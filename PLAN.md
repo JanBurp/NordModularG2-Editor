@@ -22,35 +22,29 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 
 ## Commands
 
-| Command | SubCommand | Notes |
-|---------|------------|-------|
-| `g2-cli connect` | - | Auto-detect G2, claim interface |
-| `g2-cli disconnect` | - | Release interface, close |
-| `g2-cli list-devices` | - | Debug: list all USB devices |
-| `g2-cli status` | 0x02 | All 4 slots, current slot, variation, performance |
-| `g2-cli get-patch [slot]` | 0x35+0x28 | Full patch data as JSON (default: current) |
-| `g2-cli get-patch-name [slot]` | 0x28 | Just the name (fast) |
-| `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Parse JSON and upload patch |
-| `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Upload raw G2 patch file |
-| `g2-cli set-patch-prf <file.prf2>` | - | Upload performance file (no slot needed) |
-| `g2-cli select-slot <A|B|C|D>` | 0x09 | Change active slot |
-| `g2-cli select-variation <1-8>` | 0x6a | Change variation |
-| `g2-cli list-modules [slot]` | 0x34 | List modules in patch |
-| `g2-cli get-param <module> <param> [variation]` | 0x2e | Get param value |
-| `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Set param value |
-| `g2-cli watch` | - | Monitor param changes live |
-
-## File Formats
-
-- **.pch2**: Native G2 patch format (raw binary)
-- **.prf2**: Native G2 performance format (raw binary)
-- **.json**: Parsed patch structure (for editing)
+| Command | SubCommand | Status |
+|---------|------------|--------|
+| `g2-cli connect` | - | Done |
+| `g2-cli disconnect` | - | Done |
+| `g2-cli list-devices` | - | Done |
+| `g2-cli settings` | 0x02 | Done |
+| `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
+| `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
+| `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
+| `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
+| `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
+| `g2-cli select-slot <A|B|C|D>` | 0x09 | Not implemented |
+| `g2-cli select-variation <1-8>` | 0x6a | Not implemented |
+| `g2-cli list-modules [slot]` | 0x34 | Not implemented |
+| `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
+| `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Not implemented |
+| `g2-cli watch` | - | Not implemented |
 
 ## Output Flags
 
 | Flag | Output |
 |------|--------|
-| (default) | Compact single-line |
+| (default) | Single-line JSON |
 | `--json` | Single-line JSON (for piping) |
 | `--pretty` | Multi-line formatted |
 | `--tree` | Indented tree view |
@@ -71,7 +65,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 - **Bulk OUT**: endpoint 3 (writes)
 - **Interrupt IN**: endpoint 0x81 (responses)
 - **Bulk IN**: endpoint 0x82 (extended data)
-- **Timeout**: 100ms standard
+- **Timeout**: 100ms standard, 2000ms for bulk data
 
 ## Command Format
 
@@ -89,17 +83,9 @@ c-cli/
 ├── Makefile
 ├── src/
 │   ├── main.c           # CLI entry, argument parsing
-│   ├── g2_device.c     # USB connect/disconnect (from usbComms.c)
+│   ├── g2_device.c     # USB connect/disconnect, status command
 │   ├── g2_device.h
-│   ├── g2_protocol.c   # Command building (from usbComms.c)
-│   ├── g2_protocol.h
-│   ├── g2_parse.c      # Response parsing (from protocol.c)
-│   ├── g2_parse.h
-│   ├── output.c         # JSON/text output formatting
-│   ├── output.h
-│   ├── crc.c            # CRC-16 (from utils.c)
-│   ├── crc.h
-│   └── bitstream.c      # Bit stream parsing (from utils.c)
+│   ├── bitstream.c      # Bit stream parsing
 │   └── bitstream.h
 ├── include/
 │   ├── defs.h          # Protocol constants (from G2-Edit)
@@ -127,55 +113,87 @@ make
 ./build/bin/g2-cli --help
 ./build/bin/g2-cli list-devices
 ./build/bin/g2-cli connect
-./build/bin/g2-cli status
+./build/bin/g2-cli settings
 ```
 
 ## Example output:
 
-### status
+### settings
 
+```json
 {
-    "name": "The Burp",
-    "mode": "Patch",
-    "midi": {
-        "slots": {
-            "a": 10,
-            "b": 11,
-            "c": 12,
-            "d": 13,
-            "global": 15
-        },
-        "sysex": 17,
-        "local": true,
-        "prgch": "recv",
-        "clkse": true,
-        "clkre": true
+  "name": "The Burp",
+  "mode": "Patch",
+  "midi": {
+    "slots": {
+      "a": 10,
+      "b": 11,
+      "c": 12,
+      "d": 13,
+      "global": 15
     },
-    "tuning": {
-        "semi": 0,
-        "cent": 0
+    "sysex": 17,
+    "local": true,
+    "prgch": "recv",
+    "clkse": true,
+    "clkre": true
+  },
+  "tuning": {
+    "semi": 0,
+    "cent": 0
+  },
+  "pedal": {
+    "polarity": false,
+    "gain": 1.5
+  },
+  "performance": {
+    "name": "New Performance",
+    "focus": "a",
+    "rangeEnable": true,
+    "bpm": 80,
+    "clockRunning": true,
+    "kbSplit": false
+  },
+  "slots": [
+    {
+      "slot": "a",
+      "patch": "1:16",
+      "name": "Piano&Mic",
+      "active": true,
+      "key": true,
+      "hold": false,
+      "range": {"lower": 0, "upper": 127}
     },
-    "pedal": {
-        "polarity": "open",
-        "gain": 1.5
+    {
+      "slot": "b",
+      "patch": "1:1",
+      "name": "O-CoasT",
+      "active": false,
+      "key": false,
+      "hold": false,
+      "range": {"lower": 0, "upper": 127}
     },
-    "performance": {
-        "name": "New Performance",
-        "focus": "a",
-        "rangeEnable": ??,
-        "bpm": 80,
-        "clockRunning": true,
-        "kbSplit": false
+    {
+      "slot": "c",
+      "patch": "1:1",
+      "name": "O-CoasT",
+      "active": false,
+      "key": false,
+      "hold": false,
+      "range": {"lower": 0, "upper": 127}
     },
-    "slots": [
-        "slot": "a", "patch": "1:16", "name": "Piano&Mic", "active": true , "key": true , "hold": false, "range": {lower:0,upper:127},
-        "slot": "b", "patch": "1:1", "name": "O-CoasT", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
-        "slot": "c", "patch": "1:1", "name": "O-CoasT", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
-        "slot": "d", "patch": "10:10", "name": "ER 1", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
-    ]
+    {
+      "slot": "d",
+      "patch": "10:10",
+      "name": "ER 1",
+      "active": false,
+      "key": false,
+      "hold": false,
+      "range": {"lower": 0, "upper": 127}
+    }
+  ]
 }
-
-
+```
 
 ---
 
@@ -193,11 +211,19 @@ make
 - [x] Test list-devices command
 - [x] Test connect command
 
-### Phase 3: Protocol - Status Command
+### Phase 3: Protocol - Settings Command
 - [x] Create g2_protocol.c/h (command building)
 - [x] Create output.c/h (JSON formatting)
-- [x] Implement status command
-- [x] Test: `./build/bin/g2-cli status` - WORKS! Returns `{"status": "ok", "performance": "The Burp"}`
+- [x] Implement settings command (renamed from status)
+- [x] Parse synth settings (mode, MIDI channels, sysex, local, prgch, clkse, clkre)
+- [x] Parse tuning (semi, cent)
+- [x] Parse pedal (polarity, gain)
+- [x] Parse performance data (name, focus, rangeEnable, bpm, clockRunning, kbSplit)
+- [x] Parse slot data (slot, patch, name, active, key, hold, range)
+- [x] Test: `./build/bin/g2-cli settings` - WORKS!
+- [x] Refactored to output JSON internally, then pass to `output_json()` for formatting
+- [x] Implemented tree format output
+- [x] Commands output JSON then call generic `output_json()` for formatting
 
 ### Phase 4: Protocol - Get-Patch
 - [ ] Implement get-patch-name command
@@ -224,6 +250,37 @@ make
 - 2026-04-12: JSON as primary data format
 - 2026-04-12: Separate commands for JSON vs raw patch upload
 - 2026-04-12: Performance files (.prf2) don't need slot parameter
+- 2026-04-12: Boolean values use true/false (not "on"/"off" strings)
+- 2026-04-12: Command renamed from "status" to "settings"
+
+## Verified Byte Offsets (Synth Settings Bulk Data)
+
+| Field | Byte Offset | Bits | Notes |
+|-------|-------------|------|-------|
+| name | 4-13 | - | Up to 16 bytes, null-terminated |
+| mode | 14 | bit 0 | 0=Patch, 1=Performance |
+| MIDI A-D, Global | 18-22 | - | Channels 0-15 |
+| sysex | 23 | - | +1 for display |
+| local | 24 | bit 7 | 0x80 = on |
+| prgch | 25 | bits 0-1 | 0=off, 1=send, 2=recv, 3=send/recv |
+| clkse | 27 | bit 1 | lookup ['on','off'] = [0,1] |
+| clkre | 27 | bit 0 | lookup ['on','off'] = [0,1] |
+| tune cent | 28 | - | Signed byte |
+| tune semi | 30 | - | Signed byte |
+| pedal polarity | 32 | bit 0 | |
+| pedal gain | 34 | - | 1.0 + 0.5 * val / 32 |
+
+## Performance Data Parsing
+
+Commands: 0x81 (get selection), then 0x10 (get performance data)
+
+| Field | Byte Offset | Notes |
+|-------|-------------|-------|
+| name | 4-... | parse_name returns name + remaining data |
+| perf settings | +11 | Skip 4 header + name |
+| slot name | +0 | parse_name for each slot |
+| slot data | +16 after name | active, key, hold, bank, patch, low, high |
+| slot stride | +10 after data | |
 
 ## Notes
 

@@ -10,6 +10,7 @@
 #include <libusb.h>
 #include "defs.h"
 #include "g2_device.h"
+#include "output.h"
 
 /* Global device state */
 static g2_device_t g2 = {
@@ -267,7 +268,7 @@ static int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     return (int)i;
 }
 
-int g2_status(output_format_t format) {
+int g2_settings(output_format_t format) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
     char synthName[32] = {0};
@@ -299,9 +300,7 @@ int g2_status(output_format_t format) {
     int ret;
     uint8_t msgType;
     uint16_t size;
-    int status = 0;
-
-    (void)format;
+    char json[8192];
 
     if (!g2_is_connected()) {
         if (g2_connect() < 0) {
@@ -465,72 +464,61 @@ int g2_status(output_format_t format) {
         slotPtr += 10;
     }
 
-    /* Output JSON */
-    const char *modeStr = mode ? "Performance" : "Patch";
-    const char *prgchStr;
-    switch (prgch) {
-        case 1: prgchStr = "send"; break;
-        case 2: prgchStr = "recv"; break;
-        case 3: prgchStr = "send/recv"; break;
-        default: prgchStr = "off";
+    /* Build JSON output */
+    int len = snprintf(json, sizeof(json),
+        "{"
+        "\"synthName\":\"%s\","
+        "\"mode\":%d,"
+        "\"midiChannels\":[%d,%d,%d,%d,%d],"
+        "\"sysexId\":%d,"
+        "\"localOn\":%s,"
+        "\"prgch\":%d,"
+        "\"clkSend\":%s,"
+        "\"clkRecv\":%s,"
+        "\"tune\":{\"semi\":%d,\"cent\":%d},"
+        "\"pedal\":{\"polarity\":%d,\"gain\":%d},"
+        "\"performance\":{"
+            "\"name\":\"%s\","
+            "\"focusSlot\":%d,"
+            "\"rangeEnable\":%s,"
+            "\"bpm\":%d,"
+            "\"clockRun\":%s,"
+            "\"split\":%s"
+        "},"
+        "\"slots\":["
+            "{\"slot\":\"a\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
+            "{\"slot\":\"b\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
+            "{\"slot\":\"c\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
+            "{\"slot\":\"d\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}}"
+        "]"
+        "}",
+        synthName, mode,
+        midiChannels[0], midiChannels[1], midiChannels[2], midiChannels[3], midiChannels[4],
+        sysexId,
+        localOn ? "true" : "false",
+        prgch,
+        clkSend ? "true" : "false",
+        clkRecv ? "true" : "false",
+        tuneSemi, tuneCent,
+        pedalPolarity, pedalGain,
+        perfName,
+        focusSlot,
+        rangeEnable ? "true" : "false",
+        bpm,
+        clockRun ? "true" : "false",
+        split ? "true" : "false",
+        slotNames[0], slotBanks[0], slotPatches[0], slotActive[0] ? "true" : "false", slotKey[0] ? "true" : "false", slotHold[0] ? "true" : "false", slotLow[0], slotHigh[0],
+        slotNames[1], slotBanks[1], slotPatches[1], slotActive[1] ? "true" : "false", slotKey[1] ? "true" : "false", slotHold[1] ? "true" : "false", slotLow[1], slotHigh[1],
+        slotNames[2], slotBanks[2], slotPatches[2], slotActive[2] ? "true" : "false", slotKey[2] ? "true" : "false", slotHold[2] ? "true" : "false", slotLow[2], slotHigh[2],
+        slotNames[3], slotBanks[3], slotPatches[3], slotActive[3] ? "true" : "false", slotKey[3] ? "true" : "false", slotHold[3] ? "true" : "false", slotLow[3], slotHigh[3]
+    );
+
+    if (len >= (int)sizeof(json)) {
+        fprintf(stderr, "JSON output truncated\n");
     }
 
-    printf("{\n");
-    printf("  \"name\": \"%s\",\n", synthName);
-    printf("  \"mode\": \"%s\",\n", modeStr);
-    printf("  \"midi\": {\n");
-    printf("    \"slots\": {\n");
-    printf("      \"a\": %d,\n", midiChannels[0]);
-    printf("      \"b\": %d,\n", midiChannels[1]);
-    printf("      \"c\": %d,\n", midiChannels[2]);
-    printf("      \"d\": %d,\n", midiChannels[3]);
-    printf("      \"global\": %d\n", midiChannels[4]);
-    printf("    },\n");
-    printf("    \"sysex\": %d,\n", sysexId + 1);
-    printf("    \"local\": %s,\n", localOn ? "true" : "false");
-    printf("    \"prgch\": \"%s\",\n", prgchStr);
-    printf("    \"clkse\": %s,\n", clkSend ? "false" : "true");
-    printf("    \"clkre\": %s\n", clkRecv ? "false" : "true");
-    printf("  },\n");
-    printf("  \"tuning\": {\n");
-    printf("    \"semi\": %d,\n", (int8_t)tuneSemi);
-    printf("    \"cent\": %d\n", (int8_t)tuneCent);
-    printf("  },\n");
-    printf("  \"pedal\": {\n");
-    printf("    \"polarity\": %s,\n", pedalPolarity ? "true" : "false");
-    printf("    \"gain\": %.1f\n", 1.0 + 0.5 * pedalGain / 32.0);
-    printf("  },\n");
-    printf("  \"performance\": {\n");
-    printf("    \"name\": \"%s\",\n", perfName);
-    printf("    \"focus\": \"%c\",\n", "abcd"[focusSlot]);
-    printf("    \"rangeEnable\": %s,\n", rangeEnable ? "true" : "false");
-    printf("    \"bpm\": %d,\n", bpm);
-    printf("    \"clockRunning\": %s,\n", clockRun ? "true" : "false");
-    printf("    \"kbSplit\": %s\n", split ? "true" : "false");
-    printf("  },\n");
-    printf("  \"slots\": [\n");
-    for (int i = 0; i < 4; i++) {
-        printf("    {\n");
-        printf("      \"slot\": \"%c\",\n", 'a' + i);
-        printf("      \"patch\": \"%d:%d\",\n", slotBanks[i] + 1, slotPatches[i] + 1);
-        printf("      \"name\": \"%s\",\n", slotNames[i]);
-        printf("      \"active\": %s,\n", slotActive[i] ? "true" : "false");
-        printf("      \"key\": %s,\n", slotKey[i] ? "true" : "false");
-        printf("      \"hold\": %s,\n", slotHold[i] ? "true" : "false");
-        printf("      \"range\": {\"lower\": %d, \"upper\": %d}\n", slotLow[i], slotHigh[i]);
-        printf("    }");
-        if (i < 3) printf(",");
-        printf("\n");
-    }
-    printf("  ]\n");
-    printf("}\n");
-
-    (void)slotNames;
-    (void)slotBanks;
-    (void)slotPatches;
-    (void)slotActive;
-
-    return status;
+    output_json(json, format);
+    return 0;
 }
 
 int g2_get_patch(const char *slot_str, output_format_t format) {

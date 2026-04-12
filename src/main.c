@@ -22,8 +22,8 @@ static void print_usage(const char *prog) {
     printf("Options:\n");
     printf("  -h, --help     Show this help\n");
     printf("  -V, --version  Show version\n");
-    printf("  --json         Output as JSON\n");
-    printf("  --pretty       Pretty-print JSON\n");
+    printf("  --json         Output as single-line JSON (default for data commands)\n");
+    printf("  --pretty       Pretty-print JSON (default when outputting to terminal)\n");
     printf("  --tree         Tree view output\n");
     printf("\nCommands:\n");
     printf("  connect                Connect to G2 (auto-detect)\n");
@@ -43,7 +43,7 @@ static void print_usage(const char *prog) {
     printf("  watch                 Monitor param changes live\n");
 }
 
-static output_format_t output_format = OUTPUT_DEFAULT;
+static output_format_t output_format = OUTPUT_PRETTY;
 
 int main(int argc, char *argv[]) {
     int i;
@@ -96,7 +96,7 @@ int main(int argc, char *argv[]) {
     }
     
     if (strcmp(command, "settings") == 0) {
-        return g2_status(output_format);
+        return g2_settings(output_format);
     }
     
     if (strcmp(command, "get-patch") == 0) {
