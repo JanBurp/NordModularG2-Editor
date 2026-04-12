@@ -108,7 +108,7 @@ int g2_connect(void) {
         return -1;
     }
     
-    printf("G2 found, connecting...\n");
+    fprintf(stderr, "G2 found, connecting...\n");
     
     /* Reset device (like G2-Edit does) */
     ret = libusb_reset_device(g2.handle);
@@ -126,7 +126,34 @@ int g2_connect(void) {
     }
     
     g2.interface_claimed = 1;
-    printf("Connected to G2\n");
+    fprintf(stderr, "Connected to G2\n");
+    return 0;
+}
+
+int g2_connect_silent(void) {
+    int ret;
+    
+    /* Find G2 device */
+    g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
+    if (!g2.handle) {
+        return -1;
+    }
+    
+    /* Reset device (like G2-Edit does) */
+    ret = libusb_reset_device(g2.handle);
+    if (ret < 0) {
+        /* silently ignore reset failure */
+    }
+    
+    /* Claim interface 0 */
+    ret = libusb_claim_interface(g2.handle, 0);
+    if (ret < 0) {
+        libusb_close(g2.handle);
+        g2.handle = NULL;
+        return -1;
+    }
+    
+    g2.interface_claimed = 1;
     return 0;
 }
 
@@ -139,7 +166,7 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
-    printf("Disconnected\n");
+    fprintf(stderr, "Disconnected\n");
     return 0;
 }
 
@@ -209,6 +236,34 @@ static int send_command(uint8_t cmd, uint8_t subcmd) {
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SYS;
     buff[pos++] = cmd;
+    buff[pos++] = subcmd;
+
+    msgLength = pos - COMMAND_OFFSET;
+    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret < 0) {
+        return -1;
+    }
+    return 0;
+}
+
+static int send_slot_command(uint8_t slot, uint8_t version, uint8_t subcmd) {
+    uint8_t buff[256] = {0};
+    int pos = COMMAND_OFFSET;
+    int msgLength;
+    uint16_t crc;
+    int transferred;
+    int ret;
+
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;
+    buff[pos++] = version;
     buff[pos++] = subcmd;
 
     msgLength = pos - COMMAND_OFFSET;
@@ -303,7 +358,14 @@ int g2_settings(output_format_t format) {
     uint16_t size;
 
     if (!g2_is_connected()) {
-        if (g2_connect() < 0) {
+        int connect_ret;
+        /* Use silent connect for JSON output mode to avoid polluting stdout */
+        if (format == OUTPUT_JSON) {
+            connect_ret = g2_connect_silent();
+        } else {
+            connect_ret = g2_connect();
+        }
+        if (connect_ret < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return -1;
         }
@@ -371,7 +433,8 @@ int g2_settings(output_format_t format) {
       * Offset 32: Pedal Polarity (bit 0)
       * Offset 34: Control Pedal Gain (NOT 33!)
       */
-    mode = bulkData[14] & 1;  /* mode (bit 0) */
+    /* Mode is bit 7 of byte after null terminator (bulkData[13]) */
+    mode = (bulkData[13] >> 7) & 1;  /* mode (bit 7) */
     midiCh[0] = bulkData[18];  /* MIDI A */
     midiCh[1] = bulkData[19];  /* MIDI B */
     midiCh[2] = bulkData[20];  /* MIDI C */
@@ -419,31 +482,26 @@ int g2_settings(output_format_t format) {
     if (perfData[0] != 0) {
         parse_name(perfData + 4, perfName, sizeof(perfName));
     }
-
-    /* Performance data starts at byte 21 (after 4-byte header + 16-byte name + null) */
-    focusSlot = (perfData[21] >> 2) & 0x03;  /* bits 2-3 of byte 21 */
-    rangeEnable = (perfData[22] >> 0) & 0x01;  /* bit 0 of byte 22 */
-    bpm = perfData[26];  /* byte 26 */
-    split = (perfData[26] >> 1) & 0x01;  /* bit 1 of byte 26 */
-    clockRun = (perfData[28] >> 0) & 0x01;  /* bit 0 of byte 28 */
-
-    /* Based on g2ctl:
-     * data = data[4:] (skip 4-byte header)
-     * parse_name gets perf name, data now points after perf name
-     * data = data[11:] (skip 7 bytes perf settings + 4 padding)
-     * Then for each slot: parse_name(data) gets name, data[:7] gets slot data, data = data[10:]
-     */
     
-    /* Start after header (4 bytes) */
+    /* Performance data parsing:
+     * After 4-byte header, parse perf name, then skip to perf settings
+     * g2ctl: BitStream(data, 8*4) reads perf settings at bit position 32
+     * This corresponds to byte 4 of remaining data after name
+     */
     uint8_t *slotPtr = perfData + 4;
     
-    /* Skip perf name using parse_name to get remaining data */
     char tmpName[32];
     int nameLen = parse_name(slotPtr, tmpName, sizeof(tmpName));
-    slotPtr += nameLen;  /* Advance past the name */
+    slotPtr += nameLen;
+    slotPtr += 4;  /* Skip to perf settings (byte 4 of remaining data) */
     
-    /* Skip 11 bytes (7 perf settings + 4 padding) to get to slot data */
-    slotPtr += 11;
+    focusSlot = (slotPtr[0] >> 4) & 0x03;
+    rangeEnable = (slotPtr[1] >> 0) & 0x01;
+    bpm = slotPtr[2];
+    split = (slotPtr[3] >> 1) & 0x01;
+    clockRun = (slotPtr[3] >> 0) & 0x01;
+    
+    slotPtr += 7;  /* Skip remaining perf settings + padding to slot data */
     
     /* Now parse each slot */
     for (int i = 0; i < 4; i++) {

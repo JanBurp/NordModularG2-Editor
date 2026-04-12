@@ -27,7 +27,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli connect` | - | Done |
 | `g2-cli disconnect` | - | Done |
 | `g2-cli list-devices` | - | Done |
-| `g2-cli settings` | 0x02 | Done |
+| `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
 | `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
@@ -122,7 +122,7 @@ make
 
 ```json
 {
-  "name": "The Burp",
+  "synthName": "The Burp",
   "mode": "Patch",
   "midi": {
     "slots": {
@@ -150,46 +150,62 @@ make
     "name": "New Performance",
     "focus": "a",
     "rangeEnable": true,
-    "bpm": 80,
+    "bpm": 159,
     "clockRunning": true,
     "kbSplit": false
   },
   "slots": [
     {
       "slot": "a",
-      "patch": "1:16",
+      "bank": 0,
+      "patch": 15,
       "name": "Piano&Mic",
       "active": true,
       "key": true,
       "hold": false,
-      "range": {"lower": 0, "upper": 127}
+      "range": {
+        "lower": 0,
+        "upper": 127
+      }
     },
     {
       "slot": "b",
-      "patch": "1:1",
+      "bank": 0,
+      "patch": 0,
       "name": "O-CoasT",
       "active": false,
       "key": false,
       "hold": false,
-      "range": {"lower": 0, "upper": 127}
+      "range": {
+        "lower": 0,
+        "upper": 127
+      }
     },
     {
       "slot": "c",
-      "patch": "1:1",
+      "bank": 0,
+      "patch": 0,
       "name": "O-CoasT",
       "active": false,
       "key": false,
       "hold": false,
-      "range": {"lower": 0, "upper": 127}
+      "range": {
+        "lower": 0,
+        "upper": 127
+      }
     },
     {
       "slot": "d",
-      "patch": "10:10",
+      "bank": 9,
+      "patch": 9,
       "name": "ER 1",
       "active": false,
       "key": false,
       "hold": false,
-      "range": {"lower": 0, "upper": 127}
+      "range": {
+        "lower": 0,
+        "upper": 127
+      }
     }
   ]
 }
@@ -254,13 +270,18 @@ make
 - 2026-04-12: Boolean values use true/false (not "on"/"off" strings)
 - 2026-04-12: Command renamed from "status" to "settings"
 - 2026-04-12: Using cJSON library for JSON building (ultralightweight, single-file, MIT license)
+- 2026-04-12: Pretty-print uses 2-space indent, 1 space after colon (compact format)
+- 2026-04-12: JSON output mode uses silent connect (no messages to stderr)
+- 2026-04-12: Connection/status messages go to stderr (not stdout)
+- 2026-04-12: Mode byte offset is 13 (after null), bit 7 (not byte 14, bit 0)
+- 2026-04-12: Focus slot byte offset is 8, bits 4-5 (not byte 21)
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 
 | Field | Byte Offset | Bits | Notes |
 |-------|-------------|------|-------|
-| name | 4-13 | - | Up to 16 bytes, null-terminated |
-| mode | 14 | bit 0 | 0=Patch, 1=Performance |
+| name | 4-11 | - | Up to 16 bytes, null-terminated (8 chars + null for "The Burp") |
+| mode | 13 | bit 7 | 0=Patch, 1=Performance (byte after null terminator) |
 | MIDI A-D, Global | 18-22 | - | Channels 0-15 |
 | sysex | 23 | - | +1 for display |
 | local | 24 | bit 7 | 0x80 = on |
@@ -279,10 +300,14 @@ Commands: 0x81 (get selection), then 0x10 (get performance data)
 | Field | Byte Offset | Notes |
 |-------|-------------|-------|
 | name | 4-... | parse_name returns name + remaining data |
-| perf settings | +11 | Skip 4 header + name |
-| slot name | +0 | parse_name for each slot |
-| slot data | +16 after name | active, key, hold, bank, patch, low, high |
-| slot stride | +10 after data | |
+| focus | 8 | bits 4-5 of byte 8 |
+| rangeEnable | 8 | bit 0 of byte 8 |
+| bpm | 10 | byte 10 |
+| split | 10 | bit 1 of byte 10 |
+| clockRun | 11 | bit 0 of byte 11 |
+| slot name | after 11 bytes | parse_name for each slot |
+| slot data | 7 bytes | active, key, hold, bank, patch, low, high |
+| slot stride | 10 bytes | after slot data |
 
 ## Notes
 

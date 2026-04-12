@@ -44,6 +44,9 @@ int g2_list_devices(void);
 /* Connect to G2 (auto-detect) */
 int g2_connect(void);
 
+/* Connect silently (for JSON output mode) */
+int g2_connect_silent(void);
+
 /* Disconnect from G2 */
 int g2_disconnect(void);
 
