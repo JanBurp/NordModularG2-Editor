@@ -29,7 +29,7 @@ static void print_usage(const char *prog) {
     printf("  connect                Connect to G2 (auto-detect)\n");
     printf("  disconnect             Close connection\n");
     printf("  list-devices          List USB devices (debug)\n");
-    printf("  status                Show current status\n");
+    printf("  settings              Show synth settings\n");
     printf("  get-patch [slot]      Get patch from slot (A-D, default: current)\n");
     printf("  get-patch-name [slot] Get patch name (A-D, default: current)\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
@@ -95,7 +95,7 @@ int main(int argc, char *argv[]) {
         return g2_disconnect();
     }
     
-    if (strcmp(command, "status") == 0) {
+    if (strcmp(command, "settings") == 0) {
         return g2_status(output_format);
     }
     
