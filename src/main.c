@@ -30,6 +30,7 @@ static void print_usage(const char *prog) {
     printf("  disconnect             Close connection\n");
     printf("  list-devices          List USB devices (debug)\n");
     printf("  settings              Show synth settings\n");
+    printf("  slot <A|B|C|D>        Select active slot\n");
     printf("  get-patch [slot]      Get patch from slot (A-D, default: current)\n");
     printf("  get-patch-name [slot] Get patch name (A-D, default: current)\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
@@ -107,6 +108,14 @@ int main(int argc, char *argv[]) {
     if (strcmp(command, "get-patch-name") == 0) {
         const char *slot = (i + 1 < argc) ? argv[i + 1] : NULL;
         return g2_get_patch_name(slot, output_format);
+    }
+    
+    if (strcmp(command, "slot") == 0) {
+        if (i + 1 >= argc) {
+            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            return 1;
+        }
+        return g2_select_slot(argv[i + 1]);
     }
     
     if (strcmp(command, "select-slot") == 0) {

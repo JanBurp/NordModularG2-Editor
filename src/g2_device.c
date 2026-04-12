@@ -253,6 +253,36 @@ static int send_command(uint8_t cmd, uint8_t subcmd) {
     return 0;
 }
 
+static int send_command_with_data(uint8_t cmd, uint8_t *data, int dataLen) {
+    uint8_t buff[256] = {0};
+    int pos = COMMAND_OFFSET;
+    int msgLength;
+    uint16_t crc;
+    int transferred;
+    int ret;
+
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SYS;
+    buff[pos++] = cmd;
+    for (int i = 0; i < dataLen; i++) {
+        buff[pos++] = data[i];
+    }
+
+    msgLength = pos - COMMAND_OFFSET;
+    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret < 0) {
+        return -1;
+    }
+    return 0;
+}
+
 static int send_slot_command(uint8_t slot, uint8_t version, uint8_t subcmd) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
@@ -619,9 +649,77 @@ int g2_get_patch_name(const char *slot_str, output_format_t format) {
 }
 
 int g2_select_slot(const char *slot_str) {
-    (void)slot_str;
-    fprintf(stderr, "Select slot command not yet implemented\n");
-    return -1;
+    int slot;
+    uint8_t response[16] = {0};
+    uint8_t version;
+    int ret;
+    uint8_t mask;
+    uint8_t data[8] = {0};
+
+    if (!g2_is_connected()) {
+        ret = g2_connect();
+        if (ret < 0) {
+            fprintf(stderr, "Failed to connect to G2\n");
+            return -1;
+        }
+    }
+
+    slot = parse_slot(slot_str);
+    if (slot < 0 || slot > 3) {
+        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        return -1;
+    }
+
+    /* Step 1: Send 0x41, 0x7d, 0x00 to get version */
+    data[0] = 0x7d;
+    data[1] = 0x00;
+    if (send_command_with_data(0x41, data, 2) < 0) {
+        fprintf(stderr, "Failed to send slot command 1\n");
+        return -1;
+    }
+    usleep(100000);
+    
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        fprintf(stderr, "No response from G2 for slot command 1\n");
+        return -1;
+    }
+    version = response[3];
+
+    /* Step 2: Send [version, 0x07, mask, 0x0f, mask] */
+    mask = 0x08 >> slot;
+    data[0] = 0x07;
+    data[1] = mask;
+    data[2] = 0x0f;
+    data[3] = mask;
+    if (send_command_with_data(version, data, 4) < 0) {
+        fprintf(stderr, "Failed to send slot command 2\n");
+        return -1;
+    }
+    usleep(100000);
+    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+
+    /* Step 3: Send [version, 0x09, slot] */
+    data[0] = 0x09;
+    data[1] = slot;
+    if (send_command_with_data(version, data, 2) < 0) {
+        fprintf(stderr, "Failed to send slot command 3\n");
+        return -1;
+    }
+    usleep(100000);
+    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+
+    /* Step 4: Send [CMD_SLOT+slot, 0x0a, 0x70] */
+    data[0] = 0x0a;
+    data[1] = 0x70;
+    if (send_slot_command(slot, 0x0a, 0x70) < 0) {
+        fprintf(stderr, "Failed to send slot command 4\n");
+        return -1;
+    }
+    usleep(100000);
+    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+
+    return 0;
 }
 
 int g2_select_variation(int variation) {
