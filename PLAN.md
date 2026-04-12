@@ -28,12 +28,13 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli disconnect` | - | Done |
 | `g2-cli list-devices` | - | Done |
 | `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
+| `g2-cli slot <A|B|C|D>` | 0x7d | Done |
 | `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
-| `g2-cli select-slot <A|B|C|D>` | 0x09 | Not implemented |
+| `g2-cli select-slot <A|B|C|D>` | 0x09 | Done (alias for slot) |
 | `g2-cli select-variation <1-8>` | 0x6a | Not implemented |
 | `g2-cli list-modules [slot]` | 0x34 | Not implemented |
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
@@ -44,9 +45,9 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 
 | Flag | Output |
 |------|--------|
-| (default) | Single-line JSON |
+| (default) | Pretty JSON (multi-line formatted) |
 | `--json` | Single-line JSON (for piping) |
-| `--pretty` | Multi-line formatted |
+| `--pretty` | Multi-line formatted (same as default) |
 | `--tree` | Indented tree view |
 
 ## Reusable Code from G2-Edit
@@ -118,96 +119,57 @@ make
 
 ## Example output:
 
-### settings
+### settings (Patch mode - outputs "patches")
 
 ```json
 {
   "synthName": "The Burp",
   "mode": "Patch",
   "midi": {
-    "slots": {
-      "a": 10,
-      "b": 11,
-      "c": 12,
-      "d": 13,
-      "global": 15
-    },
+    "slots": { "a": 10, "b": 11, "c": 12, "d": 13, "global": 15 },
     "sysex": 17,
     "local": true,
     "prgch": "recv",
-    "clkse": true,
-    "clkre": true
+    "clkse": false,
+    "clkre": false
   },
-  "tuning": {
-    "semi": 0,
-    "cent": 0
-  },
-  "pedal": {
-    "polarity": false,
-    "gain": 1.5
-  },
-  "performance": {
-    "name": "New Performance",
-    "focus": "a",
-    "rangeEnable": true,
-    "bpm": 159,
-    "clockRunning": true,
+  "tuning": { "semi": 0, "cent": 0 },
+  "pedal": { "polarity": false, "gain": 1.5 },
+  "patches": {
+    "name": "Lyra4",
+    "focus": "c",
+    "rangeEnable": false,
+    "bpm": 105,
+    "clockRunning": false,
     "kbSplit": false
   },
   "slots": [
-    {
-      "slot": "a",
-      "bank": 0,
-      "patch": 15,
-      "name": "Piano&Mic",
-      "active": true,
-      "key": true,
-      "hold": false,
-      "range": {
-        "lower": 0,
-        "upper": 127
-      }
-    },
-    {
-      "slot": "b",
-      "bank": 0,
-      "patch": 0,
-      "name": "O-CoasT",
-      "active": false,
-      "key": false,
-      "hold": false,
-      "range": {
-        "lower": 0,
-        "upper": 127
-      }
-    },
-    {
-      "slot": "c",
-      "bank": 0,
-      "patch": 0,
-      "name": "O-CoasT",
-      "active": false,
-      "key": false,
-      "hold": false,
-      "range": {
-        "lower": 0,
-        "upper": 127
-      }
-    },
-    {
-      "slot": "d",
-      "bank": 9,
-      "patch": 9,
-      "name": "ER 1",
-      "active": false,
-      "key": false,
-      "hold": false,
-      "range": {
-        "lower": 0,
-        "upper": 127
-      }
-    }
+    { "slot": "a", "bank": 0, "patch": 15, "name": "Piano&Mic", "active": false, "key": false, "hold": false, "range": { "lower": 0, "upper": 59 } },
+    { "slot": "b", "bank": 0, "patch": 0, "name": "O-CoasT", "active": false, "key": false, "hold": false, "range": { "lower": 0, "upper": 59 } },
+    { "slot": "c", "bank": 0, "patch": 1, "name": "Lyra4", "active": true, "key": true, "hold": false, "range": { "lower": 60, "upper": 127 } },
+    { "slot": "d", "bank": 9, "patch": 9, "name": "ER 1", "active": false, "key": false, "hold": false, "range": { "lower": 60, "upper": 127 } }
   ]
+}
+```
+
+### settings (Performance mode - outputs "performance")
+
+```json
+{
+  "synthName": "The Burp",
+  "mode": "Performance",
+  "midi": { ... },
+  "tuning": { ... },
+  "pedal": { ... },
+  "performance": {
+    "name": "PianPerformance",
+    "focus": "c",
+    "rangeEnable": false,
+    "bpm": 120,
+    "clockRunning": true,
+    "kbSplit": false
+  },
+  "slots": [ ... ]
 }
 ```
 
@@ -254,7 +216,8 @@ make
 - [ ] Test file uploads
 
 ### Phase 6: Live Control
-- [ ] Implement select-slot, select-variation
+- [x] Implement slot command (matching g2ctl protocol)
+- [ ] Implement select-variation
 - [ ] Implement list-modules, get-param, set-param
 - [ ] Implement watch (polling)
 
@@ -275,6 +238,8 @@ make
 - 2026-04-12: Connection/status messages go to stderr (not stdout)
 - 2026-04-12: Mode byte offset is 13 (after null), bit 7 (not byte 14, bit 0)
 - 2026-04-12: Focus slot byte offset is 8, bits 4-5 (not byte 21)
+- 2026-04-12: Settings command outputs "patches" in Patch mode, "performance" in Performance mode
+- 2026-04-12: Slot command implemented matching g2ctl protocol (0x7d + multi-step selection)
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 
@@ -297,17 +262,21 @@ make
 
 Commands: 0x81 (get selection), then 0x10 (get performance data)
 
+**Byte offsets relative to start of performance bulk data:**
+
 | Field | Byte Offset | Notes |
 |-------|-------------|-------|
-| name | 4-... | parse_name returns name + remaining data |
-| focus | 8 | bits 4-5 of byte 8 |
-| rangeEnable | 8 | bit 0 of byte 8 |
-| bpm | 10 | byte 10 |
-| split | 10 | bit 1 of byte 10 |
-| clockRun | 11 | bit 0 of byte 11 |
-| slot name | after 11 bytes | parse_name for each slot |
-| slot data | 7 bytes | active, key, hold, bank, patch, low, high |
-| slot stride | 10 bytes | after slot data |
+| perf name | 4-... | parse_name returns name + null + remaining |
+| remaining after name | nameLen | parse_name returns nameLen including null |
+| focus | remaining[0] | bits 4-5 (after BitStream seek to bit 32) |
+| rangeEnable | remaining[5] | 8-bit value at bit 38 |
+| bpm | remaining[6] | 8-bit value at bit 46 |
+| split | remaining[7] & 1 | bit 0 of byte 7 |
+| clockRun | remaining[8] & 1 | bit 0 of byte 8 |
+| slot data | remaining[11] | start of slot parsing loop |
+| slot stride | 10 bytes | 7 bytes data + 3 padding |
+
+**Note:** In Patch mode, `name` field uses `slotNames[focusSlot]` instead of perf name.
 
 ## Notes
 

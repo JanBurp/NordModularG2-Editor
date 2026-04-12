@@ -600,15 +600,16 @@ int g2_settings(output_format_t format) {
     cJSON_AddNumberToObject(pedal, "gain", 1.0 + 0.5 * pedalGain / 32.0);
     cJSON_AddItemToObject(root, "pedal", pedal);
     
-    /* performance object - focus is slot letter */
+    /* performance or patches object - depends on mode */
     cJSON *perf = cJSON_CreateObject();
-    cJSON_AddStringToObject(perf, "name", perfName);
+    const char *perfNameToUse = mode ? perfName : slotNames[focusSlot];
+    cJSON_AddStringToObject(perf, "name", perfNameToUse);
     cJSON_AddStringToObject(perf, "focus", (char*[]){ "a", "b", "c", "d" }[focusSlot]);
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
     cJSON_AddBoolToObject(perf, "kbSplit", split);
-    cJSON_AddItemToObject(root, "performance", perf);
+    cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
     
     /* slots array */
     cJSON *slots = cJSON_CreateArray();
