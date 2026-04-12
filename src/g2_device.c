@@ -276,6 +276,10 @@ int g2_status(output_format_t format) {
     int slotBanks[4] = {0};
     int slotPatches[4] = {0};
     int slotActive[4] = {0};
+    int slotKey[4] = {0};
+    int slotHold[4] = {0};
+    int slotLow[4] = {0};
+    int slotHigh[4] = {0};
     int mode = 0;
     int midiChannels[5] = {0};
     int sysexId = 0;
@@ -424,6 +428,44 @@ int g2_status(output_format_t format) {
     split = (perfData[26] >> 1) & 0x01;  /* bit 1 of byte 26 */
     clockRun = (perfData[28] >> 0) & 0x01;  /* bit 0 of byte 28 */
 
+    /* Based on analysis:
+     * Slot 0 name at byte 31 (10 chars + null), data at byte 41 (7 bytes)
+     * Slot 1 name at byte 51 (10 chars + null), data at byte 61 (7 bytes)
+     * Slot 2 name at byte 71 (5 chars + null + padding), data at byte 81 (7 bytes)
+     * Slot 3 name at byte 91 (5 chars + null + padding), data at byte 101 (7 bytes)
+     */
+    
+    int slotNameOffset = 31;
+    int slotDataOffset = 41;
+    int slotStride = 20;
+    
+    for (int i = 0; i < 4; i++) {
+        /* Read name */
+        int nameLen = 0;
+        for (int j = 0; j < 16; j++) {
+            uint8_t c = perfData[slotNameOffset + j];
+            if (c >= 0x20 && c <= 0x7f) {
+                slotNames[i][nameLen++] = c;
+            } else {
+                break;
+            }
+        }
+        slotNames[i][nameLen] = '\0';
+        
+        /* Read data */
+        uint8_t *data = perfData + slotDataOffset;
+        slotActive[i] = data[0] & 1;
+        slotKey[i] = data[1] & 1;
+        slotHold[i] = data[2] & 1;
+        slotBanks[i] = data[3];
+        slotPatches[i] = data[4];
+        slotLow[i] = data[5];
+        slotHigh[i] = data[6];
+        
+        slotNameOffset += slotStride;
+        slotDataOffset += slotStride;
+    }
+
     /* Output JSON */
     const char *modeStr = mode ? "Performance" : "Patch";
     const char *prgchStr;
@@ -467,7 +509,18 @@ int g2_status(output_format_t format) {
     printf("    \"clockRunning\": %s,\n", clockRun ? "true" : "false");
     printf("    \"kbSplit\": %s\n", split ? "true" : "false");
     printf("  },\n");
-    printf("  \"slots\": []\n");
+    printf("  \"slots\": [\n");
+    for (int i = 0; i < 4; i++) {
+        printf("    {\"slot\": \"%c\", \"patch\": \"%d:%d\", \"name\": \"%s\", \"active\": %s, \"key\": %s, \"hold\": %s, \"range\": {\"lower\": %d, \"upper\": %d}}",
+               'a' + i, slotBanks[i] + 1, slotPatches[i] + 1, slotNames[i],
+               slotActive[i] ? "true" : "false",
+               slotKey[i] ? "true" : "false",
+               slotHold[i] ? "true" : "false",
+               slotLow[i], slotHigh[i]);
+        if (i < 3) printf(",");
+        printf("\n");
+    }
+    printf("  ]\n");
     printf("}\n");
 
     (void)slotNames;

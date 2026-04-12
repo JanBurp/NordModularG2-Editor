@@ -167,7 +167,12 @@ make
         "clockRunning": true,
         "kbSplit": false
     },
-    "slots": []
+    "slots": [
+        "slot": "a", "patch": "1:16", "name": "Piano&Mic", "active": true , "key": true , "hold": false, "range": {lower:0,upper:127},
+        "slot": "b", "patch": "1:1", "name": "O-CoasT", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
+        "slot": "c", "patch": "1:1", "name": "O-CoasT", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
+        "slot": "d", "patch": "10:10", "name": "ER 1", "active": false, "key": false, "hold": false, "range": {lower:0,upper:127},
+    ]
 }
 
 
