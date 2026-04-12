@@ -162,7 +162,7 @@ make
     "performance": {
         "name": "New Performance",
         "focus": "a",
-        "rangeEnable": false,
+        "rangeEnable": ??,
         "bpm": 80,
         "clockRunning": true,
         "kbSplit": false
