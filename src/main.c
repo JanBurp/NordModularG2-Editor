@@ -31,6 +31,7 @@ static void print_usage(const char *prog) {
     printf("  list-devices          List USB devices (debug)\n");
     printf("  settings              Show synth settings\n");
     printf("  slot <A|B|C|D>        Select active slot\n");
+    printf("  variation <1-8>       Select variation\n");
     printf("  get-patch [slot]      Get patch from slot (A-D, default: current)\n");
     printf("  get-patch-name [slot] Get patch name (A-D, default: current)\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
@@ -124,6 +125,14 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         return g2_select_slot(argv[i + 1]);
+    }
+    
+    if (strcmp(command, "variation") == 0) {
+        if (i + 1 >= argc) {
+            fprintf(stderr, "Error: variation required (1-8)\n");
+            return 1;
+        }
+        return g2_select_variation(atoi(argv[i + 1]));
     }
     
     if (strcmp(command, "select-variation") == 0) {

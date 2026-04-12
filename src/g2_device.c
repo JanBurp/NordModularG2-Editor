@@ -311,14 +311,58 @@ static int send_slot_command(uint8_t slot, uint8_t version, uint8_t subcmd) {
     return 0;
 }
 
-static int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
-    int transferred = 0;
+static int send_slot_command_with_data(uint8_t slot, uint8_t version, uint8_t subcmd, uint8_t *extraData, int extraLen) {
+    uint8_t buff[256] = {0};
+    int pos = COMMAND_OFFSET;
+    int msgLength;
+    uint16_t crc;
+    int transferred;
     int ret;
-    ret = libusb_interrupt_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, response, size, &transferred, timeout_ms);
-    if (ret != 0 || transferred == 0) {
+
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;
+    buff[pos++] = version;
+    buff[pos++] = subcmd;
+    for (int i = 0; i < extraLen; i++) {
+        buff[pos++] = extraData[i];
+    }
+
+    msgLength = pos - COMMAND_OFFSET;
+    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    fprintf(stderr, "DEBUG: send_slot_command_with_data: slot=%d, version=0x%02x, subcmd=0x%02x\n", 
+            slot, version, subcmd);
+    fprintf(stderr, "DEBUG: sending %d bytes: ", msgLength);
+    for (int i = 0; i < msgLength; i++) fprintf(stderr, "%02x ", buff[i]);
+    fprintf(stderr, "\n");
+
+    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret < 0) {
         return -1;
     }
-    return transferred;
+    return 0;
+}
+
+static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries) {
+    int transferred = 0;
+    int ret;
+    for (int i = 0; i < retries; i++) {
+        ret = libusb_interrupt_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, response, size, &transferred, timeout_ms);
+        if (ret == 0 && transferred > 0) {
+            return transferred;
+        }
+        usleep(10000);  // Small delay between retries
+    }
+    return -1;
+}
+
+static int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
+    return recv_interrupt_with_retry(response, size, timeout_ms, 1);
 }
 
 static int recv_bulk(uint8_t *data, uint16_t size) {
@@ -724,7 +768,61 @@ int g2_select_slot(const char *slot_str) {
 }
 
 int g2_select_variation(int variation) {
-    (void)variation;
-    fprintf(stderr, "Select variation command not yet implemented\n");
-    return -1;
+    uint8_t response[16] = {0};
+    uint8_t slota[16] = {0};
+    uint8_t slotIndex;
+    int ret;
+    uint8_t extraData[1] = {0};
+
+    if (variation < 1 || variation > 8) {
+        fprintf(stderr, "Invalid variation: %d (must be 1-8)\n", variation);
+        return -1;
+    }
+
+    if (!g2_is_connected()) {
+        ret = g2_connect();
+        if (ret < 0) {
+            fprintf(stderr, "Failed to connect to G2\n");
+            return -1;
+        }
+    }
+
+    /* Step 1: Send [CMD_SYS, 0x41, 0x35, 0x00] to get current slot info */
+    uint8_t cmdData[4] = {0x35, 0x00};
+    fprintf(stderr, "DEBUG: Sending variation cmd1: [0x41, 0x35, 0x00]\n");
+    if (send_command_with_data(0x41, cmdData, 2) < 0) {
+        fprintf(stderr, "Failed to send variation command 1\n");
+        return -1;
+    }
+    usleep(100000);
+    
+    ret = recv_interrupt(slota, 16, USB_TIMEOUT_LONG);
+    fprintf(stderr, "DEBUG: variation cmd1 response (%d bytes): ", ret);
+    for (int i = 0; i < ret && i < 16; i++) fprintf(stderr, "%02x ", slota[i]);
+    fprintf(stderr, "\n");
+    if (ret <= 0) {
+        fprintf(stderr, "No response from G2 for variation command 1\n");
+        return -1;
+    }
+    slotIndex = slota[5];
+    fprintf(stderr, "DEBUG: slotIndex = %d (0x%02x)\n", slotIndex, slotIndex);
+
+    /* Step 2: Send [CMD_A, slota[5], 0x6a, variation - 1]
+     * Python uses CMD_A (0x08) as base, not CMD_A + slot
+     * Use slot=0 (slot A), version=slota[5] from first response
+     * Try version 0x0a (common version used in other commands) */
+    extraData[0] = variation - 1;
+    fprintf(stderr, "DEBUG: Sending variation cmd2: slot=0, version=0x%02x, subcmd=0x6a, extra=%d\n", 
+            0x0a, extraData[0]);
+    if (send_slot_command_with_data(0, 0x0a, 0x6a, extraData, 1) < 0) {
+        fprintf(stderr, "Failed to send variation command 2\n");
+        return -1;
+    }
+    usleep(100000);
+    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_LONG, 5);
+    fprintf(stderr, "DEBUG: variation cmd2 response (%d bytes): ", ret);
+    for (int i = 0; i < ret && i < 16; i++) fprintf(stderr, "%02x ", response[i]);
+    fprintf(stderr, "\n");
+
+    return 0;
 }

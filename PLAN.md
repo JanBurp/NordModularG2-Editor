@@ -29,13 +29,14 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli list-devices` | - | Done |
 | `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
 | `g2-cli slot <A|B|C|D>` | 0x7d | Done |
+| `g2-cli variation <1-8>` | 0x6a | Done |
 | `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
 | `g2-cli select-slot <A|B|C|D>` | 0x09 | Done (alias for slot) |
-| `g2-cli select-variation <1-8>` | 0x6a | Not implemented |
+| `g2-cli select-variation <1-8>` | 0x6a | Done (alias for variation) |
 | `g2-cli list-modules [slot]` | 0x34 | Not implemented |
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
 | `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Not implemented |
@@ -49,6 +50,13 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `--json` | Single-line JSON (for piping) |
 | `--pretty` | Multi-line formatted (same as default) |
 | `--tree` | Indented tree view |
+
+### Tip
+
+use --json output together with fx (https://fx.wtf/):
+
+`g2-cli --json settings |fx`
+
 
 ## Reusable Code from G2-Edit
 
@@ -217,7 +225,7 @@ make
 
 ### Phase 6: Live Control
 - [x] Implement slot command (matching g2ctl protocol)
-- [ ] Implement select-variation
+- [x] Implement variation command (matching g2ctl protocol)
 - [ ] Implement list-modules, get-param, set-param
 - [ ] Implement watch (polling)
 
@@ -240,6 +248,7 @@ make
 - 2026-04-12: Focus slot byte offset is 8, bits 4-5 (not byte 21)
 - 2026-04-12: Settings command outputs "patches" in Patch mode, "performance" in Performance mode
 - 2026-04-12: Slot command implemented matching g2ctl protocol (0x7d + multi-step selection)
+- 2026-04-12: Variation command implemented matching g2ctl protocol (0x35 + 0x6a)
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 
