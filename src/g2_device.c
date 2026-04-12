@@ -551,7 +551,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     return root;
 }
 
-int g2_settings(output_format_t format) {
+int g2_settings(output_format_t format, int debug) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
     uint8_t *perfData = NULL;
@@ -608,6 +608,14 @@ int g2_settings(output_format_t format) {
         return -1;
     }
 
+    if (debug) {
+        fprintf(stderr, "SYNTH:%zu:", bulkSize);
+        for (size_t j = 0; j < bulkSize; j++) {
+            fprintf(stderr, "%02x", bulkData[j]);
+        }
+        fprintf(stderr, "\n");
+    }
+
     /* Step 2: Get performance data with 0x81 and 0x10 commands */
     uint8_t selsData[1024] = {0};
     uint8_t selsInterrupt[16] = {0};
@@ -639,6 +647,14 @@ int g2_settings(output_format_t format) {
             perfSize = size;
             recv_bulk(perfData, size);
         }
+    }
+
+    if (debug) {
+        fprintf(stderr, "PERF:%zu:", perfSize);
+        for (size_t j = 0; j < perfSize; j++) {
+            fprintf(stderr, "%02x", perfData[j]);
+        }
+        fprintf(stderr, "\n");
     }
 
     /* Parse settings data and build JSON */

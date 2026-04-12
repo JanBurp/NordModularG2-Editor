@@ -45,6 +45,13 @@ extern void test_parse_local_on(void);
 extern void test_parse_prgch_values(void);
 extern void test_parse_clock_settings(void);
 
+extern void test_patch_focus_c(void);
+extern void test_perf_focus_c(void);
+extern void test_patch_focus_a(void);
+extern void test_patch_focus_d(void);
+extern void test_factory_patch(void);
+extern void test_perf_focus_a(void);
+
 int main(void) {
     UNITY_BEGIN();
     
@@ -84,6 +91,14 @@ int main(void) {
     RUN_TEST(test_parse_local_on);
     RUN_TEST(test_parse_prgch_values);
     RUN_TEST(test_parse_clock_settings);
+    
+    /* Real G2 data tests - require mock files in test/mocks/ */
+    RUN_TEST(test_patch_focus_c);
+    RUN_TEST(test_perf_focus_c);
+    RUN_TEST(test_patch_focus_a);
+    RUN_TEST(test_patch_focus_d);
+    RUN_TEST(test_factory_patch);
+    RUN_TEST(test_perf_focus_a);
     
     return UNITY_END();
 }

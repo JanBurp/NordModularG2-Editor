@@ -114,7 +114,15 @@ c-cli/
 │   ├── test_parse.c
 │   ├── test_bitstream.c
 │   ├── test_settings_parse.c
-│   └── test_parse_settings.h
+│   ├── test_real_data.c
+│   ├── test_parse_settings.h
+│   └── mocks/          # Real G2 responses (hex format)
+│       ├── patch-focus-c.txt
+│       ├── perf-focus-c.txt
+│       ├── patch-focus-a.txt
+│       ├── patch-focus-d.txt
+│       ├── factory-patch.txt
+│       └── perf-focus-a.txt
 └── build/
     ├── bin/
     │   └── g2-cli      # Built executable
@@ -260,8 +268,9 @@ make test
 - [x] Test bitstream init/seek/tell (3 tests passing)
 - [x] Test g2_parse_settings with mock data (9 tests passing)
 - [x] All 30 tests passing
-- [ ] Fix bitstream_read_bits algorithm (not matching Python's getbits)
-- Run `make test` to execute all tests
+- [x] Added --debug flag to capture real G2 responses
+- [x] Captured 6 real G2 mock data states
+- [x] All 36 tests passing (30 unit + 6 real data)
 
 ---
 

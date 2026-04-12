@@ -25,6 +25,7 @@ static void print_usage(const char *prog) {
     printf("  --json         Output as single-line JSON (default for data commands)\n");
     printf("  --pretty       Pretty-print JSON (default when outputting to terminal)\n");
     printf("  --tree         Tree view output\n");
+    printf("  --debug        Show debug info (raw USB data in hex)\n");
     printf("\nCommands:\n");
     printf("  connect                Connect to G2 (auto-detect)\n");
     printf("  disconnect             Close connection\n");
@@ -46,6 +47,7 @@ static void print_usage(const char *prog) {
 }
 
 static output_format_t output_format = OUTPUT_PRETTY;
+static int debug_mode = 0;
 
 int main(int argc, char *argv[]) {
     int i;
@@ -61,7 +63,9 @@ int main(int argc, char *argv[]) {
             print_version();
             return 0;
         }
-        if (strcmp(argv[i], "--json") == 0) {
+        if (strcmp(argv[i], "--debug") == 0) {
+            debug_mode = 1;
+        } else if (strcmp(argv[i], "--json") == 0) {
             output_format = OUTPUT_JSON;
         } else if (strcmp(argv[i], "--pretty") == 0) {
             output_format = OUTPUT_PRETTY;
@@ -98,7 +102,7 @@ int main(int argc, char *argv[]) {
     }
     
     if (strcmp(command, "settings") == 0) {
-        return g2_settings(output_format);
+        return g2_settings(output_format, debug_mode);
     }
     
     if (strcmp(command, "get-patch") == 0) {

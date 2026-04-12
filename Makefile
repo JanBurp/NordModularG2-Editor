@@ -21,6 +21,8 @@ OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 # Test source files
 TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
 TEST_SRC := $(filter-out $(TEST_DIR)/run_tests.c, $(TEST_SRC))
+# Exclude mocks directory
+TEST_SRC := $(filter-out $(TEST_DIR)/mocks/%, $(TEST_SRC))
 
 # Headers
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
