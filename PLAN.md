@@ -130,6 +130,48 @@ make
 ./build/bin/g2-cli status
 ```
 
+## Example output:
+
+### status
+
+{
+    "name": "The Burp",
+    "mode": "Patch",
+    "midi": {
+        "slots": {
+            "a": 10,
+            "b": 11,
+            "c": 12,
+            "d": 13,
+            "global": 15
+        },
+        "sysex": 17,
+        "local": true,
+        "prgch": "recv",
+        "clkse": true,
+        "clkre": true
+    },
+    "tuning": {
+        "semi": 0,
+        "cent": 0
+    },
+    "pedal": {
+        "polarity": "open",
+        "gain": 1.5
+    },
+    "performance": {
+        "name": "New Performance",
+        "focus": "a",
+        "rangeEnable": false,
+        "bpm": 80,
+        "clockRunning": true,
+        "kbSplit": false
+    },
+    "slots": []
+}
+
+
+
 ---
 
 ## Progress
