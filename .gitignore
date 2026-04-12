@@ -1,0 +1,18 @@
+# Build artifacts
+build/
+*.o
+*.a
+*.so
+*.dylib
+
+# Editor files
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Dependency directories
+.depend/
+
+# Binary
+g2-cli
