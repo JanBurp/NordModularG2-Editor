@@ -10,7 +10,6 @@
 #include <libusb.h>
 #include "defs.h"
 #include "g2_device.h"
-#include "bitstream.h"
 
 /* Global device state */
 static g2_device_t g2 = {
@@ -388,18 +387,42 @@ int g2_status(output_format_t format) {
     free(bulkData);
     bulkData = NULL;
 
-    /* Step 2: Send GET_SELECTED_PARAMETER (0x35, 0x04) */
-    if (send_command(0x35, 0x04) < 0) {
-        /* Non-fatal, continue */
+    /* Step 2: Get performance data with 0x81 and 0x10 commands */
+    uint8_t selsData[1024] = {0};
+    uint8_t selsInterrupt[16] = {0};
+    
+    if (send_command(0x41, 0x81) == 0) {
+        usleep(100000);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_LONG);
+        
+        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
+            recv_bulk(selsData, size);
+        }
     }
 
-    usleep(50000);
-    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    uint8_t perfData[1024] = {0};
+    uint8_t perfInterrupt[16] = {0};
+    if (send_command(selsData[2], 0x10) == 0) {
+        usleep(100000);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_LONG);
+        
+        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
+            recv_bulk(perfData, size);
+        }
+    }
 
-    /* Note: In Patch mode, there's no performance data - each slot is independent.
-     * For full performance data, the G2 needs to be in Performance mode.
-     * The slot names and patch info require additional commands to retrieve.
-     */
+    if (perfData[0] != 0) {
+        parse_name(perfData + 4, perfName, sizeof(perfName));
+    }
+
+    /* Performance data starts at byte 21 (after 4-byte header + 16-byte name + null) */
+    focusSlot = (perfData[21] >> 2) & 0x03;  /* bits 2-3 of byte 21 */
+    rangeEnable = (perfData[22] >> 0) & 0x01;  /* bit 0 of byte 22 */
+    bpm = perfData[26];  /* byte 26 */
+    split = (perfData[26] >> 1) & 0x01;  /* bit 1 of byte 26 */
+    clockRun = (perfData[28] >> 0) & 0x01;  /* bit 0 of byte 28 */
 
     /* Output JSON */
     const char *modeStr = mode ? "Performance" : "Patch";
@@ -437,26 +460,20 @@ int g2_status(output_format_t format) {
     printf("    \"gain\": %.1f\n", 1.0 + 0.5 * pedalGain / 32.0);
     printf("  },\n");
     printf("  \"performance\": {\n");
-    printf("    \"name\": \"\",\n");
-    printf("    \"focus\": \"\",\n");
-    printf("    \"rangeEnable\": false,\n");
-    printf("    \"bpm\": 0,\n");
-    printf("    \"clockRunning\": false,\n");
-    printf("    \"kbSplit\": false\n");
+    printf("    \"name\": \"%s\",\n", perfName);
+    printf("    \"focus\": \"%c\",\n", "abcd"[focusSlot]);
+    printf("    \"rangeEnable\": %s,\n", rangeEnable ? "true" : "false");
+    printf("    \"bpm\": %d,\n", bpm);
+    printf("    \"clockRunning\": %s,\n", clockRun ? "true" : "false");
+    printf("    \"kbSplit\": %s\n", split ? "true" : "false");
     printf("  },\n");
     printf("  \"slots\": []\n");
     printf("}\n");
 
-    (void)perfName;
     (void)slotNames;
     (void)slotBanks;
     (void)slotPatches;
     (void)slotActive;
-    (void)focusSlot;
-    (void)rangeEnable;
-    (void)bpm;
-    (void)clockRun;
-    (void)split;
 
     return status;
 }
