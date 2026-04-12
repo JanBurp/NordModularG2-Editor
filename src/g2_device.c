@@ -428,42 +428,41 @@ int g2_status(output_format_t format) {
     split = (perfData[26] >> 1) & 0x01;  /* bit 1 of byte 26 */
     clockRun = (perfData[28] >> 0) & 0x01;  /* bit 0 of byte 28 */
 
-    /* Based on analysis:
-     * Slot 0 name at byte 31 (10 chars + null), data at byte 41 (7 bytes)
-     * Slot 1 name at byte 51 (10 chars + null), data at byte 61 (7 bytes)
-     * Slot 2 name at byte 71 (5 chars + null + padding), data at byte 81 (7 bytes)
-     * Slot 3 name at byte 91 (5 chars + null + padding), data at byte 101 (7 bytes)
+    /* Based on g2ctl:
+     * data = data[4:] (skip 4-byte header)
+     * parse_name gets perf name, data now points after perf name
+     * data = data[11:] (skip 7 bytes perf settings + 4 padding)
+     * Then for each slot: parse_name(data) gets name, data[:7] gets slot data, data = data[10:]
      */
     
-    int slotNameOffset = 31;
-    int slotDataOffset = 41;
-    int slotStride = 20;
+    /* Start after header (4 bytes) */
+    uint8_t *slotPtr = perfData + 4;
     
+    /* Skip perf name using parse_name to get remaining data */
+    char tmpName[32];
+    int nameLen = parse_name(slotPtr, tmpName, sizeof(tmpName));
+    slotPtr += nameLen;  /* Advance past the name */
+    
+    /* Skip 11 bytes (7 perf settings + 4 padding) to get to slot data */
+    slotPtr += 11;
+    
+    /* Now parse each slot */
     for (int i = 0; i < 4; i++) {
-        /* Read name */
-        int nameLen = 0;
-        for (int j = 0; j < 16; j++) {
-            uint8_t c = perfData[slotNameOffset + j];
-            if (c >= 0x20 && c <= 0x7f) {
-                slotNames[i][nameLen++] = c;
-            } else {
-                break;
-            }
-        }
-        slotNames[i][nameLen] = '\0';
+        /* Parse slot name */
+        nameLen = parse_name(slotPtr, slotNames[i], 17);
+        slotPtr += nameLen;
         
-        /* Read data */
-        uint8_t *data = perfData + slotDataOffset;
-        slotActive[i] = data[0] & 1;
-        slotKey[i] = data[1] & 1;
-        slotHold[i] = data[2] & 1;
-        slotBanks[i] = data[3];
-        slotPatches[i] = data[4];
-        slotLow[i] = data[5];
-        slotHigh[i] = data[6];
+        /* Read 7 bytes: active, key, hold, bank, patch, low, high */
+        slotActive[i] = slotPtr[0] & 1;
+        slotKey[i] = slotPtr[1] & 1;
+        slotHold[i] = slotPtr[2] & 1;
+        slotBanks[i] = slotPtr[3];
+        slotPatches[i] = slotPtr[4];
+        slotLow[i] = slotPtr[5];
+        slotHigh[i] = slotPtr[6];
         
-        slotNameOffset += slotStride;
-        slotDataOffset += slotStride;
+        /* Skip 10 bytes (7 slot data + 3 padding) */
+        slotPtr += 10;
     }
 
     /* Output JSON */
@@ -511,12 +510,15 @@ int g2_status(output_format_t format) {
     printf("  },\n");
     printf("  \"slots\": [\n");
     for (int i = 0; i < 4; i++) {
-        printf("    {\"slot\": \"%c\", \"patch\": \"%d:%d\", \"name\": \"%s\", \"active\": %s, \"key\": %s, \"hold\": %s, \"range\": {\"lower\": %d, \"upper\": %d}}",
-               'a' + i, slotBanks[i] + 1, slotPatches[i] + 1, slotNames[i],
-               slotActive[i] ? "true" : "false",
-               slotKey[i] ? "true" : "false",
-               slotHold[i] ? "true" : "false",
-               slotLow[i], slotHigh[i]);
+        printf("    {\n");
+        printf("      \"slot\": \"%c\",\n", 'a' + i);
+        printf("      \"patch\": \"%d:%d\",\n", slotBanks[i] + 1, slotPatches[i] + 1);
+        printf("      \"name\": \"%s\",\n", slotNames[i]);
+        printf("      \"active\": %s,\n", slotActive[i] ? "true" : "false");
+        printf("      \"key\": %s,\n", slotKey[i] ? "true" : "false");
+        printf("      \"hold\": %s,\n", slotHold[i] ? "true" : "false");
+        printf("      \"range\": {\"lower\": %d, \"upper\": %d}\n", slotLow[i], slotHigh[i]);
+        printf("    }");
         if (i < 3) printf(",");
         printf("\n");
     }
