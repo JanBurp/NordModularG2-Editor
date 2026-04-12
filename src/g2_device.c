@@ -10,6 +10,7 @@
 #include <libusb.h>
 #include "defs.h"
 #include "g2_device.h"
+#include "utils.h"
 #include "output.h"
 #include "cJSON.h"
 
@@ -26,29 +27,6 @@ static g2_device_t g2 = {
 
 /* Command message building */
 #define COMMAND_OFFSET 2
-
-/* CRC calculation (from G2-Edit utils.c) */
-static uint16_t crc_iterator(int32_t seed, int32_t val) {
-    int32_t k = (((seed >> 8) ^ val) & 255) << 8;
-    int32_t crc = 0;
-    for (int i = 0; i < 8; i++) {
-        if ((crc ^ k) & 0x8000) {
-            crc = (crc << 1) ^ 0x1021;
-        } else {
-            crc = crc << 1;
-        }
-        k = k << 1;
-    }
-    return (uint16_t)((seed << 8) ^ crc) & 0xFFFF;
-}
-
-static uint16_t calc_crc16(uint8_t *buff, int length) {
-    uint16_t crc = 0;
-    for (int i = 0; i < length; i++) {
-        crc = crc_iterator(crc, buff[i]);
-    }
-    return crc;
-}
 
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
@@ -214,17 +192,6 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
     return transferred;
 }
 
-slot_t parse_slot(const char *slot_str) {
-    if (slot_str == NULL) {
-        return SLOT_CURRENT;
-    }
-    if (strcmp(slot_str, "A") == 0 || strcmp(slot_str, "a") == 0) return SLOT_A;
-    if (strcmp(slot_str, "B") == 0 || strcmp(slot_str, "b") == 0) return SLOT_B;
-    if (strcmp(slot_str, "C") == 0 || strcmp(slot_str, "c") == 0) return SLOT_C;
-    if (strcmp(slot_str, "D") == 0 || strcmp(slot_str, "d") == 0) return SLOT_D;
-    return SLOT_CURRENT;
-}
-
 static int send_command(uint8_t cmd, uint8_t subcmd) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
@@ -381,26 +348,11 @@ static int recv_bulk(uint8_t *data, uint16_t size) {
     return received;
 }
 
-static int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
-    size_t i;
-    for (i = 0; i < 16 && i < bufsize - 1; i++) {
-        if (data[i] >= 0x20 && data[i] <= 0x7f) {
-            buf[i] = data[i];
-        } else {
-            break;
-        }
-    }
-    buf[i] = '\0';
-    /* Include null terminator in count if present */
-    if (i < 16 && data[i] == 0) {
-        return (int)(i + 1);
-    }
-    return (int)i;
-}
-
-int g2_settings(output_format_t format) {
-    uint8_t response[8192] = {0};
-    uint8_t *bulkData = NULL;
+cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
+                         const uint8_t *perfData, size_t perfSize) {
+    (void)bulkSize;  /* Currently using fixed offsets, size not needed */
+    (void)perfSize;  /* Currently using fixed offsets, size not needed */
+    
     char synthName[32] = {0};
     char perfName[32] = {0};
     char slotNames[4][17] = {{0}};
@@ -427,56 +379,7 @@ int g2_settings(output_format_t format) {
     int bpm = 0;
     int clockRun = 0;
     int split = 0;
-    int ret;
-    uint8_t msgType;
-    uint16_t size;
-
-    if (!g2_is_connected()) {
-        int connect_ret;
-        /* Use silent connect for JSON output mode to avoid polluting stdout */
-        if (format == OUTPUT_JSON) {
-            connect_ret = g2_connect_silent();
-        } else {
-            connect_ret = g2_connect();
-        }
-        if (connect_ret < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
-        }
-    }
-
-    /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
-    if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
-        fprintf(stderr, "Failed to send synth settings command\n");
-        return -1;
-    }
-
-    usleep(100000);
-
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_LONG);
-    if (ret <= 0) {
-        fprintf(stderr, "No response from G2\n");
-        return -1;
-    }
-
-    msgType = response[0] & 0x0f;
-    if (msgType != RESPONSE_TYPE_EXTENDED) {
-        fprintf(stderr, "Unexpected response type %d\n", msgType);
-        return -1;
-    }
-
-    size = (response[1] << 8) | response[2];
-    bulkData = malloc(size);
-    if (!bulkData) {
-        fprintf(stderr, "Memory allocation failed\n");
-        return -1;
-    }
-
-    if (recv_bulk(bulkData, size) <= 0) {
-        fprintf(stderr, "Failed to read bulk data\n");
-        free(bulkData);
-        return -1;
-    }
+    int nameLen;
 
     /* Parse synth name (up to 16 bytes at offset 4) */
     parse_name(bulkData + 4, synthName, sizeof(synthName));
@@ -492,11 +395,11 @@ int g2_settings(output_format_t format) {
       * Offset 15: Perf Bank
       * Offset 16: Perf Location
       * Offset 17: Memory Protect + padding
-      * Offset 18: MIDI Slot A = 0x0a = 10 ✓
-      * Offset 19: MIDI Slot B = 0x0b = 11 ✓
-      * Offset 20: MIDI Slot C = 0x0c = 12 ✓
-      * Offset 21: MIDI Slot D = 0x0d = 13 ✓
-      * Offset 22: Global chan = 0x0f = 15 ✓
+      * Offset 18: MIDI Slot A = 0x0a = 10
+      * Offset 19: MIDI Slot B = 0x0b = 11
+      * Offset 20: MIDI Slot C = 0x0c = 12
+      * Offset 21: MIDI Slot D = 0x0d = 13
+      * Offset 22: Global chan = 0x0f = 15
       * Offset 23: Sysex ID = 0x10 = 16, g2ctl shows 17 (adds 1)
       * Offset 24: Local on (bit 7)
       * Offset 25: Prog Change Rcv (bit 0), Snd (bit 1)
@@ -524,49 +427,20 @@ int g2_settings(output_format_t format) {
     pedalPolarity = bulkData[32] & 1;  /* pedal polarity (bit 0) */
     pedalGain = bulkData[34];  /* pedal gain (byte 34, not 33) */
 
-    free(bulkData);
-    bulkData = NULL;
-
-    /* Step 2: Get performance data with 0x81 and 0x10 commands */
-    uint8_t selsData[1024] = {0};
-    uint8_t selsInterrupt[16] = {0};
-    
-    if (send_command(0x41, 0x81) == 0) {
-        usleep(100000);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_LONG);
-        
-        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size);
-        }
-    }
-
-    uint8_t perfData[1024] = {0};
-    uint8_t perfInterrupt[16] = {0};
-    if (send_command(selsData[2], 0x10) == 0) {
-        usleep(100000);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_LONG);
-        
-        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
-            recv_bulk(perfData, size);
-        }
-    }
-
-    if (perfData[0] != 0) {
-        parse_name(perfData + 4, perfName, sizeof(perfName));
-    }
-    
     /* Performance data parsing - matching g2ctl's BitStream implementation:
      * data = perfData[4:] (skip 4-byte header)
      * parse_name(data) returns (name, remaining starting at byte after name)
      * g2ctl: BitStream(data, 8*4) positions at bit 32
      * Focus is bits 4-5 of byte 4 of remaining
      */
-    uint8_t *remaining = perfData + 4;
+    if (perfData[0] != 0) {
+        parse_name(perfData + 4, perfName, sizeof(perfName));
+    }
+    
+    const uint8_t *remaining = perfData + 4;
     
     char tmpName[32];
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
     
     remaining += nameLen;  /* Skip past name */
     
@@ -574,7 +448,7 @@ int g2_settings(output_format_t format) {
      * Focus is 2 bits at bit 36 (after 4 bits skip + 2 bits focus)
      * Extract using proper bitstream formula: word bits 30-31
      */
-    uint8_t *perfSettings = remaining + 4;  /* Byte 4 of remaining = bit 32 position */
+    const uint8_t *perfSettings = remaining + 4;  /* Byte 4 of remaining = bit 32 position */
     
     /* Pack 4 bytes for bitstream reading */
     uint32_t word = (perfSettings[0] << 24) | (perfSettings[1] << 16) | (perfSettings[2] << 8) | perfSettings[3];
@@ -589,7 +463,7 @@ int g2_settings(output_format_t format) {
     clockRun = remaining[8] & 1;
     
     /* g2ctl: data = data[11:] to skip to slot data */
-    uint8_t *slotPtr = remaining + 11;
+    const uint8_t *slotPtr = remaining + 11;
     
     /* Now parse each slot */
     for (int i = 0; i < 4; i++) {
@@ -673,6 +547,110 @@ int g2_settings(output_format_t format) {
         cJSON_AddItemToArray(slots, slot);
     }
     cJSON_AddItemToObject(root, "slots", slots);
+    
+    return root;
+}
+
+int g2_settings(output_format_t format) {
+    uint8_t response[8192] = {0};
+    uint8_t *bulkData = NULL;
+    uint8_t *perfData = NULL;
+    size_t bulkSize = 0;
+    size_t perfSize = 0;
+    int ret;
+    uint8_t msgType;
+    uint16_t size;
+
+    if (!g2_is_connected()) {
+        int connect_ret;
+        if (format == OUTPUT_JSON) {
+            connect_ret = g2_connect_silent();
+        } else {
+            connect_ret = g2_connect();
+        }
+        if (connect_ret < 0) {
+            fprintf(stderr, "Failed to connect to G2\n");
+            return -1;
+        }
+    }
+
+    /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
+    if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
+        fprintf(stderr, "Failed to send synth settings command\n");
+        return -1;
+    }
+
+    usleep(100000);
+
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        fprintf(stderr, "No response from G2\n");
+        return -1;
+    }
+
+    msgType = response[0] & 0x0f;
+    if (msgType != RESPONSE_TYPE_EXTENDED) {
+        fprintf(stderr, "Unexpected response type %d\n", msgType);
+        return -1;
+    }
+
+    size = (response[1] << 8) | response[2];
+    bulkData = malloc(size);
+    if (!bulkData) {
+        fprintf(stderr, "Memory allocation failed\n");
+        return -1;
+    }
+    bulkSize = size;
+
+    if (recv_bulk(bulkData, size) <= 0) {
+        fprintf(stderr, "Failed to read bulk data\n");
+        free(bulkData);
+        return -1;
+    }
+
+    /* Step 2: Get performance data with 0x81 and 0x10 commands */
+    uint8_t selsData[1024] = {0};
+    uint8_t selsInterrupt[16] = {0};
+    
+    if (send_command(0x41, 0x81) == 0) {
+        usleep(100000);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_LONG);
+        
+        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
+            recv_bulk(selsData, size);
+        }
+    }
+
+    perfData = malloc(1024);
+    if (!perfData) {
+        fprintf(stderr, "Memory allocation failed\n");
+        free(bulkData);
+        return -1;
+    }
+
+    uint8_t perfInterrupt[16] = {0};
+    if (send_command(selsData[2], 0x10) == 0) {
+        usleep(100000);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_LONG);
+        
+        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
+            perfSize = size;
+            recv_bulk(perfData, size);
+        }
+    }
+
+    /* Parse settings data and build JSON */
+    cJSON *root = g2_parse_settings(bulkData, bulkSize, perfData, perfSize);
+    
+    free(bulkData);
+    free(perfData);
+    
+    if (!root) {
+        fprintf(stderr, "Failed to parse settings\n");
+        return -1;
+    }
     
     output_json(root, format);
     cJSON_Delete(root);

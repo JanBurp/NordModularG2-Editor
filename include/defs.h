@@ -13,6 +13,15 @@
 #ifndef __G2_DEFS_H__
 #define __G2_DEFS_H__
 
+/* Slot types */
+typedef enum {
+    SLOT_A = 0,
+    SLOT_B = 1,
+    SLOT_C = 2,
+    SLOT_D = 3,
+    SLOT_CURRENT = -1
+} slot_t;
+
 #define NUM_VARIATIONS                       (10)
 #define NUM_GUI_VARIATIONS                   (8)
 #define NUM_MORPHS                           (8)

@@ -6,7 +6,10 @@
 #define __G2_DEVICE_H__
 
 #include <stdint.h>
+#include <stddef.h>
 #include <libusb.h>
+#include "cJSON.h"
+#include "defs.h"
 
 /* Output format types */
 typedef enum {
@@ -15,15 +18,6 @@ typedef enum {
     OUTPUT_PRETTY,
     OUTPUT_TREE
 } output_format_t;
-
-/* Slot types */
-typedef enum {
-    SLOT_A = 0,
-    SLOT_B = 1,
-    SLOT_C = 2,
-    SLOT_D = 3,
-    SLOT_CURRENT = -1
-} slot_t;
 
 /* G2 Device handle */
 typedef struct {
@@ -68,5 +62,9 @@ int g2_select_variation(int variation);
 
 /* Utility */
 slot_t parse_slot(const char *slot_str);
+
+/* Parse synth settings and performance data into JSON */
+cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
+                         const uint8_t *perfData, size_t perfSize);
 
 #endif /* __G2_DEVICE_H__ */

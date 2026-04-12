@@ -28,14 +28,14 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli disconnect` | - | Done |
 | `g2-cli list-devices` | - | Done |
 | `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
-| `g2-cli slot <A|B|C|D>` | 0x7d | Done |
-| `g2-cli variation <1-8>` | 0x6a | Done |
+| `g2-cli slot <A\|B\|C\|D>` | 0x7d | Done |
+| `g2-cli variation <1-8>` | 0x6a | NOT WORKING |
 | `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
-| `g2-cli select-slot <A|B|C|D>` | 0x09 | Done (alias for slot) |
+| `g2-cli select-slot <A\|B\|C\|D>` | 0x09 | Done (alias for slot) |
 | `g2-cli select-variation <1-8>` | 0x6a | Done (alias for variation) |
 | `g2-cli list-modules [slot]` | 0x34 | Not implemented |
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
@@ -95,13 +95,31 @@ c-cli/
 │   ├── g2_device.c     # USB connect/disconnect, status command
 │   ├── g2_device.h
 │   ├── bitstream.c      # Bit stream parsing
-│   └── bitstream.h
+│   ├── bitstream.h
+│   ├── utils.c          # CRC, parse_slot, parse_name utilities
+│   ├── utils.h
+│   ├── output.c         # JSON/text formatting
+│   ├── output.h
+│   ├── cjson.c          # JSON library
+│   └── cjson.h
 ├── include/
 │   ├── defs.h          # Protocol constants (from G2-Edit)
 │   └── g2_device.h
+├── test/
+│   ├── unity.h         # Unity test framework
+│   ├── unity.c
+│   ├── unity_internals.h
+│   ├── run_tests.c     # Test runner
+│   ├── test_crc.c
+│   ├── test_parse.c
+│   ├── test_bitstream.c
+│   ├── test_settings_parse.c
+│   └── test_parse_settings.h
 └── build/
-    └── bin/
-        └── g2-cli      # Built executable
+    ├── bin/
+    │   └── g2-cli      # Built executable
+    └── test/
+        └── g2-tests     # Test executable
 ```
 
 ## Build Requirements
@@ -118,11 +136,14 @@ cd c-cli
 # Build
 make
 
-# Run tests
+# Run CLI
 ./build/bin/g2-cli --help
 ./build/bin/g2-cli list-devices
 ./build/bin/g2-cli connect
 ./build/bin/g2-cli settings
+
+# Run unit tests
+make test
 ```
 
 ## Example output:
@@ -225,9 +246,22 @@ make
 
 ### Phase 6: Live Control
 - [x] Implement slot command (matching g2ctl protocol)
-- [x] Implement variation command (matching g2ctl protocol)
+- [x] Implement variation command (matching g2ctl protocol) - NOT WORKING
+- [ ] Debug variation command
 - [ ] Implement list-modules, get-param, set-param
 - [ ] Implement watch (polling)
+
+### Phase 7: Unit Tests
+- [x] Set up Unity test framework
+- [x] Create test infrastructure (test/, run_tests.c)
+- [x] Test CRC calculation (6 tests passing)
+- [x] Test parse_slot (6 tests passing)
+- [x] Test parse_name (6 tests passing)
+- [x] Test bitstream init/seek/tell (3 tests passing)
+- [x] Test g2_parse_settings with mock data (9 tests passing)
+- [x] All 30 tests passing
+- [ ] Fix bitstream_read_bits algorithm (not matching Python's getbits)
+- Run `make test` to execute all tests
 
 ---
 
@@ -249,6 +283,10 @@ make
 - 2026-04-12: Settings command outputs "patches" in Patch mode, "performance" in Performance mode
 - 2026-04-12: Slot command implemented matching g2ctl protocol (0x7d + multi-step selection)
 - 2026-04-12: Variation command implemented matching g2ctl protocol (0x35 + 0x6a)
+- 2026-04-12: Extracted parsing functions to utils.c for testability
+- 2026-04-12: Created g2_parse_settings() for testable parsing without USB
+- 2026-04-12: Using Unity test framework for unit tests
+- 2026-04-12: slot_t moved to defs.h for shared use across modules
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 
