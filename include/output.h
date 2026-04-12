@@ -7,8 +7,9 @@
 
 #include <stdint.h>
 #include "g2_device.h"
+#include "cJSON.h"
 
-/* Output JSON string in the specified format */
-void output_json(const char *json, int format);
+/* Output JSON in the specified format */
+void output_json(const cJSON *json, int format);
 
 #endif /* __G2_OUTPUT_H__ */

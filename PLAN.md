@@ -224,6 +224,7 @@ make
 - [x] Refactored to output JSON internally, then pass to `output_json()` for formatting
 - [x] Implemented tree format output
 - [x] Commands output JSON then call generic `output_json()` for formatting
+- [x] Integrated cJSON library for robust JSON building (cJSON.c + cJSON.h in src/)
 
 ### Phase 4: Protocol - Get-Patch
 - [ ] Implement get-patch-name command
@@ -252,6 +253,7 @@ make
 - 2026-04-12: Performance files (.prf2) don't need slot parameter
 - 2026-04-12: Boolean values use true/false (not "on"/"off" strings)
 - 2026-04-12: Command renamed from "status" to "settings"
+- 2026-04-12: Using cJSON library for JSON building (ultralightweight, single-file, MIT license)
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 

@@ -11,6 +11,7 @@
 #include "defs.h"
 #include "g2_device.h"
 #include "output.h"
+#include "cJSON.h"
 
 /* Global device state */
 static g2_device_t g2 = {
@@ -282,7 +283,7 @@ int g2_settings(output_format_t format) {
     int slotLow[4] = {0};
     int slotHigh[4] = {0};
     int mode = 0;
-    int midiChannels[5] = {0};
+    int midiCh[5] = {0};
     int sysexId = 0;
     int localOn = 0;
     int prgch = 0;
@@ -300,7 +301,6 @@ int g2_settings(output_format_t format) {
     int ret;
     uint8_t msgType;
     uint16_t size;
-    char json[8192];
 
     if (!g2_is_connected()) {
         if (g2_connect() < 0) {
@@ -372,11 +372,11 @@ int g2_settings(output_format_t format) {
       * Offset 34: Control Pedal Gain (NOT 33!)
       */
     mode = bulkData[14] & 1;  /* mode (bit 0) */
-    midiChannels[0] = bulkData[18];  /* MIDI A */
-    midiChannels[1] = bulkData[19];  /* MIDI B */
-    midiChannels[2] = bulkData[20];  /* MIDI C */
-    midiChannels[3] = bulkData[21];  /* MIDI D */
-    midiChannels[4] = bulkData[22];  /* MIDI global */
+    midiCh[0] = bulkData[18];  /* MIDI A */
+    midiCh[1] = bulkData[19];  /* MIDI B */
+    midiCh[2] = bulkData[20];  /* MIDI C */
+    midiCh[3] = bulkData[21];  /* MIDI D */
+    midiCh[4] = bulkData[22];  /* MIDI global */
     sysexId = bulkData[23];  /* sysex */
     localOn = (bulkData[24] >> 7) & 1;  /* local (bit 7) */
     prgch = ((bulkData[25] >> 0) & 1) | ((bulkData[25] >> 1) & 1) << 1;  /* Rcv at bit 0, Snd at bit 1 */
@@ -464,60 +464,62 @@ int g2_settings(output_format_t format) {
         slotPtr += 10;
     }
 
-    /* Build JSON output */
-    int len = snprintf(json, sizeof(json),
-        "{"
-        "\"synthName\":\"%s\","
-        "\"mode\":%d,"
-        "\"midiChannels\":[%d,%d,%d,%d,%d],"
-        "\"sysexId\":%d,"
-        "\"localOn\":%s,"
-        "\"prgch\":%d,"
-        "\"clkSend\":%s,"
-        "\"clkRecv\":%s,"
-        "\"tune\":{\"semi\":%d,\"cent\":%d},"
-        "\"pedal\":{\"polarity\":%d,\"gain\":%d},"
-        "\"performance\":{"
-            "\"name\":\"%s\","
-            "\"focusSlot\":%d,"
-            "\"rangeEnable\":%s,"
-            "\"bpm\":%d,"
-            "\"clockRun\":%s,"
-            "\"split\":%s"
-        "},"
-        "\"slots\":["
-            "{\"slot\":\"a\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
-            "{\"slot\":\"b\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
-            "{\"slot\":\"c\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}},"
-            "{\"slot\":\"d\",\"name\":\"%s\",\"bank\":%d,\"patch\":%d,\"active\":%s,\"key\":%s,\"hold\":%s,\"range\":{\"low\":%d,\"high\":%d}}"
-        "]"
-        "}",
-        synthName, mode,
-        midiChannels[0], midiChannels[1], midiChannels[2], midiChannels[3], midiChannels[4],
-        sysexId,
-        localOn ? "true" : "false",
-        prgch,
-        clkSend ? "true" : "false",
-        clkRecv ? "true" : "false",
-        tuneSemi, tuneCent,
-        pedalPolarity, pedalGain,
-        perfName,
-        focusSlot,
-        rangeEnable ? "true" : "false",
-        bpm,
-        clockRun ? "true" : "false",
-        split ? "true" : "false",
-        slotNames[0], slotBanks[0], slotPatches[0], slotActive[0] ? "true" : "false", slotKey[0] ? "true" : "false", slotHold[0] ? "true" : "false", slotLow[0], slotHigh[0],
-        slotNames[1], slotBanks[1], slotPatches[1], slotActive[1] ? "true" : "false", slotKey[1] ? "true" : "false", slotHold[1] ? "true" : "false", slotLow[1], slotHigh[1],
-        slotNames[2], slotBanks[2], slotPatches[2], slotActive[2] ? "true" : "false", slotKey[2] ? "true" : "false", slotHold[2] ? "true" : "false", slotLow[2], slotHigh[2],
-        slotNames[3], slotBanks[3], slotPatches[3], slotActive[3] ? "true" : "false", slotKey[3] ? "true" : "false", slotHold[3] ? "true" : "false", slotLow[3], slotHigh[3]
-    );
-
-    if (len >= (int)sizeof(json)) {
-        fprintf(stderr, "JSON output truncated\n");
+    /* Build JSON output using cJSON */
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "synthName", synthName);
+    cJSON_AddNumberToObject(root, "mode", mode);
+    
+    cJSON *midiChArray = cJSON_CreateArray();
+    for (int i = 0; i < 5; i++) {
+        cJSON_AddItemToArray(midiChArray, cJSON_CreateNumber(midiCh[i]));
     }
-
-    output_json(json, format);
+    cJSON_AddItemToObject(root, "midiChannels", midiChArray);
+    
+    cJSON_AddNumberToObject(root, "sysexId", sysexId);
+    cJSON_AddBoolToObject(root, "localOn", localOn);
+    cJSON_AddNumberToObject(root, "prgch", prgch);
+    cJSON_AddBoolToObject(root, "clkSend", clkSend);
+    cJSON_AddBoolToObject(root, "clkRecv", clkRecv);
+    
+    cJSON *tune = cJSON_CreateObject();
+    cJSON_AddNumberToObject(tune, "semi", tuneSemi);
+    cJSON_AddNumberToObject(tune, "cent", tuneCent);
+    cJSON_AddItemToObject(root, "tune", tune);
+    
+    cJSON *pedal = cJSON_CreateObject();
+    cJSON_AddNumberToObject(pedal, "polarity", pedalPolarity);
+    cJSON_AddNumberToObject(pedal, "gain", pedalGain);
+    cJSON_AddItemToObject(root, "pedal", pedal);
+    
+    cJSON *perf = cJSON_CreateObject();
+    cJSON_AddStringToObject(perf, "name", perfName);
+    cJSON_AddNumberToObject(perf, "focusSlot", focusSlot);
+    cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
+    cJSON_AddNumberToObject(perf, "bpm", bpm);
+    cJSON_AddBoolToObject(perf, "clockRun", clockRun);
+    cJSON_AddBoolToObject(perf, "split", split);
+    cJSON_AddItemToObject(root, "performance", perf);
+    
+    cJSON *slots = cJSON_CreateArray();
+    for (int i = 0; i < 4; i++) {
+        cJSON *slot = cJSON_CreateObject();
+        cJSON_AddStringToObject(slot, "slot", (char*[]){ "a", "b", "c", "d" }[i]);
+        cJSON_AddStringToObject(slot, "name", slotNames[i]);
+        cJSON_AddNumberToObject(slot, "bank", slotBanks[i]);
+        cJSON_AddNumberToObject(slot, "patch", slotPatches[i]);
+        cJSON_AddBoolToObject(slot, "active", slotActive[i]);
+        cJSON_AddBoolToObject(slot, "key", slotKey[i]);
+        cJSON_AddBoolToObject(slot, "hold", slotHold[i]);
+        cJSON *range = cJSON_CreateObject();
+        cJSON_AddNumberToObject(range, "low", slotLow[i]);
+        cJSON_AddNumberToObject(range, "high", slotHigh[i]);
+        cJSON_AddItemToObject(slot, "range", range);
+        cJSON_AddItemToArray(slots, slot);
+    }
+    cJSON_AddItemToObject(root, "slots", slots);
+    
+    output_json(root, format);
+    cJSON_Delete(root);
     return 0;
 }
 

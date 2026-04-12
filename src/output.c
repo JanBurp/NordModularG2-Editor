@@ -3,8 +3,34 @@
  */
 
 #include <stdio.h>
-#include <string.h>
+#include <stdlib.h>
+#include "cJSON.h"
 #include "output.h"
+
+static void tree_parse_value(const char *json, int *pos, int indent, int isLast);
+
+void output_json(const cJSON *json, int format) {
+    char *json_str = NULL;
+    
+    if (format == OUTPUT_TREE) {
+        json_str = cJSON_PrintUnformatted(json);
+        if (!json_str) return;
+        
+        int pos = 0;
+        tree_parse_value(json_str, &pos, 0, 1);
+        free(json_str);
+    } else if (format == OUTPUT_PRETTY) {
+        json_str = cJSON_Print(json);
+        if (!json_str) return;
+        printf("%s\n", json_str);
+        free(json_str);
+    } else {
+        json_str = cJSON_PrintUnformatted(json);
+        if (!json_str) return;
+        printf("%s\n", json_str);
+        free(json_str);
+    }
+}
 
 static void tree_parse_value(const char *json, int *pos, int indent, int isLast) {
     (void)isLast;
@@ -24,7 +50,6 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
             }
             first = 0;
             
-            /* Parse key */
             if (json[*pos] == '\"') {
                 (*pos)++;
                 char key[64] = {0};
@@ -32,7 +57,7 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
                 while (json[*pos] && json[*pos] != '\"') {
                     key[ki++] = json[(*pos)++];
                 }
-                (*pos)++; /* skip closing quote */
+                (*pos)++;
                 
                 while (json[*pos] == ' ') (*pos)++;
                 if (json[*pos] == ':') {
@@ -43,7 +68,6 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
                 int isObject = (json[*pos] == '{' || json[*pos] == '[');
                 int lastInSet = 0;
                 
-                /* Check if this is the last element */
                 const char *p = json + (*pos);
                 int braceCount = 0;
                 int bracketCount = 0;
@@ -64,7 +88,6 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
                     printf("\n");
                     tree_parse_value(json, pos, childIndent, lastInSet);
                 } else {
-                    /* Print simple value */
                     while (json[*pos] == ' ') (*pos)++;
                     if (json[*pos] == '\"') {
                         (*pos)++;
@@ -80,7 +103,7 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
                             }
                         }
                         putchar('\"');
-                        (*pos)++; /* skip closing quote */
+                        (*pos)++;
                     } else {
                         while (json[*pos] && json[*pos] != ',' && json[*pos] != '}') {
                             putchar(json[*pos]);
@@ -123,58 +146,12 @@ static void tree_parse_value(const char *json, int *pos, int indent, int isLast)
             while (json[*pos] == ' ') (*pos)++;
             if (json[*pos] == ',') (*pos)++;
         }
-        (*pos)++; /* skip ] */
+        (*pos)++;
     } else {
-        /* Simple value */
         while (json[*pos] && json[*pos] != ',' && json[*pos] != '}') {
             putchar(json[*pos]);
             (*pos)++;
         }
         printf("\n");
-    }
-}
-
-void output_json(const char *json, int format) {
-    if (format == OUTPUT_TREE) {
-        int pos = 0;
-        tree_parse_value(json, &pos, 0, 1);
-    } else if (format == OUTPUT_PRETTY) {
-        /* Pretty-print JSON by parsing and re-formatting with indentation */
-        int indent = 0;
-        int inString = 0;
-        for (int i = 0; json[i]; i++) {
-            char c = json[i];
-            if (c == '"' && (i == 0 || json[i-1] != '\\')) {
-                inString = !inString;
-                putchar(c);
-            } else if (inString) {
-                putchar(c);
-            } else if (c == '{' || c == '[') {
-                putchar(c);
-                putchar('\n');
-                indent += 2;
-                for (int j = 0; j < indent; j++) putchar(' ');
-            } else if (c == ',') {
-                putchar(c);
-                putchar('\n');
-                for (int j = 0; j < indent; j++) putchar(' ');
-            } else if (c == ':') {
-                putchar(c);
-                putchar(' ');
-            } else if (c == '}' || c == ']') {
-                putchar('\n');
-                indent -= 2;
-                for (int j = 0; j < indent; j++) putchar(' ');
-                putchar(c);
-            } else if (c == ' ') {
-                /* Skip spaces in JSON */
-            } else {
-                putchar(c);
-            }
-        }
-        putchar('\n');
-    } else {
-        /* OUTPUT_JSON - single line */
-        printf("%s\n", json);
     }
 }
