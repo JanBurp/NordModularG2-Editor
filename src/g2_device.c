@@ -251,7 +251,7 @@ static int recv_bulk(uint8_t *data, uint16_t size) {
     return received;
 }
 
-static char *parse_name(const uint8_t *data, char *buf, size_t bufsize) {
+static int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     size_t i;
     for (i = 0; i < 16 && i < bufsize - 1; i++) {
         if (data[i] >= 0x20 && data[i] <= 0x7f) {
@@ -261,7 +261,11 @@ static char *parse_name(const uint8_t *data, char *buf, size_t bufsize) {
         }
     }
     buf[i] = '\0';
-    return buf;
+    /* Include null terminator in count if present */
+    if (i < 16 && data[i] == 0) {
+        return (int)(i + 1);
+    }
+    return (int)i;
 }
 
 int g2_status(output_format_t format) {
@@ -289,7 +293,6 @@ int g2_status(output_format_t format) {
     int bpm = 0;
     int clockRun = 0;
     int split = 0;
-    int transferred;
     int ret;
     uint8_t msgType;
     uint16_t size;
@@ -340,32 +343,47 @@ int g2_status(output_format_t format) {
     /* Parse synth name (up to 16 bytes at offset 4) */
     parse_name(bulkData + 4, synthName, sizeof(synthName));
 
-    /* Direct byte access based on raw data analysis:
-     * Bulk data at bytes (after 4-byte header):
-     *   13: perfMode
-     *   14: perfBank
-     *   15: perfLocation
-     *   16: memProtect+padd
-     *   17: (unknown/padding)
-     *   18: midi slot A
-     *   19: midi slot B
-     *   20: midi slot C
-     *   21: midi slot D
-     *   22: midi global
-     *   23: sysex
-     *   24: local+prgch (local=bit0, prgch=bits 2-3)
+    /* Direct byte access based on g2ctl.py bitstream analysis:
+     * Name is 10 bytes (9 chars + null), so bitstream starts at byte 14
+     * g2ctl: bitstream.seek_bit(8*5) = bit 40, then reads 5 x 8 bits for MIDI
+     * At bit 40: byte 5 of data starting at byte 14 = bulkData[19]
+     * But g2ctl shows MIDI A = 10, and bulkData[19] = 0x0a = 10
+     * 
+     * After name (10 bytes at offset 4):
+     * Offset 14: Perf Mode
+     * Offset 15: Perf Bank
+     * Offset 16: Perf Location
+     * Offset 17: Memory Protect + padding
+     * Offset 18: MIDI Slot A = 0x0a = 10 ✓
+     * Offset 19: MIDI Slot B = 0x0b = 11 ✓
+     * Offset 20: MIDI Slot C = 0x0c = 12 ✓
+     * Offset 21: MIDI Slot D = 0x0d = 13 ✓
+     * Offset 22: Global chan = 0x0f = 15 ✓
+     * Offset 23: Sysex ID = 0x10 = 16, g2ctl shows 17 (adds 1)
+     * Offset 24: Local on (bit 0) = 0x00, g2ctl shows "on"
+     * Offset 25: Prog Change Rcv (bit 0), Snd (bit 1)
+     * Offset 26: Controllers
+     * Offset 27: Send Clock (bit 1), ignore ext clock (bit 2)
+     * Offset 28: Tune cent
+     * Offset 30: Tune semi
+     * Offset 32: Pedal Polarity (bit 0)
+     * Offset 33: Control Pedal Gain
      */
-    midiChannels[0] = bulkData[18];
-    midiChannels[1] = bulkData[19];
-    midiChannels[2] = bulkData[20];
-    midiChannels[3] = bulkData[21];
-    midiChannels[4] = bulkData[22];
-    sysexId = bulkData[23];
-    localOn = bulkData[24] & 1;
-    prgch = (bulkData[24] >> 2) & 3;
-    mode = bulkData[13] & 1;  /* Mode is bit 0 of perfMode */
-    pedalPolarity = bulkData[25] & 1;
-    pedalGain = bulkData[26];
+    mode = bulkData[14] & 1;  /* mode (bit 0) */
+    midiChannels[0] = bulkData[18];  /* MIDI A */
+    midiChannels[1] = bulkData[19];  /* MIDI B */
+    midiChannels[2] = bulkData[20];  /* MIDI C */
+    midiChannels[3] = bulkData[21];  /* MIDI D */
+    midiChannels[4] = bulkData[22];  /* MIDI global */
+    sysexId = bulkData[23];  /* sysex */
+    localOn = (bulkData[24] >> 7) & 1;  /* local (bit 7) */
+    prgch = ((bulkData[25] >> 0) & 1) | ((bulkData[25] >> 1) & 1) << 1;  /* Rcv at bit 0, Snd at bit 1 */
+    clkSend = (bulkData[27] >> 1) & 1;  /* clkse (bit 1 of byte 27) - lookup ['on', 'off'] 0=on */
+    clkRecv = bulkData[27] & 1;  /* clkre (bit 0 of byte 27) */
+    tuneCent = bulkData[28];  /* tune cent */
+    tuneSemi = bulkData[30];  /* tune semi */
+    pedalPolarity = bulkData[32] & 1;  /* pedal polarity (bit 0) */
+    pedalGain = bulkData[33];  /* pedal gain */
 
     free(bulkData);
     bulkData = NULL;
@@ -405,10 +423,10 @@ int g2_status(output_format_t format) {
     printf("      \"global\": %d\n", midiChannels[4]);
     printf("    },\n");
     printf("    \"sysex\": %d,\n", sysexId + 1);
-    printf("    \"local\": %s,\n", localOn ? "true" : "false");
+    printf("    \"local\": \"%s\",\n", localOn ? "on" : "off");
     printf("    \"prgch\": \"%s\",\n", prgchStr);
-    printf("    \"clkse\": %s,\n", clkSend ? "true" : "false");
-    printf("    \"clkre\": %s\n", clkRecv ? "true" : "false");
+    printf("    \"clkse\": \"%s\",\n", clkSend ? "off" : "on");
+    printf("    \"clkre\": \"%s\"\n", clkRecv ? "off" : "on");
     printf("  },\n");
     printf("  \"tuning\": {\n");
     printf("    \"semi\": %d,\n", (int8_t)tuneSemi);
