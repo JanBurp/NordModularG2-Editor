@@ -484,16 +484,15 @@ int g2_settings(output_format_t format) {
     }
     
     /* Performance data parsing:
-     * After 4-byte header, parse perf name, then skip to perf settings
-     * g2ctl: BitStream(data, 8*4) reads perf settings at bit position 32
-     * This corresponds to byte 4 of remaining data after name
+     * After 4-byte header, parse perf name, then read perf settings
+     * g2ctl: parse_name returns name, remaining data starts at byte after name
+     * Focus is bits 4-5 of byte 0 of remaining data
      */
     uint8_t *slotPtr = perfData + 4;
     
     char tmpName[32];
     int nameLen = parse_name(slotPtr, tmpName, sizeof(tmpName));
     slotPtr += nameLen;
-    slotPtr += 4;  /* Skip to perf settings (byte 4 of remaining data) */
     
     focusSlot = (slotPtr[0] >> 4) & 0x03;
     rangeEnable = (slotPtr[1] >> 0) & 0x01;
@@ -501,7 +500,8 @@ int g2_settings(output_format_t format) {
     split = (slotPtr[3] >> 1) & 0x01;
     clockRun = (slotPtr[3] >> 0) & 0x01;
     
-    slotPtr += 7;  /* Skip remaining perf settings + padding to slot data */
+    /* Skip 11 bytes (7 perf settings + 4 padding) to get to slot data */
+    slotPtr += 11;
     
     /* Now parse each slot */
     for (int i = 0; i < 4; i++) {
