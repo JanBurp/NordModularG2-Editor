@@ -483,25 +483,39 @@ int g2_settings(output_format_t format) {
         parse_name(perfData + 4, perfName, sizeof(perfName));
     }
     
-    /* Performance data parsing:
-     * After 4-byte header, parse perf name, then read perf settings
-     * g2ctl: parse_name returns name, remaining data starts at byte after name
-     * Focus is bits 4-5 of byte 0 of remaining data
+    /* Performance data parsing - matching g2ctl's BitStream implementation:
+     * data = perfData[4:] (skip 4-byte header)
+     * parse_name(data) returns (name, remaining starting at byte after name)
+     * g2ctl: BitStream(data, 8*4) positions at bit 32
+     * Focus is bits 4-5 of byte 4 of remaining
      */
-    uint8_t *slotPtr = perfData + 4;
+    uint8_t *remaining = perfData + 4;
     
     char tmpName[32];
-    int nameLen = parse_name(slotPtr, tmpName, sizeof(tmpName));
-    slotPtr += nameLen;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
     
-    focusSlot = (slotPtr[0] >> 4) & 0x03;
-    rangeEnable = (slotPtr[1] >> 0) & 0x01;
-    bpm = slotPtr[2];
-    split = (slotPtr[3] >> 1) & 0x01;
-    clockRun = (slotPtr[3] >> 0) & 0x01;
+    remaining += nameLen;  /* Skip past name */
     
-    /* Skip 11 bytes (7 perf settings + 4 padding) to get to slot data */
-    slotPtr += 11;
+    /* g2ctl's BitStream(data, 8*4) reads at bit position 32
+     * Focus is 2 bits at bit 36 (after 4 bits skip + 2 bits focus)
+     * Extract using proper bitstream formula: word bits 30-31
+     */
+    uint8_t *perfSettings = remaining + 4;  /* Byte 4 of remaining = bit 32 position */
+    
+    /* Pack 4 bytes for bitstream reading */
+    uint32_t word = (perfSettings[0] << 24) | (perfSettings[1] << 16) | (perfSettings[2] << 8) | perfSettings[3];
+    
+    /* Extract focus from bits 36-37: (word >> 26) & 3 */
+    focusSlot = (word >> (32 - 4 - 2)) & 0x3;
+    
+    /* g2ctl reads 8-bit values for range_enable, bpm, split, clock at bit 38+ */
+    rangeEnable = remaining[5];
+    bpm = remaining[6];
+    split = remaining[7] & 1;
+    clockRun = remaining[8] & 1;
+    
+    /* g2ctl: data = data[11:] to skip to slot data */
+    uint8_t *slotPtr = remaining + 11;
     
     /* Now parse each slot */
     for (int i = 0; i < 4; i++) {
