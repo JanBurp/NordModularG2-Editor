@@ -4,10 +4,12 @@
 
 #include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
 #include "cJSON.h"
 #include "output.h"
 
 static void tree_parse_value(const char *json, int *pos, int indent, int isLast);
+static void print_compact(const char *json);
 
 void output_json(const cJSON *json, int format) {
     char *json_str = NULL;
@@ -20,9 +22,10 @@ void output_json(const cJSON *json, int format) {
         tree_parse_value(json_str, &pos, 0, 1);
         free(json_str);
     } else if (format == OUTPUT_PRETTY) {
-        json_str = cJSON_Print(json);
+        json_str = cJSON_PrintUnformatted(json);
         if (!json_str) return;
-        printf("%s\n", json_str);
+        
+        print_compact(json_str);
         free(json_str);
     } else {
         json_str = cJSON_PrintUnformatted(json);
@@ -30,6 +33,48 @@ void output_json(const cJSON *json, int format) {
         printf("%s\n", json_str);
         free(json_str);
     }
+}
+
+static void print_compact(const char *json) {
+    int depth = 0;
+    int inString = 0;
+    
+    for (int i = 0; json[i]; i++) {
+        char c = json[i];
+        
+        if (c == '"' && (i == 0 || json[i-1] != '\\')) {
+            inString = !inString;
+            putchar(c);
+        } else if (inString) {
+            putchar(c);
+        } else if (c == '{' || c == '[') {
+            putchar(c);
+            putchar('\n');
+            depth++;
+            for (int j = 0; j < depth; j++) printf("  ");
+        } else if (c == '}') {
+            putchar('\n');
+            depth--;
+            for (int j = 0; j < depth; j++) printf("  ");
+            putchar('}');
+        } else if (c == ']') {
+            putchar('\n');
+            depth--;
+            for (int j = 0; j < depth; j++) printf("  ");
+            putchar(']');
+        } else if (c == ',') {
+            putchar(',');
+            putchar('\n');
+            for (int j = 0; j < depth; j++) printf("  ");
+        } else if (c == ':') {
+            printf(": ");
+        } else if (c == ' ' || c == '\t' || c == '\n' || c == '\r') {
+            // Skip whitespace from unformatted JSON
+        } else {
+            putchar(c);
+        }
+    }
+    putchar('\n');
 }
 
 static void tree_parse_value(const char *json, int *pos, int indent, int isLast) {

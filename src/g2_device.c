@@ -467,52 +467,61 @@ int g2_settings(output_format_t format) {
     /* Build JSON output using cJSON */
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "synthName", synthName);
-    cJSON_AddNumberToObject(root, "mode", mode);
+    cJSON_AddStringToObject(root, "mode", mode ? "Performance" : "Patch");
     
-    cJSON *midiChArray = cJSON_CreateArray();
-    for (int i = 0; i < 5; i++) {
-        cJSON_AddItemToArray(midiChArray, cJSON_CreateNumber(midiCh[i]));
-    }
-    cJSON_AddItemToObject(root, "midiChannels", midiChArray);
+    /* midi object */
+    cJSON *midi = cJSON_CreateObject();
+    cJSON *midiSlots = cJSON_CreateObject();
+    cJSON_AddNumberToObject(midiSlots, "a", midiCh[0]);
+    cJSON_AddNumberToObject(midiSlots, "b", midiCh[1]);
+    cJSON_AddNumberToObject(midiSlots, "c", midiCh[2]);
+    cJSON_AddNumberToObject(midiSlots, "d", midiCh[3]);
+    cJSON_AddNumberToObject(midiSlots, "global", midiCh[4]);
+    cJSON_AddItemToObject(midi, "slots", midiSlots);
+    cJSON_AddNumberToObject(midi, "sysex", sysexId + 1);
+    cJSON_AddBoolToObject(midi, "local", localOn);
+    static const char *prgch_str[] = { "off", "send", "recv", "both" };
+    cJSON_AddStringToObject(midi, "prgch", prgch_str[prgch & 0x3]);
+    cJSON_AddBoolToObject(midi, "clkse", clkSend);
+    cJSON_AddBoolToObject(midi, "clkre", clkRecv);
+    cJSON_AddItemToObject(root, "midi", midi);
     
-    cJSON_AddNumberToObject(root, "sysexId", sysexId);
-    cJSON_AddBoolToObject(root, "localOn", localOn);
-    cJSON_AddNumberToObject(root, "prgch", prgch);
-    cJSON_AddBoolToObject(root, "clkSend", clkSend);
-    cJSON_AddBoolToObject(root, "clkRecv", clkRecv);
+    /* tuning object */
+    cJSON *tuning = cJSON_CreateObject();
+    cJSON_AddNumberToObject(tuning, "semi", tuneSemi);
+    cJSON_AddNumberToObject(tuning, "cent", tuneCent);
+    cJSON_AddItemToObject(root, "tuning", tuning);
     
-    cJSON *tune = cJSON_CreateObject();
-    cJSON_AddNumberToObject(tune, "semi", tuneSemi);
-    cJSON_AddNumberToObject(tune, "cent", tuneCent);
-    cJSON_AddItemToObject(root, "tune", tune);
-    
+    /* pedal object - gain is 1.0 + 0.5 * val / 32 */
     cJSON *pedal = cJSON_CreateObject();
-    cJSON_AddNumberToObject(pedal, "polarity", pedalPolarity);
-    cJSON_AddNumberToObject(pedal, "gain", pedalGain);
+    cJSON_AddBoolToObject(pedal, "polarity", pedalPolarity);
+    cJSON_AddNumberToObject(pedal, "gain", 1.0 + 0.5 * pedalGain / 32.0);
     cJSON_AddItemToObject(root, "pedal", pedal);
     
+    /* performance object - focus is slot letter */
     cJSON *perf = cJSON_CreateObject();
     cJSON_AddStringToObject(perf, "name", perfName);
-    cJSON_AddNumberToObject(perf, "focusSlot", focusSlot);
+    cJSON_AddStringToObject(perf, "focus", (char*[]){ "a", "b", "c", "d" }[focusSlot]);
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
-    cJSON_AddBoolToObject(perf, "clockRun", clockRun);
-    cJSON_AddBoolToObject(perf, "split", split);
+    cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
+    cJSON_AddBoolToObject(perf, "kbSplit", split);
     cJSON_AddItemToObject(root, "performance", perf);
     
+    /* slots array */
     cJSON *slots = cJSON_CreateArray();
     for (int i = 0; i < 4; i++) {
         cJSON *slot = cJSON_CreateObject();
         cJSON_AddStringToObject(slot, "slot", (char*[]){ "a", "b", "c", "d" }[i]);
-        cJSON_AddStringToObject(slot, "name", slotNames[i]);
         cJSON_AddNumberToObject(slot, "bank", slotBanks[i]);
         cJSON_AddNumberToObject(slot, "patch", slotPatches[i]);
+        cJSON_AddStringToObject(slot, "name", slotNames[i]);
         cJSON_AddBoolToObject(slot, "active", slotActive[i]);
         cJSON_AddBoolToObject(slot, "key", slotKey[i]);
         cJSON_AddBoolToObject(slot, "hold", slotHold[i]);
         cJSON *range = cJSON_CreateObject();
-        cJSON_AddNumberToObject(range, "low", slotLow[i]);
-        cJSON_AddNumberToObject(range, "high", slotHigh[i]);
+        cJSON_AddNumberToObject(range, "lower", slotLow[i]);
+        cJSON_AddNumberToObject(range, "upper", slotHigh[i]);
         cJSON_AddItemToObject(slot, "range", range);
         cJSON_AddItemToArray(slots, slot);
     }
