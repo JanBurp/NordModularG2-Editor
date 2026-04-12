@@ -344,31 +344,31 @@ int g2_status(output_format_t format) {
     parse_name(bulkData + 4, synthName, sizeof(synthName));
 
     /* Direct byte access based on g2ctl.py bitstream analysis:
-     * Name is 10 bytes (9 chars + null), so bitstream starts at byte 14
-     * g2ctl: bitstream.seek_bit(8*5) = bit 40, then reads 5 x 8 bits for MIDI
-     * At bit 40: byte 5 of data starting at byte 14 = bulkData[19]
-     * But g2ctl shows MIDI A = 10, and bulkData[19] = 0x0a = 10
-     * 
-     * After name (10 bytes at offset 4):
-     * Offset 14: Perf Mode
-     * Offset 15: Perf Bank
-     * Offset 16: Perf Location
-     * Offset 17: Memory Protect + padding
-     * Offset 18: MIDI Slot A = 0x0a = 10 ✓
-     * Offset 19: MIDI Slot B = 0x0b = 11 ✓
-     * Offset 20: MIDI Slot C = 0x0c = 12 ✓
-     * Offset 21: MIDI Slot D = 0x0d = 13 ✓
-     * Offset 22: Global chan = 0x0f = 15 ✓
-     * Offset 23: Sysex ID = 0x10 = 16, g2ctl shows 17 (adds 1)
-     * Offset 24: Local on (bit 0) = 0x00, g2ctl shows "on"
-     * Offset 25: Prog Change Rcv (bit 0), Snd (bit 1)
-     * Offset 26: Controllers
-     * Offset 27: Send Clock (bit 1), ignore ext clock (bit 2)
-     * Offset 28: Tune cent
-     * Offset 30: Tune semi
-     * Offset 32: Pedal Polarity (bit 0)
-     * Offset 33: Control Pedal Gain
-     */
+      * Name is 10 bytes (9 chars + null), so bitstream starts at byte 14
+      * g2ctl: bitstream.seek_bit(8*5) = bit 40, then reads 5 x 8 bits for MIDI
+      * At bit 40: byte 5 of data starting at byte 14 = bulkData[19]
+      * But g2ctl shows MIDI A = 10, and bulkData[19] = 0x0a = 10
+      * 
+      * After name (10 bytes at offset 4):
+      * Offset 14: Perf Mode
+      * Offset 15: Perf Bank
+      * Offset 16: Perf Location
+      * Offset 17: Memory Protect + padding
+      * Offset 18: MIDI Slot A = 0x0a = 10 ✓
+      * Offset 19: MIDI Slot B = 0x0b = 11 ✓
+      * Offset 20: MIDI Slot C = 0x0c = 12 ✓
+      * Offset 21: MIDI Slot D = 0x0d = 13 ✓
+      * Offset 22: Global chan = 0x0f = 15 ✓
+      * Offset 23: Sysex ID = 0x10 = 16, g2ctl shows 17 (adds 1)
+      * Offset 24: Local on (bit 7)
+      * Offset 25: Prog Change Rcv (bit 0), Snd (bit 1)
+      * Offset 26: Controllers
+      * Offset 27: Send Clock (bit 1), Receive Clock (bit 0)
+      * Offset 28: Tune cent
+      * Offset 30: Tune semi
+      * Offset 32: Pedal Polarity (bit 0)
+      * Offset 34: Control Pedal Gain (NOT 33!)
+      */
     mode = bulkData[14] & 1;  /* mode (bit 0) */
     midiChannels[0] = bulkData[18];  /* MIDI A */
     midiChannels[1] = bulkData[19];  /* MIDI B */
@@ -383,7 +383,7 @@ int g2_status(output_format_t format) {
     tuneCent = bulkData[28];  /* tune cent */
     tuneSemi = bulkData[30];  /* tune semi */
     pedalPolarity = bulkData[32] & 1;  /* pedal polarity (bit 0) */
-    pedalGain = bulkData[33];  /* pedal gain */
+    pedalGain = bulkData[34];  /* pedal gain (byte 34, not 33) */
 
     free(bulkData);
     bulkData = NULL;
@@ -423,17 +423,17 @@ int g2_status(output_format_t format) {
     printf("      \"global\": %d\n", midiChannels[4]);
     printf("    },\n");
     printf("    \"sysex\": %d,\n", sysexId + 1);
-    printf("    \"local\": \"%s\",\n", localOn ? "on" : "off");
+    printf("    \"local\": %s,\n", localOn ? "true" : "false");
     printf("    \"prgch\": \"%s\",\n", prgchStr);
-    printf("    \"clkse\": \"%s\",\n", clkSend ? "off" : "on");
-    printf("    \"clkre\": \"%s\"\n", clkRecv ? "off" : "on");
+    printf("    \"clkse\": %s,\n", clkSend ? "false" : "true");
+    printf("    \"clkre\": %s\n", clkRecv ? "false" : "true");
     printf("  },\n");
     printf("  \"tuning\": {\n");
     printf("    \"semi\": %d,\n", (int8_t)tuneSemi);
     printf("    \"cent\": %d\n", (int8_t)tuneCent);
     printf("  },\n");
     printf("  \"pedal\": {\n");
-    printf("    \"polarity\": \"%s\",\n", pedalPolarity ? "closed" : "open");
+    printf("    \"polarity\": %s,\n", pedalPolarity ? "true" : "false");
     printf("    \"gain\": %.1f\n", 1.0 + 0.5 * pedalGain / 32.0);
     printf("  },\n");
     printf("  \"performance\": {\n");
