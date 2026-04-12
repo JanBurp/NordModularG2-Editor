@@ -383,6 +383,52 @@ int g2_status(output_format_t format) {
      * The slot names and patch info require additional commands to retrieve.
      */
 
+    /* Output JSON */
+    const char *modeStr = mode ? "Performance" : "Patch";
+    const char *prgchStr;
+    switch (prgch) {
+        case 1: prgchStr = "send"; break;
+        case 2: prgchStr = "recv"; break;
+        case 3: prgchStr = "send/recv"; break;
+        default: prgchStr = "off";
+    }
+
+    printf("{\n");
+    printf("  \"name\": \"%s\",\n", synthName);
+    printf("  \"mode\": \"%s\",\n", modeStr);
+    printf("  \"midi\": {\n");
+    printf("    \"slots\": {\n");
+    printf("      \"a\": %d,\n", midiChannels[0]);
+    printf("      \"b\": %d,\n", midiChannels[1]);
+    printf("      \"c\": %d,\n", midiChannels[2]);
+    printf("      \"d\": %d,\n", midiChannels[3]);
+    printf("      \"global\": %d\n", midiChannels[4]);
+    printf("    },\n");
+    printf("    \"sysex\": %d,\n", sysexId + 1);
+    printf("    \"local\": %s,\n", localOn ? "true" : "false");
+    printf("    \"prgch\": \"%s\",\n", prgchStr);
+    printf("    \"clkse\": %s,\n", clkSend ? "true" : "false");
+    printf("    \"clkre\": %s\n", clkRecv ? "true" : "false");
+    printf("  },\n");
+    printf("  \"tuning\": {\n");
+    printf("    \"semi\": %d,\n", (int8_t)tuneSemi);
+    printf("    \"cent\": %d\n", (int8_t)tuneCent);
+    printf("  },\n");
+    printf("  \"pedal\": {\n");
+    printf("    \"polarity\": \"%s\",\n", pedalPolarity ? "closed" : "open");
+    printf("    \"gain\": %.1f\n", 1.0 + 0.5 * pedalGain / 32.0);
+    printf("  },\n");
+    printf("  \"performance\": {\n");
+    printf("    \"name\": \"\",\n");
+    printf("    \"focus\": \"\",\n");
+    printf("    \"rangeEnable\": false,\n");
+    printf("    \"bpm\": 0,\n");
+    printf("    \"clockRunning\": false,\n");
+    printf("    \"kbSplit\": false\n");
+    printf("  },\n");
+    printf("  \"slots\": []\n");
+    printf("}\n");
+
     (void)perfName;
     (void)slotNames;
     (void)slotBanks;
@@ -393,43 +439,6 @@ int g2_status(output_format_t format) {
     (void)bpm;
     (void)clockRun;
     (void)split;
-
-    /* Output JSON */
-    const char *modeStr = mode ? "Performance" : "Patch";
-    const char *slotLetters = "ABCD";
-    const char *localStr = localOn ? "on" : "off";
-    const char *prgchStr;
-    switch (prgch) {
-        case 1: prgchStr = "send"; break;
-        case 2: prgchStr = "recv"; break;
-        case 3: prgchStr = "send/recv"; break;
-        default: prgchStr = "off";
-    }
-
-    printf("{\n");
-    printf("  \"status\": \"ok\",\n");
-    printf("  \"synthName\": \"%s\",\n", synthName);
-    printf("  \"mode\": \"%s\",\n", modeStr);
-    printf("  \"midi\": {\n");
-    /* G2 MIDI channels are stored 0-15 representing 1-16, 16=off for slots, 128=off for global */
-    if (midiChannels[0] == 16) printf("    \"slotA\": \"off\",\n"); else printf("    \"slotA\": %d,\n", midiChannels[0]);
-    if (midiChannels[1] == 16) printf("    \"slotB\": \"off\",\n"); else printf("    \"slotB\": %d,\n", midiChannels[1]);
-    if (midiChannels[2] == 16) printf("    \"slotC\": \"off\",\n"); else printf("    \"slotC\": %d,\n", midiChannels[2]);
-    if (midiChannels[3] == 16) printf("    \"slotD\": \"off\",\n"); else printf("    \"slotD\": %d,\n", midiChannels[3]);
-    if (midiChannels[4] == 128) printf("    \"global\": \"off\"\n"); else printf("    \"global\": %d\n", midiChannels[4]);
-    printf("  },\n");
-    printf("  \"sysex\": %d,\n", sysexId + 1);
-    printf("  \"local\": %s,\n", localOn ? "true" : "false");
-    printf("  \"prgch\": \"%s\",\n", prgchStr);
-    printf("  \"tuning\": {\n");
-    printf("    \"semi\": %d,\n", (int8_t)tuneSemi);
-    printf("    \"cent\": %d\n", (int8_t)tuneCent);
-    printf("  },\n");
-    printf("  \"pedal\": {\n");
-    printf("    \"polarity\": \"%s\",\n", pedalPolarity ? "closed" : "open");
-    printf("    \"gain\": %.2f\n", 1.0 + 0.5 * pedalGain / 32.0);
-    printf("  }\n");
-    printf("}\n");
 
     return status;
 }
