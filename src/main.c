@@ -9,6 +9,7 @@
 #include <unistd.h>
 #include "defs.h"
 #include "g2_device.h"
+#include "output.h"
 
 #define PROGRAM_NAME "g2-cli"
 #define PROGRAM_VERSION "1.0.0"
@@ -84,7 +85,11 @@ int main(int argc, char *argv[]) {
     
     /* Initialize G2 library */
     if (g2_init() < 0) {
-        fprintf(stderr, "Failed to initialize G2 library\n");
+        if (output_format == OUTPUT_JSON) {
+            output_error_json("Failed to initialize G2 library", output_format);
+        } else {
+            fprintf(stderr, "Failed to initialize G2 library\n");
+        }
         return 1;
     }
     
@@ -107,7 +112,11 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(command, "get-patch") == 0) {
         if (i + 1 >= argc) {
-            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("slot required (A, B, C, or D)", output_format);
+            } else {
+                fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            }
             return 1;
         }
         return g2_get_patch(argv[i + 1], output_format);
@@ -120,7 +129,11 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(command, "slot") == 0) {
         if (i + 1 >= argc) {
-            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("slot required (A, B, C, or D)", output_format);
+            } else {
+                fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            }
             return 1;
         }
         return g2_select_slot(argv[i + 1]);
@@ -128,7 +141,11 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(command, "select-slot") == 0) {
         if (i + 1 >= argc) {
-            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("slot required (A, B, C, or D)", output_format);
+            } else {
+                fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            }
             return 1;
         }
         return g2_select_slot(argv[i + 1]);
@@ -136,7 +153,11 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(command, "variation") == 0) {
         if (i + 1 >= argc) {
-            fprintf(stderr, "Error: variation required (1-8)\n");
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("variation required (1-8)", output_format);
+            } else {
+                fprintf(stderr, "Error: variation required (1-8)\n");
+            }
             return 1;
         }
         return g2_select_variation(atoi(argv[i + 1]));
@@ -144,13 +165,21 @@ int main(int argc, char *argv[]) {
     
     if (strcmp(command, "select-variation") == 0) {
         if (i + 1 >= argc) {
-            fprintf(stderr, "Error: variation required (1-8)\n");
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("variation required (1-8)", output_format);
+            } else {
+                fprintf(stderr, "Error: variation required (1-8)\n");
+            }
             return 1;
         }
         return g2_select_variation(atoi(argv[i + 1]));
     }
     
-    fprintf(stderr, "Unknown command: %s\n", command);
-    print_usage(argv[0]);
+    if (output_format == OUTPUT_JSON) {
+        output_error_json("unknown command", output_format);
+    } else {
+        fprintf(stderr, "Unknown command: %s\n", command);
+        print_usage(argv[0]);
+    }
     return 1;
 }

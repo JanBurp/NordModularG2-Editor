@@ -35,6 +35,26 @@ void output_json(const cJSON *json, int format) {
     }
 }
 
+void output_error_json(const char *error, int format) {
+    cJSON *err_obj = cJSON_CreateObject();
+    cJSON_AddStringToObject(err_obj, "error", error);
+    
+    if (format == OUTPUT_TREE) {
+        printf("{\n");
+        printf("  \"- error\": ");
+        cJSON *err_str = cJSON_GetObjectItem(err_obj, "error");
+        if (err_str) printf("\"%s\"\n", err_str->valuestring);
+        printf("}\n");
+    } else {
+        char *json_str = cJSON_PrintUnformatted(err_obj);
+        if (json_str) {
+            printf("%s\n", json_str);
+            free(json_str);
+        }
+    }
+    cJSON_Delete(err_obj);
+}
+
 static void print_compact(const char *json) {
     int depth = 0;
     int inString = 0;
