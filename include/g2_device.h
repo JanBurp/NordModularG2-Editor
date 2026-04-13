@@ -64,7 +64,7 @@ int g2_list(output_format_t format, int filter, int bank_filter);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);
-int g2_select_variation(int variation);
+int g2_select_variation(int variation, int slot);
 
 /* Utility */
 slot_t parse_slot(const char *slot_str);

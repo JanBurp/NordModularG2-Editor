@@ -1324,15 +1324,19 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
     return 0;
 }
 
-int g2_select_variation(int variation) {
+int g2_select_variation(int variation, int slot) {
     uint8_t response[16] = {0};
     uint8_t slota[16] = {0};
-    uint8_t slotIndex;
     int ret;
     uint8_t extraData[1] = {0};
 
     if (variation < 1 || variation > 8) {
         fprintf(stderr, "Invalid variation: %d (must be 1-8)\n", variation);
+        return -1;
+    }
+
+    if (slot < 0 || slot > 3) {
+        fprintf(stderr, "Invalid slot: %d (must be 0-3 or -1 for current)\n", slot);
         return -1;
     }
 
@@ -1344,9 +1348,8 @@ int g2_select_variation(int variation) {
         }
     }
 
-    /* Step 1: Send [CMD_SYS, 0x41, 0x35, 0x00] to get current slot info */
-    uint8_t cmdData[4] = {0x35, 0x00};
-    fprintf(stderr, "DEBUG: Sending variation cmd1: [0x41, 0x35, 0x00]\n");
+    /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
+    uint8_t cmdData[4] = {0x35, (uint8_t)slot};
     if (send_command_with_data(0x41, cmdData, 2) < 0) {
         fprintf(stderr, "Failed to send variation command 1\n");
         return -1;
@@ -1354,32 +1357,21 @@ int g2_select_variation(int variation) {
     usleep(100000);
     
     ret = recv_interrupt(slota, 16, USB_TIMEOUT_LONG);
-    fprintf(stderr, "DEBUG: variation cmd1 response (%d bytes): ", ret);
-    for (int i = 0; i < ret && i < 16; i++) fprintf(stderr, "%02x ", slota[i]);
-    fprintf(stderr, "\n");
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
         return -1;
     }
-    slotIndex = slota[5];
-    fprintf(stderr, "DEBUG: slotIndex = %d (0x%02x)\n", slotIndex, slotIndex);
+    uint8_t version = slota[6];
 
-    /* Step 2: Send [CMD_A, slota[5], 0x6a, variation - 1]
-     * Python uses CMD_A (0x08) as base, not CMD_A + slot
-     * Use slot=0 (slot A), version=slota[5] from first response
-     * Try version 0x0a (common version used in other commands) */
+    /* Step 2: Send [CMD_A + slot, version, 0x6a, variation - 1]
+     * Version comes from slota[6] (matches Python embedded_message output) */
     extraData[0] = variation - 1;
-    fprintf(stderr, "DEBUG: Sending variation cmd2: slot=0, version=0x%02x, subcmd=0x6a, extra=%d\n", 
-            0x0a, extraData[0]);
-    if (send_slot_command_with_data(0, 0x0a, 0x6a, extraData, 1) < 0) {
+    if (send_slot_command_with_data(slot, version, 0x6a, extraData, 1) < 0) {
         fprintf(stderr, "Failed to send variation command 2\n");
         return -1;
     }
     usleep(100000);
     ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_LONG, 5);
-    fprintf(stderr, "DEBUG: variation cmd2 response (%d bytes): ", ret);
-    for (int i = 0; i < ret && i < 16; i++) fprintf(stderr, "%02x ", response[i]);
-    fprintf(stderr, "\n");
 
-    return 0;
+    return (ret > 0) ? 0 : -1;
 }
