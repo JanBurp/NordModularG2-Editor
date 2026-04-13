@@ -39,7 +39,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli list-modules [slot]` | 0x34 | Not implemented |
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
 | `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Not implemented |
-| `g2-cli watch` | - | Not implemented |
+| `g2-cli watch` | - | **Implemented** (simple single-threaded, Ctrl+C to stop) - **Not working**: G2 does not send param change notifications via USB interrupt. Init sequence completes but no param data received when turning knobs. Requires further investigation. |
 
 ## Testing Notes
 
@@ -47,6 +47,24 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 - `g2-cli list` - Test with real G2 to verify patch/performance listing
 - `g2-cli get-patch-file <slot> [filename]` - Test file output with real G2
 - `g2-cli set-patch-*` - Test file upload commands
+- `g2-cli watch` - **Investigation needed**: G2 does not appear to send param change notifications via USB. Both G2-Edit and CLI see no param change data.
+
+## Future Enhancements
+
+**Watch mode investigation (needed):**
+- Current `watch` implementation sends init sequence (Init, Stop, GetSynthSettings, Start) but receives no param change data
+- Possible causes:
+  1. G2 only sends param change notifications via MIDI, not USB
+  2. G2-Edit uses a different mechanism (polling vs interrupts)
+  3. Param changes require active patch data streaming to be enabled
+  4. G2 hardware knob turns don't generate USB notifications at all
+- Next steps: Capture USB traffic with G2-Edit to see actual protocol, or try polling approach instead of interrupt
+
+**Multi-threaded watch mode (future):**
+- Current `watch` implementation is simple single-threaded (blocks until Ctrl+C)
+- Future version should use separate USB polling thread (like G2-Edit's `usb_thread_loop`)
+- Benefits: Can run other commands while watching, real-time updates
+- Requires: Mutex-protected USB device access, thread-safe message passing
 
 ## Output Flags
 

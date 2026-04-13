@@ -1376,4 +1376,147 @@ int g2_select_variation(int variation, int slot) {
     return (ret > 0) ? 0 : -1;
 }
 
+volatile int g2_watch_running = 1;
+
+void g2_watch_stop(int sig) {
+    (void)sig;
+    g2_watch_running = 0;
+}
+
+static int discard_interrupt_response(void) {
+    uint8_t dummy[32] = {0};
+    return recv_interrupt(dummy, sizeof(dummy), USB_TIMEOUT_LONG);
+}
+
+int g2_watch(output_format_t format) {
+    uint8_t response[32] = {0};
+    uint8_t cmd_data[2] = {0};
+    int ret;
+    int transferred;
+    int poll_count = 0;
+
+    if (!g2_is_connected()) {
+        if (g2_connect_silent() < 0) {
+            fprintf(stderr, "Failed to connect to G2\n");
+            return -1;
+        }
+    }
+
+    signal(SIGINT, g2_watch_stop);
+    signal(SIGTERM, g2_watch_stop);
+
+    printf("Initializing G2 for param change monitoring...\n");
+
+    /* Step 1: eStateInit - send 0x80 (special single-byte command) */
+    printf("Step 1: Init (0x80)...\n");
+    uint8_t init_cmd[] = {0x80};
+    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, init_cmd, 1, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret == 0) {
+        usleep(100000);
+        discard_interrupt_response();
+        printf("  -> Init response received\n");
+    } else {
+        printf("  -> Init failed\n");
+    }
+
+    /* Step 2: eStateStop - reset the G2 */
+    printf("Step 2: Stop (0x41, 0x7d, 0x01)...\n");
+    cmd_data[0] = SUB_COMMAND_START_STOP;
+    cmd_data[1] = 0x01;  /* stop */
+    if (send_command_with_data(0x41, cmd_data, 2) == 0) {
+        usleep(100000);
+        discard_interrupt_response();
+        printf("  -> Stop response received\n");
+    } else {
+        printf("  -> Stop failed\n");
+    }
+
+    /* Step 3: eStateGetSynthSettings - get synth settings to initialize G2 state */
+    printf("Step 3: GetSynthSettings (0x41, 0x02)...\n");
+    if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
+        usleep(100000);
+        discard_interrupt_response();
+        printf("  -> SynthSettings response received\n");
+    } else {
+        printf("  -> GetSynthSettings failed\n");
+    }
+
+    /* Step 9: eStateStart - arm the G2 to send notifications */
+    printf("Step 4: Start (0x41, 0x7d, 0x00)...\n");
+    cmd_data[0] = SUB_COMMAND_START_STOP;
+    cmd_data[1] = 0x00;  /* start */
+    if (send_command_with_data(0x41, cmd_data, 2) == 0) {
+        usleep(100000);
+        discard_interrupt_response();
+        printf("  -> Start response received\n");
+    } else {
+        printf("  -> Start failed\n");
+    }
+
+    printf("Initialization complete. Starting poll loop...\n");
+    printf("NOTE: Turn knobs on G2 hardware to see param changes\n\n");
+
+    if (format == OUTPUT_JSON) {
+        printf("[\n");
+    } else {
+        printf("%-10s %-8s %-8s %-8s %-8s\n", "location", "index", "param", "value", "variation");
+        printf("%-10s %-8s %-8s %-8s %-8s\n", "---------", "------", "-----", "-----", "---------");
+    }
+
+    while (g2_watch_running) {
+        ret = recv_interrupt(response, sizeof(response), 100);
+        poll_count++;
+
+        /* Heartbeat: print "." every 50 iterations (~5 seconds) */
+        if (poll_count % 50 == 0) {
+            printf(".");
+            fflush(stdout);
+        }
+
+        if (ret > 0) {
+            printf("\n[Poll #%d] DEBUG: raw data (len=%d): ", poll_count, ret);
+            for (int j = 0; j < ret && j < 20; j++) {
+                printf("%02x ", response[j]);
+            }
+            printf("\n");
+
+            uint8_t type_nibble = response[0] & 0x0f;
+
+            printf("  type_nibble=0x%01x, byte[1]=0x%02x, byte[2]=0x%02x, byte[3]=0x%02x\n",
+                   type_nibble, response[1], response[2], response[3]);
+
+            if (type_nibble == RESPONSE_TYPE_COMMAND || type_nibble == RESPONSE_TYPE_EMBEDDED) {
+                uint8_t subCommand = response[3];
+                printf("  Trying subCommand=byte[3]=0x%02x (looking for 0x40)\n", subCommand);
+
+                if (subCommand == SUB_RESPONSE_PARAM_CHANGE) {
+                    uint8_t location = response[4];
+                    uint8_t index = response[5];
+                    uint8_t param = response[6];
+                    uint8_t value = response[7];
+                    uint8_t variation = response[8];
+
+                    if (format == OUTPUT_JSON) {
+                        printf("  {\"location\": %u, \"index\": %u, \"param\": %u, \"value\": %u, \"variation\": %u},\n",
+                               location, index, param, value, variation);
+                    } else {
+                        printf("%-10u %-8u %-8u %-8u %-8u\n",
+                               location, index, param, value, variation);
+                    }
+                }
+            }
+        }
+    }
+
+    printf("\n");
+    if (format == OUTPUT_JSON) {
+        printf("]\n");
+    }
+
+    signal(SIGINT, SIG_DFL);
+    signal(SIGTERM, SIG_DFL);
+
+    return 0;
+}
+
 

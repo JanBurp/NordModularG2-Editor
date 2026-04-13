@@ -10,6 +10,7 @@
 #include "defs.h"
 #include "g2_device.h"
 #include "output.h"
+#include "utils.h"
 
 #define PROGRAM_NAME "g2-cli"
 #define PROGRAM_VERSION "1.0.0"
@@ -37,6 +38,7 @@ static void print_usage(const char *prog) {
     printf("  list [type] [bank <n>]               List patches and performances\n");
     printf("  slot <A|B|C|D>                      Change active slot\n");
     printf("  variation <1-8> <A-D>                Select variation for slot\n");
+    printf("  watch                                Monitor param changes live\n");
     printf("\nCommands (not implemented):\n");
     printf("  * list-modules [slot]                List modules in patch\n");
     printf("  * get-param <module> <param> [var]   Get param value\n");
@@ -44,7 +46,6 @@ static void print_usage(const char *prog) {
     printf("  * set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
     printf("  * set-patch-pch <slot> <file.pch2>   Upload native G2 patch\n");
     printf("  * set-patch-prf <file.prf2>          Upload performance file\n");
-    printf("  * watch                              Monitor param changes live\n");
 }
 
 static output_format_t output_format = OUTPUT_PRETTY;
@@ -205,6 +206,10 @@ int main(int argc, char *argv[]) {
             }
         }
         return g2_select_variation(variation, slot);
+    }
+    
+    if (strcmp(command, "watch") == 0) {
+        return g2_watch(output_format);
     }
     
     if (output_format == OUTPUT_JSON) {

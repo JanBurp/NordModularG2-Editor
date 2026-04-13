@@ -66,11 +66,9 @@ int g2_list(output_format_t format, int filter, int bank_filter);
 int g2_select_slot(const char *slot_str);
 int g2_select_variation(int variation, int slot);
 
-/* Utility */
-slot_t parse_slot(const char *slot_str);
-
-/* Parse synth settings and performance data into JSON */
-cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
-                         const uint8_t *perfData, size_t perfSize);
+/* Watch for param changes (simple single-threaded approach) */
+int g2_watch(output_format_t format);
+volatile extern int g2_watch_running;
+void g2_watch_stop(int sig);
 
 #endif /* __G2_DEVICE_H__ */
