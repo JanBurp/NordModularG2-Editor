@@ -51,11 +51,16 @@ int g2_is_connected(void);
 int g2_send_command(uint8_t *data, int length);
 int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 
+/* List filter options */
+#define LIST_FILTER_ALL            0
+#define LIST_FILTER_PATCHES        1
+#define LIST_FILTER_PERFORMANCES   2
+
 /* Status commands */
 int g2_settings(output_format_t format, int debug);
 int g2_get_patch(const char *slot_str, output_format_t format);
 int g2_get_patch_file(const char *slot_str, const char *filename, output_format_t format);
-int g2_list(output_format_t format);
+int g2_list(output_format_t format, int filter, int bank_filter);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);

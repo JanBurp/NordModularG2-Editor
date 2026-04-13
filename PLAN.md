@@ -32,7 +32,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli variation <1-8>` | 0x6a | NOT WORKING |
 | `g2-cli get-patch <slot>` | 0x35+0x28 | Done (slot required) |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
-| `g2-cli list` | 0x14 | **Done** |
+| `g2-cli list [type] [bank <n>]` | 0x14 | **Done** (with filtering) |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
@@ -290,7 +290,43 @@ make test
 - [x] Iterate through both Patch (Pch2) and Performance (Prf2) modes
 - [x] Parse control codes: JUMP, SKIP, BANK, MODE, CONTINUE
 - [x] Parse category names using g2categories mapping
-- [ ] Test with real G2 hardware
+- [x] Add filter options: `list [patches|performances] [bank <n>]`
+- [x] Output grouped by bank for efficiency
+- [x] Test with real G2 hardware - WORKS!
+- [x] Verify speed improvement with bank filtering
+
+---
+
+## List Command Usage
+
+```
+g2-cli list [type] [bank <n>]
+
+Examples:
+  g2-cli list                  # All patches and performances
+  g2-cli list patches          # Only patches, all banks
+  g2-cli list performances     # Only performances, all banks
+  g2-cli list bank 7          # All from bank 7
+  g2-cli list patches bank 7   # Only patches from bank 7
+  g2-cli list performances bank 1  # Only performances from bank 1
+```
+
+**Filter Options:**
+- `patches` - Only list patches (excludes performances)
+- `performances` - Only list performances (excludes patches)
+- `bank <n>` - Only list from bank n (1-32)
+
+**Output Structure:**
+- Full list: `{"patches": {...}, "performances": {...}}`
+- Filtered: `{"1": [...], "2": [...], ...}` (directly, not wrapped)
+
+**Performance:**
+| Command | Time | Speedup |
+|---------|------|---------|
+| `list` (all) | ~1.9s | baseline |
+| `list patches` | ~1.5s | 21% faster |
+| `list patches bank 7` | ~0.7s | 63% faster |
+| `list performances bank 1` | ~0.4s | 79% faster |
 
 ---
 
@@ -348,16 +384,42 @@ make test
 | 15 | user_2 |
 
 **Example JSON Output:**
+
+Full list (patches + performances):
 ```json
 {
-  "patches": [
-    { "bank": 1, "patch": 1, "category": "Lead", "name": "My Patch" }
+  "patches": {
+    "1": [
+      { "location": 1, "name": "O-CoasT", "category": "user_1" },
+      { "location": 2, "name": "Lyra4", "category": "user_1" }
+    ],
+    "7": [
+      { "location": 1, "name": "2001 Bell DX", "category": "fantasy" }
+    ]
+  },
+  "performances": {
+    "1": [
+      { "location": 1, "name": "ZaagPerformance" }
+    ]
+  }
+}
+```
+
+Filtered (patches or performances only):
+```json
+{
+  "1": [
+    { "location": 1, "name": "O-CoasT", "category": "user_1" }
   ],
-  "performances": [
-    { "bank": 1, "patch": 1, "category": "-", "name": "My Perf" }
+  "7": [
+    { "location": 1, "name": "2001 Bell DX", "category": "fantasy" }
   ]
 }
 ```
+
+**Notes:**
+- `location` replaces `patch` (1-indexed within bank)
+- Category only present for patches (not performances)
 
 ---
 

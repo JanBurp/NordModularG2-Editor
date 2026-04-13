@@ -36,7 +36,7 @@ static void print_usage(const char *prog) {
     printf("  variation <1-8>       Select variation\n");
     printf("  get-patch <slot>      Get patch from slot (A-D) as JSON\n");
     printf("  get-patch-file <slot> [file]  Save patch as .pch2 file\n");
-    printf("  list                  List all patches and performances in G2 memory\n");
+    printf("  list [type] [bank <n>]  List patches and performances (type: patches|performances)\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
     printf("  set-patch-pch <slot> <file.pch2>    Upload native G2 patch\n");
     printf("  set-patch-prf <file.prf2>           Upload performance file\n");
@@ -137,7 +137,38 @@ int main(int argc, char *argv[]) {
     }
     
     if (strcmp(command, "list") == 0) {
-        return g2_list(output_format);
+        int filter = LIST_FILTER_ALL;
+        int bank_filter = 0;
+        
+        /* Parse optional arguments */
+        for (int j = i + 1; j < argc; j++) {
+            if (strcmp(argv[j], "patches") == 0) {
+                filter = LIST_FILTER_PATCHES;
+            } else if (strcmp(argv[j], "performances") == 0) {
+                filter = LIST_FILTER_PERFORMANCES;
+            } else if (strcmp(argv[j], "bank") == 0) {
+                if (j + 1 < argc) {
+                    bank_filter = atoi(argv[++j]);
+                    if (bank_filter < 1 || bank_filter > 32) {
+                        if (output_format == OUTPUT_JSON) {
+                            output_error_json("bank must be 1-32", output_format);
+                        } else {
+                            fprintf(stderr, "Error: bank must be 1-32\n");
+                        }
+                        return 1;
+                    }
+                }
+            } else {
+                if (output_format == OUTPUT_JSON) {
+                    output_error_json("unknown list argument", output_format);
+                } else {
+                    fprintf(stderr, "Error: unknown list argument '%s'\n", argv[j]);
+                }
+                return 1;
+            }
+        }
+        
+        return g2_list(output_format, filter, bank_filter);
     }
     
     if (strcmp(command, "slot") == 0) {

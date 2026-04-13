@@ -1139,23 +1139,26 @@ static const char* g2categories[16] = {
 #define LIST_CONTINUE  5
 #define LIST_LAST      LIST_CONTINUE
 
-int g2_list(output_format_t format) {
+int g2_list(output_format_t format, int filter, int bank_filter) {
     uint8_t response[1024] = {0};
     uint8_t cmdData[4] = {0};
-    cJSON *root = cJSON_CreateObject();
-    cJSON *patches = cJSON_CreateObject();
-    cJSON *performances = cJSON_CreateObject();
+    cJSON *root = NULL;
+    cJSON *result = NULL;
     int ret;
     int mode;
     int bank = 0;
     int patch = 0;
     int PATCH_MODE = 0;
+    int PERFORMANCE_MODE = 1;
     int END_MODE = 2;
+    int start_mode, end_mode;
+    int done = 0;
+    int bank_filter_active = (bank_filter > 0);
+    int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
     
     if (!g2_is_connected()) {
         ret = g2_connect_silent();
         if (ret < 0) {
-            cJSON_Delete(root);
             if (format == OUTPUT_JSON) {
                 output_error_json("not connected", format);
             } else {
@@ -1165,14 +1168,34 @@ int g2_list(output_format_t format) {
         }
     }
     
-    cJSON_AddItemToObject(root, "patches", patches);
-    cJSON_AddItemToObject(root, "performances", performances);
+    if (filter == LIST_FILTER_ALL) {
+        root = cJSON_CreateObject();
+        cJSON *patches = cJSON_CreateObject();
+        cJSON *performances = cJSON_CreateObject();
+        cJSON_AddItemToObject(root, "patches", patches);
+        cJSON_AddItemToObject(root, "performances", performances);
+        result = root;
+    } else {
+        result = cJSON_CreateObject();
+        root = result;
+    }
     
-    for (mode = PATCH_MODE; mode < END_MODE; mode++) {
-        bank = 0;
+    if (filter == LIST_FILTER_ALL) {
+        start_mode = PATCH_MODE;
+        end_mode = END_MODE;
+    } else if (filter == LIST_FILTER_PATCHES) {
+        start_mode = PATCH_MODE;
+        end_mode = PATCH_MODE + 1;
+    } else {
+        start_mode = PERFORMANCE_MODE;
+        end_mode = PERFORMANCE_MODE + 1;
+    }
+    
+    for (mode = start_mode; mode < end_mode && !done; mode++) {
+        bank = initial_bank;
         patch = 0;
         
-        while (mode < END_MODE) {
+        while (mode < END_MODE && !done) {
             cmdData[0] = 0x14;
             cmdData[1] = (uint8_t)mode;
             cmdData[2] = (uint8_t)bank;
@@ -1180,11 +1203,9 @@ int g2_list(output_format_t format) {
             
             if (send_command_with_data(0x41, cmdData, 4) < 0) {
                 fprintf(stderr, "Failed to send list command\n");
-                cJSON_Delete(root);
+                if (root) cJSON_Delete(root);
                 return -1;
             }
-            
-            
             
             ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
             if (ret <= 0) {
@@ -1227,21 +1248,30 @@ int g2_list(output_format_t format) {
                     char bankKey[8];
                     snprintf(bankKey, sizeof(bankKey), "%d", bank + 1);
                     cJSON *bankArray;
-                    if (mode == PATCH_MODE) {
-                        bankArray = cJSON_GetObjectItem(patches, bankKey);
-                        if (!bankArray) {
-                            bankArray = cJSON_CreateArray();
-                            cJSON_AddItemToObject(patches, bankKey, bankArray);
+                    
+                    if (filter == LIST_FILTER_ALL) {
+                        if (mode == PATCH_MODE) {
+                            bankArray = cJSON_GetObjectItem(cJSON_GetObjectItem(root, "patches"), bankKey);
+                            if (!bankArray) {
+                                bankArray = cJSON_CreateArray();
+                                cJSON_AddItemToObject(cJSON_GetObjectItem(root, "patches"), bankKey, bankArray);
+                            }
+                        } else {
+                            bankArray = cJSON_GetObjectItem(cJSON_GetObjectItem(root, "performances"), bankKey);
+                            if (!bankArray) {
+                                bankArray = cJSON_CreateArray();
+                                cJSON_AddItemToObject(cJSON_GetObjectItem(root, "performances"), bankKey, bankArray);
+                            }
                         }
-                        cJSON_AddItemToArray(bankArray, item);
                     } else {
-                        bankArray = cJSON_GetObjectItem(performances, bankKey);
+                        bankArray = cJSON_GetObjectItem(result, bankKey);
                         if (!bankArray) {
                             bankArray = cJSON_CreateArray();
-                            cJSON_AddItemToObject(performances, bankKey, bankArray);
+                            cJSON_AddItemToObject(result, bankKey, bankArray);
                         }
-                        cJSON_AddItemToArray(bankArray, item);
                     }
+                    
+                    cJSON_AddItemToArray(bankArray, item);
                     
                     patch++;
                     pos += nameLen + 1;
@@ -1249,8 +1279,15 @@ int g2_list(output_format_t format) {
                     pos++;
                 } else if (c == LIST_BANK) {
                     if (pos + 3 <= data_len) {
-                        bank = data[pos + 1];
+                        int new_bank = data[pos + 1];
                         patch = data[pos + 2];
+                        
+                        if (bank_filter_active && new_bank != bank) {
+                            done = 1;
+                            break;
+                        }
+                        
+                        bank = new_bank;
                         pos += 3;
                     } else {
                         break;
@@ -1270,18 +1307,19 @@ int g2_list(output_format_t format) {
                     bank = 0;
                     patch = 0;
                     pos++;
+                    if (filter != LIST_FILTER_ALL) {
+                        done = 1;
+                    }
                     break;
                 } else {
                     pos++;
                 }
             }
-            
-            if (mode >= END_MODE) break;
         }
     }
     
-    output_json(root, format);
-    cJSON_Delete(root);
+    output_json(result, format);
+    if (root) cJSON_Delete(root);
     
     return 0;
 }
