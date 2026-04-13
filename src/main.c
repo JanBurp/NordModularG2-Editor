@@ -34,8 +34,8 @@ static void print_usage(const char *prog) {
     printf("  settings              Show synth settings\n");
     printf("  slot <A|B|C|D>        Select active slot\n");
     printf("  variation <1-8>       Select variation\n");
-    printf("  get-patch <slot>      Get patch from slot (A-D)\n");
-    printf("  get-patch-name [slot] Get patch name (A-D, default: current)\n");
+    printf("  get-patch <slot>      Get patch from slot (A-D) as JSON\n");
+    printf("  get-patch-file <slot> [file]  Save patch as .pch2 file\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
     printf("  set-patch-pch <slot> <file.pch2>    Upload native G2 patch\n");
     printf("  set-patch-prf <file.prf2>           Upload performance file\n");
@@ -122,9 +122,17 @@ int main(int argc, char *argv[]) {
         return g2_get_patch(argv[i + 1], output_format);
     }
     
-    if (strcmp(command, "get-patch-name") == 0) {
-        const char *slot = (i + 1 < argc) ? argv[i + 1] : NULL;
-        return g2_get_patch_name(slot, output_format);
+    if (strcmp(command, "get-patch-file") == 0) {
+        if (i + 1 >= argc) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("slot required (A, B, C, or D)", output_format);
+            } else {
+                fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            }
+            return 1;
+        }
+        const char *filename = (i + 2 < argc) ? argv[i + 2] : NULL;
+        return g2_get_patch_file(argv[i + 1], filename, output_format);
     }
     
     if (strcmp(command, "slot") == 0) {

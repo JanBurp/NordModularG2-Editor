@@ -814,11 +814,227 @@ cleanup:
     return 0;
 }
 
-int g2_get_patch_name(const char *slot_str, output_format_t format) {
-    (void)slot_str;
-    (void)format;
-    fprintf(stderr, "Get patch name command not yet implemented\n");
-    return -1;
+int g2_get_patch_file(const char *slot_str, const char *filename, output_format_t format) {
+    int slot;
+    int actual_slot;
+    uint8_t version;
+    uint8_t interruptResp[16] = {0};
+    uint8_t *patchData = NULL;
+    uint16_t patchSize = 0;
+    int ret;
+    int connected = 0;
+    
+    if (!g2_is_connected()) {
+        if (format == OUTPUT_JSON) {
+            ret = g2_connect_silent();
+        } else {
+            ret = g2_connect();
+        }
+        if (ret < 0) {
+            if (format == OUTPUT_JSON) {
+                output_error_json("Failed to connect to G2", format);
+            } else {
+                fprintf(stderr, "Failed to connect to G2\n");
+            }
+            return -1;
+        }
+        connected = 1;
+    }
+    
+    if (slot_str == NULL) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("slot required (A, B, C, or D)", format);
+        } else {
+            fprintf(stderr, "Slot required (A, B, or C, or D)\n");
+        }
+        goto cleanup;
+    }
+    slot = parse_slot(slot_str);
+    if (slot < 0 || slot > 3) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("invalid slot (use A, B, C, or D)", format);
+        } else {
+            fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        }
+        goto cleanup;
+    }
+    actual_slot = slot;
+    
+    if (format != OUTPUT_JSON) {
+        fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
+    }
+    
+    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
+    if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to send get patch version command", format);
+        } else {
+            fprintf(stderr, "Failed to send get patch version command\n");
+        }
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("No response from G2 for patch version", format);
+        } else {
+            fprintf(stderr, "No response from G2 for patch version\n");
+        }
+        goto cleanup;
+    }
+    version = interruptResp[6];
+    
+    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to send get patch command", format);
+        } else {
+            fprintf(stderr, "Failed to send get patch command\n");
+        }
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("No interrupt response for patch data", format);
+        } else {
+            fprintf(stderr, "No interrupt response for patch data\n");
+        }
+        goto cleanup;
+    }
+    
+    if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Unexpected response type for patch data", format);
+        } else {
+            fprintf(stderr, "Unexpected response type for patch data\n");
+        }
+        goto cleanup;
+    }
+    
+    patchSize = (interruptResp[1] << 8) | interruptResp[2];
+    patchData = malloc(patchSize);
+    if (!patchData) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Memory allocation failed", format);
+        } else {
+            fprintf(stderr, "Memory allocation failed\n");
+        }
+        goto cleanup;
+    }
+    
+    ret = recv_bulk(patchData, patchSize);
+    if (ret <= 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to read patch bulk data", format);
+        } else {
+            fprintf(stderr, "Failed to read patch bulk data\n");
+        }
+        goto cleanup;
+    }
+    
+    char patchName[32] = {0};
+    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to send get patch name command", format);
+        } else {
+            fprintf(stderr, "Failed to send get patch name command\n");
+        }
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+        parse_name(interruptResp + 5, patchName, sizeof(patchName));
+    } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
+        uint8_t *nameData = malloc(size);
+        if (nameData) {
+            int bulkLen = recv_bulk(nameData, size);
+            if (bulkLen > 4) {
+                parse_name(nameData + 4, patchName, sizeof(patchName));
+            }
+            free(nameData);
+        }
+    }
+    
+    char defaultFilename[64];
+    if (filename == NULL) {
+        if (strlen(patchName) == 0) {
+            snprintf(defaultFilename, sizeof(defaultFilename), "slot_%c.pch2", "ABCD"[slot]);
+        } else {
+            snprintf(defaultFilename, sizeof(defaultFilename), "%s.pch2", patchName);
+        }
+        filename = defaultFilename;
+    }
+    
+    uint8_t *pch2Data = malloc(patchSize);
+    size_t pch2Size = patchSize;
+    if (!pch2Data) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Memory allocation failed for PCH2 conversion", format);
+        } else {
+            fprintf(stderr, "Memory allocation failed for PCH2 conversion\n");
+        }
+        goto cleanup;
+    }
+    
+    if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to convert patch to PCH2 format", format);
+        } else {
+            fprintf(stderr, "Failed to convert patch to PCH2 format\n");
+        }
+        free(pch2Data);
+        goto cleanup;
+    }
+    
+    FILE *f = fopen(filename, "wb");
+    if (!f) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to open file for writing", format);
+        } else {
+            fprintf(stderr, "Failed to open file '%s' for writing\n", filename);
+        }
+        free(pch2Data);
+        goto cleanup;
+    }
+    
+    size_t written = fwrite(pch2Data, 1, pch2Size, f);
+    fclose(f);
+    free(pch2Data);
+    
+    if (written != pch2Size) {
+        if (format == OUTPUT_JSON) {
+            output_error_json("Failed to write complete file", format);
+        } else {
+            fprintf(stderr, "Failed to write complete file\n");
+        }
+        goto cleanup;
+    }
+    
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "file", filename);
+    cJSON_AddStringToObject(result, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
+    cJSON_AddStringToObject(result, "name", patchName);
+    cJSON_AddNumberToObject(result, "size", (int)pch2Size);
+    
+    output_json(result, format);
+    cJSON_Delete(result);
+    
+cleanup:
+    free(patchData);
+    if (connected) {
+        g2_disconnect();
+    }
+    return 0;
 }
 
 int g2_select_slot(const char *slot_str) {

@@ -52,6 +52,17 @@ extern void test_patch_focus_d(void);
 extern void test_factory_patch(void);
 extern void test_perf_focus_a(void);
 
+extern void test_patch_usb_to_pch2_strips_header(void);
+extern void test_patch_usb_to_pch2_strips_trailer(void);
+extern void test_patch_pch2_to_usb_adds_header_and_trailer(void);
+extern void test_patch_roundtrip_conversion(void);
+extern void test_patch_usb_to_pch2_buffer_too_small(void);
+extern void test_patch_pch2_to_usb_buffer_too_small(void);
+extern void test_patch_usb_to_pch2_null_inputs(void);
+extern void test_patch_pch2_to_usb_null_inputs(void);
+extern void test_patch_usb_to_pch2_data_too_short(void);
+extern void test_patch_usb_to_pch2_exact_size(void);
+
 extern void test_parse_name_from_embedded_response_slot_b(void);
 extern void test_parse_name_from_embedded_response_slot_c(void);
 extern void test_parse_name_from_embedded_response_slot_d(void);
@@ -110,6 +121,18 @@ int main(void) {
     RUN_TEST(test_patch_focus_d);
     RUN_TEST(test_factory_patch);
     RUN_TEST(test_perf_focus_a);
+    
+    /* Patch format conversion tests */
+    RUN_TEST(test_patch_usb_to_pch2_strips_header);
+    RUN_TEST(test_patch_usb_to_pch2_strips_trailer);
+    RUN_TEST(test_patch_pch2_to_usb_adds_header_and_trailer);
+    RUN_TEST(test_patch_roundtrip_conversion);
+    RUN_TEST(test_patch_usb_to_pch2_buffer_too_small);
+    RUN_TEST(test_patch_pch2_to_usb_buffer_too_small);
+    RUN_TEST(test_patch_usb_to_pch2_null_inputs);
+    RUN_TEST(test_patch_pch2_to_usb_null_inputs);
+    RUN_TEST(test_patch_usb_to_pch2_data_too_short);
+    RUN_TEST(test_patch_usb_to_pch2_exact_size);
     
     /* get-patch name parsing tests */
     RUN_TEST(test_parse_name_from_embedded_response_slot_b);

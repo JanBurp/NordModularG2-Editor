@@ -14,4 +14,10 @@ uint16_t calc_crc16(uint8_t *buff, int length);
 int parse_name(const uint8_t *data, char *buf, size_t bufsize);
 slot_t parse_slot(const char *slot_str);
 
+/* Patch format conversion (USB <-> PCH2) */
+int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
+                      uint8_t *pch2_data, size_t *pch2_len);
+int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
+                      uint8_t *usb_data, size_t *usb_len);
+
 #endif /* __G2_UTILS_H__ */
