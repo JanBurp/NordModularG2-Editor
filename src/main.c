@@ -36,6 +36,7 @@ static void print_usage(const char *prog) {
     printf("  variation <1-8>       Select variation\n");
     printf("  get-patch <slot>      Get patch from slot (A-D) as JSON\n");
     printf("  get-patch-file <slot> [file]  Save patch as .pch2 file\n");
+    printf("  list                  List all patches and performances in G2 memory\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
     printf("  set-patch-pch <slot> <file.pch2>    Upload native G2 patch\n");
     printf("  set-patch-prf <file.prf2>           Upload performance file\n");
@@ -133,6 +134,10 @@ int main(int argc, char *argv[]) {
         }
         const char *filename = (i + 2 < argc) ? argv[i + 2] : NULL;
         return g2_get_patch_file(argv[i + 1], filename, output_format);
+    }
+    
+    if (strcmp(command, "list") == 0) {
+        return g2_list(output_format);
     }
     
     if (strcmp(command, "slot") == 0) {

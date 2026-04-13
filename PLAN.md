@@ -32,6 +32,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli variation <1-8>` | 0x6a | NOT WORKING |
 | `g2-cli get-patch <slot>` | 0x35+0x28 | Done (slot required) |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
+| `g2-cli list` | 0x14 | **Done** |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
@@ -41,6 +42,13 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
 | `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Not implemented |
 | `g2-cli watch` | - | Not implemented |
+
+## Testing Notes
+
+**Real G2 hardware testing required for:**
+- `g2-cli list` - Test with real G2 to verify patch/performance listing
+- `g2-cli get-patch-file <slot> [filename]` - Test file output with real G2
+- `g2-cli variation <1-8>` - Debug why NOT WORKING
 
 ## Output Flags
 
@@ -249,7 +257,6 @@ make test
 - [x] Test: `./build/bin/g2-cli get-patch B` - Returns "O-CoasT"
 - [x] Test: `./build/bin/g2-cli get-patch C` - Returns "Lyra4"
 - [x] Test: `./build/bin/g2-cli get-patch D` - Returns "ER 1"
-- [ ] Implement get-patch-name command
 
 ### Phase 5: Protocol - Write
 - [ ] Implement set-patch-json
@@ -277,6 +284,80 @@ make test
 - [x] Captured 6 real G2 mock data states
 - [x] All 36 tests passing (30 unit + 6 real data)
 - [x] Added 10 get-patch name parsing tests (46 total now)
+
+### Phase 8: List Command
+- [x] Implement list command to enumerate all patches and performances in G2 memory
+- [x] Iterate through both Patch (Pch2) and Performance (Prf2) modes
+- [x] Parse control codes: JUMP, SKIP, BANK, MODE, CONTINUE
+- [x] Parse category names using g2categories mapping
+- [ ] Test with real G2 hardware
+
+---
+
+## List Command Protocol
+
+**Reference:** `g2ctl.py:1055-1117`
+
+**Command:** `CMD_SYS + 0x41 + 0x14 + mode + bank + patch`
+- `CMD_SYS = 0x0c`
+- `0x14 = g2QueryBankPatchList`
+- `mode`: 0 = Pch2 (patches), 1 = Prf2 (performances)
+- `bank`: 0-8 (bank number, 1-indexed in output)
+- `patch`: 0-127 (patch number within bank, 1-indexed in output)
+
+**Response:** Bulk data starting at offset 9, ending at offset -2
+```
+[data[9:-2]]
+```
+
+**Control Codes in Response:**
+| Code | Value | Name | Action |
+|------|-------|------|--------|
+| JUMP | 1 | JUMP | `patch = data[1]`; data = data[2:] |
+| SKIP | 2 | SKIP | `patch += 1`; data = data[1:] |
+| BANK | 3 | BANK | `bank = data[1], patch = data[2]`; data = data[3:] |
+| MODE | 4 | MODE | `mode += 1, bank = 0, patch = 0`; data = data[1:] |
+| CONTINUE | 5 | CONTINUE | Continue to next entry |
+
+**Entry Format (when code > CONTINUE):**
+```
+[code] [name...] [category:1]
+```
+- `name`: parse_name() returns name + remaining data
+- `category`: data[0], remaining = data[1:]
+- Output: `type bank:patch category name`
+
+**G2 Categories:**
+| Value | Name |
+|-------|------|
+| 0 | no_cat |
+| 1 | acoustic |
+| 2 | sequencer |
+| 3 | bass |
+| 4 | classic |
+| 5 | drum |
+| 6 | fantasy |
+| 7 | fx |
+| 8 | lead |
+| 9 | organ |
+| 10 | pad |
+| 11 | piano |
+| 12 | synth |
+| 13 | audio_in |
+| 14 | user_1 |
+| 15 | user_2 |
+
+**Example JSON Output:**
+```json
+{
+  "patches": [
+    { "bank": 1, "patch": 1, "category": "Lead", "name": "My Patch" }
+  ],
+  "performances": [
+    { "bank": 1, "patch": 1, "category": "-", "name": "My Perf" }
+  ]
+}
+```
 
 ---
 

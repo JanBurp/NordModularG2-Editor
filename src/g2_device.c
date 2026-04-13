@@ -1111,6 +1111,187 @@ int g2_select_slot(const char *slot_str) {
     return 0;
 }
 
+/* G2 Categories - from nord/g2/categories.py */
+static const char* g2categories[16] = {
+    "no_cat",   /* 0: no_cat */
+    "acoustic", /* 1: acoustic */
+    "sequencer",/* 2: sequencer */
+    "bass",     /* 3: bass */
+    "classic",  /* 4: classic */
+    "drum",     /* 5: drum */
+    "fantasy",  /* 6: fantasy */
+    "fx",       /* 7: fx */
+    "lead",     /* 8: lead */
+    "organ",    /* 9: organ */
+    "pad",      /* 10: pad */
+    "piano",    /* 11: piano */
+    "synth",    /* 12: synth */
+    "audio_in", /* 13: audio_in */
+    "user_1",   /* 14: user_1 */
+    "user_2"    /* 15: user_2 */
+};
+
+/* List command control codes */
+#define LIST_JUMP      1
+#define LIST_SKIP      2
+#define LIST_BANK      3
+#define LIST_MODE      4
+#define LIST_CONTINUE  5
+#define LIST_LAST      LIST_CONTINUE
+
+int g2_list(output_format_t format) {
+    uint8_t response[1024] = {0};
+    uint8_t cmdData[4] = {0};
+    cJSON *root = cJSON_CreateObject();
+    cJSON *patches = cJSON_CreateArray();
+    cJSON *performances = cJSON_CreateArray();
+    int ret;
+    int mode;
+    int bank = 0;
+    int patch = 0;
+    int PATCH_MODE = 0;
+    int END_MODE = 2;
+    
+    if (!g2_is_connected()) {
+        ret = g2_connect_silent();
+        if (ret < 0) {
+            cJSON_Delete(root);
+            if (format == OUTPUT_JSON) {
+                output_error_json("not connected", format);
+            } else {
+                fprintf(stderr, "Not connected to G2\n");
+            }
+            return 1;
+        }
+    }
+    
+    cJSON_AddItemToObject(root, "patches", patches);
+    cJSON_AddItemToObject(root, "performances", performances);
+    
+    for (mode = PATCH_MODE; mode < END_MODE; mode++) {
+        bank = 0;
+        patch = 0;
+        
+        while (mode < END_MODE) {
+            /* Build: CMD_SYS (0x0c), 0x41, g2QueryBankPatchList (0x14), mode, bank, patch */
+            cmdData[0] = 0x14;  /* g2QueryBankPatchList */
+            cmdData[1] = (uint8_t)mode;
+            cmdData[2] = (uint8_t)bank;
+            cmdData[3] = (uint8_t)patch;
+            
+            if (send_command_with_data(0x41, cmdData, 4) < 0) {
+                fprintf(stderr, "Failed to send list command\n");
+                cJSON_Delete(root);
+                return -1;
+            }
+            
+            usleep(50000);  /* 50ms delay */
+            
+            ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+            if (ret <= 0) {
+                /* Try bulk receive for larger responses */
+                ret = recv_bulk(response, sizeof(response));
+            }
+            
+            if (ret <= 9) {
+                /* No more data or error */
+                mode++;
+                bank = 0;
+                patch = 0;
+                break;
+            }
+            
+            /* Response format: skip first 9 bytes, strip last 2 bytes */
+            int data_len = ret - 9 - 2;
+            if (data_len <= 0) {
+                mode++;
+                bank = 0;
+                patch = 0;
+                break;
+            }
+            
+            uint8_t *data = response + 9;
+            int pos = 0;
+            
+            while (pos < data_len) {
+                uint8_t c = data[pos];
+                
+                if (c > LIST_LAST) {
+                    /* Entry: code byte is part of name (like Python's parse_name)
+                     * parse_name starts at data[pos], includes code byte in name
+                     * Category is at data[pos + nameLen] (after null terminator)
+                     * Next entry starts at data[pos + nameLen + 1]
+                     */
+                    char name[32] = {0};
+                    int nameLen = parse_name(data + pos, name, sizeof(name));
+                    
+                    if (nameLen <= 0 || pos + nameLen >= data_len) {
+                        /* Invalid entry, skip */
+                        break;
+                    }
+                    
+                    int categoryIdx = data[pos + nameLen];
+                    if (categoryIdx > 15) categoryIdx = 0;
+                    
+                    cJSON *item = cJSON_CreateObject();
+                    cJSON_AddNumberToObject(item, "bank", bank + 1);
+                    cJSON_AddNumberToObject(item, "patch", patch + 1);
+                    cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
+                    cJSON_AddStringToObject(item, "name", name);
+                    
+                    if (mode == PATCH_MODE) {
+                        cJSON_AddItemToArray(patches, item);
+                    } else {
+                        cJSON_AddItemToArray(performances, item);
+                    }
+                    
+                    patch++;
+                    pos += nameLen + 1;  /* nameLen includes code byte, +1 for category */
+                } else if (c == LIST_CONTINUE) {
+                    pos++;
+                } else if (c == LIST_BANK) {
+                    if (pos + 3 <= data_len) {
+                        bank = data[pos + 1];
+                        patch = data[pos + 2];
+                        pos += 3;
+                    } else {
+                        break;
+                    }
+                } else if (c == LIST_JUMP) {
+                    if (pos + 2 <= data_len) {
+                        patch = data[pos + 1];
+                        pos += 2;
+                    } else {
+                        break;
+                    }
+                } else if (c == LIST_SKIP) {
+                    patch++;
+                    pos++;
+                } else if (c == LIST_MODE) {
+                    mode++;
+                    bank = 0;
+                    patch = 0;
+                    pos++;
+                    break;
+                } else {
+                    /* Unknown code, skip */
+                    pos++;
+                }
+            }
+            
+            /* Check if we should continue or move to next mode */
+            if (mode >= END_MODE) break;
+        }
+    }
+    
+    char *json_str = cJSON_Print(root);
+    printf("%s\n", json_str);
+    free(json_str);
+    cJSON_Delete(root);
+    
+    return 0;
+}
+
 int g2_select_variation(int variation) {
     uint8_t response[16] = {0};
     uint8_t slota[16] = {0};

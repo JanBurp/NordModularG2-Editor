@@ -55,6 +55,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 int g2_settings(output_format_t format, int debug);
 int g2_get_patch(const char *slot_str, output_format_t format);
 int g2_get_patch_file(const char *slot_str, const char *filename, output_format_t format);
+int g2_list(output_format_t format);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);
