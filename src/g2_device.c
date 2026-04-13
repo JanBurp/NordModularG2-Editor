@@ -1143,8 +1143,8 @@ int g2_list(output_format_t format) {
     uint8_t response[1024] = {0};
     uint8_t cmdData[4] = {0};
     cJSON *root = cJSON_CreateObject();
-    cJSON *patches = cJSON_CreateArray();
-    cJSON *performances = cJSON_CreateArray();
+    cJSON *patches = cJSON_CreateObject();
+    cJSON *performances = cJSON_CreateObject();
     int ret;
     int mode;
     int bank = 0;
@@ -1173,8 +1173,7 @@ int g2_list(output_format_t format) {
         patch = 0;
         
         while (mode < END_MODE) {
-            /* Build: CMD_SYS (0x0c), 0x41, g2QueryBankPatchList (0x14), mode, bank, patch */
-            cmdData[0] = 0x14;  /* g2QueryBankPatchList */
+            cmdData[0] = 0x14;
             cmdData[1] = (uint8_t)mode;
             cmdData[2] = (uint8_t)bank;
             cmdData[3] = (uint8_t)patch;
@@ -1185,28 +1184,19 @@ int g2_list(output_format_t format) {
                 return -1;
             }
             
-            usleep(50000);  /* 50ms delay */
+            
             
             ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
             if (ret <= 0) {
-                /* Try bulk receive for larger responses */
                 ret = recv_bulk(response, sizeof(response));
             }
             
             if (ret <= 9) {
-                /* No more data or error */
-                mode++;
-                bank = 0;
-                patch = 0;
                 break;
             }
             
-            /* Response format: skip first 9 bytes, strip last 2 bytes */
             int data_len = ret - 9 - 2;
             if (data_len <= 0) {
-                mode++;
-                bank = 0;
-                patch = 0;
                 break;
             }
             
@@ -1217,36 +1207,44 @@ int g2_list(output_format_t format) {
                 uint8_t c = data[pos];
                 
                 if (c > LIST_LAST) {
-                    /* Entry: code byte is part of name (like Python's parse_name)
-                     * parse_name starts at data[pos], includes code byte in name
-                     * Category is at data[pos + nameLen] (after null terminator)
-                     * Next entry starts at data[pos + nameLen + 1]
-                     */
                     char name[32] = {0};
                     int nameLen = parse_name(data + pos, name, sizeof(name));
                     
                     if (nameLen <= 0 || pos + nameLen >= data_len) {
-                        /* Invalid entry, skip */
                         break;
                     }
                     
-                    int categoryIdx = data[pos + nameLen];
-                    if (categoryIdx > 15) categoryIdx = 0;
-                    
                     cJSON *item = cJSON_CreateObject();
-                    cJSON_AddNumberToObject(item, "bank", bank + 1);
-                    cJSON_AddNumberToObject(item, "patch", patch + 1);
-                    cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
+                    cJSON_AddNumberToObject(item, "location", patch + 1);
                     cJSON_AddStringToObject(item, "name", name);
                     
                     if (mode == PATCH_MODE) {
-                        cJSON_AddItemToArray(patches, item);
+                        int categoryIdx = data[pos + nameLen];
+                        if (categoryIdx > 15) categoryIdx = 0;
+                        cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
+                    }
+                    
+                    char bankKey[8];
+                    snprintf(bankKey, sizeof(bankKey), "%d", bank + 1);
+                    cJSON *bankArray;
+                    if (mode == PATCH_MODE) {
+                        bankArray = cJSON_GetObjectItem(patches, bankKey);
+                        if (!bankArray) {
+                            bankArray = cJSON_CreateArray();
+                            cJSON_AddItemToObject(patches, bankKey, bankArray);
+                        }
+                        cJSON_AddItemToArray(bankArray, item);
                     } else {
-                        cJSON_AddItemToArray(performances, item);
+                        bankArray = cJSON_GetObjectItem(performances, bankKey);
+                        if (!bankArray) {
+                            bankArray = cJSON_CreateArray();
+                            cJSON_AddItemToObject(performances, bankKey, bankArray);
+                        }
+                        cJSON_AddItemToArray(bankArray, item);
                     }
                     
                     patch++;
-                    pos += nameLen + 1;  /* nameLen includes code byte, +1 for category */
+                    pos += nameLen + 1;
                 } else if (c == LIST_CONTINUE) {
                     pos++;
                 } else if (c == LIST_BANK) {
@@ -1274,19 +1272,15 @@ int g2_list(output_format_t format) {
                     pos++;
                     break;
                 } else {
-                    /* Unknown code, skip */
                     pos++;
                 }
             }
             
-            /* Check if we should continue or move to next mode */
             if (mode >= END_MODE) break;
         }
     }
     
-    char *json_str = cJSON_Print(root);
-    printf("%s\n", json_str);
-    free(json_str);
+    output_json(root, format);
     cJSON_Delete(root);
     
     return 0;
