@@ -52,6 +52,17 @@ extern void test_patch_focus_d(void);
 extern void test_factory_patch(void);
 extern void test_perf_focus_a(void);
 
+extern void test_parse_name_from_embedded_response_slot_b(void);
+extern void test_parse_name_from_embedded_response_slot_c(void);
+extern void test_parse_name_from_embedded_response_slot_d(void);
+extern void test_parse_name_from_extended_response_slot_a(void);
+extern void test_parse_name_with_ampersand(void);
+extern void test_parse_name_with_special_chars(void);
+extern void test_parse_name_truncation_at_buffer_size(void);
+extern void test_parse_name_returns_correct_length(void);
+extern void test_response_type_parsing_embedded(void);
+extern void test_response_type_parsing_extended(void);
+
 int main(void) {
     UNITY_BEGIN();
     
@@ -99,6 +110,18 @@ int main(void) {
     RUN_TEST(test_patch_focus_d);
     RUN_TEST(test_factory_patch);
     RUN_TEST(test_perf_focus_a);
+    
+    /* get-patch name parsing tests */
+    RUN_TEST(test_parse_name_from_embedded_response_slot_b);
+    RUN_TEST(test_parse_name_from_embedded_response_slot_c);
+    RUN_TEST(test_parse_name_from_embedded_response_slot_d);
+    RUN_TEST(test_parse_name_from_extended_response_slot_a);
+    RUN_TEST(test_parse_name_with_ampersand);
+    RUN_TEST(test_parse_name_with_special_chars);
+    RUN_TEST(test_parse_name_truncation_at_buffer_size);
+    RUN_TEST(test_parse_name_returns_correct_length);
+    RUN_TEST(test_response_type_parsing_embedded);
+    RUN_TEST(test_response_type_parsing_extended);
     
     return UNITY_END();
 }

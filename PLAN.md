@@ -276,6 +276,7 @@ make test
 - [x] Added --debug flag to capture real G2 responses
 - [x] Captured 6 real G2 mock data states
 - [x] All 36 tests passing (30 unit + 6 real data)
+- [x] Added 10 get-patch name parsing tests (46 total now)
 
 ---
 
