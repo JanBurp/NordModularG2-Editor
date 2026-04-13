@@ -33,7 +33,7 @@ static void print_usage(const char *prog) {
     printf("  settings              Show synth settings\n");
     printf("  slot <A|B|C|D>        Select active slot\n");
     printf("  variation <1-8>       Select variation\n");
-    printf("  get-patch [slot]      Get patch from slot (A-D, default: current)\n");
+    printf("  get-patch <slot>      Get patch from slot (A-D)\n");
     printf("  get-patch-name [slot] Get patch name (A-D, default: current)\n");
     printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
     printf("  set-patch-pch <slot> <file.pch2>    Upload native G2 patch\n");
@@ -106,8 +106,11 @@ int main(int argc, char *argv[]) {
     }
     
     if (strcmp(command, "get-patch") == 0) {
-        const char *slot = (i + 1 < argc) ? argv[i + 1] : NULL;
-        return g2_get_patch(slot, output_format);
+        if (i + 1 >= argc) {
+            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+            return 1;
+        }
+        return g2_get_patch(argv[i + 1], output_format);
     }
     
     if (strcmp(command, "get-patch-name") == 0) {

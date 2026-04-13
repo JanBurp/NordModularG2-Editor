@@ -302,12 +302,6 @@ static int send_slot_command_with_data(uint8_t slot, uint8_t version, uint8_t su
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    fprintf(stderr, "DEBUG: send_slot_command_with_data: slot=%d, version=0x%02x, subcmd=0x%02x\n", 
-            slot, version, subcmd);
-    fprintf(stderr, "DEBUG: sending %d bytes: ", msgLength);
-    for (int i = 0; i < msgLength; i++) fprintf(stderr, "%02x ", buff[i]);
-    fprintf(stderr, "\n");
-
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
     if (ret < 0) {
         return -1;
@@ -674,10 +668,150 @@ int g2_settings(output_format_t format, int debug) {
 }
 
 int g2_get_patch(const char *slot_str, output_format_t format) {
-    (void)slot_str;
-    (void)format;
-    fprintf(stderr, "Get patch command not yet implemented\n");
-    return -1;
+    int slot;
+    int actual_slot;
+    uint8_t version;
+    uint8_t interruptResp[16] = {0};
+    uint8_t *patchData = NULL;
+    uint16_t patchSize = 0;
+    int ret;
+    int connected = 0;
+    
+    /* Ensure connected first */
+    if (!g2_is_connected()) {
+        if (format == OUTPUT_JSON) {
+            ret = g2_connect_silent();
+        } else {
+            ret = g2_connect();
+        }
+        if (ret < 0) {
+            fprintf(stderr, "Failed to connect to G2\n");
+            return -1;
+        }
+        connected = 1;
+    }
+    
+    /* Parse slot parameter - required */
+    if (slot_str == NULL) {
+        fprintf(stderr, "Slot required (A, B, C, or D)\n");
+        goto cleanup;
+    }
+    slot = parse_slot(slot_str);
+    if (slot < 0 || slot > 3) {
+        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        goto cleanup;
+    }
+    actual_slot = slot;
+    
+    /* Step 1: Get version for the slot */
+    /* Send: [CMD_SYS, 0x41, 0x35, slot] */
+    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
+    if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+        fprintf(stderr, "Failed to send get patch version command\n");
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        fprintf(stderr, "No response from G2 for patch version\n");
+        goto cleanup;
+    }
+    
+    /* g2ctl extracts version from embedded message.
+     * Embedded response format: [length][data...][CRC]
+     * g2ctl returns data starting at index 1 (after length byte), so response[5] = byte[6] of raw
+     */
+    version = interruptResp[6];
+    
+    /* Step 2: Get patch data with version */
+    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+        fprintf(stderr, "Failed to send get patch command\n");
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    if (ret <= 0) {
+        fprintf(stderr, "No interrupt response for patch data\n");
+        goto cleanup;
+    }
+    
+    if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+        fprintf(stderr, "Unexpected response type for patch data\n");
+        goto cleanup;
+    }
+    
+    patchSize = (interruptResp[1] << 8) | interruptResp[2];
+    patchData = malloc(patchSize);
+    if (!patchData) {
+        fprintf(stderr, "Memory allocation failed\n");
+        goto cleanup;
+    }
+    
+    ret = recv_bulk(patchData, patchSize);
+    if (ret <= 0) {
+        fprintf(stderr, "Failed to read patch bulk data\n");
+        free(patchData);
+        patchData = NULL;
+        goto cleanup;
+    }
+    
+    /* Step 3: Get patch name */
+    char patchName[32] = {0};
+    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
+        fprintf(stderr, "Failed to send get patch name command\n");
+        free(patchData);
+        goto cleanup;
+    }
+    
+    usleep(100000);
+    
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    
+    if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+        parse_name(interruptResp + 5, patchName, sizeof(patchName));
+    } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
+        uint8_t *nameData = malloc(size);
+        if (nameData) {
+            int bulkLen = recv_bulk(nameData, size);
+            if (bulkLen > 4) {
+                parse_name(nameData + 4, patchName, sizeof(patchName));
+            }
+            free(nameData);
+        }
+    }
+    
+    /* Build JSON output */
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddStringToObject(root, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
+    cJSON_AddStringToObject(root, "name", patchName);
+    cJSON_AddNumberToObject(root, "size", patchSize);
+    
+    char *hexStr = malloc(patchSize * 2 + 1);
+    if (hexStr) {
+        for (size_t i = 0; i < patchSize; i++) {
+            sprintf(hexStr + i * 2, "%02x", patchData[i]);
+        }
+        hexStr[patchSize * 2] = '\0';
+        cJSON_AddStringToObject(root, "data", hexStr);
+        free(hexStr);
+    }
+    
+    output_json(root, format);
+    cJSON_Delete(root);
+    
+    free(patchData);
+    
+cleanup:
+    if (connected) {
+        g2_disconnect();
+    }
+    
+    return 0;
 }
 
 int g2_get_patch_name(const char *slot_str, output_format_t format) {

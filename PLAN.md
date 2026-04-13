@@ -30,7 +30,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
 | `g2-cli slot <A\|B\|C\|D>` | 0x7d | Done |
 | `g2-cli variation <1-8>` | 0x6a | NOT WORKING |
-| `g2-cli get-patch [slot]` | 0x35+0x28 | Not implemented |
+| `g2-cli get-patch <slot>` | 0x35+0x28 | Done (slot required) |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
@@ -242,9 +242,14 @@ make test
 - [x] Integrated cJSON library for robust JSON building (cJSON.c + cJSON.h in src/)
 
 ### Phase 4: Protocol - Get-Patch
+- [x] Implement get-patch command (slot, version, patch data, name)
+- [x] Handle both EMBEDDED (slots B,C,D) and EXTENDED (slot A) response types
+- [x] Name parsing offset: 5 for EMBEDDED, 4 for EXTENDED
+- [x] Test: `./build/bin/g2-cli get-patch A` - Returns "Piano&Mic"
+- [x] Test: `./build/bin/g2-cli get-patch B` - Returns "O-CoasT"
+- [x] Test: `./build/bin/g2-cli get-patch C` - Returns "Lyra4"
+- [x] Test: `./build/bin/g2-cli get-patch D` - Returns "ER 1"
 - [ ] Implement get-patch-name command
-- [ ] Implement get-patch command
-- [ ] Test: `./build/bin/g2-cli get-patch A`
 
 ### Phase 5: Protocol - Write
 - [ ] Implement set-patch-json
@@ -296,6 +301,7 @@ make test
 - 2026-04-12: Created g2_parse_settings() for testable parsing without USB
 - 2026-04-12: Using Unity test framework for unit tests
 - 2026-04-12: slot_t moved to defs.h for shared use across modules
+- 2026-04-13: get-patch name parsing: EMBEDDED uses offset 5, EXTENDED uses offset 4
 
 ## Verified Byte Offsets (Synth Settings Bulk Data)
 
