@@ -28,16 +28,14 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 | `g2-cli disconnect` | - | Done |
 | `g2-cli list-devices` | - | Done |
 | `g2-cli settings` | 0x02 | Done (including performance data and slot parsing) |
-| `g2-cli slot <A\|B\|C\|D>` | 0x7d | Done |
-| `g2-cli variation <1-8>` | 0x6a | NOT WORKING |
+| `g2-cli slot <A\|B\|C\|D>` | 0x09 | Done |
+| `g2-cli variation <1-8> <A-D>` | 0x6a | Done (slot required) |
 | `g2-cli get-patch <slot>` | 0x35+0x28 | Done (slot required) |
 | `g2-cli get-patch-name [slot]` | 0x28 | Not implemented |
 | `g2-cli list [type] [bank <n>]` | 0x14 | **Done** (with filtering) |
 | `g2-cli set-patch-json <slot> <file.json>` | 0x37 | Not implemented |
 | `g2-cli set-patch-pch <slot> <file.pch2>` | 0x37 | Not implemented |
 | `g2-cli set-patch-prf <file.prf2>` | - | Not implemented |
-| `g2-cli select-slot <A\|B\|C\|D>` | 0x09 | Done (alias for slot) |
-| `g2-cli select-variation <1-8>` | 0x6a | Done (alias for variation) |
 | `g2-cli list-modules [slot]` | 0x34 | Not implemented |
 | `g2-cli get-param <module> <param> [variation]` | 0x2e | Not implemented |
 | `g2-cli set-param <module> <param> <value> [variation]` | 0x40 | Not implemented |
@@ -48,7 +46,7 @@ Create a C-based CLI tool using libusb-1.0 to communicate with Nord G2 synthesiz
 **Real G2 hardware testing required for:**
 - `g2-cli list` - Test with real G2 to verify patch/performance listing
 - `g2-cli get-patch-file <slot> [filename]` - Test file output with real G2
-- `g2-cli variation <1-8>` - Debug why NOT WORKING
+- `g2-cli set-patch-*` - Test file upload commands
 
 ## Output Flags
 

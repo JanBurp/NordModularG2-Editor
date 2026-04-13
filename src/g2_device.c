@@ -1335,17 +1335,17 @@ int g2_select_variation(int variation, int slot) {
         return -1;
     }
 
-    if (slot < 0 || slot > 3) {
-        fprintf(stderr, "Invalid slot: %d (must be 0-3 or -1 for current)\n", slot);
-        return -1;
-    }
-
     if (!g2_is_connected()) {
         ret = g2_connect();
         if (ret < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return -1;
         }
+    }
+
+    if (slot < 0 || slot > 3) {
+        fprintf(stderr, "Slot required (A, B, C, or D)\n");
+        return -1;
     }
 
     /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
@@ -1375,3 +1375,5 @@ int g2_select_variation(int variation, int slot) {
 
     return (ret > 0) ? 0 : -1;
 }
+
+

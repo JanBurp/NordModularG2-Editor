@@ -27,25 +27,24 @@ static void print_usage(const char *prog) {
     printf("  --pretty       Pretty-print JSON (default when outputting to terminal)\n");
     printf("  --tree         Tree view output\n");
     printf("  --debug        Show debug info (raw USB data in hex)\n");
-    printf("\nCommands:\n");
-    printf("  connect                Connect to G2 (auto-detect)\n");
-    printf("  disconnect             Close connection\n");
-    printf("  list-devices          List USB devices (debug)\n");
-    printf("  settings              Show synth settings\n");
-    printf("  slot <A|B|C|D>        Select active slot\n");
-    printf("  variation <1-8> [A-D] Select variation (default slot A)\n");
-    printf("  get-patch <slot>      Get patch from slot (A-D) as JSON\n");
-    printf("  get-patch-file <slot> [file]  Save patch as .pch2 file\n");
-    printf("  list [type] [bank <n>]  List patches and performances (type: patches|performances)\n");
-    printf("  set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
-    printf("  set-patch-pch <slot> <file.pch2>    Upload native G2 patch\n");
-    printf("  set-patch-prf <file.prf2>           Upload performance file\n");
-    printf("  select-slot <A|B|C|D> Change active slot\n");
-    printf("  select-variation <1-8> [A-D] Change variation (default slot A)\n");
-    printf("  list-modules [slot]   List modules in patch\n");
-    printf("  get-param <module> <param> [variation] Get param value\n");
-    printf("  set-param <module> <param> <value> [variation] Set param value\n");
-    printf("  watch                 Monitor param changes live\n");
+    printf("\nCommands (implemented):\n");
+    printf("  connect                              Connect to G2 (auto-detect)\n");
+    printf("  disconnect                           Close connection\n");
+    printf("  list-devices                         List USB devices (debug)\n");
+    printf("  settings                             Show synth settings\n");
+    printf("  get-patch <slot>                     Get patch from slot (A-D) as JSON\n");
+    printf("  get-patch-file <slot> [file]         Save patch as .pch2 file\n");
+    printf("  list [type] [bank <n>]               List patches and performances\n");
+    printf("  slot <A|B|C|D>                      Change active slot\n");
+    printf("  variation <1-8> <A-D>                Select variation for slot\n");
+    printf("\nCommands (not implemented):\n");
+    printf("  * list-modules [slot]                List modules in patch\n");
+    printf("  * get-param <module> <param> [var]   Get param value\n");
+    printf("  * set-param <module> <param> <value> Set param value\n");
+    printf("  * set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
+    printf("  * set-patch-pch <slot> <file.pch2>   Upload native G2 patch\n");
+    printf("  * set-patch-prf <file.prf2>          Upload performance file\n");
+    printf("  * watch                              Monitor param changes live\n");
 }
 
 static output_format_t output_format = OUTPUT_PRETTY;
@@ -183,18 +182,6 @@ int main(int argc, char *argv[]) {
         return g2_select_slot(argv[i + 1]);
     }
     
-    if (strcmp(command, "select-slot") == 0) {
-        if (i + 1 >= argc) {
-            if (output_format == OUTPUT_JSON) {
-                output_error_json("slot required (A, B, C, or D)", output_format);
-            } else {
-                fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
-            }
-            return 1;
-        }
-        return g2_select_slot(argv[i + 1]);
-    }
-    
     if (strcmp(command, "variation") == 0) {
         if (i + 1 >= argc) {
             if (output_format == OUTPUT_JSON) {
@@ -205,32 +192,7 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         int variation = atoi(argv[i + 1]);
-        int slot = 0;
-        if (i + 2 < argc) {
-            slot = parse_slot(argv[i + 2]);
-            if (slot < 0) {
-                if (output_format == OUTPUT_JSON) {
-                    output_error_json("invalid slot (use A, B, C, or D)", output_format);
-                } else {
-                    fprintf(stderr, "Error: invalid slot (use A, B, C, or D)\n");
-                }
-                return 1;
-            }
-        }
-        return g2_select_variation(variation, slot);
-    }
-    
-    if (strcmp(command, "select-variation") == 0) {
-        if (i + 1 >= argc) {
-            if (output_format == OUTPUT_JSON) {
-                output_error_json("variation required (1-8)", output_format);
-            } else {
-                fprintf(stderr, "Error: variation required (1-8)\n");
-            }
-            return 1;
-        }
-        int variation = atoi(argv[i + 1]);
-        int slot = 0;
+        int slot = -1;
         if (i + 2 < argc) {
             slot = parse_slot(argv[i + 2]);
             if (slot < 0) {
