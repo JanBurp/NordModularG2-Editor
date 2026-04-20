@@ -1,5 +1,6 @@
 /*
- * G2 CLI - Test Runner
+ * G2 CLI - Unit Test Runner
+ * Run with: make test-unit
  */
 
 #include "unity.h"
@@ -74,25 +75,6 @@ extern void test_parse_name_returns_correct_length(void);
 extern void test_response_type_parsing_embedded(void);
 extern void test_response_type_parsing_extended(void);
 
-/* Integration tests - require real G2 device */
-extern void test_integration_connect_disconnect(void);
-extern void test_integration_settings(void);
-extern void test_integration_get_patch_slot_a(void);
-extern void test_integration_get_patch_slot_b(void);
-extern void test_integration_get_patch_slot_c(void);
-extern void test_integration_get_patch_slot_d(void);
-extern void test_integration_select_slot_a(void);
-extern void test_integration_select_slot_b(void);
-extern void test_integration_select_slot_c(void);
-extern void test_integration_select_slot_d(void);
-extern void test_integration_select_variation(void);
-extern void test_integration_list_all(void);
-extern void test_integration_list_patches(void);
-extern void test_integration_list_performances(void);
-extern void test_integration_get_patch_file(void);
-extern void test_integration_slot_then_patch(void);
-extern void test_integration_rapid_slot_switching(void);
-
 int main(void) {
     UNITY_BEGIN();
 
@@ -164,25 +146,6 @@ int main(void) {
     RUN_TEST(test_parse_name_returns_correct_length);
     RUN_TEST(test_response_type_parsing_embedded);
     RUN_TEST(test_response_type_parsing_extended);
-
-    /* Integration tests - require real G2 device */
-    RUN_TEST(test_integration_connect_disconnect);
-    RUN_TEST(test_integration_settings);
-    RUN_TEST(test_integration_get_patch_slot_a);
-    RUN_TEST(test_integration_get_patch_slot_b);
-    RUN_TEST(test_integration_get_patch_slot_c);
-    RUN_TEST(test_integration_get_patch_slot_d);
-    RUN_TEST(test_integration_select_slot_a);
-    RUN_TEST(test_integration_select_slot_b);
-    RUN_TEST(test_integration_select_slot_c);
-    RUN_TEST(test_integration_select_slot_d);
-    RUN_TEST(test_integration_select_variation);
-    RUN_TEST(test_integration_list_all);
-    RUN_TEST(test_integration_list_patches);
-    RUN_TEST(test_integration_list_performances);
-    RUN_TEST(test_integration_get_patch_file);
-    RUN_TEST(test_integration_slot_then_patch);
-    RUN_TEST(test_integration_rapid_slot_switching);
 
     return UNITY_END();
 }

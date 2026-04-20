@@ -21,13 +21,15 @@ OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 # Test source files
 TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
 TEST_SRC := $(filter-out $(TEST_DIR)/run_tests.c, $(TEST_SRC))
+TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_unit.c, $(TEST_SRC))
+TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_integration.c, $(TEST_SRC))
 # Exclude mocks directory
 TEST_SRC := $(filter-out $(TEST_DIR)/mocks/%, $(TEST_SRC))
 
 # Headers
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 
-.PHONY: all clean depend info test
+.PHONY: all clean depend info test test-unit test-integration clean-tests
 
 all: info $(BIN_DIR)/$(TARGET)
 
@@ -65,7 +67,37 @@ test: $(TEST_BIN)
 	@echo "Running tests..."
 	./$(TEST_BIN)
 
-$(TEST_BIN): $(TEST_DIR)/run_tests.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
+test-unit: $(TEST_BUILD_DIR)/g2-unit-tests
+	@echo "Running unit tests..."
+	./$(TEST_BUILD_DIR)/g2-unit-tests
+
+test-integration: $(TEST_BUILD_DIR)/g2-integration-tests
+	@echo "Running integration tests..."
+	./$(TEST_BUILD_DIR)/g2-integration-tests
+
+$(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_unit.c \
+		$(TEST_SRC) \
+		$(OBJ_DIR)/g2_device.o \
+		$(OBJ_DIR)/utils.o \
+		$(OBJ_DIR)/bitstream.o \
+		$(OBJ_DIR)/cjson.o \
+		$(OBJ_DIR)/output.o \
+		$(LDFLAGS) -o $@
+	@echo "Built: $@"
+
+$(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration.c \
+		$(TEST_SRC) \
+		$(OBJ_DIR)/g2_device.o \
+		$(OBJ_DIR)/utils.o \
+		$(OBJ_DIR)/bitstream.o \
+		$(OBJ_DIR)/cjson.o \
+		$(OBJ_DIR)/output.o \
+		$(LDFLAGS) -o $@
+	@echo "Built: $@"
+
+$(TEST_BUILD_DIR)/g2-tests: $(TEST_DIR)/run_tests.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests.c \
 		$(TEST_SRC) \
 		$(OBJ_DIR)/g2_device.o \

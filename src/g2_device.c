@@ -306,7 +306,7 @@ static int recv_bulk(uint8_t *data, uint16_t size) {
     int retries = 5;
     int received = 0;
     while (retries > 0 && received < size) {
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN, data + received, size - received, &transferred, USB_TIMEOUT_LONG);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN, data + received, size - received, &transferred, USB_TIMEOUT_STANDARD);
         if (ret == 0 && transferred > 0) {
             received += transferred;
         } else {
@@ -548,9 +548,9 @@ int g2_settings(output_format_t format, int debug) {
         return -1;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2\n");
         return -1;
@@ -589,8 +589,8 @@ int g2_settings(output_format_t format, int debug) {
     uint8_t selsInterrupt[16] = {0};
 
     if (send_command(0x41, 0x81) == 0) {
-        usleep(100000);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_LONG);
+        usleep(10000);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
 
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
@@ -607,8 +607,8 @@ int g2_settings(output_format_t format, int debug) {
 
     uint8_t perfInterrupt[16] = {0};
     if (send_command(selsData[2], 0x10) == 0) {
-        usleep(100000);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_LONG);
+        usleep(10000);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
 
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
@@ -685,9 +685,9 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for patch version\n");
         goto cleanup;
@@ -705,9 +705,9 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No interrupt response for patch data\n");
         goto cleanup;
@@ -741,9 +741,9 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
 
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
@@ -848,9 +848,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         if (format == OUTPUT_JSON) {
             output_error_json("No response from G2 for patch version", format);
@@ -870,9 +870,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         if (format == OUTPUT_JSON) {
             output_error_json("No interrupt response for patch data", format);
@@ -922,9 +922,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         goto cleanup;
     }
 
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
     } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -1314,9 +1314,9 @@ int g2_select_variation(int variation, int slot) {
         fprintf(stderr, "Failed to send variation command 1\n");
         return -1;
     }
-    usleep(100000);
+    usleep(10000);
 
-    ret = recv_interrupt(slota, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(slota, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
         return -1;
@@ -1330,8 +1330,8 @@ int g2_select_variation(int variation, int slot) {
         fprintf(stderr, "Failed to send variation command 2\n");
         return -1;
     }
-    usleep(100000);
-    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_LONG, 5);
+    usleep(10000);
+    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD, 5);
 
     return (ret > 0) ? 0 : -1;
 }
@@ -1345,7 +1345,7 @@ void g2_watch_stop(int sig) {
 
 static int discard_interrupt_response(void) {
     uint8_t dummy[32] = {0};
-    return recv_interrupt(dummy, sizeof(dummy), USB_TIMEOUT_LONG);
+    return recv_interrupt(dummy, sizeof(dummy), USB_TIMEOUT_STANDARD);
 }
 
 int g2_watch(output_format_t format) {
@@ -1372,7 +1372,7 @@ int g2_watch(output_format_t format) {
     uint8_t init_cmd[] = {0x80};
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, init_cmd, 1, &transferred, USB_TIMEOUT_STANDARD);
     if (ret == 0) {
-        usleep(100000);
+        usleep(10000);
         discard_interrupt_response();
         printf("  -> Init response received\n");
     } else {
@@ -1384,7 +1384,7 @@ int g2_watch(output_format_t format) {
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x01;  /* stop */
     if (send_command_with_data(0x41, cmd_data, 2) == 0) {
-        usleep(100000);
+        usleep(10000);
         discard_interrupt_response();
         printf("  -> Stop response received\n");
     } else {
@@ -1394,7 +1394,7 @@ int g2_watch(output_format_t format) {
     /* Step 3: eStateGetSynthSettings - get synth settings to initialize G2 state */
     printf("Step 3: GetSynthSettings (0x41, 0x02)...\n");
     if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
-        usleep(100000);
+        usleep(10000);
         discard_interrupt_response();
         printf("  -> SynthSettings response received\n");
     } else {
@@ -1406,7 +1406,7 @@ int g2_watch(output_format_t format) {
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x00;  /* start */
     if (send_command_with_data(0x41, cmd_data, 2) == 0) {
-        usleep(100000);
+        usleep(10000);
         discard_interrupt_response();
         printf("  -> Start response received\n");
     } else {
