@@ -6,6 +6,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <stdarg.h>
 #include <unistd.h>
 #include <libusb.h>
 #include "defs.h"
@@ -219,13 +220,13 @@ int g2_send_command(uint8_t *data, int length) {
 
     if (!g2.handle) {
         fprintf(stderr, "Not connected\n");
-        return -1;
+        return G2_ERR;
     }
 
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
     if (ret < 0) {
         fprintf(stderr, "Write failed: %s\n", libusb_error_name(ret));
-        return -1;
+        return G2_ERR_SEND;
     }
 
     return transferred;
@@ -237,7 +238,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
 
     if (!g2.handle) {
         fprintf(stderr, "Not connected\n");
-        return -1;
+        return G2_ERR;
     }
 
     /* G2-Edit uses bulk_transfer on endpoint 0x81 (interrupt endpoint) */
@@ -247,7 +248,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
             return 0;  /* Timeout - no data */
         }
         fprintf(stderr, "Read failed: %s\n", libusb_error_name(ret));
-        return -1;
+        return G2_ERR_RECV;
     }
 
     return transferred;
@@ -770,9 +771,9 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    usleep(USB_SEND_DELAY_US);
+    usleep(100000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
 
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
@@ -902,9 +903,9 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    usleep(USB_SEND_DELAY_US);
+    usleep(100000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
     } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -993,13 +994,13 @@ int g2_select_slot(const char *slot_str) {
 
     if (ensure_connected(0) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
+            return G2_ERR_CONNECT;
         }
 
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
         fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
-        return -1;
+        return G2_ERR_INVALID_PARAM;
     }
 
     version = get_version_for_slot(slot);
@@ -1011,7 +1012,7 @@ int g2_select_slot(const char *slot_str) {
     data[3] = mask;
     if (send_system_data(version, data, 4) < 0) {
         fprintf(stderr, "Failed to send slot command 2\n");
-        return -1;
+        return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
@@ -1019,11 +1020,11 @@ int g2_select_slot(const char *slot_str) {
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
         fprintf(stderr, "Failed to send slot command 3\n");
-        return -1;
+        return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    return 0;
+    return G2_OK;
 }
 
 /* G2 Categories - from nord/g2/categories.py */
@@ -1237,31 +1238,31 @@ int g2_select_variation(int variation, int slot) {
 
     if (variation < 1 || variation > 8) {
         fprintf(stderr, "Invalid variation: %d (must be 1-8)\n", variation);
-        return -1;
+        return G2_ERR_INVALID_PARAM;
     }
 
     if (ensure_connected(0) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
+            return G2_ERR_CONNECT;
         }
 
     if (slot < 0 || slot > 3) {
         fprintf(stderr, "Slot required (A, B, C, or D)\n");
-        return -1;
+        return G2_ERR_INVALID_PARAM;
     }
 
     /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
     uint8_t cmdData[4] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) {
         fprintf(stderr, "Failed to send variation command 1\n");
-        return -1;
+        return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(slota, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
-        return -1;
+        return G2_ERR_RECV;
     }
     uint8_t version = slota[6];
 
@@ -1270,12 +1271,12 @@ int g2_select_variation(int variation, int slot) {
     extraData[0] = variation - 1;
     if (send_slot(slot, version, 0x6a, extraData, 1) < 0) {
         fprintf(stderr, "Failed to send variation command 2\n");
-        return -1;
+        return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
     ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD, 5);
 
-    return (ret > 0) ? 0 : -1;
+    return (ret > 0) ? G2_OK : G2_ERR_RECV;
 }
 
 volatile int g2_watch_running = 1;
@@ -1299,7 +1300,7 @@ int g2_watch(output_format_t format) {
 
     if (ensure_connected(1) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
+            return G2_ERR_CONNECT;
         }
 
     signal(SIGINT, g2_watch_stop);
