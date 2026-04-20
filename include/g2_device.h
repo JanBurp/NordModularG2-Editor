@@ -8,8 +8,26 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <libusb.h>
-#include "cJSON.h"
+#include "cjson.h"
 #include "defs.h"
+
+/* G2 Error codes */
+typedef enum {
+    G2_OK = 0,
+    G2_ERR = -1,
+    G2_ERR_NOT_FOUND = -2,
+    G2_ERR_CONNECT = -3,
+    G2_ERR_RESET = -4,
+    G2_ERR_CLAIM_INTERFACE = -5,
+    G2_ERR_SEND = -6,
+    G2_ERR_RECV = -7,
+    G2_ERR_TIMEOUT = -8,
+    G2_ERR_PARSE = -9,
+    G2_ERR_INVALID_PARAM = -10,
+    G2_ERR_FILE_OPEN = -10,
+    G2_ERR_FILE_WRITE = -11,
+    G2_ERR_NO_MEMORY = -12,
+} g2_error_t;
 
 /* Output format types */
 typedef enum {

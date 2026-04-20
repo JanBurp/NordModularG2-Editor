@@ -92,9 +92,9 @@ int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
         fprintf(stderr, "Failed to initialize libusb: %s\n", libusb_error_name(ret));
-        return -1;
+        return G2_ERR_NO_MEMORY;
     }
-    return 0;
+    return G2_OK;
 }
 
 void g2_exit(void) {
@@ -113,7 +113,7 @@ int g2_list_devices(void) {
 
     if (count < 0) {
         fprintf(stderr, "Failed to get device list\n");
-        return -1;
+        return G2_ERR;
     }
 
     printf("USB Devices:\n");
@@ -143,7 +143,7 @@ int g2_connect(void) {
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
         fprintf(stderr, "G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
-        return -1;
+        return G2_ERR_NOT_FOUND;
     }
 
     fprintf(stderr, "G2 found, connecting...\n");
@@ -160,12 +160,12 @@ int g2_connect(void) {
         fprintf(stderr, "Failed to claim interface: %s\n", libusb_error_name(ret));
         libusb_close(g2.handle);
         g2.handle = NULL;
-        return -1;
+        return G2_ERR_CLAIM_INTERFACE;
     }
 
     g2.interface_claimed = 1;
     fprintf(stderr, "Connected to G2\n");
-    return 0;
+    return G2_OK;
 }
 
 int g2_connect_silent(void) {
@@ -174,7 +174,7 @@ int g2_connect_silent(void) {
     /* Find G2 device */
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
-        return -1;
+        return G2_ERR_NOT_FOUND;
     }
 
     /* Reset device (like G2-Edit does) */
@@ -188,11 +188,11 @@ int g2_connect_silent(void) {
     if (ret < 0) {
         libusb_close(g2.handle);
         g2.handle = NULL;
-        return -1;
+        return G2_ERR_CLAIM_INTERFACE;
     }
 
     g2.interface_claimed = 1;
-    return 0;
+    return G2_OK;
 }
 
 int g2_disconnect(void) {
