@@ -72,6 +72,13 @@ static void invalidate_version_cache(void) {
     version_cache.valid = 0;
 }
 
+static int ensure_connected(int silent) {
+    if (g2_is_connected()) {
+        return 0;
+    }
+    return silent ? g2_connect_silent() : g2_connect();
+}
+
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
@@ -560,13 +567,10 @@ cJSON *g2_settings(int debug) {
     uint8_t msgType;
     uint16_t size;
 
-    if (!g2_is_connected()) {
-        ret = g2_connect_silent();
-        if (ret < 0) {
+    if (ensure_connected(1) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return NULL;
         }
-    }
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
@@ -676,14 +680,10 @@ cJSON *g2_get_patch(const char *slot_str) {
     int connected = 0;
 
     /* Ensure connected first */
-    if (!g2_is_connected()) {
-        ret = g2_connect_silent();
-        if (ret < 0) {
+    if (ensure_connected(1) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return NULL;
         }
-        connected = 1;
-    }
 
     /* Parse slot parameter - required */
     if (slot_str == NULL) {
@@ -823,14 +823,10 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int ret;
     int connected = 0;
 
-    if (!g2_is_connected()) {
-        ret = g2_connect_silent();
-        if (ret < 0) {
+    if (ensure_connected(1) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return NULL;
         }
-        connected = 1;
-    }
 
     if (slot_str == NULL) {
         fprintf(stderr, "Slot required (A, B, C, or D)\n");
@@ -986,13 +982,10 @@ int g2_select_slot(const char *slot_str) {
     uint8_t mask;
     uint8_t data[8] = {0};
 
-    if (!g2_is_connected()) {
-        ret = g2_connect();
-        if (ret < 0) {
+    if (ensure_connected(0) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return -1;
         }
-    }
 
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
@@ -1073,13 +1066,10 @@ cJSON *g2_list(int filter, int bank_filter) {
     int bank_filter_active = (bank_filter > 0);
     int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
 
-    if (!g2_is_connected()) {
-        ret = g2_connect_silent();
-        if (ret < 0) {
+    if (ensure_connected(1) < 0) {
             fprintf(stderr, "Not connected to G2\n");
             return NULL;
         }
-    }
 
     if (filter == LIST_FILTER_ALL) {
         root = cJSON_CreateObject();
@@ -1245,13 +1235,10 @@ int g2_select_variation(int variation, int slot) {
         return -1;
     }
 
-    if (!g2_is_connected()) {
-        ret = g2_connect();
-        if (ret < 0) {
+    if (ensure_connected(0) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return -1;
         }
-    }
 
     if (slot < 0 || slot > 3) {
         fprintf(stderr, "Slot required (A, B, C, or D)\n");
@@ -1305,12 +1292,10 @@ int g2_watch(output_format_t format) {
     int transferred;
     int poll_count = 0;
 
-    if (!g2_is_connected()) {
-        if (g2_connect_silent() < 0) {
+    if (ensure_connected(1) < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
             return -1;
         }
-    }
 
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
