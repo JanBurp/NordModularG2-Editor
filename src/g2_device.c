@@ -31,6 +31,9 @@ static g2_version_cache_t version_cache = { .valid = 0 };
 #define USB_TIMEOUT_STANDARD 100
 #define USB_TIMEOUT_LONG    2000
 
+/* Delay after USB send (in us) */
+#define USB_SEND_DELAY_US    10000
+
 /* Command message building */
 #define COMMAND_OFFSET 2
 
@@ -54,7 +57,7 @@ static uint8_t get_version_for_slot(uint8_t slot) {
         return 0;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -329,7 +332,7 @@ static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms
         if (ret == 0 && transferred > 0) {
             return transferred;
         }
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
     }
     return -1;
 }
@@ -578,7 +581,7 @@ cJSON *g2_settings(int debug) {
         return NULL;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -619,7 +622,7 @@ cJSON *g2_settings(int debug) {
     uint8_t selsInterrupt[16] = {0};
 
     if (send_system(0x41, 0x81) == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
 
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -637,7 +640,7 @@ cJSON *g2_settings(int debug) {
 
     uint8_t perfInterrupt[16] = {0};
     if (send_system(selsData[2], 0x10) == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
 
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -705,7 +708,7 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -725,7 +728,7 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -761,7 +764,7 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
 
@@ -847,7 +850,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -861,7 +864,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -893,7 +896,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
@@ -1251,7 +1254,7 @@ int g2_select_variation(int variation, int slot) {
         fprintf(stderr, "Failed to send variation command 1\n");
         return -1;
     }
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(slota, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
@@ -1267,7 +1270,7 @@ int g2_select_variation(int variation, int slot) {
         fprintf(stderr, "Failed to send variation command 2\n");
         return -1;
     }
-    usleep(10000);
+    usleep(USB_SEND_DELAY_US);
     ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD, 5);
 
     return (ret > 0) ? 0 : -1;
@@ -1307,7 +1310,7 @@ int g2_watch(output_format_t format) {
     uint8_t init_cmd[] = {0x80};
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, init_cmd, 1, &transferred, USB_TIMEOUT_STANDARD);
     if (ret == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         discard_interrupt_response();
         printf("  -> Init response received\n");
     } else {
@@ -1319,7 +1322,7 @@ int g2_watch(output_format_t format) {
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x01;  /* stop */
     if (send_system_data(0x41, cmd_data, 2) == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         discard_interrupt_response();
         printf("  -> Stop response received\n");
     } else {
@@ -1329,7 +1332,7 @@ int g2_watch(output_format_t format) {
     /* Step 3: eStateGetSynthSettings - get synth settings to initialize G2 state */
     printf("Step 3: GetSynthSettings (0x41, 0x02)...\n");
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         discard_interrupt_response();
         printf("  -> SynthSettings response received\n");
     } else {
@@ -1341,7 +1344,7 @@ int g2_watch(output_format_t format) {
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x00;  /* start */
     if (send_system_data(0x41, cmd_data, 2) == 0) {
-        usleep(10000);
+        usleep(USB_SEND_DELAY_US);
         discard_interrupt_response();
         printf("  -> Start response received\n");
     } else {
