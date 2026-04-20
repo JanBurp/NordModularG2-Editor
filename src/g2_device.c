@@ -48,24 +48,30 @@ static uint8_t get_version_for_slot(uint8_t slot) {
     uint8_t response[16] = {0};
     uint8_t data[2] = {0x7d, 0x00};
     int ret;
+    (void)slot;
 
-    if (version_cache.valid && version_cache.slot == slot) {
+    if (version_cache.valid) {
         return version_cache.version;
     }
 
+    data[0] = 0x7d;
+    data[1] = 0x00;
     if (send_system_data(0x41, data, 2) < 0) {
-        return 0;
+        return 0x41;
     }
-
-    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        return 0;
+        return 0x41;
+    }
+
+    uint8_t version = response[3];
+    if (version == 0) {
+        version = 0x41;
     }
 
     version_cache.slot = slot;
-    version_cache.version = response[3];
+    version_cache.version = version;
     version_cache.valid = 1;
 
     return version_cache.version;
@@ -997,10 +1003,6 @@ int g2_select_slot(const char *slot_str) {
     }
 
     version = get_version_for_slot(slot);
-    if (version == 0) {
-        fprintf(stderr, "Failed to get version for slot\n");
-        return -1;
-    }
 
     mask = 0x08 >> slot;
     data[0] = 0x07;
