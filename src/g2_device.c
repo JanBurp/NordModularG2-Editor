@@ -20,6 +20,7 @@ static g2_device_t g2 = {
     .handle = NULL,
     .interface_claimed = 0
 };
+static uint8_t cached_version = 0;
 
 /* Timeout values (in ms) */
 #define USB_TIMEOUT_STANDARD 100
@@ -50,17 +51,17 @@ void g2_exit(void) {
 int g2_list_devices(void) {
     libusb_device **devices;
     ssize_t count = libusb_get_device_list(g2.ctx, &devices);
-    
+
     if (count < 0) {
         fprintf(stderr, "Failed to get device list\n");
         return -1;
     }
-    
+
     printf("USB Devices:\n");
     for (ssize_t i = 0; i < count; i++) {
         libusb_device *dev = devices[i];
         struct libusb_device_descriptor desc;
-        
+
         int ret = libusb_get_device_descriptor(dev, &desc);
         if (ret == 0) {
             const char *g2_label = (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID) ? " ← Nord G2" : "";
@@ -71,29 +72,29 @@ int g2_list_devices(void) {
                    g2_label);
         }
     }
-    
+
     libusb_free_device_list(devices, 1);
     return 0;
 }
 
 int g2_connect(void) {
     int ret;
-    
+
     /* Find G2 device */
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
         fprintf(stderr, "G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
         return -1;
     }
-    
+
     fprintf(stderr, "G2 found, connecting...\n");
-    
+
     /* Reset device (like G2-Edit does) */
     ret = libusb_reset_device(g2.handle);
     if (ret < 0) {
         fprintf(stderr, "Warning: device reset failed: %s\n", libusb_error_name(ret));
     }
-    
+
     /* Claim interface 0 */
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
@@ -102,7 +103,7 @@ int g2_connect(void) {
         g2.handle = NULL;
         return -1;
     }
-    
+
     g2.interface_claimed = 1;
     fprintf(stderr, "Connected to G2\n");
     return 0;
@@ -110,19 +111,19 @@ int g2_connect(void) {
 
 int g2_connect_silent(void) {
     int ret;
-    
+
     /* Find G2 device */
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
         return -1;
     }
-    
+
     /* Reset device (like G2-Edit does) */
     ret = libusb_reset_device(g2.handle);
     if (ret < 0) {
         /* silently ignore reset failure */
     }
-    
+
     /* Claim interface 0 */
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
@@ -130,7 +131,7 @@ int g2_connect_silent(void) {
         g2.handle = NULL;
         return -1;
     }
-    
+
     g2.interface_claimed = 1;
     return 0;
 }
@@ -144,6 +145,7 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
+    cached_version = 0;
     fprintf(stderr, "Disconnected\n");
     return 0;
 }
@@ -155,30 +157,30 @@ int g2_is_connected(void) {
 int g2_send_command(uint8_t *data, int length) {
     int transferred = 0;
     int ret;
-    
+
     if (!g2.handle) {
         fprintf(stderr, "Not connected\n");
         return -1;
     }
-    
+
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
     if (ret < 0) {
         fprintf(stderr, "Write failed: %s\n", libusb_error_name(ret));
         return -1;
     }
-    
+
     return transferred;
 }
 
 int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
     int transferred = 0;
     int ret;
-    
+
     if (!g2.handle) {
         fprintf(stderr, "Not connected\n");
         return -1;
     }
-    
+
     /* G2-Edit uses bulk_transfer on endpoint 0x81 (interrupt endpoint) */
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, buffer, size, &transferred, timeout_ms);
     if (ret < 0) {
@@ -188,7 +190,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
         fprintf(stderr, "Read failed: %s\n", libusb_error_name(ret));
         return -1;
     }
-    
+
     return transferred;
 }
 
@@ -234,34 +236,6 @@ static int send_command_with_data(uint8_t cmd, uint8_t *data, int dataLen) {
     for (int i = 0; i < dataLen; i++) {
         buff[pos++] = data[i];
     }
-
-    msgLength = pos - COMMAND_OFFSET;
-    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
-    if (ret < 0) {
-        return -1;
-    }
-    return 0;
-}
-
-static int send_slot_command(uint8_t slot, uint8_t version, uint8_t subcmd) {
-    uint8_t buff[256] = {0};
-    int pos = COMMAND_OFFSET;
-    int msgLength;
-    uint16_t crc;
-    int transferred;
-    int ret;
-
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;
-    buff[pos++] = version;
-    buff[pos++] = subcmd;
 
     msgLength = pos - COMMAND_OFFSET;
     crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
@@ -346,7 +320,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
                          const uint8_t *perfData, size_t perfSize) {
     (void)bulkSize;  /* Currently using fixed offsets, size not needed */
     (void)perfSize;  /* Currently using fixed offsets, size not needed */
-    
+
     char synthName[32] = {0};
     char perfName[32] = {0};
     char slotNames[4][17] = {{0}};
@@ -383,7 +357,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
       * g2ctl: bitstream.seek_bit(8*5) = bit 40, then reads 5 x 8 bits for MIDI
       * At bit 40: byte 5 of data starting at byte 14 = bulkData[19]
       * But g2ctl shows MIDI A = 10, and bulkData[19] = 0x0a = 10
-      * 
+      *
       * After name (10 bytes at offset 4):
       * Offset 14: Perf Mode
       * Offset 15: Perf Bank
@@ -430,41 +404,41 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     if (perfData[0] != 0) {
         parse_name(perfData + 4, perfName, sizeof(perfName));
     }
-    
+
     const uint8_t *remaining = perfData + 4;
-    
+
     char tmpName[32];
     nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    
+
     remaining += nameLen;  /* Skip past name */
-    
+
     /* g2ctl's BitStream(data, 8*4) reads at bit position 32
      * Focus is 2 bits at bit 36 (after 4 bits skip + 2 bits focus)
      * Extract using proper bitstream formula: word bits 30-31
      */
     const uint8_t *perfSettings = remaining + 4;  /* Byte 4 of remaining = bit 32 position */
-    
+
     /* Pack 4 bytes for bitstream reading */
     uint32_t word = (perfSettings[0] << 24) | (perfSettings[1] << 16) | (perfSettings[2] << 8) | perfSettings[3];
-    
+
     /* Extract focus from bits 36-37: (word >> 26) & 3 */
     focusSlot = (word >> (32 - 4 - 2)) & 0x3;
-    
+
     /* g2ctl reads 8-bit values for range_enable, bpm, split, clock at bit 38+ */
     rangeEnable = remaining[5];
     bpm = remaining[6];
     split = remaining[7] & 1;
     clockRun = remaining[8] & 1;
-    
+
     /* g2ctl: data = data[11:] to skip to slot data */
     const uint8_t *slotPtr = remaining + 11;
-    
+
     /* Now parse each slot */
     for (int i = 0; i < 4; i++) {
         /* Parse slot name */
         nameLen = parse_name(slotPtr, slotNames[i], 17);
         slotPtr += nameLen;
-        
+
         /* Read 7 bytes: active, key, hold, bank, patch, low, high */
         slotActive[i] = slotPtr[0] & 1;
         slotKey[i] = slotPtr[1] & 1;
@@ -473,7 +447,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
         slotPatches[i] = slotPtr[4];
         slotLow[i] = slotPtr[5];
         slotHigh[i] = slotPtr[6];
-        
+
         /* Skip 10 bytes (7 slot data + 3 padding) */
         slotPtr += 10;
     }
@@ -482,7 +456,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "synthName", synthName);
     cJSON_AddStringToObject(root, "mode", mode ? "Performance" : "Patch");
-    
+
     /* midi object */
     cJSON *midi = cJSON_CreateObject();
     cJSON *midiSlots = cJSON_CreateObject();
@@ -499,19 +473,19 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     cJSON_AddBoolToObject(midi, "clkse", clkSend);
     cJSON_AddBoolToObject(midi, "clkre", clkRecv);
     cJSON_AddItemToObject(root, "midi", midi);
-    
+
     /* tuning object */
     cJSON *tuning = cJSON_CreateObject();
     cJSON_AddNumberToObject(tuning, "semi", tuneSemi);
     cJSON_AddNumberToObject(tuning, "cent", tuneCent);
     cJSON_AddItemToObject(root, "tuning", tuning);
-    
+
     /* pedal object - gain is 1.0 + 0.5 * val / 32 */
     cJSON *pedal = cJSON_CreateObject();
     cJSON_AddBoolToObject(pedal, "polarity", pedalPolarity);
     cJSON_AddNumberToObject(pedal, "gain", 1.0 + 0.5 * pedalGain / 32.0);
     cJSON_AddItemToObject(root, "pedal", pedal);
-    
+
     /* performance or patches object - depends on mode */
     cJSON *perf = cJSON_CreateObject();
     const char *perfNameToUse = mode ? perfName : slotNames[focusSlot];
@@ -522,7 +496,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
     cJSON_AddBoolToObject(perf, "kbSplit", split);
     cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
-    
+
     /* slots array */
     cJSON *slots = cJSON_CreateArray();
     for (int i = 0; i < 4; i++) {
@@ -541,7 +515,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
         cJSON_AddItemToArray(slots, slot);
     }
     cJSON_AddItemToObject(root, "slots", slots);
-    
+
     return root;
 }
 
@@ -613,11 +587,11 @@ int g2_settings(output_format_t format, int debug) {
     /* Step 2: Get performance data with 0x81 and 0x10 commands */
     uint8_t selsData[1024] = {0};
     uint8_t selsInterrupt[16] = {0};
-    
+
     if (send_command(0x41, 0x81) == 0) {
         usleep(100000);
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_LONG);
-        
+
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
             recv_bulk(selsData, size);
@@ -635,7 +609,7 @@ int g2_settings(output_format_t format, int debug) {
     if (send_command(selsData[2], 0x10) == 0) {
         usleep(100000);
         ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_LONG);
-        
+
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
             perfSize = size;
@@ -653,15 +627,15 @@ int g2_settings(output_format_t format, int debug) {
 
     /* Parse settings data and build JSON */
     cJSON *root = g2_parse_settings(bulkData, bulkSize, perfData, perfSize);
-    
+
     free(bulkData);
     free(perfData);
-    
+
     if (!root) {
         fprintf(stderr, "Failed to parse settings\n");
         return -1;
     }
-    
+
     output_json(root, format);
     cJSON_Delete(root);
     return 0;
@@ -676,7 +650,7 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
     uint16_t patchSize = 0;
     int ret;
     int connected = 0;
-    
+
     /* Ensure connected first */
     if (!g2_is_connected()) {
         if (format == OUTPUT_JSON) {
@@ -690,7 +664,7 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         }
         connected = 1;
     }
-    
+
     /* Parse slot parameter - required */
     if (slot_str == NULL) {
         fprintf(stderr, "Slot required (A, B, C, or D)\n");
@@ -702,7 +676,7 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         goto cleanup;
     }
     actual_slot = slot;
-    
+
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
@@ -710,47 +684,47 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         fprintf(stderr, "Failed to send get patch version command\n");
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for patch version\n");
         goto cleanup;
     }
-    
+
     /* g2ctl extracts version from embedded message.
      * Embedded response format: [length][data...][CRC]
      * g2ctl returns data starting at index 1 (after length byte), so response[5] = byte[6] of raw
      */
     version = interruptResp[6];
-    
+
     /* Step 2: Get patch data with version */
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send get patch command\n");
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret <= 0) {
         fprintf(stderr, "No interrupt response for patch data\n");
         goto cleanup;
     }
-    
+
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
         fprintf(stderr, "Unexpected response type for patch data\n");
         goto cleanup;
     }
-    
+
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
     patchData = malloc(patchSize);
     if (!patchData) {
         fprintf(stderr, "Memory allocation failed\n");
         goto cleanup;
     }
-    
+
     ret = recv_bulk(patchData, patchSize);
     if (ret <= 0) {
         fprintf(stderr, "Failed to read patch bulk data\n");
@@ -758,7 +732,7 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         patchData = NULL;
         goto cleanup;
     }
-    
+
     /* Step 3: Get patch name */
     char patchName[32] = {0};
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
@@ -766,11 +740,11 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         free(patchData);
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
-    
+
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
     } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -784,13 +758,13 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
             free(nameData);
         }
     }
-    
+
     /* Build JSON output */
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
     cJSON_AddStringToObject(root, "name", patchName);
     cJSON_AddNumberToObject(root, "size", patchSize);
-    
+
     char *hexStr = malloc(patchSize * 2 + 1);
     if (hexStr) {
         for (size_t i = 0; i < patchSize; i++) {
@@ -800,17 +774,17 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         cJSON_AddStringToObject(root, "data", hexStr);
         free(hexStr);
     }
-    
+
     output_json(root, format);
     cJSON_Delete(root);
-    
+
     free(patchData);
-    
+
 cleanup:
     if (connected) {
         g2_disconnect();
     }
-    
+
     return 0;
 }
 
@@ -823,7 +797,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
     uint16_t patchSize = 0;
     int ret;
     int connected = 0;
-    
+
     if (!g2_is_connected()) {
         if (format == OUTPUT_JSON) {
             ret = g2_connect_silent();
@@ -840,7 +814,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         connected = 1;
     }
-    
+
     if (slot_str == NULL) {
         if (format == OUTPUT_JSON) {
             output_error_json("slot required (A, B, C, or D)", format);
@@ -859,11 +833,11 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         goto cleanup;
     }
     actual_slot = slot;
-    
+
     if (format != OUTPUT_JSON) {
         fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
     }
-    
+
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
         if (format == OUTPUT_JSON) {
@@ -873,9 +847,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret <= 0) {
         if (format == OUTPUT_JSON) {
@@ -886,7 +860,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         goto cleanup;
     }
     version = interruptResp[6];
-    
+
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         if (format == OUTPUT_JSON) {
             output_error_json("Failed to send get patch command", format);
@@ -895,9 +869,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret <= 0) {
         if (format == OUTPUT_JSON) {
@@ -907,7 +881,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
         if (format == OUTPUT_JSON) {
             output_error_json("Unexpected response type for patch data", format);
@@ -916,7 +890,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
     patchData = malloc(patchSize);
     if (!patchData) {
@@ -927,7 +901,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     ret = recv_bulk(patchData, patchSize);
     if (ret <= 0) {
         if (format == OUTPUT_JSON) {
@@ -937,7 +911,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     char patchName[32] = {0};
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         if (format == OUTPUT_JSON) {
@@ -947,9 +921,9 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     usleep(100000);
-    
+
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
@@ -964,7 +938,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
             free(nameData);
         }
     }
-    
+
     char defaultFilename[64];
     if (filename == NULL) {
         if (strlen(patchName) == 0) {
@@ -974,7 +948,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         filename = defaultFilename;
     }
-    
+
     uint8_t *pch2Data = malloc(patchSize);
     size_t pch2Size = patchSize;
     if (!pch2Data) {
@@ -985,7 +959,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
         if (format == OUTPUT_JSON) {
             output_error_json("Failed to convert patch to PCH2 format", format);
@@ -995,7 +969,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         free(pch2Data);
         goto cleanup;
     }
-    
+
     FILE *f = fopen(filename, "wb");
     if (!f) {
         if (format == OUTPUT_JSON) {
@@ -1006,11 +980,11 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         free(pch2Data);
         goto cleanup;
     }
-    
+
     size_t written = fwrite(pch2Data, 1, pch2Size, f);
     fclose(f);
     free(pch2Data);
-    
+
     if (written != pch2Size) {
         if (format == OUTPUT_JSON) {
             output_error_json("Failed to write complete file", format);
@@ -1019,16 +993,16 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
         }
         goto cleanup;
     }
-    
+
     cJSON *result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "file", filename);
     cJSON_AddStringToObject(result, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
     cJSON_AddStringToObject(result, "name", patchName);
     cJSON_AddNumberToObject(result, "size", (int)pch2Size);
-    
+
     output_json(result, format);
     cJSON_Delete(result);
-    
+
 cleanup:
     free(patchData);
     if (connected) {
@@ -1059,23 +1033,22 @@ int g2_select_slot(const char *slot_str) {
         return -1;
     }
 
-    /* Step 1: Send 0x41, 0x7d, 0x00 to get version */
-    data[0] = 0x7d;
-    data[1] = 0x00;
-    if (send_command_with_data(0x41, data, 2) < 0) {
-        fprintf(stderr, "Failed to send slot command 1\n");
-        return -1;
+    if (cached_version == 0) {
+        data[0] = 0x7d;
+        data[1] = 0x00;
+        if (send_command_with_data(0x41, data, 2) < 0) {
+            fprintf(stderr, "Failed to send slot command 1\n");
+            return -1;
+        }
+        ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+        if (ret <= 0) {
+            fprintf(stderr, "No response from G2 for slot command 1\n");
+            return -1;
+        }
+        cached_version = response[3];
     }
-    usleep(10000);
-    
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-    if (ret <= 0) {
-        fprintf(stderr, "No response from G2 for slot command 1\n");
-        return -1;
-    }
-    version = response[3];
+    version = cached_version;
 
-    /* Step 2: Send [version, 0x07, mask, 0x0f, mask] */
     mask = 0x08 >> slot;
     data[0] = 0x07;
     data[1] = mask;
@@ -1085,27 +1058,14 @@ int g2_select_slot(const char *slot_str) {
         fprintf(stderr, "Failed to send slot command 2\n");
         return -1;
     }
-    usleep(10000);
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    /* Step 3: Send [version, 0x09, slot] */
     data[0] = 0x09;
     data[1] = slot;
     if (send_command_with_data(version, data, 2) < 0) {
         fprintf(stderr, "Failed to send slot command 3\n");
         return -1;
     }
-    usleep(10000);
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-
-    /* Step 4: Send [CMD_SLOT+slot, 0x0a, 0x70] */
-    data[0] = 0x0a;
-    data[1] = 0x70;
-    if (send_slot_command(slot, 0x0a, 0x70) < 0) {
-        fprintf(stderr, "Failed to send slot command 4\n");
-        return -1;
-    }
-    usleep(10000);
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
     return 0;
@@ -1155,7 +1115,7 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
     int done = 0;
     int bank_filter_active = (bank_filter > 0);
     int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
-    
+
     if (!g2_is_connected()) {
         ret = g2_connect_silent();
         if (ret < 0) {
@@ -1167,7 +1127,7 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
             return 1;
         }
     }
-    
+
     if (filter == LIST_FILTER_ALL) {
         root = cJSON_CreateObject();
         cJSON *patches = cJSON_CreateObject();
@@ -1179,7 +1139,7 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
         result = cJSON_CreateObject();
         root = result;
     }
-    
+
     if (filter == LIST_FILTER_ALL) {
         start_mode = PATCH_MODE;
         end_mode = END_MODE;
@@ -1190,65 +1150,65 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
         start_mode = PERFORMANCE_MODE;
         end_mode = PERFORMANCE_MODE + 1;
     }
-    
+
     for (mode = start_mode; mode < end_mode && !done; mode++) {
         bank = initial_bank;
         patch = 0;
-        
+
         while (mode < END_MODE && !done) {
             cmdData[0] = 0x14;
             cmdData[1] = (uint8_t)mode;
             cmdData[2] = (uint8_t)bank;
             cmdData[3] = (uint8_t)patch;
-            
+
             if (send_command_with_data(0x41, cmdData, 4) < 0) {
                 fprintf(stderr, "Failed to send list command\n");
                 if (root) cJSON_Delete(root);
                 return -1;
             }
-            
+
             ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
             if (ret <= 0) {
                 ret = recv_bulk(response, sizeof(response));
             }
-            
+
             if (ret <= 9) {
                 break;
             }
-            
+
             int data_len = ret - 9 - 2;
             if (data_len <= 0) {
                 break;
             }
-            
+
             uint8_t *data = response + 9;
             int pos = 0;
-            
+
             while (pos < data_len) {
                 uint8_t c = data[pos];
-                
+
                 if (c > LIST_LAST) {
                     char name[32] = {0};
                     int nameLen = parse_name(data + pos, name, sizeof(name));
-                    
+
                     if (nameLen <= 0 || pos + nameLen >= data_len) {
                         break;
                     }
-                    
+
                     cJSON *item = cJSON_CreateObject();
                     cJSON_AddNumberToObject(item, "location", patch + 1);
                     cJSON_AddStringToObject(item, "name", name);
-                    
+
                     if (mode == PATCH_MODE) {
                         int categoryIdx = data[pos + nameLen];
                         if (categoryIdx > 15) categoryIdx = 0;
                         cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
                     }
-                    
+
                     char bankKey[8];
                     snprintf(bankKey, sizeof(bankKey), "%d", bank + 1);
                     cJSON *bankArray;
-                    
+
                     if (filter == LIST_FILTER_ALL) {
                         if (mode == PATCH_MODE) {
                             bankArray = cJSON_GetObjectItem(cJSON_GetObjectItem(root, "patches"), bankKey);
@@ -1270,9 +1230,9 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
                             cJSON_AddItemToObject(result, bankKey, bankArray);
                         }
                     }
-                    
+
                     cJSON_AddItemToArray(bankArray, item);
-                    
+
                     patch++;
                     pos += nameLen + 1;
                 } else if (c == LIST_CONTINUE) {
@@ -1281,12 +1241,12 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
                     if (pos + 3 <= data_len) {
                         int new_bank = data[pos + 1];
                         patch = data[pos + 2];
-                        
+
                         if (bank_filter_active && new_bank != bank) {
                             done = 1;
                             break;
                         }
-                        
+
                         bank = new_bank;
                         pos += 3;
                     } else {
@@ -1317,10 +1277,10 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
             }
         }
     }
-    
+
     output_json(result, format);
     if (root) cJSON_Delete(root);
-    
+
     return 0;
 }
 
@@ -1355,7 +1315,7 @@ int g2_select_variation(int variation, int slot) {
         return -1;
     }
     usleep(100000);
-    
+
     ret = recv_interrupt(slota, 16, USB_TIMEOUT_LONG);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
