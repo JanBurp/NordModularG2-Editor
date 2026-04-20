@@ -68,6 +68,8 @@ typedef enum {
 #define COMMAND_WRITE_NO_RESP                (0x30)  /* High nibble, no response expected */
 #define COMMAND_SYS                          (0x0c)  /* Low nibble - system */
 #define COMMAND_SLOT                         (0x08)  /* Low nibble - slot specific */
+#define COMMAND_SCOPE_SYSTEM                 (COMMAND_REQ | COMMAND_SYS)
+#define COMMAND_SCOPE_SLOT(slot)             (COMMAND_REQ | COMMAND_SLOT | (slot))
 
 /* USB Configuration */
 #define VENDOR_ID                           (0x0ffc)

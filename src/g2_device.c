@@ -193,93 +193,81 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
     return transferred;
 }
 
-static int send_command(uint8_t cmd, uint8_t subcmd) {
+static int send_system(uint8_t cmd, uint8_t subcmd) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
-    int msgLength;
-    uint16_t crc;
-    int transferred;
-    int ret;
 
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SYS;
     buff[pos++] = cmd;
     buff[pos++] = subcmd;
 
-    msgLength = pos - COMMAND_OFFSET;
-    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
     buff[pos++] = (crc >> 8) & 0xff;
     buff[pos++] = crc & 0xff;
     msgLength += 4;
+
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
-    if (ret < 0) {
-        return -1;
-    }
-    return 0;
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    return (ret < 0) ? -1 : 0;
 }
 
-static int send_command_with_data(uint8_t cmd, uint8_t *data, int dataLen) {
+static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
-    int msgLength;
-    uint16_t crc;
-    int transferred;
-    int ret;
 
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SYS;
     buff[pos++] = cmd;
-    for (int i = 0; i < dataLen; i++) {
-        buff[pos++] = data[i];
+
+    for (size_t i = 0; i < extraLen; i++) {
+        buff[pos++] = extra[i];
     }
 
-    msgLength = pos - COMMAND_OFFSET;
-    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
     buff[pos++] = (crc >> 8) & 0xff;
     buff[pos++] = crc & 0xff;
     msgLength += 4;
+
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
-    if (ret < 0) {
-        return -1;
-    }
-    return 0;
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    return (ret < 0) ? -1 : 0;
 }
 
-static int send_slot_command_with_data(uint8_t slot, uint8_t version, uint8_t subcmd, uint8_t *extraData, int extraLen) {
+static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
+                     const uint8_t *extra, size_t extraLen) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
-    int msgLength;
-    uint16_t crc;
-    int transferred;
-    int ret;
 
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;
     buff[pos++] = version;
     buff[pos++] = subcmd;
-    for (int i = 0; i < extraLen; i++) {
-        buff[pos++] = extraData[i];
+
+    for (size_t i = 0; i < extraLen; i++) {
+        buff[pos++] = extra[i];
     }
 
-    msgLength = pos - COMMAND_OFFSET;
-    crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
     buff[pos++] = (crc >> 8) & 0xff;
     buff[pos++] = crc & 0xff;
     msgLength += 4;
+
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
-    if (ret < 0) {
-        return -1;
-    }
-    return 0;
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    return (ret < 0) ? -1 : 0;
 }
 
 static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries) {
@@ -290,7 +278,7 @@ static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms
         if (ret == 0 && transferred > 0) {
             return transferred;
         }
-        usleep(10000);  // Small delay between retries
+        usleep(10000);
     }
     return -1;
 }
@@ -537,7 +525,7 @@ cJSON *g2_settings(int debug) {
     }
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
-    if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
+    if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
         fprintf(stderr, "Failed to send synth settings command\n");
         return NULL;
     }
@@ -582,7 +570,7 @@ cJSON *g2_settings(int debug) {
     uint8_t selsData[1024] = {0};
     uint8_t selsInterrupt[16] = {0};
 
-    if (send_command(0x41, 0x81) == 0) {
+    if (send_system(0x41, 0x81) == 0) {
         usleep(10000);
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
 
@@ -600,7 +588,7 @@ cJSON *g2_settings(int debug) {
     }
 
     uint8_t perfInterrupt[16] = {0};
-    if (send_command(selsData[2], 0x10) == 0) {
+    if (send_system(selsData[2], 0x10) == 0) {
         usleep(10000);
         ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
 
@@ -668,7 +656,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
-    if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
         fprintf(stderr, "Failed to send get patch version command\n");
         goto cleanup;
     }
@@ -688,7 +676,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     version = interruptResp[6];
 
     /* Step 2: Get patch data with version */
-    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send get patch command\n");
         goto cleanup;
     }
@@ -723,7 +711,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Step 3: Get patch name */
     char patchName[32] = {0};
-    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
+    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send get patch name command\n");
         free(patchData);
         goto cleanup;
@@ -814,7 +802,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
 
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
-    if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
         fprintf(stderr, "Failed to send get patch version command\n");
         goto cleanup;
     }
@@ -828,7 +816,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     }
     version = interruptResp[6];
 
-    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send get patch command\n");
         goto cleanup;
     }
@@ -860,7 +848,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     }
 
     char patchName[32] = {0};
-    if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
+    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send get patch name command\n");
         goto cleanup;
     }
@@ -971,7 +959,7 @@ int g2_select_slot(const char *slot_str) {
     if (cached_version == 0) {
         data[0] = 0x7d;
         data[1] = 0x00;
-        if (send_command_with_data(0x41, data, 2) < 0) {
+        if (send_system_data(0x41, data, 2) < 0) {
             fprintf(stderr, "Failed to send slot command 1\n");
             return -1;
         }
@@ -989,7 +977,7 @@ int g2_select_slot(const char *slot_str) {
     data[1] = mask;
     data[2] = 0x0f;
     data[3] = mask;
-    if (send_command_with_data(version, data, 4) < 0) {
+    if (send_system_data(version, data, 4) < 0) {
         fprintf(stderr, "Failed to send slot command 2\n");
         return -1;
     }
@@ -997,7 +985,7 @@ int g2_select_slot(const char *slot_str) {
 
     data[0] = 0x09;
     data[1] = slot;
-    if (send_command_with_data(version, data, 2) < 0) {
+    if (send_system_data(version, data, 2) < 0) {
         fprintf(stderr, "Failed to send slot command 3\n");
         return -1;
     }
@@ -1092,7 +1080,7 @@ cJSON *g2_list(int filter, int bank_filter) {
             cmdData[2] = (uint8_t)bank;
             cmdData[3] = (uint8_t)patch;
 
-            if (send_command_with_data(0x41, cmdData, 4) < 0) {
+            if (send_system_data(0x41, cmdData, 4) < 0) {
                 fprintf(stderr, "Failed to send list command\n");
                 if (root) cJSON_Delete(root);
                 return NULL;
@@ -1238,7 +1226,7 @@ int g2_select_variation(int variation, int slot) {
 
     /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
     uint8_t cmdData[4] = {0x35, (uint8_t)slot};
-    if (send_command_with_data(0x41, cmdData, 2) < 0) {
+    if (send_system_data(0x41, cmdData, 2) < 0) {
         fprintf(stderr, "Failed to send variation command 1\n");
         return -1;
     }
@@ -1254,7 +1242,7 @@ int g2_select_variation(int variation, int slot) {
     /* Step 2: Send [CMD_A + slot, version, 0x6a, variation - 1]
      * Version comes from slota[6] (matches Python embedded_message output) */
     extraData[0] = variation - 1;
-    if (send_slot_command_with_data(slot, version, 0x6a, extraData, 1) < 0) {
+    if (send_slot(slot, version, 0x6a, extraData, 1) < 0) {
         fprintf(stderr, "Failed to send variation command 2\n");
         return -1;
     }
@@ -1311,7 +1299,7 @@ int g2_watch(output_format_t format) {
     printf("Step 2: Stop (0x41, 0x7d, 0x01)...\n");
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x01;  /* stop */
-    if (send_command_with_data(0x41, cmd_data, 2) == 0) {
+    if (send_system_data(0x41, cmd_data, 2) == 0) {
         usleep(10000);
         discard_interrupt_response();
         printf("  -> Stop response received\n");
@@ -1321,7 +1309,7 @@ int g2_watch(output_format_t format) {
 
     /* Step 3: eStateGetSynthSettings - get synth settings to initialize G2 state */
     printf("Step 3: GetSynthSettings (0x41, 0x02)...\n");
-    if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
+    if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
         usleep(10000);
         discard_interrupt_response();
         printf("  -> SynthSettings response received\n");
@@ -1333,7 +1321,7 @@ int g2_watch(output_format_t format) {
     printf("Step 4: Start (0x41, 0x7d, 0x00)...\n");
     cmd_data[0] = SUB_COMMAND_START_STOP;
     cmd_data[1] = 0x00;  /* start */
-    if (send_command_with_data(0x41, cmd_data, 2) == 0) {
+    if (send_system_data(0x41, cmd_data, 2) == 0) {
         usleep(10000);
         discard_interrupt_response();
         printf("  -> Start response received\n");
