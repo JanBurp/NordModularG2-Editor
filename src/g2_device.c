@@ -11,7 +11,6 @@
 #include "defs.h"
 #include "g2_device.h"
 #include "utils.h"
-#include "output.h"
 #include "cJSON.h"
 
 /* Global device state */
@@ -400,7 +399,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
      * parse_name(data) returns (name, remaining starting at byte after name)
      * g2ctl: BitStream(data, 8*4) positions at bit 32
      * Focus is bits 4-5 of byte 4 of remaining
-     */
+      */
     if (perfData[0] != 0) {
         parse_name(perfData + 4, perfName, sizeof(perfName));
     }
@@ -415,7 +414,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     /* g2ctl's BitStream(data, 8*4) reads at bit position 32
      * Focus is 2 bits at bit 36 (after 4 bits skip + 2 bits focus)
      * Extract using proper bitstream formula: word bits 30-31
-     */
+      */
     const uint8_t *perfSettings = remaining + 4;  /* Byte 4 of remaining = bit 32 position */
 
     /* Pack 4 bytes for bitstream reading */
@@ -519,7 +518,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     return root;
 }
 
-int g2_settings(output_format_t format, int debug) {
+cJSON *g2_settings(int debug) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
     uint8_t *perfData = NULL;
@@ -530,22 +529,17 @@ int g2_settings(output_format_t format, int debug) {
     uint16_t size;
 
     if (!g2_is_connected()) {
-        int connect_ret;
-        if (format == OUTPUT_JSON) {
-            connect_ret = g2_connect_silent();
-        } else {
-            connect_ret = g2_connect();
-        }
-        if (connect_ret < 0) {
+        ret = g2_connect_silent();
+        if (ret < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
+            return NULL;
         }
     }
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_command(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
         fprintf(stderr, "Failed to send synth settings command\n");
-        return -1;
+        return NULL;
     }
 
     usleep(10000);
@@ -553,27 +547,27 @@ int g2_settings(output_format_t format, int debug) {
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2\n");
-        return -1;
+        return NULL;
     }
 
     msgType = response[0] & 0x0f;
     if (msgType != RESPONSE_TYPE_EXTENDED) {
         fprintf(stderr, "Unexpected response type %d\n", msgType);
-        return -1;
+        return NULL;
     }
 
     size = (response[1] << 8) | response[2];
     bulkData = malloc(size);
     if (!bulkData) {
         fprintf(stderr, "Memory allocation failed\n");
-        return -1;
+        return NULL;
     }
     bulkSize = size;
 
     if (recv_bulk(bulkData, size) <= 0) {
         fprintf(stderr, "Failed to read bulk data\n");
         free(bulkData);
-        return -1;
+        return NULL;
     }
 
     if (debug) {
@@ -602,7 +596,7 @@ int g2_settings(output_format_t format, int debug) {
     if (!perfData) {
         fprintf(stderr, "Memory allocation failed\n");
         free(bulkData);
-        return -1;
+        return NULL;
     }
 
     uint8_t perfInterrupt[16] = {0};
@@ -633,15 +627,13 @@ int g2_settings(output_format_t format, int debug) {
 
     if (!root) {
         fprintf(stderr, "Failed to parse settings\n");
-        return -1;
+        return NULL;
     }
 
-    output_json(root, format);
-    cJSON_Delete(root);
-    return 0;
+    return root;
 }
 
-int g2_get_patch(const char *slot_str, output_format_t format) {
+cJSON *g2_get_patch(const char *slot_str) {
     int slot;
     int actual_slot;
     uint8_t version;
@@ -653,14 +645,10 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
 
     /* Ensure connected first */
     if (!g2_is_connected()) {
-        if (format == OUTPUT_JSON) {
-            ret = g2_connect_silent();
-        } else {
-            ret = g2_connect();
-        }
+        ret = g2_connect_silent();
         if (ret < 0) {
             fprintf(stderr, "Failed to connect to G2\n");
-            return -1;
+            return NULL;
         }
         connected = 1;
     }
@@ -775,20 +763,25 @@ int g2_get_patch(const char *slot_str, output_format_t format) {
         free(hexStr);
     }
 
-    output_json(root, format);
-    cJSON_Delete(root);
-
     free(patchData);
 
-cleanup:
     if (connected) {
         g2_disconnect();
     }
 
-    return 0;
+    return root;
+
+cleanup:
+    if (patchData) {
+        free(patchData);
+    }
+    if (connected) {
+        g2_disconnect();
+    }
+    return NULL;
 }
 
-int g2_get_patch_file(const char *slot_str, const char *filename, output_format_t format) {
+cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int slot;
     int actual_slot;
     uint8_t version;
@@ -799,52 +792,30 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
     int connected = 0;
 
     if (!g2_is_connected()) {
-        if (format == OUTPUT_JSON) {
-            ret = g2_connect_silent();
-        } else {
-            ret = g2_connect();
-        }
+        ret = g2_connect_silent();
         if (ret < 0) {
-            if (format == OUTPUT_JSON) {
-                output_error_json("Failed to connect to G2", format);
-            } else {
-                fprintf(stderr, "Failed to connect to G2\n");
-            }
-            return -1;
+            fprintf(stderr, "Failed to connect to G2\n");
+            return NULL;
         }
         connected = 1;
     }
 
     if (slot_str == NULL) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("slot required (A, B, C, or D)", format);
-        } else {
-            fprintf(stderr, "Slot required (A, B, or C, or D)\n");
-        }
+        fprintf(stderr, "Slot required (A, B, C, or D)\n");
         goto cleanup;
     }
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("invalid slot (use A, B, C, or D)", format);
-        } else {
-            fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
-        }
+        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
         goto cleanup;
     }
     actual_slot = slot;
 
-    if (format != OUTPUT_JSON) {
-        fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
-    }
+    fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
 
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_command_with_data(0x41, cmd1, sizeof(cmd1)) < 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to send get patch version command", format);
-        } else {
-            fprintf(stderr, "Failed to send get patch version command\n");
-        }
+        fprintf(stderr, "Failed to send get patch version command\n");
         goto cleanup;
     }
 
@@ -852,21 +823,13 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("No response from G2 for patch version", format);
-        } else {
-            fprintf(stderr, "No response from G2 for patch version\n");
-        }
+        fprintf(stderr, "No response from G2 for patch version\n");
         goto cleanup;
     }
     version = interruptResp[6];
 
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to send get patch command", format);
-        } else {
-            fprintf(stderr, "Failed to send get patch command\n");
-        }
+        fprintf(stderr, "Failed to send get patch command\n");
         goto cleanup;
     }
 
@@ -874,51 +837,31 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("No interrupt response for patch data", format);
-        } else {
-            fprintf(stderr, "No interrupt response for patch data\n");
-        }
+        fprintf(stderr, "No interrupt response for patch data\n");
         goto cleanup;
     }
 
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Unexpected response type for patch data", format);
-        } else {
-            fprintf(stderr, "Unexpected response type for patch data\n");
-        }
+        fprintf(stderr, "Unexpected response type for patch data\n");
         goto cleanup;
     }
 
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
     patchData = malloc(patchSize);
     if (!patchData) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Memory allocation failed", format);
-        } else {
-            fprintf(stderr, "Memory allocation failed\n");
-        }
+        fprintf(stderr, "Memory allocation failed\n");
         goto cleanup;
     }
 
     ret = recv_bulk(patchData, patchSize);
     if (ret <= 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to read patch bulk data", format);
-        } else {
-            fprintf(stderr, "Failed to read patch bulk data\n");
-        }
+        fprintf(stderr, "Failed to read patch bulk data\n");
         goto cleanup;
     }
 
     char patchName[32] = {0};
     if (send_slot_command_with_data(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to send get patch name command", format);
-        } else {
-            fprintf(stderr, "Failed to send get patch name command\n");
-        }
+        fprintf(stderr, "Failed to send get patch name command\n");
         goto cleanup;
     }
 
@@ -952,31 +895,19 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
     uint8_t *pch2Data = malloc(patchSize);
     size_t pch2Size = patchSize;
     if (!pch2Data) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Memory allocation failed for PCH2 conversion", format);
-        } else {
-            fprintf(stderr, "Memory allocation failed for PCH2 conversion\n");
-        }
+        fprintf(stderr, "Memory allocation failed for PCH2 conversion\n");
         goto cleanup;
     }
 
     if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to convert patch to PCH2 format", format);
-        } else {
-            fprintf(stderr, "Failed to convert patch to PCH2 format\n");
-        }
+        fprintf(stderr, "Failed to convert patch to PCH2 format\n");
         free(pch2Data);
         goto cleanup;
     }
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to open file for writing", format);
-        } else {
-            fprintf(stderr, "Failed to open file '%s' for writing\n", filename);
-        }
+        fprintf(stderr, "Failed to open file '%s' for writing\n", filename);
         free(pch2Data);
         goto cleanup;
     }
@@ -986,11 +917,7 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
     free(pch2Data);
 
     if (written != pch2Size) {
-        if (format == OUTPUT_JSON) {
-            output_error_json("Failed to write complete file", format);
-        } else {
-            fprintf(stderr, "Failed to write complete file\n");
-        }
+        fprintf(stderr, "Failed to write complete file\n");
         goto cleanup;
     }
 
@@ -1000,15 +927,23 @@ int g2_get_patch_file(const char *slot_str, const char *filename, output_format_
     cJSON_AddStringToObject(result, "name", patchName);
     cJSON_AddNumberToObject(result, "size", (int)pch2Size);
 
-    output_json(result, format);
-    cJSON_Delete(result);
-
-cleanup:
-    free(patchData);
+    if (patchData) {
+        free(patchData);
+    }
     if (connected) {
         g2_disconnect();
     }
-    return 0;
+
+    return result;
+
+cleanup:
+    if (patchData) {
+        free(patchData);
+    }
+    if (connected) {
+        g2_disconnect();
+    }
+    return NULL;
 }
 
 int g2_select_slot(const char *slot_str) {
@@ -1099,7 +1034,7 @@ static const char* g2categories[16] = {
 #define LIST_CONTINUE  5
 #define LIST_LAST      LIST_CONTINUE
 
-int g2_list(output_format_t format, int filter, int bank_filter) {
+cJSON *g2_list(int filter, int bank_filter) {
     uint8_t response[1024] = {0};
     uint8_t cmdData[4] = {0};
     cJSON *root = NULL;
@@ -1119,12 +1054,8 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
     if (!g2_is_connected()) {
         ret = g2_connect_silent();
         if (ret < 0) {
-            if (format == OUTPUT_JSON) {
-                output_error_json("not connected", format);
-            } else {
-                fprintf(stderr, "Not connected to G2\n");
-            }
-            return 1;
+            fprintf(stderr, "Not connected to G2\n");
+            return NULL;
         }
     }
 
@@ -1164,7 +1095,7 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
             if (send_command_with_data(0x41, cmdData, 4) < 0) {
                 fprintf(stderr, "Failed to send list command\n");
                 if (root) cJSON_Delete(root);
-                return -1;
+                return NULL;
             }
 
             ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
@@ -1278,10 +1209,7 @@ int g2_list(output_format_t format, int filter, int bank_filter) {
         }
     }
 
-    output_json(result, format);
-    if (root) cJSON_Delete(root);
-
-    return 0;
+    return result;
 }
 
 int g2_select_variation(int variation, int slot) {
@@ -1478,5 +1406,3 @@ int g2_watch(output_format_t format) {
 
     return 0;
 }
-
-

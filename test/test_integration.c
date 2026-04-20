@@ -39,13 +39,17 @@ void test_integration_connect(void) {
 
 void test_integration_get_patch_slot_a(void) {
     ensure_connected();
-    TEST_ASSERT_TRUE(g2_get_patch("A", OUTPUT_JSON) >= 0);
+    cJSON *result = g2_get_patch("A");
+    TEST_ASSERT_TRUE(result != NULL);
+    cJSON_Delete(result);
     delay_between_tests();
 }
 
 void test_integration_list_all(void) {
     ensure_connected();
-    TEST_ASSERT_TRUE(g2_list(OUTPUT_JSON, LIST_FILTER_ALL, 0) >= 0);
+    cJSON *result = g2_list(LIST_FILTER_ALL, 0);
+    TEST_ASSERT_TRUE(result != NULL);
+    cJSON_Delete(result);
     delay_between_tests();
 }
 

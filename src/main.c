@@ -54,7 +54,7 @@ static int debug_mode = 0;
 int main(int argc, char *argv[]) {
     int i;
     const char *command = NULL;
-    
+
     /* Parse global options */
     for (i = 1; i < argc; i++) {
         if (strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
@@ -78,12 +78,12 @@ int main(int argc, char *argv[]) {
             break;
         }
     }
-    
+
     if (command == NULL) {
         print_usage(argv[0]);
         return 1;
     }
-    
+
     /* Initialize G2 library */
     if (g2_init() < 0) {
         if (output_format == OUTPUT_JSON) {
@@ -93,24 +93,35 @@ int main(int argc, char *argv[]) {
         }
         return 1;
     }
-    
+
     /* Handle commands */
     if (strcmp(command, "list-devices") == 0) {
         return g2_list_devices();
     }
-    
+
     if (strcmp(command, "connect") == 0) {
         return g2_connect();
     }
-    
+
     if (strcmp(command, "disconnect") == 0) {
         return g2_disconnect();
     }
-    
+
     if (strcmp(command, "settings") == 0) {
-        return g2_settings(output_format, debug_mode);
+        cJSON *result = g2_settings(debug_mode);
+        if (!result) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("Failed to get settings", output_format);
+            } else {
+                fprintf(stderr, "Failed to get settings\n");
+            }
+            return 1;
+        }
+        output_json(result, output_format);
+        cJSON_Delete(result);
+        return 0;
     }
-    
+
     if (strcmp(command, "get-patch") == 0) {
         if (i + 1 >= argc) {
             if (output_format == OUTPUT_JSON) {
@@ -120,9 +131,20 @@ int main(int argc, char *argv[]) {
             }
             return 1;
         }
-        return g2_get_patch(argv[i + 1], output_format);
+        cJSON *result = g2_get_patch(argv[i + 1]);
+        if (!result) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("Failed to get patch", output_format);
+            } else {
+                fprintf(stderr, "Failed to get patch\n");
+            }
+            return 1;
+        }
+        output_json(result, output_format);
+        cJSON_Delete(result);
+        return 0;
     }
-    
+
     if (strcmp(command, "get-patch-file") == 0) {
         if (i + 1 >= argc) {
             if (output_format == OUTPUT_JSON) {
@@ -133,13 +155,24 @@ int main(int argc, char *argv[]) {
             return 1;
         }
         const char *filename = (i + 2 < argc) ? argv[i + 2] : NULL;
-        return g2_get_patch_file(argv[i + 1], filename, output_format);
+        cJSON *result = g2_get_patch_file(argv[i + 1], filename);
+        if (!result) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("Failed to get patch file", output_format);
+            } else {
+                fprintf(stderr, "Failed to get patch file\n");
+            }
+            return 1;
+        }
+        output_json(result, output_format);
+        cJSON_Delete(result);
+        return 0;
     }
-    
+
     if (strcmp(command, "list") == 0) {
         int filter = LIST_FILTER_ALL;
         int bank_filter = 0;
-        
+
         /* Parse optional arguments */
         for (int j = i + 1; j < argc; j++) {
             if (strcmp(argv[j], "patches") == 0) {
@@ -167,10 +200,21 @@ int main(int argc, char *argv[]) {
                 return 1;
             }
         }
-        
-        return g2_list(output_format, filter, bank_filter);
+
+        cJSON *result = g2_list(filter, bank_filter);
+        if (!result) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("Failed to list patches", output_format);
+            } else {
+                fprintf(stderr, "Failed to list patches\n");
+            }
+            return 1;
+        }
+        output_json(result, output_format);
+        cJSON_Delete(result);
+        return 0;
     }
-    
+
     if (strcmp(command, "slot") == 0) {
         if (i + 1 >= argc) {
             if (output_format == OUTPUT_JSON) {
@@ -182,7 +226,7 @@ int main(int argc, char *argv[]) {
         }
         return g2_select_slot(argv[i + 1]);
     }
-    
+
     if (strcmp(command, "variation") == 0) {
         if (i + 1 >= argc) {
             if (output_format == OUTPUT_JSON) {
@@ -207,11 +251,11 @@ int main(int argc, char *argv[]) {
         }
         return g2_select_variation(variation, slot);
     }
-    
+
     if (strcmp(command, "watch") == 0) {
         return g2_watch(output_format);
     }
-    
+
     if (output_format == OUTPUT_JSON) {
         output_error_json("unknown command", output_format);
     } else {
