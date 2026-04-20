@@ -1066,9 +1066,9 @@ int g2_select_slot(const char *slot_str) {
         fprintf(stderr, "Failed to send slot command 1\n");
         return -1;
     }
-    usleep(100000);
+    usleep(10000);
     
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for slot command 1\n");
         return -1;
@@ -1085,8 +1085,8 @@ int g2_select_slot(const char *slot_str) {
         fprintf(stderr, "Failed to send slot command 2\n");
         return -1;
     }
-    usleep(100000);
-    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    usleep(10000);
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
     /* Step 3: Send [version, 0x09, slot] */
     data[0] = 0x09;
@@ -1095,8 +1095,8 @@ int g2_select_slot(const char *slot_str) {
         fprintf(stderr, "Failed to send slot command 3\n");
         return -1;
     }
-    usleep(100000);
-    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    usleep(10000);
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
     /* Step 4: Send [CMD_SLOT+slot, 0x0a, 0x70] */
     data[0] = 0x0a;
@@ -1105,8 +1105,8 @@ int g2_select_slot(const char *slot_str) {
         fprintf(stderr, "Failed to send slot command 4\n");
         return -1;
     }
-    usleep(100000);
-    recv_interrupt(response, 16, USB_TIMEOUT_LONG);
+    usleep(10000);
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
     return 0;
 }
