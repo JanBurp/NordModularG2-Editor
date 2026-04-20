@@ -19,7 +19,13 @@ static g2_device_t g2 = {
     .handle = NULL,
     .interface_claimed = 0
 };
-static uint8_t cached_version = 0;
+typedef struct {
+    uint8_t slot;
+    uint8_t version;
+    int valid;
+} g2_version_cache_t;
+
+static g2_version_cache_t version_cache = { .valid = 0 };
 
 /* Timeout values (in ms) */
 #define USB_TIMEOUT_STANDARD 100
@@ -27,6 +33,44 @@ static uint8_t cached_version = 0;
 
 /* Command message building */
 #define COMMAND_OFFSET 2
+
+static void invalidate_version_cache(void);
+static int recv_interrupt(uint8_t *response, int size, int timeout_ms);
+static int send_system(uint8_t cmd, uint8_t subcmd);
+static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
+static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
+                     const uint8_t *extra, size_t extraLen);
+
+static uint8_t get_version_for_slot(uint8_t slot) {
+    uint8_t response[16] = {0};
+    uint8_t data[2] = {0x7d, 0x00};
+    int ret;
+
+    if (version_cache.valid && version_cache.slot == slot) {
+        return version_cache.version;
+    }
+
+    if (send_system_data(0x41, data, 2) < 0) {
+        return 0;
+    }
+
+    usleep(10000);
+
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    if (ret <= 0) {
+        return 0;
+    }
+
+    version_cache.slot = slot;
+    version_cache.version = response[3];
+    version_cache.valid = 1;
+
+    return version_cache.version;
+}
+
+static void invalidate_version_cache(void) {
+    version_cache.valid = 0;
+}
 
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
@@ -144,7 +188,7 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
-    cached_version = 0;
+    invalidate_version_cache();
     fprintf(stderr, "Disconnected\n");
     return 0;
 }
@@ -956,21 +1000,11 @@ int g2_select_slot(const char *slot_str) {
         return -1;
     }
 
-    if (cached_version == 0) {
-        data[0] = 0x7d;
-        data[1] = 0x00;
-        if (send_system_data(0x41, data, 2) < 0) {
-            fprintf(stderr, "Failed to send slot command 1\n");
-            return -1;
-        }
-        ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-        if (ret <= 0) {
-            fprintf(stderr, "No response from G2 for slot command 1\n");
-            return -1;
-        }
-        cached_version = response[3];
+    version = get_version_for_slot(slot);
+    if (version == 0) {
+        fprintf(stderr, "Failed to get version for slot\n");
+        return -1;
     }
-    version = cached_version;
 
     mask = 0x08 >> slot;
     data[0] = 0x07;

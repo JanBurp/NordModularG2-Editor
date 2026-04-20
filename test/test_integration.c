@@ -29,7 +29,7 @@ static void ensure_connected(void) {
 }
 
 static void delay_between_tests(void) {
-    usleep(300000);
+    usleep(500000);
 }
 
 void test_integration_connect(void) {
