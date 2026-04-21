@@ -1,5 +1,5 @@
 <template>
-  <div id="app">
+  <div id="app" class="p-5">
     <HomeView />
   </div>
 </template>
@@ -9,20 +9,10 @@ import HomeView from './views/HomeView.vue'
 </script>
 
 <style>
-* {
-  margin: 0;
-  padding: 0;
-  box-sizing: border-box;
-}
-
 body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #1a1a2e;
+  background: #111827;
   color: #eee;
   min-height: 100vh;
-}
-
-#app {
-  padding: 20px;
 }
 </style>

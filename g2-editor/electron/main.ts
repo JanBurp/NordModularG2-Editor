@@ -1,4 +1,5 @@
-import { app, BrowserWindow, ipcMain } from 'electron'
+import { BrowserWindow, app, ipcMain } from 'electron'
+
 import { join } from 'path'
 import { spawn } from 'child_process'
 
@@ -16,6 +17,9 @@ function createWindow() {
       contextIsolation: true
     }
   })
+
+  win.maximize();
+  win.show();
 
   if (process.env.VITE_DEV_SERVER_URL) {
     win.loadURL(process.env.VITE_DEV_SERVER_URL)

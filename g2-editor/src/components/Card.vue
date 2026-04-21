@@ -1,6 +1,6 @@
 <template>
-  <div class="card">
-    <div v-if="title" class="card-title">{{ title }}</div>
+  <div class="bg-gray-800 rounded-lg p-4 mb-3">
+    <div v-if="title" class="text-xs uppercase text-gray-400 mb-3 tracking-wide">{{ title }}</div>
     <slot />
   </div>
 </template>
@@ -10,20 +10,3 @@ defineProps<{
   title?: string
 }>()
 </script>
-
-<style scoped>
-.card {
-  background: #16213e;
-  border-radius: 8px;
-  padding: 16px;
-  margin-bottom: 12px;
-}
-
-.card-title {
-  font-size: 12px;
-  text-transform: uppercase;
-  color: #888;
-  margin-bottom: 12px;
-  letter-spacing: 0.5px;
-}
-</style>

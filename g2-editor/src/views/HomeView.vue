@@ -1,28 +1,28 @@
 <template>
-  <div class="home">
-    <h1>G2 Editor</h1>
+  <div class="max-w-xl mx-auto">
+    <h1 class="text-2xl font-bold mb-6">G2 Editor</h1>
 
     <div v-if="!device.connected">
-      <Btn @click="handleConnect" :disabled="loading">
+      <Button @click="handleConnect" :disabled="loading">
         {{ loading ? 'Connecting...' : 'Connect to G2' }}
-      </Btn>
-      <p v-if="error" class="error">{{ error }}</p>
+      </Button>
+      <p v-if="error" class="text-red-400 mt-3">{{ error }}</p>
     </div>
 
     <div v-else>
-      <p class="status">Connected to {{ device.deviceName }}</p>
-      <Btn variant="secondary" @click="handleFetchSettings">Refresh Settings</Btn>
+      <p class="text-green-400 mb-4">Connected to {{ device.deviceName }}</p>
+      <Button variant="secondary" @click="handleFetchSettings">Refresh Settings</Button>
 
-      <div v-if="device.settings" class="settings">
+      <div v-if="device.settings" class="mt-6">
         <Card title="Synth">
           <p>{{ device.settings.synthName }} ({{ device.settings.mode }})</p>
         </Card>
 
         <Card title="Slots">
-          <div v-for="slot in device.settings.slots" :key="slot.slot" class="slot">
-            <span class="slot-name">{{ slot.slot }}:</span>
+          <div v-for="slot in device.settings.slots" :key="slot.slot" class="flex justify-between py-2 border-b border-gray-700">
+            <span class="font-medium">{{ slot.slot }}:</span>
             <span v-if="slot.name">{{ slot.name }}</span>
-            <span v-else class="empty">Empty</span>
+            <span v-else class="text-gray-500 italic">Empty</span>
           </div>
         </Card>
 
@@ -46,7 +46,7 @@
 
 <script setup lang="ts">
 import { onMounted } from 'vue'
-import Btn from '@/components/Btn.vue'
+import Button from '@/components/Button.vue'
 import Card from '@/components/Card.vue'
 import { useG2 } from '@/composables/useG2'
 
@@ -67,48 +67,3 @@ onMounted(async () => {
   await handleConnect()
 })
 </script>
-
-<style scoped>
-.home {
-  max-width: 600px;
-  margin: 0 auto;
-}
-
-h1 {
-  margin-bottom: 24px;
-}
-
-.status {
-  color: #4ade80;
-  margin-bottom: 16px;
-}
-
-.error {
-  color: #f87171;
-  margin-top: 12px;
-}
-
-.settings {
-  margin-top: 24px;
-}
-
-.slot {
-  display: flex;
-  justify-content: space-between;
-  padding: 8px 0;
-  border-bottom: 1px solid #1e3a5f;
-}
-
-.slot:last-child {
-  border-bottom: none;
-}
-
-.slot-name {
-  font-weight: 500;
-}
-
-.empty {
-  color: #666;
-  font-style: italic;
-}
-</style>
