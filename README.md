@@ -1,59 +1,40 @@
-# G2 CLI
+# G2 Editor
 
-Command-line editor for Nord G2 synthesizer.
+CLI and Electron GUI for Nord G2 synthesizer.
 
-## Prerequisites
+## Structure
 
-- libusb-1.0
-- macOS or Linux
+- `cli/` - C CLI tool
+- `g2-editor/` - Electron GUI app (Vue + TypeScript)
 
-## Build
+## Build CLI
 
 ```bash
-make
+cd cli && make
 ```
 
-## Run
+## Build Electron App
 
 ```bash
-./build/bin/g2-cli --help
+cd g2-editor
+npm install
+cd ../cli && make && cd ../g2-editor
+npm run postinstall
+npm run dev
 ```
 
-### Examples
+## CLI Commands
 
-Connect to G2:
 ```bash
-./build/bin/g2-cli connect
+./cli/build/bin/g2-cli --help
+./cli/build/bin/g2-cli connect
+./cli/build/bin/g2-cli settings
+./cli/build/bin/g2-cli get-patch A
+./cli/build/bin/g2-cli list patches
 ```
 
-Get patch from slot A:
-```bash
-./build/bin/g2-cli get-patch A
-```
+## Test CLI
 
-List all patches:
 ```bash
-./build/bin/g2-cli list patches
-```
-
-Watch for parameter changes:
-```bash
-./build/bin/g2-cli watch
-```
-
-## Test
-
-Run all tests:
-```bash
-make test
-```
-
-Run unit tests only (no hardware required):
-```bash
-make test-unit
-```
-
-Run integration tests (requires G2 hardware):
-```bash
-make test-integration
+cd cli && make test
 ```

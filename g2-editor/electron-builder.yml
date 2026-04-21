@@ -1,0 +1,24 @@
+appId: com.nord.g2-editor
+productName: G2 Editor
+directories:
+  buildResources: build
+  output: release
+files:
+  - dist/**/*
+  - dist-electron/**/*
+  - resources/**/*
+extraResources:
+  - from: ../cli/build/bin/g2-cli
+    to: g2-cli
+    filter:
+      - "**/*"
+mac:
+  target:
+    - dmg
+  category: public.app-category.music
+win:
+  target:
+    - nsis
+linux:
+  target:
+    - AppImage

@@ -112,46 +112,39 @@ use --json output together with fx (https://fx.wtf/):
 ## Project Structure
 
 ```
-c-cli/
-├── Makefile
-├── src/
-│   ├── main.c           # CLI entry, argument parsing
-│   ├── g2_device.c     # USB connect/disconnect, status command
-│   ├── g2_device.h
-│   ├── bitstream.c      # Bit stream parsing
-│   ├── bitstream.h
-│   ├── utils.c          # CRC, parse_slot, parse_name utilities
-│   ├── utils.h
-│   ├── output.c         # JSON/text formatting
-│   ├── output.h
-│   ├── cjson.c          # JSON library
-│   └── cjson.h
-├── include/
-│   ├── defs.h          # Protocol constants (from G2-Edit)
-│   └── g2_device.h
-├── test/
-│   ├── unity.h         # Unity test framework
-│   ├── unity.c
-│   ├── unity_internals.h
-│   ├── run_tests.c     # Test runner
-│   ├── test_crc.c
-│   ├── test_parse.c
-│   ├── test_bitstream.c
-│   ├── test_settings_parse.c
-│   ├── test_real_data.c
-│   ├── test_parse_settings.h
-│   └── mocks/          # Real G2 responses (hex format)
-│       ├── patch-focus-c.txt
-│       ├── perf-focus-c.txt
-│       ├── patch-focus-a.txt
-│       ├── patch-focus-d.txt
-│       ├── factory-patch.txt
-│       └── perf-focus-a.txt
-└── build/
-    ├── bin/
-    │   └── g2-cli      # Built executable
-    └── test/
-        └── g2-tests     # Test executable
+new-editor/
+├── cli/                     # C CLI tool
+│   ├── Makefile
+│   ├── src/
+│   │   ├── main.c
+│   │   ├── g2_device.c
+│   │   ├── bitstream.c
+│   │   ├── utils.c
+│   │   ├── output.c
+│   │   └── cjson.c
+│   ├── include/
+│   │   ├── defs.h
+│   │   └── g2_device.h
+│   └── test/
+│       ├── unity.h
+│       ├── run_tests.c
+│       ├── test_*.c
+│       └── mocks/
+├── g2-editor/               # Electron GUI app
+│   ├── electron/
+│   │   ├── main.ts          # Electron main process
+│   │   ├── preload.ts       # Context bridge
+│   │   └── cli/             # CLI wrapper
+│   ├── src/
+│   │   ├── components/      # Btn, Card, Label
+│   │   ├── composables/     # useG2.ts
+│   │   ├── views/           # HomeView.vue
+│   │   ├── store/           # device.ts (Pinia)
+│   │   └── types/
+│   ├── package.json
+│   ├── vite.config.ts
+│   └── electron-builder.yml
+└── README.md
 ```
 
 ## Build Requirements
@@ -159,11 +152,14 @@ c-cli/
 - libusb-1.0 (installed at /opt/homebrew/Cellar/libusb/1.0.29)
 - gcc or clang
 - make
+- Node.js 18+ (for g2-editor)
 
 ## Build & Run Commands
 
+### CLI (cli/ directory)
+
 ```bash
-cd c-cli
+cd cli
 
 # Build
 make
@@ -176,6 +172,27 @@ make
 
 # Run unit tests
 make test
+```
+
+### Electron App (g2-editor/ directory)
+
+```bash
+cd g2-editor
+
+# Install dependencies
+npm install
+
+# Build CLI binary (from cli/ directory)
+cd ../cli && make && cd ../g2-editor
+
+# Copy CLI binary to resources/
+npm run postinstall
+
+# Development mode
+npm run dev
+
+# Build for distribution
+npm run build
 ```
 
 ## Example output:
