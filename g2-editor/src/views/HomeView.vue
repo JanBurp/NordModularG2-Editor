@@ -14,26 +14,30 @@
       <Btn variant="secondary" @click="handleFetchSettings">Refresh Settings</Btn>
 
       <div v-if="device.settings" class="settings">
+        <Card title="Synth">
+          <p>{{ device.settings.synthName }} ({{ device.settings.mode }})</p>
+        </Card>
+
         <Card title="Slots">
-          <div v-for="(slot, key) in device.settings.slots" :key="key" class="slot">
-            <Label>{{ key }}:</Label>
-            <span v-if="slot">Var {{ slot.variation }} - {{ slot.name }}</span>
-            <span v-else>Empty</span>
+          <div v-for="slot in device.settings.slots" :key="slot.slot" class="slot">
+            <span class="slot-name">{{ slot.slot }}:</span>
+            <span v-if="slot.name">{{ slot.name }}</span>
+            <span v-else class="empty">Empty</span>
           </div>
         </Card>
 
-        <Card title="Program">
-          <p>Bank {{ device.settings.bank }}, Program {{ device.settings.program }}</p>
+        <Card v-if="device.settings.patches" title="Patch">
+          <p>Name: {{ device.settings.patches.name }}</p>
+          <p>Focus: {{ device.settings.patches.focus }}</p>
+          <p>BPM: {{ device.settings.patches.bpm }}</p>
+          <p>Clock: {{ device.settings.patches.clockRunning ? 'Running' : 'Stopped' }}</p>
         </Card>
 
-        <Card title="Master Clock">
-          <p>Tempo: {{ device.settings.masterClock.tempo }} BPM</p>
-          <p>{{ device.settings.masterClock.running ? 'Running' : 'Stopped' }}</p>
-        </Card>
-
-        <Card title="MIDI In">
-          <p>Channel {{ device.settings.midiIn.channel }}</p>
-          <p>Soft Thru: {{ device.settings.midiIn.softThru ? 'On' : 'Off' }}</p>
+        <Card v-if="device.settings.performance" title="Performance">
+          <p>Name: {{ device.settings.performance.name }}</p>
+          <p>Focus: {{ device.settings.performance.focus }}</p>
+          <p>BPM: {{ device.settings.performance.bpm }}</p>
+          <p>Clock: {{ device.settings.performance.clockRunning ? 'Running' : 'Stopped' }}</p>
         </Card>
       </div>
     </div>
@@ -44,7 +48,6 @@
 import { onMounted } from 'vue'
 import Btn from '@/components/Btn.vue'
 import Card from '@/components/Card.vue'
-import Label from '@/components/Label.vue'
 import { useG2 } from '@/composables/useG2'
 
 const { loading, error, device, connect, fetchSettings } = useG2()
@@ -98,5 +101,14 @@ h1 {
 
 .slot:last-child {
   border-bottom: none;
+}
+
+.slot-name {
+  font-weight: 500;
+}
+
+.empty {
+  color: #666;
+  font-style: italic;
 }
 </style>

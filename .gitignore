@@ -1,9 +1,16 @@
-# Build artifacts
-build/
+# C CLI build artifacts
+cli/build/
 *.o
-*.a
-*.so
-*.dylib
+
+# Electron app
+g2-editor/node_modules/
+g2-editor/dist/
+g2-editor/dist-electron/
+g2-editor/release/
+
+# Binary
+cli/build/bin/g2-cli
+g2-editor/resources/g2-cli
 
 # Editor files
 *.swp
@@ -13,6 +20,3 @@ build/
 
 # Dependency directories
 .depend/
-
-# Binary
-g2-cli

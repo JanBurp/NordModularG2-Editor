@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia'
-import { Settings, SlotInfo } from '@/types'
+import { Settings } from '@/types'
 
 declare global {
   interface Window {
