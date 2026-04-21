@@ -3,14 +3,12 @@ import vue from '@vitejs/plugin-vue'
 import electron from 'vite-plugin-electron'
 import renderer from 'vite-plugin-electron-renderer'
 import tailwindcss from '@tailwindcss/vite'
-import vueDevTools from 'vite-plugin-vue-devtools'
 import { resolve } from 'path'
 
 export default defineConfig({
   plugins: [
     vue(),
     tailwindcss(),
-    vueDevTools(),
     electron([
       {
         entry: 'electron/main.ts',
