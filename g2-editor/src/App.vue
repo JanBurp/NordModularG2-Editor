@@ -1,85 +1,3 @@
-<script setup>
-import { watch } from "vue";
-import "./renderer/nmg2mods.js";
-import "./renderer/parammap.js";
-import "./parser/nmg2PatchParser.js";
-import PatchCanvas from "./components/canvas/PatchCanvas.vue";
-import PatchBrowser from "./components/panels/PatchBrowser.vue";
-import PatchData from "./components/panels/PatchData.vue";
-import ModulesPane from "./components/panels/ModulesPane.vue";
-import UsbPanel from "./components/panels/UsbPanel.vue";
-import Button from "./components/toolbar/Button.vue";
-import BtnGroup from "./components/toolbar/BtnGroup.vue";
-import ToolBar from "./components/toolbar/ToolBar.vue";
-import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
-
-import { usePatchManager } from "./composables/usePatchManager";
-import { useG2Connection } from "./composables/useG2Connection";
-import { useCableVisibility } from "./composables/useCableVisibility";
-import { usePatchCategory } from "./composables/usePatchCategory";
-import { useRightPanel } from "./composables/useRightPanel";
-
-import { SOUND_CATEGORIES as soundCategories } from "./constants";
-
-const {
-	patch,
-	patchName,
-	variation,
-	selectedArea,
-	currentModules,
-	currentCables,
-	areaModulesCount,
-	areaCablesCount,
-	handleFileLoad,
-	handlePatchSelect,
-} = usePatchManager();
-
-const {
-	g2,
-	deviceStatus,
-	statusText,
-	usbLogs,
-	connectDevice,
-	disconnectDevice,
-	uploadToG2,
-	downloadFromG2,
-	clearLogs,
-} = useG2Connection();
-
-const {
-	cableColors,
-	cableVisibility,
-	cableShakeTrigger,
-	allCablesVisible,
-	toggleCableVisibility,
-	toggleShowHideAll,
-	shakeCables,
-	syncWithPatchData,
-	updatePatchData,
-} = useCableVisibility();
-
-const { selectedCategory } = usePatchCategory(patch);
-
-const { rightPaneTab, showRightPane, toggleSidebar, handleToggleOff } =
-	useRightPanel();
-
-watch(
-	() => patch.value?.description,
-	(description) => {
-		syncWithPatchData(description);
-	},
-	{ immediate: true, deep: true },
-);
-
-watch(
-	cableVisibility,
-	() => {
-		updatePatchData(patch.value?.description);
-	},
-	{ deep: true },
-);
-</script>
-
 <template>
 	<div class="flex flex-col h-screen">
 		<ToolBar>
@@ -130,17 +48,6 @@ watch(
 			<ToolBarDivider />
 
 			<BtnGroup
-				v-model="selectedArea"
-				:options="[
-					{ value: 'voice', label: 'Voice' },
-					{ value: 'fx', label: 'FX' },
-				]"
-				variant="toggle"
-			/>
-
-			<ToolBarDivider />
-
-			<BtnGroup
 				:model-value="rightPaneTab"
 				:options="[
 					{ label: 'USB', value: 'usb' },
@@ -180,6 +87,18 @@ watch(
 				FX: {{ areaModulesCount("fx") }} modules,
 				{{ areaCablesCount("fx") }} cables<br />
 			</span>
+
+			<ToolBarDivider />
+
+
+			<BtnGroup
+				v-model="selectedArea"
+				:options="[
+					{ value: 'voice', label: 'Voice' },
+					{ value: 'fx', label: 'FX' },
+				]"
+				variant="toggle"
+			/>
 
 			<ToolBarDivider />
 
@@ -294,3 +213,85 @@ watch(
 		</div>
 	</div>
 </template>
+
+<script setup>
+import { watch } from "vue";
+import "./renderer/nmg2mods.js";
+import "./renderer/parammap.js";
+import "./parser/nmg2PatchParser.js";
+import PatchCanvas from "./components/canvas/PatchCanvas.vue";
+import PatchBrowser from "./components/panels/PatchBrowser.vue";
+import PatchData from "./components/panels/PatchData.vue";
+import ModulesPane from "./components/panels/ModulesPane.vue";
+import UsbPanel from "./components/panels/UsbPanel.vue";
+import Button from "./components/toolbar/Button.vue";
+import BtnGroup from "./components/toolbar/BtnGroup.vue";
+import ToolBar from "./components/toolbar/ToolBar.vue";
+import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
+
+import { usePatchManager } from "./composables/usePatchManager";
+import { useG2Connection } from "./composables/useG2Connection";
+import { useCableVisibility } from "./composables/useCableVisibility";
+import { usePatchCategory } from "./composables/usePatchCategory";
+import { useRightPanel } from "./composables/useRightPanel";
+
+import { SOUND_CATEGORIES as soundCategories } from "./constants";
+
+const {
+	patch,
+	patchName,
+	variation,
+	selectedArea,
+	currentModules,
+	currentCables,
+	areaModulesCount,
+	areaCablesCount,
+	handleFileLoad,
+	handlePatchSelect,
+} = usePatchManager();
+
+const {
+	g2,
+	deviceStatus,
+	statusText,
+	usbLogs,
+	connectDevice,
+	disconnectDevice,
+	uploadToG2,
+	downloadFromG2,
+	clearLogs,
+} = useG2Connection();
+
+const {
+	cableColors,
+	cableVisibility,
+	cableShakeTrigger,
+	allCablesVisible,
+	toggleCableVisibility,
+	toggleShowHideAll,
+	shakeCables,
+	syncWithPatchData,
+	updatePatchData,
+} = useCableVisibility();
+
+const { selectedCategory } = usePatchCategory(patch);
+
+const { rightPaneTab, showRightPane, toggleSidebar, handleToggleOff } =
+	useRightPanel();
+
+watch(
+	() => patch.value?.description,
+	(description) => {
+		syncWithPatchData(description);
+	},
+	{ immediate: true, deep: true },
+);
+
+watch(
+	cableVisibility,
+	() => {
+		updatePatchData(patch.value?.description);
+	},
+	{ deep: true },
+);
+</script>

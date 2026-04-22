@@ -170,6 +170,7 @@ watch(
 	overflow: auto;
 	background: #666;
 	min-height: 400px;
+	height: 100%;
 	flex: 1;
 }
 
