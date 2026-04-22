@@ -1,12 +1,6 @@
 <template>
-  <div class="toolbar-divider"></div>
+  <div class="w-px h-6 bg-neutral-700 mx-1"></div>
 </template>
 
 <style scoped>
-.toolbar-divider {
-  width: 1px;
-  height: 24px;
-  background: #3a3a3a;
-  margin: 0 4px;
-}
 </style>

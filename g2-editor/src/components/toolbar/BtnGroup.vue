@@ -89,28 +89,28 @@ const handleKeydown = (event: KeyboardEvent, index: number) => {
 </template>
 
 <style scoped>
+@reference "tailwindcss";
+
 .btn-group {
-  display: flex;
-  gap: 0;
+  @apply flex gap-0;
 }
 
 .btn-group__button {
-  border-radius: 0;
-  margin: 0;
+  @apply rounded-none m-0;
 }
 
 /* First button: round left corners */
 .btn-group__button:first-child {
-  border-radius: 4px 0 0 4px;
+  @apply rounded-l;
 }
 
 /* Last button: round right corners */
 .btn-group__button:last-child {
-  border-radius: 0 4px 4px 0;
+  @apply rounded-r;
 }
 
 /* Remove double borders between buttons */
 .btn-group__button:not(:first-child) {
-  border-left: none;
+  @apply border-l-0;
 }
 </style>

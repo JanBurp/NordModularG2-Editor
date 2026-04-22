@@ -78,77 +78,59 @@ const handleKeydown = (event: KeyboardEvent) => {
 </template>
 
 <style scoped>
+@reference "tailwindcss";
+
 .btn {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  height: 32px;
-  background: #3a3a3a;
-  border: 1px solid #4a4a4a;
-  border-radius: 4px;
-  color: #e0e0e0;
-  cursor: pointer;
-  font-size: 13px;
-  transition: all 0.15s;
-  font-family: inherit;
+  @apply inline-flex items-center justify-center h-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm transition-all font-normal;
 }
 
 .btn:hover:not(.btn--disabled) {
-  background: #4a4a4a;
+  @apply bg-neutral-600;
 }
 
 /* Variant: default */
 .btn--default {
-  padding: 0 12px;
+  @apply px-3;
 }
 
 /* Variant: toggle and tab */
 .btn--toggle,
 .btn--tab {
-  padding: 0 10px;
-  background: #2a2a2a;
-  border-color: #3a3a3a;
+  @apply px-2.5 bg-neutral-800 border-neutral-700;
 }
 
 /* Variant: variation (square buttons) */
 .btn--variation {
-  width: 32px;
-  height: 32px;
-  padding: 0;
-  background: #2a2a2a;
+  @apply w-8 h-8 p-0 bg-neutral-800;
 }
 
 /* Variant: file */
 .btn--file {
-  padding: 0 12px;
-  cursor: pointer;
+  @apply px-3 cursor-pointer;
 }
 
 .btn--file input[type="file"] {
-  display: none;
+  @apply hidden;
 }
 
 /* Active state - blue for all */
 .btn--active {
-  background: #4a6a8a !important;
-  color: #fff !important;
+  background-color: #4a6a8a !important;
+  color: white !important;
   border-color: #5a7a9a !important;
 }
 
 /* Disabled state */
 .btn--disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  @apply opacity-50 cursor-not-allowed;
 }
 
 button:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
+  @apply opacity-50 cursor-not-allowed;
 }
 
 /* Focus styles for accessibility */
 .btn:focus-visible {
-  outline: 2px solid #5a7a9a;
-  outline-offset: 2px;
+  @apply outline-2 outline-blue-600 outline-offset-2;
 }
 </style>
