@@ -15,7 +15,7 @@
 	<!-- All other variants use button -->
 	<button
 		v-else
-		class="inline-flex items-center justify-center h-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal"
+		class="inline-flex items-center justify-center h-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2"
 		:class="[
 			variant === 'default' ? 'px-3' : '',
 			variant === 'toggle' || variant === 'tab'
@@ -27,9 +27,6 @@
 		]"
 		:disabled="disabled"
 		@click="handleClick"
-		focus-visible:outline-2
-		focus-visible:outline-[#2563eb]
-		focus-visible:outline-offset-2
 	>
 		<slot />
 	</button>
