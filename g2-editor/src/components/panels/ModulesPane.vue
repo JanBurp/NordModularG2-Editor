@@ -1,14 +1,60 @@
+<template>
+	<div class="h-full overflow-y-auto p-2 bg-neutral-900">
+		<SearchInput
+			v-model="searchQuery"
+			placeholder="Search modules..."
+		/>
+		<div v-for="(modules, category) in categories" :key="category" class="mb-4">
+			<div v-if="getModulesByCategory(category).length > 0">
+				<div
+					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
+					@click="toggleCategory(category)"
+				>
+					<span class="text-xs w-3 text-neutral-500">{{
+						isExpanded(category) ? "▼" : "▶"
+					}}</span>
+					{{ category }}
+					<span class="font-normal text-neutral-500 text-xs"
+						>({{ getModulesByCategory(category).length }})</span
+					>
+				</div>
+
+				<div
+					v-if="isExpanded(category)"
+					class="flex flex-col gap-2 py-2"
+				>
+					<div
+						v-for="module in getModulesByCategory(category)"
+						:key="module.id"
+						class="w-64 bg-neutral-600 rounded overflow-visible shadow"
+						:style="{ height: getModuleHeight(module) + 'px' }"
+					>
+						<svg
+							width="256"
+							:height="getModuleHeight(module)"
+							xmlns="http://www.w3.org/2000/svg"
+						>
+							<Module
+								:type="module.id"
+								:instance="getModuleInstance(module.id)"
+								@param-change="
+									(modIdx, paramIdx, val) =>
+										onParamChange(module.id, paramIdx, val)
+								"
+							/>
+						</svg>
+					</div>
+				</div>
+			</div>
+		</div>
+	</div>
+</template>
+
+
 <script setup>
 import { ref, reactive } from "vue";
 import Module from "../canvas/Module.vue";
 import SearchInput from "../common/SearchInput.vue";
-
-const props = defineProps({
-	isActive: {
-		type: Boolean,
-		default: false,
-	},
-});
 
 const categories = ref({
 	"In/Out": [
@@ -239,54 +285,3 @@ function resetAllModules() {
 	moduleInstances.clear();
 }
 </script>
-
-<template>
-	<div class="h-full overflow-y-auto p-2 bg-neutral-900">
-		<SearchInput
-			v-model="searchQuery"
-			placeholder="Search modules..."
-			:isActive="isActive"
-		/>
-		<div v-for="(modules, category) in categories" :key="category" class="mb-4">
-			<div
-				class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
-				@click="toggleCategory(category)"
-			>
-				<span class="text-xs w-3 text-neutral-500">{{
-					isExpanded(category) ? "▼" : "▶"
-				}}</span>
-				{{ category }}
-				<span class="font-normal text-neutral-500 text-xs"
-					>({{ getModulesByCategory(category).length }})</span
-				>
-			</div>
-
-			<div
-				v-if="isExpanded(category) && props.isActive"
-				class="flex flex-col gap-2 py-2"
-			>
-				<div
-					v-for="module in getModulesByCategory(category)"
-					:key="module.id"
-					class="w-64 bg-neutral-600 rounded overflow-visible shadow"
-					:style="{ height: getModuleHeight(module) + 'px' }"
-				>
-					<svg
-						width="256"
-						:height="getModuleHeight(module)"
-						xmlns="http://www.w3.org/2000/svg"
-					>
-						<Module
-							:type="module.id"
-							:instance="getModuleInstance(module.id)"
-							@param-change="
-								(modIdx, paramIdx, val) =>
-									onParamChange(module.id, paramIdx, val)
-							"
-						/>
-					</svg>
-				</div>
-			</div>
-		</div>
-	</div>
-</template>

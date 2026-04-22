@@ -52,7 +52,6 @@
 				:options="[
 					{ label: 'USB', value: 'usb' },
 					{ label: 'Browser', value: 'browser' },
-					{ label: 'Modules', value: 'modules' },
 					{ label: 'Data', value: 'data', disabled: !patch },
 				]"
 				variant="tab"
@@ -166,6 +165,11 @@
 		</ToolBar>
 
 		<div class="flex-1 flex overflow-hidden">
+			<SidePanel>
+				<ModulesPane/>
+			</SidePanel>
+
+
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
 				<PatchCanvas
 					v-if="patch"
@@ -185,31 +189,26 @@
 				</div>
 			</div>
 
-			<div
-				v-if="showRightPane"
-				class="w-72 bg-neutral-800 border-l border-neutral-700 flex flex-col"
-			>
-				<div class="flex-1 overflow-hidden p-3">
-					<UsbPanel
-						v-show="rightPaneTab === 'usb'"
-						:logs="usbLogs"
-						:device-status="deviceStatus"
-						@disconnect="disconnectDevice"
-						@connect="connectDevice"
-						@clear-logs="clearLogs"
-					/>
-					<PatchBrowser
-						v-show="rightPaneTab === 'browser'"
-						:isActive="rightPaneTab === 'browser'"
-						@select="handlePatchSelect"
-					/>
-					<PatchData v-show="rightPaneTab === 'data' && patch" :patch="patch" />
-					<ModulesPane
-						v-show="rightPaneTab === 'modules'"
-						:isActive="rightPaneTab === 'modules'"
-					/>
-				</div>
-			</div>
+			<SidePanel v-if="showRightPane">
+				<UsbPanel
+				v-show="rightPaneTab === 'usb'"
+				:logs="usbLogs"
+				:device-status="deviceStatus"
+				@disconnect="disconnectDevice"
+				@connect="connectDevice"
+				@clear-logs="clearLogs"
+				/>
+				<PatchBrowser
+					v-show="rightPaneTab === 'browser'"
+					:isActive="rightPaneTab === 'browser'"
+					@select="handlePatchSelect"
+				/>
+				<PatchData v-show="rightPaneTab === 'data' && patch" :patch="patch" />
+				<ModulesPane
+					v-show="rightPaneTab === 'modules'"
+					:isActive="rightPaneTab === 'modules'"
+				/>
+			</SidePanel>
 		</div>
 	</div>
 </template>
@@ -222,6 +221,7 @@ import "./parser/nmg2PatchParser.js";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
 import PatchData from "./components/panels/PatchData.vue";
+import SidePanel from "./components/panels/SidePanel.vue";
 import ModulesPane from "./components/panels/ModulesPane.vue";
 import UsbPanel from "./components/panels/UsbPanel.vue";
 import Button from "./components/toolbar/Button.vue";
