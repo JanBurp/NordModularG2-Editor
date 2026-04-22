@@ -1,188 +1,188 @@
 <script setup lang="ts">
-import { computed } from 'vue'
+import { computed } from "vue";
 
 interface ParamMap {
-  names?: string[]
-  width?: number
-  mode?: string
-  rows?: number
-  bmp?: string
-  low?: number
-  high?: number
+	names?: string[];
+	width?: number;
+	mode?: string;
+	rows?: number;
+	bmp?: string;
+	low?: number;
+	high?: number;
 }
 
 const props = defineProps<{
-  x: number
-  y: number
-  paramType: string
-  value: number
-  paramIndex: number
-}>()
+	x: number;
+	y: number;
+	paramType: string;
+	value: number;
+	paramIndex: number;
+}>();
 
 const emit = defineEmits<{
-  change: [index: number, value: number]
-}>()
+	change: [index: number, value: number];
+}>();
 
 const paramMap = computed<ParamMap>(() => {
-  if (typeof window !== 'undefined' && (window as any).parammap) {
-    return (window as any).parammap[props.paramType] || {}
-  }
-  return {}
-})
+	if (typeof window !== "undefined" && (window as any).parammap) {
+		return (window as any).parammap[props.paramType] || {};
+	}
+	return {};
+});
 
-const names = computed(() => paramMap.value.names || [])
-const width = computed(() => paramMap.value.width || 18)
-const mode = computed(() => paramMap.value.mode)
-const rows = computed(() => paramMap.value.rows || 1)
-const bmp = computed(() => paramMap.value.bmp)
-const hasBitmap = computed(() => !!bmp.value)
+const names = computed(() => paramMap.value.names || []);
+const width = computed(() => paramMap.value.width || 18);
+const mode = computed(() => paramMap.value.mode);
+const rows = computed(() => paramMap.value.rows || 1);
+const bmp = computed(() => paramMap.value.bmp);
+const hasBitmap = computed(() => !!bmp.value);
 
 const itemsPerRow = computed(() => {
-  return Math.ceil(names.value.length / rows.value)
-})
+	return Math.ceil(names.value.length / rows.value);
+});
 
 const activeIndex = computed(() => {
-  const low = paramMap.value.low || 0
-  const high = paramMap.value.high || (names.value.length - 1) || 0
-  // Clamp value to valid range
-  return Math.max(low, Math.min(props.value, high))
-})
+	const low = paramMap.value.low || 0;
+	const high = paramMap.value.high || names.value.length - 1 || 0;
+	// Clamp value to valid range
+	return Math.max(low, Math.min(props.value, high));
+});
 
 function getButtonX(index: number): number {
-  if (mode.value === 'VR') {
-    // Vertical: all in one column
-    return 0
-  }
-  // Horizontal or default
-  const col = index % itemsPerRow.value
-  return col * width.value
+	if (mode.value === "VR") {
+		// Vertical: all in one column
+		return 0;
+	}
+	// Horizontal or default
+	const col = index % itemsPerRow.value;
+	return col * width.value;
 }
 
 function getButtonY(index: number): number {
-  if (mode.value === 'VR') {
-    // Vertical: stack vertically
-    return index * 11
-  }
-  // Horizontal or default with optional rows
-  const row = Math.floor(index / itemsPerRow.value)
-  return row * 11
+	if (mode.value === "VR") {
+		// Vertical: stack vertically
+		return index * 11;
+	}
+	// Horizontal or default with optional rows
+	const row = Math.floor(index / itemsPerRow.value);
+	return row * 11;
 }
 
 function onButtonClick(index: number) {
-  const low = paramMap.value.low || 0
-  const high = paramMap.value.high || (names.value.length - 1) || 0
-  
-  // Ensure value is within bounds
-  const newValue = Math.max(low, Math.min(index, high))
-  
-  if (newValue !== props.value) {
-    emit('change', props.paramIndex, newValue)
-  }
+	const low = paramMap.value.low || 0;
+	const high = paramMap.value.high || names.value.length - 1 || 0;
+
+	// Ensure value is within bounds
+	const newValue = Math.max(low, Math.min(index, high));
+
+	if (newValue !== props.value) {
+		emit("change", props.paramIndex, newValue);
+	}
 }
 
 function onCycleValue() {
-  // Cycle to next value (for single-button switches)
-  const low = paramMap.value.low || 0
-  const high = paramMap.value.high || (names.value.length - 1) || 0
-  const range = high - low + 1
-  
-  const current = Math.max(low, Math.min(props.value, high))
-  const newValue = low + ((current - low + 1) % range)
-  
-  emit('change', props.paramIndex, newValue)
+	// Cycle to next value (for single-button switches)
+	const low = paramMap.value.low || 0;
+	const high = paramMap.value.high || names.value.length - 1 || 0;
+	const range = high - low + 1;
+
+	const current = Math.max(low, Math.min(props.value, high));
+	const newValue = low + ((current - low + 1) % range);
+
+	emit("change", props.paramIndex, newValue);
 }
 </script>
 
 <template>
-  <g :transform="`translate(${x}, ${y})`" class="switch-control">
-    <!-- Bitmap-based switch -->
-    <template v-if="hasBitmap">
-      <svg
-        v-for="(name, index) in names"
-        :key="index"
-        :x="getButtonX(index)"
-        :y="getButtonY(index)"
-        :width="width"
-        height="11"
-        class="switch-bitmap"
-        :class="{ active: index === activeIndex }"
-        @click="onButtonClick(index)"
-      >
-        <defs>
-          <clipPath :id="`clip-${paramType}-${index}`">
-            <rect width="100%" height="100%" />
-          </clipPath>
-        </defs>
-        <use
-          :href="`#Bitmap${bmp}`"
-          :transform="`translate(${-(index * width)}, 0)`"
-          :clip-path="`url(#clip-${paramType}-${index})`"
-          :opacity="index === activeIndex ? 1 : 0.5"
-        />
-      </svg>
-    </template>
-    
-    <!-- Text-based switch -->
-    <template v-else>
-      <g
-        v-for="(name, index) in names"
-        :key="index"
-        class="switch-button"
-        :class="{ active: index === activeIndex }"
-        @click="onButtonClick(index)"
-      >
-        <rect
-          :x="getButtonX(index)"
-          :y="getButtonY(index)"
-          :width="width"
-          height="11"
-          :fill="index === activeIndex ? '#6df2f2' : '#CCC'"
-          stroke="#333"
-          opacity="0.5"
-        />
-        <text
-          :x="getButtonX(index) + width / 2"
-          :y="getButtonY(index) + 9"
-          fill="#000"
-          font-size="8"
-          text-anchor="middle"
-          pointer-events="none"
-        >
-          {{ name }}
-        </text>
-      </g>
-    </template>
-  </g>
+	<g :transform="`translate(${x}, ${y})`" class="switch-control">
+		<!-- Bitmap-based switch -->
+		<template v-if="hasBitmap">
+			<svg
+				v-for="(name, index) in names"
+				:key="index"
+				:x="getButtonX(index)"
+				:y="getButtonY(index)"
+				:width="width"
+				height="11"
+				class="switch-bitmap"
+				:class="{ active: index === activeIndex }"
+				@click="onButtonClick(index)"
+			>
+				<defs>
+					<clipPath :id="`clip-${paramType}-${index}`">
+						<rect width="100%" height="100%" />
+					</clipPath>
+				</defs>
+				<use
+					:href="`#Bitmap${bmp}`"
+					:transform="`translate(${-(index * width)}, 0)`"
+					:clip-path="`url(#clip-${paramType}-${index})`"
+					:opacity="index === activeIndex ? 1 : 0.5"
+				/>
+			</svg>
+		</template>
+
+		<!-- Text-based switch -->
+		<template v-else>
+			<g
+				v-for="(name, index) in names"
+				:key="index"
+				class="switch-button"
+				:class="{ active: index === activeIndex }"
+				@click="onButtonClick(index)"
+			>
+				<rect
+					:x="getButtonX(index)"
+					:y="getButtonY(index)"
+					:width="width"
+					height="11"
+					:fill="index === activeIndex ? '#6df2f2' : '#CCC'"
+					stroke="#333"
+					opacity="0.5"
+				/>
+				<text
+					:x="getButtonX(index) + width / 2"
+					:y="getButtonY(index) + 9"
+					fill="#000"
+					font-size="8"
+					text-anchor="middle"
+					pointer-events="none"
+				>
+					{{ name }}
+				</text>
+			</g>
+		</template>
+	</g>
 </template>
 
 <style scoped>
 .switch-control {
-  user-select: none;
+	user-select: none;
 }
 
 .switch-bitmap {
-  cursor: pointer;
+	cursor: pointer;
 }
 
 .switch-bitmap:hover {
-  opacity: 0.8;
+	opacity: 0.8;
 }
 
 .switch-bitmap.active {
-  filter: brightness(1.2);
+	filter: brightness(1.2);
 }
 
 .switch-button {
-  cursor: pointer;
+	cursor: pointer;
 }
 
 .switch-button:hover rect {
-  stroke: #666;
-  stroke-width: 1;
+	stroke: #666;
+	stroke-width: 1;
 }
 
 .switch-button.active rect {
-  stroke: #333;
-  stroke-width: 1;
+	stroke: #333;
+	stroke-width: 1;
 }
 </style>

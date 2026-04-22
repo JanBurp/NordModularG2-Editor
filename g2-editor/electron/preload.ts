@@ -1,5 +1,5 @@
-import { contextBridge, ipcRenderer } from 'electron'
+import { contextBridge, ipcRenderer } from "electron";
 
-contextBridge.exposeInMainWorld('cli', {
-  run: (args: string[]) => ipcRenderer.invoke('cli:run', args)
-})
+contextBridge.exposeInMainWorld("cli", {
+	run: (args: string[]) => ipcRenderer.invoke("cli:run", args),
+});
