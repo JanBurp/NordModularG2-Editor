@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from 'vue';
+import { ref, watch, nextTick, computed } from 'vue';
 import type { UsbLogEntry, DeviceStatus } from '../composables/useG2Connection';
 
 interface Props {
@@ -26,13 +26,13 @@ watch(() => props.logs.length, async () => {
 
 const statusClass = computed(() => {
   switch (props.deviceStatus) {
-    case 'connected': return 'status-connected';
+    case 'connected': return 'border-l-green-500';
     case 'connecting':
     case 'uploading':
-    case 'downloading': return 'status-pending';
+    case 'downloading': return 'border-l-orange-500';
     case 'error':
-    case 'unsupported': return 'status-error';
-    default: return 'status-disconnected';
+    case 'unsupported': return 'border-l-red-500';
+    default: return 'border-l-neutral-600';
   }
 });
 
@@ -62,213 +62,48 @@ function handleClearLogs() {
 }
 </script>
 
-<script lang="ts">
-import { computed } from 'vue';
-</script>
-
 <template>
-  <div class="usb-panel">
-    <div class="usb-status" :class="statusClass">
-      <span class="status-icon">🔌</span>
-      <span class="status-label">Status: {{ statusLabel }}</span>
+  <div class="flex flex-col h-full p-2 gap-2">
+    <div class="flex items-center gap-2 p-3 rounded bg-neutral-900 border-l-4" :class="statusClass">
+      <span class="text-base">🔌</span>
+      <span class="text-sm font-medium text-neutral-200">Status: {{ statusLabel }}</span>
       <button
         v-if="deviceStatus === 'connected'"
-        class="disconnect-btn"
+        class="ml-auto px-3 py-1 text-xs bg-neutral-700 text-neutral-200 border border-neutral-600 rounded cursor-pointer hover:bg-neutral-600 transition-colors"
         @click="handleDisconnect"
       >
         Disconnect
       </button>
       <button
         v-else-if="deviceStatus !== 'connecting'"
-        class="connect-btn"
+        class="ml-auto px-3 py-1 text-xs bg-neutral-700 text-neutral-200 border border-neutral-600 rounded cursor-pointer hover:bg-neutral-600 transition-colors"
         @click="handleConnect"
       >
         Connect
       </button>
     </div>
 
-    <div class="log-header">
-      <span class="log-title">Log:</span>
-      <button class="clear-btn" @click="handleClearLogs">Clear</button>
+    <div class="flex justify-between items-center px-1">
+      <span class="text-xs font-medium text-neutral-500">Log:</span>
+      <button class="px-2 py-0.5 text-xs bg-transparent text-neutral-500 border border-neutral-700 rounded cursor-pointer hover:bg-neutral-800 hover:text-neutral-200 transition-all" @click="handleClearLogs">Clear</button>
     </div>
 
-    <div ref="logContainer" class="log-container">
-      <div v-if="logs.length === 0" class="log-empty">
+    <div ref="logContainer" class="flex-1 overflow-y-auto bg-neutral-950 rounded p-2 font-mono text-xs">
+      <div v-if="logs.length === 0" class="text-neutral-600 text-center py-12">
         No USB activity yet
       </div>
       <div
         v-for="entry in logs"
         :key="entry.id"
-        class="log-entry"
+        class="py-1 border-b border-neutral-900 last:border-b-0"
       >
-        <div class="log-header-line">
-          <span class="log-time">{{ entry.timestamp }}</span>
-          <span class="log-dir">{{ entry.direction }}</span>
-          <span class="log-event">{{ entry.event }}</span>
+        <div class="flex gap-1.5 mb-0.5">
+          <span class="text-neutral-600 flex-shrink-0">{{ entry.timestamp }}</span>
+          <span class="text-neutral-500 flex-shrink-0 w-5 text-center">{{ entry.direction }}</span>
+          <span class="text-cyan-400 flex-shrink-0 font-medium">{{ entry.event }}</span>
         </div>
-        <div class="log-message-line">{{ entry.message }}</div>
+        <div class="text-neutral-300 break-words pl-12">{{ entry.message }}</div>
       </div>
     </div>
   </div>
 </template>
-
-<style scoped>
-.usb-panel {
-  height: 100%;
-  display: flex;
-  flex-direction: column;
-  padding: 8px;
-  gap: 8px;
-}
-
-.usb-status {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  border-radius: 4px;
-  background-color: #1a1a1a;
-}
-
-.status-icon {
-  font-size: 16px;
-}
-
-.status-label {
-  font-size: 13px;
-  font-weight: 500;
-  color: #ddd;
-}
-
-.status-connected {
-  border-left: 3px solid #4caf50;
-}
-
-.status-pending {
-  border-left: 3px solid #ff9800;
-}
-
-.status-disconnected {
-  border-left: 3px solid #666;
-}
-
-.status-error {
-  border-left: 3px solid #f44336;
-}
-
-.disconnect-btn {
-  margin-left: auto;
-  padding: 4px 10px;
-  font-size: 11px;
-  background-color: #333;
-  color: #ddd;
-  border: 1px solid #555;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.disconnect-btn:hover {
-  background-color: #444;
-}
-
-.connect-btn {
-  margin-left: auto;
-  padding: 4px 10px;
-  font-size: 11px;
-  background-color: #333;
-  color: #ddd;
-  border: 1px solid #555;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: background-color 0.15s;
-}
-
-.connect-btn:hover {
-  background-color: #444;
-}
-
-.log-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 0 4px;
-}
-
-.log-title {
-  font-size: 12px;
-  font-weight: 500;
-  color: #888;
-}
-
-.clear-btn {
-  padding: 2px 8px;
-  font-size: 11px;
-  background-color: transparent;
-  color: #888;
-  border: 1px solid #444;
-  border-radius: 3px;
-  cursor: pointer;
-  transition: all 0.15s;
-}
-
-.clear-btn:hover {
-  background-color: #333;
-  color: #ddd;
-}
-
-.log-container {
-  flex: 1;
-  overflow-y: auto;
-  background-color: #111;
-  border-radius: 4px;
-  padding: 8px;
-  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
-  font-size: 11px;
-}
-
-.log-empty {
-  color: #555;
-  text-align: center;
-  padding: 20px;
-}
-
-.log-entry {
-  padding: 4px 0;
-  border-bottom: 1px solid #222;
-}
-
-.log-entry:last-child {
-  border-bottom: none;
-}
-
-.log-header-line {
-  display: flex;
-  gap: 6px;
-  margin-bottom: 2px;
-}
-
-.log-message-line {
-  color: #bbb;
-  word-break: break-word;
-  /* padding-left: 72px; */
-}
-
-.log-time {
-  color: #666;
-  flex-shrink: 0;
-}
-
-.log-dir {
-  color: #888;
-  flex-shrink: 0;
-  width: 20px;
-  text-align: center;
-}
-
-.log-event {
-  color: #4fc3f7;
-  flex-shrink: 0;
-  font-weight: 500;
-}
-</style>

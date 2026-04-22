@@ -1,3 +1,20 @@
+<template>
+  <div class="flex gap-0" role="group">
+    <Button
+      v-for="(option, index) in normalizedOptions"
+      :key="option.value"
+      :variant="variant"
+      :active="modelValue === option.value"
+      :disabled="option.disabled"
+      class="rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0"
+      @click="handleSelect(option.value, option.disabled)"
+      @keydown="(e) => handleKeydown(e, index)"
+    >
+      {{ option.label }}
+    </Button>
+  </div>
+</template>
+
 <script setup lang="ts">
 import { computed } from 'vue'
 import Button from './Button.vue'
@@ -46,14 +63,13 @@ const handleKeydown = (event: KeyboardEvent, index: number) => {
   const enabledIndices = normalizedOptions.value
     .map((opt, i) => ({ ...opt, index: i }))
     .filter(opt => !opt.disabled)
-  
+
   const currentEnabledIndex = enabledIndices.findIndex(item => item.index === index)
-  
+
   if (event.key === 'ArrowLeft' && currentEnabledIndex > 0) {
     event.preventDefault()
     const prevOption = enabledIndices[currentEnabledIndex - 1]
     handleSelect(prevOption.value)
-    // Focus previous button
     const buttons = (event.target as HTMLElement).parentElement?.querySelectorAll('button')
     if (buttons) {
       buttons[prevOption.index]?.focus()
@@ -62,7 +78,6 @@ const handleKeydown = (event: KeyboardEvent, index: number) => {
     event.preventDefault()
     const nextOption = enabledIndices[currentEnabledIndex + 1]
     handleSelect(nextOption.value)
-    // Focus next button
     const buttons = (event.target as HTMLElement).parentElement?.querySelectorAll('button')
     if (buttons) {
       buttons[nextOption.index]?.focus()
@@ -70,47 +85,3 @@ const handleKeydown = (event: KeyboardEvent, index: number) => {
   }
 }
 </script>
-
-<template>
-  <div class="btn-group" role="group">
-    <Button
-      v-for="(option, index) in normalizedOptions"
-      :key="option.value"
-      :variant="variant"
-      :active="modelValue === option.value"
-      :disabled="option.disabled"
-      class="btn-group__button"
-      @click="handleSelect(option.value, option.disabled)"
-      @keydown="(e) => handleKeydown(e, index)"
-    >
-      {{ option.label }}
-    </Button>
-  </div>
-</template>
-
-<style scoped>
-@reference "tailwindcss";
-
-.btn-group {
-  @apply flex gap-0;
-}
-
-.btn-group__button {
-  @apply rounded-none m-0;
-}
-
-/* First button: round left corners */
-.btn-group__button:first-child {
-  @apply rounded-l;
-}
-
-/* Last button: round right corners */
-.btn-group__button:last-child {
-  @apply rounded-r;
-}
-
-/* Remove double borders between buttons */
-.btn-group__button:not(:first-child) {
-  @apply border-l-0;
-}
-</style>

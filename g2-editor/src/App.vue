@@ -13,17 +13,14 @@ import BtnGroup from './components/toolbar/BtnGroup.vue';
 import ToolBar from './components/toolbar/ToolBar.vue';
 import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 
-// Composables
 import { usePatchManager } from './composables/usePatchManager';
 import { useG2Connection } from './composables/useG2Connection';
 import { useCableVisibility } from './composables/useCableVisibility';
 import { usePatchCategory } from './composables/usePatchCategory';
 import { useRightPanel } from './composables/useRightPanel';
 
-// Constants
 import { SOUND_CATEGORIES as soundCategories } from './constants';
 
-// Initialize composables
 const {
   patch,
   patchName,
@@ -61,9 +58,7 @@ const {
   updatePatchData
 } = useCableVisibility();
 
-const {
-  selectedCategory
-} = usePatchCategory(patch);
+const { selectedCategory } = usePatchCategory(patch);
 
 const {
   rightPaneTab,
@@ -72,19 +67,17 @@ const {
   handleToggleOff
 } = useRightPanel();
 
-// Watch for patch changes and sync cable visibility
 watch(() => patch.value?.description, (description) => {
   syncWithPatchData(description);
 }, { immediate: true, deep: true });
 
-// Watch for cable visibility changes and update patch data
 watch(cableVisibility, () => {
   updatePatchData(patch.value?.description);
 }, { deep: true });
 </script>
 
 <template>
-  <div class="app">
+  <div class="flex flex-col h-screen">
     <ToolBar>
       <Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
       <Button variant="default" :disabled="!patch">Save Patch</Button>
@@ -105,7 +98,7 @@ watch(cableVisibility, () => {
 
       <ToolBarDivider />
 
-      <span class="status" :class="{ connected: deviceStatus === 'connected' }">
+      <span class="ml-auto text-xs text-neutral-500" :class="{ 'text-green-600': deviceStatus === 'connected' }">
         {{ statusText }}
       </span>
 
@@ -150,107 +143,106 @@ watch(cableVisibility, () => {
     </ToolBar>
 
     <ToolBar v-if="patchName">
-        <span class="toolbar-label">{{ patchName }}</span>
+      <span class="text-xs font-semibold text-neutral-400">{{ patchName }}</span>
 
-        <div class="category-wrapper">
-          <span class="toolbar-label">Cat:</span>
-          <select
-            v-model="selectedCategory"
-            class="category-select"
-            title="Sound Category"
+      <div class="flex items-center gap-1.5">
+        <span class="text-xs font-semibold text-neutral-400">Cat:</span>
+        <select
+          v-model="selectedCategory"
+          class="h-6 px-2 text-xs border border-neutral-500 rounded bg-gray-100 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+          title="Sound Category"
+        >
+          <option
+            v-for="cat in soundCategories"
+            :key="cat.id"
+            :value="cat.id"
           >
-            <option
-              v-for="cat in soundCategories"
-              :key="cat.id"
-              :value="cat.id"
-            >
-              {{ cat.name }}
-            </option>
-          </select>
-        </div>
+            {{ cat.name }}
+          </option>
+        </select>
+      </div>
 
-        <ToolBarDivider />
+      <ToolBarDivider />
 
-        <span class="toolbar-info">
+      <span class="text-xs text-neutral-600">
         Voice: {{ areaModulesCount('voice') }} modules, {{ areaCablesCount('voice') }} cables<br>
         FX: {{ areaModulesCount('fx') }} modules, {{ areaCablesCount('fx') }} cables<br>
-        </span>
+      </span>
 
-        <ToolBarDivider />
+      <ToolBarDivider />
 
-        <div class="variations-wrapper">
-          <span class="toolbar-label">Var:</span>
-          <BtnGroup
-            v-model="variation"
-            :options="[
-              { label: '1', value: 0 },
-              { label: '2', value: 1 },
-              { label: '3', value: 2 },
-              { label: '4', value: 3 },
-              { label: '5', value: 4 },
-              { label: '6', value: 5 },
-              { label: '7', value: 6 },
-              { label: '8', value: 7 }
-            ]"
-            variant="variation"
-          />
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-neutral-400">Var:</span>
+        <BtnGroup
+          v-model="variation"
+          :options="[
+            { label: '1', value: 0 },
+            { label: '2', value: 1 },
+            { label: '3', value: 2 },
+            { label: '4', value: 3 },
+            { label: '5', value: 4 },
+            { label: '6', value: 5 },
+            { label: '7', value: 6 },
+            { label: '8', value: 7 }
+          ]"
+          variant="variation"
+        />
+      </div>
+
+      <ToolBarDivider />
+
+      <div class="flex items-center gap-2">
+        <span class="text-xs font-semibold text-neutral-400">Cables:</span>
+        <div class="flex gap-1">
+          <button
+            v-for="color in cableColors"
+            :key="color.name"
+            class="w-5 h-5 border-2 border-solid rounded cursor-pointer p-0 flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
+            :class="{ 'opacity-100 shadow-sm': cableVisibility[color.name] }"
+            :style="{ backgroundColor: color.hex, borderColor: color.hex }"
+            :title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
+            @click="toggleCableVisibility(color.name)"
+          >
+            <span class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200" :class="{ 'opacity-100': cableVisibility[color.name] }" :style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"></span>
+          </button>
+          <button
+            class="w-6 h-5 border-2 border-neutral-600 rounded bg-gray-300 text-gray-800 text-xs font-bold hover:bg-gray-200"
+            :class="{ 'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible }"
+            :title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
+            @click="toggleShowHideAll"
+          >
+            H
+          </button>
+          <button
+            class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
+            title="Re-render cables"
+            @click="shakeCables"
+          >
+            S
+          </button>
         </div>
-
-        <ToolBarDivider />
-
-        <div class="cable-visibility-wrapper">
-          <span class="toolbar-label">Cables:</span>
-          <div class="cable-toggles">
-            <button
-              v-for="color in cableColors"
-              :key="color.name"
-              class="cable-toggle"
-              :class="{ visible: cableVisibility[color.name] }"
-              :style="{ backgroundColor: color.hex, borderColor: color.hex }"
-              :title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
-              @click="toggleCableVisibility(color.name)"
-            >
-              <span class="cable-toggle-indicator"></span>
-            </button>
-            <button
-              class="cable-toggle cable-toggle-all"
-              :class="{ visible: allCablesVisible }"
-              :title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
-              @click="toggleShowHideAll"
-            >
-              H
-            </button>
-            <button
-              class="cable-toggle cable-toggle-shake"
-              title="Re-render cables"
-              @click="shakeCables"
-            >
-              S
-            </button>
-          </div>
-        </div>
+      </div>
     </ToolBar>
 
-    <div class="main-content">
-      <div class="canvas-container">
-        <template v-if="patch">
-          <PatchCanvas
-            :key="patchName"
-            :modules="currentModules"
-            :cables="currentCables"
-            :variation="variation"
-            :area="selectedArea"
-            :cable-visibility="cableVisibility"
-            :shake-trigger="cableShakeTrigger"
-          />
-        </template>
-        <div v-else class="empty-state">
+    <div class="flex-1 flex overflow-hidden">
+      <div class="flex-1 overflow-auto bg-neutral-900 relative">
+        <PatchCanvas
+          v-if="patch"
+          :key="patchName"
+          :modules="currentModules"
+          :cables="currentCables"
+          :variation="variation"
+          :area="selectedArea"
+          :cable-visibility="cableVisibility"
+          :shake-trigger="cableShakeTrigger"
+        />
+        <div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">
           Load a .pch2 or .prf2 file to begin
         </div>
       </div>
 
-      <div v-if="showRightPane" class="right-pane">
-        <div class="right-pane-content">
+      <div v-if="showRightPane" class="w-72 bg-neutral-800 border-l border-neutral-700 flex flex-col">
+        <div class="flex-1 overflow-hidden p-3">
           <UsbPanel
             v-show="rightPaneTab === 'usb'"
             :logs="usbLogs"
@@ -277,127 +269,3 @@ watch(cableVisibility, () => {
     </div>
   </div>
 </template>
-
-<style scoped>
-.cable-visibility-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
-.cable-toggles {
-  display: flex;
-  gap: 4px;
-}
-
-.cable-toggle {
-  width: 20px;
-  height: 20px;
-  border: 2px solid;
-  border-radius: 3px;
-  cursor: pointer;
-  padding: 0;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-  opacity: 0.4;
-}
-
-.cable-toggle:hover {
-  opacity: 0.7;
-  transform: scale(1.1);
-}
-
-.cable-toggle.visible {
-  opacity: 1;
-  box-shadow: 0 0 4px currentColor;
-}
-
-.cable-toggle-indicator {
-  width: 8px;
-  height: 8px;
-  background-color: rgba(0, 0, 0, 0.5);
-  border-radius: 50%;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-}
-
-.cable-toggle.visible .cable-toggle-indicator {
-  opacity: 1;
-}
-
-.cable-toggle-all {
-  background-color: #ccc !important;
-  border-color: #999 !important;
-  color: #333;
-  font-size: 11px;
-  font-weight: bold;
-  width: 24px;
-}
-
-.cable-toggle-all:hover {
-  background-color: #bbb !important;
-}
-
-.cable-toggle-all.visible {
-  background-color: #888 !important;
-  border-color: #666 !important;
-  color: #fff;
-  box-shadow: 0 0 4px rgba(0,0,0,0.3);
-}
-
-.cable-toggle-shake {
-  background-color: #ddd !important;
-  border-color: #bbb !important;
-  color: #333;
-  font-size: 11px;
-  font-weight: bold;
-  width: 24px;
-  margin-left: 4px;
-}
-
-.cable-toggle-shake:hover {
-  background-color: #ccc !important;
-  transform: scale(1.1);
-}
-
-.cable-toggle-shake:active {
-  background-color: #aaa !important;
-  transform: scale(0.95);
-}
-
-.toolbar-label {
-  font-size: 12px;
-  font-weight: 600;
-  color: #666;
-}
-
-.category-wrapper {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.category-select {
-  height: 24px;
-  padding: 0 8px;
-  font-size: 12px;
-  border: 1px solid #999;
-  border-radius: 3px;
-  background-color: #f5f5f5;
-  color: #333;
-  cursor: pointer;
-  min-width: 100px;
-}
-
-.category-select:hover {
-  background-color: #e8e8e8;
-}
-
-.category-select:focus {
-  outline: none;
-  border-color: #666;
-  box-shadow: 0 0 3px rgba(0,0,0,0.2);
-}
-</style>

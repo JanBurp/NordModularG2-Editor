@@ -19,7 +19,7 @@ const searchQuery = ref('');
 const filteredFiles = computed(() => {
   if (!searchQuery.value) return patchFiles.value;
   const query = searchQuery.value.toLowerCase();
-  return patchFiles.value.filter(file => 
+  return patchFiles.value.filter(file =>
     file.toLowerCase().includes(query)
   );
 });
@@ -64,76 +64,26 @@ onMounted(() => {
 </script>
 
 <template>
-  <div class="patch-browser">
+  <div class="h-full overflow-y-auto p-2">
     <SearchInput
       v-model="searchQuery"
       placeholder="Search patches..."
       :isActive="isActive"
       @enter="handleEnter"
     />
-    <div v-if="loading" class="loading">Loading patches...</div>
-    <div v-else-if="error" class="error">{{ error }}</div>
-    <div v-else-if="filteredFiles.length === 0" class="empty">{{ searchQuery ? 'No patches match your search' : 'No patch files found' }}</div>
-    <ul v-else class="file-list">
+    <div v-if="loading" class="p-4 text-center text-neutral-500">Loading patches...</div>
+    <div v-else-if="error" class="p-4 text-center text-red-500">{{ error }}</div>
+    <div v-else-if="filteredFiles.length === 0" class="p-4 text-center text-neutral-500">{{ searchQuery ? 'No patches match your search' : 'No patch files found' }}</div>
+    <ul v-else class="list-none m-0 p-0">
       <li
         v-for="file in filteredFiles"
         :key="file"
-        class="file-item"
+        class="flex items-center gap-2 py-2.5 px-3 cursor-pointer rounded transition-colors duration-150 hover:bg-neutral-700"
         @click="selectPatch(file)"
       >
-        <span class="file-icon">📄</span>
-        <span class="file-name">{{ formatName(file) }}</span>
+        <span class="text-sm">📄</span>
+        <span class="text-sm text-neutral-200 whitespace-nowrap overflow-hidden text-ellipsis">{{ formatName(file) }}</span>
       </li>
     </ul>
   </div>
 </template>
-
-<style scoped>
-.patch-browser {
-  height: 100%;
-  overflow-y: auto;
-  padding: 8px;
-}
-
-.loading, .error, .empty {
-  padding: 16px;
-  text-align: center;
-  color: #888;
-}
-
-.error {
-  color: #e74c3c;
-}
-
-.file-list {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-}
-
-.file-item {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 10px 12px;
-  cursor: pointer;
-  border-radius: 4px;
-  transition: background-color 0.15s;
-}
-
-.file-item:hover {
-  background-color: #2a2a2a;
-}
-
-.file-icon {
-  font-size: 14px;
-}
-
-.file-name {
-  font-size: 13px;
-  color: #ddd;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-</style>

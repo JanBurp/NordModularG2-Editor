@@ -1,5 +1,5 @@
 <script setup>
-import { ref, onMounted, watch, nextTick, reactive } from 'vue';
+import { ref, reactive } from 'vue';
 import Module from '../canvas/Module.vue';
 import SearchInput from '../common/SearchInput.vue';
 
@@ -27,7 +27,6 @@ const categories = ref({
 const expandedCategories = ref(Object.keys(categories.value));
 const searchQuery = ref('');
 
-// Store module instances with reactive parameter values
 const moduleInstances = reactive(new Map());
 
 function toggleCategory(category) {
@@ -68,30 +67,22 @@ function getModuleHeight(module) {
   return (module.height || 2) * 16;
 }
 
-// Get or create module instance for testing
 function getModuleInstance(moduleId) {
   if (!moduleInstances.has(moduleId)) {
-    // Get module definition to initialize defaults
     const modDef = window.modules?.getById(moduleId);
     const defaultLv = modDef?.params?.map((param, idx) => {
-      // For graph-related params, use sensible defaults
       const paramType = param.type;
       const paramName = param.name;
-      
-      // Check parammap for default
       const p = window.parammap?.[paramType];
       if (p?.def !== undefined) {
         return p.def;
       }
-      
-      // Default values for common param types
       if (paramType?.includes('Freq')) return 64;
       if (paramType?.includes('Res')) return 30;
       if (paramName?.includes('Slope') || paramName?.includes('Gain')) return 64;
-      
       return 64;
     }) || [];
-    
+
     moduleInstances.set(moduleId, {
       index: 0,
       type: moduleId,
@@ -105,7 +96,6 @@ function getModuleInstance(moduleId) {
   return moduleInstances.get(moduleId);
 }
 
-// Handle parameter changes from module controls
 function onParamChange(moduleId, paramIndex, value) {
   const instance = moduleInstances.get(moduleId);
   if (instance) {
@@ -113,34 +103,33 @@ function onParamChange(moduleId, paramIndex, value) {
   }
 }
 
-// Reset all module instances
 function resetAllModules() {
   moduleInstances.clear();
 }
 </script>
 
 <template>
-  <div class="modules-pane">
+  <div class="h-full overflow-y-auto p-2 bg-neutral-900">
     <SearchInput
       v-model="searchQuery"
       placeholder="Search modules..."
       :isActive="isActive"
     />
-    <div v-for="(modules, category) in categories" :key="category" class="category-section" v-show="getModulesByCategory(category).length > 0">
-      <div 
-        class="category-header"
+    <div v-for="(modules, category) in categories" :key="category" class="mb-4">
+      <div
+        class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
         @click="toggleCategory(category)"
       >
-        <span class="expand-icon">{{ isExpanded(category) ? '▼' : '▶' }}</span>
+        <span class="text-xs w-3 text-neutral-500">{{ isExpanded(category) ? '▼' : '▶' }}</span>
         {{ category }}
-        <span class="module-count">({{ getModulesByCategory(category).length }})</span>
+        <span class="font-normal text-neutral-500 text-xs">({{ getModulesByCategory(category).length }})</span>
       </div>
-      
-      <div v-if="isExpanded(category) && props.isActive" class="modules-list">
+
+      <div v-if="isExpanded(category) && props.isActive" class="flex flex-col gap-2 py-2">
         <div
           v-for="module in getModulesByCategory(category)"
           :key="module.id"
-          class="module-wrapper"
+          class="w-64 bg-neutral-600 rounded overflow-visible shadow"
           :style="{ height: getModuleHeight(module) + 'px' }"
         >
           <svg
@@ -148,8 +137,8 @@ function resetAllModules() {
             :height="getModuleHeight(module)"
             xmlns="http://www.w3.org/2000/svg"
           >
-            <Module 
-              :type="module.id" 
+            <Module
+              :type="module.id"
               :instance="getModuleInstance(module.id)"
               @param-change="(modIdx, paramIdx, val) => onParamChange(module.id, paramIdx, val)"
             />
@@ -159,63 +148,3 @@ function resetAllModules() {
     </div>
   </div>
 </template>
-
-<style scoped>
-.modules-pane {
-  height: 100%;
-  overflow-y: auto;
-  padding: 8px 4px;
-  background: #1e1e1e;
-}
-
-.category-section {
-  margin-bottom: 16px;
-}
-
-.category-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  padding: 8px 4px;
-  cursor: pointer;
-  font-size: 12px;
-  font-weight: 600;
-  color: #aaa;
-  border-bottom: 1px solid #333;
-}
-
-.category-header:hover {
-  color: #e0e0e0;
-}
-
-.expand-icon {
-  font-size: 10px;
-  width: 12px;
-  color: #666;
-}
-
-.module-count {
-  font-weight: normal;
-  color: #666;
-  font-size: 11px;
-}
-
-.modules-list {
-  display: flex;
-  flex-direction: column;
-  gap: 8px;
-  padding: 8px 0;
-}
-
-.module-wrapper {
-  width: 256px;
-  background: #666;
-  border-radius: 2px;
-  overflow: visible;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.3);
-}
-
-.module-wrapper :deep(svg) {
-  display: block;
-}
-</style>
