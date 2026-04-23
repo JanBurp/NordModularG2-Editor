@@ -182,3 +182,25 @@ export function getModuleByName(short: string): ModuleDefinition | undefined {
 export function getAllModules(): ModuleDefinition[] {
 	return modules;
 }
+
+export function getAllCategories(): string[] {
+	const categoryMap = new Map<string, number>();
+	for (const mod of modules) {
+		const name = mod.page?.name;
+		if (name) {
+			const ord = mod.page?.ord ?? 999;
+			if (!categoryMap.has(name) || categoryMap.get(name)! > ord) {
+				categoryMap.set(name, ord);
+			}
+		}
+	}
+	return Array.from(categoryMap.entries())
+		.sort((a, b) => a[1] - b[1])
+		.map(([name]) => name);
+}
+
+export function getModulesByCategory(categoryName: string): ModuleDefinition[] {
+	return modules
+		.filter((m) => m.page?.name === categoryName)
+		.sort((a, b) => (a.page?.ord ?? 999) - (b.page?.ord ?? 999));
+}
