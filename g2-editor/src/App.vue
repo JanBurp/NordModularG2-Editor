@@ -298,7 +298,7 @@ const selectedSlotIndex = ref(null);
 async function handleSlotSelect(index) {
 	const slot = SLOT_LABELS[index];
 	const result = await slotsStore.loadSlot(slot);
-	if (result) await loadFromHex(result.rawHex, result.name);
+	if (result?.patch) setPatch(result.patch, result.name);
 }
 
 const {
