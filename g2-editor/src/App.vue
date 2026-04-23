@@ -250,8 +250,6 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import "./renderer/nmg2mods.js";
-import "./renderer/parammap.js";
 import "./parser/nmg2PatchParser.js";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";

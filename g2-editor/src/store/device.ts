@@ -29,7 +29,7 @@ export const useDeviceStore = defineStore("device", {
 		connected: (state) => state.status === "connected",
 		perfName: (state): string => {
 			if (state.device?.performance) return state.device.performance.name;
-			return '';
+			return '---';
 		},
 		bpm: (state): number => {
 			if (state.device?.patches) return state.device.patches.bpm;

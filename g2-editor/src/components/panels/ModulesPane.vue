@@ -55,6 +55,8 @@
 import { ref, reactive } from "vue";
 import Module from "../canvas/Module.vue";
 import SearchInput from "../common/SearchInput.vue";
+import { getModule, getModuleByName, getAllModules } from "../../renderer/nmg2mods";
+import { getParam } from "../../renderer/parammap";
 
 const categories = ref({
 	"In/Out": [
@@ -218,10 +220,6 @@ function isExpanded(category) {
 	return expandedCategories.value.includes(category);
 }
 
-function getModuleByName(name) {
-	return window.modules?.getByIdByName(name);
-}
-
 function getModulesByCategory(category) {
 	const moduleNames = categories.value[category] || [];
 	let modules = moduleNames
@@ -231,7 +229,7 @@ function getModulesByCategory(category) {
 	if (searchQuery.value) {
 		const query = searchQuery.value.toLowerCase();
 		modules = modules.filter((m) => {
-			const name = (m.shortnm || "").toLowerCase();
+			const name = (m.short || "").toLowerCase();
 			return name.includes(query);
 		});
 	}
@@ -245,12 +243,12 @@ function getModuleHeight(module) {
 
 function getModuleInstance(moduleId) {
 	if (!moduleInstances.has(moduleId)) {
-		const modDef = window.modules?.getById(moduleId);
+		const modDef = getModule(moduleId);
 		const defaultLv =
-			modDef?.params?.map((param, idx) => {
+			modDef?.params?.map((param) => {
 				const paramType = param.type;
 				const paramName = param.name;
-				const p = window.parammap?.[paramType];
+				const p = getParam(paramType);
 				if (p?.def !== undefined) {
 					return p.def;
 				}

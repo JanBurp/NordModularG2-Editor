@@ -1,10 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-
-interface ParamMap {
-	img?: string;
-	h?: number;
-}
+import { getParam } from "../../renderer/parammap";
+import type { ParamDefinition } from "../../types";
 
 const props = defineProps<{
 	x?: number;
@@ -20,11 +17,8 @@ const y = computed(() => props.y ?? 0);
 const width = computed(() => props.width ?? 20);
 const height = computed(() => props.height ?? 18);
 
-const paramMap = computed<ParamMap>(() => {
-	if (typeof window !== "undefined" && (window as any).parammap) {
-		return (window as any).parammap[props.paramType] || {};
-	}
-	return {};
+const paramMap = computed<ParamDefinition>(() => {
+	return getParam(props.paramType) || {};
 });
 
 const bitmapId = computed(() => paramMap.value.img || "");
