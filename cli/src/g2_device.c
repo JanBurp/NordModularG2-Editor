@@ -1287,8 +1287,9 @@ void g2_watch_stop(int sig) {
 
 
 int g2_watch(output_format_t format) {
-    uint8_t response[32] = {0};
+    uint8_t response[16] = {0};
     int ret;
+    (void)format;
 
     if (ensure_connected(1) < 0) {
         fprintf(stderr, "watch: failed to connect\n");
@@ -1318,32 +1319,53 @@ int g2_watch(output_format_t format) {
         if (ret <= 0) continue;
 
         fprintf(stderr, "watch: msg");
-        for (int i = 0; i < ret && i < 12; i++) fprintf(stderr, " %02x", response[i]);
+        for (int i = 0; i < ret; i++) fprintf(stderr, " %02x", response[i]);
         fprintf(stderr, "\n");
 
-        /* Only process embedded messages (type nibble 0x2) that start with 0x01 */
-        if ((response[0] & 0x0f) != RESPONSE_TYPE_EMBEDDED) continue;
-        if (response[1] != 0x01) continue;
+        uint8_t msgType = response[0] & 0x0f;
+
+        /* Extended message: G2 has bulk data pending — drain it or it blocks notifications */
+        if (msgType == RESPONSE_TYPE_EXTENDED) {
+            uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
+            if (bulkSize > 0) {
+                uint8_t *bulk = malloc(bulkSize);
+                if (bulk) {
+                    recv_bulk(bulk, bulkSize);
+                    free(bulk);
+                }
+            }
+            continue;
+        }
+
+        /* Only process embedded messages (type nibble 0x2) */
+        if (msgType != RESPONSE_TYPE_EMBEDDED) continue;
 
         /*
          * Embedded notification format (from Delphi NMG2Mess.pas):
          *   [0] = (len<<4)|2  header
-         *   [1] = 0x01
-         *   [2] = cmd byte (slot index)
+         *   [1] = slot index (0-3)
+         *   [2] = cmd byte
          *   [3] = patch version
          *   [4] = sub-command
          *   [5..9] = data bytes
          */
+        uint8_t slot = response[1];
         uint8_t subCommand = response[4];
         if (subCommand == SUB_RESPONSE_PARAM_CHANGE) {
-            printf("{\"type\":\"param_change\",\"location\":%u,\"index\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                   response[5], response[6], response[7], response[8], response[9]);
+            printf("{\"type\":\"param_change\",\"slot\":%u,\"location\":%u,\"index\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                   slot, response[5], response[6], response[7], response[8], response[9]);
         } else {
-            printf("{\"type\":\"unknown\",\"cmd\":%u,\"sub\":%u}\n",
-                   response[2], subCommand);
+            printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u}\n",
+                   slot, response[2], subCommand);
         }
         fflush(stdout);
     }
+
+    /* Disarm G2 so it stops streaming and subsequent commands work normally */
+    uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
+    send_system_data(0x41, stop_cmd, 2);
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
 
     signal(SIGINT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);

@@ -52,6 +52,8 @@ typedef enum {
 #define SUB_COMMAND_SET_PARAM                (0x40)
 #define SUB_COMMAND_SET                      (0x37)  /* Upload patch to slot */
 #define SUB_COMMAND_START_STOP               (0x7d)  /* Start/stop notifications */
+#define START_COMM                           (0x00)  /* Arm G2 for unsolicited notifications */
+#define STOP_COMM                            (0x01)  /* Disarm G2 */
 
 /* Response types */
 #define SUB_RESPONSE_SYNTH_SETTINGS          (0x03)
