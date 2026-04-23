@@ -8,7 +8,7 @@
 #include <stdint.h>
 #include <stddef.h>
 #include <libusb.h>
-#include "cjson.h"
+#include "cJSON.h"
 #include "defs.h"
 
 /* G2 Error codes */
