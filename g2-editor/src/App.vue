@@ -1,11 +1,28 @@
 <template>
 	<div class="flex flex-col h-screen">
 		<ToolBar>
+			<template v-if="device">
+				<ToolBarLabel>Perf:</ToolBarLabel>
+				<ToolBarText class="w-32">{{ device.perfName }}</ToolBarText>
+				<ToolBarLabel>Master Clock</ToolBarLabel>
+				<ToolBarText class="w-10">{{ device.bpm }}</ToolBarText>
+				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
+				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
+				<BtnGroup
+					:options="[
+						{ label: 'A', value: 0 },
+						{ label: 'B', value: 1 },
+						{ label: 'C', value: 2 },
+						{ label: 'D', value: 3 },
+					]"
+				/>
+			</template>
+
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad"
 				>Load Patch</Button
 			>
 			<Button variant="default" :disabled="!patch">Save Patch</Button>
-			<Button
+			<!-- <Button
 				variant="default"
 				:disabled="!patch || deviceStatus !== 'connected'"
 				@click="uploadToG2(patch)"
@@ -18,7 +35,7 @@
 				@click="downloadFromG2"
 			>
 				Download from G2
-			</Button>
+			</Button> -->
 
 			<ToolBarDivider />
 
@@ -42,7 +59,11 @@
 				:disabled="deviceStatus === 'connecting'"
 				@click="connectDevice"
 			>
-				{{ deviceStatus === "connecting" ? "Connecting..." : "Connect G2" }}
+				{{
+					deviceStatus === "connecting"
+						? "Connecting..."
+						: "Connect G2"
+				}}
 			</Button>
 
 			<ToolBarDivider />
@@ -72,7 +93,11 @@
 					class="h-6 px-2 text-xs border border-neutral-500 rounded bg-gray-100 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
 					title="Sound Category"
 				>
-					<option v-for="cat in soundCategories" :key="cat.id" :value="cat.id">
+					<option
+						v-for="cat in soundCategories"
+						:key="cat.id"
+						:value="cat.id"
+					>
 						{{ cat.name }}
 					</option>
 				</select>
@@ -88,7 +113,6 @@
 			</span>
 
 			<ToolBarDivider />
-
 
 			<BtnGroup
 				v-model="selectedArea"
@@ -122,23 +146,35 @@
 			<ToolBarDivider />
 
 			<div class="flex items-center gap-2">
-				<span class="text-xs font-semibold text-neutral-400">Cables:</span>
+				<span class="text-xs font-semibold text-neutral-400"
+					>Cables:</span
+				>
 				<div class="flex gap-1">
 					<button
 						v-for="color in cableColors"
 						:key="color.name"
 						class="w-5 h-5 border-2 border-solid rounded cursor-pointer p-0 flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
-						:class="{ 'opacity-100 shadow-sm': cableVisibility[color.name] }"
-						:style="{ backgroundColor: color.hex, borderColor: color.hex }"
+						:class="{
+							'opacity-100 shadow-sm':
+								cableVisibility[color.name],
+						}"
+						:style="{
+							backgroundColor: color.hex,
+							borderColor: color.hex,
+						}"
 						:title="
 							color.label +
-							(cableVisibility[color.name] ? ' (visible)' : ' (hidden)')
+							(cableVisibility[color.name]
+								? ' (visible)'
+								: ' (hidden)')
 						"
 						@click="toggleCableVisibility(color.name)"
 					>
 						<span
 							class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
-							:class="{ 'opacity-100': cableVisibility[color.name] }"
+							:class="{
+								'opacity-100': cableVisibility[color.name],
+							}"
 							:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
 						></span>
 					</button>
@@ -148,7 +184,11 @@
 							'bg-gray-500 border-neutral-500 text-white shadow':
 								allCablesVisible,
 						}"
-						:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
+						:title="
+							allCablesVisible
+								? 'Hide all cables'
+								: 'Show all cables'
+						"
 						@click="toggleShowHideAll"
 					>
 						H
@@ -166,9 +206,8 @@
 
 		<div class="flex-1 flex overflow-hidden">
 			<SidePanel>
-				<ModulesPane/>
+				<ModulesPane />
 			</SidePanel>
-
 
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
 				<PatchCanvas
@@ -191,19 +230,22 @@
 
 			<SidePanel v-if="showRightPane">
 				<UsbPanel
-				v-show="rightPaneTab === 'usb'"
-				:logs="usbLogs"
-				:device-status="deviceStatus"
-				@disconnect="disconnectDevice"
-				@connect="connectDevice"
-				@clear-logs="clearLogs"
+					v-show="rightPaneTab === 'usb'"
+					:logs="usbLogs"
+					:device-status="deviceStatus"
+					@disconnect="disconnectDevice"
+					@connect="connectDevice"
+					@clear-logs="clearLogs"
 				/>
 				<PatchBrowser
 					v-show="rightPaneTab === 'browser'"
 					:isActive="rightPaneTab === 'browser'"
 					@select="handlePatchSelect"
 				/>
-				<PatchData v-show="rightPaneTab === 'data' && patch" :patch="patch" />
+				<PatchData
+					v-show="rightPaneTab === 'data' && patch"
+					:patch="patch"
+				/>
 				<ModulesPane
 					v-show="rightPaneTab === 'modules'"
 					:isActive="rightPaneTab === 'modules'"
@@ -227,15 +269,20 @@ import UsbPanel from "./components/panels/UsbPanel.vue";
 import Button from "./components/toolbar/Button.vue";
 import BtnGroup from "./components/toolbar/BtnGroup.vue";
 import ToolBar from "./components/toolbar/ToolBar.vue";
+import ToolBarLabel from "./components/toolbar/ToolBarLabel.vue";
+import ToolBarText from "./components/toolbar/ToolBarText.vue";
 import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
 
 import { usePatchManager } from "./composables/usePatchManager";
 import { useG2 } from "./composables/useG2";
+import { useDeviceStore } from "./store/device.js";
 import { useCableVisibility } from "./composables/useCableVisibility";
 import { usePatchCategory } from "./composables/usePatchCategory";
 import { useRightPanel } from "./composables/useRightPanel";
 
 import { SOUND_CATEGORIES as soundCategories } from "./constants";
+
+const device = useDeviceStore();
 
 const {
 	patch,
@@ -256,8 +303,8 @@ const {
 	usbLogs,
 	connectDevice,
 	disconnectDevice,
-	uploadToG2,
-	downloadFromG2,
+	// uploadToG2,
+	// downloadFromG2,
 	clearLogs,
 } = useG2();
 

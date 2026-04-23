@@ -1,5 +1,5 @@
-import { defineStore } from "pinia";
 import { Device } from "@/types";
+import { defineStore } from "pinia";
 
 declare global {
 	interface Window {
@@ -27,6 +27,20 @@ export const useDeviceStore = defineStore("device", {
 
 	getters: {
 		connected: (state) => state.status === "connected",
+		perfName: (state): string => {
+			if (state.device?.performance) return state.device.performance.name;
+			return '...';
+		},
+		bpm: (state): number => {
+			if (state.device?.patches) return state.device.patches.bpm;
+			if (state.device?.performance) return state.device.performance.bpm;
+			return 0;
+		},
+		clockRunning: (state): boolean => {
+			if (state.device?.patches) return state.device.patches.clockRunning;
+			if (state.device?.performance) return state.device.performance.clockRunning;
+			return false;
+		},
 	},
 
 	actions: {

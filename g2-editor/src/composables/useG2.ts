@@ -1,6 +1,8 @@
-import { ref, computed } from "vue";
-import { useDeviceStore } from "@/store/device";
+import { computed, ref } from "vue";
+
+import { Device } from "@/types";
 import type { DeviceStatus } from "@/store/device";
+import { useDeviceStore } from "@/store/device";
 
 export type { DeviceStatus };
 
@@ -42,6 +44,7 @@ export function useG2() {
 	}
 
 	const deviceStatus = computed<DeviceStatus>(() => store.status);
+	const device = computed<Device|null>(() => store.device);
 
 	const statusText = computed<string>(() => {
 		switch (store.status) {
@@ -124,6 +127,7 @@ export function useG2() {
 
 	return {
 		deviceStatus,
+		device,
 		statusText,
 		usbLogs: logs,
 		clearLogs,
