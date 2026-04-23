@@ -1330,7 +1330,77 @@ int g2_watch(output_format_t format) {
             if (bulkSize > 0) {
                 uint8_t *bulk = malloc(bulkSize);
                 if (bulk) {
-                    recv_bulk(bulk, bulkSize);
+                    int bret = recv_bulk(bulk, bulkSize);
+                    if (bret > 0) {
+                        fprintf(stderr, "watch: bulk[%d]:", bret);
+                        for (int i = 0; i < bret && i < 16; i++) fprintf(stderr, " %02x", bulk[i]);
+                        fprintf(stderr, "\n");
+
+                        /*
+                         * Bulk payload format (confirmed):
+                         *   [0] = 0x01 (type marker)
+                         *   [1] = aCmd: 0x00=slot A, 0x01=slot B, 0x02=C, 0x03=D,
+                         *               0x04=perf, 0x0C=sys
+                         *   [2] = version
+                         *   [3] = subCmd
+                         *   [4..end-3] = data
+                         *   [end-2..end-1] = CRC (stripped)
+                         *
+                         * LED data (0x39): 1 unknown prefix byte, then LEDs packed
+                         *   4 per byte (2-bit each), FX LedList first then VA LedList.
+                         * Volume data (0x3A): pairs (unknown, value) per LedStrip,
+                         *   FX LedStripList first then VA LedStripList.
+                         */
+                        if (bret > 6) {
+                            uint8_t baCmd   = bulk[1];
+                            uint8_t bsubCmd = bulk[3];
+                            int dataEnd     = bret - 2;
+
+                            if (baCmd == 0x04) {
+                                /* Performance-level bulk messages */
+                                if (bsubCmd == 0x29) {
+                                    char name[17] = {0};
+                                    int n = 0;
+                                    for (int i = 4; i < dataEnd && n < 16 && bulk[i]; i++)
+                                        name[n++] = (char)bulk[i];
+                                    printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
+                                    fflush(stdout);
+                                }
+                            } else if (baCmd <= 0x03) {
+                                /* Slot-level bulk messages */
+                                uint8_t bslot = baCmd;
+                                switch (bsubCmd) {
+                                    case 0x39:
+                                        printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
+                                        for (int i = 4; i < dataEnd; i++) {
+                                            if (i > 4) printf(",");
+                                            printf("%u", bulk[i]);
+                                        }
+                                        printf("]}\n");
+                                        fflush(stdout);
+                                        break;
+                                    case 0x3A:
+                                        printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
+                                        for (int i = 4; i < dataEnd; i++) {
+                                            if (i > 4) printf(",");
+                                            printf("%u", bulk[i]);
+                                        }
+                                        printf("]}\n");
+                                        fflush(stdout);
+                                        break;
+                                    case 0x72:
+                                        printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
+                                        for (int i = 4; i < dataEnd; i++) {
+                                            if (i > 4) printf(",");
+                                            printf("%u", bulk[i]);
+                                        }
+                                        printf("]}\n");
+                                        fflush(stdout);
+                                        break;
+                                }
+                            }
+                        }
+                    }
                     free(bulk);
                 }
             }
@@ -1457,16 +1527,6 @@ int g2_watch(output_format_t format) {
                            response[6], response[7], response[8], response[9]);
                 }
                 break;
-            case 0x2B: /* S_SET_MODE: location, module, param, value (no variation) */
-                if (response[5] == 2) {
-                    printf("{\"type\":\"patch_mode\",\"slot\":%u,\"param\":%u,\"value\":%u}\n",
-                           slot, response[7], response[8]);
-                } else {
-                    printf("{\"type\":\"mode_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u}\n",
-                           slot, response[5] == 0 ? "fx" : "va",
-                           response[6], response[7], response[8]);
-                }
-                break;
             case 0x27: { /* S_PATCH_NAME: null-terminated patch name */
                 char name[17] = {0};
                 int n = 0;
@@ -1496,18 +1556,6 @@ int g2_watch(output_format_t format) {
                 printf("{\"type\":\"current_note\",\"slot\":%u,\"note\":%u,\"velocity\":%u}\n",
                        slot, response[5], response[6]);
                 break;
-            case 0x39: { /* R_LED_DATA: [5]=unknown, [6..lastByte]=packed 2-bit LEDs */
-                printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":\"", slot);
-                for (int i = 6; i <= lastByte; i++) printf("%02x", response[i]);
-                printf("\"}\n");
-                break;
-            }
-            case 0x3A: { /* R_VOLUME_DATA: pairs (unknown, value) per VU strip */
-                printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":\"", slot);
-                for (int i = 5; i <= lastByte; i++) printf("%02x", response[i]);
-                printf("\"}\n");
-                break;
-            }
             case 0x72: /* R_RESOURCES_USED */
                 printf("{\"type\":\"resources_used\",\"slot\":%u,\"location\":%u}\n",
                        slot, response[5]);
