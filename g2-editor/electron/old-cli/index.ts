@@ -1,13 +1,5 @@
 import { Settings, DeviceInfo } from "./types";
 
-declare global {
-	interface Window {
-		cli: {
-			run(args: string[]): Promise<string>;
-		};
-	}
-}
-
 async function run(args: string[]): Promise<string> {
 	return window.cli.run(args);
 }

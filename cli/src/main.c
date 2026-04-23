@@ -93,6 +93,7 @@ int main(int argc, char *argv[]) {
         }
         return 1;
     }
+    atexit(g2_exit);
 
     /* Handle commands */
     if (strcmp(command, "list-devices") == 0) {

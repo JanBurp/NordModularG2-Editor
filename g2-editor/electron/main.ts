@@ -3,7 +3,7 @@ import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
-import { spawn } from "child_process";
+import { spawn, type ChildProcess } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -15,6 +15,7 @@ export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
 let win: BrowserWindow | null = null;
+let watchProcess: ChildProcess | null = null;
 
 const cliPath = path.join(process.env.APP_ROOT, "resources/g2-cli");
 
@@ -39,8 +40,40 @@ function createWindow() {
 	}
 }
 
-function runCli(args: string[]): Promise<string> {
+function startWatch() {
+	if (watchProcess) return;
+	const proc = spawn(cliPath, ["watch"]);
+	watchProcess = proc;
+	let buffer = "";
+	proc.stdout?.on("data", (data: Buffer) => {
+		buffer += data.toString();
+		const lines = buffer.split("\n");
+		buffer = lines.pop() ?? "";
+		for (const line of lines) {
+			const trimmed = line.trim();
+			if (trimmed) win?.webContents.send("cli:watch-event", trimmed);
+		}
+	});
+	proc.on("close", () => {
+		// Only clear if this is still the current watch process (not a new one)
+		if (watchProcess === proc) watchProcess = null;
+		win?.webContents.send("cli:watch-done");
+	});
+}
+
+async function stopWatchAndWait(): Promise<void> {
+	if (!watchProcess) return;
+	const proc = watchProcess;
+	watchProcess = null;
+	return new Promise<void>((resolve) => {
+		proc.on("close", () => resolve());
+		proc.kill("SIGTERM");
+	});
+}
+
+async function runCliRaw(args: string[]): Promise<string> {
 	return new Promise((resolve, reject) => {
+		console.log(`[cli] spawn: ${args.join(" ")}`);
 		const child = spawn(cliPath, args);
 		let stdout = "";
 		let stderr = "";
@@ -49,19 +82,35 @@ function runCli(args: string[]): Promise<string> {
 			stdout += data.toString();
 		});
 		child.stderr?.on("data", (data) => {
-			stderr += data.toString();
+			const text = data.toString();
+			stderr += text;
+			console.log(`[cli:${args[0]}] stderr: ${text.trim()}`);
 		});
 
-		child.on("close", (code) => {
+		child.on("close", (code, signal) => {
+			console.log(`[cli:${args[0]}] exit code=${code} signal=${signal}`);
 			if (code === 0) {
 				resolve(stdout);
 			} else {
-				reject(new Error(stderr || `Exit code: ${code}`));
+				reject(new Error(stderr || `Exit code: ${code}, signal: ${signal}`));
 			}
 		});
 
-		child.on("error", reject);
+		child.on("error", (err) => {
+			console.log(`[cli:${args[0]}] error: ${err.message}`);
+			reject(err);
+		});
 	});
+}
+
+async function runCli(args: string[]): Promise<string> {
+	const wasWatching = !!watchProcess;
+	if (wasWatching) await stopWatchAndWait();
+	try {
+		return await runCliRaw(args);
+	} finally {
+		if (wasWatching) startWatch();
+	}
 }
 
 ipcMain.handle("cli:run", async (_, args: string[]) => {
@@ -71,6 +120,9 @@ ipcMain.handle("cli:run", async (_, args: string[]) => {
 		throw new Error(err.message);
 	}
 });
+
+ipcMain.on("cli:watch-start", () => startWatch());
+ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
 
 app.whenReady().then(async () => {
 	if (VITE_DEV_SERVER_URL) {

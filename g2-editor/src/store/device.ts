@@ -1,14 +1,6 @@
 import { Device } from "@/types";
 import { defineStore } from "pinia";
 
-declare global {
-	interface Window {
-		cli: {
-			run(args: string[]): Promise<string>;
-		};
-	}
-}
-
 export type DeviceStatus =
 	| "connected"
 	| "connecting"

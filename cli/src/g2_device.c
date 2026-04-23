@@ -149,12 +149,6 @@ int g2_connect(void) {
 
     fprintf(stderr, "G2 found, connecting...\n");
 
-    /* Reset device (like G2-Edit does) */
-    ret = libusb_reset_device(g2.handle);
-    if (ret < 0) {
-        fprintf(stderr, "Warning: device reset failed: %s\n", libusb_error_name(ret));
-    }
-
     /* Claim interface 0 */
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
@@ -176,12 +170,6 @@ int g2_connect_silent(void) {
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
         return G2_ERR_NOT_FOUND;
-    }
-
-    /* Reset device (like G2-Edit does) */
-    ret = libusb_reset_device(g2.handle);
-    if (ret < 0) {
-        /* silently ignore reset failure */
     }
 
     /* Claim interface 0 */
@@ -1297,132 +1285,64 @@ void g2_watch_stop(int sig) {
     g2_watch_running = 0;
 }
 
-static int discard_interrupt_response(void) {
-    uint8_t dummy[32] = {0};
-    return recv_interrupt(dummy, sizeof(dummy), USB_TIMEOUT_STANDARD);
-}
 
 int g2_watch(output_format_t format) {
     uint8_t response[32] = {0};
-    uint8_t cmd_data[2] = {0};
     int ret;
-    int transferred;
-    int poll_count = 0;
 
     if (ensure_connected(1) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
-            return G2_ERR_CONNECT;
-        }
+        fprintf(stderr, "watch: failed to connect\n");
+        return G2_ERR_CONNECT;
+    }
 
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
 
-    printf("Initializing G2 for param change monitoring...\n");
-
-    /* Step 1: eStateInit - send 0x80 (special single-byte command) */
-    printf("Step 1: Init (0x80)...\n");
-    uint8_t init_cmd[] = {0x80};
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, init_cmd, 1, &transferred, USB_TIMEOUT_STANDARD);
-    if (ret == 0) {
-        usleep(USB_SEND_DELAY_US);
-        discard_interrupt_response();
-        printf("  -> Init response received\n");
-    } else {
-        printf("  -> Init failed\n");
+    /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
+    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
+    ret = send_system_data(0x41, start_cmd, 2);
+    if (ret < 0) {
+        fprintf(stderr, "watch: failed to send StartComm\n");
+        return G2_ERR;
     }
-
-    /* Step 2: eStateStop - reset the G2 */
-    printf("Step 2: Stop (0x41, 0x7d, 0x01)...\n");
-    cmd_data[0] = SUB_COMMAND_START_STOP;
-    cmd_data[1] = 0x01;  /* stop */
-    if (send_system_data(0x41, cmd_data, 2) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        discard_interrupt_response();
-        printf("  -> Stop response received\n");
-    } else {
-        printf("  -> Stop failed\n");
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    fprintf(stderr, "watch: armed, response len=%d", ret);
+    if (ret > 0) {
+        for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
     }
-
-    /* Step 3: eStateGetSynthSettings - get synth settings to initialize G2 state */
-    printf("Step 3: GetSynthSettings (0x41, 0x02)...\n");
-    if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        discard_interrupt_response();
-        printf("  -> SynthSettings response received\n");
-    } else {
-        printf("  -> GetSynthSettings failed\n");
-    }
-
-    /* Step 9: eStateStart - arm the G2 to send notifications */
-    printf("Step 4: Start (0x41, 0x7d, 0x00)...\n");
-    cmd_data[0] = SUB_COMMAND_START_STOP;
-    cmd_data[1] = 0x00;  /* start */
-    if (send_system_data(0x41, cmd_data, 2) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        discard_interrupt_response();
-        printf("  -> Start response received\n");
-    } else {
-        printf("  -> Start failed\n");
-    }
-
-    printf("Initialization complete. Starting poll loop...\n");
-    printf("NOTE: Turn knobs on G2 hardware to see param changes\n\n");
-
-    if (format == OUTPUT_JSON) {
-        printf("[\n");
-    } else {
-        printf("%-10s %-8s %-8s %-8s %-8s\n", "location", "index", "param", "value", "variation");
-        printf("%-10s %-8s %-8s %-8s %-8s\n", "---------", "------", "-----", "-----", "---------");
-    }
+    fprintf(stderr, "\n");
 
     while (g2_watch_running) {
         ret = recv_interrupt(response, sizeof(response), 100);
-        poll_count++;
+        if (ret <= 0) continue;
 
-        /* Heartbeat: print "." every 50 iterations (~5 seconds) */
-        if (poll_count % 50 == 0) {
-            printf(".");
-            fflush(stdout);
+        fprintf(stderr, "watch: msg");
+        for (int i = 0; i < ret && i < 12; i++) fprintf(stderr, " %02x", response[i]);
+        fprintf(stderr, "\n");
+
+        /* Only process embedded messages (type nibble 0x2) that start with 0x01 */
+        if ((response[0] & 0x0f) != RESPONSE_TYPE_EMBEDDED) continue;
+        if (response[1] != 0x01) continue;
+
+        /*
+         * Embedded notification format (from Delphi NMG2Mess.pas):
+         *   [0] = (len<<4)|2  header
+         *   [1] = 0x01
+         *   [2] = cmd byte (slot index)
+         *   [3] = patch version
+         *   [4] = sub-command
+         *   [5..9] = data bytes
+         */
+        uint8_t subCommand = response[4];
+        if (subCommand == SUB_RESPONSE_PARAM_CHANGE) {
+            printf("{\"type\":\"param_change\",\"location\":%u,\"index\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                   response[5], response[6], response[7], response[8], response[9]);
+        } else {
+            printf("{\"type\":\"unknown\",\"cmd\":%u,\"sub\":%u}\n",
+                   response[2], subCommand);
         }
-
-        if (ret > 0) {
-            printf("\n[Poll #%d] DEBUG: raw data (len=%d): ", poll_count, ret);
-            for (int j = 0; j < ret && j < 20; j++) {
-                printf("%02x ", response[j]);
-            }
-            printf("\n");
-
-            uint8_t type_nibble = response[0] & 0x0f;
-
-            printf("  type_nibble=0x%01x, byte[1]=0x%02x, byte[2]=0x%02x, byte[3]=0x%02x\n",
-                   type_nibble, response[1], response[2], response[3]);
-
-            if (type_nibble == RESPONSE_TYPE_COMMAND || type_nibble == RESPONSE_TYPE_EMBEDDED) {
-                uint8_t subCommand = response[3];
-                printf("  Trying subCommand=byte[3]=0x%02x (looking for 0x40)\n", subCommand);
-
-                if (subCommand == SUB_RESPONSE_PARAM_CHANGE) {
-                    uint8_t location = response[4];
-                    uint8_t index = response[5];
-                    uint8_t param = response[6];
-                    uint8_t value = response[7];
-                    uint8_t variation = response[8];
-
-                    if (format == OUTPUT_JSON) {
-                        printf("  {\"location\": %u, \"index\": %u, \"param\": %u, \"value\": %u, \"variation\": %u},\n",
-                               location, index, param, value, variation);
-                    } else {
-                        printf("%-10u %-8u %-8u %-8u %-8u\n",
-                               location, index, param, value, variation);
-                    }
-                }
-            }
-        }
-    }
-
-    printf("\n");
-    if (format == OUTPUT_JSON) {
-        printf("]\n");
+        fflush(stdout);
     }
 
     signal(SIGINT, SIG_DFL);

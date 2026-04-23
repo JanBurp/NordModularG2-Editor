@@ -65,6 +65,29 @@ export function useG2() {
 		}
 	});
 
+	function startWatch(): void {
+		window.cli.offWatchEvent();
+		window.cli.onWatchEvent((line: string) => {
+			try {
+				const evt = JSON.parse(line);
+				if (evt.type === "param_change") {
+					log("←", "Watch", `param loc=${evt.location} idx=${evt.index} param=${evt.param} val=${evt.value} var=${evt.variation}`);
+				} else {
+					log("←", "Watch", `${evt.type} cmd=${evt.cmd} sub=${evt.sub}`);
+				}
+			} catch {
+				log("←", "Watch", line);
+			}
+		});
+		window.cli.watchStart();
+		log("•", "Watch", "Started");
+	}
+
+	function stopWatch(): void {
+		window.cli.watchStop();
+		window.cli.offWatchEvent();
+	}
+
 	async function connectDevice(): Promise<void> {
 		if (typeof window === "undefined" || !window.cli) {
 			store.status = "unsupported";
@@ -78,12 +101,14 @@ export function useG2() {
 			log("→", "Device", "Fetching device info...");
 			await store.fetchDevice();
 			log("←", "Device", `${store.deviceName} (${store.device?.mode})`);
+			startWatch();
 		} catch (e: any) {
 			log("←", "Connect", `Connection failed: ${e.message}`);
 		}
 	}
 
 	async function disconnectDevice(): Promise<void> {
+		stopWatch();
 		log("→", "Disconnect", "Disconnecting from G2...");
 		try {
 			await store.disconnect();
@@ -134,6 +159,8 @@ export function useG2() {
 		connectDevice,
 		disconnectDevice,
 		fetchDevice,
+		startWatch,
+		stopWatch,
 		uploadToG2,
 		downloadFromG2,
 	};
