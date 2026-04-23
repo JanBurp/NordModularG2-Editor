@@ -72,6 +72,9 @@ export function useG2() {
 		try {
 			await store.connect();
 			log("←", "Connect", "Connected to G2 successfully");
+			log("→", "Device", "Fetching device info...");
+			await store.fetchDevice();
+			log("←", "Device", `${store.deviceName} (${store.device?.mode})`);
 		} catch (e: any) {
 			log("←", "Connect", `Connection failed: ${e.message}`);
 		}
@@ -87,11 +90,11 @@ export function useG2() {
 		}
 	}
 
-	async function fetchSettings(): Promise<void> {
+	async function fetchDevice(): Promise<void> {
 		log("→", "Device", "Fetching device info...");
 		try {
-			await store.fetchSettings();
-			log("←", "Device", "Device info fetched");
+			await store.fetchDevice();
+			log("←", "Device", `${store.deviceName} (${store.device?.mode})`);
 		} catch (e: any) {
 			log("←", "Device", `Failed: ${e.message}`);
 		}
@@ -126,7 +129,7 @@ export function useG2() {
 		clearLogs,
 		connectDevice,
 		disconnectDevice,
-		fetchSettings,
+		fetchDevice,
 		uploadToG2,
 		downloadFromG2,
 	};

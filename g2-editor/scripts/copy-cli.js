@@ -3,7 +3,7 @@ const { existsSync, mkdirSync, copyFileSync } = require('fs')
 const { join } = require('path')
 
 const srcDir = join(__dirname, '../../cli/build/bin')
-const destDir = join(__dirname, 'resources')
+const destDir = join(__dirname, '../resources')
 const destFile = join(destDir, 'g2-cli')
 
 try {

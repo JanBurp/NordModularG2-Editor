@@ -25,7 +25,7 @@ export interface PatchData {
 	kbSplit: boolean;
 }
 
-export interface Settings {
+export interface Device {
 	synthName: string;
 	mode: string;
 	patches: PatchData | null;
@@ -46,5 +46,5 @@ export interface Settings {
 export interface DeviceState {
 	connected: boolean;
 	deviceName: string;
-	settings: Settings | null;
+	device: Device | null;
 }

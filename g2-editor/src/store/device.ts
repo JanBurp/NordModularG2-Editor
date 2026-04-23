@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import { Settings } from "@/types";
+import { Device } from "@/types";
 
 declare global {
 	interface Window {
@@ -22,7 +22,7 @@ export const useDeviceStore = defineStore("device", {
 	state: () => ({
 		status: "disconnected" as DeviceStatus,
 		deviceName: "",
-		settings: null as Settings | null,
+		device: null as Device | null,
 	}),
 
 	getters: {
@@ -50,14 +50,15 @@ export const useDeviceStore = defineStore("device", {
 			} finally {
 				this.status = "disconnected";
 				this.deviceName = "";
-				this.settings = null;
+				this.device = null;
 			}
 		},
 
-		async fetchSettings() {
+		async fetchDevice() {
 			if (this.status !== "connected") throw new Error("Not connected");
 			const output = await window.cli.run(["device"]);
-			this.settings = JSON.parse(output);
+			this.device = JSON.parse(output) as Device;
+			this.deviceName = this.device.synthName;
 		},
 	},
 });
