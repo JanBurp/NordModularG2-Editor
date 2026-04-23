@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(python3 *)",
+      "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/electron-G2-editor/patches/FMritm.pch2\")",
+      "Bash(\"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/new-editor/cli/build/bin/g2-cli\" get-patch A)"
+    ]
+  }
+}

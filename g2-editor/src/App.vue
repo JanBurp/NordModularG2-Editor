@@ -8,13 +8,17 @@
 				<ToolBarText class="w-10">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
+				<!-- SLOT BUTTONS -->
 				<BtnGroup
+					v-model="selectedSlotIndex"
 					:options="[
 						{ label: 'A', value: 0 },
 						{ label: 'B', value: 1 },
 						{ label: 'C', value: 2 },
 						{ label: 'D', value: 3 },
 					]"
+					variant="toggle"
+					@update:model-value="handleSlotSelect"
 				/>
 			</template>
 
@@ -256,7 +260,7 @@
 </template>
 
 <script setup>
-import { watch } from "vue";
+import { ref, watch } from "vue";
 import "./renderer/nmg2mods.js";
 import "./renderer/parammap.js";
 import "./parser/nmg2PatchParser.js";
@@ -276,6 +280,7 @@ import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
 import { usePatchManager } from "./composables/usePatchManager";
 import { useG2 } from "./composables/useG2";
 import { useDeviceStore } from "./store/device.js";
+import { useSlotsStore } from "./store/slots.js";
 import { useCableVisibility } from "./composables/useCableVisibility";
 import { usePatchCategory } from "./composables/usePatchCategory";
 import { useRightPanel } from "./composables/useRightPanel";
@@ -283,6 +288,7 @@ import { useRightPanel } from "./composables/useRightPanel";
 import { SOUND_CATEGORIES as soundCategories } from "./constants";
 
 const device = useDeviceStore();
+const slotsStore = useSlotsStore();
 
 const {
 	patch,
@@ -295,7 +301,17 @@ const {
 	areaCablesCount,
 	handleFileLoad,
 	handlePatchSelect,
+	loadFromHex,
 } = usePatchManager();
+
+const SLOT_LABELS = ["A", "B", "C", "D"];
+const selectedSlotIndex = ref(null);
+
+async function handleSlotSelect(index) {
+	const slot = SLOT_LABELS[index];
+	const result = await slotsStore.loadSlot(slot);
+	if (result) await loadFromHex(result.rawHex, result.name);
+}
 
 const {
 	deviceStatus,

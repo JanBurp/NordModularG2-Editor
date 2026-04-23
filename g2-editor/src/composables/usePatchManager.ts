@@ -114,6 +114,29 @@ export function usePatchManager() {
 		reader.readAsArrayBuffer(file);
 	}
 
+	// Load patch from device slot — CLI returns pch2 section data (USB wrapper stripped in C).
+	// A .pch2 file has: [name]\0[0x17][0x00][sections][crc]. The USB response has only
+	// [sections][crc], so we prepend the minimal header to put sections at the right offset.
+	async function loadFromHex(hex: string, name: string): Promise<void> {
+		const sectionBytes = new Uint8Array(
+			hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+		);
+		const nameBytes = new TextEncoder().encode(name);
+		const header = new Uint8Array(nameBytes.length + 3);
+		header.set(nameBytes);
+		header[nameBytes.length] = 0x00;
+		header[nameBytes.length + 1] = 0x17;
+		header[nameBytes.length + 2] = 0x00;
+		const pch2 = new Uint8Array(header.length + sectionBytes.length);
+		pch2.set(header, 0);
+		pch2.set(sectionBytes, header.length);
+		const buffer = pch2.buffer;
+		const { PatchParser } = await import("../parser/nmg2PatchParser.js");
+		patch.value = new PatchParser(buffer).parse() as Patch;
+		patchName.value = name;
+		selectedArea.value = "voice";
+	}
+
 	// Load patch from browser
 	async function handlePatchSelect(filename: string): Promise<void> {
 		if (typeof window === "undefined" || !window.electronAPI) return;
@@ -158,5 +181,6 @@ export function usePatchManager() {
 		// Actions
 		handleFileLoad,
 		handlePatchSelect,
+		loadFromHex,
 	};
 }

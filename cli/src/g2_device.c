@@ -789,6 +789,17 @@ cJSON *g2_get_patch(const char *slot_str) {
         }
     }
 
+    /* Convert USB bulk format to pch2 format before returning */
+    uint8_t *pch2Data = malloc(patchSize);
+    size_t pch2Size = patchSize;
+    if (pch2Data && patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) == 0) {
+        free(patchData);
+        patchData = pch2Data;
+        patchSize = (uint16_t)pch2Size;
+    } else {
+        free(pch2Data);
+    }
+
     /* Build JSON output */
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);

@@ -26,7 +26,7 @@ interface Option {
 }
 
 interface Props {
-	modelValue: string | number;
+	modelValue: string | number | null;
 	options: (string | number | Option)[];
 	variant?: "toggle" | "variation" | "tab";
 }
