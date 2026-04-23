@@ -77,7 +77,6 @@
 				:options="[
 					{ label: 'USB', value: 'usb' },
 					{ label: 'Browser', value: 'browser' },
-					{ label: 'Data', value: 'data', disabled: !patch },
 				]"
 				variant="tab"
 				@update:model-value="toggleSidebar"
@@ -86,15 +85,13 @@
 		</ToolBar>
 
 		<ToolBar v-if="patchName">
-			<span class="text-xs font-semibold text-neutral-400">{{
-				patchName
-			}}</span>
+			<ToolBarText class="w-32">{{patchName}}</ToolBarText>
 
 			<div class="flex items-center gap-1.5">
-				<span class="text-xs font-semibold text-neutral-400">Cat:</span>
+				<ToolBarLabel>Cat:</ToolBarLabel>
 				<select
 					v-model="selectedCategory"
-					class="h-6 px-2 text-xs border border-neutral-500 rounded bg-gray-100 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+					class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
 					title="Sound Category"
 				>
 					<option
@@ -246,14 +243,6 @@
 					:isActive="rightPaneTab === 'browser'"
 					@select="handlePatchSelect"
 				/>
-				<PatchData
-					v-show="rightPaneTab === 'data' && patch"
-					:patch="patch"
-				/>
-				<ModulesPane
-					v-show="rightPaneTab === 'modules'"
-					:isActive="rightPaneTab === 'modules'"
-				/>
 			</SidePanel>
 		</div>
 	</div>
@@ -266,7 +255,6 @@ import "./renderer/parammap.js";
 import "./parser/nmg2PatchParser.js";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
-import PatchData from "./components/panels/PatchData.vue";
 import SidePanel from "./components/panels/SidePanel.vue";
 import ModulesPane from "./components/panels/ModulesPane.vue";
 import UsbPanel from "./components/panels/UsbPanel.vue";
