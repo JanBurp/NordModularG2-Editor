@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed } from "vue";
 import { makePatchCables, removeAllCables } from "../../renderer/cableRenderer";
 import { getModule } from "../../renderer/nmg2mods";
