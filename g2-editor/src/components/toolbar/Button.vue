@@ -15,14 +15,14 @@
 	<!-- All other variants use button -->
 	<button
 		v-else
-		class="inline-flex items-center justify-center h-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2"
+		class="inline-flex  items-center justify-center h-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2"
 		:class="[
 			variant === 'default' ? 'px-3' : '',
 			variant === 'toggle' || variant === 'tab'
 				? 'px-2.5 bg-neutral-800 border-neutral-700'
 				: '',
 			variant === 'variation' ? 'w-8 p-0 bg-neutral-800' : '',
-			active ? '!bg-[#4a6a8a] !text-white !border-[#5a7a9a]' : '',
+			active ? '!bg-blue-300 !text-white' : '',
 			disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-600',
 		]"
 		:disabled="disabled"

@@ -1,6 +1,6 @@
 import { ref } from "vue";
 
-export type PaneTab = "browser" | "data" | "usb";
+export type PaneTab = "browser" | "usb";
 
 export function useRightPanel() {
 	const rightPaneTab = ref<PaneTab>("usb");
