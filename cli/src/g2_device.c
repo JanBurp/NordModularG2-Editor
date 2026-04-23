@@ -1390,12 +1390,24 @@ int g2_watch(output_format_t format) {
         /* ---- Performance messages (aCmd == 0x04) ---- */
         if (aCmd == 0x04) {
             switch (subCmd) {
-                case 0x09: /* S_SEL_SLOT: selected slot changed */
+                case 0x09: /* S_SEL_SLOT */
                     printf("{\"type\":\"slot_change\",\"slot\":%u}\n", response[5]);
                     break;
                 case 0x05: /* R_ASSIGNED_VOICES: 4 bytes = voices per slot */
                     printf("{\"type\":\"assigned_voices\",\"voices\":[%u,%u,%u,%u]}\n",
                            response[5], response[6], response[7], response[8]);
+                    break;
+                case 0x29: { /* C_PERF_NAME: null-terminated performance name */
+                    char name[17] = {0};
+                    int n = 0;
+                    for (int i = 5; i <= lastByte && n < 16 && response[i]; i++)
+                        name[n++] = (char)response[i];
+                    printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
+                    break;
+                }
+                case 0x11: /* C_PERF_SETTINGS */
+                case 0x10: /* Q_PERF_SETTINGS */
+                    printf("{\"type\":\"perf_settings_update\"}\n");
                     break;
                 case 0x3F: /* S_SET_MASTER_CLOCK: [5]=unknown [6]=type(0=run,1=bpm) [7]=value */
                     if (response[6] == 0x00)
@@ -1422,18 +1434,67 @@ int g2_watch(output_format_t format) {
 
         /* ---- Slot messages (aCmd 0x00-0x03 or 0x08-0x0B) ---- */
         uint8_t slot = aCmd & 0x03;
+
+        /* version=0x40 means version-update message at slot level */
+        if (version == 0x40) {
+            if (subCmd == 0x36 || subCmd == 0x38) /* R_PATCH_VERSION */
+                printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
+                       response[5], response[6]);
+            else
+                printf("{\"type\":\"unknown_version\",\"slot\":%u,\"sub\":%u}\n", slot, subCmd);
+            fflush(stdout);
+            continue;
+        }
+
         switch (subCmd) {
-            case 0x40: /* S_SET_PARAM: location, module, param, value, variation */
-                printf("{\"type\":\"param_change\",\"slot\":%u,\"location\":%u,\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                       slot, response[5], response[6], response[7], response[8], response[9]);
+            case 0x40: /* S_SET_PARAM: location(0=fx,1=va,2=patch), module, param, value, variation */
+                if (response[5] == 2) {
+                    printf("{\"type\":\"patch_param\",\"slot\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                           slot, response[7], response[8], response[9]);
+                } else {
+                    printf("{\"type\":\"param_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                           slot, response[5] == 0 ? "fx" : "va",
+                           response[6], response[7], response[8], response[9]);
+                }
                 break;
-            case 0x6A: /* S_SEL_VARIATION: variation */
+            case 0x2B: /* S_SET_MODE: location, module, param, value (no variation) */
+                if (response[5] == 2) {
+                    printf("{\"type\":\"patch_mode\",\"slot\":%u,\"param\":%u,\"value\":%u}\n",
+                           slot, response[7], response[8]);
+                } else {
+                    printf("{\"type\":\"mode_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u}\n",
+                           slot, response[5] == 0 ? "fx" : "va",
+                           response[6], response[7], response[8]);
+                }
+                break;
+            case 0x27: { /* S_PATCH_NAME: null-terminated patch name */
+                char name[17] = {0};
+                int n = 0;
+                for (int i = 5; i <= lastByte && n < 16 && response[i]; i++)
+                    name[n++] = (char)response[i];
+                printf("{\"type\":\"patch_name\",\"slot\":%u,\"name\":\"%s\"}\n", slot, name);
+                break;
+            }
+            case 0x44: /* S_COPY_VARIATION: from, to */
+                printf("{\"type\":\"copy_variation\",\"slot\":%u,\"from\":%u,\"to\":%u}\n",
+                       slot, response[5], response[6]);
+                break;
+            case 0x6A: /* S_SEL_VARIATION */
                 printf("{\"type\":\"variation_change\",\"slot\":%u,\"variation\":%u}\n",
                        slot, response[5]);
                 break;
             case 0x2F: /* S_SEL_PARAM: unknown, location, module, param */
-                printf("{\"type\":\"selected_param\",\"slot\":%u,\"location\":%u,\"module\":%u,\"param\":%u}\n",
-                       slot, response[6], response[7], response[8]);
+                printf("{\"type\":\"selected_param\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u}\n",
+                       slot, response[6] == 0 ? "fx" : (response[6] == 1 ? "va" : "patch"),
+                       response[7], response[8]);
+                break;
+            case 0x21: /* C_PATCH_DESCR: patch data loaded */
+            case 0x3C: /* Q_PATCH: patch update complete */
+                printf("{\"type\":\"patch_update\",\"slot\":%u}\n", slot);
+                break;
+            case 0x69: /* C_CURRENT_NOTE_2: note on/off */
+                printf("{\"type\":\"current_note\",\"slot\":%u,\"note\":%u,\"velocity\":%u}\n",
+                       slot, response[5], response[6]);
                 break;
             case 0x39: { /* R_LED_DATA: [5]=unknown, [6..lastByte]=packed 2-bit LEDs */
                 printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":\"", slot);
@@ -1451,6 +1512,8 @@ int g2_watch(output_format_t format) {
                 printf("{\"type\":\"resources_used\",\"slot\":%u,\"location\":%u}\n",
                        slot, response[5]);
                 break;
+            case 0x59: /* M_UNKNOWN_2 */
+            case 0x70: /* M_UNKNOWN_6 */
             case 0x7F: printf("{\"type\":\"ok\",\"slot\":%u}\n", slot); break;
             case 0x7E: printf("{\"type\":\"error\",\"slot\":%u,\"code\":%u}\n", slot, response[5]); break;
             default:

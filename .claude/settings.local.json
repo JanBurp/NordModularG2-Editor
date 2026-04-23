@@ -3,7 +3,9 @@
     "allow": [
       "Bash(python3 *)",
       "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/electron-G2-editor/patches/FMritm.pch2\")",
-      "Bash(\"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/new-editor/cli/build/bin/g2-cli\" get-patch A)"
+      "Bash(\"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/new-editor/cli/build/bin/g2-cli\" get-patch A)",
+      "Bash(grep -n \"S_SET_MODE\\\\|S_SET_MORPH\\\\|S_SET_UPRATE\\\\|S_COPY_VARIATION\\\\|\\\\$2B\\\\|\\\\$43\\\\|\\\\$2A\" \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/Delphi-editor/nord_g2_editor-master/Gen2/Common/BVE.NMG2Mess.pas\")",
+      "Bash(make)"
     ]
   }
 }
