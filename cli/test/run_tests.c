@@ -76,7 +76,7 @@ extern void test_response_type_parsing_extended(void);
 
 /* Integration tests - require real G2 device */
 extern void test_integration_connect_disconnect(void);
-extern void test_integration_settings(void);
+extern void test_integration_device(void);
 extern void test_integration_get_patch_slot_a(void);
 extern void test_integration_get_patch_slot_b(void);
 extern void test_integration_get_patch_slot_c(void);
@@ -167,7 +167,7 @@ int main(void) {
 
     /* Integration tests - require real G2 device */
     RUN_TEST(test_integration_connect_disconnect);
-    RUN_TEST(test_integration_settings);
+    RUN_TEST(test_integration_device);
     RUN_TEST(test_integration_get_patch_slot_a);
     RUN_TEST(test_integration_get_patch_slot_b);
     RUN_TEST(test_integration_get_patch_slot_c);

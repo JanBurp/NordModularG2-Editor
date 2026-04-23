@@ -32,7 +32,7 @@ static void print_usage(const char *prog) {
     printf("  connect                              Connect to G2 (auto-detect)\n");
     printf("  disconnect                           Close connection\n");
     printf("  list-devices                         List USB devices (debug)\n");
-    printf("  settings                             Show synth settings\n");
+    printf("  device                               Show synth device info\n");
     printf("  get-patch <slot>                     Get patch from slot (A-D) as JSON\n");
     printf("  get-patch-file <slot> [file]         Save patch as .pch2 file\n");
     printf("  list [type] [bank <n>]               List patches and performances\n");
@@ -107,13 +107,13 @@ int main(int argc, char *argv[]) {
         return g2_disconnect();
     }
 
-    if (strcmp(command, "settings") == 0) {
-        cJSON *result = g2_settings(debug_mode);
+    if (strcmp(command, "device") == 0) {
+        cJSON *result = g2_device_info(debug_mode);
         if (!result) {
             if (output_format == OUTPUT_JSON) {
-                output_error_json("Failed to get settings", output_format);
+                output_error_json("Failed to get device info", output_format);
             } else {
-                fprintf(stderr, "Failed to get settings\n");
+                fprintf(stderr, "Failed to get device info\n");
             }
             return 1;
         }

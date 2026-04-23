@@ -76,7 +76,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 
 /* Query commands - return cJSON* on success, NULL on error */
 /* Caller is responsible for freeing the returned cJSON* */
-cJSON *g2_settings(int debug);
+cJSON *g2_device_info(int debug);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
 cJSON *g2_list(int filter, int bank_filter);

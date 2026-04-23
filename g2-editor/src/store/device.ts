@@ -29,7 +29,7 @@ export const useDeviceStore = defineStore("device", {
 
 		async fetchSettings() {
 			if (!this.connected) throw new Error("Not connected");
-			const output = await window.cli.run(["settings"]);
+			const output = await window.cli.run(["device"]);
 			this.settings = JSON.parse(output);
 		},
 	},

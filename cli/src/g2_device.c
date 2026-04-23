@@ -567,7 +567,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     return root;
 }
 
-cJSON *g2_settings(int debug) {
+cJSON *g2_device_info(int debug) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
     uint8_t *perfData = NULL;
