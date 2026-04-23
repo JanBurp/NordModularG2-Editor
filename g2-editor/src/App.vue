@@ -301,7 +301,7 @@ const {
 	areaCablesCount,
 	handleFileLoad,
 	handlePatchSelect,
-	loadFromHex,
+	setPatch,
 } = usePatchManager();
 
 const SLOT_LABELS = ["A", "B", "C", "D"];
