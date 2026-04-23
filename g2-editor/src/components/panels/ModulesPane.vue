@@ -4,8 +4,11 @@
 			v-model="searchQuery"
 			placeholder="Search modules..."
 		/>
+		<div class="text-xs text-neutral-500 py-1 px-1">
+			{{ totalModuleCount }} modules
+		</div>
 		<div v-for="category in categories" :key="category" class="mb-4">
-			<div v-if="getModulesByCategory(category).length > 0">
+			<div v-if="categoryMatchesSearch(category)">
 				<div
 					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
 					@click="toggleCategory(category)"
@@ -51,7 +54,7 @@
 </template>
 
 
-<script setup>
+<script setup lang="ts">
 import { ref, reactive, computed } from "vue";
 import Module from "../canvas/Module.vue";
 import SearchInput from "../common/SearchInput.vue";
@@ -61,6 +64,16 @@ import { getParam } from "../../renderer/parammap";
 const categories = computed(() => getAllCategories());
 const expandedCategories = ref(getAllCategories());
 const searchQuery = ref("");
+
+const totalModuleCount = computed(() => {
+	let count = 0;
+	for (const category of categories.value) {
+		if (categoryMatchesSearch(category)) {
+			count += getModulesByCategory(category).length;
+		}
+	}
+	return count;
+});
 
 const moduleInstances = reactive(new Map());
 
@@ -77,15 +90,57 @@ function isExpanded(category) {
 	return expandedCategories.value.includes(category);
 }
 
+function categoryMatchesSearch(category: string): boolean {
+	if (!searchQuery.value) return true;
+
+	const query = searchQuery.value.toLowerCase();
+
+	if (query.includes(" ")) {
+		const [catQuery, modQuery] = query.split(" ");
+		if (category.toLowerCase().includes(catQuery)) {
+			if (!modQuery) return true;
+			const modules = getModulesByCategoryRaw(category);
+			return modules.some(
+				(m) =>
+					(m.short || "").toLowerCase().includes(modQuery) ||
+					(m.long || "").toLowerCase().includes(modQuery)
+			);
+		}
+		return false;
+	}
+
+	if (category.toLowerCase().includes(query)) return true;
+
+	const modules = getModulesByCategoryRaw(category);
+	return modules.some(
+		(m) =>
+			(m.short || "").toLowerCase().includes(query) ||
+			(m.long || "").toLowerCase().includes(query)
+	);
+}
+
 function getModulesByCategory(category) {
 	let modules = getModulesByCategoryRaw(category);
 
 	if (searchQuery.value) {
 		const query = searchQuery.value.toLowerCase();
-		modules = modules.filter((m) => {
-			const name = (m.short || "").toLowerCase();
-			return name.includes(query);
-		});
+		let modQuery = query;
+
+		if (query.includes(" ")) {
+			const [catQuery, mod] = query.split(" ");
+			if (category.toLowerCase().includes(catQuery)) {
+				modQuery = mod;
+			} else {
+				return [];
+			}
+		}
+
+		if (modQuery) {
+			modules = modules.filter((m) => {
+				const name = (m.short || "").toLowerCase();
+				return name.includes(modQuery);
+			});
+		}
 	}
 
 	return modules;
