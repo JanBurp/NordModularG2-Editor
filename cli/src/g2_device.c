@@ -1337,26 +1337,126 @@ int g2_watch(output_format_t format) {
             continue;
         }
 
-        /* Only process embedded messages (type nibble 0x2) */
         if (msgType != RESPONSE_TYPE_EMBEDDED) continue;
 
         /*
-         * Embedded notification format (from Delphi NMG2Mess.pas):
-         *   [0] = (len<<4)|2  header
-         *   [1] = slot index (0-3)
-         *   [2] = cmd byte
-         *   [3] = patch version
-         *   [4] = sub-command
-         *   [5..9] = data bytes
+         * Embedded notification layout (Delphi BVE.NMG2USB.pas USBProcessResponseMessage
+         * skips byte[0], so MemStream reads start at byte[1]):
+         *   [0] = (len<<4)|2   header; len covers bytes[1..len], last 2 are CRC
+         *   [1] = aR           routing byte (always 0x01)
+         *   [2] = aCmd         0x00/0x08=slot A, 0x01/0x09=slot B, 0x02/0x0A=slot C,
+         *                      0x03/0x0B=slot D, 0x04=perf, 0x0C=sys
+         *   [3] = version      patch/perf version (or 0x40 for version-update messages)
+         *   [4] = subCmd       S_SET_PARAM=0x40, R_LED=0x39, R_VOL=0x3A, etc.
+         *   [5..] = data
          */
-        uint8_t slot = response[1];
-        uint8_t subCommand = response[4];
-        if (subCommand == SUB_RESPONSE_PARAM_CHANGE) {
-            printf("{\"type\":\"param_change\",\"slot\":%u,\"location\":%u,\"index\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                   slot, response[5], response[6], response[7], response[8], response[9]);
-        } else {
-            printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u}\n",
-                   slot, response[2], subCommand);
+        uint8_t aCmd    = response[2];
+        uint8_t version = response[3];
+        uint8_t subCmd  = response[4];
+        /* last data byte index = (len field) - 2 (excludes 2 CRC bytes) */
+        int lastByte = (response[0] >> 4) - 2;
+        if (lastByte > 15) lastByte = 15;
+
+        /* ---- System messages (aCmd == 0x0C) ---- */
+        if (aCmd == 0x0C) {
+            if (version == 0x40) {
+                /* Version-update messages */
+                switch (subCmd) {
+                    case 0x1F: /* perf + all slot versions */
+                        printf("{\"type\":\"version_update\",\"perf_version\":%u}\n", response[5]);
+                        break;
+                    case 0x36: /* single slot/perf version */
+                    case 0x38:
+                        printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
+                               response[5], response[6]);
+                        break;
+                    default:
+                        printf("{\"type\":\"unknown_sys\",\"version\":64,\"sub\":%u}\n", subCmd);
+                        break;
+                }
+            } else {
+                switch (subCmd) {
+                    case 0x7F: printf("{\"type\":\"ok\"}\n"); break;
+                    case 0x7E: printf("{\"type\":\"error\",\"code\":%u}\n", response[5]); break;
+                    default:
+                        printf("{\"type\":\"unknown_sys\",\"sub\":%u}\n", subCmd);
+                        break;
+                }
+            }
+            fflush(stdout);
+            continue;
+        }
+
+        /* ---- Performance messages (aCmd == 0x04) ---- */
+        if (aCmd == 0x04) {
+            switch (subCmd) {
+                case 0x09: /* S_SEL_SLOT: selected slot changed */
+                    printf("{\"type\":\"slot_change\",\"slot\":%u}\n", response[5]);
+                    break;
+                case 0x05: /* R_ASSIGNED_VOICES: 4 bytes = voices per slot */
+                    printf("{\"type\":\"assigned_voices\",\"voices\":[%u,%u,%u,%u]}\n",
+                           response[5], response[6], response[7], response[8]);
+                    break;
+                case 0x3F: /* S_SET_MASTER_CLOCK: [5]=unknown [6]=type(0=run,1=bpm) [7]=value */
+                    if (response[6] == 0x00)
+                        printf("{\"type\":\"master_clock_run\",\"run\":%u}\n", response[7]);
+                    else
+                        printf("{\"type\":\"master_clock_bpm\",\"bpm\":%u}\n", response[7]);
+                    break;
+                case 0x5D: /* R_EXT_MASTER_CLOCK: [5]=unknown [6..7]=value */
+                    printf("{\"type\":\"ext_master_clock\",\"value\":%u}\n",
+                           (response[6] << 8) | response[7]);
+                    break;
+                case 0x80: /* R_MIDI_CC: [5]=unknown [6]=cc */
+                    printf("{\"type\":\"midi_cc\",\"cc\":%u}\n", response[6]);
+                    break;
+                case 0x7F: printf("{\"type\":\"ok\"}\n"); break;
+                case 0x7E: printf("{\"type\":\"error\",\"code\":%u}\n", response[5]); break;
+                default:
+                    printf("{\"type\":\"unknown_perf\",\"sub\":%u}\n", subCmd);
+                    break;
+            }
+            fflush(stdout);
+            continue;
+        }
+
+        /* ---- Slot messages (aCmd 0x00-0x03 or 0x08-0x0B) ---- */
+        uint8_t slot = aCmd & 0x03;
+        switch (subCmd) {
+            case 0x40: /* S_SET_PARAM: location, module, param, value, variation */
+                printf("{\"type\":\"param_change\",\"slot\":%u,\"location\":%u,\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                       slot, response[5], response[6], response[7], response[8], response[9]);
+                break;
+            case 0x6A: /* S_SEL_VARIATION: variation */
+                printf("{\"type\":\"variation_change\",\"slot\":%u,\"variation\":%u}\n",
+                       slot, response[5]);
+                break;
+            case 0x2F: /* S_SEL_PARAM: unknown, location, module, param */
+                printf("{\"type\":\"selected_param\",\"slot\":%u,\"location\":%u,\"module\":%u,\"param\":%u}\n",
+                       slot, response[6], response[7], response[8]);
+                break;
+            case 0x39: { /* R_LED_DATA: [5]=unknown, [6..lastByte]=packed 2-bit LEDs */
+                printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":\"", slot);
+                for (int i = 6; i <= lastByte; i++) printf("%02x", response[i]);
+                printf("\"}\n");
+                break;
+            }
+            case 0x3A: { /* R_VOLUME_DATA: pairs (unknown, value) per VU strip */
+                printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":\"", slot);
+                for (int i = 5; i <= lastByte; i++) printf("%02x", response[i]);
+                printf("\"}\n");
+                break;
+            }
+            case 0x72: /* R_RESOURCES_USED */
+                printf("{\"type\":\"resources_used\",\"slot\":%u,\"location\":%u}\n",
+                       slot, response[5]);
+                break;
+            case 0x7F: printf("{\"type\":\"ok\",\"slot\":%u}\n", slot); break;
+            case 0x7E: printf("{\"type\":\"error\",\"slot\":%u,\"code\":%u}\n", slot, response[5]); break;
+            default:
+                printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u}\n",
+                       slot, aCmd, subCmd);
+                break;
         }
         fflush(stdout);
     }
