@@ -230,7 +230,7 @@ import ToolBar from "./components/toolbar/ToolBar.vue";
 import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
 
 import { usePatchManager } from "./composables/usePatchManager";
-import { useG2Connection } from "./composables/useG2Connection";
+import { useG2 } from "./composables/useG2";
 import { useCableVisibility } from "./composables/useCableVisibility";
 import { usePatchCategory } from "./composables/usePatchCategory";
 import { useRightPanel } from "./composables/useRightPanel";
@@ -251,7 +251,6 @@ const {
 } = usePatchManager();
 
 const {
-	g2,
 	deviceStatus,
 	statusText,
 	usbLogs,
@@ -260,7 +259,7 @@ const {
 	uploadToG2,
 	downloadFromG2,
 	clearLogs,
-} = useG2Connection();
+} = useG2();
 
 const {
 	cableColors,

@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import { ref, watch, nextTick, computed } from "vue";
-import type { UsbLogEntry, DeviceStatus } from "../composables/useG2Connection";
+import type { UsbLogEntry, DeviceStatus } from "@/composables/useG2";
 
 interface Props {
 	logs: UsbLogEntry[];

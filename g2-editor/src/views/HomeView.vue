@@ -6,7 +6,7 @@
 			<Button @click="handleConnect" :disabled="loading">
 				{{ loading ? "Connecting..." : "Connect to G2" }}
 			</Button>
-			<p v-if="error" class="text-red-400 mt-3">{{ error }}</p>
+			<p v-if="device.status === 'error'" class="text-red-400 mt-3">Connection failed</p>
 		</div>
 
 		<div v-else>
@@ -59,15 +59,19 @@
 </template>
 
 <script setup lang="ts">
-import { onMounted } from "vue";
+import { computed, onMounted } from "vue";
 import Button from "@/components/Button.vue";
 import Card from "@/components/Card.vue";
 import { useG2 } from "@/composables/useG2";
+import { useDeviceStore } from "@/store/device";
 
-const { loading, error, device, connect, fetchSettings } = useG2();
+const device = useDeviceStore();
+const { connectDevice, fetchSettings } = useG2();
+
+const loading = computed(() => device.status === "connecting");
 
 async function handleConnect() {
-	await connect();
+	await connectDevice();
 	if (device.connected) {
 		await fetchSettings();
 	}
