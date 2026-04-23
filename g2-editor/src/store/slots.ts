@@ -48,7 +48,7 @@ export const useSlotsStore = defineStore("slots", {
 				pch2.set(header, 0);
 				pch2.set(sectionBytes, header.length);
 				const { PatchParser } = await import(
-					"../parser/nmg2PatchParser.js"
+					"../parser/nmg2PatchParser"
 				);
 				const patch = new PatchParser(pch2.buffer).parse() as Patch;
 

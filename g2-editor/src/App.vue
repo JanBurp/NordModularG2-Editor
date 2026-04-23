@@ -248,11 +248,8 @@
 	</div>
 </template>
 
-<script setup>
+<script setup lang="ts">
 import { ref, watch } from "vue";
-import "./renderer/nmg2mods.js";
-import "./renderer/parammap.js";
-import "./parser/nmg2PatchParser.js";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
 import SidePanel from "./components/panels/SidePanel.vue";
@@ -267,8 +264,8 @@ import ToolBarDivider from "./components/toolbar/ToolBarDivider.vue";
 
 import { usePatchManager } from "./composables/usePatchManager";
 import { useG2 } from "./composables/useG2";
-import { useDeviceStore } from "./store/device.js";
-import { useSlotsStore } from "./store/slots.js";
+import { useDeviceStore } from "./store/device";
+import { useSlotsStore } from "./store/slots";
 import { useCableVisibility } from "./composables/useCableVisibility";
 import { usePatchCategory } from "./composables/usePatchCategory";
 import { useRightPanel } from "./composables/useRightPanel";

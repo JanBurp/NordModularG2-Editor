@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed } from "vue";
+import { getModule } from "../../renderer/nmg2mods";
 
 const props = defineProps<{
 	type: "graph" | "graphenv";
@@ -33,10 +34,7 @@ const graphPath = computed(() => {
 	// Filter & EQ graphs (graphs without 'f' property but with filter-related parameters)
 	// Look up module definition to get correct parameter indices
 	if (!f && props.type === "graph" && props.moduleId !== undefined) {
-		const modDef =
-			typeof window !== "undefined" && (window as any).modules?.getById
-				? (window as any).modules.getById(props.moduleId)
-				: null;
+		const modDef = getModule(props.moduleId) || null;
 
 		if (modDef?.params) {
 			// Find parameter indices by type/name

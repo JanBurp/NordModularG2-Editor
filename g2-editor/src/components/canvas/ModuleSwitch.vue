@@ -1,15 +1,7 @@
 <script setup lang="ts">
 import { computed } from "vue";
-
-interface ParamMap {
-	names?: string[];
-	width?: number;
-	mode?: string;
-	rows?: number;
-	bmp?: string;
-	low?: number;
-	high?: number;
-}
+import { getParam } from "../../renderer/parammap";
+import type { ParamDefinition } from "../../types";
 
 const props = defineProps<{
 	x: number;
@@ -23,11 +15,8 @@ const emit = defineEmits<{
 	change: [index: number, value: number];
 }>();
 
-const paramMap = computed<ParamMap>(() => {
-	if (typeof window !== "undefined" && (window as any).parammap) {
-		return (window as any).parammap[props.paramType] || {};
-	}
-	return {};
+const paramMap = computed<ParamDefinition>(() => {
+	return getParam(props.paramType) || {};
 });
 
 const names = computed(() => paramMap.value.names || []);

@@ -8,6 +8,37 @@ import ModuleJack from "./ModuleJack.vue";
 import ModuleGraph from "./ModuleGraph.vue";
 import SvgGradientDefs from "./SvgGradientDefs.vue";
 import { MODULE_COLORS } from "../../constants";
+import { getModule } from "../../renderer/nmg2mods";
+import {
+	getParam,
+	adsrT,
+	adsrL,
+	lfoP,
+	rateBPM,
+	rateLo,
+	OscFreq,
+	filterFreq,
+	filterFreq1,
+	filterFreq2,
+} from "../../renderer/parammap";
+
+const paramFormattingFunctions: Record<string, (i: number) => string> = {
+	adsrT,
+	adsrL,
+	lfoP,
+	rateBPM,
+	filterFreq,
+	filterFreq1,
+	filterFreq2,
+};
+
+const paramFormattingFunctionsWithArgs: Record<
+	string,
+	(i: number, con: unknown, tw: unknown) => string | undefined
+> = {
+	OscFreq,
+	rateLo,
+};
 
 interface ModuleInstance {
 	horiz?: number;
@@ -69,19 +100,14 @@ interface ModuleOutput {
 
 interface ModuleDefinition {
 	id: number;
-	shortnm: string;
-	longnm: string;
+	short: string;
+	long: string;
 	height: number;
 	inputs?: ModuleInput[];
 	outputs?: ModuleOutput[];
 	params?: ModuleParam[];
 	modes?: ModuleMode[];
 	ve?: VisualElement[];
-}
-
-interface ParamMap {
-	def?: number;
-	names?: string[];
 }
 
 const props = defineProps<{
@@ -96,10 +122,7 @@ const emit = defineEmits<{
 const instance = computed(() => props.instance || { colour: 0 });
 
 const moduleDef = computed<ModuleDefinition | null>(() => {
-	if (typeof window !== "undefined" && (window as any).modules?.getById) {
-		return (window as any).modules.getById(props.type);
-	}
-	return null;
+	return getModule(props.type) || null;
 });
 
 const x = computed(() => (instance.value.horiz || 0) * 256);
@@ -119,11 +142,8 @@ watch(
 			// Initialize with defaults
 			localLv.value =
 				moduleDef.value?.params?.map((param) => {
-					if (typeof window !== "undefined") {
-						const p = (window as any).parammap?.[param.type] as ParamMap;
-						return p?.def ?? 64;
-					}
-					return 64;
+					const p = getParam(param.type);
+					return p?.def ?? 64;
 				}) || [];
 		}
 	},
@@ -135,7 +155,7 @@ const moduleColor = computed(
 );
 
 const displayName = computed(() => {
-	return instance.value.uname || moduleDef.value?.shortnm || "Module";
+	return instance.value.uname || moduleDef.value?.short || "Module";
 });
 
 const height = computed(() => {
@@ -166,8 +186,8 @@ function getParamValue(index: number): number {
 	}
 	// Return default from paramMap
 	const param = moduleDef.value?.params?.[index];
-	if (param && typeof window !== "undefined") {
-		const p = (window as any).parammap?.[param.type] as ParamMap;
+	if (param) {
+		const p = getParam(param.type);
 		return p?.def ?? 64;
 	}
 	return 64;
@@ -192,14 +212,13 @@ function getModeValue(index: number): number {
 
 // Format value for display
 function formatValue(value: number, paramType: string): string {
-	if (typeof window === "undefined") return String(value);
-	const p = (window as any).parammap?.[paramType];
+	const p = getParam(paramType);
 	if (!p) return String(value);
 
 	// Use formatting function if available
-	if (p.f && typeof window[p.f] === "function") {
+	if (p.f && paramFormattingFunctions[p.f]) {
 		try {
-			return window[p.f](value) || String(value);
+			return paramFormattingFunctions[p.f](value) || String(value);
 		} catch {
 			return String(value);
 		}
@@ -210,28 +229,26 @@ function formatValue(value: number, paramType: string): string {
 
 // Format combined value from multiple parameters (for freq displays)
 function formatCombinedValue(refIndices: number[], funcName?: string): string {
-	if (typeof window === "undefined") return "";
-
 	// Get the first parameter's type for the formatting function
 	const firstParam = moduleDef.value?.params?.[refIndices[0]];
 	if (!firstParam) return "";
 
-	const p = (window as any).parammap?.[firstParam.type];
+	const p = getParam(firstParam.type);
 	if (!p) return "";
 
 	// Use explicit func name or the param type's formatting function
 	const formatFunc = funcName || p.f;
 
-	if (formatFunc && typeof (window as any)[formatFunc] === "function") {
+	if (formatFunc && paramFormattingFunctionsWithArgs[formatFunc]) {
 		try {
 			// Build controls array - all params need .l property with their value
-			const controls: { l: number; p: any }[] = [];
+			const controls: { l: number; p: unknown }[] = [];
 
 			// Populate controls for all module params (formatters may reference any param)
 			moduleDef.value?.params?.forEach((param, idx) => {
 				controls[idx] = {
 					l: getParamValue(idx),
-					p: (window as any).parammap?.[param.type],
+					p: getParam(param.type),
 				};
 			});
 
@@ -242,7 +259,11 @@ function formatCombinedValue(refIndices: number[], funcName?: string): string {
 			};
 
 			// Call formatter - first arg is ignored (index), second is controls array, third is tw
-			const result = (window as any)[formatFunc](0, controls, tw);
+			const result = paramFormattingFunctionsWithArgs[formatFunc](
+				0,
+				controls,
+				tw,
+			);
 
 			if (result && result !== "undefined") {
 				return result;

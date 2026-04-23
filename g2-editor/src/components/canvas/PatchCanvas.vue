@@ -1,6 +1,7 @@
-<script setup>
+<script setup lang="ts">
 import { ref, onMounted, watch, nextTick, computed } from "vue";
 import { makePatchCables, removeAllCables } from "../../renderer/cableRenderer";
+import { getModule } from "../../renderer/nmg2mods";
 import "../../renderer/svgStyles.css";
 import Module from "./Module.vue";
 import { CABLE_COLOR_INDEX_MAP } from "../../constants";
@@ -50,7 +51,7 @@ const canvasWidth = computed(() => {
 	if (props.modules.length === 0) return 1280;
 	let maxX = 0;
 	props.modules.forEach((m) => {
-		const modDef = window.modules?.getById(m.type);
+		const modDef = getModule(m.type);
 		const modHeight = modDef?.height || 2;
 		const mx = (m.horiz + 1) * 256;
 		if (mx > maxX) maxX = mx;
@@ -62,7 +63,7 @@ const canvasHeight = computed(() => {
 	if (props.modules.length === 0) return 600;
 	let maxY = 0;
 	props.modules.forEach((m) => {
-		const modDef = window.modules?.getById(m.type);
+		const modDef = getModule(m.type);
 		const modHeight = modDef?.height || 2;
 		const my = (m.vert + modHeight) * 16;
 		if (my > maxY) maxY = my;

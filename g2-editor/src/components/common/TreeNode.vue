@@ -1,4 +1,4 @@
-<script setup>
+<script setup lang="ts">
 const props = defineProps({
 	node: { required: true },
 	depth: { type: Number, default: 0 },

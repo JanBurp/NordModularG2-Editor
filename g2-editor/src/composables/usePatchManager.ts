@@ -103,7 +103,7 @@ export function usePatchManager() {
 			if (!buffer || !(buffer instanceof ArrayBuffer)) return;
 
 			// Dynamic import to avoid circular dependencies
-			import("../parser/nmg2PatchParser.js").then(({ PatchParser }) => {
+			import("../parser/nmg2PatchParser").then(({ PatchParser }) => {
 				const parser = new PatchParser(buffer);
 				const parsedPatch = parser.parse() as Patch;
 				patch.value = parsedPatch;
@@ -129,7 +129,7 @@ export function usePatchManager() {
 			const result = await window.electronAPI.patches.load(filename);
 			if (result.success && result.data) {
 				const buffer = new Uint8Array(result.data).buffer;
-				const { PatchParser } = await import("../parser/nmg2PatchParser.js");
+				const { PatchParser } = await import("../parser/nmg2PatchParser");
 				const parser = new PatchParser(buffer);
 				const parsedPatch = parser.parse() as Patch;
 				patch.value = parsedPatch;
