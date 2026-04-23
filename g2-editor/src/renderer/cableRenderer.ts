@@ -7,6 +7,7 @@
 import { Patchcord } from "./patchcord";
 import { svgPath, svgGroup } from "./svgUtils";
 import { CABLE_SVG_COLORS } from "../constants";
+import { getModule } from "./nmg2mods";
 
 /**
  * Represents a cable connection
@@ -89,10 +90,10 @@ export function makePatchCables(
 		}
 
 		// Look up module definitions to get inputs/outputs
-		const smodDef = (window as any).modules?.getById(smod.type) as
+		const smodDef = getModule(smod.type) as
 			| ModuleDef
 			| undefined;
-		const dmodDef = (window as any).modules?.getById(dmod.type) as
+		const dmodDef = getModule(dmod.type) as
 			| ModuleDef
 			| undefined;
 

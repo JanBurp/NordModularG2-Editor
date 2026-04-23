@@ -250,7 +250,6 @@
 
 <script setup>
 import { ref, watch } from "vue";
-import "./parser/nmg2PatchParser.js";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
 import SidePanel from "./components/panels/SidePanel.vue";
