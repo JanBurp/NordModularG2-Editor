@@ -19,6 +19,13 @@ extern void test_integration_get_patch_slot_a(void);
 extern void test_integration_list_all(void);
 extern void test_integration_select_slot_a(void);
 
+extern void test_slot_then_get_patch_no_delay(void);
+extern void test_slot_cycle_with_get_patch(void);
+extern void test_variation_cycle_slot_a(void);
+extern void test_repeated_slot_cycle(void);
+extern void test_interleaved_slot_variation(void);
+extern void test_drain_count_logged(void);
+
 static int suppress_stdout(void) {
     fflush(stdout);
     int fd = dup(STDOUT_FILENO);
@@ -54,6 +61,13 @@ int main(void) {
     run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
     run_test_silently("test_integration_list_all", test_integration_list_all);
     run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
+
+    run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
+    run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
+    run_test_silently("test_variation_cycle_slot_a", test_variation_cycle_slot_a);
+    run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
+    run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
+    run_test_silently("test_drain_count_logged", test_drain_count_logged);
 
     return UNITY_END();
 }

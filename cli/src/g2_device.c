@@ -698,6 +698,22 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
     actual_slot = slot;
 
+    /* Flush any stale G2 data left in the USB FIFO from a previous command */
+    {
+        uint8_t stale[16]; int n, stale_count = 0;
+        while ((n = recv_interrupt(stale, sizeof(stale), 20)) > 0) {
+            stale_count++;
+            fprintf(stderr, "[get-patch] stale #%d:", stale_count);
+            for (int i = 0; i < n && i < 8; i++) fprintf(stderr, " %02x", stale[i]);
+            fprintf(stderr, "\n");
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
+        if (stale_count) fprintf(stderr, "[get-patch] flushed %d stale msg(s)\n", stale_count);
+    }
+
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
@@ -988,10 +1004,14 @@ cleanup:
 
 /* Drain any pending interrupt+bulk messages left in USB buffers after a command
  * that triggers a burst of unsolicited G2 notifications (e.g. slot change). */
-static void g2_drain_pending(void) {
+static int g2_drain_pending(void) {
     uint8_t response[16];
-    int ret;
+    int ret, count = 0;
     while ((ret = recv_interrupt(response, sizeof(response), 50)) > 0) {
+        count++;
+        fprintf(stderr, "[drain #%d] type=%02x", count, response[0] & 0x0f);
+        for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
+        fprintf(stderr, "\n");
         if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)response[1] << 8) | response[2];
             if (size > 0) {
@@ -1000,6 +1020,8 @@ static void g2_drain_pending(void) {
             }
         }
     }
+    if (count) fprintf(stderr, "[drain] total: %d msg(s)\n", count);
+    return count;
 }
 
 int g2_select_slot(const char *slot_str) {
@@ -1032,7 +1054,7 @@ int g2_select_slot(const char *slot_str) {
         send_system_data(0x41, stop_cmd, 2);
         recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     }
-    g2_drain_pending();
+    { int n = g2_drain_pending(); fprintf(stderr, "[slot] pre-drain: %d msg(s)\n", n); }
 
     mask = 0x08 >> slot;
     data[0] = 0x07;
@@ -1054,7 +1076,7 @@ int g2_select_slot(const char *slot_str) {
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
     /* Drain the slot-change notification burst the G2 sends after the switch. */
-    g2_drain_pending();
+    { int n = g2_drain_pending(); fprintf(stderr, "[slot] post-drain: %d msg(s)\n", n); }
 
     return G2_OK;
 }
