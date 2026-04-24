@@ -124,6 +124,15 @@ ipcMain.handle("cli:run", async (_, args: string[]) => {
 ipcMain.on("cli:watch-start", () => startWatch());
 ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
 
+app.on("before-quit", (e) => {
+	e.preventDefault();
+	(async () => {
+		await stopWatchAndWait();
+		try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
+		app.exit(0);
+	})();
+});
+
 app.whenReady().then(async () => {
 	if (VITE_DEV_SERVER_URL) {
 		try {
