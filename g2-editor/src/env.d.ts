@@ -9,6 +9,7 @@ declare module "*.vue" {
 interface Window {
 	cli: {
 		run: (args: string[]) => Promise<string>;
+		runBatch: (argsList: string[][]) => Promise<string[]>;
 		watchStart: () => void;
 		watchStop: () => void;
 		onWatchEvent: (cb: (line: string) => void) => void;

@@ -2,6 +2,7 @@ import { contextBridge, ipcRenderer } from "electron";
 
 contextBridge.exposeInMainWorld("cli", {
 	run: (args: string[]) => ipcRenderer.invoke("cli:run", args),
+	runBatch: (argsList: string[][]) => ipcRenderer.invoke("cli:run-batch", argsList),
 	watchStart: () => ipcRenderer.send("cli:watch-start"),
 	watchStop: () => ipcRenderer.send("cli:watch-stop"),
 	onWatchEvent: (cb: (line: string) => void) =>

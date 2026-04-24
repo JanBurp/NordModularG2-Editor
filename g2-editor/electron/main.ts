@@ -121,6 +121,20 @@ ipcMain.handle("cli:run", async (_, args: string[]) => {
 	}
 });
 
+ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
+	const wasWatching = !!watchProcess;
+	if (wasWatching) await stopWatchAndWait();
+	try {
+		const results: string[] = [];
+		for (const args of argsList) {
+			results.push(await runCliRaw(args));
+		}
+		return results;
+	} finally {
+		if (wasWatching) startWatch();
+	}
+});
+
 ipcMain.on("cli:watch-start", () => startWatch());
 ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
 

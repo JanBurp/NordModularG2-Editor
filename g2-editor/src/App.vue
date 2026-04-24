@@ -18,7 +18,7 @@
 						{ label: 'D', value: 3 },
 					]"
 					variant="toggle"
-					@update:model-value="handleSlotSelect"
+					@update:model-value="handleSlotClick"
 				/>
 			</template>
 
@@ -141,6 +141,7 @@
 						{ label: '8', value: 7 },
 					]"
 					variant="variation"
+					@update:model-value="handleVariationClick"
 				/>
 			</div>
 
@@ -289,13 +290,28 @@ const {
 	setPatch,
 } = usePatchManager();
 
-const SLOT_LABELS = ["A", "B", "C", "D"];
-const selectedSlotIndex = ref(null);
+const SLOT_LABELS = ["A", "B", "C", "D"] as const;
+const selectedSlotIndex = ref<number | null>(null);
 
-async function handleSlotSelect(index) {
+function applySlotResult(result: { patch: any; name: string } | null) {
+	if (!result?.patch) return;
+	setPatch(result.patch, result.name);
+	variation.value = result.patch.description?.variation ?? 0;
+}
+
+async function loadSlotPatch(index: number) {
 	const slot = SLOT_LABELS[index];
-	const result = await slotsStore.loadSlot(slot);
-	if (result?.patch) setPatch(result.patch, result.name);
+	applySlotResult(await slotsStore.loadSlot(slot));
+}
+
+async function handleSlotClick(index: number) {
+	selectedSlotIndex.value = index;
+	const slot = SLOT_LABELS[index];
+	applySlotResult(await slotsStore.selectSlot(slot));
+}
+
+async function handleVariationClick(variationIndex: number) {
+	await slotsStore.selectVariation(variationIndex);
 }
 
 const {
@@ -337,7 +353,7 @@ onMounted(async () => {
 	const idx = ["A", "B", "C", "D"].indexOf(focusLabel);
 	if (idx >= 0) {
 		selectedSlotIndex.value = idx;
-		await handleSlotSelect(idx);
+		await loadSlotPatch(idx);
 	}
 });
 

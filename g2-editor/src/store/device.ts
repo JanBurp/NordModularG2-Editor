@@ -66,5 +66,13 @@ export const useDeviceStore = defineStore("device", {
 			this.device = JSON.parse(output) as Device;
 			this.deviceName = this.device.synthName;
 		},
+
+		setActiveSlot(slot: string) {
+			if (!this.device) return;
+			const lower = slot.toLowerCase();
+			for (const s of this.device.slots) {
+				s.active = s.slot === lower;
+			}
+		},
 	},
 });
