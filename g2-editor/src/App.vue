@@ -249,7 +249,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch } from "vue";
+import { ref, watch, onMounted } from "vue";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
 import SidePanel from "./components/panels/SidePanel.vue";
@@ -325,6 +325,21 @@ const { selectedCategory } = usePatchCategory(patch);
 
 const { rightPaneTab, showRightPane, toggleSidebar, handleToggleOff } =
 	useRightPanel();
+
+onMounted(async () => {
+	await connectDevice();
+	if (device.status !== "connected") return;
+	const focusLabel = (
+		device.device?.patches?.focus ??
+		device.device?.performance?.focus ??
+		"a"
+	).toUpperCase();
+	const idx = ["A", "B", "C", "D"].indexOf(focusLabel);
+	if (idx >= 0) {
+		selectedSlotIndex.value = idx;
+		await handleSlotSelect(idx);
+	}
+});
 
 watch(
 	() => patch.value?.description,
