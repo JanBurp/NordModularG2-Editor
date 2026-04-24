@@ -86,7 +86,7 @@ int g2_select_slot(const char *slot_str);
 int g2_select_variation(int variation, int slot);
 
 /* Watch for param changes (simple single-threaded approach) */
-int g2_watch(output_format_t format);
+int g2_watch(output_format_t format, int debug);
 volatile extern int g2_watch_running;
 void g2_watch_stop(int sig);
 

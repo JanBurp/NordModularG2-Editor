@@ -12,6 +12,7 @@ export interface UsbLogEntry {
 	direction: "→" | "←" | "•";
 	event: string;
 	message: string;
+	category?: "param" | "led_volume" | "unknown" | "raw";
 }
 
 let logId = 0;
@@ -35,8 +36,9 @@ export function useG2() {
 		direction: "→" | "←" | "•",
 		event: string,
 		message: string,
+		category?: UsbLogEntry["category"],
 	): void {
-		logs.value.push({ id: ++logId, timestamp: now(), direction, event, message });
+		logs.value.push({ id: ++logId, timestamp: now(), direction, event, message, category });
 	}
 
 	function clearLogs(): void {
@@ -65,16 +67,31 @@ export function useG2() {
 		}
 	});
 
+	function formatWatchEvent(ev: any): string {
+		switch (ev.type) {
+			case "param_change":  return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
+			case "patch_param":   return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
+			case "led_data":      return `led slot=${ev.slot}`;
+			case "volume_data":   return `vol slot=${ev.slot}`;
+			case "slot_change":   return `slot → ${ev.slot}`;
+			case "perf_name":     return `perf: ${ev.name}`;
+			case "raw_interrupt": return `intr: ${ev.hex}`;
+			case "raw_bulk":      return `bulk[${ev.size}]: ${ev.hex}`;
+			default:              return ev.type ?? "(unknown)";
+		}
+	}
+
 	function startWatch(): void {
 		window.cli.offWatchEvent();
 		window.cli.onWatchEvent((line: string) => {
 			try {
-				const evt = JSON.parse(line);
-				if (evt.type === "param_change") {
-					log("←", "Watch", `param loc=${evt.location} idx=${evt.index} param=${evt.param} val=${evt.value} var=${evt.variation}`);
-				} else {
-					log("←", "Watch", `${evt.type} cmd=${evt.cmd} sub=${evt.sub}`);
-				}
+				const ev = JSON.parse(line);
+				const category: UsbLogEntry["category"] =
+					ev.type === "param_change" || ev.type === "patch_param" ? "param" :
+					ev.type === "led_data"     || ev.type === "volume_data"  ? "led_volume" :
+					ev.type === "raw_interrupt" || ev.type === "raw_bulk"    ? "raw" :
+					ev.type?.startsWith("unknown") ? "unknown" : undefined;
+				log("←", "Watch", formatWatchEvent(ev), category);
 			} catch {
 				log("←", "Watch", line);
 			}

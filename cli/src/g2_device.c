@@ -1370,7 +1370,7 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
     return 0;
 }
 
-int g2_watch(output_format_t format) {
+int g2_watch(output_format_t format, int debug) {
     uint8_t response[16] = {0};
     int ret;
     (void)format;
@@ -1402,9 +1402,11 @@ int g2_watch(output_format_t format) {
         ret = recv_interrupt(response, sizeof(response), 100);
         if (ret <= 0) continue;
 
-        fprintf(stderr, "watch: msg");
-        for (int i = 0; i < ret; i++) fprintf(stderr, " %02x", response[i]);
-        fprintf(stderr, "\n");
+        if (debug) {
+            printf("{\"type\":\"raw_interrupt\",\"hex\":\"");
+            for (int i = 0; i < ret; i++) { if (i) printf(" "); printf("%02x", response[i]); }
+            printf("\"}\n"); fflush(stdout);
+        }
 
         uint8_t msgType = response[0] & 0x0f;
 
@@ -1421,9 +1423,11 @@ int g2_watch(output_format_t format) {
                 if (bulk) {
                     int bret = recv_bulk(bulk, bulkSize);
                     if (bret > 0) {
-                        fprintf(stderr, "watch: bulk[%d]:", bret);
-                        for (int i = 0; i < bret && i < 16; i++) fprintf(stderr, " %02x", bulk[i]);
-                        fprintf(stderr, "\n");
+                        if (debug) {
+                            printf("{\"type\":\"raw_bulk\",\"size\":%d,\"hex\":\"", bret);
+                            for (int i = 0; i < bret; i++) { if (i) printf(" "); printf("%02x", bulk[i]); }
+                            printf("\"}\n"); fflush(stdout);
+                        }
                         if (process_bulk_event(bulk, bret) & BULK_REARM) {
                             /* G2 stops unsolicited data after full performance switch;
                              * re-arm it (Delphi does the same via SynthStartStopCommunication) */

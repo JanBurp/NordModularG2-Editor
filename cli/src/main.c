@@ -254,7 +254,7 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(command, "watch") == 0) {
-        return g2_watch(output_format);
+        return g2_watch(output_format, debug_mode);
     }
 
     if (output_format == OUTPUT_JSON) {

@@ -17,6 +17,21 @@ const emit = defineEmits<{
 
 const logContainer = ref<HTMLElement | null>(null);
 
+const hideParam     = ref(false);
+const hideLedVolume = ref(false);
+const hideUnknown   = ref(false);
+const hideRaw       = ref(true);
+
+const filteredLogs = computed(() =>
+	props.logs.filter((e) => {
+		if (hideParam.value     && e.category === "param")      return false;
+		if (hideLedVolume.value && e.category === "led_volume") return false;
+		if (hideUnknown.value   && e.category === "unknown")    return false;
+		if (hideRaw.value       && e.category === "raw")        return false;
+		return true;
+	}),
+);
+
 watch(
 	() => props.logs.length,
 	async () => {
@@ -103,10 +118,32 @@ function handleClearLogs() {
 			</button>
 		</div>
 
-		<div class="flex justify-between items-center px-1">
-			<span class="text-xs font-medium text-neutral-500">Log:</span>
+		<div class="flex justify-between items-center px-1 gap-2">
+			<span class="text-xs font-medium text-neutral-500 flex-shrink-0">Log:</span>
+			<div class="flex items-center gap-1 flex-wrap">
+				<button
+					@click="hideParam = !hideParam"
+					class="px-2 py-0.5 text-xs rounded border cursor-pointer transition-all"
+					:class="hideParam ? 'bg-transparent text-neutral-600 border-neutral-800' : 'bg-neutral-800 text-neutral-300 border-neutral-600'"
+				>params</button>
+				<button
+					@click="hideLedVolume = !hideLedVolume"
+					class="px-2 py-0.5 text-xs rounded border cursor-pointer transition-all"
+					:class="hideLedVolume ? 'bg-transparent text-neutral-600 border-neutral-800' : 'bg-neutral-800 text-neutral-300 border-neutral-600'"
+				>led/vol</button>
+				<button
+					@click="hideUnknown = !hideUnknown"
+					class="px-2 py-0.5 text-xs rounded border cursor-pointer transition-all"
+					:class="hideUnknown ? 'bg-transparent text-neutral-600 border-neutral-800' : 'bg-neutral-800 text-neutral-300 border-neutral-600'"
+				>unknown</button>
+				<button
+					@click="hideRaw = !hideRaw"
+					class="px-2 py-0.5 text-xs rounded border cursor-pointer transition-all"
+					:class="hideRaw ? 'bg-transparent text-neutral-600 border-neutral-800' : 'bg-neutral-800 text-neutral-300 border-neutral-600'"
+				>raw</button>
+			</div>
 			<button
-				class="px-2 py-0.5 text-xs bg-transparent text-neutral-500 border border-neutral-700 rounded cursor-pointer hover:bg-neutral-800 hover:text-neutral-200 transition-all"
+				class="px-2 py-0.5 text-xs bg-transparent text-neutral-500 border border-neutral-700 rounded cursor-pointer hover:bg-neutral-800 hover:text-neutral-200 transition-all flex-shrink-0"
 				@click="handleClearLogs"
 			>
 				Clear
@@ -117,11 +154,11 @@ function handleClearLogs() {
 			ref="logContainer"
 			class="flex-1 overflow-y-auto bg-neutral-950 rounded p-2 font-mono text-xs"
 		>
-			<div v-if="logs.length === 0" class="text-neutral-600 text-center py-12">
+			<div v-if="filteredLogs.length === 0" class="text-neutral-600 text-center py-12">
 				No USB activity yet
 			</div>
 			<div
-				v-for="entry in logs"
+				v-for="entry in filteredLogs"
 				:key="entry.id"
 				class="py-1 border-b border-neutral-900 last:border-b-0"
 			>
