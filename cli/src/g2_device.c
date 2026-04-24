@@ -323,7 +323,10 @@ static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms
     int transferred = 0;
     int ret;
     for (int i = 0; i < retries; i++) {
-        ret = libusb_interrupt_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, response, size, &transferred, timeout_ms);
+        /* Use bulk_transfer even on the interrupt endpoint: g2_recv_response does
+         * the same and libusb_interrupt_transfer on macOS can ignore timeouts
+         * after many rapid transfers, causing the watch loop to hang. */
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, response, size, &transferred, timeout_ms);
         if (ret == 0 && transferred > 0) {
             return transferred;
         }
@@ -1020,6 +1023,17 @@ int g2_select_slot(const char *slot_str) {
 
     version = get_version_for_slot(slot);
 
+    /* get_version_for_slot sends START_COMM which arms the G2 to stream
+     * LED/volume data.  Silence it NOW before the slot commands so that
+     * unsolicited data can't interleave with the command responses — that
+     * interleaving is what caused the growing queue and eventual send failure. */
+    {
+        uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
+        send_system_data(0x41, stop_cmd, 2);
+        recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    }
+    g2_drain_pending();
+
     mask = 0x08 >> slot;
     data[0] = 0x07;
     data[1] = mask;
@@ -1039,9 +1053,7 @@ int g2_select_slot(const char *slot_str) {
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    /* Drain the burst of unsolicited notifications (slot_change, version_update,
-     * resources_used, etc.) the G2 sends after a slot switch so the next CLI
-     * command doesn't read stale messages. */
+    /* Drain the slot-change notification burst the G2 sends after the switch. */
     g2_drain_pending();
 
     return G2_OK;
