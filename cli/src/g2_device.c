@@ -983,6 +983,22 @@ cleanup:
     return NULL;
 }
 
+/* Drain any pending interrupt+bulk messages left in USB buffers after a command
+ * that triggers a burst of unsolicited G2 notifications (e.g. slot change). */
+static void g2_drain_pending(void) {
+    uint8_t response[16];
+    int ret;
+    while ((ret = recv_interrupt(response, sizeof(response), 50)) > 0) {
+        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t size = ((uint16_t)response[1] << 8) | response[2];
+            if (size > 0) {
+                uint8_t *bulk = malloc(size);
+                if (bulk) { recv_bulk(bulk, size); free(bulk); }
+            }
+        }
+    }
+}
+
 int g2_select_slot(const char *slot_str) {
     int slot;
     uint8_t response[16] = {0};
@@ -1022,6 +1038,11 @@ int g2_select_slot(const char *slot_str) {
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+
+    /* Drain the burst of unsolicited notifications (slot_change, version_update,
+     * resources_used, etc.) the G2 sends after a slot switch so the next CLI
+     * command doesn't read stale messages. */
+    g2_drain_pending();
 
     return G2_OK;
 }
@@ -1286,6 +1307,57 @@ void g2_watch_stop(int sig) {
 }
 
 
+#define BULK_REARM 1  /* caller should re-send START_COMM */
+
+/* Returns BULK_REARM if the G2 will stop sending after this message. */
+static int process_bulk_event(const uint8_t *bulk, int bret) {
+    if (bret <= 6) return 0;
+    uint8_t baCmd    = bulk[1];
+    uint8_t bversion = bulk[2];
+    uint8_t bsubCmd  = bulk[3];
+    int dataEnd      = bret - 2;
+
+    if (baCmd == 0x04 && bversion == 0x40 && bsubCmd == 0x1f) {
+        /* All-slots version update — sent as the final message of a full
+         * performance switch.  The G2 stops sending after this until
+         * START_COMM is re-sent. */
+        printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+        fflush(stdout);
+        return BULK_REARM;
+    }
+
+    if (baCmd == 0x04) {
+        if (bsubCmd == 0x29) {
+            char name[17] = {0};
+            int n = 0;
+            for (int i = 4; i < dataEnd && n < 16 && bulk[i]; i++)
+                name[n++] = (char)bulk[i];
+            printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
+            fflush(stdout);
+        } else if (bsubCmd == 0x11) {
+            printf("{\"type\":\"perf_settings\"}\n");
+            fflush(stdout);
+        }
+    } else if (baCmd <= 0x03) {
+        uint8_t bslot = baCmd;
+        switch (bsubCmd) {
+            case 0x39:
+                printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
+            case 0x3A:
+                printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
+            case 0x72:
+                printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
+        }
+    }
+    return 0;
+}
+
 int g2_watch(output_format_t format) {
     uint8_t response[16] = {0};
     int ret;
@@ -1324,7 +1396,12 @@ int g2_watch(output_format_t format) {
 
         uint8_t msgType = response[0] & 0x0f;
 
-        /* Extended message: G2 has bulk data pending — drain it or it blocks notifications */
+        /* Extended message: G2 has bulk data pending — drain it or it blocks notifications.
+         * Bulk payload format:
+         *   [0]=0x01  [1]=aCmd (0=slotA,1=B,2=C,3=D,4=perf,0x0C=sys)
+         *   [2]=version  [3]=subCmd  [4..end-3]=data  [end-2..end-1]=CRC
+         * LED (0x39): 1 unknown prefix byte, then 4 LEDs/byte (2-bit), FX then VA.
+         * Volume (0x3A): pairs (unknown, value) per strip, FX then VA. */
         if (msgType == RESPONSE_TYPE_EXTENDED) {
             uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
             if (bulkSize > 0) {
@@ -1335,70 +1412,11 @@ int g2_watch(output_format_t format) {
                         fprintf(stderr, "watch: bulk[%d]:", bret);
                         for (int i = 0; i < bret && i < 16; i++) fprintf(stderr, " %02x", bulk[i]);
                         fprintf(stderr, "\n");
-
-                        /*
-                         * Bulk payload format (confirmed):
-                         *   [0] = 0x01 (type marker)
-                         *   [1] = aCmd: 0x00=slot A, 0x01=slot B, 0x02=C, 0x03=D,
-                         *               0x04=perf, 0x0C=sys
-                         *   [2] = version
-                         *   [3] = subCmd
-                         *   [4..end-3] = data
-                         *   [end-2..end-1] = CRC (stripped)
-                         *
-                         * LED data (0x39): 1 unknown prefix byte, then LEDs packed
-                         *   4 per byte (2-bit each), FX LedList first then VA LedList.
-                         * Volume data (0x3A): pairs (unknown, value) per LedStrip,
-                         *   FX LedStripList first then VA LedStripList.
-                         */
-                        if (bret > 6) {
-                            uint8_t baCmd   = bulk[1];
-                            uint8_t bsubCmd = bulk[3];
-                            int dataEnd     = bret - 2;
-
-                            if (baCmd == 0x04) {
-                                /* Performance-level bulk messages */
-                                if (bsubCmd == 0x29) {
-                                    char name[17] = {0};
-                                    int n = 0;
-                                    for (int i = 4; i < dataEnd && n < 16 && bulk[i]; i++)
-                                        name[n++] = (char)bulk[i];
-                                    printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
-                                    fflush(stdout);
-                                }
-                            } else if (baCmd <= 0x03) {
-                                /* Slot-level bulk messages */
-                                uint8_t bslot = baCmd;
-                                switch (bsubCmd) {
-                                    case 0x39:
-                                        printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
-                                        for (int i = 4; i < dataEnd; i++) {
-                                            if (i > 4) printf(",");
-                                            printf("%u", bulk[i]);
-                                        }
-                                        printf("]}\n");
-                                        fflush(stdout);
-                                        break;
-                                    case 0x3A:
-                                        printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
-                                        for (int i = 4; i < dataEnd; i++) {
-                                            if (i > 4) printf(",");
-                                            printf("%u", bulk[i]);
-                                        }
-                                        printf("]}\n");
-                                        fflush(stdout);
-                                        break;
-                                    case 0x72:
-                                        printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
-                                        for (int i = 4; i < dataEnd; i++) {
-                                            if (i > 4) printf(",");
-                                            printf("%u", bulk[i]);
-                                        }
-                                        printf("]}\n");
-                                        fflush(stdout);
-                                        break;
-                                }
-                            }
+                        if (process_bulk_event(bulk, bret) & BULK_REARM) {
+                            /* G2 stops unsolicited data after full performance switch;
+                             * re-arm it (Delphi does the same via SynthStartStopCommunication) */
+                            uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
+                            send_system_data(0x41, arm, 2);
                         }
                     }
                     free(bulk);
