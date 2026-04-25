@@ -20,6 +20,8 @@ extern void test_integration_list_all(void);
 extern void test_integration_select_slot_a(void);
 extern void test_startup_sequence(void);
 extern void test_fullstack_with_watch(void);
+extern void test_watch_then_slot_then_watch(void);
+extern void test_slot_cycle_interspersed_watch(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -84,6 +86,12 @@ int main(void) {
 
     /* Full real-life scenario: startup sequence + 30 s of live JSON watch output. */
     run_test_with_output("test_fullstack_with_watch", test_fullstack_with_watch);
+
+    /* Slot switch between two watch sessions (10 s each). */
+    run_test_with_output("test_watch_then_slot_then_watch", test_watch_then_slot_then_watch);
+
+    /* A/B/C/D slot cycle with 8 s watch after each switch. */
+    run_test_with_output("test_slot_cycle_interspersed_watch", test_slot_cycle_interspersed_watch);
 
     return UNITY_END();
 }

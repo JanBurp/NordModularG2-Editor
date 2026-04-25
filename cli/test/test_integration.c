@@ -99,6 +99,60 @@ void test_startup_sequence(void) {
     g2_disconnect();
 }
 
+/* Run g2_watch for exactly n seconds then stop. */
+static void watch_for(int seconds) {
+    g2_watch_running = 1;
+    signal(SIGALRM, g2_watch_stop);
+    alarm(seconds);
+    g2_watch(OUTPUT_DEFAULT, 0);
+    alarm(0);
+}
+
+/*
+ * Startup → 10 s watch on slot A → switch to slot B → 10 s watch on slot B.
+ * Verifies that g2_watch (which ends with STOP_COMM) leaves the G2 in a
+ * state where normal commands still work and watch can be restarted.
+ */
+void test_watch_then_slot_then_watch(void) {
+    ensure_connected();
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    cJSON *info = g2_device_info(0);
+    TEST_ASSERT_NOT_NULL(info);
+    output_json(info, OUTPUT_DEFAULT);
+    cJSON_Delete(info);
+
+    fprintf(stderr, "watch: slot A, 10 s\n");
+    watch_for(10);
+
+    fprintf(stderr, "switching to slot B\n");
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_select_slot("B"));
+
+    fprintf(stderr, "watch: slot B, 10 s\n");
+    watch_for(10);
+
+    g2_disconnect();
+}
+
+/*
+ * Cycle through all four slots, running an 8 s watch after each switch.
+ * Each switch issues STOP_COMM internally; each watch re-arms START_COMM.
+ * Total ~32 s of live JSON output, one watch session per slot.
+ */
+void test_slot_cycle_interspersed_watch(void) {
+    ensure_connected();
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    const char *slots[] = {"A", "B", "C", "D"};
+    for (int i = 0; i < 4; i++) {
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, g2_select_slot(slots[i]), slots[i]);
+        fprintf(stderr, "watch: slot %s, 8 s\n", slots[i]);
+        watch_for(8);
+    }
+
+    g2_disconnect();
+}
+
 /*
  * Full real-life scenario with JSON output to stdout:
  *   Same startup sequence as test_startup_sequence, but each step's result
