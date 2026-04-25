@@ -16,6 +16,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
+#include <sys/time.h>
 
 static int suite_initialized = 0;
 
@@ -99,13 +100,14 @@ void test_startup_sequence(void) {
     g2_disconnect();
 }
 
-/* Run g2_watch for exactly n seconds then stop. */
-static void watch_for(int seconds) {
+static void watch_for_ms(int ms) {
+    struct itimerval t = { {0,0}, {ms/1000, (ms%1000)*1000} };
     g2_watch_running = 1;
     signal(SIGALRM, g2_watch_stop);
-    alarm(seconds);
+    setitimer(ITIMER_REAL, &t, NULL);
     g2_watch(OUTPUT_DEFAULT, 0);
-    alarm(0);
+    t.it_value.tv_sec = 0; t.it_value.tv_usec = 0;
+    setitimer(ITIMER_REAL, &t, NULL);
 }
 
 /*
@@ -122,32 +124,40 @@ void test_watch_then_slot_then_watch(void) {
     output_json(info, OUTPUT_DEFAULT);
     cJSON_Delete(info);
 
-    fprintf(stderr, "watch: slot A, 10 s\n");
-    watch_for(10);
+    fprintf(stderr, "watch: slot A, 4 s\n");
+    watch_for_ms(4000);
 
     fprintf(stderr, "switching to slot B\n");
     TEST_ASSERT_EQUAL_INT(G2_OK, g2_select_slot("B"));
 
-    fprintf(stderr, "watch: slot B, 10 s\n");
-    watch_for(10);
+    fprintf(stderr, "watch: slot B, 4 s\n");
+    watch_for_ms(4000);
 
     g2_disconnect();
 }
 
 /*
- * Cycle through all four slots, running an 8 s watch after each switch.
- * Each switch issues STOP_COMM internally; each watch re-arms START_COMM.
- * Total ~32 s of live JSON output, one watch session per slot.
+ * Cycle A→B→C→D with a variation change after each slot switch, then a short
+ * watch. Uses varied sub-second to 2 s watch durations to keep total time ~10 s.
  */
 void test_slot_cycle_interspersed_watch(void) {
     ensure_connected();
     TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
 
-    const char *slots[] = {"A", "B", "C", "D"};
-    for (int i = 0; i < 4; i++) {
-        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, g2_select_slot(slots[i]), slots[i]);
-        fprintf(stderr, "watch: slot %s, 8 s\n", slots[i]);
-        watch_for(8);
+    static const struct { const char *slot; int slot_idx; int variation; int watch_ms; } steps[] = {
+        { "A", 0, 1, 2000 },
+        { "B", 1, 3, 1000 },
+        { "C", 2, 5, 2000 },
+        { "D", 3, 2, 1000 },
+        { "A", 0, 4,  500 },
+    };
+    for (int i = 0; i < 5; i++) {
+        fprintf(stderr, "slot → %s  var %d  watch %d ms\n",
+                steps[i].slot, steps[i].variation, steps[i].watch_ms);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, g2_select_slot(steps[i].slot), steps[i].slot);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK,
+            g2_select_variation(steps[i].variation, steps[i].slot_idx), steps[i].slot);
+        watch_for_ms(steps[i].watch_ms);
     }
 
     g2_disconnect();
