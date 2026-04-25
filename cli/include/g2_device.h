@@ -80,6 +80,7 @@ int g2_send_init(void);
 
 /* Query commands - return cJSON* on success, NULL on error */
 /* Caller is responsible for freeing the returned cJSON* */
+cJSON *g2_startup(void);
 cJSON *g2_device_info(int debug);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
