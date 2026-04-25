@@ -164,6 +164,42 @@ void test_slot_cycle_interspersed_watch(void) {
 }
 
 /*
+ * Stress test: 10 slot changes and 20 variation changes with short watches
+ * (~200–300 ms) to maximise command throughput. Slot changes on even steps,
+ * variation changes on every step. Total ~4.5 s.
+ */
+void test_stress_slot_variation_watch(void) {
+    ensure_connected();
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    /* slot==NULL means keep current slot; slot_idx always reflects current slot */
+    static const struct { const char *slot; int slot_idx; int variation; int watch_ms; } steps[] = {
+        {"A", 0, 1, 300}, {NULL, 0, 2, 200},
+        {"B", 1, 3, 250}, {NULL, 1, 4, 150},
+        {"C", 2, 5, 300}, {NULL, 2, 6, 200},
+        {"D", 3, 7, 250}, {NULL, 3, 8, 150},
+        {"A", 0, 1, 300}, {NULL, 0, 2, 200},
+        {"B", 1, 3, 250}, {NULL, 1, 4, 150},
+        {"C", 2, 5, 300}, {NULL, 2, 6, 200},
+        {"D", 3, 7, 250}, {NULL, 3, 8, 150},
+        {"A", 0, 1, 300}, {NULL, 0, 2, 200},
+        {"B", 1, 3, 250}, {NULL, 1, 4, 150},
+    };
+    for (int i = 0; i < 20; i++) {
+        if (steps[i].slot) {
+            fprintf(stderr, "slot → %s  ", steps[i].slot);
+            TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, g2_select_slot(steps[i].slot), steps[i].slot);
+        }
+        fprintf(stderr, "var %d  watch %d ms\n", steps[i].variation, steps[i].watch_ms);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK,
+            g2_select_variation(steps[i].variation, steps[i].slot_idx), steps[i].slot);
+        watch_for_ms(steps[i].watch_ms);
+    }
+
+    g2_disconnect();
+}
+
+/*
  * Full real-life scenario with JSON output to stdout:
  *   Same startup sequence as test_startup_sequence, but each step's result
  *   is printed as JSON, followed by 30 seconds of START_COMM watch output
