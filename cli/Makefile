@@ -12,7 +12,6 @@ BUILD_DIR = build
 OBJ_DIR = $(BUILD_DIR)/obj
 BIN_DIR = $(BUILD_DIR)/bin
 TEST_BUILD_DIR = $(BUILD_DIR)/test
-TEST_BIN = $(TEST_BUILD_DIR)/g2-tests
 
 # Source files
 SRC_FILES = $(wildcard $(SRC_DIR)/*.c)
@@ -63,9 +62,7 @@ depend:
 -include .depend
 
 # Test rules
-test: $(TEST_BIN)
-	@echo "Running tests..."
-	./$(TEST_BIN)
+test: test-unit test-integration
 
 test-unit: $(TEST_BUILD_DIR)/g2-unit-tests
 	@echo "Running unit tests..."
@@ -88,17 +85,6 @@ $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_
 
 $(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration.c \
-		$(TEST_SRC) \
-		$(OBJ_DIR)/g2_device.o \
-		$(OBJ_DIR)/utils.o \
-		$(OBJ_DIR)/bitstream.o \
-		$(OBJ_DIR)/cjson.o \
-		$(OBJ_DIR)/output.o \
-		$(LDFLAGS) -o $@
-	@echo "Built: $@"
-
-$(TEST_BUILD_DIR)/g2-tests: $(TEST_DIR)/run_tests.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
-	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests.c \
 		$(TEST_SRC) \
 		$(OBJ_DIR)/g2_device.o \
 		$(OBJ_DIR)/utils.o \

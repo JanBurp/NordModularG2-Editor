@@ -74,6 +74,10 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 #define LIST_FILTER_PATCHES        1
 #define LIST_FILTER_PERFORMANCES   2
 
+/* Send CMD_INIT (0x80) — step 1 of the startup sequence.
+ * Resets G2 patch version counters. Returns G2_OK on success. */
+int g2_send_init(void);
+
 /* Query commands - return cJSON* on success, NULL on error */
 /* Caller is responsible for freeing the returned cJSON* */
 cJSON *g2_device_info(int debug);

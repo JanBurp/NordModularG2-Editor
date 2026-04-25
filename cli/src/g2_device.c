@@ -40,10 +40,12 @@ static g2_version_cache_t version_cache = { .valid = 0 };
 
 static void invalidate_version_cache(void);
 static int recv_interrupt(uint8_t *response, int size, int timeout_ms);
+static int recv_bulk(uint8_t *data, uint16_t size);
 static int send_system(uint8_t cmd, uint8_t subcmd);
 static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
 static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
                      const uint8_t *extra, size_t extraLen);
+static int g2_drain_pending(void);
 
 static uint8_t get_version_for_slot(uint8_t slot) {
     uint8_t response[16] = {0};
@@ -200,6 +202,69 @@ int g2_disconnect(void) {
 
 int g2_is_connected(void) {
     return g2.handle != NULL && g2.interface_claimed;
+}
+
+/* Send CMD_INIT (0x80) — the first step of the startup sequence.
+ * Resets the G2's patch version counters and returns G2 type info. */
+static int send_init_msg(void) {
+    uint8_t buff[8] = {0};
+    buff[COMMAND_OFFSET] = 0x80;
+    int msgLen = 1;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLen);
+    buff[COMMAND_OFFSET + 1] = (crc >> 8) & 0xff;
+    buff[COMMAND_OFFSET + 2] = crc & 0xff;
+    msgLen += 4;
+    buff[0] = (msgLen >> 8) & 0xff;
+    buff[1] = msgLen & 0xff;
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLen,
+                                   &transferred, USB_TIMEOUT_STANDARD);
+    return (ret < 0) ? -1 : 0;
+}
+
+int g2_send_init(void) {
+    uint8_t response[16] = {0};
+
+    if (ensure_connected(1) < 0) return G2_ERR_CONNECT;
+
+    /* Drain any stale notifications before sending CMD_INIT so we don't
+     * mistake a leftover notification for the init response. */
+    g2_drain_pending();
+
+    if (send_init_msg() < 0) {
+        fprintf(stderr, "Failed to send init message\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+
+    int ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    if (ret <= 0) {
+        fprintf(stderr, "No response to init message\n");
+        return G2_ERR_RECV;
+    }
+
+    if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+        fprintf(stderr, "Unexpected response type to init: %02x\n", response[0]);
+        return G2_ERR_RECV;
+    }
+
+    uint16_t size = ((uint16_t)response[1] << 8) | response[2];
+    if (size > 0) {
+        uint8_t *data = malloc(size);
+        if (!data) return G2_ERR_NO_MEMORY;
+        recv_bulk(data, size);
+        uint8_t first = data[0];
+        free(data);
+        if (first != RESPONSE_TYPE_INIT) {
+            fprintf(stderr, "Unexpected init response data: %02x\n", first);
+            return G2_ERR_RECV;
+        }
+    }
+
+    /* Init resets the G2's version counters, so our cache is stale. */
+    invalidate_version_cache();
+
+    return G2_OK;
 }
 
 int g2_send_command(uint8_t *data, int length) {
@@ -572,6 +637,10 @@ cJSON *g2_device_info(int debug) {
             fprintf(stderr, "Failed to connect to G2\n");
             return NULL;
         }
+
+    /* Drain stale notifications left over from any prior command or session
+     * before issuing GET_SYNTH_SETTINGS — same guard used in g2_get_patch(). */
+    g2_drain_pending();
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
@@ -1028,7 +1097,6 @@ int g2_select_slot(const char *slot_str) {
     int slot;
     uint8_t response[16] = {0};
     uint8_t version;
-    int ret;
     uint8_t mask;
     uint8_t data[8] = {0};
 

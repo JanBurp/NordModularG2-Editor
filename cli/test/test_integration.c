@@ -57,3 +57,42 @@ void test_integration_select_slot_a(void) {
     ensure_connected();
     TEST_ASSERT_TRUE(g2_select_slot("A") >= 0);
 }
+
+/*
+ * Startup sequence as documented in "G2 USB Messages.html":
+ *   1. CMD_INIT (0x80)        — resets version counters, get G2 type info
+ *   2. STOP_COMM              — silence G2→Host notifications (done inside slot/get-patch)
+ *   3. GET_SYNTH_SETTINGS     — global settings
+ *   4. GET_PATCH per slot     — slot state
+ *   5. GET_NAMES (list)       — patch/performance names
+ *
+ * This test verifies the full sequence completes without errors and that
+ * each step returns a non-NULL result.
+ */
+void test_startup_sequence(void) {
+    ensure_connected();
+
+    /* Step 1: CMD_INIT */
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    /* Step 2+3: synth settings (g2_device_info drains stale messages first) */
+    cJSON *info = g2_device_info(0);
+    TEST_ASSERT_NOT_NULL(info);
+    cJSON_Delete(info);
+
+    /* Step 4: patch data for each slot */
+    const char *slots[] = {"A", "B", "C", "D"};
+    for (int i = 0; i < 4; i++) {
+        cJSON *patch = g2_get_patch(slots[i]);
+        TEST_ASSERT_NOT_NULL_MESSAGE(patch, slots[i]);
+        cJSON_Delete(patch);
+    }
+
+    /* Step 5: patch/performance names */
+    cJSON *names = g2_list(LIST_FILTER_ALL, 0);
+    TEST_ASSERT_NOT_NULL(names);
+    cJSON_Delete(names);
+
+    /* CMD_INIT resets G2 state — disconnect so subsequent tests get a clean connection. */
+    g2_disconnect();
+}

@@ -18,6 +18,7 @@ extern void test_integration_connect(void);
 extern void test_integration_get_patch_slot_a(void);
 extern void test_integration_list_all(void);
 extern void test_integration_select_slot_a(void);
+extern void test_startup_sequence(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -68,6 +69,10 @@ int main(void) {
     run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
     run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
     run_test_silently("test_drain_count_logged", test_drain_count_logged);
+
+    /* Startup sequence last: CMD_INIT resets the G2, disrupting any shared
+     * connection state — running it last prevents it from affecting other tests. */
+    run_test_silently("test_startup_sequence", test_startup_sequence);
 
     return UNITY_END();
 }
