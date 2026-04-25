@@ -23,6 +23,7 @@ extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
 extern void test_slot_cycle_interspersed_watch(void);
 extern void test_stress_slot_variation_watch(void);
+extern void test_stress_editor_mimic(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -96,6 +97,9 @@ int main(void) {
 
     /* Stress: 10 slot changes + 20 variation changes, 200–300 ms watches. */
     run_test_with_output("test_stress_slot_variation_watch", test_stress_slot_variation_watch);
+
+    /* Stress: editor-accurate behaviour — fresh connect/disconnect per command. */
+    run_test_with_output("test_stress_editor_mimic", test_stress_editor_mimic);
 
     return UNITY_END();
 }
