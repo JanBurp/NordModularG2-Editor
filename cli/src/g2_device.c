@@ -276,6 +276,10 @@ int g2_send_command(uint8_t *data, int length) {
     }
 
     ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret == LIBUSB_ERROR_PIPE) {
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
+    }
     if (ret < 0) {
         fprintf(stderr, "Write failed: %s\n", libusb_error_name(ret));
         return G2_ERR_SEND;
@@ -1127,6 +1131,7 @@ int g2_select_slot(const char *slot_str) {
         return G2_ERR_INVALID_PARAM;
     }
 
+    g2_drain_pending();
     version = get_version_for_slot(slot);
 
     mask = 0x08 >> slot;
@@ -1377,6 +1382,8 @@ int g2_select_variation(int variation, int slot) {
         return G2_ERR_INVALID_PARAM;
     }
 
+    g2_drain_pending();
+
     /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
     uint8_t cmdData[4] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) {
@@ -1476,6 +1483,11 @@ int g2_watch(output_format_t format, int debug) {
 
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
+
+    /* Clear any stale notifications from a preceding command (e.g. slot switch)
+     * before arming — sending START_COMM while the G2 is still flushing its
+     * notification burst can stall the bulk-OUT endpoint. */
+    g2_drain_pending();
 
     /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
     uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
@@ -1705,6 +1717,9 @@ int g2_watch(output_format_t format, int debug) {
     send_system_data(0x41, stop_cmd, 2);
     usleep(USB_SEND_DELAY_US);
     recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    /* Flush any extended messages (with pending bulk data) that arrived before
+     * STOP_COMM took effect — leaving them unread blocks subsequent commands. */
+    g2_drain_pending();
 
     signal(SIGINT, SIG_DFL);
     signal(SIGTERM, SIG_DFL);
