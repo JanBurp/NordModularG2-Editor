@@ -19,6 +19,7 @@ extern void test_integration_get_patch_slot_a(void);
 extern void test_integration_list_all(void);
 extern void test_integration_select_slot_a(void);
 extern void test_startup_sequence(void);
+extern void test_fullstack_with_watch(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -53,6 +54,13 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     fflush(stderr);
 }
 
+static void run_test_with_output(const char *name, void (*test_func)(void)) {
+    fprintf(stderr, "%s\n", name);
+    fflush(stderr);
+    RUN_TEST(test_func);
+    fflush(stdout);
+}
+
 int main(void) {
     fprintf(stderr, "Running integration tests...\n");
     fflush(stderr);
@@ -73,6 +81,9 @@ int main(void) {
     /* Startup sequence last: CMD_INIT resets the G2, disrupting any shared
      * connection state — running it last prevents it from affecting other tests. */
     run_test_silently("test_startup_sequence", test_startup_sequence);
+
+    /* Full real-life scenario: startup sequence + 30 s of live JSON watch output. */
+    run_test_with_output("test_fullstack_with_watch", test_fullstack_with_watch);
 
     return UNITY_END();
 }
