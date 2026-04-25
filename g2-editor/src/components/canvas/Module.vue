@@ -12,6 +12,11 @@
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam, adsrT, adsrL, lfoP, rateBPM, rateLo, OscFreq, filterFreq, filterFreq1, filterFreq2 } from '../../renderer/parammap';
+	import ModuleVeText from './ModuleVeText.vue';
+	import ModuleVeLine from './ModuleVeLine.vue';
+	import ModuleVePaths from './ModuleVePaths.vue';
+	import ModuleVeLed from './ModuleVeLed.vue';
+	import ModuleBitmap from './ModuleBitmap.vue';
 
 	const paramFormattingFunctions: Record<string, (i: number) => string> = {
 		adsrT,
@@ -336,18 +341,9 @@
 
 		<!-- Visual elements from ve array -->
 		<template v-for="(ve, index) in moduleDef.ve" :key="`ve-${index}`">
-			<!-- Text labels -->
-			<text v-if="ve.type === 'text' && ve.t" :x="ve.x" :y="ve.y" fill="#000" font-size="9">
-				{{ ve.t }}
-			</text>
-
-			<!-- Lines -->
-			<line v-else-if="ve.type === 'line'" :x1="ve.x1" :y1="ve.y1" :x2="ve.x2" :y2="ve.y2" stroke="#333" />
-
-			<!-- Paths -->
-			<path v-else-if="ve.type === 'path' && ve.d" :d="ve.d" stroke="#333" fill="none" />
-
-			<!-- Graph areas -->
+			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
+			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
+			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
 			<ModuleGraph
 				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
 				:type="ve.type"
@@ -374,22 +370,8 @@
 				</text>
 			</template>
 
-			<!-- LEDs -->
-			<template v-else-if="ve.type === 'led' || ve.type === 'ledArray'">
-				<rect
-					v-for="i in ve.cnt || 1"
-					:key="`led-${i}`"
-					:x="(ve.x || 0) + 2 + (i - 1) * (ve.xo || 0)"
-					:y="ve.y"
-					:width="ve.w"
-					height="6.5"
-					fill="#040"
-					stroke="#000"
-				/>
-			</template>
-
-			<!-- Bitmaps (using use element) -->
-			<use v-else-if="ve.type === 'bmp' && ve.id" :href="`#Bitmap${ve.id}`" :x="ve.x" :y="ve.y" />
+			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
+			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
 		</template>
 
 		<!-- Input jacks -->
