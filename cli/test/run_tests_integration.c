@@ -63,6 +63,8 @@ static void run_test_with_output(const char *name, void (*test_func)(void)) {
     fflush(stderr);
     RUN_TEST(test_func);
     fflush(stdout);
+    fprintf(stderr, "-------------------\n");
+    fflush(stderr);
 }
 
 int main(void) {

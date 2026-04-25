@@ -258,7 +258,7 @@ void test_stress_editor_mimic(void) {
 /*
  * Full real-life scenario with JSON output to stdout:
  *   Same startup sequence as test_startup_sequence, but each step's result
- *   is printed as JSON, followed by 30 seconds of START_COMM watch output
+ *   is printed as JSON, followed by 10 seconds of START_COMM watch output
  *   (LED data, volume data, param changes, etc.) so the stream can be
  *   observed exactly as the editor would see it.
  */
@@ -289,12 +289,8 @@ void test_fullstack_with_watch(void) {
     output_json(names, OUTPUT_DEFAULT);
     cJSON_Delete(names);
 
-    /* Step 6: START_COMM — watch for 30 seconds, then auto-stop */
-    g2_watch_running = 1;
-    signal(SIGALRM, g2_watch_stop);
-    alarm(30);
-    g2_watch(OUTPUT_DEFAULT, 0);
-    alarm(0);
+    /* Step 6: START_COMM — watch for 10 seconds, then auto-stop */
+    watch_for_ms(10000);
 
     g2_disconnect();
 }
