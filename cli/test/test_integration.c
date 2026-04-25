@@ -200,6 +200,62 @@ void test_stress_slot_variation_watch(void) {
 }
 
 /*
+ * Mimics the exact Electron editor behaviour for each user action:
+ *
+ *   startup process  : g2_startup() → g2_disconnect()
+ *   watch process    : g2_connect() → watch_for_ms() → STOP_COMM → g2_disconnect()
+ *   command process  : g2_connect() → g2_select_slot/variation() → g2_disconnect()
+ *   watch restarted  : g2_connect() → (next iteration)
+ *
+ * Each step performs one slot change and one variation change as separate
+ * connect/command/disconnect cycles, matching the two IPC calls the editor
+ * would issue. 5 steps × 2 commands = 10 slot + 5 variation changes,
+ * 10 watch sessions, ~30 USB connect/disconnect cycles total.
+ */
+void test_stress_editor_mimic(void) {
+    /* mimic startup command process */
+    ensure_connected();
+    cJSON *init_result = g2_startup();
+    TEST_ASSERT_NOT_NULL(init_result);
+    cJSON_Delete(init_result);
+    g2_disconnect();
+
+    static const struct { const char *slot; int slot_idx; int variation; int watch_ms; } steps[] = {
+        {"A", 0, 1, 300},
+        {"B", 1, 3, 250},
+        {"C", 2, 5, 300},
+        {"D", 3, 2, 250},
+        {"A", 0, 4, 300},
+    };
+
+    for (int i = 0; i < 5; i++) {
+        /* watch process */
+        TEST_ASSERT_TRUE(g2_connect_silent() >= 0);
+        fprintf(stderr, "watch %d ms\n", steps[i].watch_ms);
+        watch_for_ms(steps[i].watch_ms);
+        g2_disconnect();
+
+        /* slot command process */
+        TEST_ASSERT_TRUE(g2_connect_silent() >= 0);
+        fprintf(stderr, "slot → %s\n", steps[i].slot);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, g2_select_slot(steps[i].slot), steps[i].slot);
+        g2_disconnect();
+
+        /* variation command process */
+        TEST_ASSERT_TRUE(g2_connect_silent() >= 0);
+        fprintf(stderr, "var %d\n", steps[i].variation);
+        TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK,
+            g2_select_variation(steps[i].variation, steps[i].slot_idx), steps[i].slot);
+        g2_disconnect();
+    }
+
+    /* final watch process */
+    TEST_ASSERT_TRUE(g2_connect_silent() >= 0);
+    watch_for_ms(500);
+    g2_disconnect();
+}
+
+/*
  * Full real-life scenario with JSON output to stdout:
  *   Same startup sequence as test_startup_sequence, but each step's result
  *   is printed as JSON, followed by 30 seconds of START_COMM watch output
