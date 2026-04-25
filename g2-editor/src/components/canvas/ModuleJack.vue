@@ -21,12 +21,12 @@
 <template>
 	<g class="jack-group" :class="type">
 		<template v-if="type == 'input'">
-			<circle :cx="x" :cy="y" r="6" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<circle :cx="x" :cy="y" r="3" fill="#000" stroke="#333" stroke-width="1" class="jack" />
+			<circle :cx="x" :cy="y" r="5.5" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
+			<circle :cx="x" :cy="y" r="2.5" fill="#000" stroke="#333" stroke-width="1" class="jack" />
 		</template>
 		<template v-else>
-			<rect :x="x - 6" :y="y - 6" width="12" height="12" rx="2" ry="2" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<rect :x="x - 3" :y="y - 3" width="6" height="6" rx="2" ry="2" fill="#000" stroke="#333" stroke-width="1" class="jack" />
+			<rect :x="x - 5.5" :y="y - 5.5" width="11" height="11" rx="1" ry="1" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
+			<rect :x="x - 2.5" :y="y - 2.5" width="5" height="5" rx="1" ry="1" fill="#000" stroke="#333" stroke-width="1" class="jack" />
 		</template>
 		<!-- <text
 			:x="labelX"

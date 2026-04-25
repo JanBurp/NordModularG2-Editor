@@ -8,7 +8,7 @@
 	<rect
 		v-for="i in ve.cnt || 1"
 		:key="`led-${i}`"
-		:x="(ve.x || 0) + 2 + (i - 1) * (ve.xo || 0)"
+		:x="(ve.x || 0) + 1 + (i - 1) * (ve.xo || 0)"
 		:y="ve.y"
 		:width="ve.w"
 		height="6.5"
