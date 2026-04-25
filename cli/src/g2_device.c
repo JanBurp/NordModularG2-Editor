@@ -49,26 +49,25 @@ static int g2_drain_pending(void);
 
 static uint8_t get_version_for_slot(uint8_t slot) {
     uint8_t response[16] = {0};
-    uint8_t data[2] = {0x7d, 0x00};
     int ret;
-    (void)slot;
 
     if (version_cache.valid) {
         return version_cache.version;
     }
 
-    data[0] = 0x7d;
-    data[1] = 0x00;
-    if (send_system_data(0x41, data, 2) < 0) {
+    /* Use GET_PATCH_VERSION (0x35) — does not trigger streaming, unlike START_COMM */
+    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, slot};
+    if (send_system_data(0x41, cmd, 2) < 0) {
         return 0x41;
     }
+    usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
         return 0x41;
     }
 
-    uint8_t version = response[3];
+    uint8_t version = response[6];
     if (version == 0) {
         version = 0x41;
     }
@@ -772,15 +771,12 @@ cJSON *g2_get_patch(const char *slot_str) {
         uint8_t stale[16]; int n, stale_count = 0;
         while ((n = recv_interrupt(stale, sizeof(stale), 20)) > 0) {
             stale_count++;
-            fprintf(stderr, "[get-patch] stale #%d:", stale_count);
-            for (int i = 0; i < n && i < 8; i++) fprintf(stderr, " %02x", stale[i]);
-            fprintf(stderr, "\n");
             if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
                 uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
                 if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
             }
         }
-        if (stale_count) fprintf(stderr, "[get-patch] flushed %d stale msg(s)\n", stale_count);
+        (void)stale_count;
     }
 
     /* Step 1: Get version for the slot */
@@ -1101,9 +1097,6 @@ static int g2_drain_pending(void) {
     int ret, count = 0;
     while ((ret = recv_interrupt(response, sizeof(response), 50)) > 0) {
         count++;
-        fprintf(stderr, "[drain #%d] type=%02x", count, response[0] & 0x0f);
-        for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
-        fprintf(stderr, "\n");
         if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)response[1] << 8) | response[2];
             if (size > 0) {
@@ -1112,7 +1105,7 @@ static int g2_drain_pending(void) {
             }
         }
     }
-    if (count) fprintf(stderr, "[drain] total: %d msg(s)\n", count);
+    (void)count;
     return count;
 }
 
@@ -1136,17 +1129,6 @@ int g2_select_slot(const char *slot_str) {
 
     version = get_version_for_slot(slot);
 
-    /* get_version_for_slot sends START_COMM which arms the G2 to stream
-     * LED/volume data.  Silence it NOW before the slot commands so that
-     * unsolicited data can't interleave with the command responses — that
-     * interleaving is what caused the growing queue and eventual send failure. */
-    {
-        uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
-        send_system_data(0x41, stop_cmd, 2);
-        recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-    }
-    { int n = g2_drain_pending(); fprintf(stderr, "[slot] pre-drain: %d msg(s)\n", n); }
-
     mask = 0x08 >> slot;
     data[0] = 0x07;
     data[1] = mask;
@@ -1166,8 +1148,7 @@ int g2_select_slot(const char *slot_str) {
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    /* Drain the slot-change notification burst the G2 sends after the switch. */
-    { int n = g2_drain_pending(); fprintf(stderr, "[slot] post-drain: %d msg(s)\n", n); }
+    g2_drain_pending();
 
     return G2_OK;
 }
