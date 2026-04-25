@@ -11,4 +11,8 @@ contextBridge.exposeInMainWorld("cli", {
 	onWatchDone: (cb: () => void) =>
 		ipcRenderer.on("cli:watch-done", () => cb()),
 	offWatchDone: () => ipcRenderer.removeAllListeners("cli:watch-done"),
+	onDeviceDisconnected: (cb: () => void) =>
+		ipcRenderer.on("cli:device-disconnected", () => cb()),
+	offDeviceDisconnected: () =>
+		ipcRenderer.removeAllListeners("cli:device-disconnected"),
 });

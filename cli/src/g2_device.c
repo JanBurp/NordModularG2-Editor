@@ -398,6 +398,7 @@ static int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms
         if (ret == 0 && transferred > 0) {
             return transferred;
         }
+        if (ret == LIBUSB_ERROR_NO_DEVICE) return LIBUSB_ERROR_NO_DEVICE;
         usleep(USB_SEND_DELAY_US);
     }
     return -1;
@@ -1506,6 +1507,13 @@ int g2_watch(output_format_t format, int debug) {
 
     while (g2_watch_running) {
         ret = recv_interrupt(response, sizeof(response), 100);
+        if (ret == LIBUSB_ERROR_NO_DEVICE) {
+            printf("{\"type\":\"device_disconnected\"}\n");
+            fflush(stdout);
+            signal(SIGINT, SIG_DFL);
+            signal(SIGTERM, SIG_DFL);
+            return 1;
+        }
         if (ret <= 0) continue;
 
         if (debug) {
