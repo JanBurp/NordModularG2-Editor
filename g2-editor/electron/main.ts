@@ -54,10 +54,15 @@ function startWatch() {
 			if (trimmed) win?.webContents.send("cli:watch-event", trimmed);
 		}
 	});
-	proc.on("close", () => {
-		// Only clear if this is still the current watch process (not a new one)
-		if (watchProcess === proc) watchProcess = null;
-		win?.webContents.send("cli:watch-done");
+	proc.on("close", (code) => {
+		const wasActive = watchProcess === proc;
+		if (wasActive) watchProcess = null;
+		if (!wasActive) return; // killed intentionally by stopWatchAndWait
+		if (code !== null && code !== 0) {
+			win?.webContents.send("cli:device-disconnected");
+		} else {
+			win?.webContents.send("cli:watch-done");
+		}
 	});
 }
 
