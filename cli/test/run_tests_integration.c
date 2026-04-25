@@ -22,6 +22,7 @@ extern void test_startup_sequence(void);
 extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
 extern void test_slot_cycle_interspersed_watch(void);
+extern void test_stress_slot_variation_watch(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -90,8 +91,11 @@ int main(void) {
     /* Slot switch between two watch sessions (10 s each). */
     run_test_with_output("test_watch_then_slot_then_watch", test_watch_then_slot_then_watch);
 
-    /* A/B/C/D slot cycle with 8 s watch after each switch. */
+    /* A/B/C/D slot cycle with variation changes and short watches. */
     run_test_with_output("test_slot_cycle_interspersed_watch", test_slot_cycle_interspersed_watch);
+
+    /* Stress: 10 slot changes + 20 variation changes, 200–300 ms watches. */
+    run_test_with_output("test_stress_slot_variation_watch", test_stress_slot_variation_watch);
 
     return UNITY_END();
 }
