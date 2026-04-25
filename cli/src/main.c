@@ -29,6 +29,7 @@ static void print_usage(const char *prog) {
     printf("  --tree         Tree view output\n");
     printf("  --debug        Show debug info (raw USB data in hex)\n");
     printf("\nCommands (implemented):\n");
+    printf("  startup                              Full startup sequence (init + device + all slots + names)\n");
     printf("  connect                              Connect to G2 (auto-detect)\n");
     printf("  disconnect                           Close connection\n");
     printf("  list-devices                         List USB devices (debug)\n");
@@ -98,6 +99,21 @@ int main(int argc, char *argv[]) {
     /* Handle commands */
     if (strcmp(command, "list-devices") == 0) {
         return g2_list_devices();
+    }
+
+    if (strcmp(command, "startup") == 0) {
+        cJSON *result = g2_startup();
+        if (!result) {
+            if (output_format == OUTPUT_JSON) {
+                output_error_json("Startup sequence failed", output_format);
+            } else {
+                fprintf(stderr, "Startup sequence failed\n");
+            }
+            return 1;
+        }
+        output_json(result, output_format);
+        cJSON_Delete(result);
+        return 0;
     }
 
     if (strcmp(command, "connect") == 0) {

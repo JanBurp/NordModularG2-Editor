@@ -39,9 +39,11 @@ export const useDeviceStore = defineStore("device", {
 		async connect() {
 			this.status = "connecting";
 			try {
-				await window.cli.run(["connect"]);
+				const output = await window.cli.run(["startup"]);
+				const data = JSON.parse(output);
+				this.device = data.device as Device;
+				this.deviceName = this.device.synthName;
 				this.status = "connected";
-				this.deviceName = "Nord G2";
 			} catch (e: any) {
 				this.status = "error";
 				throw new Error(`Failed to connect: ${e.message}`);
@@ -58,13 +60,6 @@ export const useDeviceStore = defineStore("device", {
 				this.deviceName = "";
 				this.device = null;
 			}
-		},
-
-		async fetchDevice() {
-			if (this.status !== "connected") throw new Error("Not connected");
-			const output = await window.cli.run(["device"]);
-			this.device = JSON.parse(output) as Device;
-			this.deviceName = this.device.synthName;
 		},
 
 		setActiveSlot(slot: string) {

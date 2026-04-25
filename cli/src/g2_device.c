@@ -1071,6 +1071,29 @@ cleanup:
     return NULL;
 }
 
+cJSON *g2_startup(void) {
+    if (ensure_connected(1) < 0) return NULL;
+    if (g2_send_init() != G2_OK) return NULL;
+
+    cJSON *device = g2_device_info(0);
+    if (!device) return NULL;
+
+    const char *slotNames[] = {"A", "B", "C", "D"};
+    cJSON *slots = cJSON_CreateArray();
+    for (int i = 0; i < 4; i++) {
+        cJSON *patch = g2_get_patch(slotNames[i]);
+        cJSON_AddItemToArray(slots, patch ? patch : cJSON_CreateNull());
+    }
+
+    cJSON *names = g2_list(LIST_FILTER_ALL, 0);
+
+    cJSON *root = cJSON_CreateObject();
+    cJSON_AddItemToObject(root, "device", device);
+    cJSON_AddItemToObject(root, "slots", slots);
+    cJSON_AddItemToObject(root, "names", names ? names : cJSON_CreateNull());
+    return root;
+}
+
 /* Drain any pending interrupt+bulk messages left in USB buffers after a command
  * that triggers a burst of unsolicited G2 notifications (e.g. slot change). */
 static int g2_drain_pending(void) {

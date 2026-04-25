@@ -111,13 +111,10 @@ export function useG2() {
 			log("•", "Connect", "CLI not available");
 			return;
 		}
-		log("→", "Connect", "Connecting to G2...");
+		log("→", "Connect", "Running startup sequence...");
 		try {
 			await store.connect();
-			log("←", "Connect", "Connected to G2 successfully");
-			log("→", "Device", "Fetching device info...");
-			await store.fetchDevice();
-			log("←", "Device", `${store.deviceName} (${store.device?.mode})`);
+			log("←", "Connect", `${store.deviceName} (${store.device?.mode})`);
 			startWatch();
 		} catch (e: any) {
 			log("←", "Connect", `Connection failed: ${e.message}`);
@@ -132,16 +129,6 @@ export function useG2() {
 			log("←", "Disconnect", "Disconnected from G2");
 		} catch (e: any) {
 			log("←", "Disconnect", `Disconnect error: ${e.message}`);
-		}
-	}
-
-	async function fetchDevice(): Promise<void> {
-		log("→", "Device", "Fetching device info...");
-		try {
-			await store.fetchDevice();
-			log("←", "Device", `${store.deviceName} (${store.device?.mode})`);
-		} catch (e: any) {
-			log("←", "Device", `Failed: ${e.message}`);
 		}
 	}
 
@@ -175,7 +162,6 @@ export function useG2() {
 		clearLogs,
 		connectDevice,
 		disconnectDevice,
-		fetchDevice,
 		startWatch,
 		stopWatch,
 		uploadToG2,
