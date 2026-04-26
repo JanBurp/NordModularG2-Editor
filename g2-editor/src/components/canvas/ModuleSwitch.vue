@@ -9,6 +9,7 @@
 		paramType: string;
 		value: number;
 		paramIndex: number;
+		paramName: string;
 	}>();
 
 	const emit = defineEmits<{
@@ -20,11 +21,34 @@
 	});
 
 	const names = computed(() => paramMap.value.names || []);
+	const defin = computed(() => paramMap.value.defin || []);
 	const width = computed(() => paramMap.value.width || 18);
 	const mode = computed(() => paramMap.value.mode);
 	const rows = computed(() => paramMap.value.rows || 1);
 	const bmp = computed(() => paramMap.value.bmp);
 	const hasBitmap = computed(() => !!bmp.value);
+
+	const optionNames = computed(() => {
+		const def = defin.value;
+		if (def && def.length > 0) {
+			const options = def[0].split(',').map((s) => {
+				const parts = s.split('~');
+				return parts.length >= 2 ? parts[1].trim() : s.trim();
+			});
+			if (options.length > 0 && options[0] !== '') return options;
+		}
+		return names.value;
+	});
+
+	const displayNames = computed(() => {
+		if (names.value.length === 1 && names.value[0] === 'Ch#') {
+			return [props.paramName];
+		}
+		if (names.value.length > 1) {
+			return names.value;
+		}
+		return optionNames.value;
+	});
 
 	const itemsPerRow = computed(() => {
 		if (width.value === 18) return 1;
@@ -62,14 +86,18 @@
 	}
 
 	function onButtonClick(index: number) {
-		const low = paramMap.value.low || 0;
-		const high = paramMap.value.high || names.value.length - 1 || 0;
+		if (mode.value !== 'VR' && mode.value !== 'HR') {
+			onCycleValue();
+		} else {
+			const low = paramMap.value.low || 0;
+			const high = paramMap.value.high || names.value.length - 1 || 0;
 
-		// Ensure value is within bounds
-		const newValue = Math.max(low, Math.min(index, high));
+			// Ensure value is within bounds
+			const newValue = Math.max(low, Math.min(index, high));
 
-		if (newValue !== props.value) {
-			emit('change', props.paramIndex, newValue);
+			if (newValue !== props.value) {
+				emit('change', props.paramIndex, newValue);
+			}
 		}
 	}
 
@@ -91,7 +119,7 @@
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<svg
-				v-for="(name, index) in names"
+				v-for="(name, index) in displayNames"
 				:key="index"
 				:x="getButtonX(index)"
 				:y="getButtonY(index)"
@@ -108,7 +136,13 @@
 
 		<!-- Text-based switch -->
 		<template v-else>
-			<g v-for="(name, index) in names" :key="index" class="switch-button" :class="{ active: index === activeIndex }" @click="onButtonClick(index)">
+			<g
+				v-for="(name, index) in displayNames"
+				:key="index"
+				class="switch-button"
+				:class="{ active: index === activeIndex }"
+				@click="onButtonClick(index)"
+			>
 				<rect
 					:x="getButtonX(index)"
 					:y="getButtonY(index)"
