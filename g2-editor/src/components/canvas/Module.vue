@@ -11,28 +11,14 @@
 	import SvgGradientDefs from './SvgGradientDefs.vue';
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
-	import { getParam, adsrT, adsrL, lfoP, rateBPM, rateLo, OscFreq, filterFreq, filterFreq1, filterFreq2 } from '../../renderer/parammap';
+	import { getParam } from '../../renderer/parammap';
+	import { isKnob, isSlider, isSwitch, isSpinner, formatValue, formatCombinedValue } from '../../composables/useModuleControls';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
-
-	const paramFormattingFunctions: Record<string, (i: number) => string> = {
-		adsrT,
-		adsrL,
-		lfoP,
-		rateBPM,
-		filterFreq,
-		filterFreq1,
-		filterFreq2,
-	};
-
-	const paramFormattingFunctionsWithArgs: Record<string, (i: number, con: unknown, tw: unknown) => string | undefined> = {
-		OscFreq,
-		rateLo,
-	};
 
 	const props = defineProps<{
 		type: number;
@@ -87,23 +73,6 @@
 		return (moduleDef.value?.height || 2) * 16;
 	});
 
-	// Helper functions for control types
-	function isKnob(n: string): boolean {
-		return ['KnobBig', 'KnobMedium', 'KnobSmall', 'KnobReset'].includes(n);
-	}
-
-	function isSlider(n: string): boolean {
-		return ['KnobSlider', 'KnobSeqSlider'].includes(n);
-	}
-
-	function isSwitch(n: string): boolean {
-		return n?.startsWith('SwM') || n === 'levelshift';
-	}
-
-	function isSpinner(n: string): boolean {
-		return n === 'KnobSpin';
-	}
-
 	// Get parameter value from localLv or default
 	function getParamValue(index: number): number {
 		if (localLv.value.length > index) {
@@ -133,73 +102,6 @@
 			return instance.value.modes[index];
 		}
 		return 0;
-	}
-
-	// Format value for display
-	function formatValue(value: number, paramType: string): string {
-		const p = getParam(paramType);
-		if (!p) return String(value);
-
-		// Use formatting function if available
-		if (p.f && paramFormattingFunctions[p.f]) {
-			try {
-				return paramFormattingFunctions[p.f](value) || String(value);
-			} catch {
-				return String(value);
-			}
-		}
-
-		return String(value);
-	}
-
-	// Format combined value from multiple parameters (for freq displays)
-	function formatCombinedValue(refIndices: number[], funcName?: string): string {
-		// Get the first parameter's type for the formatting function
-		const firstParam = moduleDef.value?.params?.[refIndices[0]];
-		if (!firstParam) return '';
-
-		const p = getParam(firstParam.type);
-		if (!p) return '';
-
-		// Use explicit func name or the param type's formatting function
-		const formatFunc = funcName || p.f;
-
-		if (formatFunc && paramFormattingFunctionsWithArgs[formatFunc]) {
-			try {
-				// Build controls array - all params need .l property with their value
-				const controls: { l: number; p: unknown }[] = [];
-
-				// Populate controls for all module params (formatters may reference any param)
-				moduleDef.value?.params?.forEach((param, idx) => {
-					controls[idx] = {
-						l: getParamValue(idx),
-						p: getParam(param.type),
-					};
-				});
-
-				// Create tw object with ca array pointing to our ref indices
-				// The formatter uses con[tw.ca[0]].l, con[tw.ca[1]].l, etc.
-				const tw = {
-					ca: refIndices, // Control indices the formatter should use
-				};
-
-				// Call formatter - first arg is ignored (index), second is controls array, third is tw
-				const result = paramFormattingFunctionsWithArgs[formatFunc](0, controls, tw);
-
-				if (result && result !== 'undefined') {
-					return result;
-				}
-
-				// If formatter returned empty/undefined, fallback to simple display
-				return refIndices.map((idx) => getParamValue(idx)).join(' ');
-			} catch (e) {
-				console.error('Format error:', formatFunc, e);
-				return refIndices.map((idx) => getParamValue(idx)).join(' ');
-			}
-		}
-
-		// Fallback: just show all values
-		return refIndices.map((idx) => getParamValue(idx)).join(' ');
 	}
 </script>
 
@@ -251,7 +153,7 @@
 						{{ formatValue(getParamValue(ve.ref), moduleDef?.params?.[ve.ref]?.type || '') }}
 					</template>
 					<template v-else-if="Array.isArray(ve.ref)">
-						{{ formatCombinedValue(ve.ref, ve.func) }}
+						{{ formatCombinedValue(ve.ref, ve.func, moduleDef.params, localLv) }}
 					</template>
 				</text>
 			</template>
