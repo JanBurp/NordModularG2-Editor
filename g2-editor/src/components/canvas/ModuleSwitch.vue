@@ -62,6 +62,15 @@
 		return Math.max(low, Math.min(props.value, high));
 	});
 
+	const singleButtonMode = computed(() => {
+		return mode.value !== 'VR' && mode.value !== 'HR';
+	});
+
+	const activeOptionName = computed(() => {
+		const idx = activeIndex.value;
+		return optionNames.value[idx] ?? optionNames.value[0];
+	});
+
 	function getButtonX(index: number): number {
 		if (mode.value === 'VR') {
 			// Vertical: all in one column
@@ -118,7 +127,15 @@
 	<g :transform="`translate(${x}, ${y})`" class="switch-control">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
+			<!-- Single button mode: show only active bitmap without highlight -->
+			<svg v-if="singleButtonMode" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
+				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * 10)})`" :clip-path="`url(#clip-${paramType}-0)`" />
+			</svg>
+
+			<!-- VR/HR mode: show all bitmaps with active highlighted -->
 			<svg
+				v-else
 				v-for="(name, index) in displayNames"
 				:key="index"
 				:x="getButtonX(index)"
@@ -136,7 +153,17 @@
 
 		<!-- Text-based switch -->
 		<template v-else>
+			<!-- Single button mode: show only active option without highlight -->
+			<g v-if="singleButtonMode" class="switch-button" @click="onCycleValue">
+				<rect :x="0" :y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+					{{ activeOptionName }}
+				</text>
+			</g>
+
+			<!-- VR/HR mode: show all options with active highlighted -->
 			<g
+				v-else
 				v-for="(name, index) in displayNames"
 				:key="index"
 				class="switch-button"
@@ -166,6 +193,7 @@
 
 	.switch-bitmap {
 		cursor: pointer;
+		overflow: hidden;
 	}
 
 	.switch-bitmap:hover {
