@@ -45,6 +45,10 @@
 			type: Object as () => Cable | null,
 			default: null,
 		},
+		selectedModuleIndex: {
+			type: Number as () => number | null,
+			default: null,
+		},
 	});
 
 	const emit = defineEmits<{
@@ -52,6 +56,10 @@
 		cableClick: [cable: Cable];
 		jackDragStart: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
 		jackDragEnd: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
+		moduleClick: [moduleIndex: number];
+		moduleMove: [info: { moduleIndex: number; col: number; row: number }];
+		moduleDrop: [info: { typeId: number; col: number; row: number }];
+		canvasClick: [];
 	}>();
 
 	const canvasRef = ref(null);
@@ -289,20 +297,138 @@
 
 	onUnmounted(() => {
 		clearDragPreview();
+		clearModuleDrag();
+		clearDropGhost();
 	});
+
+	// --- Module drag (move) ---
+	type ModuleDragInfo = { moduleIndex: number; clientX: number; clientY: number };
+	let dragModuleIndex: number | null = null;
+	let dragStartClientX = 0;
+	let dragStartClientY = 0;
+	let dragGhost: SVGRectElement | null = null;
+	let dragCurrentCol = 0;
+	let dragCurrentRow = 0;
+
+	function handleModuleDragStart(info: ModuleDragInfo) {
+		dragModuleIndex = info.moduleIndex;
+		dragStartClientX = info.clientX;
+		dragStartClientY = info.clientY;
+		window.addEventListener('mousemove', onModuleDragMove);
+		window.addEventListener('mouseup', onModuleDragEnd);
+	}
+
+	function onModuleDragMove(e: MouseEvent) {
+		if (dragModuleIndex === null) return;
+		const dist = Math.hypot(e.clientX - dragStartClientX, e.clientY - dragStartClientY);
+		if (dist < 5) return;
+
+		if (!dragGhost) {
+			const mod = (props.modules as any[]).find((m) => m.index === dragModuleIndex);
+			if (!mod) return;
+			const modDef = getModule(mod.type) as any;
+			const modHeight = (modDef?.height || 2) * 16;
+			dragGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+			dragGhost.setAttribute('width', '256');
+			dragGhost.setAttribute('height', String(modHeight));
+			dragGhost.setAttribute('fill', 'rgba(255,165,0,0.25)');
+			dragGhost.setAttribute('stroke', 'orange');
+			dragGhost.setAttribute('stroke-width', '2');
+			dragGhost.setAttribute('rx', '2');
+			dragGhost.setAttribute('pointer-events', 'none');
+			(svgRef.value as SVGElement).appendChild(dragGhost);
+		}
+
+		const mp = toSvgCoords(e);
+		if (!mp) return;
+		dragCurrentCol = Math.max(0, Math.floor(mp.x / 256));
+		dragCurrentRow = Math.max(0, Math.floor(mp.y / 16));
+		dragGhost.setAttribute('transform', `translate(${dragCurrentCol * 256}, ${dragCurrentRow * 16})`);
+	}
+
+	function onModuleDragEnd(_e: MouseEvent) {
+		window.removeEventListener('mousemove', onModuleDragMove);
+		window.removeEventListener('mouseup', onModuleDragEnd);
+		const moduleIndex = dragModuleIndex;
+		dragModuleIndex = null;
+		if (dragGhost) {
+			dragGhost.remove();
+			dragGhost = null;
+			if (moduleIndex !== null) {
+				emit('moduleMove', { moduleIndex, col: dragCurrentCol, row: dragCurrentRow });
+			}
+		} else {
+			if (moduleIndex !== null) {
+				emit('moduleClick', moduleIndex);
+			}
+		}
+	}
+
+	function clearModuleDrag() {
+		dragGhost?.remove();
+		dragGhost = null;
+		dragModuleIndex = null;
+		window.removeEventListener('mousemove', onModuleDragMove);
+		window.removeEventListener('mouseup', onModuleDragEnd);
+	}
+
+	// --- Module drop (add from ModulesPane) ---
+	let dropGhost: SVGRectElement | null = null;
+
+	function handleDragOver(e: DragEvent) {
+		if (!svgRef.value) return;
+		const mp = toSvgCoords(e as unknown as MouseEvent);
+		if (!mp) return;
+		const col = Math.max(0, Math.floor(mp.x / 256));
+		const row = Math.max(0, Math.floor(mp.y / 16));
+		const typeId = window.__g2DragTypeId;
+		const modDef = typeId ? getModule(typeId) : null;
+		const modHeight = (modDef?.height || 2) * 16;
+		if (!dropGhost) {
+			dropGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+			dropGhost.setAttribute('fill', 'rgba(100,200,100,0.25)');
+			dropGhost.setAttribute('stroke', '#4ade80');
+			dropGhost.setAttribute('stroke-width', '2');
+			dropGhost.setAttribute('rx', '2');
+			dropGhost.setAttribute('pointer-events', 'none');
+			(svgRef.value as SVGElement).appendChild(dropGhost);
+		}
+		dropGhost.setAttribute('width', '256');
+		dropGhost.setAttribute('height', String(modHeight));
+		dropGhost.setAttribute('transform', `translate(${col * 256}, ${row * 16})`);
+	}
+
+	function clearDropGhost() {
+		dropGhost?.remove();
+		dropGhost = null;
+		delete window.__g2DragTypeId;
+	}
+
+	function handleModuleDropOnWrapper(e: DragEvent) {
+		clearDropGhost();
+		const typeId = parseInt(e.dataTransfer?.getData('text/plain') || '0');
+		if (!typeId || !svgRef.value) return;
+		const mp = toSvgCoords(e as unknown as MouseEvent);
+		if (!mp) return;
+		const col = Math.max(0, Math.floor(mp.x / 256));
+		const row = Math.max(0, Math.floor(mp.y / 16));
+		emit('moduleDrop', { typeId, col, row });
+	}
 </script>
 
 <template>
-	<div class="patch-canvas-wrapper" ref="canvasRef">
-		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg">
+	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg" @click="emit('canvasClick')">
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
 				:type="mod.type"
 				:instance="mod"
+				:is-selected="mod.index === props.selectedModuleIndex"
 				@param-change="onParamChange"
 				@jack-drag-start="handleLocalJackDragStart"
 				@jack-drag-end="handleLocalJackDragEnd"
+				@module-drag-start="handleModuleDragStart"
 			/>
 		</svg>
 	</div>

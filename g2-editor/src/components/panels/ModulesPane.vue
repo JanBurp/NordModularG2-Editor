@@ -30,20 +30,19 @@
 						v-for="module in getModulesByCategory(category)"
 						:key="module.id"
 						class="w-64 bg-neutral-600 rounded overflow-visible shadow"
-						:style="{ height: getModuleHeight(module) + 'px' }"
+						:style="{ height: getModuleHeight(module) + 'px', cursor: 'grab' }"
+						draggable="true"
+						@dragstart="(e) => handleModuleDragStart(e, module.id)"
 					>
 						<svg
 							width="256"
 							:height="getModuleHeight(module)"
 							xmlns="http://www.w3.org/2000/svg"
+							style="pointer-events: none;"
 						>
 							<Module
 								:type="module.id"
 								:instance="getModuleInstance(module.id)"
-								@param-change="
-									(modIdx, paramIdx, val) =>
-										onParamChange(module.id, paramIdx, val)
-								"
 							/>
 						</svg>
 					</div>
@@ -186,6 +185,11 @@ function onParamChange(moduleId, paramIndex, value) {
 	if (instance) {
 		instance.lv[paramIndex] = value;
 	}
+}
+
+function handleModuleDragStart(e: DragEvent, moduleId: number) {
+	if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
+	window.__g2DragTypeId = moduleId;
 }
 
 function resetAllModules() {

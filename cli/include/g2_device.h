@@ -99,6 +99,15 @@ int g2_del_cable(int slot, int location,
                  int from_mod, int from_con_type, int from_con_id,
                  int to_mod,   int to_con_type,   int to_con_id);
 
+/* Module commands: slot 0-3, location 0=fx/1=va */
+int g2_del_module(int slot, int location, int module_id);
+int g2_move_module(int slot, int location, int module_id, int col, int row);
+int g2_add_module(int slot, int location, int type_id, int module_id,
+                  int col, int row,
+                  int num_modes, const int *mode_vals,
+                  int num_params, const int *param_vals,
+                  const char *name);
+
 /* Watch for param changes (simple single-threaded approach) */
 int g2_watch(output_format_t format, int debug);
 volatile extern int g2_watch_running;

@@ -361,7 +361,7 @@ static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) 
 
 static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
                      const uint8_t *extra, size_t extraLen) {
-    uint8_t buff[256] = {0};
+    uint8_t buff[2048] = {0};
     int pos = COMMAND_OFFSET;
 
     buff[pos++] = 0x01;
@@ -1494,6 +1494,100 @@ int g2_del_cable(int slot, int location,
     };
     if (send_slot(slot, version, 0x51, extra, 5) < 0) {
         fprintf(stderr, "del-cable: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_del_module(int slot, int location, int module_id) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)          { fprintf(stderr, "del-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { fprintf(stderr, "del-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { fprintf(stderr, "del-module: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t extra[2] = { (uint8_t)location, (uint8_t)module_id };
+    if (send_slot(slot, version, 0x32, extra, 2) < 0) {
+        fprintf(stderr, "del-module: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_move_module(int slot, int location, int module_id, int col, int row) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)          { fprintf(stderr, "move-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { fprintf(stderr, "move-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { fprintf(stderr, "move-module: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t extra[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)col, (uint8_t)row };
+    if (send_slot(slot, version, 0x34, extra, 4) < 0) {
+        fprintf(stderr, "move-module: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_add_module(int slot, int location, int type_id, int module_id,
+                  int col, int row,
+                  int num_modes, const int *mode_vals,
+                  int num_params, const int *param_vals,
+                  const char *name) {
+    (void)num_params; (void)param_vals; /* G2 initialises params to defaults */
+
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)          { fprintf(stderr, "add-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { fprintf(stderr, "add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { fprintf(stderr, "add-module: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    uint8_t payload[512];
+    int pos = 0;
+
+    payload[pos++] = (uint8_t)type_id;
+    payload[pos++] = (uint8_t)location;
+    payload[pos++] = (uint8_t)module_id;
+    payload[pos++] = (uint8_t)col;
+    payload[pos++] = (uint8_t)row;
+    payload[pos++] = 0x00; /* colour */
+    payload[pos++] = 0x00; /* upRate */
+    payload[pos++] = 0x00; /* isLed */
+
+    for (int m = 0; m < num_modes; m++)
+        payload[pos++] = (uint8_t)(mode_vals ? mode_vals[m] : 0);
+
+    if (name && *name) {
+        size_t nlen = strlen(name);
+        memcpy(payload + pos, name, nlen + 1);
+        pos += (int)nlen + 1;
+    } else {
+        payload[pos++] = 0x00;
+    }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    if (send_slot(slot, version, 0x30, payload, pos) < 0) {
+        fprintf(stderr, "add-module: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);

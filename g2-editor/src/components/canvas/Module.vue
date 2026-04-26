@@ -24,13 +24,19 @@
 	const props = defineProps<{
 		type: number;
 		instance?: ModuleInstance;
+		isSelected?: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd:   [info: JackDragInfo];
+		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 	}>();
+
+	function onDragHandleMousedown(e: MouseEvent) {
+		emit('moduleDragStart', { moduleIndex: moduleIdx.value, clientX: e.clientX, clientY: e.clientY });
+	}
 
 	const instance = computed(() => props.instance || { colour: 0 });
 	const moduleIdx = computed(() => instance.value.index || 0);
@@ -107,12 +113,15 @@
 </script>
 
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module">
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" @click.stop>
 		<SvgGradientDefs />
 
 		<ModuleBackground :height="height"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
+
+		<!-- Drag handle: title row only, transparent, cursor grab -->
+		<rect width="256" height="13" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" />
 
 		<!-- Modes -->
 		<g class="modes">
@@ -233,6 +242,15 @@
 			:connectorIndex="idx"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
+		/>
+
+		<!-- Selection highlight: at end so it renders on top of all module content -->
+		<rect
+			v-if="isSelected"
+			width="256"
+			:height="height"
+			style="fill: none; stroke: orange; stroke-width: 3; pointer-events: none;"
+			rx="2"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">

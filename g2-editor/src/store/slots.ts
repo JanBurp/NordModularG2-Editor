@@ -96,6 +96,72 @@ export const useSlotsStore = defineStore("slots", {
 			return this.loadSlot(slot);
 		},
 
+		async deleteCableNoReload(
+			cable: { smod: number; scon: number; dmod: number; dcon: number },
+			area: "voice" | "fx",
+		): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run([
+				"del-cable", slot, location,
+				String(cable.smod), "1", String(cable.scon),
+				String(cable.dmod), "0", String(cable.dcon),
+			]);
+		},
+
+		async deleteModule(
+			moduleId: number,
+			area: "voice" | "fx",
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return null;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run(["del-module", slot, location, String(moduleId)]);
+			return this.loadSlot(slot);
+		},
+
+		async moveModule(
+			moduleId: number,
+			col: number,
+			row: number,
+			area: "voice" | "fx",
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return null;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run(["move-module", slot, location, String(moduleId), String(col), String(row)]);
+			return this.loadSlot(slot);
+		},
+
+		async addModule(
+			typeId: number,
+			moduleId: number,
+			col: number,
+			row: number,
+			area: "voice" | "fx",
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return null;
+			const location = area === "voice" ? "va" : "fx";
+			const { getModule } = await import("../renderer/nmg2mods");
+			const { getParam } = await import("../renderer/parammap");
+			const modDef = getModule(typeId) as any;
+			const numModes = modDef?.modes?.length ?? 0;
+			const modeVals: number[] = Array(numModes).fill(0);
+			const numParams = modDef?.params?.length ?? 0;
+			const paramVals: number[] = (modDef?.params ?? []).map((p: any) => getParam(p.type)?.def ?? 64);
+			const name = (modDef?.short ?? "Module") + moduleId;
+			await window.cli.run([
+				"add-module", slot, location,
+				String(typeId), String(moduleId), String(col), String(row),
+				String(numModes), ...modeVals.map(String),
+				String(numParams), ...paramVals.map(String),
+				name,
+			]);
+			return this.loadSlot(slot);
+		},
+
 		async addCable(
 			fromMod: number, fromConType: number, fromCon: number,
 			toMod: number, toConType: number, toCon: number,
