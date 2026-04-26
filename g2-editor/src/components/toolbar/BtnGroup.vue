@@ -17,16 +17,11 @@
 </template>
 
 <script setup lang="ts">
-import { computed } from "vue";
-import Button from "./Button.vue";
+	import { computed } from "vue";
+	import Button from "./Button.vue";
+	import type { Option } from "@/types/ui";
 
-interface Option {
-	label: string;
-	value: string | number;
-	disabled?: boolean;
-}
-
-interface Props {
+	interface Props {
 	modelValue: string | number | null | (string | number)[];
 	options: (string | number | Option)[];
 	variant?: "toggle" | "variation" | "tab";

@@ -17,6 +17,7 @@
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 
 	const paramFormattingFunctions: Record<string, (i: number) => string> = {
 		adsrT,
@@ -33,83 +34,10 @@
 		rateLo,
 	};
 
-	interface ModuleInstance {
-		index?: number;
-		horiz?: number;
-		vert?: number;
-		colour?: number;
-		uname?: string | null;
-		lv?: number[];
-		modes?: number[];
-	}
-
-	interface VisualElement {
-		type: string;
-		x?: number;
-		y?: number;
-		x1?: number;
-		y1?: number;
-		x2?: number;
-		y2?: number;
-		w?: number;
-		h?: number;
-		t?: string;
-		d?: string;
-		id?: string;
-		ref?: number | number[];
-		cnt?: number;
-		xo?: number;
-	}
-
-	interface ModuleParam {
-		name: string;
-		type: string;
-		n: string;
-		x: number;
-		y: number;
-	}
-
-	interface ModuleMode {
-		name: string;
-		type: string;
-		x: number;
-		y: number;
-		w?: number;
-		h?: number;
-	}
-
-	interface ModuleInput {
-		name: string;
-		colour: string;
-		x: number;
-		y: number;
-	}
-
-	interface ModuleOutput {
-		name: string;
-		colour: string;
-		x: number;
-		y: number;
-	}
-
-	interface ModuleDefinition {
-		id: number;
-		short: string;
-		long: string;
-		height: number;
-		inputs?: ModuleInput[];
-		outputs?: ModuleOutput[];
-		params?: ModuleParam[];
-		modes?: ModuleMode[];
-		ve?: VisualElement[];
-	}
-
 	const props = defineProps<{
 		type: number;
 		instance?: ModuleInstance;
 	}>();
-
-	type JackDragInfo = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
 
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
