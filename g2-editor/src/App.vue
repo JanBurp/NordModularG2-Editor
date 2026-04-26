@@ -10,7 +10,7 @@
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
 				<!-- SLOT BUTTONS -->
 				<BtnGroup
-					v-model="selectedSlotIndex"
+					:model-value="selectedSlotIndex"
 					:options="[
 						{ label: 'A', value: 0 },
 						{ label: 'B', value: 1 },
@@ -252,7 +252,7 @@
 </template>
 
 <script setup lang="ts">
-import { ref, watch, onMounted } from "vue";
+import { computed, ref, watch, onMounted } from "vue";
 import PatchCanvas from "./components/canvas/PatchCanvas.vue";
 import PatchBrowser from "./components/panels/PatchBrowser.vue";
 import SidePanel from "./components/panels/SidePanel.vue";
@@ -293,7 +293,11 @@ const {
 } = usePatchManager();
 
 const SLOT_LABELS = ["A", "B", "C", "D"] as const;
-const selectedSlotIndex = ref<number | null>(null);
+const selectedSlotIndex = computed<number | null>(() => {
+	const label = device.getActiveSlot;
+	if (!label) return null;
+	return SLOT_LABELS.indexOf(label);
+});
 
 function applySlotResult(result: { patch: any; name: string } | null) {
 	if (!result?.patch) return;
@@ -307,7 +311,6 @@ async function loadSlotPatch(index: number) {
 }
 
 async function handleSlotClick(index: number) {
-	selectedSlotIndex.value = index;
 	const slot = SLOT_LABELS[index];
 	applySlotResult(await slotsStore.selectSlot(slot));
 }
@@ -354,7 +357,6 @@ onMounted(async () => {
 	).toUpperCase();
 	const idx = ["A", "B", "C", "D"].indexOf(focusLabel);
 	if (idx >= 0) {
-		selectedSlotIndex.value = idx;
 		await loadSlotPatch(idx);
 	}
 });

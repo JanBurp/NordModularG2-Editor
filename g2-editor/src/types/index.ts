@@ -1,3 +1,5 @@
+export type SlotLabel = "A" | "B" | "C" | "D";
+
 export interface SlotInfo {
 	slot: string;
 	bank: number;

@@ -1,4 +1,4 @@
-import { Device } from "@/types";
+import { Device, SlotLabel } from "@/types";
 import { defineStore } from "pinia";
 
 export type DeviceStatus =
@@ -20,6 +20,12 @@ export const useDeviceStore = defineStore("device", {
 
 	getters: {
 		connected: (state) => state.status === "connected",
+		getActiveSlot: (state): SlotLabel | null => {
+			if (!state.device) return null;
+			const active = state.device.slots.find(s => s.active);
+			if (!active) return null;
+			return active.slot.toUpperCase() as SlotLabel;
+		},
 		perfName: (state): string => {
 			if (state.device?.performance) return state.device.performance.name;
 			return '---';

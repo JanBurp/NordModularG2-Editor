@@ -1,8 +1,9 @@
 import { defineStore } from "pinia";
 import type { Patch } from "../composables/usePatchManager";
 import { useDeviceStore } from "./device";
+import type { SlotLabel } from "@/types";
 
-export type SlotLabel = "A" | "B" | "C" | "D";
+export type { SlotLabel };
 
 interface SlotEntry {
 	name: string;
@@ -14,7 +15,6 @@ interface SlotEntry {
 
 export const useSlotsStore = defineStore("slots", {
 	state: () => ({
-		selected: null as SlotLabel | null,
 		slots: {
 			A: { name: "", loading: false, error: null, rawHex: null, patch: null },
 			B: { name: "", loading: false, error: null, rawHex: null, patch: null },
@@ -56,9 +56,8 @@ export const useSlotsStore = defineStore("slots", {
 		async selectSlot(
 			slot: SlotLabel,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			if (this.selected === slot) return this.loadSlot(slot);
+			if (useDeviceStore().getActiveSlot === slot) return this.loadSlot(slot);
 
-			this.selected = slot;
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
 			try {
@@ -77,14 +76,14 @@ export const useSlotsStore = defineStore("slots", {
 		},
 
 		async selectVariation(variation: number): Promise<void> {
-			if (!this.selected) return;
-			await window.cli.run(["variation", String(variation + 1), this.selected]);
+			const active = useDeviceStore().getActiveSlot;
+			if (!active) return;
+			await window.cli.run(["variation", String(variation + 1), active]);
 		},
 
 		async loadSlot(
 			slot: SlotLabel,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			this.selected = slot;
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
 			try {
