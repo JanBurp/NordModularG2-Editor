@@ -93,7 +93,7 @@ const parammap: Record<string, ParamDefinition> = {
 	LoopOnce: { bmp: "SeqLp", w: 19, maskh: 11, names: ["", ""], low: 0, high: 1, def: 1, defin: ["0 ~ Once, 1 ~ Loop"], comments: "" },
 	LpBpHp: { names: ["LP", "BP", "HP"], low: 0, high: 2, def: 0, defin: ["0 ~ LP, 1 ~ BP, 2 ~ HP"], comments: "" },
 	LpBpHp2: { names: ["LP", "BP", "HP"], low: 0, high: 2, def: 0, defin: ["0 ~ LP, 1 ~ BP, 2 ~ HP"], comments: "" },
-	LpBpHpBr: { names: ["LP", "BP", "HP", "BR"], low: 0, high: 3, def: 0, defin: ["0 ~ LP, 1 ~ BP, 2 ~ HP, 3 ~ BR"], comments: "" },
+	LpBpHpBr: { mode: "VR", names: ["LP", "BP", "HP", "BR"], low: 0, high: 3, def: 0, defin: ["0 ~ LP, 1 ~ BP, 2 ~ HP, 3 ~ BR"], comments: "" },
 	MidiCh_16: { low: 0, high: 16, def: 0, defin: ["0 ~ ch1, 1 ~ ch 2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This"], comments: "" },
 	MidiCh_17: { low: 0, high: 17, def: 0, defin: ["0 ~ ch1, 1 ~ ch2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ keyb"], comments: "" },
 	MidiCh_20: { low: 0, high: 20, def: 0, defin: ["0 ~ ch1, 1 ~ ch 2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ Slot A, 18 ~ Slot B, 19 ~ Slot C, 20 ~ Slot D"], comments: "" },
