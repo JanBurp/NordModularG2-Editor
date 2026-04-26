@@ -7,6 +7,7 @@ declare module "*.vue" {
 }
 
 interface Window {
+	__g2DragTypeId?: number;
 	cli: {
 		run: (args: string[]) => Promise<string>;
 		runBatch: (argsList: string[][]) => Promise<string[]>;

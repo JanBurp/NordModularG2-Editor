@@ -173,9 +173,14 @@
 					:cable-visibility="cableVisibility"
 					:shake-trigger="cableShakeTrigger"
 					:selected-cable="selectedCable"
+					:selected-module-index="selectedModule"
 					@cable-click="handleCableClick"
 					@jack-drag-start="handleJackDragStart"
 					@jack-drag-end="handleJackDragEnd"
+					@module-click="handleModuleClick"
+					@module-move="handleModuleMove"
+					@module-drop="handleModuleDrop"
+					@canvas-click="handleCanvasClick"
 				/>
 				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
 			</div>
@@ -224,6 +229,7 @@
 	const slotsStore = useSlotsStore();
 
 	const selectedCable = ref<Cable | null>(null);
+	const selectedModule = ref<number | null>(null);
 	const dragSource = ref<{ moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string } | null>(null);
 
 	const {
@@ -291,12 +297,45 @@
 
 	async function handleDeleteKey(e: KeyboardEvent) {
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+
+		if (selectedModule.value !== null && !selectedCable.value) {
+			const moduleId = selectedModule.value;
+			const connectedCables = currentCables.value.filter(
+				(c: any) => c.smod === moduleId || c.dmod === moduleId,
+			);
+			for (const cable of connectedCables) {
+				await slotsStore.deleteCableNoReload(cable as any, selectedArea.value as 'voice' | 'fx');
+			}
+			applySlotResult(await slotsStore.deleteModule(moduleId, selectedArea.value as 'voice' | 'fx'));
+			selectedModule.value = null;
+			return;
+		}
+
 		if (!selectedCable.value) return;
 		const cable = selectedCable.value;
 		applySlotResult(
 			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, selectedArea.value as 'voice' | 'fx'),
 		);
 		selectedCable.value = null;
+	}
+
+	function handleModuleClick(moduleIndex: number) {
+		selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+		selectedCable.value = null;
+	}
+
+	function handleCanvasClick() {
+		selectedModule.value = null;
+	}
+
+	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }) {
+		applySlotResult(await slotsStore.moveModule(moduleIndex, col, row, selectedArea.value as 'voice' | 'fx'));
+	}
+
+	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }) {
+		const ids = currentModules.value.map((m: any) => m.index as number);
+		const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+		applySlotResult(await slotsStore.addModule(typeId, moduleId, col, row, selectedArea.value as 'voice' | 'fx'));
 	}
 
 	async function loadSlotPatch(index: number) {

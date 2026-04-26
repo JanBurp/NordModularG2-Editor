@@ -306,6 +306,63 @@ int main(int argc, char *argv[]) {
         return g2_del_cable(slot, location, from_mod, from_ct, from_con, to_mod, to_ct, to_con);
     }
 
+    if (strcmp(command, "del-module") == 0) {
+        /* del-module <slot> <va|fx> <module-id> */
+        if (i + 3 >= argc) {
+            fprintf(stderr, "Usage: del-module <slot> <va|fx> <module-id>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int module_id = atoi(argv[i + 3]);
+        return g2_del_module(slot, location, module_id);
+    }
+
+    if (strcmp(command, "move-module") == 0) {
+        /* move-module <slot> <va|fx> <module-id> <col> <row> */
+        if (i + 5 >= argc) {
+            fprintf(stderr, "Usage: move-module <slot> <va|fx> <module-id> <col> <row>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int module_id = atoi(argv[i + 3]);
+        int col       = atoi(argv[i + 4]);
+        int row       = atoi(argv[i + 5]);
+        return g2_move_module(slot, location, module_id, col, row);
+    }
+
+    if (strcmp(command, "add-module") == 0) {
+        /* add-module <slot> <va|fx> <type-id> <module-id> <col> <row>
+         *            <num-modes> [mode-val...] <num-params> [param-val...] <name> */
+        if (i + 7 >= argc) {
+            fprintf(stderr, "Usage: add-module <slot> <va|fx> <type-id> <module-id> <col> <row>"
+                            " <num-modes> [mode-vals...] <num-params> [param-vals...] <name>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int type_id   = atoi(argv[i + 3]);
+        int module_id = atoi(argv[i + 4]);
+        int col       = atoi(argv[i + 5]);
+        int row       = atoi(argv[i + 6]);
+        int j = i + 7;
+
+        int num_modes = (j < argc) ? atoi(argv[j++]) : 0;
+        int mode_vals[64] = {0};
+        for (int m = 0; m < num_modes && j < argc - 2; m++)
+            mode_vals[m] = atoi(argv[j++]);
+
+        int num_params = (j < argc) ? atoi(argv[j++]) : 0;
+        int param_vals[256] = {0};
+        for (int p = 0; p < num_params && j < argc - 1; p++)
+            param_vals[p] = atoi(argv[j++]);
+
+        const char *name = (j < argc) ? argv[j] : "Module";
+        return g2_add_module(slot, location, type_id, module_id, col, row,
+                             num_modes, mode_vals, num_params, param_vals, name);
+    }
+
     if (strcmp(command, "watch") == 0) {
         return g2_watch(output_format, debug_mode);
     }
