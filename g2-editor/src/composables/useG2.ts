@@ -62,6 +62,8 @@ export function useG2() {
 				return "Connection Error";
 			case "unsupported":
 				return "G2 Not Available";
+			case "lost":
+				return "G2 Disconnected";
 			default:
 				return "Not Connected";
 		}
@@ -83,9 +85,24 @@ export function useG2() {
 
 	function startWatch(): void {
 		window.cli.offWatchEvent();
+		window.cli.offDeviceDisconnected();
+		window.cli.onDeviceDisconnected(() => {
+			store.status = "lost";
+			log("•", "Connect", "G2 disconnected — cable unplugged?");
+		});
 		window.cli.onWatchEvent((line: string) => {
 			try {
 				const ev = JSON.parse(line);
+				if (ev.type === "device_disconnected") {
+					store.status = "lost";
+					log("•", "Connect", "G2 disconnected — cable unplugged?");
+					return;
+				}
+				if (ev.type === "device_reconnected") {
+					store.status = "connected";
+					log("•", "Connect", "G2 reconnected");
+					return;
+				}
 				const category: UsbLogEntry["category"] =
 					ev.type === "param_change" || ev.type === "patch_param" ? "param" :
 					ev.type === "led_data"     || ev.type === "volume_data"  ? "led_volume" :
@@ -103,6 +120,7 @@ export function useG2() {
 	function stopWatch(): void {
 		window.cli.watchStop();
 		window.cli.offWatchEvent();
+		window.cli.offDeviceDisconnected();
 	}
 
 	async function connectDevice(): Promise<void> {

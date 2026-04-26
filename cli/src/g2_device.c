@@ -1510,9 +1510,28 @@ int g2_watch(output_format_t format, int debug) {
         if (ret == LIBUSB_ERROR_NO_DEVICE) {
             printf("{\"type\":\"device_disconnected\"}\n");
             fflush(stdout);
-            signal(SIGINT, SIG_DFL);
-            signal(SIGTERM, SIG_DFL);
-            return 1;
+            g2_disconnect();
+
+            /* Poll every 1 s until the cable comes back (or SIGTERM fires) */
+            while (g2_watch_running) {
+                usleep(1000000);
+                if (g2_connect_silent() >= 0) break;
+            }
+            if (!g2_watch_running) break;   /* SIGTERM during wait → clean exit */
+
+            /* Re-arm: drain stale data, send START_COMM, recv ACK */
+            g2_drain_pending();
+            uint8_t start_cmd2[2] = {SUB_COMMAND_START_STOP, 0x00};
+            ret = send_system_data(0x41, start_cmd2, 2);
+            if (ret < 0) {
+                fprintf(stderr, "watch: failed to re-arm after reconnect\n");
+                break;
+            }
+            usleep(USB_SEND_DELAY_US);
+            recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+            printf("{\"type\":\"device_reconnected\"}\n");
+            fflush(stdout);
+            continue;
         }
         if (ret <= 0) continue;
 
