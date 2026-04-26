@@ -62,6 +62,7 @@ export interface PatchDescription {
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
+	mode?: { area: 0 | 1; variation: number };
 }
 
 function pch2_(data: ArrayBuffer, filename: string) {

@@ -23,11 +23,11 @@
 			</template>
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!patch">Save Patch</Button>
+			<Button variant="default" :disabled="!currentPatch">Save Patch</Button>
 			<!-- <Button
 				variant="default"
-				:disabled="!patch || deviceStatus !== 'connected'"
-				@click="uploadToG2(patch)"
+				:disabled="!currentPatch || deviceStatus !== 'connected'"
+				@click="uploadToG2(currentPatch)"
 			>
 				Upload to G2
 			</Button>
@@ -80,10 +80,10 @@
 			<ToolBarDivider />
 
 			<BtnGroup
-				v-model="selectedArea"
+				v-model="uiStore.area"
 				:options="[
-					{ value: 'voice', label: 'Voice' },
-					{ value: 'fx', label: 'FX' },
+					{ value: 1, label: 'Voice' },
+					{ value: 0, label: 'FX' },
 				]"
 				variant="toggle"
 			/>
@@ -93,7 +93,7 @@
 			<div class="flex items-center gap-2">
 				<span class="text-xs font-semibold text-neutral-400">Var:</span>
 				<BtnGroup
-					v-model="variation"
+					v-model="uiStore.variation"
 					:options="[
 						{ label: '1', value: 0 },
 						{ label: '2', value: 1 },
@@ -164,12 +164,12 @@
 
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
 				<PatchCanvas
-					v-if="patch"
+					v-if="currentPatch"
 					:key="patchName"
 					:modules="currentModules"
 					:cables="currentCables"
-					:variation="variation"
-					:area="selectedArea"
+					:variation="uiStore.variation"
+					:area="uiStore.area === 1 ? 'voice' : 'fx'"
 					:cable-visibility="cableVisibility"
 					:shake-trigger="cableShakeTrigger"
 					:selected-cable="selectedCable"
@@ -216,10 +216,10 @@
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 
 	import { getModule } from './renderer/nmg2mods';
-	import { usePatchManager } from './composables/usePatchManager';
 	import { useG2 } from './composables/useG2';
 	import { useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
+	import { useUiStore } from './store/ui';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useRightPanel } from './composables/useRightPanel';
@@ -228,36 +228,44 @@
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
 
 	const selectedCable = ref<Cable | null>(null);
 	const selectedModule = ref<number | null>(null);
 	const dragSource = ref<{ moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string } | null>(null);
 
-	const {
-		patch,
-		patchName,
-		variation,
-		selectedArea,
-		currentModules,
-		currentCables,
-		areaModulesCount,
-		areaCablesCount,
-		handleFileLoad,
-		handlePatchSelect,
-		setPatch,
-	} = usePatchManager();
-
 	const SLOT_LABELS = ['A', 'B', 'C', 'D'] as const;
+
+	const currentPatch = computed(() => slotsStore.slots[uiStore.activeSlot]?.patch);
+	const currentModules = computed(() => {
+		if (!currentPatch.value?.areas) return [];
+		return currentPatch.value.areas[uiStore.area]?.modules || [];
+	});
+	const currentCables = computed(() => {
+		if (!currentPatch.value?.areas) return [];
+		return currentPatch.value.areas[uiStore.area]?.cableList || [];
+	});
+	const patchName = computed(() => slotsStore.slots[uiStore.activeSlot]?.name || '');
 	const selectedSlotIndex = computed<number | null>(() => {
 		const label = device.getActiveSlot;
-		if (!label) return null;
+		if (!label) return SLOT_LABELS.indexOf(uiStore.activeSlot);
 		return SLOT_LABELS.indexOf(label);
 	});
 
+	const areaModulesCount = (area: 'voice' | 'fx') => {
+		const areaIndex = area === 'voice' ? 1 : 0;
+		return currentPatch.value?.areas?.[areaIndex]?.modules?.length ?? 0;
+	};
+	const areaCablesCount = (area: 'voice' | 'fx') => {
+		const areaIndex = area === 'voice' ? 1 : 0;
+		return currentPatch.value?.areas?.[areaIndex]?.cableList?.length ?? 0;
+	};
+
 	function applySlotResult(result: { patch: any; name: string } | null) {
 		if (!result?.patch) return;
-		setPatch(result.patch, result.name);
-		variation.value = result.patch.description?.variation ?? 0;
+		if (result.patch?.description?.variation !== undefined) {
+			uiStore.variation = result.patch.description.variation;
+		}
 	}
 
 	function handleCableClick(cable: Cable) {
@@ -291,7 +299,7 @@
 				input.moduleIndex,
 				0,
 				input.connectorIndex,
-				selectedArea.value as 'voice' | 'fx',
+				uiStore.area === 1 ? 'voice' : 'fx',
 			),
 		);
 	}
@@ -301,13 +309,11 @@
 
 		if (selectedModule.value !== null && !selectedCable.value) {
 			const moduleId = selectedModule.value;
-			const connectedCables = currentCables.value.filter(
-				(c: any) => c.smod === moduleId || c.dmod === moduleId,
-			);
+			const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
 			for (const cable of connectedCables) {
-				await slotsStore.deleteCableNoReload(cable as any, selectedArea.value as 'voice' | 'fx');
+				await slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
 			}
-			applySlotResult(await slotsStore.deleteModule(moduleId, selectedArea.value as 'voice' | 'fx'));
+			applySlotResult(await slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx'));
 			selectedModule.value = null;
 			return;
 		}
@@ -315,7 +321,7 @@
 		if (!selectedCable.value) return;
 		const cable = selectedCable.value;
 		applySlotResult(
-			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, selectedArea.value as 'voice' | 'fx'),
+			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx'),
 		);
 		selectedCable.value = null;
 	}
@@ -366,9 +372,9 @@
 			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
 		const displaced = resolveColumnCollisions(colModules, row, height);
 		for (const d of displaced) {
-			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, selectedArea.value as 'voice' | 'fx');
+			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, uiStore.area === 1 ? 'voice' : 'fx');
 		}
-		applySlotResult(await slotsStore.moveModule(moduleIndex, col, row, selectedArea.value as 'voice' | 'fx'));
+		applySlotResult(await slotsStore.moveModule(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx'));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }) {
@@ -380,9 +386,9 @@
 			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
 		const displaced = resolveColumnCollisions(colModules, row, height);
 		for (const d of displaced) {
-			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, selectedArea.value as 'voice' | 'fx');
+			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, uiStore.area === 1 ? 'voice' : 'fx');
 		}
-		applySlotResult(await slotsStore.addModule(typeId, moduleId, col, row, selectedArea.value as 'voice' | 'fx'));
+		applySlotResult(await slotsStore.addModule(typeId, moduleId, col, row, uiStore.area === 1 ? 'voice' : 'fx'));
 	}
 
 	async function loadSlotPatch(index: number) {
@@ -392,11 +398,50 @@
 
 	async function handleSlotClick(index: number) {
 		const slot = SLOT_LABELS[index];
-		applySlotResult(await slotsStore.selectSlot(slot));
+		uiStore.activeSlot = slot;
+		if (device.status === 'connected') {
+			applySlotResult(await slotsStore.selectSlot(slot));
+		}
 	}
 
 	async function handleVariationClick(variationIndex: number) {
-		await slotsStore.selectVariation(variationIndex);
+		uiStore.variation = variationIndex;
+		if (device.status === 'connected') {
+			await slotsStore.selectVariation(variationIndex);
+		}
+	}
+
+	async function handleFileLoad(event: Event) {
+		const input = event.target as HTMLInputElement;
+		const file = input.files?.[0];
+		if (!file) return;
+		const reader = new FileReader();
+		reader.onload = async (e) => {
+			const buffer = e.target?.result;
+			if (!buffer || !(buffer instanceof ArrayBuffer)) return;
+			const { PatchParser } = await import('./parser/nmg2PatchParser');
+			const parser = new PatchParser(buffer);
+			const parsedPatch = parser.parse() as any;
+			const name = file.name.replace('.pch2', '').replace('.prf2', '');
+			slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
+		};
+		reader.readAsArrayBuffer(file);
+	}
+
+	async function handlePatchSelect(filename: string) {
+		if (typeof window === 'undefined' || !window.electronAPI) return;
+		try {
+			const result = await window.electronAPI.patches.load(filename);
+			if (result.success && result.data) {
+				const buffer = new Uint8Array(result.data).buffer;
+				const { PatchParser } = await import('./parser/nmg2PatchParser');
+				const parser = new PatchParser(buffer);
+				const parsedPatch = parser.parse() as any;
+				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, filename.replace('.pch2', '').replace('.prf2', ''));
+			}
+		} catch (err) {
+			console.error('Failed to load patch:', err);
+		}
 	}
 
 	const {
@@ -424,7 +469,7 @@
 		updatePatchData,
 	} = useCableVisibility();
 
-	const { selectedCategory } = usePatchCategory(patch);
+	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
 
 	const { rightPaneTab, showRightPane, toggleSidebar, handleToggleOff } = useRightPanel();
 
@@ -436,11 +481,14 @@
 		window.addEventListener('keydown', handleDeleteKey);
 		window.addEventListener('mouseup', handleWindowMouseup);
 		await connectDevice();
-		if (device.status !== 'connected') return;
-		const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
-		const idx = ['A', 'B', 'C', 'D'].indexOf(focusLabel);
-		if (idx >= 0) {
-			await loadSlotPatch(idx);
+		if (device.status === 'connected') {
+			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
+			const idx = ['A', 'B', 'C', 'D'].indexOf(focusLabel);
+			if (idx >= 0) {
+				const slot = SLOT_LABELS[idx];
+				uiStore.activeSlot = slot;
+				await loadSlotPatch(idx);
+			}
 		}
 	});
 
@@ -454,28 +502,27 @@
 		const slot = SLOT_LABELS[slotIndex];
 		if (!slot) return;
 		device.setActiveSlot(slot);
-		applySlotResult(await slotsStore.loadSlot(slot));
+		uiStore.activeSlot = slot;
+		if (device.status === 'connected') {
+			applySlotResult(await slotsStore.loadSlot(slot));
+		}
 	});
 
 	watch(hardwareVariationChange, (change) => {
 		if (!change) return;
 		const changeSlot = (['A', 'B', 'C', 'D'] as const)[change.slot];
 		if (changeSlot !== device.getActiveSlot) return;
-		variation.value = change.variation;
+		uiStore.variation = change.variation;
+		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;
+		if (activePatch?.description) {
+			activePatch.description.variation = change.variation;
+		}
 	});
-
-	watch(
-		() => patch.value?.description,
-		(description) => {
-			syncWithPatchData(description);
-		},
-		{ immediate: true, deep: true },
-	);
 
 	watch(
 		cableVisibility,
 		() => {
-			updatePatchData(patch.value?.description);
+			updatePatchData(currentPatch.value?.description);
 		},
 		{ deep: true },
 	);

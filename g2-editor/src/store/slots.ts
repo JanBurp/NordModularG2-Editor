@@ -1,5 +1,5 @@
 import { defineStore } from "pinia";
-import type { Patch } from "../composables/usePatchManager";
+import type { Patch } from "../parser/nmg2PatchParser";
 import { useDeviceStore } from "./device";
 import type { SlotLabel } from "@/types";
 
@@ -15,6 +15,7 @@ interface SlotEntry {
 
 export const useSlotsStore = defineStore("slots", {
 	state: () => ({
+		activeSlot: "A" as SlotLabel,
 		slots: {
 			A: { name: "", loading: false, error: null, rawHex: null, patch: null },
 			B: { name: "", loading: false, error: null, rawHex: null, patch: null },
@@ -50,12 +51,14 @@ export const useSlotsStore = defineStore("slots", {
 			this.slots[slot].name = name;
 			this.slots[slot].rawHex = rawHex;
 			this.slots[slot].patch = patch;
+			patch.mode = { area: 1, variation: patch.description?.variation ?? 0 };
 			return { name, rawHex, patch };
 		},
 
 		async selectSlot(
 			slot: SlotLabel,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			this.activeSlot = slot;
 			if (useDeviceStore().getActiveSlot === slot) return this.loadSlot(slot);
 
 			this.slots[slot].loading = true;
@@ -205,6 +208,11 @@ export const useSlotsStore = defineStore("slots", {
 			} finally {
 				this.slots[slot].loading = false;
 			}
+		},
+
+		loadPatchFile(slot: SlotLabel, patch: Patch, name: string): void {
+			this.slots[slot].patch = patch;
+			this.slots[slot].name = name;
 		},
 	},
 });
