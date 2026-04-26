@@ -39,6 +39,8 @@ static void print_usage(const char *prog) {
     printf("  list [type] [bank <n>]               List patches and performances\n");
     printf("  slot <A|B|C|D>                      Change active slot\n");
     printf("  variation <1-8> <A-D>                Select variation for slot\n");
+    printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
+    printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
     printf("  watch                                Monitor param changes live\n");
     printf("\nCommands (not implemented):\n");
     printf("  * list-modules [slot]                List modules in patch\n");
@@ -267,6 +269,41 @@ int main(int argc, char *argv[]) {
             }
         }
         return g2_select_variation(variation, slot);
+    }
+
+    if (strcmp(command, "add-cable") == 0) {
+        /* add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con> */
+        if (i + 9 >= argc) {
+            fprintf(stderr, "Usage: add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
+            return 1;
+        }
+        int slot     = parse_slot(argv[i + 1]);
+        int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int color    = atoi(argv[i + 3]);
+        int from_mod = atoi(argv[i + 4]);
+        int from_ct  = atoi(argv[i + 5]);
+        int from_con = atoi(argv[i + 6]);
+        int to_mod   = atoi(argv[i + 7]);
+        int to_ct    = atoi(argv[i + 8]);
+        int to_con   = atoi(argv[i + 9]);
+        return g2_add_cable(slot, location, color, from_mod, from_ct, from_con, to_mod, to_ct, to_con);
+    }
+
+    if (strcmp(command, "del-cable") == 0) {
+        /* del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con> */
+        if (i + 8 >= argc) {
+            fprintf(stderr, "Usage: del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
+            return 1;
+        }
+        int slot     = parse_slot(argv[i + 1]);
+        int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int from_mod = atoi(argv[i + 3]);
+        int from_ct  = atoi(argv[i + 4]);
+        int from_con = atoi(argv[i + 5]);
+        int to_mod   = atoi(argv[i + 6]);
+        int to_ct    = atoi(argv[i + 7]);
+        int to_con   = atoi(argv[i + 8]);
+        return g2_del_cable(slot, location, from_mod, from_ct, from_con, to_mod, to_ct, to_con);
     }
 
     if (strcmp(command, "watch") == 0) {

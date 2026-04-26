@@ -64,15 +64,22 @@ export interface ModuleDef {
  * @param svgElement - SVG element to append cables to
  * @param visibleCables - Optional filter for cable visibility
  */
+export interface CableRenderOptions {
+	onCableClick?: (cable: Cable) => void;
+	selectedCable?: Cable | null;
+}
+
+function isSameCable(a: Cable, b: Cable): boolean {
+	return a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
+}
+
 export function makePatchCables(
 	modules: Module[],
 	cables: Cable[],
 	svgElement: SVGElement,
-	visibleCables?: Cable[],
+	options?: CableRenderOptions,
 ): void {
-	const cablesToRender = visibleCables || cables;
-
-	cablesToRender.forEach((cable) => {
+	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
 		const sourceJack = cable.sourceJack ?? cable.scon;
@@ -129,19 +136,37 @@ export function makePatchCables(
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
+		const isSelected = options?.selectedCable ? isSameCable(cable, options.selectedCable) : false;
+		const cableKey = `${cable.smod ?? cable.sourceModule}-${cable.scon ?? cable.sourceJack}-${cable.dmod ?? cable.destModule}-${cable.dcon ?? cable.destJack}`;
+
 		// Create 2-layer cable: border -> main
 		const border = svgPath(d, {
-			stroke: color,
 			fill: "none",
-			class: "svgcableborder nomouse",
+			class: `svgcableborder nomouse${isSelected ? " selected" : ""}`,
+			"data-cable-key": cableKey,
 		});
 		const main = svgPath(d, {
 			stroke: color,
 			fill: "none",
 			class: "svgcable nomouse",
 		});
+		// Transparent wide hit area for clicking
+		const hitArea = svgPath(d, {
+			stroke: "transparent",
+			fill: "none",
+			"stroke-width": "12",
+			class: "cable-hit",
+			style: "cursor: pointer",
+		});
+		if (options?.onCableClick) {
+			hitArea.addEventListener("click", (e) => {
+				e.stopPropagation();
+				options.onCableClick!(cable);
+			});
+		}
 		svgElement.appendChild(border);
 		svgElement.appendChild(main);
+		svgElement.appendChild(hitArea);
 	});
 }
 
@@ -158,7 +183,8 @@ export function removeAllCables(svgElement: SVGElement): void {
 		if (
 			sibling.tagName === "path" &&
 			(sibling.classList.contains("svgcable") ||
-				sibling.classList.contains("svgcableborder"))
+				sibling.classList.contains("svgcableborder") ||
+				sibling.classList.contains("cable-hit"))
 		) {
 			toRemove.push(sibling);
 		}

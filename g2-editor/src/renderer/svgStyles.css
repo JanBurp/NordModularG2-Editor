@@ -1,159 +1,165 @@
 html,
 body {
-  font-family: sans-serif;
-  height: 100%;
+	font-family: sans-serif;
+	height: 100%;
 }
 
 #options {
-  border: 1px solid black;
+	border: 1px solid black;
 }
 
 @media (max-width: 75em) {
-  #options {
-    font-size: 75%;
-  }
+	#options {
+		font-size: 75%;
+	}
 
-  #options input {
-    font-size: 100%;
-  }
+	#options input {
+		font-size: 100%;
+	}
 }
 
 svg {
-  overflow: visible;
-  -webkit-user-select: none;
-  -moz-user-select: none;
-  user-select: none;
+	overflow: visible;
+	-webkit-user-select: none;
+	-moz-user-select: none;
+	user-select: none;
 }
 
 svg.clipper {
-  overflow: hidden;
+	overflow: hidden;
 }
 
 body {
-  background-color: gainsboro;
-  margin: 0;
+	background-color: gainsboro;
+	margin: 0;
 }
 
 circle.knob {
-  cursor: pointer;
+	cursor: pointer;
 }
 
 div#wrap {
-  position: relative;
-  /* background: url(brushedmetaltile.jpg) repeat; */
-  background-color: #666;
-  width: 100%;
-  /* height: 1600px; */
-  min-height: 100%;
+	position: relative;
+	/* background: url(brushedmetaltile.jpg) repeat; */
+	background-color: #666;
+	width: 100%;
+	/* height: 1600px; */
+	min-height: 100%;
 }
 
-div#wrap.knobs_shadow g[id^="Knob"] circle {
-  filter: url(#f3);
+div#wrap.knobs_shadow g[id^='Knob'] circle {
+	filter: url(#f3);
 }
 
 div#wrap.sockets_shadow g#input circle[stroke] {
-  filter: url(#f4);
+	filter: url(#f4);
 }
 
 div#wrap.sockets_shadow g#output path {
-  filter: url(#f4);
+	filter: url(#f4);
 }
 
-div#wrap.cables_shadow path[class^="svgcable"] {
-  filter: url(#f3);
+div#wrap.cables_shadow path[class^='svgcable'] {
+	filter: url(#f3);
 }
 
 div#wrap.patching {
-  cursor: crosshair;
+	cursor: crosshair;
 }
 
 text {
-  cursor: default;
+	cursor: default;
 }
 
 g.module {
-  width: 256px;
+	width: 256px;
 }
 
 /* Main cable with shadow */
-path[class^="svgcable"] {
-  stroke-width: 3;
-  stroke-linecap: round;
-  fill: none;
-  opacity: 0.9;
-  filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.4));
+path[class^='svgcable'] {
+	stroke-width: 3;
+	stroke-linecap: round;
+	fill: none;
+	opacity: 0.9;
+	filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.4));
 }
 
 /* Cable border/outline for definition */
-path[class^="svgcableborder"] {
-  stroke-width: 5;
-  stroke-linecap: round;
-  fill: none;
-  opacity: 1;
-  stroke: rgba(0, 0, 0, 0.3);
+path[class^='svgcableborder'] {
+	stroke-width: 5;
+	stroke-linecap: round;
+	fill: none;
+	opacity: 1;
+	stroke: rgba(0, 0, 0, 0.3);
+}
+
+path.svgcableborder.selected {
+	stroke: black;
+	stroke-width: 5;
+	opacity: 1;
 }
 
 input#shifter,
 input#scaler {
-  display: none;
+	display: none;
 }
 
 li.current {
-  background-color: blue;
-  color: white;
+	background-color: blue;
+	color: white;
 }
 
 fieldset {
-  display: inline-block;
-  padding: 0 6px;
-  text-align: center;
+	display: inline-block;
+	padding: 0 6px;
+	text-align: center;
 }
 
 .nomouse {
-  pointer-events: none;
+	pointer-events: none;
 }
 
 ul#slotlist,
 ul#variationselect {
-  display: inline-block;
-  list-style: none;
-  padding: 0;
+	display: inline-block;
+	list-style: none;
+	padding: 0;
 }
 
 ul#slotlist li,
 ul#variationselect li {
-  display: inline-block;
-  border-radius: 3px;
-  vertical-align: middle;
+	display: inline-block;
+	border-radius: 3px;
+	vertical-align: middle;
 }
 
 ul#slotlist li span,
 ul#variationselect li span {
-  display: inline-block;
-  padding: 6px 9px;
-  border-radius: 10px;
-  color: white;
-  font-size: small;
-  cursor: pointer;
-  border: 2px solid gainsboro;
+	display: inline-block;
+	padding: 6px 9px;
+	border-radius: 10px;
+	color: white;
+	font-size: small;
+	cursor: pointer;
+	border: 2px solid gainsboro;
 }
 
 ul#slotlist li span.currentbutton,
 ul#variationselect li span.currentbutton {
-  border-color: orange;
-  background-color: orange;
+	border-color: orange;
+	background-color: orange;
 }
 
 .buttonbg {
-  background-repeat: repeat-x;
-  background-size: contain;
-  background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAgCAYAAAA40qkZAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAABOAAAATgBsmZOHAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABRSURBVBiVlY9BCsAwCASnkn/3SXlZPImnsPSQEkgLJfUkMyuyR631NDOKu7MurbUHiQgAiiQAjHt2iC1E0r/zrRcfqveOJEpmjkxEjF6TvNQF9XRDKy9nNs4AAAAASUVORK5CYII=);
+	background-repeat: repeat-x;
+	background-size: contain;
+	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAgCAYAAAA40qkZAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAABOAAAATgBsmZOHAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABRSURBVBiVlY9BCsAwCASnkn/3SXlZPImnsPSQEkgLJfUkMyuyR631NDOKu7MurbUHiQgAiiQAjHt2iC1E0r/zrRcfqveOJEpmjkxEjF6TvNQF9XRDKy9nNs4AAAAASUVORK5CYII=);
 }
 
 fieldset {
-  border: 1px solid silver;
+	border: 1px solid silver;
 }
 
 .nope {
-  display: none;
+	display: none;
 }

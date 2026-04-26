@@ -81,6 +81,38 @@ export const useSlotsStore = defineStore("slots", {
 			await window.cli.run(["variation", String(variation + 1), active]);
 		},
 
+		async deleteCable(
+			cable: { smod: number; scon: number; dmod: number; dcon: number },
+			area: "voice" | "fx",
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return null;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run([
+				"del-cable", slot, location,
+				String(cable.smod), "1", String(cable.scon),
+				String(cable.dmod), "0", String(cable.dcon),
+			]);
+			return this.loadSlot(slot);
+		},
+
+		async addCable(
+			fromMod: number, fromConType: number, fromCon: number,
+			toMod: number, toConType: number, toCon: number,
+			area: "voice" | "fx",
+			color = 1,
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return null;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run([
+				"add-cable", slot, location, String(color),
+				String(fromMod), String(fromConType), String(fromCon),
+				String(toMod), String(toConType), String(toCon),
+			]);
+			return this.loadSlot(slot);
+		},
+
 		async loadSlot(
 			slot: SlotLabel,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
