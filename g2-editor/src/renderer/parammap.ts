@@ -1,7 +1,7 @@
 import type { ParamDefinition } from "../types/index.ts";
 
 const parammap: Record<string, ParamDefinition> = {
-	ActiveMonitor: { mode: "HR", names: [""], width: 11, bmp: "pwr", low: 0, high: 1, def: 1, defin: ["0 ~ Monitor,1 ~ Active "], comments: "" },
+	ActiveMonitor: { names: [""], width: 11, bmp: "pwr", low: 0, high: 1, def: 1, defin: ["0 ~ Monitor,1 ~ Active "], comments: "" },
 	AdAr: { low: 0, high: 1, def: 0, defin: ["0 ~ AD, 1 ~ AR"], comments: "Selects between Decay and Release modes" },
 	Bipolar_127: { low: 0, high: 127, def: 0, defin: ["0 ~ -64, 64 ~ 0, 127 ~ 64"], comments: "not necesarraly a linear control" },
 	BipPosNeg: { names: ["Bip", "Pos", "Neg"], width: 22, low: 0, high: 2, def: 0, defin: ["0 ~ Bip, 1 ~ Pos, 2 ~ Neg"], comments: "" },
@@ -27,8 +27,8 @@ const parammap: Record<string, ParamDefinition> = {
 	DrumSynthFreq: { low: 0, high: 127, def: 42, defin: ["0 ~ 20 Hz, 64 ~ 127 Hz, 127 ~ 784 Hz"], comments: "" },
 	DrumSynthNoiseFlt: { low: 0, high: 127, def: 57, defin: ["0 ~ 10.30 Hz, 64 ~ 415.3 Hz, 127 ~ 15.8 kHz"], comments: "" },
 	DrumSynthRatio: { low: 0, high: 127, def: 15, defin: ["0 ~ 1:1, 64 ~ x2.52, 127 ~ x6.26"], comments: "" },
-	Dst_1: { names: ["1/2", "3/4", "1/2", "3/4", "1/2", "3/4"], width: 17, low: 0, high: 5, def: 0, defin: ["0 ~ Out 1/2, 1 ~ Out 3/4, 2 ~ Fx 1/2, 3 ~ Fx 3/4, 4 ~ Bus 1/2, 5 ~ Bus 3/4"], comments: "" },
-	Dst_2: { names: ["Out", "Fx", "Bus"], low: 0, high: 2, def: 0, defin: ["0 ~ Out, 1 ~ Fx, 2 ~ Bus"], comments: "" },
+	Dst_1: { mode: "HR", names: ["1/2", "3/4", "1/2", "3/4", "1/2", "3/4"], width: 17, low: 0, high: 5, def: 0, defin: ["0 ~ Out 1/2, 1 ~ Out 3/4, 2 ~ Fx 1/2, 3 ~ Fx 3/4, 4 ~ Bus 1/2, 5 ~ Bus 3/4"], comments: "" },
+	Dst_2: { mode: "HR", names: ["Out", "Fx", "Bus"], width: 17, low: 0, high: 2, def: 0, defin: ["0 ~ Out, 1 ~ Fx, 2 ~ Bus"], comments: "" },
 	DxAlgorithm: { low: 0, high: 31, def: 0, defin: ["0 ~ 1, 31 ~ 32"], comments: "" },
 	DxFeedback: { low: 0, high: 7, def: 0, defin: ["0 ~ 0, 1 ~ 1, 2 ~ 2, 3 ~ 3, 4 ~ 4, 5 ~ 5, 6 ~ 6, 7 ~ 7"], comments: "" },
 	EnvFollowAttack: { low: 0, high: 127, def: 0, defin: ["0 ~ Fast, 1 ~ 0.53m, 64 ~ 23.0m, 127 ~ 1.00s"], comments: "" },

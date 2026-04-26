@@ -62,14 +62,18 @@
 	}
 
 	function onButtonClick(index: number) {
-		const low = paramMap.value.low || 0;
-		const high = paramMap.value.high || names.value.length - 1 || 0;
+		if (mode.value !== 'VR' && mode.value !== 'HR') {
+			onCycleValue();
+		} else {
+			const low = paramMap.value.low || 0;
+			const high = paramMap.value.high || names.value.length - 1 || 0;
 
-		// Ensure value is within bounds
-		const newValue = Math.max(low, Math.min(index, high));
+			// Ensure value is within bounds
+			const newValue = Math.max(low, Math.min(index, high));
 
-		if (newValue !== props.value) {
-			emit('change', props.paramIndex, newValue);
+			if (newValue !== props.value) {
+				emit('change', props.paramIndex, newValue);
+			}
 		}
 	}
 
