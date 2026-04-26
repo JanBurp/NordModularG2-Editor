@@ -12,12 +12,13 @@
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
-	import { isKnob, isSlider, isSwitch, isSpinner, formatValue, formatCombinedValue } from '../../composables/useModuleControls';
+	import { isKnob, isSlider, isSwitch, isSpinner } from '../../composables/useModuleControls';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
+	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 
 	const props = defineProps<{
@@ -144,19 +145,12 @@
 				:module-id="props.type"
 			/>
 
-			<!-- Value displays with formatted text -->
-			<template v-else-if="ve.type === 'valueDisplay' && ve.w">
-				<rect :x="ve.x" :y="ve.y" :width="ve.w" height="14" fill="#666" />
-				<!-- Show formatted value if ref points to a param -->
-				<text v-if="ve.ref !== undefined" :x="(ve.x || 0) + (ve.w || 0) / 2" :y="(ve.y || 0) + 10" fill="#fff" font-size="8" text-anchor="middle">
-					<template v-if="typeof ve.ref === 'number'">
-						{{ formatValue(getParamValue(ve.ref), moduleDef?.params?.[ve.ref]?.type || '') }}
-					</template>
-					<template v-else-if="Array.isArray(ve.ref)">
-						{{ formatCombinedValue(ve.ref, ve.func, moduleDef.params, localLv) }}
-					</template>
-				</text>
-			</template>
+			<ModuleValueDisplay
+				v-else-if="ve.type === 'valueDisplay'"
+				:ve="ve"
+				:params="moduleDef.params || []"
+				:values="localLv"
+			/>
 
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
