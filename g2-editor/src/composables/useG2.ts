@@ -28,9 +28,13 @@ function now(): string {
 	);
 }
 
+const SLOT_LABELS = ["A", "B", "C", "D"] as const;
+
 export function useG2() {
 	const store = useDeviceStore();
 	const logs = ref<UsbLogEntry[]>([]);
+	const hardwareVariationChange = ref<{ slot: number; variation: number } | null>(null);
+	const hardwareSlotChange = ref<number | null>(null);
 
 	function log(
 		direction: "→" | "←" | "•",
@@ -71,15 +75,16 @@ export function useG2() {
 
 	function formatWatchEvent(ev: any): string {
 		switch (ev.type) {
-			case "param_change":  return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
-			case "patch_param":   return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
-			case "led_data":      return `led slot=${ev.slot}`;
-			case "volume_data":   return `vol slot=${ev.slot}`;
-			case "slot_change":   return `slot → ${ev.slot}`;
-			case "perf_name":     return `perf: ${ev.name}`;
-			case "raw_interrupt": return `intr: ${ev.hex}`;
-			case "raw_bulk":      return `bulk[${ev.size}]: ${ev.hex}`;
-			default:              return ev.type ?? "(unknown)";
+			case "param_change":      return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
+			case "patch_param":       return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
+			case "led_data":          return `led slot=${ev.slot}`;
+			case "volume_data":       return `vol slot=${ev.slot}`;
+			case "slot_change":       return `slot → ${ev.slot}`;
+			case "variation_change":  return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
+			case "perf_name":         return `perf: ${ev.name}`;
+			case "raw_interrupt":     return `intr: ${ev.hex}`;
+			case "raw_bulk":          return `bulk[${ev.size}]: ${ev.hex}`;
+			default:                  return ev.type ?? "(unknown)";
 		}
 	}
 
@@ -101,6 +106,16 @@ export function useG2() {
 				if (ev.type === "device_reconnected") {
 					store.status = "connected";
 					log("•", "Connect", "G2 reconnected");
+					return;
+				}
+				if (ev.type === "variation_change") {
+					hardwareVariationChange.value = { slot: ev.slot, variation: ev.variation };
+					log("←", "Watch", formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === "slot_change") {
+					hardwareSlotChange.value = ev.slot;
+					log("←", "Watch", formatWatchEvent(ev));
 					return;
 				}
 				const category: UsbLogEntry["category"] =
@@ -184,5 +199,7 @@ export function useG2() {
 		stopWatch,
 		uploadToG2,
 		downloadFromG2,
+		hardwareVariationChange,
+		hardwareSlotChange,
 	};
 }

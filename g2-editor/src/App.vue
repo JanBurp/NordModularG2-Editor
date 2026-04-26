@@ -328,6 +328,8 @@ const {
 	// uploadToG2,
 	// downloadFromG2,
 	clearLogs,
+	hardwareVariationChange,
+	hardwareSlotChange,
 } = useG2();
 
 const {
@@ -359,6 +361,21 @@ onMounted(async () => {
 	if (idx >= 0) {
 		await loadSlotPatch(idx);
 	}
+});
+
+watch(hardwareSlotChange, async (slotIndex) => {
+	if (slotIndex === null) return;
+	const slot = SLOT_LABELS[slotIndex];
+	if (!slot) return;
+	device.setActiveSlot(slot);
+	applySlotResult(await slotsStore.loadSlot(slot));
+});
+
+watch(hardwareVariationChange, (change) => {
+	if (!change) return;
+	const changeSlot = (["A", "B", "C", "D"] as const)[change.slot];
+	if (changeSlot !== device.getActiveSlot) return;
+	variation.value = change.variation;
 });
 
 watch(
