@@ -16,5 +16,7 @@ interface Window {
 		offWatchEvent: () => void;
 		onWatchDone: (cb: () => void) => void;
 		offWatchDone: () => void;
+		onDeviceDisconnected: (cb: () => void) => void;
+		offDeviceDisconnected: () => void;
 	};
 }

@@ -45,7 +45,7 @@
 
 			<span
 				class="ml-auto text-xs text-neutral-500"
-				:class="{ 'text-green-600': deviceStatus === 'connected' }"
+				:class="{ 'text-green-600': deviceStatus === 'connected', 'text-red-500': deviceStatus === 'lost' }"
 			>
 				{{ statusText }}
 			</span>
@@ -66,6 +66,8 @@
 				{{
 					deviceStatus === "connecting"
 						? "Connecting..."
+						: deviceStatus === "lost"
+						? "Reconnect"
 						: "Connect G2"
 				}}
 			</Button>

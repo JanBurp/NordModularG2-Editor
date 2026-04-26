@@ -8,7 +8,8 @@ export type DeviceStatus =
 	| "uploading"
 	| "downloading"
 	| "error"
-	| "unsupported";
+	| "unsupported"
+	| "lost";
 
 export const useDeviceStore = defineStore("device", {
 	state: () => ({
