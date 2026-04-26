@@ -78,42 +78,4 @@ export interface ModuleJack {
 	y: number;
 }
 
-export interface ModuleParam {
-	name: string;
-	type: string;
-	n?: string;
-	x: number;
-	y: number;
-	isgraph?: number;
-}
-
-export interface ModuleMode {
-	name: string;
-	type: string;
-	x: number;
-	h?: number;
-	w?: number;
-}
-
-export interface VisualElement {
-	type: string;
-	[key: string]: unknown;
-}
-
-export interface ModulePage {
-	name: string;
-	ord: number;
-}
-
-export interface ModuleDefinition {
-	id: number;
-	short: string;
-	long: string;
-	height: number;
-	page: ModulePage;
-	inputs: ModuleJack[];
-	outputs: ModuleJack[];
-	params: ModuleParam[];
-	modes: ModuleMode[];
-	ve: VisualElement[];
-}
+export type { ModuleInstance, ModuleParam, ModuleMode, ModuleInput, ModuleOutput, ModulePage, ModuleDefinition, JackDragInfo } from './module';
