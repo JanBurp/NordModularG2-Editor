@@ -399,6 +399,10 @@
 	async function handleSlotClick(index: number) {
 		const slot = SLOT_LABELS[index];
 		uiStore.activeSlot = slot;
+		const patch = slotsStore.slots[slot]?.patch;
+		if (patch?.description?.variation !== undefined) {
+			uiStore.variation = patch.description.variation;
+		}
 		if (device.status === 'connected') {
 			applySlotResult(await slotsStore.selectSlot(slot));
 		}
@@ -406,6 +410,10 @@
 
 	async function handleVariationClick(variationIndex: number) {
 		uiStore.variation = variationIndex;
+		const patch = slotsStore.slots[uiStore.activeSlot]?.patch;
+		if (patch?.description) {
+			patch.description.variation = variationIndex;
+		}
 		if (device.status === 'connected') {
 			await slotsStore.selectVariation(variationIndex);
 		}
@@ -424,6 +432,9 @@
 			const parsedPatch = parser.parse() as any;
 			const name = file.name.replace('.pch2', '').replace('.prf2', '');
 			slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
+			if (parsedPatch?.description?.variation !== undefined) {
+				uiStore.variation = parsedPatch.description.variation;
+			}
 		};
 		reader.readAsArrayBuffer(file);
 	}
@@ -438,6 +449,9 @@
 				const parser = new PatchParser(buffer);
 				const parsedPatch = parser.parse() as any;
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, filename.replace('.pch2', '').replace('.prf2', ''));
+				if (parsedPatch?.description?.variation !== undefined) {
+					uiStore.variation = parsedPatch.description.variation;
+				}
 			}
 		} catch (err) {
 			console.error('Failed to load patch:', err);
