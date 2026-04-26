@@ -163,3 +163,7 @@ fieldset {
 .nope {
 	display: none;
 }
+
+.cable-hidden {
+	display: none;
+}

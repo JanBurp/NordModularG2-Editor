@@ -41,18 +41,8 @@
 
 			<ToolBarDivider />
 
-			<span class="ml-auto text-xs text-neutral-500" :class="{ 'text-green-600': deviceStatus === 'connected', 'text-red-500': deviceStatus === 'lost' }">
-				{{ statusText }}
-			</span>
-
-			<Button v-if="deviceStatus === 'connected'" variant="default" @click="disconnectDevice"> Disconnect </Button>
-			<Button v-else variant="default" :disabled="deviceStatus === 'connecting'" @click="connectDevice">
-				{{ deviceStatus === 'connecting' ? 'Connecting...' : deviceStatus === 'lost' ? 'Reconnect' : 'Connect G2' }}
-			</Button>
-
-			<ToolBarDivider />
-
 			<BtnGroup
+				class="ml-auto"
 				:model-value="rightPaneTab"
 				:options="[
 					{ label: 'USB', value: 'usb' },
