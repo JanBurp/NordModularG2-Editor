@@ -12,7 +12,7 @@ export interface UsbLogEntry {
 	direction: "→" | "←" | "•";
 	event: string;
 	message: string;
-	category?: "param" | "led_volume" | "unknown" | "raw";
+	category?: "param" | "led" | "volume" | "unknown" | "raw";
 }
 
 let logId = 0;
@@ -120,7 +120,8 @@ export function useG2() {
 				}
 				const category: UsbLogEntry["category"] =
 					ev.type === "param_change" || ev.type === "patch_param" ? "param" :
-					ev.type === "led_data"     || ev.type === "volume_data"  ? "led_volume" :
+					ev.type === "led_data"     ? "led" :
+					ev.type === "volume_data"  ? "volume" :
 					ev.type === "raw_interrupt" || ev.type === "raw_bulk"    ? "raw" :
 					ev.type?.startsWith("unknown") ? "unknown" : undefined;
 				log("←", "Watch", formatWatchEvent(ev), category);

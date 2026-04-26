@@ -4,11 +4,12 @@
 			v-for="(option, index) in normalizedOptions"
 			:key="option.value"
 			:variant="variant"
-			:active="modelValue === option.value"
+			:active="isActive(option.value)"
 			:disabled="option.disabled"
+			:size="size"
 			class="rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0"
 			@click="handleSelect(option.value, option.disabled)"
-			@keydown="(e) => handleKeydown(e, index)"
+			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
 		>
 			{{ option.label }}
 		</Button>
@@ -26,17 +27,21 @@ interface Option {
 }
 
 interface Props {
-	modelValue: string | number | null;
+	modelValue: string | number | null | (string | number)[];
 	options: (string | number | Option)[];
 	variant?: "toggle" | "variation" | "tab";
+	size?: "normal" | "small";
+	multiSelect?: boolean;
 }
 
 const props = withDefaults(defineProps<Props>(), {
 	variant: "toggle",
+	size: "normal",
+	multiSelect: false,
 });
 
 const emit = defineEmits<{
-	"update:modelValue": [value: string | number];
+	"update:modelValue": [value: string | number | (string | number)[]];
 	"toggle-off": [value: string | number];
 }>();
 
@@ -50,12 +55,27 @@ const normalizedOptions = computed(() => {
 	});
 });
 
+const isActive = (value: string | number): boolean => {
+	if (props.multiSelect && Array.isArray(props.modelValue)) {
+		return props.modelValue.includes(value);
+	}
+	return props.modelValue === value;
+};
+
 const handleSelect = (value: string | number, disabled?: boolean) => {
 	if (disabled) return;
-	if (props.modelValue === value) {
-		emit("toggle-off", value);
+
+	if (props.multiSelect && Array.isArray(props.modelValue)) {
+		const newValue = props.modelValue.includes(value)
+			? props.modelValue.filter((v) => v !== value)
+			: [...props.modelValue, value];
+		emit("update:modelValue", newValue);
 	} else {
-		emit("update:modelValue", value);
+		if (props.modelValue === value) {
+			emit("toggle-off", value);
+		} else {
+			emit("update:modelValue", value);
+		}
 	}
 };
 
