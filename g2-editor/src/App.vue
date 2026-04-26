@@ -215,6 +215,7 @@
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 
+	import { getModule } from './renderer/nmg2mods';
 	import { usePatchManager } from './composables/usePatchManager';
 	import { useG2 } from './composables/useG2';
 	import { useDeviceStore } from './store/device';
@@ -328,13 +329,59 @@
 		selectedModule.value = null;
 	}
 
+	// Returns modules that need to be displaced and their new rows.
+	// The new/moved module is treated as fixed at (targetRow, targetRow+targetHeight).
+	// Any existing module in the same column that would overlap is pushed down in cascade.
+	function resolveColumnCollisions(
+		colModules: { index: number; vert: number; height: number }[],
+		targetRow: number,
+		targetHeight: number,
+	): { index: number; newRow: number }[] {
+		const sorted = [...colModules].sort((a, b) => a.vert - b.vert);
+		const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
+		let floor = targetRow + targetHeight;
+		for (const mod of sorted) {
+			const r = newRows.get(mod.index)!;
+			if (r + mod.height <= targetRow) continue; // entirely above the placed module
+			if (r < floor) {
+				newRows.set(mod.index, floor);
+				floor += mod.height;
+			} else {
+				floor = r + mod.height;
+			}
+		}
+		return sorted.filter((m) => newRows.get(m.index) !== m.vert).map((m) => ({ index: m.index, newRow: newRows.get(m.index)! }));
+	}
+
+	function moduleHeight(m: any): number {
+		return (getModule(m.type) as any)?.height || 2;
+	}
+
 	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }) {
+		const mod = (currentModules.value as any[]).find((m: any) => m.index === moduleIndex);
+		if (!mod) return;
+		const height = moduleHeight(mod);
+		const colModules = (currentModules.value as any[])
+			.filter((m: any) => m.horiz === col && m.index !== moduleIndex)
+			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
+		const displaced = resolveColumnCollisions(colModules, row, height);
+		for (const d of displaced) {
+			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, selectedArea.value as 'voice' | 'fx');
+		}
 		applySlotResult(await slotsStore.moveModule(moduleIndex, col, row, selectedArea.value as 'voice' | 'fx'));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }) {
-		const ids = currentModules.value.map((m: any) => m.index as number);
+		const ids = (currentModules.value as any[]).map((m: any) => m.index as number);
 		const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+		const height = (getModule(typeId) as any)?.height || 2;
+		const colModules = (currentModules.value as any[])
+			.filter((m: any) => m.horiz === col)
+			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
+		const displaced = resolveColumnCollisions(colModules, row, height);
+		for (const d of displaced) {
+			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, selectedArea.value as 'voice' | 'fx');
+		}
 		applySlotResult(await slotsStore.addModule(typeId, moduleId, col, row, selectedArea.value as 'voice' | 'fx'));
 	}
 

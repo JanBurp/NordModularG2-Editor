@@ -121,6 +121,18 @@ export const useSlotsStore = defineStore("slots", {
 			return this.loadSlot(slot);
 		},
 
+		async moveModuleNoReload(
+			moduleId: number,
+			col: number,
+			row: number,
+			area: "voice" | "fx",
+		): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run(["move-module", slot, location, String(moduleId), String(col), String(row)]);
+		},
+
 		async moveModule(
 			moduleId: number,
 			col: number,
