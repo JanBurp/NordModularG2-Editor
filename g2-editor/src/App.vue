@@ -303,10 +303,10 @@
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
 		if (!selectedCable.value) return;
 		const cable = selectedCable.value;
-		selectedCable.value = null;
 		applySlotResult(
 			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, selectedArea.value as 'voice' | 'fx'),
 		);
+		selectedCable.value = null;
 	}
 
 	async function loadSlotPatch(index: number) {

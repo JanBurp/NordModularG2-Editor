@@ -1,11 +1,12 @@
 <script setup lang="ts">
-	import { ref, onMounted, watch, nextTick, computed } from 'vue';
+	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 	import { makePatchCables, removeAllCables } from '../../renderer/cableRenderer';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
+	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
-	import { CABLE_COLOR_INDEX_MAP } from '../../constants';
+	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
 
 	const props = defineProps({
 		modules: {
@@ -165,8 +166,17 @@
 			if (!svgRef.value) return;
 			const svg = svgRef.value as SVGElement;
 			if (oldCable) {
-				const key = cableKey(oldCable as Cable);
-				svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.remove('selected');
+				const removeOldSelected = () => {
+					const key = cableKey(oldCable as Cable);
+					svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.remove('selected');
+				};
+				if (newCable === null) {
+					// Deselect/delete: defer so renderCables() runs first and removes the element
+					nextTick(removeOldSelected);
+				} else {
+					// Switching cables: remove immediately for instant visual feedback
+					removeOldSelected();
+				}
 			}
 			if (newCable) {
 				const key = cableKey(newCable as Cable);
@@ -178,6 +188,94 @@
 	function cableKey(cable: Cable): string {
 		return `${(cable as any).smod ?? (cable as any).sourceModule}-${(cable as any).scon ?? (cable as any).sourceJack}-${(cable as any).dmod ?? (cable as any).destModule}-${(cable as any).dcon ?? (cable as any).destJack}`;
 	}
+
+	// --- Drag preview ---
+	type JackInfo = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
+	let previewCable: SVGPathElement | null = null;
+	let dragSrcPos: { x: number; y: number } | null = null;
+	let dragSrcColour = '';
+
+	function getJackSvgPos(info: JackInfo) {
+		const mod = (props.modules as any[]).find((m) => m.index === info.moduleIndex);
+		if (!mod) return null;
+		const modDef = getModule(mod.type) as any;
+		if (!modDef) return null;
+		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
+		const jack = jacks?.[info.connectorIndex];
+		if (!jack) return null;
+		return { x: jack.x + mod.horiz * 256, y: jack.y + mod.vert * 16 };
+	}
+
+	function toSvgCoords(e: MouseEvent) {
+		const svg = svgRef.value as SVGSVGElement | null;
+		if (!svg?.getScreenCTM) return null;
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return null;
+		const pt = svg.createSVGPoint();
+		pt.x = e.clientX;
+		pt.y = e.clientY;
+		return pt.matrixTransform(ctm.inverse());
+	}
+
+	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
+		const dist = Math.hypot(dx - sx, dy - sy);
+		const sag = Math.min(dist * 0.25, 60);
+		const bot = Math.max(sy, dy) + sag;
+		return `M${sx} ${sy} C${sx + (dx - sx) * 0.25} ${bot},${sx + (dx - sx) * 0.75} ${bot},${dx} ${dy}`;
+	}
+
+	function onMouseMovePreview(e: MouseEvent) {
+		if (!dragSrcPos || !svgRef.value) return;
+		const mp = toSvgCoords(e);
+		if (!mp) return;
+		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
+		const svg = svgRef.value as SVGElement;
+		if (!previewCable) {
+			previewCable = svgPath(d, {
+				fill: 'none',
+				stroke: (JACK_COLORS as any)[dragSrcColour] || '#ffffff',
+				'stroke-width': '5',
+				// 'stroke-dasharray': '6,4',
+				opacity: '0.8',
+				class: 'cable-preview nomouse',
+			});
+		} else {
+			previewCable.setAttribute('d', d);
+		}
+		svg.appendChild(previewCable); // keep on top
+	}
+
+	function clearDragPreview() {
+		previewCable?.remove();
+		previewCable = null;
+		dragSrcPos = null;
+		window.removeEventListener('mousemove', onMouseMovePreview);
+		window.removeEventListener('mouseup', onDragCancelMouseup);
+	}
+
+	function onDragCancelMouseup() {
+		clearDragPreview();
+	}
+
+	function handleLocalJackDragStart(info: JackInfo) {
+		const pos = getJackSvgPos(info);
+		if (pos) {
+			dragSrcPos = pos;
+			dragSrcColour = info.colour;
+			window.addEventListener('mousemove', onMouseMovePreview);
+			window.addEventListener('mouseup', onDragCancelMouseup);
+		}
+		emit('jackDragStart', info);
+	}
+
+	function handleLocalJackDragEnd(info: JackInfo) {
+		clearDragPreview();
+		emit('jackDragEnd', info);
+	}
+
+	onUnmounted(() => {
+		clearDragPreview();
+	});
 </script>
 
 <template>
@@ -189,8 +287,8 @@
 				:type="mod.type"
 				:instance="mod"
 				@param-change="onParamChange"
-				@jack-drag-start="(info) => emit('jackDragStart', info)"
-				@jack-drag-end="(info) => emit('jackDragEnd', info)"
+				@jack-drag-start="handleLocalJackDragStart"
+				@jack-drag-end="handleLocalJackDragEnd"
 			/>
 		</svg>
 	</div>
