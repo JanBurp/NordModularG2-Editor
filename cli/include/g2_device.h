@@ -90,6 +90,15 @@ cJSON *g2_list(int filter, int bank_filter);
 int g2_select_slot(const char *slot_str);
 int g2_select_variation(int variation, int slot);
 
+/* Cable commands: slot 0-3, location 0=fx/1=va, color 0-6,
+ * con_type 0=input/1=output, con_id 0-63 */
+int g2_add_cable(int slot, int location, int color,
+                 int from_mod, int from_con_type, int from_con_id,
+                 int to_mod,   int to_con_type,   int to_con_id);
+int g2_del_cable(int slot, int location,
+                 int from_mod, int from_con_type, int from_con_id,
+                 int to_mod,   int to_con_type,   int to_con_id);
+
 /* Watch for param changes (simple single-threaded approach) */
 int g2_watch(output_format_t format, int debug);
 volatile extern int g2_watch_running;

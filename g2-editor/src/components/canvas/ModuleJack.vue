@@ -1,5 +1,4 @@
 <script setup lang="ts">
-	// import { computed } from 'vue';
 	import { JACK_COLORS } from '../../constants';
 
 	const props = defineProps<{
@@ -8,9 +7,26 @@
 		x: number;
 		y: number;
 		type: 'input' | 'output';
+		moduleIndex: number;
+		connectorIndex: number;
+	}>();
+
+	const emit = defineEmits<{
+		jackDragStart: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
+		jackDragEnd:   [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
 	}>();
 
 	const jackColor = JACK_COLORS[props.colour] || props.colour;
+
+	function onMousedown(e: MouseEvent) {
+		e.stopPropagation();
+		emit('jackDragStart', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colour: props.colour });
+	}
+
+	function onMouseup(e: MouseEvent) {
+		e.stopPropagation();
+		emit('jackDragEnd', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colour: props.colour });
+	}
 
 	// Label positioning
 	// const labelX = computed(() => {
@@ -19,7 +35,7 @@
 </script>
 
 <template>
-	<g class="jack-group" :class="type">
+	<g class="jack-group" :class="type" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup">
 		<template v-if="type == 'input'">
 			<circle :cx="x" :cy="y" r="5.5" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
 			<circle :cx="x" :cy="y" r="2.5" fill="#000" stroke="#333" stroke-width="1" class="jack" />

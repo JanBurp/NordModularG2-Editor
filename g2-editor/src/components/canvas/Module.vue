@@ -34,6 +34,7 @@
 	};
 
 	interface ModuleInstance {
+		index?: number;
 		horiz?: number;
 		vert?: number;
 		colour?: number;
@@ -108,11 +109,16 @@
 		instance?: ModuleInstance;
 	}>();
 
+	type JackDragInfo = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
+
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
+		jackDragStart: [info: JackDragInfo];
+		jackDragEnd:   [info: JackDragInfo];
 	}>();
 
 	const instance = computed(() => props.instance || { colour: 0 });
+	const moduleIdx = computed(() => instance.value.index || 0);
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
 		return getModule(props.type) || null;
@@ -190,7 +196,7 @@
 		localLv.value[paramIndex] = value;
 
 		// Emit to parent
-		emit('paramChange', instance.value.index || 0, paramIndex, value);
+		emit('paramChange', moduleIdx.value, paramIndex, value);
 	}
 
 	// Get mode value from instance or default
@@ -376,24 +382,32 @@
 
 		<!-- Input jacks -->
 		<ModuleJack
-			v-for="input in moduleDef.inputs"
+			v-for="(input, idx) in moduleDef.inputs"
 			:key="`in-${input.name}`"
 			:name="input.name"
 			:colour="input.colour"
 			:x="input.x"
 			:y="input.y"
 			type="input"
+			:moduleIndex="moduleIdx"
+			:connectorIndex="idx"
+			@jackDragStart="(info) => emit('jackDragStart', info)"
+			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
 
 		<!-- Output jacks -->
 		<ModuleJack
-			v-for="output in moduleDef.outputs"
+			v-for="(output, idx) in moduleDef.outputs"
 			:key="`out-${output.name}`"
 			:name="output.name"
 			:colour="output.colour"
 			:x="output.x"
 			:y="output.y"
 			type="output"
+			:moduleIndex="moduleIdx"
+			:connectorIndex="idx"
+			@jackDragStart="(info) => emit('jackDragStart', info)"
+			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
