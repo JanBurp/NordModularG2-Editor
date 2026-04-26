@@ -127,10 +127,10 @@
 	<g :transform="`translate(${x}, ${y})`" class="switch-control">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
-			<!-- Single button mode: show only active bitmap without highlight -->
+			<!-- Single button mode: show active bitmap with highlight -->
 			<svg v-if="singleButtonMode" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
-				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * 10)})`" :clip-path="`url(#clip-${paramType}-0)`" />
+				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${paramType}-0)`" />
 			</svg>
 
 			<!-- VR/HR mode: show all bitmaps with active highlighted -->

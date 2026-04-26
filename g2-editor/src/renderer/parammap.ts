@@ -69,7 +69,7 @@ const parammap: Record<string, ParamDefinition> = {
 	InternalMaster: { low: 0, high: 1, def: 0, defin: ["0 ~ Internal, 1 ~ Master"], comments: "" },
 	Kbt_1: { names: ["Off", "On"], low: 0, high: 1, def: 1, defin: ["0 ~ Off, 1 ~ On"], comments: "" },
 	Kbt_4: { names: ["Off", "25%", "50%", "75%", "100%"], low: 0, high: 4, def: 0, defin: ["0 ~ Off, 1 ~ 25%, 2 ~ 50%, 3 ~ 75%, 4 ~ 100%"], comments: "" },
-	KeyQuantCapture: { low: 0, high: 1, def: 0, defin: ["0 ~ Closest, 1 ~ Evenly"], comments: "" },
+	KeyQuantCapture: { width: 32, low: 0, high: 1, def: 0, defin: ["0 ~ Closest, 1 ~ Evenly"], comments: "" },
 	LevAmpGain: { low: 0, high: 127, def: 64, defin: ["0 ~ x0.00, 64 ~ x1.00, 127 ~ x4.00"], comments: "" },
 	LevBipUni: { low: 0, high: 127, def: 0, defin: ["0 ~ -64, 64 ~ 0, 127 ~ 64", "0 ~ 0, 64 ~ 50, 127 ~ 100"], comments: "Bip, Uni. Determined by [BipUni] setting" },
 	Level_100: { low: 0, high: 127, def: 0, defin: ["0 ~ 0, 64 ~ 50, 127 ~ 100"], comments: "Can be used to denote a =not necessarily linear) 0 .. 100 range or a percentage" },
