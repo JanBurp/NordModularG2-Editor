@@ -364,6 +364,7 @@
 					:param-type="param.type"
 					:value="getParamValue(index)"
 					:param-index="index"
+					:param-name="param.name"
 					@change="onParamChange"
 				/>
 
