@@ -144,11 +144,13 @@ export function makePatchCables(
 			fill: "none",
 			class: `svgcableborder nomouse${isSelected ? " selected" : ""}`,
 			"data-cable-key": cableKey,
+			"data-cable-color": String(cable.colour),
 		});
 		const main = svgPath(d, {
 			stroke: color,
 			fill: "none",
 			class: "svgcable nomouse",
+			"data-cable-color": String(cable.colour),
 		});
 		// Transparent wide hit area for clicking
 		const hitArea = svgPath(d, {
@@ -157,6 +159,7 @@ export function makePatchCables(
 			"stroke-width": "12",
 			class: "cable-hit",
 			style: "cursor: pointer",
+			"data-cable-color": String(cable.colour),
 		});
 		if (options?.onCableClick) {
 			hitArea.addEventListener("click", (e) => {

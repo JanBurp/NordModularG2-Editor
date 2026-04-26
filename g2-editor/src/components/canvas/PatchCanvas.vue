@@ -117,6 +117,20 @@
 		}
 	}
 
+	function updateCableVisibilityClasses() {
+		if (!svgRef.value) return;
+		const svg = svgRef.value;
+		const cableElements = svg.querySelectorAll('[data-cable-color]');
+		cableElements.forEach((el) => {
+			const colorIndex = parseInt(el.getAttribute('data-cable-color') || '0', 10);
+			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
+			if (colorName && colorName in props.cableVisibility) {
+				const isHidden = props.cableVisibility[colorName] === false;
+				el.classList.toggle('cable-hidden', isHidden);
+			}
+		});
+	}
+
 	function onParamChange(moduleIndex, paramIndex, value) {
 		emit('paramChange', moduleIndex, paramIndex, value);
 	}
@@ -137,12 +151,12 @@
 		{ deep: true },
 	);
 
-	// Watch for cable visibility changes and re-render
+	// Watch for cable visibility changes - use CSS classes to hide/show cables
 	watch(
 		() => props.cableVisibility,
 		() => {
 			nextTick(() => {
-				renderCables();
+				updateCableVisibilityClasses();
 			});
 		},
 		{ deep: true },
