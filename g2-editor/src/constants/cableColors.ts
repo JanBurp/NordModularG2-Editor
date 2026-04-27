@@ -77,8 +77,8 @@ export const JACK_COLORS: Record<string, string> = {
 	blue: "#6d6df2",
 	red: "#f26d6d",
 	yellow: "#f2f26d",
-	orange: "#f2a26d",
+	orange: "#f2f26d", // orange: "#f2a26d",
 	green: "#6df26d",
-	purple: "#d26df2",
+	purple: "#6d6df2", // purple: "#d26df2",
 	white: "#e0e0e0",
 };
