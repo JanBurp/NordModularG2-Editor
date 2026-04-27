@@ -8,7 +8,6 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
-	import SvgGradientDefs from './SvgGradientDefs.vue';
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
@@ -114,8 +113,6 @@
 
 <template>
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" @click.stop>
-		<SvgGradientDefs />
-
 		<ModuleBackground :height="height"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
