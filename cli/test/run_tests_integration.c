@@ -25,6 +25,12 @@ extern void test_slot_cycle_interspersed_watch(void);
 extern void test_stress_slot_variation_watch(void);
 extern void test_stress_editor_mimic(void);
 
+extern void test_upload_empty_patch(void);
+extern void test_upload_burp(void);
+extern void test_upload_lyra4(void);
+extern void test_upload_fmritm(void);
+extern void test_upload_ocoast(void);
+
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
 extern void test_variation_cycle_slot_a(void);
@@ -73,6 +79,14 @@ int main(void) {
     UNITY_BEGIN();
 
     run_test_silently("test_integration_connect", test_integration_connect);
+
+    /* Upload / roundtrip tests — run with output so section diffs are visible */
+    run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
+    run_test_with_output("test_upload_burp",        test_upload_burp);
+    run_test_with_output("test_upload_lyra4",       test_upload_lyra4);
+    run_test_with_output("test_upload_fmritm",      test_upload_fmritm);
+    run_test_with_output("test_upload_ocoast",      test_upload_ocoast);
+
     run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
     run_test_silently("test_integration_list_all", test_integration_list_all);
     run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);

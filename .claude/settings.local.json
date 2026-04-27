@@ -8,7 +8,11 @@
       "Bash(make)",
       "Bash(npm run *2)",
       "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/Patches/Eigen Patches/Burp  NL-X v7.2.pch2\")",
-      "Bash(grep -n \"SetPatch\\\\|S_SET_PATCH\\\\|0x37\\\\|\\\\$37\\\\|CreateSet\\\\|SendPatch\\\\|UploadPatch\" \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/Delphi-editor/nord_g2_editor-master/Gen2/Common/BVE.NMG2USB.pas\")"
+      "Bash(grep -n \"SetPatch\\\\|S_SET_PATCH\\\\|0x37\\\\|\\\\$37\\\\|CreateSet\\\\|SendPatch\\\\|UploadPatch\" \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/Delphi-editor/nord_g2_editor-master/Gen2/Common/BVE.NMG2USB.pas\")",
+      "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/new-editor/test-patches/EmptyPatch.pch2\")",
+      "Bash(make test-integration *)",
+      "Bash(xxd \"/tmp/g2-upload-test/EmptyPatch_roundtrip.pch2\")",
+      "Bash(npm run *)"
     ]
   }
 }
