@@ -49,6 +49,8 @@ static void print_usage(const char *prog) {
     printf("                                       Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>\n");
     printf("                                       Move a module to a new grid position\n");
+    printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
+    printf("                                       Set a module parameter value\n");
     printf("  watch                                Monitor param/cable/slot changes live\n");
 }
 
@@ -362,6 +364,21 @@ int main(int argc, char *argv[]) {
         const char *name = (j < argc) ? argv[j] : "Module";
         return g2_add_module(slot, location, type_id, module_id, col, row,
                              num_modes, mode_vals, num_params, param_vals, name);
+    }
+
+    if (strcmp(command, "set-param") == 0) {
+        /* set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation> */
+        if (i + 6 >= argc) {
+            fprintf(stderr, "Usage: set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
+            return 1;
+        }
+        int slot     = parse_slot(argv[i + 1]);
+        int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int mod_id   = atoi(argv[i + 3]);
+        int param    = atoi(argv[i + 4]);
+        int val      = atoi(argv[i + 5]);
+        int var      = atoi(argv[i + 6]);
+        return g2_set_param(slot, location, mod_id, param, val, var);
     }
 
     if (strcmp(command, "watch") == 0) {

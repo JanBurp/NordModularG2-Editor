@@ -194,6 +194,22 @@ export const useSlotsStore = defineStore("slots", {
 			return this.loadSlot(slot);
 		},
 
+		async setParam(
+			moduleId: number,
+			paramIdx: number,
+			value: number,
+			variation: number,
+			area: "voice" | "fx",
+		): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot;
+			if (!slot) return;
+			const location = area === "voice" ? "va" : "fx";
+			await window.cli.run([
+				"set-param", slot, location,
+				String(moduleId), String(paramIdx), String(value), String(variation),
+			]);
+		},
+
 		async loadSlot(
 			slot: SlotLabel,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {

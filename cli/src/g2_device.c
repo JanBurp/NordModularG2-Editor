@@ -1596,6 +1596,41 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     return G2_OK;
 }
 
+int g2_set_param(int slot, int location, int module_id,
+                 int param_idx, int value, int variation) {
+    if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 1) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)      return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = 0x40; /* SUB_COMMAND_SET_PARAM */
+    buff[pos++] = (uint8_t)location;
+    buff[pos++] = (uint8_t)module_id;
+    buff[pos++] = (uint8_t)param_idx;
+    buff[pos++] = (uint8_t)value;
+    buff[pos++] = (uint8_t)variation;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+    /* No recv_interrupt — WRITE_NO_RESP */
+}
+
 volatile int g2_watch_running = 1;
 
 void g2_watch_stop(int sig) {
