@@ -224,7 +224,12 @@
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useRightPanel } from './composables/useRightPanel';
 
-	import { SOUND_CATEGORIES as soundCategories } from './constants';
+	import { SOUND_CATEGORIES as soundCategories, CABLE_COLOR_INDEX_MAP } from './constants';
+
+	function jackColourToIndex(colour: string): number {
+		const entry = Object.entries(CABLE_COLOR_INDEX_MAP).find(([, name]) => name === colour);
+		return entry ? Number(entry[0]) : 1; // default to blue
+	}
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -300,6 +305,7 @@
 				0,
 				input.connectorIndex,
 				uiStore.area === 1 ? 'voice' : 'fx',
+				jackColourToIndex(output.colour),
 			),
 		);
 	}
