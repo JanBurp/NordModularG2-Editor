@@ -40,15 +40,16 @@ static void print_usage(const char *prog) {
     printf("  slot <A|B|C|D>                      Change active slot\n");
     printf("  variation <1-8> <A-D>                Select variation for slot\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
+    printf("                                       Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
-    printf("  watch                                Monitor param changes live\n");
-    printf("\nCommands (not implemented):\n");
-    printf("  * list-modules [slot]                List modules in patch\n");
-    printf("  * get-param <module> <param> [var]   Get param value\n");
-    printf("  * set-param <module> <param> <value> Set param value\n");
-    printf("  * set-patch-json <slot> <file.json>  Upload JSON patch to slot\n");
-    printf("  * set-patch-pch <slot> <file.pch2>   Upload native G2 patch\n");
-    printf("  * set-patch-prf <file.prf2>          Upload performance file\n");
+    printf("                                       Delete a cable\n");
+    printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row>\n");
+    printf("                                       Add a module to the patch\n");
+    printf("  del-module <slot> <va|fx> <module-id>\n");
+    printf("                                       Delete a module (delete its cables first)\n");
+    printf("  move-module <slot> <va|fx> <module-id> <col> <row>\n");
+    printf("                                       Move a module to a new grid position\n");
+    printf("  watch                                Monitor param/cable/slot changes live\n");
 }
 
 static output_format_t output_format = OUTPUT_PRETTY;
