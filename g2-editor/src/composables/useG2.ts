@@ -4,6 +4,7 @@ import { Device } from "@/types";
 import type { DeviceStatus } from "@/store/device";
 import { useDeviceStore } from "@/store/device";
 import { useSlotsStore } from "@/store/slots";
+import { SLOT_LABELS } from "@/constants";
 
 export type { DeviceStatus };
 
@@ -28,8 +29,6 @@ function now(): string {
 		String(d.getMilliseconds()).padStart(3, "0")
 	);
 }
-
-const SLOT_LABELS = ["A", "B", "C", "D"] as const;
 
 export function useG2() {
 	const store = useDeviceStore();

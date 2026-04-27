@@ -12,7 +12,8 @@
       "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/new-editor/test-patches/EmptyPatch.pch2\")",
       "Bash(make test-integration *)",
       "Bash(xxd \"/tmp/g2-upload-test/EmptyPatch_roundtrip.pch2\")",
-      "Bash(npm run *)"
+      "Bash(npm run *)",
+      "Bash(npx tsc *)"
     ]
   }
 }

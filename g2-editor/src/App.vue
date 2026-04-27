@@ -10,13 +10,8 @@
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
 				<!-- SLOT BUTTONS -->
 				<BtnGroup
-					:model-value="selectedSlotIndex"
-					:options="[
-						{ label: 'A', value: 0 },
-						{ label: 'B', value: 1 },
-						{ label: 'C', value: 2 },
-						{ label: 'D', value: 3 },
-					]"
+					:model-value="uiStore.selectedSlotIndex"
+					:options="SLOT_OPTIONS"
 					variant="toggle"
 					@update:model-value="handleSlotClick"
 				/>
@@ -30,11 +25,7 @@
 			<BtnGroup
 				class="ml-auto"
 				:model-value="uiStore.rightPaneTab"
-				:options="[
-					{ label: 'Modules', value: 'modules' },
-					{ label: 'USB', value: 'usb' },
-					{ label: 'Browser', value: 'browser' },
-				]"
+				:options="PANE_TAB_OPTIONS"
 				variant="tab"
 				@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 				@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
@@ -61,10 +52,7 @@
 
 			<BtnGroup
 				v-model="uiStore.area"
-				:options="[
-					{ value: 1, label: 'Voice' },
-					{ value: 0, label: 'FX' },
-				]"
+				:options="AREA_OPTIONS"
 				variant="toggle"
 			/>
 
@@ -74,16 +62,7 @@
 				<span class="text-xs font-semibold text-neutral-400">Var:</span>
 				<BtnGroup
 					v-model="uiStore.variation"
-					:options="[
-						{ label: '1', value: 0 },
-						{ label: '2', value: 1 },
-						{ label: '3', value: 2 },
-						{ label: '4', value: 3 },
-						{ label: '5', value: 4 },
-						{ label: '6', value: 5 },
-						{ label: '7', value: 6 },
-						{ label: '8', value: 7 },
-					]"
+					:options="VARIATION_OPTIONS"
 					variant="variation"
 					@update:model-value="handleVariationClick"
 				/>
@@ -148,8 +127,8 @@
 					:area="uiStore.area === 1 ? 'voice' : 'fx'"
 					:cable-visibility="cableVisibility"
 					:shake-trigger="cableShakeTrigger"
-					:selected-cable="selectedCable"
-					:selected-module-index="selectedModule"
+					:selected-cable="uiStore.selectedCable"
+					:selected-module-index="uiStore.selectedModule"
 					@cable-click="handleCableClick"
 					@jack-drag-start="handleJackDragStart"
 					@jack-drag-end="handleJackDragEnd"
@@ -179,10 +158,7 @@
 			<BtnGroup
 				v-model="uiStore.area"
 				size="xs"
-				:options="[
-					{ value: 1, label: 'Voice' },
-					{ value: 0, label: 'FX' },
-				]"
+				:options="AREA_OPTIONS"
 				variant="toggle"
 			/>
 
@@ -219,17 +195,25 @@
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import StatusBarDivider from './components/toolbar/StatusBarDivider.vue';
 
-	import { getModule } from './renderer/nmg2mods';
 	import { useG2 } from './composables/useG2';
 	import { useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
 	import type { PaneTab } from './store/ui';
+	import type { SlotLabel } from './store/slots';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useBrowserStore } from './store/browser';
 
-	import { SOUND_CATEGORIES as soundCategories, CABLE_COLOR_INDEX_MAP } from './constants';
+	import {
+		SOUND_CATEGORIES as soundCategories,
+		CABLE_COLOR_INDEX_MAP,
+		SLOT_LABELS,
+		SLOT_OPTIONS,
+		PANE_TAB_OPTIONS,
+		AREA_OPTIONS,
+		VARIATION_OPTIONS,
+	} from './constants';
 
 	function jackColourToIndex(colour: string): number {
 		const entry = Object.entries(CABLE_COLOR_INDEX_MAP).find(([, name]) => name === colour);
@@ -241,27 +225,12 @@
 	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
 
-	const selectedCable = ref<Cable | null>(null);
-	const selectedModule = ref<number | -1 | null>(null);
 	const dragSource = ref<{ moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string } | null>(null);
 
-	const SLOT_LABELS = ['A', 'B', 'C', 'D'] as const;
-
-	const currentPatch = computed(() => slotsStore.slots[uiStore.activeSlot]?.patch);
-	const currentModules = computed(() => {
-		if (!currentPatch.value?.areas) return [];
-		return currentPatch.value.areas[uiStore.area]?.modules || [];
-	});
-	const currentCables = computed(() => {
-		if (!currentPatch.value?.areas) return [];
-		return currentPatch.value.areas[uiStore.area]?.cableList || [];
-	});
-	const patchName = computed(() => slotsStore.slots[uiStore.activeSlot]?.name || '');
-	const selectedSlotIndex = computed<number | null>(() => {
-		const label = device.getActiveSlot;
-		if (!label) return SLOT_LABELS.indexOf(uiStore.activeSlot);
-		return SLOT_LABELS.indexOf(label);
-	});
+	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const currentModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, uiStore.area));
+	const currentCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, uiStore.area));
+	const patchName = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
 
 	const areaModulesCount = (area: 'voice' | 'fx') => {
 		const areaIndex = area === 'voice' ? 1 : 0;
@@ -280,7 +249,7 @@
 	}
 
 	function handleCableClick(cable: Cable) {
-		selectedCable.value = selectedCable.value && isSameCable(selectedCable.value, cable) ? null : cable;
+		uiStore.selectedCable = uiStore.selectedCable && isSameCable(uiStore.selectedCable, cable) ? null : cable;
 	}
 
 	function isSameCable(a: Cable, b: Cable): boolean {
@@ -316,53 +285,37 @@
 		);
 	}
 
-	function deleteSelection() {
-		if (selectedModule.value !== null && !selectedCable.value) {
-			if (selectedModule.value === -1) {
-				// select-all case: delete all modules in current area
-				const modulesToDelete = currentModules.value.map((m: any) => m.index);
-				for (const moduleId of modulesToDelete) {
-					const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
-					for (const cable of connectedCables) {
-						slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
-					}
-					slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
-				}
-				selectedModule.value = null;
-				return;
-			}
-			const moduleId = selectedModule.value;
-			const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
-			for (const cable of connectedCables) {
-				slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
-			}
-			slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
-			selectedModule.value = null;
-			return;
+	async function deleteSelection() {
+		try {
+			await slotsStore.deleteSelection(
+				uiStore.selectedModule,
+				uiStore.selectedCable,
+				uiStore.area === 1 ? 'voice' : 'fx',
+				currentModules.value,
+				currentCables.value,
+			);
+		} finally {
+			uiStore.selectedModule = null;
+			uiStore.selectedCable = null;
 		}
-
-		if (!selectedCable.value) return;
-		const cable = selectedCable.value;
-		slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx');
-		selectedCable.value = null;
 	}
 
 	async function handleDeleteKey(e: KeyboardEvent) {
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-		deleteSelection();
+		await deleteSelection();
 	}
 
 	function handleModuleClick(moduleIndex: number) {
-		if (selectedModule.value === -1) {
-			selectedModule.value = null;
+		if (uiStore.selectedModule === -1) {
+			uiStore.selectedModule = null;
 		} else {
-			selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+			uiStore.selectedModule = uiStore.selectedModule === moduleIndex ? null : moduleIndex;
 		}
-		selectedCable.value = null;
+		uiStore.selectedCable = null;
 	}
 
 	function handleCanvasClick() {
-		selectedModule.value = null;
+		uiStore.selectedModule = null;
 	}
 
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
@@ -380,60 +333,14 @@
 		}, 50);
 	}
 
-	// Returns modules that need to be displaced and their new rows.
-	// The new/moved module is treated as fixed at (targetRow, targetRow+targetHeight).
-	// Any existing module in the same column that would overlap is pushed down in cascade.
-	function resolveColumnCollisions(
-		colModules: { index: number; vert: number; height: number }[],
-		targetRow: number,
-		targetHeight: number,
-	): { index: number; newRow: number }[] {
-		const sorted = [...colModules].sort((a, b) => a.vert - b.vert);
-		const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
-		let floor = targetRow + targetHeight;
-		for (const mod of sorted) {
-			const r = newRows.get(mod.index)!;
-			if (r + mod.height <= targetRow) continue; // entirely above the placed module
-			if (r < floor) {
-				newRows.set(mod.index, floor);
-				floor += mod.height;
-			} else {
-				floor = r + mod.height;
-			}
-		}
-		return sorted.filter((m) => newRows.get(m.index) !== m.vert).map((m) => ({ index: m.index, newRow: newRows.get(m.index)! }));
-	}
-
-	function moduleHeight(m: any): number {
-		return (getModule(m.type) as any)?.height || 2;
-	}
-
 	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }) {
-		const mod = (currentModules.value as any[]).find((m: any) => m.index === moduleIndex);
-		if (!mod) return;
-		const height = moduleHeight(mod);
-		const colModules = (currentModules.value as any[])
-			.filter((m: any) => m.horiz === col && m.index !== moduleIndex)
-			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
-		const displaced = resolveColumnCollisions(colModules, row, height);
-		for (const d of displaced) {
-			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, uiStore.area === 1 ? 'voice' : 'fx');
-		}
-		applySlotResult(await slotsStore.moveModule(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx'));
+		applySlotResult(await slotsStore.moveModuleWithCollision(
+			moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }) {
-		const ids = (currentModules.value as any[]).map((m: any) => m.index as number);
-		const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
-		const height = (getModule(typeId) as any)?.height || 2;
-		const colModules = (currentModules.value as any[])
-			.filter((m: any) => m.horiz === col)
-			.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: moduleHeight(m) }));
-		const displaced = resolveColumnCollisions(colModules, row, height);
-		for (const d of displaced) {
-			await slotsStore.moveModuleNoReload(d.index, col, d.newRow, uiStore.area === 1 ? 'voice' : 'fx');
-		}
-		applySlotResult(await slotsStore.addModule(typeId, moduleId, col, row, uiStore.area === 1 ? 'voice' : 'fx'));
+		applySlotResult(await slotsStore.dropModuleWithCollision(
+			typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function loadSlotPatch(index: number) {
@@ -640,7 +547,7 @@
 					break;
 				}
 				case 'save-all':
-					for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
+					for (const s of SLOT_LABELS) {
 						if (slotsStore.slots[s]?.rawHex) {
 							await slotsStore.saveSlot(s);
 						}
@@ -650,7 +557,7 @@
 					deleteSelection();
 					break;
 				case 'select-all':
-					selectedModule.value = -1;
+					uiStore.selectedModule = -1;
 					break;
 				case 'toggle-modules':
 					uiStore.toggleSidebar('modules');
@@ -685,7 +592,7 @@
 		await connectDevice();
 		if (device.status === 'connected') {
 			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
-			const idx = ['A', 'B', 'C', 'D'].indexOf(focusLabel);
+			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
 				uiStore.activeSlot = slot;
@@ -718,7 +625,7 @@
 
 	watch(hardwareVariationChange, (change) => {
 		if (!change) return;
-		const changeSlot = (['A', 'B', 'C', 'D'] as const)[change.slot];
+		const changeSlot = SLOT_LABELS[change.slot];
 		if (changeSlot !== device.getActiveSlot) return;
 		uiStore.variation = change.variation;
 		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;

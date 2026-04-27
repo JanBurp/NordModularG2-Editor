@@ -27,6 +27,20 @@ export const useSlotsStore = defineStore("slots", {
 		} as Record<SlotLabel, SlotEntry>,
 	}),
 
+	getters: {
+		getPatchForSlot: (state) => (slot: SlotLabel) =>
+			state.slots[slot]?.patch ?? null,
+
+		getPatchName: (state) => (slot: SlotLabel) =>
+			state.slots[slot]?.name ?? '',
+
+		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) =>
+			state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
+
+		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) =>
+			state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
+	},
+
 	actions: {
 		async _applyPatchOutput(
 			slot: SlotLabel,
@@ -244,6 +258,90 @@ export const useSlotsStore = defineStore("slots", {
 			const data = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			await window.electronAPI.savePatch(path, data);
 			this.slotFilePaths[slot] = path;
+		},
+
+		_resolveColumnCollisions(
+			colModules: { index: number; vert: number; height: number }[],
+			targetRow: number,
+			targetHeight: number,
+		): { index: number; newRow: number }[] {
+			const sorted = [...colModules].sort((a, b) => a.vert - b.vert);
+			const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
+			let floor = targetRow + targetHeight;
+			for (const mod of sorted) {
+				const r = newRows.get(mod.index)!;
+				if (r + mod.height <= targetRow) continue;
+				if (r < floor) {
+					newRows.set(mod.index, floor);
+					floor += mod.height;
+				} else {
+					floor = r + mod.height;
+				}
+			}
+			return sorted.filter((m) => newRows.get(m.index) !== m.vert).map((m) => ({ index: m.index, newRow: newRows.get(m.index)! }));
+		},
+
+		async moveModuleWithCollision(
+			moduleIndex: number,
+			col: number,
+			row: number,
+			area: "voice" | "fx",
+			currentModuleList: any[],
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const mod = currentModuleList.find((m: any) => m.index === moduleIndex);
+			if (!mod) return null;
+			const { getModule } = await import("../renderer/nmg2mods");
+			const height = (getModule(mod.type) as any)?.height ?? 2;
+			const colMods = currentModuleList
+				.filter((m: any) => m.horiz === col && m.index !== moduleIndex)
+				.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
+			for (const d of this._resolveColumnCollisions(colMods, row, height))
+				await this.moveModuleNoReload(d.index, col, d.newRow, area);
+			return this.moveModule(moduleIndex, col, row, area);
+		},
+
+		async dropModuleWithCollision(
+			typeId: number,
+			col: number,
+			row: number,
+			area: "voice" | "fx",
+			currentModuleList: any[],
+		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const { getModule } = await import("../renderer/nmg2mods");
+			const ids = currentModuleList.map((m: any) => m.index as number);
+			const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+			const height = (getModule(typeId) as any)?.height ?? 2;
+			const colMods = currentModuleList
+				.filter((m: any) => m.horiz === col)
+				.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
+			for (const d of this._resolveColumnCollisions(colMods, row, height))
+				await this.moveModuleNoReload(d.index, col, d.newRow, area);
+			return this.addModule(typeId, moduleId, col, row, area);
+		},
+
+		async deleteSelection(
+			selectedModule: number | -1 | null,
+			selectedCable: { smod?: number; scon?: number; dmod?: number; dcon?: number } | null,
+			area: "voice" | "fx",
+			currentModuleList: any[],
+			currentCableList: any[],
+		): Promise<void> {
+			if (selectedModule !== null && !selectedCable) {
+				const ids = selectedModule === -1
+					? currentModuleList.map((m: any) => m.index)
+					: [selectedModule];
+				for (const id of ids) {
+					for (const c of currentCableList.filter((c: any) => c.smod === id || c.dmod === id))
+						this.deleteCableNoReload(c, area);
+					this.deleteModule(id, area);
+				}
+				return;
+			}
+			if (selectedCable)
+				this.deleteCable(
+					{ smod: selectedCable.smod!, scon: selectedCable.scon!, dmod: selectedCable.dmod!, dcon: selectedCable.dcon! },
+					area,
+				);
 		},
 	},
 });
