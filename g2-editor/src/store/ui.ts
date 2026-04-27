@@ -1,6 +1,9 @@
 import { defineStore } from "pinia";
-import { ref } from "vue";
+import { ref, computed } from "vue";
 import type { SlotLabel } from "@/types";
+import type { Cable } from "@/renderer/cableRenderer";
+import { useDeviceStore } from "./device";
+import { SLOT_LABELS } from "@/constants";
 
 export type PaneTab = "modules" | "browser" | "usb";
 
@@ -12,6 +15,14 @@ export const useUiStore = defineStore("ui", () => {
   const rightPaneTab = ref<PaneTab>("modules");
   const showRightPane = ref<boolean>(true);
 
+  const selectedCable = ref<Cable | null>(null);
+  const selectedModule = ref<number | -1 | null>(null);
+
+  const selectedSlotIndex = computed<number | null>(() => {
+    const label = useDeviceStore().getActiveSlot;
+    return SLOT_LABELS.indexOf((label ?? activeSlot.value) as SlotLabel);
+  });
+
   function toggleSidebar(tab: PaneTab): void {
     if (rightPaneTab.value === tab) {
       showRightPane.value = !showRightPane.value;
@@ -21,5 +32,6 @@ export const useUiStore = defineStore("ui", () => {
     }
   }
 
-  return { activeSlot, area, variation, rightPaneTab, showRightPane, toggleSidebar };
+  return { activeSlot, area, variation, rightPaneTab, showRightPane, toggleSidebar,
+           selectedCable, selectedModule, selectedSlotIndex };
 });
