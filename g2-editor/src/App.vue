@@ -24,20 +24,6 @@
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
 			<Button variant="default" :disabled="!currentPatch">Save Patch</Button>
-			<!-- <Button
-				variant="default"
-				:disabled="!currentPatch || deviceStatus !== 'connected'"
-				@click="uploadToG2(currentPatch)"
-			>
-				Upload to G2
-			</Button>
-			<Button
-				variant="default"
-				:disabled="deviceStatus !== 'connected'"
-				@click="downloadFromG2"
-			>
-				Download from G2
-			</Button> -->
 
 			<ToolBarDivider />
 
@@ -69,13 +55,6 @@
 					</option>
 				</select>
 			</div>
-
-			<ToolBarDivider />
-
-			<span class="text-xs text-neutral-600">
-				Voice: {{ areaModulesCount('voice') }} modules, {{ areaCablesCount('voice') }} cables<br />
-				FX: {{ areaModulesCount('fx') }} modules, {{ areaCablesCount('fx') }} cables<br />
-			</span>
 
 			<ToolBarDivider />
 
@@ -198,6 +177,28 @@
 				<PatchBrowser v-show="rightPaneTab === 'browser'" :isActive="rightPaneTab === 'browser'" @select="handlePatchSelect" />
 			</SidePanel>
 		</div>
+		<StatusBar>
+			<BtnGroup
+				class="ml-3 mr-10"
+				v-model="uiStore.area"
+				size="xs"
+				:options="[
+					{ value: 1, label: 'Voice' },
+					{ value: 0, label: 'FX' },
+				]"
+				variant="toggle"
+			/>
+
+			<span> Voice: {{ areaModulesCount('voice') }} modules / {{ areaCablesCount('voice') }} cables<br /> </span>
+			<StatusBarDivider></StatusBarDivider>
+			<span> FX: {{ areaModulesCount('fx') }} modules / {{ areaCablesCount('fx') }} cables<br /> </span>
+
+			<StatusBarDivider class="ml-auto"></StatusBarDivider>
+			<div class="flex gap-2 items-center">
+				<span>🔌</span>
+				<span>{{ device.status }}</span>
+			</div>
+		</StatusBar>
 	</div>
 </template>
 
@@ -215,6 +216,8 @@
 	import ToolBarLabel from './components/toolbar/ToolBarLabel.vue';
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
+	import StatusBar from './components/toolbar/StatusBar.vue';
+	import StatusBarDivider from './components/toolbar/StatusBarDivider.vue';
 
 	import { getModule } from './renderer/nmg2mods';
 	import { useG2 } from './composables/useG2';
@@ -347,16 +350,12 @@
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (deviceStatus.value !== "connected") return;
+		if (deviceStatus.value !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
 			try {
-				await slotsStore.setParam(
-					moduleIndex, paramIndex, value,
-					uiStore.variation,
-					uiStore.area === 1 ? "voice" : "fx",
-				);
+				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
 			} catch {
 				// ignore — G2 may be temporarily busy
 			}
@@ -467,10 +466,8 @@
 		reader.readAsArrayBuffer(file);
 	}
 
-	async function handlePatchSelect(
-		item: { type: "disk"; filepath: string } | { type: "synth"; bank: number; location: number }
-	) {
-		if (item.type === "disk") {
+	async function handlePatchSelect(item: { type: 'disk'; filepath: string } | { type: 'synth'; bank: number; location: number }) {
+		if (item.type === 'disk') {
 			if (typeof window === 'undefined' || !window.electronAPI) return;
 			try {
 				const result = await window.electronAPI.patches.load(item.filepath);
@@ -478,33 +475,29 @@
 				const buffer = new Uint8Array(result.data).buffer;
 				const { PatchParser } = await import('./parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const name = (item.filepath.split("/").pop() ?? item.filepath)
-					.replace(/\.(pch2|prf2)$/i, "");
+				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
 				if (parsedPatch?.description?.variation !== undefined) {
 					uiStore.variation = parsedPatch.description.variation;
 				}
-				if (deviceStatus.value === "connected") {
+				if (deviceStatus.value === 'connected') {
 					try {
-						await window.cli.run(["upload-patch", uiStore.activeSlot, item.filepath]);
+						await window.cli.run(['upload-patch', uiStore.activeSlot, item.filepath]);
 						applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
 					} catch (uploadErr) {
-						console.error("Upload to G2 failed:", uploadErr);
+						console.error('Upload to G2 failed:', uploadErr);
 					}
 				}
 			} catch (err) {
 				console.error('Failed to load patch:', err);
 			}
 		} else {
-			if (deviceStatus.value !== "connected") return;
+			if (deviceStatus.value !== 'connected') return;
 			try {
-				await window.cli.run([
-					"select-patch", uiStore.activeSlot,
-					String(item.bank), String(item.location),
-				]);
+				await window.cli.run(['select-patch', uiStore.activeSlot, String(item.bank), String(item.location)]);
 				applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
 			} catch (err) {
-				console.error("Failed to select synth patch:", err);
+				console.error('Failed to select synth patch:', err);
 			}
 		}
 	}
