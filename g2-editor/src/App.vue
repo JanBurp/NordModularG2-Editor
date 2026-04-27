@@ -29,14 +29,15 @@
 
 			<BtnGroup
 				class="ml-auto"
-				:model-value="rightPaneTab"
+				:model-value="uiStore.rightPaneTab"
 				:options="[
+					{ label: 'Modules', value: 'modules' },
 					{ label: 'USB', value: 'usb' },
 					{ label: 'Browser', value: 'browser' },
 				]"
 				variant="tab"
-				@update:model-value="toggleSidebar"
-				@toggle-off="handleToggleOff"
+				@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
+				@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 			/>
 		</ToolBar>
 
@@ -137,10 +138,6 @@
 		</ToolBar>
 
 		<div class="flex-1 flex overflow-hidden">
-			<SidePanel>
-				<ModulesPane />
-			</SidePanel>
-
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
 				<PatchCanvas
 					v-if="currentPatch"
@@ -165,21 +162,21 @@
 				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
 			</div>
 
-			<SidePanel v-if="showRightPane">
+			<SidePanel v-if="uiStore.showRightPane">
+				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
 				<UsbPanel
-					v-show="rightPaneTab === 'usb'"
+					v-show="uiStore.rightPaneTab === 'usb'"
 					:logs="usbLogs"
 					:device-status="deviceStatus"
 					@disconnect="disconnectDevice"
 					@connect="connectDevice"
 					@clear-logs="clearLogs"
 				/>
-				<PatchBrowser v-show="rightPaneTab === 'browser'" :isActive="rightPaneTab === 'browser'" @select="handlePatchSelect" />
+				<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="handlePatchSelect" />
 			</SidePanel>
 		</div>
 		<StatusBar>
 			<BtnGroup
-				class="ml-3 mr-10"
 				v-model="uiStore.area"
 				size="xs"
 				:options="[
@@ -193,8 +190,11 @@
 			<StatusBarDivider></StatusBarDivider>
 			<span> FX: {{ areaModulesCount('fx') }} modules / {{ areaCablesCount('fx') }} cables<br /> </span>
 
-			<StatusBarDivider class="ml-auto"></StatusBarDivider>
-			<div class="flex gap-2 items-center">
+			<div
+				class="ml-auto flex gap-2 items-center px-2 cursor-pointer"
+				:class="device.status === 'connected' ? 'bg-green-500' : 'bg-orange-500'"
+				@click="uiStore.toggleSidebar('usb')"
+			>
 				<span>🔌</span>
 				<span>{{ device.status }}</span>
 			</div>
@@ -224,9 +224,9 @@
 	import { useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
+	import type { PaneTab } from './store/ui';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { usePatchCategory } from './composables/usePatchCategory';
-	import { useRightPanel } from './composables/useRightPanel';
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, CABLE_COLOR_INDEX_MAP } from './constants';
@@ -476,7 +476,10 @@
 			const parser = new PatchParser(buffer);
 			const parsedPatch = parser.parse() as any;
 			const name = file.name.replace('.pch2', '').replace('.prf2', '');
-			slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
+			const rawHex = Array.from(new Uint8Array(buffer))
+				.map((b) => b.toString(16).padStart(2, '0'))
+				.join('');
+			slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex);
 			if (parsedPatch?.description?.variation !== undefined) {
 				uiStore.variation = parsedPatch.description.variation;
 			}
@@ -494,7 +497,8 @@
 				const { PatchParser } = await import('./parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
 				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
-				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
+				const rawHex = result.data.map((b: number) => b.toString(16).padStart(2, '0')).join('');
+				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
 				if (parsedPatch?.description?.variation !== undefined) {
 					uiStore.variation = parsedPatch.description.variation;
 				}
@@ -546,8 +550,6 @@
 	} = useCableVisibility();
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
-
-	const { rightPaneTab, showRightPane, toggleSidebar, handleToggleOff } = useRightPanel();
 
 	function handleWindowMouseup() {
 		dragSource.value = null;
@@ -609,9 +611,20 @@
 					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
 					break;
 				}
-				case 'open':
-					toggleSidebar('browser');
+				case 'open': {
+					const result = await window.electronAPI.openPatchDialog();
+					if (!result.success || !result.data) break;
+					const buffer = new Uint8Array(result.data).buffer;
+					const { PatchParser } = await import('./parser/nmg2PatchParser');
+					const parsedPatch = new PatchParser(buffer).parse() as any;
+					const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+					const rawHex = result.data.map((b: number) => b.toString(16).padStart(2, '0')).join('');
+					slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
+					if (parsedPatch?.description?.variation !== undefined) {
+						uiStore.variation = parsedPatch.description.variation;
+					}
 					break;
+				}
 				case 'save': {
 					const slot = slotsStore.slots[uiStore.activeSlot];
 					if (slot?.rawHex) await slotsStore.saveSlot(uiStore.activeSlot);
@@ -638,6 +651,33 @@
 					break;
 				case 'select-all':
 					selectedModule.value = -1;
+					break;
+				case 'toggle-modules':
+					uiStore.toggleSidebar('modules');
+					break;
+				case 'toggle-browser':
+					uiStore.toggleSidebar('browser');
+					break;
+				case 'toggle-usb':
+					uiStore.toggleSidebar('usb');
+					break;
+				case 'area-voice':
+					uiStore.area = 1;
+					break;
+				case 'area-fx':
+					uiStore.area = 0;
+					break;
+				case 'slot-A':
+					uiStore.activeSlot = 'A';
+					break;
+				case 'slot-B':
+					uiStore.activeSlot = 'B';
+					break;
+				case 'slot-C':
+					uiStore.activeSlot = 'C';
+					break;
+				case 'slot-D':
+					uiStore.activeSlot = 'D';
 					break;
 			}
 		});
