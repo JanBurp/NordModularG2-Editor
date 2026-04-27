@@ -7,7 +7,8 @@
       "Bash(grep -n \"S_SET_MODE\\\\|S_SET_MORPH\\\\|S_SET_UPRATE\\\\|S_COPY_VARIATION\\\\|\\\\$2B\\\\|\\\\$43\\\\|\\\\$2A\" \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/Delphi-editor/nord_g2_editor-master/Gen2/Common/BVE.NMG2Mess.pas\")",
       "Bash(make)",
       "Bash(npm run *2)",
-      "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/Patches/Eigen Patches/Burp  NL-X v7.2.pch2\")"
+      "Bash(xxd \"/Users/jan/Music/Gear/Nord Modular G2/Patches/Eigen Patches/Burp  NL-X v7.2.pch2\")",
+      "Bash(grep -n \"SetPatch\\\\|S_SET_PATCH\\\\|0x37\\\\|\\\\$37\\\\|CreateSet\\\\|SendPatch\\\\|UploadPatch\" \"/Users/jan/Music/Gear/Nord Modular G2/EDITOR/Delphi-editor/nord_g2_editor-master/Gen2/Common/BVE.NMG2USB.pas\")"
     ]
   }
 }
