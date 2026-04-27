@@ -1625,31 +1625,56 @@ int g2_upload_patch(int slot, const char *filepath) {
     fread(file_data, 1, (size_t)fsize, f);
     fclose(f);
 
-    /* .pch2 format: [name bytes][0x00][0x17][0x00][section bytes] */
+    /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
+     * Use filename (without extension) as the patch name, like g2ctl.py does. */
+    const char *base = strrchr(filepath, '/');
+    base = base ? base + 1 : filepath;
+    char name[16] = {0};
+    int ni = 0;
+    while (ni < 15 && base[ni] && base[ni] != '.') { name[ni] = base[ni]; ni++; }
+
     int name_end = 0;
     while (name_end < fsize && file_data[name_end]) name_end++;
-    char name[17] = {0};
-    int ncopy = name_end < 16 ? name_end : 16;
-    memcpy(name, file_data, ncopy);
-    int data_offset = name_end + 3;  /* skip NUL + 0x17 + 0x00 */
-    int data_len = (int)fsize - data_offset;
+    int data_offset = name_end + 3;   /* skip NUL + 0x17 + 0x00 */
+    int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
     if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
 
     uint8_t version = cable_get_version(slot);
 
-    /* payload: 3 zero bytes + 16-byte padded name + section bytes */
-    size_t plen = 3 + 16 + (size_t)data_len;
-    uint8_t *payload = (uint8_t *)calloc(1, plen);
-    if (!payload) { free(file_data); return G2_ERR_NO_MEMORY; }
-    /* payload[0..2] = 0x00 0x00 0x00 */
-    memcpy(payload + 3, name, 16);
-    memcpy(payload + 3 + 16, file_data + data_offset, (size_t)data_len);
+    /* Build USB packet with dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer.
+     * Packet: [len_hi][len_lo][0x01][cmd][ver][0x37][0x00 x3][name_16][section_data][crc_hi][crc_lo] */
+    size_t extraLen = 3 + 16 + (size_t)data_len;
+    size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
+    uint8_t *buff = (uint8_t *)calloc(1, totalLen);
+    if (!buff) { free(file_data); return G2_ERR_NO_MEMORY; }
+
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = SUB_COMMAND_SET;  /* 0x37 */
+    pos += 3;  /* three zero bytes (calloc) */
+    memcpy(buff + pos, name, 16);
+    pos += 16;
+    memcpy(buff + pos, file_data + data_offset, (size_t)data_len);
+    pos += data_len;
     free(file_data);
 
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
     g2_drain_pending();
-    int ret = send_slot(slot, version, 0x37, payload, plen);
-    free(payload);
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    free(buff);
     if (ret < 0) return G2_ERR_SEND;
+
     usleep(USB_SEND_DELAY_US * 5);
     uint8_t response[64] = {0};
     recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
