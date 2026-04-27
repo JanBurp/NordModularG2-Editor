@@ -1,4 +1,5 @@
 import { Device, SlotLabel } from "@/types";
+
 import { defineStore } from "pinia";
 
 export type DeviceStatus =

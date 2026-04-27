@@ -190,6 +190,18 @@ ipcMain.handle("patch:save-dialog", async (event) => {
 	return { success: true, filepath: result.filePath };
 });
 
+ipcMain.handle("patch:open-dialog", async (event) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showOpenDialog(browserWin!, {
+		filters: [{ name: "Patch Files", extensions: ["pch2", "prf2"] }],
+		properties: ["openFile"],
+	});
+	if (result.canceled || !result.filePaths[0]) return { success: false };
+	const filepath = result.filePaths[0];
+	const buf = fs.readFileSync(filepath);
+	return { success: true, filepath, data: Array.from(buf) };
+});
+
 app.on("before-quit", (e) => {
 	e.preventDefault();
 	(async () => {
@@ -260,6 +272,8 @@ app.whenReady().then(async () => {
 				{ label: "Slot B", click: () => win!.webContents.send("menu:action", "slot-B"), accelerator: "B" },
 				{ label: "Slot C", click: () => win!.webContents.send("menu:action", "slot-C"), accelerator: "C" },
 				{ label: "Slot D", click: () => win!.webContents.send("menu:action", "slot-D"), accelerator: "D" },
+				{ type: "separator" },
+				{ label: "Toggle DevTools", role: "toggleDevTools", accelerator: "CommandOrControl+Shift+I" },
 			],
 		},
 		{
