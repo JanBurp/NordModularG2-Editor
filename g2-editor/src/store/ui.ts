@@ -5,7 +5,7 @@ import type { Cable } from "@/renderer/cableRenderer";
 import { useDeviceStore } from "./device";
 import { SLOT_LABELS } from "@/constants";
 
-export type PaneTab = "modules" | "browser" | "usb";
+export type PaneTab = "modules" | "browser";
 
 export const useUiStore = defineStore("ui", () => {
   const activeSlot = ref<SlotLabel>("A");

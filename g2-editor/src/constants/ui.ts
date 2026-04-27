@@ -11,7 +11,6 @@ export const SLOT_OPTIONS = [
 
 export const PANE_TAB_OPTIONS = [
 	{ label: 'Modules', value: 'modules' },
-	{ label: 'USB', value: 'usb' },
 	{ label: 'Browser', value: 'browser' },
 ];
 
