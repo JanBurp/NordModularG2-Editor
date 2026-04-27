@@ -3,6 +3,7 @@ import { computed, ref } from "vue";
 import { Device } from "@/types";
 import type { DeviceStatus } from "@/store/device";
 import { useDeviceStore } from "@/store/device";
+import { useSlotsStore } from "@/store/slots";
 
 export type { DeviceStatus };
 
@@ -32,6 +33,7 @@ const SLOT_LABELS = ["A", "B", "C", "D"] as const;
 
 export function useG2() {
 	const store = useDeviceStore();
+	const slotsStore = useSlotsStore();
 	const logs = ref<UsbLogEntry[]>([]);
 	const hardwareVariationChange = ref<{ slot: number; variation: number } | null>(null);
 	const hardwareSlotChange = ref<number | null>(null);
@@ -116,6 +118,20 @@ export function useG2() {
 				if (ev.type === "slot_change") {
 					hardwareSlotChange.value = ev.slot;
 					log("←", "Watch", formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === "param_change") {
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (slotLabel) {
+						const patch = slotsStore.slots[slotLabel]?.patch;
+						const areaIdx = ev.area === "va" ? 1 : 0;
+						const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
+						if (mod?.lv && mod.pcnt) {
+							const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
+							if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
+						}
+					}
+					log("←", "Watch", formatWatchEvent(ev), "param");
 					return;
 				}
 				const category: UsbLogEntry["category"] =
