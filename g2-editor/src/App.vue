@@ -668,16 +668,16 @@
 					uiStore.area = 0;
 					break;
 				case 'slot-A':
-					uiStore.activeSlot = 'A';
+					handleSlotClick(0);
 					break;
 				case 'slot-B':
-					uiStore.activeSlot = 'B';
+					handleSlotClick(1);
 					break;
 				case 'slot-C':
-					uiStore.activeSlot = 'C';
+					handleSlotClick(2);
 					break;
 				case 'slot-D':
-					uiStore.activeSlot = 'D';
+					handleSlotClick(3);
 					break;
 			}
 		});
