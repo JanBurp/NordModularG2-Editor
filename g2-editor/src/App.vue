@@ -487,7 +487,6 @@
 				if (deviceStatus.value === "connected") {
 					try {
 						await window.cli.run(["upload-patch", uiStore.activeSlot, item.filepath]);
-						applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
 					} catch (uploadErr) {
 						console.error("Upload to G2 failed:", uploadErr);
 					}
