@@ -1639,10 +1639,9 @@ int g2_upload_patch(int slot, const char *filepath) {
     int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
     if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
 
-    uint8_t version = cable_get_version(slot);
-
     /* Build USB packet with dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer.
-     * Packet: [len_hi][len_lo][0x01][cmd][ver][0x37][0x00 x3][name_16][section_data][crc_hi][crc_lo] */
+     * Packet: [len_hi][len_lo][0x01][cmd][0x53][0x37][0x00 x3][name_16][section_data][crc_hi][crc_lo]
+     * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by Delphi editor and g2ctl.py). */
     size_t extraLen = 3 + 16 + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
@@ -1651,7 +1650,7 @@ int g2_upload_patch(int slot, const char *filepath) {
     int pos = COMMAND_OFFSET;
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
+    buff[pos++] = 0x53;  /* fixed version for S_SET_PATCH — not the dynamic patch version */
     buff[pos++] = SUB_COMMAND_SET;  /* 0x37 */
     pos += 3;  /* three zero bytes (calloc) */
     memcpy(buff + pos, name, 16);

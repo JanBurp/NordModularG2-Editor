@@ -20,3 +20,5 @@ g2-editor/resources/g2-cli
 
 # Dependency directories
 .depend/
+/screenshots
+/test-patches
