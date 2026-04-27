@@ -2,9 +2,9 @@ import { computed, ref } from "vue";
 
 import { Device } from "@/types";
 import type { DeviceStatus } from "@/store/device";
+import { SLOT_LABELS } from "@/constants";
 import { useDeviceStore } from "@/store/device";
 import { useSlotsStore } from "@/store/slots";
-import { SLOT_LABELS } from "@/constants";
 
 export type { DeviceStatus };
 
@@ -43,7 +43,9 @@ export function useG2() {
 		message: string,
 		category?: UsbLogEntry["category"],
 	): void {
-		logs.value.push({ id: ++logId, timestamp: now(), direction, event, message, category });
+		const entry: UsbLogEntry = { id: ++logId, timestamp: now(), direction, event, message, category };
+		logs.value.push(entry);
+		console.debug(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
 	}
 
 	function clearLogs(): void {
@@ -51,41 +53,60 @@ export function useG2() {
 	}
 
 	const deviceStatus = computed<DeviceStatus>(() => store.status);
-	const device = computed<Device|null>(() => store.device);
+	const device = computed<Device | null>(() => store.device);
 
-	const statusText = computed<string>(() => {
+	const statusClass = computed(() => {
 		switch (store.status) {
 			case "connected":
-				return "G2 Connected";
+				return "border-green-500 bg-green-500";
 			case "connecting":
-				return "Connecting...";
 			case "uploading":
-				return "Uploading...";
 			case "downloading":
-				return "Downloading...";
+				return "border-orange-300 bg-orange-300";
 			case "error":
-				return "Connection Error";
 			case "unsupported":
-				return "G2 Not Available";
 			case "lost":
-				return "G2 Disconnected";
+				return "border-red-500 bg-red-500";
 			default:
-				return "Not Connected";
+				return "border-neutral-600 bg-neutral-900";
+		}
+	});
+
+	const statusLabel = computed(() => {
+		switch (store.status) {
+			case "connected":
+				return "connected";
+			case "connecting":
+				return "connecting...";
+			case "disconnected":
+				return "disconnected";
+			case "uploading":
+				return "uploading...";
+			case "downloading":
+				return "downloading...";
+			case "error":
+				return "error";
+			case "unsupported":
+				return "not available";
+			case "lost":
+				return "lost";
+			default:
+				return "unknown";
 		}
 	});
 
 	function formatWatchEvent(ev: any): string {
 		switch (ev.type) {
-			case "param_change":      return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
-			case "patch_param":       return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
-			case "led_data":          return `led slot=${ev.slot}`;
-			case "volume_data":       return `vol slot=${ev.slot}`;
-			case "slot_change":       return `slot → ${ev.slot}`;
-			case "variation_change":  return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
-			case "perf_name":         return `perf: ${ev.name}`;
-			case "raw_interrupt":     return `intr: ${ev.hex}`;
-			case "raw_bulk":          return `bulk[${ev.size}]: ${ev.hex}`;
-			default:                  return ev.type ?? "(unknown)";
+			case "param_change": return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
+			case "patch_param": return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
+			case "led_data": return `led slot=${ev.slot}`;
+			case "volume_data": return `vol slot=${ev.slot}`;
+			case "slot_change": return `slot → ${ev.slot}`;
+			case "variation_change": return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
+			case "perf_name": return `perf: ${ev.name}`;
+			case "raw_interrupt": return `intr: ${ev.hex}`;
+			case "raw_bulk": return `bulk[${ev.size}]: ${ev.hex}`;
+			default: return ev.type ?? "(unknown)";
 		}
 	}
 
@@ -142,10 +163,10 @@ export function useG2() {
 				}
 				const category: UsbLogEntry["category"] =
 					ev.type === "param_change" || ev.type === "patch_param" ? "param" :
-					ev.type === "led_data"     ? "led" :
-					ev.type === "volume_data"  ? "volume" :
-					ev.type === "raw_interrupt" || ev.type === "raw_bulk"    ? "raw" :
-					ev.type?.startsWith("unknown") ? "unknown" : undefined;
+						ev.type === "led_data" ? "led" :
+							ev.type === "volume_data" ? "volume" :
+								ev.type === "raw_interrupt" || ev.type === "raw_bulk" ? "raw" :
+									ev.type?.startsWith("unknown") ? "unknown" : undefined;
 				log("←", "Watch", formatWatchEvent(ev), category);
 			} catch {
 				log("←", "Watch", line);
@@ -207,6 +228,13 @@ export function useG2() {
 		}
 	}
 
+	async function toggleConnection(): Promise<void> {
+		if (store.status === "connected") {
+			return await disconnectDevice();
+		}
+		return await connectDevice();
+	}
+
 	async function uploadToG2<T extends Record<string, any>>(
 		patch: T | null,
 	): Promise<void> {
@@ -232,11 +260,13 @@ export function useG2() {
 	return {
 		deviceStatus,
 		device,
-		statusText,
+		statusClass,
+		statusLabel,
 		usbLogs: logs,
 		clearLogs,
 		connectDevice,
 		disconnectDevice,
+		toggleConnection,
 		startWatch,
 		stopWatch,
 		uploadToG2,

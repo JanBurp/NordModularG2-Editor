@@ -9,12 +9,7 @@
 				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
 				<!-- SLOT BUTTONS -->
-				<BtnGroup
-					:model-value="uiStore.selectedSlotIndex"
-					:options="SLOT_OPTIONS"
-					variant="toggle"
-					@update:model-value="handleSlotClick"
-				/>
+				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
 			</template>
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
@@ -50,22 +45,13 @@
 
 			<ToolBarDivider />
 
-			<BtnGroup
-				v-model="uiStore.area"
-				:options="AREA_OPTIONS"
-				variant="toggle"
-			/>
+			<BtnGroup v-model="uiStore.area" :options="AREA_OPTIONS" variant="toggle" />
 
 			<ToolBarDivider />
 
 			<div class="flex items-center gap-2">
 				<span class="text-xs font-semibold text-neutral-400">Var:</span>
-				<BtnGroup
-					v-model="uiStore.variation"
-					:options="VARIATION_OPTIONS"
-					variant="variation"
-					@update:model-value="handleVariationClick"
-				/>
+				<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="handleVariationClick" />
 			</div>
 
 			<ToolBarDivider />
@@ -143,36 +129,22 @@
 
 			<SidePanel v-if="uiStore.showRightPane">
 				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-				<UsbPanel
-					v-show="uiStore.rightPaneTab === 'usb'"
-					:logs="usbLogs"
-					:device-status="deviceStatus"
-					@disconnect="disconnectDevice"
-					@connect="connectDevice"
-					@clear-logs="clearLogs"
-				/>
 				<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="handlePatchSelect" />
 			</SidePanel>
 		</div>
 		<StatusBar>
-			<BtnGroup
-				v-model="uiStore.area"
-				size="xs"
-				:options="AREA_OPTIONS"
-				variant="toggle"
-			/>
+			<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
 
 			<span> Voice: {{ areaModulesCount('voice') }} modules / {{ areaCablesCount('voice') }} cables<br /> </span>
 			<StatusBarDivider></StatusBarDivider>
 			<span> FX: {{ areaModulesCount('fx') }} modules / {{ areaCablesCount('fx') }} cables<br /> </span>
 
 			<div
-				class="ml-auto flex gap-2 items-center px-2 cursor-pointer"
-				:class="device.status === 'connected' ? 'bg-green-500' : 'bg-orange-500'"
-				@click="uiStore.toggleSidebar('usb')"
+				class="ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-30"
+				:class="statusClass"
+				@click="toggleConnection"
 			>
-				<span>🔌</span>
-				<span>{{ device.status }}</span>
+				<span class="text-sm">{{ statusLabel }}</span>
 			</div>
 		</StatusBar>
 	</div>
@@ -185,7 +157,6 @@
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import ModulesPane from './components/panels/ModulesPane.vue';
-	import UsbPanel from './components/panels/UsbPanel.vue';
 	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';
 	import ToolBar from './components/toolbar/ToolBar.vue';
@@ -334,13 +305,11 @@
 	}
 
 	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }) {
-		applySlotResult(await slotsStore.moveModuleWithCollision(
-			moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+		applySlotResult(await slotsStore.moveModuleWithCollision(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }) {
-		applySlotResult(await slotsStore.dropModuleWithCollision(
-			typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+		applySlotResult(await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function loadSlotPatch(index: number) {
@@ -431,18 +400,7 @@
 		}
 	}
 
-	const {
-		deviceStatus,
-		statusText,
-		usbLogs,
-		connectDevice,
-		disconnectDevice,
-		// uploadToG2,
-		// downloadFromG2,
-		clearLogs,
-		hardwareVariationChange,
-		hardwareSlotChange,
-	} = useG2();
+	const { deviceStatus, statusClass, statusLabel, connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
 
 	const {
 		cableColors,
@@ -564,9 +522,6 @@
 					break;
 				case 'toggle-browser':
 					uiStore.toggleSidebar('browser');
-					break;
-				case 'toggle-usb':
-					uiStore.toggleSidebar('usb');
 					break;
 				case 'area-voice':
 					uiStore.area = 1;

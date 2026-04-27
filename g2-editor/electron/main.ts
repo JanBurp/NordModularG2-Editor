@@ -263,7 +263,6 @@ app.whenReady().then(async () => {
 			submenu: [
 				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
 				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
-				{ label: "USB", click: () => win!.webContents.send("menu:action", "toggle-usb"), accelerator: "CommandOrControl+U" },
 				{ type: "separator" },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "CommandOrControl+V" },
 				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "CommandOrControl+F" },
