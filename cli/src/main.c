@@ -51,6 +51,9 @@ static void print_usage(const char *prog) {
     printf("                                       Move a module to a new grid position\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
     printf("                                       Set a module parameter value\n");
+    printf("  select-patch <slot> <bank:1-32> <location:1-127>\n");
+    printf("                                       Load bank patch into slot\n");
+    printf("  upload-patch <slot> <filepath>       Upload .pch2 file to slot\n");
     printf("  watch                                Monitor param/cable/slot changes live\n");
 }
 
@@ -379,6 +382,28 @@ int main(int argc, char *argv[]) {
         int val      = atoi(argv[i + 5]);
         int var      = atoi(argv[i + 6]);
         return g2_set_param(slot, location, mod_id, param, val, var);
+    }
+
+    if (strcmp(command, "select-patch") == 0) {
+        /* select-patch <slot> <bank:1-32> <location:1-127> */
+        if (i + 3 >= argc) {
+            fprintf(stderr, "Usage: select-patch <slot> <bank:1-32> <location:1-127>\n");
+            return 1;
+        }
+        int slot     = parse_slot(argv[i + 1]);
+        int bank     = atoi(argv[i + 2]);
+        int location = atoi(argv[i + 3]);
+        return g2_select_patch(slot, bank, location);
+    }
+
+    if (strcmp(command, "upload-patch") == 0) {
+        /* upload-patch <slot> <filepath> */
+        if (i + 2 >= argc) {
+            fprintf(stderr, "Usage: upload-patch <slot> <filepath>\n");
+            return 1;
+        }
+        int slot = parse_slot(argv[i + 1]);
+        return g2_upload_patch(slot, argv[i + 2]);
     }
 
     if (strcmp(command, "watch") == 0) {

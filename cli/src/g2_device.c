@@ -1596,6 +1596,67 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     return G2_OK;
 }
 
+int g2_select_patch(int slot, int bank, int location) {
+    if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
+    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
+    g2_drain_pending();
+    uint8_t cmd[4] = { 0x0a, (uint8_t)slot, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
+    if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_upload_patch(int slot, const char *filepath) {
+    if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) return G2_ERR_FILE_OPEN;
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
+    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
+    fread(file_data, 1, (size_t)fsize, f);
+    fclose(f);
+
+    /* .pch2 format: [name bytes][0x00][0x17][0x00][section bytes] */
+    int name_end = 0;
+    while (name_end < fsize && file_data[name_end]) name_end++;
+    char name[17] = {0};
+    int ncopy = name_end < 16 ? name_end : 16;
+    memcpy(name, file_data, ncopy);
+    int data_offset = name_end + 3;  /* skip NUL + 0x17 + 0x00 */
+    int data_len = (int)fsize - data_offset;
+    if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
+
+    uint8_t version = cable_get_version(slot);
+
+    /* payload: 3 zero bytes + 16-byte padded name + section bytes */
+    size_t plen = 3 + 16 + (size_t)data_len;
+    uint8_t *payload = (uint8_t *)calloc(1, plen);
+    if (!payload) { free(file_data); return G2_ERR_NO_MEMORY; }
+    /* payload[0..2] = 0x00 0x00 0x00 */
+    memcpy(payload + 3, name, 16);
+    memcpy(payload + 3 + 16, file_data + data_offset, (size_t)data_len);
+    free(file_data);
+
+    g2_drain_pending();
+    int ret = send_slot(slot, version, 0x37, payload, plen);
+    free(payload);
+    if (ret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US * 5);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;

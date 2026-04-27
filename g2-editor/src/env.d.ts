@@ -8,6 +8,13 @@ declare module "*.vue" {
 
 interface Window {
 	__g2DragTypeId?: number;
+	electronAPI: {
+		patches: {
+			list:      (folder: string) => Promise<{ success: boolean; entries: { name: string; path: string; isDir: boolean }[]; error?: string }>;
+			load:      (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
+			setFolder: () => Promise<{ success: boolean; folder?: string }>;
+		};
+	};
 	cli: {
 		run: (args: string[]) => Promise<string>;
 		runBatch: (argsList: string[][]) => Promise<string[]>;

@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from "electron";
 
+contextBridge.exposeInMainWorld("electronAPI", {
+	patches: {
+		list:      (folder: string) => ipcRenderer.invoke("patches:list", folder),
+		load:      (filepath: string) => ipcRenderer.invoke("patches:load", filepath),
+		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
+	},
+});
+
 contextBridge.exposeInMainWorld("cli", {
 	run: (args: string[]) => ipcRenderer.invoke("cli:run", args),
 	runBatch: (argsList: string[][]) => ipcRenderer.invoke("cli:run-batch", argsList),

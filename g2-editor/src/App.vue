@@ -224,6 +224,7 @@
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useRightPanel } from './composables/useRightPanel';
+	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, CABLE_COLOR_INDEX_MAP } from './constants';
 
@@ -235,6 +236,7 @@
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const browserStore = useBrowserStore();
 
 	const selectedCable = ref<Cable | null>(null);
 	const selectedModule = ref<number | null>(null);
@@ -465,22 +467,45 @@
 		reader.readAsArrayBuffer(file);
 	}
 
-	async function handlePatchSelect(filename: string) {
-		if (typeof window === 'undefined' || !window.electronAPI) return;
-		try {
-			const result = await window.electronAPI.patches.load(filename);
-			if (result.success && result.data) {
+	async function handlePatchSelect(
+		item: { type: "disk"; filepath: string } | { type: "synth"; bank: number; location: number }
+	) {
+		if (item.type === "disk") {
+			if (typeof window === 'undefined' || !window.electronAPI) return;
+			try {
+				const result = await window.electronAPI.patches.load(item.filepath);
+				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
 				const { PatchParser } = await import('./parser/nmg2PatchParser');
-				const parser = new PatchParser(buffer);
-				const parsedPatch = parser.parse() as any;
-				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, filename.replace('.pch2', '').replace('.prf2', ''));
+				const parsedPatch = new PatchParser(buffer).parse() as any;
+				const name = (item.filepath.split("/").pop() ?? item.filepath)
+					.replace(/\.(pch2|prf2)$/i, "");
+				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
 				if (parsedPatch?.description?.variation !== undefined) {
 					uiStore.variation = parsedPatch.description.variation;
 				}
+				if (deviceStatus.value === "connected") {
+					try {
+						await window.cli.run(["upload-patch", uiStore.activeSlot, item.filepath]);
+						applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
+					} catch (uploadErr) {
+						console.error("Upload to G2 failed:", uploadErr);
+					}
+				}
+			} catch (err) {
+				console.error('Failed to load patch:', err);
 			}
-		} catch (err) {
-			console.error('Failed to load patch:', err);
+		} else {
+			if (deviceStatus.value !== "connected") return;
+			try {
+				await window.cli.run([
+					"select-patch", uiStore.activeSlot,
+					String(item.bank), String(item.location),
+				]);
+				applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
+			} catch (err) {
+				console.error("Failed to select synth patch:", err);
+			}
 		}
 	}
 
@@ -528,6 +553,11 @@
 				const slot = SLOT_LABELS[idx];
 				uiStore.activeSlot = slot;
 				await loadSlotPatch(idx);
+			}
+			if (device.startupNames) {
+				browserStore.applyNamesData(device.startupNames);
+			} else {
+				browserStore.loadSynthList();
 			}
 		}
 	});
