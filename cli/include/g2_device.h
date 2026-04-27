@@ -108,6 +108,10 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
                   int num_params, const int *param_vals,
                   const char *name);
 
+/* Param commands */
+int g2_set_param(int slot, int location, int module_id,
+                 int param_idx, int value, int variation);
+
 /* Watch for param changes (simple single-threaded approach) */
 int g2_watch(output_format_t format, int debug);
 volatile extern int g2_watch_running;

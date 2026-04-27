@@ -90,6 +90,8 @@ export function useG2() {
 		}
 	}
 
+	const paramWatchTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
 	function startWatch(): void {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
@@ -121,8 +123,14 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === "param_change") {
-					const slotLabel = SLOT_LABELS[ev.slot as number];
-					if (slotLabel) {
+					log("←", "Watch", formatWatchEvent(ev), "param");
+					const key = `${ev.slot}-${ev.area}-${ev.module}-${ev.param}-${ev.variation}`;
+					const existing = paramWatchTimers.get(key);
+					if (existing) clearTimeout(existing);
+					paramWatchTimers.set(key, setTimeout(() => {
+						paramWatchTimers.delete(key);
+						const slotLabel = SLOT_LABELS[ev.slot as number];
+						if (!slotLabel) return;
 						const patch = slotsStore.slots[slotLabel]?.patch;
 						const areaIdx = ev.area === "va" ? 1 : 0;
 						const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
@@ -130,8 +138,7 @@ export function useG2() {
 							const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
 							if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
 						}
-					}
-					log("←", "Watch", formatWatchEvent(ev), "param");
+					}, 50));
 					return;
 				}
 				const category: UsbLogEntry["category"] =

@@ -181,6 +181,7 @@
 					@module-move="handleModuleMove"
 					@module-drop="handleModuleDrop"
 					@canvas-click="handleCanvasClick"
+					@param-change="handleParamChange"
 				/>
 				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
 			</div>
@@ -339,6 +340,25 @@
 
 	function handleCanvasClick() {
 		selectedModule.value = null;
+	}
+
+	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
+
+	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
+		if (deviceStatus.value !== "connected") return;
+		if (paramChangeTimer) clearTimeout(paramChangeTimer);
+		paramChangeTimer = setTimeout(async () => {
+			paramChangeTimer = null;
+			try {
+				await slotsStore.setParam(
+					moduleIndex, paramIndex, value,
+					uiStore.variation,
+					uiStore.area === 1 ? "voice" : "fx",
+				);
+			} catch {
+				// ignore — G2 may be temporarily busy
+			}
+		}, 50);
 	}
 
 	// Returns modules that need to be displaced and their new rows.
