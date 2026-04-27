@@ -14,6 +14,10 @@ interface Window {
 			load:      (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
 			setFolder: () => Promise<{ success: boolean; folder?: string }>;
 		};
+		onMenuAction: (cb: (action: string) => void) => void;
+		offMenuAction: () => void;
+		savePatch: (filepath: string, data: number[]) => Promise<void>;
+		showSaveDialog: () => Promise<{ success: boolean; filepath?: string }>;
 	};
 	cli: {
 		run: (args: string[]) => Promise<string>;

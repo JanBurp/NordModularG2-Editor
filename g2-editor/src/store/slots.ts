@@ -16,6 +16,9 @@ interface SlotEntry {
 export const useSlotsStore = defineStore("slots", {
 	state: () => ({
 		activeSlot: "A" as SlotLabel,
+		slotFilePaths: {
+			A: "", B: "", C: "", D: "",
+		} as Record<SlotLabel, string>,
 		slots: {
 			A: { name: "", loading: false, error: null, rawHex: null, patch: null },
 			B: { name: "", loading: false, error: null, rawHex: null, patch: null },
@@ -226,9 +229,21 @@ export const useSlotsStore = defineStore("slots", {
 			}
 		},
 
-		loadPatchFile(slot: SlotLabel, patch: Patch, name: string): void {
+		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
 			this.slots[slot].patch = patch;
 			this.slots[slot].name = name;
+			if (rawHex) this.slots[slot].rawHex = rawHex;
+			if (filepath) this.slotFilePaths[slot] = filepath;
+		},
+
+		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
+			const entry = this.slots[slot];
+			if (!entry?.rawHex) return;
+			const path = filepath || this.slotFilePaths[slot];
+			if (!path) return;
+			const data = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			await window.electronAPI.savePatch(path, data);
+			this.slotFilePaths[slot] = path;
 		},
 	},
 });
