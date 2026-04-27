@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, dialog } from "electron";
+import { BrowserWindow, app, ipcMain, dialog, Menu } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 import { fileURLToPath } from "node:url";
@@ -176,6 +176,20 @@ ipcMain.handle("patches:set-folder", async (event) => {
 	return { success: true, folder: result.filePaths[0] };
 });
 
+ipcMain.handle("patch:save", async (_, filepath: string, data: number[]) => {
+	fs.writeFileSync(filepath, Buffer.from(data));
+});
+
+ipcMain.handle("patch:save-dialog", async (event) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showSaveDialog(browserWin!, {
+		filters: [{ name: "Patch Files", extensions: ["pch2"] }],
+		defaultPath: "patch.pch2",
+	});
+	if (result.canceled || !result.filePath) return { success: false };
+	return { success: true, filepath: result.filePath };
+});
+
 app.on("before-quit", (e) => {
 	e.preventDefault();
 	(async () => {
@@ -196,4 +210,63 @@ app.whenReady().then(async () => {
 	}
 
 	createWindow();
+
+	const template: Electron.MenuItemConstructorOptions[] = [
+		{
+			label: "G2 Editor",
+			submenu: [
+				{ role: "about" },
+				{ type: "separator" },
+				{ role: "services" },
+				{ type: "separator" },
+				{ role: "hide" },
+				{ role: "hideOthers" },
+				{ role: "unhide" },
+				{ type: "separator" },
+				{ role: "quit" },
+			],
+		},
+		{
+			label: "File",
+			submenu: [
+				{ label: "New Patch", click: () => win!.webContents.send("menu:action", "new-patch") },
+				{ label: "New Performance", click: () => win!.webContents.send("menu:action", "new-performance") },
+				{ type: "separator" },
+				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
+				{ type: "separator" },
+				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
+				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as") },
+				{ label: "Save All", click: () => win!.webContents.send("menu:action", "save-all") },
+			],
+		},
+		{
+			label: "Edit",
+			submenu: [
+				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete") },
+				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all") },
+			],
+		},
+		{
+			label: "View",
+			submenu: [
+				{ label: "Browser", click: () => win!.webContents.send("menu:action", "slot-A"), accelerator: "CommandOrControl+B" },
+				{ label: "USB", click: () => win!.webContents.send("menu:action", "slot-A"), accelerator: "CommandOrControl+U" },
+				{ type: "separator" },
+				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "CommandOrControl+V" },
+				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "CommandOrControl+F" },
+				{ type: "separator" },
+				{ label: "Slot A", click: () => win!.webContents.send("menu:action", "slot-A"), accelerator: "A" },
+				{ label: "Slot B", click: () => win!.webContents.send("menu:action", "slot-B"), accelerator: "B" },
+				{ label: "Slot C", click: () => win!.webContents.send("menu:action", "slot-C"), accelerator: "C" },
+				{ label: "Slot D", click: () => win!.webContents.send("menu:action", "slot-D"), accelerator: "D" },
+			],
+		},
+		{
+			label: "Help",
+			submenu: [
+				{ role: "about" },
+			],
+		},
+	];
+	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
 });

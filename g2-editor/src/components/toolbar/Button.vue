@@ -18,11 +18,9 @@
 		class="inline-flex items-center justify-center bg-neutral-700 border border-neutral-600 rounded text-neutral-200 font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2"
 		:class="[
 			variant === 'default' ? 'h-8 px-3 text-sm' : '',
-			variant === 'toggle' || variant === 'tab'
-				? 'h-8 px-2.5 text-sm bg-neutral-800 border-neutral-700'
-				: '',
+			variant === 'toggle' || variant === 'tab' ? 'h-8 px-2.5 text-sm bg-neutral-800 border-neutral-700' : '',
 			variant === 'variation' ? 'w-8 h-8 p-0 text-sm bg-neutral-800' : '',
-			size === 'small' ? 'h-6 px-1.5 text-xs' : 'h-8 px-2.5 text-sm',
+			sizeClass,
 			active ? '!bg-blue-300 !text-white' : '',
 			disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-600',
 		]"
@@ -34,48 +32,54 @@
 </template>
 
 <script setup lang="ts">
-interface Props {
-	variant: "default" | "toggle" | "variation" | "tab" | "file";
-	active?: boolean;
-	disabled?: boolean;
-	accept?: string;
-	size?: "normal" | "small";
-}
+	import { computed } from 'vue';
 
-const props = withDefaults(defineProps<Props>(), {
-	active: false,
-	disabled: false,
-	size: "normal",
-});
-
-const emit = defineEmits<{
-	click: [event: MouseEvent];
-	change: [event: Event];
-}>();
-
-const handleClick = (event: MouseEvent) => {
-	if (!props.disabled) {
-		emit("click", event);
+	interface Props {
+		variant: 'default' | 'toggle' | 'variation' | 'tab' | 'file';
+		active?: boolean;
+		disabled?: boolean;
+		accept?: string;
+		size?: 'normal' | 'small' | 'xs';
 	}
-};
 
-const handleChange = (event: Event) => {
-	emit("change", event);
-};
+	const props = withDefaults(defineProps<Props>(), {
+		active: false,
+		disabled: false,
+		size: 'normal',
+	});
 
-const handleKeydown = (event: KeyboardEvent) => {
-	if (props.disabled) return;
+	const sizeClass = computed(() => {
+		if (props.size === 'xs') return '!h-4 !px-1 !text-xs !rounded-none';
+		if (props.size === 'small') return 'h-6 px-1.5 text-xs';
+		return 'h-8 px-2.5 text-sm';
+	});
 
-	if (event.key === "Enter" || event.key === " ") {
-		event.preventDefault();
-		if (props.variant === "file") {
-			const input = (event.target as HTMLElement).querySelector(
-				'input[type="file"]',
-			) as HTMLInputElement;
-			input?.click();
-		} else {
-			emit("click", event as unknown as MouseEvent);
+	const emit = defineEmits<{
+		click: [event: MouseEvent];
+		change: [event: Event];
+	}>();
+
+	const handleClick = (event: MouseEvent) => {
+		if (!props.disabled) {
+			emit('click', event);
 		}
-	}
-};
+	};
+
+	const handleChange = (event: Event) => {
+		emit('change', event);
+	};
+
+	const handleKeydown = (event: KeyboardEvent) => {
+		if (props.disabled) return;
+
+		if (event.key === 'Enter' || event.key === ' ') {
+			event.preventDefault();
+			if (props.variant === 'file') {
+				const input = (event.target as HTMLElement).querySelector('input[type="file"]') as HTMLInputElement;
+				input?.click();
+			} else {
+				emit('click', event as unknown as MouseEvent);
+			}
+		}
+	};
 </script>

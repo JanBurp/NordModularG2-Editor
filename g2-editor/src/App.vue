@@ -23,21 +23,7 @@
 			</template>
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!currentPatch">Save Patch</Button>
-			<!-- <Button
-				variant="default"
-				:disabled="!currentPatch || deviceStatus !== 'connected'"
-				@click="uploadToG2(currentPatch)"
-			>
-				Upload to G2
-			</Button>
-			<Button
-				variant="default"
-				:disabled="deviceStatus !== 'connected'"
-				@click="downloadFromG2"
-			>
-				Download from G2
-			</Button> -->
+			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.rawHex">Save Patch</Button>
 
 			<ToolBarDivider />
 
@@ -69,13 +55,6 @@
 					</option>
 				</select>
 			</div>
-
-			<ToolBarDivider />
-
-			<span class="text-xs text-neutral-600">
-				Voice: {{ areaModulesCount('voice') }} modules, {{ areaCablesCount('voice') }} cables<br />
-				FX: {{ areaModulesCount('fx') }} modules, {{ areaCablesCount('fx') }} cables<br />
-			</span>
 
 			<ToolBarDivider />
 
@@ -198,6 +177,28 @@
 				<PatchBrowser v-show="rightPaneTab === 'browser'" :isActive="rightPaneTab === 'browser'" @select="handlePatchSelect" />
 			</SidePanel>
 		</div>
+		<StatusBar>
+			<BtnGroup
+				class="ml-3 mr-10"
+				v-model="uiStore.area"
+				size="xs"
+				:options="[
+					{ value: 1, label: 'Voice' },
+					{ value: 0, label: 'FX' },
+				]"
+				variant="toggle"
+			/>
+
+			<span> Voice: {{ areaModulesCount('voice') }} modules / {{ areaCablesCount('voice') }} cables<br /> </span>
+			<StatusBarDivider></StatusBarDivider>
+			<span> FX: {{ areaModulesCount('fx') }} modules / {{ areaCablesCount('fx') }} cables<br /> </span>
+
+			<StatusBarDivider class="ml-auto"></StatusBarDivider>
+			<div class="flex gap-2 items-center">
+				<span>🔌</span>
+				<span>{{ device.status }}</span>
+			</div>
+		</StatusBar>
 	</div>
 </template>
 
@@ -215,6 +216,8 @@
 	import ToolBarLabel from './components/toolbar/ToolBarLabel.vue';
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
+	import StatusBar from './components/toolbar/StatusBar.vue';
+	import StatusBarDivider from './components/toolbar/StatusBarDivider.vue';
 
 	import { getModule } from './renderer/nmg2mods';
 	import { useG2 } from './composables/useG2';
@@ -239,7 +242,7 @@
 	const browserStore = useBrowserStore();
 
 	const selectedCable = ref<Cable | null>(null);
-	const selectedModule = ref<number | null>(null);
+	const selectedModule = ref<number | -1 | null>(null);
 	const dragSource = ref<{ moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string } | null>(null);
 
 	const SLOT_LABELS = ['A', 'B', 'C', 'D'] as const;
@@ -313,30 +316,48 @@
 		);
 	}
 
-	async function handleDeleteKey(e: KeyboardEvent) {
-		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-
+	function deleteSelection() {
 		if (selectedModule.value !== null && !selectedCable.value) {
+			if (selectedModule.value === -1) {
+				// select-all case: delete all modules in current area
+				const modulesToDelete = currentModules.value.map((m: any) => m.index);
+				for (const moduleId of modulesToDelete) {
+					const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
+					for (const cable of connectedCables) {
+						slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
+					}
+					slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
+				}
+				selectedModule.value = null;
+				return;
+			}
 			const moduleId = selectedModule.value;
 			const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
 			for (const cable of connectedCables) {
-				await slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
+				slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
 			}
-			applySlotResult(await slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx'));
+			slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
 			selectedModule.value = null;
 			return;
 		}
 
 		if (!selectedCable.value) return;
 		const cable = selectedCable.value;
-		applySlotResult(
-			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx'),
-		);
+		slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx');
 		selectedCable.value = null;
 	}
 
+	async function handleDeleteKey(e: KeyboardEvent) {
+		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+		deleteSelection();
+	}
+
 	function handleModuleClick(moduleIndex: number) {
-		selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+		if (selectedModule.value === -1) {
+			selectedModule.value = null;
+		} else {
+			selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+		}
 		selectedCable.value = null;
 	}
 
@@ -347,16 +368,12 @@
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (deviceStatus.value !== "connected") return;
+		if (deviceStatus.value !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
 			try {
-				await slotsStore.setParam(
-					moduleIndex, paramIndex, value,
-					uiStore.variation,
-					uiStore.area === 1 ? "voice" : "fx",
-				);
+				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
 			} catch {
 				// ignore — G2 may be temporarily busy
 			}
@@ -467,10 +484,8 @@
 		reader.readAsArrayBuffer(file);
 	}
 
-	async function handlePatchSelect(
-		item: { type: "disk"; filepath: string } | { type: "synth"; bank: number; location: number }
-	) {
-		if (item.type === "disk") {
+	async function handlePatchSelect(item: { type: 'disk'; filepath: string } | { type: 'synth'; bank: number; location: number }) {
+		if (item.type === 'disk') {
 			if (typeof window === 'undefined' || !window.electronAPI) return;
 			try {
 				const result = await window.electronAPI.patches.load(item.filepath);
@@ -478,32 +493,29 @@
 				const buffer = new Uint8Array(result.data).buffer;
 				const { PatchParser } = await import('./parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const name = (item.filepath.split("/").pop() ?? item.filepath)
-					.replace(/\.(pch2|prf2)$/i, "");
+				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name);
 				if (parsedPatch?.description?.variation !== undefined) {
 					uiStore.variation = parsedPatch.description.variation;
 				}
-				if (deviceStatus.value === "connected") {
+				if (deviceStatus.value === 'connected') {
 					try {
-						await window.cli.run(["upload-patch", uiStore.activeSlot, item.filepath]);
+						await window.cli.run(['upload-patch', uiStore.activeSlot, item.filepath]);
+						// applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
 					} catch (uploadErr) {
-						console.error("Upload to G2 failed:", uploadErr);
+						console.error('Upload to G2 failed:', uploadErr);
 					}
 				}
 			} catch (err) {
 				console.error('Failed to load patch:', err);
 			}
 		} else {
-			if (deviceStatus.value !== "connected") return;
+			if (deviceStatus.value !== 'connected') return;
 			try {
-				await window.cli.run([
-					"select-patch", uiStore.activeSlot,
-					String(item.bank), String(item.location),
-				]);
+				await window.cli.run(['select-patch', uiStore.activeSlot, String(item.bank), String(item.location)]);
 				applySlotResult(await slotsStore.loadSlot(uiStore.activeSlot));
 			} catch (err) {
-				console.error("Failed to select synth patch:", err);
+				console.error('Failed to select synth patch:', err);
 			}
 		}
 	}
@@ -544,6 +556,92 @@
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
 		window.addEventListener('mouseup', handleWindowMouseup);
+
+		window.electronAPI?.onMenuAction(async (action: string) => {
+			switch (action) {
+				case 'new-patch': {
+					const emptyPatch = {
+						areas: [
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+						],
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 0,
+							blue: 0,
+							yellow: 0,
+							orange: 0,
+							green: 0,
+							purple: 0,
+							white: 0,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
+					};
+					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					break;
+				}
+				case 'new-performance': {
+					const emptyPatch = {
+						areas: [
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+						],
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 0,
+							blue: 0,
+							yellow: 0,
+							orange: 0,
+							green: 0,
+							purple: 0,
+							white: 0,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
+					};
+					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					break;
+				}
+				case 'open':
+					toggleSidebar('browser');
+					break;
+				case 'save': {
+					const slot = slotsStore.slots[uiStore.activeSlot];
+					if (slot?.rawHex) await slotsStore.saveSlot(uiStore.activeSlot);
+					break;
+				}
+				case 'save-as': {
+					const slot = slotsStore.slots[uiStore.activeSlot];
+					if (!slot?.rawHex) break;
+					const result = await window.electronAPI.showSaveDialog();
+					if (result.success && result.filepath) {
+						await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+					}
+					break;
+				}
+				case 'save-all':
+					for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
+						if (slotsStore.slots[s]?.rawHex) {
+							await slotsStore.saveSlot(s);
+						}
+					}
+					break;
+				case 'delete':
+					deleteSelection();
+					break;
+				case 'select-all':
+					selectedModule.value = -1;
+					break;
+			}
+		});
+
 		await connectDevice();
 		if (device.status === 'connected') {
 			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
@@ -564,6 +662,7 @@
 	onUnmounted(() => {
 		window.removeEventListener('keydown', handleDeleteKey);
 		window.removeEventListener('mouseup', handleWindowMouseup);
+		window.electronAPI?.offMenuAction();
 	});
 
 	watch(hardwareSlotChange, async (slotIndex) => {
