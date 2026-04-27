@@ -6,6 +6,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		load:      (filepath: string) => ipcRenderer.invoke("patches:load", filepath),
 		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
 	},
+
+	onMenuAction: (cb: (action: string) => void) =>
+		ipcRenderer.on("menu:action", (_, action) => cb(action)),
+	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
+
+	savePatch: (filepath: string, data: number[]) =>
+		ipcRenderer.invoke("patch:save", filepath, data),
+	showSaveDialog: () => ipcRenderer.invoke("patch:save-dialog"),
 });
 
 contextBridge.exposeInMainWorld("cli", {
