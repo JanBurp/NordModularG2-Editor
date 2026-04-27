@@ -108,6 +108,10 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
                   int num_params, const int *param_vals,
                   const char *name);
 
+/* Patch browser commands */
+int g2_select_patch(int slot, int bank, int location);
+int g2_upload_patch(int slot, const char *filepath);
+
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);

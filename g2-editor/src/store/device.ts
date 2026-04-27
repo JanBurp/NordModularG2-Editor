@@ -16,6 +16,7 @@ export const useDeviceStore = defineStore("device", {
 		status: "disconnected" as DeviceStatus,
 		deviceName: "",
 		device: null as Device | null,
+		startupNames: null as any,
 	}),
 
 	getters: {
@@ -50,6 +51,7 @@ export const useDeviceStore = defineStore("device", {
 				const data = JSON.parse(output);
 				this.device = data.device as Device;
 				this.deviceName = this.device.synthName;
+				this.startupNames = data.names ?? null;
 				this.status = "connected";
 			} catch (e: any) {
 				this.status = "error";
@@ -66,6 +68,7 @@ export const useDeviceStore = defineStore("device", {
 				this.status = "disconnected";
 				this.deviceName = "";
 				this.device = null;
+				this.startupNames = null;
 			}
 		},
 

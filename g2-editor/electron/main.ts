@@ -1,8 +1,9 @@
-import { BrowserWindow, app, ipcMain } from "electron";
+import { BrowserWindow, app, ipcMain, dialog } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 import { fileURLToPath } from "node:url";
 import path from "node:path";
+import fs from "node:fs";
 import { spawn, type ChildProcess } from "child_process";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -142,6 +143,38 @@ ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
 
 ipcMain.on("cli:watch-start", () => startWatch());
 ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
+
+ipcMain.handle("patches:list", async (_, folder: string) => {
+	try {
+		const names = fs.readdirSync(folder).sort();
+		const entries = names.map((name) => {
+			const full = path.join(folder, name);
+			const isDir = fs.statSync(full).isDirectory();
+			return { name, path: full, isDir };
+		}).filter((e) => e.isDir || e.name.endsWith(".pch2") || e.name.endsWith(".prf2"));
+		return { success: true, entries };
+	} catch (e: any) {
+		return { success: false, error: e.message, entries: [] };
+	}
+});
+
+ipcMain.handle("patches:load", async (_, filepath: string) => {
+	try {
+		const buf = fs.readFileSync(filepath);
+		return { success: true, data: Array.from(buf) };
+	} catch (e: any) {
+		return { success: false, error: e.message };
+	}
+});
+
+ipcMain.handle("patches:set-folder", async (event) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showOpenDialog(browserWin!, {
+		properties: ["openDirectory"],
+	});
+	if (result.canceled || !result.filePaths[0]) return { success: false };
+	return { success: true, folder: result.filePaths[0] };
+});
 
 app.on("before-quit", (e) => {
 	e.preventDefault();
