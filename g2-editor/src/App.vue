@@ -23,7 +23,7 @@
 			</template>
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!currentPatch">Save Patch</Button>
+			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.rawHex">Save Patch</Button>
 
 			<ToolBarDivider />
 
@@ -242,7 +242,7 @@
 	const browserStore = useBrowserStore();
 
 	const selectedCable = ref<Cable | null>(null);
-	const selectedModule = ref<number | null>(null);
+	const selectedModule = ref<number | -1 | null>(null);
 	const dragSource = ref<{ moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string } | null>(null);
 
 	const SLOT_LABELS = ['A', 'B', 'C', 'D'] as const;
@@ -316,30 +316,48 @@
 		);
 	}
 
-	async function handleDeleteKey(e: KeyboardEvent) {
-		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-
+	function deleteSelection() {
 		if (selectedModule.value !== null && !selectedCable.value) {
+			if (selectedModule.value === -1) {
+				// select-all case: delete all modules in current area
+				const modulesToDelete = currentModules.value.map((m: any) => m.index);
+				for (const moduleId of modulesToDelete) {
+					const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
+					for (const cable of connectedCables) {
+						slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
+					}
+					slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
+				}
+				selectedModule.value = null;
+				return;
+			}
 			const moduleId = selectedModule.value;
 			const connectedCables = currentCables.value.filter((c: any) => c.smod === moduleId || c.dmod === moduleId);
 			for (const cable of connectedCables) {
-				await slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
+				slotsStore.deleteCableNoReload(cable as any, uiStore.area === 1 ? 'voice' : 'fx');
 			}
-			applySlotResult(await slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx'));
+			slotsStore.deleteModule(moduleId, uiStore.area === 1 ? 'voice' : 'fx');
 			selectedModule.value = null;
 			return;
 		}
 
 		if (!selectedCable.value) return;
 		const cable = selectedCable.value;
-		applySlotResult(
-			await slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx'),
-		);
+		slotsStore.deleteCable({ smod: cable.smod!, scon: cable.scon!, dmod: cable.dmod!, dcon: cable.dcon! }, uiStore.area === 1 ? 'voice' : 'fx');
 		selectedCable.value = null;
 	}
 
+	async function handleDeleteKey(e: KeyboardEvent) {
+		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+		deleteSelection();
+	}
+
 	function handleModuleClick(moduleIndex: number) {
-		selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+		if (selectedModule.value === -1) {
+			selectedModule.value = null;
+		} else {
+			selectedModule.value = selectedModule.value === moduleIndex ? null : moduleIndex;
+		}
 		selectedCable.value = null;
 	}
 
@@ -538,6 +556,64 @@
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
 		window.addEventListener('mouseup', handleWindowMouseup);
+
+		window.electronAPI?.onMenuAction(async (action: string) => {
+			switch (action) {
+				case 'new-patch': {
+					const emptyPatch = {
+						areas: [
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+						],
+						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+					};
+					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					break;
+				}
+				case 'new-performance': {
+					const emptyPatch = {
+						areas: [
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+						],
+						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+					};
+					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					break;
+				}
+				case 'open':
+					toggleSidebar('browser');
+					break;
+				case 'save': {
+					const slot = slotsStore.slots[uiStore.activeSlot];
+					if (slot?.rawHex) await slotsStore.saveSlot(uiStore.activeSlot);
+					break;
+				}
+				case 'save-as': {
+					const slot = slotsStore.slots[uiStore.activeSlot];
+					if (!slot?.rawHex) break;
+					const result = await window.electronAPI.showSaveDialog();
+					if (result.success && result.filepath) {
+						await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+					}
+					break;
+				}
+				case 'save-all':
+					for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
+						if (slotsStore.slots[s]?.rawHex) {
+							await slotsStore.saveSlot(s);
+						}
+					}
+					break;
+				case 'delete':
+					deleteSelection();
+					break;
+				case 'select-all':
+					selectedModule.value = -1;
+					break;
+			}
+		});
+
 		await connectDevice();
 		if (device.status === 'connected') {
 			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
@@ -558,6 +634,7 @@
 	onUnmounted(() => {
 		window.removeEventListener('keydown', handleDeleteKey);
 		window.removeEventListener('mouseup', handleWindowMouseup);
+		window.electronAPI?.offMenuAction();
 	});
 
 	watch(hardwareSlotChange, async (slotIndex) => {

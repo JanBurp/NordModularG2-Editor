@@ -46,7 +46,7 @@
 			default: null,
 		},
 		selectedModuleIndex: {
-			type: Number as () => number | null,
+			type: Number as () => number | -1 | null,
 			default: null,
 		},
 	});
@@ -424,7 +424,7 @@
 				:key="mod.index"
 				:type="mod.type"
 				:instance="mod"
-				:is-selected="mod.index === props.selectedModuleIndex"
+				:is-selected="props.selectedModuleIndex === -1 || mod.index === props.selectedModuleIndex"
 				@param-change="onParamChange"
 				@jack-drag-start="handleLocalJackDragStart"
 				@jack-drag-end="handleLocalJackDragEnd"
