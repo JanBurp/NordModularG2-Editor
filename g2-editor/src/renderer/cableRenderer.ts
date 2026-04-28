@@ -182,8 +182,23 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
 }
 
 /**
+ * Shifts a cubic bezier cable path to new endpoints while preserving the existing curve shape.
+ * Path format (from getCurvePath): Mdx dyCcp1x cp1y,cp2x cp2y,sx sy
+ * cp1 lives near dst so it shifts by the dst delta; cp2 lives near src so it shifts by the src delta.
+ */
+function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: number, newDy: number): string {
+	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
+	if (!m) return existingD;
+	const [oldDx, oldDy, cp1x, cp1y, cp2x, cp2y, oldSx, oldSy] = m.slice(1).map(Number);
+	const ddx = newDx - oldDx, ddy = newDy - oldDy;
+	const dsx = newSx - oldSx, dsy = newSy - oldSy;
+	return `M${newDx} ${newDy}C${cp1x + ddx} ${cp1y + ddy},${cp2x + dsx} ${cp2y + dsy},${newSx} ${newSy}`;
+}
+
+/**
  * Re-paths cables whose source or destination module is in movedIds.
  * Cables connected to modules that didn't move are left untouched (preserving their shaken shape).
+ * The existing curve shape is preserved — only the endpoints and their nearby control points translate.
  */
 export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
@@ -210,13 +225,12 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const scon = dir === 1 ? smodDef.outputs?.[scon_i] : smodDef.inputs?.[scon_i];
 		if (!scon || !dcon) return;
 
-		const sx = scon.x + smod.horiz * 256;
-		const sy = scon.y + smod.vert * 16;
-		const dx = dcon.x + dmod.horiz * 256;
-		const dy = dcon.y + dmod.vert * 16;
+		const newSx = scon.x + smod.horiz * 256;
+		const newSy = scon.y + smod.vert * 16;
+		const newDx = dcon.x + dmod.horiz * 256;
+		const newDy = dcon.y + dmod.vert * 16;
 
-		const d = new Patchcord(sx, sy, dx, dy).getStaticPath();
-
+		const d = shiftCablePath(border.getAttribute("d") || "", newSx, newSy, newDx, newDy);
 		svgElement.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`)
 			.forEach((el) => el.setAttribute("d", d));
 	});
