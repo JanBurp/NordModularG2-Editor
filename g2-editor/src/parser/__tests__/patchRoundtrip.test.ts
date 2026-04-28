@@ -1,0 +1,297 @@
+import { describe, it, expect } from "vitest";
+import fs from "fs";
+import path from "path";
+import { fileURLToPath } from "url";
+import { PatchParser } from "../nmg2PatchParser";
+import type { Patch, ModuleInstance, Cable } from "../nmg2PatchParser";
+import { serializePatch } from "../nmg2PatchSerializer";
+import {
+	mutDeleteCable,
+	mutDeleteModule,
+	mutMoveModule,
+	mutAddModule,
+	mutAddCable,
+} from "../patchMutations";
+
+const __dirname = fileURLToPath(new URL(".", import.meta.url));
+const FIXTURES = path.resolve(__dirname, "../../../../test-patches");
+
+// ── helpers ──────────────────────────────────────────────────────────────────
+
+function loadFixture(filename: string): { name: string; rawHex: string; patch: Patch } {
+	const buf = fs.readFileSync(path.join(FIXTURES, filename));
+	const fileBytes = new Uint8Array(buf);
+	let ofs = 0;
+	while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
+	const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
+	const rawHex = Array.from(fileBytes.slice(ofs + 3))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+	const patch = new PatchParser(fileBytes.buffer).parse();
+	return { name, rawHex, patch };
+}
+
+function parsePatchFromRawHex(name: string, rawHex: string): Patch {
+	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const nameBytes = new TextEncoder().encode(name);
+	const pch2 = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
+	pch2.set(nameBytes);
+	pch2[nameBytes.length] = 0x00;
+	pch2[nameBytes.length + 1] = 0x17;
+	pch2[nameBytes.length + 2] = 0x00;
+	pch2.set(sectionBytes, nameBytes.length + 3);
+	return new PatchParser(pch2.buffer).parse();
+}
+
+// Extracts only the persisted fields of a module for comparison
+function modSnap(m: ModuleInstance) {
+	return {
+		type: m.type,
+		index: m.index,
+		horiz: m.horiz,
+		vert: m.vert,
+		colour: m.colour,
+		uprate: m.uprate,
+		leds: m.leds,
+		modes: [...(m.modes ?? [])],
+		lv: [...(m.lv ?? [])],
+	};
+}
+
+// Extracts the persisted cable fields
+function cableSnap(c: Cable) {
+	return { colour: c.colour, smod: c.smod, scon: c.scon, dir: c.dir, dmod: c.dmod, dcon: c.dcon };
+}
+
+function expectPatchEqual(a: Patch, b: Patch) {
+	for (const i of [0, 1] as const) {
+		const modsA = a.areas[i].modules.map(modSnap).sort((x, y) => x.index - y.index);
+		const modsB = b.areas[i].modules.map(modSnap).sort((x, y) => x.index - y.index);
+		expect(modsB).toEqual(modsA);
+
+		const cabsA = (a.areas[i].cableList ?? []).map(cableSnap);
+		const cabsB = (b.areas[i].cableList ?? []).map(cableSnap);
+		expect(cabsB).toEqual(cabsA);
+	}
+	expect(b.description).toEqual(a.description);
+}
+
+// ── tests ─────────────────────────────────────────────────────────────────────
+
+describe("patch round-trip: parse → serialize → parse", () => {
+	for (const file of ["EmptyPatch.pch2", "FMritm.pch2", "Lyra4.pch2"]) {
+		it(file, () => {
+			const { name, rawHex, patch: patchA } = loadFixture(file);
+			const newHex = serializePatch(name, patchA, rawHex);
+			const patchB = parsePatchFromRawHex(name, newHex);
+			expectPatchEqual(patchA, patchB);
+		});
+	}
+});
+
+describe("deleteCable", () => {
+	it("removes cable and leaves others intact", () => {
+		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const cables = patch.areas[1].cableList ?? [];
+		expect(cables.length).toBeGreaterThan(0);
+		const target = cables[0];
+		const remainingCount = cables.length - 1;
+
+		mutDeleteCable(patch, 1, target);
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const cabsB = patchB.areas[1].cableList ?? [];
+		expect(cabsB).toHaveLength(remainingCount);
+		const found = cabsB.find(
+			(c) => c.smod === target.smod && c.scon === target.scon &&
+			       c.dmod === target.dmod && c.dcon === target.dcon,
+		);
+		expect(found).toBeUndefined();
+	});
+});
+
+describe("deleteModule", () => {
+	it("removes module and its connected cables", () => {
+		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const modules = patch.areas[1].modules;
+		const cables = patch.areas[1].cableList ?? [];
+		expect(modules.length).toBeGreaterThan(0);
+
+		// Pick first module that has at least one cable
+		const target = modules.find(
+			(m) => cables.some((c) => c.smod === m.index || c.dmod === m.index),
+		)!;
+		expect(target).toBeDefined();
+
+		const connectedCables = cables.filter(
+			(c) => c.smod === target.index || c.dmod === target.index,
+		).length;
+		const expectedMods = modules.length - 1;
+		const expectedCables = cables.length - connectedCables;
+
+		mutDeleteModule(patch, 1, target.index);
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.areas[1].modules).toHaveLength(expectedMods);
+		expect(patchB.areas[1].cableList ?? []).toHaveLength(expectedCables);
+		expect(patchB.areas[1].modules.find((m) => m.index === target.index)).toBeUndefined();
+		const leftoverCables = (patchB.areas[1].cableList ?? []).filter(
+			(c) => c.smod === target.index || c.dmod === target.index,
+		);
+		expect(leftoverCables).toHaveLength(0);
+	});
+});
+
+describe("moveModule", () => {
+	it("updates position and preserves all other fields", () => {
+		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const modules = patch.areas[1].modules;
+		expect(modules.length).toBeGreaterThan(0);
+		const target = modules[0];
+		const newCol = (target.horiz + 3) % 20;
+		const newRow = (target.vert + 5) % 100;
+
+		const before = modSnap(target);
+		mutMoveModule(patch, 1, target.index, newCol, newRow);
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const moved = patchB.areas[1].modules.find((m) => m.index === target.index)!;
+		expect(moved).toBeDefined();
+		expect(moved.horiz).toBe(newCol);
+		expect(moved.vert).toBe(newRow);
+		// All other fields unchanged
+		expect(moved.type).toBe(before.type);
+		expect(moved.colour).toBe(before.colour);
+		expect(moved.modes).toEqual(before.modes);
+		expect(moved.lv).toEqual(before.lv);
+	});
+});
+
+describe("addModule", () => {
+	it("adds module with correct fields that survive round-trip", () => {
+		// Use EmptyPatch so we control the full module list
+		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+		expect(patch.areas[1].modules).toHaveLength(0);
+
+		// Keyboard module (type 1): 0 params, 0 modes, 6 outputs — simplest case
+		const mod: ModuleInstance = {
+			type: 1,
+			index: 1,
+			horiz: 3,
+			vert: 7,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
+		};
+		mutAddModule(patch, 1, mod);
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.areas[1].modules).toHaveLength(1);
+		const added = patchB.areas[1].modules[0];
+		expect(added.type).toBe(1);
+		expect(added.index).toBe(1);
+		expect(added.horiz).toBe(3);
+		expect(added.vert).toBe(7);
+		expect(added.modes).toEqual([]);
+		expect(added.lv).toEqual([]);
+	});
+
+	it("adds module with params that survive round-trip", () => {
+		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+
+		// 2-Out module (type 4): 3 params, 0 modes
+		const pcnt = 3;
+		const lv: number[] = Array(pcnt * 9);
+		for (let v = 0; v < 9; v++)
+			for (let p = 0; p < pcnt; p++)
+				lv[v * pcnt + p] = p + 10; // arbitrary distinct values
+
+		const mod: ModuleInstance = {
+			type: 4, index: 2, horiz: 1, vert: 2,
+			colour: 0, uprate: 0, leds: 0,
+			pcnt, lv, modes: [],
+		};
+		mutAddModule(patch, 1, mod);
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const added = patchB.areas[1].modules.find((m) => m.index === 2)!;
+		expect(added).toBeDefined();
+		expect(added.pcnt).toBe(pcnt);
+		expect(added.lv).toEqual(lv);
+	});
+});
+
+describe("addCable", () => {
+	it("adds cable that survives round-trip", () => {
+		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const existingCount = (patch.areas[1].cableList ?? []).length;
+
+		// Use module indices that exist in FMritm (index 1 and 2 confirmed above)
+		const newCable: Cable = { colour: 2, smod: 2, scon: 0, dir: 1, dmod: 1, dcon: 0 };
+		mutAddCable(patch, 1, newCable);
+
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const cables = patchB.areas[1].cableList ?? [];
+		expect(cables).toHaveLength(existingCount + 1);
+		const found = cables.find(
+			(c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2,
+		);
+		expect(found).toBeDefined();
+	});
+});
+
+describe("chained edits round-trip", () => {
+	it("add module, add cable, move module, delete cable — patch object matches re-parse", () => {
+		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const ids = patch.areas[1].modules.map((m) => m.index);
+		const newModId = Math.max(...ids) + 1;
+
+		// 1. Add a Keyboard module (type 1, no params)
+		const newMod: ModuleInstance = {
+			type: 1, index: newModId, horiz: 10, vert: 10,
+			colour: 0, uprate: 0, leds: 0,
+			pcnt: 0, lv: [], modes: [],
+		};
+		mutAddModule(patch, 1, newMod);
+
+		// 2. Add a cable from the new module (output 0) to module index 1 (input 0)
+		const newCable: Cable = { colour: 1, smod: newModId, scon: 0, dir: 1, dmod: 1, dcon: 0 };
+		mutAddCable(patch, 1, newCable);
+
+		// 3. Move an existing module
+		const existingMod = patch.areas[1].modules.find((m) => m.index === 2)!;
+		const movedCol = existingMod.horiz + 1;
+		const movedRow = existingMod.vert + 1;
+		mutMoveModule(patch, 1, 2, movedCol, movedRow);
+
+		// 4. Delete the first cable (before our additions)
+		const firstCable = (patch.areas[1].cableList ?? []).find(
+			(c) => c.smod !== newModId && c.dmod !== newModId,
+		)!;
+		mutDeleteCable(patch, 1, firstCable);
+
+		// Snapshot of patch state before serialization
+		const modulesBeforeSerialize = patch.areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
+		const cablesBeforeSerialize = (patch.areas[1].cableList ?? []).map(cableSnap);
+
+		// Serialize → re-parse
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const modulesAfterParse = patchB.areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
+		const cablesAfterParse = (patchB.areas[1].cableList ?? []).map(cableSnap);
+
+		expect(modulesAfterParse).toEqual(modulesBeforeSerialize);
+		expect(cablesAfterParse).toEqual(cablesBeforeSerialize);
+	});
+});

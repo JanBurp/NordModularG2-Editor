@@ -1,7 +1,14 @@
 import { defineStore } from "pinia";
-import type { Patch } from "../parser/nmg2PatchParser";
+import type { Patch, ModuleInstance } from "../parser/nmg2PatchParser";
 import { useDeviceStore } from "./device";
 import type { SlotLabel } from "@/types";
+import {
+	mutDeleteCable,
+	mutDeleteModule,
+	mutMoveModule,
+	mutAddModule,
+	mutAddCable,
+} from "../parser/patchMutations";
 
 export type { SlotLabel };
 
@@ -10,6 +17,7 @@ interface SlotEntry {
 	loading: boolean;
 	error: string | null;
 	rawHex: string | null;
+	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
 }
 
@@ -20,10 +28,10 @@ export const useSlotsStore = defineStore("slots", {
 			A: "", B: "", C: "", D: "",
 		} as Record<SlotLabel, string>,
 		slots: {
-			A: { name: "", loading: false, error: null, rawHex: null, patch: null },
-			B: { name: "", loading: false, error: null, rawHex: null, patch: null },
-			C: { name: "", loading: false, error: null, rawHex: null, patch: null },
-			D: { name: "", loading: false, error: null, rawHex: null, patch: null },
+			A: { name: "", loading: false, error: null, rawHex: null, templateRawHex: null, patch: null },
+			B: { name: "", loading: false, error: null, rawHex: null, templateRawHex: null, patch: null },
+			C: { name: "", loading: false, error: null, rawHex: null, templateRawHex: null, patch: null },
+			D: { name: "", loading: false, error: null, rawHex: null, templateRawHex: null, patch: null },
 		} as Record<SlotLabel, SlotEntry>,
 	}),
 
@@ -67,6 +75,7 @@ export const useSlotsStore = defineStore("slots", {
 
 			this.slots[slot].name = name;
 			this.slots[slot].rawHex = rawHex;
+			this.slots[slot].templateRawHex = rawHex;
 			this.slots[slot].patch = patch;
 			patch.mode = { area: 1, variation: patch.description?.variation ?? 0 };
 			return { name, rawHex, patch };
@@ -105,40 +114,66 @@ export const useSlotsStore = defineStore("slots", {
 			cable: { smod: number; scon: number; dmod: number; dcon: number },
 			area: "voice" | "fx",
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return null;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run([
-				"del-cable", slot, location,
-				String(cable.smod), "1", String(cable.scon),
-				String(cable.dmod), "0", String(cable.dcon),
-			]);
-			return this.loadSlot(slot);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
+
+			mutDeleteCable(patch, area === "voice" ? 1 : 0, cable);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run([
+					"del-cable", deviceSlot, location,
+					String(cable.smod), "1", String(cable.scon),
+					String(cable.dmod), "0", String(cable.dcon),
+				]);
+			}
+
+			return { name: this.slots[slot].name, rawHex: "", patch };
 		},
 
 		async deleteCableNoReload(
 			cable: { smod: number; scon: number; dmod: number; dcon: number },
 			area: "voice" | "fx",
 		): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run([
-				"del-cable", slot, location,
-				String(cable.smod), "1", String(cable.scon),
-				String(cable.dmod), "0", String(cable.dcon),
-			]);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+
+			mutDeleteCable(patch, area === "voice" ? 1 : 0, cable);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run([
+					"del-cable", deviceSlot, location,
+					String(cable.smod), "1", String(cable.scon),
+					String(cable.dmod), "0", String(cable.dcon),
+				]);
+			}
 		},
 
 		async deleteModule(
 			moduleId: number,
 			area: "voice" | "fx",
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return null;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run(["del-module", slot, location, String(moduleId)]);
-			return this.loadSlot(slot);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
+
+			mutDeleteModule(patch, area === "voice" ? 1 : 0, moduleId);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run(["del-module", deviceSlot, location, String(moduleId)]);
+			}
+
+			return { name: this.slots[slot].name, rawHex: "", patch };
 		},
 
 		async moveModuleNoReload(
@@ -147,10 +182,18 @@ export const useSlotsStore = defineStore("slots", {
 			row: number,
 			area: "voice" | "fx",
 		): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run(["move-module", slot, location, String(moduleId), String(col), String(row)]);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+
+			mutMoveModule(patch, area === "voice" ? 1 : 0, moduleId, col, row);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run(["move-module", deviceSlot, location, String(moduleId), String(col), String(row)]);
+			}
 		},
 
 		async moveModule(
@@ -159,11 +202,20 @@ export const useSlotsStore = defineStore("slots", {
 			row: number,
 			area: "voice" | "fx",
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return null;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run(["move-module", slot, location, String(moduleId), String(col), String(row)]);
-			return this.loadSlot(slot);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
+
+			mutMoveModule(patch, area === "voice" ? 1 : 0, moduleId, col, row);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run(["move-module", deviceSlot, location, String(moduleId), String(col), String(row)]);
+			}
+
+			return { name: this.slots[slot].name, rawHex: "", patch };
 		},
 
 		async addModule(
@@ -173,9 +225,11 @@ export const useSlotsStore = defineStore("slots", {
 			row: number,
 			area: "voice" | "fx",
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return null;
-			const location = area === "voice" ? "va" : "fx";
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
+
 			const { getModule } = await import("../renderer/nmg2mods");
 			const { getParam } = await import("../renderer/parammap");
 			const modDef = getModule(typeId) as any;
@@ -183,15 +237,42 @@ export const useSlotsStore = defineStore("slots", {
 			const modeVals: number[] = Array(numModes).fill(0);
 			const numParams = modDef?.params?.length ?? 0;
 			const paramVals: number[] = (modDef?.params ?? []).map((p: any) => getParam(p.type)?.def ?? 64);
-			const name = (modDef?.short ?? "Module") + moduleId;
-			await window.cli.run([
-				"add-module", slot, location,
-				String(typeId), String(moduleId), String(col), String(row),
-				String(numModes), ...modeVals.map(String),
-				String(numParams), ...paramVals.map(String),
-				name,
-			]);
-			return this.loadSlot(slot);
+			const uname = (modDef?.short ?? "Module") + moduleId;
+
+			const lv: number[] = Array(numParams * 9);
+			for (let v = 0; v < 9; v++)
+				for (let p = 0; p < numParams; p++)
+					lv[v * numParams + p] = paramVals[p] ?? 64;
+
+			const mod: ModuleInstance = {
+				type: typeId,
+				index: moduleId,
+				horiz: col,
+				vert: row,
+				colour: 0,
+				uprate: 0,
+				leds: 0,
+				pcnt: numParams,
+				lv,
+				modes: modeVals,
+				uname,
+			};
+
+			mutAddModule(patch, area === "voice" ? 1 : 0, mod);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run([
+					"add-module", deviceSlot, location,
+					String(typeId), String(moduleId), String(col), String(row),
+					String(numModes), ...modeVals.map(String),
+					String(numParams), ...paramVals.map(String),
+					uname,
+				]);
+			}
+
+			return { name: this.slots[slot].name, rawHex: "", patch };
 		},
 
 		async addCable(
@@ -200,15 +281,32 @@ export const useSlotsStore = defineStore("slots", {
 			area: "voice" | "fx",
 			color = 1,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return null;
-			const location = area === "voice" ? "va" : "fx";
-			await window.cli.run([
-				"add-cable", slot, location, String(color),
-				String(fromMod), String(fromConType), String(fromCon),
-				String(toMod), String(toConType), String(toCon),
-			]);
-			return this.loadSlot(slot);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
+
+			// Enforce output→input direction (source must be output, matching CLI swap logic)
+			let smod = fromMod, scon = fromCon, stype = fromConType;
+			let dmod = toMod, dcon = toCon, dtype = toConType;
+			if (stype === 0) { // source is input, swap
+				[smod, scon, stype, dmod, dcon, dtype] = [dmod, dcon, dtype, smod, scon, stype];
+			}
+
+			const cable = { colour: color, smod, scon, dir: 1, dmod, dcon };
+			mutAddCable(patch, area === "voice" ? 1 : 0, cable);
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === "voice" ? "va" : "fx";
+				await window.cli.run([
+					"add-cable", deviceSlot, location, String(color),
+					String(fromMod), String(fromConType), String(fromCon),
+					String(toMod), String(toConType), String(toCon),
+				]);
+			}
+
+			return { name: this.slots[slot].name, rawHex: "", patch };
 		},
 
 		async setParam(
@@ -246,15 +344,23 @@ export const useSlotsStore = defineStore("slots", {
 		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
 			this.slots[slot].patch = patch;
 			this.slots[slot].name = name;
-			if (rawHex) this.slots[slot].rawHex = rawHex;
+			if (rawHex) {
+				this.slots[slot].rawHex = rawHex;
+				this.slots[slot].templateRawHex = rawHex;
+			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
 			const entry = this.slots[slot];
-			if (!entry?.rawHex) return;
+			if (!entry?.patch) return;
 			const path = filepath || this.slotFilePaths[slot];
 			if (!path) return;
+			if (!entry.rawHex) {
+				if (!entry.templateRawHex) return;
+				const { serializePatch } = await import("../parser/nmg2PatchSerializer");
+				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
+			}
 			const data = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			await window.electronAPI.savePatch(path, data);
 			this.slotFilePaths[slot] = path;
