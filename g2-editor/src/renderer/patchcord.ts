@@ -135,12 +135,30 @@ export class Patchcord {
 	}
 
 	/**
-	 * Generate SVG path data for the cable
-	 *
-	 * @returns Path data string
+	 * Generate SVG path data for the cable (with random organic droop via shake())
 	 */
 	getCurvePath(): string {
 		this.shake();
+		return (
+			this.points[0].toString("M") +
+			this.points[1]!.toString("C") +
+			this.points[2]!.toString(",") +
+			this.points[3].toString(",")
+		);
+	}
+
+	/**
+	 * Generate SVG path data with a deterministic gravity droop — no randomness.
+	 * Used when repositioning cables after a module move so existing cables don't shake.
+	 */
+	getStaticPath(): string {
+		const dst = this.points[0];
+		const src = this.points[3];
+		const dist = Math.hypot(src.x - dst.x, src.y - dst.y);
+		const sag = Math.min(dist * 0.25, 60);
+		const bot = Math.max(dst.y, src.y) + sag;
+		this.points[1] = new FastVector(dst.x + (src.x - dst.x) * 0.25, bot);
+		this.points[2] = new FastVector(dst.x + (src.x - dst.x) * 0.75, bot);
 		return (
 			this.points[0].toString("M") +
 			this.points[1]!.toString("C") +
