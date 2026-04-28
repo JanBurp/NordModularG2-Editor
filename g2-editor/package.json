@@ -7,7 +7,8 @@
     "dev": "electron-vite dev",
     "build": "electron-vite build && electron-builder",
     "preview": "electron-vite preview",
-    "postinstall": "node scripts/copy-cli.js"
+    "postinstall": "node scripts/copy-cli.js",
+    "test": "vitest run"
   },
   "dependencies": {
     "pinia": "^2.1.7",
@@ -26,6 +27,7 @@
     "tailwindcss": "^4.2.4",
     "typescript": "^5.4.2",
     "vite": "^6.4.2",
+    "vitest": "^4.1.5",
     "vue-tsc": "^2.0.6"
   }
 }
