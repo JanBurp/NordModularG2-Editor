@@ -1,7 +1,7 @@
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
-	import { makePatchCables, removeAllCables } from '../../renderer/cableRenderer';
-	import type { Cable } from '../../renderer/cableRenderer';
+	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey } from '../../renderer/cableRenderer';
+	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
@@ -149,11 +149,56 @@
 		renderCables();
 	});
 
+	// Diff-based cables watch: only add new cables / remove deleted ones.
+	// This prevents the shake-all effect that a full removeAllCables+re-add would cause.
 	watch(
 		() => props.cables,
 		() => {
 			nextTick(() => {
-				renderCables();
+				if (!svgRef.value) return;
+				const svg = svgRef.value as SVGElement;
+
+				// Keys currently rendered in the DOM
+				const renderedKeys = new Set<string>();
+				svg.querySelectorAll<SVGPathElement>(".svgcableborder[data-cable-key]").forEach((el) => {
+					renderedKeys.add(el.getAttribute("data-cable-key")!);
+				});
+
+				// Keys we want (respecting visibility filter)
+				const wantedMap = new Map<string, any>(visibleCables.value.map((c) => [makeCableKey(c), c]));
+
+				// Remove cables no longer in the list
+				for (const key of renderedKeys) {
+					if (!wantedMap.has(key)) removeCableByKey(svg, key);
+				}
+
+				// Add cables not yet rendered
+				for (const [key, cable] of wantedMap) {
+					if (!renderedKeys.has(key)) {
+						makePatchCables(props.modules as CableModule[], [cable], svg, {
+							selectedCable: props.selectedCable,
+							onCableClick: (c) => emit("cableClick", c),
+						});
+					}
+				}
+			});
+		},
+	);
+
+	// When module positions change, re-path only cables connected to modules that actually moved.
+	// Cables connected to stationary modules keep their existing shaken shape untouched.
+	watch(
+		() => props.modules,
+		(newMods, oldMods) => {
+			nextTick(() => {
+				if (!svgRef.value || !oldMods) return;
+				const movedIds = new Set<number>();
+				for (const m of (newMods as any[])) {
+					const prev = (oldMods as any[]).find((o: any) => o.index === m.index);
+					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert) movedIds.add(m.index);
+				}
+				if (movedIds.size > 0)
+					updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);
 			});
 		},
 	);

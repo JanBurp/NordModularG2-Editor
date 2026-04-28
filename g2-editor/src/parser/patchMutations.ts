@@ -29,11 +29,10 @@ export function mutMoveModule(
 	col: number,
 	row: number,
 ): void {
-	const mod = patch.areas[areaIdx].modules.find((m) => m.index === moduleId);
-	if (mod) {
-		mod.horiz = col;
-		mod.vert = row;
-	}
+	// Replace array (not in-place mutation) so Vue's non-deep reference watch on modules fires
+	patch.areas[areaIdx].modules = patch.areas[areaIdx].modules.map((m) =>
+		m.index === moduleId ? { ...m, horiz: col, vert: row } : m,
+	);
 }
 
 export function mutAddModule(patch: Patch, areaIdx: 0 | 1, mod: ModuleInstance): void {
