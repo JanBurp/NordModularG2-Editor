@@ -13,7 +13,7 @@
 			</template>
 
 			<Button variant="file" accept=".pch2,.prf2" @change="handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.rawHex">Save Patch</Button>
+			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.templateRawHex">Save Patch</Button>
 
 			<ToolBarDivider />
 
@@ -320,6 +320,7 @@
 	async function handleSlotClick(index: number) {
 		const slot = SLOT_LABELS[index];
 		uiStore.activeSlot = slot;
+		slotsStore.activeSlot = slot;
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) {
 			uiStore.variation = patch.description.variation;
@@ -352,7 +353,10 @@
 			const parser = new PatchParser(buffer);
 			const parsedPatch = parser.parse() as any;
 			const name = file.name.replace('.pch2', '').replace('.prf2', '');
-			const rawHex = Array.from(new Uint8Array(buffer))
+			const fileBytes = new Uint8Array(buffer);
+			let nameEnd = 0;
+			while (nameEnd < fileBytes.length && fileBytes[nameEnd] !== 0) nameEnd++;
+			const rawHex = Array.from(fileBytes.slice(nameEnd + 3))
 				.map((b) => b.toString(16).padStart(2, '0'))
 				.join('');
 			slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex);
@@ -373,7 +377,10 @@
 				const { PatchParser } = await import('./parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
 				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
-				const rawHex = result.data.map((b: number) => b.toString(16).padStart(2, '0')).join('');
+				const diskBytes = result.data as number[];
+				let diskNameEnd = 0;
+				while (diskNameEnd < diskBytes.length && diskBytes[diskNameEnd] !== 0) diskNameEnd++;
+				const rawHex = diskBytes.slice(diskNameEnd + 3).map((b: number) => b.toString(16).padStart(2, '0')).join('');
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
 				if (parsedPatch?.description?.variation !== undefined) {
 					uiStore.variation = parsedPatch.description.variation;
@@ -492,12 +499,12 @@
 				}
 				case 'save': {
 					const slot = slotsStore.slots[uiStore.activeSlot];
-					if (slot?.rawHex) await slotsStore.saveSlot(uiStore.activeSlot);
+					if (slot?.templateRawHex) await slotsStore.saveSlot(uiStore.activeSlot);
 					break;
 				}
 				case 'save-as': {
 					const slot = slotsStore.slots[uiStore.activeSlot];
-					if (!slot?.rawHex) break;
+					if (!slot?.templateRawHex) break;
 					const result = await window.electronAPI.showSaveDialog();
 					if (result.success && result.filepath) {
 						await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
@@ -506,7 +513,7 @@
 				}
 				case 'save-all':
 					for (const s of SLOT_LABELS) {
-						if (slotsStore.slots[s]?.rawHex) {
+						if (slotsStore.slots[s]?.templateRawHex) {
 							await slotsStore.saveSlot(s);
 						}
 					}

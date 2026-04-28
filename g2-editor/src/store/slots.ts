@@ -361,7 +361,9 @@ export const useSlotsStore = defineStore("slots", {
 				const { serializePatch } = await import("../parser/nmg2PatchSerializer");
 				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
 			}
-			const data = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
+			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
 			await window.electronAPI.savePatch(path, data);
 			this.slotFilePaths[slot] = path;
 		},

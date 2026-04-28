@@ -76,6 +76,34 @@ function expectPatchEqual(a: Patch, b: Patch) {
 	expect(b.description).toEqual(a.description);
 }
 
+/**
+ * Simulates the full save → load file cycle:
+ *   saveSlot: prepend [name][0x00][0x17][0x00] then write
+ *   handleFileLoad: scan for null terminator, slice from ofs+3 to get rawHex
+ * Returns { rawHex, patch } as the app would see them after re-loading.
+ */
+function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string; patch: Patch } {
+	// saveSlot path: prepend name header
+	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const nameBytes = new TextEncoder().encode(name);
+	const fileBytes = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
+	fileBytes.set(nameBytes);
+	fileBytes[nameBytes.length] = 0x00;
+	fileBytes[nameBytes.length + 1] = 0x17;
+	fileBytes[nameBytes.length + 2] = 0x00;
+	fileBytes.set(sectionBytes, nameBytes.length + 3);
+
+	// handleFileLoad path: scan for null terminator, strip header
+	let nameEnd = 0;
+	while (nameEnd < fileBytes.length && fileBytes[nameEnd] !== 0) nameEnd++;
+	const strippedRawHex = Array.from(fileBytes.slice(nameEnd + 3))
+		.map((b) => b.toString(16).padStart(2, "0"))
+		.join("");
+
+	const patch = new PatchParser(fileBytes.buffer).parse();
+	return { rawHex: strippedRawHex, patch };
+}
+
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe("patch round-trip: parse → serialize → parse", () => {
@@ -293,5 +321,54 @@ describe("chained edits round-trip", () => {
 
 		expect(modulesAfterParse).toEqual(modulesBeforeSerialize);
 		expect(cablesAfterParse).toEqual(cablesBeforeSerialize);
+	});
+});
+
+describe("file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)", () => {
+	for (const file of ["EmptyPatch.pch2", "FMritm.pch2", "Lyra4.pch2"]) {
+		it(`unmodified patch — ${file}`, () => {
+			const { name, rawHex, patch: patchA } = loadFixture(file);
+
+			// Serialize (as saveSlot does after mutations)
+			const savedRawHex = serializePatch(name, patchA, rawHex);
+
+			// Simulate save then load: prepend name header, strip it back
+			const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+
+			// rawHex must survive the file cycle unchanged
+			expect(loadedRawHex).toEqual(savedRawHex);
+
+			// Parsed patch must equal original
+			expectPatchEqual(patchA, patchB);
+		});
+	}
+
+	it("edited patch (add module + cable) — EmptyPatch.pch2", () => {
+		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+
+		const mod: ModuleInstance = {
+			type: 1, index: 1, horiz: 2, vert: 3,
+			colour: 0, uprate: 0, leds: 0,
+			pcnt: 0, lv: [], modes: [],
+		};
+		mutAddModule(patch, 1, mod);
+
+		const mod2: ModuleInstance = {
+			type: 1, index: 2, horiz: 5, vert: 3,
+			colour: 0, uprate: 0, leds: 0,
+			pcnt: 0, lv: [], modes: [],
+		};
+		mutAddModule(patch, 1, mod2);
+
+		const cable: Cable = { colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 };
+		mutAddCable(patch, 1, cable);
+
+		const savedRawHex = serializePatch(name, patch, rawHex);
+		const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		expect(loadedRawHex).toEqual(savedRawHex);
+		expect(patchB.areas[1].modules).toHaveLength(2);
+		expect(patchB.areas[1].cableList ?? []).toHaveLength(1);
+		expectPatchEqual(patch, patchB);
 	});
 });

@@ -37,10 +37,11 @@ export function mutMoveModule(
 }
 
 export function mutAddModule(patch: Patch, areaIdx: 0 | 1, mod: ModuleInstance): void {
-	patch.areas[areaIdx].modules.push(mod);
+	// Replace array (not push) so Vue's non-deep reference watch on modules fires
+	patch.areas[areaIdx].modules = [...patch.areas[areaIdx].modules, mod];
 }
 
 export function mutAddCable(patch: Patch, areaIdx: 0 | 1, cable: Cable): void {
-	if (!patch.areas[areaIdx].cableList) patch.areas[areaIdx].cableList = [];
-	patch.areas[areaIdx].cableList.push(cable);
+	// Replace array (not push) so Vue's non-deep reference watch on cables fires
+	patch.areas[areaIdx].cableList = [...(patch.areas[areaIdx].cableList ?? []), cable];
 }
