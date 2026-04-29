@@ -6,7 +6,6 @@
 	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
-	import SvgGradientDefs from './SvgGradientDefs.vue';
 	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
 
 	const props = defineProps({
@@ -462,7 +461,6 @@
 <template>
 	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg" @click="emit('canvasClick')">
-			<SvgGradientDefs />
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
