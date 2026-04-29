@@ -1,4 +1,7 @@
 <template>
+	<svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+		<SvgGradientDefs />
+	</svg>
 	<div class="flex flex-col h-screen">
 		<ToolBar>
 			<template v-if="device">
@@ -90,26 +93,48 @@
 
 		<div class="flex-1 flex overflow-hidden">
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
-				<PatchCanvas
-					v-if="currentPatch"
-					:key="patchName"
-					:modules="currentModules"
-					:cables="currentCables"
-					:variation="uiStore.variation"
-					:area="uiStore.area === 1 ? 'voice' : 'fx'"
-					:cable-visibility="cableVisibility"
-					:shake-trigger="cableShakeTrigger"
-					:selected-cable="uiStore.selectedCable"
-					:selected-module-index="uiStore.selectedModule"
-					@cable-click="handleCableClick"
-					@jack-drag-start="jackPatching.handleJackDragStart"
-					@jack-drag-end="jackPatching.handleJackDragEnd"
-					@module-click="handleModuleClick"
-					@module-move="handleModuleMove"
-					@module-drop="handleModuleDrop"
-					@canvas-click="handleCanvasClick"
-					@param-change="handleParamChange"
-				/>
+				<template v-if="currentPatch">
+					<PatchCanvas
+						v-show="uiStore.area === 1"
+						:key="patchName + '-voice'"
+						:modules="voiceModules"
+						:cables="voiceCables"
+						:variation="uiStore.variation"
+						area="voice"
+						:cable-visibility="cableVisibility"
+						:shake-trigger="cableShakeTrigger"
+						:selected-cable="uiStore.selectedCable"
+						:selected-module-index="uiStore.selectedModule"
+						@cable-click="handleCableClick"
+						@jack-drag-start="jackPatching.handleJackDragStart"
+						@jack-drag-end="jackPatching.handleJackDragEnd"
+						@module-click="handleModuleClick"
+						@module-move="handleModuleMove"
+						@module-drop="handleModuleDrop"
+						@canvas-click="handleCanvasClick"
+						@param-change="handleParamChange"
+					/>
+					<PatchCanvas
+						v-show="uiStore.area === 0"
+						:key="patchName + '-fx'"
+						:modules="fxModules"
+						:cables="fxCables"
+						:variation="uiStore.variation"
+						area="fx"
+						:cable-visibility="cableVisibility"
+						:shake-trigger="cableShakeTrigger"
+						:selected-cable="uiStore.selectedCable"
+						:selected-module-index="uiStore.selectedModule"
+						@cable-click="handleCableClick"
+						@jack-drag-start="jackPatching.handleJackDragStart"
+						@jack-drag-end="jackPatching.handleJackDragEnd"
+						@module-click="handleModuleClick"
+						@module-move="handleModuleMove"
+						@module-drop="handleModuleDrop"
+						@canvas-click="handleCanvasClick"
+						@param-change="handleParamChange"
+					/>
+				</template>
 				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
 			</div>
 
@@ -137,6 +162,7 @@
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
+	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
@@ -167,8 +193,12 @@
 	const patchFile    = usePatchFile();
 
 	const currentPatch   = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
-	const currentModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, uiStore.area));
-	const currentCables  = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, uiStore.area));
+	const voiceModules   = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 1));
+	const voiceCables    = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 1));
+	const fxModules      = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
+	const fxCables       = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
+	const currentModules = computed(() => uiStore.area === 1 ? voiceModules.value : fxModules.value);
+	const currentCables  = computed(() => uiStore.area === 1 ? voiceCables.value : fxCables.value);
 	const patchName      = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
 
 	function applySlotResult(result: { patch: any; name: string } | null): void {
