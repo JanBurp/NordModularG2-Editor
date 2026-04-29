@@ -22,6 +22,31 @@ export const useDeviceStore = defineStore("device", {
 
 	getters: {
 		connected: (state) => state.status === "connected",
+		statusClass: (state): string => {
+			switch (state.status) {
+				case "connected": return "border-green-500 bg-green-500";
+				case "connecting":
+				case "uploading":
+				case "downloading": return "border-orange-300 bg-orange-300";
+				case "error":
+				case "unsupported":
+				case "lost": return "border-red-500 bg-red-500";
+				default: return "border-neutral-600 bg-neutral-900";
+			}
+		},
+		statusLabel: (state): string => {
+			switch (state.status) {
+				case "connected": return "connected";
+				case "connecting": return "connecting...";
+				case "disconnected": return "disconnected";
+				case "uploading": return "uploading...";
+				case "downloading": return "downloading...";
+				case "error": return "error";
+				case "unsupported": return "not available";
+				case "lost": return "lost";
+				default: return "unknown";
+			}
+		},
 		getActiveSlot: (state): SlotLabel | null => {
 			if (!state.device) return null;
 			const active = state.device.slots.find(s => s.active);
