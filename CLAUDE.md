@@ -39,18 +39,7 @@ This is an **Electron + Vue 3** desktop app for editing Nord G2 synthesizer patc
 - **Renderer** (`src/`) — Vue 3 SPA; talks to hardware only through the IPC bridge
 
 ### State & Business Logic
-State lives in **composables**, not Pinia (Pinia is present but barely used):
-
-| Composable | Owns |
-|---|---|
-| `usePatchManager()` | Loaded patch, area/variation selection, module + cable lists |
-| `useG2Connection()` | USB device status, upload/download, log output |
-| `useCableVisibility()` | Per-color cable show/hide toggles |
-| `useCableShake()` | Animation trigger |
-| `useRightPanel()` | Right sidebar tab selection |
-| `usePatchCategory()` | Category filter |
-
-`App.vue` is the composition root — it instantiates the composables and passes state/handlers down as props.
+State lives in **Pinia stores**. Pinia stores should be single source of truth.
 
 ### Key Data Flow
 1. User opens a `.pch2` file → `usePatchManager.handleFileLoad()` → parser in `src/parser/` → reactive `patch` ref
@@ -59,6 +48,3 @@ State lives in **composables**, not Pinia (Pinia is present but barely used):
 
 ### Styling
 Tailwind CSS v4 (via `@tailwindcss/vite` plugin). Global styles in `src/style.css`. No separate Tailwind config file — configuration is done in CSS.
-
-### No test framework for the renderer
-Only the C CLI (`cli/`) has tests (`make test`). The Vue/Electron side has no test runner configured.
