@@ -1,5 +1,5 @@
 <template>
-	<svg style="position: absolute; width: 0; height: 0; overflow: hidden;" aria-hidden="true">
+	<svg style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true">
 		<SvgGradientDefs />
 	</svg>
 	<div class="flex flex-col h-screen">
@@ -58,8 +58,11 @@
 
 			<ToolBarDivider />
 
+			<ColorPicker />
+
+			<ToolBarDivider />
+
 			<div class="flex items-center gap-2">
-				<span class="text-xs font-semibold text-neutral-400">Cables:</span>
 				<div class="flex gap-1">
 					<button
 						v-for="color in cableColors"
@@ -81,12 +84,16 @@
 						:class="{ 'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible }"
 						:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
 						@click="toggleShowHideAll"
-					>H</button>
+					>
+						H
+					</button>
 					<button
 						class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
 						title="Re-render cables"
 						@click="shakeCables"
-					>S</button>
+					>
+						S
+					</button>
 				</div>
 			</div>
 		</ToolBar>
@@ -140,7 +147,11 @@
 
 			<SidePanel v-if="uiStore.showRightPane">
 				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-				<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
+				<PatchBrowser
+					v-show="uiStore.rightPaneTab === 'browser'"
+					:isActive="uiStore.rightPaneTab === 'browser'"
+					@select="patchFile.handlePatchSelect"
+				/>
 			</SidePanel>
 		</div>
 
@@ -162,6 +173,7 @@
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
+	import ColorPicker from './components/common/ColorPicker.vue';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 
 	import { useG2 } from './composables/useG2';
@@ -176,30 +188,23 @@
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useBrowserStore } from './store/browser';
 
-	import {
-		SOUND_CATEGORIES as soundCategories,
-		SLOT_LABELS,
-		SLOT_OPTIONS,
-		PANE_TAB_OPTIONS,
-		AREA_OPTIONS,
-		VARIATION_OPTIONS,
-	} from './constants';
+	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
 
-	const device      = useDeviceStore();
-	const slotsStore  = useSlotsStore();
-	const uiStore     = useUiStore();
+	const device = useDeviceStore();
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
 	const jackPatching = useJackPatching();
-	const patchFile    = usePatchFile();
+	const patchFile = usePatchFile();
 
-	const currentPatch   = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
-	const voiceModules   = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 1));
-	const voiceCables    = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 1));
-	const fxModules      = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
-	const fxCables       = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
-	const currentModules = computed(() => uiStore.area === 1 ? voiceModules.value : fxModules.value);
-	const currentCables  = computed(() => uiStore.area === 1 ? voiceCables.value : fxCables.value);
-	const patchName      = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
+	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 1));
+	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 1));
+	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
+	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
+	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
+	const currentCables = computed(() => (uiStore.area === 1 ? voiceCables.value : fxCables.value));
+	const patchName = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
 
 	function applySlotResult(result: { patch: any; name: string } | null): void {
 		if (result?.patch?.description?.variation !== undefined) {
@@ -225,16 +230,14 @@
 			);
 		} finally {
 			uiStore.selectedModule = null;
-			uiStore.selectedCable  = null;
+			uiStore.selectedCable = null;
 		}
 	}
 
 	// ── Module interaction ────────────────────────────────────────────────────
 
 	function handleModuleClick(moduleIndex: number): void {
-		uiStore.selectedModule = uiStore.selectedModule === -1 ? null
-			: uiStore.selectedModule === moduleIndex ? null
-			: moduleIndex;
+		uiStore.selectedModule = uiStore.selectedModule === -1 ? null : uiStore.selectedModule === moduleIndex ? null : moduleIndex;
 		uiStore.selectedCable = null;
 	}
 
@@ -258,7 +261,9 @@
 			paramChangeTimer = null;
 			try {
 				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
-			} catch { /* G2 may be temporarily busy */ }
+			} catch {
+				/* G2 may be temporarily busy */
+			}
 		}, 50);
 	}
 
@@ -273,7 +278,7 @@
 
 	async function handleSlotClick(index: number): Promise<void> {
 		const slot = SLOT_LABELS[index];
-		uiStore.activeSlot    = slot;
+		uiStore.activeSlot = slot;
 		slotsStore.activeSlot = slot;
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
@@ -309,7 +314,9 @@
 
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
-		window.addEventListener('mouseup', () => { jackPatching.dragSource.value = null; });
+		window.addEventListener('mouseup', () => {
+			jackPatching.dragSource.value = null;
+		});
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			const area = uiStore.area === 1 ? 'voice' : 'fx';
@@ -318,22 +325,34 @@
 				case 'new-performance': {
 					const emptyPatch = {
 						areas: [
-							{ name: 'fx',    modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 0,
+							blue: 0,
+							yellow: 0,
+							orange: 0,
+							green: 0,
+							purple: 0,
+							white: 0,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
 					};
 					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
 					break;
 				}
 				case 'open':
 					await patchFile.openFromElectronDialog();
-					if (currentPatch.value?.description?.variation !== undefined)
-						uiStore.variation = currentPatch.value.description.variation;
+					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
 					break;
 				case 'save':
-					if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex)
-						await slotsStore.saveSlot(uiStore.activeSlot);
+					if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex) await slotsStore.saveSlot(uiStore.activeSlot);
 					break;
 				case 'save-as': {
 					if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
@@ -346,16 +365,36 @@
 						if (slotsStore.slots[s]?.templateRawHex) await slotsStore.saveSlot(s);
 					}
 					break;
-				case 'delete':     await deleteSelection(); break;
-				case 'select-all': uiStore.selectedModule = -1; break;
-				case 'toggle-modules': uiStore.toggleSidebar('modules'); break;
-				case 'toggle-browser': uiStore.toggleSidebar('browser'); break;
-				case 'area-voice': uiStore.area = 1; break;
-				case 'area-fx':    uiStore.area = 0; break;
-				case 'slot-A': handleSlotClick(0); break;
-				case 'slot-B': handleSlotClick(1); break;
-				case 'slot-C': handleSlotClick(2); break;
-				case 'slot-D': handleSlotClick(3); break;
+				case 'delete':
+					await deleteSelection();
+					break;
+				case 'select-all':
+					uiStore.selectedModule = -1;
+					break;
+				case 'toggle-modules':
+					uiStore.toggleSidebar('modules');
+					break;
+				case 'toggle-browser':
+					uiStore.toggleSidebar('browser');
+					break;
+				case 'area-voice':
+					uiStore.area = 1;
+					break;
+				case 'area-fx':
+					uiStore.area = 0;
+					break;
+				case 'slot-A':
+					handleSlotClick(0);
+					break;
+				case 'slot-B':
+					handleSlotClick(1);
+					break;
+				case 'slot-C':
+					handleSlotClick(2);
+					break;
+				case 'slot-D':
+					handleSlotClick(3);
+					break;
 			}
 		});
 
@@ -365,7 +404,7 @@
 			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
-				uiStore.activeSlot    = slot;
+				uiStore.activeSlot = slot;
 				slotsStore.activeSlot = slot;
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
@@ -389,7 +428,7 @@
 		const slot = SLOT_LABELS[slotIndex];
 		if (!slot) return;
 		device.setActiveSlot(slot);
-		uiStore.activeSlot    = slot;
+		uiStore.activeSlot = slot;
 		slotsStore.activeSlot = slot;
 		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
 	});
@@ -403,5 +442,11 @@
 		if (activePatch?.description) activePatch.description.variation = change.variation;
 	});
 
-	watch(cableVisibility, () => { updatePatchData(currentPatch.value?.description); }, { deep: true });
+	watch(
+		cableVisibility,
+		() => {
+			updatePatchData(currentPatch.value?.description);
+		},
+		{ deep: true },
+	);
 </script>
