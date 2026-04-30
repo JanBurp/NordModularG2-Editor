@@ -1,5 +1,6 @@
 import { defineConfig } from "vitest/config";
 import path from "path";
+import tailwindcss from '@tailwindcss/vite'
 
 export default defineConfig({
 	test: {
@@ -11,4 +12,8 @@ export default defineConfig({
 			"@": path.resolve(__dirname, "./src"),
 		},
 	},
+	plugins: [
+		vue(),
+		tailwindcss(),
+	],
 });

@@ -2,8 +2,8 @@
 	<!-- File variant uses label wrapper -->
 	<label
 		v-if="variant === 'file'"
-		class="inline-flex items-center justify-center h-8 px-3 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal cursor-pointer"
-		:class="{ 'opacity-50 cursor-not-allowed': disabled }"
+		class="btn btn-default btn-file"
+		:class="{ 'btn-disabled': disabled }"
 		tabindex="0"
 		role="button"
 		@keydown="handleKeydown"
@@ -15,14 +15,14 @@
 	<!-- All other variants use button -->
 	<button
 		v-else
-		class="inline-flex items-center justify-center bg-neutral-700 border border-neutral-600 rounded text-neutral-200 font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2"
+		class="btn"
 		:class="[
-			variant === 'default' ? 'h-8 px-3 text-sm' : '',
-			variant === 'toggle' || variant === 'tab' ? 'h-8 px-2.5 text-sm bg-neutral-800 border-neutral-700' : '',
-			variant === 'variation' ? 'w-8 h-8 p-0 text-sm bg-neutral-800' : '',
+			variant === 'default' ? 'btn-default' : '',
+			variant === 'toggle' || variant === 'tab' ? 'btn-toggle' : '',
+			variant === 'variation' ? 'btn-variation' : '',
 			sizeClass,
-			active ? '!bg-blue-300 !text-white' : '',
-			disabled ? 'opacity-50 cursor-not-allowed' : 'hover:bg-neutral-600',
+			active ? 'btn-active' : '',
+			disabled ? 'btn-disabled' : 'btn-hover',
 		]"
 		:disabled="disabled"
 		@click="handleClick"
@@ -49,9 +49,9 @@
 	});
 
 	const sizeClass = computed(() => {
-		if (props.size === 'xs') return '!h-4 !px-1 !text-xs !rounded-none';
-		if (props.size === 'small') return 'h-6 px-1.5 text-xs';
-		return 'h-8 px-2.5 text-sm';
+		if (props.size === 'xs') return 'btn-xs';
+		if (props.size === 'small') return 'btn-small';
+		return '';
 	});
 
 	const emit = defineEmits<{

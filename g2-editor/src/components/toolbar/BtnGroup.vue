@@ -7,7 +7,7 @@
 			:active="isActive(option.value)"
 			:disabled="option.disabled"
 			:size="size"
-			class="rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0"
+			class="btn-group-item"
 			@click="handleSelect(option.value, option.disabled)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
 		>
