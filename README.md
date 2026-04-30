@@ -16,6 +16,12 @@ A lot is working, and a lot is not working ;-)
 
 ### Screenshots of current status
 
+30 april 2026
+
+Video: 
+
+[![Watch the video](https://youtu.be/BuMu8OjTbvk/hqdefault.jpg)](https://youtu.be/BuMu8OjTbvk)
+
 27 april 2026:
 
 ![alt text](screenshots/G2-editor-00.jpg)
