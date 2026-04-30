@@ -16,7 +16,7 @@ First goal is to have a basic working editor
 - [x] Switch Slots & Variations (in editor & G2, synced)
 - [x] Load & Save pch2 file
 - [x] Adding, deleting, moving and change colors of modules. (also multiple modules)
-- [ ] Rename module
+- [x] Rename module
 - [x] Adding and deleting cables
 - [ ] Change color of cable
 - [x] Watch params change in editor, while changed on G2 - not tested with all params
