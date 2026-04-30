@@ -58,14 +58,14 @@ function handleEnter() {
 			ref="searchInputRef"
 			v-model="searchValue"
 			type="text"
-			class="w-full px-3 py-2 pr-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-xs focus:outline-none focus:border-blue-700 placeholder:text-neutral-500"
+			class="search-input"
 			:placeholder="placeholder"
 			@keydown.esc="clearSearch"
 			@keydown.enter="handleEnter"
 		/>
 		<span
 			v-show="searchValue"
-			class="absolute right-2 top-1/2 -translate-y-1/2 text-neutral-500 text-base cursor-pointer leading-1 hover:text-neutral-200"
+			class="search-clear"
 			@click="clearSearch"
 			>×</span
 		>

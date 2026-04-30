@@ -66,8 +66,10 @@
 	const svgRef = ref<SVGSVGElement | null>(null);
 	const isInitialized = ref(false);
 
-	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } =
-		useModuleSelecting(svgRef, computed(() => props.modules as any[]));
+	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
+		svgRef,
+		computed(() => props.modules as any[]),
+	);
 
 	const canvasWidth = computed(() => {
 		if (props.modules.length === 0) return 1280;
@@ -162,8 +164,8 @@
 
 				// Keys currently rendered in the DOM
 				const renderedKeys = new Set<string>();
-				svg.querySelectorAll<SVGPathElement>(".svgcableborder[data-cable-key]").forEach((el) => {
-					renderedKeys.add(el.getAttribute("data-cable-key")!);
+				svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
+					renderedKeys.add(el.getAttribute('data-cable-key')!);
 				});
 
 				// Keys we want (respecting visibility filter)
@@ -179,7 +181,7 @@
 					if (!renderedKeys.has(key)) {
 						makePatchCables(props.modules as CableModule[], [cable], svg, {
 							selectedCable: props.selectedCable,
-							onCableClick: (c) => emit("cableClick", c),
+							onCableClick: (c) => emit('cableClick', c),
 						});
 					}
 				}
@@ -195,12 +197,11 @@
 			nextTick(() => {
 				if (!svgRef.value || !oldMods) return;
 				const movedIds = new Set<number>();
-				for (const m of (newMods as any[])) {
+				for (const m of newMods as any[]) {
 					const prev = (oldMods as any[]).find((o: any) => o.index === m.index);
 					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert) movedIds.add(m.index);
 				}
-				if (movedIds.size > 0)
-					updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);
+				if (movedIds.size > 0) updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);
 			});
 		},
 	);
@@ -463,7 +464,19 @@
 
 <template>
 	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
-		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg" @mousedown="handleCanvasMousedown" @click="emit('canvasClick'); handleCanvasClick()">
+		<svg
+			ref="svgRef"
+			class="patch-canvas"
+			font-size="9"
+			:width="canvasWidth"
+			:height="canvasHeight"
+			xmlns="http://www.w3.org/2000/svg"
+			@mousedown="handleCanvasMousedown"
+			@click="
+				emit('canvasClick');
+				handleCanvasClick();
+			"
+		>
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
@@ -482,8 +495,8 @@
 				:width="Math.max(0, selectionRect.width)"
 				:height="Math.max(0, selectionRect.height)"
 				fill="none"
-				stroke="rgba(100,150,255,0.8)"
-				stroke-width="1"
+				stroke="rgba(30,30,30,0.8)"
+				stroke-width="3"
 				stroke-dasharray="4 4"
 				pointer-events="none"
 			/>
