@@ -46,6 +46,7 @@ static void print_usage(const char *prog) {
     printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>                   Add a module to the patch\n");
     printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
+    printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
@@ -369,6 +370,19 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         const char *name = (j < argc) ? argv[j] : "Module";
         return g2_add_module(slot, location, type_id, module_id, col, row, color,
                              num_modes, mode_vals, num_params, param_vals, name);
+    }
+
+    if (strcmp(command, "set-module-color") == 0) {
+        /* set-module-color <slot> <va|fx> <module-id> <color:0-6> */
+        if (i + 4 >= argc) {
+            fprintf(stderr, "Usage: set-module-color <slot> <va|fx> <module-id> <color:0-6>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int module_id = atoi(argv[i + 3]);
+        int color     = atoi(argv[i + 4]);
+        return g2_set_module_color(slot, location, module_id, color);
     }
 
     if (strcmp(command, "set-param") == 0) {

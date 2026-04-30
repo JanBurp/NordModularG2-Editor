@@ -5,6 +5,7 @@ import {
 	mutDeleteCable,
 	mutDeleteModule,
 	mutMoveModule,
+	mutSetModuleColor,
 } from "../parser/patchMutations";
 
 import type { SlotLabel } from "@/types";
@@ -428,6 +429,27 @@ export const useSlotsStore = defineStore("slots", {
 			for (const d of this._resolveColumnCollisions(colMods, row, height))
 				await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.addModule(typeId, moduleId, col, row, area);
+		},
+
+		async setModuleColors(
+			moduleIds: number[],
+			color: number,
+			area: "voice" | "fx",
+		): Promise<void> {
+			if (moduleIds.length === 0) return;
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+			const areaIdx = area === "voice" ? 1 : 0;
+			const location = area === "voice" ? "va" : "fx";
+			for (const id of moduleIds)
+				mutSetModuleColor(patch, areaIdx, id, color);
+			this.slots[slot].rawHex = null;
+			if (deviceSlot) {
+				const cliCmds = moduleIds.map((id) => `set-module-color ${deviceSlot} ${location} ${id} ${color}`);
+				await window.cli.run(["seq", ...cliCmds]);
+			}
 		},
 
 		async deleteSelection(
