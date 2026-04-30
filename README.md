@@ -4,6 +4,8 @@ Editor for the Nord Modular G2 - For macOS, Windows and Linux.
 
 The original editor by Clavia does not work on macOS. A new editor, for all platforms, would benefit the future of the Nord G2.
 
+![alt text](screenshots/clavianordg2.jpg)
+
 ## Current status
 
 A lot is working, and a lot is not working ;-)
@@ -11,6 +13,13 @@ A lot is working, and a lot is not working ;-)
 - First goal is to have a basic working editor.
 - Next goal is to have all features the original Clavia editor has.
 - Future goals could be: A small/light version that runs on a raspberry pi, batch processing of patches, modules, params, ... .
+
+### Screenshots of current status
+
+27 april 2026:
+
+![alt text](screenshots/G2-editor-00.jpg)
+
 
 ### First goal:
 
@@ -39,12 +48,6 @@ A lot is working, and a lot is not working ;-)
 - [ ] Morphs
 - [ ] Parameter Pages
 - [ ] ...
-
-### Screenshots of current status
-
-27 april 2026:
-
-![alt text](screenshots/G2-editor-00.jpg)
 
 ## Tech goals and stack
 
@@ -77,3 +80,7 @@ You could contribute:
 ### Acknowledgement
 
 A lot of the code is based on work of others from the Nord G2 community at https://electro-music.com, specialy the Delphi Editor by bverhue: https://www.bverhue.nl/g2dev/ and the patchviewer by ian-s: https://electro-music.com/patchviewer/. But also the g2ools from qfingers: https://electro-music.com/forum/viewtopic.php?t=15405.
+
+#### My development setup
+
+![alt text](screenshots/development-setup.jpg)
