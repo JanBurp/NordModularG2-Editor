@@ -1,14 +1,16 @@
-import { defineStore } from "pinia";
-import type { Patch, ModuleInstance } from "../parser/nmg2PatchParser";
-import { useDeviceStore } from "./device";
-import type { SlotLabel } from "@/types";
+import type { ModuleInstance, Patch } from "../parser/nmg2PatchParser";
 import {
+	mutAddCable,
+	mutAddModule,
 	mutDeleteCable,
 	mutDeleteModule,
 	mutMoveModule,
-	mutAddModule,
-	mutAddCable,
 } from "../parser/patchMutations";
+
+import type { SlotLabel } from "@/types";
+import { defineStore } from "pinia";
+import { useDeviceStore } from "./device";
+import { useUiStore } from './ui';
 
 export type { SlotLabel };
 
@@ -226,6 +228,7 @@ export const useSlotsStore = defineStore("slots", {
 			area: "voice" | "fx",
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
+			const uiStore = useUiStore();
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
@@ -249,7 +252,7 @@ export const useSlotsStore = defineStore("slots", {
 				index: moduleId,
 				horiz: col,
 				vert: row,
-				colour: 0,
+				colour: uiStore.moduleColor,
 				uprate: 0,
 				leds: 0,
 				pcnt: numParams,
