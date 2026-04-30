@@ -10,11 +10,11 @@
 
 			<div v-if="deviceStore.device?.midi" class="mt-2">
 				<h4>Midi:</h4>
-				<div class="ml-2 flex gap-2 items-center"><span class="w-16">Slot A</span><input class="w-10" v-model="midiA" /></div>
-				<div class="ml-2 flex gap-2 items-center"><span class="w-16">Slot B</span><input class="w-10" v-model="midiB" /></div>
-				<div class="ml-2 flex gap-2 items-center"><span class="w-16">Slot C</span><input class="w-10" v-model="midiC" /></div>
-				<div class="ml-2 flex gap-2 items-center"><span class="w-16">Slot D</span><input class="w-10" v-model="midiD" /></div>
-				<div class="ml-2 flex gap-2 items-center"><span class="w-16">Global</span><input class="w-10" v-model="midiGlobal" /></div>
+				<div class="ml-2 flex gap-2 items-center"><span class="w-16 label">Slot A</span><input class="w-10 text" v-model="midiA" /></div>
+				<div class="ml-2 flex gap-2 items-center"><span class="w-16 label">Slot B</span><input class="w-10 text" v-model="midiB" /></div>
+				<div class="ml-2 flex gap-2 items-center"><span class="w-16 label">Slot C</span><input class="w-10 text" v-model="midiC" /></div>
+				<div class="ml-2 flex gap-2 items-center"><span class="w-16 label">Slot D</span><input class="w-10 text" v-model="midiD" /></div>
+				<div class="ml-2 flex gap-2 items-center"><span class="w-16 label">Global</span><input class="w-10 text" v-model="midiGlobal" /></div>
 			</div>
 		</div>
 		<div class="p-2 bg-neutral-900">

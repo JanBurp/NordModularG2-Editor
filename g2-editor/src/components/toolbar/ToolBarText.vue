@@ -1,5 +1,5 @@
 <template>
-	<span class="text-sm border border-black text-black inline-block px-2 py-1 text-center rounded h-8" :class="bgColor">
+	<span class="label text" :class="bgColor">
 		<slot></slot>
 	</span>
 </template>
