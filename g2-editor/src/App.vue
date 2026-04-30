@@ -148,6 +148,7 @@
 					:isActive="uiStore.rightPaneTab === 'browser'"
 					@select="patchFile.handlePatchSelect"
 				/>
+				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
 			</SidePanel>
 		</div>
 
@@ -185,6 +186,7 @@
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
+	import SettingsPane from './components/panels/SettingsPane.vue';
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
