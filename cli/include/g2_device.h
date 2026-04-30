@@ -103,7 +103,7 @@ int g2_del_cable(int slot, int location,
 int g2_del_module(int slot, int location, int module_id);
 int g2_move_module(int slot, int location, int module_id, int col, int row);
 int g2_add_module(int slot, int location, int type_id, int module_id,
-                  int col, int row,
+                  int col, int row, int color,
                   int num_modes, const int *mode_vals,
                   int num_params, const int *param_vals,
                   const char *name);

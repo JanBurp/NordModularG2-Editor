@@ -43,7 +43,7 @@ static void print_usage(const char *prog) {
     printf("                                       Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
     printf("                                       Delete a cable\n");
-    printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row>\n");
+    printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>\n");
     printf("                                       Add a module to the patch\n");
     printf("  del-module <slot> <va|fx> <module-id>\n");
     printf("                                       Delete a module (delete its cables first)\n");
@@ -339,10 +339,10 @@ int main(int argc, char *argv[]) {
     }
 
     if (strcmp(command, "add-module") == 0) {
-        /* add-module <slot> <va|fx> <type-id> <module-id> <col> <row>
+        /* add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color>
          *            <num-modes> [mode-val...] <num-params> [param-val...] <name> */
-        if (i + 7 >= argc) {
-            fprintf(stderr, "Usage: add-module <slot> <va|fx> <type-id> <module-id> <col> <row>"
+        if (i + 8 >= argc) {
+            fprintf(stderr, "Usage: add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color>"
                             " <num-modes> [mode-vals...] <num-params> [param-vals...] <name>\n");
             return 1;
         }
@@ -352,7 +352,8 @@ int main(int argc, char *argv[]) {
         int module_id = atoi(argv[i + 4]);
         int col       = atoi(argv[i + 5]);
         int row       = atoi(argv[i + 6]);
-        int j = i + 7;
+        int color     = atoi(argv[i + 7]);
+        int j = i + 8;
 
         int num_modes = (j < argc) ? atoi(argv[j++]) : 0;
         int mode_vals[64] = {0};
@@ -365,7 +366,7 @@ int main(int argc, char *argv[]) {
             param_vals[p] = atoi(argv[j++]);
 
         const char *name = (j < argc) ? argv[j] : "Module";
-        return g2_add_module(slot, location, type_id, module_id, col, row,
+        return g2_add_module(slot, location, type_id, module_id, col, row, color,
                              num_modes, mode_vals, num_params, param_vals, name);
     }
 
