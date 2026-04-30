@@ -1547,7 +1547,7 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
 }
 
 int g2_add_module(int slot, int location, int type_id, int module_id,
-                  int col, int row,
+                  int col, int row, int color,
                   int num_modes, const int *mode_vals,
                   int num_params, const int *param_vals,
                   const char *name) {
@@ -1568,7 +1568,7 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     payload[pos++] = (uint8_t)module_id;
     payload[pos++] = (uint8_t)col;
     payload[pos++] = (uint8_t)row;
-    payload[pos++] = 0x00; /* colour */
+    payload[pos++] = (uint8_t)(color & 0xff); /* colour */
     payload[pos++] = 0x00; /* upRate */
     payload[pos++] = 0x00; /* isLed */
 
