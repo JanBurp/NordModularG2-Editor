@@ -438,19 +438,27 @@ export const useSlotsStore = defineStore("slots", {
 			currentCableList: any[],
 		): Promise<void> {
 			if (selectedModules.length > 0 && !selectedCable) {
-				// Track which cables have already been deleted to avoid duplicate USB calls
+				const deviceSlot = useDeviceStore().getActiveSlot;
+				const slot = deviceSlot ?? this.activeSlot;
+				const patch = this.slots[slot].patch;
+				if (!patch) return;
+				const location = area === "voice" ? "va" : "fx";
+				const cliCmds: string[] = [];
 				const deletedCableKeys = new Set<string>();
 				for (const id of selectedModules) {
-					const cables = currentCableList.filter((c: any) => c.smod === id || c.dmod === id);
-					for (const c of cables) {
+					for (const c of currentCableList.filter((c: any) => c.smod === id || c.dmod === id)) {
 						const key = `${c.smod}-${c.scon}-${c.dmod}-${c.dcon}`;
 						if (!deletedCableKeys.has(key)) {
 							deletedCableKeys.add(key);
-							await this.deleteCableNoReload(c, area);
+							mutDeleteCable(patch, area === "voice" ? 1 : 0, c);
+							if (deviceSlot) cliCmds.push(`del-cable ${deviceSlot} ${location} ${c.smod} 1 ${c.scon} ${c.dmod} 0 ${c.dcon}`);
 						}
 					}
-					await this.deleteModule(id, area);
+					mutDeleteModule(patch, area === "voice" ? 1 : 0, id);
+					if (deviceSlot) cliCmds.push(`del-module ${deviceSlot} ${location} ${id}`);
 				}
+				this.slots[slot].rawHex = null;
+				if (deviceSlot && cliCmds.length > 0) await window.cli.run(["seq", ...cliCmds]);
 				return;
 			}
 			if (selectedCable)

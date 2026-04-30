@@ -22,43 +22,40 @@ static void print_version(void) {
 static void print_usage(const char *prog) {
     printf("Usage: %s [options] command [arguments]\n\n", prog);
     printf("Options:\n");
-    printf("  -h, --help     Show this help\n");
-    printf("  -V, --version  Show version\n");
-    printf("  --json         Output as single-line JSON (default for data commands)\n");
-    printf("  --pretty       Pretty-print JSON (default when outputting to terminal)\n");
-    printf("  --tree         Tree view output\n");
-    printf("  --debug        Show debug info (raw USB data in hex)\n");
+    printf("  -h, --help        Show this help\n");
+    printf("  -V, --version     Show version\n");
+    printf("  --json            Output as single-line JSON (default for data commands)\n");
+    printf("  --pretty          Pretty-print JSON (default when outputting to terminal)\n");
+    printf("  --tree            Tree view output\n");
+    printf("  --debug           Show debug info (raw USB data in hex)\n");
     printf("\nCommands (implemented):\n");
-    printf("  startup                              Full startup sequence (init + device + all slots + names)\n");
-    printf("  connect                              Connect to G2 (auto-detect)\n");
-    printf("  disconnect                           Close connection\n");
-    printf("  list-devices                         List USB devices (debug)\n");
-    printf("  device                               Show synth device info\n");
-    printf("  get-patch <slot>                     Get patch from slot (A-D) as JSON\n");
-    printf("  get-patch-file <slot> [file]         Save patch as .pch2 file\n");
-    printf("  list [type] [bank <n>]               List patches and performances\n");
-    printf("  slot <A|B|C|D>                      Change active slot\n");
-    printf("  variation <1-8> <A-D>                Select variation for slot\n");
-    printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
-    printf("                                       Add cable between two jacks\n");
-    printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
-    printf("                                       Delete a cable\n");
-    printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>\n");
-    printf("                                       Add a module to the patch\n");
-    printf("  del-module <slot> <va|fx> <module-id>\n");
-    printf("                                       Delete a module (delete its cables first)\n");
-    printf("  move-module <slot> <va|fx> <module-id> <col> <row>\n");
-    printf("                                       Move a module to a new grid position\n");
-    printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
-    printf("                                       Set a module parameter value\n");
-    printf("  select-patch <slot> <bank:1-32> <location:1-127>\n");
-    printf("                                       Load bank patch into slot\n");
-    printf("  upload-patch <slot> <filepath>       Upload .pch2 file to slot\n");
-    printf("  watch                                Monitor param/cable/slot changes live\n");
+    printf("  list-devices                                                                              List USB devices (debug)\n");
+    printf("  connect                                                                                   Connect to G2 (auto-detect)\n");
+    printf("  disconnect                                                                                Close connection\n");
+    printf("  startup                                                                                   Full startup sequence (init + device + all slots + names)\n");
+    printf("  device                                                                                    Show synth device info\n");
+    printf("  get-patch <slot>                                                                          Get patch from slot (A-D) as JSON\n");
+    printf("  get-patch-file <slot> [file]                                                              Save patch as .pch2 file\n");
+    printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
+    printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
+    printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
+    printf("  slot <A|B|C|D>                                                                            Change active slot\n");
+    printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
+    printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Add cable between two jacks\n");
+    printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>              Delete a cable\n");
+    printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>                   Add a module to the patch\n");
+    printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
+    printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
+    printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
+    printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
+    printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
 
 static output_format_t output_format = OUTPUT_PRETTY;
 static int debug_mode = 0;
+
+/* Forward declaration */
+static int dispatch_command(const char *command, int argc, char **argv, int cmd_idx);
 
 int main(int argc, char *argv[]) {
     int i;
@@ -104,6 +101,10 @@ int main(int argc, char *argv[]) {
     }
     atexit(g2_exit);
 
+    return dispatch_command(command, argc, argv, i);
+}
+
+static int dispatch_command(const char *command, int argc, char **argv, int i) {
     /* Handle commands */
     if (strcmp(command, "list-devices") == 0) {
         return g2_list_devices();
@@ -409,6 +410,22 @@ int main(int argc, char *argv[]) {
 
     if (strcmp(command, "watch") == 0) {
         return g2_watch(output_format, debug_mode);
+    }
+
+    if (strcmp(command, "seq") == 0) {
+        /* seq "<cmd1>" "<cmd2>" ...
+         * Run each quoted argument as a sub-command, sharing the USB connection. */
+        for (int j = i + 1; j < argc; j++) {
+            char buf[1024];
+            strncpy(buf, argv[j], sizeof(buf) - 1);
+            buf[sizeof(buf) - 1] = '\0';
+            char *sub_argv[64];
+            int sub_argc = tokenize_command(buf, sub_argv, 64);
+            if (sub_argc == 0) continue;
+            int ret = dispatch_command(sub_argv[0], sub_argc, sub_argv, 0);
+            if (ret != 0) return ret;
+        }
+        return 0;
     }
 
     if (output_format == OUTPUT_JSON) {

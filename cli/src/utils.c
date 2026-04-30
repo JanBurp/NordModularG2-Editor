@@ -78,6 +78,19 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
     return 0;
 }
 
+int tokenize_command(char *buf, char **argv_out, int max_argc) {
+    int argc = 0;
+    char *p = buf;
+    while (*p && argc < max_argc) {
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p == '\0') break;
+        argv_out[argc++] = p;
+        while (*p && *p != ' ' && *p != '\t') p++;
+        if (*p) *p++ = '\0';
+    }
+    return argc;
+}
+
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
                       uint8_t *usb_data, size_t *usb_len) {
     if (pch2_data == NULL || usb_data == NULL || usb_len == NULL) {
