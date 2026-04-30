@@ -29,7 +29,7 @@
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
 		jackDragStart: [info: JackDragInfo];
-		jackDragEnd:   [info: JackDragInfo];
+		jackDragEnd: [info: JackDragInfo];
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 	}>();
 
@@ -113,12 +113,12 @@
 
 <template>
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
-		<ModuleBackground :height="height"></ModuleBackground>
+		<ModuleBackground :height="height" :selected="isSelected"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
-		<rect width="256" height="13" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" />
+		<rect width="256" height="18" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" />
 
 		<!-- Modes -->
 		<g class="modes">
@@ -151,12 +151,7 @@
 				:module-id="props.type"
 			/>
 
-			<ModuleValueDisplay
-				v-else-if="ve.type === 'valueDisplay'"
-				:ve="ve"
-				:params="moduleDef.params || []"
-				:values="localLv"
-			/>
+			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
 
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
@@ -239,15 +234,6 @@
 			:connectorIndex="idx"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
-		/>
-
-		<!-- Selection highlight: at end so it renders on top of all module content -->
-		<rect
-			v-if="isSelected"
-			width="256"
-			:height="height"
-			style="fill: none; stroke: orange; stroke-width: 4; pointer-events: none;"
-			rx="2"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
