@@ -118,6 +118,7 @@
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
 						@param-change="handleParamChange"
+						@module-label-edit="handleModuleLabelEdit"
 					/>
 					<PatchCanvas
 						v-show="uiStore.area === 0"
@@ -136,6 +137,7 @@
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
 						@param-change="handleParamChange"
+						@module-label-edit="handleModuleLabelEdit"
 					/>
 				</template>
 				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
@@ -154,10 +156,18 @@
 
 		<StatusBar @toggle-connection="toggleConnection" />
 	</div>
+
+	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
+		<input
+			v-model="editingLabel"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			maxlength="16"
+		/>
+	</Dialog>
 </template>
 
 <script setup lang="ts">
-	import { computed, watch, onMounted, onUnmounted } from 'vue';
+	import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 	import type { Cable } from './renderer/cableRenderer';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
@@ -171,6 +181,7 @@
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import ColorPicker from './components/common/ColorPicker.vue';
+	import Dialog from './components/common/Dialog.vue';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 
 	import { useG2 } from './composables/useG2';
@@ -254,9 +265,29 @@
 		}, 50);
 	}
 
+	// ── Module label dialog ───────────────────────────────────────────────────
+
+	const showLabelDialog = ref(false);
+	const editingLabel = ref('');
+	const editingModuleId = ref<number | null>(null);
+
+	function handleModuleLabelEdit({ moduleIndex, currentLabel }: { moduleIndex: number; currentLabel: string }): void {
+		editingModuleId.value = moduleIndex;
+		editingLabel.value = currentLabel;
+		showLabelDialog.value = true;
+	}
+
+	async function confirmModuleLabel(): Promise<void> {
+		if (editingModuleId.value === null) return;
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		await slotsStore.setModuleLabel(editingModuleId.value, editingLabel.value, area as 'voice' | 'fx');
+		showLabelDialog.value = false;
+	}
+
 	// ── Keyboard ──────────────────────────────────────────────────────────────
 
 	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
+		if (showLabelDialog.value) return;
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
 		await deleteSelection();
 	}

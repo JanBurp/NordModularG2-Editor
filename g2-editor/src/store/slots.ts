@@ -6,6 +6,7 @@ import {
 	mutDeleteModule,
 	mutMoveModule,
 	mutSetModuleColor,
+	mutSetModuleLabel,
 } from "../parser/patchMutations";
 
 import type { SlotLabel } from "@/types";
@@ -449,6 +450,20 @@ export const useSlotsStore = defineStore("slots", {
 			if (deviceSlot) {
 				const cliCmds = moduleIds.map((id) => `set-module-color ${deviceSlot} ${location} ${id} ${color}`);
 				await window.cli.run(["seq", ...cliCmds]);
+			}
+		},
+
+		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+			const areaIdx = area === 'voice' ? 1 : 0;
+			mutSetModuleLabel(patch, areaIdx, moduleId, label);
+			this.slots[slot].rawHex = null;
+			if (deviceSlot) {
+				const location = area === 'voice' ? 'va' : 'fx';
+				await window.cli.run(['set-module-name', deviceSlot, location, String(moduleId), label]);
 			}
 		},
 

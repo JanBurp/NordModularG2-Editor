@@ -111,6 +111,9 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 /* Set module color: slot 0-3, location 0=fx/1=va, color 0-6 */
 int g2_set_module_color(int slot, int location, int module_id, int color);
 
+/* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
+int g2_set_module_label(int slot, int location, int module_id, const char *label);
+
 /* Patch browser commands */
 int g2_select_patch(int slot, int bank, int location);
 int g2_upload_patch(int slot, const char *filepath);

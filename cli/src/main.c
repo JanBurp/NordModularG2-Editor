@@ -47,6 +47,7 @@ static void print_usage(const char *prog) {
     printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
+    printf("  set-module-name <slot> <va|fx> <module-id> <name>                                        Set a module label\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
@@ -383,6 +384,19 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         int module_id = atoi(argv[i + 3]);
         int color     = atoi(argv[i + 4]);
         return g2_set_module_color(slot, location, module_id, color);
+    }
+
+    if (strcmp(command, "set-module-name") == 0) {
+        /* set-module-name <slot> <va|fx> <module-id> <name> */
+        if (i + 4 >= argc) {
+            fprintf(stderr, "Usage: set-module-name <slot> <va|fx> <module-id> <name>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int module_id = atoi(argv[i + 3]);
+        const char *name = argv[i + 4];
+        return g2_set_module_label(slot, location, module_id, name);
     }
 
     if (strcmp(command, "set-param") == 0) {
