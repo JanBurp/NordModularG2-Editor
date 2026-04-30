@@ -15,7 +15,7 @@ export const useUiStore = defineStore("ui", {
     rightPaneTab: "modules" as PaneTab,
     showRightPane: true as boolean,
     selectedCable: null as Cable | null,
-    selectedModule: null as number | -1 | null,
+    selectedModules: [] as number[],
   }),
 
   getters: {
@@ -40,7 +40,21 @@ export const useUiStore = defineStore("ui", {
 
     setModuleColor(index: number) {
       this.moduleColor = index;
-    }
+    },
+
+    selectModules(indices: number[]) {
+      this.selectedModules = indices;
+    },
+
+    toggleModuleSelection(index: number) {
+      const i = this.selectedModules.indexOf(index);
+      if (i >= 0) this.selectedModules.splice(i, 1);
+      else this.selectedModules.push(index);
+    },
+
+    clearSelection() {
+      this.selectedModules = [];
+    },
 
   },
 });

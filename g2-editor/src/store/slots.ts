@@ -431,25 +431,30 @@ export const useSlotsStore = defineStore("slots", {
 		},
 
 		async deleteSelection(
-			selectedModule: number | -1 | null,
+			selectedModules: number[],
 			selectedCable: { smod?: number; scon?: number; dmod?: number; dcon?: number } | null,
 			area: "voice" | "fx",
 			currentModuleList: any[],
 			currentCableList: any[],
 		): Promise<void> {
-			if (selectedModule !== null && !selectedCable) {
-				const ids = selectedModule === -1
-					? currentModuleList.map((m: any) => m.index)
-					: [selectedModule];
-				for (const id of ids) {
-					for (const c of currentCableList.filter((c: any) => c.smod === id || c.dmod === id))
-						this.deleteCableNoReload(c, area);
-					this.deleteModule(id, area);
+			if (selectedModules.length > 0 && !selectedCable) {
+				// Track which cables have already been deleted to avoid duplicate USB calls
+				const deletedCableKeys = new Set<string>();
+				for (const id of selectedModules) {
+					const cables = currentCableList.filter((c: any) => c.smod === id || c.dmod === id);
+					for (const c of cables) {
+						const key = `${c.smod}-${c.scon}-${c.dmod}-${c.dcon}`;
+						if (!deletedCableKeys.has(key)) {
+							deletedCableKeys.add(key);
+							await this.deleteCableNoReload(c, area);
+						}
+					}
+					await this.deleteModule(id, area);
 				}
 				return;
 			}
 			if (selectedCable)
-				this.deleteCable(
+				await this.deleteCable(
 					{ smod: selectedCable.smod!, scon: selectedCable.scon!, dmod: selectedCable.dmod!, dcon: selectedCable.dcon! },
 					area,
 				);

@@ -112,7 +112,7 @@
 </script>
 
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" @click.stop>
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
 		<ModuleBackground :height="height"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
@@ -246,7 +246,7 @@
 			v-if="isSelected"
 			width="256"
 			:height="height"
-			style="fill: none; stroke: orange; stroke-width: 3; pointer-events: none;"
+			style="fill: none; stroke: orange; stroke-width: 4; pointer-events: none;"
 			rx="2"
 		/>
 	</g>
@@ -260,5 +260,8 @@
 	.module {
 		cursor: default;
 		color: v-bind(moduleColor);
+	}
+	.module.selected {
+		filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
 	}
 </style>
