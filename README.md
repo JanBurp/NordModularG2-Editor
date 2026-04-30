@@ -7,7 +7,12 @@ The original editor by Clavia does not work on macOS. A new editor, for all plat
 ## Current status
 
 A lot is working, and a lot is not working ;-)
-First goal is to have a basic working editor
+
+- First goal is to have a basic working editor.
+- Next goal is to have all features the original Clavia editor has.
+- Future goals could be: A small/light version that runs on a raspberry pi, batch processing of patches, modules, params, ... .
+
+### First goal:
 
 - [x] Core USB Communication: connecting, disconnecting
 - [x] Startup sequence, getting device info, patches from the slots, and list of patches and performances
@@ -41,11 +46,9 @@ First goal is to have a basic working editor
 
 ![alt text](screenshots/G2-editor-00.jpg)
 
-## Tech
+## Tech goals and stack
 
-Goals:
-
-- An editor for multiple platforms, at least macOS, Windows and if possible Linux and then also Raspberry Pi.
+- An editor for multiple platforms, at least macOS, Windows and if possible Linux.
 - Using tech that is widely available and used by many developers.
 
 This editor is build with electronjs, with TypeScript and VueJS.
@@ -53,10 +56,10 @@ It uses a C++ CLI tool to handle the USB communication. Which will be part of th
 
 ## How to contribute
 
-Coded and tested by me on M1 apple macOS 15.7.3 and a Nord Modular G2 - expanded.
+Coded and tested by me on M1 apple macOS 15.7.3 and an expanded Nord Modular G2.
 With some help from coding agents (claude & opencode) on a tight budget.
 
-While i did not publish the code and builds yet, feel free to contact me if you want to help.
+While I did not publish the code and builds yet, feel free to contact me if you want to help.
 
 You could contribute:
 
@@ -66,10 +69,10 @@ You could contribute:
   - UX improvements, menu, key commands, mouse commands, all the edit flows
   - Overal look & feel of the app.
   - ...
-  - Adding features towards a complete basic editor (same functionalities as original editor)
-- Testing on your hardware (PC and/or G2 type).
-- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself) feel free to contact me.
-- If you can't contribute whatsoever, but realy wan't to support this editor, consider a donation (contact me).
+  - Adding features towards a complete basic editor
+- Testing on your hardware.
+- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond a working basic editor) feel free to contact me.
+- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a donation (contact me).
 
 ### Acknowledgement
 
