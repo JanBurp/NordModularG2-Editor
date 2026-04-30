@@ -460,48 +460,36 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     /* Parse synth name (up to 16 bytes at offset 4) */
     parse_name(bulkData + 4, synthName, sizeof(synthName));
 
-    /* Direct byte access based on g2ctl.py bitstream analysis:
-      * Name is 10 bytes (9 chars + null), so bitstream starts at byte 14
-      * g2ctl: bitstream.seek_bit(8*5) = bit 40, then reads 5 x 8 bits for MIDI
-      * At bit 40: byte 5 of data starting at byte 14 = bulkData[19]
-      * But g2ctl shows MIDI A = 10, and bulkData[19] = 0x0a = 10
-      *
-      * After name (10 bytes at offset 4):
+    /* Verified offsets from raw device dump (synth name "TheBurp", 7 chars + null):
       * Offset 14: Perf Mode
-      * Offset 15: Perf Bank
-      * Offset 16: Perf Location
-      * Offset 17: Memory Protect + padding
-      * Offset 18: MIDI Slot A = 0x0a = 10
-      * Offset 19: MIDI Slot B = 0x0b = 11
-      * Offset 20: MIDI Slot C = 0x0c = 12
-      * Offset 21: MIDI Slot D = 0x0d = 13
-      * Offset 22: Global chan = 0x0f = 15
-      * Offset 23: Sysex ID = 0x10 = 16, g2ctl shows 17 (adds 1)
-      * Offset 24: Local on (bit 7)
-      * Offset 25: Prog Change Rcv (bit 0), Snd (bit 1)
-      * Offset 26: Controllers
-      * Offset 27: Send Clock (bit 1), Receive Clock (bit 0)
-      * Offset 28: Tune cent
-      * Offset 30: Tune semi
-      * Offset 32: Pedal Polarity (bit 0)
-      * Offset 34: Control Pedal Gain (NOT 33!)
+      * Offset 15: Perf Bank / location
+      * Offset 16: ?
+      * Offset 17: MIDI Slot A (0-indexed, +1 = MIDI channel 1-16)
+      * Offset 18: MIDI Slot B
+      * Offset 19: MIDI Slot C
+      * Offset 20: MIDI Slot D
+      * Offset 21: MIDI Global channel
+      * Offset 22: Sysex ID (CLI adds 1 when reporting)
+      * Offset 23: Local on (bit 7)
+      * Offset 24: Prog Change Rcv (bit 0), Snd (bit 1)
+      * Offset 25: Send Clock (bit 1), Receive Clock (bit 0)
       */
     /* Mode is bit 7 of byte after null terminator (bulkData[13]) */
     mode = (bulkData[13] >> 7) & 1;  /* mode (bit 7) */
-    midiCh[0] = bulkData[18];  /* MIDI A */
-    midiCh[1] = bulkData[19];  /* MIDI B */
-    midiCh[2] = bulkData[20];  /* MIDI C */
-    midiCh[3] = bulkData[21];  /* MIDI D */
-    midiCh[4] = bulkData[22];  /* MIDI global */
-    sysexId = bulkData[23];  /* sysex */
-    localOn = (bulkData[24] >> 7) & 1;  /* local (bit 7) */
-    prgch = ((bulkData[25] >> 0) & 1) | ((bulkData[25] >> 1) & 1) << 1;  /* Rcv at bit 0, Snd at bit 1 */
-    clkSend = (bulkData[27] >> 1) & 1;  /* clkse (bit 1 of byte 27) - lookup ['on', 'off'] 0=on */
-    clkRecv = bulkData[27] & 1;  /* clkre (bit 0 of byte 27) */
+    midiCh[0] = bulkData[17] + 1;  /* MIDI A (0-indexed stored, +1 = channel 1-16) */
+    midiCh[1] = bulkData[18] + 1;  /* MIDI B */
+    midiCh[2] = bulkData[19] + 1;  /* MIDI C */
+    midiCh[3] = bulkData[20] + 1;  /* MIDI D */
+    midiCh[4] = bulkData[21] + 1;  /* MIDI global */
+    sysexId = bulkData[22];  /* sysex */
+    localOn = (bulkData[23] >> 7) & 1;  /* local (bit 7) */
+    prgch = ((bulkData[24] >> 0) & 1) | ((bulkData[24] >> 1) & 1) << 1;  /* Rcv at bit 0, Snd at bit 1 */
+    clkSend = !((bulkData[25] >> 1) & 1);  /* clkse (bit 1, inverted: 0=on) */
+    clkRecv = bulkData[25] & 1;  /* clkre (bit 0) */
     tuneCent = bulkData[28];  /* tune cent */
     tuneSemi = bulkData[30];  /* tune semi */
     pedalPolarity = bulkData[32] & 1;  /* pedal polarity (bit 0) */
-    pedalGain = bulkData[34];  /* pedal gain (byte 34, not 33) */
+    pedalGain = bulkData[34];  /* pedal gain */
 
     /* Performance data parsing - matching g2ctl's BitStream implementation:
      * data = perfData[4:] (skip 4-byte header)
