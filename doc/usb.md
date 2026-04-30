@@ -177,19 +177,54 @@ Response: Embedded ACK.
 
 ## 6. System Commands
 
-All system commands share the format: `[01][2C][41][sub_cmd][...extra][CRC]`
+Most system commands use `0x41` as the cmd_id byte:
+
+```
+[01][2C][41][sub_cmd][...extra][CRC]
+```
+
+However, some commands that need to be version-matched use the **performance version** in place of `0x41` — notably SELECT_SLOT and all performance-level commands (see §6b).
+
+### 6a. System Commands (cmd_id = `0x41`)
 
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
 | `0x02` | GET_SYNTH_SETTINGS | — | Extended bulk (§10) |
+| `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10) | Embedded ACK |
+| `0x04` | GET_ASSIGNED_VOICES | — | Embedded; 4 voice counts at `[5..8]` |
+| `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
+| `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
+| `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
+| `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
+| `0x19 tt bb ll` | PATCH_BANK_DATA (download) | file_type, bank, location, name, patch_data | Embedded ACK |
+| `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
+| `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
+| `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
+| `0x3D` | MIDI_DUMP | — | None |
+| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=performance, 1=patch) | Embedded ACK |
+| `0x56 oo nn` | PLAY_NOTE | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
-| `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
-| `0x28 ss` | GET_PATCH_NAME | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
-| `0x09 ss` | SELECT_SLOT (step 2) | `ss`=slot | Embedded ACK |
-| `0x0A ss bb ll` | SELECT_PATCH | slot, bank-1, location-1 | Embedded ACK |
-| `0x14 mm bb ll` | LIST_PATCHES | mode, bank, patch start | Embedded or bulk (§11) |
-| `0x81` | GET_PERF_SETTINGS (step 1) | — | Extended bulk |
+| `0x81` | UNKNOWN_1 (init query) | — | Extended bulk |
+
+### 6b. Performance-Version System Commands (cmd_id = perf_version)
+
+These use the same scope (`0x2C`) but put the **performance version** at the cmd_id position instead of `0x41`. Obtain the perf version from GET_PATCH_VERSION with slot=4 or from the init response.
+
+```
+[01][2C][perf_version][sub_cmd][...extra][CRC]
+```
+
+| Sub-cmd | Name | Extra bytes | Response |
+|---------|------|-------------|----------|
+| `0x09 ss` | SELECT_SLOT | `ss`=slot (0-3) | Embedded ACK |
+| `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
+| `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
+| `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
+| `0x59` | UNKNOWN_2 (perf init query) | — | Embedded ACK |
+| `0x5E` | GET_GLOBAL_KNOBS | — | Extended bulk |
 
 ### SELECT_SLOT full sequence
 
@@ -221,17 +256,47 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
-| `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §8) |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
+| `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
+| `0x2E` | GET_SELECTED_PARAM | — | Embedded; area/module/param at `[5..7]` |
+| `0x2F` | SEL_PARAM | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
+| `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
+| `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
+| `0x32` | DEL_MODULE | `loc mod_id` | Embedded ACK |
+| `0x33` | SET_MODULE_LABEL | `loc mod name\0` | Embedded ACK |
+| `0x34` | MOVE_MODULE | `loc mod_id col row` | Embedded ACK |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot | Embedded; version at `response[6]` |
-| `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
+| `0x37` | SET_PATCH (upload) | see §9 | Embedded ACK |
+| `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
+| `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
+| `0x44` | COPY_VARIATION | `from to` | Embedded ACK |
+| `0x4C` | GET_PARAMS | `location` | Extended bulk |
+| `0x4F` | GET_PARAM_NAMES | `location` | Extended bulk |
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
-| `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
-| `0x32` | DEL_MODULE | `loc mod_id` | Embedded ACK |
-| `0x34` | MOVE_MODULE | `loc mod_id col row` | Embedded ACK |
-| `0x37` | SET_PATCH (upload) | see §9 | Embedded ACK |
+| `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con color` | Embedded ACK |
+| `0x55` | CTRL_SNAPSHOT | — | Embedded ACK |
+| `0x68` | GET_CURRENT_NOTE | — | Embedded; note/velocity at `[5..6]` |
+| `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
+| `0x6F` | SET_PATCH_NOTES | patch notes chunk | Embedded ACK |
+| `0x70` | UNKNOWN_6 | — | Embedded ACK |
+| `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
+
+### Knob & MIDI Assignment Sub-Commands
+
+These are combined into slot-command messages. Each message can contain multiple sub-operations via `AddXxxMessage` calls:
+
+| Sub-cmd | Name | Payload bytes | Response |
+|---------|------|---------------|----------|
+| `0x1C` | ASSIGN_GLOBAL_KNOB | `mod param loc 00 knob_index` | via parent message |
+| `0x1D` | DEASSIGN_GLOBAL_KNOB | `00 knob_index` | via parent message |
+| `0x1E` | SEL_GLOBAL_PAGE | `page` | via parent message |
+| `0x22` | ASSIGN_MIDICC | `loc mod param cc` | via parent message |
+| `0x23` | DEASSIGN_MIDICC | `cc` | via parent message |
+| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | via parent message |
+| `0x26` | DEASSIGN_KNOB | `00 knob_index` | via parent message |
+| `0x2D` | SEL_PARAM_PAGE | `page` | via parent message |
 
 ---
 
@@ -585,7 +650,37 @@ for (let i = 0; i < data.length; i += 2) {
 
 ---
 
-## 17. Error Codes
+## 17. Response Sub-Command Codes
+
+Codes carried in `subCmd` (response[4] in embedded messages) that identify what a response is answering:
+
+| Code | Name | Source command | Meaning |
+|------|------|----------------|---------|
+| `0x03` | R_SYNTH_SETTINGS | GET_SYNTH_SETTINGS | Synth settings data |
+| `0x05` | R_ASSIGNED_VOICES | GET_ASSIGNED_VOICES | 4 voice counts (one per slot) |
+| `0x0D` | R_STORE | STORE / PATCH_BANK_DATA | Bank store confirmed |
+| `0x12` | R_CLEAR_BANK | CLEAR_BANK | Bank range cleared |
+| `0x13` | R_LIST_NAMES | LIST_PATCHES | Patch/perf name list entry |
+| `0x15` | R_CLEAR | CLEAR | Single entry cleared |
+| `0x16` | R_ADD_NAMES | LIST_PATCHES | Additional name list data |
+| `0x18` | R_PATCH_BANK_UPLOAD | PATCH_BANK_UPLOAD | Bank upload data |
+| `0x21` | C_PATCH_DESCR | SET_PATCH | Patch description received |
+| `0x27` | S_PATCH_NAME | — | Patch name notification |
+| `0x29` | C_PERF_NAME | — | Performance name notification |
+| `0x36` | R_PATCH_VERSION | GET_PATCH_VERSION | Patch version value |
+| `0x38` | R_PATCH_VERSION_CHANGE | — | Patch version changed (watch) |
+| `0x39` | R_LED_DATA | — | LED states (bulk, watch only) |
+| `0x3A` | R_VOLUME_DATA | — | Volume/level data (bulk, watch only) |
+| `0x5F` | C_KNOBS_GLOBAL | GET_GLOBAL_KNOBS | Global knob assignments |
+| `0x6F` | C_PATCH_NOTES | — | Patch text notes |
+| `0x72` | R_RESOURCES_USED | GET_RESOURCES_USED | DSP resource usage |
+| `0x7E` | R_ERROR | any | Error response; code at `[5]` |
+| `0x7F` | R_OK | any | Generic ACK |
+| `0x80` | R_MIDI_CC | — | MIDI CC event (watch) |
+
+---
+
+## 18. Error Codes
 
 | Code | Name | Meaning |
 |------|------|---------|
