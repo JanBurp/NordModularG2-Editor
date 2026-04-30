@@ -1,6 +1,6 @@
 # Nord G2 USB Protocol
 
-Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, and confirmed against the original Delphi editor (`BVE.NMG2USB.pas`).
+Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the original Delphi editor (`BVE.NMG2USB.pas`), and cross-checked with the Python tool `g2ools/g2ctl.py`.
 
 ---
 
@@ -198,7 +198,7 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
 | `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
-| `0x19 tt bb ll` | PATCH_BANK_DATA (download) | file_type, bank, location, name, patch_data | Embedded ACK |
+| `0x19 tt bb ll` | PATCH_BANK_DATA (download) | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
@@ -220,6 +220,7 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
 | `0x09 ss` | SELECT_SLOT | `ss`=slot (0-3) | Embedded ACK |
+| `0x10` | GET_PERF_SETTINGS | — | Extended bulk (performance settings) |
 | `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
@@ -228,16 +229,19 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 
 ### SELECT_SLOT full sequence
 
-Selecting a slot requires two system commands. Both use the version retrieved via GET_PATCH_VERSION:
+Selecting a slot requires two system commands plus one slot command. The `version` byte for steps 1 and 2 comes from byte [3] of the START_COMM (`0x7D 0x00`) response — **not** from GET_PATCH_VERSION:
 
 ```
-Step 1:  [01][2C][version][07][mask][0F][mask][CRC]
-         mask = 0x08 >> slot   (A=0x08, B=0x04, C=0x02, D=0x01)
+Step 1 (sys):   [01][2C][version][07][mask][0F][mask][CRC]
+                mask = 0x08 >> slot   (A=0x08, B=0x04, C=0x02, D=0x01)
 
-Step 2:  [01][2C][version][09][slot][CRC]
+Step 2 (sys):   [01][2C][version][09][slot][CRC]
+
+Step 3 (slot):  [01][28+slot][0x0a][70][CRC]
+                version for step 3 is constant 0x0a (per g2ctl.py)
 ```
 
-After both commands, drain any pending notifications (`g2_drain_pending`).
+After all three commands, drain any pending notifications (`g2_drain_pending`).
 
 ---
 
@@ -259,6 +263,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
 | `0x2E` | GET_SELECTED_PARAM | — | Embedded; area/module/param at `[5..7]` |
+| `0x2A` | SET_UPRATE_MODE | `loc mod uprate` | Embedded ACK |
 | `0x2F` | SEL_PARAM | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
 | `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
 | `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
@@ -279,6 +284,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x55` | CTRL_SNAPSHOT | — | Embedded ACK |
 | `0x68` | GET_CURRENT_NOTE | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
+| `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text) |
 | `0x6F` | SET_PATCH_NOTES | patch notes chunk | Embedded ACK |
 | `0x70` | UNKNOWN_6 | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
@@ -375,6 +381,22 @@ Uses a fixed version byte `0x53` (not the dynamic patch version). Packet layout:
 `section_data` = file bytes starting at `name_end + 3` (skip NUL + `0x17` + `0x00`), excluding the trailing 2-byte PCH2 CRC.
 
 After sending, wait `5 × 10 ms = 50 ms` then read one interrupt response + drain pending.
+
+### Patch Binary Chunk Types
+
+The patch binary (from GET_PATCH / SET_PATCH) is composed of typed sections. Each section starts with a 1-byte type identifier:
+
+| Code | Name | Content |
+|------|------|---------|
+| `0x4A` | ModuleList | List of modules with positions and parameters |
+| `0x4D` | ParameterList | Module parameter values |
+| `0x52` | CableList | Cable connections |
+| `0x5A` | ModuleNames | Module name strings |
+| `0x5B` | ParameterNames | Parameter name strings |
+| `0x60` | Controllers | MIDI CC assignments |
+| `0x62` | Knobs | Knob assignments |
+| `0x65` | MorphParameters | Morph range settings |
+| `0x69` | CurrentNote | Current note info |
 
 ---
 
