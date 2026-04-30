@@ -7,6 +7,7 @@
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
 	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
+	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 
 	const props = defineProps({
 		modules: {
@@ -45,9 +46,9 @@
 			type: Object as () => Cable | null,
 			default: null,
 		},
-		selectedModuleIndex: {
-			type: Number as () => number | -1 | null,
-			default: null,
+		selectedModuleIndices: {
+			type: Array as () => number[],
+			default: () => [],
 		},
 	});
 
@@ -56,15 +57,17 @@
 		cableClick: [cable: Cable];
 		jackDragStart: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
 		jackDragEnd: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
-		moduleClick: [moduleIndex: number];
 		moduleMove: [info: { moduleIndex: number; col: number; row: number }];
 		moduleDrop: [info: { typeId: number; col: number; row: number }];
 		canvasClick: [];
 	}>();
 
 	const canvasRef = ref(null);
-	const svgRef = ref(null);
+	const svgRef = ref<SVGSVGElement | null>(null);
 	const isInitialized = ref(false);
+
+	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } =
+		useModuleSelecting(svgRef, computed(() => props.modules as any[]));
 
 	const canvasWidth = computed(() => {
 		if (props.modules.length === 0) return 1280;
@@ -388,7 +391,7 @@
 		dragGhost.setAttribute('transform', `translate(${dragCurrentCol * 256}, ${dragCurrentRow * 16})`);
 	}
 
-	function onModuleDragEnd(_e: MouseEvent) {
+	function onModuleDragEnd(e: MouseEvent) {
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
 		const moduleIndex = dragModuleIndex;
@@ -401,7 +404,7 @@
 			}
 		} else {
 			if (moduleIndex !== null) {
-				emit('moduleClick', moduleIndex);
+				handleModuleClick(moduleIndex, e.shiftKey);
 			}
 		}
 	}
@@ -460,17 +463,29 @@
 
 <template>
 	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
-		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg" @click="emit('canvasClick')">
+		<svg ref="svgRef" class="patch-canvas" font-size="9" :width="canvasWidth" :height="canvasHeight" xmlns="http://www.w3.org/2000/svg" @mousedown="handleCanvasMousedown" @click="emit('canvasClick'); handleCanvasClick()">
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
 				:type="mod.type"
 				:instance="mod"
-				:is-selected="props.selectedModuleIndex === -1 || mod.index === props.selectedModuleIndex"
+				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				@param-change="onParamChange"
 				@jack-drag-start="handleLocalJackDragStart"
 				@jack-drag-end="handleLocalJackDragEnd"
 				@module-drag-start="handleModuleDragStart"
+			/>
+			<rect
+				v-if="isDraggingSelection && selectionRect"
+				:x="selectionRect.x"
+				:y="selectionRect.y"
+				:width="Math.max(0, selectionRect.width)"
+				:height="Math.max(0, selectionRect.height)"
+				fill="none"
+				stroke="rgba(100,150,255,0.8)"
+				stroke-width="1"
+				stroke-dasharray="4 4"
+				pointer-events="none"
 			/>
 		</svg>
 	</div>

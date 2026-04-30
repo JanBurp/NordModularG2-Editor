@@ -111,14 +111,12 @@
 						:cable-visibility="cableVisibility"
 						:shake-trigger="cableShakeTrigger"
 						:selected-cable="uiStore.selectedCable"
-						:selected-module-index="uiStore.selectedModule"
+						:selected-module-indices="uiStore.selectedModules"
 						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
-						@module-click="handleModuleClick"
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
-						@canvas-click="handleCanvasClick"
 						@param-change="handleParamChange"
 					/>
 					<PatchCanvas
@@ -131,14 +129,12 @@
 						:cable-visibility="cableVisibility"
 						:shake-trigger="cableShakeTrigger"
 						:selected-cable="uiStore.selectedCable"
-						:selected-module-index="uiStore.selectedModule"
+						:selected-module-indices="uiStore.selectedModules"
 						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
-						@module-click="handleModuleClick"
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
-						@canvas-click="handleCanvasClick"
 						@param-change="handleParamChange"
 					/>
 				</template>
@@ -222,27 +218,16 @@
 	async function deleteSelection(): Promise<void> {
 		try {
 			await slotsStore.deleteSelection(
-				uiStore.selectedModule,
+				uiStore.selectedModules,
 				uiStore.selectedCable,
 				uiStore.area === 1 ? 'voice' : 'fx',
 				currentModules.value,
 				currentCables.value,
 			);
 		} finally {
-			uiStore.selectedModule = null;
+			uiStore.clearSelection();
 			uiStore.selectedCable = null;
 		}
-	}
-
-	// ── Module interaction ────────────────────────────────────────────────────
-
-	function handleModuleClick(moduleIndex: number): void {
-		uiStore.selectedModule = uiStore.selectedModule === -1 ? null : uiStore.selectedModule === moduleIndex ? null : moduleIndex;
-		uiStore.selectedCable = null;
-	}
-
-	function handleCanvasClick(): void {
-		uiStore.selectedModule = null;
 	}
 
 	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }): Promise<void> {
@@ -369,7 +354,7 @@
 					await deleteSelection();
 					break;
 				case 'select-all':
-					uiStore.selectedModule = -1;
+					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number));
 					break;
 				case 'toggle-modules':
 					uiStore.toggleSidebar('modules');
