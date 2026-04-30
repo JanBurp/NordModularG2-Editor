@@ -86,6 +86,8 @@ cd cli && make test     # run tests
 ./cli/build/bin/g2-cli --help
 ```
 
+Key slot commands: `add-module`, `del-module`, `move-module`, `set-module-color`, `set-module-name`, `set-param`, `add-cable`, `del-cable`. All take `<slot> <va|fx> ...` as first args. Subcmd bytes documented in `doc/usb.md`.
+
 ### Electron GUI
 ```bash
 cd g2-editor
@@ -134,7 +136,7 @@ State lives in **Pinia stores** (`src/store/`). Stores are the single source of 
 ### Parser & Mutations (`src/parser/`)
 - `nmg2PatchParser.ts` — parses `.pch2` binary format into JS objects
 - `nmg2PatchSerializer.ts` — serializes patches back to binary
-- `patchMutations.ts` — immutable patch mutations (add/delete/move modules & cables)
+- `patchMutations.ts` — immutable patch mutations (add/delete/move modules & cables, set color/label)
 - `g2usb.ts` — USB protocol abstraction
 
 ### Renderer Data (`src/renderer/`)
@@ -146,10 +148,10 @@ State lives in **Pinia stores** (`src/store/`). Stores are the single source of 
 - `canvas/` — `PatchCanvas.vue`, `Module.vue`, `ModuleKnob`, `ModuleSlider`, `ModuleSwitch`, `ModuleJack`, `ModuleVe*` visual elements
 - `panels/` — `SidePanel.vue`, `ModulesPane.vue`, `PatchBrowser.vue`
 - `toolbar/` — `ToolBar.vue`, `StatusBar.vue`, `Button.vue`, `BtnGroup.vue`
-- `common/` — `ColorPicker.vue`, `TreeNode.vue`
+- `common/` — `ColorPicker.vue`, `TreeNode.vue`, `Dialog.vue` (generic modal: title, slot, OK/Cancel, ESC/Enter)
 
 ### Styling
-Tailwind CSS v4 (via `@tailwindcss/vite` plugin). Global styles in `src/style.css`. No separate Tailwind config file — configuration is done in CSS.
+Tailwind CSS v4 (via `@tailwindcss/vite` plugin). Global styles in `src/style.css`. No separate Tailwind config file — configuration is done in CSS. Use only inline classes when it is unique. Otherwise add class to `src/style.css`.
 
 ### Testing
 Vitest (`npm test` in `g2-editor/`). Parser unit tests in `src/parser/__tests__/`.
