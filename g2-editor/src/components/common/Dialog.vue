@@ -5,7 +5,7 @@
 			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
 			@click.self="onCancel"
 		>
-			<div class="bg-neutral-800 border border-neutral-600 rounded shadow-xl min-w-72 max-w-md w-full mx-4">
+			<div ref="dialogEl" class="bg-neutral-800 border border-neutral-600 rounded shadow-xl min-w-72 max-w-md w-full mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-neutral-600">
 					<span class="text-sm font-semibold text-neutral-200">{{ title }}</span>
 					<button
