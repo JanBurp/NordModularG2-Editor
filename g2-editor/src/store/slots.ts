@@ -268,9 +268,9 @@ export const useSlotsStore = defineStore("slots", {
 				const location = area === "voice" ? "va" : "fx";
 				await window.cli.run([
 					"add-module", deviceSlot, location,
-					String(typeId), String(moduleId), String(col), String(row),
+					String(mod.typeId), String(mod.moduleId), String(mod.col), String(mod.row),
 					String(numModes), ...modeVals.map(String),
-					String(numParams), ...paramVals.map(String),
+					String(mod.pcnt), ...paramVals.map(String),
 					uname,
 				]);
 			}
