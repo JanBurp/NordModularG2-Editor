@@ -22,3 +22,4 @@ g2-editor/resources/g2-cli
 .depend/
 /screenshots
 /test-patches
+/.claude
