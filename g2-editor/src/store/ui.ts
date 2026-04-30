@@ -1,37 +1,46 @@
-import { defineStore } from "pinia";
-import { ref, computed } from "vue";
-import type { SlotLabel } from "@/types";
 import type { Cable } from "@/renderer/cableRenderer";
-import { useDeviceStore } from "./device";
 import { SLOT_LABELS } from "@/constants";
+import type { SlotLabel } from "@/types";
+import { defineStore } from "pinia";
+import { useDeviceStore } from "./device";
 
 export type PaneTab = "modules" | "browser";
 
-export const useUiStore = defineStore("ui", () => {
-  const activeSlot = ref<SlotLabel>("A");
-  const area = ref<0 | 1>(1);
-  const variation = ref(0);
+export const useUiStore = defineStore("ui", {
+  state: () => ({
+    activeSlot: "A" as SlotLabel,
+    area: 1 as number,
+    variation: 0 as number,
+    moduleColor: 0 as number,
+    rightPaneTab: "modules" as PaneTab,
+    showRightPane: true as boolean,
+    selectedCable: null as Cable | null,
+    selectedModule: null as number | -1 | null,
+  }),
 
-  const rightPaneTab = ref<PaneTab>("modules");
-  const showRightPane = ref<boolean>(true);
+  getters: {
 
-  const selectedCable = ref<Cable | null>(null);
-  const selectedModule = ref<number | -1 | null>(null);
+    selectedSlotIndex: (state) => {
+      const label = useDeviceStore().getActiveSlot;
+      return SLOT_LABELS.indexOf((label ?? state.activeSlot) as SlotLabel);
+    },
 
-  const selectedSlotIndex = computed<number | null>(() => {
-    const label = useDeviceStore().getActiveSlot;
-    return SLOT_LABELS.indexOf((label ?? activeSlot.value) as SlotLabel);
-  });
+  },
 
-  function toggleSidebar(tab: PaneTab): void {
-    if (rightPaneTab.value === tab) {
-      showRightPane.value = !showRightPane.value;
-    } else {
-      rightPaneTab.value = tab;
-      showRightPane.value = true;
+  actions: {
+
+    toggleSidebar(tab: PaneTab) {
+      if (this.rightPaneTab === tab) {
+        this.showRightPane = !this.showRightPane;
+      } else {
+        this.rightPaneTab = tab;
+        this.showRightPane = true;
+      }
+    },
+
+    setModuleColor(index: number) {
+      this.moduleColor = index;
     }
-  }
 
-  return { activeSlot, area, variation, rightPaneTab, showRightPane, toggleSidebar,
-           selectedCable, selectedModule, selectedSlotIndex };
+  },
 });
