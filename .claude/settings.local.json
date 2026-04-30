@@ -13,7 +13,11 @@
       "Bash(make test-integration *)",
       "Bash(xxd \"/tmp/g2-upload-test/EmptyPatch_roundtrip.pch2\")",
       "Bash(npm run *)",
-      "Bash(npx tsc *)"
+      "Bash(npx tsc *)",
+      "Bash(make test-unit *)",
+      "Bash(npm test *)",
+      "Bash(npx vitest *)",
+      "Bash(./node_modules/.bin/vitest run *)"
     ]
   }
 }

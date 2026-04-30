@@ -60,6 +60,18 @@ void test_tokenize_extra_spaces(void) {
     TEST_ASSERT_EQUAL_STRING("3", argv[3]);
 }
 
+void test_tokenize_set_module_color(void) {
+    char buf[] = "set-module-color A va 3 2";
+    char *argv[8];
+    int argc = tokenize_command(buf, argv, 8);
+    TEST_ASSERT_EQUAL_INT(5, argc);
+    TEST_ASSERT_EQUAL_STRING("set-module-color", argv[0]);
+    TEST_ASSERT_EQUAL_STRING("A", argv[1]);
+    TEST_ASSERT_EQUAL_STRING("va", argv[2]);
+    TEST_ASSERT_EQUAL_STRING("3", argv[3]);
+    TEST_ASSERT_EQUAL_STRING("2", argv[4]);
+}
+
 void test_tokenize_respects_max_argc(void) {
     char buf[] = "a b c d e f";
     char *argv[3];

@@ -1596,6 +1596,29 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     return G2_OK;
 }
 
+int g2_set_module_color(int slot, int location, int module_id, int color) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)          { fprintf(stderr, "set-module-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { fprintf(stderr, "set-module-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (color < 0 || color > 24)       { fprintf(stderr, "set-module-color: color must be 0-24\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { fprintf(stderr, "set-module-color: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t extra[3] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)color };
+    if (send_slot(slot, version, 0x31, extra, 3) < 0) {
+        fprintf(stderr, "set-module-color: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_select_patch(int slot, int bank, int location) {
     if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
