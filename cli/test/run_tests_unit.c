@@ -75,6 +75,13 @@ extern void test_parse_name_returns_correct_length(void);
 extern void test_response_type_parsing_embedded(void);
 extern void test_response_type_parsing_extended(void);
 
+extern void test_tokenize_del_cable(void);
+extern void test_tokenize_del_module(void);
+extern void test_tokenize_empty_string(void);
+extern void test_tokenize_single_token(void);
+extern void test_tokenize_extra_spaces(void);
+extern void test_tokenize_respects_max_argc(void);
+
 int main(void) {
     UNITY_BEGIN();
 
@@ -146,6 +153,14 @@ int main(void) {
     RUN_TEST(test_parse_name_returns_correct_length);
     RUN_TEST(test_response_type_parsing_embedded);
     RUN_TEST(test_response_type_parsing_extended);
+
+    /* seq tokenize tests */
+    RUN_TEST(test_tokenize_del_cable);
+    RUN_TEST(test_tokenize_del_module);
+    RUN_TEST(test_tokenize_empty_string);
+    RUN_TEST(test_tokenize_single_token);
+    RUN_TEST(test_tokenize_extra_spaces);
+    RUN_TEST(test_tokenize_respects_max_argc);
 
     return UNITY_END();
 }

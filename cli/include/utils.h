@@ -20,4 +20,11 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
                       uint8_t *usb_data, size_t *usb_len);
 
+/*
+ * Split a whitespace-delimited command string into tokens in-place.
+ * Writes pointers into argv_out and NUL-terminates each token in buf.
+ * Returns the number of tokens found (capped at max_argc).
+ */
+int tokenize_command(char *buf, char **argv_out, int max_argc);
+
 #endif /* __G2_UTILS_H__ */
