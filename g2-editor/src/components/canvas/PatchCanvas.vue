@@ -60,6 +60,7 @@
 		moduleMove: [info: { moduleIndex: number; col: number; row: number }];
 		moduleDrop: [info: { typeId: number; col: number; row: number }];
 		canvasClick: [];
+		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 	}>();
 
 	const canvasRef = ref(null);
@@ -487,6 +488,7 @@
 				@jack-drag-start="handleLocalJackDragStart"
 				@jack-drag-end="handleLocalJackDragEnd"
 				@module-drag-start="handleModuleDragStart"
+				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
 			/>
 			<rect
 				v-if="isDraggingSelection && selectionRect"

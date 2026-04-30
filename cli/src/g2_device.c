@@ -1607,6 +1607,37 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
     return G2_OK;
 }
 
+int g2_set_module_label(int slot, int location, int module_id, const char *label) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)         { fprintf(stderr, "set-module-name: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1) { fprintf(stderr, "set-module-name: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (!label || !*label)            { fprintf(stderr, "set-module-name: label must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { fprintf(stderr, "set-module-name: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    size_t nlen = strlen(label);
+    if (nlen > 16) nlen = 16;
+
+    uint8_t payload[20];
+    payload[0] = (uint8_t)location;
+    payload[1] = (uint8_t)module_id;
+    memcpy(payload + 2, label, nlen);
+    payload[2 + nlen] = 0x00;
+
+    if (send_slot(slot, version, 0x33, payload, (int)(3 + nlen)) < 0) {
+        fprintf(stderr, "set-module-name: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_select_patch(int slot, int bank, int location) {
     if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;

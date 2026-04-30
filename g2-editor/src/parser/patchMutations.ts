@@ -46,6 +46,12 @@ export function mutSetModuleColor(patch: Patch, areaIdx: 0 | 1, moduleId: number
 	);
 }
 
+export function mutSetModuleLabel(patch: Patch, areaIdx: 0 | 1, moduleId: number, label: string): void {
+	patch.areas[areaIdx].modules = patch.areas[areaIdx].modules.map((m) =>
+		m.index === moduleId ? { ...m, uname: label } : m,
+	);
+}
+
 export function mutAddCable(patch: Patch, areaIdx: 0 | 1, cable: Cable): void {
 	// Replace array (not push) so Vue's non-deep reference watch on cables fires
 	patch.areas[areaIdx].cableList = [...(patch.areas[areaIdx].cableList ?? []), cable];

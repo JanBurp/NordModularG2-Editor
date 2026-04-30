@@ -31,10 +31,15 @@
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd: [info: JackDragInfo];
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
+		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 	}>();
 
 	function onDragHandleMousedown(e: MouseEvent) {
 		emit('moduleDragStart', { moduleIndex: moduleIdx.value, clientX: e.clientX, clientY: e.clientY });
+	}
+
+	function onTitleDblClick() {
+		emit('moduleLabelEdit', { moduleIndex: moduleIdx.value, currentLabel: displayName.value });
 	}
 
 	const instance = computed(() => props.instance || { colour: 0 });
@@ -118,7 +123,7 @@
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
-		<rect width="256" height="18" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" />
+		<rect width="256" height="18" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" @dblclick.stop.prevent="onTitleDblClick" />
 
 		<!-- Modes -->
 		<g class="modes">
