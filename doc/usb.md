@@ -198,7 +198,7 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
 | `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
-| `0x19 tt bb ll` | PATCH_BANK_DATA (download) | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
+| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not in CLI)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
@@ -243,6 +243,8 @@ Step 3 (slot):  [01][28+slot][0x0a][70][CRC]
 
 After all three commands, drain any pending notifications (`g2_drain_pending`).
 
+> **CLI note:** the current C CLI (`g2_select_slot`) only implements steps 1 and 2, and obtains `version` via GET_PATCH_VERSION rather than from the START_COMM response. Step 3 is not yet implemented.
+
 ---
 
 ## 7. Slot Commands
@@ -261,9 +263,9 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
+| `0x2A` | SET_UPRATE_MODE *(not in CLI)* | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
 | `0x2E` | GET_SELECTED_PARAM | — | Embedded; area/module/param at `[5..7]` |
-| `0x2A` | SET_UPRATE_MODE | `loc mod uprate` | Embedded ACK |
 | `0x2F` | SEL_PARAM | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
 | `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
 | `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
@@ -284,7 +286,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x55` | CTRL_SNAPSHOT | — | Embedded ACK |
 | `0x68` | GET_CURRENT_NOTE | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
-| `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text) |
+| `0x6E` | GET_PATCH_NOTES *(not in CLI)* | — | Extended bulk (patch notes text) |
 | `0x6F` | SET_PATCH_NOTES | patch notes chunk | Embedded ACK |
 | `0x70` | UNKNOWN_6 | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
