@@ -1,17 +1,18 @@
-import { describe, it, expect } from "vitest";
-import fs from "fs";
-import path from "path";
-import { fileURLToPath } from "url";
-import { PatchParser } from "../nmg2PatchParser";
-import type { Patch, ModuleInstance, Cable } from "../nmg2PatchParser";
-import { serializePatch } from "../nmg2PatchSerializer";
+import type { Cable, ModuleInstance, Patch } from "../nmg2PatchParser";
+import { describe, expect, it } from "vitest";
 import {
+	mutAddCable,
+	mutAddModule,
 	mutDeleteCable,
 	mutDeleteModule,
 	mutMoveModule,
-	mutAddModule,
-	mutAddCable,
 } from "../patchMutations";
+
+import { PatchParser } from "../nmg2PatchParser";
+import { fileURLToPath } from "url";
+import fs from "fs";
+import path from "path";
+import { serializePatch } from "../nmg2PatchSerializer";
 
 const __dirname = fileURLToPath(new URL(".", import.meta.url));
 const FIXTURES = path.resolve(__dirname, "../../../../test-patches");
@@ -107,7 +108,7 @@ function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe("patch round-trip: parse → serialize → parse", () => {
-	for (const file of ["EmptyPatch.pch2", "FMritm.pch2", "Lyra4.pch2"]) {
+	for (const file of ["EmptyPatch.pch2", "Basics  NL2.pch2", "DXBass FM4.pch2"]) {
 		it(file, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 			const newHex = serializePatch(name, patchA, rawHex);
@@ -119,7 +120,7 @@ describe("patch round-trip: parse → serialize → parse", () => {
 
 describe("deleteCable", () => {
 	it("removes cable and leaves others intact", () => {
-		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
 		const cables = patch.areas[1].cableList ?? [];
 		expect(cables.length).toBeGreaterThan(0);
 		const target = cables[0];
@@ -133,7 +134,7 @@ describe("deleteCable", () => {
 		expect(cabsB).toHaveLength(remainingCount);
 		const found = cabsB.find(
 			(c) => c.smod === target.smod && c.scon === target.scon &&
-			       c.dmod === target.dmod && c.dcon === target.dcon,
+				c.dmod === target.dmod && c.dcon === target.dcon,
 		);
 		expect(found).toBeUndefined();
 	});
@@ -141,7 +142,7 @@ describe("deleteCable", () => {
 
 describe("deleteModule", () => {
 	it("removes module and its connected cables", () => {
-		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
 		const modules = patch.areas[1].modules;
 		const cables = patch.areas[1].cableList ?? [];
 		expect(modules.length).toBeGreaterThan(0);
@@ -174,7 +175,7 @@ describe("deleteModule", () => {
 
 describe("moveModule", () => {
 	it("updates position and preserves all other fields", () => {
-		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
 		const modules = patch.areas[1].modules;
 		expect(modules.length).toBeGreaterThan(0);
 		const target = modules[0];
@@ -259,7 +260,7 @@ describe("addModule", () => {
 
 describe("addCable", () => {
 	it("adds cable that survives round-trip", () => {
-		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
 		const existingCount = (patch.areas[1].cableList ?? []).length;
 
 		// Use module indices that exist in FMritm (index 1 and 2 confirmed above)
@@ -280,7 +281,7 @@ describe("addCable", () => {
 
 describe("chained edits round-trip", () => {
 	it("add module, add cable, move module, delete cable — patch object matches re-parse", () => {
-		const { name, rawHex, patch } = loadFixture("FMritm.pch2");
+		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
 		const ids = patch.areas[1].modules.map((m) => m.index);
 		const newModId = Math.max(...ids) + 1;
 
@@ -325,7 +326,7 @@ describe("chained edits round-trip", () => {
 });
 
 describe("file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)", () => {
-	for (const file of ["EmptyPatch.pch2", "FMritm.pch2", "Lyra4.pch2"]) {
+	for (const file of ["EmptyPatch.pch2", "Basics  NL2.pch2", "DXBass FM4.pch2"]) {
 		it(`unmodified patch — ${file}`, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 
