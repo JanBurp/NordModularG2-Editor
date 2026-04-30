@@ -21,6 +21,7 @@ First goal is to have a basic working editor
 - [ ] Change color of cable
 - [x] Watch params change in editor, while changed on G2 - not tested with all params
 - [x] Change params in editor and sync to G2 - not tested with all params
+- [ ] Switching perf/patch mode
 - [ ] Undo/Redo
 - [ ] Update Led's
 - [ ] Update VU meters
