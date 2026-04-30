@@ -95,11 +95,11 @@ void test_parse_midi_channels(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[18] = 0x0A;  /* MIDI A = 10 */
-    bulkData[19] = 0x0B;  /* MIDI B = 11 */
-    bulkData[20] = 0x0C;  /* MIDI C = 12 */
-    bulkData[21] = 0x0D;  /* MIDI D = 13 */
-    bulkData[22] = 0x0F;  /* MIDI global = 15 */
+    bulkData[17] = 0x09;  /* MIDI A stored 9 (0-indexed) → output 10 */
+    bulkData[18] = 0x0A;  /* MIDI B stored 10 → output 11 */
+    bulkData[19] = 0x0B;  /* MIDI C stored 11 → output 12 */
+    bulkData[20] = 0x0C;  /* MIDI D stored 12 → output 13 */
+    bulkData[21] = 0x0E;  /* MIDI global stored 14 → output 15 */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -117,7 +117,7 @@ void test_parse_midi_channels(void) {
     TEST_ASSERT(json_has_number(slots, "b", 11));
     TEST_ASSERT(json_has_number(slots, "c", 12));
     TEST_ASSERT(json_has_number(slots, "d", 13));
-    TEST_ASSERT(json_has_number(slots, "global", 15));
+    TEST_ASSERT(json_has_number(slots, "global", 15));  /* stored 0-indexed + 1 */
     
     cJSON_Delete(result);
 }
@@ -210,7 +210,7 @@ void test_parse_local_on(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[24] = 0x80;  /* local = on (bit 7) */
+    bulkData[23] = 0x80;  /* local = on (bit 7) */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -234,7 +234,7 @@ void test_parse_prgch_values(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[25] = 0x02;  /* prgch = recv (bit 1 = 1, bit 0 = 0) => value 2 */
+    bulkData[24] = 0x02;  /* prgch = recv (bit 1 = 1, bit 0 = 0) => value 2 */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -258,17 +258,19 @@ void test_parse_clock_settings(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[27] = 0x03;  /* clkse = on (bit 1 = 1), clkre = on (bit 0 = 1) */
-    
+    /* clkse uses inverted encoding: bit1=0 means on, bit1=1 means off
+     * 0x01 = bit0=1 (clkre=on), bit1=0 (clkse=on via inversion) */
+    bulkData[25] = 0x01;
+
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
-    
+
     cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
     TEST_ASSERT_NOT_NULL(result);
-    
+
     cJSON *midi = cJSON_GetObjectItem(result, "midi");
     TEST_ASSERT_NOT_NULL(midi);
-    
+
     TEST_ASSERT(json_has_bool(midi, "clkse", 1));
     TEST_ASSERT(json_has_bool(midi, "clkre", 1));
     

@@ -412,15 +412,15 @@ The bulk data from GET_SYNTH_SETTINGS (`0x02`) is parsed at fixed byte offsets:
 | 13 | Mode | Bit 7: 0=Patch, 1=Performance |
 | 14 | Perf Bank | — |
 | 15 | Perf Location | — |
-| 18 | MIDI Slot A channel | 0-indexed |
-| 19 | MIDI Slot B channel | |
-| 20 | MIDI Slot C channel | |
-| 21 | MIDI Slot D channel | |
-| 22 | MIDI global channel | |
-| 23 | Sysex ID | CLI adds 1 when reporting |
-| 24 | Local On | Bit 7 |
-| 25 | Prog Change | Bit 0=recv, Bit 1=send |
-| 27 | Clock | Bit 1=send, Bit 0=recv |
+| 17 | MIDI Slot A channel | Stored 0-indexed; CLI outputs +1 (= channel 1-16) |
+| 18 | MIDI Slot B channel | |
+| 19 | MIDI Slot C channel | |
+| 20 | MIDI Slot D channel | |
+| 21 | MIDI global channel | |
+| 22 | Sysex ID | CLI adds 1 when reporting |
+| 23 | Local On | Bit 7 |
+| 24 | Prog Change | Bit 0=recv, Bit 1=send |
+| 25 | Clock | Bit 0=recv (1=on); Bit 1=send (inverted: 0=on, 1=off) |
 | 28 | Tune cents | Raw byte |
 | 30 | Tune semitones | Raw byte |
 | 32 | Pedal polarity | Bit 0 |
