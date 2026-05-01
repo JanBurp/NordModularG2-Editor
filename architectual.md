@@ -125,3 +125,26 @@ Daemon creates a socket at a known path (e.g. `/tmp/g2-daemon.sock`). Electron c
 Daemon listens on a local port. Cross-platform, but overkill for a single local process and risks port conflicts.
 
 **Recommendation:** stdin/stdout. It's already half-implemented (watch events already flow over stdout). Add stdin command reading to the daemon and a write path in Electron — no new infrastructure needed.
+
+---
+
+## Daemon: Interactive CLI Testing While Connected
+
+Can you keep the daemon running (watch active) and send commands from a second terminal? Depends on the IPC choice.
+
+### stdin/stdout
+stdin is owned by the process that spawned the daemon — a second terminal can't inject commands. Workaround: use a named FIFO as the daemon's stdin (`mkfifo /tmp/g2-in`), then `echo '{"cmd":"..."}' > /tmp/g2-in` from another terminal. Works but is clunky.
+
+### Unix socket
+Natural fit. Terminal 1 runs the daemon; watch events stream to stdout. Terminal 2 connects and sends commands interactively:
+```
+socat - UNIX-CONNECT:/tmp/g2-daemon.sock
+# or:
+nc -U /tmp/g2-daemon.sock
+```
+Multiple clients can connect simultaneously (e.g. Electron + test terminal at the same time).
+
+### Hybrid (best of both)
+**Socket for command input + stdout for events.** Electron switches from stdin to socket (`net.createConnection()`). A thin `g2-cli send '{"cmd":"..."}'` wrapper connects to the socket, sends one command, prints the response, and exits — same feel as the current one-shot CLI.
+
+**Verdict:** stdin/stdout is simpler for Electron but kills interactive CLI testing. If testing from a second terminal matters, the Unix socket approach is worth the small extra complexity.
