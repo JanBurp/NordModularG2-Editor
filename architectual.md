@@ -1,5 +1,3 @@
-claude --resume d5e4e12d-a2a0-4158-b194-598efa80c498
-
 # Architectural Investigation: USB Connection Approaches
 
 ## Current Architecture
@@ -74,3 +72,56 @@ The current CLI tests by running it as a subprocess against a real device or fee
 **Unit tests** become easier with WebUSB: all logic is TypeScript, `navigator.usb` is mockable in Vitest like any interface. Existing parser tests are unaffected.
 
 **Integration tests** are the gap: the CLI is a binary driveable at shell level. WebUSB runs inside Electron's Chromium renderer, so end-to-end tests without hardware require a full Electron/Playwright harness or OS-level virtual USB — a meaningful step up in CI infrastructure complexity.
+
+---
+
+## Performance & Stability: Daemon vs WebUSB
+
+### Performance (UX experience): essentially identical
+
+USB hardware round-trip dominates (1–4ms on USB Full Speed). Added overhead:
+
+- **Daemon:** IPC hop (pipe/socket) + libusb → ~0.5ms overhead over raw USB
+- **WebUSB:** Chromium's Blink USB layer → slightly thicker than libusb, but imperceptible for the G2's small packet sizes
+
+Neither approach is the bottleneck — G2 hardware response time is.
+
+### Stability
+
+| Scenario | Daemon | WebUSB |
+|---|---|---|
+| Device unplugged mid-session | C reconnect loop already exists and tested | Must reimplement: catch `NetworkError`, re-open, re-claim interface |
+| Bulk endpoint stall after reconnect | `g2_drain_pending()` already handles this | Must reimplement drain logic in JS — easy to get wrong |
+| USB transfer timeout | libusb error codes, mature error handling | Promise rejection — straightforward but untested against G2 |
+| Stack crash | Daemon is separate process; Electron detects and restarts | Renderer crash = USB lost (but that's also a full UI crash) |
+| Chromium USB quirks | Not applicable | Less predictable than libusb for vendor-specific edge cases |
+
+**Key risk for WebUSB:** The `g2_drain_pending()` logic clears the bulk-IN FIFO before arming/re-arming the watch loop. Without it the G2's endpoint stalls silently. The daemon already has this working; WebUSB requires reimplementing it in JS — not complex, but a known failure mode that needs revalidation.
+
+---
+
+## Daemon IPC: How C Communicates with Electron
+
+Three options, in order of practicality for this project:
+
+### Option A: stdin/stdout (recommended)
+
+The current Electron code already spawns the CLI with `child_process.spawn()` and reads stdout for watch events. The daemon extends this bidirectionally:
+
+- Electron writes commands to daemon's **stdin** (newline-delimited JSON: `{"cmd":"add-module","args":[...]}\n`)
+- Daemon writes responses and events to **stdout** (same JSON format as now)
+- Electron already has the stdout read-loop infrastructure
+
+Minimal changes to Electron. Daemon polls both stdin (commands) and USB (events) in its main loop. Works on all platforms.
+
+### Option B: Unix socket / named pipe
+
+Daemon creates a socket at a known path (e.g. `/tmp/g2-daemon.sock`). Electron connects via Node.js `net.createConnection()`. Full duplex, same JSON protocol. Node.js `net` handles both Unix sockets (macOS/Linux) and Windows named pipes with the same API.
+
+**Advantage over stdin/stdout:** Electron can disconnect and reconnect without killing the daemon — useful if the daemon should outlive an Electron restart.
+
+### Option C: localhost TCP
+
+Daemon listens on a local port. Cross-platform, but overkill for a single local process and risks port conflicts.
+
+**Recommendation:** stdin/stdout. It's already half-implemented (watch events already flow over stdout). Add stdin command reading to the daemon and a write path in Electron — no new infrastructure needed.
