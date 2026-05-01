@@ -12,8 +12,11 @@ CLI and Electron GUI for Nord G2 synthesizer.
 ### CLI
 
 ```bash
-cd cli && make
-cd cli && make test   # run tests
+cd cli
+make                    # build cli
+make test               # run all tests
+make test-unit          # run unit tests (no need for connected G2, fast)
+make test-integration   # run integrations tests (needs connected G2, slow)
 ```
 
 ### Electron app
