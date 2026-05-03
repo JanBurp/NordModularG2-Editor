@@ -21,13 +21,7 @@ let logId = 0;
 
 function now(): string {
 	const d = new Date();
-	return (
-		[d.getHours(), d.getMinutes(), d.getSeconds()]
-			.map((n) => String(n).padStart(2, '0'))
-			.join(':') +
-		'.' +
-		String(d.getMilliseconds()).padStart(3, '0')
-	);
+	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
 export function useG2() {
@@ -40,12 +34,7 @@ export function useG2() {
 	} | null>(null);
 	const hardwareSlotChange = ref<number | null>(null);
 
-	function log(
-		direction: '→' | '←' | '•',
-		event: string,
-		message: string,
-		category?: UsbLogEntry['category'],
-	): void {
+	function log(direction: '→' | '←' | '•', event: string, message: string, category?: UsbLogEntry['category']): void {
 		const entry: UsbLogEntry = {
 			id: ++logId,
 			timestamp: now(),
@@ -55,9 +44,7 @@ export function useG2() {
 			category,
 		};
 		logs.value.push(entry);
-		console.debug(
-			`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`,
-		);
+		console.debug(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
 	}
 
 	function clearLogs(): void {
@@ -180,16 +167,10 @@ export function useG2() {
 							if (!slotLabel) return;
 							const patch = slotsStore.slots[slotLabel]?.patch;
 							const areaIdx = ev.area === 'va' ? 1 : 0;
-							const mod = (
-								patch?.areas?.[areaIdx]?.modules as any[]
-							)?.find((m: any) => m.index === ev.module);
+							const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
 							if (mod?.lv && mod.pcnt) {
-								const lvIdx =
-									(ev.variation as number) *
-										(mod.pcnt as number) +
-									(ev.param as number);
-								if (lvIdx >= 0 && lvIdx < mod.lv.length)
-									mod.lv[lvIdx] = ev.value;
+								const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
+								if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
 							}
 						}, 50),
 					);
@@ -202,8 +183,7 @@ export function useG2() {
 							? 'led'
 							: ev.type === 'volume_data'
 								? 'volume'
-								: ev.type === 'raw_interrupt' ||
-									  ev.type === 'raw_bulk'
+								: ev.type === 'raw_interrupt' || ev.type === 'raw_bulk'
 									? 'raw'
 									: ev.type?.startsWith('unknown')
 										? 'unknown'
@@ -276,9 +256,7 @@ export function useG2() {
 		return await connectDevice();
 	}
 
-	async function uploadToG2<T extends Record<string, any>>(
-		patch: T | null,
-	): Promise<void> {
+	async function uploadToG2<T extends Record<string, any>>(patch: T | null): Promise<void> {
 		if (!patch) {
 			log('•', 'Upload', 'No patch to upload');
 			return;

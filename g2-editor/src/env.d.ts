@@ -15,9 +15,7 @@ interface Window {
 				entries: { name: string; path: string; isDir: boolean }[];
 				error?: string;
 			}>;
-			load: (
-				filepath: string,
-			) => Promise<{ success: boolean; data?: number[]; error?: string }>;
+			load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
 			setFolder: () => Promise<{ success: boolean; folder?: string }>;
 		};
 		onMenuAction: (cb: (action: string) => void) => void;

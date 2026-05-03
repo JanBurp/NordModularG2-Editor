@@ -11,23 +11,14 @@
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
-	import {
-		isKnob,
-		isSlider,
-		isSwitch,
-		isSpinner,
-	} from '../../composables/useModuleControls';
+	import { isKnob, isSlider, isSwitch, isSpinner } from '../../composables/useModuleControls';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
-	import type {
-		ModuleInstance,
-		ModuleDefinition,
-		JackDragInfo,
-	} from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 
 	const props = defineProps<{
 		type: number;
@@ -39,9 +30,7 @@
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd: [info: JackDragInfo];
-		moduleDragStart: [
-			info: { moduleIndex: number; clientX: number; clientY: number },
-		];
+		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 	}>();
 
@@ -92,9 +81,7 @@
 		{ immediate: true },
 	);
 
-	const moduleColor = computed(
-		() => MODULE_COLORS[colour.value] || MODULE_COLORS[0],
-	);
+	const moduleColor = computed(() => MODULE_COLORS[colour.value] || MODULE_COLORS[0]);
 
 	const displayName = computed(() => {
 		return instance.value.uname || moduleDef.value?.short || 'Module';
@@ -137,18 +124,8 @@
 </script>
 
 <template>
-	<g
-		v-if="moduleDef"
-		:transform="`translate(${x}, ${y})`"
-		class="module"
-		:class="{ selected: isSelected }"
-		@click.stop
-		@mousedown.stop
-	>
-		<ModuleBackground
-			:height="height"
-			:selected="isSelected"
-		></ModuleBackground>
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
+		<ModuleBackground :height="height" :selected="isSelected"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
@@ -179,20 +156,10 @@
 		<!-- Visual elements from ve array -->
 		<template v-for="(ve, index) in moduleDef.ve" :key="`ve-${index}`">
 			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
-			<ModuleVeLine
-				v-else-if="ve.type === 'line'"
-				:ve="ve"
-			></ModuleVeLine>
-			<ModuleVePaths
-				v-else-if="ve.type === 'path'"
-				:ve="ve"
-			></ModuleVePaths>
+			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
+			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
 			<ModuleGraph
-				v-else-if="
-					(ve.type === 'graph' || ve.type === 'graphenv') &&
-					ve.w &&
-					ve.h
-				"
+				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
 				:type="ve.type"
 				:x="ve.x"
 				:y="ve.y"
@@ -203,26 +170,15 @@
 				:module-id="props.type"
 			/>
 
-			<ModuleValueDisplay
-				v-else-if="ve.type === 'valueDisplay'"
-				:ve="ve"
-				:params="moduleDef.params || []"
-				:values="localLv"
-			/>
+			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
 
-			<ModuleVeLed
-				v-else-if="ve.type === 'led' || ve.type === 'ledArray'"
-				:ve="ve"
-			></ModuleVeLed>
+			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
 		</template>
 
 		<!-- Parameters -->
 		<g class="params">
-			<template
-				v-for="(param, index) in moduleDef.params"
-				:key="param.name"
-			>
+			<template v-for="(param, index) in moduleDef.params" :key="param.name">
 				<!-- Knobs -->
 				<ModuleKnob
 					v-if="isKnob(param.n)"
@@ -301,9 +257,7 @@
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
 		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
-		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle">
-			Unknown Module ({{ type }})
-		</text>
+		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ type }}) </text>
 	</g>
 </template>
 

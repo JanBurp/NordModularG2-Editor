@@ -8,14 +8,7 @@ export interface CableColor {
 	hex: string;
 }
 
-export type CableColorName =
-	| 'red'
-	| 'blue'
-	| 'yellow'
-	| 'orange'
-	| 'green'
-	| 'purple'
-	| 'white';
+export type CableColorName = 'red' | 'blue' | 'yellow' | 'orange' | 'green' | 'purple' | 'white';
 
 /**
  * Cable color definitions with display names and hex values

@@ -1,8 +1,4 @@
-export function useDoubleClick(
-	onClick: () => void,
-	onDblClick: () => void,
-	delay = 220,
-) {
+export function useDoubleClick(onClick: () => void, onDblClick: () => void, delay = 220) {
 	let timer: ReturnType<typeof setTimeout> | null = null;
 
 	function handleClick() {

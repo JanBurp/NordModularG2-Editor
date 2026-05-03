@@ -14,12 +14,8 @@ export const XLINK_NS = 'http://www.w3.org/1999/xlink';
  * @param attrs - Object containing attributes to set
  * @returns The created or modified SVG element
  */
-export function svgNSGet(
-	tag: string | SVGElement,
-	attrs?: Record<string, any>,
-): SVGElement {
-	const se =
-		typeof tag === 'object' ? tag : document.createElementNS(XMLNS, tag);
+export function svgNSGet(tag: string | SVGElement, attrs?: Record<string, any>): SVGElement {
+	const se = typeof tag === 'object' ? tag : document.createElementNS(XMLNS, tag);
 	if (attrs) {
 		for (const a in attrs) {
 			if (a === 'innerHTML' || a === 'textContent') {
@@ -39,10 +35,7 @@ export function svgNSGet(
  * @param attrs - Additional attributes
  * @returns SVG use element
  */
-export function svgUse(
-	href: string,
-	attrs?: Record<string, any>,
-): SVGUseElement {
+export function svgUse(href: string, attrs?: Record<string, any>): SVGUseElement {
 	const use = document.createElementNS(XMLNS, 'use');
 	use.setAttributeNS(XLINK_NS, 'xlink:href', href);
 	if (attrs) {
@@ -73,13 +66,7 @@ export function svgGroup(attrs?: Record<string, any>): SVGGElement {
  * @param attrs - Additional attributes
  * @returns SVG rect element
  */
-export function svgRect(
-	x: number,
-	y: number,
-	width: number,
-	height: number,
-	attrs?: Record<string, any>,
-): SVGRectElement {
+export function svgRect(x: number, y: number, width: number, height: number, attrs?: Record<string, any>): SVGRectElement {
 	return svgNSGet('rect', {
 		x,
 		y,
@@ -98,12 +85,7 @@ export function svgRect(
  * @param attrs - Additional attributes
  * @returns SVG circle element
  */
-export function svgCircle(
-	cx: number,
-	cy: number,
-	r: number,
-	attrs?: Record<string, any>,
-): SVGCircleElement {
+export function svgCircle(cx: number, cy: number, r: number, attrs?: Record<string, any>): SVGCircleElement {
 	return svgNSGet('circle', { cx, cy, r, ...attrs }) as SVGCircleElement;
 }
 
@@ -117,13 +99,7 @@ export function svgCircle(
  * @param attrs - Additional attributes
  * @returns SVG line element
  */
-export function svgLine(
-	x1: number,
-	y1: number,
-	x2: number,
-	y2: number,
-	attrs?: Record<string, any>,
-): SVGLineElement {
+export function svgLine(x1: number, y1: number, x2: number, y2: number, attrs?: Record<string, any>): SVGLineElement {
 	return svgNSGet('line', { x1, y1, x2, y2, ...attrs }) as SVGLineElement;
 }
 
@@ -134,10 +110,7 @@ export function svgLine(
  * @param attrs - Additional attributes
  * @returns SVG path element
  */
-export function svgPath(
-	d: string,
-	attrs?: Record<string, any>,
-): SVGPathElement {
+export function svgPath(d: string, attrs?: Record<string, any>): SVGPathElement {
 	return svgNSGet('path', { d, ...attrs }) as SVGPathElement;
 }
 
@@ -150,12 +123,7 @@ export function svgPath(
  * @param attrs - Additional attributes
  * @returns SVG text element
  */
-export function svgText(
-	x: number,
-	y: number,
-	text: string,
-	attrs?: Record<string, any>,
-): SVGTextElement {
+export function svgText(x: number, y: number, text: string, attrs?: Record<string, any>): SVGTextElement {
 	return svgNSGet('text', {
 		x,
 		y,

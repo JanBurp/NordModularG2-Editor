@@ -1,32 +1,19 @@
 <template>
 	<div class="h-full overflow-y-auto p-2 bg-neutral-900">
-		<SearchInput
-			v-model="searchQuery"
-			:isActive="isActive"
-			placeholder="Search modules..."
-		/>
-		<div class="text-xs text-neutral-500 py-1 px-1">
-			{{ totalModuleCount }} modules
-		</div>
+		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
+		<div class="text-xs text-neutral-500 py-1 px-1">{{ totalModuleCount }} modules</div>
 		<div v-for="category in categories" :key="category" class="mb-4">
 			<div v-if="categoryMatchesSearch(category)">
 				<div
 					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
 					@click="toggleCategory(category)"
 				>
-					<span class="text-xs w-3 text-neutral-500">{{
-						isExpanded(category) ? '▼' : '▶'
-					}}</span>
+					<span class="text-xs w-3 text-neutral-500">{{ isExpanded(category) ? '▼' : '▶' }}</span>
 					{{ category }}
-					<span class="font-normal text-neutral-500 text-xs"
-						>({{ getModulesByCategory(category).length }})</span
-					>
+					<span class="font-normal text-neutral-500 text-xs">({{ getModulesByCategory(category).length }})</span>
 				</div>
 
-				<div
-					v-if="isExpanded(category)"
-					class="flex flex-col gap-2 py-2"
-				>
+				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 					<div
 						v-for="module in getModulesByCategory(category)"
 						:key="module.id"
@@ -38,16 +25,8 @@
 						draggable="true"
 						@dragstart="(e) => handleModuleDragStart(e, module.id)"
 					>
-						<svg
-							width="256"
-							:height="getModuleHeight(module)"
-							xmlns="http://www.w3.org/2000/svg"
-							style="pointer-events: none"
-						>
-							<Module
-								:type="module.id"
-								:instance="getModuleInstance(module.id)"
-							/>
+						<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
+							<Module :type="module.id" :instance="getModuleInstance(module.id)" />
 						</svg>
 					</div>
 				</div>
@@ -60,11 +39,7 @@
 	import { ref, reactive, computed } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
-	import {
-		getModule,
-		getAllCategories,
-		getModulesByCategory as getModulesByCategoryRaw,
-	} from '../../renderer/nmg2mods';
+	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
 
 	const categories = computed(() => getAllCategories());
@@ -108,11 +83,7 @@
 			if (category.toLowerCase().includes(catQuery)) {
 				if (!modQuery) return true;
 				const modules = getModulesByCategoryRaw(category);
-				return modules.some(
-					(m) =>
-						(m.short || '').toLowerCase().includes(modQuery) ||
-						(m.long || '').toLowerCase().includes(modQuery),
-				);
+				return modules.some((m) => (m.short || '').toLowerCase().includes(modQuery) || (m.long || '').toLowerCase().includes(modQuery));
 			}
 			return false;
 		}
@@ -120,11 +91,7 @@
 		if (category.toLowerCase().includes(query)) return true;
 
 		const modules = getModulesByCategoryRaw(category);
-		return modules.some(
-			(m) =>
-				(m.short || '').toLowerCase().includes(query) ||
-				(m.long || '').toLowerCase().includes(query),
-		);
+		return modules.some((m) => (m.short || '').toLowerCase().includes(query) || (m.long || '').toLowerCase().includes(query));
 	}
 
 	function getModulesByCategory(category) {
@@ -171,11 +138,7 @@
 					}
 					if (paramType?.includes('Freq')) return 64;
 					if (paramType?.includes('Res')) return 30;
-					if (
-						paramName?.includes('Slope') ||
-						paramName?.includes('Gain')
-					)
-						return 64;
+					if (paramName?.includes('Slope') || paramName?.includes('Gain')) return 64;
 					return 64;
 				}) || [];
 
@@ -200,8 +163,7 @@
 	}
 
 	function handleModuleDragStart(e: DragEvent, moduleId: number) {
-		if (e.dataTransfer)
-			e.dataTransfer.setData('text/plain', String(moduleId));
+		if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
 		window.__g2DragTypeId = moduleId;
 	}
 

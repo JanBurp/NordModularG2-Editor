@@ -2,15 +2,7 @@ import { Device, SlotLabel } from '@/types';
 
 import { defineStore } from 'pinia';
 
-export type DeviceStatus =
-	| 'connected'
-	| 'connecting'
-	| 'disconnected'
-	| 'uploading'
-	| 'downloading'
-	| 'error'
-	| 'unsupported'
-	| 'lost';
+export type DeviceStatus = 'connected' | 'connecting' | 'disconnected' | 'uploading' | 'downloading' | 'error' | 'unsupported' | 'lost';
 
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
@@ -77,8 +69,7 @@ export const useDeviceStore = defineStore('device', {
 		},
 		clockRunning: (state): boolean => {
 			if (state.device?.patches) return state.device.patches.clockRunning;
-			if (state.device?.performance)
-				return state.device.performance.clockRunning;
+			if (state.device?.performance) return state.device.performance.clockRunning;
 			return false;
 		},
 	},

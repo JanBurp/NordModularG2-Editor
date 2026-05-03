@@ -42,29 +42,13 @@
 				const paramCount = params.length;
 
 				// Look for filter-specific parameters
-				const freqIdx = params.findIndex(
-					(p: any) =>
-						p.type?.includes('Freq') || p.name?.includes('Freq'),
-				);
-				const resIdx = params.findIndex(
-					(p: any) =>
-						p.type?.includes('Res') || p.name?.includes('Res'),
-				);
-				const typeIdx = params.findIndex(
-					(p: any) =>
-						p.type?.includes('FilterType') ||
-						p.type?.includes('LpBpHp'),
-				);
+				const freqIdx = params.findIndex((p: any) => p.type?.includes('Freq') || p.name?.includes('Freq'));
+				const resIdx = params.findIndex((p: any) => p.type?.includes('Res') || p.name?.includes('Res'));
+				const typeIdx = params.findIndex((p: any) => p.type?.includes('FilterType') || p.type?.includes('LpBpHp'));
 
 				// Check for EQ parameters (EqdB type parameters indicate EQ module)
 				const eqIndices = params
-					.map((p: any, i: number) =>
-						p.type === 'EqdB' ||
-						p.name?.includes('Slope') ||
-						p.name?.includes('Gain')
-							? i
-							: -1,
-					)
+					.map((p: any, i: number) => (p.type === 'EqdB' || p.name?.includes('Slope') || p.name?.includes('Gain') ? i : -1))
 					.filter((i: number) => i >= 0);
 
 				const isEQ = eqIndices.length >= 2;
@@ -80,11 +64,7 @@
 					});
 
 					// EQ positions (left, center, right)
-					const positions = [
-						x + w * 0.2,
-						x + w * 0.5,
-						x + w * 0.8,
-					].slice(0, gains.length);
+					const positions = [x + w * 0.2, x + w * 0.5, x + w * 0.8].slice(0, gains.length);
 
 					if (gains.length === 2) {
 						// 2-band EQ (shelves)
@@ -259,18 +239,8 @@
 		// Multi envelope - uses multiple time/level pairs
 		if (f.includes('multi') || f.includes('Multi')) {
 			// Multi env params: L0, L1, L2, L3, T0, T1, T2, T3
-			const levels = [
-				norm(getVal(0, 100)),
-				norm(getVal(1, 80)),
-				norm(getVal(2, 60)),
-				norm(getVal(3, 40)),
-			];
-			const times = [
-				norm(getVal(4, 20)),
-				norm(getVal(5, 30)),
-				norm(getVal(6, 25)),
-				norm(getVal(7, 35)),
-			];
+			const levels = [norm(getVal(0, 100)), norm(getVal(1, 80)), norm(getVal(2, 60)), norm(getVal(3, 40))];
+			const times = [norm(getVal(4, 20)), norm(getVal(5, 30)), norm(getVal(6, 25)), norm(getVal(7, 35))];
 
 			let path = `M${x},${y + h}`;
 			let currentX = x;
@@ -330,11 +300,7 @@
 
 	// Determine if we should fill the graph
 	const shouldFill = computed(() => {
-		return (
-			props.type === 'graphenv' ||
-			props.f?.includes('env') ||
-			props.f?.includes('Env')
-		);
+		return props.type === 'graphenv' || props.f?.includes('env') || props.f?.includes('Env');
 	});
 </script>
 
@@ -348,23 +314,10 @@
 		</defs>
 
 		<!-- Background rectangle -->
-		<rect
-			:x="x"
-			:y="y"
-			:width="w"
-			:height="h"
-			:fill="type === 'graphenv' ? '#00A4A4' : '#088'"
-			:stroke="type === 'graphenv' ? 'none' : undefined"
-		/>
+		<rect :x="x" :y="y" :width="w" :height="h" :fill="type === 'graphenv' ? '#00A4A4' : '#088'" :stroke="type === 'graphenv' ? 'none' : undefined" />
 
 		<!-- Graph path with clipping -->
-		<path
-			:d="graphPath"
-			stroke="#AFA"
-			:fill="shouldFill ? '#00A4A4' : 'none'"
-			:clip-path="`url(#${clipId})`"
-			stroke-width="1.5"
-		/>
+		<path :d="graphPath" stroke="#AFA" :fill="shouldFill ? '#00A4A4' : 'none'" :clip-path="`url(#${clipId})`" stroke-width="1.5" />
 	</g>
 </template>
 

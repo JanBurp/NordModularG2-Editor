@@ -63,8 +63,6 @@
 			@keydown.esc="clearSearch"
 			@keydown.enter="handleEnter"
 		/>
-		<span v-show="searchValue" class="search-clear" @click="clearSearch"
-			>×</span
-		>
+		<span v-show="searchValue" class="search-clear" @click="clearSearch">×</span>
 	</div>
 </template>

@@ -74,20 +74,10 @@ export function makeCableKey(cable: Cable): string {
 }
 
 function isSameCable(a: Cable, b: Cable): boolean {
-	return (
-		a.smod === b.smod &&
-		a.scon === b.scon &&
-		a.dmod === b.dmod &&
-		a.dcon === b.dcon
-	);
+	return a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
 }
 
-export function makePatchCables(
-	modules: Module[],
-	cables: Cable[],
-	svgElement: SVGElement,
-	options?: CableRenderOptions,
-): void {
+export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
@@ -99,9 +89,7 @@ export function makePatchCables(
 		const dmod = modules.find((m) => m.index == destModule);
 
 		if (!smod || !dmod) {
-			console.warn(
-				`Cable skipped: module not found (source=${sourceModule}, dest=${destModule})`,
-			);
+			console.warn(`Cable skipped: module not found (source=${sourceModule}, dest=${destModule})`);
 			return;
 		}
 
@@ -109,23 +97,16 @@ export function makePatchCables(
 		const dmodDef = getModule(dmod.type) as ModuleDef | undefined;
 
 		if (!smodDef || !dmodDef) {
-			console.warn(
-				`Cable skipped: module definition not found (source=${smod.type}, dest=${dmod.type})`,
-			);
+			console.warn(`Cable skipped: module definition not found (source=${smod.type}, dest=${dmod.type})`);
 			return;
 		}
 
 		// dir: 1 = output->input, 0 = input->input; dcon is always an input
 		const dcon = dmodDef.inputs?.[destJack ?? 0];
-		const scon =
-			dir === 1
-				? smodDef.outputs?.[sourceJack ?? 0]
-				: smodDef.inputs?.[sourceJack ?? 0];
+		const scon = dir === 1 ? smodDef.outputs?.[sourceJack ?? 0] : smodDef.inputs?.[sourceJack ?? 0];
 
 		if (!scon || !dcon) {
-			console.warn(
-				`Cable skipped: jack not found (sourceJack=${sourceJack}, destJack=${destJack}, dir=${dir})`,
-			);
+			console.warn(`Cable skipped: jack not found (sourceJack=${sourceJack}, destJack=${destJack}, dir=${dir})`);
 			return;
 		}
 
@@ -138,9 +119,7 @@ export function makePatchCables(
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
-		const isSelected = options?.selectedCable
-			? isSameCable(cable, options.selectedCable)
-			: false;
+		const isSelected = options?.selectedCable ? isSameCable(cable, options.selectedCable) : false;
 		const key = makeCableKey(cable);
 
 		// All three paths share the same data-cable-key so they can be queried/removed together.
@@ -202,20 +181,10 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
  * Path format (from getCurvePath): Mdx dyCcp1x cp1y,cp2x cp2y,sx sy
  * cp1 lives near dst so it shifts by the dst delta; cp2 lives near src so it shifts by the src delta.
  */
-function shiftCablePath(
-	existingD: string,
-	newSx: number,
-	newSy: number,
-	newDx: number,
-	newDy: number,
-): string {
-	const m = existingD.match(
-		/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/,
-	);
+function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: number, newDy: number): string {
+	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
 	if (!m) return existingD;
-	const [oldDx, oldDy, cp1x, cp1y, cp2x, cp2y, oldSx, oldSy] = m
-		.slice(1)
-		.map(Number);
+	const [oldDx, oldDy, cp1x, cp1y, cp2x, cp2y, oldSx, oldSy] = m.slice(1).map(Number);
 	const ddx = newDx - oldDx,
 		ddy = newDy - oldDy;
 	const dsx = newSx - oldSx,
@@ -228,15 +197,9 @@ function shiftCablePath(
  * Cables connected to modules that didn't move are left untouched (preserving their shaken shape).
  * The existing curve shape is preserved — only the endpoints and their nearby control points translate.
  */
-export function updateCablePaths(
-	modules: Module[],
-	svgElement: SVGElement,
-	movedIds: Set<number>,
-): void {
+export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
-	const borders = svgElement.querySelectorAll<SVGPathElement>(
-		'.svgcableborder[data-smod]',
-	);
+	const borders = svgElement.querySelectorAll<SVGPathElement>('.svgcableborder[data-smod]');
 	borders.forEach((border) => {
 		const smod_i = parseInt(border.getAttribute('data-smod')!);
 		const dmod_i = parseInt(border.getAttribute('data-dmod')!);
@@ -256,8 +219,7 @@ export function updateCablePaths(
 		if (!smodDef || !dmodDef) return;
 
 		const dcon = dmodDef.inputs?.[dcon_i];
-		const scon =
-			dir === 1 ? smodDef.outputs?.[scon_i] : smodDef.inputs?.[scon_i];
+		const scon = dir === 1 ? smodDef.outputs?.[scon_i] : smodDef.inputs?.[scon_i];
 		if (!scon || !dcon) return;
 
 		const newSx = scon.x + smod.horiz * 256;
@@ -265,16 +227,8 @@ export function updateCablePaths(
 		const newDx = dcon.x + dmod.horiz * 256;
 		const newDy = dcon.y + dmod.vert * 16;
 
-		const d = shiftCablePath(
-			border.getAttribute('d') || '',
-			newSx,
-			newSy,
-			newDx,
-			newDy,
-		);
-		svgElement
-			.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`)
-			.forEach((el) => el.setAttribute('d', d));
+		const d = shiftCablePath(border.getAttribute('d') || '', newSx, newSy, newDx, newDy);
+		svgElement.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`).forEach((el) => el.setAttribute('d', d));
 	});
 }
 
@@ -290,9 +244,7 @@ export function removeAllCables(svgElement: SVGElement): void {
 		const next = sibling.nextElementSibling;
 		if (
 			sibling.tagName === 'path' &&
-			(sibling.classList.contains('svgcable') ||
-				sibling.classList.contains('svgcableborder') ||
-				sibling.classList.contains('cable-hit'))
+			(sibling.classList.contains('svgcable') || sibling.classList.contains('svgcableborder') || sibling.classList.contains('cable-hit'))
 		) {
 			toRemove.push(sibling);
 		}

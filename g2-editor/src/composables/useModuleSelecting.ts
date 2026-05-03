@@ -10,10 +10,7 @@ interface ModuleInstance {
 	vert?: number;
 }
 
-export function useModuleSelecting(
-	svgEl: Ref<SVGSVGElement | null>,
-	modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>,
-) {
+export function useModuleSelecting(svgEl: Ref<SVGSVGElement | null>, modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>) {
 	const uiStore = useUiStore();
 
 	const dragStart = ref<{ x: number; y: number } | null>(null);
@@ -42,12 +39,7 @@ export function useModuleSelecting(
 		return pt.matrixTransform(ctm.inverse());
 	}
 
-	function getModulesInRect(rect: {
-		x: number;
-		y: number;
-		width: number;
-		height: number;
-	}): number[] {
+	function getModulesInRect(rect: { x: number; y: number; width: number; height: number }): number[] {
 		const rx1 = rect.x;
 		const ry1 = rect.y;
 		const rx2 = rect.x + rect.width;
@@ -74,8 +66,7 @@ export function useModuleSelecting(
 		if (!isDraggingSelection.value) {
 			const dx = coords.x - dragStart.value.x;
 			const dy = coords.y - dragStart.value.y;
-			if (Math.abs(dx) > 5 || Math.abs(dy) > 5)
-				isDraggingSelection.value = true;
+			if (Math.abs(dx) > 5 || Math.abs(dy) > 5) isDraggingSelection.value = true;
 		}
 	}
 
