@@ -1,3 +1,8 @@
+<template>
+	<svg :x="x" :y="y" :width="Math.abs(width)" :height="height" class="mode-selector clipper">
+		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
+	</svg>
+</template>
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
@@ -28,9 +33,3 @@
 		return props.value * itemHeight.value;
 	});
 </script>
-
-<template>
-	<svg :x="x" :y="y" :width="Math.abs(width)" :height="height" class="mode-selector clipper">
-		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
-	</svg>
-</template>
