@@ -13,16 +13,5 @@
   "vueIndentScriptAndStyle": true,
   "endOfLine": "lf",
   "embeddedLanguageFormatting": "auto",
-  "singleAttributePerLine": false,
-  "overrides": [
-    {
-      "files": [
-        "src/renderer/nmg2mods.ts",
-        "src/renderer/parammap.ts"
-      ],
-      "options": {
-        "printWidth": 9999
-      }
-    }
-  ]
+  "singleAttributePerLine": false
 }
