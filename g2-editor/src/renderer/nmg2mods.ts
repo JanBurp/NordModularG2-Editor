@@ -172,12 +172,15 @@ const modules: ModuleDefinition[] = [
 	{ id: 56, short: "Res", long: "Resonator", height: 5, page: { name: "Hidden", ord: 2 }, inputs: [{ name: "Pitch", colour: "blue", x: 8, y: 20 }, { name: "PitchMod", colour: "blue", x: 8, y: 20 }, { name: "In", colour: "red", x: 246, y: 8 }], outputs: [{ name: "Out", colour: "red", x: 246, y: 50 }, { name: "Drv", colour: "red", x: 236, y: 8 }], params: [{ name: "Sel", type: "sw_3", n: "SwM322bb710", x: 67.5, y: 29.5 }], modes: [], ve: [{ type: "text", x: 3, y: 38.5, t: "Pitch" }, { type: "text", x: 159, y: 50, t: "Algorithm" }] }
 ];
 
+const moduleMap = new Map(modules.map((m) => [m.id, m]));
+const moduleNameMap = new Map(modules.map((m) => [m.short, m]));
+
 export function getModule(id: number): ModuleDefinition | undefined {
-	return modules.find((m) => m.id === id);
+	return moduleMap.get(id);
 }
 
 export function getModuleByName(short: string): ModuleDefinition | undefined {
-	return modules.find((m) => m.short === short);
+	return moduleNameMap.get(short);
 }
 
 export function getAllModules(): ModuleDefinition[] {
