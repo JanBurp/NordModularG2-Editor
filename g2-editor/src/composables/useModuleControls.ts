@@ -1,4 +1,15 @@
-import { getParam, adsrT, adsrL, lfoP, rateBPM, rateLo, OscFreq, filterFreq, filterFreq1, filterFreq2 } from '../renderer/parammap';
+import {
+	getParam,
+	adsrT,
+	adsrL,
+	lfoP,
+	rateBPM,
+	rateLo,
+	OscFreq,
+	filterFreq,
+	filterFreq1,
+	filterFreq2,
+} from '../renderer/parammap';
 import type { ModuleDefinition } from '../types';
 
 export const paramFormattingFunctions: Record<string, (i: number) => string> = {
@@ -11,7 +22,10 @@ export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	filterFreq2,
 };
 
-export const paramFormattingFunctionsWithArgs: Record<string, (i: number, con: unknown, tw: unknown) => string | undefined> = {
+export const paramFormattingFunctionsWithArgs: Record<
+	string,
+	(i: number, con: unknown, tw: unknown) => string | undefined
+> = {
 	OscFreq,
 	rateLo,
 };
@@ -47,7 +61,12 @@ export function formatValue(value: number, paramType: string): string {
 	return String(value);
 }
 
-export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
+export function formatCombinedValue(
+	refIndices: number[],
+	funcName: string | undefined,
+	params: ModuleDefinition['params'],
+	values: number[],
+): string {
 	if (!params) return '';
 
 	const firstParam = params[refIndices[0]];
@@ -73,7 +92,11 @@ export function formatCombinedValue(refIndices: number[], funcName: string | und
 				ca: refIndices,
 			};
 
-			const result = paramFormattingFunctionsWithArgs[formatFunc](0, controls, tw);
+			const result = paramFormattingFunctionsWithArgs[formatFunc](
+				0,
+				controls,
+				tw,
+			);
 
 			if (result && result !== 'undefined') {
 				return result;

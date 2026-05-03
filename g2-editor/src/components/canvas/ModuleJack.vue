@@ -12,20 +12,44 @@
 	}>();
 
 	const emit = defineEmits<{
-		jackDragStart: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
-		jackDragEnd: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
+		jackDragStart: [
+			info: {
+				moduleIndex: number;
+				connectorIndex: number;
+				type: 'input' | 'output';
+				colour: string;
+			},
+		];
+		jackDragEnd: [
+			info: {
+				moduleIndex: number;
+				connectorIndex: number;
+				type: 'input' | 'output';
+				colour: string;
+			},
+		];
 	}>();
 
 	const jackColor = JACK_COLORS[props.colour] || props.colour;
 
 	function onMousedown(e: MouseEvent) {
 		e.stopPropagation();
-		emit('jackDragStart', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colour: props.colour });
+		emit('jackDragStart', {
+			moduleIndex: props.moduleIndex,
+			connectorIndex: props.connectorIndex,
+			type: props.type,
+			colour: props.colour,
+		});
 	}
 
 	function onMouseup(e: MouseEvent) {
 		e.stopPropagation();
-		emit('jackDragEnd', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colour: props.colour });
+		emit('jackDragEnd', {
+			moduleIndex: props.moduleIndex,
+			connectorIndex: props.connectorIndex,
+			type: props.type,
+			colour: props.colour,
+		});
 	}
 
 	// Label positioning
@@ -35,14 +59,57 @@
 </script>
 
 <template>
-	<g class="jack-group" :class="type" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup">
+	<g
+		class="jack-group"
+		:class="type"
+		@mousedown.stop="onMousedown"
+		@mouseup.stop="onMouseup"
+	>
 		<template v-if="type == 'input'">
-			<circle :cx="x" :cy="y" r="5.5" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<circle :cx="x" :cy="y" r="2.5" fill="#000" stroke="#333" stroke-width="1" class="jack" />
+			<circle
+				:cx="x"
+				:cy="y"
+				r="5.5"
+				:fill="jackColor"
+				stroke="#333"
+				stroke-width="1"
+				class="jack"
+			/>
+			<circle
+				:cx="x"
+				:cy="y"
+				r="2.5"
+				fill="#000"
+				stroke="#333"
+				stroke-width="1"
+				class="jack"
+			/>
 		</template>
 		<template v-else>
-			<rect :x="x - 5.5" :y="y - 5.5" width="11" height="11" rx="1" ry="1" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<rect :x="x - 2.5" :y="y - 2.5" width="5" height="5" rx="1" ry="1" fill="#000" stroke="#333" stroke-width="1" class="jack" />
+			<rect
+				:x="x - 5.5"
+				:y="y - 5.5"
+				width="11"
+				height="11"
+				rx="1"
+				ry="1"
+				:fill="jackColor"
+				stroke="#333"
+				stroke-width="1"
+				class="jack"
+			/>
+			<rect
+				:x="x - 2.5"
+				:y="y - 2.5"
+				width="5"
+				height="5"
+				rx="1"
+				ry="1"
+				fill="#000"
+				stroke="#333"
+				stroke-width="1"
+				class="jack"
+			/>
 		</template>
 		<!-- <text
 			:x="labelX"

@@ -1,9 +1,21 @@
 <template>
 	<div class="relative" @mouseleave="closePicker()">
-		<div :style="currentColorStyle" class="border border-neutral-600 rounded min-w-10 h-8 cursor-pointer" @click.stop="handleClick"></div>
-		<div v-if="pickerOpen" class="z-50 absolute bg-neutral-200 grid grid-cols-4 grid-rows-4 border border-neutral-600 rounded w-40">
+		<div
+			:style="currentColorStyle"
+			class="border border-neutral-600 rounded min-w-10 h-8 cursor-pointer"
+			@click.stop="handleClick"
+		></div>
+		<div
+			v-if="pickerOpen"
+			class="z-50 absolute bg-neutral-200 grid grid-cols-4 grid-rows-4 border border-neutral-600 rounded w-40"
+		>
 			<template v-for="index in MODULE_COLORS_ORDER">
-				<div v-if="index > 0" class="w-10 h-8 border border-neutral-600" :style="colorStyle(index)" @click.stop="setColor(index)"></div>
+				<div
+					v-if="index > 0"
+					class="w-10 h-8 border border-neutral-600"
+					:style="colorStyle(index)"
+					@click.stop="setColor(index)"
+				></div>
 			</template>
 		</div>
 	</div>
@@ -11,7 +23,10 @@
 
 <script setup lang="ts">
 	import { ref, computed } from 'vue';
-	import { getModuleColor, MODULE_COLORS_ORDER } from '../../constants/moduleColors';
+	import {
+		getModuleColor,
+		MODULE_COLORS_ORDER,
+	} from '../../constants/moduleColors';
 	import { useUiStore } from '@/store/ui';
 	import { useSlotsStore } from '@/store/slots';
 	import { useDoubleClick } from '@/composables/useDoubleClick';
@@ -33,7 +48,11 @@
 		uiStore.setModuleColor(index);
 		if (uiStore.selectedModules.length > 0) {
 			const area = uiStore.area === 1 ? 'voice' : 'fx';
-			slotsStore.setModuleColors(uiStore.selectedModules, index, area as 'voice' | 'fx');
+			slotsStore.setModuleColors(
+				uiStore.selectedModules,
+				index,
+				area as 'voice' | 'fx',
+			);
 		}
 		pickerOpen.value = false;
 	}

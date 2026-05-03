@@ -1,15 +1,34 @@
 <template>
 	<!-- File variant uses label wrapper -->
-	<label v-if="variant === 'file'" class="btn btn-default btn-file" :class="{ 'btn-disabled': disabled }" tabindex="0" role="button" @keydown="handleKeydown">
+	<label
+		v-if="variant === 'file'"
+		class="btn btn-default btn-file"
+		:class="{ 'btn-disabled': disabled }"
+		tabindex="0"
+		role="button"
+		@keydown="handleKeydown"
+	>
 		<slot />
-		<input type="file" :accept="accept" class="hidden" @change="handleChange" />
+		<input
+			type="file"
+			:accept="accept"
+			class="hidden"
+			@change="handleChange"
+		/>
 	</label>
 
 	<!-- All other variants use button -->
 	<button
 		v-else
 		class="btn"
-		:class="[variant === 'default' ? 'btn-default' : '', variant === 'toggle' || variant === 'tab' ? 'btn-toggle' : '', variant === 'variation' ? 'btn-variation' : '', sizeClass, active ? 'btn-active' : '', disabled ? 'btn-disabled' : 'btn-hover']"
+		:class="[
+			variant === 'default' ? 'btn-default' : '',
+			variant === 'toggle' || variant === 'tab' ? 'btn-toggle' : '',
+			variant === 'variation' ? 'btn-variation' : '',
+			sizeClass,
+			active ? 'btn-active' : '',
+			disabled ? 'btn-disabled' : 'btn-hover',
+		]"
 		:disabled="disabled"
 		@click="handleClick"
 	>
@@ -61,7 +80,9 @@
 		if (event.key === 'Enter' || event.key === ' ') {
 			event.preventDefault();
 			if (props.variant === 'file') {
-				const input = (event.target as HTMLElement).querySelector('input[type="file"]') as HTMLInputElement;
+				const input = (event.target as HTMLElement).querySelector(
+					'input[type="file"]',
+				) as HTMLInputElement;
 				input?.click();
 			} else {
 				emit('click', event as unknown as MouseEvent);

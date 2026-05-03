@@ -1,5 +1,5 @@
 {
-  "printWidth": 260,
+  "printWidth": 80,
   "tabWidth": 4,
   "useTabs": true,
   "semi": true,
@@ -13,5 +13,16 @@
   "vueIndentScriptAndStyle": true,
   "endOfLine": "lf",
   "embeddedLanguageFormatting": "auto",
-  "singleAttributePerLine": false
+  "singleAttributePerLine": false,
+  "overrides": [
+    {
+      "files": [
+        "src/renderer/nmg2mods.ts",
+        "src/renderer/parammap.ts"
+      ],
+      "options": {
+        "printWidth": 9999
+      }
+    }
+  ]
 }

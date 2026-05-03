@@ -61,7 +61,9 @@
 		if (disabled) return;
 
 		if (props.multiSelect && Array.isArray(props.modelValue)) {
-			const newValue = props.modelValue.includes(value) ? props.modelValue.filter((v) => v !== value) : [...props.modelValue, value];
+			const newValue = props.modelValue.includes(value)
+				? props.modelValue.filter((v) => v !== value)
+				: [...props.modelValue, value];
 			emit('update:modelValue', newValue);
 		} else {
 			if (props.modelValue === value) {
@@ -73,23 +75,34 @@
 	};
 
 	const handleKeydown = (event: KeyboardEvent, index: number) => {
-		const enabledIndices = normalizedOptions.value.map((opt, i) => ({ ...opt, index: i })).filter((opt) => !opt.disabled);
+		const enabledIndices = normalizedOptions.value
+			.map((opt, i) => ({ ...opt, index: i }))
+			.filter((opt) => !opt.disabled);
 
-		const currentEnabledIndex = enabledIndices.findIndex((item) => item.index === index);
+		const currentEnabledIndex = enabledIndices.findIndex(
+			(item) => item.index === index,
+		);
 
 		if (event.key === 'ArrowLeft' && currentEnabledIndex > 0) {
 			event.preventDefault();
 			const prevOption = enabledIndices[currentEnabledIndex - 1];
 			handleSelect(prevOption.value);
-			const buttons = (event.target as HTMLElement).parentElement?.querySelectorAll('button');
+			const buttons = (
+				event.target as HTMLElement
+			).parentElement?.querySelectorAll('button');
 			if (buttons) {
 				buttons[prevOption.index]?.focus();
 			}
-		} else if (event.key === 'ArrowRight' && currentEnabledIndex < enabledIndices.length - 1) {
+		} else if (
+			event.key === 'ArrowRight' &&
+			currentEnabledIndex < enabledIndices.length - 1
+		) {
 			event.preventDefault();
 			const nextOption = enabledIndices[currentEnabledIndex + 1];
 			handleSelect(nextOption.value);
-			const buttons = (event.target as HTMLElement).parentElement?.querySelectorAll('button');
+			const buttons = (
+				event.target as HTMLElement
+			).parentElement?.querySelectorAll('button');
 			if (buttons) {
 				buttons[nextOption.index]?.focus();
 			}

@@ -4,7 +4,20 @@
  * Handles rendering of module panels and controls
  */
 
-import { svgNSGet, svgUse, svgGroup, svgRect, svgCircle, svgLine, svgPath, svgText, svgNested, svgClipPath, XMLNS, XLINK_NS } from './svgUtils';
+import {
+	svgNSGet,
+	svgUse,
+	svgGroup,
+	svgRect,
+	svgCircle,
+	svgLine,
+	svgPath,
+	svgText,
+	svgNested,
+	svgClipPath,
+	XMLNS,
+	XLINK_NS,
+} from './svgUtils';
 
 import { getModuleColor } from '../constants';
 
@@ -53,7 +66,9 @@ export function clearTemplateCache(): void {
  */
 export function makeBasicPanel(s: SVGElement, h: number | string): void {
 	const h0 = parseInt(String(h)) - 16;
-	s.appendChild(svgRect(0, 0, 256, parseInt(String(h)), { fill: 'currentColor' }));
+	s.appendChild(
+		svgRect(0, 0, 256, parseInt(String(h)), { fill: 'currentColor' }),
+	);
 	s.appendChild(
 		svgRect(0, 0, 256, 16, {
 			fill: 'url(#g119)',
@@ -62,16 +77,22 @@ export function makeBasicPanel(s: SVGElement, h: number | string): void {
 	);
 	s.appendChild(svgRect(0, 0, 256, 16, { fill: 'url(#g118)' }));
 	s.appendChild(
-		svgPath(`M256,0 l0,${parseInt(String(h)) - 1} -4,-4 0,${-(parseInt(String(h)) - 7)}z`, {
-			fill: 'url(#g117)',
-			stroke: 'none',
-		}),
+		svgPath(
+			`M256,0 l0,${parseInt(String(h)) - 1} -4,-4 0,${-(parseInt(String(h)) - 7)}z`,
+			{
+				fill: 'url(#g117)',
+				stroke: 'none',
+			},
+		),
 	);
 	s.appendChild(
-		svgPath(`M0,0 l0,${parseInt(String(h)) - 1} 4,-4 0,${-(parseInt(String(h)) - 7)}z`, {
-			fill: 'url(#g116)',
-			stroke: 'none',
-		}),
+		svgPath(
+			`M0,0 l0,${parseInt(String(h)) - 1} 4,-4 0,${-(parseInt(String(h)) - 7)}z`,
+			{
+				fill: 'url(#g116)',
+				stroke: 'none',
+			},
+		),
 	);
 }
 
@@ -100,7 +121,9 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
 				}
 				break;
 			case 'line':
-				s.appendChild(svgLine(n.x1, n.y1, n.x2, n.y2, { stroke: '#333' }));
+				s.appendChild(
+					svgLine(n.x1, n.y1, n.x2, n.y2, { stroke: '#333' }),
+				);
 				break;
 			case 'path':
 				s.appendChild(svgPath(n.d, { stroke: '#333', fill: 'none' }));
@@ -162,10 +185,13 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
 				}),
 			);
 			s.appendChild(
-				svgPath(`M${n.x + absW + 1.5},${n.y + (n.h >> 1) - 1.5} l5,0 -2.5,3z`, {
-					stroke: 'none',
-					fill: '#000',
-				}),
+				svgPath(
+					`M${n.x + absW + 1.5},${n.y + (n.h >> 1) - 1.5} l5,0 -2.5,3z`,
+					{
+						stroke: 'none',
+						fill: '#000',
+					},
+				),
 			);
 		}
 	});
@@ -210,7 +236,10 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
  * @param defs - SVG defs element to append to
  * @returns The created template
  */
-function createModuleTemplate(moduleDef: ModuleDef, defs: SVGElement): SVGSVGElement {
+function createModuleTemplate(
+	moduleDef: ModuleDef,
+	defs: SVGElement,
+): SVGSVGElement {
 	const cached = templateCache.get(moduleDef.id);
 	if (cached) return cached;
 

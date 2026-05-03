@@ -78,4 +78,14 @@ export interface ModuleJack {
 	y: number;
 }
 
-export type { ModuleInstance, ModuleParam, ModuleMode, ModuleInput, ModuleOutput, ModulePage, ModuleDefinition, JackDragInfo, VisualElement } from './module';
+export type {
+	ModuleInstance,
+	ModuleParam,
+	ModuleMode,
+	ModuleInput,
+	ModuleOutput,
+	ModulePage,
+	ModuleDefinition,
+	JackDragInfo,
+	VisualElement,
+} from './module';
