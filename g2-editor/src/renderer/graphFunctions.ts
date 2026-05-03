@@ -4,7 +4,7 @@
  * Generates SVG paths for module graphs (LFOs, envelopes, oscillators)
  */
 
-import { Patchcord, FastVector, createFastVector } from './patchcord';
+import { FastVector, createFastVector } from './patchcord';
 
 interface GraphElement {
 	svg: SVGSVGElement;
@@ -247,7 +247,7 @@ export function lfoShpgraph(g: GraphElement, con: Control[]): void {
 	if (tp[2]) s.push.apply(s, interpol([tp[1]], [tp[2]], shapeVal));
 
 	const d: FastVector[] = [];
-	const div = safeArrayGet([1, 2, 2, 1, 1, 1.5, 1.5], shp, 0, 'lfoShpgraph');
+	// const div = safeArrayGet([1, 2, 2, 1, 1, 1.5, 1.5], shp, 0, 'lfoShpgraph');
 
 	s.forEach(function (v) {
 		if (v && typeof v.x === 'number' && typeof v.y === 'number') {

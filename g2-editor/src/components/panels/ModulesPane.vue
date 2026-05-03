@@ -46,7 +46,9 @@
 	const expandedCategories = ref(getAllCategories());
 	const searchQuery = ref('');
 
-	const props = defineProps<{ isActive: boolean }>();
+	defineProps<{
+		isActive: boolean;
+	}>();
 
 	const totalModuleCount = computed(() => {
 		let count = 0;
@@ -155,19 +157,8 @@
 		return moduleInstances.get(moduleId);
 	}
 
-	function onParamChange(moduleId, paramIndex, value) {
-		const instance = moduleInstances.get(moduleId);
-		if (instance) {
-			instance.lv[paramIndex] = value;
-		}
-	}
-
 	function handleModuleDragStart(e: DragEvent, moduleId: number) {
 		if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
 		window.__g2DragTypeId = moduleId;
-	}
-
-	function resetAllModules() {
-		moduleInstances.clear();
 	}
 </script>

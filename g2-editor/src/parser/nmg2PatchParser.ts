@@ -6,7 +6,6 @@
  */
 
 import { getModule } from '../renderer/nmg2mods';
-import type { ModuleDefinition } from '../types/index';
 
 export interface ModuleInstance {
 	index: number;
@@ -65,7 +64,7 @@ export interface Patch {
 	mode?: { area: 0 | 1; variation: number };
 }
 
-function pch2_(data: ArrayBuffer, filename: string) {
+function pch2_(data: ArrayBuffer) {
 	const slots: string[] = [];
 	const self = this;
 
@@ -342,20 +341,20 @@ function pch2_(data: ArrayBuffer, filename: string) {
 		return array;
 	};
 
-	const g2section: Record<number, [string, (data: Uint8Array) => string | undefined]> = {
-		0x21: ['Patch Description', parsePatchDesc],
-		0x5a: ['Module Names', parseModuleNames],
-		0x4a: ['Module List', parseModuleList],
-		0x6f: ['Text Pad', parseTextPad],
-		0x11: ['Perf data', parsePrfData],
-		0x52: ['Cable List', parseCableList],
-		0x4d: ['Parameters', parseModuleParameters],
-	};
+	// const g2section: Record<number, [string, (data: Uint8Array) => string | undefined]> = {
+	// 	0x21: ['Patch Description', parsePatchDesc],
+	// 	0x5a: ['Module Names', parseModuleNames],
+	// 	0x4a: ['Module List', parseModuleList],
+	// 	0x6f: ['Text Pad', parseTextPad],
+	// 	0x11: ['Perf data', parsePrfData],
+	// 	0x52: ['Cable List', parseCableList],
+	// 	0x4d: ['Parameters', parseModuleParameters],
+	// };
 
 	const hdr = new Uint8Array(data, 0, 320);
 	const str = String.fromCharCode.apply(null, hdr as unknown as number[]);
 	let ofs = str.indexOf('\0');
-	const textHdrLen = ofs + 3;
+	// const textHdrLen = ofs + 3;
 	const fileCRC = new DataView(data).getInt16(data.byteLength - 2) & 0xffff;
 	const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
 	this.ofs = ofs;
@@ -367,14 +366,14 @@ function pch2_(data: ArrayBuffer, filename: string) {
 
 	const maxofs = filedata.byteLength;
 	ofs = 0;
-	let res = '';
+	// let res = '';
 	while (ofs < maxofs) {
 		const type = filedata.getInt8(ofs);
 		const siz = filedata.getInt16(ofs + 1);
-		if (type in g2section) {
-			res += '\n' + g2section[type][0] + ':offset=0x' + (textHdrLen + ofs).toString(16);
-			if (g2section[type][1]) res += g2section[type][1](new Int8Array(data, textHdrLen + ofs + 3, siz));
-		}
+		// if (type in g2section) {
+		// 	// res += '\n' + g2section[type][0] + ':offset=0x' + (textHdrLen + ofs).toString(16);
+		// 	// if (g2section[type][1]) res += g2section[type][1](new Int8Array(data, textHdrLen + ofs + 3, siz));
+		// }
 		ofs += siz + 3;
 		if (type == 0x6f) {
 			if (ofs < maxofs) {
@@ -414,7 +413,7 @@ export class PatchParser {
 	private patcher: ReturnType<typeof pch2_>;
 
 	constructor(buffer: ArrayBuffer) {
-		this.patcher = new pch2_(buffer, '') as unknown as ReturnType<typeof pch2_>;
+		this.patcher = new pch2_(buffer) as unknown as ReturnType<typeof pch2_>;
 	}
 
 	parse(): Patch {
