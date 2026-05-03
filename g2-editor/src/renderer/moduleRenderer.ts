@@ -4,7 +4,7 @@
  * Handles rendering of module panels and controls
  */
 
-import { svgNSGet, svgUse, svgGroup, svgRect, svgCircle, svgLine, svgPath, svgText, svgNested, svgClipPath, XMLNS, XLINK_NS } from './svgUtils';
+import { XLINK_NS, XMLNS, svgLine, svgNested, svgPath, svgRect, svgText } from './svgUtils';
 
 import { getModuleColor } from '../constants';
 
@@ -210,19 +210,19 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
  * @param defs - SVG defs element to append to
  * @returns The created template
  */
-function createModuleTemplate(moduleDef: ModuleDef, defs: SVGElement): SVGSVGElement {
-	const cached = templateCache.get(moduleDef.id);
-	if (cached) return cached;
+// function createModuleTemplate(moduleDef: ModuleDef, defs: SVGElement): SVGSVGElement {
+// 	const cached = templateCache.get(moduleDef.id);
+// 	if (cached) return cached;
 
-	const h = moduleDef.height * 16;
-	const s = document.createElementNS(XMLNS, 'svg');
-	s.setAttributeNS(null, 'id', moduleDef.shortnm);
-	makeBasicPanel(s, h);
-	makeSubElements(s, moduleDef);
-	defs.appendChild(s);
-	templateCache.set(moduleDef.id, s);
-	return s;
-}
+// 	const h = moduleDef.height * 16;
+// 	const s = document.createElementNS(XMLNS, 'svg');
+// 	s.setAttributeNS(null, 'id', moduleDef.shortnm);
+// 	makeBasicPanel(s, h);
+// 	makeSubElements(s, moduleDef);
+// 	defs.appendChild(s);
+// 	templateCache.set(moduleDef.id, s);
+// 	return s;
+// }
 
 /**
  * Removes all modules from an SVG element

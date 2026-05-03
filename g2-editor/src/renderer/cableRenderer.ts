@@ -4,10 +4,10 @@
  * Handles rendering of patch cables between modules
  */
 
-import { Patchcord } from './patchcord';
-import { svgPath, svgGroup } from './svgUtils';
 import { CABLE_SVG_COLORS } from '../constants';
+import { Patchcord } from './patchcord';
 import { getModule } from './nmg2mods';
+import { svgPath } from './svgUtils';
 
 /**
  * Represents a cable connection

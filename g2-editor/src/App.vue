@@ -323,17 +323,8 @@
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
 
-	const {
-		cableColors,
-		cableVisibility,
-		cableShakeTrigger,
-		allCablesVisible,
-		toggleCableVisibility,
-		toggleShowHideAll,
-		shakeCables,
-		syncWithPatchData,
-		updatePatchData,
-	} = useCableVisibility();
+	const { cableColors, cableVisibility, cableShakeTrigger, allCablesVisible, toggleCableVisibility, toggleShowHideAll, shakeCables, updatePatchData } =
+		useCableVisibility();
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
 
@@ -346,7 +337,7 @@
 		});
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
-			const area = uiStore.area === 1 ? 'voice' : 'fx';
+			// const area = uiStore.area === 1 ? 'voice' : 'fx';
 			switch (action) {
 				case 'new-patch':
 				case 'new-performance': {

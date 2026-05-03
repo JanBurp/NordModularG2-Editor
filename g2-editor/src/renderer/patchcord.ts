@@ -4,8 +4,6 @@
  * Handles Bezier curve calculations for patch cables
  */
 
-import { svgNSGet, svgPath } from './svgUtils';
-
 /**
  * FastVector - 2D vector math for patchcord calculations
  */

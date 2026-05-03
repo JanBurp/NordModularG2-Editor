@@ -1,9 +1,3 @@
-<script setup lang="ts">
-	const props = defineProps<{
-		ve: object;
-	}>();
-</script>
-
 <template>
 	<rect
 		v-for="i in ve.cnt || 1"
@@ -16,3 +10,8 @@
 		stroke="#000"
 	/>
 </template>
+<script setup lang="ts">
+	defineProps<{
+		ve: object;
+	}>();
+</script>

@@ -1,108 +1,3 @@
-<script setup lang="ts">
-	import { ref, computed } from 'vue';
-	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
-	import { useDeviceStore } from '../../store/device';
-	import BtnGroup from '../toolbar/BtnGroup.vue';
-	import SearchInput from '../common/SearchInput.vue';
-
-	const props = defineProps<{ isActive: boolean }>();
-
-	const emit = defineEmits<{
-		select: [item: { type: 'disk'; filepath: string } | { type: 'synth'; bank: number; location: number }];
-	}>();
-
-	const browser = useBrowserStore();
-	const device = useDeviceStore();
-
-	const searchQuery = ref('');
-
-	const viewOptions = [
-		{ label: 'Patches', value: 'patches' },
-		{ label: 'Performances', value: 'performances' },
-		{ label: 'Disk', value: 'disk' },
-	];
-
-	/* Group a flat SynthPatch list by bank number */
-	function groupByBank(list: SynthPatch[]): { bank: number; patches: SynthPatch[] }[] {
-		const map = new Map<number, SynthPatch[]>();
-		for (const p of list) {
-			let arr = map.get(p.bank);
-			if (!arr) {
-				arr = [];
-				map.set(p.bank, arr);
-			}
-			arr.push(p);
-		}
-		return Array.from(map.entries())
-			.sort(([a], [b]) => a - b)
-			.map(([bank, patches]) => ({ bank, patches }));
-	}
-
-	const filteredPatches = computed(() => {
-		const q = searchQuery.value.toLowerCase();
-		return q ? browser.synthPatches.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPatches;
-	});
-
-	const filteredPerformances = computed(() => {
-		const q = searchQuery.value.toLowerCase();
-		return q ? browser.synthPerformances.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPerformances;
-	});
-
-	const patchGroups = computed(() => groupByBank(filteredPatches.value));
-	const perfGroups = computed(() => groupByBank(filteredPerformances.value));
-
-	const filteredDiskDirs = computed(() => browser.diskEntries.filter((e) => e.isDir));
-	const filteredDiskFiles = computed(() => {
-		const q = searchQuery.value.toLowerCase();
-		const files = browser.diskEntries.filter((e) => !e.isDir);
-		return q ? files.filter((e) => e.name.toLowerCase().includes(q)) : files;
-	});
-
-	const diskFolderName = computed(() => browser.diskFolder.split('/').pop() || browser.diskFolder);
-	const diskParentName = computed(() => {
-		const parts = browser.diskFolder.split('/');
-		return parts.length > 1 ? parts[parts.length - 2] || '/' : '';
-	});
-
-	async function onViewChange(view: string | number | null | (string | number)[]) {
-		const v = view as 'patches' | 'performances' | 'disk';
-		browser.view = v;
-		searchQuery.value = '';
-		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && device.connected) {
-			await browser.loadSynthList();
-		}
-	}
-
-	function selectDisk(entry: DiskEntry) {
-		if (entry.isDir) {
-			browser.loadDiskList(entry.path);
-		} else {
-			emit('select', { type: 'disk', filepath: entry.path });
-		}
-	}
-
-	function selectSynth(p: SynthPatch) {
-		emit('select', { type: 'synth', bank: p.bank, location: p.location });
-	}
-
-	function handleEnter() {
-		if (browser.view === 'disk' && filteredDiskFiles.value.length > 0) {
-			emit('select', {
-				type: 'disk',
-				filepath: filteredDiskFiles.value[0].path,
-			});
-		} else if (browser.view === 'patches' && filteredPatches.value.length > 0) {
-			selectSynth(filteredPatches.value[0]);
-		} else if (browser.view === 'performances' && filteredPerformances.value.length > 0) {
-			selectSynth(filteredPerformances.value[0]);
-		}
-	}
-
-	function formatFileName(entry: DiskEntry): string {
-		return entry.isDir ? entry.name : entry.name.replace(/\.(pch2|prf2)$/i, '');
-	}
-</script>
-
 <template>
 	<div class="h-full flex flex-col overflow-hidden">
 		<!-- Tab switcher -->
@@ -214,3 +109,110 @@
 		</template>
 	</div>
 </template>
+
+<script setup lang="ts">
+	import { ref, computed } from 'vue';
+	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
+	import { useDeviceStore } from '../../store/device';
+	import BtnGroup from '../toolbar/BtnGroup.vue';
+	import SearchInput from '../common/SearchInput.vue';
+
+	defineProps<{
+		isActive: boolean;
+	}>();
+
+	const emit = defineEmits<{
+		select: [item: { type: 'disk'; filepath: string } | { type: 'synth'; bank: number; location: number }];
+	}>();
+
+	const browser = useBrowserStore();
+	const device = useDeviceStore();
+
+	const searchQuery = ref('');
+
+	const viewOptions = [
+		{ label: 'Patches', value: 'patches' },
+		{ label: 'Performances', value: 'performances' },
+		{ label: 'Disk', value: 'disk' },
+	];
+
+	/* Group a flat SynthPatch list by bank number */
+	function groupByBank(list: SynthPatch[]): { bank: number; patches: SynthPatch[] }[] {
+		const map = new Map<number, SynthPatch[]>();
+		for (const p of list) {
+			let arr = map.get(p.bank);
+			if (!arr) {
+				arr = [];
+				map.set(p.bank, arr);
+			}
+			arr.push(p);
+		}
+		return Array.from(map.entries())
+			.sort(([a], [b]) => a - b)
+			.map(([bank, patches]) => ({ bank, patches }));
+	}
+
+	const filteredPatches = computed(() => {
+		const q = searchQuery.value.toLowerCase();
+		return q ? browser.synthPatches.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPatches;
+	});
+
+	const filteredPerformances = computed(() => {
+		const q = searchQuery.value.toLowerCase();
+		return q ? browser.synthPerformances.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPerformances;
+	});
+
+	const patchGroups = computed(() => groupByBank(filteredPatches.value));
+	const perfGroups = computed(() => groupByBank(filteredPerformances.value));
+
+	const filteredDiskDirs = computed(() => browser.diskEntries.filter((e) => e.isDir));
+	const filteredDiskFiles = computed(() => {
+		const q = searchQuery.value.toLowerCase();
+		const files = browser.diskEntries.filter((e) => !e.isDir);
+		return q ? files.filter((e) => e.name.toLowerCase().includes(q)) : files;
+	});
+
+	const diskFolderName = computed(() => browser.diskFolder.split('/').pop() || browser.diskFolder);
+	const diskParentName = computed(() => {
+		const parts = browser.diskFolder.split('/');
+		return parts.length > 1 ? parts[parts.length - 2] || '/' : '';
+	});
+
+	async function onViewChange(view: string | number | null | (string | number)[]) {
+		const v = view as 'patches' | 'performances' | 'disk';
+		browser.view = v;
+		searchQuery.value = '';
+		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && device.connected) {
+			await browser.loadSynthList();
+		}
+	}
+
+	function selectDisk(entry: DiskEntry) {
+		if (entry.isDir) {
+			browser.loadDiskList(entry.path);
+		} else {
+			emit('select', { type: 'disk', filepath: entry.path });
+		}
+	}
+
+	function selectSynth(p: SynthPatch) {
+		emit('select', { type: 'synth', bank: p.bank, location: p.location });
+	}
+
+	function handleEnter() {
+		if (browser.view === 'disk' && filteredDiskFiles.value.length > 0) {
+			emit('select', {
+				type: 'disk',
+				filepath: filteredDiskFiles.value[0].path,
+			});
+		} else if (browser.view === 'patches' && filteredPatches.value.length > 0) {
+			selectSynth(filteredPatches.value[0]);
+		} else if (browser.view === 'performances' && filteredPerformances.value.length > 0) {
+			selectSynth(filteredPerformances.value[0]);
+		}
+	}
+
+	function formatFileName(entry: DiskEntry): string {
+		return entry.isDir ? entry.name : entry.name.replace(/\.(pch2|prf2)$/i, '');
+	}
+</script>

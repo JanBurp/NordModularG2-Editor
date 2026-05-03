@@ -39,7 +39,7 @@
 			if (modDef?.params) {
 				// Find parameter indices by type/name
 				const params = modDef.params;
-				const paramCount = params.length;
+				// const paramCount = params.length;
 
 				// Look for filter-specific parameters
 				const freqIdx = params.findIndex((p: any) => p.type?.includes('Freq') || p.name?.includes('Freq'));
@@ -70,7 +70,7 @@
 						// 2-band EQ (shelves)
 						const loY = midY - gains[0] * h * 0.4;
 						const hiY = midY - gains[1] * h * 0.4;
-						return `M${x},${midY} Q${x + w * 0.1},${midY} ${positions[0]},${loY} 
+						return `M${x},${midY} Q${x + w * 0.1},${midY} ${positions[0]},${loY}
                   L${positions[1]},${hiY} Q${x + w * 0.9},${midY} ${x + w},${midY}`;
 					} else if (gains.length >= 3) {
 						// 3-band EQ with mid control
@@ -149,14 +149,14 @@
 				// LFO Shape - modulated waveform
 				const modAmount = norm(getVal(8, 0)); // ShapeMod
 				const yOffset = shape * h * 0.3 + modAmount * h * 0.2;
-				return `M${x},${y + h / 2} 
-              Q${x + w * (0.25 + rate * 0.1)},${y + yOffset} ${x + w * 0.5},${y + h / 2} 
+				return `M${x},${y + h / 2}
+              Q${x + w * (0.25 + rate * 0.1)},${y + yOffset} ${x + w * 0.5},${y + h / 2}
               Q${x + w * (0.75 - rate * 0.1)},${y + h - yOffset} ${x + w},${y + h / 2}`;
 			}
 
 			// Standard LFO - sine wave with rate affecting frequency visualization
 			const freq = 0.3 + rate * 0.4; // 0.3 to 0.7
-			return `M${x},${y + h / 2} 
+			return `M${x},${y + h / 2}
             C${x + w * freq},${y} ${x + w * freq},${y + h} ${x + w * 0.5},${y + h / 2}
             C${x + w * (1 - freq)},${y} ${x + w * (1 - freq)},${y + h} ${x + w},${y + h / 2}`;
 		}
@@ -170,14 +170,14 @@
 				const pulseWidth = 0.3 + shape * 0.4; // 0.3 to 0.7
 				const topY = y + h * 0.2;
 				const bottomY = y + h * 0.8;
-				return `M${x},${y + h / 2} L${x + w * pulseWidth},${y + h / 2} L${x + w * pulseWidth},${topY} 
-              L${x + w * (pulseWidth + 0.3)},${topY} L${x + w * (pulseWidth + 0.3)},${bottomY} 
+				return `M${x},${y + h / 2} L${x + w * pulseWidth},${y + h / 2} L${x + w * pulseWidth},${topY}
+              L${x + w * (pulseWidth + 0.3)},${topY} L${x + w * (pulseWidth + 0.3)},${bottomY}
               L${x + w},${bottomY} L${x + w},${y + h / 2}`;
 			}
 
 			// Osc Shape A - sawtooth with shape affecting slope
 			const slope = 0.2 + shape * 0.3; // 0.2 to 0.5
-			return `M${x},${y + h / 2} L${x + w * slope},${y + h * 0.2} L${x + w * (slope + 0.2)},${y + h * 0.8} 
+			return `M${x},${y + h / 2} L${x + w * slope},${y + h * 0.2} L${x + w * (slope + 0.2)},${y + h * 0.8}
             L${x + w * (slope + 0.4)},${y + h * 0.2} L${x + w * (slope + 0.6)},${y + h * 0.8} L${x + w},${y + h / 2}`;
 		}
 
@@ -196,16 +196,16 @@
 
 			if (f.includes('M') || f.includes('m')) {
 				// Mod ADSR - slightly different curve
-				return `M${x},${y + h} L${attackX},${y + h * 0.1} 
-              L${decayX},${sustainY} 
-              L${releaseStartX},${sustainY} 
+				return `M${x},${y + h} L${attackX},${y + h * 0.1}
+              L${decayX},${sustainY}
+              L${releaseStartX},${sustainY}
               L${x + w},${y + h}`;
 			}
 
 			// Standard ADSR
-			return `M${x},${y + h} L${attackX},${y + h * 0.05} 
-            L${decayX},${sustainY} 
-            L${releaseStartX},${sustainY} 
+			return `M${x},${y + h} L${attackX},${y + h * 0.05}
+            L${decayX},${sustainY}
+            L${releaseStartX},${sustainY}
             L${x + w},${y + h}`;
 		}
 
@@ -219,9 +219,9 @@
 			const holdEndX = attackX + w * (0.05 + hold * 0.2);
 			const decayEndX = holdEndX + w * (0.05 + decay * 0.25);
 
-			return `M${x},${y + h} L${attackX},${y + h * 0.05} 
-            L${holdEndX},${y + h * 0.05} 
-            L${decayEndX},${y + h * 0.5} 
+			return `M${x},${y + h} L${attackX},${y + h * 0.05}
+            L${holdEndX},${y + h * 0.05}
+            L${decayEndX},${y + h * 0.5}
             L${x + w},${y + h}`;
 		}
 
@@ -231,8 +231,8 @@
 			const holdWidth = 0.1 + hold * 0.3;
 			const holdY = y + h * 0.25;
 
-			return `M${x},${y + h} L${x + w * 0.2},${holdY} 
-            L${x + w * (0.2 + holdWidth)},${holdY} 
+			return `M${x},${y + h} L${x + w * 0.2},${holdY}
+            L${x + w * (0.2 + holdWidth)},${holdY}
             L${x + w},${y + h}`;
 		}
 
@@ -283,7 +283,7 @@
 
 			return (
 				path ||
-				`M${x + w * 0.2},${y + h * 0.2} L${x + w * 0.2},${y + h * 0.8} 
+				`M${x + w * 0.2},${y + h * 0.2} L${x + w * 0.2},${y + h * 0.8}
             M${x + w * 0.5},${y + h * 0.2} L${x + w * 0.5},${y + h * 0.8}
             M${x + w * 0.8},${y + h * 0.2} L${x + w * 0.8},${y + h * 0.8}`
 			);
