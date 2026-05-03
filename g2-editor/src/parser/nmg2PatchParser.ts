@@ -359,21 +359,17 @@ function pch2_(data: ArrayBuffer) {
 	const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
 	this.ofs = ofs;
 	const filedataArray = new Uint8Array(data, ofs + 1, data.byteLength - ofs - 3);
-	const calcCRC = calcCrc(filedataArray);
-	if (fileCRC != calcCRC) {
+	if (fileCRC !== calcCrc(filedataArray)) {
 		console.warn('PCH2 WARNING: CRC mismatch');
 	}
 
 	const maxofs = filedata.byteLength;
 	ofs = 0;
-	let res = '';
 	while (ofs < maxofs) {
 		const type = filedata.getInt8(ofs);
 		const siz = filedata.getInt16(ofs + 1);
 		if (type in g2section) {
-			res += '\n' + g2section[type][0] + ':offset=0x' + (textHdrLen + ofs).toString(16);
-			// eslint-disable-next-line @typescript-eslint/no-unused-vars
-			if (g2section[type][1]) res += g2section[type][1](new Int8Array(data, textHdrLen + ofs + 3, siz));
+			g2section[type][1]?.(new Int8Array(data, textHdrLen + ofs + 3, siz));
 		}
 		ofs += siz + 3;
 		if (type == 0x6f) {
