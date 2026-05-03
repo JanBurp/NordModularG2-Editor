@@ -73,10 +73,6 @@ body {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
 }
 
-.btn-file {
-	@apply inline-flex items-center justify-center h-8 px-3 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-sm font-normal cursor-pointer;
-}
-
 .search-input {
 	@apply w-full px-3 py-2 pr-8 bg-neutral-700 border border-neutral-600 rounded text-neutral-200 text-xs focus:outline-none focus:border-blue-700 placeholder:text-neutral-500;
 }
