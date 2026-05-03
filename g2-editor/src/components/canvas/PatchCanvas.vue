@@ -1,3 +1,45 @@
+<template>
+	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+		<svg
+			ref="svgRef"
+			class="patch-canvas"
+			font-size="9"
+			:width="canvasWidth"
+			:height="canvasHeight"
+			xmlns="http://www.w3.org/2000/svg"
+			@mousedown="handleCanvasMousedown"
+			@click="
+				emit('canvasClick');
+				handleCanvasClick();
+			"
+		>
+			<Module
+				v-for="mod in modulesWithVariation"
+				:key="mod.index"
+				:type="mod.type"
+				:instance="mod"
+				:is-selected="props.selectedModuleIndices.includes(mod.index)"
+				@param-change="onParamChange"
+				@jack-drag-start="handleLocalJackDragStart"
+				@jack-drag-end="handleLocalJackDragEnd"
+				@module-drag-start="handleModuleDragStart"
+				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
+			/>
+			<rect
+				v-if="isDraggingSelection && selectionRect"
+				:x="selectionRect.x"
+				:y="selectionRect.y"
+				:width="Math.max(0, selectionRect.width)"
+				:height="Math.max(0, selectionRect.height)"
+				fill="none"
+				stroke="rgba(30,30,30,0.8)"
+				stroke-width="3"
+				stroke-dasharray="4 4"
+				pointer-events="none"
+			/>
+		</svg>
+	</div>
+</template>
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
 	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey } from '../../renderer/cableRenderer';
@@ -489,50 +531,6 @@
 		emit('moduleDrop', { typeId, col, row });
 	}
 </script>
-
-<template>
-	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
-		<svg
-			ref="svgRef"
-			class="patch-canvas"
-			font-size="9"
-			:width="canvasWidth"
-			:height="canvasHeight"
-			xmlns="http://www.w3.org/2000/svg"
-			@mousedown="handleCanvasMousedown"
-			@click="
-				emit('canvasClick');
-				handleCanvasClick();
-			"
-		>
-			<Module
-				v-for="mod in modulesWithVariation"
-				:key="mod.index"
-				:type="mod.type"
-				:instance="mod"
-				:is-selected="props.selectedModuleIndices.includes(mod.index)"
-				@param-change="onParamChange"
-				@jack-drag-start="handleLocalJackDragStart"
-				@jack-drag-end="handleLocalJackDragEnd"
-				@module-drag-start="handleModuleDragStart"
-				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
-			/>
-			<rect
-				v-if="isDraggingSelection && selectionRect"
-				:x="selectionRect.x"
-				:y="selectionRect.y"
-				:width="Math.max(0, selectionRect.width)"
-				:height="Math.max(0, selectionRect.height)"
-				fill="none"
-				stroke="rgba(30,30,30,0.8)"
-				stroke-width="3"
-				stroke-dasharray="4 4"
-				pointer-events="none"
-			/>
-		</svg>
-	</div>
-</template>
-
 <style scoped>
 	.patch-canvas-wrapper {
 		position: relative;

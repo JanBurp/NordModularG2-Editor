@@ -1,21 +1,3 @@
-<script setup lang="ts">
-	const props = defineProps({
-		node: { required: true },
-		depth: { type: Number, default: 0 },
-		expanded: { required: true },
-		getValueType: { type: Function, required: true },
-		isExpandable: { type: Function, required: true },
-	});
-
-	const emit = defineEmits(['toggle']);
-
-	function handleToggle() {
-		if (props.isExpandable(props.node)) {
-			emit('toggle', props.node.key);
-		}
-	}
-</script>
-
 <template>
 	<div class="select-none" :style="{ paddingLeft: depth * 4 + 'px' }">
 		<div class="flex items-center py-0.5 px-1 cursor-pointer rounded hover:bg-neutral-700" @click="handleToggle">
@@ -47,3 +29,20 @@
 		</div>
 	</div>
 </template>
+<script setup lang="ts">
+	const props = defineProps({
+		node: { required: true },
+		depth: { type: Number, default: 0 },
+		expanded: { required: true },
+		getValueType: { type: Function, required: true },
+		isExpandable: { type: Function, required: true },
+	});
+
+	const emit = defineEmits(['toggle']);
+
+	function handleToggle() {
+		if (props.isExpandable(props.node)) {
+			emit('toggle', props.node.key);
+		}
+	}
+</script>

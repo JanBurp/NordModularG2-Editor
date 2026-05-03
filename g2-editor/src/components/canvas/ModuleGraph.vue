@@ -1,3 +1,19 @@
+<template>
+	<g class="graph">
+		<!-- Define clip path to keep graph within bounds -->
+		<defs>
+			<clipPath :id="clipId">
+				<rect :x="x" :y="y" :width="w" :height="h" />
+			</clipPath>
+		</defs>
+
+		<!-- Background rectangle -->
+		<rect :x="x" :y="y" :width="w" :height="h" :fill="type === 'graphenv' ? '#00A4A4' : '#088'" :stroke="type === 'graphenv' ? 'none' : undefined" />
+
+		<!-- Graph path with clipping -->
+		<path :d="graphPath" stroke="#AFA" :fill="shouldFill ? '#00A4A4' : 'none'" :clip-path="`url(#${clipId})`" stroke-width="1.5" />
+	</g>
+</template>
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getModule } from '../../renderer/nmg2mods';
@@ -303,24 +319,6 @@
 		return props.type === 'graphenv' || props.f?.includes('env') || props.f?.includes('Env');
 	});
 </script>
-
-<template>
-	<g class="graph">
-		<!-- Define clip path to keep graph within bounds -->
-		<defs>
-			<clipPath :id="clipId">
-				<rect :x="x" :y="y" :width="w" :height="h" />
-			</clipPath>
-		</defs>
-
-		<!-- Background rectangle -->
-		<rect :x="x" :y="y" :width="w" :height="h" :fill="type === 'graphenv' ? '#00A4A4' : '#088'" :stroke="type === 'graphenv' ? 'none' : undefined" />
-
-		<!-- Graph path with clipping -->
-		<path :d="graphPath" stroke="#AFA" :fill="shouldFill ? '#00A4A4' : 'none'" :clip-path="`url(#${clipId})`" stroke-width="1.5" />
-	</g>
-</template>
-
 <style scoped>
 	.graph {
 		pointer-events: none;

@@ -1,3 +1,65 @@
+<template>
+	<g :transform="`translate(${x}, ${y})`" class="switch-control">
+		<!-- Bitmap-based switch -->
+		<template v-if="hasBitmap">
+			<!-- Single button mode: show active bitmap with highlight -->
+			<svg v-if="singleButtonMode" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
+				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${paramType}-0)`" />
+			</svg>
+
+			<!-- VR/HR mode: show all bitmaps with active highlighted -->
+			<svg
+				v-else
+				v-for="(name, index) in displayNames"
+				:key="index"
+				:x="getButtonX(index)"
+				:y="getButtonY(index)"
+				:width="width"
+				height="11"
+				class="switch-bitmap"
+				:class="{ active: index === activeIndex }"
+				@click="onButtonClick(index)"
+			>
+				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${paramType}-${index})`" />
+			</svg>
+		</template>
+
+		<!-- Text-based switch -->
+		<template v-else>
+			<!-- Single button mode: show only active option without highlight -->
+			<g v-if="singleButtonMode" class="switch-button" @click="onCycleValue">
+				<rect :x="0" :y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+					{{ activeOptionName }}
+				</text>
+			</g>
+
+			<!-- VR/HR mode: show all options with active highlighted -->
+			<g
+				v-else
+				v-for="(name, index) in displayNames"
+				:key="index"
+				class="switch-button"
+				:class="{ active: index === activeIndex }"
+				@click="onButtonClick(index)"
+			>
+				<rect
+					:x="getButtonX(index)"
+					:y="getButtonY(index)"
+					:width="width"
+					height="11"
+					:fill="index === activeIndex ? '#6df2f2' : '#CCC'"
+					stroke="#333"
+				/>
+				<text :x="getButtonX(index) + width / 2" :y="getButtonY(index) + 9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+					{{ name }}
+				</text>
+			</g>
+		</template>
+	</g>
+</template>
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
@@ -122,70 +184,6 @@
 		emit('change', props.paramIndex, newValue);
 	}
 </script>
-
-<template>
-	<g :transform="`translate(${x}, ${y})`" class="switch-control">
-		<!-- Bitmap-based switch -->
-		<template v-if="hasBitmap">
-			<!-- Single button mode: show active bitmap with highlight -->
-			<svg v-if="singleButtonMode" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
-				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${paramType}-0)`" />
-			</svg>
-
-			<!-- VR/HR mode: show all bitmaps with active highlighted -->
-			<svg
-				v-else
-				v-for="(name, index) in displayNames"
-				:key="index"
-				:x="getButtonX(index)"
-				:y="getButtonY(index)"
-				:width="width"
-				height="11"
-				class="switch-bitmap"
-				:class="{ active: index === activeIndex }"
-				@click="onButtonClick(index)"
-			>
-				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${paramType}-${index})`" />
-			</svg>
-		</template>
-
-		<!-- Text-based switch -->
-		<template v-else>
-			<!-- Single button mode: show only active option without highlight -->
-			<g v-if="singleButtonMode" class="switch-button" @click="onCycleValue">
-				<rect :x="0" :y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
-				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
-					{{ activeOptionName }}
-				</text>
-			</g>
-
-			<!-- VR/HR mode: show all options with active highlighted -->
-			<g
-				v-else
-				v-for="(name, index) in displayNames"
-				:key="index"
-				class="switch-button"
-				:class="{ active: index === activeIndex }"
-				@click="onButtonClick(index)"
-			>
-				<rect
-					:x="getButtonX(index)"
-					:y="getButtonY(index)"
-					:width="width"
-					height="11"
-					:fill="index === activeIndex ? '#6df2f2' : '#CCC'"
-					stroke="#333"
-				/>
-				<text :x="getButtonX(index) + width / 2" :y="getButtonY(index) + 9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
-					{{ name }}
-				</text>
-			</g>
-		</template>
-	</g>
-</template>
-
 <style scoped>
 	.switch-control {
 		user-select: none;
