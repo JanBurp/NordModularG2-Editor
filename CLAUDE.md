@@ -1,10 +1,10 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to Claude Code and other coding agents when working with code in this repository.
 
 ## Goal
 
-A basic editor for the Nord Modular G2 synthesizer. Whith use of a C++ CLI for USB communications. And en electronjs (Typescript, VueJS, Pinia) for the actual editor and graphical representation.
+An editor for the Nord Modular G2 synthesizer. With use of a C++ CLI/deaman for USB communications. And en electronjs (Typescript, VueJS, Pinia) for the actual editor and graphical representation.
 
 ## Coding And behavioral guidelines to reduce LLM coding mistakes
 
@@ -76,6 +76,7 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 - `cli/` — C CLI tool for USB communication with the Nord G2 hardware
 - `g2-editor/` — Electron desktop app (Vue 3 + TypeScript)
 - `test-patches/` — Sample `.pch2` patch files for testing
+- `doc` - For architecural documentation
 
 ## Commands
 
@@ -99,12 +100,17 @@ npm run build           # production build + package
 npm run preview         # preview production build
 npm test                # run Vitest unit tests
 ```
-
 The `@/` path alias resolves to `g2-editor/src/`.
 
 ## Architecture
 
 This is an **Electron + Vue 3** desktop app for editing Nord G2 synthesizer patches.
+
+### Coding guidelines
+
+- Use tab indentation with 4 spaces witdh
+- Vue components must have this order: <template> <script setup lang="ts"> <style scoped>
+- Use eslint and prettier
 
 ### Process Model
 - **Electron main** (`electron/main.ts`) — spawns the `g2-cli` C binary as a child process for all USB/device communication; handles IPC for file ops, CLI run/batch, and watch events
