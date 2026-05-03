@@ -98,10 +98,7 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['variation', String(variation + 1), active]);
 		},
 
-		async deleteCable(
-			cable: { smod: number; scon: number; dmod: number; dcon: number },
-			area: 'voice' | 'fx',
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async deleteCable(cable: { smod: number; scon: number; dmod: number; dcon: number }, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -112,17 +109,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'del-cable',
-					deviceSlot,
-					location,
-					String(cable.smod),
-					'1',
-					String(cable.scon),
-					String(cable.dmod),
-					'0',
-					String(cable.dcon),
-				]);
+				await window.cli.run(['del-cable', deviceSlot, location, String(cable.smod), '1', String(cable.scon), String(cable.dmod), '0', String(cable.dcon)]);
 			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
@@ -139,17 +126,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'del-cable',
-					deviceSlot,
-					location,
-					String(cable.smod),
-					'1',
-					String(cable.scon),
-					String(cable.dmod),
-					'0',
-					String(cable.dcon),
-				]);
+				await window.cli.run(['del-cable', deviceSlot, location, String(cable.smod), '1', String(cable.scon), String(cable.dmod), '0', String(cable.dcon)]);
 			}
 		},
 
@@ -202,13 +179,7 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async addModule(
-			typeId: number,
-			moduleId: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async addModule(typeId: number, moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const uiStore = useUiStore();
 			const slot = deviceSlot ?? this.activeSlot;
@@ -246,36 +217,13 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'add-module',
-					deviceSlot,
-					location,
-					String(typeId),
-					String(moduleId),
-					String(col),
-					String(row),
-					String(mod.colour),
-					String(numModes),
-					...modeVals.map(String),
-					String(numParams),
-					...paramVals.map(String),
-					uname,
-				]);
+				await window.cli.run(['add-module', deviceSlot, location, String(typeId), String(moduleId), String(col), String(row), String(mod.colour), String(numModes), ...modeVals.map(String), String(numParams), ...paramVals.map(String), uname]);
 			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async addCable(
-			fromMod: number,
-			fromConType: number,
-			fromCon: number,
-			toMod: number,
-			toConType: number,
-			toCon: number,
-			area: 'voice' | 'fx',
-			color = 1,
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async addCable(fromMod: number, fromConType: number, fromCon: number, toMod: number, toConType: number, toCon: number, area: 'voice' | 'fx', color = 1): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -299,18 +247,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'add-cable',
-					deviceSlot,
-					location,
-					String(color),
-					String(fromMod),
-					String(fromConType),
-					String(fromCon),
-					String(toMod),
-					String(toConType),
-					String(toCon),
-				]);
+				await window.cli.run(['add-cable', deviceSlot, location, String(color), String(fromMod), String(fromConType), String(fromCon), String(toMod), String(toConType), String(toCon)]);
 			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
@@ -364,11 +301,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slotFilePaths[slot] = path;
 		},
 
-		_resolveColumnCollisions(
-			colModules: { index: number; vert: number; height: number }[],
-			targetRow: number,
-			targetHeight: number,
-		): { index: number; newRow: number }[] {
+		_resolveColumnCollisions(colModules: { index: number; vert: number; height: number }[], targetRow: number, targetHeight: number): { index: number; newRow: number }[] {
 			const sorted = [...colModules].sort((a, b) => a.vert - b.vert);
 			const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
 			let floor = targetRow + targetHeight;
@@ -385,38 +318,22 @@ export const useSlotsStore = defineStore('slots', {
 			return sorted.filter((m) => newRows.get(m.index) !== m.vert).map((m) => ({ index: m.index, newRow: newRows.get(m.index)! }));
 		},
 
-		async moveModuleWithCollision(
-			moduleIndex: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-			currentModuleList: any[],
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async moveModuleWithCollision(moduleIndex: number, col: number, row: number, area: 'voice' | 'fx', currentModuleList: any[]): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const mod = currentModuleList.find((m: any) => m.index === moduleIndex);
 			if (!mod) return null;
 			const { getModule } = await import('../renderer/nmg2mods');
 			const height = (getModule(mod.type) as any)?.height ?? 2;
-			const colMods = currentModuleList
-				.filter((m: any) => m.horiz === col && m.index !== moduleIndex)
-				.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
+			const colMods = currentModuleList.filter((m: any) => m.horiz === col && m.index !== moduleIndex).map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
 			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.moveModule(moduleIndex, col, row, area);
 		},
 
-		async dropModuleWithCollision(
-			typeId: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-			currentModuleList: any[],
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async dropModuleWithCollision(typeId: number, col: number, row: number, area: 'voice' | 'fx', currentModuleList: any[]): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const { getModule } = await import('../renderer/nmg2mods');
 			const ids = currentModuleList.map((m: any) => m.index as number);
 			const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
 			const height = (getModule(typeId) as any)?.height ?? 2;
-			const colMods = currentModuleList
-				.filter((m: any) => m.horiz === col)
-				.map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
+			const colMods = currentModuleList.filter((m: any) => m.horiz === col).map((m: any) => ({ index: m.index as number, vert: m.vert as number, height: ((getModule(m.type) as any)?.height ?? 2) as number }));
 			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.addModule(typeId, moduleId, col, row, area);
 		},
@@ -451,13 +368,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		async deleteSelection(
-			selectedModules: number[],
-			selectedCable: { smod?: number; scon?: number; dmod?: number; dcon?: number } | null,
-			area: 'voice' | 'fx',
-			currentModuleList: any[],
-			currentCableList: any[],
-		): Promise<void> {
+		async deleteSelection(selectedModules: number[], selectedCable: { smod?: number; scon?: number; dmod?: number; dcon?: number } | null, area: 'voice' | 'fx', currentModuleList: any[], currentCableList: any[]): Promise<void> {
 			if (selectedModules.length > 0 && !selectedCable) {
 				const deviceSlot = useDeviceStore().getActiveSlot;
 				const slot = deviceSlot ?? this.activeSlot;
@@ -482,8 +393,7 @@ export const useSlotsStore = defineStore('slots', {
 				if (deviceSlot && cliCmds.length > 0) await window.cli.run(['seq', ...cliCmds]);
 				return;
 			}
-			if (selectedCable)
-				await this.deleteCable({ smod: selectedCable.smod!, scon: selectedCable.scon!, dmod: selectedCable.dmod!, dcon: selectedCable.dcon! }, area);
+			if (selectedCable) await this.deleteCable({ smod: selectedCable.smod!, scon: selectedCable.scon!, dmod: selectedCable.dmod!, dcon: selectedCable.dcon! }, area);
 		},
 	},
 });

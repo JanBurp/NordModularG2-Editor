@@ -50,42 +50,10 @@ function interpol(a: FastVector[], b: FastVector[], shp: number): FastVector[] {
  */
 export function lfoBgraph(g: GraphElement, con: Control[]): void {
 	const dp = [
-		[
-			createFastVector(0, 0),
-			createFastVector(0.14, -0.2),
-			createFastVector(0.3, -0.5),
-			createFastVector(0.5, -0.5),
-			createFastVector(0.7, -0.5),
-			createFastVector(0.86, -0.2),
-			createFastVector(1, 0),
-		],
-		[
-			createFastVector(0, 0),
-			createFastVector(0.14, -0.2),
-			createFastVector(0.3, -0.5),
-			createFastVector(0.5, 0),
-			createFastVector(0.7, 0.5),
-			createFastVector(0.86, 0.2),
-			createFastVector(1, 0),
-		],
-		[
-			createFastVector(0, 0),
-			createFastVector(0.14, 0.2),
-			createFastVector(0.3, 0.5),
-			createFastVector(0.5, 0.5),
-			createFastVector(0.7, 0.5),
-			createFastVector(0.86, 0.2),
-			createFastVector(1, 0),
-		],
-		[
-			createFastVector(0, 0),
-			createFastVector(0.14, 0.2),
-			createFastVector(0.3, 0.5),
-			createFastVector(0.5, 0),
-			createFastVector(0.7, -0.5),
-			createFastVector(0.86, -0.2),
-			createFastVector(1, 0),
-		],
+		[createFastVector(0, 0), createFastVector(0.14, -0.2), createFastVector(0.3, -0.5), createFastVector(0.5, -0.5), createFastVector(0.7, -0.5), createFastVector(0.86, -0.2), createFastVector(1, 0)],
+		[createFastVector(0, 0), createFastVector(0.14, -0.2), createFastVector(0.3, -0.5), createFastVector(0.5, 0), createFastVector(0.7, 0.5), createFastVector(0.86, 0.2), createFastVector(1, 0)],
+		[createFastVector(0, 0), createFastVector(0.14, 0.2), createFastVector(0.3, 0.5), createFastVector(0.5, 0.5), createFastVector(0.7, 0.5), createFastVector(0.86, 0.2), createFastVector(1, 0)],
+		[createFastVector(0, 0), createFastVector(0.14, 0.2), createFastVector(0.3, 0.5), createFastVector(0.5, 0), createFastVector(0.7, -0.5), createFastVector(0.86, -0.2), createFastVector(1, 0)],
 		[
 			createFastVector(0, 0),
 			createFastVector(0.125, 0.5),
@@ -97,15 +65,7 @@ export function lfoBgraph(g: GraphElement, con: Control[]): void {
 			createFastVector(0.875, 0.5),
 			createFastVector(1, 0),
 		],
-		[
-			createFastVector(0, 0),
-			createFastVector(0.2, -0.3),
-			createFastVector(0.35, 0.3),
-			createFastVector(0.5, -0.3),
-			createFastVector(0.65, 0.3),
-			createFastVector(0.8, -0.3),
-			createFastVector(1, 0),
-		],
+		[createFastVector(0, 0), createFastVector(0.2, -0.3), createFastVector(0.35, 0.3), createFastVector(0.5, -0.3), createFastVector(0.65, 0.3), createFastVector(0.8, -0.3), createFastVector(1, 0)],
 	];
 
 	const shp = con[1]?.l ?? 0;

@@ -29,16 +29,7 @@ export function useJackPatching() {
 
 		const output = src.type === 'output' ? src : info;
 		const input = src.type === 'input' ? src : info;
-		await slotsStore.addCable(
-			output.moduleIndex,
-			1,
-			output.connectorIndex,
-			input.moduleIndex,
-			0,
-			input.connectorIndex,
-			uiStore.area === 1 ? 'voice' : 'fx',
-			jackColourToIndex(output.colour),
-		);
+		await slotsStore.addCable(output.moduleIndex, 1, output.connectorIndex, input.moduleIndex, 0, input.connectorIndex, uiStore.area === 1 ? 'voice' : 'fx', jackColourToIndex(output.colour));
 	}
 
 	return { dragSource, handleJackDragStart, handleJackDragEnd };

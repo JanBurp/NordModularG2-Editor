@@ -9,14 +9,7 @@
 	<button
 		v-else
 		class="btn"
-		:class="[
-			variant === 'default' ? 'btn-default' : '',
-			variant === 'toggle' || variant === 'tab' ? 'btn-toggle' : '',
-			variant === 'variation' ? 'btn-variation' : '',
-			sizeClass,
-			active ? 'btn-active' : '',
-			disabled ? 'btn-disabled' : 'btn-hover',
-		]"
+		:class="[variant === 'default' ? 'btn-default' : '', variant === 'toggle' || variant === 'tab' ? 'btn-toggle' : '', variant === 'variation' ? 'btn-variation' : '', sizeClass, active ? 'btn-active' : '', disabled ? 'btn-disabled' : 'btn-hover']"
 		:disabled="disabled"
 		@click="handleClick"
 	>

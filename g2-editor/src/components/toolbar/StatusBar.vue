@@ -4,11 +4,7 @@
 		<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
 		<StatusBarDivider />
 		<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
-		<div
-			class="ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-30"
-			:class="device.statusClass"
-			@click="emit('toggle-connection')"
-		>
+		<div class="ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-30" :class="device.statusClass" @click="emit('toggle-connection')">
 			<span class="text-sm">{{ device.statusLabel }}</span>
 		</div>
 	</div>

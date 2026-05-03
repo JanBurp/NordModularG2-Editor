@@ -5,15 +5,7 @@
  */
 
 // Cable colors
-export {
-	CABLE_COLORS,
-	CABLE_COLOR_INDEX_MAP,
-	CABLE_SVG_COLORS,
-	DEFAULT_CABLE_VISIBILITY,
-	JACK_COLORS,
-	type CableColor,
-	type CableColorName,
-} from './cableColors';
+export { CABLE_COLORS, CABLE_COLOR_INDEX_MAP, CABLE_SVG_COLORS, DEFAULT_CABLE_VISIBILITY, JACK_COLORS, type CableColor, type CableColorName } from './cableColors';
 
 // Module colors
 export { MODULE_COLORS, DEFAULT_MODULE_COLOR, getModuleColor, type ModuleColor } from './moduleColors';

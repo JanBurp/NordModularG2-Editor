@@ -91,15 +91,7 @@
 		<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
 
 		<!-- Rotating indicator line -->
-		<line
-			:x1="radius + 2"
-			:y1="radius + 2"
-			:x2="radius + 2"
-			:y2="2"
-			stroke="black"
-			stroke-width="2"
-			:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
-		/>
+		<line :x1="radius + 2" :y1="radius + 2" :x2="radius + 2" :y2="2" stroke="black" stroke-width="2" :transform="`rotate(${angle} ${radius + 2} ${radius + 2})`" />
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
 		<path v-if="isReset" d="M-3,-2 L3,-2 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" />

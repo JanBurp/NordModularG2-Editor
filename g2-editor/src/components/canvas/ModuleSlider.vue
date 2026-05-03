@@ -68,16 +68,7 @@
 		<rect width="12" height="62" fill="rgba(44,0,0,0.01)" class="track" />
 
 		<!-- Handle -->
-		<rect
-			width="10"
-			height="6"
-			x="1"
-			fill="url(#g121)"
-			stroke="#333"
-			stroke-width="0.5"
-			:transform="`translate(0, ${handleY})`"
-			:class="{ dragging: isDragging }"
-		/>
+		<rect width="10" height="6" x="1" fill="url(#g121)" stroke="#333" stroke-width="0.5" :transform="`translate(0, ${handleY})`" :class="{ dragging: isDragging }" />
 	</g>
 </template>
 

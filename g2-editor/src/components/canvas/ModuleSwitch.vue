@@ -134,18 +134,7 @@
 			</svg>
 
 			<!-- VR/HR mode: show all bitmaps with active highlighted -->
-			<svg
-				v-else
-				v-for="(name, index) in displayNames"
-				:key="index"
-				:x="getButtonX(index)"
-				:y="getButtonY(index)"
-				:width="width"
-				height="11"
-				class="switch-bitmap"
-				:class="{ active: index === activeIndex }"
-				@click="onButtonClick(index)"
-			>
+			<svg v-else v-for="(name, index) in displayNames" :key="index" :x="getButtonX(index)" :y="getButtonY(index)" :width="width" height="11" class="switch-bitmap" :class="{ active: index === activeIndex }" @click="onButtonClick(index)">
 				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${paramType}-${index})`" />
 			</svg>
@@ -162,22 +151,8 @@
 			</g>
 
 			<!-- VR/HR mode: show all options with active highlighted -->
-			<g
-				v-else
-				v-for="(name, index) in displayNames"
-				:key="index"
-				class="switch-button"
-				:class="{ active: index === activeIndex }"
-				@click="onButtonClick(index)"
-			>
-				<rect
-					:x="getButtonX(index)"
-					:y="getButtonY(index)"
-					:width="width"
-					height="11"
-					:fill="index === activeIndex ? '#6df2f2' : '#CCC'"
-					stroke="#333"
-				/>
+			<g v-else v-for="(name, index) in displayNames" :key="index" class="switch-button" :class="{ active: index === activeIndex }" @click="onButtonClick(index)">
+				<rect :x="getButtonX(index)" :y="getButtonY(index)" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<text :x="getButtonX(index) + width / 2" :y="getButtonY(index) + 9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ name }}
 				</text>

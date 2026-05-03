@@ -19,14 +19,7 @@
 
 			<ToolBarDivider />
 
-			<BtnGroup
-				class="ml-auto"
-				:model-value="uiStore.rightPaneTab"
-				:options="PANE_TAB_OPTIONS"
-				variant="tab"
-				@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
-				@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
-			/>
+			<BtnGroup class="ml-auto" :model-value="uiStore.rightPaneTab" :options="PANE_TAB_OPTIONS" variant="tab" @update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)" @toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)" />
 		</ToolBar>
 
 		<ToolBar v-if="patchName">
@@ -34,11 +27,7 @@
 
 			<div class="flex items-center gap-1.5">
 				<ToolBarLabel>Cat:</ToolBarLabel>
-				<select
-					v-model="selectedCategory"
-					class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
-					title="Sound Category"
-				>
+				<select v-model="selectedCategory" class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow" title="Sound Category">
 					<option v-for="cat in soundCategories" :key="cat.id" :value="cat.id">
 						{{ cat.name }}
 					</option>
@@ -73,11 +62,7 @@
 						:title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
 						@click="toggleCableVisibility(color.name)"
 					>
-						<span
-							class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
-							:class="{ 'opacity-100': cableVisibility[color.name] }"
-							:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
-						></span>
+						<span class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200" :class="{ 'opacity-100': cableVisibility[color.name] }" :style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"></span>
 					</button>
 					<button
 						class="w-6 h-5 border-2 border-neutral-600 rounded bg-gray-300 text-gray-800 text-xs font-bold hover:bg-gray-200"
@@ -87,13 +72,7 @@
 					>
 						H
 					</button>
-					<button
-						class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
-						title="Re-render cables"
-						@click="shakeCables"
-					>
-						S
-					</button>
+					<button class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400" title="Re-render cables" @click="shakeCables">S</button>
 				</div>
 			</div>
 		</ToolBar>
@@ -145,11 +124,7 @@
 
 			<SidePanel v-if="uiStore.showRightPane">
 				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-				<PatchBrowser
-					v-show="uiStore.rightPaneTab === 'browser'"
-					:isActive="uiStore.rightPaneTab === 'browser'"
-					@select="patchFile.handlePatchSelect"
-				/>
+				<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
 				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
 			</SidePanel>
 		</div>
@@ -158,11 +133,7 @@
 	</div>
 
 	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
-		<input
-			v-model="editingLabel"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
-			maxlength="16"
-		/>
+		<input v-model="editingLabel" class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400" maxlength="16" />
 	</Dialog>
 </template>
 
@@ -230,13 +201,7 @@
 
 	async function deleteSelection(): Promise<void> {
 		try {
-			await slotsStore.deleteSelection(
-				uiStore.selectedModules,
-				uiStore.selectedCable,
-				uiStore.area === 1 ? 'voice' : 'fx',
-				currentModules.value,
-				currentCables.value,
-			);
+			await slotsStore.deleteSelection(uiStore.selectedModules, uiStore.selectedCable, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value, currentCables.value);
 		} finally {
 			uiStore.clearSelection();
 			uiStore.selectedCable = null;
@@ -314,17 +279,7 @@
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
 
-	const {
-		cableColors,
-		cableVisibility,
-		cableShakeTrigger,
-		allCablesVisible,
-		toggleCableVisibility,
-		toggleShowHideAll,
-		shakeCables,
-		syncWithPatchData,
-		updatePatchData,
-	} = useCableVisibility();
+	const { cableColors, cableVisibility, cableShakeTrigger, allCablesVisible, toggleCableVisibility, toggleShowHideAll, shakeCables, syncWithPatchData, updatePatchData } = useCableVisibility();
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
 

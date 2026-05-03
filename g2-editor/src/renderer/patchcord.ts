@@ -77,12 +77,7 @@ export class FastVector {
 /**
  * Creates a FastVector with optional getstr override
  */
-export function createFastVector(
-	x: number,
-	y: number,
-	x2?: number,
-	getstrFn?: (this: any, p: string, xs: number, ys: number, yo: number, shp?: number) => string,
-): FastVector {
+export function createFastVector(x: number, y: number, x2?: number, getstrFn?: (this: any, p: string, xs: number, ys: number, yo: number, shp?: number) => string): FastVector {
 	const fv = new FastVector(x, y, x2);
 	if (getstrFn) {
 		(fv as any).getstr = getstrFn.bind(fv);
