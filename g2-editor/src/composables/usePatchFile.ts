@@ -1,7 +1,9 @@
+import { SLOT_LABELS } from '../constants';
+import { useDeviceStore } from '../store/device';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { useDeviceStore } from '../store/device';
-import { SLOT_LABELS } from '../constants';
+const { PatchParser } = await import('../parser/nmg2PatchParser');
+
 
 type DiskItem = { type: 'disk'; filepath: string };
 type SynthItem = { type: 'synth'; bank: number; location: number };
@@ -34,7 +36,6 @@ export function usePatchFile() {
 		const file = input.files?.[0];
 		if (!file) return;
 		const buffer = await file.arrayBuffer();
-		const { PatchParser } = await import('../parser/nmg2PatchParser');
 		const parsedPatch = new PatchParser(buffer).parse() as any;
 		const name = file.name.replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(new Uint8Array(buffer));
@@ -47,7 +48,6 @@ export function usePatchFile() {
 		const result = await window.electronAPI.openPatchDialog();
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
-		const { PatchParser } = await import('../parser/nmg2PatchParser');
 		const parsedPatch = new PatchParser(buffer).parse() as any;
 		const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
@@ -62,7 +62,6 @@ export function usePatchFile() {
 				const result = await window.electronAPI.patches.load(item.filepath);
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
-				const { PatchParser } = await import('../parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
 				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				const rawHex = stripFileHeader(result.data as number[]);

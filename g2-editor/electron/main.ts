@@ -247,7 +247,7 @@ app.whenReady().then(async () => {
 				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
 				{ type: "separator" },
 				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
-				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as") },
+				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
 				{ label: "Save All", click: () => win!.webContents.send("menu:action", "save-all") },
 			],
 		},
