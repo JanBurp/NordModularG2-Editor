@@ -47,9 +47,7 @@
 				const typeIdx = params.findIndex((p: any) => p.type?.includes('FilterType') || p.type?.includes('LpBpHp'));
 
 				// Check for EQ parameters (EqdB type parameters indicate EQ module)
-				const eqIndices = params
-					.map((p: any, i: number) => (p.type === 'EqdB' || p.name?.includes('Slope') || p.name?.includes('Gain') ? i : -1))
-					.filter((i: number) => i >= 0);
+				const eqIndices = params.map((p: any, i: number) => (p.type === 'EqdB' || p.name?.includes('Slope') || p.name?.includes('Gain') ? i : -1)).filter((i: number) => i >= 0);
 
 				const isEQ = eqIndices.length >= 2;
 

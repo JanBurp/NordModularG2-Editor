@@ -111,14 +111,7 @@
 		<template v-if="browser.view === 'disk'">
 			<!-- Folder header -->
 			<div class="flex items-center gap-1 px-2 py-1.5 border-b border-neutral-700 shrink-0 min-w-0">
-				<button
-					v-if="diskParentName"
-					class="text-neutral-400 hover:text-white text-xs px-1 shrink-0"
-					:title="`Up to ${diskParentName}`"
-					@click="browser.navigateUp()"
-				>
-					↑
-				</button>
+				<button v-if="diskParentName" class="text-neutral-400 hover:text-white text-xs px-1 shrink-0" :title="`Up to ${diskParentName}`" @click="browser.navigateUp()">↑</button>
 				<span class="text-xs text-neutral-300 truncate flex-1 min-w-0 font-medium">
 					{{ diskFolderName || 'No folder selected' }}
 				</span>
@@ -134,22 +127,12 @@
 				<div v-else-if="browser.error" class="p-4 text-center text-red-500 text-xs">{{ browser.error }}</div>
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Directories first -->
-					<li
-						v-for="entry in filteredDiskDirs"
-						:key="entry.path"
-						class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
-						@click="selectDisk(entry)"
-					>
+					<li v-for="entry in filteredDiskDirs" :key="entry.path" class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors" @click="selectDisk(entry)">
 						<span class="text-neutral-400 text-xs shrink-0">▶</span>
 						<span class="text-xs text-neutral-300 truncate">{{ entry.name }}</span>
 					</li>
 					<!-- Files -->
-					<li
-						v-for="entry in filteredDiskFiles"
-						:key="entry.path"
-						class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
-						@click="selectDisk(entry)"
-					>
+					<li v-for="entry in filteredDiskFiles" :key="entry.path" class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors" @click="selectDisk(entry)">
 						<span class="text-neutral-600 text-xs shrink-0 w-3"></span>
 						<span class="text-xs text-neutral-200 truncate flex-1">{{ formatFileName(entry) }}</span>
 						<span class="text-neutral-600 text-xs shrink-0">{{ entry.name.split('.').pop() }}</span>
@@ -178,10 +161,7 @@
 					<!-- Patches grouped by bank -->
 					<template v-for="group in browser.view === 'patches' ? patchGroups : perfGroups" :key="group.bank">
 						<!-- Bank header (collapsible) -->
-						<li
-							class="flex items-center gap-2 px-3 py-1 bg-neutral-800 cursor-pointer select-none border-b border-neutral-700 sticky top-0 z-10"
-							@click="browser.toggleBank(group.bank)"
-						>
+						<li class="flex items-center gap-2 px-3 py-1 bg-neutral-800 cursor-pointer select-none border-b border-neutral-700 sticky top-0 z-10" @click="browser.toggleBank(group.bank)">
 							<span class="text-neutral-500 text-xs w-3">
 								{{ browser.isBankCollapsed(group.bank) ? '▶' : '▼' }}
 							</span>
@@ -190,12 +170,7 @@
 						</li>
 						<!-- Patch entries -->
 						<template v-if="!browser.isBankCollapsed(group.bank)">
-							<li
-								v-for="p in group.patches"
-								:key="`${p.bank}-${p.location}`"
-								class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
-								@click="selectSynth(p)"
-							>
+							<li v-for="p in group.patches" :key="`${p.bank}-${p.location}`" class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors" @click="selectSynth(p)">
 								<span class="text-neutral-600 text-xs shrink-0 w-5">{{ p.location }}</span>
 								<span class="text-xs text-neutral-200 truncate flex-1">{{ p.name }}</span>
 							</li>

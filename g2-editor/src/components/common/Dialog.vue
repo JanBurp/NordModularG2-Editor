@@ -10,18 +10,8 @@
 					<slot />
 				</div>
 				<div class="flex justify-end gap-2 px-4 py-3 border-t border-neutral-600">
-					<button
-						class="px-3 py-1 text-xs border border-neutral-500 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 cursor-pointer"
-						@click="onCancel"
-					>
-						Cancel
-					</button>
-					<button
-						class="px-3 py-1 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 hover:bg-gray-200 cursor-pointer"
-						@click="onConfirm"
-					>
-						OK
-					</button>
+					<button class="px-3 py-1 text-xs border border-neutral-500 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 cursor-pointer" @click="onCancel">Cancel</button>
+					<button class="px-3 py-1 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 hover:bg-gray-200 cursor-pointer" @click="onConfirm">OK</button>
 				</div>
 			</div>
 		</div>

@@ -123,27 +123,11 @@
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
-		<rect
-			width="256"
-			height="18"
-			fill="transparent"
-			style="cursor: grab"
-			@mousedown.stop.prevent="onDragHandleMousedown"
-			@dblclick.stop.prevent="onTitleDblClick"
-		/>
+		<rect width="256" height="18" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" @dblclick.stop.prevent="onTitleDblClick" />
 
 		<!-- Modes -->
 		<g class="modes">
-			<ModuleMode
-				v-for="(mode, index) in moduleDef.modes"
-				:key="mode.name"
-				:x="mode.x"
-				:y="mode.y"
-				:width="mode.w || 20"
-				:height="mode.h || 18"
-				:param-type="mode.type"
-				:value="getModeValue(index)"
-			/>
+			<ModuleMode v-for="(mode, index) in moduleDef.modes" :key="mode.name" :x="mode.x" :y="mode.y" :width="mode.w || 20" :height="mode.h || 18" :param-type="mode.type" :value="getModeValue(index)" />
 		</g>
 
 		<!-- Visual elements from ve array -->
@@ -151,17 +135,7 @@
 			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
 			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
 			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
-			<ModuleGraph
-				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
-				:type="ve.type"
-				:x="ve.x"
-				:y="ve.y"
-				:w="ve.w"
-				:h="ve.h"
-				:f="ve.f"
-				:lv="localLv"
-				:module-id="props.type"
-			/>
+			<ModuleGraph v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h" :type="ve.type" :x="ve.x" :y="ve.y" :w="ve.w" :h="ve.h" :f="ve.f" :lv="localLv" :module-id="props.type" />
 
 			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
 
@@ -173,48 +147,16 @@
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
 				<!-- Knobs -->
-				<ModuleKnob
-					v-if="isKnob(param.n)"
-					:type="param.n"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnob v-if="isKnob(param.n)" :type="param.n" :x="param.x" :y="param.y" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Sliders -->
-				<ModuleSlider
-					v-else-if="isSlider(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleSlider v-else-if="isSlider(param.n)" :x="param.x" :y="param.y" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Switches -->
-				<ModuleSwitch
-					v-else-if="isSwitch(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:param-type="param.type"
-					:value="getParamValue(index)"
-					:param-index="index"
-					:param-name="param.name"
-					@change="onParamChange"
-				/>
+				<ModuleSwitch v-else-if="isSwitch(param.n)" :x="param.x" :y="param.y" :param-type="param.type" :value="getParamValue(index)" :param-index="index" :param-name="param.name" @change="onParamChange" />
 
 				<!-- Spinners (KnobSpin) - render as small knob for now -->
-				<ModuleKnob
-					v-else-if="isSpinner(param.n)"
-					type="KnobSmall"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnob v-else-if="isSpinner(param.n)" type="KnobSmall" :x="param.x" :y="param.y" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 			</template>
 		</g>
 

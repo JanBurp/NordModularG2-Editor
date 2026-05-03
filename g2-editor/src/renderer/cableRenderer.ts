@@ -242,10 +242,7 @@ export function removeAllCables(svgElement: SVGElement): void {
 	let sibling = svgElement.firstElementChild;
 	while (sibling) {
 		const next = sibling.nextElementSibling;
-		if (
-			sibling.tagName === 'path' &&
-			(sibling.classList.contains('svgcable') || sibling.classList.contains('svgcableborder') || sibling.classList.contains('cable-hit'))
-		) {
+		if (sibling.tagName === 'path' && (sibling.classList.contains('svgcable') || sibling.classList.contains('svgcableborder') || sibling.classList.contains('cable-hit'))) {
 			toRemove.push(sibling);
 		}
 		sibling = next;

@@ -34,16 +34,7 @@
 			<span v-else class="text-neutral-500 italic">{{ node.value }}</span>
 		</div>
 		<div v-if="isExpandable(node) && expanded.has(node.key) && node.children">
-			<TreeNode
-				v-for="child in node.children"
-				:key="child.key"
-				:node="child"
-				:depth="depth + 1"
-				:expanded="expanded"
-				:get-value-type="getValueType"
-				:is-expandable="isExpandable"
-				@toggle="$emit('toggle', $event)"
-			/>
+			<TreeNode v-for="child in node.children" :key="child.key" :node="child" :depth="depth + 1" :expanded="expanded" :get-value-type="getValueType" :is-expandable="isExpandable" @toggle="$emit('toggle', $event)" />
 		</div>
 	</div>
 </template>
