@@ -25,7 +25,9 @@ export function usePatchFile() {
 		}
 	}
 
-	async function loadSlotPatch(index: number): Promise<{ name: string; patch: any } | null> {
+	async function loadSlotPatch(
+		index: number,
+	): Promise<{ name: string; patch: any } | null> {
 		return slotsStore.loadSlot(SLOT_LABELS[index]);
 	}
 
@@ -49,28 +51,53 @@ export function usePatchFile() {
 		const buffer = new Uint8Array(result.data).buffer;
 		const { PatchParser } = await import('../parser/nmg2PatchParser');
 		const parsedPatch = new PatchParser(buffer).parse() as any;
-		const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		const name = (
+			result.filepath!.split('/').pop() ?? result.filepath!
+		).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
-		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
+		slotsStore.loadPatchFile(
+			uiStore.activeSlot,
+			parsedPatch,
+			name,
+			rawHex,
+			result.filepath!,
+		);
 		applyVariation(parsedPatch);
 	}
 
-	async function handlePatchSelect(item: DiskItem | SynthItem): Promise<void> {
+	async function handlePatchSelect(
+		item: DiskItem | SynthItem,
+	): Promise<void> {
 		if (item.type === 'disk') {
 			if (!window.electronAPI) return;
 			try {
-				const result = await window.electronAPI.patches.load(item.filepath);
+				const result = await window.electronAPI.patches.load(
+					item.filepath,
+				);
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
-				const { PatchParser } = await import('../parser/nmg2PatchParser');
+				const { PatchParser } =
+					await import('../parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				const name = (
+					item.filepath.split('/').pop() ?? item.filepath
+				).replace(/\.(pch2|prf2)$/i, '');
 				const rawHex = stripFileHeader(result.data as number[]);
-				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
+				slotsStore.loadPatchFile(
+					uiStore.activeSlot,
+					parsedPatch,
+					name,
+					rawHex,
+					item.filepath,
+				);
 				applyVariation(parsedPatch);
 				if (device.status === 'connected') {
 					try {
-						await window.cli.run(['upload-patch', uiStore.activeSlot, item.filepath]);
+						await window.cli.run([
+							'upload-patch',
+							uiStore.activeSlot,
+							item.filepath,
+						]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
 					}
@@ -81,7 +108,12 @@ export function usePatchFile() {
 		} else {
 			if (device.status !== 'connected') return;
 			try {
-				await window.cli.run(['select-patch', uiStore.activeSlot, String(item.bank), String(item.location)]);
+				await window.cli.run([
+					'select-patch',
+					uiStore.activeSlot,
+					String(item.bank),
+					String(item.location),
+				]);
 				await slotsStore.loadSlot(uiStore.activeSlot);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
@@ -89,5 +121,10 @@ export function usePatchFile() {
 		}
 	}
 
-	return { handleFileLoad, handlePatchSelect, loadSlotPatch, openFromElectronDialog };
+	return {
+		handleFileLoad,
+		handlePatchSelect,
+		loadSlotPatch,
+		openFromElectronDialog,
+	};
 }

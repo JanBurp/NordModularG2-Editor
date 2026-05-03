@@ -24,7 +24,8 @@
 
 	function onMouseDown(event: MouseEvent | TouchEvent) {
 		isDragging.value = true;
-		startY.value = 'touches' in event ? event.touches[0].clientY : event.clientY;
+		startY.value =
+			'touches' in event ? event.touches[0].clientY : event.clientY;
 		startValue.value = props.value;
 
 		document.addEventListener('mousemove', onMouseMove);
@@ -37,12 +38,16 @@
 		if (!isDragging.value) return;
 		event.preventDefault();
 
-		const clientY = 'touches' in event ? event.touches[0].clientY : event.clientY;
+		const clientY =
+			'touches' in event ? event.touches[0].clientY : event.clientY;
 		const deltaY = startY.value - clientY; // Up is positive
 
 		// Sensitivity: ~3 units per pixel for finer control, clamp to 0-127
 		const sensitivity = 0.3;
-		const newValue = Math.max(0, Math.min(127, Math.round(startValue.value + deltaY * sensitivity)));
+		const newValue = Math.max(
+			0,
+			Math.min(127, Math.round(startValue.value + deltaY * sensitivity)),
+		);
 
 		if (newValue !== props.value) {
 			emit('change', props.paramIndex, newValue);
@@ -63,12 +68,27 @@
 </script>
 
 <template>
-	<g :transform="`translate(${x}, ${y})`" class="slider-control" @mousedown="onMouseDown" @touchstart.passive="onMouseDown" @dblclick="onDoubleClick">
+	<g
+		:transform="`translate(${x}, ${y})`"
+		class="slider-control"
+		@mousedown="onMouseDown"
+		@touchstart.passive="onMouseDown"
+		@dblclick="onDoubleClick"
+	>
 		<!-- Track (hit area) -->
 		<rect width="12" height="62" fill="rgba(44,0,0,0.01)" class="track" />
 
 		<!-- Handle -->
-		<rect width="10" height="6" x="1" fill="url(#g121)" stroke="#333" stroke-width="0.5" :transform="`translate(0, ${handleY})`" :class="{ dragging: isDragging }" />
+		<rect
+			width="10"
+			height="6"
+			x="1"
+			fill="url(#g121)"
+			stroke="#333"
+			stroke-width="0.5"
+			:transform="`translate(0, ${handleY})`"
+			:class="{ dragging: isDragging }"
+		/>
 	</g>
 </template>
 

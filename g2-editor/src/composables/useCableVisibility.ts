@@ -1,5 +1,10 @@
 import { reactive, computed, ref } from 'vue';
-import { CABLE_COLORS, CABLE_COLOR_INDEX_MAP, DEFAULT_CABLE_VISIBILITY, type CableColorName } from '../constants';
+import {
+	CABLE_COLORS,
+	CABLE_COLOR_INDEX_MAP,
+	DEFAULT_CABLE_VISIBILITY,
+	type CableColorName,
+} from '../constants';
 
 export interface CableVisibility {
 	red: boolean;
@@ -18,7 +23,10 @@ export interface Cable {
 }
 
 // Re-export constants for backward compatibility
-export { CABLE_COLORS as cableColors, CABLE_COLOR_INDEX_MAP as COLOR_INDEX_TO_NAME };
+export {
+	CABLE_COLORS as cableColors,
+	CABLE_COLOR_INDEX_MAP as COLOR_INDEX_TO_NAME,
+};
 export type { CableColorName };
 
 export interface PatchDescription {
@@ -47,7 +55,9 @@ export function useCableVisibility() {
 
 	// Computed property for H button - true when all cables are visible
 	const allCablesVisible = computed<boolean>(() => {
-		return cableColors.every((color) => cableVisibility[color.name as keyof CableVisibility]);
+		return cableColors.every(
+			(color) => cableVisibility[color.name as keyof CableVisibility],
+		);
 	});
 
 	// Toggle cable visibility
@@ -76,21 +86,30 @@ export function useCableVisibility() {
 	}
 
 	// Sync visibility state with patch data
-	function syncWithPatchData(description: PatchDescription | null | undefined): void {
+	function syncWithPatchData(
+		description: PatchDescription | null | undefined,
+	): void {
 		if (description) {
 			cableColors.forEach((color) => {
 				if (description[color.name] !== undefined) {
-					cableVisibility[color.name as keyof CableVisibility] = description[color.name] === 1;
+					cableVisibility[color.name as keyof CableVisibility] =
+						description[color.name] === 1;
 				}
 			});
 		}
 	}
 
 	// Update patch data from visibility state
-	function updatePatchData(description: PatchDescription | null | undefined): void {
+	function updatePatchData(
+		description: PatchDescription | null | undefined,
+	): void {
 		if (description) {
 			cableColors.forEach((color) => {
-				description[color.name] = cableVisibility[color.name as keyof CableVisibility] ? 1 : 0;
+				description[color.name] = cableVisibility[
+					color.name as keyof CableVisibility
+				]
+					? 1
+					: 0;
 			});
 		}
 	}

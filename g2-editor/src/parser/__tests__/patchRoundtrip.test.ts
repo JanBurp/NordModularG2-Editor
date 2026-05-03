@@ -1,6 +1,12 @@
 import type { Cable, ModuleInstance, Patch } from '../nmg2PatchParser';
 import { describe, expect, it } from 'vitest';
-import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
+import {
+	mutAddCable,
+	mutAddModule,
+	mutDeleteCable,
+	mutDeleteModule,
+	mutMoveModule,
+} from '../patchMutations';
 
 import { PatchParser } from '../nmg2PatchParser';
 import { fileURLToPath } from 'url';
@@ -13,7 +19,11 @@ const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
-function loadFixture(filename: string): { name: string; rawHex: string; patch: Patch } {
+function loadFixture(filename: string): {
+	name: string;
+	rawHex: string;
+	patch: Patch;
+} {
 	const buf = fs.readFileSync(path.join(FIXTURES, filename));
 	const fileBytes = new Uint8Array(buf);
 	let ofs = 0;
@@ -27,7 +37,9 @@ function loadFixture(filename: string): { name: string; rawHex: string; patch: P
 }
 
 function parsePatchFromRawHex(name: string, rawHex: string): Patch {
-	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const sectionBytes = new Uint8Array(
+		rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+	);
 	const nameBytes = new TextEncoder().encode(name);
 	const pch2 = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
 	pch2.set(nameBytes);
@@ -55,13 +67,24 @@ function modSnap(m: ModuleInstance) {
 
 // Extracts the persisted cable fields
 function cableSnap(c: Cable) {
-	return { colour: c.colour, smod: c.smod, scon: c.scon, dir: c.dir, dmod: c.dmod, dcon: c.dcon };
+	return {
+		colour: c.colour,
+		smod: c.smod,
+		scon: c.scon,
+		dir: c.dir,
+		dmod: c.dmod,
+		dcon: c.dcon,
+	};
 }
 
 function expectPatchEqual(a: Patch, b: Patch) {
 	for (const i of [0, 1] as const) {
-		const modsA = a.areas[i].modules.map(modSnap).sort((x, y) => x.index - y.index);
-		const modsB = b.areas[i].modules.map(modSnap).sort((x, y) => x.index - y.index);
+		const modsA = a.areas[i].modules
+			.map(modSnap)
+			.sort((x, y) => x.index - y.index);
+		const modsB = b.areas[i].modules
+			.map(modSnap)
+			.sort((x, y) => x.index - y.index);
 		expect(modsB).toEqual(modsA);
 
 		const cabsA = (a.areas[i].cableList ?? []).map(cableSnap);
@@ -77,11 +100,18 @@ function expectPatchEqual(a: Patch, b: Patch) {
  *   handleFileLoad: scan for null terminator, slice from ofs+3 to get rawHex
  * Returns { rawHex, patch } as the app would see them after re-loading.
  */
-function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string; patch: Patch } {
+function simulateFileSaveAndLoad(
+	name: string,
+	rawHex: string,
+): { rawHex: string; patch: Patch } {
 	// saveSlot path: prepend name header
-	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const sectionBytes = new Uint8Array(
+		rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
+	);
 	const nameBytes = new TextEncoder().encode(name);
-	const fileBytes = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
+	const fileBytes = new Uint8Array(
+		nameBytes.length + 3 + sectionBytes.length,
+	);
 	fileBytes.set(nameBytes);
 	fileBytes[nameBytes.length] = 0x00;
 	fileBytes[nameBytes.length + 1] = 0x17;
@@ -102,7 +132,11 @@ function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string
 // ── tests ─────────────────────────────────────────────────────────────────────
 
 describe('patch round-trip: parse → serialize → parse', () => {
-	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
+	for (const file of [
+		'EmptyPatch.pch2',
+		'Basics  NL2.pch2',
+		'DXBass FM4.pch2',
+	]) {
 		it(file, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 			const newHex = serializePatch(name, patchA, rawHex);
@@ -126,7 +160,13 @@ describe('deleteCable', () => {
 
 		const cabsB = patchB.areas[1].cableList ?? [];
 		expect(cabsB).toHaveLength(remainingCount);
-		const found = cabsB.find((c) => c.smod === target.smod && c.scon === target.scon && c.dmod === target.dmod && c.dcon === target.dcon);
+		const found = cabsB.find(
+			(c) =>
+				c.smod === target.smod &&
+				c.scon === target.scon &&
+				c.dmod === target.dmod &&
+				c.dcon === target.dcon,
+		);
 		expect(found).toBeUndefined();
 	});
 });
@@ -139,10 +179,14 @@ describe('deleteModule', () => {
 		expect(modules.length).toBeGreaterThan(0);
 
 		// Pick first module that has at least one cable
-		const target = modules.find((m) => cables.some((c) => c.smod === m.index || c.dmod === m.index))!;
+		const target = modules.find((m) =>
+			cables.some((c) => c.smod === m.index || c.dmod === m.index),
+		)!;
 		expect(target).toBeDefined();
 
-		const connectedCables = cables.filter((c) => c.smod === target.index || c.dmod === target.index).length;
+		const connectedCables = cables.filter(
+			(c) => c.smod === target.index || c.dmod === target.index,
+		).length;
 		const expectedMods = modules.length - 1;
 		const expectedCables = cables.length - connectedCables;
 
@@ -152,8 +196,12 @@ describe('deleteModule', () => {
 
 		expect(patchB.areas[1].modules).toHaveLength(expectedMods);
 		expect(patchB.areas[1].cableList ?? []).toHaveLength(expectedCables);
-		expect(patchB.areas[1].modules.find((m) => m.index === target.index)).toBeUndefined();
-		const leftoverCables = (patchB.areas[1].cableList ?? []).filter((c) => c.smod === target.index || c.dmod === target.index);
+		expect(
+			patchB.areas[1].modules.find((m) => m.index === target.index),
+		).toBeUndefined();
+		const leftoverCables = (patchB.areas[1].cableList ?? []).filter(
+			(c) => c.smod === target.index || c.dmod === target.index,
+		);
 		expect(leftoverCables).toHaveLength(0);
 	});
 });
@@ -172,7 +220,9 @@ describe('moveModule', () => {
 		const newHex = serializePatch(name, patch, rawHex);
 		const patchB = parsePatchFromRawHex(name, newHex);
 
-		const moved = patchB.areas[1].modules.find((m) => m.index === target.index)!;
+		const moved = patchB.areas[1].modules.find(
+			(m) => m.index === target.index,
+		)!;
 		expect(moved).toBeDefined();
 		expect(moved.horiz).toBe(newCol);
 		expect(moved.vert).toBe(newRow);
@@ -223,7 +273,8 @@ describe('addModule', () => {
 		// 2-Out module (type 4): 3 params, 0 modes
 		const pcnt = 3;
 		const lv: number[] = Array(pcnt * 9);
-		for (let v = 0; v < 9; v++) for (let p = 0; p < pcnt; p++) lv[v * pcnt + p] = p + 10; // arbitrary distinct values
+		for (let v = 0; v < 9; v++)
+			for (let p = 0; p < pcnt; p++) lv[v * pcnt + p] = p + 10; // arbitrary distinct values
 
 		const mod: ModuleInstance = {
 			type: 4,
@@ -254,7 +305,14 @@ describe('addCable', () => {
 		const existingCount = (patch.areas[1].cableList ?? []).length;
 
 		// Use module indices that exist in FMritm (index 1 and 2 confirmed above)
-		const newCable: Cable = { colour: 2, smod: 2, scon: 0, dir: 1, dmod: 1, dcon: 0 };
+		const newCable: Cable = {
+			colour: 2,
+			smod: 2,
+			scon: 0,
+			dir: 1,
+			dmod: 1,
+			dcon: 0,
+		};
 		mutAddCable(patch, 1, newCable);
 
 		const newHex = serializePatch(name, patch, rawHex);
@@ -262,7 +320,14 @@ describe('addCable', () => {
 
 		const cables = patchB.areas[1].cableList ?? [];
 		expect(cables).toHaveLength(existingCount + 1);
-		const found = cables.find((c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2);
+		const found = cables.find(
+			(c) =>
+				c.smod === 2 &&
+				c.scon === 0 &&
+				c.dmod === 1 &&
+				c.dcon === 0 &&
+				c.colour === 2,
+		);
 		expect(found).toBeDefined();
 	});
 });
@@ -289,7 +354,14 @@ describe('chained edits round-trip', () => {
 		mutAddModule(patch, 1, newMod);
 
 		// 2. Add a cable from the new module (output 0) to module index 1 (input 0)
-		const newCable: Cable = { colour: 1, smod: newModId, scon: 0, dir: 1, dmod: 1, dcon: 0 };
+		const newCable: Cable = {
+			colour: 1,
+			smod: newModId,
+			scon: 0,
+			dir: 1,
+			dmod: 1,
+			dcon: 0,
+		};
 		mutAddCable(patch, 1, newCable);
 
 		// 3. Move an existing module
@@ -299,19 +371,29 @@ describe('chained edits round-trip', () => {
 		mutMoveModule(patch, 1, 2, movedCol, movedRow);
 
 		// 4. Delete the first cable (before our additions)
-		const firstCable = (patch.areas[1].cableList ?? []).find((c) => c.smod !== newModId && c.dmod !== newModId)!;
+		const firstCable = (patch.areas[1].cableList ?? []).find(
+			(c) => c.smod !== newModId && c.dmod !== newModId,
+		)!;
 		mutDeleteCable(patch, 1, firstCable);
 
 		// Snapshot of patch state before serialization
-		const modulesBeforeSerialize = patch.areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
-		const cablesBeforeSerialize = (patch.areas[1].cableList ?? []).map(cableSnap);
+		const modulesBeforeSerialize = patch.areas[1].modules
+			.map(modSnap)
+			.sort((a, b) => a.index - b.index);
+		const cablesBeforeSerialize = (patch.areas[1].cableList ?? []).map(
+			cableSnap,
+		);
 
 		// Serialize → re-parse
 		const newHex = serializePatch(name, patch, rawHex);
 		const patchB = parsePatchFromRawHex(name, newHex);
 
-		const modulesAfterParse = patchB.areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
-		const cablesAfterParse = (patchB.areas[1].cableList ?? []).map(cableSnap);
+		const modulesAfterParse = patchB.areas[1].modules
+			.map(modSnap)
+			.sort((a, b) => a.index - b.index);
+		const cablesAfterParse = (patchB.areas[1].cableList ?? []).map(
+			cableSnap,
+		);
 
 		expect(modulesAfterParse).toEqual(modulesBeforeSerialize);
 		expect(cablesAfterParse).toEqual(cablesBeforeSerialize);
@@ -319,7 +401,11 @@ describe('chained edits round-trip', () => {
 });
 
 describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)', () => {
-	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
+	for (const file of [
+		'EmptyPatch.pch2',
+		'Basics  NL2.pch2',
+		'DXBass FM4.pch2',
+	]) {
 		it(`unmodified patch — ${file}`, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 
@@ -327,7 +413,8 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 			const savedRawHex = serializePatch(name, patchA, rawHex);
 
 			// Simulate save then load: prepend name header, strip it back
-			const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+			const { rawHex: loadedRawHex, patch: patchB } =
+				simulateFileSaveAndLoad(name, savedRawHex);
 
 			// rawHex must survive the file cycle unchanged
 			expect(loadedRawHex).toEqual(savedRawHex);
@@ -368,11 +455,21 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		};
 		mutAddModule(patch, 1, mod2);
 
-		const cable: Cable = { colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 };
+		const cable: Cable = {
+			colour: 1,
+			smod: 1,
+			scon: 0,
+			dir: 1,
+			dmod: 2,
+			dcon: 0,
+		};
 		mutAddCable(patch, 1, cable);
 
 		const savedRawHex = serializePatch(name, patch, rawHex);
-		const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+		const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(
+			name,
+			savedRawHex,
+		);
 
 		expect(loadedRawHex).toEqual(savedRawHex);
 		expect(patchB.areas[1].modules).toHaveLength(2);

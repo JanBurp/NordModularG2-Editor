@@ -1,5 +1,8 @@
 <template>
-	<svg style="position: absolute; width: 0; height: 0; overflow: hidden" aria-hidden="true">
+	<svg
+		style="position: absolute; width: 0; height: 0; overflow: hidden"
+		aria-hidden="true"
+	>
 		<SvgGradientDefs />
 	</svg>
 	<div class="flex flex-col h-screen">
@@ -9,17 +12,45 @@
 				<ToolBarText class="w-32">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Master Clock</ToolBarLabel>
 				<ToolBarText class="w-10">{{ device.bpm }}</ToolBarText>
-				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
+				<Button variant="toggle"
+					><span v-if="device.clockRunning">Run</span
+					><span v-else>Stop</span></Button
+				>
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
-				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
+				<BtnGroup
+					:model-value="uiStore.selectedSlotIndex"
+					:options="SLOT_OPTIONS"
+					variant="toggle"
+					@update:model-value="handleSlotClick"
+				/>
 			</template>
 
-			<Button variant="file" accept=".pch2,.prf2" @change="patchFile.handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.templateRawHex">Save Patch</Button>
+			<Button
+				variant="file"
+				accept=".pch2,.prf2"
+				@change="patchFile.handleFileLoad"
+				>Load Patch</Button
+			>
+			<Button
+				variant="default"
+				:disabled="
+					!slotsStore.slots[uiStore.activeSlot]?.templateRawHex
+				"
+				>Save Patch</Button
+			>
 
 			<ToolBarDivider />
 
-			<BtnGroup class="ml-auto" :model-value="uiStore.rightPaneTab" :options="PANE_TAB_OPTIONS" variant="tab" @update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)" @toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)" />
+			<BtnGroup
+				class="ml-auto"
+				:model-value="uiStore.rightPaneTab"
+				:options="PANE_TAB_OPTIONS"
+				variant="tab"
+				@update:model-value="
+					(tab) => uiStore.toggleSidebar(tab as PaneTab)
+				"
+				@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
+			/>
 		</ToolBar>
 
 		<ToolBar v-if="patchName">
@@ -27,8 +58,16 @@
 
 			<div class="flex items-center gap-1.5">
 				<ToolBarLabel>Cat:</ToolBarLabel>
-				<select v-model="selectedCategory" class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow" title="Sound Category">
-					<option v-for="cat in soundCategories" :key="cat.id" :value="cat.id">
+				<select
+					v-model="selectedCategory"
+					class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+					title="Sound Category"
+				>
+					<option
+						v-for="cat in soundCategories"
+						:key="cat.id"
+						:value="cat.id"
+					>
 						{{ cat.name }}
 					</option>
 				</select>
@@ -36,13 +75,22 @@
 
 			<ToolBarDivider />
 
-			<BtnGroup v-model="uiStore.area" :options="AREA_OPTIONS" variant="toggle" />
+			<BtnGroup
+				v-model="uiStore.area"
+				:options="AREA_OPTIONS"
+				variant="toggle"
+			/>
 
 			<ToolBarDivider />
 
 			<div class="flex items-center gap-2">
 				<span class="text-xs font-semibold text-neutral-400">Var:</span>
-				<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="handleVariationClick" />
+				<BtnGroup
+					v-model="uiStore.variation"
+					:options="VARIATION_OPTIONS"
+					variant="variation"
+					@update:model-value="handleVariationClick"
+				/>
 			</div>
 
 			<ToolBarDivider />
@@ -57,22 +105,52 @@
 						v-for="color in cableColors"
 						:key="color.name"
 						class="w-5 h-5 border-2 border-solid rounded cursor-pointer p-0 flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
-						:class="{ 'opacity-100 shadow-sm': cableVisibility[color.name] }"
-						:style="{ backgroundColor: color.hex, borderColor: color.hex }"
-						:title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
+						:class="{
+							'opacity-100 shadow-sm':
+								cableVisibility[color.name],
+						}"
+						:style="{
+							backgroundColor: color.hex,
+							borderColor: color.hex,
+						}"
+						:title="
+							color.label +
+							(cableVisibility[color.name]
+								? ' (visible)'
+								: ' (hidden)')
+						"
 						@click="toggleCableVisibility(color.name)"
 					>
-						<span class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200" :class="{ 'opacity-100': cableVisibility[color.name] }" :style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"></span>
+						<span
+							class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
+							:class="{
+								'opacity-100': cableVisibility[color.name],
+							}"
+							:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
+						></span>
 					</button>
 					<button
 						class="w-6 h-5 border-2 border-neutral-600 rounded bg-gray-300 text-gray-800 text-xs font-bold hover:bg-gray-200"
-						:class="{ 'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible }"
-						:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
+						:class="{
+							'bg-gray-500 border-neutral-500 text-white shadow':
+								allCablesVisible,
+						}"
+						:title="
+							allCablesVisible
+								? 'Hide all cables'
+								: 'Show all cables'
+						"
 						@click="toggleShowHideAll"
 					>
 						H
 					</button>
-					<button class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400" title="Re-render cables" @click="shakeCables">S</button>
+					<button
+						class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
+						title="Re-render cables"
+						@click="shakeCables"
+					>
+						S
+					</button>
 				</div>
 			</div>
 		</ToolBar>
@@ -119,12 +197,24 @@
 						@module-label-edit="handleModuleLabelEdit"
 					/>
 				</template>
-				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
+				<div
+					v-else
+					class="flex items-center justify-center h-full text-neutral-500 text-sm"
+				>
+					Load a .pch2 or .prf2 file to begin
+				</div>
 			</div>
 
 			<SidePanel v-if="uiStore.showRightPane">
-				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-				<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
+				<ModulesPane
+					v-show="uiStore.rightPaneTab === 'modules'"
+					:isActive="uiStore.rightPaneTab === 'modules'"
+				/>
+				<PatchBrowser
+					v-show="uiStore.rightPaneTab === 'browser'"
+					:isActive="uiStore.rightPaneTab === 'browser'"
+					@select="patchFile.handlePatchSelect"
+				/>
 				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
 			</SidePanel>
 		</div>
@@ -132,8 +222,17 @@
 		<StatusBar @toggle-connection="toggleConnection" />
 	</div>
 
-	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
-		<input v-model="editingLabel" class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400" maxlength="16" />
+	<Dialog
+		v-model="showLabelDialog"
+		title="Rename Module"
+		@confirm="confirmModuleLabel"
+		@cancel="showLabelDialog = false"
+	>
+		<input
+			v-model="editingLabel"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			maxlength="16"
+		/>
 	</Dialog>
 </template>
 
@@ -167,7 +266,14 @@
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useBrowserStore } from './store/browser';
 
-	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
+	import {
+		SOUND_CATEGORIES as soundCategories,
+		SLOT_LABELS,
+		SLOT_OPTIONS,
+		PANE_TAB_OPTIONS,
+		AREA_OPTIONS,
+		VARIATION_OPTIONS,
+	} from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 
 	const device = useDeviceStore();
@@ -177,16 +283,34 @@
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
 
-	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
-	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 1));
-	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 1));
-	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
-	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
-	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
-	const currentCables = computed(() => (uiStore.area === 1 ? voiceCables.value : fxCables.value));
-	const patchName = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
+	const currentPatch = computed(() =>
+		slotsStore.getPatchForSlot(uiStore.activeSlot),
+	);
+	const voiceModules = computed(() =>
+		slotsStore.getAreaModules(uiStore.activeSlot, 1),
+	);
+	const voiceCables = computed(() =>
+		slotsStore.getAreaCables(uiStore.activeSlot, 1),
+	);
+	const fxModules = computed(() =>
+		slotsStore.getAreaModules(uiStore.activeSlot, 0),
+	);
+	const fxCables = computed(() =>
+		slotsStore.getAreaCables(uiStore.activeSlot, 0),
+	);
+	const currentModules = computed(() =>
+		uiStore.area === 1 ? voiceModules.value : fxModules.value,
+	);
+	const currentCables = computed(() =>
+		uiStore.area === 1 ? voiceCables.value : fxCables.value,
+	);
+	const patchName = computed(() =>
+		slotsStore.getPatchName(uiStore.activeSlot),
+	);
 
-	function applySlotResult(result: { patch: any; name: string } | null): void {
+	function applySlotResult(
+		result: { patch: any; name: string } | null,
+	): void {
 		if (result?.patch?.description?.variation !== undefined) {
 			uiStore.variation = result.patch.description.variation;
 		}
@@ -195,35 +319,90 @@
 	// ── Cable / selection ─────────────────────────────────────────────────────
 
 	function handleCableClick(cable: Cable): void {
-		const same = (a: Cable, b: Cable) => a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
-		uiStore.selectedCable = uiStore.selectedCable && same(uiStore.selectedCable, cable) ? null : cable;
+		const same = (a: Cable, b: Cable) =>
+			a.smod === b.smod &&
+			a.scon === b.scon &&
+			a.dmod === b.dmod &&
+			a.dcon === b.dcon;
+		uiStore.selectedCable =
+			uiStore.selectedCable && same(uiStore.selectedCable, cable)
+				? null
+				: cable;
 	}
 
 	async function deleteSelection(): Promise<void> {
 		try {
-			await slotsStore.deleteSelection(uiStore.selectedModules, uiStore.selectedCable, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value, currentCables.value);
+			await slotsStore.deleteSelection(
+				uiStore.selectedModules,
+				uiStore.selectedCable,
+				uiStore.area === 1 ? 'voice' : 'fx',
+				currentModules.value,
+				currentCables.value,
+			);
 		} finally {
 			uiStore.clearSelection();
 			uiStore.selectedCable = null;
 		}
 	}
 
-	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }): Promise<void> {
-		applySlotResult(await slotsStore.moveModuleWithCollision(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+	async function handleModuleMove({
+		moduleIndex,
+		col,
+		row,
+	}: {
+		moduleIndex: number;
+		col: number;
+		row: number;
+	}): Promise<void> {
+		applySlotResult(
+			await slotsStore.moveModuleWithCollision(
+				moduleIndex,
+				col,
+				row,
+				uiStore.area === 1 ? 'voice' : 'fx',
+				currentModules.value,
+			),
+		);
 	}
 
-	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
-		applySlotResult(await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+	async function handleModuleDrop({
+		typeId,
+		col,
+		row,
+	}: {
+		typeId: number;
+		col: number;
+		row: number;
+	}): Promise<void> {
+		applySlotResult(
+			await slotsStore.dropModuleWithCollision(
+				typeId,
+				col,
+				row,
+				uiStore.area === 1 ? 'voice' : 'fx',
+				currentModules.value,
+			),
+		);
 	}
 
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
-	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
+	function handleParamChange(
+		moduleIndex: number,
+		paramIndex: number,
+		value: number,
+	): void {
 		if (device.status !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
 			try {
-				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
+				await slotsStore.setParam(
+					moduleIndex,
+					paramIndex,
+					value,
+					uiStore.variation,
+					uiStore.area === 1 ? 'voice' : 'fx',
+				);
 			} catch {
 				/* G2 may be temporarily busy */
 			}
@@ -236,7 +415,13 @@
 	const editingLabel = ref('');
 	const editingModuleId = ref<number | null>(null);
 
-	function handleModuleLabelEdit({ moduleIndex, currentLabel }: { moduleIndex: number; currentLabel: string }): void {
+	function handleModuleLabelEdit({
+		moduleIndex,
+		currentLabel,
+	}: {
+		moduleIndex: number;
+		currentLabel: string;
+	}): void {
 		editingModuleId.value = moduleIndex;
 		editingLabel.value = currentLabel;
 		showLabelDialog.value = true;
@@ -245,7 +430,11 @@
 	async function confirmModuleLabel(): Promise<void> {
 		if (editingModuleId.value === null) return;
 		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setModuleLabel(editingModuleId.value, editingLabel.value, area as 'voice' | 'fx');
+		await slotsStore.setModuleLabel(
+			editingModuleId.value,
+			editingLabel.value,
+			area as 'voice' | 'fx',
+		);
 		showLabelDialog.value = false;
 	}
 
@@ -264,24 +453,44 @@
 		uiStore.activeSlot = slot;
 		slotsStore.activeSlot = slot;
 		const patch = slotsStore.slots[slot]?.patch;
-		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
-		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
+		if (patch?.description?.variation !== undefined)
+			uiStore.variation = patch.description.variation;
+		if (device.status === 'connected')
+			applySlotResult(await slotsStore.selectSlot(slot));
 	}
 
 	async function handleVariationClick(variationIndex: number): Promise<void> {
 		uiStore.variation = variationIndex;
 		const patch = slotsStore.slots[uiStore.activeSlot]?.patch;
 		if (patch?.description) patch.description.variation = variationIndex;
-		if (device.status === 'connected') await slotsStore.selectVariation(variationIndex);
+		if (device.status === 'connected')
+			await slotsStore.selectVariation(variationIndex);
 	}
 
 	// ── G2 connection ─────────────────────────────────────────────────────────
 
-	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
+	const {
+		connectDevice,
+		toggleConnection,
+		hardwareVariationChange,
+		hardwareSlotChange,
+	} = useG2();
 
-	const { cableColors, cableVisibility, cableShakeTrigger, allCablesVisible, toggleCableVisibility, toggleShowHideAll, shakeCables, syncWithPatchData, updatePatchData } = useCableVisibility();
+	const {
+		cableColors,
+		cableVisibility,
+		cableShakeTrigger,
+		allCablesVisible,
+		toggleCableVisibility,
+		toggleShowHideAll,
+		shakeCables,
+		syncWithPatchData,
+		updatePatchData,
+	} = useCableVisibility();
 
-	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
+	const { selectedCategory } = usePatchCategory(
+		computed(() => currentPatch.value),
+	);
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -298,8 +507,18 @@
 				case 'new-performance': {
 					const emptyPatch = {
 						areas: [
-							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
-							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{
+								name: 'fx',
+								modules: [],
+								cableList: [],
+								paramaterDataOfs: 0,
+							},
+							{
+								name: 'voice',
+								modules: [],
+								cableList: [],
+								paramaterDataOfs: 0,
+							},
 						],
 						description: {
 							voices: 1,
@@ -317,32 +536,49 @@
 							category: 0,
 						},
 					};
-					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					slotsStore.loadPatchFile(
+						uiStore.activeSlot,
+						emptyPatch,
+						'Untitled',
+					);
 					break;
 				}
 				case 'open':
 					await patchFile.openFromElectronDialog();
-					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					if (
+						currentPatch.value?.description?.variation !== undefined
+					)
+						uiStore.variation =
+							currentPatch.value.description.variation;
 					break;
 				case 'save':
-					if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex) await slotsStore.saveSlot(uiStore.activeSlot);
+					if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex)
+						await slotsStore.saveSlot(uiStore.activeSlot);
 					break;
 				case 'save-as': {
-					if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
+					if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex)
+						break;
 					const result = await window.electronAPI.showSaveDialog();
-					if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+					if (result.success && result.filepath)
+						await slotsStore.saveSlot(
+							uiStore.activeSlot,
+							result.filepath,
+						);
 					break;
 				}
 				case 'save-all':
 					for (const s of SLOT_LABELS) {
-						if (slotsStore.slots[s]?.templateRawHex) await slotsStore.saveSlot(s);
+						if (slotsStore.slots[s]?.templateRawHex)
+							await slotsStore.saveSlot(s);
 					}
 					break;
 				case 'delete':
 					await deleteSelection();
 					break;
 				case 'select-all':
-					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number));
+					uiStore.selectModules(
+						currentModules.value.map((m: any) => m.index as number),
+					);
 					break;
 				case 'toggle-modules':
 					uiStore.toggleSidebar('modules');
@@ -373,7 +609,11 @@
 
 		await connectDevice();
 		if (device.status === 'connected') {
-			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
+			const focusLabel = (
+				device.device?.patches?.focus ??
+				device.device?.performance?.focus ??
+				'a'
+			).toUpperCase();
 			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
@@ -403,7 +643,8 @@
 		device.setActiveSlot(slot);
 		uiStore.activeSlot = slot;
 		slotsStore.activeSlot = slot;
-		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
+		if (device.status === 'connected')
+			applySlotResult(await slotsStore.loadSlot(slot));
 	});
 
 	watch(hardwareVariationChange, (change) => {
@@ -412,7 +653,8 @@
 		if (changeSlot !== device.getActiveSlot) return;
 		uiStore.variation = change.variation;
 		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;
-		if (activePatch?.description) activePatch.description.variation = change.variation;
+		if (activePatch?.description)
+			activePatch.description.variation = change.variation;
 	});
 
 	watch(
