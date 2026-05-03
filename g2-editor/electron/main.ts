@@ -179,11 +179,11 @@ ipcMain.handle("patch:save", async (_, filepath: string, data: number[]) => {
 	fs.writeFileSync(filepath, Buffer.from(data));
 });
 
-ipcMain.handle("patch:save-dialog", async (event) => {
+ipcMain.handle("patch:save-dialog", async (event, defaultName?: string) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showSaveDialog(browserWin!, {
 		filters: [{ name: "Patch Files", extensions: ["pch2"] }],
-		defaultPath: "patch.pch2",
+		defaultPath: defaultName ? `${defaultName}.pch2` : "patch.pch2",
 	});
 	if (result.canceled || !result.filePath) return { success: false };
 	return { success: true, filepath: result.filePath };

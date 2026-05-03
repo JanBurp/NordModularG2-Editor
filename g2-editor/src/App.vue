@@ -14,9 +14,6 @@
 				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
 			</template>
 
-			<Button variant="file" accept=".pch2,.prf2" @change="patchFile.handleFileLoad">Load Patch</Button>
-			<Button variant="default" :disabled="!slotsStore.slots[uiStore.activeSlot]?.templateRawHex">Save Patch</Button>
-
 			<ToolBarDivider />
 
 			<BtnGroup
@@ -182,7 +179,6 @@
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import ModulesPane from './components/panels/ModulesPane.vue';
-	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';
 	import ToolBar from './components/toolbar/ToolBar.vue';
 	import ToolBarLabel from './components/toolbar/ToolBarLabel.vue';
@@ -384,7 +380,8 @@
 					break;
 				case 'save-as': {
 					if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
-					const result = await window.electronAPI.showSaveDialog();
+					const name = slotsStore.slots[uiStore.activeSlot].name;
+					const result = await window.electronAPI.showSaveDialog(name);
 					if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
 					break;
 				}

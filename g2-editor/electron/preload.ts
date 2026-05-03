@@ -13,7 +13,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 	savePatch: (filepath: string, data: number[]) =>
 		ipcRenderer.invoke("patch:save", filepath, data),
-	showSaveDialog: () => ipcRenderer.invoke("patch:save-dialog"),
+	showSaveDialog: (defaultName?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName),
 	openPatchDialog: () => ipcRenderer.invoke("patch:open-dialog"),
 });
 

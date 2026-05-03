@@ -381,8 +381,12 @@ export const useSlotsStore = defineStore('slots', {
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
 			const entry = this.slots[slot];
 			if (!entry?.patch) return;
-			const path = filepath || this.slotFilePaths[slot];
-			if (!path) return;
+			let path = filepath || this.slotFilePaths[slot];
+			if (!path) {
+				const result = await window.electronAPI.showSaveDialog(entry.name);
+				if (!result.success || !result.filepath) return;
+				path = result.filepath;
+			}
 			if (!entry.rawHex) {
 				if (!entry.templateRawHex) return;
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');

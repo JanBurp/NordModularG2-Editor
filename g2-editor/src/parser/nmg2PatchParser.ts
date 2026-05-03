@@ -372,6 +372,7 @@ function pch2_(data: ArrayBuffer) {
 		const siz = filedata.getInt16(ofs + 1);
 		if (type in g2section) {
 			res += '\n' + g2section[type][0] + ':offset=0x' + (textHdrLen + ofs).toString(16);
+			// eslint-disable-next-line @typescript-eslint/no-unused-vars
 			if (g2section[type][1]) res += g2section[type][1](new Int8Array(data, textHdrLen + ofs + 3, siz));
 		}
 		ofs += siz + 3;

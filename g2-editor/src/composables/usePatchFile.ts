@@ -4,7 +4,6 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 const { PatchParser } = await import('../parser/nmg2PatchParser');
 
-
 type DiskItem = { type: 'disk'; filepath: string };
 type SynthItem = { type: 'synth'; bank: number; location: number };
 
