@@ -1,4 +1,4 @@
-import { defineStore } from "pinia";
+import { defineStore } from 'pinia';
 
 export interface SynthPatch {
 	bank: number;
@@ -13,23 +13,23 @@ export interface DiskEntry {
 	isDir: boolean;
 }
 
-export const useBrowserStore = defineStore("browser", {
+export const useBrowserStore = defineStore('browser', {
 	state: () => ({
-		view: "patches" as "patches" | "performances" | "disk",
-		synthPatches:       [] as SynthPatch[],
-		synthPerformances:  [] as SynthPatch[],
-		collapsedBanks:     [] as number[],
-		diskFolder: "" as string,
+		view: 'patches' as 'patches' | 'performances' | 'disk',
+		synthPatches: [] as SynthPatch[],
+		synthPerformances: [] as SynthPatch[],
+		collapsedBanks: [] as number[],
+		diskFolder: '' as string,
 		diskEntries: [] as DiskEntry[],
 		loading: false,
-		error:   "" as string,
+		error: '' as string,
 	}),
 
 	actions: {
 		/* Populate from startup JSON `names` field (avoids extra `list` call) */
 		applyNamesData(names: any): void {
 			const patches: SynthPatch[] = [];
-			const perfs:   SynthPatch[] = [];
+			const perfs: SynthPatch[] = [];
 			for (const [bankStr, entries] of Object.entries(names?.patches ?? {})) {
 				for (const e of entries as any[]) {
 					patches.push({ bank: Number(bankStr), location: e.location, name: e.name, category: e.category });
@@ -40,16 +40,16 @@ export const useBrowserStore = defineStore("browser", {
 					perfs.push({ bank: Number(bankStr), location: e.location, name: e.name });
 				}
 			}
-			this.synthPatches      = patches;
+			this.synthPatches = patches;
 			this.synthPerformances = perfs;
 		},
 
 		/* Fallback: load list with separate CLI call */
 		async loadSynthList(): Promise<void> {
 			this.loading = true;
-			this.error = "";
+			this.error = '';
 			try {
-				const output = await window.cli.run(["list"]);
+				const output = await window.cli.run(['list']);
 				this.applyNamesData(JSON.parse(output));
 			} catch (e: any) {
 				this.error = e.message;
@@ -71,11 +71,11 @@ export const useBrowserStore = defineStore("browser", {
 		async loadDiskList(folder: string): Promise<void> {
 			this.diskFolder = folder;
 			this.loading = true;
-			this.error = "";
+			this.error = '';
 			try {
 				const result = await window.electronAPI.patches.list(folder);
 				this.diskEntries = result.success ? result.entries : [];
-				if (!result.success) this.error = result.error ?? "Failed to list files";
+				if (!result.success) this.error = result.error ?? 'Failed to list files';
 			} catch (e: any) {
 				this.error = e.message;
 			} finally {
@@ -85,7 +85,7 @@ export const useBrowserStore = defineStore("browser", {
 
 		async navigateUp(): Promise<void> {
 			if (!this.diskFolder) return;
-			const parent = this.diskFolder.split("/").slice(0, -1).join("/") || "/";
+			const parent = this.diskFolder.split('/').slice(0, -1).join('/') || '/';
 			await this.loadDiskList(parent);
 		},
 

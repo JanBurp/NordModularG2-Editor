@@ -10,10 +10,7 @@ interface ModuleInstance {
 	vert?: number;
 }
 
-export function useModuleSelecting(
-	svgEl: Ref<SVGSVGElement | null>,
-	modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>,
-) {
+export function useModuleSelecting(svgEl: Ref<SVGSVGElement | null>, modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>) {
 	const uiStore = useUiStore();
 
 	const dragStart = ref<{ x: number; y: number } | null>(null);

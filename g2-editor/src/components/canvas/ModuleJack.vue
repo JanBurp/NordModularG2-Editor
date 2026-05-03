@@ -13,7 +13,7 @@
 
 	const emit = defineEmits<{
 		jackDragStart: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
-		jackDragEnd:   [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
+		jackDragEnd: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string }];
 	}>();
 
 	const jackColor = JACK_COLORS[props.colour] || props.colour;

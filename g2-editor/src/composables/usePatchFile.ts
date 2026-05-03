@@ -3,8 +3,8 @@ import { useUiStore } from '../store/ui';
 import { useDeviceStore } from '../store/device';
 import { SLOT_LABELS } from '../constants';
 
-type DiskItem   = { type: 'disk'; filepath: string };
-type SynthItem  = { type: 'synth'; bank: number; location: number };
+type DiskItem = { type: 'disk'; filepath: string };
+type SynthItem = { type: 'synth'; bank: number; location: number };
 
 function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;
@@ -16,8 +16,8 @@ function stripFileHeader(bytes: number[] | Uint8Array): string {
 
 export function usePatchFile() {
 	const slotsStore = useSlotsStore();
-	const uiStore    = useUiStore();
-	const device     = useDeviceStore();
+	const uiStore = useUiStore();
+	const device = useDeviceStore();
 
 	function applyVariation(parsedPatch: any): void {
 		if (parsedPatch?.description?.variation !== undefined) {
@@ -31,12 +31,12 @@ export function usePatchFile() {
 
 	async function handleFileLoad(event: Event): Promise<void> {
 		const input = event.target as HTMLInputElement;
-		const file  = input.files?.[0];
+		const file = input.files?.[0];
 		if (!file) return;
 		const buffer = await file.arrayBuffer();
 		const { PatchParser } = await import('../parser/nmg2PatchParser');
 		const parsedPatch = new PatchParser(buffer).parse() as any;
-		const name   = file.name.replace(/\.(pch2|prf2)$/i, '');
+		const name = file.name.replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(new Uint8Array(buffer));
 		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex);
 		applyVariation(parsedPatch);
@@ -49,7 +49,7 @@ export function usePatchFile() {
 		const buffer = new Uint8Array(result.data).buffer;
 		const { PatchParser } = await import('../parser/nmg2PatchParser');
 		const parsedPatch = new PatchParser(buffer).parse() as any;
-		const name   = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
 		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
@@ -64,7 +64,7 @@ export function usePatchFile() {
 				const buffer = new Uint8Array(result.data).buffer;
 				const { PatchParser } = await import('../parser/nmg2PatchParser');
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const name   = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				const rawHex = stripFileHeader(result.data as number[]);
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);

@@ -47,12 +47,7 @@ export function formatValue(value: number, paramType: string): string {
 	return String(value);
 }
 
-export function formatCombinedValue(
-	refIndices: number[],
-	funcName: string | undefined,
-	params: ModuleDefinition['params'],
-	values: number[],
-): string {
+export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
 	if (!params) return '';
 
 	const firstParam = params[refIndices[0]];

@@ -28,10 +28,14 @@ export function useJackPatching() {
 		if (src.type === info.type) return; // can't connect two inputs or two outputs
 
 		const output = src.type === 'output' ? src : info;
-		const input  = src.type === 'input'  ? src : info;
+		const input = src.type === 'input' ? src : info;
 		await slotsStore.addCable(
-			output.moduleIndex, 1, output.connectorIndex,
-			input.moduleIndex,  0, input.connectorIndex,
+			output.moduleIndex,
+			1,
+			output.connectorIndex,
+			input.moduleIndex,
+			0,
+			input.connectorIndex,
 			uiStore.area === 1 ? 'voice' : 'fx',
 			jackColourToIndex(output.colour),
 		);

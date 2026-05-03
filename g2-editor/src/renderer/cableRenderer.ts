@@ -4,10 +4,10 @@
  * Handles rendering of patch cables between modules
  */
 
-import { Patchcord } from "./patchcord";
-import { svgPath, svgGroup } from "./svgUtils";
-import { CABLE_SVG_COLORS } from "../constants";
-import { getModule } from "./nmg2mods";
+import { Patchcord } from './patchcord';
+import { svgPath, svgGroup } from './svgUtils';
+import { CABLE_SVG_COLORS } from '../constants';
+import { getModule } from './nmg2mods';
 
 /**
  * Represents a cable connection
@@ -77,12 +77,7 @@ function isSameCable(a: Cable, b: Cable): boolean {
 	return a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
 }
 
-export function makePatchCables(
-	modules: Module[],
-	cables: Cable[],
-	svgElement: SVGElement,
-	options?: CableRenderOptions,
-): void {
+export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
@@ -130,34 +125,34 @@ export function makePatchCables(
 		// All three paths share the same data-cable-key so they can be queried/removed together.
 		// The border also carries connection data for updateCablePaths().
 		const border = svgPath(d, {
-			fill: "none",
-			class: `svgcableborder nomouse${isSelected ? " selected" : ""}`,
-			"data-cable-key": key,
-			"data-cable-color": String(cable.colour),
-			"data-smod": String(smod.index),
-			"data-scon": String(sourceJack ?? 0),
-			"data-dmod": String(dmod.index),
-			"data-dcon": String(destJack ?? 0),
-			"data-dir": String(dir),
+			fill: 'none',
+			class: `svgcableborder nomouse${isSelected ? ' selected' : ''}`,
+			'data-cable-key': key,
+			'data-cable-color': String(cable.colour),
+			'data-smod': String(smod.index),
+			'data-scon': String(sourceJack ?? 0),
+			'data-dmod': String(dmod.index),
+			'data-dcon': String(destJack ?? 0),
+			'data-dir': String(dir),
 		});
 		const main = svgPath(d, {
 			stroke: color,
-			fill: "none",
-			class: "svgcable nomouse",
-			"data-cable-key": key,
-			"data-cable-color": String(cable.colour),
+			fill: 'none',
+			class: 'svgcable nomouse',
+			'data-cable-key': key,
+			'data-cable-color': String(cable.colour),
 		});
 		const hitArea = svgPath(d, {
-			stroke: "transparent",
-			fill: "none",
-			"stroke-width": "12",
-			class: "cable-hit",
-			style: "cursor: pointer",
-			"data-cable-key": key,
-			"data-cable-color": String(cable.colour),
+			stroke: 'transparent',
+			fill: 'none',
+			'stroke-width': '12',
+			class: 'cable-hit',
+			style: 'cursor: pointer',
+			'data-cable-key': key,
+			'data-cable-color': String(cable.colour),
 		});
 		if (options?.onCableClick) {
-			hitArea.addEventListener("click", (e) => {
+			hitArea.addEventListener('click', (e) => {
 				e.stopPropagation();
 				options.onCableClick!(cable);
 			});
@@ -175,7 +170,7 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
 	const toRemove: Element[] = [];
 	let el = svgElement.firstElementChild;
 	while (el) {
-		if (el.getAttribute("data-cable-key") === key) toRemove.push(el);
+		if (el.getAttribute('data-cable-key') === key) toRemove.push(el);
 		el = el.nextElementSibling;
 	}
 	toRemove.forEach((el) => el.remove());
@@ -190,8 +185,10 @@ function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: 
 	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
 	if (!m) return existingD;
 	const [oldDx, oldDy, cp1x, cp1y, cp2x, cp2y, oldSx, oldSy] = m.slice(1).map(Number);
-	const ddx = newDx - oldDx, ddy = newDy - oldDy;
-	const dsx = newSx - oldSx, dsy = newSy - oldSy;
+	const ddx = newDx - oldDx,
+		ddy = newDy - oldDy;
+	const dsx = newSx - oldSx,
+		dsy = newSy - oldSy;
 	return `M${newDx} ${newDy}C${cp1x + ddx} ${cp1y + ddy},${cp2x + dsx} ${cp2y + dsy},${newSx} ${newSy}`;
 }
 
@@ -202,16 +199,16 @@ function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: 
  */
 export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
-	const borders = svgElement.querySelectorAll<SVGPathElement>(".svgcableborder[data-smod]");
+	const borders = svgElement.querySelectorAll<SVGPathElement>('.svgcableborder[data-smod]');
 	borders.forEach((border) => {
-		const smod_i = parseInt(border.getAttribute("data-smod")!);
-		const dmod_i = parseInt(border.getAttribute("data-dmod")!);
+		const smod_i = parseInt(border.getAttribute('data-smod')!);
+		const dmod_i = parseInt(border.getAttribute('data-dmod')!);
 		if (!movedIds.has(smod_i) && !movedIds.has(dmod_i)) return;
 
-		const scon_i = parseInt(border.getAttribute("data-scon")!);
-		const dcon_i = parseInt(border.getAttribute("data-dcon")!);
-		const dir = parseInt(border.getAttribute("data-dir") || "1");
-		const key = border.getAttribute("data-cable-key")!;
+		const scon_i = parseInt(border.getAttribute('data-scon')!);
+		const dcon_i = parseInt(border.getAttribute('data-dcon')!);
+		const dir = parseInt(border.getAttribute('data-dir') || '1');
+		const key = border.getAttribute('data-cable-key')!;
 
 		const smod = modules.find((m) => m.index === smod_i);
 		const dmod = modules.find((m) => m.index === dmod_i);
@@ -230,9 +227,8 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const newDx = dcon.x + dmod.horiz * 256;
 		const newDy = dcon.y + dmod.vert * 16;
 
-		const d = shiftCablePath(border.getAttribute("d") || "", newSx, newSy, newDx, newDy);
-		svgElement.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`)
-			.forEach((el) => el.setAttribute("d", d));
+		const d = shiftCablePath(border.getAttribute('d') || '', newSx, newSy, newDx, newDy);
+		svgElement.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`).forEach((el) => el.setAttribute('d', d));
 	});
 }
 
@@ -247,10 +243,8 @@ export function removeAllCables(svgElement: SVGElement): void {
 	while (sibling) {
 		const next = sibling.nextElementSibling;
 		if (
-			sibling.tagName === "path" &&
-			(sibling.classList.contains("svgcable") ||
-				sibling.classList.contains("svgcableborder") ||
-				sibling.classList.contains("cable-hit"))
+			sibling.tagName === 'path' &&
+			(sibling.classList.contains('svgcable') || sibling.classList.contains('svgcableborder') || sibling.classList.contains('cable-hit'))
 		) {
 			toRemove.push(sibling);
 		}

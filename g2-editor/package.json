@@ -8,26 +8,36 @@
     "build": "electron-vite build && electron-builder",
     "preview": "electron-vite preview",
     "postinstall": "node scripts/copy-cli.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "lint": "eslint src --max-warnings 0",
+    "lint:fix": "eslint src --fix",
+    "format": "prettier --write src",
+    "format:check": "prettier --check src"
   },
   "dependencies": {
     "pinia": "^2.1.7",
     "vue": "^3.4.21"
   },
   "devDependencies": {
+    "@eslint/js": "^10.0.1",
     "@tailwindcss/vite": "^4.2.4",
+    "@typescript-eslint/eslint-plugin": "^8.59.1",
+    "@typescript-eslint/parser": "^8.59.1",
     "@vitejs/plugin-vue": "^5.0.4",
     "autoprefixer": "^10.5.0",
     "electron": "^33.4.11",
     "electron-builder": "^24.13.3",
     "electron-devtools-installer": "^3.2.1",
     "electron-vite": "^5.0.0",
+    "eslint-config-prettier": "^10.1.8",
+    "eslint-plugin-prettier": "^5.5.5",
     "postcss": "^8.5.10",
     "prettier": "^3.8.3",
     "tailwindcss": "^4.2.4",
     "typescript": "^5.4.2",
     "vite": "^6.4.2",
     "vitest": "^4.1.5",
+    "vue-eslint-parser": "^10.4.0",
     "vue-tsc": "^2.0.6"
   }
 }

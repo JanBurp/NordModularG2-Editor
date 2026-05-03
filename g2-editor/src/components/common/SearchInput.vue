@@ -1,55 +1,55 @@
 <script setup lang="ts">
-import { ref, watch, nextTick } from "vue";
+	import { ref, watch, nextTick } from 'vue';
 
-const props = defineProps({
-	modelValue: {
-		type: String,
-		default: "",
-	},
-	placeholder: {
-		type: String,
-		default: "Search...",
-	},
-	isActive: {
-		type: Boolean,
-		default: false,
-	},
-});
+	const props = defineProps({
+		modelValue: {
+			type: String,
+			default: '',
+		},
+		placeholder: {
+			type: String,
+			default: 'Search...',
+		},
+		isActive: {
+			type: Boolean,
+			default: false,
+		},
+	});
 
-const emit = defineEmits(["update:modelValue", "enter"]);
+	const emit = defineEmits(['update:modelValue', 'enter']);
 
-const searchInputRef = ref(null);
-const searchValue = ref(props.modelValue);
+	const searchInputRef = ref(null);
+	const searchValue = ref(props.modelValue);
 
-watch(
-	() => props.modelValue,
-	(val) => {
-		searchValue.value = val;
-	},
-);
+	watch(
+		() => props.modelValue,
+		(val) => {
+			searchValue.value = val;
+		},
+	);
 
-watch(searchValue, (val) => {
-	emit("update:modelValue", val);
-});
+	watch(searchValue, (val) => {
+		emit('update:modelValue', val);
+	});
 
-watch(
-	() => props.isActive,
-	async (active) => {
-		if (active) {
-			await nextTick();
-			searchInputRef.value?.focus();
-		}
-	},
-);
+	watch(
+		() => props.isActive,
+		async (active) => {
+			if (active) {
+				await nextTick();
+				searchInputRef.value?.focus();
+			}
+		},
+	);
 
-function clearSearch() {
-	searchValue.value = "";
-	searchInputRef.value?.blur();
-}
+	function clearSearch() {
+		searchValue.value = '';
+		searchInputRef.value?.blur();
+	}
 
-function handleEnter() {
-	emit("enter");
-}
+	function handleEnter() {
+		emit('enter');
+	}
 </script>
 
 <template>
@@ -63,11 +63,6 @@ function handleEnter() {
 			@keydown.esc="clearSearch"
 			@keydown.enter="handleEnter"
 		/>
-		<span
-			v-show="searchValue"
-			class="search-clear"
-			@click="clearSearch"
-			>×</span
-		>
+		<span v-show="searchValue" class="search-clear" @click="clearSearch">×</span>
 	</div>
 </template>

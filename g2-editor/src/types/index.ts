@@ -1,4 +1,4 @@
-export type SlotLabel = "A" | "B" | "C" | "D";
+export type SlotLabel = 'A' | 'B' | 'C' | 'D';
 
 export interface SlotInfo {
 	slot: string;

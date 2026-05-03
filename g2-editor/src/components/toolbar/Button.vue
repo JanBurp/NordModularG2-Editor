@@ -1,13 +1,6 @@
 <template>
 	<!-- File variant uses label wrapper -->
-	<label
-		v-if="variant === 'file'"
-		class="btn btn-default btn-file"
-		:class="{ 'btn-disabled': disabled }"
-		tabindex="0"
-		role="button"
-		@keydown="handleKeydown"
-	>
+	<label v-if="variant === 'file'" class="btn btn-default btn-file" :class="{ 'btn-disabled': disabled }" tabindex="0" role="button" @keydown="handleKeydown">
 		<slot />
 		<input type="file" :accept="accept" class="hidden" @change="handleChange" />
 	</label>
