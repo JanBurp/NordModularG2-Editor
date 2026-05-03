@@ -1,13 +1,5 @@
 import type { ModuleInstance, Patch } from '../parser/nmg2PatchParser';
-import {
-	mutAddCable,
-	mutAddModule,
-	mutDeleteCable,
-	mutDeleteModule,
-	mutMoveModule,
-	mutSetModuleColor,
-	mutSetModuleLabel,
-} from '../parser/patchMutations';
+import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
@@ -71,31 +63,22 @@ export const useSlotsStore = defineStore('slots', {
 	}),
 
 	getters: {
-		getPatchForSlot: (state) => (slot: SlotLabel) =>
-			state.slots[slot]?.patch ?? null,
+		getPatchForSlot: (state) => (slot: SlotLabel) => state.slots[slot]?.patch ?? null,
 
-		getPatchName: (state) => (slot: SlotLabel) =>
-			state.slots[slot]?.name ?? '',
+		getPatchName: (state) => (slot: SlotLabel) => state.slots[slot]?.name ?? '',
 
-		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) =>
-			state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
+		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
 
-		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) =>
-			state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
+		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
 	},
 
 	actions: {
-		async _applyPatchOutput(
-			slot: SlotLabel,
-			output: string,
-		): Promise<{ name: string; rawHex: string; patch: Patch }> {
+		async _applyPatchOutput(slot: SlotLabel, output: string): Promise<{ name: string; rawHex: string; patch: Patch }> {
 			const result = JSON.parse(output);
 			const name: string = result.name;
 			const rawHex: string = result.data;
 
-			const sectionBytes = new Uint8Array(
-				rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)),
-			);
+			const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 			const nameBytes = new TextEncoder().encode(name);
 			const header = new Uint8Array(nameBytes.length + 3);
 			header.set(nameBytes);
@@ -119,12 +102,9 @@ export const useSlotsStore = defineStore('slots', {
 			return { name, rawHex, patch };
 		},
 
-		async selectSlot(
-			slot: SlotLabel,
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			this.activeSlot = slot;
-			if (useDeviceStore().getActiveSlot === slot)
-				return this.loadSlot(slot);
+			if (useDeviceStore().getActiveSlot === slot) return this.loadSlot(slot);
 
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
@@ -179,10 +159,7 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async deleteCableNoReload(
-			cable: { smod: number; scon: number; dmod: number; dcon: number },
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async deleteCableNoReload(cable: { smod: number; scon: number; dmod: number; dcon: number }, area: 'voice' | 'fx'): Promise<void> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -207,10 +184,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		async deleteModule(
-			moduleId: number,
-			area: 'voice' | 'fx',
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -221,23 +195,13 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'del-module',
-					deviceSlot,
-					location,
-					String(moduleId),
-				]);
+				await window.cli.run(['del-module', deviceSlot, location, String(moduleId)]);
 			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async moveModuleNoReload(
-			moduleId: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async moveModuleNoReload(moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<void> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -248,23 +212,11 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'move-module',
-					deviceSlot,
-					location,
-					String(moduleId),
-					String(col),
-					String(row),
-				]);
+				await window.cli.run(['move-module', deviceSlot, location, String(moduleId), String(col), String(row)]);
 			}
 		},
 
-		async moveModule(
-			moduleId: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async moveModule(moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -275,14 +227,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'move-module',
-					deviceSlot,
-					location,
-					String(moduleId),
-					String(col),
-					String(row),
-				]);
+				await window.cli.run(['move-module', deviceSlot, location, String(moduleId), String(col), String(row)]);
 			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
@@ -307,15 +252,11 @@ export const useSlotsStore = defineStore('slots', {
 			const numModes = modDef?.modes?.length ?? 0;
 			const modeVals: number[] = Array(numModes).fill(0);
 			const numParams = modDef?.params?.length ?? 0;
-			const paramVals: number[] = (modDef?.params ?? []).map(
-				(p: any) => getParam(p.type)?.def ?? 64,
-			);
+			const paramVals: number[] = (modDef?.params ?? []).map((p: any) => getParam(p.type)?.def ?? 64);
 			const uname = (modDef?.short ?? 'Module') + moduleId;
 
 			const lv: number[] = Array(numParams * 9);
-			for (let v = 0; v < 9; v++)
-				for (let p = 0; p < numParams; p++)
-					lv[v * numParams + p] = paramVals[p] ?? 64;
+			for (let v = 0; v < 9; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
 
 			const mod: ModuleInstance = {
 				type: typeId,
@@ -380,14 +321,7 @@ export const useSlotsStore = defineStore('slots', {
 				dtype = toConType;
 			if (stype === 0) {
 				// source is input, swap
-				[smod, scon, stype, dmod, dcon, dtype] = [
-					dmod,
-					dcon,
-					dtype,
-					smod,
-					scon,
-					stype,
-				];
+				[smod, scon, stype, dmod, dcon, dtype] = [dmod, dcon, dtype, smod, scon, stype];
 			}
 
 			const cable = { colour: color, smod, scon, dir: 1, dmod, dcon };
@@ -413,30 +347,14 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async setParam(
-			moduleId: number,
-			paramIdx: number,
-			value: number,
-			variation: number,
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
 			const slot = useDeviceStore().getActiveSlot;
 			if (!slot) return;
 			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run([
-				'set-param',
-				slot,
-				location,
-				String(moduleId),
-				String(paramIdx),
-				String(value),
-				String(variation),
-			]);
+			await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
 
-		async loadSlot(
-			slot: SlotLabel,
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async loadSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
 			try {
@@ -450,13 +368,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		loadPatchFile(
-			slot: SlotLabel,
-			patch: Patch,
-			name: string,
-			rawHex?: string,
-			filepath?: string,
-		): void {
+		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
 			this.slots[slot].patch = patch;
 			this.slots[slot].name = name;
 			if (rawHex) {
@@ -473,17 +385,10 @@ export const useSlotsStore = defineStore('slots', {
 			if (!path) return;
 			if (!entry.rawHex) {
 				if (!entry.templateRawHex) return;
-				const { serializePatch } =
-					await import('../parser/nmg2PatchSerializer');
-				entry.rawHex = serializePatch(
-					entry.name,
-					entry.patch,
-					entry.templateRawHex,
-				);
+				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
+				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
 			}
-			const sectionBytes = entry.rawHex
-				.match(/.{2}/g)!
-				.map((b) => parseInt(b, 16));
+			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
 			await window.electronAPI.savePatch(path, data);
@@ -523,9 +428,7 @@ export const useSlotsStore = defineStore('slots', {
 			area: 'voice' | 'fx',
 			currentModuleList: any[],
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const mod = currentModuleList.find(
-				(m: any) => m.index === moduleIndex,
-			);
+			const mod = currentModuleList.find((m: any) => m.index === moduleIndex);
 			if (!mod) return null;
 			const { getModule } = await import('../renderer/nmg2mods');
 			const height = (getModule(mod.type) as any)?.height ?? 2;
@@ -536,8 +439,7 @@ export const useSlotsStore = defineStore('slots', {
 					vert: m.vert as number,
 					height: ((getModule(m.type) as any)?.height ?? 2) as number,
 				}));
-			for (const d of this._resolveColumnCollisions(colMods, row, height))
-				await this.moveModuleNoReload(d.index, col, d.newRow, area);
+			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.moveModule(moduleIndex, col, row, area);
 		},
 
@@ -559,16 +461,11 @@ export const useSlotsStore = defineStore('slots', {
 					vert: m.vert as number,
 					height: ((getModule(m.type) as any)?.height ?? 2) as number,
 				}));
-			for (const d of this._resolveColumnCollisions(colMods, row, height))
-				await this.moveModuleNoReload(d.index, col, d.newRow, area);
+			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.addModule(typeId, moduleId, col, row, area);
 		},
 
-		async setModuleColors(
-			moduleIds: number[],
-			color: number,
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async setModuleColors(moduleIds: number[], color: number, area: 'voice' | 'fx'): Promise<void> {
 			if (moduleIds.length === 0) return;
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
@@ -576,23 +473,15 @@ export const useSlotsStore = defineStore('slots', {
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
 			const location = area === 'voice' ? 'va' : 'fx';
-			for (const id of moduleIds)
-				mutSetModuleColor(patch, areaIdx, id, color);
+			for (const id of moduleIds) mutSetModuleColor(patch, areaIdx, id, color);
 			this.slots[slot].rawHex = null;
 			if (deviceSlot) {
-				const cliCmds = moduleIds.map(
-					(id) =>
-						`set-module-color ${deviceSlot} ${location} ${id} ${color}`,
-				);
+				const cliCmds = moduleIds.map((id) => `set-module-color ${deviceSlot} ${location} ${id} ${color}`);
 				await window.cli.run(['seq', ...cliCmds]);
 			}
 		},
 
-		async setModuleLabel(
-			moduleId: number,
-			label: string,
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
 			const deviceSlot = useDeviceStore().getActiveSlot;
 			const slot = deviceSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -602,13 +491,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = null;
 			if (deviceSlot) {
 				const location = area === 'voice' ? 'va' : 'fx';
-				await window.cli.run([
-					'set-module-name',
-					deviceSlot,
-					location,
-					String(moduleId),
-					label,
-				]);
+				await window.cli.run(['set-module-name', deviceSlot, location, String(moduleId), label]);
 			}
 		},
 
@@ -633,28 +516,19 @@ export const useSlotsStore = defineStore('slots', {
 				const cliCmds: string[] = [];
 				const deletedCableKeys = new Set<string>();
 				for (const id of selectedModules) {
-					for (const c of currentCableList.filter(
-						(c: any) => c.smod === id || c.dmod === id,
-					)) {
+					for (const c of currentCableList.filter((c: any) => c.smod === id || c.dmod === id)) {
 						const key = `${c.smod}-${c.scon}-${c.dmod}-${c.dcon}`;
 						if (!deletedCableKeys.has(key)) {
 							deletedCableKeys.add(key);
 							mutDeleteCable(patch, area === 'voice' ? 1 : 0, c);
-							if (deviceSlot)
-								cliCmds.push(
-									`del-cable ${deviceSlot} ${location} ${c.smod} 1 ${c.scon} ${c.dmod} 0 ${c.dcon}`,
-								);
+							if (deviceSlot) cliCmds.push(`del-cable ${deviceSlot} ${location} ${c.smod} 1 ${c.scon} ${c.dmod} 0 ${c.dcon}`);
 						}
 					}
 					mutDeleteModule(patch, area === 'voice' ? 1 : 0, id);
-					if (deviceSlot)
-						cliCmds.push(
-							`del-module ${deviceSlot} ${location} ${id}`,
-						);
+					if (deviceSlot) cliCmds.push(`del-module ${deviceSlot} ${location} ${id}`);
 				}
 				this.slots[slot].rawHex = null;
-				if (deviceSlot && cliCmds.length > 0)
-					await window.cli.run(['seq', ...cliCmds]);
+				if (deviceSlot && cliCmds.length > 0) await window.cli.run(['seq', ...cliCmds]);
 				return;
 			}
 			if (selectedCable)

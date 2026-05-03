@@ -30,9 +30,7 @@ export const useBrowserStore = defineStore('browser', {
 		applyNamesData(names: any): void {
 			const patches: SynthPatch[] = [];
 			const perfs: SynthPatch[] = [];
-			for (const [bankStr, entries] of Object.entries(
-				names?.patches ?? {},
-			)) {
+			for (const [bankStr, entries] of Object.entries(names?.patches ?? {})) {
 				for (const e of entries as any[]) {
 					patches.push({
 						bank: Number(bankStr),
@@ -42,9 +40,7 @@ export const useBrowserStore = defineStore('browser', {
 					});
 				}
 			}
-			for (const [bankStr, entries] of Object.entries(
-				names?.performances ?? {},
-			)) {
+			for (const [bankStr, entries] of Object.entries(names?.performances ?? {})) {
 				for (const e of entries as any[]) {
 					perfs.push({
 						bank: Number(bankStr),
@@ -88,8 +84,7 @@ export const useBrowserStore = defineStore('browser', {
 			try {
 				const result = await window.electronAPI.patches.list(folder);
 				this.diskEntries = result.success ? result.entries : [];
-				if (!result.success)
-					this.error = result.error ?? 'Failed to list files';
+				if (!result.success) this.error = result.error ?? 'Failed to list files';
 			} catch (e: any) {
 				this.error = e.message;
 			} finally {
@@ -99,15 +94,13 @@ export const useBrowserStore = defineStore('browser', {
 
 		async navigateUp(): Promise<void> {
 			if (!this.diskFolder) return;
-			const parent =
-				this.diskFolder.split('/').slice(0, -1).join('/') || '/';
+			const parent = this.diskFolder.split('/').slice(0, -1).join('/') || '/';
 			await this.loadDiskList(parent);
 		},
 
 		async chooseDiskFolder(): Promise<void> {
 			const result = await window.electronAPI.patches.setFolder();
-			if (result.success && result.folder)
-				await this.loadDiskList(result.folder);
+			if (result.success && result.folder) await this.loadDiskList(result.folder);
 		},
 	},
 });

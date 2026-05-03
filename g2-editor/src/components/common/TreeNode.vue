@@ -18,15 +18,8 @@
 
 <template>
 	<div class="select-none" :style="{ paddingLeft: depth * 4 + 'px' }">
-		<div
-			class="flex items-center py-0.5 px-1 cursor-pointer rounded hover:bg-neutral-700"
-			@click="handleToggle"
-		>
-			<span
-				v-if="isExpandable(node)"
-				class="w-4 text-xs text-neutral-500 flex-shrink-0"
-				>{{ expanded.has(node.key) ? '▼' : '▶' }}</span
-			>
+		<div class="flex items-center py-0.5 px-1 cursor-pointer rounded hover:bg-neutral-700" @click="handleToggle">
+			<span v-if="isExpandable(node)" class="w-4 text-xs text-neutral-500 flex-shrink-0">{{ expanded.has(node.key) ? '▼' : '▶' }}</span>
 			<span v-else class="w-4 flex-shrink-0"></span>
 			<span class="text-red-400 mr-1">{{ node.key }}:</span>
 			<span
@@ -40,9 +33,7 @@
 			>
 			<span v-else class="text-neutral-500 italic">{{ node.value }}</span>
 		</div>
-		<div
-			v-if="isExpandable(node) && expanded.has(node.key) && node.children"
-		>
+		<div v-if="isExpandable(node) && expanded.has(node.key) && node.children">
 			<TreeNode
 				v-for="child in node.children"
 				:key="child.key"

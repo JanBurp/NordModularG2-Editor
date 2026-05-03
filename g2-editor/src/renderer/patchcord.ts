@@ -56,10 +56,7 @@ export class FastVector {
 	rotate(angle: number): FastVector {
 		const sa = Math.sin(angle);
 		const ca = Math.cos(angle);
-		return new FastVector(
-			ca * this.x - sa * this.y,
-			sa * this.x + ca * this.y,
-		);
+		return new FastVector(ca * this.x - sa * this.y, sa * this.x + ca * this.y);
 	}
 
 	/**
@@ -84,14 +81,7 @@ export function createFastVector(
 	x: number,
 	y: number,
 	x2?: number,
-	getstrFn?: (
-		this: any,
-		p: string,
-		xs: number,
-		ys: number,
-		yo: number,
-		shp?: number,
-	) => string,
+	getstrFn?: (this: any, p: string, xs: number, ys: number, yo: number, shp?: number) => string,
 ): FastVector {
 	const fv = new FastVector(x, y, x2);
 	if (getstrFn) {
@@ -142,11 +132,6 @@ export class Patchcord {
 	 */
 	getCurvePath(): string {
 		this.shake();
-		return (
-			this.points[0].toString('M') +
-			this.points[1]!.toString('C') +
-			this.points[2]!.toString(',') +
-			this.points[3].toString(',')
-		);
+		return this.points[0].toString('M') + this.points[1]!.toString('C') + this.points[2]!.toString(',') + this.points[3].toString(',');
 	}
 }

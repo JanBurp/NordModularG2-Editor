@@ -1,33 +1,15 @@
 <template>
 	<Teleport to="body">
-		<div
-			v-if="modelValue"
-			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
-			@click.self="onCancel"
-		>
-			<div
-				ref="dialogEl"
-				class="bg-neutral-800 border border-neutral-600 rounded shadow-xl min-w-72 max-w-md w-full mx-4"
-			>
-				<div
-					class="flex items-center justify-between px-4 py-3 border-b border-neutral-600"
-				>
-					<span class="text-sm font-semibold text-neutral-200">{{
-						title
-					}}</span>
-					<button
-						class="text-neutral-400 hover:text-neutral-200 text-lg leading-none cursor-pointer"
-						@click="onCancel"
-					>
-						×
-					</button>
+		<div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="onCancel">
+			<div ref="dialogEl" class="bg-neutral-800 border border-neutral-600 rounded shadow-xl min-w-72 max-w-md w-full mx-4">
+				<div class="flex items-center justify-between px-4 py-3 border-b border-neutral-600">
+					<span class="text-sm font-semibold text-neutral-200">{{ title }}</span>
+					<button class="text-neutral-400 hover:text-neutral-200 text-lg leading-none cursor-pointer" @click="onCancel">×</button>
 				</div>
 				<div class="px-4 py-3">
 					<slot />
 				</div>
-				<div
-					class="flex justify-end gap-2 px-4 py-3 border-t border-neutral-600"
-				>
+				<div class="flex justify-end gap-2 px-4 py-3 border-t border-neutral-600">
 					<button
 						class="px-3 py-1 text-xs border border-neutral-500 rounded bg-neutral-700 text-neutral-200 hover:bg-neutral-600 cursor-pointer"
 						@click="onCancel"
@@ -75,12 +57,7 @@
 	watch(
 		() => props.modelValue,
 		(open) => {
-			if (open)
-				nextTick(() =>
-					dialogEl.value
-						?.querySelector<HTMLElement>('input, textarea')
-						?.focus(),
-				);
+			if (open) nextTick(() => dialogEl.value?.querySelector<HTMLElement>('input, textarea')?.focus());
 		},
 	);
 

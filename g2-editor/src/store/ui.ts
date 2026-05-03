@@ -21,9 +21,7 @@ export const useUiStore = defineStore('ui', {
 	getters: {
 		selectedSlotIndex: (state) => {
 			const label = useDeviceStore().getActiveSlot;
-			return SLOT_LABELS.indexOf(
-				(label ?? state.activeSlot) as SlotLabel,
-			);
+			return SLOT_LABELS.indexOf((label ?? state.activeSlot) as SlotLabel);
 		},
 	},
 

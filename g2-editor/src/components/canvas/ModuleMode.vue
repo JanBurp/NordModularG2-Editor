@@ -30,17 +30,7 @@
 </script>
 
 <template>
-	<svg
-		:x="x"
-		:y="y"
-		:width="Math.abs(width)"
-		:height="height"
-		class="mode-selector clipper"
-	>
-		<use
-			v-if="bitmapId"
-			:href="`#${bitmapId}`"
-			:transform="`translate(0, ${offset})`"
-		/>
+	<svg :x="x" :y="y" :width="Math.abs(width)" :height="height" class="mode-selector clipper">
+		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
 	</svg>
 </template>

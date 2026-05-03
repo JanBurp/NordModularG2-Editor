@@ -32,28 +32,16 @@ export class G2USB {
 			const allDevices = await navigator.usb.getDevices();
 			console.log(
 				'All USB devices:',
-				allDevices.map(
-					(d) =>
-						`${d.productName || 'Unknown'} VID:${d.vendorId} PID:${d.productId}`,
-				),
+				allDevices.map((d) => `${d.productName || 'Unknown'} VID:${d.vendorId} PID:${d.productId}`),
 			);
 
-			const g2Devices = allDevices.filter(
-				(d) =>
-					d.vendorId === this.G2_VENDOR_ID &&
-					d.productId === this.G2_PRODUCT_ID,
-			);
+			const g2Devices = allDevices.filter((d) => d.vendorId === this.G2_VENDOR_ID && d.productId === this.G2_PRODUCT_ID);
 
 			if (g2Devices.length > 0) {
-				console.log(
-					'Found previously paired G2 device(s):',
-					g2Devices.length,
-				);
+				console.log('Found previously paired G2 device(s):', g2Devices.length);
 				device = g2Devices[0];
 			} else {
-				console.log(
-					'No G2 found in paired devices, requesting new device...',
-				);
+				console.log('No G2 found in paired devices, requesting new device...');
 				device = await navigator.usb.requestDevice({
 					filters: [
 						{
@@ -66,31 +54,17 @@ export class G2USB {
 		} catch (error: any) {
 			if (error.name === 'NotFoundError' || error.name === 'AbortError') {
 				console.log('Device selection cancelled or no device found');
-				throw new Error(
-					'No device selected. Please select your Nord Modular G2 from the list.',
-				);
+				throw new Error('No device selected. Please select your Nord Modular G2 from the list.');
 			}
 			throw error;
 		}
 
 		if (!device) {
-			throw new Error(
-				'No device selected. Make sure your Nord Modular G2 is connected via USB and click Connect again.',
-			);
+			throw new Error('No device selected. Make sure your Nord Modular G2 is connected via USB and click Connect again.');
 		}
 
-		console.log(
-			'G2 device:',
-			device.productName || 'Unknown device',
-			'Serial:',
-			device.serialNumber,
-		);
-		console.log(
-			'  VendorID:',
-			device.vendorId,
-			'ProductID:',
-			device.productId,
-		);
+		console.log('G2 device:', device.productName || 'Unknown device', 'Serial:', device.serialNumber);
+		console.log('  VendorID:', device.vendorId, 'ProductID:', device.productId);
 		console.log('  Configurations:', device.configurations?.length);
 
 		this.device = device;
@@ -119,42 +93,20 @@ export class G2USB {
 		const config = device.configuration;
 		if (config) {
 			for (const iface of config.interfaces) {
-				console.log(
-					'  Interface:',
-					iface.interfaceNumber,
-					'Alternates:',
-					iface.alternates?.length,
-				);
+				console.log('  Interface:', iface.interfaceNumber, 'Alternates:', iface.alternates?.length);
 				for (const alt of iface.alternates || []) {
-					console.log(
-						'    Endpoints:',
-						alt.endpoints
-							?.map(
-								(e) =>
-									`ep${e.endpointNumber}(${e.direction},${e.type})`,
-							)
-							.join(', '),
-					);
+					console.log('    Endpoints:', alt.endpoints?.map((e) => `ep${e.endpointNumber}(${e.direction},${e.type})`).join(', '));
 
 					for (const ep of alt.endpoints || []) {
 						if (ep.type === 'bulk' && ep.direction === 'out') {
 							this.bulkOutEndpoint = ep.endpointNumber;
 							console.log('    Bulk OUT: ep', ep.endpointNumber);
-						} else if (
-							ep.type === 'bulk' &&
-							ep.direction === 'in'
-						) {
+						} else if (ep.type === 'bulk' && ep.direction === 'in') {
 							this.bulkInEndpoint = ep.endpointNumber;
 							console.log('    Bulk IN: ep', ep.endpointNumber);
-						} else if (
-							ep.type === 'interrupt' &&
-							ep.direction === 'in'
-						) {
+						} else if (ep.type === 'interrupt' && ep.direction === 'in') {
 							this.interruptInEndpoint = ep.endpointNumber;
-							console.log(
-								'    Interrupt IN: ep',
-								ep.endpointNumber,
-							);
+							console.log('    Interrupt IN: ep', ep.endpointNumber);
 						}
 					}
 				}
@@ -210,69 +162,40 @@ export class G2USB {
 		console.log('Starting G2 protocol...');
 
 		const initData = this.buildInitMessage();
-		console.log(
-			'Sending init:',
-			initData.map((b) => b.toString(16).padStart(2, '0')).join(' '),
-		);
+		console.log('Sending init:', initData.map((b) => b.toString(16).padStart(2, '0')).join(' '));
 		await this.sendInternal(initData);
 		console.log('Init command sent');
 		await this.delay(100);
 
 		const initResp = await this.readResponse(2000);
-		console.log(
-			'Init response:',
-			initResp
-				? initResp.map((b) => b.toString(16).padStart(2, '0')).join(' ')
-				: 'none',
-		);
+		console.log('Init response:', initResp ? initResp.map((b) => b.toString(16).padStart(2, '0')).join(' ') : 'none');
 
 		await this.delay(100);
 
 		const stopData = this.buildStopMessage();
-		console.log(
-			'Sending stop:',
-			stopData.map((b) => b.toString(16).padStart(2, '0')).join(' '),
-		);
+		console.log('Sending stop:', stopData.map((b) => b.toString(16).padStart(2, '0')).join(' '));
 		await this.sendInternal(stopData);
 		console.log('Stop command sent');
 		await this.delay(100);
 
 		const stopResp = await this.readResponse(2000);
-		console.log(
-			'Stop response:',
-			stopResp
-				? stopResp.map((b) => b.toString(16).padStart(2, '0')).join(' ')
-				: 'none',
-		);
+		console.log('Stop response:', stopResp ? stopResp.map((b) => b.toString(16).padStart(2, '0')).join(' ') : 'none');
 
 		await this.delay(100);
 
 		const settingsData = this.buildGetSynthSettingsMessage();
-		console.log(
-			'Sending get synth settings:',
-			settingsData.map((b) => b.toString(16).padStart(2, '0')).join(' '),
-		);
+		console.log('Sending get synth settings:', settingsData.map((b) => b.toString(16).padStart(2, '0')).join(' '));
 		await this.sendInternal(settingsData);
 		console.log('Get synth settings sent');
 		await this.delay(100);
 
 		const settingsResp = await this.readResponse(2000);
-		console.log(
-			'Settings response:',
-			settingsResp
-				? settingsResp
-						.map((b) => b.toString(16).padStart(2, '0'))
-						.join(' ')
-				: 'none',
-		);
+		console.log('Settings response:', settingsResp ? settingsResp.map((b) => b.toString(16).padStart(2, '0')).join(' ') : 'none');
 
 		await this.delay(100);
 
 		const startData = this.buildStartMessage();
-		console.log(
-			'Sending start:',
-			startData.map((b) => b.toString(16).padStart(2, '0')).join(' '),
-		);
+		console.log('Sending start:', startData.map((b) => b.toString(16).padStart(2, '0')).join(' '));
 		await this.sendInternal(startData);
 		console.log('Start command sent');
 
@@ -285,26 +208,13 @@ export class G2USB {
 		const tryEndpoint = async (endpoint: number, timeoutMs: number) => {
 			try {
 				console.log('Reading from endpoint:', endpoint);
-				const result = await this.device.transferIn(
-					endpoint,
-					timeoutMs,
-				);
-				console.log(
-					'Transfer result:',
-					result.status,
-					'bytes:',
-					result.data?.byteLength,
-				);
+				const result = await this.device.transferIn(endpoint, timeoutMs);
+				console.log('Transfer result:', result.status, 'bytes:', result.data?.byteLength);
 				if (result.data && result.data.byteLength > 0) {
 					return Array.from(new Uint8Array(result.data));
 				}
 			} catch (e: any) {
-				console.log(
-					'Transfer error on endpoint',
-					endpoint,
-					':',
-					e.name || e.message,
-				);
+				console.log('Transfer error on endpoint', endpoint, ':', e.name || e.message);
 			}
 			return null;
 		};
@@ -328,24 +238,13 @@ export class G2USB {
 	}
 
 	private async receiveAsync(): Promise<void> {
-		console.log(
-			'Receive loop starting, device opened:',
-			this.device?.opened,
-		);
+		console.log('Receive loop starting, device opened:', this.device?.opened);
 
 		while (this.receiveLoopRunning && this.device && this.device.opened) {
 			try {
 				console.log('Waiting for data on bulk endpoint...');
-				const result = await this.device.transferIn(
-					this.bulkInEndpoint,
-					5000,
-				);
-				console.log(
-					'Bulk result:',
-					result.status,
-					'bytes:',
-					result.data?.byteLength,
-				);
+				const result = await this.device.transferIn(this.bulkInEndpoint, 5000);
+				console.log('Bulk result:', result.status, 'bytes:', result.data?.byteLength);
 
 				if (result.data && result.data.byteLength > 0) {
 					const bytes = new Uint8Array(result.data);
@@ -367,16 +266,8 @@ export class G2USB {
 
 			try {
 				console.log('Waiting for data on interrupt endpoint...');
-				const intResult = await this.device.transferIn(
-					this.interruptInEndpoint,
-					1000,
-				);
-				console.log(
-					'Interrupt result:',
-					intResult.status,
-					'bytes:',
-					intResult.data?.byteLength,
-				);
+				const intResult = await this.device.transferIn(this.interruptInEndpoint, 1000);
+				console.log('Interrupt result:', intResult.status, 'bytes:', intResult.data?.byteLength);
 
 				if (intResult.data && intResult.data.byteLength > 0) {
 					const bytes = new Uint8Array(intResult.data);
@@ -427,10 +318,7 @@ export class G2USB {
 			throw new Error('Device not open');
 		}
 
-		console.log(
-			'Sending:',
-			data.map((b) => b.toString(16).padStart(2, '0')).join(' '),
-		);
+		console.log('Sending:', data.map((b) => b.toString(16).padStart(2, '0')).join(' '));
 		const buffer = new Uint8Array(data);
 		await this.device.transferOut(this.bulkOutEndpoint, buffer);
 	}
@@ -475,12 +363,7 @@ export class G2USB {
 	}
 
 	isIdentityReply(data: number[]): boolean {
-		return (
-			data.length >= 8 &&
-			data[0] === 0x7e &&
-			data[3] === 0x06 &&
-			data[4] === 0x02
-		);
+		return data.length >= 8 && data[0] === 0x7e && data[3] === 0x06 && data[4] === 0x02;
 	}
 
 	isG2Response(data: number[]): boolean {
@@ -532,13 +415,7 @@ export class G2USB {
 		const payload = [0x80];
 		const crc = this.calcCRC16(payload, payload.length);
 		const msgLen = payload.length + 2;
-		const data = [
-			(msgLen >> 8) & 0xff,
-			msgLen & 0xff,
-			...payload,
-			(crc >> 8) & 0xff,
-			crc & 0xff,
-		];
+		const data = [(msgLen >> 8) & 0xff, msgLen & 0xff, ...payload, (crc >> 8) & 0xff, crc & 0xff];
 		return data;
 	}
 
@@ -546,13 +423,7 @@ export class G2USB {
 		const payload = [0x01, 0x2c, 0x41, 0x7d, 0x01];
 		const crc = this.calcCRC16(payload, payload.length);
 		const msgLen = payload.length + 2;
-		const data = [
-			(msgLen >> 8) & 0xff,
-			msgLen & 0xff,
-			...payload,
-			(crc >> 8) & 0xff,
-			crc & 0xff,
-		];
+		const data = [(msgLen >> 8) & 0xff, msgLen & 0xff, ...payload, (crc >> 8) & 0xff, crc & 0xff];
 		return data;
 	}
 
@@ -560,13 +431,7 @@ export class G2USB {
 		const payload = [0x01, 0x2c, 0x41, 0x7d, 0x00];
 		const crc = this.calcCRC16(payload, payload.length);
 		const msgLen = payload.length + 2;
-		const data = [
-			(msgLen >> 8) & 0xff,
-			msgLen & 0xff,
-			...payload,
-			(crc >> 8) & 0xff,
-			crc & 0xff,
-		];
+		const data = [(msgLen >> 8) & 0xff, msgLen & 0xff, ...payload, (crc >> 8) & 0xff, crc & 0xff];
 		return data;
 	}
 
@@ -574,13 +439,7 @@ export class G2USB {
 		const payload = [0x01, 0x2c, 0x41, 0x02];
 		const crc = this.calcCRC16(payload, payload.length);
 		const msgLen = payload.length + 2;
-		const data = [
-			(msgLen >> 8) & 0xff,
-			msgLen & 0xff,
-			...payload,
-			(crc >> 8) & 0xff,
-			crc & 0xff,
-		];
+		const data = [(msgLen >> 8) & 0xff, msgLen & 0xff, ...payload, (crc >> 8) & 0xff, crc & 0xff];
 		return data;
 	}
 }

@@ -1,23 +1,7 @@
 <script setup lang="ts">
-	import {
-		ref,
-		onMounted,
-		onUnmounted,
-		watch,
-		nextTick,
-		computed,
-	} from 'vue';
-	import {
-		makePatchCables,
-		removeAllCables,
-		removeCableByKey,
-		updateCablePaths,
-		makeCableKey,
-	} from '../../renderer/cableRenderer';
-	import type {
-		Cable,
-		Module as CableModule,
-	} from '../../renderer/cableRenderer';
+	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
+	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey } from '../../renderer/cableRenderer';
+	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
@@ -97,13 +81,7 @@
 	const svgRef = ref<SVGSVGElement | null>(null);
 	const isInitialized = ref(false);
 
-	const {
-		selectionRect,
-		isDraggingSelection,
-		handleCanvasMousedown,
-		handleModuleClick,
-		handleCanvasClick,
-	} = useModuleSelecting(
+	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
 		computed(() => props.modules as any[]),
 	);
@@ -171,10 +149,7 @@
 		const svg = svgRef.value;
 		const cableElements = svg.querySelectorAll('[data-cable-color]');
 		cableElements.forEach((el) => {
-			const colorIndex = parseInt(
-				el.getAttribute('data-cable-color') || '0',
-				10,
-			);
+			const colorIndex = parseInt(el.getAttribute('data-cable-color') || '0', 10);
 			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
 			if (colorName && colorName in props.cableVisibility) {
 				const isHidden = props.cableVisibility[colorName] === false;
@@ -204,16 +179,12 @@
 
 				// Keys currently rendered in the DOM
 				const renderedKeys = new Set<string>();
-				svg.querySelectorAll<SVGPathElement>(
-					'.svgcableborder[data-cable-key]',
-				).forEach((el) => {
+				svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
 					renderedKeys.add(el.getAttribute('data-cable-key')!);
 				});
 
 				// Keys we want (respecting visibility filter)
-				const wantedMap = new Map<string, any>(
-					visibleCables.value.map((c) => [makeCableKey(c), c]),
-				);
+				const wantedMap = new Map<string, any>(visibleCables.value.map((c) => [makeCableKey(c), c]));
 
 				// Remove cables no longer in the list
 				for (const key of renderedKeys) {
@@ -223,15 +194,10 @@
 				// Add cables not yet rendered
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
-						makePatchCables(
-							props.modules as CableModule[],
-							[cable],
-							svg,
-							{
-								selectedCable: props.selectedCable,
-								onCableClick: (c) => emit('cableClick', c),
-							},
-						);
+						makePatchCables(props.modules as CableModule[], [cable], svg, {
+							selectedCable: props.selectedCable,
+							onCableClick: (c) => emit('cableClick', c),
+						});
 					}
 				}
 			});
@@ -247,18 +213,10 @@
 				if (!svgRef.value || !oldMods) return;
 				const movedIds = new Set<number>();
 				for (const m of newMods as any[]) {
-					const prev = (oldMods as any[]).find(
-						(o: any) => o.index === m.index,
-					);
-					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert)
-						movedIds.add(m.index);
+					const prev = (oldMods as any[]).find((o: any) => o.index === m.index);
+					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert) movedIds.add(m.index);
 				}
-				if (movedIds.size > 0)
-					updateCablePaths(
-						props.modules as CableModule[],
-						svgRef.value as SVGElement,
-						movedIds,
-					);
+				if (movedIds.size > 0) updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);
 			});
 		},
 	);
@@ -293,9 +251,7 @@
 			if (oldCable) {
 				const removeOldSelected = () => {
 					const key = cableKey(oldCable as Cable);
-					svg.querySelector(
-						`.svgcableborder[data-cable-key="${key}"]`,
-					)?.classList.remove('selected');
+					svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.remove('selected');
 				};
 				if (newCable === null) {
 					// Deselect/delete: defer so renderCables() runs first and removes the element
@@ -307,9 +263,7 @@
 			}
 			if (newCable) {
 				const key = cableKey(newCable as Cable);
-				svg.querySelector(
-					`.svgcableborder[data-cable-key="${key}"]`,
-				)?.classList.add('selected');
+				svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.add('selected');
 			}
 		},
 	);
@@ -330,9 +284,7 @@
 	let dragSrcColour = '';
 
 	function getJackSvgPos(info: JackInfo) {
-		const mod = (props.modules as any[]).find(
-			(m) => m.index === info.moduleIndex,
-		);
+		const mod = (props.modules as any[]).find((m) => m.index === info.moduleIndex);
 		if (!mod) return null;
 		const modDef = getModule(mod.type) as any;
 		if (!modDef) return null;
@@ -353,12 +305,7 @@
 		return pt.matrixTransform(ctm.inverse());
 	}
 
-	function previewPath(
-		sx: number,
-		sy: number,
-		dx: number,
-		dy: number,
-	): string {
+	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
 		const dist = Math.hypot(dx - sx, dy - sy);
 		const sag = Math.min(dist * 0.25, 60);
 		const bot = Math.max(sy, dy) + sag;
@@ -443,23 +390,15 @@
 
 	function onModuleDragMove(e: MouseEvent) {
 		if (dragModuleIndex === null) return;
-		const dist = Math.hypot(
-			e.clientX - dragStartClientX,
-			e.clientY - dragStartClientY,
-		);
+		const dist = Math.hypot(e.clientX - dragStartClientX, e.clientY - dragStartClientY);
 		if (dist < 5) return;
 
 		if (!dragGhost) {
-			const mod = (props.modules as any[]).find(
-				(m) => m.index === dragModuleIndex,
-			);
+			const mod = (props.modules as any[]).find((m) => m.index === dragModuleIndex);
 			if (!mod) return;
 			const modDef = getModule(mod.type) as any;
 			const modHeight = (modDef?.height || 2) * 16;
-			dragGhost = document.createElementNS(
-				'http://www.w3.org/2000/svg',
-				'rect',
-			);
+			dragGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 			dragGhost.setAttribute('width', '256');
 			dragGhost.setAttribute('height', String(modHeight));
 			dragGhost.setAttribute('fill', 'rgba(255,165,0,0.25)');
@@ -474,10 +413,7 @@
 		if (!mp) return;
 		dragCurrentCol = Math.max(0, Math.floor(mp.x / 256));
 		dragCurrentRow = Math.max(0, Math.floor(mp.y / 16));
-		dragGhost.setAttribute(
-			'transform',
-			`translate(${dragCurrentCol * 256}, ${dragCurrentRow * 16})`,
-		);
+		dragGhost.setAttribute('transform', `translate(${dragCurrentCol * 256}, ${dragCurrentRow * 16})`);
 	}
 
 	function onModuleDragEnd(e: MouseEvent) {
@@ -523,10 +459,7 @@
 		const modDef = typeId ? getModule(typeId) : null;
 		const modHeight = (modDef?.height || 2) * 16;
 		if (!dropGhost) {
-			dropGhost = document.createElementNS(
-				'http://www.w3.org/2000/svg',
-				'rect',
-			);
+			dropGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 			dropGhost.setAttribute('fill', 'rgba(100,200,100,0.25)');
 			dropGhost.setAttribute('stroke', '#4ade80');
 			dropGhost.setAttribute('stroke-width', '2');
@@ -536,10 +469,7 @@
 		}
 		dropGhost.setAttribute('width', '256');
 		dropGhost.setAttribute('height', String(modHeight));
-		dropGhost.setAttribute(
-			'transform',
-			`translate(${col * 256}, ${row * 16})`,
-		);
+		dropGhost.setAttribute('transform', `translate(${col * 256}, ${row * 16})`);
 	}
 
 	function clearDropGhost() {
@@ -561,13 +491,7 @@
 </script>
 
 <template>
-	<div
-		class="patch-canvas-wrapper"
-		ref="canvasRef"
-		@dragover.prevent="handleDragOver"
-		@dragleave="clearDropGhost"
-		@drop.prevent="handleModuleDropOnWrapper"
-	>
+	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
 			class="patch-canvas"
