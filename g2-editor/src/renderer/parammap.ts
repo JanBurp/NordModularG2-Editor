@@ -1,5 +1,6 @@
 import type { ParamDefinition } from '../types/index.ts';
 
+// prettier-ignore
 const parammap: Record<string, ParamDefinition> = {
 	ActiveMonitor: { names: [''], width: 11, bmp: 'pwr', low: 0, high: 1, def: 1, defin: ['0 ~ Monitor,1 ~ Active '], comments: '' },
 	AdAr: { low: 0, high: 1, def: 0, defin: ['0 ~ AD, 1 ~ AR'], comments: 'Selects between Decay and Release modes' },
