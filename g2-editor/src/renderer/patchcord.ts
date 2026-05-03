@@ -4,7 +4,7 @@
  * Handles Bezier curve calculations for patch cables
  */
 
-import { svgNSGet, svgPath } from "./svgUtils";
+import { svgNSGet, svgPath } from './svgUtils';
 
 /**
  * FastVector - 2D vector math for patchcord calculations
@@ -24,7 +24,7 @@ export class FastVector {
 	 * Add a scalar or vector
 	 */
 	add(B: number | FastVector): FastVector {
-		if (typeof B === "number") {
+		if (typeof B === 'number') {
 			return new FastVector(this.x + B, this.y + B);
 		}
 		return new FastVector(this.x + B.x, this.y + B.y);
@@ -34,7 +34,7 @@ export class FastVector {
 	 * Subtract a scalar or vector
 	 */
 	subtract(B: number | FastVector): FastVector {
-		if (typeof B === "number") {
+		if (typeof B === 'number') {
 			return new FastVector(this.x - B, this.y - B);
 		}
 		return new FastVector(this.x - B.x, this.y - B.y);
@@ -44,7 +44,7 @@ export class FastVector {
 	 * Multiply by a scalar or vector
 	 */
 	multiply(B: number | FastVector): FastVector {
-		if (typeof B === "number") {
+		if (typeof B === 'number') {
 			return new FastVector(this.x * B, this.y * B);
 		}
 		return new FastVector(this.x * B.x, this.y * B.y);
@@ -63,13 +63,13 @@ export class FastVector {
 	 * Get string representation for path commands
 	 */
 	getstr(p: string, xs: number, ys: number, yo: number): string {
-		return p + this.x * xs + "," + (this.y * ys + yo);
+		return p + this.x * xs + ',' + (this.y * ys + yo);
 	}
 
 	/**
 	 * Convert to SVG path string
 	 */
-	toString(pre = ""): string {
+	toString(pre = ''): string {
 		return `${pre}${this.x} ${this.y}`;
 	}
 }
@@ -81,14 +81,7 @@ export function createFastVector(
 	x: number,
 	y: number,
 	x2?: number,
-	getstrFn?: (
-		this: any,
-		p: string,
-		xs: number,
-		ys: number,
-		yo: number,
-		shp?: number,
-	) => string,
+	getstrFn?: (this: any, p: string, xs: number, ys: number, yo: number, shp?: number) => string,
 ): FastVector {
 	const fv = new FastVector(x, y, x2);
 	if (getstrFn) {
@@ -139,12 +132,6 @@ export class Patchcord {
 	 */
 	getCurvePath(): string {
 		this.shake();
-		return (
-			this.points[0].toString("M") +
-			this.points[1]!.toString("C") +
-			this.points[2]!.toString(",") +
-			this.points[3].toString(",")
-		);
+		return this.points[0].toString('M') + this.points[1]!.toString('C') + this.points[2]!.toString(',') + this.points[3].toString(',');
 	}
-
 }

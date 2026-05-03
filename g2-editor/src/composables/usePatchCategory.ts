@@ -1,5 +1,5 @@
-import { ref, watch, type Ref } from "vue";
-import { SOUND_CATEGORIES, type SoundCategory } from "../constants";
+import { ref, watch, type Ref } from 'vue';
+import { SOUND_CATEGORIES, type SoundCategory } from '../constants';
 
 export interface PatchDescription {
 	category?: number;

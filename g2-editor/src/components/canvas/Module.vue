@@ -123,7 +123,14 @@
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
-		<rect width="256" height="18" fill="transparent" style="cursor: grab" @mousedown.stop.prevent="onDragHandleMousedown" @dblclick.stop.prevent="onTitleDblClick" />
+		<rect
+			width="256"
+			height="18"
+			fill="transparent"
+			style="cursor: grab"
+			@mousedown.stop.prevent="onDragHandleMousedown"
+			@dblclick.stop.prevent="onTitleDblClick"
+		/>
 
 		<!-- Modes -->
 		<g class="modes">

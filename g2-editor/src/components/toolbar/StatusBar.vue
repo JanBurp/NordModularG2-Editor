@@ -33,8 +33,6 @@
 
 	function areaCount(area: 'voice' | 'fx', type: 'modules' | 'cables'): number {
 		const i = area === 'voice' ? 1 : 0;
-		return type === 'modules'
-			? currentPatch.value?.areas?.[i]?.modules?.length ?? 0
-			: currentPatch.value?.areas?.[i]?.cableList?.length ?? 0;
+		return type === 'modules' ? (currentPatch.value?.areas?.[i]?.modules?.length ?? 0) : (currentPatch.value?.areas?.[i]?.cableList?.length ?? 0);
 	}
 </script>

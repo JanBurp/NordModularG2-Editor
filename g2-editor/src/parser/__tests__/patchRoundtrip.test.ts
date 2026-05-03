@@ -1,21 +1,15 @@
-import type { Cable, ModuleInstance, Patch } from "../nmg2PatchParser";
-import { describe, expect, it } from "vitest";
-import {
-	mutAddCable,
-	mutAddModule,
-	mutDeleteCable,
-	mutDeleteModule,
-	mutMoveModule,
-} from "../patchMutations";
+import type { Cable, ModuleInstance, Patch } from '../nmg2PatchParser';
+import { describe, expect, it } from 'vitest';
+import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
 
-import { PatchParser } from "../nmg2PatchParser";
-import { fileURLToPath } from "url";
-import fs from "fs";
-import path from "path";
-import { serializePatch } from "../nmg2PatchSerializer";
+import { PatchParser } from '../nmg2PatchParser';
+import { fileURLToPath } from 'url';
+import fs from 'fs';
+import path from 'path';
+import { serializePatch } from '../nmg2PatchSerializer';
 
-const __dirname = fileURLToPath(new URL(".", import.meta.url));
-const FIXTURES = path.resolve(__dirname, "../../../../test-patches");
+const __dirname = fileURLToPath(new URL('.', import.meta.url));
+const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
 
 // ── helpers ──────────────────────────────────────────────────────────────────
 
@@ -26,8 +20,8 @@ function loadFixture(filename: string): { name: string; rawHex: string; patch: P
 	while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
 	const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
 	const rawHex = Array.from(fileBytes.slice(ofs + 3))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
 	const patch = new PatchParser(fileBytes.buffer).parse();
 	return { name, rawHex, patch };
 }
@@ -98,8 +92,8 @@ function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string
 	let nameEnd = 0;
 	while (nameEnd < fileBytes.length && fileBytes[nameEnd] !== 0) nameEnd++;
 	const strippedRawHex = Array.from(fileBytes.slice(nameEnd + 3))
-		.map((b) => b.toString(16).padStart(2, "0"))
-		.join("");
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
 
 	const patch = new PatchParser(fileBytes.buffer).parse();
 	return { rawHex: strippedRawHex, patch };
@@ -107,8 +101,8 @@ function simulateFileSaveAndLoad(name: string, rawHex: string): { rawHex: string
 
 // ── tests ─────────────────────────────────────────────────────────────────────
 
-describe("patch round-trip: parse → serialize → parse", () => {
-	for (const file of ["EmptyPatch.pch2", "Basics  NL2.pch2", "DXBass FM4.pch2"]) {
+describe('patch round-trip: parse → serialize → parse', () => {
+	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
 		it(file, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 			const newHex = serializePatch(name, patchA, rawHex);
@@ -118,9 +112,9 @@ describe("patch round-trip: parse → serialize → parse", () => {
 	}
 });
 
-describe("deleteCable", () => {
-	it("removes cable and leaves others intact", () => {
-		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
+describe('deleteCable', () => {
+	it('removes cable and leaves others intact', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const cables = patch.areas[1].cableList ?? [];
 		expect(cables.length).toBeGreaterThan(0);
 		const target = cables[0];
@@ -132,30 +126,23 @@ describe("deleteCable", () => {
 
 		const cabsB = patchB.areas[1].cableList ?? [];
 		expect(cabsB).toHaveLength(remainingCount);
-		const found = cabsB.find(
-			(c) => c.smod === target.smod && c.scon === target.scon &&
-				c.dmod === target.dmod && c.dcon === target.dcon,
-		);
+		const found = cabsB.find((c) => c.smod === target.smod && c.scon === target.scon && c.dmod === target.dmod && c.dcon === target.dcon);
 		expect(found).toBeUndefined();
 	});
 });
 
-describe("deleteModule", () => {
-	it("removes module and its connected cables", () => {
-		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
+describe('deleteModule', () => {
+	it('removes module and its connected cables', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const modules = patch.areas[1].modules;
 		const cables = patch.areas[1].cableList ?? [];
 		expect(modules.length).toBeGreaterThan(0);
 
 		// Pick first module that has at least one cable
-		const target = modules.find(
-			(m) => cables.some((c) => c.smod === m.index || c.dmod === m.index),
-		)!;
+		const target = modules.find((m) => cables.some((c) => c.smod === m.index || c.dmod === m.index))!;
 		expect(target).toBeDefined();
 
-		const connectedCables = cables.filter(
-			(c) => c.smod === target.index || c.dmod === target.index,
-		).length;
+		const connectedCables = cables.filter((c) => c.smod === target.index || c.dmod === target.index).length;
 		const expectedMods = modules.length - 1;
 		const expectedCables = cables.length - connectedCables;
 
@@ -166,16 +153,14 @@ describe("deleteModule", () => {
 		expect(patchB.areas[1].modules).toHaveLength(expectedMods);
 		expect(patchB.areas[1].cableList ?? []).toHaveLength(expectedCables);
 		expect(patchB.areas[1].modules.find((m) => m.index === target.index)).toBeUndefined();
-		const leftoverCables = (patchB.areas[1].cableList ?? []).filter(
-			(c) => c.smod === target.index || c.dmod === target.index,
-		);
+		const leftoverCables = (patchB.areas[1].cableList ?? []).filter((c) => c.smod === target.index || c.dmod === target.index);
 		expect(leftoverCables).toHaveLength(0);
 	});
 });
 
-describe("moveModule", () => {
-	it("updates position and preserves all other fields", () => {
-		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
+describe('moveModule', () => {
+	it('updates position and preserves all other fields', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const modules = patch.areas[1].modules;
 		expect(modules.length).toBeGreaterThan(0);
 		const target = modules[0];
@@ -199,10 +184,10 @@ describe("moveModule", () => {
 	});
 });
 
-describe("addModule", () => {
-	it("adds module with correct fields that survive round-trip", () => {
+describe('addModule', () => {
+	it('adds module with correct fields that survive round-trip', () => {
 		// Use EmptyPatch so we control the full module list
-		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 		expect(patch.areas[1].modules).toHaveLength(0);
 
 		// Keyboard module (type 1): 0 params, 0 modes, 6 outputs — simplest case
@@ -232,20 +217,25 @@ describe("addModule", () => {
 		expect(added.lv).toEqual([]);
 	});
 
-	it("adds module with params that survive round-trip", () => {
-		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+	it('adds module with params that survive round-trip', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 
 		// 2-Out module (type 4): 3 params, 0 modes
 		const pcnt = 3;
 		const lv: number[] = Array(pcnt * 9);
-		for (let v = 0; v < 9; v++)
-			for (let p = 0; p < pcnt; p++)
-				lv[v * pcnt + p] = p + 10; // arbitrary distinct values
+		for (let v = 0; v < 9; v++) for (let p = 0; p < pcnt; p++) lv[v * pcnt + p] = p + 10; // arbitrary distinct values
 
 		const mod: ModuleInstance = {
-			type: 4, index: 2, horiz: 1, vert: 2,
-			colour: 0, uprate: 0, leds: 0,
-			pcnt, lv, modes: [],
+			type: 4,
+			index: 2,
+			horiz: 1,
+			vert: 2,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt,
+			lv,
+			modes: [],
 		};
 		mutAddModule(patch, 1, mod);
 		const newHex = serializePatch(name, patch, rawHex);
@@ -258,9 +248,9 @@ describe("addModule", () => {
 	});
 });
 
-describe("addCable", () => {
-	it("adds cable that survives round-trip", () => {
-		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
+describe('addCable', () => {
+	it('adds cable that survives round-trip', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const existingCount = (patch.areas[1].cableList ?? []).length;
 
 		// Use module indices that exist in FMritm (index 1 and 2 confirmed above)
@@ -272,24 +262,29 @@ describe("addCable", () => {
 
 		const cables = patchB.areas[1].cableList ?? [];
 		expect(cables).toHaveLength(existingCount + 1);
-		const found = cables.find(
-			(c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2,
-		);
+		const found = cables.find((c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2);
 		expect(found).toBeDefined();
 	});
 });
 
-describe("chained edits round-trip", () => {
-	it("add module, add cable, move module, delete cable — patch object matches re-parse", () => {
-		const { name, rawHex, patch } = loadFixture("Basics  NL2.pch2");
+describe('chained edits round-trip', () => {
+	it('add module, add cable, move module, delete cable — patch object matches re-parse', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const ids = patch.areas[1].modules.map((m) => m.index);
 		const newModId = Math.max(...ids) + 1;
 
 		// 1. Add a Keyboard module (type 1, no params)
 		const newMod: ModuleInstance = {
-			type: 1, index: newModId, horiz: 10, vert: 10,
-			colour: 0, uprate: 0, leds: 0,
-			pcnt: 0, lv: [], modes: [],
+			type: 1,
+			index: newModId,
+			horiz: 10,
+			vert: 10,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
 		};
 		mutAddModule(patch, 1, newMod);
 
@@ -304,9 +299,7 @@ describe("chained edits round-trip", () => {
 		mutMoveModule(patch, 1, 2, movedCol, movedRow);
 
 		// 4. Delete the first cable (before our additions)
-		const firstCable = (patch.areas[1].cableList ?? []).find(
-			(c) => c.smod !== newModId && c.dmod !== newModId,
-		)!;
+		const firstCable = (patch.areas[1].cableList ?? []).find((c) => c.smod !== newModId && c.dmod !== newModId)!;
 		mutDeleteCable(patch, 1, firstCable);
 
 		// Snapshot of patch state before serialization
@@ -325,8 +318,8 @@ describe("chained edits round-trip", () => {
 	});
 });
 
-describe("file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)", () => {
-	for (const file of ["EmptyPatch.pch2", "Basics  NL2.pch2", "DXBass FM4.pch2"]) {
+describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)', () => {
+	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
 		it(`unmodified patch — ${file}`, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 
@@ -344,20 +337,34 @@ describe("file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		});
 	}
 
-	it("edited patch (add module + cable) — EmptyPatch.pch2", () => {
-		const { name, rawHex, patch } = loadFixture("EmptyPatch.pch2");
+	it('edited patch (add module + cable) — EmptyPatch.pch2', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 
 		const mod: ModuleInstance = {
-			type: 1, index: 1, horiz: 2, vert: 3,
-			colour: 0, uprate: 0, leds: 0,
-			pcnt: 0, lv: [], modes: [],
+			type: 1,
+			index: 1,
+			horiz: 2,
+			vert: 3,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
 		};
 		mutAddModule(patch, 1, mod);
 
 		const mod2: ModuleInstance = {
-			type: 1, index: 2, horiz: 5, vert: 3,
-			colour: 0, uprate: 0, leds: 0,
-			pcnt: 0, lv: [], modes: [],
+			type: 1,
+			index: 2,
+			horiz: 5,
+			vert: 3,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
 		};
 		mutAddModule(patch, 1, mod2);
 
