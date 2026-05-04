@@ -13,10 +13,14 @@
 #include "../include/g2_device.h"
 #include "../include/defs.h"
 #include "../include/output.h"
+#include "../include/cJSON.h"
+#include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
 #include <signal.h>
 #include <sys/time.h>
+#include <sys/wait.h>
+#include <sys/select.h>
 
 static int suite_initialized = 0;
 
@@ -254,6 +258,86 @@ void test_stress_editor_mimic(void) {
     watch_for_ms(500);
     g2_disconnect();
 }
+
+/* ── daemon integration test ─────────────────────────────────────────── */
+
+/* Read one newline-terminated line from fd. Returns byte count or -1 on timeout/error. */
+static int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec) {
+    int pos = 0;
+    while (pos < bufsize - 1) {
+        fd_set fds;
+        FD_ZERO(&fds);
+        FD_SET(fd, &fds);
+        struct timeval tv = { timeout_sec, 0 };
+        if (select(fd + 1, &fds, NULL, NULL, &tv) <= 0) return -1;
+        if (read(fd, buf + pos, 1) <= 0) return -1;
+        if (buf[pos++] == '\n') break;
+    }
+    buf[pos] = '\0';
+    return pos;
+}
+
+/* Send a JSON command line, skip watch events, return 0 if response has "ok":true for expected_id. */
+static int send_and_expect_ok(int wfd, int rfd, const char *json, int expected_id) {
+    char line_buf[4096];
+    int json_len = (int)strlen(json);
+    if (write(wfd, json, json_len) != json_len) return -1;
+    if (write(wfd, "\n", 1) != 1) return -1;
+    for (int attempts = 0; attempts < 30; attempts++) {
+        if (read_line_timeout(rfd, line_buf, sizeof(line_buf), 5) < 0) return -1;
+        cJSON *resp = cJSON_Parse(line_buf);
+        if (!resp) continue;
+        cJSON *id_j = cJSON_GetObjectItem(resp, "id");
+        if (id_j && (int)id_j->valuedouble == expected_id) {
+            int ok = cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok"));
+            cJSON_Delete(resp);
+            return ok ? 0 : -1;
+        }
+        cJSON_Delete(resp);
+    }
+    return -1;
+}
+
+/*
+ * Spawn the daemon as a child process, send slot and variation switch commands
+ * via stdin, and verify each responds with {"ok":true}.
+ */
+void test_daemon_slot_variation_commands(void) {
+    int in_pipe[2], out_pipe[2];
+    TEST_ASSERT_EQUAL_INT(0, pipe(in_pipe));
+    TEST_ASSERT_EQUAL_INT(0, pipe(out_pipe));
+
+    pid_t pid = fork();
+    TEST_ASSERT_TRUE(pid >= 0);
+
+    if (pid == 0) {
+        dup2(in_pipe[0],  STDIN_FILENO);
+        dup2(out_pipe[1], STDOUT_FILENO);
+        close(in_pipe[1]); close(out_pipe[0]);
+        close(in_pipe[0]); close(out_pipe[1]);
+        execl("build/bin/g2-cli", "g2-cli", "--json", "daemon", NULL);
+        exit(1);
+    }
+    close(in_pipe[0]);
+    close(out_pipe[1]);
+
+    usleep(1500000); /* allow daemon to connect and arm watch */
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1), "slot A");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"0\"]}", 2), "var 1 slot 0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":3,\"cmd\":\"slot\",\"args\":[\"B\"]}", 3), "slot B");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"1\"]}", 4), "var 3 slot 1");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":5,\"cmd\":\"slot\",\"args\":[\"C\"]}", 5), "slot C");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"2\"]}", 6), "var 5 slot 2");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":7,\"cmd\":\"slot\",\"args\":[\"D\"]}", 7), "slot D");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"3\"]}", 8), "var 2 slot 3");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":9,\"cmd\":\"slot\",\"args\":[\"A\"]}", 9), "slot A");
+
+    close(in_pipe[1]);  /* EOF triggers daemon shutdown */
+    waitpid(pid, NULL, 0);
+}
+
+/* ── watch-based tests (kept for reference, not run in normal suite) ──── */
 
 /*
  * Full real-life scenario with JSON output to stdout:
