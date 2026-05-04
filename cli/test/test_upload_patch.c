@@ -180,18 +180,14 @@ void test_upload_empty_patch(void) {
     do_upload_roundtrip("EmptyPatch", TEST_PATCHES_DIR "/EmptyPatch.pch2");
 }
 
-void test_upload_burp(void) {
-    do_upload_roundtrip("Burp", TEST_PATCHES_DIR "/Burp  NL-X v7.2.pch2");
+void test_upload_nl2(void) {
+    do_upload_roundtrip("Analogue", TEST_PATCHES_DIR "/Analogue NL2.pch2");
 }
 
-void test_upload_lyra4(void) {
-    do_upload_roundtrip("Lyra4", TEST_PATCHES_DIR "/Lyra4.pch2");
+void test_upload_dxbass(void) {
+    do_upload_roundtrip("DXBass", TEST_PATCHES_DIR "/DXBass FM4.pch2");
 }
 
-void test_upload_fmritm(void) {
-    do_upload_roundtrip("FMritm", TEST_PATCHES_DIR "/FMritm.pch2");
-}
-
-void test_upload_ocoast(void) {
-    do_upload_roundtrip("O-CoasT", TEST_PATCHES_DIR "/O-CoasT.pch2");
+void test_upload_mixt(void) {
+    do_upload_roundtrip("Mixturtrautonium", TEST_PATCHES_DIR "/Mixturtrautonium.pch2");
 }

@@ -75,6 +75,7 @@ test-integration: $(TEST_BUILD_DIR)/g2-integration-tests
 $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_unit.c \
 		$(TEST_SRC) \
+		$(OBJ_DIR)/daemon.o \
 		$(OBJ_DIR)/g2_device.o \
 		$(OBJ_DIR)/utils.o \
 		$(OBJ_DIR)/bitstream.o \
@@ -86,6 +87,7 @@ $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_
 $(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration.c \
 		$(TEST_SRC) \
+		$(OBJ_DIR)/daemon.o \
 		$(OBJ_DIR)/g2_device.o \
 		$(OBJ_DIR)/utils.o \
 		$(OBJ_DIR)/bitstream.o \

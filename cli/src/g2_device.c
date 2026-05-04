@@ -1761,10 +1761,33 @@ int g2_set_param(int slot, int location, int module_id,
 }
 
 volatile int g2_watch_running = 1;
+void (*g2_watch_tick_hook)(void) = NULL;
 
 void g2_watch_stop(int sig) {
     (void)sig;
     g2_watch_running = 0;
+}
+
+/* Send STOP_COMM so the G2 stops streaming and normal commands work again. */
+int g2_watch_disarm(void) {
+    uint8_t response[16];
+    uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
+    send_system_data(0x41, stop_cmd, 2);
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+/* Drain stale data, send START_COMM to re-arm unsolicited notifications. */
+int g2_watch_rearm(void) {
+    uint8_t response[16];
+    g2_drain_pending();
+    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
+    if (send_system_data(0x41, start_cmd, 2) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    return G2_OK;
 }
 
 
@@ -1853,6 +1876,7 @@ int g2_watch(output_format_t format, int debug) {
     fprintf(stderr, "\n");
 
     while (g2_watch_running) {
+        if (g2_watch_tick_hook) g2_watch_tick_hook();
         ret = recv_interrupt(response, sizeof(response), 100);
         if (ret == LIBUSB_ERROR_NO_DEVICE) {
             printf("{\"type\":\"device_disconnected\"}\n");
