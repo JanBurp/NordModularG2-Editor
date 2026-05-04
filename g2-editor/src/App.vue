@@ -146,7 +146,6 @@
 						@module-label-edit="handleModuleLabelEdit"
 					/>
 				</template>
-				<div v-else class="flex items-center justify-center h-full text-neutral-500 text-sm">Load a .pch2 or .prf2 file to begin</div>
 			</div>
 
 			<SidePanel v-if="uiStore.showRightPane">
