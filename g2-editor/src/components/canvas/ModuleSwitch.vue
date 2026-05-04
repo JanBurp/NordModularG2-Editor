@@ -3,9 +3,15 @@
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
-			<svg v-if="singleButtonMode" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
+			<svg v-if="singleButtonMode && optionNames.length === 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
 				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${paramType}-0)`" />
+			</svg>
+
+			<!-- Single button mode: show active bitmap without highlight -->
+			<svg v-if="singleButtonMode && optionNames.length > 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
+				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${paramType}-0)`" />
 			</svg>
 
 			<!-- VR/HR mode: show all bitmaps with active highlighted -->
@@ -28,9 +34,17 @@
 
 		<!-- Text-based switch -->
 		<template v-else>
+			<!-- Single button mode, with one displayname: show with highlight -->
+			<g v-if="singleButtonMode && displayNames.length === 1" class="switch-button" @click="onCycleValue">
+				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" />
+				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+					{{ activeOptionName }}
+				</text>
+			</g>
+
 			<!-- Single button mode: show only active option without highlight -->
-			<g v-if="singleButtonMode" class="switch-button" @click="onCycleValue">
-				<rect :x="0" :y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+			<g v-if="singleButtonMode && displayNames.length > 1" class="switch-button" @click="onCycleValue">
+				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" fill="#EEE" />
 				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
 				</text>
@@ -89,6 +103,7 @@
 	const rows = computed(() => paramMap.value.rows || 1);
 	const bmp = computed(() => paramMap.value.bmp);
 	const hasBitmap = computed(() => !!bmp.value);
+	const maskh = computed(() => paramMap.value.maskh || 11);
 
 	const optionNames = computed(() => {
 		const def = defin.value;
@@ -130,7 +145,7 @@
 
 	const activeOptionName = computed(() => {
 		const idx = activeIndex.value;
-		return optionNames.value[idx] ?? optionNames.value[0];
+		return displayNames.value[idx] ?? displayNames.value[0];
 	});
 
 	function getButtonX(index: number): number {
