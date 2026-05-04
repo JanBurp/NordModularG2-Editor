@@ -1,4 +1,5 @@
-import { getParam, adsrT, adsrL, lfoP, rateBPM, rateLo, OscFreq, filterFreq, filterFreq1, filterFreq2 } from '../renderer/parammap';
+import { OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
+
 import type { ModuleDefinition } from '../types';
 
 export const paramFormattingFunctions: Record<string, (i: number) => string> = {

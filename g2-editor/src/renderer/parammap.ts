@@ -79,8 +79,8 @@ const parammap: Record<string, ParamDefinition> = {
 	LevScaledB: { low: 0, high: 127, def: 64, defin: ['0 ~ -8.0 dB, 64 ~ 0.0 dB, 127 ~ 8.0 dB'], comments: '' },
 	LfoA_Waveform: { mode: 'HR', names: ['', '', '', '', '', ''], width: 17, bmp: 'LfoAWave', low: 0, high: 5, def: 0, defin: ['0 ~ Sine, 1 ~ Tri, 2 ~ Saw, 3 ~ Aqr, 4 ~ RndStep, 5 ~ Rnd'], comments: '' },
 	LfoB_Waveform: { mode: 'HR', names: ['', '', '', ''], width: 17, bmp: 'LfoBWave', low: 0, high: 3, def: 0, defin: ['0 ~ Sine, 1 ~ Tri, 2 ~ Saw, 3 ~ Square'], comments: '' },
-	LfoRange_3: { f: 'rateLo', low: 0, high: 3, def: 1, defin: ['0 ~ Sub, 1 ~ Lo, 2 ~ Hi, 3 ~ BPM'], comments: 'Determines [LfoRate_3]' },
-	LfoRange_4: { f: 'rateLo', low: 0, high: 4, def: 0, defin: ['0 ~ Rate Sub, 1 ~ Rate Lo, 2 ~ Rate Hi, 3 ~ BPM, 4 ~ Clock'], comments: 'Determines [LfoRate_4]' },
+	LfoRange_3: { width: 40, f: 'rateLo', low: 0, high: 3, def: 1, defin: ['0 ~ Sub, 1 ~ Lo, 2 ~ Hi, 3 ~ BPM'], comments: 'Determines [LfoRate_3]' },
+	LfoRange_4: { width: 40, f: 'rateLo', low: 0, high: 4, def: 0, defin: ['0 ~ Rate Sub, 1 ~ Rate Lo, 2 ~ Rate Hi, 3 ~ BPM, 4 ~ Clock'], comments: 'Determines [LfoRate_4]' },
 	LfoRate_3: { f: 'rateLo', low: 0, high: 127, def: 1, defin: ['0 ~ 699s, 127 ~ 5.46s', '1 ~ 62.9s, 127 ~ 24.4 Hz', '2 ~ 0.26 Hz, 127 ~ 392 Hz', '3 ~ 24, 127 ~ 214'], comments: 'Sub, Lo, Hi, BPM =BPM is the same as for RateBpm). Determined by [LfoRange_3]' },
 	LfoRate_4: { f: 'rateLo', low: 0, high: 127, def: 1, defin: ['0 ~ 699s, 127 ~ 5.46s', '1 ~ 62.9s, 127 ~ 24.4 Hz', '2 ~ 0.26 Hz, 127 ~ 392 Hz', '3 ~ 24, 127 ~ 214', '4 ~ 64/1, 64 ~ 1/4D, 127 ~ 1/64T'], comments: 'Sub, Lo, Hi, BPM, Clock =BPM is the same as for RateBpm). Determined by [LfoRange_4]' },
 	LfoShpA__Waveform: { mode: 'HR', names: ['', '', '', '', '', ''], width: 17, bmp: 'LfoShpAWave', low: 0, high: 5, def: 0, defin: ['0 ~ Sine, 1 ~ CosBell, 2 ~ TriBell, 3 ~ Saw2Tri, 4 ~ Sqr2Tri, 5 ~ Sqr'], comments: '' },
@@ -177,7 +177,7 @@ const parammap: Record<string, ParamDefinition> = {
 	sw_3: { names: ['1', '2', '3', '4', '5', '6', '7', '8'], rows: 2, width: 42, low: 0, high: 7, def: 0, defin: ['0 ~ sw1, 1 ~ sw2, 2 ~ sw3, 3 ~ sw4, 4 ~ sw5, 5 ~ sw6, 6 ~ sw7, 7 ~ sw8'], comments: '' },
 	Threshold_127: { low: 0, high: 127, def: 0, defin: ['0 ~ -{00}, 64 ~ -6.0 dB, 127 ~ -0 dB'], comments: '' },
 	Threshold_42: { low: 0, high: 42, def: 18, defin: ['0 ~ -30 dB, 18 ~ -12 dB, 42 ~ Off'], comments: '' },
-	TimeClk: { low: 0, high: 1, def: 0, defin: ['0 ~ Time, 1 ~ Clk'], comments: '' },
+	TimeClk: { width: 40, low: 0, high: 1, def: 0, defin: ['0 ~ Time, 1 ~ Clk'], comments: '' },
 	TrigGate: { names: ['T', 'G'], width: 11, low: 0, high: 1, def: 0, defin: ['0 ~ Trig, 1 ~ Gate'], comments: '' },
 	ValSwVal: { low: 0, high: 63, def: 0, defin: ['0 ~ 0, 62 ~ 62, 63 ~ 64'], comments: '' },
 	VocoderBand: { low: 0, high: 16, def: 0, defin: ['0 ~ Off, 1 ~ 1, 2 ~ 2, 3 ~ 3, 4 ~ 4, 5 ~ 5, 6 ~ 6, 7 ~ 7, 8 ~ 8, 9 ~ 9, 10 ~ 10, 11 ~ 11, 12 ~ 12, 13 ~ 13, 14 ~ 14, 15 ~ 15, 16 ~ 16'], comments: '' },
@@ -250,6 +250,11 @@ const _clk = [
 	'1/64T',
 ];
 
+
+function numberFormat(value: number) {
+	return (Math.round(value * 100) / 100).toFixed(1);
+}
+
 export function rateLo(i: number, con: unknown, tw: unknown): string | undefined {
 	if (!tw) return;
 	i = (con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[0]].l;
@@ -259,8 +264,8 @@ export function rateLo(i: number, con: unknown, tw: unknown): string | undefined
 	if (bf == 0) return rateBPM(i).slice(0, -3);
 	if (bf == 1) return _clk[i >> 2];
 	const r = (bf as { b: number; f: number }).b / Math.pow((bf as { b: number; f: number }).f, 64 - Math.floor(i));
-	const sec = 1 / r;
-	sec.toFixed(1);
+	const sec = numberFormat(1 / r);
+	// sec.toFixed(1);
 	return (r < 0.1 && sec + 's') || r.toFixed((r < 10 && 2) || 1) + 'Hz';
 }
 
