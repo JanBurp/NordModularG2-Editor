@@ -240,7 +240,7 @@ app.whenReady().then(async () => {
 		{
 			label: "File",
 			submenu: [
-				{ label: "New Patch", click: () => win!.webContents.send("menu:action", "new-patch") },
+				{ label: "New Patch", click: () => win!.webContents.send("menu:action", "new-patch"), accelerator: "CommandOrControl+N" },
 				{ label: "New Performance", click: () => win!.webContents.send("menu:action", "new-performance") },
 				{ type: "separator" },
 				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
