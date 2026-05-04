@@ -405,11 +405,16 @@
 				case 'toggle-browser':
 					uiStore.toggleSidebar('browser');
 					break;
-				case 'area-voice':
-					uiStore.area = 1;
+				case 'toggle-info':
+					uiStore.toggleSidebar('info');
 					break;
+				case 'area-voice':
 				case 'area-fx':
-					uiStore.area = 0;
+					if (uiStore.area === 1) {
+						uiStore.area = 0;
+					} else {
+						uiStore.area = 1;
+					}
 					break;
 				case 'slot-A':
 					handleSlotClick(0);
@@ -422,6 +427,17 @@
 					break;
 				case 'slot-D':
 					handleSlotClick(3);
+					break;
+				case 'variation-1':
+				case 'variation-2':
+				case 'variation-3':
+				case 'variation-4':
+				case 'variation-5':
+				case 'variation-6':
+				case 'variation-7':
+				case 'variation-8':
+					const variation = parseInt(action.substring(10, 11));
+					await handleVariationClick(variation - 1);
 					break;
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
