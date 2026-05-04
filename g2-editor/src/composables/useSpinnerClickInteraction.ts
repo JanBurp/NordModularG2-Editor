@@ -1,6 +1,6 @@
 import type { MouseEvent as VueMouseEvent } from 'vue';
 
-export type SpinnerType = 'KnobSpin' | 'KnobSpinH';
+export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSlider';
 
 export function useSpinnerClickInteraction(
 	type: SpinnerType,
@@ -17,14 +17,14 @@ export function useSpinnerClickInteraction(
 		const y = e.clientY - rect.top;
 		const value = getValue();
 
-		if (type === 'KnobSpin') {
-			if (y < 10) {
+		if (type === 'KnobSpin' || type === 'KnobSlider') {
+			if (y < rect.height / 2) {
 				onChange(paramIndex, Math.min(127, value + STEP));
 			} else {
 				onChange(paramIndex, Math.max(0, value - STEP));
 			}
 		} else if (type === 'KnobSpinH') {
-			if (x < 10) {
+			if (x < rect.width / 2) {
 				onChange(paramIndex, Math.max(0, value - STEP));
 			} else {
 				onChange(paramIndex, Math.min(127, value + STEP));
