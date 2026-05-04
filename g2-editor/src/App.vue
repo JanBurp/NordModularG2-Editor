@@ -160,6 +160,8 @@
 		</div>
 
 		<StatusBar @toggle-connection="toggleConnection" />
+
+		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
 
 	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
@@ -188,6 +190,7 @@
 	import ColorPicker from './components/common/ColorPicker.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
+	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
@@ -419,6 +422,9 @@
 					break;
 				case 'slot-D':
 					handleSlotClick(3);
+					break;
+				case 'toggle-svg-viewer':
+					uiStore.toggleSvgViewer();
 					break;
 			}
 		});

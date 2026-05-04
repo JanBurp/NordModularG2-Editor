@@ -272,6 +272,7 @@ app.whenReady().then(async () => {
 				{ label: "Slot D", click: () => win!.webContents.send("menu:action", "slot-D"), accelerator: "CommandOrControl+Shift+D" },
 				{ type: "separator" },
 				{ label: "Toggle DevTools", role: "toggleDevTools", accelerator: "CommandOrControl+Shift+I" },
+				{ label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
 			],
 		},
 		{

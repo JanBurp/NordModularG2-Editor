@@ -16,6 +16,7 @@ export const useUiStore = defineStore('ui', {
 		showRightPane: true as boolean,
 		selectedCable: null as Cable | null,
 		selectedModules: [] as number[],
+		showSvgViewer: false as boolean,
 	}),
 
 	getters: {
@@ -51,6 +52,10 @@ export const useUiStore = defineStore('ui', {
 
 		clearSelection() {
 			this.selectedModules = [];
+		},
+
+		toggleSvgViewer() {
+			this.showSvgViewer = !this.showSvgViewer;
 		},
 	},
 });
