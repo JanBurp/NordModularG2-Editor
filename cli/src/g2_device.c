@@ -1105,12 +1105,23 @@ int g2_select_slot(const char *slot_str) {
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py) */
+    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py).
+     * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
+     * consume the bulk immediately — leaving it unread blocks subsequent commands. */
     if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send slot command 3\n");
         return G2_ERR_SEND;
     }
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    {
+        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+        if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
+            if (sz > 0) {
+                uint8_t *bulk = malloc(sz);
+                if (bulk) { recv_bulk(bulk, sz); free(bulk); }
+            }
+        }
+    }
 
     g2_drain_pending();
 
@@ -1740,11 +1751,13 @@ void g2_watch_stop(int sig) {
 
 /* Send STOP_COMM so the G2 stops streaming and normal commands work again. */
 int g2_watch_disarm(void) {
-    uint8_t response[16];
     uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop_cmd, 2);
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    /* Use g2_drain_pending (not a bare recv_interrupt) so that any EXTENDED
+     * interrupt arriving here has its bulk data consumed — an unread bulk
+     * blocks the G2 from sending further interrupts, including the response
+     * to GET_PATCH_VERSION in g2_select_variation. */
     g2_drain_pending();
     return G2_OK;
 }
@@ -1904,9 +1917,12 @@ int g2_watch(output_format_t format, int debug) {
                         }
                         if (process_bulk_event(bulk, bret) & BULK_REARM) {
                             /* G2 stops unsolicited data after full performance switch;
-                             * re-arm it (Delphi does the same via SynthStartStopCommunication) */
+                             * re-arm it (Delphi does the same via SynthStartStopCommunication).
+                             * Read the ack to keep the interrupt FIFO clean. */
                             uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
+                            uint8_t arm_ack[16];
                             send_system_data(0x41, arm, 2);
+                            recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD);
                         }
                     }
                     free(bulk);

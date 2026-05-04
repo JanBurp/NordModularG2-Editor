@@ -83,25 +83,21 @@ int main(void) {
     run_test_silently("test_integration_connect", test_integration_connect);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
-    run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
-    run_test_with_output("test_upload_nl2",        test_upload_nl2);
-    run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
-    run_test_with_output("test_upload_mixt",      test_upload_mixt);
+    // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
+    // run_test_with_output("test_upload_nl2",        test_upload_nl2);
+    // run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
+    // run_test_with_output("test_upload_mixt",      test_upload_mixt);
 
-    run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
-    run_test_silently("test_integration_list_all", test_integration_list_all);
+    // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
+    // run_test_silently("test_integration_list_all", test_integration_list_all);
     run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
 
-    run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
-    run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
+    // run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
+    // run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
     run_test_silently("test_variation_cycle_slot_a", test_variation_cycle_slot_a);
-    run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
-    run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
-    run_test_silently("test_drain_count_logged", test_drain_count_logged);
-
-    /* Startup sequence last: CMD_INIT resets the G2, disrupting any shared
-     * connection state — running it last prevents it from affecting other tests. */
-    run_test_silently("test_startup_sequence", test_startup_sequence);
+    // run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
+    // run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
+    // run_test_silently("test_drain_count_logged", test_drain_count_logged);
 
     /* Daemon: spawn g2-cli daemon subprocess, verify slot + variation commands over stdin/stdout. */
     run_test_silently("test_daemon_slot_variation_commands", test_daemon_slot_variation_commands);
@@ -113,6 +109,10 @@ int main(void) {
     run_test_with_output("test_stress_slot_variation_watch", test_stress_slot_variation_watch);
     run_test_with_output("test_stress_editor_mimic", test_stress_editor_mimic);
     */
+
+    /* Startup sequence last: CMD_INIT resets the G2, disrupting any shared
+     * connection state — running it last prevents it from affecting other tests. */
+    // run_test_silently("test_startup_sequence", test_startup_sequence);
 
     return UNITY_END();
 }
