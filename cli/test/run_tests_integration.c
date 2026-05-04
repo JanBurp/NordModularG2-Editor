@@ -83,17 +83,17 @@ int main(void) {
     run_test_silently("test_integration_connect", test_integration_connect);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
-    // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
-    // run_test_with_output("test_upload_nl2",        test_upload_nl2);
-    // run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
-    // run_test_with_output("test_upload_mixt",      test_upload_mixt);
+    run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
+    run_test_with_output("test_upload_nl2",        test_upload_nl2);
+    run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
+    run_test_with_output("test_upload_mixt",      test_upload_mixt);
 
-    // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
-    // run_test_silently("test_integration_list_all", test_integration_list_all);
+    run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
+    run_test_silently("test_integration_list_all", test_integration_list_all);
     run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
 
-    // run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
-    // run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
+    run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
+    run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
     run_test_silently("test_variation_cycle_slot_a", test_variation_cycle_slot_a);
     run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
     run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);

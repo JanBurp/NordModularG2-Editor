@@ -20,14 +20,6 @@ static g2_device_t g2 = {
     .handle = NULL,
     .interface_claimed = 0
 };
-typedef struct {
-    uint8_t slot;
-    uint8_t version;
-    int valid;
-} g2_version_cache_t;
-
-static g2_version_cache_t version_cache = { .valid = 0 };
-
 /* Timeout values (in ms) */
 #define USB_TIMEOUT_STANDARD 100
 #define USB_TIMEOUT_LONG    2000
@@ -38,7 +30,6 @@ static g2_version_cache_t version_cache = { .valid = 0 };
 /* Command message building */
 #define COMMAND_OFFSET 2
 
-static void invalidate_version_cache(void);
 static int recv_interrupt(uint8_t *response, int size, int timeout_ms);
 static int recv_bulk(uint8_t *data, uint16_t size);
 static int send_system(uint8_t cmd, uint8_t subcmd);
@@ -46,42 +37,6 @@ static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
 static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
                      const uint8_t *extra, size_t extraLen);
 static int g2_drain_pending(void);
-
-static uint8_t get_version_for_slot(uint8_t slot) {
-    uint8_t response[16] = {0};
-    int ret;
-
-    if (version_cache.valid) {
-        return version_cache.version;
-    }
-
-    /* Use GET_PATCH_VERSION (0x35) — does not trigger streaming, unlike START_COMM */
-    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, slot};
-    if (send_system_data(0x41, cmd, 2) < 0) {
-        return 0x41;
-    }
-    usleep(USB_SEND_DELAY_US);
-
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-    if (ret <= 0) {
-        return 0x41;
-    }
-
-    uint8_t version = response[6];
-    if (version == 0) {
-        version = 0x41;
-    }
-
-    version_cache.slot = slot;
-    version_cache.version = version;
-    version_cache.valid = 1;
-
-    return version_cache.version;
-}
-
-static void invalidate_version_cache(void) {
-    version_cache.valid = 0;
-}
 
 static int ensure_connected(int silent) {
     if (g2_is_connected()) {
@@ -194,7 +149,6 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
-    invalidate_version_cache();
     fprintf(stderr, "Disconnected\n");
     return 0;
 }
@@ -259,9 +213,6 @@ int g2_send_init(void) {
             return G2_ERR_RECV;
         }
     }
-
-    /* Init resets the G2's version counters, so our cache is stale. */
-    invalidate_version_cache();
 
     return G2_OK;
 }
@@ -1110,9 +1061,9 @@ int g2_select_slot(const char *slot_str) {
     uint8_t data[8] = {0};
 
     if (ensure_connected(0) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
-            return G2_ERR_CONNECT;
-        }
+        fprintf(stderr, "Failed to connect to G2\n");
+        return G2_ERR_CONNECT;
+    }
 
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
@@ -1121,22 +1072,41 @@ int g2_select_slot(const char *slot_str) {
     }
 
     g2_drain_pending();
-    version = get_version_for_slot(slot);
 
+    /* Steps 1+2 use the performance version (slot=4), not the patch slot version.
+     * Per doc/usb.md §6 and g2ctl.py: SELECT_SLOT is a performance-level command. */
+    {
+        uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
+        uint8_t pv_resp[16] = {0};
+        send_system_data(0x41, pv_cmd, 2);
+        usleep(USB_SEND_DELAY_US);
+        int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
+        version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
+    }
+
+    /* Step 1: select bitmask */
     mask = 0x08 >> slot;
     data[0] = 0x07;
     data[1] = mask;
     data[2] = 0x0f;
     data[3] = mask;
     if (send_system_data(version, data, 4) < 0) {
+        fprintf(stderr, "Failed to send slot command 1\n");
+        return G2_ERR_SEND;
+    }
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+
+    /* Step 2: set active slot index */
+    data[0] = 0x09;
+    data[1] = slot;
+    if (send_system_data(version, data, 2) < 0) {
         fprintf(stderr, "Failed to send slot command 2\n");
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
-    data[0] = 0x09;
-    data[1] = slot;
-    if (send_system_data(version, data, 2) < 0) {
+    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py) */
+    if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
         fprintf(stderr, "Failed to send slot command 3\n");
         return G2_ERR_SEND;
     }
@@ -1381,7 +1351,7 @@ int g2_select_variation(int variation, int slot) {
     }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(slota, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD, 5);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
         return G2_ERR_RECV;
