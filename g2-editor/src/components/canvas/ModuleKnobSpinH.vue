@@ -1,10 +1,10 @@
 <template>
-	<g :transform="`translate(${x}, ${y})`" class="knob-spin-h" @click="onClick" @dblclick="onDoubleClick">
+	<g :transform="`translate(${x}, ${y})`" class="knob-spin-h" @mousedown="onMouseDown" @touchstart.passive="onMouseDown" @dblclick="onDoubleClick">
 		<use href="#KnobSpinH" width="20" height="10" />
 	</g>
 </template>
 <script setup lang="ts">
-	import { useSpinnerClickInteraction } from '../../composables/useSpinnerClickInteraction';
+	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 
 	const props = defineProps<{
 		x: number;
@@ -17,7 +17,7 @@
 		change: [index: number, value: number];
 	}>();
 
-	const { onClick, onDoubleClick } = useSpinnerClickInteraction(
+	const { onMouseDown, onDoubleClick } = useSpinnerHoldInteraction(
 		'KnobSpinH',
 		props.paramIndex,
 		() => props.value,

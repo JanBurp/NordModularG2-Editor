@@ -1,7 +1,7 @@
 <template>
 	<g :transform="`translate(${x}, ${y})`" class="slider-control">
-		<!-- Track (KnobSlider) -->
-		<use href="#KnobSlider" width="10" height="62" @click="onClick" @dblclick="onDoubleClick" />
+		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
+		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" @dblclick="onDoubleClick" />
 
 		<!-- Handle -->
 		<rect
@@ -16,7 +16,7 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
-	import { useSpinnerClickInteraction } from '../../composables/useSpinnerClickInteraction';
+	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 
 	const props = defineProps<{
@@ -30,7 +30,11 @@
 		change: [index: number, value: number];
 	}>();
 
-	const { onClick, onDoubleClick } = useSpinnerClickInteraction(
+	const {
+		onMouseDown: onTrackMouseDown,
+		onDoubleClick,
+		stopRepeat,
+	} = useSpinnerHoldInteraction(
 		'KnobSlider',
 		props.paramIndex,
 		() => props.value,
@@ -44,7 +48,8 @@
 	);
 
 	const levelShiftY = computed(() => {
-		return ((127 - props.value) / 135) * 42;
+		return ((127 - props.value) / 132) * 42;
+		// return ((127 - props.value) / 127) * 42;
 	});
 </script>
 <style scoped>
