@@ -87,10 +87,19 @@
 					@change="onParamChange"
 				/>
 
-				<!-- Spinners (KnobSpin) - render as small knob for now -->
-				<ModuleKnob
+				<!-- Spinners (KnobSpin) -->
+				<ModuleKnobSpin
 					v-else-if="isSpinner(param.n)"
-					type="KnobSmall"
+					:x="param.x"
+					:y="param.y"
+					:value="getParamValue(index)"
+					:param-index="index"
+					@change="onParamChange"
+				/>
+
+				<!-- Spinners horizontal (KnobSpinH) -->
+				<ModuleKnobSpinH
+					v-else-if="isSpinnerH(param.n)"
 					:x="param.x"
 					:y="param.y"
 					:value="getParamValue(index)"
@@ -148,13 +157,15 @@
 	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
-	import { isKnob, isSlider, isSwitch, isSpinner } from '../../composables/useModuleControls';
+	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../composables/useModuleControls';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
+	import ModuleKnobSpin from './ModuleKnobSpin.vue';
+	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 
 	const props = defineProps<{

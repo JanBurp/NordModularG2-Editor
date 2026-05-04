@@ -32,6 +32,10 @@ export function isSpinner(n: string): boolean {
 	return n === 'KnobSpin';
 }
 
+export function isSpinnerH(n: string): boolean {
+	return n === 'KnobSpinH';
+}
+
 export function formatValue(value: number, paramType: string): string {
 	const p = getParam(paramType);
 	if (!p) return String(value);
