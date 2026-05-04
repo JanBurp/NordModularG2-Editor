@@ -443,7 +443,11 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
     }
 
     if (strcmp(command, "daemon") == 0) {
-        return g2_daemon_run(output_format);
+        int ret = g2_daemon_run(output_format);
+        /* Skip atexit(g2_exit): explicit libusb_close() triggers a G2 USB
+         * state change that requires re-enumeration time.  The OS reclaims
+         * the handle cleanly without it. */
+        _exit(ret);
     }
 
     if (strcmp(command, "seq") == 0) {

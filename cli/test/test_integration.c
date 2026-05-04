@@ -30,7 +30,10 @@ static void ensure_connected(void) {
         suite_initialized = 1;
     }
     if (!g2_is_connected()) {
-        TEST_ASSERT_TRUE(g2_connect_silent() >= 0);
+        /* Retry with delay — needed after the daemon test releases the USB
+         * interface and the G2 takes a moment to re-enumerate. */
+        for (int i = 0; i < 6 && g2_connect_silent() < 0; i++)
+            usleep(500000);
     }
     TEST_ASSERT_TRUE(g2_is_connected());
 }
@@ -303,6 +306,11 @@ static int send_and_expect_ok(int wfd, int rfd, const char *json, int expected_i
  * via stdin, and verify each responds with {"ok":true}.
  */
 void test_daemon_slot_variation_commands(void) {
+    /* g2_disconnect() leaves g2.ctx alive; libusb_exit() is needed so the
+     * forked subprocess can claim the interface on macOS/IOKit. */
+    g2_exit();
+    suite_initialized = 0;
+
     int in_pipe[2], out_pipe[2];
     TEST_ASSERT_EQUAL_INT(0, pipe(in_pipe));
     TEST_ASSERT_EQUAL_INT(0, pipe(out_pipe));
@@ -323,18 +331,32 @@ void test_daemon_slot_variation_commands(void) {
 
     usleep(1500000); /* allow daemon to connect and arm watch */
 
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1), "slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"0\"]}", 2), "var 1 slot 0");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":3,\"cmd\":\"slot\",\"args\":[\"B\"]}", 3), "slot B");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"1\"]}", 4), "var 3 slot 1");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":5,\"cmd\":\"slot\",\"args\":[\"C\"]}", 5), "slot C");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"2\"]}", 6), "var 5 slot 2");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":7,\"cmd\":\"slot\",\"args\":[\"D\"]}", 7), "slot D");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"3\"]}", 8), "var 2 slot 3");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":9,\"cmd\":\"slot\",\"args\":[\"A\"]}", 9), "slot A");
+    /* Collect all results before asserting so the daemon is always shut down
+     * cleanly — an early TEST_ASSERT longjmp would leave it holding the USB
+     * device, causing the next test to fail. */
+    int r[9];
+    r[0] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1);
+    r[1] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"0\"]}", 2);
+    r[2] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":3,\"cmd\":\"slot\",\"args\":[\"B\"]}", 3);
+    r[3] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"1\"]}", 4);
+    r[4] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":5,\"cmd\":\"slot\",\"args\":[\"C\"]}", 5);
+    r[5] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"2\"]}", 6);
+    r[6] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":7,\"cmd\":\"slot\",\"args\":[\"D\"]}", 7);
+    r[7] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"3\"]}", 8);
+    r[8] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":9,\"cmd\":\"slot\",\"args\":[\"A\"]}", 9);
 
     close(in_pipe[1]);  /* EOF triggers daemon shutdown */
     waitpid(pid, NULL, 0);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[0], "slot A");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "var 1 slot 0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[2], "slot B");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "var 3 slot 1");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[4], "slot C");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "var 5 slot 2");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[6], "slot D");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[7], "var 2 slot 3");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[8], "slot A");
 }
 
 /* ── watch-based tests (kept for reference, not run in normal suite) ──── */
