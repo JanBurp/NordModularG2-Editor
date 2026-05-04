@@ -4,7 +4,7 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'settings' | 'browser';
+export type PaneTab = 'modules' | 'info' | 'browser';
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({
@@ -12,7 +12,7 @@ export const useUiStore = defineStore('ui', {
 		area: 1 as number,
 		variation: 0 as number,
 		moduleColor: 0 as number,
-		rightPaneTab: 'settings' as PaneTab,
+		rightPaneTab: 'modules' as PaneTab,
 		showRightPane: true as boolean,
 		selectedCable: null as Cable | null,
 		selectedModules: [] as number[],
