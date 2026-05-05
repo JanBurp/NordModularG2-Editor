@@ -97,6 +97,8 @@ exec 3>/tmp/g2-cmd
 echo '{"id":1,"cmd":"slot","args":["B"]}' >&3               # Change slot B
 echo '{"id":2,"cmd":"variation","args":["4","B"]}' >&3      # Change to variaton 4 on slot B (1)
 echo '{"id":3,"cmd":"device"}' >&3                          # device
+echo '{"id":5,"cmd":"verbose","args":["off"]}' >&3          # suppress led/volume
+echo '{"id":6,"cmd":"verbose","args":["on"]}' >&3           # restore
 exec 3>&-   # close when done (causes daemon to exit cleanly)
 ```
 The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.
