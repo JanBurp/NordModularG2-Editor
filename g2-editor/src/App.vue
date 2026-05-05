@@ -123,6 +123,7 @@
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
+						@mode-change="handleModeChange"
 						@param-change="handleParamChange"
 						@module-label-edit="handleModuleLabelEdit"
 					/>
@@ -142,6 +143,7 @@
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
 						@module-drop="handleModuleDrop"
+						@mode-change="handleModeChange"
 						@param-change="handleParamChange"
 						@module-label-edit="handleModuleLabelEdit"
 					/>
@@ -267,6 +269,18 @@
 			paramChangeTimer = null;
 			try {
 				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
+			} catch {
+				/* G2 may be temporarily busy */
+			}
+		}, 50);
+	}
+	function handleModeChange(moduleIndex: number, index: number, value: number): void {
+		if (device.status !== 'connected') return;
+		if (paramChangeTimer) clearTimeout(paramChangeTimer);
+		paramChangeTimer = setTimeout(async () => {
+			paramChangeTimer = null;
+			try {
+				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
 			} catch {
 				/* G2 may be temporarily busy */
 			}
