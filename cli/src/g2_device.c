@@ -149,7 +149,6 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
-    fprintf(stderr, "Disconnected\n");
     return 0;
 }
 
@@ -1749,6 +1748,7 @@ int g2_set_param(int slot, int location, int module_id,
 }
 
 volatile int g2_watch_running = 1;
+int g2_watch_verbose = 1;
 void (*g2_watch_tick_hook)(void) = NULL;
 
 void g2_watch_stop(int sig) {
@@ -1816,13 +1816,19 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
         uint8_t bslot = baCmd;
         switch (bsubCmd) {
             case 0x39:
-                printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
-                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
-                printf("]}\n"); fflush(stdout); break;
+                if (g2_watch_verbose) {
+                    printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
+                    for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                    printf("]}\n"); fflush(stdout);
+                }
+                break;
             case 0x3A:
-                printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
-                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
-                printf("]}\n"); fflush(stdout); break;
+                if (g2_watch_verbose) {
+                    printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
+                    for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                    printf("]}\n"); fflush(stdout);
+                }
+                break;
             case 0x72:
                 printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
@@ -1850,6 +1856,13 @@ int g2_watch(output_format_t format, int debug) {
      * notification burst can stall the bulk-OUT endpoint. */
     g2_drain_pending();
 
+    /* Clear any halted endpoints left over from a previous bad session.
+     * The output endpoint is already cleared on-demand in send_slot/g2_send_command,
+     * but the input endpoints are never cleared otherwise. */
+    libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+    libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
+    libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
+
     /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
     uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
     ret = send_system_data(0x41, start_cmd, 2);
@@ -1864,6 +1877,33 @@ int g2_watch(output_format_t format, int debug) {
         for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
     }
     fprintf(stderr, "\n");
+
+    if (ret <= 0) {
+        /* G2 is connected but not responding — bad state (halted endpoint,
+         * firmware stuck, etc.). Emit event, disconnect, and wait for it to
+         * come back using the same reconnect loop used inside the watch. */
+        printf("{\"type\":\"device_bad_state\"}\n");
+        fflush(stdout);
+        g2_disconnect();
+        while (g2_watch_running) {
+            if (g2_connect_silent() >= 0) break;
+            usleep(100000);
+        }
+        if (!g2_watch_running) return G2_OK;
+        g2_drain_pending();
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
+        ret = send_system_data(0x41, start_cmd, 2);
+        if (ret < 0) {
+            fprintf(stderr, "watch: failed to re-arm after bad state\n");
+            return G2_ERR;
+        }
+        usleep(USB_SEND_DELAY_US);
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+        printf("{\"type\":\"device_reconnected\"}\n");
+        fflush(stdout);
+    }
 
     while (g2_watch_running) {
         if (g2_watch_tick_hook) g2_watch_tick_hook();

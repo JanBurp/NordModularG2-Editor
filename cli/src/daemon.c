@@ -141,6 +141,21 @@ static void execute_cmd(const char *line) {
 	int ret = G2_ERR_INVALID_PARAM;
 	cJSON *data = NULL;
 
+	/* Non-USB commands: handle before disarm/rearm. */
+	if (strcmp(cmd, "verbose") == 0 && n >= 1) {
+		const char *val = arg_s(args, 0);
+		if (strcmp(val, "on") == 0)       g2_watch_verbose = 1;
+		else if (strcmp(val, "off") == 0) g2_watch_verbose = 0;
+		else {
+			cJSON *r = daemon_make_error(id, G2_ERR_INVALID_PARAM);
+			emit(r); cJSON_Delete(r); cJSON_Delete(req);
+			return;
+		}
+		cJSON *r = daemon_make_ok(id);
+		emit(r); cJSON_Delete(r); cJSON_Delete(req);
+		return;
+	}
+
 	/* Stop streaming so the G2 accepts normal commands, then re-arm after. */
 	g2_watch_disarm();
 
