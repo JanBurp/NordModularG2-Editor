@@ -2,7 +2,7 @@
 # Build C CLI tool for Nord G2 synthesizer
 
 CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude -Itest -I. -I/opt/homebrew/Cellar/libusb/1.0.29/include/libusb-1.0 -g
+CFLAGS = -Wall -Wextra -Iinclude -Itest -I. -I/opt/homebrew/Cellar/libusb/1.0.29/include/libusb-1.0 -g -DUNITY_OUTPUT_COLOR
 LDFLAGS = -L/opt/homebrew/Cellar/libusb/1.0.29/lib -lusb-1.0 -pthread
 TARGET = g2-cli
 SRC_DIR = src
