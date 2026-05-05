@@ -75,7 +75,33 @@ g2-cli del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-c
 
 ```bash
 g2-cli watch                            # monitor param/cable/slot changes live
+g2-cli daemon                           # persistent connection: watch + JSON commands on stdin
 ```
+
+In daemon mode, send newline-delimited JSON commands to stdin:
+```
+{"id":1,"cmd":"slot","args":["B"]}
+{"id":2,"cmd":"set-param","args":["A","va","5","0","64","0"]}
+```
+Responses: `{"id":1,"ok":true}` (action) or `{"id":1,"ok":true,"data":{...}}` (query).
+Watch events flow to stdout unchanged alongside responses.
+
+**Interactive testing from a second terminal:**
+```bash
+# Terminal 1 — start daemon, reading commands from a named pipe
+mkfifo /tmp/g2-cmd
+./build/bin/g2-cli daemon < /tmp/g2-cmd
+
+# Terminal 2 — keep the pipe open and send commands
+exec 3>/tmp/g2-cmd
+echo '{"id":1,"cmd":"slot","args":["B"]}' >&3               # Change slot B
+echo '{"id":2,"cmd":"variation","args":["4","B"]}' >&3      # Change to variaton 4 on slot B (1)
+echo '{"id":3,"cmd":"device"}' >&3                          # device
+echo '{"id":5,"cmd":"verbose","args":["off"]}' >&3          # suppress led/volume
+echo '{"id":6,"cmd":"verbose","args":["on"]}' >&3           # restore
+exec 3>&-   # close when done (causes daemon to exit cleanly)
+```
+The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.
 
 ### Output formats
 

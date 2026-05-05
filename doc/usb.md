@@ -243,7 +243,7 @@ Step 3 (slot):  [01][28+slot][0x0a][70][CRC]
 
 After all three commands, drain any pending notifications (`g2_drain_pending`).
 
-> **CLI note:** the current C CLI (`g2_select_slot`) only implements steps 1 and 2, and obtains `version` via GET_PATCH_VERSION rather than from the START_COMM response. Step 3 is not yet implemented.
+> **CLI note:** `g2_select_slot` implements all three steps. Steps 1+2 use the performance version obtained via GET_PATCH_VERSION with slot=4.
 
 ---
 
