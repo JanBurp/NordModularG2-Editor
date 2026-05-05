@@ -1,14 +1,20 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code and other coding agents when working with code in this repository.
-
-## Goal
-
-An editor for the Nord Modular G2 synthesizer. With use of a C++ CLI/deaman for USB communications. And en electronjs (Typescript, VueJS, Pinia) for the actual editor and graphical representation.
+## Project Context
+- This is a G2 synth project with a C firmware layer (g2_device.c, MIDI/USB), a TypeScript CLI, and a Vue editor (App.vue, slots.ts). Changes often need to flow across all three layers — check each layer when wiring new commands like add-module or SET_MODULE_LABEL.
 
 ## Coding And behavioral guidelines to reduce LLM coding mistakes
 
-**Tradeoff:** These guidelines bias toward caution over speed. For trivial tasks, use judgment.
+## Workflow Discipline
+- When fixing a specific bug, stay focused on the file/command mentioned. Do NOT explore unrelated files (e.g., Vue stores, patch parsing) unless the user explicitly asks.
+- When adding a `ref` in `<script>`, immediately verify it is attached to the corresponding template element before considering the task complete.
+- For code review requests, ask whether to review a specific commit, branch range, or working tree before starting.
+
+## Verification Before Done
+- For C/firmware bit-field parsing changes, request a raw byte dump from the connected G2 and verify each field (including inverted bits like clkse) before claiming the fix is complete.
+- For Vue/SVG refactors, run the test suite AND check for ID collisions when components are duplicated (e.g., gradient defs should live at App root).
+- Always run `npm run typecheck` (or equivalent) after multi-file TypeScript edits before reporting success.
+
 
 ### 1. Think Before Coding
 
