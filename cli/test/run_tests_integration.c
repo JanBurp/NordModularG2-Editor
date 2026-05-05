@@ -62,7 +62,8 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     int fd = suppress_stdout();
     RUN_TEST(test_func);
     restore_stdout(fd);
-    fprintf(stderr, "%s\n", Unity.TestFailures > before ? "FAIL" : "PASS");
+    int failed = Unity.TestFailures > before;
+    fprintf(stderr, "%s%s\033[0m\n", failed ? "\033[31m" : "\033[32m", failed ? "FAIL" : "PASS");
     fflush(stderr);
 }
 
