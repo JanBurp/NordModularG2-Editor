@@ -354,6 +354,14 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
 
+		// TODO
+		async setMode(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
+			// const slot = useDeviceStore().getActiveSlot;
+			// if (!slot) return;
+			// const location = area === 'voice' ? 'va' : 'fx';
+			// await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+		},
+
 		async loadSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;

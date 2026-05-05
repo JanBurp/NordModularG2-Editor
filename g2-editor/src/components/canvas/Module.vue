@@ -14,20 +14,6 @@
 			@dblclick.stop.prevent="onTitleDblClick"
 		/>
 
-		<!-- Modes -->
-		<g class="modes">
-			<ModuleMode
-				v-for="(mode, index) in moduleDef.modes"
-				:key="mode.name"
-				:x="mode.x"
-				:y="mode.y"
-				:width="mode.w || 20"
-				:height="mode.h || 18"
-				:param-type="mode.type"
-				:value="getModeValue(index)"
-			/>
-		</g>
-
 		<!-- Visual elements from ve array -->
 		<template v-for="(ve, index) in moduleDef.ve" :key="`ve-${index}`">
 			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
@@ -50,6 +36,20 @@
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
 		</template>
+
+		<!-- Modes -->
+		<g class="modes">
+			<ModuleMode
+				v-for="(mode, index) in moduleDef.modes"
+				:key="mode.name"
+				:x="mode.x"
+				:y="mode.y"
+				:param-type="mode.type"
+				:value="getModeValue(index)"
+				:param-index="index"
+				@change="onModeChange"
+			/>
+		</g>
 
 		<!-- Parameters -->
 		<g class="params">
@@ -176,6 +176,7 @@
 
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
+		modeChange: [moduleIndex: number, index: number, value: number];
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd: [info: JackDragInfo];
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
@@ -268,6 +269,16 @@
 			return instance.value.modes[index];
 		}
 		return 0;
+	}
+
+	// Handle parameter change from mode controls
+	function onModeChange(index: number, value: number) {
+		// Update local state
+		if (instance.value.modes && instance.value.modes.length > index) {
+			instance.value.modes[index] = value;
+		}
+		// Emit to parent
+		emit('modeChange', moduleIdx.value, index, value);
 	}
 </script>
 <style scoped>

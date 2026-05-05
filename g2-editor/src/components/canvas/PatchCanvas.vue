@@ -20,6 +20,7 @@
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				@param-change="onParamChange"
+				@mode-change="onModeChange"
 				@jack-drag-start="handleLocalJackDragStart"
 				@jack-drag-end="handleLocalJackDragEnd"
 				@module-drag-start="handleModuleDragStart"
@@ -96,6 +97,7 @@
 
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
+		modeChange: [moduleIndex: number, index: number, value: number];
 		cableClick: [cable: Cable];
 		jackDragStart: [
 			info: {
@@ -202,6 +204,10 @@
 
 	function onParamChange(moduleIndex, paramIndex, value) {
 		emit('paramChange', moduleIndex, paramIndex, value);
+	}
+
+	function onModeChange(moduleIndex, index, value) {
+		emit('modeChange', moduleIndex, index, value);
 	}
 
 	onMounted(async () => {

@@ -1,5 +1,6 @@
 <template>
-	<svg :x="x" :y="y" :width="Math.abs(width)" :height="height" class="mode-selector clipper">
+	<svg :x="x" :y="y" :width="width" :height="height" class="mode-selector clipper" @click="onCycleValue()">
+		<rect x="0" y="0" :width="width" :height="height" fill="#EEE" stroke="#333" />
 		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
 	</svg>
 </template>
@@ -11,20 +12,23 @@
 	const props = defineProps<{
 		x?: number;
 		y?: number;
-		width?: number;
-		height?: number;
+		paramIndex: number;
 		paramType: string;
 		value: number;
 	}>();
 
-	const x = computed(() => props.x ?? 0);
-	const y = computed(() => props.y ?? 0);
-	const width = computed(() => props.width ?? 20);
-	const height = computed(() => props.height ?? 18);
+	const emit = defineEmits<{
+		change: [index: number, value: number];
+	}>();
 
 	const paramMap = computed<ParamDefinition>(() => {
 		return getParam(props.paramType) || {};
 	});
+
+	const x = computed(() => props.x ?? 0);
+	const y = computed(() => props.y ?? 0);
+	const width = computed(() => paramMap.value.width || 18);
+	const height = computed(() => paramMap.value.height || 21);
 
 	const bitmapId = computed(() => paramMap.value.img || '');
 	const itemHeight = computed(() => paramMap.value.h || -18);
@@ -32,4 +36,19 @@
 	const offset = computed(() => {
 		return props.value * itemHeight.value;
 	});
+
+	function onCycleValue() {
+		const low = paramMap.value.low || 0;
+		const high = paramMap.value.high || 0;
+		const range = high - low + 1;
+		const current = Math.max(low, Math.min(props.value, high));
+		const newValue = low + ((current - low + 1) % range);
+		emit('change', props.paramIndex, newValue);
+	}
 </script>
+<style scoped>
+	.mode-selector {
+		cursor: pointer;
+		overflow: hidden;
+	}
+</style>
