@@ -1873,10 +1873,10 @@ int g2_watch(output_format_t format, int debug) {
             fflush(stdout);
             g2_disconnect();
 
-            /* Poll every 1 s until the cable comes back (or SIGTERM fires) */
+            /* Retry immediately, then every 100 ms until cable comes back. */
             while (g2_watch_running) {
-                usleep(1000000);
                 if (g2_connect_silent() >= 0) break;
+                usleep(100000);
             }
             if (!g2_watch_running) break;   /* SIGTERM during wait → clean exit */
 
