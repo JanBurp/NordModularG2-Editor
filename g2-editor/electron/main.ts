@@ -15,7 +15,9 @@ export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
 let win: BrowserWindow | null = null;
-let watchProcess: ChildProcess | null = null;
+let daemonProcess: ChildProcess | null = null;
+let cmdId = 0;
+const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void }>();
 
 const cliPath = path.join(process.env.APP_ROOT, "resources/g2-cli");
 
@@ -40,10 +42,10 @@ function createWindow() {
 	}
 }
 
-function startWatch() {
-	if (watchProcess) return;
-	const proc = spawn(cliPath, ["watch"]);
-	watchProcess = proc;
+function startDaemon() {
+	if (daemonProcess) return;
+	const proc = spawn(cliPath, ["daemon"]);
+	daemonProcess = proc;
 	let buffer = "";
 	proc.stdout?.on("data", (data: Buffer) => {
 		buffer += data.toString();
@@ -51,13 +53,39 @@ function startWatch() {
 		buffer = lines.pop() ?? "";
 		for (const line of lines) {
 			const trimmed = line.trim();
-			if (trimmed) win?.webContents.send("cli:watch-event", trimmed);
+			if (!trimmed) continue;
+			console.log(`[daemon-watch]`, line);
+			try {
+				const msg = JSON.parse(trimmed);
+				if (msg.id !== undefined) {
+					const pending = pendingCmds.get(msg.id);
+					if (pending) {
+						pendingCmds.delete(msg.id);
+						if (msg.ok) {
+							pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
+						} else {
+							pending.reject(new Error(`G2 error code: ${msg.code}`));
+						}
+					}
+				} else {
+					win?.webContents.send("cli:watch-event", trimmed);
+				}
+			} catch {
+				win?.webContents.send("cli:watch-event", trimmed);
+			}
 		}
 	});
+	proc.stderr?.on("data", (data: Buffer) => {
+		console.log(`[daemon-error] ${data.toString().trim()}`);
+	});
 	proc.on("close", (code) => {
-		const wasActive = watchProcess === proc;
-		if (wasActive) watchProcess = null;
-		if (!wasActive) return; // killed intentionally by stopWatchAndWait
+		const wasActive = daemonProcess === proc;
+		if (wasActive) daemonProcess = null;
+		for (const pending of pendingCmds.values()) {
+			pending.reject(new Error("Daemon exited"));
+		}
+		pendingCmds.clear();
+		if (!wasActive) return;
 		if (code !== null && code !== 0) {
 			win?.webContents.send("cli:device-disconnected");
 		} else {
@@ -66,13 +94,27 @@ function startWatch() {
 	});
 }
 
-async function stopWatchAndWait(): Promise<void> {
-	if (!watchProcess) return;
-	const proc = watchProcess;
-	watchProcess = null;
+async function stopDaemon(): Promise<void> {
+	if (!daemonProcess) return;
+	const proc = daemonProcess;
+	daemonProcess = null;
 	return new Promise<void>((resolve) => {
 		proc.on("close", () => resolve());
 		proc.kill("SIGTERM");
+	});
+}
+
+function sendCmd(cmd: string, args: string[]): Promise<string> {
+	return new Promise((resolve, reject) => {
+		if (!daemonProcess) {
+			reject(new Error("Daemon not running"));
+			return;
+		}
+		const id = ++cmdId;
+		pendingCmds.set(id, { resolve, reject });
+		const json = JSON.stringify({ id, cmd, args });
+		console.log('[deamon-cmd]->', json);
+		daemonProcess.stdin?.write(json + "\n");
 	});
 }
 
@@ -108,40 +150,46 @@ async function runCliRaw(args: string[]): Promise<string> {
 	});
 }
 
-async function runCli(args: string[]): Promise<string> {
-	const wasWatching = !!watchProcess;
-	if (wasWatching) await stopWatchAndWait();
-	try {
-		return await runCliRaw(args);
-	} finally {
-		if (wasWatching) startWatch();
-	}
-}
+// async function runCli(args: string[]): Promise<string> {
+// 	const wasWatching = !!watchProcess;
+// 	if (wasWatching) await stopWatchAndWait();
+// 	try {
+// 		return await runCliRaw(args);
+// 	} finally {
+// 		if (wasWatching) startWatch();
+// 	}
+// }
 
 ipcMain.handle("cli:run", async (_, args: string[]) => {
-	try {
-		return await runCli(args);
-	} catch (err: any) {
-		throw new Error(err.message);
-	}
+	const [cmd, ...rest] = args;
+	if (cmd === "disconnect") { await stopDaemon(); return ""; }
+	return await sendCmd(cmd, rest);
 });
 
 ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
-	const wasWatching = !!watchProcess;
-	if (wasWatching) await stopWatchAndWait();
-	try {
-		const results: string[] = [];
-		for (const args of argsList) {
-			results.push(await runCliRaw(args));
-		}
-		return results;
-	} finally {
-		if (wasWatching) startWatch();
+	// const wasWatching = !!watchProcess;
+	// if (wasWatching) await stopWatchAndWait();
+	// try {
+	// 	const results: string[] = [];
+	// 	for (const args of argsList) {
+	// 		results.push(await runCliRaw(args));
+	// 	}
+	// 	return results;
+	// } finally {
+	// 	if (wasWatching) startWatch();
+	// }
+	const results: string[] = [];
+	for (const args of argsList) {
+		const [cmd, ...rest] = args;
+		results.push(await sendCmd(cmd, rest));
 	}
+	return results;
 });
 
-ipcMain.on("cli:watch-start", () => startWatch());
-ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
+// ipcMain.on("cli:watch-start", () => startWatch());
+// ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
+ipcMain.on("cli:watch-start", () => startDaemon());
+ipcMain.on("cli:watch-stop", () => { stopDaemon(); });
 
 ipcMain.handle("patches:list", async (_, folder: string) => {
 	try {
@@ -204,8 +252,9 @@ ipcMain.handle("patch:open-dialog", async (event) => {
 app.on("before-quit", (e) => {
 	e.preventDefault();
 	(async () => {
-		await stopWatchAndWait();
-		try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
+		// await stopWatchAndWait();
+		// try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
+		await stopDaemon();
 		app.exit(0);
 	})();
 });

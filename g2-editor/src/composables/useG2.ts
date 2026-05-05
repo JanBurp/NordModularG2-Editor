@@ -203,17 +203,17 @@ export function useG2() {
 		window.cli.offDeviceDisconnected();
 	}
 
-	async function isG2Connected(): Promise<boolean> {
-		if (typeof window === 'undefined' || !window.cli) {
-			return false;
-		}
-		try {
-			const output = await window.cli.run(['list-devices']);
-			return output.includes('Nord G2');
-		} catch {
-			return false;
-		}
-	}
+	// async function isG2Connected(): Promise<boolean> {
+	// 	if (typeof window === 'undefined' || !window.cli) {
+	// 		return false;
+	// 	}
+	// 	try {
+	// 		const output = await window.cli.run(['list-devices']);
+	// 		return output.includes('Nord G2');
+	// 	} catch {
+	// 		return false;
+	// 	}
+	// }
 
 	async function connectDevice(): Promise<void> {
 		if (typeof window === 'undefined' || !window.cli) {
@@ -221,20 +221,22 @@ export function useG2() {
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
-		log('→', 'Connect', 'Checking for G2 device...');
-		const g2Found = await isG2Connected();
-		if (!g2Found) {
-			store.status = 'disconnected';
-			log('←', 'Connect', 'No G2 device found');
-			return;
-		}
+		startWatch();
+		// log('→', 'Connect', 'Checking for G2 device...');
+		// const g2Found = await isG2Connected();
+		// if (!g2Found) {
+		// 	store.status = 'disconnected';
+		// 	log('←', 'Connect', 'No G2 device found');
+		// 	return;
+		// }
 		log('→', 'Connect', 'Running startup sequence...');
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
-			startWatch();
+			// startWatch();
 		} catch (e: any) {
 			log('←', 'Connect', `Connection failed: ${e.message}`);
+			stopWatch();
 		}
 	}
 
