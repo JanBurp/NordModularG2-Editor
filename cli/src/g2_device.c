@@ -1872,11 +1872,8 @@ int g2_watch(output_format_t format, int debug) {
     }
     usleep(USB_SEND_DELAY_US);
     ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
-    fprintf(stderr, "watch: armed, response len=%d", ret);
-    if (ret > 0) {
-        for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
-    }
-    fprintf(stderr, "\n");
+    printf("{\"type\":\"watch_armed\"}\n");
+    fflush(stdout);
 
     if (ret <= 0) {
         /* G2 is connected but not responding — bad state (halted endpoint,

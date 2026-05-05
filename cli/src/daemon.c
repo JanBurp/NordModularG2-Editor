@@ -249,6 +249,11 @@ static void execute_cmd(const char *line) {
 
 	g2_watch_rearm();
 
+	if (ret == G2_ERR_SEND || ret == G2_ERR_CONNECT) {
+		printf("{\"type\":\"device_disconnected\"}\n");
+		fflush(stdout);
+	}
+
 	cJSON *resp;
 	if (ret == G2_OK) {
 		resp = daemon_make_ok(id);
