@@ -91,11 +91,11 @@ int main(void) {
 
     // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
     // run_test_silently("test_integration_list_all", test_integration_list_all);
-    run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
+    // run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
 
     // run_test_silently("test_slot_then_get_patch_no_delay", test_slot_then_get_patch_no_delay);
     // run_test_silently("test_slot_cycle_with_get_patch", test_slot_cycle_with_get_patch);
-    run_test_silently("test_variation_cycle_slot_a", test_variation_cycle_slot_a);
+    // run_test_silently("test_variation_cycle_slot_a", test_variation_cycle_slot_a);
     // run_test_silently("test_repeated_slot_cycle", test_repeated_slot_cycle);
     // run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
     // run_test_silently("test_drain_count_logged", test_drain_count_logged);

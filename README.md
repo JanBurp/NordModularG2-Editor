@@ -94,8 +94,9 @@ mkfifo /tmp/g2-cmd
 
 # Terminal 2 — keep the pipe open and send commands
 exec 3>/tmp/g2-cmd
-echo '{"id":1,"cmd":"slot","args":["B"]}' >&3
-echo '{"id":2,"cmd":"device"}' >&3
+echo '{"id":1,"cmd":"slot","args":["B"]}' >&3               # Change slot B
+echo '{"id":2,"cmd":"variation","args":["4","B"]}' >&3      # Change to variaton 4 on slot B (1)
+echo '{"id":3,"cmd":"device"}' >&3                          # device
 exec 3>&-   # close when done (causes daemon to exit cleanly)
 ```
 The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.

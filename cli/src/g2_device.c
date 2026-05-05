@@ -335,6 +335,10 @@ static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
 
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret == LIBUSB_ERROR_PIPE) {
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    }
     return (ret < 0) ? -1 : 0;
 }
 
@@ -1104,6 +1108,9 @@ int g2_select_slot(const char *slot_str) {
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
+     * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
+    g2_drain_pending();
 
     /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py).
      * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
