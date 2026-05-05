@@ -11,6 +11,7 @@
 #include "g2_device.h"
 #include "output.h"
 #include "utils.h"
+#include "daemon.h"
 
 #define PROGRAM_NAME "g2-cli"
 #define PROGRAM_VERSION "1.0.0"
@@ -50,6 +51,7 @@ static void print_usage(const char *prog) {
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                        Set a module label\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
+    printf("  daemon                                                                                    Persistent connection: watch + accept JSON commands on stdin\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
 
@@ -438,6 +440,14 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
 
     if (strcmp(command, "watch") == 0) {
         return g2_watch(output_format, debug_mode);
+    }
+
+    if (strcmp(command, "daemon") == 0) {
+        int ret = g2_daemon_run(output_format);
+        /* Skip atexit(g2_exit): explicit libusb_close() triggers a G2 USB
+         * state change that requires re-enumeration time.  The OS reclaims
+         * the handle cleanly without it. */
+        _exit(ret);
     }
 
     if (strcmp(command, "seq") == 0) {

@@ -125,6 +125,10 @@ int g2_set_param(int slot, int location, int module_id,
 /* Watch for param changes (simple single-threaded approach) */
 int g2_watch(output_format_t format, int debug);
 volatile extern int g2_watch_running;
+extern int g2_watch_verbose;
+extern void (*g2_watch_tick_hook)(void);
 void g2_watch_stop(int sig);
+int g2_watch_disarm(void);
+int g2_watch_rearm(void);
 
 #endif /* __G2_DEVICE_H__ */

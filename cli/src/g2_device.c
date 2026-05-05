@@ -20,14 +20,6 @@ static g2_device_t g2 = {
     .handle = NULL,
     .interface_claimed = 0
 };
-typedef struct {
-    uint8_t slot;
-    uint8_t version;
-    int valid;
-} g2_version_cache_t;
-
-static g2_version_cache_t version_cache = { .valid = 0 };
-
 /* Timeout values (in ms) */
 #define USB_TIMEOUT_STANDARD 100
 #define USB_TIMEOUT_LONG    2000
@@ -38,7 +30,6 @@ static g2_version_cache_t version_cache = { .valid = 0 };
 /* Command message building */
 #define COMMAND_OFFSET 2
 
-static void invalidate_version_cache(void);
 static int recv_interrupt(uint8_t *response, int size, int timeout_ms);
 static int recv_bulk(uint8_t *data, uint16_t size);
 static int send_system(uint8_t cmd, uint8_t subcmd);
@@ -46,42 +37,6 @@ static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
 static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
                      const uint8_t *extra, size_t extraLen);
 static int g2_drain_pending(void);
-
-static uint8_t get_version_for_slot(uint8_t slot) {
-    uint8_t response[16] = {0};
-    int ret;
-
-    if (version_cache.valid) {
-        return version_cache.version;
-    }
-
-    /* Use GET_PATCH_VERSION (0x35) — does not trigger streaming, unlike START_COMM */
-    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, slot};
-    if (send_system_data(0x41, cmd, 2) < 0) {
-        return 0x41;
-    }
-    usleep(USB_SEND_DELAY_US);
-
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
-    if (ret <= 0) {
-        return 0x41;
-    }
-
-    uint8_t version = response[6];
-    if (version == 0) {
-        version = 0x41;
-    }
-
-    version_cache.slot = slot;
-    version_cache.version = version;
-    version_cache.valid = 1;
-
-    return version_cache.version;
-}
-
-static void invalidate_version_cache(void) {
-    version_cache.valid = 0;
-}
 
 static int ensure_connected(int silent) {
     if (g2_is_connected()) {
@@ -194,8 +149,6 @@ int g2_disconnect(void) {
         libusb_close(g2.handle);
         g2.handle = NULL;
     }
-    invalidate_version_cache();
-    fprintf(stderr, "Disconnected\n");
     return 0;
 }
 
@@ -259,9 +212,6 @@ int g2_send_init(void) {
             return G2_ERR_RECV;
         }
     }
-
-    /* Init resets the G2's version counters, so our cache is stale. */
-    invalidate_version_cache();
 
     return G2_OK;
 }
@@ -384,6 +334,10 @@ static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
 
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    if (ret == LIBUSB_ERROR_PIPE) {
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    }
     return (ret < 0) ? -1 : 0;
 }
 
@@ -1110,9 +1064,9 @@ int g2_select_slot(const char *slot_str) {
     uint8_t data[8] = {0};
 
     if (ensure_connected(0) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
-            return G2_ERR_CONNECT;
-        }
+        fprintf(stderr, "Failed to connect to G2\n");
+        return G2_ERR_CONNECT;
+    }
 
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
@@ -1121,26 +1075,59 @@ int g2_select_slot(const char *slot_str) {
     }
 
     g2_drain_pending();
-    version = get_version_for_slot(slot);
 
+    /* Steps 1+2 use the performance version (slot=4), not the patch slot version.
+     * Per doc/usb.md §6 and g2ctl.py: SELECT_SLOT is a performance-level command. */
+    {
+        uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
+        uint8_t pv_resp[16] = {0};
+        send_system_data(0x41, pv_cmd, 2);
+        usleep(USB_SEND_DELAY_US);
+        int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
+        version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
+    }
+
+    /* Step 1: select bitmask */
     mask = 0x08 >> slot;
     data[0] = 0x07;
     data[1] = mask;
     data[2] = 0x0f;
     data[3] = mask;
     if (send_system_data(version, data, 4) < 0) {
-        fprintf(stderr, "Failed to send slot command 2\n");
+        fprintf(stderr, "Failed to send slot command 1\n");
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
 
+    /* Step 2: set active slot index */
     data[0] = 0x09;
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
-        fprintf(stderr, "Failed to send slot command 3\n");
+        fprintf(stderr, "Failed to send slot command 2\n");
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
+     * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
+    g2_drain_pending();
+
+    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py).
+     * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
+     * consume the bulk immediately — leaving it unread blocks subsequent commands. */
+    if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
+        fprintf(stderr, "Failed to send slot command 3\n");
+        return G2_ERR_SEND;
+    }
+    {
+        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+        if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
+            if (sz > 0) {
+                uint8_t *bulk = malloc(sz);
+                if (bulk) { recv_bulk(bulk, sz); free(bulk); }
+            }
+        }
+    }
 
     g2_drain_pending();
 
@@ -1381,7 +1368,7 @@ int g2_select_variation(int variation, int slot) {
     }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(slota, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD, 5);
     if (ret <= 0) {
         fprintf(stderr, "No response from G2 for variation command 1\n");
         return G2_ERR_RECV;
@@ -1761,10 +1748,36 @@ int g2_set_param(int slot, int location, int module_id,
 }
 
 volatile int g2_watch_running = 1;
+int g2_watch_verbose = 1;
+void (*g2_watch_tick_hook)(void) = NULL;
 
 void g2_watch_stop(int sig) {
     (void)sig;
     g2_watch_running = 0;
+}
+
+/* Send STOP_COMM so the G2 stops streaming and normal commands work again. */
+int g2_watch_disarm(void) {
+    uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
+    send_system_data(0x41, stop_cmd, 2);
+    usleep(USB_SEND_DELAY_US);
+    /* Use g2_drain_pending (not a bare recv_interrupt) so that any EXTENDED
+     * interrupt arriving here has its bulk data consumed — an unread bulk
+     * blocks the G2 from sending further interrupts, including the response
+     * to GET_PATCH_VERSION in g2_select_variation. */
+    g2_drain_pending();
+    return G2_OK;
+}
+
+/* Drain stale data, send START_COMM to re-arm unsolicited notifications. */
+int g2_watch_rearm(void) {
+    uint8_t response[16];
+    g2_drain_pending();
+    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
+    if (send_system_data(0x41, start_cmd, 2) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    return G2_OK;
 }
 
 
@@ -1803,13 +1816,19 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
         uint8_t bslot = baCmd;
         switch (bsubCmd) {
             case 0x39:
-                printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
-                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
-                printf("]}\n"); fflush(stdout); break;
+                if (g2_watch_verbose) {
+                    printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
+                    for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                    printf("]}\n"); fflush(stdout);
+                }
+                break;
             case 0x3A:
-                printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
-                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
-                printf("]}\n"); fflush(stdout); break;
+                if (g2_watch_verbose) {
+                    printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
+                    for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                    printf("]}\n"); fflush(stdout);
+                }
+                break;
             case 0x72:
                 printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
@@ -1837,6 +1856,13 @@ int g2_watch(output_format_t format, int debug) {
      * notification burst can stall the bulk-OUT endpoint. */
     g2_drain_pending();
 
+    /* Clear any halted endpoints left over from a previous bad session.
+     * The output endpoint is already cleared on-demand in send_slot/g2_send_command,
+     * but the input endpoints are never cleared otherwise. */
+    libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+    libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
+    libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
+
     /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
     uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
     ret = send_system_data(0x41, start_cmd, 2);
@@ -1846,23 +1872,48 @@ int g2_watch(output_format_t format, int debug) {
     }
     usleep(USB_SEND_DELAY_US);
     ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
-    fprintf(stderr, "watch: armed, response len=%d", ret);
-    if (ret > 0) {
-        for (int i = 0; i < ret && i < 8; i++) fprintf(stderr, " %02x", response[i]);
+    printf("{\"type\":\"watch_armed\"}\n");
+    fflush(stdout);
+
+    if (ret <= 0) {
+        /* G2 is connected but not responding — bad state (halted endpoint,
+         * firmware stuck, etc.). Emit event, disconnect, and wait for it to
+         * come back using the same reconnect loop used inside the watch. */
+        printf("{\"type\":\"device_bad_state\"}\n");
+        fflush(stdout);
+        g2_disconnect();
+        while (g2_watch_running) {
+            if (g2_connect_silent() >= 0) break;
+            usleep(100000);
+        }
+        if (!g2_watch_running) return G2_OK;
+        g2_drain_pending();
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
+        ret = send_system_data(0x41, start_cmd, 2);
+        if (ret < 0) {
+            fprintf(stderr, "watch: failed to re-arm after bad state\n");
+            return G2_ERR;
+        }
+        usleep(USB_SEND_DELAY_US);
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+        printf("{\"type\":\"device_reconnected\"}\n");
+        fflush(stdout);
     }
-    fprintf(stderr, "\n");
 
     while (g2_watch_running) {
+        if (g2_watch_tick_hook) g2_watch_tick_hook();
         ret = recv_interrupt(response, sizeof(response), 100);
         if (ret == LIBUSB_ERROR_NO_DEVICE) {
             printf("{\"type\":\"device_disconnected\"}\n");
             fflush(stdout);
             g2_disconnect();
 
-            /* Poll every 1 s until the cable comes back (or SIGTERM fires) */
+            /* Retry immediately, then every 100 ms until cable comes back. */
             while (g2_watch_running) {
-                usleep(1000000);
                 if (g2_connect_silent() >= 0) break;
+                usleep(100000);
             }
             if (!g2_watch_running) break;   /* SIGTERM during wait → clean exit */
 
@@ -1910,9 +1961,12 @@ int g2_watch(output_format_t format, int debug) {
                         }
                         if (process_bulk_event(bulk, bret) & BULK_REARM) {
                             /* G2 stops unsolicited data after full performance switch;
-                             * re-arm it (Delphi does the same via SynthStartStopCommunication) */
+                             * re-arm it (Delphi does the same via SynthStartStopCommunication).
+                             * Read the ack to keep the interrupt FIFO clean. */
                             uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
+                            uint8_t arm_ack[16];
                             send_system_data(0x41, arm, 2);
+                            recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD);
                         }
                     }
                     free(bulk);

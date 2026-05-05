@@ -24,10 +24,10 @@ void UNITY_OUTPUT_CHAR(int);
 struct UNITY_STORAGE_T Unity;
 
 #ifdef UNITY_OUTPUT_COLOR
-const char UNITY_PROGMEM UnityStrOk[]                            = "\033[42mOK\033[0m";
-const char UNITY_PROGMEM UnityStrPass[]                          = "\033[42mPASS\033[0m";
-const char UNITY_PROGMEM UnityStrFail[]                          = "\033[41mFAIL\033[0m";
-const char UNITY_PROGMEM UnityStrIgnore[]                        = "\033[43mIGNORE\033[0m";
+const char UNITY_PROGMEM UnityStrOk[]                            = "\033[32mOK\033[0m";
+const char UNITY_PROGMEM UnityStrPass[]                          = "\033[32mPASS\033[0m";
+const char UNITY_PROGMEM UnityStrFail[]                          = "\033[31mFAIL\033[0m";
+const char UNITY_PROGMEM UnityStrIgnore[]                        = "\033[33mIGNORE\033[0m";
 #else
 const char UNITY_PROGMEM UnityStrOk[]                            = "OK";
 const char UNITY_PROGMEM UnityStrPass[]                          = "PASS";
@@ -377,7 +377,7 @@ void UnityPrintFloat(const UNITY_DOUBLE input_number)
     }
     else if (UNITY_IS_INF(number))
     {
-        if (number < 0.0f) 
+        if (number < 0.0f)
         {
             UnityPrint(UnityStrNegInf);
         }
@@ -2393,7 +2393,7 @@ void UnityPopDetail(UNITY_DETAIL_LABEL_TYPE label, UNITY_DETAIL_VALUE_TYPE value
         UnityPrint(UnityStrErrDetailStackPop);
         UnityAddMsgIfSpecified(NULL);
         UNITY_FAIL_AND_BAIL;
-    }   
+    }
     Unity.CurrentDetailStackSize--;
 }
 #endif
