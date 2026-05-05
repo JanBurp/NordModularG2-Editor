@@ -96,7 +96,7 @@ mkfifo /tmp/g2-cmd
 exec 3>/tmp/g2-cmd
 echo '{"id":1,"cmd":"slot","args":["B"]}' >&3
 echo '{"id":2,"cmd":"device"}' >&3
-# exec 3>&-   # close when done (causes daemon to exit cleanly)
+exec 3>&-   # close when done (causes daemon to exit cleanly)
 ```
 The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.
 
