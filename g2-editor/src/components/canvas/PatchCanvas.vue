@@ -15,7 +15,6 @@
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
-				:type="mod.type"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				@param-change="onParamChange"
