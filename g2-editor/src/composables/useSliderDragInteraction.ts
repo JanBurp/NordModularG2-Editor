@@ -1,10 +1,6 @@
 import { ref } from 'vue';
 
-export function useSliderDragInteraction(
-	paramIndex: number,
-	getValue: () => number,
-	onChange: (index: number, value: number) => void,
-) {
+export function useSliderDragInteraction(paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
 	const isDragging = ref(false);
 	const startY = ref(0);
 	const startValue = ref(0);

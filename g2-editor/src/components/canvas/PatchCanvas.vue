@@ -1,8 +1,7 @@
 <template>
-	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+	<div class="overflow-auto bg-neutral-700" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
-			class="patch-canvas"
 			font-size="9"
 			:width="canvasWidth"
 			:height="canvasHeight"
@@ -51,6 +50,7 @@
 	import Module from './Module.vue';
 	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
+	import { useCableVisibility } from '../../composables/useCableVisibility';
 
 	const props = defineProps({
 		modules: {
@@ -68,22 +68,6 @@
 		area: {
 			type: String,
 			default: 'voice',
-		},
-		cableVisibility: {
-			type: Object,
-			default: () => ({
-				red: true,
-				blue: true,
-				yellow: true,
-				orange: true,
-				green: true,
-				purple: true,
-				white: true,
-			}),
-		},
-		shakeTrigger: {
-			type: Number,
-			default: 0,
 		},
 		selectedCable: {
 			type: Object as () => Cable | null,
@@ -121,9 +105,10 @@
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 	}>();
 
-	const canvasRef = ref(null);
 	const svgRef = ref<SVGSVGElement | null>(null);
 	const isInitialized = ref(false);
+
+	const { cableVisibility, cableShakeTrigger } = useCableVisibility();
 
 	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
@@ -164,28 +149,20 @@
 		});
 	});
 
-	// Filter cables based on visibility settings
-	const visibleCables = computed(() => {
-		return props.cables.filter((cable) => {
-			const colorIndex = cable.colour;
-			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
-			return props.cableVisibility[colorName] !== false;
-		});
-	});
-
 	function renderCables() {
 		if (!svgRef.value) return;
 		const svg = svgRef.value;
 		removeAllCables(svg);
 
-		if (visibleCables.value.length > 0) {
-			makePatchCables(props.modules, visibleCables.value, svg, {
+		if (props.cables.length > 0) {
+			makePatchCables(props.modules, props.cables, svg, {
 				selectedCable: props.selectedCable,
 				onCableClick: (cable) => {
 					emit('cableClick', cable);
 				},
 			});
 		}
+		updateCableVisibilityClasses();
 	}
 
 	function updateCableVisibilityClasses() {
@@ -195,8 +172,8 @@
 		cableElements.forEach((el) => {
 			const colorIndex = parseInt(el.getAttribute('data-cable-color') || '0', 10);
 			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
-			if (colorName && colorName in props.cableVisibility) {
-				const isHidden = props.cableVisibility[colorName] === false;
+			if (colorName && colorName in cableVisibility.value) {
+				const isHidden = cableVisibility.value[colorName] === false;
 				el.classList.toggle('cable-hidden', isHidden);
 			}
 		});
@@ -231,8 +208,8 @@
 					renderedKeys.add(el.getAttribute('data-cable-key')!);
 				});
 
-				// Keys we want (respecting visibility filter)
-				const wantedMap = new Map<string, any>(visibleCables.value.map((c) => [makeCableKey(c), c]));
+				// Keys we want
+				const wantedMap = new Map<string, any>(props.cables.map((c) => [makeCableKey(c), c]));
 
 				// Remove cables no longer in the list
 				for (const key of renderedKeys) {
@@ -248,6 +225,9 @@
 						});
 					}
 				}
+
+				// Update visibility
+				updateCableVisibilityClasses();
 			});
 		},
 	);
@@ -271,7 +251,7 @@
 
 	// Watch for cable visibility changes - use CSS classes to hide/show cables
 	watch(
-		() => props.cableVisibility,
+		cableVisibility,
 		() => {
 			nextTick(() => {
 				updateCableVisibilityClasses();
@@ -281,14 +261,11 @@
 	);
 
 	// Watch for shake trigger to re-render cables
-	watch(
-		() => props.shakeTrigger,
-		() => {
-			nextTick(() => {
-				renderCables();
-			});
-		},
-	);
+	watch(cableShakeTrigger, () => {
+		nextTick(() => {
+			renderCables();
+		});
+	});
 
 	// Watch for selectedCable changes: directly update border class, no full re-render
 	watch(
@@ -537,18 +514,3 @@
 		emit('moduleDrop', { typeId, col, row });
 	}
 </script>
-<style scoped>
-	.patch-canvas-wrapper {
-		position: relative;
-		overflow: auto;
-		background: #666;
-		min-height: 400px;
-		height: 100%;
-		flex: 1;
-	}
-
-	.patch-canvas {
-		overflow: visible;
-		display: block;
-	}
-</style>

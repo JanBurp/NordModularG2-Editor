@@ -2,12 +2,7 @@ import type { MouseEvent as VueMouseEvent } from 'vue';
 
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSlider';
 
-export function useSpinnerHoldInteraction(
-	type: SpinnerType,
-	paramIndex: number,
-	getValue: () => number,
-	onChange: (index: number, value: number) => void,
-) {
+export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
 	const STEP = 1;
 	const INITIAL_DELAY = 300;
 	const REPEAT_INTERVAL = 50;
@@ -29,9 +24,7 @@ export function useSpinnerHoldInteraction(
 	function startRepeat(direction: 1 | -1) {
 		intervalId = setInterval(() => {
 			const value = getValue();
-			const newValue = direction === 1
-				? Math.min(127, value + STEP)
-				: Math.max(0, value - STEP);
+			const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
 			onChange(paramIndex, newValue);
 		}, REPEAT_INTERVAL);
 	}
@@ -47,7 +40,7 @@ export function useSpinnerHoldInteraction(
 		let direction: 1 | -1;
 
 		if (type === 'KnobSpin' || type === 'KnobSlider') {
-			const halfH = (type === 'KnobSpin') ? rect.height / 2 : (rect.height + 44) / 2;
+			const halfH = type === 'KnobSpin' ? rect.height / 2 : (rect.height + 44) / 2;
 			direction = y < halfH ? 1 : -1;
 		} else if (type === 'KnobSpinH') {
 			direction = x < rect.width / 2 ? -1 : 1;
@@ -56,9 +49,7 @@ export function useSpinnerHoldInteraction(
 		}
 
 		const value = getValue();
-		const newValue = direction === 1
-			? Math.min(127, value + STEP)
-			: Math.max(0, value - STEP);
+		const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
 		onChange(paramIndex, newValue);
 
 		timeoutId = setTimeout(() => {
