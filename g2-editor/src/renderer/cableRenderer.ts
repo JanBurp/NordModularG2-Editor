@@ -135,6 +135,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-dcon': String(destJack ?? 0),
 			'data-dir': String(dir),
 		});
+
 		const main = svgPath(d, {
 			stroke: color,
 			fill: 'none',
