@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed } from 'vue';
 import { CABLE_COLORS, CABLE_COLOR_INDEX_MAP, type CableColorName } from '../constants';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
@@ -16,13 +16,6 @@ export interface CableVisibility {
 // Re-export constants for backward compatibility
 export { CABLE_COLORS as cableColors, CABLE_COLOR_INDEX_MAP as COLOR_INDEX_TO_NAME };
 export type { CableColorName };
-
-// Module-level singleton — purely UI state, not part of patch data
-const cableShakeTrigger = ref<number>(0);
-
-function shakeCables(): void {
-	cableShakeTrigger.value++;
-}
 
 export function useCableVisibility() {
 	const slotsStore = useSlotsStore();
@@ -61,17 +54,11 @@ export function useCableVisibility() {
 	}
 
 	return {
-		// Constants
 		cableColors: CABLE_COLORS,
 		COLOR_INDEX_TO_NAME: CABLE_COLOR_INDEX_MAP,
-		// State
 		cableVisibility,
-		cableShakeTrigger,
-		// Computed
 		allCablesVisible,
-		// Actions
 		toggleCableVisibility,
 		toggleShowHideAll,
-		shakeCables,
 	};
 }

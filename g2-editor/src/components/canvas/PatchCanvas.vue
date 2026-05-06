@@ -42,15 +42,16 @@
 </template>
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
-	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey } from '../../renderer/cableRenderer';
+	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility } from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
-	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
+	import { JACK_COLORS } from '../../constants';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
+	import { useUiStore } from '../../store/ui';
 
 	const props = defineProps({
 		modules: {
@@ -108,7 +109,8 @@
 	const svgRef = ref<SVGSVGElement | null>(null);
 	const isInitialized = ref(false);
 
-	const { cableVisibility, cableShakeTrigger } = useCableVisibility();
+	const { cableVisibility } = useCableVisibility();
+	const uiStore = useUiStore();
 
 	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
@@ -162,21 +164,7 @@
 				},
 			});
 		}
-		updateCableVisibilityClasses();
-	}
-
-	function updateCableVisibilityClasses() {
-		if (!svgRef.value) return;
-		const svg = svgRef.value;
-		const cableElements = svg.querySelectorAll('[data-cable-color]');
-		cableElements.forEach((el) => {
-			const colorIndex = parseInt(el.getAttribute('data-cable-color') || '0', 10);
-			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
-			if (colorName && colorName in cableVisibility.value) {
-				const isHidden = cableVisibility.value[colorName] === false;
-				el.classList.toggle('cable-hidden', isHidden);
-			}
-		});
+		applyCableVisibility(svg, cableVisibility.value);
 	}
 
 	function onParamChange(moduleIndex, paramIndex, value) {
@@ -227,7 +215,7 @@
 				}
 
 				// Update visibility
-				updateCableVisibilityClasses();
+				if (svgRef.value) applyCableVisibility(svgRef.value, cableVisibility.value);
 			});
 		},
 	);
@@ -254,18 +242,21 @@
 		cableVisibility,
 		() => {
 			nextTick(() => {
-				updateCableVisibilityClasses();
+				if (svgRef.value) applyCableVisibility(svgRef.value, cableVisibility.value);
 			});
 		},
 		{ deep: true },
 	);
 
 	// Watch for shake trigger to re-render cables
-	watch(cableShakeTrigger, () => {
-		nextTick(() => {
-			renderCables();
-		});
-	});
+	watch(
+		() => uiStore.cableShakeCount,
+		() => {
+			nextTick(() => {
+				renderCables();
+			});
+		},
+	);
 
 	// Watch for selectedCable changes: directly update border class, no full re-render
 	watch(
