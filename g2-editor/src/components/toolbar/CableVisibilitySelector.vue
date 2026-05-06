@@ -36,7 +36,7 @@
 			<button
 				class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
 				title="Re-render cables"
-				@click="shakeCables"
+				@click="uiStore.shakeCables()"
 			>
 				S
 			</button>
@@ -46,6 +46,8 @@
 
 <script setup lang="ts">
 	import { useCableVisibility } from '../../composables/useCableVisibility';
+	import { useUiStore } from '../../store/ui';
 
-	const { cableColors, cableVisibility, allCablesVisible, toggleCableVisibility, toggleShowHideAll, shakeCables } = useCableVisibility();
+	const { cableColors, cableVisibility, allCablesVisible, toggleCableVisibility, toggleShowHideAll } = useCableVisibility();
+	const uiStore = useUiStore();
 </script>
