@@ -1,6 +1,6 @@
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
-		<ModuleBackground :height="height" :selected="isSelected"></ModuleBackground>
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
+		<ModuleBackground :height="height" :colour="instance.colour || 0" :selected="isSelected"></ModuleBackground>
 
 		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
 
@@ -154,7 +154,6 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
-	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../composables/useModuleControls';
@@ -207,7 +206,6 @@
 
 	const x = computed(() => (instance.value.horiz || 0) * 256);
 	const y = computed(() => (instance.value.vert || 0) * 16);
-	const colour = computed(() => instance.value.colour || 0);
 
 	// Reactive local parameter values
 	const localLv = ref<number[]>([]);
@@ -229,8 +227,6 @@
 		},
 		{ immediate: true },
 	);
-
-	const moduleColor = computed(() => MODULE_COLORS[colour.value] || MODULE_COLORS[0]);
 
 	const displayName = computed(() => {
 		return instance.value.uname || moduleDef.value?.short || 'Module';
@@ -281,12 +277,3 @@
 		emit('modeChange', moduleIdx.value, index, value);
 	}
 </script>
-<style scoped>
-	.module {
-		cursor: default;
-		color: v-bind(moduleColor);
-	}
-	.module.selected {
-		filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
-	}
-</style>
