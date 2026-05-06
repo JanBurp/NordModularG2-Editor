@@ -26,7 +26,7 @@
 						@dragstart="(e) => handleModuleDragStart(e, module.id)"
 					>
 						<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
-							<Module :type="module.id" :instance="getModuleInstance(module.id)" />
+							<Module :instance="getModuleInstance(module.id)" />
 						</svg>
 					</div>
 				</div>
@@ -145,8 +145,8 @@
 				}) || [];
 
 			moduleInstances.set(moduleId, {
-				index: 0,
 				type: moduleId,
+				index: 0,
 				horiz: 0,
 				vert: 0,
 				colour: 0,

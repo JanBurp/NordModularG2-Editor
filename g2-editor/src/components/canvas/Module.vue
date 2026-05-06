@@ -2,7 +2,7 @@
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
 		<ModuleBackground :height="height" :colour="instance.colour || 0" :selected="isSelected"></ModuleBackground>
 
-		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
+		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
@@ -28,7 +28,7 @@
 				:h="ve.h"
 				:f="ve.f"
 				:lv="localLv"
-				:module-id="props.type"
+				:module-id="instance.type"
 			/>
 
 			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
@@ -141,7 +141,7 @@
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
 		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
-		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ type }}) </text>
+		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ instance.type }}) </text>
 	</g>
 </template>
 <script setup lang="ts">
@@ -168,7 +168,6 @@
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 
 	const props = defineProps<{
-		type: number;
 		instance?: ModuleInstance;
 		isSelected?: boolean;
 	}>();
@@ -197,11 +196,11 @@
 		});
 	}
 
-	const instance = computed(() => props.instance || { colour: 0 });
+	const instance = computed(() => props.instance || { type: -1, colour: 0 });
 	const moduleIdx = computed(() => instance.value.index || 0);
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
-		return getModule(props.type) || null;
+		return getModule(instance.value.type) || null;
 	});
 
 	const x = computed(() => (instance.value.horiz || 0) * 256);
