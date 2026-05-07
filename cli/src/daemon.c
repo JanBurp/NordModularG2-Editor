@@ -163,7 +163,7 @@ static void execute_cmd(const char *line) {
 		ret = g2_select_slot(arg_s(args, 0));
 
 	} else if (strcmp(cmd, "variation") == 0 && n >= 2) {
-		ret = g2_select_variation(arg_i(args, 0), arg_i(args, 1));
+		ret = g2_select_variation(arg_i(args, 0), parse_slot(arg_s(args, 1)));
 
 	} else if (strcmp(cmd, "add-cable") == 0 && n >= 9) {
 		int slot = parse_slot(arg_s(args, 0));
