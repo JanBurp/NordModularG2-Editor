@@ -32,7 +32,7 @@ interface Window {
 	cli: {
 		run: (args: string[]) => Promise<string>;
 		runBatch: (argsList: string[][]) => Promise<string[]>;
-		watchStart: () => void;
+		watchStart: () => Promise<void>;
 		watchStop: () => void;
 		onWatchEvent: (cb: (line: string) => void) => void;
 		offWatchEvent: () => void;

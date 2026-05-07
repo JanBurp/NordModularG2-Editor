@@ -33,6 +33,7 @@ export function useG2() {
 		variation: number;
 	} | null>(null);
 	const hardwareSlotChange = ref<number | null>(null);
+	const isDaemonRunning = ref(false);
 
 	function log(direction: '→' | '←' | '•', event: string, message: string, category?: UsbLogEntry['category']): void {
 		const entry: UsbLogEntry = {
@@ -121,12 +122,18 @@ export function useG2() {
 
 	const paramWatchTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
-	function startWatch(): void {
+	async function startWatch(): Promise<void> {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
+		window.cli.offWatchDone();
 		window.cli.onDeviceDisconnected(() => {
+			isDaemonRunning.value = false;
 			store.status = 'lost';
-			log('•', 'Connect', 'G2 disconnected — cable unplugged?');
+			log('•', 'Connect', 'Daemon exited unexpectedly');
+		});
+		window.cli.onWatchDone(() => {
+			isDaemonRunning.value = false;
+			window.cli.offWatchDone();
 		});
 		window.cli.onWatchEvent((line: string) => {
 			try {
@@ -193,7 +200,8 @@ export function useG2() {
 				log('←', 'Watch', line);
 			}
 		});
-		window.cli.watchStart();
+		await window.cli.watchStart();
+		isDaemonRunning.value = true;
 		log('•', 'Watch', 'Started');
 	}
 
@@ -201,19 +209,8 @@ export function useG2() {
 		window.cli.watchStop();
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
+		window.cli.offWatchDone();
 	}
-
-	// async function isG2Connected(): Promise<boolean> {
-	// 	if (typeof window === 'undefined' || !window.cli) {
-	// 		return false;
-	// 	}
-	// 	try {
-	// 		const output = await window.cli.run(['list-devices']);
-	// 		return output.includes('Nord G2');
-	// 	} catch {
-	// 		return false;
-	// 	}
-	// }
 
 	async function connectDevice(): Promise<void> {
 		if (typeof window === 'undefined' || !window.cli) {
@@ -221,22 +218,14 @@ export function useG2() {
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
-		startWatch();
-		// log('→', 'Connect', 'Checking for G2 device...');
-		// const g2Found = await isG2Connected();
-		// if (!g2Found) {
-		// 	store.status = 'disconnected';
-		// 	log('←', 'Connect', 'No G2 device found');
-		// 	return;
-		// }
-		log('→', 'Connect', 'Running startup sequence...');
+		await startWatch();
+		log('→', 'Connect', 'Connecting to G2...');
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
-			// startWatch();
 		} catch (e: any) {
-			log('←', 'Connect', `Connection failed: ${e.message}`);
-			stopWatch();
+			store.status = 'disconnected';
+			log('←', 'Connect', `G2 not found: ${e.message}`);
 		}
 	}
 
@@ -294,5 +283,6 @@ export function useG2() {
 		downloadFromG2,
 		hardwareVariationChange,
 		hardwareSlotChange,
+		isDaemonRunning,
 	};
 }
