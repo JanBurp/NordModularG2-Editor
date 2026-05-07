@@ -27,7 +27,7 @@ export const useDeviceStore = defineStore('device', {
 				case 'lost':
 					return 'border-red-500 bg-red-500';
 				default:
-					return 'border-neutral-600 bg-neutral-900';
+					return 'border-neutral-600 bg-neutral-900 text-neutral-300';
 			}
 		},
 		statusLabel: (state): string => {
