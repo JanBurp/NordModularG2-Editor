@@ -118,9 +118,10 @@
 	});
 
 	const displayNames = computed(() => {
-		if (names.value.length === 1 && names.value[0] === 'Ch#') {
-			return [props.paramName];
-		}
+		// TODO: Ch# -> set names??
+		// if (names.value.length === 1 && names.value[0] === 'Ch#') {
+		// 	return [props.paramName];
+		// }
 		if (names.value.length > 1) {
 			return names.value;
 		}

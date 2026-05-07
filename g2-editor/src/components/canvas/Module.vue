@@ -1,8 +1,8 @@
 <template>
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
-		<ModuleBackground :height="height" :colour="instance.colour || 0" :selected="isSelected"></ModuleBackground>
+		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
 
-		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126"></ModuleTitle>
+		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
@@ -76,10 +76,12 @@
 				/>
 
 				<!-- Switches -->
+				<!-- TODO: param meegeven als enige, dan hebben we param.width -->
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:x="param.x"
 					:y="param.y"
+					:param="param"
 					:param-type="param.type"
 					:value="getParamValue(index)"
 					:param-index="index"
