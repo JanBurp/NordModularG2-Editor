@@ -118,48 +118,6 @@ function sendCmd(cmd: string, args: string[]): Promise<string> {
 	});
 }
 
-// async function runCliRaw(args: string[]): Promise<string> {
-// 	return new Promise((resolve, reject) => {
-// 		console.log(`[cli] spawn: ${args.join(" ")}`);
-// 		const child = spawn(cliPath, args);
-// 		let stdout = "";
-// 		let stderr = "";
-
-// 		child.stdout?.on("data", (data) => {
-// 			stdout += data.toString();
-// 		});
-// 		child.stderr?.on("data", (data) => {
-// 			const text = data.toString();
-// 			stderr += text;
-// 			console.log(`[cli:${args[0]}] stderr: ${text.trim()}`);
-// 		});
-
-// 		child.on("close", (code, signal) => {
-// 			console.log(`[cli:${args[0]}] exit code=${code} signal=${signal}`);
-// 			if (code === 0) {
-// 				resolve(stdout);
-// 			} else {
-// 				reject(new Error(stderr || `Exit code: ${code}, signal: ${signal}`));
-// 			}
-// 		});
-
-// 		child.on("error", (err) => {
-// 			console.log(`[cli:${args[0]}] error: ${err.message}`);
-// 			reject(err);
-// 		});
-// 	});
-// }
-
-// async function runCli(args: string[]): Promise<string> {
-// 	const wasWatching = !!watchProcess;
-// 	if (wasWatching) await stopWatchAndWait();
-// 	try {
-// 		return await runCliRaw(args);
-// 	} finally {
-// 		if (wasWatching) startWatch();
-// 	}
-// }
-
 ipcMain.handle("cli:run", async (_, args: string[]) => {
 	const [cmd, ...rest] = args;
 	if (cmd === "disconnect") { await stopDaemon(); return ""; }
@@ -167,17 +125,6 @@ ipcMain.handle("cli:run", async (_, args: string[]) => {
 });
 
 ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
-	// const wasWatching = !!watchProcess;
-	// if (wasWatching) await stopWatchAndWait();
-	// try {
-	// 	const results: string[] = [];
-	// 	for (const args of argsList) {
-	// 		results.push(await runCliRaw(args));
-	// 	}
-	// 	return results;
-	// } finally {
-	// 	if (wasWatching) startWatch();
-	// }
 	const results: string[] = [];
 	for (const args of argsList) {
 		const [cmd, ...rest] = args;
@@ -186,8 +133,6 @@ ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
 	return results;
 });
 
-// ipcMain.on("cli:watch-start", () => startWatch());
-// ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
 ipcMain.handle("cli:watch-start", () => { startDaemon(); });
 ipcMain.on("cli:watch-stop", () => { stopDaemon(); });
 
