@@ -336,13 +336,13 @@ void test_daemon_slot_variation_commands(void) {
      * device, causing the next test to fail. */
     int r[9];
     r[0] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1);
-    r[1] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"0\"]}", 2);
+    r[1] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"A\"]}", 2);
     r[2] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":3,\"cmd\":\"slot\",\"args\":[\"B\"]}", 3);
-    r[3] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"1\"]}", 4);
+    r[3] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"B\"]}", 4);
     r[4] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":5,\"cmd\":\"slot\",\"args\":[\"C\"]}", 5);
-    r[5] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"2\"]}", 6);
+    r[5] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"C\"]}", 6);
     r[6] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":7,\"cmd\":\"slot\",\"args\":[\"D\"]}", 7);
-    r[7] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"3\"]}", 8);
+    r[7] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"D\"]}", 8);
     r[8] = send_and_expect_ok(in_pipe[1], out_pipe[0], "{\"id\":9,\"cmd\":\"slot\",\"args\":[\"A\"]}", 9);
 
     close(in_pipe[1]);  /* EOF triggers daemon shutdown */
