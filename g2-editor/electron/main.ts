@@ -118,37 +118,37 @@ function sendCmd(cmd: string, args: string[]): Promise<string> {
 	});
 }
 
-async function runCliRaw(args: string[]): Promise<string> {
-	return new Promise((resolve, reject) => {
-		console.log(`[cli] spawn: ${args.join(" ")}`);
-		const child = spawn(cliPath, args);
-		let stdout = "";
-		let stderr = "";
+// async function runCliRaw(args: string[]): Promise<string> {
+// 	return new Promise((resolve, reject) => {
+// 		console.log(`[cli] spawn: ${args.join(" ")}`);
+// 		const child = spawn(cliPath, args);
+// 		let stdout = "";
+// 		let stderr = "";
 
-		child.stdout?.on("data", (data) => {
-			stdout += data.toString();
-		});
-		child.stderr?.on("data", (data) => {
-			const text = data.toString();
-			stderr += text;
-			console.log(`[cli:${args[0]}] stderr: ${text.trim()}`);
-		});
+// 		child.stdout?.on("data", (data) => {
+// 			stdout += data.toString();
+// 		});
+// 		child.stderr?.on("data", (data) => {
+// 			const text = data.toString();
+// 			stderr += text;
+// 			console.log(`[cli:${args[0]}] stderr: ${text.trim()}`);
+// 		});
 
-		child.on("close", (code, signal) => {
-			console.log(`[cli:${args[0]}] exit code=${code} signal=${signal}`);
-			if (code === 0) {
-				resolve(stdout);
-			} else {
-				reject(new Error(stderr || `Exit code: ${code}, signal: ${signal}`));
-			}
-		});
+// 		child.on("close", (code, signal) => {
+// 			console.log(`[cli:${args[0]}] exit code=${code} signal=${signal}`);
+// 			if (code === 0) {
+// 				resolve(stdout);
+// 			} else {
+// 				reject(new Error(stderr || `Exit code: ${code}, signal: ${signal}`));
+// 			}
+// 		});
 
-		child.on("error", (err) => {
-			console.log(`[cli:${args[0]}] error: ${err.message}`);
-			reject(err);
-		});
-	});
-}
+// 		child.on("error", (err) => {
+// 			console.log(`[cli:${args[0]}] error: ${err.message}`);
+// 			reject(err);
+// 		});
+// 	});
+// }
 
 // async function runCli(args: string[]): Promise<string> {
 // 	const wasWatching = !!watchProcess;
@@ -188,7 +188,7 @@ ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
 
 // ipcMain.on("cli:watch-start", () => startWatch());
 // ipcMain.on("cli:watch-stop", () => { stopWatchAndWait(); });
-ipcMain.on("cli:watch-start", () => startDaemon());
+ipcMain.handle("cli:watch-start", () => { startDaemon(); });
 ipcMain.on("cli:watch-stop", () => { stopDaemon(); });
 
 ipcMain.handle("patches:list", async (_, folder: string) => {
