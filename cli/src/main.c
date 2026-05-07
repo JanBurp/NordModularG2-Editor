@@ -139,6 +139,10 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
     }
 
     if (strcmp(command, "device") == 0) {
+        if (g2_send_init() != G2_OK) {
+            fprintf(stderr, "Failed to initialize G2\n");
+            return 1;
+        }
         cJSON *result = g2_device_info(debug_mode);
         if (!result) {
             if (output_format == OUTPUT_JSON) {
