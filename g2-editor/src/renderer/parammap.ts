@@ -66,7 +66,7 @@ const parammap: Record<string, ParamDefinition> = {
 	FreqShiftRange: { low: 0, high: 2, def: 0, defin: ['0 ~ Sub, 1 ~ Lo, 2 ~ Hi'], comments: 'Determines [FreqShiftFreq] range' },
 	GateMode: { width: 36, img: 'ModeGate', h: -21, low: 0, high: 5, def: 0, defin: ['0 ~ AND, 1 ~ NAND, 2 ~ OR, 3 ~ NOR, 4 ~ XOR, 5 ~ XNOR'], comments: '' },
 	GlideTime: { low: 0, high: 127, def: 64, defin: ['0 ~ 0.2 m, 64 ~ 511 m, 127 ~ 22.4s', '0 ~ 0.2 ms/Oct, 64 ~ 480 ms/Oct, 127 ~ 23.5 s/Oct'], comments: 'Log, Lin. Determined by the Shape parameter =[LogLin])' },
-	HpLpSlopeMode: { low: 0, high: 5, def: 0, defin: ['0 ~ 6dB, 1 ~ 12dB, 2 ~ 18dB, 3 ~ 24dB, 4 ~ 30dB, 5 ~ 36dB'], comments: '' },
+	HpLpSlopeMode: { width: 32, height: 10, low: 0, high: 5, def: 0, defin: ['0 ~ 6dB, 1 ~ 12dB, 2 ~ 18dB, 3 ~ 24dB, 4 ~ 30dB, 5 ~ 36dB'], comments: '' },
 	InternalMaster: { low: 0, high: 1, def: 0, defin: ['0 ~ Internal, 1 ~ Master'], comments: '' },
 	Kbt_1: { names: ['Off', 'On'], low: 0, high: 1, def: 1, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
 	Kbt_4: { width: 24, names: ['Off', '25%', '50%', '75%', '100%'], low: 0, high: 4, def: 0, defin: ['0 ~ Off, 1 ~ 25%, 2 ~ 50%, 3 ~ 75%, 4 ~ 100%'], comments: '' },

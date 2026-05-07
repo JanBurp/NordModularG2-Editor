@@ -1,8 +1,19 @@
 <template>
-	<svg :x="x" :y="y" :width="width" :height="height" class="mode-selector clipper" @click="onCycleValue()">
-		<rect x="0" y="0" :width="width" :height="height" fill="#EEE" stroke="#333" />
+	<svg :x="x" :y="y" :width="width" :height="height" class="overflow-hidden cursor-pointer" @click="onCycleValue()">
+		<rect x="0" y="0" :width="width" :height="height" fill="#CCC" stroke="#333" />
 		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
-		<text v-else x="50%" y="50%" :width="width" :height="height" fill="#000" font-size="9" dominant-baseline="middle" text-anchor="middle">
+		<text
+			v-else
+			x="50%"
+			y="50%"
+			:width="width"
+			:height="height"
+			fill="#000"
+			font-size="9"
+			dominant-baseline="middle"
+			text-anchor="middle"
+			class="cursor-pointer!"
+		>
 			{{ valueName }}
 		</text>
 	</svg>
@@ -57,9 +68,3 @@
 		emit('change', props.paramIndex, newValue);
 	}
 </script>
-<style scoped>
-	.mode-selector {
-		cursor: pointer;
-		overflow: hidden;
-	}
-</style>
