@@ -33,7 +33,6 @@
 				fill="none"
 				stroke="rgba(30,30,30,0.8)"
 				stroke-width="3"
-				stroke-dasharray="4 4"
 				pointer-events="none"
 			/>
 		</svg>
