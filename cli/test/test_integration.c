@@ -331,6 +331,12 @@ void test_daemon_slot_variation_commands(void) {
 
     usleep(1500000); /* allow daemon to connect and arm watch */
 
+    /* Initialize exactly as the Electron editor does: startup first (CMD_INIT +
+     * device info + patches). Without this, G2 version counters are stale and
+     * g2_select_variation commands time out. */
+    int r_startup = send_and_expect_ok(in_pipe[1], out_pipe[0],
+        "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
+
     /* Collect all results before asserting so the daemon is always shut down
      * cleanly — an early TEST_ASSERT longjmp would leave it holding the USB
      * device, causing the next test to fail. */
@@ -348,14 +354,15 @@ void test_daemon_slot_variation_commands(void) {
     close(in_pipe[1]);  /* EOF triggers daemon shutdown */
     waitpid(pid, NULL, 0);
 
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_startup, "startup");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[0], "slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "var 1 slot 0");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "var 1 slot A");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[2], "slot B");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "var 3 slot 1");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "var 3 slot B");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[4], "slot C");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "var 5 slot 2");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "var 5 slot C");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[6], "slot D");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[7], "var 2 slot 3");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[7], "var 2 slot D");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[8], "slot A");
 }
 

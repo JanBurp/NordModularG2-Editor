@@ -226,8 +226,27 @@ int g2_send_init(void) {
         uint8_t first = data[0];
         free(data);
         if (first != RESPONSE_TYPE_INIT) {
-            g2_err("Unexpected init response data: %02x\n", first);
-            return G2_ERR_RECV;
+            /* Stale notification bulk arrived instead of the init response
+             * (e.g. after a daemon session left the G2 in streaming mode).
+             * Drain remaining notifications and retry CMD_INIT once. */
+            g2_drain_pending();
+            if (send_init_msg() < 0) { g2_err("Failed to resend init\n"); return G2_ERR_SEND; }
+            usleep(USB_SEND_DELAY_US);
+            ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+            if (ret <= 0) { g2_err("No response to init retry\n"); return G2_ERR_RECV; }
+            if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+            size = ((uint16_t)response[1] << 8) | response[2];
+            if (size > 0) {
+                data = malloc(size);
+                if (!data) return G2_ERR_NO_MEMORY;
+                recv_bulk(data, size);
+                first = data[0];
+                free(data);
+                if (first != RESPONSE_TYPE_INIT) {
+                    g2_err("Unexpected init response data: %02x\n", first);
+                    return G2_ERR_RECV;
+                }
+            }
         }
     }
 
