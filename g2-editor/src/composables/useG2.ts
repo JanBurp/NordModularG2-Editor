@@ -45,7 +45,11 @@ export function useG2() {
 			category,
 		};
 		logs.value.push(entry);
-		console.debug(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
+		if (category === 'led' || category === 'volume') {
+			console.debug(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
+		} else {
+			console.log(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
+		}
 	}
 
 	function clearLogs(): void {

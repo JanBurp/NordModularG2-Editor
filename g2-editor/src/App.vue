@@ -497,7 +497,7 @@
 	watch(hardwareVariationChange, (change) => {
 		if (!change) return;
 		const changeSlot = SLOT_LABELS[change.slot];
-		if (changeSlot !== device.getActiveSlot) return;
+		if (changeSlot !== uiStore.activeSlot) return;
 		uiStore.variation = change.variation;
 		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;
 		if (activePatch?.description) activePatch.description.variation = change.variation;
