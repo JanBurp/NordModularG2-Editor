@@ -17,6 +17,7 @@ export const useUiStore = defineStore('ui', {
 		selectedCable: null as Cable | null,
 		selectedModules: [] as number[],
 		showSvgViewer: false as boolean,
+		cableShakeCount: 0 as number,
 	}),
 
 	getters: {
@@ -56,6 +57,10 @@ export const useUiStore = defineStore('ui', {
 
 		toggleSvgViewer() {
 			this.showSvgViewer = !this.showSvgViewer;
+		},
+
+		shakeCables() {
+			this.cableShakeCount++;
 		},
 	},
 });
