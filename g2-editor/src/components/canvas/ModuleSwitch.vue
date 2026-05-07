@@ -98,7 +98,7 @@
 
 	const names = computed(() => paramMap.value.names || []);
 	const defin = computed(() => paramMap.value.defin || []);
-	const width = computed(() => paramMap.value.width || 18);
+	const width = computed(() => paramMap.value.width || 40);
 	const mode = computed(() => paramMap.value.mode);
 	const rows = computed(() => paramMap.value.rows || 1);
 	const bmp = computed(() => paramMap.value.bmp);
