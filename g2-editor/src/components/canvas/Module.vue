@@ -76,10 +76,12 @@
 				/>
 
 				<!-- Switches -->
+				<!-- TODO: param meegeven als enige, dan hebben we param.width -->
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:x="param.x"
 					:y="param.y"
+					:param="param"
 					:param-type="param.type"
 					:value="getParamValue(index)"
 					:param-index="index"
