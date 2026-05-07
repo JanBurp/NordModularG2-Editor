@@ -35,7 +35,7 @@ static void g2_err(const char *fmt, ...) {
         printf("{\"type\":\"error\",\"error\":\"%s\"}\n", msg);
         fflush(stdout);
     } else {
-        g2_err("%s\n", msg);
+        fprintf(stderr, "%s\n", msg);
     }
 }
 /* Timeout values (in ms) */
@@ -399,7 +399,6 @@ static int recv_bulk(uint8_t *data, uint16_t size) {
 cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
                          const uint8_t *perfData, size_t perfSize) {
     (void)bulkSize;  /* Currently using fixed offsets, size not needed */
-    (void)perfSize;  /* Currently using fixed offsets, size not needed */
 
     char synthName[32] = {0};
     char perfName[32] = {0};
@@ -500,23 +499,25 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
 
     /* g2ctl: data = data[11:] to skip to slot data */
     const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd = perfData + perfSize;
 
-    /* Now parse each slot */
+    /* Now parse each slot, guarded by perfSize */
     for (int i = 0; i < 4; i++) {
-        /* Parse slot name */
-        nameLen = parse_name(slotPtr, slotNames[i], 17);
+        if (slotPtr >= perfEnd) break;
+        int maxName = (int)(perfEnd - slotPtr);
+        if (maxName > 17) maxName = 17;
+        nameLen = parse_name(slotPtr, slotNames[i], maxName);
         slotPtr += nameLen;
 
-        /* Read 7 bytes: active, key, hold, bank, patch, low, high */
+        if (slotPtr + 7 > perfEnd) break;
         slotActive[i] = slotPtr[0] & 1;
-        slotKey[i] = slotPtr[1] & 1;
-        slotHold[i] = slotPtr[2] & 1;
-        slotBanks[i] = slotPtr[3];
+        slotKey[i]    = slotPtr[1] & 1;
+        slotHold[i]   = slotPtr[2] & 1;
+        slotBanks[i]  = slotPtr[3];
         slotPatches[i] = slotPtr[4];
-        slotLow[i] = slotPtr[5];
-        slotHigh[i] = slotPtr[6];
+        slotLow[i]    = slotPtr[5];
+        slotHigh[i]   = slotPtr[6];
 
-        /* Skip 10 bytes (7 slot data + 3 padding) */
         slotPtr += 10;
     }
 
