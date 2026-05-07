@@ -2026,17 +2026,25 @@ int g2_watch(output_format_t format, int debug) {
                         printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
                                response[5], response[6]);
                         break;
-                    default:
-                        printf("{\"type\":\"unknown_sys\",\"version\":64,\"sub\":%u}\n", subCmd);
+                    default: {
+                        char hex[32] = "";
+                        for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                            snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                        printf("{\"type\":\"unknown_sys\",\"version\":64,\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                         break;
+                    }
                 }
             } else {
                 switch (subCmd) {
                     case 0x7F: printf("{\"type\":\"ok\"}\n"); break;
                     case 0x7E: printf("{\"type\":\"error\",\"code\":%u}\n", response[5]); break;
-                    default:
-                        printf("{\"type\":\"unknown_sys\",\"sub\":%u}\n", subCmd);
+                    default: {
+                        char hex[32] = "";
+                        for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                            snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                        printf("{\"type\":\"unknown_sys\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                         break;
+                    }
                 }
             }
             fflush(stdout);
@@ -2080,9 +2088,13 @@ int g2_watch(output_format_t format, int debug) {
                     break;
                 case 0x7F: printf("{\"type\":\"ok\"}\n"); break;
                 case 0x7E: printf("{\"type\":\"error\",\"code\":%u}\n", response[5]); break;
-                default:
-                    printf("{\"type\":\"unknown_perf\",\"sub\":%u}\n", subCmd);
+                default: {
+                    char hex[32] = "";
+                    for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                        snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                    printf("{\"type\":\"unknown_perf\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                     break;
+                }
             }
             fflush(stdout);
             continue;
@@ -2096,8 +2108,12 @@ int g2_watch(output_format_t format, int debug) {
             if (subCmd == 0x36 || subCmd == 0x38) /* R_PATCH_VERSION */
                 printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
                        response[5], response[6]);
-            else
-                printf("{\"type\":\"unknown_version\",\"slot\":%u,\"sub\":%u}\n", slot, subCmd);
+            else {
+                char hex[32] = "";
+                for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                    snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                printf("{\"type\":\"unknown_version\",\"slot\":%u,\"sub\":%u,\"data\":\"%s\"}\n", slot, subCmd, hex);
+            }
             fflush(stdout);
             continue;
         }
@@ -2105,13 +2121,19 @@ int g2_watch(output_format_t format, int debug) {
         switch (subCmd) {
             case 0x40: /* S_SET_PARAM: location(0=fx,1=va,2=patch), module, param, value, variation */
                 if (response[5] == 2) {
-                    printf("{\"type\":\"patch_param\",\"slot\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                           slot, response[7], response[8], response[9]);
+                    printf("{\"type\":\"patch_param\",\"slot\":%u,\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                           slot, response[6], response[7], response[8], response[9]);
                 } else {
                     printf("{\"type\":\"param_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
                            slot, response[5] == 0 ? "fx" : "va",
                            response[6], response[7], response[8], response[9]);
                 }
+                break;
+            case 0x43: /* S_SET_MORPH_RANGE: location, module, param, morph, value, negative, variation */
+                printf("{\"type\":\"morph_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,"
+                       "\"morph\":%u,\"value\":%u,\"negative\":%u,\"variation\":%u}\n",
+                       slot, response[5] == 0 ? "fx" : "va",
+                       response[6], response[7], response[8], response[9], response[10], response[11]);
                 break;
             case 0x27: { /* S_PATCH_NAME: null-terminated patch name */
                 char name[17] = {0};
@@ -2150,10 +2172,14 @@ int g2_watch(output_format_t format, int debug) {
             case 0x70: /* M_UNKNOWN_6 */
             case 0x7F: printf("{\"type\":\"ok\",\"slot\":%u}\n", slot); break;
             case 0x7E: printf("{\"type\":\"error\",\"slot\":%u,\"code\":%u}\n", slot, response[5]); break;
-            default:
-                printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u}\n",
-                       slot, aCmd, subCmd);
+            default: {
+                char hex[32] = "";
+                for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                    snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u,\"data\":\"%s\"}\n",
+                       slot, aCmd, subCmd, hex);
                 break;
+            }
         }
         fflush(stdout);
     }
