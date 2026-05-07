@@ -103,6 +103,9 @@ exec 3>&-   # close when done (causes daemon to exit cleanly)
 ```
 The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.
 
+use ./daemin.sh start ... etc
+pkill -f "g2-cli daemon"
+
 ### Output formats
 
 ```bash
