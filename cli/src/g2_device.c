@@ -1910,18 +1910,21 @@ int g2_watch(output_format_t format, int debug) {
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
 
-    /* Drain any stale notifications left from a previous session. */
+    /* Cold-connect arm sequence — mirrors the reconnect path below exactly:
+     * drain stale data, send START_COMM, read the ACK.  No clear_halt on a
+     * freshly-reset G2 — issuing CLEAR_FEATURE(ENDPOINT_HALT) when no halt is
+     * present puts the G2 in a state where direct queries time out, even
+     * though streaming notifications still work. */
     g2_drain_pending();
-
-    /* Clear any halted endpoints left over from a previous bad session. */
-    libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-    libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
-    libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
-
-    /* CMD_INIT (0x80) must run before any query command so the G2 initialises
-     * its bulk-IN pipeline.  Do it here — before STOP_COMM and before any
-     * daemon command — matching the Delphi startup order exactly. */
-    g2_send_init();
+    {
+        uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
+        if (send_system_data(0x41, start_cmd, 2) < 0) {
+            g2_err("watch: failed to send StartComm\n");
+            return G2_ERR;
+        }
+        usleep(USB_SEND_DELAY_US);
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    }
 
     printf("{\"type\":\"watch_armed\"}\n");
     fflush(stdout);
