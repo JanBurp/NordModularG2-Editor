@@ -4,6 +4,7 @@ export interface VisualElement {
 }
 
 export interface ModuleInstance {
+	type: number;
 	index?: number;
 	horiz?: number;
 	vert?: number;

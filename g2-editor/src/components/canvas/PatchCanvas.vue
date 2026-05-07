@@ -1,8 +1,7 @@
 <template>
-	<div class="patch-canvas-wrapper" ref="canvasRef" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+	<div class="overflow-auto bg-neutral-700" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
-			class="patch-canvas"
 			font-size="9"
 			:width="canvasWidth"
 			:height="canvasHeight"
@@ -16,13 +15,12 @@
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index"
-				:type="mod.type"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				@param-change="onParamChange"
 				@mode-change="onModeChange"
-				@jack-drag-start="handleLocalJackDragStart"
-				@jack-drag-end="handleLocalJackDragEnd"
+				@jack-drag-start="(info) => cablesRef?.handleJackDragStart(info)"
+				@jack-drag-end="(info) => cablesRef?.handleJackDragEnd(info)"
 				@module-drag-start="handleModuleDragStart"
 				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
 			/>
@@ -39,17 +37,24 @@
 				pointer-events="none"
 			/>
 		</svg>
+		<Cables
+			ref="cablesRef"
+			:modules="props.modules as any[]"
+			:cables="props.cables as any[]"
+			:selected-cable="props.selectedCable"
+			@cable-click="emit('cableClick', $event)"
+			@jack-drag-start="emit('jackDragStart', $event)"
+			@jack-drag-end="emit('jackDragEnd', $event)"
+		/>
 	</div>
 </template>
 <script setup lang="ts">
-	import { ref, onMounted, onUnmounted, watch, nextTick, computed } from 'vue';
-	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey } from '../../renderer/cableRenderer';
-	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
+	import { ref, onUnmounted, computed, provide } from 'vue';
+	import type { Cable } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
-	import { svgPath } from '../../renderer/svgUtils';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
-	import { CABLE_COLOR_INDEX_MAP, JACK_COLORS } from '../../constants';
+	import Cables from './Cables.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 
 	const props = defineProps({
@@ -68,22 +73,6 @@
 		area: {
 			type: String,
 			default: 'voice',
-		},
-		cableVisibility: {
-			type: Object,
-			default: () => ({
-				red: true,
-				blue: true,
-				yellow: true,
-				orange: true,
-				green: true,
-				purple: true,
-				white: true,
-			}),
-		},
-		shakeTrigger: {
-			type: Number,
-			default: 0,
 		},
 		selectedCable: {
 			type: Object as () => Cable | null,
@@ -121,9 +110,9 @@
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 	}>();
 
-	const canvasRef = ref(null);
 	const svgRef = ref<SVGSVGElement | null>(null);
-	const isInitialized = ref(false);
+	provide('patchCanvasSvg', svgRef);
+	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
 
 	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
@@ -164,44 +153,6 @@
 		});
 	});
 
-	// Filter cables based on visibility settings
-	const visibleCables = computed(() => {
-		return props.cables.filter((cable) => {
-			const colorIndex = cable.colour;
-			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
-			return props.cableVisibility[colorName] !== false;
-		});
-	});
-
-	function renderCables() {
-		if (!svgRef.value) return;
-		const svg = svgRef.value;
-		removeAllCables(svg);
-
-		if (visibleCables.value.length > 0) {
-			makePatchCables(props.modules, visibleCables.value, svg, {
-				selectedCable: props.selectedCable,
-				onCableClick: (cable) => {
-					emit('cableClick', cable);
-				},
-			});
-		}
-	}
-
-	function updateCableVisibilityClasses() {
-		if (!svgRef.value) return;
-		const svg = svgRef.value;
-		const cableElements = svg.querySelectorAll('[data-cable-color]');
-		cableElements.forEach((el) => {
-			const colorIndex = parseInt(el.getAttribute('data-cable-color') || '0', 10);
-			const colorName = CABLE_COLOR_INDEX_MAP[colorIndex];
-			if (colorName && colorName in props.cableVisibility) {
-				const isHidden = props.cableVisibility[colorName] === false;
-				el.classList.toggle('cable-hidden', isHidden);
-			}
-		});
-	}
-
 	function onParamChange(moduleIndex, paramIndex, value) {
 		emit('paramChange', moduleIndex, paramIndex, value);
 	}
@@ -210,207 +161,7 @@
 		emit('modeChange', moduleIndex, index, value);
 	}
 
-	onMounted(async () => {
-		await nextTick();
-		isInitialized.value = true;
-		renderCables();
-	});
-
-	// Diff-based cables watch: only add new cables / remove deleted ones.
-	// This prevents the shake-all effect that a full removeAllCables+re-add would cause.
-	watch(
-		() => props.cables,
-		() => {
-			nextTick(() => {
-				if (!svgRef.value) return;
-				const svg = svgRef.value as SVGElement;
-
-				// Keys currently rendered in the DOM
-				const renderedKeys = new Set<string>();
-				svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
-					renderedKeys.add(el.getAttribute('data-cable-key')!);
-				});
-
-				// Keys we want (respecting visibility filter)
-				const wantedMap = new Map<string, any>(visibleCables.value.map((c) => [makeCableKey(c), c]));
-
-				// Remove cables no longer in the list
-				for (const key of renderedKeys) {
-					if (!wantedMap.has(key)) removeCableByKey(svg, key);
-				}
-
-				// Add cables not yet rendered
-				for (const [key, cable] of wantedMap) {
-					if (!renderedKeys.has(key)) {
-						makePatchCables(props.modules as CableModule[], [cable], svg, {
-							selectedCable: props.selectedCable,
-							onCableClick: (c) => emit('cableClick', c),
-						});
-					}
-				}
-			});
-		},
-	);
-
-	// When module positions change, re-path only cables connected to modules that actually moved.
-	// Cables connected to stationary modules keep their existing shaken shape untouched.
-	watch(
-		() => props.modules,
-		(newMods, oldMods) => {
-			nextTick(() => {
-				if (!svgRef.value || !oldMods) return;
-				const movedIds = new Set<number>();
-				for (const m of newMods as any[]) {
-					const prev = (oldMods as any[]).find((o: any) => o.index === m.index);
-					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert) movedIds.add(m.index);
-				}
-				if (movedIds.size > 0) updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);
-			});
-		},
-	);
-
-	// Watch for cable visibility changes - use CSS classes to hide/show cables
-	watch(
-		() => props.cableVisibility,
-		() => {
-			nextTick(() => {
-				updateCableVisibilityClasses();
-			});
-		},
-		{ deep: true },
-	);
-
-	// Watch for shake trigger to re-render cables
-	watch(
-		() => props.shakeTrigger,
-		() => {
-			nextTick(() => {
-				renderCables();
-			});
-		},
-	);
-
-	// Watch for selectedCable changes: directly update border class, no full re-render
-	watch(
-		() => props.selectedCable,
-		(newCable, oldCable) => {
-			if (!svgRef.value) return;
-			const svg = svgRef.value as SVGElement;
-			if (oldCable) {
-				const removeOldSelected = () => {
-					const key = cableKey(oldCable as Cable);
-					svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.remove('selected');
-				};
-				if (newCable === null) {
-					// Deselect/delete: defer so renderCables() runs first and removes the element
-					nextTick(removeOldSelected);
-				} else {
-					// Switching cables: remove immediately for instant visual feedback
-					removeOldSelected();
-				}
-			}
-			if (newCable) {
-				const key = cableKey(newCable as Cable);
-				svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.add('selected');
-			}
-		},
-	);
-
-	function cableKey(cable: Cable): string {
-		return `${(cable as any).smod ?? (cable as any).sourceModule}-${(cable as any).scon ?? (cable as any).sourceJack}-${(cable as any).dmod ?? (cable as any).destModule}-${(cable as any).dcon ?? (cable as any).destJack}`;
-	}
-
-	// --- Drag preview ---
-	type JackInfo = {
-		moduleIndex: number;
-		connectorIndex: number;
-		type: 'input' | 'output';
-		colour: string;
-	};
-	let previewCable: SVGPathElement | null = null;
-	let dragSrcPos: { x: number; y: number } | null = null;
-	let dragSrcColour = '';
-
-	function getJackSvgPos(info: JackInfo) {
-		const mod = (props.modules as any[]).find((m) => m.index === info.moduleIndex);
-		if (!mod) return null;
-		const modDef = getModule(mod.type) as any;
-		if (!modDef) return null;
-		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
-		const jack = jacks?.[info.connectorIndex];
-		if (!jack) return null;
-		return { x: jack.x + mod.horiz * 256, y: jack.y + mod.vert * 16 };
-	}
-
-	function toSvgCoords(e: MouseEvent) {
-		const svg = svgRef.value as SVGSVGElement | null;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform(ctm.inverse());
-	}
-
-	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
-		const dist = Math.hypot(dx - sx, dy - sy);
-		const sag = Math.min(dist * 0.25, 60);
-		const bot = Math.max(sy, dy) + sag;
-		return `M${sx} ${sy} C${sx + (dx - sx) * 0.25} ${bot},${sx + (dx - sx) * 0.75} ${bot},${dx} ${dy}`;
-	}
-
-	function onMouseMovePreview(e: MouseEvent) {
-		if (!dragSrcPos || !svgRef.value) return;
-		const mp = toSvgCoords(e);
-		if (!mp) return;
-		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
-		const svg = svgRef.value as SVGElement;
-		if (!previewCable) {
-			previewCable = svgPath(d, {
-				fill: 'none',
-				stroke: (JACK_COLORS as any)[dragSrcColour] || '#ffffff',
-				'stroke-width': '5',
-				// 'stroke-dasharray': '6,4',
-				opacity: '0.8',
-				class: 'cable-preview nomouse',
-			});
-		} else {
-			previewCable.setAttribute('d', d);
-		}
-		svg.appendChild(previewCable); // keep on top
-	}
-
-	function clearDragPreview() {
-		previewCable?.remove();
-		previewCable = null;
-		dragSrcPos = null;
-		window.removeEventListener('mousemove', onMouseMovePreview);
-		window.removeEventListener('mouseup', onDragCancelMouseup);
-	}
-
-	function onDragCancelMouseup() {
-		clearDragPreview();
-	}
-
-	function handleLocalJackDragStart(info: JackInfo) {
-		const pos = getJackSvgPos(info);
-		if (pos) {
-			dragSrcPos = pos;
-			dragSrcColour = info.colour;
-			window.addEventListener('mousemove', onMouseMovePreview);
-			window.addEventListener('mouseup', onDragCancelMouseup);
-		}
-		emit('jackDragStart', info);
-	}
-
-	function handleLocalJackDragEnd(info: JackInfo) {
-		clearDragPreview();
-		emit('jackDragEnd', info);
-	}
-
 	onUnmounted(() => {
-		clearDragPreview();
 		clearModuleDrag();
 		clearDropGhost();
 	});
@@ -536,19 +287,15 @@
 		const row = Math.max(0, Math.floor(mp.y / 16));
 		emit('moduleDrop', { typeId, col, row });
 	}
-</script>
-<style scoped>
-	.patch-canvas-wrapper {
-		position: relative;
-		overflow: auto;
-		background: #666;
-		min-height: 400px;
-		height: 100%;
-		flex: 1;
-	}
 
-	.patch-canvas {
-		overflow: visible;
-		display: block;
+	function toSvgCoords(e: MouseEvent) {
+		const svg = svgRef.value as SVGSVGElement | null;
+		if (!svg?.getScreenCTM) return null;
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return null;
+		const pt = svg.createSVGPoint();
+		pt.x = e.clientX;
+		pt.y = e.clientY;
+		return pt.matrixTransform(ctm.inverse());
 	}
-</style>
+</script>
