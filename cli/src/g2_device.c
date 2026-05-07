@@ -1054,7 +1054,6 @@ cleanup:
 
 cJSON *g2_startup(void) {
     if (ensure_connected(1) < 0) return NULL;
-    if (g2_send_init() != G2_OK) return NULL;
 
     cJSON *device = g2_device_info(0);
     if (!device) return NULL;
@@ -1919,8 +1918,11 @@ int g2_watch(output_format_t format, int debug) {
     libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
     libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
 
-    /* Signal ready without arming START_COMM yet; the startup command arms
-     * it via g2_watch_rearm() after init queries complete — matching Delphi. */
+    /* CMD_INIT (0x80) must run before any query command so the G2 initialises
+     * its bulk-IN pipeline.  Do it here — before STOP_COMM and before any
+     * daemon command — matching the Delphi startup order exactly. */
+    g2_send_init();
+
     printf("{\"type\":\"watch_armed\"}\n");
     fflush(stdout);
 
