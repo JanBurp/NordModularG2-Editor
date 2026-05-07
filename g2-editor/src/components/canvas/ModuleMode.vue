@@ -1,5 +1,5 @@
 <template>
-	<svg :x="x" :y="y" :width="width" :height="height" class="overflow-hidden cursor-pointer" @click="onCycleValue()">
+	<svg :x="x" :y="y" :width="width" :height="height" class="overflow-hidden! cursor-pointer" @click="onCycleValue()">
 		<rect x="0" y="0" :width="width" :height="height" fill="#CCC" stroke="#333" />
 		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
 		<text

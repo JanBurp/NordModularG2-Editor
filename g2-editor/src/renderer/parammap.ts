@@ -109,7 +109,7 @@ const parammap: Record<string, ParamDefinition> = {
 	NoteQuantNotes: { low: 0, high: 127, def: 0, defin: ['0 ~ Off, 1 ~ 1, 127 ~ 127'], comments: '' },
 	NoteRange: { low: 0, high: 127, def: 0, defin: ['0 ~ {+-}0, 1 ~ {+-}0.5, 64 ~ {+-}32, 126 ~ {+-}63.0, 127 ~ {+-}64.0'], comments: '' },
 	NoteZoneThru: { low: 0, high: 1, def: 0, defin: ['0 ~ Notes Only, 1 ~ Note+Ctrls'], comments: '' },
-	OffOn: { names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
+	OffOn: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
 	OffOn2: { names: ['Off', 'On'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: 'Alternative for punch etc' },
 	OffOnBlank: { names: [''], width: 12, low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
 	OpAmod: { low: 0, high: 7, def: 0, defin: ['0 ~ 0, 7 ~ 7'], comments: '' },

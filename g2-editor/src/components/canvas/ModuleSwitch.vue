@@ -98,7 +98,7 @@
 
 	const names = computed(() => paramMap.value.names || []);
 	const defin = computed(() => paramMap.value.defin || []);
-	const width = computed(() => paramMap.value.width || 40);
+	const width = computed(() => paramMap.value.width || 18);
 	const mode = computed(() => paramMap.value.mode);
 	const rows = computed(() => paramMap.value.rows || 1);
 	const bmp = computed(() => paramMap.value.bmp);
@@ -118,9 +118,10 @@
 	});
 
 	const displayNames = computed(() => {
-		if (names.value.length === 1 && names.value[0] === 'Ch#') {
-			return [props.paramName];
-		}
+		// TODO: Ch# -> set names??
+		// if (names.value.length === 1 && names.value[0] === 'Ch#') {
+		// 	return [props.paramName];
+		// }
 		if (names.value.length > 1) {
 			return names.value;
 		}
