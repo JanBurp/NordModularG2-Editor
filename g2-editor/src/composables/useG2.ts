@@ -130,6 +130,8 @@ export function useG2() {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
 		window.cli.offWatchDone();
+		let resolveArmed!: () => void;
+		const armed = new Promise<void>((r) => { resolveArmed = r; });
 		window.cli.onDeviceDisconnected(() => {
 			isDaemonRunning.value = false;
 			store.status = 'lost';
@@ -142,6 +144,7 @@ export function useG2() {
 		window.cli.onWatchEvent((line: string) => {
 			try {
 				const ev = JSON.parse(line);
+				if (ev.type === 'watch_armed') { resolveArmed(); return; }
 				if (ev.type === 'device_disconnected') {
 					store.status = 'lost';
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
@@ -205,6 +208,7 @@ export function useG2() {
 			}
 		});
 		await window.cli.watchStart();
+		await armed;
 		isDaemonRunning.value = true;
 		log('•', 'Watch', 'Started');
 	}
