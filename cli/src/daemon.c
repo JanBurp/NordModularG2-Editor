@@ -238,6 +238,19 @@ static void execute_cmd(const char *line) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
 
+	} else if (strcmp(cmd, "list") == 0) {
+		int filter = LIST_FILTER_ALL;
+		int bank_filter = 0;
+		for (int j = 0; j < n; j++) {
+			const char *a = arg_s(args, j);
+			if (!a) continue;
+			if (strcmp(a, "patches") == 0)            filter = LIST_FILTER_PATCHES;
+			else if (strcmp(a, "performances") == 0)  filter = LIST_FILTER_PERFORMANCES;
+			else if (strcmp(a, "bank") == 0 && j + 1 < n) bank_filter = arg_i(args, ++j);
+		}
+		data = g2_list(filter, bank_filter);
+		ret = data ? G2_OK : G2_ERR;
+
 	} else if (strcmp(cmd, "device") == 0) {
 		data = g2_device_info(0);
 		ret = data ? G2_OK : G2_ERR;
