@@ -27,4 +27,7 @@ int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
  */
 int tokenize_command(char *buf, char **argv_out, int max_argc);
 
+/* Parse "va"/"fx" location string: returns 1 for "va", 0 otherwise */
+int parse_location(const char *s);
+
 #endif /* __G2_UTILS_H__ */

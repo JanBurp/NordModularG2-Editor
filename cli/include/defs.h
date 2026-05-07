@@ -82,4 +82,9 @@ typedef enum {
 #define ENDPOINT_INTERRUPT_IN               (0x81)  /* Interrupt IN */
 #define ENDPOINT_BULK_IN                    (0x82)  /* Bulk IN */
 
+/* List filter options */
+#define LIST_FILTER_ALL            0
+#define LIST_FILTER_PATCHES        1
+#define LIST_FILTER_PERFORMANCES   2
+
 #endif /* __G2_DEFS_H__ */
