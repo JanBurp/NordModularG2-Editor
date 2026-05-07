@@ -1,8 +1,8 @@
 <template>
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
-		<ModuleBackground :height="height" :colour="instance.colour || 0" :selected="isSelected"></ModuleBackground>
+		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
 
-		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126"></ModuleTitle>
+		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
