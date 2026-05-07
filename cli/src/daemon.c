@@ -210,6 +210,11 @@ static void execute_cmd(const char *line) {
 		                    num_modes, mode_vals, num_params, param_vals,
 		                    name ? name : "Module");
 
+	} else if (strcmp(cmd, "set-module-mode") == 0 && n >= 5) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		ret = g2_set_module_mode(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+
 	} else if (strcmp(cmd, "set-module-color") == 0 && n >= 4) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);

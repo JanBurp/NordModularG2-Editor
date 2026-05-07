@@ -1643,6 +1643,28 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
     return G2_OK;
 }
 
+int g2_set_module_mode(int slot, int location, int module_id, int param, int val) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)         { g2_err("set-module-mode: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1) { g2_err("set-module-mode: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { g2_err("set-module-mode: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t extra[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)param, (uint8_t)val };
+    if (send_slot(slot, version, 0x2B, extra, 4) < 0) {
+        g2_err("set-module-mode: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_select_patch(int slot, int bank, int location) {
     if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
