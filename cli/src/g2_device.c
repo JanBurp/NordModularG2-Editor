@@ -20,6 +20,24 @@ static g2_device_t g2 = {
     .handle = NULL,
     .interface_claimed = 0
 };
+
+int g2_daemon_mode = 0;
+
+static void g2_err(const char *fmt, ...) {
+    char msg[256];
+    va_list ap;
+    va_start(ap, fmt);
+    vsnprintf(msg, sizeof(msg), fmt, ap);
+    va_end(ap);
+    size_t len = strlen(msg);
+    if (len > 0 && msg[len - 1] == '\n') msg[--len] = '\0';
+    if (g2_daemon_mode) {
+        printf("{\"type\":\"error\",\"error\":\"%s\"}\n", msg);
+        fflush(stdout);
+    } else {
+        g2_err("%s\n", msg);
+    }
+}
 /* Timeout values (in ms) */
 #define USB_TIMEOUT_STANDARD 100
 #define USB_TIMEOUT_LONG    2000
@@ -48,7 +66,7 @@ static int ensure_connected(int silent) {
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
-        fprintf(stderr, "Failed to initialize libusb: %s\n", libusb_error_name(ret));
+        g2_err("Failed to initialize libusb: %s\n", libusb_error_name(ret));
         return G2_ERR_NO_MEMORY;
     }
     return G2_OK;
@@ -69,7 +87,7 @@ int g2_list_devices(void) {
     ssize_t count = libusb_get_device_list(g2.ctx, &devices);
 
     if (count < 0) {
-        fprintf(stderr, "Failed to get device list\n");
+        g2_err("Failed to get device list\n");
         return G2_ERR;
     }
 
@@ -99,23 +117,23 @@ int g2_connect(void) {
     /* Find G2 device */
     g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     if (!g2.handle) {
-        fprintf(stderr, "G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
+        g2_err("G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
         return G2_ERR_NOT_FOUND;
     }
 
-    fprintf(stderr, "G2 found, connecting...\n");
+    g2_err("G2 found, connecting...\n");
 
     /* Claim interface 0 */
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
-        fprintf(stderr, "Failed to claim interface: %s\n", libusb_error_name(ret));
+        g2_err("Failed to claim interface: %s\n", libusb_error_name(ret));
         libusb_close(g2.handle);
         g2.handle = NULL;
         return G2_ERR_CLAIM_INTERFACE;
     }
 
     g2.interface_claimed = 1;
-    fprintf(stderr, "Connected to G2\n");
+    g2_err("Connected to G2\n");
     return G2_OK;
 }
 
@@ -184,19 +202,19 @@ int g2_send_init(void) {
     g2_drain_pending();
 
     if (send_init_msg() < 0) {
-        fprintf(stderr, "Failed to send init message\n");
+        g2_err("Failed to send init message\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
 
     int ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No response to init message\n");
+        g2_err("No response to init message\n");
         return G2_ERR_RECV;
     }
 
     if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        fprintf(stderr, "Unexpected response type to init: %02x\n", response[0]);
+        g2_err("Unexpected response type to init: %02x\n", response[0]);
         return G2_ERR_RECV;
     }
 
@@ -208,7 +226,7 @@ int g2_send_init(void) {
         uint8_t first = data[0];
         free(data);
         if (first != RESPONSE_TYPE_INIT) {
-            fprintf(stderr, "Unexpected init response data: %02x\n", first);
+            g2_err("Unexpected init response data: %02x\n", first);
             return G2_ERR_RECV;
         }
     }
@@ -221,7 +239,7 @@ int g2_send_command(uint8_t *data, int length) {
     int ret;
 
     if (!g2.handle) {
-        fprintf(stderr, "Not connected\n");
+        g2_err("Not connected\n");
         return G2_ERR;
     }
 
@@ -231,7 +249,7 @@ int g2_send_command(uint8_t *data, int length) {
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
     }
     if (ret < 0) {
-        fprintf(stderr, "Write failed: %s\n", libusb_error_name(ret));
+        g2_err("Write failed: %s\n", libusb_error_name(ret));
         return G2_ERR_SEND;
     }
 
@@ -243,7 +261,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
     int ret;
 
     if (!g2.handle) {
-        fprintf(stderr, "Not connected\n");
+        g2_err("Not connected\n");
         return G2_ERR;
     }
 
@@ -253,7 +271,7 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
         if (ret == LIBUSB_ERROR_TIMEOUT) {
             return 0;  /* Timeout - no data */
         }
-        fprintf(stderr, "Read failed: %s\n", libusb_error_name(ret));
+        g2_err("Read failed: %s\n", libusb_error_name(ret));
         return G2_ERR_RECV;
     }
 
@@ -580,7 +598,7 @@ cJSON *g2_device_info(int debug) {
     uint16_t size;
 
     if (ensure_connected(1) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
+            g2_err("Failed to connect to G2\n");
             return NULL;
         }
 
@@ -590,7 +608,7 @@ cJSON *g2_device_info(int debug) {
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
-        fprintf(stderr, "Failed to send synth settings command\n");
+        g2_err("Failed to send synth settings command\n");
         return NULL;
     }
 
@@ -598,31 +616,31 @@ cJSON *g2_device_info(int debug) {
 
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No response from G2\n");
+        g2_err("No response from G2\n");
         return NULL;
     }
 
     msgType = response[0] & 0x0f;
     if (msgType != RESPONSE_TYPE_EXTENDED) {
-        fprintf(stderr, "Unexpected response type %d\n", msgType);
+        g2_err("Unexpected response type %d\n", msgType);
         return NULL;
     }
 
     size = (response[1] << 8) | response[2];
     bulkData = malloc(size);
     if (!bulkData) {
-        fprintf(stderr, "Memory allocation failed\n");
+        g2_err("Memory allocation failed\n");
         return NULL;
     }
     bulkSize = size;
 
     if (recv_bulk(bulkData, size) <= 0) {
-        fprintf(stderr, "Failed to read bulk data\n");
+        g2_err("Failed to read bulk data\n");
         free(bulkData);
         return NULL;
     }
 
-    if (debug) {
+    if (debug && !g2_daemon_mode) {
         fprintf(stderr, "SYNTH:%zu:", bulkSize);
         for (size_t j = 0; j < bulkSize; j++) {
             fprintf(stderr, "%02x", bulkData[j]);
@@ -646,7 +664,7 @@ cJSON *g2_device_info(int debug) {
 
     perfData = malloc(1024);
     if (!perfData) {
-        fprintf(stderr, "Memory allocation failed\n");
+        g2_err("Memory allocation failed\n");
         free(bulkData);
         return NULL;
     }
@@ -663,7 +681,7 @@ cJSON *g2_device_info(int debug) {
         }
     }
 
-    if (debug) {
+    if (debug && !g2_daemon_mode) {
         fprintf(stderr, "PERF:%zu:", perfSize);
         for (size_t j = 0; j < perfSize; j++) {
             fprintf(stderr, "%02x", perfData[j]);
@@ -678,7 +696,7 @@ cJSON *g2_device_info(int debug) {
     free(perfData);
 
     if (!root) {
-        fprintf(stderr, "Failed to parse settings\n");
+        g2_err("Failed to parse settings\n");
         return NULL;
     }
 
@@ -697,18 +715,18 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Ensure connected first */
     if (ensure_connected(1) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
+            g2_err("Failed to connect to G2\n");
             return NULL;
         }
 
     /* Parse slot parameter - required */
     if (slot_str == NULL) {
-        fprintf(stderr, "Slot required (A, B, C, or D)\n");
+        g2_err("Slot required (A, B, C, or D)\n");
         goto cleanup;
     }
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
-        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        g2_err("Invalid slot: %s (use A, B, C, or D)\n", slot_str);
         goto cleanup;
     }
     actual_slot = slot;
@@ -730,7 +748,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
-        fprintf(stderr, "Failed to send get patch version command\n");
+        g2_err("Failed to send get patch version command\n");
         goto cleanup;
     }
 
@@ -738,7 +756,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No response from G2 for patch version\n");
+        g2_err("No response from G2 for patch version\n");
         goto cleanup;
     }
 
@@ -750,7 +768,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Step 2: Get patch data with version */
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-        fprintf(stderr, "Failed to send get patch command\n");
+        g2_err("Failed to send get patch command\n");
         goto cleanup;
     }
 
@@ -758,25 +776,25 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No interrupt response for patch data\n");
+        g2_err("No interrupt response for patch data\n");
         goto cleanup;
     }
 
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        fprintf(stderr, "Unexpected response type for patch data\n");
+        g2_err("Unexpected response type for patch data\n");
         goto cleanup;
     }
 
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
     patchData = malloc(patchSize);
     if (!patchData) {
-        fprintf(stderr, "Memory allocation failed\n");
+        g2_err("Memory allocation failed\n");
         goto cleanup;
     }
 
     ret = recv_bulk(patchData, patchSize);
     if (ret <= 0) {
-        fprintf(stderr, "Failed to read patch bulk data\n");
+        g2_err("Failed to read patch bulk data\n");
         free(patchData);
         patchData = NULL;
         goto cleanup;
@@ -785,7 +803,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     /* Step 3: Get patch name */
     char patchName[32] = {0};
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
-        fprintf(stderr, "Failed to send get patch name command\n");
+        g2_err("Failed to send get patch name command\n");
         free(patchData);
         goto cleanup;
     }
@@ -864,26 +882,26 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int connected = 0;
 
     if (ensure_connected(1) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
+            g2_err("Failed to connect to G2\n");
             return NULL;
         }
 
     if (slot_str == NULL) {
-        fprintf(stderr, "Slot required (A, B, C, or D)\n");
+        g2_err("Slot required (A, B, C, or D)\n");
         goto cleanup;
     }
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
-        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        g2_err("Invalid slot: %s (use A, B, C, or D)\n", slot_str);
         goto cleanup;
     }
     actual_slot = slot;
 
-    fprintf(stderr, "Fetching patch from slot %c...\n", "ABCD"[slot]);
+    g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
-        fprintf(stderr, "Failed to send get patch version command\n");
+        g2_err("Failed to send get patch version command\n");
         goto cleanup;
     }
 
@@ -891,13 +909,13 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No response from G2 for patch version\n");
+        g2_err("No response from G2 for patch version\n");
         goto cleanup;
     }
     version = interruptResp[6];
 
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-        fprintf(stderr, "Failed to send get patch command\n");
+        g2_err("Failed to send get patch command\n");
         goto cleanup;
     }
 
@@ -905,31 +923,31 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
     if (ret <= 0) {
-        fprintf(stderr, "No interrupt response for patch data\n");
+        g2_err("No interrupt response for patch data\n");
         goto cleanup;
     }
 
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        fprintf(stderr, "Unexpected response type for patch data\n");
+        g2_err("Unexpected response type for patch data\n");
         goto cleanup;
     }
 
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
     patchData = malloc(patchSize);
     if (!patchData) {
-        fprintf(stderr, "Memory allocation failed\n");
+        g2_err("Memory allocation failed\n");
         goto cleanup;
     }
 
     ret = recv_bulk(patchData, patchSize);
     if (ret <= 0) {
-        fprintf(stderr, "Failed to read patch bulk data\n");
+        g2_err("Failed to read patch bulk data\n");
         goto cleanup;
     }
 
     char patchName[32] = {0};
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
-        fprintf(stderr, "Failed to send get patch name command\n");
+        g2_err("Failed to send get patch name command\n");
         goto cleanup;
     }
 
@@ -963,19 +981,19 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     uint8_t *pch2Data = malloc(patchSize);
     size_t pch2Size = patchSize;
     if (!pch2Data) {
-        fprintf(stderr, "Memory allocation failed for PCH2 conversion\n");
+        g2_err("Memory allocation failed for PCH2 conversion\n");
         goto cleanup;
     }
 
     if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
-        fprintf(stderr, "Failed to convert patch to PCH2 format\n");
+        g2_err("Failed to convert patch to PCH2 format\n");
         free(pch2Data);
         goto cleanup;
     }
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
-        fprintf(stderr, "Failed to open file '%s' for writing\n", filename);
+        g2_err("Failed to open file '%s' for writing\n", filename);
         free(pch2Data);
         goto cleanup;
     }
@@ -985,7 +1003,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     free(pch2Data);
 
     if (written != pch2Size) {
-        fprintf(stderr, "Failed to write complete file\n");
+        g2_err("Failed to write complete file\n");
         goto cleanup;
     }
 
@@ -1064,13 +1082,13 @@ int g2_select_slot(const char *slot_str) {
     uint8_t data[8] = {0};
 
     if (ensure_connected(0) < 0) {
-        fprintf(stderr, "Failed to connect to G2\n");
+        g2_err("Failed to connect to G2\n");
         return G2_ERR_CONNECT;
     }
 
     slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) {
-        fprintf(stderr, "Invalid slot: %s (use A, B, C, or D)\n", slot_str);
+        g2_err("Invalid slot: %s (use A, B, C, or D)\n", slot_str);
         return G2_ERR_INVALID_PARAM;
     }
 
@@ -1094,7 +1112,7 @@ int g2_select_slot(const char *slot_str) {
     data[2] = 0x0f;
     data[3] = mask;
     if (send_system_data(version, data, 4) < 0) {
-        fprintf(stderr, "Failed to send slot command 1\n");
+        g2_err("Failed to send slot command 1\n");
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
@@ -1103,7 +1121,7 @@ int g2_select_slot(const char *slot_str) {
     data[0] = 0x09;
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
-        fprintf(stderr, "Failed to send slot command 2\n");
+        g2_err("Failed to send slot command 2\n");
         return G2_ERR_SEND;
     }
     recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
@@ -1115,7 +1133,7 @@ int g2_select_slot(const char *slot_str) {
      * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
      * consume the bulk immediately — leaving it unread blocks subsequent commands. */
     if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
-        fprintf(stderr, "Failed to send slot command 3\n");
+        g2_err("Failed to send slot command 3\n");
         return G2_ERR_SEND;
     }
     {
@@ -1180,7 +1198,7 @@ cJSON *g2_list(int filter, int bank_filter) {
     int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
 
     if (ensure_connected(1) < 0) {
-            fprintf(stderr, "Not connected to G2\n");
+            g2_err("Not connected to G2\n");
             return NULL;
         }
 
@@ -1218,7 +1236,7 @@ cJSON *g2_list(int filter, int bank_filter) {
             cmdData[3] = (uint8_t)patch;
 
             if (send_system_data(0x41, cmdData, 4) < 0) {
-                fprintf(stderr, "Failed to send list command\n");
+                g2_err("Failed to send list command\n");
                 if (root) cJSON_Delete(root);
                 return NULL;
             }
@@ -1344,17 +1362,17 @@ int g2_select_variation(int variation, int slot) {
     uint8_t extraData[1] = {0};
 
     if (variation < 1 || variation > 8) {
-        fprintf(stderr, "Invalid variation: %d (must be 1-8)\n", variation);
+        g2_err("Invalid variation: %d (must be 1-8)\n", variation);
         return G2_ERR_INVALID_PARAM;
     }
 
     if (ensure_connected(0) < 0) {
-            fprintf(stderr, "Failed to connect to G2\n");
+            g2_err("Failed to connect to G2\n");
             return G2_ERR_CONNECT;
         }
 
     if (slot < 0 || slot > 3) {
-        fprintf(stderr, "Slot required (A, B, C, or D)\n");
+        g2_err("Slot required (A, B, C, or D)\n");
         return G2_ERR_INVALID_PARAM;
     }
 
@@ -1363,14 +1381,14 @@ int g2_select_variation(int variation, int slot) {
     /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
     uint8_t cmdData[4] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) {
-        fprintf(stderr, "Failed to send variation command 1\n");
+        g2_err("Failed to send variation command 1\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD, 5);
     if (ret <= 0) {
-        fprintf(stderr, "No response from G2 for variation command 1\n");
+        g2_err("No response from G2 for variation command 1\n");
         return G2_ERR_RECV;
     }
     uint8_t version = slota[6];
@@ -1379,7 +1397,7 @@ int g2_select_variation(int variation, int slot) {
      * Version comes from slota[6] (matches Python embedded_message output) */
     extraData[0] = variation - 1;
     if (send_slot(slot, version, 0x6a, extraData, 1) < 0) {
-        fprintf(stderr, "Failed to send variation command 2\n");
+        g2_err("Failed to send variation command 2\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1403,12 +1421,12 @@ int g2_add_cable(int slot, int location, int color,
                  int to_mod,   int to_con_type,   int to_con_id) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)                { fprintf(stderr, "add-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)        { fprintf(stderr, "add-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
-    if (color < 0 || color > 6)              { fprintf(stderr, "add-cable: color must be 0-6\n"); return G2_ERR_INVALID_PARAM; }
-    if (from_con_type < 0 || to_con_type < 0) { fprintf(stderr, "add-cable: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)                { g2_err("add-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)        { g2_err("add-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (color < 0 || color > 6)              { g2_err("add-cable: color must be 0-6\n"); return G2_ERR_INVALID_PARAM; }
+    if (from_con_type < 0 || to_con_type < 0) { g2_err("add-cable: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "add-cable: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("add-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
     /* Enforce output→input: swap if from is an input */
     if (from_con_type == 0) {
@@ -1429,7 +1447,7 @@ int g2_add_cable(int slot, int location, int color,
         (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
     };
     if (send_slot(slot, version, 0x50, extra, 5) < 0) {
-        fprintf(stderr, "add-cable: failed to send\n");
+        g2_err("add-cable: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1443,11 +1461,11 @@ int g2_del_cable(int slot, int location,
                  int to_mod,   int to_con_type,   int to_con_id) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)          { fprintf(stderr, "del-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)  { fprintf(stderr, "del-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
-    if (from_con_type < 0 || to_con_type < 0) { fprintf(stderr, "del-cable: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)          { g2_err("del-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("del-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (from_con_type < 0 || to_con_type < 0) { g2_err("del-cable: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "del-cable: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("del-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
     /* Enforce output→input: swap if from is an input */
     if (from_con_type == 0) {
@@ -1468,7 +1486,7 @@ int g2_del_cable(int slot, int location,
         (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
     };
     if (send_slot(slot, version, 0x51, extra, 5) < 0) {
-        fprintf(stderr, "del-cable: failed to send\n");
+        g2_err("del-cable: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1480,17 +1498,17 @@ int g2_del_cable(int slot, int location,
 int g2_del_module(int slot, int location, int module_id) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)          { fprintf(stderr, "del-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)  { fprintf(stderr, "del-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)          { g2_err("del-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("del-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "del-module: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("del-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
 
     uint8_t extra[2] = { (uint8_t)location, (uint8_t)module_id };
     if (send_slot(slot, version, 0x32, extra, 2) < 0) {
-        fprintf(stderr, "del-module: failed to send\n");
+        g2_err("del-module: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1502,17 +1520,17 @@ int g2_del_module(int slot, int location, int module_id) {
 int g2_move_module(int slot, int location, int module_id, int col, int row) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)          { fprintf(stderr, "move-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)  { fprintf(stderr, "move-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)          { g2_err("move-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("move-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "move-module: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("move-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
 
     uint8_t extra[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)col, (uint8_t)row };
     if (send_slot(slot, version, 0x34, extra, 4) < 0) {
-        fprintf(stderr, "move-module: failed to send\n");
+        g2_err("move-module: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1530,10 +1548,10 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)          { fprintf(stderr, "add-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)  { fprintf(stderr, "add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)          { g2_err("add-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "add-module: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("add-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
     uint8_t payload[512];
     int pos = 0;
@@ -1562,7 +1580,7 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     uint8_t version = cable_get_version(slot);
 
     if (send_slot(slot, version, 0x30, payload, pos) < 0) {
-        fprintf(stderr, "add-module: failed to send\n");
+        g2_err("add-module: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1574,18 +1592,18 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 int g2_set_module_color(int slot, int location, int module_id, int color) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)          { fprintf(stderr, "set-module-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)  { fprintf(stderr, "set-module-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
-    if (color < 0 || color > 24)       { fprintf(stderr, "set-module-color: color must be 0-24\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)          { g2_err("set-module-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("set-module-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (color < 0 || color > 24)       { g2_err("set-module-color: color must be 0-24\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "set-module-color: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("set-module-color: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
 
     uint8_t extra[3] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)color };
     if (send_slot(slot, version, 0x31, extra, 3) < 0) {
-        fprintf(stderr, "set-module-color: failed to send\n");
+        g2_err("set-module-color: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1597,11 +1615,11 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
 int g2_set_module_label(int slot, int location, int module_id, const char *label) {
     uint8_t response[16] = {0};
 
-    if (slot < 0 || slot > 3)         { fprintf(stderr, "set-module-name: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1) { fprintf(stderr, "set-module-name: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
-    if (!label || !*label)            { fprintf(stderr, "set-module-name: label must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)         { g2_err("set-module-name: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1) { g2_err("set-module-name: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (!label || !*label)            { g2_err("set-module-name: label must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (ensure_connected(0) < 0) { fprintf(stderr, "set-module-name: failed to connect\n"); return G2_ERR_CONNECT; }
+    if (ensure_connected(0) < 0) { g2_err("set-module-name: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
@@ -1616,7 +1634,7 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
     payload[2 + nlen] = 0x00;
 
     if (send_slot(slot, version, 0x33, payload, (int)(3 + nlen)) < 0) {
-        fprintf(stderr, "set-module-name: failed to send\n");
+        g2_err("set-module-name: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1844,7 +1862,7 @@ int g2_watch(output_format_t format, int debug) {
     (void)format;
 
     if (ensure_connected(1) < 0) {
-        fprintf(stderr, "watch: failed to connect\n");
+        g2_err("watch: failed to connect\n");
         return G2_ERR_CONNECT;
     }
 
@@ -1867,7 +1885,7 @@ int g2_watch(output_format_t format, int debug) {
     uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
     ret = send_system_data(0x41, start_cmd, 2);
     if (ret < 0) {
-        fprintf(stderr, "watch: failed to send StartComm\n");
+        g2_err("watch: failed to send StartComm\n");
         return G2_ERR;
     }
     usleep(USB_SEND_DELAY_US);
@@ -1893,7 +1911,7 @@ int g2_watch(output_format_t format, int debug) {
         libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
         ret = send_system_data(0x41, start_cmd, 2);
         if (ret < 0) {
-            fprintf(stderr, "watch: failed to re-arm after bad state\n");
+            g2_err("watch: failed to re-arm after bad state\n");
             return G2_ERR;
         }
         usleep(USB_SEND_DELAY_US);
@@ -1922,7 +1940,7 @@ int g2_watch(output_format_t format, int debug) {
             uint8_t start_cmd2[2] = {SUB_COMMAND_START_STOP, 0x00};
             ret = send_system_data(0x41, start_cmd2, 2);
             if (ret < 0) {
-                fprintf(stderr, "watch: failed to re-arm after reconnect\n");
+                g2_err("watch: failed to re-arm after reconnect\n");
                 break;
             }
             usleep(USB_SEND_DELAY_US);

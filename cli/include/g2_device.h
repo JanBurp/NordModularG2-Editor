@@ -44,6 +44,9 @@ typedef struct {
     int interface_claimed;
 } g2_device_t;
 
+/* Set to 1 when running as daemon — redirects error output to JSON stdout */
+extern int g2_daemon_mode;
+
 /* Initialize device library */
 int g2_init(void);
 

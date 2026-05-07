@@ -262,7 +262,8 @@ static void execute_cmd(const char *line) {
 
 	g2_watch_rearm();
 
-	if (ret == G2_ERR_SEND || ret == G2_ERR_CONNECT) {
+	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
+	    ret == G2_ERR_CONNECT || ret == G2_ERR_RESET) {
 		printf("{\"type\":\"device_disconnected\"}\n");
 		fflush(stdout);
 	}
@@ -303,6 +304,7 @@ static void *stdin_reader(void *arg) {
 /* ── entry point ───────────────────────────────────────────────────────── */
 
 int g2_daemon_run(output_format_t format) {
+	g2_daemon_mode = 1;
 	pthread_t tid;
 	pthread_create(&tid, NULL, stdin_reader, NULL);
 	g2_watch_tick_hook = daemon_tick;
