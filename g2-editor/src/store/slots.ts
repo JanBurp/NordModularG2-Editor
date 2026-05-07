@@ -348,18 +348,37 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot;
-			if (!slot) return;
-			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleId);
+			if (mod?.lv) mod.lv[variation * mod.pcnt + paramIdx] = value;
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === 'voice' ? 'va' : 'fx';
+				await window.cli.run(['set-param', deviceSlot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+			}
 		},
 
-		// TODO
-		async setMode(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
-			// const slot = useDeviceStore().getActiveSlot;
-			// if (!slot) return;
-			// const location = area === 'voice' ? 'va' : 'fx';
-			// await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
+			const deviceSlot = useDeviceStore().getActiveSlot;
+			const slot = deviceSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleId);
+			if (mod?.modes) mod.modes[modeIdx] = value;
+			this.slots[slot].rawHex = null;
+
+			if (deviceSlot) {
+				const location = area === 'voice' ? 'va' : 'fx';
+				await window.cli.run(['set-module-mode', deviceSlot, location, String(moduleId), String(modeIdx), String(value)]);
+			}
 		},
 
 		async loadSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
