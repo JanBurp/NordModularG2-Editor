@@ -581,8 +581,9 @@ When `version != 0x40`:
 | `0x21` or `0x3C` | `patch_update` | `slot` |
 | `0x27` | `patch_name` | `slot`, `name` |
 | `0x2F` | `selected_param` | `slot`, `area` ("fx"/"va"/"patch"), `module`=r[7], `param`=r[8] |
-| `0x40` (location==2) | `patch_param` | `slot`, `param`=r[7], `value`=r[8], `variation`=r[9] |
+| `0x40` (location==2) | `patch_param` | `slot`, `module`=r[6], `param`=r[7], `value`=r[8], `variation`=r[9] |
 | `0x40` (location 0/1) | `param_change` | `slot`, `area` ("fx"/"va"), `module`=r[6], `param`=r[7], `value`=r[8], `variation`=r[9] |
+| `0x43` | `morph_change` | `slot`, `area` ("fx"/"va"), `module`=r[6], `param`=r[7], `morph`=r[8], `value`=r[9], `negative`=r[10], `variation`=r[11] |
 | `0x44` | `copy_variation` | `slot`, `from`=r[5], `to`=r[6] |
 | `0x59` or `0x70` or `0x7F` | `ok` | `slot` |
 | `0x69` | `current_note` | `slot`, `note`=r[5], `velocity`=r[6] |
