@@ -6,8 +6,14 @@
 #define __G2_OUTPUT_H__
 
 #include <stdint.h>
-#include "g2_device.h"
 #include "cJSON.h"
+
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_JSON,
+    OUTPUT_PRETTY,
+    OUTPUT_TREE
+} output_format_t;
 
 /* Output JSON in the specified format */
 void output_json(const cJSON *json, int format);
