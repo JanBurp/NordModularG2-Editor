@@ -1,20 +1,18 @@
 # CLAUDE.md
 
 ## Project Context
-- This is a G2 synth project with a C firmware layer (g2_device.c, MIDI/USB), a TypeScript CLI, and a Vue editor (App.vue, slots.ts). Changes often need to flow across all three layers — check each layer when wiring new commands like add-module or SET_MODULE_LABEL.
+This is a G2 synth project with a C firmware layer (g2_device.c, MIDI/USB), a TypeScript CLI, and a Vue editor (App.vue, slots.ts). Changes often need to flow across all three layers — check each layer when wiring new commands like add-module or SET_MODULE_LABEL.
 
 ## Coding And behavioral guidelines to reduce LLM coding mistakes
 
 ## Workflow Discipline
 - When fixing a specific bug, stay focused on the file/command mentioned. Do NOT explore unrelated files (e.g., Vue stores, patch parsing) unless the user explicitly asks.
-- When adding a `ref` in `<script>`, immediately verify it is attached to the corresponding template element before considering the task complete.
 - For code review requests, ask whether to review a specific commit, branch range, or working tree before starting.
 
 ## Verification Before Done
 - For C/firmware bit-field parsing changes, request a raw byte dump from the connected G2 and verify each field (including inverted bits like clkse) before claiming the fix is complete.
 - For Vue/SVG refactors, run the test suite AND check for ID collisions when components are duplicated (e.g., gradient defs should live at App root).
 - Always run `npm run typecheck` (or equivalent) after multi-file TypeScript edits before reporting success.
-
 
 ### 1. Think Before Coding
 
@@ -92,7 +90,6 @@ cd cli && make          # build
 cd cli && make test     # run tests
 ./cli/build/bin/g2-cli --help
 ```
-
 Key slot commands: `add-module`, `del-module`, `move-module`, `set-module-color`, `set-module-name`, `set-param`, `add-cable`, `del-cable`. All take `<slot> <va|fx> ...` as first args. Subcmd bytes documented in `doc/usb.md`.
 
 ### Electron GUI
@@ -114,9 +111,10 @@ This is an **Electron + Vue 3** desktop app for editing Nord G2 synthesizer patc
 
 ### Coding guidelines
 
-- Use tab indentation with 4 spaces witdh
+- Use tab indentation with 4 spaces width
 - Vue components must have this order: <template> <script setup lang="ts"> <style scoped>
 - Use eslint and prettier
+- Never commit
 
 ### Process Model
 - **Electron main** (`electron/main.ts`) — spawns the `g2-cli` C binary as a child process for all USB/device communication; handles IPC for file ops, CLI run/batch, and watch events
