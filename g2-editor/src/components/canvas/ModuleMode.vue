@@ -2,6 +2,9 @@
 	<svg :x="x" :y="y" :width="width" :height="height" class="mode-selector clipper" @click="onCycleValue()">
 		<rect x="0" y="0" :width="width" :height="height" fill="#EEE" stroke="#333" />
 		<use v-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
+		<text v-else x="50%" y="50%" :width="width" :height="height" fill="#000" font-size="9" dominant-baseline="middle" text-anchor="middle">
+			{{ valueName }}
+		</text>
 	</svg>
 </template>
 <script setup lang="ts">
@@ -35,6 +38,14 @@
 
 	const offset = computed(() => {
 		return props.value * itemHeight.value;
+	});
+
+	const valueName = computed(() => {
+		if (paramMap.value.defin) {
+			const def = paramMap.value.defin[0].split(',');
+			return def[props.value].substring(4);
+		}
+		return props.value;
 	});
 
 	function onCycleValue() {

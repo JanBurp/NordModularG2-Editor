@@ -9,7 +9,7 @@ const parammap: Record<string, ParamDefinition> = {
 	BipUni: { names: ['Bip', 'Uni'], width: 18, low: 0, high: 1, def: 0, defin: ['0 ~ Bip, 1 ~ Uni'], comments: 'Determines display for [LevBipUni]' },
 	ClassicSlope: { names: ['12', '18', '24'], low: 0, high: 2, def: 0, defin: ['0 ~ 12, 1 ~ 18, 2 ~ 24'], comments: '' },
 	ClipShape: { width: 24, low: 0, high: 1, def: 0, defin: ['0 ~ Asym, 1 ~ Sym'], comments: '' },
-	ClkDivMode: { low: 0, high: 1, def: 0, defin: ['0 ~ Gated, 1 ~ Toggled'], comments: 'Gated mode follows input clocks positive pulse width' },
+	ClkDivMode: { width: 40, height: 21, low: 0, high: 1, def: 0, defin: ['0 ~ Gated, 1 ~ Toggled'], comments: 'Gated mode follows input clocks positive pulse width' },
 	ClkGenBeatSync: { low: 0, high: 5, def: 2, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 4, 3 ~ 8, 4 ~ 16, 5 ~ 32'], comments: '' },
 	ClkGenSwing: { low: 0, high: 127, def: 0, defin: ['0 ~ 50.0%, 64 ~ 62.6%, 127 ~ 75.0%'], comments: '' },
 	CombType: { width: 28, low: 0, high: 2, def: 0, defin: ['0 ~ Notch, 1 ~ Peak, 2 ~ Deep'], comments: '' },
