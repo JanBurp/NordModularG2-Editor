@@ -124,7 +124,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectVariation(variation: number): Promise<void> {
-			const active = useDeviceStore().getActiveSlot;
+			const active = useDeviceStore().getActiveSlot ?? this.activeSlot;
 			if (!active) return;
 			await window.cli.run(['variation', String(variation + 1), active]);
 		},
