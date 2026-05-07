@@ -215,6 +215,7 @@
 		applySlotResult(await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
+	// TODO: Investigate why param changes from editor->G2 are slow. Too much commands send? Does it something extra?
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
 		if (device.status !== 'connected') return;
