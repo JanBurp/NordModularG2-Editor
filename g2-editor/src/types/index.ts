@@ -54,6 +54,7 @@ export interface DeviceState {
 export interface ParamDefinition {
 	names?: string[];
 	width?: number;
+	height?: number;
 	low: number;
 	high: number;
 	def: number;

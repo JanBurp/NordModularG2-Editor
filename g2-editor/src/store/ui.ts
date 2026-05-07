@@ -4,7 +4,7 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'info' | 'browser';
+export type PaneTab = 'modules' | 'info' | 'browser' | '';
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({
@@ -31,6 +31,9 @@ export const useUiStore = defineStore('ui', {
 		toggleSidebar(tab: PaneTab) {
 			if (this.rightPaneTab === tab) {
 				this.showRightPane = !this.showRightPane;
+				if (this.showRightPane === false) {
+					this.rightPaneTab = '';
+				}
 			} else {
 				this.rightPaneTab = tab;
 				this.showRightPane = true;
