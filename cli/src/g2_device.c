@@ -1911,56 +1911,18 @@ int g2_watch(output_format_t format, int debug) {
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
 
-    /* Clear any stale notifications from a preceding command (e.g. slot switch)
-     * before arming — sending START_COMM while the G2 is still flushing its
-     * notification burst can stall the bulk-OUT endpoint. */
+    /* Drain any stale notifications left from a previous session. */
     g2_drain_pending();
 
-    /* Clear any halted endpoints left over from a previous bad session.
-     * The output endpoint is already cleared on-demand in send_slot/g2_send_command,
-     * but the input endpoints are never cleared otherwise. */
+    /* Clear any halted endpoints left over from a previous bad session. */
     libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
     libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
     libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
 
-    /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
-    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
-    ret = send_system_data(0x41, start_cmd, 2);
-    if (ret < 0) {
-        g2_err("watch: failed to send StartComm\n");
-        return G2_ERR;
-    }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    /* Signal ready without arming START_COMM yet; the startup command arms
+     * it via g2_watch_rearm() after init queries complete — matching Delphi. */
     printf("{\"type\":\"watch_armed\"}\n");
     fflush(stdout);
-
-    if (ret <= 0) {
-        /* G2 is connected but not responding — bad state (halted endpoint,
-         * firmware stuck, etc.). Emit event, disconnect, and wait for it to
-         * come back using the same reconnect loop used inside the watch. */
-        printf("{\"type\":\"device_bad_state\"}\n");
-        fflush(stdout);
-        g2_disconnect();
-        while (g2_watch_running) {
-            if (g2_connect_silent() >= 0) break;
-            usleep(100000);
-        }
-        if (!g2_watch_running) return G2_OK;
-        g2_drain_pending();
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
-        ret = send_system_data(0x41, start_cmd, 2);
-        if (ret < 0) {
-            g2_err("watch: failed to re-arm after bad state\n");
-            return G2_ERR;
-        }
-        usleep(USB_SEND_DELAY_US);
-        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
-        printf("{\"type\":\"device_reconnected\"}\n");
-        fflush(stdout);
-    }
 
     while (g2_watch_running) {
         if (g2_watch_tick_hook) g2_watch_tick_hook();
