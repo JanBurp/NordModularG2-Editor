@@ -55,59 +55,19 @@
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
 				<!-- Knobs -->
-				<ModuleKnob
-					v-if="isKnob(param.n)"
-					:type="param.n"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Sliders -->
-				<ModuleSlider
-					v-else-if="isSlider(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Switches -->
-				<!-- TODO: param meegeven als enige, dan hebben we param.width -->
-				<ModuleSwitch
-					v-else-if="isSwitch(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:param="param"
-					:param-type="param.type"
-					:value="getParamValue(index)"
-					:param-index="index"
-					:param-name="param.name"
-					@change="onParamChange"
-				/>
+				<ModuleSwitch v-else-if="isSwitch(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Spinners (KnobSpin) -->
-				<ModuleKnobSpin
-					v-else-if="isSpinner(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 
 				<!-- Spinners horizontal (KnobSpinH) -->
-				<ModuleKnobSpinH
-					v-else-if="isSpinnerH(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 			</template>
 		</g>
 

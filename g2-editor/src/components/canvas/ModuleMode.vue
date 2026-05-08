@@ -35,33 +35,33 @@
 		change: [index: number, value: number];
 	}>();
 
-	const paramMap = computed<ParamDefinition>(() => {
-		return getParam(props.paramType) || {};
+	const paramDef = computed<ParamDefinition>(() => {
+		return getParam(props.paramType) || ({} as ParamDefinition);
 	});
 
 	const x = computed(() => props.x ?? 0);
 	const y = computed(() => props.y ?? 0);
-	const width = computed(() => paramMap.value.width || 18);
-	const height = computed(() => paramMap.value.height || 21);
+	const width = computed(() => paramDef.value.width || 18);
+	const height = computed(() => paramDef.value.height || 21);
 
-	const bitmapId = computed(() => paramMap.value.img || '');
-	const itemHeight = computed(() => paramMap.value.h || -18);
+	const bitmapId = computed(() => paramDef.value.img || '');
+	const itemHeight = computed(() => paramDef.value.h || -18);
 
 	const offset = computed(() => {
 		return props.value * itemHeight.value;
 	});
 
 	const valueName = computed(() => {
-		if (paramMap.value.defin) {
-			const def = paramMap.value.defin[0].split(',');
+		if (paramDef.value.defin) {
+			const def = paramDef.value.defin[0].split(',');
 			return def[props.value].substring(4);
 		}
 		return props.value;
 	});
 
 	function onCycleValue() {
-		const low = paramMap.value.low || 0;
-		const high = paramMap.value.high || 0;
+		const low = paramDef.value.low || 0;
+		const high = paramDef.value.high || 0;
 		const range = high - low + 1;
 		const current = Math.max(low, Math.min(props.value, high));
 		const newValue = low + ((current - low + 1) % range);
