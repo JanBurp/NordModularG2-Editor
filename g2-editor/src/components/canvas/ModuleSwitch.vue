@@ -75,7 +75,7 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed, ref } from 'vue';
+	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
 	import type { ModuleParam } from '../../types';
 	import type { ParamDefinition } from '../../types';
@@ -96,7 +96,7 @@
 
 	const names = computed(() => paramDef.value.names || []);
 	const defin = computed(() => paramDef.value.defin || []);
-	const width = computed(() => paramDef.value.width || 18);
+	const width = computed(() => props.param.w || paramDef.value.width || 18);
 	const mode = computed(() => paramDef.value.mode);
 	const rows = computed(() => paramDef.value.rows || 1);
 	const bmp = computed(() => paramDef.value.bmp);
@@ -117,10 +117,10 @@
 
 	const displayNames = computed(() => {
 		// TODO: Ch# -> set names??
-		// if (names.value.length === 1 && names.value[0] === 'Ch#') {
-		// 	return [props.param.name];
-		// }
-		if (names.value.length > 1) {
+		if (names.value.length === 1 && names.value[0] === 'Ch#') {
+			return [props.param.name];
+		}
+		if (names.value && names.value.length > 0) {
 			return names.value;
 		}
 		return optionNames.value;
