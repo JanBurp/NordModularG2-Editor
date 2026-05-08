@@ -1,5 +1,19 @@
 export interface VisualElement {
 	type: string;
+	x?: number;
+	y?: number;
+	x1?: number;
+	y1?: number;
+	x2?: number;
+	y2?: number;
+	w?: number;
+	h?: number;
+	d?: string;
+	f?: string;
+	xo?: number;
+	func?: string;
+	lv?: number[];
+	moduleId?: number;
 	[key: string]: unknown;
 }
 

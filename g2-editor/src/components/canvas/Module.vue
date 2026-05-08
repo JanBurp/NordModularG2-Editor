@@ -19,20 +19,8 @@
 			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
 			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
 			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
-			<ModuleGraph
-				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
-				:type="ve.type"
-				:x="ve.x"
-				:y="ve.y"
-				:w="ve.w"
-				:h="ve.h"
-				:f="ve.f"
-				:lv="localLv"
-				:module-id="instance.type"
-			/>
-
+			<ModuleGraph v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h" :ve="ve" :lv="localLv" :module-id="instance.type" />
 			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
-
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
 		</template>
