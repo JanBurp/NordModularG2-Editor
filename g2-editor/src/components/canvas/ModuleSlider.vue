@@ -16,12 +16,12 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 
 	const props = defineProps<{
-		x: number;
-		y: number;
+		param: ModuleParam;
 		value: number;
 		paramIndex: number;
 	}>();

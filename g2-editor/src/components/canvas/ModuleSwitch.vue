@@ -1,17 +1,17 @@
 <template>
-	<g :transform="`translate(${x}, ${y})`" class="switch-control">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
 			<svg v-if="singleButtonMode && optionNames.length === 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
 				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${paramType}-0)`" />
+				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
 			<!-- Single button mode: show active bitmap without highlight -->
 			<svg v-if="singleButtonMode && optionNames.length > 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
 				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${paramType}-0)`" />
+				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
 			<!-- VR/HR mode: show all bitmaps with active highlighted -->
@@ -28,7 +28,7 @@
 				@click="onButtonClick(index)"
 			>
 				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
-				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${paramType}-${index})`" />
+				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${param.n}-${index})`" />
 			</svg>
 		</template>
 
@@ -75,35 +75,33 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref } from 'vue';
 	import { getParam } from '../../renderer/parammap';
+	import type { ModuleParam } from '../../types';
 	import type { ParamDefinition } from '../../types';
 
 	const props = defineProps<{
-		x: number;
-		y: number;
-		paramType: string;
+		param: ModuleParam;
 		value: number;
 		paramIndex: number;
-		paramName: string;
 	}>();
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
 	}>();
 
-	const paramMap = computed<ParamDefinition>(() => {
-		return getParam(props.paramType) || {};
+	const paramDef = computed<ParamDefinition>(() => {
+		return getParam(props.param.type) || ({} as ParamDefinition);
 	});
 
-	const names = computed(() => paramMap.value.names || []);
-	const defin = computed(() => paramMap.value.defin || []);
-	const width = computed(() => paramMap.value.width || 18);
-	const mode = computed(() => paramMap.value.mode);
-	const rows = computed(() => paramMap.value.rows || 1);
-	const bmp = computed(() => paramMap.value.bmp);
+	const names = computed(() => paramDef.value.names || []);
+	const defin = computed(() => paramDef.value.defin || []);
+	const width = computed(() => paramDef.value.width || 18);
+	const mode = computed(() => paramDef.value.mode);
+	const rows = computed(() => paramDef.value.rows || 1);
+	const bmp = computed(() => paramDef.value.bmp);
 	const hasBitmap = computed(() => !!bmp.value);
-	const maskh = computed(() => paramMap.value.maskh || 11);
+	const maskh = computed(() => paramDef.value.maskh || 11);
 
 	const optionNames = computed(() => {
 		const def = defin.value;
@@ -120,7 +118,7 @@
 	const displayNames = computed(() => {
 		// TODO: Ch# -> set names??
 		// if (names.value.length === 1 && names.value[0] === 'Ch#') {
-		// 	return [props.paramName];
+		// 	return [props.param.name];
 		// }
 		if (names.value.length > 1) {
 			return names.value;
@@ -134,8 +132,8 @@
 	});
 
 	const activeIndex = computed(() => {
-		const low = paramMap.value.low || 0;
-		const high = paramMap.value.high || names.value.length - 1 || 0;
+		const low = paramDef.value.low || 0;
+		const high = paramDef.value.high || names.value.length - 1 || 0;
 		// Clamp value to valid range
 		return Math.max(low, Math.min(props.value, high));
 	});
@@ -176,8 +174,8 @@
 		if (mode.value !== 'VR' && mode.value !== 'HR') {
 			onCycleValue();
 		} else {
-			const low = paramMap.value.low || 0;
-			const high = paramMap.value.high || names.value.length - 1 || 0;
+			const low = paramDef.value.low || 0;
+			const high = paramDef.value.high || names.value.length - 1 || 0;
 
 			// Ensure value is within bounds
 			const newValue = Math.max(low, Math.min(index, high));
@@ -190,8 +188,8 @@
 
 	function onCycleValue() {
 		// Cycle to next value (for single-button switches)
-		const low = paramMap.value.low || 0;
-		const high = paramMap.value.high || names.value.length - 1 || 0;
+		const low = paramDef.value.low || 0;
+		const high = paramDef.value.high || names.value.length - 1 || 0;
 		const range = high - low + 1;
 
 		const current = Math.max(low, Math.min(props.value, high));
