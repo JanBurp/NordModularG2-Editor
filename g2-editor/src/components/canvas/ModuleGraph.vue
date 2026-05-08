@@ -14,7 +14,8 @@
 					stroke-opacity="0.45"
 					stroke-width="0.5"
 				/>
-				<path :d="result.d" :transform="result.transform" stroke="#AFA" :fill="pathFill" />
+				<path v-if="result.dFill" :d="result.dFill" stroke="none" :fill="result.fill ?? 'none'" />
+				<path v-if="result.d" :d="result.d" :transform="result.transform" stroke="#AFA" :fill="result.dFill ? 'none' : pathFill" />
 				<text v-if="result.label" :x="result.label.x" :y="result.label.y" fill="#FF0" font-size="9" text-anchor="end">
 					{{ result.label.text }}
 				</text>
