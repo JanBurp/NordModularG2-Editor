@@ -50,6 +50,7 @@ function fvf(x: number, y: number, x2?: number, ns?: GetStrFn): FastVector {
 export type GraphPathResult = {
 	kind: 'path';
 	d: string;
+	dFill?: string;
 	transform?: string;
 	zeroLine?: boolean;
 	label?: { text: string; x: number; y: number };
@@ -663,15 +664,16 @@ function peakResp(hz: number, fc: number, gainDb: number, bwOct: number): number
 	return Math.sqrt(num / Math.max(1e-12, denom));
 }
 
-// Sample a magnitude function across the graph and return an SVG path.
-// db range = ±dbRange. Path is closed at bottom corners so the fill works.
+// Sample a magnitude function across the graph and return both the open
+// curve (for stroke) and a closed version (for fill). Splitting them keeps
+// the stroke off the bottom and side closing edges.
 function sampleResponse(
 	w: number,
 	h: number,
 	mag: (hz: number) => number,
 	dbRange = 24,
 	n = 96,
-): string {
+): { d: string; dFill: string } {
 	const parts: string[] = [];
 	for (let i = 0; i <= n; i++) {
 		const x = (i / n) * w;
@@ -682,8 +684,9 @@ function sampleResponse(
 		const y = h / 2 - (db * (h / 2)) / dbRange;
 		parts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
 	}
-	parts.push(`L${w.toFixed(2)},${h} L0,${h} Z`);
-	return parts.join(' ');
+	const d = parts.join(' ');
+	const dFill = `${d} L${w.toFixed(2)},${h} L0,${h} Z`;
+	return { d, dFill };
 }
 
 const FILTER_FILL = '#066';
@@ -703,10 +706,11 @@ function filterNord(ve: VisualElement, vals: number[]): GraphPathResult {
 	const order = slopeDb / 6;
 	const mag = pickFilterResp(filterType, fc, Q, order);
 	const norm = gc ? gainComp(mag, fc, Q) : 1;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
 	return {
 		kind: 'path',
 		d,
+		dFill,
 		zeroLine: true,
 		label: makeSlopeLabel(String(slopeDb), ve.w!),
 		fill: FILTER_FILL,
@@ -722,8 +726,8 @@ function filterStatic(ve: VisualElement, vals: number[]): GraphPathResult {
 	const order = 2;
 	const mag = pickFilterResp(filterType, fc, Q, order);
 	const norm = gc ? gainComp(mag, fc, Q) : 1;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
 // --- Filter Classic (id 92) — always LP ---
@@ -733,10 +737,11 @@ function filterClassic(ve: VisualElement, vals: number[]): GraphPathResult {
 	const slopeIdx = lv(vals, 4, 0); // 0=12, 1=18, 2=24
 	const slopeDb = [12, 18, 24][Math.max(0, Math.min(2, slopeIdx))];
 	const order = slopeDb / 6;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, Q, order));
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, Q, order));
 	return {
 		kind: 'path',
 		d,
+		dFill,
 		zeroLine: true,
 		label: makeSlopeLabel(String(slopeDb), ve.w!),
 		fill: FILTER_FILL,
@@ -749,10 +754,11 @@ function filterLowpass(ve: VisualElement, vals: number[], modes: number[] | unde
 	const slopeIdx = modes?.[0] ?? 0; // 0..5 → 6/12/18/24/30/36 dB
 	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
 	const order = slopeDb / 6;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, 0.707, order));
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, 0.707, order));
 	return {
 		kind: 'path',
 		d,
+		dFill,
 		zeroLine: true,
 		label: makeSlopeLabel(String(slopeDb), ve.w!),
 		fill: FILTER_FILL,
@@ -765,10 +771,11 @@ function filterHighpass(ve: VisualElement, vals: number[], modes: number[] | und
 	const slopeIdx = modes?.[0] ?? 0;
 	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
 	const order = slopeDb / 6;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => hpResp(hz, fc, 0.707, order));
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => hpResp(hz, fc, 0.707, order));
 	return {
 		kind: 'path',
 		d,
+		dFill,
 		zeroLine: true,
 		label: makeSlopeLabel(String(slopeDb), ve.w!),
 		fill: FILTER_FILL,
@@ -781,8 +788,12 @@ function eq2Band(ve: VisualElement, vals: number[]): GraphPathResult {
 	const hiSlopeDb = eqDbFromVal(lv(vals, 1, 64));
 	const loFc = eqLoFreqToHz(lv(vals, 4, 0));
 	const hiFc = eqHiFreqToHz(lv(vals, 5, 0));
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => loShelfResp(hz, loFc, loSlopeDb) * hiShelfResp(hz, hiFc, hiSlopeDb));
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	const { d, dFill } = sampleResponse(
+		ve.w!,
+		ve.h!,
+		(hz) => loShelfResp(hz, loFc, loSlopeDb) * hiShelfResp(hz, hiFc, hiSlopeDb),
+	);
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
 // --- Eq 3 Band (id 33) ---
@@ -793,7 +804,7 @@ function eq3Band(ve: VisualElement, vals: number[]): GraphPathResult {
 	const hiSlopeDb = eqDbFromVal(lv(vals, 3, 64));
 	const loFc = eqLoFreqToHz(lv(vals, 6, 0));
 	const hiFc = eqHiFreqToHz(lv(vals, 7, 0));
-	const d = sampleResponse(
+	const { d, dFill } = sampleResponse(
 		ve.w!,
 		ve.h!,
 		(hz) =>
@@ -801,7 +812,7 @@ function eq3Band(ve: VisualElement, vals: number[]): GraphPathResult {
 			peakResp(hz, midFc, midGainDb, 1.0) *
 			hiShelfResp(hz, hiFc, hiSlopeDb),
 	);
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
 // --- Eq Peak (id 103) ---
@@ -809,8 +820,8 @@ function eqPeak(ve: VisualElement, vals: number[]): GraphPathResult {
 	const fc = freq3ToHz(lv(vals, 0, 60));
 	const gainDb = eqDbFromVal(lv(vals, 1, 64));
 	const bw = bandwidthOct(lv(vals, 2, 64));
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => peakResp(hz, fc, gainDb, bw));
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => peakResp(hz, fc, gainDb, bw));
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
 // --- Filter Phase (id 102) — multi-notch ---
@@ -819,14 +830,14 @@ function filterPhase(ve: VisualElement, vals: number[]): GraphPathResult {
 	const notchCount = lv(vals, 4, 2) + 1; // 0..5 → 1..6
 	const type = lv(vals, 9, 0); // 0=Notch, 1=Peak, 2=Deep
 	const Q = type === 2 ? 8 : type === 1 ? 4 : 2;
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => {
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => {
 		let m = 1;
 		for (let k = 1; k <= notchCount; k++) {
 			m *= type === 1 ? bpResp(hz, fc * k, Q) * 1.5 + 0.3 : brResp(hz, fc * k, Q);
 		}
 		return Math.min(2, m);
 	});
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
 // --- Filter Comb (id 162) ---
@@ -837,15 +848,15 @@ function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
 	const type = lv(vals, 5, 0); // 0=Notch, 1=Peak, 2=Deep
 	if (type === 0) fb = -Math.abs(fb);
 	else if (type === 2) fb = Math.sign(fb || 1) * Math.min(0.985, Math.abs(fb) * 1.3);
-	const d = sampleResponse(ve.w!, ve.h!, (hz) => {
+	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => {
 		const phase = (2 * Math.PI * hz) / fc;
 		const denom = 1 - 2 * fb * Math.cos(phase) + fb * fb;
 		return 1 / Math.sqrt(Math.max(1e-6, denom));
 	});
-	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
 
-// --- Vocoder (id 108) — 16-band bar graph ---
+// --- Vocoder (id 108) — 16-band bar graph (fill only, no stroke) ---
 function vocoder(ve: VisualElement, vals: number[]): GraphPathResult | null {
 	// Vocoder has two graph elements; only render bars on the main analysis pane.
 	if (ve.h !== 47) return null;
@@ -861,7 +872,7 @@ function vocoder(ve: VisualElement, vals: number[]): GraphPathResult | null {
 		const y0 = h - barH;
 		parts.push(`M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${h} Z`);
 	}
-	return { kind: 'path', d: parts.join(' '), fill: '#AFA' };
+	return { kind: 'path', d: '', dFill: parts.join(' '), fill: '#AFA' };
 }
 
 // Helpers
