@@ -4,7 +4,20 @@
 
 		<svg v-if="result" :x="(ve.x ?? 0) + 0.5" :y="ve.y" :width="ve.w" :height="ve.h">
 			<template v-if="result.kind === 'path'">
-				<path :d="result.d" :transform="result.transform" stroke="#AFA" :fill="ve.type === 'graphenv' ? '#00A4A4' : 'none'" />
+				<line
+					v-if="result.zeroLine"
+					x1="0"
+					:y1="(ve.h ?? 0) / 2"
+					:x2="ve.w ?? 0"
+					:y2="(ve.h ?? 0) / 2"
+					stroke="#AFA"
+					stroke-opacity="0.45"
+					stroke-width="0.5"
+				/>
+				<path :d="result.d" :transform="result.transform" stroke="#AFA" :fill="pathFill" />
+				<text v-if="result.label" :x="result.label.x" :y="result.label.y" fill="#FF0" font-size="9" text-anchor="end">
+					{{ result.label.text }}
+				</text>
 			</template>
 			<template v-else-if="result.kind === 'dx'">
 				<path :d="result.d" stroke="white" fill="none" />
@@ -25,9 +38,17 @@
 		ve: VisualElement;
 		lv?: number[];
 		modes?: number[];
+		moduleId?: number;
 	}>();
 
-	const result = computed(() => getGraph(props.ve, props.lv, props.modes));
+	const result = computed(() => getGraph(props.ve, props.lv, props.modes, props.moduleId));
+
+	const pathFill = computed(() => {
+		const r = result.value;
+		if (!r || r.kind !== 'path') return 'none';
+		if (r.fill) return r.fill;
+		return props.ve.type === 'graphenv' ? '#00A4A4' : 'none';
+	});
 </script>
 <style scoped>
 	.graph {

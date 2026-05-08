@@ -51,6 +51,9 @@ export type GraphPathResult = {
 	kind: 'path';
 	d: string;
 	transform?: string;
+	zeroLine?: boolean;
+	label?: { text: string; x: number; y: number };
+	fill?: string;
 };
 
 export type GraphDxNode = { x: number; y: number; label: number };
@@ -579,13 +582,343 @@ const registry: Record<
 	dxrouterGraph,
 };
 
+// ---------------------------------------------------------------------------
+// Filter graph functions (no `f` field — dispatch by module id)
+// ---------------------------------------------------------------------------
+
+// Frequency-axis range used for all filter graphs (matches FltFreq's range)
+const F_MIN = 13.75;
+const F_MAX = 21100;
+const F_OCT = Math.log2(F_MAX / F_MIN); // ≈ 10.58
+
+// Param value → Hz mappings
+const fltFreqToHz = (v: number) => F_MIN * Math.pow(2, v / 12);
+const freq1ToHz = (v: number) => 8.1758 * Math.pow(2, v / 12);
+const freq2ToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 7.32);
+const freq3ToHz = (v: number) => 20 * Math.pow(2, (v / 127) * 9.64);
+const eqMidFreqToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 6.32);
+const eqLoFreqToHz = (v: number) => [80, 110, 160][Math.max(0, Math.min(2, v))];
+const eqHiFreqToHz = (v: number) => [6000, 8000, 12000][Math.max(0, Math.min(2, v))];
+
+// Param value → other quantities
+const eqDbFromVal = (v: number) => ((v - 63.5) * 36) / 127; // EqdB: 0→-18, 64→0, 127→+18
+const bandwidthOct = (v: number) => 2 - (1.98 * v) / 127; // EqPeakBandwidth
+const res1ToQ = (v: number) => 0.5 * Math.pow(100, v / 127); // Res_1: 0.5..50
+const level100Q = (v: number) => 0.5 + (v / 127) * 9.5; // resonance from Level_100: 0.5..10
+const fbFromBipolar = (v: number) => Math.max(-0.985, Math.min(0.985, (v - 64) / 64));
+
+// Filter response math (magnitude, not in dB)
+function lpResp(hz: number, fc: number, Q: number, order: number): number {
+	const r = hz / fc;
+	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	let mag = 1 / Math.sqrt(Math.max(1e-12, denom));
+	if (order > 2) {
+		mag *= 1 / Math.sqrt(1 + Math.pow(r, 2 * (order - 2)));
+	} else if (order < 2 && order > 0) {
+		mag = 1 / Math.sqrt(1 + Math.pow(r, 2 * order));
+	}
+	return mag;
+}
+
+function hpResp(hz: number, fc: number, Q: number, order: number): number {
+	return lpResp(fc, hz, Q, order);
+}
+
+function bpResp(hz: number, fc: number, Q: number): number {
+	const r = hz / fc;
+	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	return r / Q / Math.sqrt(Math.max(1e-12, denom));
+}
+
+function brResp(hz: number, fc: number, Q: number): number {
+	const r = hz / fc;
+	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	return Math.abs(1 - r * r) / Math.sqrt(Math.max(1e-12, denom));
+}
+
+// Shelving filter (1st-order). gainDb at extreme; flat at the other side; transition near fc.
+function loShelfResp(hz: number, fc: number, gainDb: number): number {
+	const A = Math.pow(10, gainDb / 40);
+	const r = hz / fc;
+	// Smooth crossfade between A^2 (DC) and 1 (high freq)
+	const k = 1 / (1 + r * r);
+	return Math.sqrt(A * A * k + (1 - k));
+}
+
+function hiShelfResp(hz: number, fc: number, gainDb: number): number {
+	const A = Math.pow(10, gainDb / 40);
+	const r = hz / fc;
+	const k = (r * r) / (1 + r * r);
+	return Math.sqrt(A * A * k + (1 - k));
+}
+
+function peakResp(hz: number, fc: number, gainDb: number, bwOct: number): number {
+	const A = Math.pow(10, gainDb / 40);
+	// Bandwidth in octaves → Q
+	const Q = Math.max(0.1, 1 / (2 * Math.sinh((Math.LN2 / 2) * bwOct)));
+	const r = hz / fc;
+	const w = r - 1 / r;
+	const denom = w * w + 1 / (Q * Q);
+	const num = w * w + (A * A) / (Q * Q);
+	return Math.sqrt(num / Math.max(1e-12, denom));
+}
+
+// Sample a magnitude function across the graph and return an SVG path.
+// db range = ±dbRange. Path is closed at bottom corners so the fill works.
+function sampleResponse(
+	w: number,
+	h: number,
+	mag: (hz: number) => number,
+	dbRange = 24,
+	n = 96,
+): string {
+	const parts: string[] = [];
+	for (let i = 0; i <= n; i++) {
+		const x = (i / n) * w;
+		const hz = F_MIN * Math.pow(2, (x / w) * F_OCT);
+		let db = 20 * Math.log10(Math.max(1e-6, mag(hz)));
+		if (db > dbRange) db = dbRange;
+		else if (db < -dbRange) db = -dbRange;
+		const y = h / 2 - (db * (h / 2)) / dbRange;
+		parts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+	}
+	parts.push(`L${w.toFixed(2)},${h} L0,${h} Z`);
+	return parts.join(' ');
+}
+
+const FILTER_FILL = '#066';
+
+function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
+	return { text, x: w - 2, y: 9 };
+}
+
+// --- Filter Nord (id 51) ---
+function filterNord(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = fltFreqToHz(lv(vals, 0, 75));
+	const gc = !!lv(vals, 3, 0);
+	const Q = res1ToQ(lv(vals, 4, 0));
+	const slopeIdx = lv(vals, 5, 0);
+	const filterType = lv(vals, 8, 0);
+	const slopeDb = slopeIdx === 0 ? 12 : 24;
+	const order = slopeDb / 6;
+	const mag = pickFilterResp(filterType, fc, Q, order);
+	const norm = gc ? gainComp(mag, fc, Q) : 1;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
+	return {
+		kind: 'path',
+		d,
+		zeroLine: true,
+		label: makeSlopeLabel(String(slopeDb), ve.w!),
+		fill: FILTER_FILL,
+	};
+}
+
+// --- Filter Static (id 54) ---
+function filterStatic(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = fltFreqToHz(lv(vals, 0, 75));
+	const Q = res1ToQ(lv(vals, 1, 0));
+	const filterType = lv(vals, 2, 0);
+	const gc = !!lv(vals, 4, 0);
+	const order = 2;
+	const mag = pickFilterResp(filterType, fc, Q, order);
+	const norm = gc ? gainComp(mag, fc, Q) : 1;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Filter Classic (id 92) — always LP ---
+function filterClassic(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = fltFreqToHz(lv(vals, 0, 75));
+	const Q = level100Q(lv(vals, 3, 0));
+	const slopeIdx = lv(vals, 4, 0); // 0=12, 1=18, 2=24
+	const slopeDb = [12, 18, 24][Math.max(0, Math.min(2, slopeIdx))];
+	const order = slopeDb / 6;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, Q, order));
+	return {
+		kind: 'path',
+		d,
+		zeroLine: true,
+		label: makeSlopeLabel(String(slopeDb), ve.w!),
+		fill: FILTER_FILL,
+	};
+}
+
+// --- Filter Lowpass (id 87) — always LP, slope from mode ---
+function filterLowpass(ve: VisualElement, vals: number[], modes: number[] | undefined): GraphPathResult {
+	const fc = fltFreqToHz(lv(vals, 0, 75));
+	const slopeIdx = modes?.[0] ?? 0; // 0..5 → 6/12/18/24/30/36 dB
+	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
+	const order = slopeDb / 6;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, 0.707, order));
+	return {
+		kind: 'path',
+		d,
+		zeroLine: true,
+		label: makeSlopeLabel(String(slopeDb), ve.w!),
+		fill: FILTER_FILL,
+	};
+}
+
+// --- Filter Highpass (id 134) — always HP, slope from mode ---
+function filterHighpass(ve: VisualElement, vals: number[], modes: number[] | undefined): GraphPathResult {
+	const fc = fltFreqToHz(lv(vals, 0, 75));
+	const slopeIdx = modes?.[0] ?? 0;
+	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
+	const order = slopeDb / 6;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => hpResp(hz, fc, 0.707, order));
+	return {
+		kind: 'path',
+		d,
+		zeroLine: true,
+		label: makeSlopeLabel(String(slopeDb), ve.w!),
+		fill: FILTER_FILL,
+	};
+}
+
+// --- Eq 2 Band (id 32) ---
+function eq2Band(ve: VisualElement, vals: number[]): GraphPathResult {
+	const loSlopeDb = eqDbFromVal(lv(vals, 0, 64));
+	const hiSlopeDb = eqDbFromVal(lv(vals, 1, 64));
+	const loFc = eqLoFreqToHz(lv(vals, 4, 0));
+	const hiFc = eqHiFreqToHz(lv(vals, 5, 0));
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => loShelfResp(hz, loFc, loSlopeDb) * hiShelfResp(hz, hiFc, hiSlopeDb));
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Eq 3 Band (id 33) ---
+function eq3Band(ve: VisualElement, vals: number[]): GraphPathResult {
+	const loSlopeDb = eqDbFromVal(lv(vals, 0, 64));
+	const midGainDb = eqDbFromVal(lv(vals, 1, 64));
+	const midFc = eqMidFreqToHz(lv(vals, 2, 93));
+	const hiSlopeDb = eqDbFromVal(lv(vals, 3, 64));
+	const loFc = eqLoFreqToHz(lv(vals, 6, 0));
+	const hiFc = eqHiFreqToHz(lv(vals, 7, 0));
+	const d = sampleResponse(
+		ve.w!,
+		ve.h!,
+		(hz) =>
+			loShelfResp(hz, loFc, loSlopeDb) *
+			peakResp(hz, midFc, midGainDb, 1.0) *
+			hiShelfResp(hz, hiFc, hiSlopeDb),
+	);
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Eq Peak (id 103) ---
+function eqPeak(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = freq3ToHz(lv(vals, 0, 60));
+	const gainDb = eqDbFromVal(lv(vals, 1, 64));
+	const bw = bandwidthOct(lv(vals, 2, 64));
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => peakResp(hz, fc, gainDb, bw));
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Filter Phase (id 102) — multi-notch ---
+function filterPhase(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = freq2ToHz(lv(vals, 1, 64));
+	const notchCount = lv(vals, 4, 2) + 1; // 0..5 → 1..6
+	const type = lv(vals, 9, 0); // 0=Notch, 1=Peak, 2=Deep
+	const Q = type === 2 ? 8 : type === 1 ? 4 : 2;
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => {
+		let m = 1;
+		for (let k = 1; k <= notchCount; k++) {
+			m *= type === 1 ? bpResp(hz, fc * k, Q) * 1.5 + 0.3 : brResp(hz, fc * k, Q);
+		}
+		return Math.min(2, m);
+	});
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Filter Comb (id 162) ---
+function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
+	const fc = freq1ToHz(lv(vals, 0, 64));
+	const fbVal = lv(vals, 3, 0);
+	let fb = fbFromBipolar(fbVal);
+	const type = lv(vals, 5, 0); // 0=Notch, 1=Peak, 2=Deep
+	if (type === 0) fb = -Math.abs(fb);
+	else if (type === 2) fb = Math.sign(fb || 1) * Math.min(0.985, Math.abs(fb) * 1.3);
+	const d = sampleResponse(ve.w!, ve.h!, (hz) => {
+		const phase = (2 * Math.PI * hz) / fc;
+		const denom = 1 - 2 * fb * Math.cos(phase) + fb * fb;
+		return 1 / Math.sqrt(Math.max(1e-6, denom));
+	});
+	return { kind: 'path', d, zeroLine: true, fill: FILTER_FILL };
+}
+
+// --- Vocoder (id 108) — 16-band bar graph ---
+function vocoder(ve: VisualElement, vals: number[]): GraphPathResult | null {
+	// Vocoder has two graph elements; only render bars on the main analysis pane.
+	if (ve.h !== 47) return null;
+	const w = ve.w!;
+	const h = ve.h!;
+	const barW = w / 16;
+	const parts: string[] = [];
+	for (let i = 0; i < 16; i++) {
+		const v = lv(vals, i, 0);
+		const barH = (v / 16) * (h - 2);
+		const x0 = i * barW + 1;
+		const x1 = (i + 1) * barW - 1;
+		const y0 = h - barH;
+		parts.push(`M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${h} Z`);
+	}
+	return { kind: 'path', d: parts.join(' '), fill: '#AFA' };
+}
+
+// Helpers
+function pickFilterResp(filterType: number, fc: number, Q: number, order: number): (hz: number) => number {
+	switch (filterType) {
+		case 0:
+			return (hz) => lpResp(hz, fc, Q, order);
+		case 1:
+			return (hz) => bpResp(hz, fc, Q);
+		case 2:
+			return (hz) => hpResp(hz, fc, Q, order);
+		case 3:
+			return (hz) => brResp(hz, fc, Q);
+		default:
+			return (hz) => lpResp(hz, fc, Q, order);
+	}
+}
+
+// Approximate gain compensation: attenuate so resonant peak doesn't exceed +6 dB.
+function gainComp(mag: (hz: number) => number, fc: number, Q: number): number {
+	if (Q <= 1) return 1;
+	const peakMag = mag(fc);
+	if (peakMag <= 2) return 1;
+	return 2 / peakMag;
+}
+
+const moduleIdRegistry: Record<
+	number,
+	(ve: VisualElement, vals: number[], modes: number[] | undefined) => GraphResult | null
+> = {
+	51: filterNord,
+	54: filterStatic,
+	92: filterClassic,
+	87: filterLowpass,
+	134: filterHighpass,
+	32: eq2Band,
+	33: eq3Band,
+	103: eqPeak,
+	102: filterPhase,
+	162: filterComb,
+	108: vocoder,
+};
+
 export function getGraph(
 	ve: VisualElement,
 	lvVals: number[] | undefined,
 	modes: number[] | undefined,
+	moduleId?: number,
 ): GraphResult | null {
-	if (!ve.f) return null;
-	const fn = registry[ve.f];
-	if (!fn) return null;
-	return fn(ve, lvVals ?? [], modes);
+	if (ve.f) {
+		const fn = registry[ve.f];
+		if (!fn) return null;
+		return fn(ve, lvVals ?? [], modes);
+	}
+	if (moduleId !== undefined) {
+		const fn = moduleIdRegistry[moduleId];
+		if (fn) return fn(ve, lvVals ?? [], modes);
+	}
+	return null;
 }
