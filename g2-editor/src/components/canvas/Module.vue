@@ -1,7 +1,6 @@
 <template>
 	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
-
 		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
@@ -30,9 +29,7 @@
 			<ModuleMode
 				v-for="(mode, index) in moduleDef.modes"
 				:key="mode.name"
-				:x="mode.x"
-				:y="mode.y"
-				:param-type="mode.type"
+				:mode="mode"
 				:value="getModeValue(index)"
 				:param-index="index"
 				@change="onModeChange"
@@ -42,19 +39,10 @@
 		<!-- Parameters -->
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
-				<!-- Knobs -->
 				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-
-				<!-- Sliders -->
 				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-
-				<!-- Switches -->
 				<ModuleSwitch v-else-if="isSwitch(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-
-				<!-- Spinners (KnobSpin) -->
 				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-
-				<!-- Spinners horizontal (KnobSpinH) -->
 				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 			</template>
 		</g>

@@ -21,13 +21,12 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
+	import type { ModuleMode } from '../../types';
 	import type { ParamDefinition } from '../../types';
 
 	const props = defineProps<{
-		x?: number;
-		y?: number;
+		mode: ModuleMode;
 		paramIndex: number;
-		paramType: string;
 		value: number;
 	}>();
 
@@ -36,11 +35,11 @@
 	}>();
 
 	const paramDef = computed<ParamDefinition>(() => {
-		return getParam(props.paramType) || ({} as ParamDefinition);
+		return getParam(props.mode.type) || ({} as ParamDefinition);
 	});
 
-	const x = computed(() => props.x ?? 0);
-	const y = computed(() => props.y ?? 0);
+	const x = computed(() => props.mode.x ?? 0);
+	const y = computed(() => props.mode.y ?? 0);
 	const width = computed(() => paramDef.value.width || 18);
 	const height = computed(() => paramDef.value.height || 21);
 
