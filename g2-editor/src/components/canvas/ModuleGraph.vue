@@ -2,7 +2,7 @@
 	<g class="graph">
 		<rect :x="ve.x" :y="ve.y" :width="ve.w" :height="ve.h" :fill="ve.type === 'graphenv' ? colors.bgEnv : colors.bg" />
 
-		<svg v-if="result" :x="(ve.x ?? 0) + 0.5" :y="ve.y" :width="ve.w" :height="ve.h">
+		<svg v-if="result" :x="(ve.x ?? 0) + 0.5" :y="ve.y" :width="ve.w" :height="ve.h" overflow="hidden" style="overflow: hidden">
 			<template v-if="result.kind === 'path'">
 				<line
 					v-if="result.zeroLine"
@@ -15,7 +15,7 @@
 					stroke-width="0.5"
 				/>
 				<path v-if="result.dFill" :d="result.dFill" stroke="none" :fill="result.fill ?? 'none'" />
-				<path v-if="result.d" :d="result.d" :transform="result.transform" :stroke="colors.curveStroke" :fill="result.dFill ? 'none' : pathFill" />
+				<path v-if="result.d" :d="result.d" :transform="result.transform" :stroke="colors.curveStroke" :fill="strokePathFill" />
 				<text v-if="result.label" :x="result.label.x" :y="result.label.y" :fill="colors.label" font-size="9" text-anchor="end">
 					{{ result.label.text }}
 				</text>
@@ -46,10 +46,11 @@
 
 	const result = computed(() => getGraph(props.ve, props.lv, props.modes, props.moduleId));
 
-	const pathFill = computed(() => {
+	const strokePathFill = computed(() => {
 		const r = result.value;
 		if (!r || r.kind !== 'path') return 'none';
-		if (r.fill) return r.fill;
+		if (r.dFill) return 'none';
+		if (r.fill !== undefined) return r.fill;
 		return props.ve.type === 'graphenv' ? colors.envFill : 'none';
 	});
 </script>
