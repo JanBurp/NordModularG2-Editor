@@ -684,8 +684,9 @@ function peakResp(hz: number, fc: number, gainDb: number, bwOct: number): number
 }
 
 // Sample a magnitude function across the graph and return both the open
-// curve (for stroke) and a closed version (for fill). Splitting them keeps
-// the stroke off the bottom and side closing edges.
+// curve (for stroke) and a closed version (for fill). The stroke path
+// breaks across regions where the magnitude falls below -dbRange so the
+// flat clamped tail at the bottom isn't drawn as a horizontal line.
 function sampleResponse(
 	w: number,
 	h: number,
@@ -693,19 +694,27 @@ function sampleResponse(
 	dbRange = 24,
 	n = 96,
 ): { d: string; dFill: string } {
-	const parts: string[] = [];
+	const fillParts: string[] = [];
+	const strokeParts: string[] = [];
+	let inRange = false;
 	for (let i = 0; i <= n; i++) {
 		const x = (i / n) * w;
 		const hz = F_MIN * Math.pow(2, (x / w) * F_OCT);
 		let db = 20 * Math.log10(Math.max(1e-6, mag(hz)));
+		const clampedLow = db <= -dbRange;
 		if (db > dbRange) db = dbRange;
 		else if (db < -dbRange) db = -dbRange;
 		const y = h / 2 - (db * (h / 2)) / dbRange;
-		parts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+		fillParts.push(`${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`);
+		if (!clampedLow) {
+			strokeParts.push(`${inRange ? 'L' : 'M'}${x.toFixed(2)},${y.toFixed(2)}`);
+			inRange = true;
+		} else {
+			inRange = false;
+		}
 	}
-	const d = parts.join(' ');
-	const dFill = `${d} L${w.toFixed(2)},${h} L0,${h} Z`;
-	return { d, dFill };
+	const dFill = `${fillParts.join(' ')} L${w.toFixed(2)},${h} L0,${h} Z`;
+	return { d: strokeParts.join(' '), dFill };
 }
 
 const FILTER_FILL = GRAPH_COLORS.filterFill;
