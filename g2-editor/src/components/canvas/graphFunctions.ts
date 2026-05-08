@@ -6,6 +6,25 @@
 import type { VisualElement } from '../../types';
 
 // ---------------------------------------------------------------------------
+// Visual constants — adjust here to retheme the module graphs
+// ---------------------------------------------------------------------------
+
+export const GRAPH_COLORS = {
+	bgEnv: '#00A4A4',          // background rect for graphenv (envelopes, filters, dx)
+	bg: '#088',                // background rect for graph (LFO/OSC waveforms)
+	curveStroke: '#AFA',       // waveform / envelope / filter curve stroke
+	envFill: '#00A4A4',        // envelope path fill (matches bgEnv → invisible)
+	filterFill: '#066',        // area below filter response curve
+	vocoderBar: '#AFA',        // vocoder band bars
+	zeroLine: '#AFA',          // 0 dB reference line in filter graphs
+	zeroLineOpacity: 0.45,     // ditto, opacity
+	label: '#FF0',             // slope value label (yellow text)
+	dxLine: 'white',           // dxrouter connection lines
+	dxNodeBg: 'white',         // dxrouter node rect
+	dxNodeText: '#088',        // dxrouter node number
+} as const;
+
+// ---------------------------------------------------------------------------
 // FastVector (patchviewer:806) and helpers
 // ---------------------------------------------------------------------------
 
@@ -689,7 +708,7 @@ function sampleResponse(
 	return { d, dFill };
 }
 
-const FILTER_FILL = '#066';
+const FILTER_FILL = GRAPH_COLORS.filterFill;
 
 function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
 	return { text, x: w - 2, y: 9 };
@@ -872,7 +891,7 @@ function vocoder(ve: VisualElement, vals: number[]): GraphPathResult | null {
 		const y0 = h - barH;
 		parts.push(`M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${h} Z`);
 	}
-	return { kind: 'path', d: '', dFill: parts.join(' '), fill: '#AFA' };
+	return { kind: 'path', d: '', dFill: parts.join(' '), fill: GRAPH_COLORS.vocoderBar };
 }
 
 // Helpers
