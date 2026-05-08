@@ -34,6 +34,7 @@ export interface ModuleParam {
 	n: string;
 	x: number;
 	y: number;
+	w?: number;
 }
 
 export interface ModuleMode {
