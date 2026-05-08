@@ -3,12 +3,19 @@
 		<!-- Define clip path to keep graph within bounds -->
 		<defs>
 			<clipPath :id="clipId">
-				<rect :x="x" :y="y" :width="w" :height="h" />
+				<rect :x="ve.x" :y="ve.y" :width="ve.w" :height="ve.h" />
 			</clipPath>
 		</defs>
 
 		<!-- Background rectangle -->
-		<rect :x="x" :y="y" :width="w" :height="h" :fill="type === 'graphenv' ? '#00A4A4' : '#088'" :stroke="type === 'graphenv' ? 'none' : undefined" />
+		<rect
+			:x="ve.x"
+			:y="ve.y"
+			:width="ve.w"
+			:height="ve.h"
+			:fill="ve.type === 'graphenv' ? '#00A4A4' : '#088'"
+			:stroke="ve.type === 'graphenv' ? 'none' : undefined"
+		/>
 
 		<!-- Graph path with clipping -->
 		<path :d="graphPath" stroke="#AFA" :fill="shouldFill ? '#00A4A4' : 'none'" :clip-path="`url(#${clipId})`" stroke-width="1.5" />
@@ -16,21 +23,17 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import type { VisualElement } from '../../types';
 	import { getModule } from '../../renderer/nmg2mods';
 
 	const props = defineProps<{
-		type: 'graph' | 'graphenv';
-		x: number;
-		y: number;
-		w: number;
-		h: number;
-		f?: string;
-		lv?: number[]; // Parameter values array
-		moduleId?: number; // Module type ID for looking up parameter definitions
+		ve: VisualElement;
+		lv?: number[];
+		moduleId?: number;
 	}>();
 
 	// Generate a unique clip path ID based on position
-	const clipId = computed(() => `graph-clip-${props.x}-${props.y}`);
+	const clipId = computed(() => `graph-clip-${props.ve.x}-${props.ve.y}`);
 
 	// Helper to get parameter value with default
 	const getVal = (index: number, defaultVal: number = 64): number => {
@@ -45,11 +48,11 @@
 
 	// Determine graph shape based on function type
 	const graphPath = computed(() => {
-		const { x, y, w, h, f } = props;
+		const { x, y, w, h, f } = props.ve;
 
 		// Filter & EQ graphs (graphs without 'f' property but with filter-related parameters)
 		// Look up module definition to get correct parameter indices
-		if (!f && props.type === 'graph' && props.moduleId !== undefined) {
+		if (!f && props.ve.type === 'graph' && props.moduleId !== undefined) {
 			const modDef = getModule(props.moduleId) || null;
 
 			if (modDef?.params) {
@@ -306,7 +309,7 @@
 		}
 
 		// Default based on type
-		if (props.type === 'graph') {
+		if (props.ve.type === 'graph') {
 			return `M${x},${y + h / 2} L${x + w},${y + h / 2}`;
 		}
 
@@ -316,7 +319,7 @@
 
 	// Determine if we should fill the graph
 	const shouldFill = computed(() => {
-		return props.type === 'graphenv' || props.f?.includes('env') || props.f?.includes('Env');
+		return props.ve.type === 'graphenv' || props.ve.f?.includes('env') || props.ve.f?.includes('Env');
 	});
 </script>
 <style scoped>
