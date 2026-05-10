@@ -7,6 +7,18 @@
 
 import { getModule } from '../renderer/nmg2mods';
 
+export interface ParamLabel {
+	paramIndex: number;
+	isString: boolean;
+	paramLen: number;
+	labels: string[];
+}
+
+export interface ModuleParamLabels {
+	moduleIndex: number;
+	entries: ParamLabel[];
+}
+
 export interface ModuleInstance {
 	index: number;
 	type: number;
@@ -37,6 +49,7 @@ export interface Area {
 	modules: ModuleInstance[];
 	cableList: Cable[];
 	paramaterDataOfs: number;
+	paramLabels?: ModuleParamLabels[];
 	nummod?: number;
 	numcab?: number;
 	[key: string]: unknown;
@@ -72,6 +85,7 @@ function pch2_(data: ArrayBuffer) {
 		name: string;
 		modules: ModuleInstance[] = [];
 		paramaterDataOfs = 0;
+		paramLabels?: ModuleParamLabels[];
 		nummod?: number;
 		numcab?: number;
 
@@ -176,6 +190,47 @@ function pch2_(data: ArrayBuffer) {
 			if (charcode) ofs--;
 			setModuleName(areaIdx, index, str);
 		}
+		return 'Area=' + areaIdx + ':Count=' + nummod;
+	}
+
+	function parseParamNames(data: Uint8Array) {
+		const areaIdx = getBits(2, data);
+		const nummod = getBits(8);
+		if (areaIdx > 1) return 'Area=' + areaIdx;
+		const moduleLabels: ModuleParamLabels[] = [];
+		for (let i = 0; i < nummod; i++) {
+			const modIdx = getBits(8);
+			const moduleLen = getBits(8);
+			const entries: ParamLabel[] = [];
+			let bytesRemaining = moduleLen;
+			while (bytesRemaining > 0) {
+				const isString = getBits(8);
+				const paramLen = getBits(8);
+				const paramIndex = getBits(8);
+				bytesRemaining -= 3;
+				const entry: ParamLabel = {
+					paramIndex,
+					isString: isString === 1,
+					paramLen,
+					labels: [],
+				};
+				if (paramLen - 1 > 0) {
+					const labelCount = Math.floor((paramLen - 1) / 7);
+					for (let j = 0; j < labelCount; j++) {
+						let str = '';
+						for (let k = 0; k < 7; k++) {
+							const c = getBits(8);
+							if (c) str += String.fromCharCode(c);
+						}
+						entry.labels.push(str);
+						bytesRemaining -= 7;
+					}
+				}
+				entries.push(entry);
+			}
+			if (entries.length > 0) moduleLabels.push({ moduleIndex: modIdx, entries });
+		}
+		if (moduleLabels.length > 0) areas[aof + areaIdx].paramLabels = moduleLabels;
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
 
@@ -349,6 +404,7 @@ function pch2_(data: ArrayBuffer) {
 		0x11: ['Perf data', parsePrfData],
 		0x52: ['Cable List', parseCableList],
 		0x4d: ['Parameters', parseModuleParameters],
+		0x5b: ['Param Names', parseParamNames],
 	};
 
 	const hdr = new Uint8Array(data, 0, 320);
