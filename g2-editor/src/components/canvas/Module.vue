@@ -18,7 +18,13 @@
 			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
 			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
 			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
-			<ModuleGraph v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h" :ve="ve" :lv="localLv" :modes="instance.modes" :module-id="instance.type" />
+			<ModuleGraph
+				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
+				:ve="ve"
+				:lv="localLv"
+				:modes="instance.modes"
+				:module-id="instance.type"
+			/>
 			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
@@ -41,7 +47,14 @@
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
 				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-				<ModuleSwitch v-else-if="isSwitch(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleSwitch
+					v-else-if="isSwitch(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:label="getParamLabel(index)"
+					:param-index="index"
+					@change="onParamChange"
+				/>
 				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 			</template>
@@ -103,7 +116,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -134,7 +147,7 @@
 		});
 	}
 
-	const instance = computed(() => props.instance || { type: -1, colour: 0 });
+	const instance = computed(() => props.instance as ModuleInstance);
 	const moduleIdx = computed(() => instance.value.index || 0);
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
@@ -185,6 +198,13 @@
 			return p?.def ?? 64;
 		}
 		return 64;
+	}
+
+	function getParamLabel(index: number): ParamLabel | undefined {
+		if (typeof instance.value.paramLabels === 'undefined' || instance.value.paramLabels?.length === 0) return undefined;
+		const idx = instance.value.paramLabels.findIndex((label) => label.paramIndex === index);
+		if (idx < 0) return undefined;
+		return instance.value.paramLabels[idx];
 	}
 
 	// Handle parameter change from controls
