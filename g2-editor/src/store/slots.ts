@@ -1,4 +1,4 @@
-import type { ModuleInstance, Patch } from '../parser/nmg2PatchParser';
+import type { ModuleInstance, Patch } from '@/types';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { SlotLabel } from '@/types';

@@ -6,76 +6,10 @@
  */
 
 import { getModule } from '../renderer/nmg2mods';
+import type { ModuleInstance, ParamLabel } from '../types/module';
+import type { Area, Cable, Patch, PatchDescription } from '../types/patch';
 
-export interface ParamLabel {
-	paramIndex: number;
-	isString: boolean;
-	paramLen: number;
-	labels: string[];
-}
-
-export interface ModuleParamLabels {
-	moduleIndex: number;
-	entries: ParamLabel[];
-}
-
-export interface ModuleInstance {
-	index: number;
-	type: number;
-	horiz: number;
-	vert: number;
-	colour: number;
-	uprate: number;
-	leds: number;
-	pcnt: number;
-	lv: number[];
-	modes: number[];
-	uname?: string;
-	[key: string]: unknown;
-}
-
-export interface Cable {
-	colour: number;
-	smod: number;
-	scon: number;
-	dir: number;
-	dmod: number;
-	dcon: number;
-	[key: string]: unknown;
-}
-
-export interface Area {
-	name: string;
-	modules: ModuleInstance[];
-	cableList: Cable[];
-	paramaterDataOfs: number;
-	paramLabels?: ModuleParamLabels[];
-	nummod?: number;
-	numcab?: number;
-	[key: string]: unknown;
-}
-
-export interface PatchDescription {
-	voices: number;
-	height: number;
-	unk2: number;
-	red: number;
-	blue: number;
-	yellow: number;
-	orange: number;
-	green: number;
-	purple: number;
-	white: number;
-	monopoly: number;
-	variation: number;
-	category: number;
-}
-
-export interface Patch {
-	areas: [Area, Area];
-	description?: PatchDescription;
-	mode?: { area: 0 | 1; variation: number };
-}
+export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription };
 
 function pch2_(data: ArrayBuffer) {
 	const slots: string[] = [];
@@ -85,7 +19,6 @@ function pch2_(data: ArrayBuffer) {
 		name: string;
 		modules: ModuleInstance[] = [];
 		paramaterDataOfs = 0;
-		paramLabels?: ModuleParamLabels[];
 		nummod?: number;
 		numcab?: number;
 
@@ -197,7 +130,6 @@ function pch2_(data: ArrayBuffer) {
 		const areaIdx = getBits(2, data);
 		const nummod = getBits(8);
 		if (areaIdx > 1) return 'Area=' + areaIdx;
-		const moduleLabels: ModuleParamLabels[] = [];
 		for (let i = 0; i < nummod; i++) {
 			const modIdx = getBits(8);
 			const moduleLen = getBits(8);
@@ -228,9 +160,11 @@ function pch2_(data: ArrayBuffer) {
 				}
 				entries.push(entry);
 			}
-			if (entries.length > 0) moduleLabels.push({ moduleIndex: modIdx, entries });
+			if (entries.length > 0) {
+				const m = findModule(aof + areaIdx, modIdx);
+				if (m) m.paramLabels = entries;
+			}
 		}
-		if (moduleLabels.length > 0) areas[aof + areaIdx].paramLabels = moduleLabels;
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
 
