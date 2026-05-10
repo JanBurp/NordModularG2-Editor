@@ -77,13 +77,13 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
-	import type { ModuleParam } from '../../types';
-	import type { ParamDefinition } from '../../types';
+	import type { ModuleParam, ParamDefinition, ParamLabel } from '../../types';
 
 	const props = defineProps<{
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
+		label?: ParamLabel;
 	}>();
 
 	const emit = defineEmits<{
@@ -116,8 +116,16 @@
 	});
 
 	const displayNames = computed(() => {
-		// TODO: Ch# -> set names??
-		if (names.value.length === 1 && names.value[0] === 'Ch#') {
+		if (props.label) return props.label.labels;
+		if (names.value[0] === 'Ch#' && [props.param.name][0]) {
+			const name = [props.param.name][0];
+			const last = name.substring(name.length - 1);
+			// @ts-ignore
+			if (!isNaN(last)) {
+				return ['Ch ' + last];
+			}
+		}
+		if (names.value.length === 1) {
 			return [props.param.name];
 		}
 		if (names.value && names.value.length > 0) {
