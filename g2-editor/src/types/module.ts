@@ -17,15 +17,27 @@ export interface VisualElement {
 	[key: string]: unknown;
 }
 
+export interface ParamLabel {
+	paramIndex: number;
+	isString: boolean;
+	paramLen: number;
+	labels: string[];
+}
+
 export interface ModuleInstance {
+	index: number;
 	type: number;
-	index?: number;
-	horiz?: number;
-	vert?: number;
-	colour?: number;
-	uname?: string | null;
-	lv?: number[];
-	modes?: number[];
+	horiz: number;
+	vert: number;
+	colour: number;
+	uprate: number;
+	leds: number;
+	pcnt: number;
+	lv: number[];
+	modes: number[];
+	uname?: string;
+	paramLabels?: ParamLabel[];
+	[key: string]: unknown;
 }
 
 export interface ModuleParam {
