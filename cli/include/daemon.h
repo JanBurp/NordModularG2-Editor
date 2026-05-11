@@ -1,6 +1,4 @@
-#ifndef __G2_DAEMON_H__
-#define __G2_DAEMON_H__
-
+#pragma once
 #include "output.h"
 #include "cJSON.h"
 
@@ -12,5 +10,3 @@ char  *daemon_dequeue(void);
 cJSON *daemon_parse_request(const char *line);
 cJSON *daemon_make_ok(cJSON *id);
 cJSON *daemon_make_error(cJSON *id, int code);
-
-#endif /* __G2_DAEMON_H__ */
