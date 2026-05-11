@@ -10,17 +10,17 @@ import type { VisualElement } from '../../types';
 // ---------------------------------------------------------------------------
 
 export const GRAPH_COLORS = {
-	bgEnv: '#00A4A4',          // background rect for graphenv (envelopes, filters, dx)
+	bgEnv: '#088',	           // background rect for graphenv (envelopes, filters, dx)
 	bg: '#088',                // background rect for graph (LFO/OSC waveforms)
 	curveStroke: '#AFA',       // waveform / envelope / filter curve stroke
-	envFill: '#00A4A4',        // envelope path fill (matches bgEnv → invisible)
+	envFill: '#066',        // envelope path fill (matches bgEnv → invisible)
 	filterFill: '#066',        // area below filter response curve
 	vocoderBar: '#AFA',        // vocoder band bars
 	zeroLine: '#AFA',          // 0 dB reference line in filter graphs
-	zeroLineOpacity: 0.45,     // ditto, opacity
+	zeroLineOpacity: 0.65,     // ditto, opacity
 	label: '#FF0',             // slope value label (yellow text)
-	dxLine: 'white',           // dxrouter connection lines
-	dxNodeBg: 'white',         // dxrouter node rect
+	dxLine: '#AFA',           // dxrouter connection lines
+	dxNodeBg: '#FF0',         // dxrouter node rect
 	dxNodeText: '#088',        // dxrouter node number
 } as const;
 
@@ -107,7 +107,7 @@ const lfoXf = [
 function lfoBgraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	const dp: FastVector[][] = [
 		[fvf(0, 0), fvf(0.14, -0.2), fvf(0.3, -0.5), fvf(0.5, -0.5), fvf(0.7, -0.5), fvf(0.86, -0.2),
-			fvf(1, 0), fvf(1.14, 0.2), fvf(1.3, 0.5), fvf(1.5, 0.5), fvf(1.7, 0.5), fvf(1.86, 0.2), fvf(2, 0)],
+		fvf(1, 0), fvf(1.14, 0.2), fvf(1.3, 0.5), fvf(1.5, 0.5), fvf(1.7, 0.5), fvf(1.86, 0.2), fvf(2, 0)],
 		[fvf(0, 0), fvf(0.5, -0.5), fvf(1.5, 0.5), fvf(2, 0)],
 		[fvf(0, 0.5), fvf(0, -0.5), fvf(2, 0.5)],
 		[fvf(0, 0.5), fvf(0, -0.5), fvf(1, -0.5), fvf(1, 0.5), fvf(2, 0.5)],
