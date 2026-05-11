@@ -173,6 +173,20 @@
 	let snapJack: SnapJack | null = null;
 	let snapHighlight: SVGCircleElement | null = null;
 
+	// --- Jack click cable cycle ---
+	let cycleJack: JackInfo | null = null;
+	let cycleIndex = -1;
+	let cycleAllCableKeys: string[] = [];
+
+	function clearCycleAllSelected() {
+		if (!svgRef?.value || cycleAllCableKeys.length === 0) return;
+		const svg = svgRef.value as SVGElement;
+		for (const key of cycleAllCableKeys) {
+			svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('selected'));
+		}
+		cycleAllCableKeys = [];
+	}
+
 	function revealConnectedCables(info: JackInfo) {
 		if (!svgRef?.value) return;
 		const svg = svgRef.value as SVGElement;
@@ -193,18 +207,19 @@
 		});
 	}
 
-	function findCableForJack(info: JackInfo): Cable | null {
+	function findAllCablesForJack(info: JackInfo): Cable[] {
+		const result: Cable[] = [];
 		for (const cable of props.cables as Cable[]) {
 			const smod = cable.smod ?? cable.sourceModule;
 			const scon = cable.scon ?? cable.sourceJack;
 			const dmod = cable.dmod ?? cable.destModule;
 			const dcon = cable.dcon ?? cable.destJack;
 			const dir = cable.dir ?? 1;
-			if (info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) return cable;
-			if (info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) return cable;
-			if (info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex) return cable;
+			if (info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) result.push(cable);
+			if (info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) result.push(cable);
+			if (info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex) result.push(cable);
 		}
-		return null;
+		return result;
 	}
 
 	function findSnapJack(mousePos: { x: number; y: number }): SnapJack | null {
@@ -358,10 +373,48 @@
 
 	function handleJackDragEnd(info: JackInfo) {
 		if (!hasDragged) {
-			// Click: select connected cable, don't create a new one
-			const cable = findCableForJack(info);
+			const cables = findAllCablesForJack(info);
 			clearDragPreview();
-			if (cable) emit('cableClick', cable);
+
+			if (cables.length === 0) {
+				clearCycleAllSelected();
+				cycleJack = null;
+				cycleIndex = -1;
+				return;
+			}
+
+			const sameJack =
+				cycleJack?.moduleIndex === info.moduleIndex &&
+				cycleJack?.connectorIndex === info.connectorIndex &&
+				cycleJack?.type === info.type;
+
+			clearCycleAllSelected();
+
+			if (!sameJack) {
+				cycleJack = info;
+				cycleIndex = 0;
+			} else {
+				cycleIndex++;
+			}
+
+			if (cycleIndex < cables.length) {
+				emit('cableClick', cables[cycleIndex]);
+			} else if (cycleIndex === cables.length) {
+				// All cables for this jack selected simultaneously
+				uiStore.selectedCable = null;
+				if (svgRef?.value) {
+					const svg = svgRef.value as SVGElement;
+					for (const cable of cables) {
+						const key = makeCableKey(cable);
+						svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
+						cycleAllCableKeys.push(key);
+					}
+				}
+			} else {
+				// Deselect all
+				uiStore.selectedCable = null;
+				cycleIndex = -1;
+			}
 		} else {
 			clearDragPreview();
 			emit('jackDragEnd', info);

@@ -135,7 +135,6 @@
 	});
 
 	const itemsPerRow = computed(() => {
-		if (width.value === 18) return 1;
 		return Math.ceil(names.value.length / rows.value);
 	});
 
