@@ -40,7 +40,7 @@ export interface ModuleDef {
 
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
-	selectedCable?: Cable | null;
+	selectedCables?: Cable[];
 }
 
 export function makeCableKey(cable: Cable): string {
@@ -93,7 +93,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
-		const isSelected = options?.selectedCable ? isSameCable(cable, options.selectedCable) : false;
+		const isSelected = options?.selectedCables?.some((c) => isSameCable(cable, c)) ?? false;
 		const key = makeCableKey(cable);
 
 		// All three paths share the same data-cable-key so they can be queried/removed together.

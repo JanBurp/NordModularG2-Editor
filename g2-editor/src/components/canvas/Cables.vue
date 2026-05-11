@@ -6,8 +6,7 @@
 	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility } from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
-	import { svgPath, svgLine, svgCircle } from '../../renderer/svgUtils';
-	import { JACK_COLORS } from '../../constants';
+	import { svgPath, svgCircle } from '../../renderer/svgUtils';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
 
@@ -20,9 +19,9 @@
 			type: Array,
 			default: () => [],
 		},
-		selectedCable: {
-			type: Object as () => Cable | null,
-			default: null,
+		selectedCables: {
+			type: Array as () => Cable[],
+			default: () => [],
 		},
 	});
 
@@ -34,7 +33,6 @@
 	};
 
 	const emit = defineEmits<{
-		cableClick: [cable: Cable];
 		jackDragStart: [info: JackInfo];
 		jackDragEnd: [info: JackInfo];
 	}>();
@@ -51,10 +49,7 @@
 
 		if (props.cables.length > 0) {
 			makePatchCables(props.modules, props.cables, svg, {
-				selectedCable: props.selectedCable,
-				onCableClick: (cable) => {
-					emit('cableClick', cable);
-				},
+				selectedCables: props.selectedCables,
 			});
 		}
 		applyCableVisibility(svg, cableVisibility.value);
@@ -86,8 +81,7 @@
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
 						makePatchCables(props.modules as CableModule[], [cable], svg, {
-							selectedCable: props.selectedCable,
-							onCableClick: (c) => emit('cableClick', c),
+							selectedCables: props.selectedCables,
 						});
 					}
 				}
@@ -132,33 +126,25 @@
 		},
 	);
 
-	// Watch for selectedCable changes: directly update border class, no full re-render.
+	// Watch selectedCables array: diff old vs new by key, toggle 'selected' class.
 	watch(
-		() => props.selectedCable,
-		(newCable, oldCable) => {
+		() => props.selectedCables,
+		(newCables, oldCables) => {
 			if (!svgRef?.value) return;
 			const svg = svgRef.value as SVGElement;
-			if (oldCable) {
-				const removeOldSelected = () => {
-					const key = cableKey(oldCable as Cable);
-					svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.remove('selected');
-				};
-				if (newCable === null) {
-					nextTick(removeOldSelected);
-				} else {
-					removeOldSelected();
-				}
+			const newKeys = new Set((newCables ?? []).map(makeCableKey));
+			const oldKeys = new Set((oldCables ?? []).map(makeCableKey));
+			for (const key of oldKeys) {
+				if (!newKeys.has(key))
+					svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('selected'));
 			}
-			if (newCable) {
-				const key = cableKey(newCable as Cable);
-				svg.querySelector(`.svgcableborder[data-cable-key="${key}"]`)?.classList.add('selected');
+			for (const key of newKeys) {
+				if (!oldKeys.has(key))
+					svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
 			}
 		},
+		{ deep: true },
 	);
-
-	function cableKey(cable: Cable): string {
-		return `${(cable as any).smod ?? (cable as any).sourceModule}-${(cable as any).scon ?? (cable as any).sourceJack}-${(cable as any).dmod ?? (cable as any).destModule}-${(cable as any).dcon ?? (cable as any).destJack}`;
-	}
 
 	// --- Jack drag preview ---
 	const SNAP_RANGE = 64;
@@ -176,16 +162,6 @@
 	// --- Jack click cable cycle ---
 	let cycleJack: JackInfo | null = null;
 	let cycleIndex = -1;
-	let cycleAllCableKeys: string[] = [];
-
-	function clearCycleAllSelected() {
-		if (!svgRef?.value || cycleAllCableKeys.length === 0) return;
-		const svg = svgRef.value as SVGElement;
-		for (const key of cycleAllCableKeys) {
-			svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('selected'));
-		}
-		cycleAllCableKeys = [];
-	}
 
 	function revealConnectedCables(info: JackInfo) {
 		if (!svgRef?.value) return;
@@ -311,26 +287,15 @@
 
 		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
 		if (!previewCable) {
-			// previewCable = svgLine(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y, {
-			// 	fill: 'none',
-			// 	stroke: '#000', //(JACK_COLORS as any)[dragSrcColour] || '#ffffff',
-			// 	'stroke-width': '3',
-			// 	opacity: '0.8',
-			// 	class: 'cable-preview nomouse',
-			// });
 			previewCable = svgPath(d, {
 				fill: 'none',
-				stroke: '#000', //(JACK_COLORS as any)[dragSrcColour] || '#ffffff',
+				stroke: '#000',
 				'stroke-width': '3',
 				opacity: '0.8',
 				class: 'cable-preview nomouse',
 			});
 		} else {
 			previewCable.setAttribute('d', d);
-			// previewCable.setAttribute('x1', dragSrcPos.x);
-			// previewCable.setAttribute('y1', dragSrcPos.y);
-			// previewCable.setAttribute('x2', mp.x);
-			// previewCable.setAttribute('y2', mp.y);
 		}
 		svg.appendChild(previewCable);
 	}
@@ -377,7 +342,7 @@
 			clearDragPreview();
 
 			if (cables.length === 0) {
-				clearCycleAllSelected();
+				uiStore.selectedCables = [];
 				cycleJack = null;
 				cycleIndex = -1;
 				return;
@@ -388,8 +353,6 @@
 				cycleJack?.connectorIndex === info.connectorIndex &&
 				cycleJack?.type === info.type;
 
-			clearCycleAllSelected();
-
 			if (!sameJack) {
 				cycleJack = info;
 				cycleIndex = 0;
@@ -398,21 +361,11 @@
 			}
 
 			if (cycleIndex < cables.length) {
-				emit('cableClick', cables[cycleIndex]);
+				uiStore.selectedCables = [cables[cycleIndex]];
 			} else if (cycleIndex === cables.length) {
-				// All cables for this jack selected simultaneously
-				uiStore.selectedCable = null;
-				if (svgRef?.value) {
-					const svg = svgRef.value as SVGElement;
-					for (const cable of cables) {
-						const key = makeCableKey(cable);
-						svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
-						cycleAllCableKeys.push(key);
-					}
-				}
+				uiStore.selectedCables = [...cables];
 			} else {
-				// Deselect all
-				uiStore.selectedCable = null;
+				uiStore.selectedCables = [];
 				cycleIndex = -1;
 			}
 		} else {

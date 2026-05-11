@@ -43,8 +43,7 @@
 			ref="cablesRef"
 			:modules="props.modules as any[]"
 			:cables="props.cables as any[]"
-			:selected-cable="props.selectedCable"
-			@cable-click="emit('cableClick', $event)"
+			:selected-cables="props.selectedCables"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
 		/>
@@ -80,9 +79,9 @@
 			type: String,
 			default: 'voice',
 		},
-		selectedCable: {
-			type: Object as () => Cable | null,
-			default: null,
+		selectedCables: {
+			type: Array as () => Cable[],
+			default: () => [],
 		},
 		selectedModuleIndices: {
 			type: Array as () => number[],
@@ -93,7 +92,6 @@
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number];
 		modeChange: [moduleIndex: number, index: number, value: number];
-		cableClick: [cable: Cable];
 		jackDragStart: [
 			info: {
 				moduleIndex: number;

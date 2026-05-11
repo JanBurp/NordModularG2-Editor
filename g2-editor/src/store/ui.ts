@@ -14,7 +14,7 @@ export const useUiStore = defineStore('ui', {
 		moduleColor: 0 as number,
 		rightPaneTab: 'modules' as PaneTab,
 		showRightPane: true as boolean,
-		selectedCable: null as Cable | null,
+		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
 		showSvgViewer: false as boolean,
 		cableShakeCount: 0 as number,
