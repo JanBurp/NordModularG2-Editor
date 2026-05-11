@@ -207,8 +207,8 @@
 		}
 	}
 
-	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }): Promise<void> {
-		applySlotResult(await slotsStore.moveModuleWithCollision(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+	async function handleModuleMove({ indices, dCol, dRow }: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }): Promise<void> {
+		applySlotResult(await slotsStore.moveModulesWithCollision(indices, dCol, dRow, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
