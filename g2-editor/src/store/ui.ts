@@ -18,6 +18,7 @@ export const useUiStore = defineStore('ui', {
 		selectedModules: [] as number[],
 		showSvgViewer: false as boolean,
 		cableShakeCount: 0 as number,
+		draggedModuleId: null as number | null,
 	}),
 
 	getters: {
