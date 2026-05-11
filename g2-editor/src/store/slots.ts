@@ -409,22 +409,23 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		_resolveColumnCollisions(
-			colModules: { index: number; vert: number; height: number }[],
-			targetRow: number,
-			targetHeight: number,
+			stationaryModules: { index: number; vert: number; height: number }[],
+			occupantRects: { row: number; height: number }[],
 		): { index: number; newRow: number }[] {
-			const sorted = [...colModules].sort((a, b) => a.vert - b.vert);
+			if (occupantRects.length === 0) return [];
+			const occupants = [...occupantRects].sort((a, b) => a.row - b.row);
+			const sorted = [...stationaryModules].sort((a, b) => a.vert - b.vert);
 			const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
-			let floor = targetRow + targetHeight;
+			let floor = 0;
 			for (const mod of sorted) {
-				const r = newRows.get(mod.index)!;
-				if (r + mod.height <= targetRow) continue;
-				if (r < floor) {
-					newRows.set(mod.index, floor);
-					floor += mod.height;
-				} else {
-					floor = r + mod.height;
+				let candidate = Math.max(newRows.get(mod.index)!, floor);
+				for (const o of occupants) {
+					if (candidate < o.row + o.height && candidate + mod.height > o.row) {
+						candidate = o.row + o.height;
+					}
 				}
+				newRows.set(mod.index, candidate);
+				floor = candidate + mod.height;
 			}
 			return sorted
 				.filter((m) => newRows.get(m.index) !== m.vert)
@@ -434,26 +435,70 @@ export const useSlotsStore = defineStore('slots', {
 				}));
 		},
 
-		async moveModuleWithCollision(
-			moduleIndex: number,
-			col: number,
-			row: number,
+		async moveModulesWithCollision(
+			indices: number[],
+			dCol: number,
+			dRow: number,
 			area: 'voice' | 'fx',
 			currentModuleList: any[],
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const mod = currentModuleList.find((m: any) => m.index === moduleIndex);
-			if (!mod) return null;
+			if (indices.length === 0) return null;
+			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return null;
 			const { getModule } = await import('../renderer/nmg2mods');
-			const height = (getModule(mod.type) as any)?.height ?? 2;
-			const colMods = currentModuleList
-				.filter((m: any) => m.horiz === col && m.index !== moduleIndex)
-				.map((m: any) => ({
-					index: m.index as number,
-					vert: m.vert as number,
-					height: ((getModule(m.type) as any)?.height ?? 2) as number,
-				}));
-			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
-			return this.moveModule(moduleIndex, col, row, area);
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const location = area === 'voice' ? 'va' : 'fx';
+
+			const movedSet = new Set(indices);
+			const targets = indices
+				.map((id) => {
+					const m = currentModuleList.find((x: any) => x.index === id);
+					if (!m) return null;
+					const height = (getModule(m.type) as any)?.height ?? 2;
+					return {
+						index: id,
+						fromCol: m.horiz as number,
+						fromRow: m.vert as number,
+						toCol: Math.max(0, (m.horiz as number) + dCol),
+						toRow: Math.max(0, (m.vert as number) + dRow),
+						height: height as number,
+					};
+				})
+				.filter((t): t is { index: number; fromCol: number; fromRow: number; toCol: number; toRow: number; height: number } => t !== null);
+
+			const occupantsByCol = new Map<number, { row: number; height: number }[]>();
+			for (const t of targets) {
+				if (!occupantsByCol.has(t.toCol)) occupantsByCol.set(t.toCol, []);
+				occupantsByCol.get(t.toCol)!.push({ row: t.toRow, height: t.height });
+			}
+
+			const pushDowns: { index: number; col: number; newRow: number }[] = [];
+			for (const [col, occupants] of occupantsByCol) {
+				const stationary = currentModuleList
+					.filter((m: any) => m.horiz === col && !movedSet.has(m.index))
+					.map((m: any) => ({
+						index: m.index as number,
+						vert: m.vert as number,
+						height: ((getModule(m.type) as any)?.height ?? 2) as number,
+					}));
+				for (const d of this._resolveColumnCollisions(stationary, occupants)) {
+					pushDowns.push({ index: d.index, col, newRow: d.newRow });
+				}
+			}
+
+			for (const p of pushDowns) mutMoveModule(patch, areaIdx, p.index, p.col, p.newRow);
+			for (const t of targets) mutMoveModule(patch, areaIdx, t.index, t.toCol, t.toRow);
+			this.slots[slot].rawHex = null;
+
+			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			const cliCmds: string[][] = [
+				...pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]),
+				...targets.map((t) => ['move-module', slot, location, String(t.index), String(t.toCol), String(t.toRow)]),
+			];
+			if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+
+			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
 		async dropModuleWithCollision(
@@ -474,7 +519,7 @@ export const useSlotsStore = defineStore('slots', {
 					vert: m.vert as number,
 					height: ((getModule(m.type) as any)?.height ?? 2) as number,
 				}));
-			for (const d of this._resolveColumnCollisions(colMods, row, height)) await this.moveModuleNoReload(d.index, col, d.newRow, area);
+			for (const d of this._resolveColumnCollisions(colMods, [{ row, height }])) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.addModule(typeId, moduleId, col, row, area);
 		},
 
