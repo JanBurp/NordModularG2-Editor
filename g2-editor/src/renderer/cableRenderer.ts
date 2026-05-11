@@ -121,17 +121,10 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			stroke: 'transparent',
 			fill: 'none',
 			'stroke-width': '12',
-			class: 'cable-hit',
-			style: 'cursor: pointer',
+			class: 'cable-hit nomouse',
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
 		});
-		if (options?.onCableClick) {
-			hitArea.addEventListener('click', (e) => {
-				e.stopPropagation();
-				options.onCableClick!(cable);
-			});
-		}
 		svgElement.appendChild(border);
 		svgElement.appendChild(main);
 		svgElement.appendChild(hitArea);

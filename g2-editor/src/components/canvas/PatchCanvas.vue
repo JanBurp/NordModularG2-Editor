@@ -17,6 +17,8 @@
 				:key="mod.index"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
+				:connected-inputs="connectedJacksMap.get(mod.index)?.inputs"
+				:connected-outputs="connectedJacksMap.get(mod.index)?.outputs"
 				@param-change="onParamChange"
 				@mode-change="onModeChange"
 				@jack-drag-start="(info) => cablesRef?.handleJackDragStart(info)"
@@ -153,6 +155,23 @@
 		dyPx: number;
 	};
 	const dragState = ref<DragState | null>(null);
+
+	const connectedJacksMap = computed(() => {
+		const map = new Map<number, { inputs: Set<number>; outputs: Set<number> }>();
+		for (const cable of props.cables as any[]) {
+			const smod = cable.smod ?? cable.sourceModule;
+			const scon = cable.scon ?? cable.sourceJack;
+			const dmod = cable.dmod ?? cable.destModule;
+			const dcon = cable.dcon ?? cable.destJack;
+			const dir = cable.dir ?? 1;
+			if (!map.has(dmod)) map.set(dmod, { inputs: new Set(), outputs: new Set() });
+			map.get(dmod)!.inputs.add(dcon);
+			if (!map.has(smod)) map.set(smod, { inputs: new Set(), outputs: new Set() });
+			if (dir === 1) map.get(smod)!.outputs.add(scon);
+			else map.get(smod)!.inputs.add(scon);
+		}
+		return map;
+	});
 
 	const modulesWithVariation = computed(() => {
 		return props.modules.map((m) => {

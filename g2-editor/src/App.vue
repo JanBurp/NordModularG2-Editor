@@ -297,9 +297,6 @@
 
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
-		window.addEventListener('mouseup', () => {
-			jackPatching.dragSource.value = null;
-		});
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			// const area = uiStore.area === 1 ? 'voice' : 'fx';

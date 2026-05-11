@@ -6,7 +6,7 @@
 	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility } from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { getModule } from '../../renderer/nmg2mods';
-	import { svgPath } from '../../renderer/svgUtils';
+	import { svgPath, svgLine, svgCircle } from '../../renderer/svgUtils';
 	import { JACK_COLORS } from '../../constants';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
@@ -161,9 +161,99 @@
 	}
 
 	// --- Jack drag preview ---
+	const SNAP_RANGE = 64;
+
+	type SnapJack = JackInfo & { x: number; y: number };
+
 	let previewCable: SVGPathElement | null = null;
 	let dragSrcPos: { x: number; y: number } | null = null;
 	let dragSrcColour = '';
+	let dragSrcInfo: JackInfo | null = null;
+	let hasDragged = false;
+	let snapJack: SnapJack | null = null;
+	let snapHighlight: SVGCircleElement | null = null;
+
+	function revealConnectedCables(info: JackInfo) {
+		if (!svgRef?.value) return;
+		const svg = svgRef.value as SVGElement;
+		svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
+			const smod = parseInt(el.getAttribute('data-smod') || '-1');
+			const scon = parseInt(el.getAttribute('data-scon') || '-1');
+			const dmod = parseInt(el.getAttribute('data-dmod') || '-1');
+			const dcon = parseInt(el.getAttribute('data-dcon') || '-1');
+			const dir = parseInt(el.getAttribute('data-dir') || '1');
+			const key = el.getAttribute('data-cable-key')!;
+			const matches =
+				(info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) ||
+				(info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) ||
+				(info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex);
+			if (matches) {
+				svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((e) => e.classList.remove('cable-hidden'));
+			}
+		});
+	}
+
+	function findCableForJack(info: JackInfo): Cable | null {
+		for (const cable of props.cables as Cable[]) {
+			const smod = cable.smod ?? cable.sourceModule;
+			const scon = cable.scon ?? cable.sourceJack;
+			const dmod = cable.dmod ?? cable.destModule;
+			const dcon = cable.dcon ?? cable.destJack;
+			const dir = cable.dir ?? 1;
+			if (info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) return cable;
+			if (info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) return cable;
+			if (info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex) return cable;
+		}
+		return null;
+	}
+
+	function findSnapJack(mousePos: { x: number; y: number }): SnapJack | null {
+		if (!dragSrcInfo) return null;
+		const targetType: 'input' | 'output' = dragSrcInfo.type === 'input' ? 'output' : 'input';
+		let bestDist = SNAP_RANGE;
+		let best: SnapJack | null = null;
+		for (const mod of props.modules as any[]) {
+			const modDef = getModule(mod.type) as any;
+			if (!modDef) continue;
+			const baseX = mod.horiz * 256;
+			const baseY = mod.vert * 16;
+			const jacks: any[] = targetType === 'input' ? modDef.inputs || [] : modDef.outputs || [];
+			jacks.forEach((jack: any, idx: number) => {
+				const jx = jack.x + baseX;
+				const jy = jack.y + baseY;
+				const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
+				if (dist < bestDist) {
+					bestDist = dist;
+					best = { moduleIndex: mod.index, connectorIndex: idx, type: targetType, colour: jack.colour, x: jx, y: jy };
+				}
+			});
+		}
+		return best;
+	}
+
+	function updateSnapHighlight(snap: SnapJack | null) {
+		if (!svgRef?.value) return;
+		const svg = svgRef.value as SVGElement;
+		if (!snap) {
+			snapHighlight?.remove();
+			snapHighlight = null;
+			return;
+		}
+		if (!snapHighlight) {
+			snapHighlight = svgCircle(snap.x, snap.y, 8, {
+				fill: 'none',
+				stroke: '#000',
+				'stroke-width': '3',
+				class: 'nomouse',
+				opacity: '0.8',
+			});
+			svg.appendChild(snapHighlight);
+		} else {
+			snapHighlight.setAttribute('cx', String(snap.x));
+			snapHighlight.setAttribute('cy', String(snap.y));
+			snapHighlight.setAttribute('stroke', '#000');
+		}
+	}
 
 	function getJackSvgPos(info: JackInfo) {
 		const mod = (props.modules as any[]).find((m) => m.index === info.moduleIndex);
@@ -196,20 +286,36 @@
 
 	function onMouseMovePreview(e: MouseEvent) {
 		if (!dragSrcPos || !svgRef?.value) return;
+		hasDragged = true;
 		const mp = toSvgCoords(e);
 		if (!mp) return;
-		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
 		const svg = svgRef.value as SVGElement;
+
+		snapJack = findSnapJack(mp);
+		updateSnapHighlight(snapJack);
+
+		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
 		if (!previewCable) {
+			// previewCable = svgLine(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y, {
+			// 	fill: 'none',
+			// 	stroke: '#000', //(JACK_COLORS as any)[dragSrcColour] || '#ffffff',
+			// 	'stroke-width': '3',
+			// 	opacity: '0.8',
+			// 	class: 'cable-preview nomouse',
+			// });
 			previewCable = svgPath(d, {
 				fill: 'none',
-				stroke: (JACK_COLORS as any)[dragSrcColour] || '#ffffff',
-				'stroke-width': '5',
+				stroke: '#000', //(JACK_COLORS as any)[dragSrcColour] || '#ffffff',
+				'stroke-width': '3',
 				opacity: '0.8',
 				class: 'cable-preview nomouse',
 			});
 		} else {
 			previewCable.setAttribute('d', d);
+			// previewCable.setAttribute('x1', dragSrcPos.x);
+			// previewCable.setAttribute('y1', dragSrcPos.y);
+			// previewCable.setAttribute('x2', mp.x);
+			// previewCable.setAttribute('y2', mp.y);
 		}
 		svg.appendChild(previewCable);
 	}
@@ -217,13 +323,23 @@
 	function clearDragPreview() {
 		previewCable?.remove();
 		previewCable = null;
+		snapHighlight?.remove();
+		snapHighlight = null;
+		snapJack = null;
 		dragSrcPos = null;
+		dragSrcInfo = null;
+		hasDragged = false;
 		window.removeEventListener('mousemove', onMouseMovePreview);
-		window.removeEventListener('mouseup', onDragCancelMouseup);
+		window.removeEventListener('mouseup', onWindowMouseup);
+		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value);
 	}
 
-	function onDragCancelMouseup() {
+	function onWindowMouseup() {
+		// Jack's own mouseup fires first → handleJackDragEnd → clearDragPreview removes this listener.
+		// This only fires when mouse is released over empty canvas (not on any jack).
+		const localSnapJack = snapJack;
 		clearDragPreview();
+		if (localSnapJack) emit('jackDragEnd', localSnapJack);
 	}
 
 	function handleJackDragStart(info: JackInfo) {
@@ -231,15 +347,25 @@
 		if (pos) {
 			dragSrcPos = pos;
 			dragSrcColour = info.colour;
+			dragSrcInfo = info;
+			hasDragged = false;
 			window.addEventListener('mousemove', onMouseMovePreview);
-			window.addEventListener('mouseup', onDragCancelMouseup);
+			window.addEventListener('mouseup', onWindowMouseup);
+			revealConnectedCables(info);
 		}
 		emit('jackDragStart', info);
 	}
 
 	function handleJackDragEnd(info: JackInfo) {
-		clearDragPreview();
-		emit('jackDragEnd', info);
+		if (!hasDragged) {
+			// Click: select connected cable, don't create a new one
+			const cable = findCableForJack(info);
+			clearDragPreview();
+			if (cable) emit('cableClick', cable);
+		} else {
+			clearDragPreview();
+			emit('jackDragEnd', info);
+		}
 	}
 
 	onUnmounted(() => {
