@@ -83,6 +83,15 @@
 						makePatchCables(props.modules as CableModule[], [cable], svg, {
 							selectedCables: props.selectedCables,
 						});
+					} else {
+						// Re-render if colour changed
+						const border = svg.querySelector<SVGPathElement>(`.svgcableborder[data-cable-key="${key}"]`);
+						if (border && border.getAttribute('data-cable-color') !== String(cable.colour)) {
+							removeCableByKey(svg, key);
+							makePatchCables(props.modules as CableModule[], [cable], svg, {
+								selectedCables: props.selectedCables,
+							});
+						}
 					}
 				}
 
@@ -200,7 +209,27 @@
 
 	function findSnapJack(mousePos: { x: number; y: number }): SnapJack | null {
 		if (!dragSrcInfo) return null;
-		const targetType: 'input' | 'output' = dragSrcInfo.type === 'input' ? 'output' : 'input';
+		const src = dragSrcInfo;
+		// Outputs connect only to inputs; inputs can connect to outputs or other inputs.
+		const targetTypes: ('input' | 'output')[] = src.type === 'output' ? ['input'] : ['output', 'input'];
+		// Expand each dir=1 destination through dir=0 cables to get all jacks in driven nests
+		const dir0Cables = (props.cables as any[]).filter((c) => (c.dir ?? 1) === 0);
+		const drivenNestJacks = new Set<string>();
+		for (const c of props.cables as any[]) {
+			if ((c.dir ?? 1) !== 1) continue;
+			const queue: { mod: number; con: number }[] = [{ mod: c.dmod ?? 0, con: c.dcon ?? 0 }];
+			while (queue.length > 0) {
+				const { mod, con } = queue.shift()!;
+				const key = `${mod}-${con}`;
+				if (drivenNestJacks.has(key)) continue;
+				drivenNestJacks.add(key);
+				for (const dc of dir0Cables) {
+					const sm = dc.smod ?? 0, sc = dc.scon ?? 0, dm = dc.dmod ?? 0, dc2 = dc.dcon ?? 0;
+					if (sm === mod && sc === con) queue.push({ mod: dm, con: dc2 });
+					else if (dm === mod && dc2 === con) queue.push({ mod: sm, con: sc });
+				}
+			}
+		}
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
 		for (const mod of props.modules as any[]) {
@@ -208,16 +237,20 @@
 			if (!modDef) continue;
 			const baseX = mod.horiz * 256;
 			const baseY = mod.vert * 16;
-			const jacks: any[] = targetType === 'input' ? modDef.inputs || [] : modDef.outputs || [];
-			jacks.forEach((jack: any, idx: number) => {
-				const jx = jack.x + baseX;
-				const jy = jack.y + baseY;
-				const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
-				if (dist < bestDist) {
-					bestDist = dist;
-					best = { moduleIndex: mod.index, connectorIndex: idx, type: targetType, colour: jack.colour, x: jx, y: jy };
-				}
-			});
+			for (const targetType of targetTypes) {
+				const jacks: any[] = targetType === 'input' ? modDef.inputs || [] : modDef.outputs || [];
+				jacks.forEach((jack: any, idx: number) => {
+					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
+					if (targetType === 'input' && src.type === 'output' && drivenNestJacks.has(`${mod.index}-${idx}`)) return;
+					const jx = jack.x + baseX;
+					const jy = jack.y + baseY;
+					const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
+					if (dist < bestDist) {
+						bestDist = dist;
+						best = { moduleIndex: mod.index, connectorIndex: idx, type: targetType, colour: jack.colour, x: jx, y: jy };
+					}
+				});
+			}
 		}
 		return best;
 	}
