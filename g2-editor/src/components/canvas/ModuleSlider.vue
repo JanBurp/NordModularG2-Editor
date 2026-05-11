@@ -1,5 +1,5 @@
 <template>
-	<g :transform="`translate(${x}, ${y})`" class="slider-control">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control">
 		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
 		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" @dblclick="onDoubleClick" />
 
@@ -16,12 +16,12 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 
 	const props = defineProps<{
-		x: number;
-		y: number;
+		param: ModuleParam;
 		value: number;
 		paramIndex: number;
 	}>();

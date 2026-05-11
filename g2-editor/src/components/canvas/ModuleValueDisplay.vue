@@ -10,17 +10,11 @@
 	</text>
 </template>
 <script setup lang="ts">
+	import type { VisualElement } from '../../types';
 	import { formatValue, formatCombinedValue } from '@/composables/useModuleControls';
 
 	const props = defineProps<{
-		ve: {
-			type?: string;
-			x?: number;
-			y?: number;
-			w?: number;
-			ref?: number | number[];
-			func?: string;
-		};
+		ve: VisualElement;
 		params: any[];
 		values: number[];
 	}>();

@@ -59,49 +59,7 @@
 
 			<ToolBarDivider />
 
-			<div class="flex items-center gap-2">
-				<div class="flex gap-1">
-					<button
-						v-for="color in cableColors"
-						:key="color.name"
-						class="w-5 h-5 border-2 border-solid rounded cursor-pointer p-0 flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
-						:class="{
-							'opacity-100 shadow-sm': cableVisibility[color.name],
-						}"
-						:style="{
-							backgroundColor: color.hex,
-							borderColor: color.hex,
-						}"
-						:title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
-						@click="toggleCableVisibility(color.name)"
-					>
-						<span
-							class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
-							:class="{
-								'opacity-100': cableVisibility[color.name],
-							}"
-							:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
-						></span>
-					</button>
-					<button
-						class="w-6 h-5 border-2 border-neutral-600 rounded bg-gray-300 text-gray-800 text-xs font-bold hover:bg-gray-200"
-						:class="{
-							'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible,
-						}"
-						:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
-						@click="toggleShowHideAll"
-					>
-						H
-					</button>
-					<button
-						class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
-						title="Re-render cables"
-						@click="shakeCables"
-					>
-						S
-					</button>
-				</div>
-			</div>
+			<CableVisibilitySelector />
 		</ToolBar>
 
 		<div class="flex-1 flex overflow-hidden">
@@ -114,11 +72,8 @@
 						:cables="voiceCables"
 						:variation="uiStore.variation"
 						area="voice"
-						:cable-visibility="cableVisibility"
-						:shake-trigger="cableShakeTrigger"
-						:selected-cable="uiStore.selectedCable"
+						:selected-cables="uiStore.selectedCables"
 						:selected-module-indices="uiStore.selectedModules"
-						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
@@ -134,11 +89,8 @@
 						:cables="fxCables"
 						:variation="uiStore.variation"
 						area="fx"
-						:cable-visibility="cableVisibility"
-						:shake-trigger="cableShakeTrigger"
-						:selected-cable="uiStore.selectedCable"
+						:selected-cables="uiStore.selectedCables"
 						:selected-module-indices="uiStore.selectedModules"
-						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
@@ -202,12 +154,12 @@
 	import { useUiStore } from './store/ui';
 	import type { PaneTab } from './store/ui';
 	import type { SlotLabel } from './store/slots';
-	import { useCableVisibility } from './composables/useCableVisibility';
 	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
+	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -233,34 +185,30 @@
 
 	// ── Cable / selection ─────────────────────────────────────────────────────
 
-	function handleCableClick(cable: Cable): void {
-		const same = (a: Cable, b: Cable) => a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
-		uiStore.selectedCable = uiStore.selectedCable && same(uiStore.selectedCable, cable) ? null : cable;
-	}
-
 	async function deleteSelection(): Promise<void> {
 		try {
 			await slotsStore.deleteSelection(
 				uiStore.selectedModules,
-				uiStore.selectedCable,
+				uiStore.selectedCables,
 				uiStore.area === 1 ? 'voice' : 'fx',
 				currentModules.value,
 				currentCables.value,
 			);
 		} finally {
 			uiStore.clearSelection();
-			uiStore.selectedCable = null;
+			uiStore.selectedCables = [];
 		}
 	}
 
-	async function handleModuleMove({ moduleIndex, col, row }: { moduleIndex: number; col: number; row: number }): Promise<void> {
-		applySlotResult(await slotsStore.moveModuleWithCollision(moduleIndex, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
+	async function handleModuleMove({ indices, dCol, dRow }: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }): Promise<void> {
+		applySlotResult(await slotsStore.moveModulesWithCollision(indices, dCol, dRow, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
 		applySlotResult(await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
 	}
 
+	// TODO: Investigate why param changes from editor->G2 are slow. Too much commands send? Does it something extra?
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
 		if (device.status !== 'connected') return;
@@ -336,18 +284,12 @@
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
 
-	const { cableColors, cableVisibility, cableShakeTrigger, allCablesVisible, toggleCableVisibility, toggleShowHideAll, shakeCables, updatePatchData } =
-		useCableVisibility();
-
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
-		window.addEventListener('mouseup', () => {
-			jackPatching.dragSource.value = null;
-		});
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			// const area = uiStore.area === 1 ? 'voice' : 'fx';
@@ -502,12 +444,4 @@
 		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;
 		if (activePatch?.description) activePatch.description.variation = change.variation;
 	});
-
-	watch(
-		cableVisibility,
-		() => {
-			updatePatchData(currentPatch.value?.description);
-		},
-		{ deep: true },
-	);
 </script>

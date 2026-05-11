@@ -27,7 +27,7 @@ export const useDeviceStore = defineStore('device', {
 				case 'lost':
 					return 'border-red-500 bg-red-500';
 				default:
-					return 'border-neutral-600 bg-neutral-900';
+					return 'border-neutral-600 bg-neutral-900 text-neutral-300';
 			}
 		},
 		statusLabel: (state): string => {
@@ -77,17 +77,23 @@ export const useDeviceStore = defineStore('device', {
 	actions: {
 		async connect() {
 			this.status = 'connecting';
-			try {
-				const output = await window.cli.run(['startup']);
-				const data = JSON.parse(output);
-				this.device = data.device as Device;
-				this.deviceName = this.device.synthName;
-				this.startupNames = data.names ?? null;
-				this.status = 'connected';
-			} catch (e: any) {
-				this.status = 'error';
-				throw new Error(`Failed to connect: ${e.message}`);
+			let lastErr: Error | null = null;
+			for (let attempt = 0; attempt < 3; attempt++) {
+				if (attempt > 0) await new Promise((r) => setTimeout(r, 300));
+				try {
+					const output = await window.cli.run(['startup']);
+					const data = JSON.parse(output);
+					this.device = data.device as Device;
+					this.deviceName = this.device.synthName;
+					this.startupNames = data.names ?? null;
+					this.status = 'connected';
+					return;
+				} catch (e: any) {
+					lastErr = e;
+				}
 			}
+			this.status = 'error';
+			throw new Error(`Failed to connect: ${lastErr?.message}`);
 		},
 
 		async disconnect() {

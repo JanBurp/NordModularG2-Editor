@@ -1,17 +1,8 @@
-/**
- * Cable Renderer for Nord Modular G2
- *
- * Handles rendering of patch cables between modules
- */
-
-import { CABLE_SVG_COLORS } from '../constants';
+import { CABLE_SVG_COLORS, CABLE_COLOR_INDEX_MAP } from '../constants';
 import { Patchcord } from './patchcord';
 import { getModule } from './nmg2mods';
 import { svgPath } from './svgUtils';
 
-/**
- * Represents a cable connection
- */
 export interface Cable {
 	colour: number;
 	sourceModule?: number;
@@ -26,9 +17,6 @@ export interface Cable {
 	[key: string]: any;
 }
 
-/**
- * Represents a module
- */
 export interface Module {
 	index: number;
 	type: number;
@@ -37,9 +25,6 @@ export interface Module {
 	[key: string]: any;
 }
 
-/**
- * Represents a jack connection point
- */
 export interface Jack {
 	name: string;
 	colour: string;
@@ -47,26 +32,15 @@ export interface Jack {
 	y: number;
 }
 
-/**
- * Module definition interface
- */
 export interface ModuleDef {
 	inputs?: Jack[];
 	outputs?: Jack[];
 	[key: string]: any;
 }
 
-/**
- * Renders all patch cables
- *
- * @param modules - Array of modules
- * @param cables - Array of cables to render
- * @param svgElement - SVG element to append cables to
- * @param visibleCables - Optional filter for cable visibility
- */
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
-	selectedCable?: Cable | null;
+	selectedCables?: Cable[];
 }
 
 export function makeCableKey(cable: Cable): string {
@@ -119,7 +93,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
-		const isSelected = options?.selectedCable ? isSameCable(cable, options.selectedCable) : false;
+		const isSelected = options?.selectedCables?.some((c) => isSameCable(cable, c)) ?? false;
 		const key = makeCableKey(cable);
 
 		// All three paths share the same data-cable-key so they can be queried/removed together.
@@ -135,6 +109,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-dcon': String(destJack ?? 0),
 			'data-dir': String(dir),
 		});
+
 		const main = svgPath(d, {
 			stroke: color,
 			fill: 'none',
@@ -146,41 +121,30 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			stroke: 'transparent',
 			fill: 'none',
 			'stroke-width': '12',
-			class: 'cable-hit',
-			style: 'cursor: pointer',
+			class: 'cable-hit nomouse',
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
 		});
-		if (options?.onCableClick) {
-			hitArea.addEventListener('click', (e) => {
-				e.stopPropagation();
-				options.onCableClick!(cable);
-			});
-		}
 		svgElement.appendChild(border);
 		svgElement.appendChild(main);
 		svgElement.appendChild(hitArea);
 	});
 }
 
-/**
- * Removes all three SVG paths (border, main, hit) for a cable identified by key.
- */
 export function removeCableByKey(svgElement: SVGElement, key: string): void {
-	const toRemove: Element[] = [];
-	let el = svgElement.firstElementChild;
-	while (el) {
-		if (el.getAttribute('data-cable-key') === key) toRemove.push(el);
-		el = el.nextElementSibling;
-	}
-	toRemove.forEach((el) => el.remove());
+	svgElement.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.remove());
 }
 
-/**
- * Shifts a cubic bezier cable path to new endpoints while preserving the existing curve shape.
- * Path format (from getCurvePath): Mdx dyCcp1x cp1y,cp2x cp2y,sx sy
- * cp1 lives near dst so it shifts by the dst delta; cp2 lives near src so it shifts by the src delta.
- */
+// Applies CSS cable-hidden class based on per-color visibility flags.
+export function applyCableVisibility(svgElement: SVGElement, visibility: Record<string, boolean>): void {
+	svgElement.querySelectorAll<Element>('[data-cable-color]').forEach((el) => {
+		const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
+		if (colorName) el.classList.toggle('cable-hidden', visibility[colorName] === false);
+	});
+}
+
+// Shifts a bezier cable path to new endpoints while preserving the existing curve shape.
+// cp1 lives near dst so it shifts by the dst delta; cp2 lives near src so it shifts by the src delta.
 function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: number, newDy: number): string {
 	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
 	if (!m) return existingD;
@@ -192,11 +156,7 @@ function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: 
 	return `M${newDx} ${newDy}C${cp1x + ddx} ${cp1y + ddy},${cp2x + dsx} ${cp2y + dsy},${newSx} ${newSy}`;
 }
 
-/**
- * Re-paths cables whose source or destination module is in movedIds.
- * Cables connected to modules that didn't move are left untouched (preserving their shaken shape).
- * The existing curve shape is preserved — only the endpoints and their nearby control points translate.
- */
+// Re-paths cables whose source or destination module is in movedIds, preserving curve shape.
 export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
 	const borders = svgElement.querySelectorAll<SVGPathElement>('.svgcableborder[data-smod]');
@@ -232,23 +192,6 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 	});
 }
 
-/**
- * Removes all cables from an SVG element
- *
- * @param svgElement - SVG element to remove cables from
- */
 export function removeAllCables(svgElement: SVGElement): void {
-	const toRemove: Element[] = [];
-	let sibling = svgElement.firstElementChild;
-	while (sibling) {
-		const next = sibling.nextElementSibling;
-		if (
-			sibling.tagName === 'path' &&
-			(sibling.classList.contains('svgcable') || sibling.classList.contains('svgcableborder') || sibling.classList.contains('cable-hit'))
-		) {
-			toRemove.push(sibling);
-		}
-		sibling = next;
-	}
-	toRemove.forEach((cable) => svgElement.removeChild(cable));
+	svgElement.querySelectorAll('.svgcable, .svgcableborder, .cable-hit').forEach((el) => el.remove());
 }

@@ -130,6 +130,8 @@ export function useG2() {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
 		window.cli.offWatchDone();
+		let resolveArmed!: () => void;
+		const armed = new Promise<void>((r) => { resolveArmed = r; });
 		window.cli.onDeviceDisconnected(() => {
 			isDaemonRunning.value = false;
 			store.status = 'lost';
@@ -142,6 +144,7 @@ export function useG2() {
 		window.cli.onWatchEvent((line: string) => {
 			try {
 				const ev = JSON.parse(line);
+				if (ev.type === 'watch_armed') { resolveArmed(); return; }
 				if (ev.type === 'device_disconnected') {
 					store.status = 'lost';
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
@@ -167,24 +170,15 @@ export function useG2() {
 				}
 				if (ev.type === 'param_change') {
 					log('←', 'Watch', formatWatchEvent(ev), 'param');
-					const key = `${ev.slot}-${ev.area}-${ev.module}-${ev.param}-${ev.variation}`;
-					const existing = paramWatchTimers.get(key);
-					if (existing) clearTimeout(existing);
-					paramWatchTimers.set(
-						key,
-						setTimeout(() => {
-							paramWatchTimers.delete(key);
-							const slotLabel = SLOT_LABELS[ev.slot as number];
-							if (!slotLabel) return;
-							const patch = slotsStore.slots[slotLabel]?.patch;
-							const areaIdx = ev.area === 'va' ? 1 : 0;
-							const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
-							if (mod?.lv && mod.pcnt) {
-								const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
-								if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
-							}
-						}, 50),
-					);
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (!slotLabel) return;
+					const patch = slotsStore.slots[slotLabel]?.patch;
+					const areaIdx = ev.area === 'va' ? 1 : 0;
+					const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
+					if (mod?.lv && mod.pcnt) {
+						const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
+						if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
+					}
 					return;
 				}
 				const category: UsbLogEntry['category'] =
@@ -205,6 +199,7 @@ export function useG2() {
 			}
 		});
 		await window.cli.watchStart();
+		await armed;
 		isDaemonRunning.value = true;
 		log('•', 'Watch', 'Started');
 	}

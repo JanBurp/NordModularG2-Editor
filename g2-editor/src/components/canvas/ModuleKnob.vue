@@ -1,5 +1,11 @@
 <template>
-	<g :transform="`translate(${x}, ${y})`" class="knob-control" @mousedown="onMouseDown" @touchstart.passive="onMouseDown" @dblclick="onDoubleClick">
+	<g
+		:transform="`translate(${param.x}, ${param.y})`"
+		class="knob-control"
+		@mousedown="onMouseDown"
+		@touchstart.passive="onMouseDown"
+		@dblclick="onDoubleClick"
+	>
 		<!-- Invisible hit area for easier grabbing -->
 		<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" class="hit-area" />
 
@@ -29,11 +35,10 @@
 </template>
 <script setup lang="ts">
 	import { computed, ref } from 'vue';
+	import type { ModuleParam } from '../../types';
 
 	const props = defineProps<{
-		type: string;
-		x: number;
-		y: number;
+		param: ModuleParam;
 		value: number;
 		paramIndex: number;
 	}>();
@@ -49,7 +54,7 @@
 			KnobSmall: 9,
 			KnobReset: 10,
 		};
-		return radii[props.type] || 10;
+		return radii[props.param.n] || 10;
 	});
 
 	const angle = computed(() => {
@@ -57,7 +62,7 @@
 		return (props.value / 128) * 270 - 135;
 	});
 
-	const isReset = computed(() => props.type === 'KnobReset');
+	const isReset = computed(() => props.param.n === 'KnobReset');
 
 	// Interaction state
 	const isDragging = ref(false);

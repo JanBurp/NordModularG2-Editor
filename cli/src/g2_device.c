@@ -1054,7 +1054,6 @@ cleanup:
 
 cJSON *g2_startup(void) {
     if (ensure_connected(1) < 0) return NULL;
-    if (g2_send_init() != G2_OK) return NULL;
 
     cJSON *device = g2_device_info(0);
     if (!device) return NULL;
@@ -1911,56 +1910,24 @@ int g2_watch(output_format_t format, int debug) {
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
 
-    /* Clear any stale notifications from a preceding command (e.g. slot switch)
-     * before arming — sending START_COMM while the G2 is still flushing its
-     * notification burst can stall the bulk-OUT endpoint. */
+    /* Cold-connect arm sequence — mirrors the reconnect path below exactly:
+     * drain stale data, send START_COMM, read the ACK.  No clear_halt on a
+     * freshly-reset G2 — issuing CLEAR_FEATURE(ENDPOINT_HALT) when no halt is
+     * present puts the G2 in a state where direct queries time out, even
+     * though streaming notifications still work. */
     g2_drain_pending();
-
-    /* Clear any halted endpoints left over from a previous bad session.
-     * The output endpoint is already cleared on-demand in send_slot/g2_send_command,
-     * but the input endpoints are never cleared otherwise. */
-    libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-    libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
-    libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
-
-    /* Arm G2 to send unsolicited notifications (StartComm = 0x7d 0x00) */
-    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
-    ret = send_system_data(0x41, start_cmd, 2);
-    if (ret < 0) {
-        g2_err("watch: failed to send StartComm\n");
-        return G2_ERR;
-    }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
-    printf("{\"type\":\"watch_armed\"}\n");
-    fflush(stdout);
-
-    if (ret <= 0) {
-        /* G2 is connected but not responding — bad state (halted endpoint,
-         * firmware stuck, etc.). Emit event, disconnect, and wait for it to
-         * come back using the same reconnect loop used inside the watch. */
-        printf("{\"type\":\"device_bad_state\"}\n");
-        fflush(stdout);
-        g2_disconnect();
-        while (g2_watch_running) {
-            if (g2_connect_silent() >= 0) break;
-            usleep(100000);
-        }
-        if (!g2_watch_running) return G2_OK;
-        g2_drain_pending();
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        libusb_clear_halt(g2.handle, ENDPOINT_INTERRUPT_IN);
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_IN);
-        ret = send_system_data(0x41, start_cmd, 2);
-        if (ret < 0) {
-            g2_err("watch: failed to re-arm after bad state\n");
+    {
+        uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
+        if (send_system_data(0x41, start_cmd, 2) < 0) {
+            g2_err("watch: failed to send StartComm\n");
             return G2_ERR;
         }
         usleep(USB_SEND_DELAY_US);
         recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
-        printf("{\"type\":\"device_reconnected\"}\n");
-        fflush(stdout);
     }
+
+    printf("{\"type\":\"watch_armed\"}\n");
+    fflush(stdout);
 
     while (g2_watch_running) {
         if (g2_watch_tick_hook) g2_watch_tick_hook();

@@ -4,7 +4,7 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'info' | 'browser';
+export type PaneTab = 'modules' | 'info' | 'browser' | '';
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({
@@ -14,9 +14,11 @@ export const useUiStore = defineStore('ui', {
 		moduleColor: 0 as number,
 		rightPaneTab: 'modules' as PaneTab,
 		showRightPane: true as boolean,
-		selectedCable: null as Cable | null,
+		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
 		showSvgViewer: false as boolean,
+		cableShakeCount: 0 as number,
+		draggedModuleId: null as number | null,
 	}),
 
 	getters: {
@@ -30,6 +32,9 @@ export const useUiStore = defineStore('ui', {
 		toggleSidebar(tab: PaneTab) {
 			if (this.rightPaneTab === tab) {
 				this.showRightPane = !this.showRightPane;
+				if (this.showRightPane === false) {
+					this.rightPaneTab = '';
+				}
 			} else {
 				this.rightPaneTab = tab;
 				this.showRightPane = true;
@@ -56,6 +61,10 @@ export const useUiStore = defineStore('ui', {
 
 		toggleSvgViewer() {
 			this.showSvgViewer = !this.showSvgViewer;
+		},
+
+		shakeCables() {
+			this.cableShakeCount++;
 		},
 	},
 });
