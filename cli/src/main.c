@@ -44,6 +44,7 @@ static void print_usage(const char *prog) {
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>              Delete a cable\n");
+    printf("  set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Set color of an existing cable\n");
     printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>                   Add a module to the patch\n");
     printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
@@ -320,6 +321,24 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         int to_ct    = atoi(argv[i + 7]);
         int to_con   = atoi(argv[i + 8]);
         return g2_del_cable(slot, location, from_mod, from_ct, from_con, to_mod, to_ct, to_con);
+    }
+
+    if (strcmp(command, "set-cable-color") == 0) {
+        /* set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con> */
+        if (i + 9 >= argc) {
+            fprintf(stderr, "Usage: set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>\n");
+            return 1;
+        }
+        int slot     = parse_slot(argv[i + 1]);
+        int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int color    = atoi(argv[i + 3]);
+        int from_mod = atoi(argv[i + 4]);
+        int from_ct  = atoi(argv[i + 5]);
+        int from_con = atoi(argv[i + 6]);
+        int to_mod   = atoi(argv[i + 7]);
+        int to_ct    = atoi(argv[i + 8]);
+        int to_con   = atoi(argv[i + 9]);
+        return g2_set_cable_color(slot, location, color, from_mod, from_ct, from_con, to_mod, to_ct, to_con);
     }
 
     if (strcmp(command, "del-module") == 0) {

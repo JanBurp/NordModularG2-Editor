@@ -101,6 +101,9 @@ int g2_add_cable(int slot, int location, int color,
 int g2_del_cable(int slot, int location,
                  int from_mod, int from_con_type, int from_con_id,
                  int to_mod,   int to_con_type,   int to_con_id);
+int g2_set_cable_color(int slot, int location, int color,
+                       int from_mod, int from_con_type, int from_con_id,
+                       int to_mod,   int to_con_type,   int to_con_id);
 
 /* Module commands: slot 0-3, location 0=fx/1=va */
 int g2_del_module(int slot, int location, int module_id);

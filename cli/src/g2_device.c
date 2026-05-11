@@ -1514,6 +1514,47 @@ int g2_del_cable(int slot, int location,
     return G2_OK;
 }
 
+int g2_set_cable_color(int slot, int location, int color,
+                       int from_mod, int from_con_type, int from_con_id,
+                       int to_mod,   int to_con_type,   int to_con_id) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)                 { g2_err("set-cable-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)         { g2_err("set-cable-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (color < 0 || color > 6)               { g2_err("set-cable-color: color must be 0-6\n"); return G2_ERR_INVALID_PARAM; }
+    if (from_con_type < 0 || to_con_type < 0) { g2_err("set-cable-color: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { g2_err("set-cable-color: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    /* Enforce output→input: swap if from is an input */
+    if (from_con_type == 0) {
+        int tmp;
+        tmp = from_mod;      from_mod      = to_mod;       to_mod       = tmp;
+        tmp = from_con_type; from_con_type = to_con_type;  to_con_type  = tmp;
+        tmp = from_con_id;   from_con_id   = to_con_id;    to_con_id    = tmp;
+    }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t extra[6] = {
+        (uint8_t)((1 << 1) | (location & 1)),
+        (uint8_t)from_mod,
+        (uint8_t)(((from_con_type & 3) << 6) | (from_con_id & 0x3f)),
+        (uint8_t)to_mod,
+        (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
+        (uint8_t)color,
+    };
+    if (send_slot(slot, version, 0x54, extra, 6) < 0) {
+        g2_err("set-cable-color: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_del_module(int slot, int location, int module_id) {
     uint8_t response[16] = {0};
 

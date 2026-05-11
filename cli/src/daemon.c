@@ -180,6 +180,14 @@ static void execute_cmd(const char *line) {
 		                   arg_i(args, 2), arg_i(args, 3), arg_i(args, 4),
 		                   arg_i(args, 5), arg_i(args, 6), arg_i(args, 7));
 
+	} else if (strcmp(cmd, "set-cable-color") == 0 && n >= 9) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		ret = g2_set_cable_color(slot, loc,
+		                         arg_i(args, 2),
+		                         arg_i(args, 3), arg_i(args, 4), arg_i(args, 5),
+		                         arg_i(args, 6), arg_i(args, 7), arg_i(args, 8));
+
 	} else if (strcmp(cmd, "del-module") == 0 && n >= 3) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
