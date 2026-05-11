@@ -1,7 +1,7 @@
 import type { ModuleInstance, Patch } from '@/types';
-import type { Cable } from '@/renderer/cableRenderer';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
+import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
@@ -169,57 +169,6 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['variation', String(variation + 1), active]);
 		},
 
-		async deleteCable(
-			cable: { smod: number; scon: number; dmod: number; dcon: number },
-			area: 'voice' | 'fx',
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
-			const patch = this.slots[slot].patch;
-			if (!patch) return null;
-
-			mutDeleteCable(patch, area === 'voice' ? 1 : 0, cable);
-			this.slots[slot].rawHex = null;
-
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
-			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run([
-				'del-cable',
-				slot,
-				location,
-				String(cable.smod),
-				'1',
-				String(cable.scon),
-				String(cable.dmod),
-				'0',
-				String(cable.dcon),
-			]);
-
-			return { name: this.slots[slot].name, rawHex: '', patch };
-		},
-
-		async deleteCableNoReload(cable: { smod: number; scon: number; dmod: number; dcon: number }, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
-			const patch = this.slots[slot].patch;
-			if (!patch) return;
-
-			mutDeleteCable(patch, area === 'voice' ? 1 : 0, cable);
-			this.slots[slot].rawHex = null;
-
-			if (!slot) return;
-			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run([
-				'del-cable',
-				slot,
-				location,
-				String(cable.smod),
-				'1',
-				String(cable.scon),
-				String(cable.dmod),
-				'0',
-				String(cable.dcon),
-			]);
-		},
-
 		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
 			const patch = this.slots[slot].patch;
@@ -377,7 +326,6 @@ export const useSlotsStore = defineStore('slots', {
 					patch.areas[areaIdx].cableList = cableList.map((c) => {
 						if (!toRecolor.has(c)) return c;
 						const gsmod = c.smod ?? 0, gscon = c.scon ?? 0, gdmod = c.dmod ?? 0, gdcon = c.dcon ?? 0;
-						// TODO: replace del+add with a set-cable-color CLI command when available
 						recolorCmds.push(['del-cable', slot, location, String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
 						recolorCmds.push(['add-cable', slot, location, String(targetColor), String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
 						return { ...c, colour: targetColor };
@@ -635,7 +583,7 @@ export const useSlotsStore = defineStore('slots', {
 						if (!deletedCableKeys.has(key)) {
 							deletedCableKeys.add(key);
 							mutDeleteCable(patch, area === 'voice' ? 1 : 0, c);
-							cliCmds.push(['del-cable', slot, location, String(c.smod), '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]);
+							cliCmds.push(['del-cable', slot, location, String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]);
 						}
 					}
 					mutDeleteModule(patch, area === 'voice' ? 1 : 0, id);
@@ -657,7 +605,7 @@ export const useSlotsStore = defineStore('slots', {
 					const dmod = cable.dmod!;
 					const dcon = cable.dcon!;
 					mutDeleteCable(patch, area === 'voice' ? 1 : 0, { smod, scon, dmod, dcon });
-					cliCmds.push(['del-cable', slot, location, String(smod), '1', String(scon), String(dmod), '0', String(dcon)]);
+					cliCmds.push(['del-cable', slot, location, String(smod), cable.dir === 0 ? '0' : '1', String(scon), String(dmod), '0', String(dcon)]);
 				}
 				this.slots[slot].rawHex = null;
 				if (slot && cliCmds.length > 0) await window.cli.runBatch(cliCmds);
