@@ -72,9 +72,8 @@
 						:cables="voiceCables"
 						:variation="uiStore.variation"
 						area="voice"
-						:selected-cable="uiStore.selectedCable"
+						:selected-cables="uiStore.selectedCables"
 						:selected-module-indices="uiStore.selectedModules"
-						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
@@ -90,9 +89,8 @@
 						:cables="fxCables"
 						:variation="uiStore.variation"
 						area="fx"
-						:selected-cable="uiStore.selectedCable"
+						:selected-cables="uiStore.selectedCables"
 						:selected-module-indices="uiStore.selectedModules"
-						@cable-click="handleCableClick"
 						@jack-drag-start="jackPatching.handleJackDragStart"
 						@jack-drag-end="jackPatching.handleJackDragEnd"
 						@module-move="handleModuleMove"
@@ -187,23 +185,18 @@
 
 	// ── Cable / selection ─────────────────────────────────────────────────────
 
-	function handleCableClick(cable: Cable): void {
-		const same = (a: Cable, b: Cable) => a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
-		uiStore.selectedCable = uiStore.selectedCable && same(uiStore.selectedCable, cable) ? null : cable;
-	}
-
 	async function deleteSelection(): Promise<void> {
 		try {
 			await slotsStore.deleteSelection(
 				uiStore.selectedModules,
-				uiStore.selectedCable,
+				uiStore.selectedCables,
 				uiStore.area === 1 ? 'voice' : 'fx',
 				currentModules.value,
 				currentCables.value,
 			);
 		} finally {
 			uiStore.clearSelection();
-			uiStore.selectedCable = null;
+			uiStore.selectedCables = [];
 		}
 	}
 

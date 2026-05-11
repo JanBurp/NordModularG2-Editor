@@ -1,4 +1,5 @@
 import type { ModuleInstance, Patch } from '@/types';
+import type { Cable } from '@/renderer/cableRenderer';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { SlotLabel } from '@/types';
@@ -550,17 +551,12 @@ export const useSlotsStore = defineStore('slots', {
 
 		async deleteSelection(
 			selectedModules: number[],
-			selectedCable: {
-				smod?: number;
-				scon?: number;
-				dmod?: number;
-				dcon?: number;
-			} | null,
+			selectedCables: Cable[],
 			area: 'voice' | 'fx',
 			currentModuleList: any[],
 			currentCableList: any[],
 		): Promise<void> {
-			if (selectedModules.length > 0 && !selectedCable) {
+			if (selectedModules.length > 0 && selectedCables.length === 0) {
 				const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
 				const patch = this.slots[slot].patch;
 				if (!patch) return;
@@ -583,16 +579,23 @@ export const useSlotsStore = defineStore('slots', {
 				if (slot && cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				return;
 			}
-			if (selectedCable)
-				await this.deleteCable(
-					{
-						smod: selectedCable.smod!,
-						scon: selectedCable.scon!,
-						dmod: selectedCable.dmod!,
-						dcon: selectedCable.dcon!,
-					},
-					area,
-				);
+			if (selectedCables.length > 0) {
+				const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+				const patch = this.slots[slot].patch;
+				if (!patch) return;
+				const location = area === 'voice' ? 'va' : 'fx';
+				const cliCmds: string[][] = [];
+				for (const cable of selectedCables) {
+					const smod = cable.smod!;
+					const scon = cable.scon!;
+					const dmod = cable.dmod!;
+					const dcon = cable.dcon!;
+					mutDeleteCable(patch, area === 'voice' ? 1 : 0, { smod, scon, dmod, dcon });
+					cliCmds.push(['del-cable', slot, location, String(smod), '1', String(scon), String(dmod), '0', String(dcon)]);
+				}
+				this.slots[slot].rawHex = null;
+				if (slot && cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+			}
 		},
 	},
 });
