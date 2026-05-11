@@ -18,6 +18,45 @@ interface SlotEntry {
 	patch: Patch | null;
 }
 
+// BFS over dir=0 (input-to-input) cables to find all cables transitively connected to a given input jack
+function findConnectedInputCables(cableList: Cable[], startMod: number, startCon: number): Cable[] {
+	const visitedJacks = new Set<string>();
+	const result: Cable[] = [];
+	const queue: { mod: number; con: number }[] = [{ mod: startMod, con: startCon }];
+	while (queue.length > 0) {
+		const { mod, con } = queue.shift()!;
+		const key = `${mod}-${con}`;
+		if (visitedJacks.has(key)) continue;
+		visitedJacks.add(key);
+		for (const cable of cableList) {
+			if ((cable.dir ?? 1) !== 0 || result.includes(cable)) continue;
+			const csmod = cable.smod ?? 0, cscon = cable.scon ?? 0, cdmod = cable.dmod ?? 0, cdcon = cable.dcon ?? 0;
+			if (csmod === mod && cscon === con) {
+				result.push(cable);
+				queue.push({ mod: cdmod, con: cdcon });
+			} else if (cdmod === mod && cdcon === con) {
+				result.push(cable);
+				queue.push({ mod: csmod, con: cscon });
+			}
+		}
+	}
+	return result;
+}
+
+// Returns the colour of any output already driving the combined input group of (smod,scon) and (dmod,dcon).
+// Falls back to 6 (white) when no output is connected.
+function findGroupOutputColor(cableList: Cable[], smod: number, scon: number, dmod: number, dcon: number): number {
+	const inputJacks = new Set<string>([`${smod}-${scon}`, `${dmod}-${dcon}`]);
+	for (const c of [...findConnectedInputCables(cableList, smod, scon), ...findConnectedInputCables(cableList, dmod, dcon)]) {
+		inputJacks.add(`${c.smod ?? 0}-${c.scon ?? 0}`);
+		inputJacks.add(`${c.dmod ?? 0}-${c.dcon ?? 0}`);
+	}
+	for (const c of cableList) {
+		if ((c.dir ?? 1) === 1 && inputJacks.has(`${c.dmod ?? 0}-${c.dcon ?? 0}`)) return c.colour;
+	}
+	return 6; // white
+}
+
 export const useSlotsStore = defineStore('slots', {
 	state: () => ({
 		activeSlot: 'A' as SlotLabel,
@@ -307,29 +346,56 @@ export const useSlotsStore = defineStore('slots', {
 			let dmod = toMod,
 				dcon = toCon,
 				dtype = toConType;
-			if (stype === 0) {
-				// source is input, swap
+			const areaIdx = area === 'voice' ? 1 : 0;
+			let dir = 1;
+			if (stype === 0 && dtype !== 0) {
+				// source is input, dest is output: swap to normalise
 				[smod, scon, stype, dmod, dcon, dtype] = [dmod, dcon, dtype, smod, scon, stype];
+			} else if (stype === 0 && dtype === 0) {
+				// input-to-input: no swap needed
+				dir = 0;
 			}
 
-			const cable = { colour: color, smod, scon, dir: 1, dmod, dcon };
-			mutAddCable(patch, area === 'voice' ? 1 : 0, cable);
+			// For input-to-input cables, inherit color from any output already in the connected group
+			const effectiveColor = dir === 0 ? findGroupOutputColor(patch.areas[areaIdx].cableList ?? [], smod, scon, dmod, dcon) : color;
+
+			const cable = { colour: effectiveColor, smod, scon, dir, dmod, dcon };
+			mutAddCable(patch, areaIdx, cable);
 			this.slots[slot].rawHex = null;
 
 			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
 			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run([
-				'add-cable',
-				slot,
-				location,
-				String(color),
-				String(fromMod),
-				String(fromConType),
-				String(fromCon),
-				String(toMod),
-				String(toConType),
-				String(toCon),
-			]);
+			const mainCmd = ['add-cable', slot, location, String(effectiveColor), String(fromMod), String(fromConType), String(fromCon), String(toMod), String(toConType), String(toCon)];
+
+			// Recolor dir=0 cables in the input group to match an output that was just connected or already present
+			const recolorCmds: string[][] = [];
+			const recolorGroup = (startMod: number, startCon: number, targetColor: number) => {
+				const cableList = patch.areas[areaIdx].cableList ?? [];
+				const toRecolor = new Set(findConnectedInputCables(cableList, startMod, startCon).filter((gc) => gc.colour !== targetColor));
+				if (toRecolor.size > 0) {
+					// Replace cable objects (new array) so Vue's watcher detects the change
+					patch.areas[areaIdx].cableList = cableList.map((c) => {
+						if (!toRecolor.has(c)) return c;
+						const gsmod = c.smod ?? 0, gscon = c.scon ?? 0, gdmod = c.dmod ?? 0, gdcon = c.dcon ?? 0;
+						// TODO: replace del+add with a set-cable-color CLI command when available
+						recolorCmds.push(['del-cable', slot, location, String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
+						recolorCmds.push(['add-cable', slot, location, String(targetColor), String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
+						return { ...c, colour: targetColor };
+					});
+				}
+			};
+			if (dir === 1) {
+				recolorGroup(dmod, dcon, effectiveColor);
+			} else if (effectiveColor !== color) {
+				// Merged two groups; recolor the full connected set (new cable links them)
+				recolorGroup(smod, scon, effectiveColor);
+			}
+
+			if (recolorCmds.length > 0) {
+				await window.cli.runBatch([mainCmd, ...recolorCmds]);
+			} else {
+				await window.cli.run(mainCmd);
+			}
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
