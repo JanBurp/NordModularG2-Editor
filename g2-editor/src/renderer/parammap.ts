@@ -85,7 +85,7 @@ const parammap: Record<string, ParamDefinition> = {
 	LfoRate_4: { f: 'rateLo', low: 0, high: 127, def: 1, defin: ['0 ~ 699s, 127 ~ 5.46s', '1 ~ 62.9s, 127 ~ 24.4 Hz', '2 ~ 0.26 Hz, 127 ~ 392 Hz', '3 ~ 24, 127 ~ 214', '4 ~ 64/1, 64 ~ 1/4D, 127 ~ 1/64T'], comments: 'Sub, Lo, Hi, BPM, Clock =BPM is the same as for RateBpm). Determined by [LfoRange_4]' },
 	LfoShpA__Waveform: { mode: 'HR', names: ['', '', '', '', '', ''], width: 17, bmp: 'LfoShpAWave', low: 0, high: 5, def: 0, defin: ['0 ~ Sine, 1 ~ CosBell, 2 ~ TriBell, 3 ~ Saw2Tri, 4 ~ Sqr2Tri, 5 ~ Sqr'], comments: '' },
 	LfoShpAPW: { low: 0, high: 127, def: 0, defin: ['0 ~ 1%, 64 ~ 50%, 127 ~ 98%'], comments: '' },
-	LfoWaveform_1: { img: 'ModeLfoC', low: 0, high: 7, def: 0, defin: ['0 ~ Sine, 1 ~ Tri, 2 ~ Saw, 3 ~ Square, 4 ~ RndStep, 5 ~ Rnd, 6 ~ RndPulse, 7 ~ RndRoundedPulse'], comments: '' },
+	LfoWaveform_1: { width: 22, img: 'ModeLfoC', low: 0, high: 7, def: 0, defin: ['0 ~ Sine, 1 ~ Tri, 2 ~ Saw, 3 ~ Square, 4 ~ RndStep, 5 ~ Rnd, 6 ~ RndPulse, 7 ~ RndRoundedPulse'], comments: '' },
 	LinDB: { low: 0, high: 1, def: 0, defin: ['0 ~ Lin, 1 ~ dB'], comments: '' },
 	LogicDelayMode: { width: 20, img: 'ModeDelay', h: -21, low: 0, high: 2, def: 0, defin: ['0 ~ Positive edge delay, 1 ~ Negative edge delay, 2 ~ Cycle delay'], comments: '' },
 	LogicRange: { low: 0, high: 2, def: 0, defin: ['0 ~ Sub, 1 ~ Lo, 2 ~ Hi'], comments: 'Determines [LogicTime]' },
