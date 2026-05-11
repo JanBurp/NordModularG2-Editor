@@ -71,6 +71,7 @@
 			type="input"
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
+			:connected="connectedInputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
@@ -86,6 +87,7 @@
 			type="output"
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
+			:connected="connectedOutputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
@@ -121,6 +123,8 @@
 	const props = defineProps<{
 		instance?: ModuleInstance;
 		isSelected?: boolean;
+		connectedInputs?: Set<number>;
+		connectedOutputs?: Set<number>;
 	}>();
 
 	const emit = defineEmits<{
