@@ -152,7 +152,7 @@ const parammap: Record<string, ParamDefinition> = {
 	Range_64: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.0, 1 ~ 0.5, 64 ~ 32.0, 126 ~ 63.0, 127 ~ 64.0'], comments: '' },
 	RangeBip_128: { low: 0, high: 127, def: 64, defin: ['0 ~ -64, 64 ~ 0, 126 ~ 62, 127 ~ 64'], comments: '' },
 	RateBpm: { f: 'rateBPM', low: 0, high: 127, def: 64, defin: ['0 ~ 24 BPM, 64 ~ 120 BPM, 127 ~ 214 BPM'], comments: '' },
-	RatioFixed: { names: ['Ratio', 'Fixed'], low: 0, high: 1, def: 0, defin: ['0 ~ Ratio, 1 ~ Fixed'], comments: '' },
+	RatioFixed: { width: 32, names: ['Ratio', 'Fixed'], low: 0, high: 1, def: 0, defin: ['0 ~ Ratio, 1 ~ Fixed'], comments: '' },
 	RectMode: { mode: 'HR', names: ['', '', '', ''], width: 22, bmp: 'Rect', low: 0, high: 3, def: 0, defin: ['0 ~ Half wave positive, 1 ~ Half wave negative, 2 ~ Full wave positive, 3 ~ Full wave negative'], comments: '' },
 	Res_1: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.50, 64 ~ 1.67, 127 ~ 50'], comments: '' },
 	ReverbTime: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.0ms, 127 ~ 3.000s', '0 ~ 0.0ms, 127 ~ 6.000s', '0 ~ 0.0ms, 127 ~ 9.000s', '0 ~ 0.0ms, 127 ~ 12.00s'], comments: 'Small, Medium, Large, Hall. Determined by [RoomType]' },

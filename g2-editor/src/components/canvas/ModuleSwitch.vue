@@ -126,6 +126,7 @@
 			}
 		}
 		if (names.value.length === 1) {
+			if (names.value[0] === '') return '';
 			return [props.param.name];
 		}
 		if (names.value && names.value.length > 0) {
