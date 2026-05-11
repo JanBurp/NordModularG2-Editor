@@ -7,9 +7,9 @@
 
 #include <stdint.h>
 #include <stddef.h>
+#include <libusb.h>
 #include "cJSON.h"
 #include "defs.h"
-#include "output.h"
 
 /* G2 Error codes */
 typedef enum {
@@ -24,13 +24,28 @@ typedef enum {
     G2_ERR_TIMEOUT = -8,
     G2_ERR_PARSE = -9,
     G2_ERR_INVALID_PARAM = -10,
-    G2_ERR_FILE_OPEN = -11,
-    G2_ERR_FILE_WRITE = -12,
-    G2_ERR_NO_MEMORY = -13,
+    G2_ERR_FILE_OPEN = -10,
+    G2_ERR_FILE_WRITE = -11,
+    G2_ERR_NO_MEMORY = -12,
 } g2_error_t;
 
-/* Set error output handler (default: stderr). Daemon sets JSON handler at startup. */
-void g2_set_error_handler(void (*fn)(const char *));
+/* Output format types */
+typedef enum {
+    OUTPUT_DEFAULT,
+    OUTPUT_JSON,
+    OUTPUT_PRETTY,
+    OUTPUT_TREE
+} output_format_t;
+
+/* G2 Device handle */
+typedef struct {
+    libusb_context *ctx;
+    libusb_device_handle *handle;
+    int interface_claimed;
+} g2_device_t;
+
+/* Set to 1 when running as daemon — redirects error output to JSON stdout */
+extern int g2_daemon_mode;
 
 /* Initialize device library */
 int g2_init(void);
@@ -57,6 +72,11 @@ int g2_is_connected(void);
 int g2_send_command(uint8_t *data, int length);
 int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 
+/* List filter options */
+#define LIST_FILTER_ALL            0
+#define LIST_FILTER_PATCHES        1
+#define LIST_FILTER_PERFORMANCES   2
+
 /* Send CMD_INIT (0x80) — step 1 of the startup sequence.
  * Resets G2 patch version counters. Returns G2_OK on success. */
 int g2_send_init(void);
@@ -68,8 +88,6 @@ cJSON *g2_device_info(int debug);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
 cJSON *g2_list(int filter, int bank_filter);
-cJSON *g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
-                          const uint8_t *perfData, size_t perfSize);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);
@@ -110,16 +128,11 @@ int g2_upload_patch(int slot, const char *filepath);
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
 
-/* Watch state */
-typedef struct {
-    volatile int running;
-    int verbose;
-    void (*tick_hook)(void);
-} g2_watch_state_t;
-extern g2_watch_state_t g2_watch_cfg;
-
 /* Watch for param changes (simple single-threaded approach) */
 int g2_watch(output_format_t format, int debug);
+volatile extern int g2_watch_running;
+extern int g2_watch_verbose;
+extern void (*g2_watch_tick_hook)(void);
 void g2_watch_stop(int sig);
 int g2_watch_disarm(void);
 int g2_watch_rearm(void);
