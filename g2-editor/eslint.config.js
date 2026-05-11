@@ -66,5 +66,11 @@ export default [
       'preserve-caught-error': 'off',
     },
   },
+  {
+    files: ['src/renderer/nmg2mods.ts'],
+    rules: {
+      '@typescript-eslint/no-unused-vars': 'off',
+    },
+  },
   eslintConfigPrettier,
 ];

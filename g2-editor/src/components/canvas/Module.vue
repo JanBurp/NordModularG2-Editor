@@ -1,8 +1,7 @@
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="module" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
-		<ModuleBackground :height="height" :selected="isSelected"></ModuleBackground>
-
-		<ModuleTitle :displayName="displayName" :type="type"></ModuleTitle>
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
+		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
+		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
@@ -21,18 +20,12 @@
 			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
 			<ModuleGraph
 				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
-				:type="ve.type"
-				:x="ve.x"
-				:y="ve.y"
-				:w="ve.w"
-				:h="ve.h"
-				:f="ve.f"
+				:ve="ve"
 				:lv="localLv"
-				:module-id="props.type"
+				:modes="instance.modes"
+				:module-id="instance.type"
 			/>
-
 			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
-
 			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
 			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
 		</template>
@@ -42,9 +35,7 @@
 			<ModuleMode
 				v-for="(mode, index) in moduleDef.modes"
 				:key="mode.name"
-				:x="mode.x"
-				:y="mode.y"
-				:param-type="mode.type"
+				:mode="mode"
 				:value="getModeValue(index)"
 				:param-index="index"
 				@change="onModeChange"
@@ -54,58 +45,18 @@
 		<!-- Parameters -->
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
-				<!-- Knobs -->
-				<ModuleKnob
-					v-if="isKnob(param.n)"
-					:type="param.n"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
-
-				<!-- Sliders -->
-				<ModuleSlider
-					v-else-if="isSlider(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
-
-				<!-- Switches -->
+				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:param-type="param.type"
+					:param="param"
 					:value="getParamValue(index)"
-					:param-index="index"
-					:param-name="param.name"
-					@change="onParamChange"
-				/>
-
-				<!-- Spinners (KnobSpin) -->
-				<ModuleKnobSpin
-					v-else-if="isSpinner(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
+					:label="getParamLabel(index)"
 					:param-index="index"
 					@change="onParamChange"
 				/>
-
-				<!-- Spinners horizontal (KnobSpinH) -->
-				<ModuleKnobSpinH
-					v-else-if="isSpinnerH(param.n)"
-					:x="param.x"
-					:y="param.y"
-					:value="getParamValue(index)"
-					:param-index="index"
-					@change="onParamChange"
-				/>
+				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 			</template>
 		</g>
 
@@ -120,6 +71,7 @@
 			type="input"
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
+			:connected="connectedInputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
@@ -135,13 +87,14 @@
 			type="output"
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
+			:connected="connectedOutputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
 		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
-		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ type }}) </text>
+		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ instance.type }}) </text>
 	</g>
 </template>
 <script setup lang="ts">
@@ -154,7 +107,6 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
-	import { MODULE_COLORS } from '../../constants';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../composables/useModuleControls';
@@ -166,12 +118,13 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
 
 	const props = defineProps<{
-		type: number;
 		instance?: ModuleInstance;
 		isSelected?: boolean;
+		connectedInputs?: Set<number>;
+		connectedOutputs?: Set<number>;
 	}>();
 
 	const emit = defineEmits<{
@@ -198,16 +151,15 @@
 		});
 	}
 
-	const instance = computed(() => props.instance || { colour: 0 });
+	const instance = computed(() => props.instance as ModuleInstance);
 	const moduleIdx = computed(() => instance.value.index || 0);
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
-		return getModule(props.type) || null;
+		return getModule(instance.value.type) || null;
 	});
 
 	const x = computed(() => (instance.value.horiz || 0) * 256);
 	const y = computed(() => (instance.value.vert || 0) * 16);
-	const colour = computed(() => instance.value.colour || 0);
 
 	// Reactive local parameter values
 	const localLv = ref<number[]>([]);
@@ -230,8 +182,6 @@
 		{ immediate: true },
 	);
 
-	const moduleColor = computed(() => MODULE_COLORS[colour.value] || MODULE_COLORS[0]);
-
 	const displayName = computed(() => {
 		return instance.value.uname || moduleDef.value?.short || 'Module';
 	});
@@ -252,6 +202,13 @@
 			return p?.def ?? 64;
 		}
 		return 64;
+	}
+
+	function getParamLabel(index: number): ParamLabel | undefined {
+		if (typeof instance.value.paramLabels === 'undefined' || instance.value.paramLabels?.length === 0) return undefined;
+		const idx = instance.value.paramLabels.findIndex((label) => label.paramIndex === index);
+		if (idx < 0) return undefined;
+		return instance.value.paramLabels[idx];
 	}
 
 	// Handle parameter change from controls
@@ -281,12 +238,3 @@
 		emit('modeChange', moduleIdx.value, index, value);
 	}
 </script>
-<style scoped>
-	.module {
-		cursor: default;
-		color: v-bind(moduleColor);
-	}
-	.module.selected {
-		filter: drop-shadow(0 2px 6px rgba(0, 0, 0, 0.5));
-	}
-</style>

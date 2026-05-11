@@ -109,7 +109,7 @@ export function useModuleSelecting(svgEl: Ref<SVGSVGElement | null>, modules: Re
 		} else {
 			uiStore.selectModules([index]);
 		}
-		uiStore.selectedCable = null;
+		uiStore.selectedCables = [];
 	}
 
 	function handleCanvasClick() {

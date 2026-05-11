@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable } from './nmg2PatchParser';
+import type { Patch, ModuleInstance, Cable } from '@/types';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -116,6 +116,29 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 	return makeSection(0x4d, bw.flush());
 }
 
+function writeParamNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
+	const labeled = modules.filter((m) => m.paramLabels && m.paramLabels.length > 0);
+	if (labeled.length === 0) return null;
+
+	const bw = new BitWriter();
+	bw.write(2, areaIdx);
+	bw.write(8, labeled.length);
+	for (const m of labeled) {
+		bw.write(8, m.index);
+		const moduleLen = m.paramLabels!.reduce((sum, e) => sum + 3 + e.labels.length * 7, 0);
+		bw.write(8, moduleLen);
+		for (const entry of m.paramLabels!) {
+			bw.write(8, entry.isString ? 1 : 0);
+			bw.write(8, 1 + entry.labels.length * 7);
+			bw.write(8, entry.paramIndex);
+			for (const label of entry.labels) {
+				for (let i = 0; i < 7; i++) bw.write(8, i < label.length ? label.charCodeAt(i) : 0);
+			}
+		}
+	}
+	return makeSection(0x5b, bw.flush());
+}
+
 function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
 	const named = modules.filter((m) => m.uname && m.uname.length > 0);
 	if (named.length === 0) return null;
@@ -162,6 +185,7 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	const written52 = new Set<number>();
 	const written4d = new Set<number>();
 	const written5a = new Set<number>();
+	const written5b = new Set<number>();
 
 	let ofs = 0;
 	while (ofs < sectionDataLen) {
@@ -180,6 +204,17 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		} else if (type === 0x4d && areaIdx <= 1 && !written4d.has(areaIdx)) {
 			outSections.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
 			written4d.add(areaIdx);
+			// Param names follow params in Delphi write order; emit here so
+			// labels survive even if the template predates them.
+			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+			if (paramNamesSection) outSections.push(paramNamesSection);
+			written5b.add(areaIdx);
+		} else if (type === 0x5b && areaIdx <= 1 && !written5b.has(areaIdx)) {
+			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+			if (paramNamesSection) outSections.push(paramNamesSection);
+			written5b.add(areaIdx);
+		} else if (type === 0x5b && areaIdx <= 1 && written5b.has(areaIdx)) {
+			// Already emitted via 0x4d trigger; skip the template's 0x5b.
 		} else if (type === 0x5a && areaIdx <= 1 && !written5a.has(areaIdx)) {
 			const namesSection = writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
 			// Only emit if there are named modules; if none, omit the section entirely

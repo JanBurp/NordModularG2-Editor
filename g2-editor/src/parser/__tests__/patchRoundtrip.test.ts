@@ -1,4 +1,4 @@
-import type { Cable, ModuleInstance, Patch } from '../nmg2PatchParser';
+import type { Cable, ModuleInstance, ParamLabel, Patch } from '@/types';
 import { describe, expect, it } from 'vitest';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
 
@@ -340,6 +340,74 @@ describe('chained edits round-trip', () => {
 
 		expect(modulesAfterParse).toEqual(modulesBeforeSerialize);
 		expect(cablesAfterParse).toEqual(cablesBeforeSerialize);
+	});
+});
+
+describe('paramLabels round-trip', () => {
+	it('preserves user-set labels parsed from a fixture', () => {
+		// Find a fixture that actually has labels for a useful comparison
+		const fixtures = ['Basics  NL2.pch2', 'DXBass FM4.pch2', 'Analogue NL2.pch2'];
+		const fixture = fixtures.find((f) => {
+			const { patch } = loadFixture(f);
+			return patch.areas.some((a) => a.modules.some((m) => m.paramLabels && m.paramLabels.length > 0));
+		});
+		expect(fixture).toBeDefined();
+
+		const { name, rawHex, patch: patchA } = loadFixture(fixture!);
+		const newHex = serializePatch(name, patchA, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		for (const i of [0, 1] as const) {
+			const labeledA = patchA.areas[i].modules.filter((m) => m.paramLabels && m.paramLabels.length > 0);
+			const labeledB = patchB.areas[i].modules.filter((m) => m.paramLabels && m.paramLabels.length > 0);
+			expect(labeledB.map((m) => m.index).sort()).toEqual(labeledA.map((m) => m.index).sort());
+			for (const ma of labeledA) {
+				const mb = labeledB.find((m) => m.index === ma.index)!;
+				expect(mb.paramLabels).toEqual(ma.paramLabels);
+			}
+		}
+	});
+
+	it('preserves manually-added labels through round-trip', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+
+		const labels: ParamLabel[] = [
+			{ paramIndex: 0, isString: true, paramLen: 1 + 7 * 3, labels: ['Sine', 'Square', 'Saw'] },
+			{ paramIndex: 2, isString: true, paramLen: 1 + 7 * 2, labels: ['On', 'Off'] },
+		];
+
+		const mod: ModuleInstance = {
+			type: 1,
+			index: 1,
+			horiz: 0,
+			vert: 0,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
+			paramLabels: labels,
+		};
+		mutAddModule(patch, 1, mod);
+
+		const newHex = serializePatch(name, patch, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const added = patchB.areas[1].modules.find((m) => m.index === 1);
+		expect(added).toBeDefined();
+		expect(added!.paramLabels).toEqual(labels);
+	});
+
+	it('omits 0x5b chunk when no module has labels', () => {
+		// EmptyPatch starts with no labels; round-trip should not introduce any
+		const { name, rawHex, patch: patchA } = loadFixture('EmptyPatch.pch2');
+		const newHex = serializePatch(name, patchA, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		for (const i of [0, 1] as const) {
+			expect(patchB.areas[i].modules.every((m) => !m.paramLabels)).toBe(true);
+		}
 	});
 });
 

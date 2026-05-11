@@ -24,9 +24,10 @@
 						}"
 						draggable="true"
 						@dragstart="(e) => handleModuleDragStart(e, module.id)"
+						@dragend="handleModuleDragEnd"
 					>
 						<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
-							<Module :type="module.id" :instance="getModuleInstance(module.id)" />
+							<Module :instance="getModuleInstance(module.id)" />
 						</svg>
 					</div>
 				</div>
@@ -41,6 +42,9 @@
 	import SearchInput from '../common/SearchInput.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
+	import { useUiStore } from '@/store/ui';
+
+	const ui = useUiStore();
 
 	const categories = computed(() => getAllCategories());
 	const expandedCategories = ref(getAllCategories());
@@ -145,8 +149,8 @@
 				}) || [];
 
 			moduleInstances.set(moduleId, {
-				index: 0,
 				type: moduleId,
+				index: 0,
 				horiz: 0,
 				vert: 0,
 				colour: 0,
@@ -159,6 +163,10 @@
 
 	function handleModuleDragStart(e: DragEvent, moduleId: number) {
 		if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
-		window.__g2DragTypeId = moduleId;
+		ui.draggedModuleId = moduleId;
+	}
+
+	function handleModuleDragEnd() {
+		ui.draggedModuleId = null;
 	}
 </script>

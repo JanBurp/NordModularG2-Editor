@@ -22,6 +22,8 @@ Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/def
 
 > Note: the interrupt endpoint (`0x81`) is polled with `libusb_bulk_transfer`, not `libusb_interrupt_transfer`. On macOS, interrupt_transfer can ignore timeouts after rapid transfers and hang the watch loop.
 
+> **`libusb_clear_halt` gotcha:** Do NOT call `libusb_clear_halt` on a freshly cold-reset G2. With no halt present, the resulting CLEAR_FEATURE(ENDPOINT_HALT) request puts the device in a state where streaming notifications still flow (e.g. `assigned_voices`) but direct queries time out (`recv_interrupt` returns nothing) and BULK_OUT eventually stalls on the next send. Only issue `libusb_clear_halt` after a verified halt condition (e.g. a prior bulk transfer returned `LIBUSB_ERROR_PIPE`).
+
 ---
 
 ## 2. Packet Framing
@@ -172,6 +174,20 @@ Packet:  00 09  01 2C 41 7D 00  CRC_HI CRC_LO
 ```
 
 Response: Embedded ACK.
+
+### Minimal cold-connect (daemon flow)
+
+The full 4-step sequence above mirrors the Delphi editor. The `g2-cli` daemon uses a simpler cold-connect that **skips CMD_INIT entirely**:
+
+```
+1. drain pending interrupts (consume any stale stream from a prior session)
+2. send START_NOTIFICATIONS (0x7D 0x00)
+3. read the embedded ACK
+```
+
+This works because every subsequent query goes through the daemon's disarm → body → rearm wrapper (`g2_watch_disarm()` / `g2_watch_rearm()`), which sends STOP_COMM before the query and START_COMM after. GET_PATCH_VERSION inside each query syncs the version counter on demand, so the patch-version reset that CMD_INIT performs is not needed.
+
+**Critical:** this flow only works if `libusb_clear_halt` is **not** called between attach and START_COMM (see §1 gotcha). The reconnect-after-cable-pull path uses the same minimal sequence.
 
 ---
 

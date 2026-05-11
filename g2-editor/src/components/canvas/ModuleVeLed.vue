@@ -11,7 +11,8 @@
 	/>
 </template>
 <script setup lang="ts">
+	import type { VisualElement } from '../../types';
 	defineProps<{
-		ve: object;
+		ve: VisualElement;
 	}>();
 </script>

@@ -1,16 +1,43 @@
 export interface VisualElement {
 	type: string;
+	x?: number;
+	y?: number;
+	x1?: number;
+	y1?: number;
+	x2?: number;
+	y2?: number;
+	w?: number;
+	h?: number;
+	d?: string;
+	f?: string;
+	xo?: number;
+	func?: string;
+	lv?: number[];
+	moduleId?: number;
 	[key: string]: unknown;
 }
 
+export interface ParamLabel {
+	paramIndex: number;
+	isString: boolean;
+	paramLen: number;
+	labels: string[];
+}
+
 export interface ModuleInstance {
-	index?: number;
-	horiz?: number;
-	vert?: number;
-	colour?: number;
-	uname?: string | null;
-	lv?: number[];
-	modes?: number[];
+	index: number;
+	type: number;
+	horiz: number;
+	vert: number;
+	colour: number;
+	uprate: number;
+	leds: number;
+	pcnt: number;
+	lv: number[];
+	modes: number[];
+	uname?: string;
+	paramLabels?: ParamLabel[];
+	[key: string]: unknown;
 }
 
 export interface ModuleParam {
@@ -19,6 +46,7 @@ export interface ModuleParam {
 	n: string;
 	x: number;
 	y: number;
+	w?: number;
 }
 
 export interface ModuleMode {

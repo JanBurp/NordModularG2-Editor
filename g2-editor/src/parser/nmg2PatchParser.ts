@@ -6,63 +6,10 @@
  */
 
 import { getModule } from '../renderer/nmg2mods';
+import type { ModuleInstance, ParamLabel } from '../types/module';
+import type { Area, Cable, Patch, PatchDescription } from '../types/patch';
 
-export interface ModuleInstance {
-	index: number;
-	type: number;
-	horiz: number;
-	vert: number;
-	colour: number;
-	uprate: number;
-	leds: number;
-	pcnt: number;
-	lv: number[];
-	modes: number[];
-	uname?: string;
-	[key: string]: unknown;
-}
-
-export interface Cable {
-	colour: number;
-	smod: number;
-	scon: number;
-	dir: number;
-	dmod: number;
-	dcon: number;
-	[key: string]: unknown;
-}
-
-export interface Area {
-	name: string;
-	modules: ModuleInstance[];
-	cableList: Cable[];
-	paramaterDataOfs: number;
-	nummod?: number;
-	numcab?: number;
-	[key: string]: unknown;
-}
-
-export interface PatchDescription {
-	voices: number;
-	height: number;
-	unk2: number;
-	red: number;
-	blue: number;
-	yellow: number;
-	orange: number;
-	green: number;
-	purple: number;
-	white: number;
-	monopoly: number;
-	variation: number;
-	category: number;
-}
-
-export interface Patch {
-	areas: [Area, Area];
-	description?: PatchDescription;
-	mode?: { area: 0 | 1; variation: number };
-}
+export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription };
 
 function pch2_(data: ArrayBuffer) {
 	const slots: string[] = [];
@@ -175,6 +122,48 @@ function pch2_(data: ArrayBuffer) {
 			ofs += j + 1;
 			if (charcode) ofs--;
 			setModuleName(areaIdx, index, str);
+		}
+		return 'Area=' + areaIdx + ':Count=' + nummod;
+	}
+
+	function parseParamNames(data: Uint8Array) {
+		const areaIdx = getBits(2, data);
+		const nummod = getBits(8);
+		if (areaIdx > 1) return 'Area=' + areaIdx;
+		for (let i = 0; i < nummod; i++) {
+			const modIdx = getBits(8);
+			const moduleLen = getBits(8);
+			const entries: ParamLabel[] = [];
+			let bytesRemaining = moduleLen;
+			while (bytesRemaining > 0) {
+				const isString = getBits(8);
+				const paramLen = getBits(8);
+				const paramIndex = getBits(8);
+				bytesRemaining -= 3;
+				const entry: ParamLabel = {
+					paramIndex,
+					isString: isString === 1,
+					paramLen,
+					labels: [],
+				};
+				if (paramLen - 1 > 0) {
+					const labelCount = Math.floor((paramLen - 1) / 7);
+					for (let j = 0; j < labelCount; j++) {
+						let str = '';
+						for (let k = 0; k < 7; k++) {
+							const c = getBits(8);
+							if (c) str += String.fromCharCode(c);
+						}
+						entry.labels.push(str);
+						bytesRemaining -= 7;
+					}
+				}
+				entries.push(entry);
+			}
+			if (entries.length > 0) {
+				const m = findModule(aof + areaIdx, modIdx);
+				if (m) m.paramLabels = entries;
+			}
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
@@ -349,6 +338,7 @@ function pch2_(data: ArrayBuffer) {
 		0x11: ['Perf data', parsePrfData],
 		0x52: ['Cable List', parseCableList],
 		0x4d: ['Parameters', parseModuleParameters],
+		0x5b: ['Param Names', parseParamNames],
 	};
 
 	const hdr = new Uint8Array(data, 0, 320);

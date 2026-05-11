@@ -7,7 +7,6 @@ declare module '*.vue' {
 }
 
 interface Window {
-	__g2DragTypeId?: number;
 	electronAPI: {
 		patches: {
 			list: (folder: string) => Promise<{

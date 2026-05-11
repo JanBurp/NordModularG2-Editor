@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable } from './nmg2PatchParser';
+import type { Patch, ModuleInstance, Cable } from '@/types';
 
 export function mutDeleteCable(patch: Patch, areaIdx: 0 | 1, cable: { smod: number; scon: number; dmod: number; dcon: number }): void {
 	const list = patch.areas[areaIdx].cableList ?? [];
