@@ -1,3 +1,4 @@
+// @ts-nocheck
 import type { ModuleDefinition } from '../types/index.ts';
 
 // prettier-ignore
