@@ -55,6 +55,9 @@
 	import Module from './Module.vue';
 	import Cables from './Cables.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
+	import { useUiStore } from '@/store/ui';
+
+	const ui = useUiStore();
 
 	const props = defineProps({
 		modules: {
@@ -253,7 +256,7 @@
 		if (!mp) return;
 		const col = Math.max(0, Math.floor(mp.x / 256));
 		const row = Math.max(0, Math.floor(mp.y / 16));
-		const typeId = window.__g2DragTypeId;
+		const typeId = ui.draggedModuleId;
 		const modDef = typeId ? getModule(typeId) : null;
 		const modHeight = (modDef?.height || 2) * 16;
 		if (!dropGhost) {
@@ -273,7 +276,6 @@
 	function clearDropGhost() {
 		dropGhost?.remove();
 		dropGhost = null;
-		delete window.__g2DragTypeId;
 	}
 
 	function handleModuleDropOnWrapper(e: DragEvent) {
