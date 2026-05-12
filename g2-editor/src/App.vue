@@ -8,14 +8,14 @@
 				<ToolBarLabel class="w-8">Perf:</ToolBarLabel>
 				<ToolBarText class="w-36">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-12">{{ device.bpm }}</ToolBarText>
+				<ToolBarText class="w-13">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle" :active="device.clockRunning">Run</Button>
+				<ToolBarDivider />
 				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
+				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.deviceName || '' }}</ToolBarText>
-				<Button variant="toggle" :active="device.device?.mode == 'Perf'">Perf</Button>
+				<Button variant="toggle" :active="device.device?.mode === 'Performance'">Perf</Button>
 			</template>
-
-			<ToolBarDivider />
 
 			<BtnGroup
 				class="ml-auto"

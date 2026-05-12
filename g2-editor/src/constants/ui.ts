@@ -21,6 +21,6 @@ export const AREA_OPTIONS = [
 ];
 
 export const VARIATION_OPTIONS = Array.from({ length: 9 }, (_, i) => ({
-	label: i < 8 ? String(i + 1) : 'init',
+	label: i < 8 ? String(i + 1) : 'INIT ',
 	value: i,
 }));
