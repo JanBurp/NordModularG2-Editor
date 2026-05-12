@@ -563,6 +563,58 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
 		},
 
+		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleIndex);
+			if (!mod?.paramLabels) return;
+			const entry = (mod.paramLabels as any[]).find((pl) => pl.paramIndex === paramIndex);
+			if (!entry) return;
+			entry.labels[0] = label;
+			this.slots[slot].rawHex = null;
+			// TODO: CLI set-param-label command when available
+		},
+
+		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const location = area === 'voice' ? 'va' : 'fx';
+			const cableList = patch.areas[areaIdx].cableList ?? [];
+			const matching = cableList.filter((c) => {
+				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
+				return ((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) || ((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)));
+			});
+			if (matching.length === 0) return;
+			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color } : c));
+			this.slots[slot].rawHex = null;
+			await window.cli.runBatch(
+				matching.map((c) => ['set-cable-color', slot, location, String(color), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]),
+			);
+		},
+
+		async deleteConnectedCables(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', area: 'voice' | 'fx'): Promise<void> {
+			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const patch = this.slots[slot].patch;
+			if (!patch) return;
+			const areaIdx = area === 'voice' ? 1 : 0;
+			const location = area === 'voice' ? 'va' : 'fx';
+			const cableList = patch.areas[areaIdx].cableList ?? [];
+			const matching = cableList.filter((c) => {
+				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
+				return ((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) || ((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)));
+			});
+			if (matching.length === 0) return;
+			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
+			this.slots[slot].rawHex = null;
+			await window.cli.runBatch(
+				matching.map((c) => ['del-cable', slot, location, String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]),
+			);
+		},
+
 		async deleteSelection(
 			selectedModules: number[],
 			selectedCables: Cable[],

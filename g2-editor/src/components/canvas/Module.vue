@@ -54,6 +54,7 @@
 					:label="getParamLabel(index)"
 					:param-index="index"
 					@change="onParamChange"
+					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
 				/>
 				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
 				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
@@ -74,6 +75,8 @@
 			:connected="connectedInputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
+			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
+			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
 		/>
 
 		<!-- Output jacks -->
@@ -90,6 +93,8 @@
 			:connected="connectedOutputs?.has(idx)"
 			@jackDragStart="(info) => emit('jackDragStart', info)"
 			@jackDragEnd="(info) => emit('jackDragEnd', info)"
+			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
+			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
@@ -120,7 +125,7 @@
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { MODULE_COLORS, MODULE_COLORS_ORDER } from '../../constants/moduleColors';
+	import { buildColorSwatches } from '../../composables/useColorSwatches';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -138,6 +143,9 @@
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 		moduleDelete: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colourId: number];
+		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
+		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
@@ -147,19 +155,15 @@
 	}
 
 	function onContextMenu(e: MouseEvent) {
-		const colorSwatches = Object.entries(MODULE_COLORS_ORDER)
-			.sort(([a], [b]) => Number(a) - Number(b))
-			.map(([, colorId]) => ({
-				color: MODULE_COLORS[colorId],
-				action: () => emit('moduleColorChange', moduleIdx.value, colorId),
-			}));
-
 		openContextMenu(e, [
 			{ label: 'Rename…', action: () => onTitleDblClick() },
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
 			{ type: 'separator' },
-			{ label: 'Set Color', children: [{ type: 'swatches', swatches: colorSwatches }] },
+			{
+				label: 'Set Color',
+				children: [{ type: 'swatches', swatches: buildColorSwatches((id) => emit('moduleColorChange', moduleIdx.value, id)) }],
+			},
 		]);
 	}
 

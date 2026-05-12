@@ -25,6 +25,11 @@
 				@jack-drag-end="(info) => cablesRef?.handleJackDragEnd(info)"
 				@module-drag-start="handleModuleDragStart"
 				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
+				@module-delete="(idx) => emit('moduleDelete', idx)"
+				@module-color-change="(idx, colorId) => emit('moduleColorChange', idx, colorId)"
+				@jack-delete-connected="(info) => emit('jackDeleteConnected', info)"
+				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
+				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<rect
 				v-if="isDraggingSelection && selectionRect"
@@ -112,6 +117,11 @@
 		moduleDrop: [info: { typeId: number; col: number; row: number }];
 		canvasClick: [];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
+		moduleDelete: [moduleIndex: number];
+		moduleColorChange: [moduleIndex: number, colorId: number];
+		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
+		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
 	}>();
 
 	const svgRef = ref<SVGSVGElement | null>(null);
