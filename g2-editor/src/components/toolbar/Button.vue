@@ -12,11 +12,7 @@
 		:disabled="disabled"
 		@click="handleClick"
 	>
-		<span
-			v-if="indicator"
-			class="indicator-strip"
-			:class="indicatorValue ? 'indicator-bright' : 'indicator-dimmed'"
-		/>
+		<span v-if="indicator" class="indicator-strip" :class="indicatorValue ? 'indicator-bright' : 'indicator-dimmed'" />
 		<slot />
 	</button>
 </template>
@@ -59,24 +55,23 @@
 </script>
 
 <style scoped>
-.btn {
-	position: relative;
-}
+	.btn {
+		position: relative;
+	}
 
-.indicator-strip {
-	position: absolute;
-	top: 2px;
-	left: 2px;
-	right: 2px;
-	height: 3px;
-	border-radius: 2px 2px 0 0;
-}
+	.indicator-strip {
+		position: absolute;
+		top: 0px;
+		left: 0px;
+		right: 0px;
+		height: 4px;
+	}
 
-.indicator-strip.indicator-bright {
-	background-color: #dc3232;
-}
+	.indicator-strip.indicator-bright {
+		background-color: #ff3232;
+	}
 
-.indicator-strip.indicator-dimmed {
-	background-color: rgba(220, 50, 50, 0.4);
-}
+	.indicator-strip.indicator-dimmed {
+		background-color: rgba(220, 50, 50, 0.4);
+	}
 </style>
