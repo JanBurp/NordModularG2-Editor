@@ -12,11 +12,12 @@
 			<template v-for="(item, idx) in items" :key="idx">
 				<li v-if="item.type === 'separator'" class="border-t border-neutral-700 my-1 mx-2" />
 
-				<li v-else-if="item.type === 'swatches'" class="px-2 py-1.5 flex flex-wrap gap-1">
+				<li v-else-if="item.type === 'swatches'" class="grid grid-cols-4">
 					<button
 						v-for="(sw, si) in item.swatches"
 						:key="si"
-						class="w-5 h-5 rounded-sm border-2 border-neutral-600 hover:border-neutral-200 cursor-pointer"
+						class="h-8 border border-neutral-600 hover:border-2 hover:border-neutral-200 cursor-pointer"
+						:class="sw.fullWidth ? 'col-span-4 w-full' : 'w-10'"
 						:style="{ backgroundColor: sw.color }"
 						@click.stop="onSwatchClick(sw)"
 					/>
@@ -26,7 +27,8 @@
 					v-else
 					:ref="(el) => setItemRef(idx, el as HTMLElement | null)"
 					class="flex items-center justify-between px-3 py-1.5 select-none"
-					:class="[item.disabled ? 'text-neutral-500 cursor-not-allowed' : 'hover:bg-neutral-700 cursor-pointer', activeSubmenu === idx ? 'bg-neutral-700' : '']"
+					:class="[item.disabled ? 'text-neutral-500 cursor-not-allowed' : 'hover:bg-neutral-700 cursor-pointer', activeSubmenu === idx ? 'bg-neutral-700' : '', item.bgColor ? 'text-neutral-900' : '']"
+					:style="item.bgColor ? { backgroundColor: item.bgColor } : {}"
 					@mouseenter="onItemEnter(idx)"
 					@click.stop="onItemClick(item)"
 				>

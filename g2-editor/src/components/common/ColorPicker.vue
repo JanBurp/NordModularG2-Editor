@@ -1,9 +1,10 @@
 <template>
 	<div class="relative" @mouseleave="closePicker()">
 		<div :style="currentColorStyle" class="border border-neutral-600 rounded min-w-10 h-8 cursor-pointer" @click.stop="handleClick"></div>
-		<div v-if="pickerOpen" class="z-50 absolute bg-neutral-200 grid grid-cols-4 grid-rows-4 border border-neutral-600 rounded w-40">
+		<div v-if="pickerOpen" class="z-50 absolute bg-neutral-200 grid grid-cols-4 border border-neutral-600 rounded w-40">
+			<div class="col-span-4 h-8 border border-neutral-600" :style="colorStyle(0)" @click.stop="setColor(0)" />
 			<template v-for="index in MODULE_COLORS_ORDER">
-				<div v-if="index > 0" class="w-10 h-8 border border-neutral-600" :style="colorStyle(index)" @click.stop="setColor(index)"></div>
+				<div v-if="index > 0" class="w-10 h-8 border border-neutral-600" :style="colorStyle(index)" @click.stop="setColor(index)" />
 			</template>
 		</div>
 	</div>

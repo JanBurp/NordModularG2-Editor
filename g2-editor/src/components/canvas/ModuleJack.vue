@@ -9,7 +9,18 @@
 		</template>
 		<template v-else>
 			<rect :x="x - 5.5" :y="y - 5.5" width="11" height="11" rx="1" ry="1" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<rect :x="x - 2.5" :y="y - 2.5" width="5" height="5" rx="1" ry="1" :fill="connected ? jackColor : '#000'" stroke="#333" stroke-width="1" class="jack" />
+			<rect
+				:x="x - 2.5"
+				:y="y - 2.5"
+				width="5"
+				height="5"
+				rx="1"
+				ry="1"
+				:fill="connected ? jackColor : '#000'"
+				stroke="#333"
+				stroke-width="1"
+				class="jack"
+			/>
 		</template>
 		<!-- <text
 			:x="labelX"
@@ -25,6 +36,7 @@
 <script setup lang="ts">
 	import { JACK_COLORS } from '../../constants';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { buildCableColorItems } from '../../composables/useColorSwatches';
 
 	const props = defineProps<{
 		name: string;
@@ -54,7 +66,8 @@
 				colour: string;
 			},
 		];
-		jackDisconnect: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
@@ -65,8 +78,15 @@
 		if (!props.connected) return;
 		openContextMenu(e, [
 			{
-				label: 'Disconnect',
-				action: () => emit('jackDisconnect', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
+				label: 'Set Cable Color',
+				children: buildCableColorItems((colorId) =>
+					emit('jackSetCableColor', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colorId }),
+				),
+			},
+			{ type: 'separator' },
+			{
+				label: 'Delete connected',
+				action: () => emit('jackDeleteConnected', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
 			},
 		]);
 	}

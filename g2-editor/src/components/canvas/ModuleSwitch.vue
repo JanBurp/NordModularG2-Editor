@@ -89,6 +89,7 @@
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
+		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
 	}>();
 
 	const paramDef = computed<ParamDefinition>(() => {
@@ -198,7 +199,10 @@
 	const { open: openContextMenu } = useContextMenu();
 
 	function onContextMenu(e: MouseEvent) {
-		openContextMenu(e, [{ label: 'Reset to default', action: () => emit('change', props.paramIndex, paramDef.value.def ?? 0) }]);
+		if (!props.label) return;
+		openContextMenu(e, [
+			{ label: 'Rename label', action: () => emit('paramLabelEdit', { paramIndex: props.paramIndex, currentLabel: props.label!.labels[0] ?? '' }) },
+		]);
 	}
 
 	function onCycleValue() {

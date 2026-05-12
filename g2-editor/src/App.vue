@@ -81,6 +81,11 @@
 						@mode-change="handleModeChange"
 						@param-change="handleParamChange"
 						@module-label-edit="handleModuleLabelEdit"
+						@module-delete="handleModuleDelete"
+						@module-color-change="handleModuleColorChange"
+						@jack-delete-connected="handleJackDeleteConnected"
+						@jack-set-cable-color="handleJackSetCableColor"
+						@param-label-edit="handleParamLabelEdit"
 					/>
 					<PatchCanvas
 						v-show="uiStore.area === 0"
@@ -98,6 +103,11 @@
 						@mode-change="handleModeChange"
 						@param-change="handleParamChange"
 						@module-label-edit="handleModuleLabelEdit"
+						@module-delete="handleModuleDelete"
+						@module-color-change="handleModuleColorChange"
+						@jack-delete-connected="handleJackDeleteConnected"
+						@jack-set-cable-color="handleJackSetCableColor"
+						@param-label-edit="handleParamLabelEdit"
 					/>
 				</template>
 			</div>
@@ -117,6 +127,14 @@
 
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
+
+	<Dialog v-model="showParamLabelDialog" title="Rename Label" @confirm="confirmParamLabel" @cancel="showParamLabelDialog = false">
+		<input
+			v-model="editingParamLabel"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			maxlength="16"
+		/>
+	</Dialog>
 
 	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
 		<input
@@ -247,6 +265,11 @@
 	const editingLabel = ref('');
 	const editingModuleId = ref<number | null>(null);
 
+	const showParamLabelDialog = ref(false);
+	const editingParamLabel = ref('');
+	const editingParamLabelModuleId = ref<number | null>(null);
+	const editingParamLabelParamIndex = ref<number | null>(null);
+
 	function handleModuleLabelEdit({ moduleIndex, currentLabel }: { moduleIndex: number; currentLabel: string }): void {
 		editingModuleId.value = moduleIndex;
 		editingLabel.value = currentLabel;
@@ -258,6 +281,47 @@
 		const area = uiStore.area === 1 ? 'voice' : 'fx';
 		await slotsStore.setModuleLabel(editingModuleId.value, editingLabel.value, area as 'voice' | 'fx');
 		showLabelDialog.value = false;
+	}
+
+	function handleParamLabelEdit({ moduleIndex, paramIndex, currentLabel }: { moduleIndex: number; paramIndex: number; currentLabel: string }): void {
+		editingParamLabelModuleId.value = moduleIndex;
+		editingParamLabelParamIndex.value = paramIndex;
+		editingParamLabel.value = currentLabel;
+		showParamLabelDialog.value = true;
+	}
+
+	async function confirmParamLabel(): Promise<void> {
+		if (editingParamLabelModuleId.value === null || editingParamLabelParamIndex.value === null) return;
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		await slotsStore.setParamLabel(editingParamLabelModuleId.value, editingParamLabelParamIndex.value, editingParamLabel.value, area);
+		showParamLabelDialog.value = false;
+	}
+
+	// ── Module delete / color ─────────────────────────────────────────────────
+
+	async function handleModuleDelete(moduleIndex: number): Promise<void> {
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		await slotsStore.deleteModule(moduleIndex, area as 'voice' | 'fx');
+		uiStore.selectModules(uiStore.selectedModules.filter((i) => i !== moduleIndex));
+	}
+
+	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
+		uiStore.setModuleColor(colorId);
+		await slotsStore.setModuleColors(targets, colorId, area as 'voice' | 'fx');
+	}
+
+	// ── Jack disconnect / recolor ─────────────────────────────────────────────
+
+	async function handleJackDeleteConnected({ moduleIndex, connectorIndex, type }: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }): Promise<void> {
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
+	}
+
+	async function handleJackSetCableColor({ moduleIndex, connectorIndex, type, colorId }: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }): Promise<void> {
+		const area = uiStore.area === 1 ? 'voice' : 'fx';
+		await slotsStore.setCableColor(moduleIndex, connectorIndex, type, colorId, area);
 	}
 
 	// ── Keyboard ──────────────────────────────────────────────────────────────

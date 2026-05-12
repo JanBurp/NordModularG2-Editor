@@ -96,6 +96,7 @@ export type { Patch, Area, Cable, PatchDescription } from './patch';
 export interface ContextMenuSwatch {
 	color: string;
 	action: () => void;
+	fullWidth?: boolean;
 }
 
 export interface ContextMenuItem {
@@ -105,4 +106,5 @@ export interface ContextMenuItem {
 	action?: () => void;
 	children?: ContextMenuItem[];
 	swatches?: ContextMenuSwatch[];
+	bgColor?: string;
 }
