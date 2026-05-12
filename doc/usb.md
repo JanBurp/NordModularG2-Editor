@@ -424,10 +424,10 @@ The bulk data from GET_SYNTH_SETTINGS (`0x02`) is parsed at fixed byte offsets:
 
 | Offset | Field | Notes |
 |--------|-------|-------|
-| 4–13 | Synth name | Up to 10 bytes, null-terminated |
-| 13 | Mode | Bit 7: 0=Patch, 1=Performance |
-| 14 | Perf Bank | — |
-| 15 | Perf Location | — |
+| 4+ | Synth name | Variable length, null-terminated (up to 16 chars); use `parse_name(bulkData + 4, name, size)` to extract |
+| 4 + nameLen | Mode | Bit 7: 0=Patch, 1=Performance; where `nameLen` is the return value from `parse_name()` |
+| 4 + nameLen + 1 | Perf Bank | — |
+| 4 + nameLen + 2 | Perf Location | — |
 | 17 | MIDI Slot A channel | Stored 0-indexed; CLI outputs +1 (= channel 1-16) |
 | 18 | MIDI Slot B channel | |
 | 19 | MIDI Slot C channel | |
