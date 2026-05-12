@@ -46,7 +46,7 @@ body {
 }
 
 .btn-variation {
-	@apply w-8 h-8 p-0 text-sm bg-neutral-800;
+	@apply min-w-8 h-8 px-2 text-sm bg-neutral-800;
 }
 
 .btn-active {
