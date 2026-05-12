@@ -72,6 +72,13 @@ export const useDeviceStore = defineStore('device', {
 			if (state.device?.performance) return state.device.performance.clockRunning;
 			return false;
 		},
+		getSlotStatus: (state): boolean[] => {
+			if (!state.device) return [false, false, false, false];
+			return ['a', 'b', 'c', 'd'].map((s) => {
+				const slot = state.device?.slots.find((slot) => slot.slot === s);
+				return slot?.active ?? false;
+			});
+		},
 	},
 
 	actions: {
