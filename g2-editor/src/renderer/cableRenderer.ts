@@ -32,7 +32,7 @@ export interface Jack {
 	y: number;
 }
 
-export interface ModuleDef {
+export interface CableModuleDef {
 	inputs?: Jack[];
 	outputs?: Jack[];
 	[key: string]: any;
@@ -67,8 +67,8 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			return;
 		}
 
-		const smodDef = getModule(smod.type) as ModuleDef | undefined;
-		const dmodDef = getModule(dmod.type) as ModuleDef | undefined;
+		const smodDef = getModule(smod.type) as CableModuleDef | undefined;
+		const dmodDef = getModule(dmod.type) as CableModuleDef | undefined;
 
 		if (!smodDef || !dmodDef) {
 			console.warn(`Cable skipped: module definition not found (source=${smod.type}, dest=${dmod.type})`);
@@ -174,8 +174,8 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const dmod = modules.find((m) => m.index === dmod_i);
 		if (!smod || !dmod) return;
 
-		const smodDef = getModule(smod.type) as ModuleDef | undefined;
-		const dmodDef = getModule(dmod.type) as ModuleDef | undefined;
+		const smodDef = getModule(smod.type) as CableModuleDef | undefined;
+		const dmodDef = getModule(dmod.type) as CableModuleDef | undefined;
 		if (!smodDef || !dmodDef) return;
 
 		const dcon = dmodDef.inputs?.[dcon_i];

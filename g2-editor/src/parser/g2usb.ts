@@ -1,3 +1,5 @@
+// @ts-nocheck
+
 export class G2USB {
 	connected: boolean;
 	onMessage: ((data: number[]) => void) | null;

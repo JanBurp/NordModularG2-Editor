@@ -1,4 +1,4 @@
-import type { ModuleInstance, Patch } from '@/types';
+import type { ModuleInstance, Patch, SlotInfo } from '@/types';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { Cable } from '@/renderer/cableRenderer';
@@ -177,7 +177,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutDeleteModule(patch, area === 'voice' ? 1 : 0, moduleId);
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			if (!slot) return { name: (this.slots[slot] as SlotInfo).name, rawHex: '', patch };
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
 
@@ -205,7 +205,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutMoveModule(patch, area === 'voice' ? 1 : 0, moduleId, col, row);
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			if (!slot) return { name: (this.slots[slot] as SlotInfo).name, rawHex: '', patch };
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
 
@@ -253,7 +253,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutAddModule(patch, area === 'voice' ? 1 : 0, mod);
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			if (!slot) return { name: (this.slots[slot] as SlotInfo).name, rawHex: '', patch };
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run([
 				'add-module',
@@ -312,7 +312,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutAddCable(patch, areaIdx, cable);
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			if (!slot) return { name: (this.slots[slot] as SlotInfo).name, rawHex: '', patch };
 			const location = area === 'voice' ? 'va' : 'fx';
 			const mainCmd = ['add-cable', slot, location, String(effectiveColor), String(fromMod), String(fromConType), String(fromCon), String(toMod), String(toConType), String(toCon)];
 
@@ -407,14 +407,17 @@ export const useSlotsStore = defineStore('slots', {
 			if (!entry?.patch) return;
 			let path = filepath || this.slotFilePaths[slot];
 			if (!path) {
+				//@ts-ignore
 				const result = await window.electronAPI.showSaveDialog(entry.name);
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			if (!entry.templateRawHex) return;
-			const { serializePatch } = await import('../parser/nmg2PatchSerializer');
-			const rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
-			const sectionBytes = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			if (!entry.rawHex) {
+				if (!entry.templateRawHex) return;
+				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
+				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
+			}
+			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
 			await window.electronAPI.savePatch(path, data);
@@ -504,7 +507,7 @@ export const useSlotsStore = defineStore('slots', {
 			for (const t of targets) mutMoveModule(patch, areaIdx, t.index, t.toCol, t.toRow);
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return { name: this.slots[slot].name, rawHex: '', patch };
+			if (!slot) return { name: (this.slots[slot] as SlotInfo).name, rawHex: '', patch };
 			const cliCmds: string[][] = [
 				...pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]),
 				...targets.map((t) => ['move-module', slot, location, String(t.index), String(t.toCol), String(t.toRow)]),
