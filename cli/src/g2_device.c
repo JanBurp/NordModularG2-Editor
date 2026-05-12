@@ -1897,6 +1897,10 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
         } else if (bsubCmd == 0x11) {
             printf("{\"type\":\"perf_settings\"}\n");
             fflush(stdout);
+        } else {
+            printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+            for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+            printf("]}\n"); fflush(stdout);
         }
     } else if (baCmd <= 0x03) {
         uint8_t bslot = baCmd;
@@ -1915,11 +1919,31 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
                     printf("]}\n"); fflush(stdout);
                 }
                 break;
+            case 0x4D:
+                printf("{\"type\":\"param_list\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
+            case 0x5B:
+                printf("{\"type\":\"param_names\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
+            case 0x6F:
+                printf("{\"type\":\"patch_notes\",\"slot\":%u,\"data\":[", bslot);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
             case 0x72:
                 printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
+            default:
+                printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
         }
+    } else {
+        printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+        for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+        printf("]}\n"); fflush(stdout);
     }
     return 0;
 }
