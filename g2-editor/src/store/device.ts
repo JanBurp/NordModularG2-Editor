@@ -117,6 +117,13 @@ export const useDeviceStore = defineStore('device', {
 			}
 		},
 
+		async togglePerfMode() {
+			if (!this.device || this.status !== 'connected') return;
+			const newMode = this.device.mode === 'Performance' ? 'patch' : 'performance';
+			this.device.mode = newMode === 'performance' ? 'Performance' : 'Patch';
+			await window.cli.run(['set-perf-mode', newMode]);
+		},
+
 		updateSynthSettings(ev: { synthName: string; mode: string; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
 			if (!this.device) return;
 			this.device.synthName = ev.synthName;
