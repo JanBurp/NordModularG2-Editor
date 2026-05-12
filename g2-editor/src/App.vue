@@ -23,6 +23,8 @@
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'">Perf</Button>
 			</template>
 
+			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
+
 			<BtnGroup
 				class="ml-auto"
 				:model-value="uiStore.rightPaneTab"
@@ -63,6 +65,10 @@
 			<ToolBarDivider />
 
 			<CableVisibilitySelector />
+
+			<ToolBarDivider />
+
+			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 77.6 }"></CPU>
 		</ToolBar>
 
 		<div class="flex-1 flex overflow-hidden">
@@ -185,6 +191,7 @@
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
+	import CPU from './components/toolbar/CPU.vue';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 
