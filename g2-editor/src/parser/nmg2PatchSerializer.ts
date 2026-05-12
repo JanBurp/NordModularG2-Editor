@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable } from '@/types';
+import type { Patch, ModuleInstance, Cable, PatchDescription } from '@/types';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -164,6 +164,29 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 	return makeSection(0x5a, data);
 }
 
+function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uint8Array {
+	const bw = new BitWriter();
+	// Preserve the first 61 bits (unknown header, not stored during parsing)
+	for (let b = 0; b < 61; b++) {
+		const bitMask = 1 << (7 - (b % 8));
+		bw.write(1, secData[Math.floor(b / 8)] & bitMask ? 1 : 0);
+	}
+	bw.write(5, desc.voices);
+	bw.write(14, desc.height);
+	bw.write(3, desc.unk2);
+	bw.write(1, desc.red);
+	bw.write(1, desc.blue);
+	bw.write(1, desc.yellow);
+	bw.write(1, desc.orange);
+	bw.write(1, desc.green);
+	bw.write(1, desc.purple);
+	bw.write(1, desc.white);
+	bw.write(2, desc.monopoly);
+	bw.write(8, desc.variation);
+	bw.write(8, desc.category);
+	return bw.flush();
+}
+
 /**
  * Re-serializes a Patch to rawHex using section-replacement:
  * mutable sections (module list, cable list, parameters, names) are regenerated
@@ -220,8 +243,11 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 			// Only emit if there are named modules; if none, omit the section entirely
 			if (namesSection) outSections.push(namesSection);
 			written5a.add(areaIdx);
+		} else if (type === 0x21) {
+			const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
+			outSections.push(makeSection(0x21, newData));
 		} else {
-			// Preserve verbatim: description (0x21), text pad (0x6f), perf data (0x11), etc.
+			// Preserve verbatim: text pad (0x6f), perf data (0x11), etc.
 			outSections.push(template.slice(ofs, ofs + 3 + siz));
 		}
 
