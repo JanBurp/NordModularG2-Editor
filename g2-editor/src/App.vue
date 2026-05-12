@@ -14,7 +14,7 @@
 				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
-				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="device.togglePerfMode()">Perf</Button>
+				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 			</template>
 
 			<BtnGroup
@@ -368,6 +368,14 @@
 	// ── G2 connection ─────────────────────────────────────────────────────────
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
+
+	async function handlePerfModeToggle(): Promise<void> {
+		try {
+			await device.togglePerfMode();
+		} catch (e: any) {
+			console.error('togglePerfMode failed:', e?.message ?? e);
+		}
+	}
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
 
