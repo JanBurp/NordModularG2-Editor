@@ -448,24 +448,10 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     int nameLen;
 
     /* Parse synth name (up to 16 bytes at offset 4) */
-    parse_name(bulkData + 4, synthName, sizeof(synthName));
+    nameLen = parse_name(bulkData + 4, synthName, sizeof(synthName));
 
-    /* Verified offsets from raw device dump (synth name "TheBurp", 7 chars + null):
-      * Offset 14: Perf Mode
-      * Offset 15: Perf Bank / location
-      * Offset 16: ?
-      * Offset 17: MIDI Slot A (0-indexed, +1 = MIDI channel 1-16)
-      * Offset 18: MIDI Slot B
-      * Offset 19: MIDI Slot C
-      * Offset 20: MIDI Slot D
-      * Offset 21: MIDI Global channel
-      * Offset 22: Sysex ID (CLI adds 1 when reporting)
-      * Offset 23: Local on (bit 7)
-      * Offset 24: Prog Change Rcv (bit 0), Snd (bit 1)
-      * Offset 25: Send Clock (bit 1), Receive Clock (bit 0)
-      */
-    /* Mode is bit 7 of byte after null terminator (bulkData[13]) */
-    mode = (bulkData[13] >> 7) & 1;  /* mode (bit 7) */
+    /* Mode is bit 7 of byte after name (bulkData[4 + nameLen]) */
+    mode = (bulkData[4 + nameLen] >> 7) & 1;  /* mode (bit 7) */
     midiCh[0] = bulkData[17] + 1;  /* MIDI A (0-indexed stored, +1 = channel 1-16) */
     midiCh[1] = bulkData[18] + 1;  /* MIDI B */
     midiCh[2] = bulkData[19] + 1;  /* MIDI C */
