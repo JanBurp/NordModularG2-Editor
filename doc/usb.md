@@ -624,6 +624,17 @@ When `version != 0x40`:
 | any | `0x11` | `perf_settings` | — |
 | any | `0x29` | `perf_name` | `name` from bulk[4..] |
 
+### Unknown bulk sub-commands (`aCmd 0x0C`)
+
+Unsolicited bulk responses sent after switching PERF mode. Currently emitted as `unknown_bulk` JSON (not yet identified/handled). Known sub-commands:
+
+| `version` | `subCmd` | Observed data | Status |
+|-----------|----------|---------------|--------|
+| `0x05` | `0x80` (128) | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated | Likely slot/patch state |
+| `0x05` | `0x29` (41) | Patch names + metadata (null-terminated strings interspersed with binary) | Likely patch bank list |
+
+These responses arrive automatically after PERF button press (mode switch). They are silently dropped by the CLI daemon until handlers are implemented.
+
 ### Connection events
 
 | JSON type | Trigger |
