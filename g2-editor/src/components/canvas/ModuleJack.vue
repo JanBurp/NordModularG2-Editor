@@ -1,5 +1,5 @@
 <template>
-	<g class="jack-group" :class="type" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup">
+	<g class="jack-group" :class="type" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup" @contextmenu.stop.prevent="onContextMenu">
 		<!-- Larger hit area for easier clicking/dragging -->
 		<circle v-if="type === 'input'" :cx="x" :cy="y" r="10" fill="none" style="pointer-events: all" />
 		<rect v-else :x="x - 10" :y="y - 10" width="20" height="20" rx="1" fill="none" style="pointer-events: all" />
@@ -24,6 +24,7 @@
 </template>
 <script setup lang="ts">
 	import { JACK_COLORS } from '../../constants';
+	import { useContextMenu } from '../../composables/useContextMenu';
 
 	const props = defineProps<{
 		name: string;
@@ -53,9 +54,22 @@
 				colour: string;
 			},
 		];
+		jackDisconnect: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 	}>();
 
+	const { open: openContextMenu } = useContextMenu();
+
 	const jackColor = JACK_COLORS[props.colour] || props.colour;
+
+	function onContextMenu(e: MouseEvent) {
+		if (!props.connected) return;
+		openContextMenu(e, [
+			{
+				label: 'Disconnect',
+				action: () => emit('jackDisconnect', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
+			},
+		]);
+	}
 
 	function onMousedown(e: MouseEvent) {
 		e.stopPropagation();
