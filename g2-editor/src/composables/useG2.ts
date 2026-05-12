@@ -115,6 +115,10 @@ export function useG2() {
 				return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
 			case 'perf_name':
 				return `perf: ${ev.name}`;
+			case 'synth_settings_update':
+				return `synth mode=${ev.mode} name=${ev.synthName}`;
+			case 'perf_settings':
+				return `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`;
 			case 'raw_interrupt':
 				return `intr: ${ev.hex}`;
 			case 'raw_bulk':
@@ -179,6 +183,16 @@ export function useG2() {
 						const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
 						if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
 					}
+					return;
+				}
+				if (ev.type === 'synth_settings_update') {
+					store.updateSynthSettings(ev);
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'perf_settings') {
+					store.updatePerfSettings(ev);
+					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				const category: UsbLogEntry['category'] =
