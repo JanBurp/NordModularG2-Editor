@@ -4,7 +4,7 @@
 			<button
 				v-for="color in cableColors"
 				:key="color.name"
-				class="w-5 h-5 border-2 border-solid rounded cursor-pointer p-0 flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
+				class="w-6 h-6 border-2 border-solid rounded cursor-pointer flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
 				:class="{
 					'opacity-100 shadow-sm': cableVisibility[color.name],
 				}"
@@ -24,7 +24,7 @@
 				></span>
 			</button>
 			<button
-				class="w-6 h-5 border-2 border-neutral-600 rounded bg-gray-300 text-gray-800 text-xs font-bold hover:bg-gray-200"
+				class="w-6 h-6 border-2 border-solid rounded cursor-pointer flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
 				:class="{
 					'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible,
 				}"
@@ -34,7 +34,7 @@
 				H
 			</button>
 			<button
-				class="w-6 h-5 border-2 border-neutral-500 rounded bg-gray-200 text-gray-800 text-xs font-bold ml-1 hover:bg-gray-300 active:bg-gray-400"
+				class="w-6 h-6 border-2 border-solid rounded cursor-pointer flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
 				title="Re-render cables"
 				@click="uiStore.shakeCables()"
 			>

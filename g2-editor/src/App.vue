@@ -5,13 +5,14 @@
 	<div class="flex flex-col h-screen">
 		<ToolBar>
 			<template v-if="device">
-				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
+				<ToolBarLabel class="w-8">Perf:</ToolBarLabel>
 				<ToolBarText class="w-36">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-10">{{ device.bpm }}</ToolBarText>
-				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
-				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
+				<ToolBarText class="w-12">{{ device.bpm }}</ToolBarText>
+				<Button variant="toggle" :active="device.clockRunning">Run</Button>
 				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
+				<ToolBarText class="w-32">{{ device.deviceName || '' }}</ToolBarText>
+				<Button variant="toggle" :active="device.device?.mode == 'Perf'">Perf</Button>
 			</template>
 
 			<ToolBarDivider />
@@ -27,14 +28,14 @@
 		</ToolBar>
 
 		<ToolBar v-if="patchName">
-			<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
+			<ToolBarLabel class="w-8">Patch:</ToolBarLabel>
 			<ToolBarText class="w-36">{{ patchName }}</ToolBarText>
 
 			<div class="flex items-center gap-1.5">
 				<ToolBarLabel>Cat:</ToolBarLabel>
 				<select
 					v-model="selectedCategory"
-					class="h-8 px-2 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+					class="h-8 px-1 border rounded bg-neutral-300 text-black cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
 					title="Sound Category"
 				>
 					<option v-for="cat in soundCategories" :key="cat.id" :value="cat.id">
@@ -310,12 +311,30 @@
 
 	// ── Jack disconnect / recolor ─────────────────────────────────────────────
 
-	async function handleJackDeleteConnected({ moduleIndex, connectorIndex, type }: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }): Promise<void> {
+	async function handleJackDeleteConnected({
+		moduleIndex,
+		connectorIndex,
+		type,
+	}: {
+		moduleIndex: number;
+		connectorIndex: number;
+		type: 'input' | 'output';
+	}): Promise<void> {
 		const area = uiStore.area === 1 ? 'voice' : 'fx';
 		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
 	}
 
-	async function handleJackSetCableColor({ moduleIndex, connectorIndex, type, colorId }: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }): Promise<void> {
+	async function handleJackSetCableColor({
+		moduleIndex,
+		connectorIndex,
+		type,
+		colorId,
+	}: {
+		moduleIndex: number;
+		connectorIndex: number;
+		type: 'input' | 'output';
+		colorId: number;
+	}): Promise<void> {
 		const area = uiStore.area === 1 ? 'voice' : 'fx';
 		await slotsStore.setCableColor(moduleIndex, connectorIndex, type, colorId, area);
 	}
