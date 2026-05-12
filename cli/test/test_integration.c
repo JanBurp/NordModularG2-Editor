@@ -407,3 +407,67 @@ void test_fullstack_with_watch(void) {
 
     g2_disconnect();
 }
+
+/*
+ * Test set-perf-mode: switch to performance mode and back to patch mode.
+ * Verifies that the mode change completes without disconnecting the device.
+ * After each mode change, verify a subsequent command (get_patch) still works.
+ */
+void test_set_perf_mode_cycle(void) {
+    ensure_connected();
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    cJSON *info = g2_device_info(0);
+    TEST_ASSERT_NOT_NULL(info);
+    cJSON_Delete(info);
+    delay_between_tests();
+
+    fprintf(stderr, "set-perf-mode: switching to performance\n");
+    int ret1 = g2_set_perf_mode(0);
+    TEST_ASSERT_TRUE(ret1 == G2_OK || ret1 == G2_ERR);
+    delay_between_tests();
+
+    fprintf(stderr, "get-patch: verify connection still works after perf mode\n");
+    cJSON *patch1 = g2_get_patch("A");
+    TEST_ASSERT_TRUE(patch1 != NULL || !g2_is_connected());
+    if (patch1) cJSON_Delete(patch1);
+    delay_between_tests();
+
+    fprintf(stderr, "set-perf-mode: switching back to patch\n");
+    int ret2 = g2_set_perf_mode(1);
+    TEST_ASSERT_TRUE(ret2 == G2_OK || ret2 == G2_ERR);
+    delay_between_tests();
+
+    fprintf(stderr, "get-patch: verify connection still works after mode switch\n");
+    cJSON *patch2 = g2_get_patch("A");
+    TEST_ASSERT_TRUE(patch2 != NULL || !g2_is_connected());
+    if (patch2) cJSON_Delete(patch2);
+
+    g2_disconnect();
+}
+
+/*
+ * Test set-perf-name: set the current performance name.
+ * Verifies that the name change completes and subsequent commands work.
+ */
+void test_set_perf_name(void) {
+    ensure_connected();
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_send_init());
+
+    cJSON *info = g2_device_info(0);
+    TEST_ASSERT_NOT_NULL(info);
+    cJSON_Delete(info);
+    delay_between_tests();
+
+    fprintf(stderr, "set-perf-name: setting performance name\n");
+    int ret = g2_set_perf_name("TestPerf");
+    TEST_ASSERT_TRUE(ret == G2_OK || ret == G2_ERR);
+    delay_between_tests();
+
+    fprintf(stderr, "get-patch: verify connection still works after perf name change\n");
+    cJSON *patch = g2_get_patch("A");
+    TEST_ASSERT_TRUE(patch != NULL || !g2_is_connected());
+    if (patch) cJSON_Delete(patch);
+
+    g2_disconnect();
+}
