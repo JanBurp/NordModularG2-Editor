@@ -23,8 +23,6 @@
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 			</template>
 
-			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
-
 			<BtnGroup
 				class="ml-auto"
 				:model-value="uiStore.rightPaneTab"
@@ -68,7 +66,7 @@
 
 			<ToolBarDivider />
 
-			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 77.6 }"></CPU>
+			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
 		</ToolBar>
 
 		<div class="flex-1 flex overflow-hidden">
