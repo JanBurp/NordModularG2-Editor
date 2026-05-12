@@ -1848,6 +1848,15 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
             char *s = cJSON_PrintUnformatted(ev);
             if (s) { printf("%s\n", s); fflush(stdout); free(s); }
             cJSON_Delete(ev);
+
+            /* Emit full device info for editor UI update */
+            cJSON *di = g2_device_info(0);
+            if (di) {
+                cJSON_AddStringToObject(di, "type", "device");
+                char *ds = cJSON_PrintUnformatted(di);
+                if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
+                cJSON_Delete(di);
+            }
         } else if (bsubCmd == 0x29) {
             char name[17] = {0};
             int n = 0;
