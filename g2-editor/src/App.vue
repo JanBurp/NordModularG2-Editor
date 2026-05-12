@@ -13,7 +13,7 @@
 				<ToolBarDivider />
 				<BtnGroup :model-value="uiStore.selectedSlotIndex" :options="SLOT_OPTIONS" variant="toggle" @update:model-value="handleSlotClick" />
 				<ToolBarDivider />
-				<ToolBarText class="w-32">{{ device.deviceName || '' }}</ToolBarText>
+				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'">Perf</Button>
 			</template>
 
