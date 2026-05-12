@@ -1,7 +1,11 @@
 {
   "name": "g2-editor",
   "version": "0.1.0",
-  "description": "Electron GUI for Nord G2 CLI",
+  "author": {
+    "name": "Jan den Besten",
+    "url": "https://janburp.github.io/NordModularG2-Editor/"
+  },
+  "description": "Modern Editor for Nord Modular G2",
   "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "electron-vite dev",
