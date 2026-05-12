@@ -1835,7 +1835,19 @@ int g2_set_perf_mode(int mode) {
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[16] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    if (ret <= 0) { g2_err("No response from G2 for set-perf-mode\n"); return G2_ERR; }
+    /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
+    if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
+        if (bulkSize > 0) {
+            uint8_t *bulk = malloc(bulkSize);
+            if (bulk) {
+                recv_bulk(bulk, bulkSize);
+                free(bulk);
+            }
+        }
+    }
     g2_drain_pending();
     return G2_OK;
 }
@@ -1850,7 +1862,8 @@ int g2_set_perf_name(const char *name) {
     send_system_data(0x41, pv_cmd, 2);
     usleep(USB_SEND_DELAY_US);
     int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
-    uint8_t version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
+    if (pv_ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
+    uint8_t version = pv_resp[6];
 
     size_t nlen = strlen(name);
     if (nlen > 16) nlen = 16;
@@ -1864,7 +1877,19 @@ int g2_set_perf_name(const char *name) {
     if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[16] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    if (ret <= 0) { g2_err("No response from G2 for set-perf-name\n"); return G2_ERR; }
+    /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
+    if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
+        if (bulkSize > 0) {
+            uint8_t *bulk = malloc(bulkSize);
+            if (bulk) {
+                recv_bulk(bulk, bulkSize);
+                free(bulk);
+            }
+        }
+    }
     g2_drain_pending();
     return G2_OK;
 }
