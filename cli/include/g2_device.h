@@ -130,6 +130,10 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
 int g2_select_patch(int slot, int bank, int location);
 int g2_upload_patch(int slot, const char *filepath);
 
+/* Performance mode and name */
+int g2_set_perf_mode(int mode);
+int g2_set_perf_name(const char *name);
+
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);

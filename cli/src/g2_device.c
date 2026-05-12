@@ -1827,6 +1827,48 @@ int g2_select_patch(int slot, int bank, int location) {
     return G2_OK;
 }
 
+int g2_set_perf_mode(int mode) {
+    if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(performance) or 1(patch)\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-perf-mode: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t cmd[3] = { 0x3E, (uint8_t)mode, 0x00 };
+    if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_set_perf_name(const char *name) {
+    if (!name || !*name) { g2_err("set-perf-name: name must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-perf-name: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+
+    uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
+    uint8_t pv_resp[16] = {0};
+    send_system_data(0x41, pv_cmd, 2);
+    usleep(USB_SEND_DELAY_US);
+    int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
+    uint8_t version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
+
+    size_t nlen = strlen(name);
+    if (nlen > 16) nlen = 16;
+    uint8_t cmd[19];
+    int pos = 0;
+    cmd[pos++] = 0x29;
+    memcpy(cmd + pos, name, nlen);
+    pos += (int)nlen;
+    cmd[pos++] = 0;
+
+    if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_upload_patch(int slot, const char *filepath) {
     if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;

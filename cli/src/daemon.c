@@ -252,6 +252,15 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		ret = g2_upload_patch(slot, arg_s(args, 1));
 
+	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
+		const char *m = arg_s(args, 0);
+		int mode = (m && strcmp(m, "performance") == 0) ? 0
+		         : (m && strcmp(m, "patch") == 0)       ? 1 : -1;
+		ret = (mode >= 0) ? g2_set_perf_mode(mode) : G2_ERR_INVALID_PARAM;
+
+	} else if (strcmp(cmd, "set-perf-name") == 0 && n >= 1) {
+		ret = g2_set_perf_name(arg_s(args, 0));
+
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;

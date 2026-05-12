@@ -39,6 +39,8 @@ static void print_usage(const char *prog) {
     printf("  get-patch-file <slot> [file]                                                              Save patch as .pch2 file\n");
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
+    printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
+    printf("  set-perf-name <name>                                                                      Set the current performance name\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
     printf("  slot <A|B|C|D>                                                                            Change active slot\n");
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
@@ -490,6 +492,19 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         }
         int slot = parse_slot(argv[i + 1]);
         return g2_upload_patch(slot, argv[i + 2]);
+    }
+
+    if (strcmp(command, "set-perf-mode") == 0) {
+        if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-mode <patch|performance>\n"); return 1; }
+        const char *m = argv[i + 1];
+        int mode = (strcmp(m, "performance") == 0) ? 0 : (strcmp(m, "patch") == 0) ? 1 : -1;
+        if (mode < 0) { fprintf(stderr, "set-perf-mode: mode must be 'patch' or 'performance'\n"); return 1; }
+        return g2_set_perf_mode(mode);
+    }
+
+    if (strcmp(command, "set-perf-name") == 0) {
+        if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-name <name>\n"); return 1; }
+        return g2_set_perf_name(argv[i + 1]);
     }
 
     if (strcmp(command, "watch") == 0) {
