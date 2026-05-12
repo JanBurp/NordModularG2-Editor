@@ -75,6 +75,20 @@ extern void test_parse_name_returns_correct_length(void);
 extern void test_response_type_parsing_embedded(void);
 extern void test_response_type_parsing_extended(void);
 
+extern void test_set_cable_color_invalid_slot_low(void);
+extern void test_set_cable_color_invalid_slot_high(void);
+extern void test_set_cable_color_invalid_location(void);
+extern void test_set_cable_color_invalid_color_high(void);
+extern void test_set_cable_color_invalid_from_con_type(void);
+extern void test_set_cable_color_invalid_to_con_type(void);
+
+extern void test_set_param_label_invalid_slot_low(void);
+extern void test_set_param_label_invalid_slot_high(void);
+extern void test_set_param_label_invalid_location(void);
+extern void test_set_param_label_invalid_label_idx(void);
+extern void test_set_param_label_null_label(void);
+extern void test_set_param_label_empty_label(void);
+
 extern void test_set_module_label_invalid_slot_low(void);
 extern void test_set_module_label_invalid_slot_high(void);
 extern void test_set_module_label_invalid_location(void);
@@ -177,6 +191,22 @@ int main(void) {
     RUN_TEST(test_parse_name_returns_correct_length);
     RUN_TEST(test_response_type_parsing_embedded);
     RUN_TEST(test_response_type_parsing_extended);
+
+    /* set-cable-color validation tests */
+    RUN_TEST(test_set_cable_color_invalid_slot_low);
+    RUN_TEST(test_set_cable_color_invalid_slot_high);
+    RUN_TEST(test_set_cable_color_invalid_location);
+    RUN_TEST(test_set_cable_color_invalid_color_high);
+    RUN_TEST(test_set_cable_color_invalid_from_con_type);
+    RUN_TEST(test_set_cable_color_invalid_to_con_type);
+
+    /* set-param-label validation tests */
+    RUN_TEST(test_set_param_label_invalid_slot_low);
+    RUN_TEST(test_set_param_label_invalid_slot_high);
+    RUN_TEST(test_set_param_label_invalid_location);
+    RUN_TEST(test_set_param_label_invalid_label_idx);
+    RUN_TEST(test_set_param_label_null_label);
+    RUN_TEST(test_set_param_label_empty_label);
 
     /* set-module-name validation tests */
     RUN_TEST(test_set_module_label_invalid_slot_low);
