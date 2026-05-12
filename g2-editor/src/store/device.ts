@@ -1,4 +1,4 @@
-import { Device, SlotLabel } from '@/types';
+import { Device, PatchData, SlotLabel } from '@/types';
 
 import { defineStore } from 'pinia';
 
@@ -115,6 +115,23 @@ export const useDeviceStore = defineStore('device', {
 			for (const s of this.device.slots) {
 				s.active = s.slot === lower;
 			}
+		},
+
+		updateSynthSettings(ev: { synthName: string; mode: string; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
+			if (!this.device) return;
+			this.device.synthName = ev.synthName;
+			this.device.mode = ev.mode;
+			this.device.midi = ev.midi;
+			this.device.tuning = ev.tuning;
+			this.device.pedal = ev.pedal;
+			this.deviceName = ev.synthName;
+		},
+
+		updatePerfSettings(ev: { performance?: PatchData | null; patches?: PatchData | null; slots: Device['slots'] }) {
+			if (!this.device) return;
+			this.device.performance = ev.performance ?? null;
+			this.device.patches = ev.patches ?? null;
+			this.device.slots = ev.slots;
 		},
 	},
 });
