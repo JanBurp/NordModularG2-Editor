@@ -430,6 +430,56 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		});
 	}
 
+	it('cable visibility changes survive file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const desc = patch.description!;
+
+		// Force all visibility flags to known values (opposite of typical defaults)
+		desc.red = 0;
+		desc.blue = 0;
+		desc.yellow = 1;
+		desc.orange = 0;
+		desc.green = 1;
+		desc.purple = 0;
+		desc.white = 0;
+
+		const savedRawHex = serializePatch(name, patch, rawHex);
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		expect(patchB.description!.red).toBe(0);
+		expect(patchB.description!.blue).toBe(0);
+		expect(patchB.description!.yellow).toBe(1);
+		expect(patchB.description!.orange).toBe(0);
+		expect(patchB.description!.green).toBe(1);
+		expect(patchB.description!.purple).toBe(0);
+		expect(patchB.description!.white).toBe(0);
+	});
+
+	it('variation change survives file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const desc = patch.description!;
+		const newVariation = (desc.variation + 3) % 9;
+		desc.variation = newVariation;
+
+		const savedRawHex = serializePatch(name, patch, rawHex);
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		expect(patchB.description!.variation).toBe(newVariation);
+	});
+
+	it('monopoly and category changes survive file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const desc = patch.description!;
+		desc.monopoly = 1;
+		desc.category = 7;
+
+		const savedRawHex = serializePatch(name, patch, rawHex);
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		expect(patchB.description!.monopoly).toBe(1);
+		expect(patchB.description!.category).toBe(7);
+	});
+
 	it('edited patch (add module + cable) — EmptyPatch.pch2', () => {
 		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 
