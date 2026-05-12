@@ -18,6 +18,7 @@ let win: BrowserWindow | null = null;
 let daemonProcess: ChildProcess | null = null;
 let cmdId = 0;
 const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void }>();
+const isMac = process.platform === 'darwin';
 
 const cliPath = path.join(process.env.APP_ROOT, "resources/g2-cli");
 
@@ -217,7 +218,7 @@ app.whenReady().then(async () => {
 	createWindow();
 
 	const template: Electron.MenuItemConstructorOptions[] = [
-		{
+		...(isMac ? [{
 			label: "G2 Editor",
 			submenu: [
 				{ role: "about" },
@@ -230,7 +231,7 @@ app.whenReady().then(async () => {
 				{ type: "separator" },
 				{ role: "quit" },
 			],
-		},
+		}] : []),
 		{
 			label: "File",
 			submenu: [
@@ -277,6 +278,10 @@ app.whenReady().then(async () => {
 				{ type: "separator" },
 				{ label: "Toggle DevTools", role: "toggleDevTools", accelerator: "CommandOrControl+Shift+I" },
 				{ label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
+				{ type: "separator" },
+				{ role: "zoomIn" },
+				{ role: "zoomOut" },
+				{ role: "resetZoom" },
 			],
 		},
 		{
