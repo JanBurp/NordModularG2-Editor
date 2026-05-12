@@ -548,6 +548,107 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     return root;
 }
 
+static cJSON *query_perf_settings(int mode, const char *type) {
+    uint8_t selsData[1024] = {0}, selsInterrupt[16] = {0};
+    uint8_t perfData[1024] = {0}, perfInterrupt[16] = {0};
+    size_t perfSize = 0;
+    int ret;
+    uint16_t size;
+
+    if (send_system(0x41, 0x81) == 0) {
+        usleep(USB_SEND_DELAY_US);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
+        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
+            recv_bulk(selsData, size);
+        }
+    }
+
+    if (send_system(selsData[2], 0x10) == 0) {
+        usleep(USB_SEND_DELAY_US);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
+        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
+            perfSize = size;
+            recv_bulk(perfData, size);
+        }
+    }
+
+    char perfName[32] = {0};
+    char slotNames[4][17] = {{0}};
+    int slotBanks[4] = {0}, slotPatches[4] = {0};
+    int slotActive[4] = {0}, slotKey[4] = {0}, slotHold[4] = {0};
+    int slotLow[4] = {0}, slotHigh[4] = {0};
+    int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0, split = 0;
+
+    if (perfData[0] != 0)
+        parse_name(perfData + 4, perfName, sizeof(perfName));
+
+    const uint8_t *remaining = perfData + 4;
+    char tmpName[32];
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+
+    const uint8_t *perfSettings = remaining + 4;
+    uint32_t word = ((uint32_t)perfSettings[0] << 24) | ((uint32_t)perfSettings[1] << 16) |
+                    ((uint32_t)perfSettings[2] << 8)  |  (uint32_t)perfSettings[3];
+    focusSlot   = (word >> (32 - 4 - 2)) & 0x3;
+    rangeEnable = remaining[5];
+    bpm         = remaining[6];
+    split       = remaining[7] & 1;
+    clockRun    = remaining[8] & 1;
+
+    const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd = perfData + perfSize;
+    for (int i = 0; i < 4; i++) {
+        if (slotPtr >= perfEnd) break;
+        int maxName = (int)(perfEnd - slotPtr);
+        if (maxName > 17) maxName = 17;
+        nameLen = parse_name(slotPtr, slotNames[i], maxName);
+        slotPtr += nameLen;
+        if (slotPtr + 7 > perfEnd) break;
+        slotActive[i]  = slotPtr[0] & 1;
+        slotKey[i]     = slotPtr[1] & 1;
+        slotHold[i]    = slotPtr[2] & 1;
+        slotBanks[i]   = slotPtr[3];
+        slotPatches[i] = slotPtr[4];
+        slotLow[i]     = slotPtr[5];
+        slotHigh[i]    = slotPtr[6];
+        slotPtr += 10;
+    }
+
+    cJSON *root = cJSON_CreateObject();
+    if (type) cJSON_AddStringToObject(root, "type", type);
+    cJSON *perf = cJSON_CreateObject();
+    cJSON_AddStringToObject(perf, "name", mode ? perfName : slotNames[focusSlot]);
+    cJSON_AddStringToObject(perf, "focus", (char*[]){ "a", "b", "c", "d" }[focusSlot]);
+    cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
+    cJSON_AddNumberToObject(perf, "bpm", bpm);
+    cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
+    cJSON_AddBoolToObject(perf, "kbSplit", split);
+    cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
+
+    cJSON *slots = cJSON_CreateArray();
+    for (int i = 0; i < 4; i++) {
+        cJSON *slot = cJSON_CreateObject();
+        cJSON_AddStringToObject(slot, "slot", (char*[]){ "a", "b", "c", "d" }[i]);
+        cJSON_AddNumberToObject(slot, "bank", slotBanks[i]);
+        cJSON_AddNumberToObject(slot, "patch", slotPatches[i]);
+        cJSON_AddStringToObject(slot, "name", slotNames[i]);
+        cJSON_AddBoolToObject(slot, "active", slotActive[i]);
+        cJSON_AddBoolToObject(slot, "key", slotKey[i]);
+        cJSON_AddBoolToObject(slot, "hold", slotHold[i]);
+        cJSON *range = cJSON_CreateObject();
+        cJSON_AddNumberToObject(range, "lower", slotLow[i]);
+        cJSON_AddNumberToObject(range, "upper", slotHigh[i]);
+        cJSON_AddItemToObject(slot, "range", range);
+        cJSON_AddItemToArray(slots, slot);
+    }
+    cJSON_AddItemToObject(root, "slots", slots);
+
+    return root;
+}
+
 cJSON *g2_device_info(int debug) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
@@ -1847,15 +1948,15 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
             cJSON *ev = build_synth_bulk_json(bulk, "synth_settings_update");
             char *s = cJSON_PrintUnformatted(ev);
             if (s) { printf("%s\n", s); fflush(stdout); free(s); }
+            int mode = strcmp(cJSON_GetObjectItem(ev, "mode")->valuestring, "Performance") == 0;
             cJSON_Delete(ev);
 
-            /* Emit full device info for editor UI update */
-            cJSON *di = g2_device_info(0);
-            if (di) {
-                cJSON_AddStringToObject(di, "type", "device");
-                char *ds = cJSON_PrintUnformatted(di);
+            /* Query perf/slot settings (skip redundant GET_SYNTH_SETTINGS) */
+            cJSON *ps = query_perf_settings(mode, "perf_settings");
+            if (ps) {
+                char *ds = cJSON_PrintUnformatted(ps);
                 if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
-                cJSON_Delete(di);
+                cJSON_Delete(ps);
             }
         } else if (bsubCmd == 0x29) {
             char name[17] = {0};
