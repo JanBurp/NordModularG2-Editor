@@ -40,6 +40,9 @@ extern void test_repeated_slot_cycle(void);
 extern void test_interleaved_slot_variation(void);
 extern void test_drain_count_logged(void);
 
+extern void test_set_perf_mode_cycle(void);
+extern void test_set_perf_name(void);
+
 static int suppress_stdout(void) {
     fflush(stdout);
     int fd = dup(STDOUT_FILENO);
@@ -82,6 +85,10 @@ int main(void) {
     UNITY_BEGIN();
 
     run_test_silently("test_integration_connect", test_integration_connect);
+
+    /* Performance mode and naming tests */
+    run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
+    run_test_silently("test_set_perf_name", test_set_perf_name);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
     // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);

@@ -424,18 +424,18 @@ void test_set_perf_mode_cycle(void) {
 
     fprintf(stderr, "set-perf-mode: switching to performance\n");
     int ret1 = g2_set_perf_mode(0);
-    TEST_ASSERT_TRUE(ret1 == G2_OK || ret1 == G2_ERR);
+    TEST_ASSERT_EQUAL_INT(G2_OK, ret1);
     delay_between_tests();
 
     fprintf(stderr, "get-patch: verify connection still works after perf mode\n");
     cJSON *patch1 = g2_get_patch("A");
-    TEST_ASSERT_TRUE(patch1 != NULL || !g2_is_connected());
+    TEST_ASSERT_NOT_NULL(patch1);
     if (patch1) cJSON_Delete(patch1);
     delay_between_tests();
 
     fprintf(stderr, "set-perf-mode: switching back to patch\n");
     int ret2 = g2_set_perf_mode(1);
-    TEST_ASSERT_TRUE(ret2 == G2_OK || ret2 == G2_ERR);
+    TEST_ASSERT_EQUAL_INT(G2_OK, ret2);
     delay_between_tests();
 
     fprintf(stderr, "get-patch: verify connection still works after mode switch\n");
