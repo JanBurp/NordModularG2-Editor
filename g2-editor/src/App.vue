@@ -5,9 +5,9 @@
 	<div class="flex flex-col h-screen">
 		<ToolBar>
 			<template v-if="device">
-				<ToolBarLabel>Perf:</ToolBarLabel>
-				<ToolBarText class="w-32">{{ device.perfName }}</ToolBarText>
-				<ToolBarLabel>Master Clock</ToolBarLabel>
+				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
+				<ToolBarText class="w-36">{{ device.perfName }}</ToolBarText>
+				<ToolBarLabel>Clk:</ToolBarLabel>
 				<ToolBarText class="w-10">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle"><span v-if="device.clockRunning">Run</span><span v-else>Stop</span></Button>
 				<ToolBarText class="w-32">{{ device.deviceName }}</ToolBarText>
@@ -27,7 +27,8 @@
 		</ToolBar>
 
 		<ToolBar v-if="patchName">
-			<ToolBarText class="w-32">{{ patchName }}</ToolBarText>
+			<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
+			<ToolBarText class="w-36">{{ patchName }}</ToolBarText>
 
 			<div class="flex items-center gap-1.5">
 				<ToolBarLabel>Cat:</ToolBarLabel>
@@ -44,12 +45,7 @@
 
 			<ToolBarDivider />
 
-			<BtnGroup v-model="uiStore.area" :options="AREA_OPTIONS" variant="toggle" />
-
-			<ToolBarDivider />
-
 			<div class="flex items-center gap-2">
-				<span class="text-xs font-semibold text-neutral-400">Var:</span>
 				<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="handleVariationClick" />
 			</div>
 

@@ -20,7 +20,7 @@ export const AREA_OPTIONS = [
 	{ value: 0, label: 'FX' },
 ];
 
-export const VARIATION_OPTIONS = Array.from({ length: 8 }, (_, i) => ({
-	label: String(i + 1),
+export const VARIATION_OPTIONS = Array.from({ length: 9 }, (_, i) => ({
+	label: i < 8 ? String(i + 1) : 'init',
 	value: i,
 }));
