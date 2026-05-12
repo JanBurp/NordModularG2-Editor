@@ -14,11 +14,11 @@ extraResources:
       - "**/*"
 mac:
   target:
-    - dmg
+    - dir
   category: public.app-category.music
 win:
   target:
-    - nsis
+    - dir
 linux:
   target:
-    - AppImage
+    - dir
