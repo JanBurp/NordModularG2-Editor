@@ -50,6 +50,7 @@ static void print_usage(const char *prog) {
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
+    printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
@@ -423,6 +424,21 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         int module_id = atoi(argv[i + 3]);
         const char *name = argv[i + 4];
         return g2_set_module_label(slot, location, module_id, name);
+    }
+
+    if (strcmp(command, "set-param-label") == 0) {
+        /* set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label> */
+        if (i + 6 >= argc) {
+            fprintf(stderr, "Usage: set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>\n");
+            return 1;
+        }
+        int slot      = parse_slot(argv[i + 1]);
+        int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+        int module_id = atoi(argv[i + 3]);
+        int param_idx = atoi(argv[i + 4]);
+        int label_idx = atoi(argv[i + 5]);
+        const char *label = argv[i + 6];
+        return g2_set_param_label(slot, location, module_id, param_idx, label_idx, label);
     }
 
     if (strcmp(command, "set-module-mode") == 0) {

@@ -233,6 +233,11 @@ static void execute_cmd(const char *line) {
 		int loc  = parse_location(args, 1);
 		ret = g2_set_module_label(slot, loc, arg_i(args, 2), arg_s(args, 3));
 
+	} else if (strcmp(cmd, "set-param-label") == 0 && n >= 6) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4), arg_s(args, 5));
+
 	} else if (strcmp(cmd, "set-param") == 0 && n >= 6) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);

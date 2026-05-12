@@ -1745,6 +1745,51 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
     return G2_OK;
 }
 
+int g2_set_param_label(int slot, int location, int module_id, int param_idx, int label_idx, const char *label) {
+    uint8_t response[16] = {0};
+
+    if (slot < 0 || slot > 3)         { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1) { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (label_idx < 0 || label_idx > 127) { g2_err("set-param-label: label_idx out of range\n"); return G2_ERR_INVALID_PARAM; }
+    if (!label || !*label)             { g2_err("set-param-label: label must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { g2_err("set-param-label: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    int num_labels = label_idx + 1;
+    int module_len = 3 + 7 * num_labels;
+    int param_len  = 1 + 7 * num_labels;
+    int payload_len = 6 + 7 * num_labels;
+
+    uint8_t payload[6 + 7 * 128];
+    int idx = 0;
+    payload[idx++] = (uint8_t)location;
+    payload[idx++] = (uint8_t)module_id;
+    payload[idx++] = (uint8_t)module_len;
+    payload[idx++] = 1;
+    payload[idx++] = (uint8_t)param_len;
+    payload[idx++] = (uint8_t)param_idx;
+
+    for (int i = 0; i < label_idx; i++)
+        for (int j = 0; j < 7; j++) payload[idx++] = 0;
+
+    size_t llen = strlen(label);
+    if (llen > 7) llen = 7;
+    for (int j = 0; j < 7; j++)
+        payload[idx++] = (j < (int)llen) ? (uint8_t)label[j] : 0;
+
+    if (send_slot(slot, version, 0x42, payload, payload_len) < 0) {
+        g2_err("set-param-label: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val) {
     uint8_t response[16] = {0};
 
