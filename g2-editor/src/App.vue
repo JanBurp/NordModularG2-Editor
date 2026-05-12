@@ -125,6 +125,8 @@
 			maxlength="16"
 		/>
 	</Dialog>
+
+	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 </template>
 
 <script setup lang="ts">
@@ -143,6 +145,8 @@
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import ColorPicker from './components/common/ColorPicker.vue';
 	import Dialog from './components/common/Dialog.vue';
+	import ContextMenu from './components/common/ContextMenu.vue';
+	import { useContextMenu } from './composables/useContextMenu';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
@@ -160,6 +164,8 @@
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
+
+	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();

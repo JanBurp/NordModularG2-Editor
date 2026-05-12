@@ -1,5 +1,5 @@
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop @mousedown.stop>
+	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop="onModuleClick" @mousedown.stop @contextmenu.stop.prevent="onContextMenu">
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
 		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
@@ -119,6 +119,8 @@
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
+	import { useContextMenu } from '../../composables/useContextMenu';
+	import { MODULE_COLORS, MODULE_COLORS_ORDER } from '../../constants/moduleColors';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -134,7 +136,32 @@
 		jackDragEnd: [info: JackDragInfo];
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
+		moduleDelete: [moduleIndex: number];
+		moduleColorChange: [moduleIndex: number, colourId: number];
 	}>();
+
+	const { open: openContextMenu } = useContextMenu();
+
+	function onModuleClick(e: MouseEvent) {
+		if (e.altKey) onContextMenu(e);
+	}
+
+	function onContextMenu(e: MouseEvent) {
+		const colorSwatches = Object.entries(MODULE_COLORS_ORDER)
+			.sort(([a], [b]) => Number(a) - Number(b))
+			.map(([, colorId]) => ({
+				color: MODULE_COLORS[colorId],
+				action: () => emit('moduleColorChange', moduleIdx.value, colorId),
+			}));
+
+		openContextMenu(e, [
+			{ label: 'Rename…', action: () => onTitleDblClick() },
+			{ type: 'separator' },
+			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
+			{ type: 'separator' },
+			{ label: 'Set Color', children: [{ type: 'swatches', swatches: colorSwatches }] },
+		]);
+	}
 
 	function onDragHandleMousedown(e: MouseEvent) {
 		emit('moduleDragStart', {

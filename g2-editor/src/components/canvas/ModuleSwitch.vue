@@ -1,5 +1,5 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="onContextMenu">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
@@ -78,6 +78,7 @@
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
 	import type { ModuleParam, ParamDefinition, ParamLabel } from '../../types';
+	import { useContextMenu } from '../../composables/useContextMenu';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -192,6 +193,12 @@
 				emit('change', props.paramIndex, newValue);
 			}
 		}
+	}
+
+	const { open: openContextMenu } = useContextMenu();
+
+	function onContextMenu(e: MouseEvent) {
+		openContextMenu(e, [{ label: 'Reset to default', action: () => emit('change', props.paramIndex, paramDef.value.def ?? 0) }]);
 	}
 
 	function onCycleValue() {

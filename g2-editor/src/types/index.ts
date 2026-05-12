@@ -92,3 +92,17 @@ export type {
 	ParamLabel,
 } from './module';
 export type { Patch, Area, Cable, PatchDescription } from './patch';
+
+export interface ContextMenuSwatch {
+	color: string;
+	action: () => void;
+}
+
+export interface ContextMenuItem {
+	type?: 'item' | 'separator' | 'swatches';
+	label?: string;
+	disabled?: boolean;
+	action?: () => void;
+	children?: ContextMenuItem[];
+	swatches?: ContextMenuSwatch[];
+}
