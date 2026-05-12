@@ -6,6 +6,11 @@
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build && electron-builder",
+    "build:mac:intel": "electron-vite build && electron-builder --mac --x64 --dir",
+    "build:mac:arm": "electron-vite build && electron-builder --mac --arm64 --dir",
+    "build:mac:universal": "electron-vite build && electron-builder --mac --universal --dir",
+    "build:win": "electron-vite build && electron-builder --win --dir",
+    "build:linux": "electron-vite build && electron-builder --linux --dir",
     "preview": "electron-vite preview",
     "postinstall": "node scripts/copy-cli.js",
     "test": "vitest run",
