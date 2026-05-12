@@ -1,7 +1,8 @@
 appId: com.nord.g2-editor
 productName: G2 Editor
+icon: resources/jack_icon.png
 directories:
-  buildResources: build
+  buildResources: resources
   output: release
 files:
   - dist/**/*
