@@ -120,6 +120,9 @@ int g2_set_module_color(int slot, int location, int module_id, int color);
 /* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
 int g2_set_module_label(int slot, int location, int module_id, const char *label);
 
+/* Set param label: slot 0-3, location 0=fx/1=va, label_idx 0-127, label max 7 chars */
+int g2_set_param_label(int slot, int location, int module_id, int param_idx, int label_idx, const char *label);
+
 /* Set module mode: slot 0-3, location 0=fx/1=va, param index, value */
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val);
 

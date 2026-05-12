@@ -292,6 +292,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x37` | SET_PATCH (upload) | see §9 | Embedded ACK |
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
+| `0x42` | SET_PARAM_LABEL | `loc mod_id param_idx label_idx label` | Embedded ACK |
 | `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
 | `0x44` | COPY_VARIATION | `from to` | Embedded ACK |
 | `0x4C` | GET_PARAMS | `location` | Extended bulk |
@@ -355,6 +356,39 @@ Bits 5-0: connector id    0-63
 ```
 
 The CLI enforces **output → input** direction: if `from_con_type == 0` (input), the from/to pair is swapped before sending.
+
+---
+
+## 8b. SET_PARAM_LABEL Wire Format
+
+Slot command `0x42` sets a text label for a parameter's value slot(s).
+
+**Payload structure (passed to `send_slot`):**
+
+```
+[0]  location            (0=FX, 1=VA)
+[1]  module_id
+[2]  module_len          = 3 + 7 * (label_idx + 1)
+[3]  is_string           = 1
+[4]  param_len           = 1 + 7 * (label_idx + 1)
+[5]  param_idx
+[6 .. 6+7*label_idx-1]   empty label slots (zeros), one per position 0..label_idx-1
+[6+7*label_idx .. +6]    target label text, null-padded to exactly 7 bytes
+```
+
+**Key points:**
+- Labels are **null-padded** (not space-padded) to 7 bytes each
+- `label_idx` (0–127) determines which slot within the parameter to set
+- Empty slots before the target are sent as all zeros
+- Label text longer than 7 chars is truncated
+- Sending `label_idx=0` with one label is the simplest case: `module_len=10`, `param_len=8`, payload_len=13
+
+**Example:** Set parameter 2's label at index 0 to "Gate":
+```
+module_len = 3 + 7*1 = 10
+param_len  = 1 + 7*1 = 8
+payload = [location, module_id, 10, 1, 8, param_idx, 'G', 'a', 't', 'e', 0, 0, 0]
+```
 
 ---
 
