@@ -7,6 +7,8 @@
 			:active="isActive(option.value)"
 			:disabled="option.disabled"
 			:size="size"
+			:indicator="indicators ? indicators[index] !== undefined : false"
+			:indicatorValue="indicators ? !!indicators[index] : false"
 			class="btn-group-item"
 			@click="handleSelect(option.value, option.disabled)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
@@ -27,12 +29,14 @@
 		variant?: 'toggle' | 'variation' | 'tab';
 		size?: 'normal' | 'small' | 'xs';
 		multiSelect?: boolean;
+		indicators?: boolean[];
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
 		variant: 'toggle',
 		size: 'normal',
 		multiSelect: false,
+		indicators: () => [],
 	});
 
 	const emit = defineEmits<{
