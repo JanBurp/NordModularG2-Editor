@@ -74,7 +74,7 @@ void test_parse_mode_performance(void) {
     bulkData[0] = 0x00;
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
-    bulkData[13] = 0x80;  /* mode = Performance (bit 7 = 1) */
+    bulkData[9] = 0x80;   /* mode = Performance: bulkData[4 + nameLen], nameLen=5 ("Test\0") */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
