@@ -620,6 +620,7 @@ When `version != 0x40`:
 | `version` | `subCmd` | JSON type | Notes |
 |-----------|----------|-----------|-------|
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
+| any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent when user presses PERF button |
 | any | `0x11` | `perf_settings` | — |
 | any | `0x29` | `perf_name` | `name` from bulk[4..] |
 
