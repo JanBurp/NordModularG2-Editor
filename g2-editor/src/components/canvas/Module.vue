@@ -9,7 +9,7 @@
 		@contextmenu.stop.prevent="onContextMenu"
 	>
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
-		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
+		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected ?? false"></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect

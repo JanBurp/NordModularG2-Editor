@@ -20,7 +20,7 @@ interface Window {
 		onMenuAction: (cb: (action: string) => void) => void;
 		offMenuAction: () => void;
 		savePatch: (filepath: string, data: number[]) => Promise<void>;
-		showSaveDialog: () => Promise<{ success: boolean; filepath?: string }>;
+		showSaveDialog: (defaultName?: string) => Promise<{ success: boolean; filepath?: string }>;
 		openPatchDialog: () => Promise<{
 			success: boolean;
 			filepath?: string;

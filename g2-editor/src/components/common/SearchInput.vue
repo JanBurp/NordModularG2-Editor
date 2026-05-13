@@ -32,7 +32,7 @@
 
 	const emit = defineEmits(['update:modelValue', 'enter']);
 
-	const searchInputRef = ref(null);
+	const searchInputRef = ref<HTMLInputElement | null>(null);
 	const searchValue = ref(props.modelValue);
 
 	watch(

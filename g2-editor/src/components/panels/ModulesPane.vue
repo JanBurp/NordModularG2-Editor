@@ -41,6 +41,7 @@
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
+	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
 
@@ -66,7 +67,7 @@
 
 	const moduleInstances = reactive(new Map());
 
-	function toggleCategory(category) {
+	function toggleCategory(category: string) {
 		const idx = expandedCategories.value.indexOf(category);
 		if (idx >= 0) {
 			expandedCategories.value.splice(idx, 1);
@@ -75,7 +76,7 @@
 		}
 	}
 
-	function isExpanded(category) {
+	function isExpanded(category: string) {
 		return expandedCategories.value.includes(category);
 	}
 
@@ -100,7 +101,7 @@
 		return modules.some((m) => (m.short || '').toLowerCase().includes(query) || (m.long || '').toLowerCase().includes(query));
 	}
 
-	function getModulesByCategory(category) {
+	function getModulesByCategory(category: string): ModuleDefinition[] {
 		let modules = getModulesByCategoryRaw(category);
 
 		if (searchQuery.value) {
@@ -127,11 +128,11 @@
 		return modules;
 	}
 
-	function getModuleHeight(module) {
+	function getModuleHeight(module: ModuleDefinition) {
 		return (module.height || 2) * 16;
 	}
 
-	function getModuleInstance(moduleId) {
+	function getModuleInstance(moduleId: number) {
 		if (!moduleInstances.has(moduleId)) {
 			const modDef = getModule(moduleId);
 			const defaultLv =
