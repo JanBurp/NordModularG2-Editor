@@ -6,13 +6,14 @@
 		:y="ve.y"
 		:width="ve.w"
 		height="6.5"
-		fill="#040"
+		:fill="props.on ? '#0F0' : '#040'"
 		stroke="#000"
 	/>
 </template>
 <script setup lang="ts">
 	import type { VisualElement } from '../../types';
-	defineProps<{
+	const props = defineProps<{
 		ve: VisualElement;
+		on?: boolean;
 	}>();
 </script>
