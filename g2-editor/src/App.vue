@@ -44,6 +44,10 @@
 
 			<ToolBarDivider />
 
+			<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
+
+			<ToolBarDivider />
+
 			<div class="flex items-center gap-2">
 				<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="handleVariationClick" />
 			</div>
@@ -148,7 +152,6 @@
 
 <script setup lang="ts">
 	import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
-	import type { Cable } from './renderer/cableRenderer';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
@@ -180,6 +183,7 @@
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
+	import { VOICEMODE_OPTIONS } from './types/patch';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
 	import CPU from './components/toolbar/CPU.vue';
@@ -382,6 +386,7 @@
 	}
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
+	const { selectedVoiceMode } = computed(() => currentPatch.value?.description?.voices);
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
