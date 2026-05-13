@@ -39,15 +39,7 @@
 
 			<div class="flex items-center gap-1.5">
 				<ToolBarLabel>Cat:</ToolBarLabel>
-				<select
-					v-model="selectedCategory"
-					class="h-8 px-1 border rounded bg-neutral-300 text-black cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
-					title="Sound Category"
-				>
-					<option v-for="cat in soundCategories" :key="cat.id" :value="cat.id">
-						{{ cat.name }}
-					</option>
-				</select>
+				<Select v-model="selectedCategory" :options="soundCategories" title="Sound Category" />
 			</div>
 
 			<ToolBarDivider />
@@ -169,6 +161,7 @@
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import ColorPicker from './components/common/ColorPicker.vue';
+	import Select from './components/common/Select.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
