@@ -357,8 +357,9 @@
 
 	// ── Slot / variation ──────────────────────────────────────────────────────
 
-	async function handleSlotClick(index: number): Promise<void> {
-		const slot = SLOT_LABELS[index];
+	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
+		const idx = value as number;
+		const slot = SLOT_LABELS[idx];
 		uiStore.activeSlot = slot;
 		slotsStore.activeSlot = slot;
 		const patch = slotsStore.slots[slot]?.patch;
@@ -366,11 +367,12 @@
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
 	}
 
-	async function handleVariationClick(variationIndex: number): Promise<void> {
-		uiStore.variation = variationIndex;
+	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {
+		const idx = value as number;
+		uiStore.variation = idx;
 		const patch = slotsStore.slots[uiStore.activeSlot]?.patch;
-		if (patch?.description) patch.description.variation = variationIndex;
-		if (device.status === 'connected') await slotsStore.selectVariation(variationIndex);
+		if (patch?.description) patch.description.variation = idx;
+		if (device.status === 'connected') await slotsStore.selectVariation(idx);
 	}
 
 	// ── G2 connection ─────────────────────────────────────────────────────────
@@ -385,8 +387,13 @@
 		}
 	}
 
-	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value));
-	const { selectedVoiceMode } = computed(() => currentPatch.value?.description?.voices);
+	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value) as any);
+	const selectedVoiceMode = computed({
+		get: () => currentPatch.value?.description?.voices ?? 1,
+		set: (val: number) => {
+			if (currentPatch.value?.description) currentPatch.value.description.voices = val;
+		},
+	});
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 
@@ -429,7 +436,7 @@
 							category: 0,
 						},
 					};
-					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch, 'Untitled');
+					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch as any, 'Untitled');
 					break;
 				}
 				case 'open':

@@ -137,7 +137,7 @@
 	const canvasWidth = computed(() => {
 		if (props.modules.length === 0) return 1280;
 		let maxX = 0;
-		props.modules.forEach((m) => {
+		(props.modules as any[]).forEach((m: any) => {
 			const mx = (m.horiz + 1) * 256;
 			if (mx > maxX) maxX = mx;
 		});
@@ -147,7 +147,7 @@
 	const canvasHeight = computed(() => {
 		if (props.modules.length === 0) return 600;
 		let maxY = 0;
-		props.modules.forEach((m) => {
+		(props.modules as any[]).forEach((m: any) => {
 			const modDef = getModule(m.type);
 			const modHeight = modDef?.height || 2;
 			const my = (m.vert + modHeight) * 16;
@@ -183,7 +183,7 @@
 	});
 
 	const modulesWithVariation = computed(() => {
-		return props.modules.map((m) => {
+		return (props.modules as any[]).map((m: any) => {
 			if (!m.lv || !m.pcnt) return m;
 			const startIdx = props.variation * m.pcnt;
 			const endIdx = startIdx + m.pcnt;
@@ -213,11 +213,11 @@
 			.filter((g): g is { idx: number; x: number; y: number; height: number } => g !== null);
 	});
 
-	function onParamChange(moduleIndex, paramIndex, value) {
+	function onParamChange(moduleIndex: number, paramIndex: number, value: number) {
 		emit('paramChange', moduleIndex, paramIndex, value);
 	}
 
-	function onModeChange(moduleIndex, index, value) {
+	function onModeChange(moduleIndex: number, index: number, value: number) {
 		emit('modeChange', moduleIndex, index, value);
 	}
 

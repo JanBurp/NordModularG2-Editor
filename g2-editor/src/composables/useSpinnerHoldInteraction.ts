@@ -1,5 +1,3 @@
-import type { MouseEvent as VueMouseEvent } from 'vue';
-
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSlider';
 
 export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
@@ -32,7 +30,7 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 	function onMouseDown(event: MouseEvent | TouchEvent) {
 		stopRepeat();
 
-		const e = event as VueMouseEvent;
+		const e = event as MouseEvent;
 		const rect = (e.currentTarget as SVGElement).getBoundingClientRect();
 		const x = e.clientX - rect.left;
 		const y = e.clientY - rect.top;

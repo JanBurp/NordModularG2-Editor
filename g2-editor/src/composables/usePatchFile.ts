@@ -11,7 +11,7 @@ function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;
 	while (ofs < bytes.length && bytes[ofs] !== 0) ofs++;
 	return Array.from((bytes as any).slice(ofs + 3))
-		.map((b: number) => b.toString(16).padStart(2, '0'))
+		.map((b: unknown) => (b as number).toString(16).padStart(2, '0'))
 		.join('');
 }
 

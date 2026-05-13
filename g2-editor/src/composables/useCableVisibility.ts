@@ -49,7 +49,7 @@ export function useCableVisibility() {
 		if (!desc) return;
 		const hide = allCablesVisible.value;
 		CABLE_COLORS.forEach((color) => {
-			desc[color.name] = hide ? 0 : 1;
+			(desc as any)[color.name] = hide ? 0 : 1;
 		});
 	}
 

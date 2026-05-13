@@ -48,11 +48,11 @@
 		removeAllCables(svg);
 
 		if (props.cables.length > 0) {
-			makePatchCables(props.modules, props.cables, svg, {
-				selectedCables: props.selectedCables,
+			makePatchCables(props.modules as CableModule[], props.cables as Cable[], svg, {
+				selectedCables: props.selectedCables as Cable[],
 			});
 		}
-		applyCableVisibility(svg, cableVisibility.value);
+		applyCableVisibility(svg, cableVisibility.value as unknown as Record<string, boolean>);
 	}
 
 	onMounted(() => {
@@ -72,7 +72,7 @@
 					renderedKeys.add(el.getAttribute('data-cable-key')!);
 				});
 
-				const wantedMap = new Map<string, any>(props.cables.map((c) => [makeCableKey(c), c]));
+				const wantedMap = new Map<string, any>((props.cables as Cable[]).map((c) => [makeCableKey(c), c]));
 
 				for (const key of renderedKeys) {
 					if (!wantedMap.has(key)) removeCableByKey(svg, key);
@@ -95,7 +95,7 @@
 					}
 				}
 
-				applyCableVisibility(svgRef.value!, cableVisibility.value);
+				applyCableVisibility(svgRef.value!, cableVisibility.value as unknown as Record<string, boolean>);
 			});
 		},
 	);
@@ -121,7 +121,7 @@
 		cableVisibility,
 		() => {
 			nextTick(() => {
-				if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value);
+if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
 			});
 		},
 		{ deep: true },
@@ -344,7 +344,7 @@
 		hasDragged = false;
 		window.removeEventListener('mousemove', onMouseMovePreview);
 		window.removeEventListener('mouseup', onWindowMouseup);
-		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value);
+		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
 	}
 
 	function onWindowMouseup() {

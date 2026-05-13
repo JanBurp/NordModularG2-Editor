@@ -4,7 +4,7 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'info' | 'browser' | '';
+export type PaneTab = 'modules' | 'info' | 'browser' | 'settings' | '';
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({

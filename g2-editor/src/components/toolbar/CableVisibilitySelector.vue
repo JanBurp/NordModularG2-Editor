@@ -6,19 +6,19 @@
 				:key="color.name"
 				class="w-6 h-6 border-2 border-solid rounded cursor-pointer flex items-center justify-center transition-all duration-200 opacity-40 hover:opacity-70 hover:scale-110"
 				:class="{
-					'opacity-100 shadow-sm': cableVisibility[color.name],
+					'opacity-100 shadow-sm': getVisibility(color.name),
 				}"
 				:style="{
 					backgroundColor: color.hex,
 					borderColor: color.hex,
 				}"
-				:title="color.label + (cableVisibility[color.name] ? ' (visible)' : ' (hidden)')"
-				@click="toggleCableVisibility(color.name)"
+				:title="color.label + (getVisibility(color.name) ? ' (visible)' : ' (hidden)')"
+				@click="toggle(color.name)"
 			>
 				<span
 					class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
 					:class="{
-						'opacity-100': cableVisibility[color.name],
+						'opacity-100': getVisibility(color.name),
 					}"
 					:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
 				></span>
@@ -47,7 +47,16 @@
 <script setup lang="ts">
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
+	import type { CableVisibility } from '../../composables/useCableVisibility';
 
 	const { cableColors, cableVisibility, allCablesVisible, toggleCableVisibility, toggleShowHideAll } = useCableVisibility();
 	const uiStore = useUiStore();
+
+	function getVisibility(colorName: string): boolean {
+		return cableVisibility.value[colorName as keyof CableVisibility];
+	}
+
+	function toggle(colorName: string) {
+		toggleCableVisibility(colorName as keyof CableVisibility);
+	}
 </script>
