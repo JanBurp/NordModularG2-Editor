@@ -1,12 +1,12 @@
 # CLAUDE.md
 
 ## Project Context
-This is a G2 synth project with a C firmware layer (g2_device.c, MIDI/USB), a TypeScript CLI, and a Vue editor (App.vue, slots.ts). Changes often need to flow across all three layers — check each layer when wiring new commands like add-module or SET_MODULE_LABEL.
+Editor for the Nord Modular G2 synthesizer. USB communication layer in C++. And an electronjs (VueJS, TypeScript) frontend. Changes often need to flow across all layers.
 
 ## Coding And behavioral guidelines to reduce LLM coding mistakes
 
 ## Workflow Discipline
-- When fixing a specific bug, stay focused on the file/command mentioned. Do NOT explore unrelated files (e.g., Vue stores, patch parsing) unless the user explicitly asks.
+- When fixing a specific bug, stay focused on the file/command mentioned. Do NOT explore unrelated files unless the user explicitly asks.
 - For code review requests, ask whether to review a specific commit, branch range, or working tree before starting.
 
 ## Verification Before Done
@@ -105,22 +105,6 @@ npm test                # run Vitest unit tests
 ```
 The `@/` path alias resolves to `g2-editor/src/`.
 
-## Architecture
-
-This is an **Electron + Vue 3** desktop app for editing Nord G2 synthesizer patches.
-
-### Coding guidelines
-
-- Use tab indentation with 4 spaces width
-- Vue components must have this order: <template> <script setup lang="ts"> <style scoped>
-- Use eslint and prettier
-- Never commit
-
-### Process Model
-- **Electron main** (`electron/main.ts`) — spawns the `g2-cli` C binary as a child process for all USB/device communication; handles IPC for file ops, CLI run/batch, and watch events
-- **Preload** (`electron/preload.ts`) — exposes `window.electronAPI` (file I/O) and `window.cli` (CLI execution + watch events) to the renderer via `contextBridge`
-- **Renderer** (`src/`) — Vue 3 SPA; talks to hardware only through the IPC bridge
-
 ### State & Business Logic
 State lives in **Pinia stores** (`src/store/`). Stores are the single source of truth.
 
@@ -130,11 +114,6 @@ State lives in **Pinia stores** (`src/store/`). Stores are the single source of 
 | device | `device.ts` | Connection state, device info, slot info, BPM |
 | ui | `ui.ts` | Active slot/area, right pane tab, selected module/cable |
 | browser | `browser.ts` | Patch browser state, synth patches, performances, disk nav |
-
-### Key Data Flow
-1. User opens a `.pch2` file → `usePatchFile.ts` → parser in `src/parser/` → slots store
-2. USB ops → `useG2.ts` → `window.cli.run()` → Electron IPC → spawned `g2-cli` binary → events fills slits wich results in rendering UX & patches
-3. `PatchCanvas.vue` renders modules and cables
 
 ### Key Composables (`src/composables/`)
 - `useG2.ts` — main device connection/startup/status polling
