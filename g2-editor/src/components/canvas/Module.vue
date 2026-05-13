@@ -1,5 +1,13 @@
 <template>
-	<g v-if="moduleDef" :transform="`translate(${x}, ${y})`" class="cursor-default" :class="{ selected: isSelected }" @click.stop="onModuleClick" @mousedown.stop @contextmenu.stop.prevent="onContextMenu">
+	<g
+		v-if="moduleDef"
+		:transform="`translate(${x}, ${y})`"
+		class="cursor-default"
+		:class="{ selected: isSelected }"
+		@click.stop="onModuleClick"
+		@mousedown.stop
+		@contextmenu.stop.prevent="onContextMenu"
+	>
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
 		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected"></ModuleTitle>
 
@@ -14,20 +22,26 @@
 		/>
 
 		<!-- Visual elements from ve array -->
-		<template v-for="(ve, index) in moduleDef.ve" :key="`ve-${index}`">
-			<ModuleVeText v-if="ve.type === 'text'" :ve="ve"></ModuleVeText>
-			<ModuleVeLine v-else-if="ve.type === 'line'" :ve="ve"></ModuleVeLine>
-			<ModuleVePaths v-else-if="ve.type === 'path'" :ve="ve"></ModuleVePaths>
+		<template v-for="entry in visualElementsGroupedLeds" :key="entry.key">
+			<ModuleVeText v-if="entry.ve.type === 'text'" :ve="entry.ve"></ModuleVeText>
+			<ModuleVeLine v-else-if="entry.ve.type === 'line'" :ve="entry.ve"></ModuleVeLine>
+			<ModuleVePaths v-else-if="entry.ve.type === 'path'" :ve="entry.ve"></ModuleVePaths>
 			<ModuleGraph
-				v-else-if="(ve.type === 'graph' || ve.type === 'graphenv') && ve.w && ve.h"
-				:ve="ve"
+				v-else-if="(entry.ve.type === 'graph' || entry.ve.type === 'graphenv') && entry.ve.w && entry.ve.h"
+				:ve="entry.ve"
 				:lv="localLv"
 				:modes="instance.modes"
 				:module-id="instance.type"
 			/>
-			<ModuleValueDisplay v-else-if="ve.type === 'valueDisplay'" :ve="ve" :params="moduleDef.params || []" :values="localLv" />
-			<ModuleVeLed v-else-if="ve.type === 'led' || ve.type === 'ledArray'" :ve="ve"></ModuleVeLed>
-			<ModuleBitmap v-else-if="ve.type === 'bmp'" :ve="ve"></ModuleBitmap>
+			<ModuleValueDisplay v-else-if="entry.ve.type === 'valueDisplay'" :ve="entry.ve" :params="moduleDef.params || []" :values="localLv" />
+			<ModuleVeLed
+				v-else-if="entry.ve.type === 'led' || entry.ve.type === 'ledArray'"
+				:ve="entry.ve"
+				:area="props.areaLabel || 'fx'"
+				:module-index="instance.index"
+				:group-id="entry.groupId"
+			></ModuleVeLed>
+			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 		</template>
 
 		<!-- Modes -->
@@ -132,6 +146,7 @@
 		isSelected?: boolean;
 		connectedInputs?: Set<number>;
 		connectedOutputs?: Set<number>;
+		areaLabel?: 'fx' | 'va';
 	}>();
 
 	const emit = defineEmits<{
@@ -187,6 +202,29 @@
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
 		return getModule(instance.value.type) || null;
+	});
+
+	const visualElementsGroupedLeds = computed(() => {
+		if (!moduleDef.value?.ve) return [];
+		const entries: { ve: any; groupId: number; key: string }[] = [];
+		let ledIdx = 0;
+		let veIdx = 0;
+		for (const ve of moduleDef.value.ve) {
+			if (ve.type === 'led') {
+				entries.push({ ve, groupId: 0, key: `led-${ledIdx}` });
+				ledIdx++;
+			} else if (ve.type === 'ledArray') {
+				const cnt = Number(ve.cnt) || 1;
+				for (let i = 0; i < cnt; i++) {
+					entries.push({ ve, groupId: i, key: `led-${ledIdx}` });
+					ledIdx++;
+				}
+			} else {
+				entries.push({ ve, groupId: 0, key: `ve-${veIdx}` });
+				veIdx++;
+			}
+		}
+		return entries;
 	});
 
 	const x = computed(() => (instance.value.horiz || 0) * 256);

@@ -19,6 +19,7 @@
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				:connected-inputs="connectedJacksMap.get(mod.index)?.inputs"
 				:connected-outputs="connectedJacksMap.get(mod.index)?.outputs"
+				:area-label="props.area as 'fx' | 'va'"
 				@param-change="onParamChange"
 				@mode-change="onModeChange"
 				@jack-drag-start="(info) => cablesRef?.handleJackDragStart(info)"
