@@ -5,6 +5,7 @@ import type { DeviceStatus } from '@/store/device';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
+import { useLedStore } from '@/store/led';
 
 export type { DeviceStatus };
 
@@ -27,6 +28,7 @@ function now(): string {
 export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
+	const ledStore = useLedStore();
 	const logs = ref<UsbLogEntry[]>([]);
 	const hardwareVariationChange = ref<{
 		slot: number;
@@ -193,6 +195,11 @@ export function useG2() {
 				if (ev.type === 'perf_settings') {
 					store.updatePerfSettings(ev);
 					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'led_data') {
+					ledStore.parseLedData(ev.slot, ev.data);
+					log('←', 'Watch', formatWatchEvent(ev), 'led');
 					return;
 				}
 				const category: UsbLogEntry['category'] =

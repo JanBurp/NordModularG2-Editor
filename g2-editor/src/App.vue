@@ -74,7 +74,7 @@
 						:modules="voiceModules"
 						:cables="voiceCables"
 						:variation="uiStore.variation"
-						area="voice"
+						area="va"
 						:selected-cables="uiStore.selectedCables"
 						:selected-module-indices="uiStore.selectedModules"
 						@jack-drag-start="jackPatching.handleJackDragStart"
