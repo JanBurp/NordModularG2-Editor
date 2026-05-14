@@ -287,13 +287,6 @@ static void execute_cmd(const char *line) {
 			cJSON *info = g2_device_info(0);
 			if (info) cJSON_Delete(info);
 			ret = g2_set_perf_mode(mode);
-			if (ret == G2_OK) {
-				/* mode 0=performance → query as perf (qmode=1)
-				 * mode 1=patch       → query as patch (qmode=0) */
-				int qmode = (mode == 0) ? 1 : 0;
-				cJSON *ps = query_perf_settings(qmode, "perf_settings");
-				if (ps) { emit(ps); cJSON_Delete(ps); }
-			}
 		}
 
 	} else if (strcmp(cmd, "set-perf-name") == 0 && n >= 1) {
