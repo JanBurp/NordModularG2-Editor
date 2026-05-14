@@ -548,7 +548,7 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     return root;
 }
 
-static cJSON *query_perf_settings(int mode, const char *type) {
+cJSON *query_perf_settings(int mode, const char *type) {
     uint8_t selsData[1024] = {0}, selsInterrupt[16] = {0};
     uint8_t perfData[1024] = {0}, perfInterrupt[16] = {0};
     size_t perfSize = 0;
