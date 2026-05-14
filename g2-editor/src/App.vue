@@ -45,6 +45,7 @@
 			<ToolBarDivider />
 
 			<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
+			<Select v-model="selectedVoices" :options="VOICES" title="Voice mode" :disabled="selectedVoiceMode !== 0" />
 
 			<ToolBarDivider />
 
@@ -183,7 +184,7 @@
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
-	import { VOICEMODE_OPTIONS } from './types/patch';
+	import { VOICEMODE_OPTIONS, VOICES } from './types/patch';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
 	import CPU from './components/toolbar/CPU.vue';
@@ -389,7 +390,13 @@
 
 	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value) as any);
 	const selectedVoiceMode = computed({
-		get: () => currentPatch.value?.description?.voices ?? 1,
+		get: () => currentPatch.value?.description?.monopoly ?? 1,
+		set: (val: number) => {
+			if (currentPatch.value?.description) currentPatch.value.description.monopoly = val;
+		},
+	});
+	const selectedVoices = computed({
+		get: () => currentPatch.value?.description?.voices ?? 0,
 		set: (val: number) => {
 			if (currentPatch.value?.description) currentPatch.value.description.voices = val;
 		},

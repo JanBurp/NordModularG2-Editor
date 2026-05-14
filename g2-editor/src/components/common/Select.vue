@@ -2,7 +2,8 @@
 	<select
 		:value="modelValue"
 		@change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
-		class="h-8 px-1 border rounded bg-neutral-300 text-black cursor-pointer min-w-24 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+		class="h-8 px-1 border rounded bg-neutral-300 text-black cursor-pointer min-w-12 hover:bg-gray-200 focus:outline-none focus:border-neutral-600 focus:shadow"
+		:class="{ 'opacity-25': disabled }"
 		:title="title"
 		:disabled="disabled"
 	>
@@ -27,7 +28,7 @@
 		}>(),
 		{
 			disabled: false,
-		}
+		},
 	);
 
 	defineEmits<{
