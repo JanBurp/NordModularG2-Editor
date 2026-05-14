@@ -1,4 +1,4 @@
-import { OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
+import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
 
 import type { ModuleDefinition } from '../types';
 
@@ -10,6 +10,7 @@ export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	filterFreq,
 	filterFreq1,
 	filterFreq2,
+	MidiNote
 };
 
 export const paramFormattingFunctionsWithArgs: Record<string, (i: number, con: unknown, tw: unknown) => string | undefined> = {
@@ -37,6 +38,80 @@ export function isSpinnerH(n: string): boolean {
 	return n === 'KnobSpinH';
 }
 
+export const definReplacements: Record<string, string> = {
+	'{+-}': '±',
+	'{00}': '∞',
+};
+
+export function applyDefinReplacements(label: string, extraReplacements?: Record<string, string>): string {
+	const replacements = extraReplacements
+		? { ...definReplacements, ...extraReplacements }
+		: definReplacements;
+
+	let result = label;
+	for (const [from, to] of Object.entries(replacements)) {
+		result = result.split(from).join(to);
+	}
+	return result;
+}
+
+export function parseDefin(defin: string[]): Array<{ numVal: number; label: string }> {
+	if (!defin || defin.length === 0) return [];
+	return defin[0].split(',')
+		.map(s => {
+			const [v, label] = s.split('~').map(p => p.trim());
+			return { numVal: Number(v), label };
+		})
+		.sort((a, b) => a.numVal - b.numVal);
+}
+
+export function calcDefinOptions(value: number, options: Array<{ numVal: number; label: string }>, extraReplacements?: Record<string, string>, isClkMode?: boolean): string {
+	const exact = options.find(o => o.numVal === value);
+	if (exact) return applyDefinReplacements(exact.label, extraReplacements);
+
+	if (isClkMode) {
+		let nearest = options[0];
+		let minDist = Math.abs(value - options[0].numVal);
+		for (const opt of options) {
+			const dist = Math.abs(value - opt.numVal);
+			if (dist <= minDist) {
+				minDist = dist;
+				nearest = opt;
+			}
+		}
+		return applyDefinReplacements(nearest.label, extraReplacements);
+	}
+
+	for (let i = 0; i < options.length - 1; i++) {
+		const curr = options[i];
+		const next = options[i + 1];
+		if (value > curr.numVal && value < next.numVal) {
+			const currNum = parseFloat(curr.label.replace(/^[^\d]+/, ''));
+			const nextNum = parseFloat(next.label.replace(/^[^\d]+/, ''));
+			if (!isNaN(currNum) && !isNaN(nextNum)) {
+				const t = (value - curr.numVal) / (next.numVal - curr.numVal);
+				const resultNum = currNum + t * (nextNum - currNum);
+				const nextPostfix = next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, '');
+				const nextHasDecimalAndPostfix = /\.\d/.test(next.label) && nextPostfix.length > 0;
+				const hasDecimal = resultNum % 1 !== 0 || nextHasDecimalAndPostfix;
+				const formatted = hasDecimal ? resultNum.toFixed(1) : String(Math.round(resultNum));
+				const currNumericMatch = curr.label.match(/^(\D*)(\d+\.?\d*)(.*)$/);
+				const currHasNumeric = currNumericMatch && currNumericMatch[2].length > 0 && /^-?\d/.test(curr.label);
+				const prefix = currHasNumeric
+					? (curr.label.match(/^(\D*)/)?.[1] ?? '')
+					: (next.label.match(/^(\D*)/)?.[1] ?? '');
+				const postfix = currHasNumeric
+					? (curr.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''))
+					: (next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''));
+				return applyDefinReplacements(`${prefix}${formatted}${postfix}`, extraReplacements);
+			}
+			return applyDefinReplacements(String(value), extraReplacements);
+		}
+	}
+
+	return applyDefinReplacements(String(value), extraReplacements);
+}
+
 export function formatValue(value: number, paramType: string): string {
 	const p = getParam(paramType);
 	if (!p) return String(value);
@@ -48,13 +123,78 @@ export function formatValue(value: number, paramType: string): string {
 			return String(value);
 		}
 	}
+	if (p.defin && p.defin.length > 0) {
+		const options = parseDefin(p.defin);
+		return calcDefinOptions(value, options);
+	}
 
 	return String(value);
 }
 
-export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
+function getContextFromRef(
+	refIndices: number[],
+	params: ModuleDefinition['params'] | undefined,
+	modeValues: number[] | undefined,
+	modeDefs: ModuleDefinition['modes'] | undefined,
+	values: number[],
+	paramCount: number
+): Record<string, number> {
+	const context: Record<string, number> = {};
+	if (!params) return context;
+	for (let i = 1; i < refIndices.length; i++) {
+		const idx = refIndices[i];
+		if (idx < paramCount) {
+			const param = params[idx];
+			if (param) {
+				context[param.type] = values[idx] ?? 64;
+			}
+		} else {
+			const modeIdx = idx - paramCount;
+			const modeDef = modeDefs?.[modeIdx];
+			const modeValue = modeValues?.[modeIdx];
+			if (modeDef && modeValue !== undefined) {
+				context[modeDef.type] = modeValue;
+			}
+		}
+	}
+	return context;
+}
+
+function getDefinIndexFromContext(context: Record<string, number>, comments: string | undefined, maxIndex: number): { definIndex: number; isClkMode: boolean } {
+	if (!comments) return { definIndex: 0, isClkMode: false };
+	const match = comments.match(/Determined by \[(\w+)\]/);
+	if (!match) return { definIndex: 0, isClkMode: false };
+
+	const delayRangeParam = match[1];
+	const delayValue = context[delayRangeParam];
+	if (delayValue === undefined) return { definIndex: 0, isClkMode: false };
+
+	const andByMatch = comments.match(/and(?: by)? \[(\w+)\]/);
+	if (andByMatch) {
+		const timeClkParam = andByMatch[1];
+		const timeClkValue = context[timeClkParam];
+		if (timeClkValue !== undefined) {
+			if (timeClkValue === 1) {
+				return { definIndex: maxIndex, isClkMode: true };
+			}
+			return { definIndex: Math.min(delayValue, maxIndex), isClkMode: false };
+		}
+	}
+
+	return { definIndex: Math.min(delayValue, maxIndex), isClkMode: false };
+}
+
+export function formatCombinedValue(
+	refIndices: number[],
+	funcName: string | undefined,
+	params: ModuleDefinition['params'],
+	values: number[],
+	modeValues?: number[],
+	modeDefs?: ModuleDefinition['modes']
+): string {
 	if (!params) return '';
 
+	const paramCount = params.length;
 	const firstParam = params[refIndices[0]];
 	if (!firstParam) return '';
 
@@ -83,12 +223,17 @@ export function formatCombinedValue(refIndices: number[], funcName: string | und
 			if (result && result !== 'undefined') {
 				return result;
 			}
-
-			return refIndices.map((idx) => values[idx] ?? 64).join(' ');
 		} catch (e) {
 			console.error('Format error:', formatFunc, e);
-			return refIndices.map((idx) => values[idx] ?? 64).join(' ');
 		}
+	}
+
+	if (p.defin && p.defin.length > 1) {
+		const context = getContextFromRef(refIndices, params, modeValues, modeDefs, values, paramCount);
+		const { definIndex, isClkMode } = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
+		const options = parseDefin([p.defin[definIndex]]);
+		const value = values[refIndices[0]] ?? 64;
+		return calcDefinOptions(value, options, undefined, isClkMode);
 	}
 
 	return refIndices.map((idx) => values[idx] ?? 64).join(' ');

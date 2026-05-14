@@ -1,5 +1,7 @@
 import type { ParamDefinition } from '../types/index.ts';
 
+const CLK_FORMAT = '0 ~ 1/64T, 4 ~ 1/64, 8 ~ 1/32T, 12 ~ 1/64D, 16 ~ 1/32, 20 ~ 1/16T, 24 ~ 1/32D, 28 ~ 1/16, 32 ~ 1/16, 36 ~ 1/8T, 40 ~ 1/8T, 44 ~ 1/16D, 48 ~ 1/16D, 52 ~ 1/8, 56 ~ 1/8, 60 ~ 1/4T, 64 ~ 1/4T, 68 ~ 1/8D, 72 ~ 1/8D, 76 ~ 1/4, 80 ~ 1/4, 84 ~ 1/2T, 88 ~ 1/2T, 92 ~ 1/4D, 96 ~ 1/4D, 100 ~ 1/2, 104 ~ 1/2, 108 ~ 1/1T, 112 ~ 1/2D, 116 ~ 1/1, 120 ~ 1/1D, 124 ~ 2/1';
+
 // prettier-ignore
 const parammap: Record<string, ParamDefinition> = {
 	ActiveMonitor: { names: [''], width: 11, bmp: 'pwr', low: 0, high: 1, def: 1, defin: ['0 ~ Monitor,1 ~ Active '], comments: '' },
@@ -20,9 +22,9 @@ const parammap: Record<string, ParamDefinition> = {
 	DelayRange_1: { width: 43, height: 14, low: 0, high: 2, def: 0, defin: ['0 ~ 500 m, 1 ~ 1.0 s, 2 ~ 2.0 s, 3 ~ 1.35 s'], comments: 'Determines [DelayTime_1]' },
 	DelayRange_2: { width: 43, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ 500 m, 1 ~ 1.0 s, 2 ~ 2.0 s, 3 ~ 2.7 s'], comments: 'Possibly determines [DelayTime_1], [DelayTime_2] and [DelayTime_3]' },
 	DelayRange_3: { width: 43, height: 14, low: 0, high: 6, def: 0, defin: ['0 ~ 5 m, 1 ~ 25 m, 2 ~ 100 m, 3 ~ 500 m, 4 ~ 1.0 s, 5 ~ 2.0 s, 6 ~ 2.7 s'], comments: 'Determines [DelayTime_3]' },
-	DelayTime_1: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 661 ms, 127 ~ 1.351 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=500 ms, 1.0 s, 1.35 s), Clk. Determined by [DelayRange_1] and by [TimeClk] =if present)' },
-	DelayTime_2: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=500 ms, 1.0 s, 2.0 s, 2.7 s), Clk. Determined by [DelayRange_2] and by [TimeClk] =if present)' },
-	DelayTime_3: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 2.68 m, 127 ~ 5.30 m', '0 ~ 0.01 m, 64 ~ 12.7 m, 127 ~ 25.1 m', '0 ~ 0.01 m, 64 ~ 50.7 m, 127 ~ 101 m', '0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=5ms, 25ms, 100ms, 500ms, 1.0s, 2.0s, 2.7s), Clk. Determined by [DelayRange_3] and [TimeClk] =if present)' },
+	DelayTime_1: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 661 ms, 127 ~ 1.351 s', CLK_FORMAT], comments: 'Time=500 ms, 1.0 s, 1.35 s), Clk. Determined by [DelayRange_1] and by [TimeClk] =if present)' },
+	DelayTime_2: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', CLK_FORMAT], comments: 'Time=500 ms, 1.0 s, 2.0 s, 2.7 s), Clk. Determined by [DelayRange_2] and by [TimeClk] =if present)' },
+	DelayTime_3: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 2.68 m, 127 ~ 5.30 m', '0 ~ 0.01 m, 64 ~ 12.7 m, 127 ~ 25.1 m', '0 ~ 0.01 m, 64 ~ 50.7 m, 127 ~ 101 m', '0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', CLK_FORMAT], comments: 'Time=5ms, 25ms, 100ms, 500ms, 1.0s, 2.0s, 2.7s), Clk. Determined by [DelayRange_3] and [TimeClk] =if present)' },
 	DigitizerBits: { low: 0, high: 12, def: 11, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4, 4 ~ 5, 5 ~ 6, 6 ~ 7, 7 ~ 8, 8 ~ 9, 9 ~ 10, 10 ~ 11, 11 ~ 12, 12 ~ Off'], comments: '' },
 	DigitizerRate: { low: 0, high: 127, def: 64, defin: ['0 ~ 32.70 Hz, 64 ~ 1.32 kHz, 127 ~ 50.2 kHz'], comments: '' },
 	DrumSynthFreq: { low: 0, high: 127, def: 42, defin: ['0 ~ 20 Hz, 64 ~ 127 Hz, 127 ~ 784 Hz'], comments: '' },
@@ -99,6 +101,7 @@ const parammap: Record<string, ParamDefinition> = {
 	MidiCh_17: { low: 0, high: 17, def: 0, defin: ['0 ~ ch1, 1 ~ ch2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ keyb'], comments: '' },
 	MidiCh_20: { low: 0, high: 20, def: 0, defin: ['0 ~ ch1, 1 ~ ch 2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ Slot A, 18 ~ Slot B, 19 ~ Slot C, 20 ~ Slot D'], comments: '' },
 	MidiData: { low: 0, high: 127, def: 0, defin: ['0 ~ 0, 127 ~ 127'], comments: 'One to one mapping with MIDI data values' },
+	MidiNote: { f: 'MidiNote', low: 0, high: 127, def: 64, defin: ['0 ~ C-1, 64 ~ E4, 127 ~ G9'], comments: 'MIDI Notes' },
 	MixInvert: { names: ['Inv'], width: 17, low: 0, high: 1, def: 0, defin: ['0 ~ Normal, 1 ~ Inverted'], comments: '' },
 	MixLevel: { low: 0, high: 127, def: 0, defin: ['0 ~ 0, 64 ~ 50, 127 ~ 100', '0 ~ 0, 64 ~ 50, 127 ~ 100', '0 ~ -{00}, 64 ~ -17.6, 127 ~ -0'], comments: 'Lin, Exp, dB' },
 	ModAmtInvert: { low: 0, high: 1, def: 0, defin: ['0 ~ m, 1 ~ 1-m'], comments: '' },
@@ -138,7 +141,7 @@ const parammap: Record<string, ParamDefinition> = {
 	PartialRange: { low: 0, high: 127, def: 0, defin: ['0 ~ {+-}0, 1 ~ {+-}0, 64 ~ {+-}32, 65 ~ {+-}32*, 126 ~ {+-}63*, 126 ~ {+-}63*'], comments: '* clipped at {+-}32 and the lowest bit is not effective' },
 	Phase: { f: 'lfoP', low: 0, high: 127, def: 0, defin: ['0 ~ 0, 64 ~ 180, 127 ~ 357'], comments: 'In degrees, 360 degrees in a full circle' },
 	PhaserFreq: { low: 0, high: 127, def: 64, defin: ['0 ~ 0.05 Hz, 64 ~ 2.98 Hz, 127 ~ 11.6 Hz'], comments: '' },
-	PhaserType: { low: 0, high: 1, def: 0, defin: ['0 ~ Type I, 1 ~ Type II'], comments: '' },
+	PhaserType: { width: 28, low: 0, high: 1, def: 0, defin: ['0 ~ Type I, 1 ~ Type II'], comments: '' },
 	PolyMono: { width: 28, low: 0, high: 1, def: 0, defin: ['0 ~ Poly, 1 ~ Mono'], comments: '' },
 	PosNegInv: { width: 14, bmp: 'OutputMode', low: 0, high: 3, def: 0, defin: ['0 ~ Pos, 1 ~ PosInv, 2 ~ Neg, 3 ~ NegInv'], comments: '' },
 	PosNegInvBip: { width: 14, bmp: 'OutputMode', low: 0, high: 4, def: 0, defin: ['0 ~ Pos, 1 ~ PosInv, 2 ~ Neg, 3 ~ NegInv, 4 ~ Bip'], comments: '' },
@@ -161,7 +164,7 @@ const parammap: Record<string, ParamDefinition> = {
 	RndStepPulse: { low: 0, high: 1, def: 0, defin: ['0 ~ Step, 1 ~ Pulse'], comments: '' },
 	RoomType: { width: 44, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ Small, 1 ~ Medium, 2 ~ Large, 3 ~ Hall'], comments: 'Determines ranges for [ReverbTime]' },
 	SaturateCurve: { names: ['1', '2', '3', '4'], low: 0, high: 3, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4'], comments: '' },
-	ScratchDelay: { low: 0, high: 3, def: 2, defin: ['0 ~ 12.5m, 1 ~ 25m, 2 ~ 50m, 3 ~ 100m'], comments: 'mili seconds' },
+	ScratchDelay: { width: 28, low: 0, high: 3, def: 2, defin: ['0 ~ 12.5m, 1 ~ 25m, 2 ~ 50m, 3 ~ 100m'], comments: 'mili seconds' },
 	ScratchRatio: { low: 0, high: 127, def: 80, defin: ['0 ~ -x4.00, 64 ~ x0, 80 ~ x1.00, 127 ~ x4.00'], comments: 'negative speeds mean backwards playing' },
 	SeqCtrlXFade: { low: 0, high: 3, def: 0, defin: ['0 ~ Off, 1 ~ 25%, 2 ~ 50%, 3 ~ 100%'], comments: '' },
 	SeqLen: { low: 0, high: 15, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4, 4 ~ 5, 5 ~ 6, 6 ~ 7, 7 ~ 8, 8 ~ 9, 9 ~ 10, 10 ~ 11, 11 ~ 12, 12 ~ 13, 13 ~ 14, 14 ~ 15, 15 ~ 16'], comments: '' },
@@ -301,4 +304,11 @@ export function filterFreq2(i: number): string {
 export function filterFreq1(i: number): string {
 	const r = 329.63 / Math.pow(1.05946309436, 64 - i);
 	return r < 1000 ? r.toFixed((r < 100 && 3) || 2) + 'Hz' : (r / 1000).toFixed((r < 10000 && 3) || 2) + 'kHz';
+}
+
+export function MidiNote(i: number): string {
+	const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+	const octave = Math.floor(i / 12) - 1;
+	const noteName = noteNames[i % 12];
+	return noteName + String(octave);
 }

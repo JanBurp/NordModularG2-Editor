@@ -9,6 +9,7 @@
   "main": "dist-electron/main/main.js",
   "scripts": {
     "dev": "electron-vite dev",
+    "dev:offline": "DEV_OFFLINE=true electron-vite dev",
     "build": "electron-vite build && electron-builder",
     "build:mac:intel": "electron-vite build && electron-builder --mac --x64 --dir",
     "build:mac:arm": "electron-vite build && electron-builder --mac --arm64 --dir",
