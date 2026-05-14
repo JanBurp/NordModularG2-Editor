@@ -34,37 +34,18 @@ export const useLedStore = defineStore('led', () => {
 			[1, 'va'] as const,
 		]) {
 			const area = patch.areas[areaIdx];
-			for (const mod of area.modules) {
+			const sortedMods = [...area.modules].sort((a, b) => a.index - b.index);
+			for (const mod of sortedMods) {
 				const modDef = getModule(mod.type);
 				if (!modDef) continue;
 
+				let ledGroupId = 0;
+				const list = areaName === 'fx' ? newFxList : newVaList;
 				for (const ve of modDef.ve || []) {
 					if (ve.type === 'led') {
-						const entry: LedEntry = {
-							moduleIndex: mod.index,
-							groupId: 0,
-							area: areaName,
-						};
-						if (areaName === 'fx') {
-							newFxList.push(entry);
-						} else {
-							newVaList.push(entry);
-						}
-					} else if (ve.type === 'ledArray') {
-						const cnt = Number(ve.cnt) || 1;
-						for (let g = 0; g < cnt; g++) {
-							const entry: LedEntry = {
-								moduleIndex: mod.index,
-								groupId: g,
-								area: areaName,
-							};
-							if (areaName === 'fx') {
-								newFxList.push(entry);
-							} else {
-								newVaList.push(entry);
-							}
-						}
+						list.push({ moduleIndex: mod.index, groupId: ledGroupId++, area: areaName });
 					}
+					// ledArray → volume_data (0x3A), not led_data (0x39)
 				}
 			}
 		}
@@ -85,7 +66,7 @@ export const useLedStore = defineStore('led', () => {
 			const byte = data[i];
 
 			for (let bits = 0; bits < 4; bits++) {
-				const shift = 6 - bits * 2;
+				const shift = bits * 2;
 				const value = (byte >> shift) & 0x03;
 				const on = value === 1;
 
