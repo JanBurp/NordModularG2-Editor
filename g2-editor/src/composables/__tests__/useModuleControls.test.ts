@@ -208,6 +208,34 @@ describe('calcDefinOptions', () => {
 			expect(calcDefinOptions(128, dbOptions)).toBe('128');
 		});
 	});
+
+	describe('CLK mode stepped lookup', () => {
+		const clkOptions = parseDefin(['0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1']);
+
+		it('returns nearest label (value 0 → 1/64 T)', () => {
+			expect(calcDefinOptions(0, clkOptions, undefined, true)).toBe('1/64 T');
+		});
+
+		it('returns nearest label (value 32 → 1/4 T, midpoint between 0 and 64)', () => {
+			expect(calcDefinOptions(32, clkOptions, undefined, true)).toBe('1/4 T');
+		});
+
+		it('returns nearest label (value 64 → 1/4 T)', () => {
+			expect(calcDefinOptions(64, clkOptions, undefined, true)).toBe('1/4 T');
+		});
+
+		it('returns nearest label (value 65 → 1/4 T, closer to 64 than 127)', () => {
+			expect(calcDefinOptions(65, clkOptions, undefined, true)).toBe('1/4 T');
+		});
+
+		it('returns nearest label (value 96 → 2/1, closer to 127 than 64)', () => {
+			expect(calcDefinOptions(96, clkOptions, undefined, true)).toBe('2/1');
+		});
+
+		it('returns nearest label (value 127 → 2/1)', () => {
+			expect(calcDefinOptions(127, clkOptions, undefined, true)).toBe('2/1');
+		});
+	});
 });
 
 describe('applyDefinReplacements', () => {

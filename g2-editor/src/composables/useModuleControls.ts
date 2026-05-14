@@ -65,9 +65,22 @@ export function parseDefin(defin: string[]): Array<{ numVal: number; label: stri
 		.sort((a, b) => a.numVal - b.numVal);
 }
 
-export function calcDefinOptions(value: number, options: Array<{ numVal: number; label: string }>, extraReplacements?: Record<string, string>): string {
+export function calcDefinOptions(value: number, options: Array<{ numVal: number; label: string }>, extraReplacements?: Record<string, string>, isClkMode?: boolean): string {
 	const exact = options.find(o => o.numVal === value);
 	if (exact) return applyDefinReplacements(exact.label, extraReplacements);
+
+	if (isClkMode) {
+		let nearest = options[0];
+		let minDist = Math.abs(value - options[0].numVal);
+		for (const opt of options) {
+			const dist = Math.abs(value - opt.numVal);
+			if (dist <= minDist) {
+				minDist = dist;
+				nearest = opt;
+			}
+		}
+		return applyDefinReplacements(nearest.label, extraReplacements);
+	}
 
 	for (let i = 0; i < options.length - 1; i++) {
 		const curr = options[i];
@@ -120,13 +133,30 @@ export function formatValue(value: number, paramType: string): string {
 	return String(value);
 }
 
-function getContextFromRef(refIndices: number[], params: ModuleDefinition['params'] | undefined, values: number[]): Record<string, number> {
+function getContextFromRef(
+	refIndices: number[],
+	params: ModuleDefinition['params'] | undefined,
+	modeValues: number[] | undefined,
+	modeDefs: ModuleDefinition['modes'] | undefined,
+	values: number[],
+	paramCount: number
+): Record<string, number> {
 	const context: Record<string, number> = {};
 	if (!params) return context;
 	for (let i = 1; i < refIndices.length; i++) {
-		const param = params[refIndices[i]];
-		if (param) {
-			context[param.type] = values[refIndices[i]] ?? 64;
+		const idx = refIndices[i];
+		if (idx < paramCount) {
+			const param = params[idx];
+			if (param) {
+				context[param.type] = values[idx] ?? 64;
+			}
+		} else {
+			const modeIdx = idx - paramCount;
+			const modeDef = modeDefs?.[modeIdx];
+			const modeValue = modeValues?.[modeIdx];
+			if (modeDef && modeValue !== undefined) {
+				context[modeDef.type] = modeValue;
+			}
 		}
 	}
 	return context;
@@ -135,27 +165,37 @@ function getContextFromRef(refIndices: number[], params: ModuleDefinition['param
 function getDefinIndexFromContext(context: Record<string, number>, comments: string | undefined, maxIndex: number): number {
 	if (!comments) return 0;
 	const match = comments.match(/Determined by \[(\w+)\]/);
-	if (match) {
-		const controllingParam = match[1];
-		const value = context[controllingParam];
-		if (value !== undefined) {
-			return Math.min(value, maxIndex);
-		}
-	}
+	if (!match) return 0;
+
+	const delayRangeParam = match[1];
+	const delayValue = context[delayRangeParam];
+	if (delayValue === undefined) return 0;
+
 	const andByMatch = comments.match(/and by \[(\w+)\]/);
 	if (andByMatch) {
-		const controllingParam = andByMatch[1];
-		const value = context[controllingParam];
-		if (value !== undefined) {
-			return Math.min(value, maxIndex);
+		const timeClkParam = andByMatch[1];
+		const timeClkValue = context[timeClkParam];
+		if (timeClkValue !== undefined) {
+			return timeClkValue === 1 ? maxIndex : Math.min(delayValue, maxIndex);
 		}
 	}
-	return 0;
+
+	return Math.min(delayValue, maxIndex);
 }
 
-export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
+export function formatCombinedValue(
+	refIndices: number[],
+	funcName: string | undefined,
+	params: ModuleDefinition['params'],
+	values: number[],
+	modeValues?: number[],
+	modeDefs?: ModuleDefinition['modes']
+): string {
 	if (!params) return '';
 
+	console.log('formatCombinedValue', values, modeValues);
+
+	const paramCount = params.length;
 	const firstParam = params[refIndices[0]];
 	if (!firstParam) return '';
 
@@ -190,10 +230,16 @@ export function formatCombinedValue(refIndices: number[], funcName: string | und
 	}
 
 	if (p.defin && p.defin.length > 1) {
-		const context = getContextFromRef(refIndices, params, values);
+		const context = getContextFromRef(refIndices, params, modeValues, modeDefs, values, paramCount);
+		console.log('p.comments:', p.comments, 'p.defin.length:', p.defin.length, 'modeValues:', modeValues);
 		const definIndex = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
 		const options = parseDefin([p.defin[definIndex]]);
-		return calcDefinOptions(values[refIndices[0]], options);
+		console.log('context:', context, 'definIndex:', definIndex, 'options:', options);
+		const value = values[refIndices[0]];
+		const maxIndex = p.defin.length - 1;
+		const isClkMode = definIndex === maxIndex;
+		console.log('value:', value, 'calcDefinOptions result:', calcDefinOptions(value, options, undefined, isClkMode));
+		return calcDefinOptions(value, options, undefined, isClkMode);
 	}
 
 	return refIndices.map((idx) => values[idx] ?? 64).join(' ');
