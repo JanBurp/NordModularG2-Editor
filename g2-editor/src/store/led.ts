@@ -1,5 +1,5 @@
 import { defineStore } from 'pinia';
-import { ref, shallowRef } from 'vue';
+import { ref, shallowRef, watch } from 'vue';
 import type { Patch } from '@/types';
 import type { SlotLabel } from '@/store/slots';
 import { useSlotsStore } from '@/store/slots';
@@ -164,19 +164,13 @@ export const useLedStore = defineStore('led', () => {
 		return vaStripValues.value.get(key) ?? 255;
 	}
 
-	function init(): void {
-		slotsStore.$subscribe((_, state) => {
-			for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
-				const slot = state.slots[slotLabel];
-				if (slot?.patch) {
-					buildLedListFromPatch(slot.patch);
-					break;
-				}
-			}
-		});
+	for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
+		watch(
+			() => slotsStore.slots[slotLabel].patch,
+			(patch) => { if (patch) buildLedListFromPatch(patch); },
+			{ immediate: true },
+		);
 	}
-
-	init();
 
 	return {
 		fxLedList,

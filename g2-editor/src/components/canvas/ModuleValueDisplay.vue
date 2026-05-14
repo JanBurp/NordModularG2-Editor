@@ -12,7 +12,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { VisualElement, ModuleMode } from '../../types';
-	import { formatValue, formatCombinedValue } from '@/composables/useModuleControls';
+	import { formatValue, formatCombinedValue } from '@/utils/moduleControls';
 
 	const props = defineProps<{
 		ve: VisualElement;

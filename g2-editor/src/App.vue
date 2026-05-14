@@ -180,7 +180,6 @@
 	import { useUiStore } from './store/ui';
 	import type { PaneTab } from './store/ui';
 	import type { SlotLabel } from './store/slots';
-	import { usePatchCategory } from './composables/usePatchCategory';
 	import { useBrowserStore } from './store/browser';
 
 	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
@@ -362,7 +361,6 @@
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
 		uiStore.activeSlot = slot;
-		slotsStore.activeSlot = slot;
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
@@ -388,7 +386,17 @@
 		}
 	}
 
-	const { selectedCategory } = usePatchCategory(computed(() => currentPatch.value) as any);
+	const selectedCategory = ref<number>(0);
+	watch(
+		() => (currentPatch.value as any)?.description?.category,
+		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		{ immediate: true },
+	);
+	watch(selectedCategory, (cat) => {
+		const desc = (currentPatch.value as any)?.description;
+		if (desc) desc.category = cat;
+	});
+
 	const selectedVoiceMode = computed({
 		get: () => currentPatch.value?.description?.monopoly ?? 1,
 		set: (val: number) => {
@@ -529,7 +537,6 @@
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
 				uiStore.activeSlot = slot;
-				slotsStore.activeSlot = slot;
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
 			if (device.startupNames) {
@@ -553,7 +560,6 @@
 		if (!slot) return;
 		device.setActiveSlot(slot);
 		uiStore.activeSlot = slot;
-		slotsStore.activeSlot = slot;
 		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
 	});
 

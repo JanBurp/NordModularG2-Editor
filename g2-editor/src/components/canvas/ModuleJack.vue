@@ -36,7 +36,7 @@
 <script setup lang="ts">
 	import { JACK_COLORS } from '../../constants';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { buildCableColorItems } from '../../composables/useColorSwatches';
+	import { buildCableColorItems } from '../../utils/colorSwatches';
 
 	const props = defineProps<{
 		name: string;

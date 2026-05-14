@@ -37,9 +37,8 @@
 			<ModuleVeLed
 				v-else-if="entry.ve.type === 'led' || entry.ve.type === 'ledArray'"
 				:ve="entry.ve"
-				:area="props.areaLabel || 'fx'"
-				:module-index="instance.index"
-				:group-id="entry.groupId"
+				:led-on="ledStateMap[entry.key]?.on ?? false"
+				:active-step="ledStateMap[entry.key]?.step ?? 255"
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 		</template>
@@ -128,7 +127,7 @@
 	import ModuleGraph from './ModuleGraph.vue';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getParam } from '../../renderer/parammap';
-	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../composables/useModuleControls';
+	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
@@ -139,7 +138,8 @@
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { buildColorSwatches } from '../../composables/useColorSwatches';
+	import { buildColorSwatches } from '../../utils/colorSwatches';
+	import { useLedStore } from '../../store/led';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -223,6 +223,22 @@
 			}
 		}
 		return entries;
+	});
+
+	const ledStore = useLedStore();
+	const ledStateMap = computed(() => {
+		const area = props.areaLabel || 'fx';
+		const idx = moduleIdx.value;
+		const map: Record<string, { on: boolean; step: number }> = {};
+		for (const entry of visualElementsGroupedLeds.value) {
+			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray') {
+				map[entry.key] = {
+					on: ledStore.getLedState(area, idx, entry.groupId),
+					step: ledStore.getStripValue(area, idx, entry.groupId),
+				};
+			}
+		}
+		return map;
 	});
 
 	const x = computed(() => (instance.value.horiz || 0) * 256);
