@@ -1,4 +1,4 @@
-import { OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
+import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
 
 import type { ModuleDefinition } from '../types';
 
@@ -10,6 +10,7 @@ export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	filterFreq,
 	filterFreq1,
 	filterFreq2,
+	MidiNote
 };
 
 export const paramFormattingFunctionsWithArgs: Record<string, (i: number, con: unknown, tw: unknown) => string | undefined> = {
@@ -41,14 +42,17 @@ export function formatValue(value: number, paramType: string): string {
 	const p = getParam(paramType);
 	if (!p) return String(value);
 
+	// console.log('formatValue', value, p.f);
+
 	if (p.f && paramFormattingFunctions[p.f]) {
 		try {
 			return paramFormattingFunctions[p.f](value) || String(value);
 		} catch {
+			console.log('catch', value);
 			return String(value);
 		}
 	}
-
+	// console.log('no f', String(value));
 	return String(value);
 }
 
@@ -62,6 +66,8 @@ export function formatCombinedValue(refIndices: number[], funcName: string | und
 	if (!p) return '';
 
 	const formatFunc = funcName || p.f;
+
+	// console.log('formatCombinedValue', refIndices, funcName, formatFunc);
 
 	if (formatFunc && paramFormattingFunctionsWithArgs[formatFunc]) {
 		try {

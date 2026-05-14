@@ -99,6 +99,7 @@ const parammap: Record<string, ParamDefinition> = {
 	MidiCh_17: { low: 0, high: 17, def: 0, defin: ['0 ~ ch1, 1 ~ ch2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ keyb'], comments: '' },
 	MidiCh_20: { low: 0, high: 20, def: 0, defin: ['0 ~ ch1, 1 ~ ch 2, 2 ~ ch3, 3 ~ ch4, 4 ~ ch5, 5 ~ ch6, 6 ~ ch7, 7 ~ ch8, 8 ~ ch9, 9 ~ ch10, 10 ~ ch11, 11 ~ ch12, 12 ~ ch13, 13 ~ ch14, 14 ~ ch15, 15 ~ ch16, 16 ~ This, 17 ~ Slot A, 18 ~ Slot B, 19 ~ Slot C, 20 ~ Slot D'], comments: '' },
 	MidiData: { low: 0, high: 127, def: 0, defin: ['0 ~ 0, 127 ~ 127'], comments: 'One to one mapping with MIDI data values' },
+	MidiNote: { f: 'MidiNote', low: 0, high: 127, def: 64, defin: ['0 ~ C-1, 64 ~ E4, 127 ~ G9'], comments: 'MIDI Notes' },
 	MixInvert: { names: ['Inv'], width: 17, low: 0, high: 1, def: 0, defin: ['0 ~ Normal, 1 ~ Inverted'], comments: '' },
 	MixLevel: { low: 0, high: 127, def: 0, defin: ['0 ~ 0, 64 ~ 50, 127 ~ 100', '0 ~ 0, 64 ~ 50, 127 ~ 100', '0 ~ -{00}, 64 ~ -17.6, 127 ~ -0'], comments: 'Lin, Exp, dB' },
 	ModAmtInvert: { low: 0, high: 1, def: 0, defin: ['0 ~ m, 1 ~ 1-m'], comments: '' },
@@ -301,4 +302,11 @@ export function filterFreq2(i: number): string {
 export function filterFreq1(i: number): string {
 	const r = 329.63 / Math.pow(1.05946309436, 64 - i);
 	return r < 1000 ? r.toFixed((r < 100 && 3) || 2) + 'Hz' : (r / 1000).toFixed((r < 10000 && 3) || 2) + 'kHz';
+}
+
+export function MidiNote(i: number): string {
+	const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+	const octave = Math.floor(i / 12) - 1;
+	const noteName = noteNames[i % 12];
+	return noteName + String(octave);
 }
