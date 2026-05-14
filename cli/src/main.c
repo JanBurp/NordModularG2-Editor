@@ -447,12 +447,34 @@ static int cmd_set_perf_mode(int argc, char **argv, int i) {
     if (g2_send_init() != G2_OK) return 1;
     cJSON *info = g2_device_info(0);
     if (info) cJSON_Delete(info);
-    return g2_set_perf_mode(mode);
+    int ret = g2_set_perf_mode(mode);
+    if (ret == G2_OK) {
+        if (output_format == OUTPUT_JSON) {
+            cJSON *r = cJSON_CreateObject();
+            cJSON_AddBoolToObject(r, "ok", 1);
+            output_json(r, output_format);
+            cJSON_Delete(r);
+        } else {
+            fprintf(stderr, "OK\n");
+        }
+    }
+    return ret;
 }
 
 static int cmd_set_perf_name(int argc, char **argv, int i) {
     if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-name <name>\n"); return 1; }
-    return g2_set_perf_name(argv[i + 1]);
+    int ret = g2_set_perf_name(argv[i + 1]);
+    if (ret == G2_OK) {
+        if (output_format == OUTPUT_JSON) {
+            cJSON *r = cJSON_CreateObject();
+            cJSON_AddBoolToObject(r, "ok", 1);
+            output_json(r, output_format);
+            cJSON_Delete(r);
+        } else {
+            fprintf(stderr, "OK\n");
+        }
+    }
+    return ret;
 }
 
 static int cmd_watch(int argc, char **argv, int i) {

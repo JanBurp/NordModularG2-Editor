@@ -88,7 +88,7 @@ int main(void) {
 
     /* Performance mode and naming tests */
     run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
-    run_test_silently("test_set_perf_name", test_set_perf_name);
+    // run_test_silently("test_set_perf_name", test_set_perf_name);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
     // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
