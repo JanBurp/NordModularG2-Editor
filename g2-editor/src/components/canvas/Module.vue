@@ -33,7 +33,7 @@
 				:modes="instance.modes"
 				:module-id="instance.type"
 			/>
-			<ModuleValueDisplay v-else-if="entry.ve.type === 'valueDisplay'" :ve="entry.ve" :params="moduleDef.params || []" :values="localLv" />
+			<ModuleValueDisplay v-else-if="entry.ve.type === 'valueDisplay'" :ve="entry.ve" :params="moduleDef.params || []" :values="localLv" :modes="instance.modes" :modeDefs="moduleDef.modes || []" />
 			<ModuleVeLed
 				v-else-if="entry.ve.type === 'led' || entry.ve.type === 'ledArray'"
 				:ve="entry.ve"
@@ -280,6 +280,14 @@
 
 	// Handle parameter change from controls
 	function onParamChange(paramIndex: number, value: number) {
+		// Clamp to param's valid range
+		const param = moduleDef.value?.params?.[paramIndex];
+		if (param) {
+			const p = getParam(param.type);
+			if (p) {
+				value = Math.min(Math.max(value, p.low), p.high);
+			}
+		}
 		// Update local state
 		localLv.value[paramIndex] = value;
 

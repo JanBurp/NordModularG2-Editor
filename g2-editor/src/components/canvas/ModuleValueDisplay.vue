@@ -1,25 +1,32 @@
 <template>
 	<rect :x="ve.x" :y="ve.y" :width="ve.w" height="14" fill="#666" />
 	<text v-if="ve.ref !== undefined" :x="(ve.x || 0) + (ve.w || 0) / 2" :y="(ve.y || 0) + 10" fill="#fff" font-size="8" text-anchor="middle">
-		<template v-if="typeof ve.ref === 'number'">
+		<template v-if="t === 'number' && typeof ve.ref === 'number' && ve.ref !== null">
 			{{ formatValue(getParamValue(ve.ref), props.params[ve.ref]?.type || '') }}
 		</template>
 		<template v-else-if="Array.isArray(ve.ref)">
-			{{ formatCombinedValue(ve.ref, ve.func, props.params, values) }}
+			{{ formatCombinedValue(ve.ref, ve.func, props.params, values, props.modes, props.modeDefs) }}
 		</template>
 	</text>
 </template>
 <script setup lang="ts">
-	import type { VisualElement } from '../../types';
+	import { computed } from 'vue';
+	import type { VisualElement, ModuleMode } from '../../types';
 	import { formatValue, formatCombinedValue } from '@/composables/useModuleControls';
 
 	const props = defineProps<{
 		ve: VisualElement;
 		params: any[];
 		values: number[];
+		modes?: number[];
+		modeDefs?: ModuleMode[];
 	}>();
 
 	function getParamValue(index: number): number {
 		return props.values[index] ?? 64;
 	}
+
+	const t = computed(() => {
+		return typeof props.ve.ref;
+	});
 </script>
