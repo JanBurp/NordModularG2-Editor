@@ -208,17 +208,15 @@
 		if (!moduleDef.value?.ve) return [];
 		const entries: { ve: any; groupId: number; key: string }[] = [];
 		let ledIdx = 0;
+		let ledArrayIdx = 0;
 		let veIdx = 0;
 		for (const ve of moduleDef.value.ve) {
 			if (ve.type === 'led') {
-				entries.push({ ve, groupId: 0, key: `led-${ledIdx}` });
+				entries.push({ ve, groupId: ledIdx, key: `led-${ledIdx}` });
 				ledIdx++;
 			} else if (ve.type === 'ledArray') {
-				const cnt = Number(ve.cnt) || 1;
-				for (let i = 0; i < cnt; i++) {
-					entries.push({ ve, groupId: i, key: `led-${ledIdx}` });
-					ledIdx++;
-				}
+				entries.push({ ve, groupId: ledArrayIdx, key: `ledArray-${ledArrayIdx}` });
+				ledArrayIdx++;
 			} else {
 				entries.push({ ve, groupId: 0, key: `ve-${veIdx}` });
 				veIdx++;
