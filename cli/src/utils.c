@@ -52,7 +52,7 @@ slot_t parse_slot(const char *slot_str) {
     if (strcmp(slot_str, "B") == 0 || strcmp(slot_str, "b") == 0) return SLOT_B;
     if (strcmp(slot_str, "C") == 0 || strcmp(slot_str, "c") == 0) return SLOT_C;
     if (strcmp(slot_str, "D") == 0 || strcmp(slot_str, "d") == 0) return SLOT_D;
-    return SLOT_CURRENT;
+    return SLOT_INVALID;
 }
 
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,

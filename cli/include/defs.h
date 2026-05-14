@@ -19,7 +19,8 @@ typedef enum {
     SLOT_B = 1,
     SLOT_C = 2,
     SLOT_D = 3,
-    SLOT_CURRENT = -1
+    SLOT_CURRENT = -1,
+    SLOT_INVALID = -2
 } slot_t;
 
 #define NUM_VARIATIONS                       (10)
