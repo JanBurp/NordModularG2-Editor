@@ -52,6 +52,13 @@ export function usePatchFile() {
 		const rawHex = stripFileHeader(result.data as number[]);
 		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
+		if (device.status === 'connected') {
+			try {
+				await window.cli.run(['upload-patch', uiStore.activeSlot, result.filepath!]);
+			} catch (err) {
+				console.error('Upload to G2 failed:', err);
+			}
+		}
 	}
 
 	async function handlePatchSelect(item: DiskItem | SynthItem): Promise<void> {
