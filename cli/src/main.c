@@ -442,11 +442,9 @@ static int cmd_upload_patch(int argc, char **argv, int i) {
 static int cmd_set_perf_mode(int argc, char **argv, int i) {
     if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-mode <patch|performance>\n"); return 1; }
     const char *m = argv[i + 1];
-    int mode = (strcmp(m, "performance") == 0) ? 0 : (strcmp(m, "patch") == 0) ? 1 : -1;
+    int mode = (strcmp(m, "performance") == 0) ? 1 : (strcmp(m, "patch") == 0) ? 0 : -1;
     if (mode < 0) { fprintf(stderr, "set-perf-mode: mode must be 'patch' or 'performance'\n"); return 1; }
     if (g2_send_init() != G2_OK) return 1;
-    cJSON *info = g2_device_info(0);
-    if (info) cJSON_Delete(info);
     int ret = g2_set_perf_mode(mode);
     if (ret == G2_OK) {
         if (output_format == OUTPUT_JSON) {
