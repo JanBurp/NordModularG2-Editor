@@ -120,10 +120,41 @@ export function formatValue(value: number, paramType: string): string {
 	return String(value);
 }
 
+function getContextFromRef(refIndices: number[], params: ModuleDefinition['params'] | undefined, values: number[]): Record<string, number> {
+	const context: Record<string, number> = {};
+	if (!params) return context;
+	for (let i = 1; i < refIndices.length; i++) {
+		const param = params[refIndices[i]];
+		if (param) {
+			context[param.type] = values[refIndices[i]] ?? 64;
+		}
+	}
+	return context;
+}
+
+function getDefinIndexFromContext(context: Record<string, number>, comments: string | undefined, maxIndex: number): number {
+	if (!comments) return 0;
+	const match = comments.match(/Determined by \[(\w+)\]/);
+	if (match) {
+		const controllingParam = match[1];
+		const value = context[controllingParam];
+		if (value !== undefined) {
+			return Math.min(value, maxIndex);
+		}
+	}
+	const andByMatch = comments.match(/and by \[(\w+)\]/);
+	if (andByMatch) {
+		const controllingParam = andByMatch[1];
+		const value = context[controllingParam];
+		if (value !== undefined) {
+			return Math.min(value, maxIndex);
+		}
+	}
+	return 0;
+}
+
 export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
 	if (!params) return '';
-
-	console.log('formatCombinedValue', values, refIndices, funcName, params);
 
 	const firstParam = params[refIndices[0]];
 	if (!firstParam) return '';
@@ -153,12 +184,16 @@ export function formatCombinedValue(refIndices: number[], funcName: string | und
 			if (result && result !== 'undefined') {
 				return result;
 			}
-
-			return refIndices.map((idx) => values[idx] ?? 64).join(' ');
 		} catch (e) {
 			console.error('Format error:', formatFunc, e);
-			return refIndices.map((idx) => values[idx] ?? 64).join(' ');
 		}
+	}
+
+	if (p.defin && p.defin.length > 1) {
+		const context = getContextFromRef(refIndices, params, values);
+		const definIndex = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
+		const options = parseDefin([p.defin[definIndex]]);
+		return calcDefinOptions(values[refIndices[0]], options);
 	}
 
 	return refIndices.map((idx) => values[idx] ?? 64).join(' ');
