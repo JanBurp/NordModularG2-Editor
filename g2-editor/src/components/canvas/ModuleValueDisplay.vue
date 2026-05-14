@@ -1,7 +1,7 @@
 <template>
 	<rect :x="ve.x" :y="ve.y" :width="ve.w" height="14" fill="#666" />
 	<text v-if="ve.ref !== undefined" :x="(ve.x || 0) + (ve.w || 0) / 2" :y="(ve.y || 0) + 10" fill="#fff" font-size="8" text-anchor="middle">
-		<template v-if="typeof ve.ref === 'number'">
+		<template v-if="t === 'number'">
 			{{ formatValue(getParamValue(ve.ref), props.params[ve.ref]?.type || '') }}
 		</template>
 		<template v-else-if="Array.isArray(ve.ref)">
@@ -10,6 +10,7 @@
 	</text>
 </template>
 <script setup lang="ts">
+	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
 	import { formatValue, formatCombinedValue } from '@/composables/useModuleControls';
 
@@ -22,4 +23,8 @@
 	function getParamValue(index: number): number {
 		return props.values[index] ?? 64;
 	}
+
+	const t = computed(() => {
+		return typeof props.ve.ref;
+	});
 </script>
