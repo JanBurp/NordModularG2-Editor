@@ -278,14 +278,12 @@ static void execute_cmd(const char *line) {
 
 	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
 		const char *m = arg_s(args, 0);
-		int mode = (m && strcmp(m, "performance") == 0) ? 0
-		         : (m && strcmp(m, "patch") == 0)       ? 1 : -1;
+		int mode = (m && strcmp(m, "performance") == 0) ? 1
+		         : (m && strcmp(m, "patch") == 0)       ? 0 : -1;
 		if (mode < 0) {
 			ret = G2_ERR_INVALID_PARAM;
 		} else {
 			g2_send_init();
-			cJSON *info = g2_device_info(0);
-			if (info) cJSON_Delete(info);
 			ret = g2_set_perf_mode(mode);
 		}
 

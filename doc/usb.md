@@ -219,7 +219,7 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
 | `0x3D` | MIDI_DUMP | — | None |
-| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=performance, 1=patch) | Embedded ACK |
+| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Embedded ACK |
 | `0x56 oo nn` | PLAY_NOTE | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
