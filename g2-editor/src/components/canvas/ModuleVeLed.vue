@@ -1,8 +1,19 @@
 <template>
+	<template v-if="ve.type === 'ledArray'">
+		<rect
+			v-for="i in (ve.cnt || 1)"
+			:key="`led-${i}`"
+			:x="(ve.x || 0) + 1 + (Number(i) - 1) * (Number(ve.xo) || 0)"
+			:y="ve.y"
+			:width="ve.w"
+			height="6.5"
+			:fill="activeStep === i - 1 ? '#0F0' : '#040'"
+			stroke="#000"
+		/>
+	</template>
 	<rect
-		v-for="i in (ve.cnt || 1)"
-		:key="`led-${i}`"
-		:x="(ve.x || 0) + 1 + (Number(i) - 1) * (Number(ve.xo) || 0)"
+		v-else
+		:x="(ve.x || 0) + 1"
 		:y="ve.y"
 		:width="ve.w"
 		height="6.5"
@@ -22,4 +33,5 @@
 	}>();
 	const ledStore = useLedStore();
 	const ledOn = computed(() => ledStore.getLedState(props.area, props.moduleIndex, props.groupId));
+	const activeStep = computed(() => ledStore.getStripValue(props.area, props.moduleIndex, props.groupId));
 </script>
