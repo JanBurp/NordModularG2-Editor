@@ -32,8 +32,8 @@ void test_parse_slot_null_returns_current(void) {
 }
 
 void test_parse_slot_invalid_returns_current(void) {
-    TEST_ASSERT_EQUAL_INT(-1, parse_slot("X"));
-    TEST_ASSERT_EQUAL_INT(-1, parse_slot(""));
+    TEST_ASSERT_EQUAL_INT(-2, parse_slot("X"));
+    TEST_ASSERT_EQUAL_INT(-2, parse_slot(""));
 }
 
 void test_parse_name_simple(void) {

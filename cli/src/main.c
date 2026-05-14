@@ -273,7 +273,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         int slot = -1;
         if (i + 2 < argc) {
             slot = parse_slot(argv[i + 2]);
-            if (slot < 0) {
+            if (slot == SLOT_INVALID) {
                 if (output_format == OUTPUT_JSON) {
                     output_error_json("invalid slot (use A, B, C, or D)", output_format);
                 } else {
@@ -292,6 +292,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot     = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "add-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int color    = atoi(argv[i + 3]);
         int from_mod = atoi(argv[i + 4]);
@@ -310,6 +311,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot     = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "del-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int from_mod = atoi(argv[i + 3]);
         int from_ct  = atoi(argv[i + 4]);
@@ -327,6 +329,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot     = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-cable-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int color    = atoi(argv[i + 3]);
         int from_mod = atoi(argv[i + 4]);
@@ -345,6 +348,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "del-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         return g2_del_module(slot, location, module_id);
@@ -357,6 +361,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "move-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         int col       = atoi(argv[i + 4]);
@@ -373,6 +378,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "add-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int type_id   = atoi(argv[i + 3]);
         int module_id = atoi(argv[i + 4]);
@@ -405,6 +411,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         int color     = atoi(argv[i + 4]);
@@ -418,6 +425,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-name: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         const char *name = argv[i + 4];
@@ -431,6 +439,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-param-label: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         int param_idx = atoi(argv[i + 4]);
@@ -446,6 +455,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot      = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-mode: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int module_id = atoi(argv[i + 3]);
         int param     = atoi(argv[i + 4]);
@@ -460,6 +470,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot     = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "set-param: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
         int mod_id   = atoi(argv[i + 3]);
         int param    = atoi(argv[i + 4]);
@@ -475,6 +486,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot     = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "select-patch: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         int bank     = atoi(argv[i + 2]);
         int location = atoi(argv[i + 3]);
         return g2_select_patch(slot, bank, location);
@@ -487,6 +499,7 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
             return 1;
         }
         int slot = parse_slot(argv[i + 1]);
+        if (slot == SLOT_INVALID) { fprintf(stderr, "upload-patch: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
         return g2_upload_patch(slot, argv[i + 2]);
     }
 

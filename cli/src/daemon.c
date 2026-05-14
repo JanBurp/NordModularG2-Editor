@@ -88,6 +88,12 @@ cJSON *daemon_make_error(cJSON *id, int code) {
 	return r;
 }
 
+static void daemon_error_cb(const char *msg, void *ctx) {
+	(void)ctx;
+	printf("{\"type\":\"error\",\"error\":\"%s\"}\n", msg);
+	fflush(stdout);
+}
+
 static void emit(cJSON *resp) {
 	char *s = cJSON_PrintUnformatted(resp);
 	if (s) { printf("%s\n", s); fflush(stdout); free(s); }
@@ -163,12 +169,15 @@ static void execute_cmd(const char *line) {
 		ret = g2_select_slot(arg_s(args, 0));
 
 	} else if (strcmp(cmd, "variation") == 0 && n >= 2) {
-		ret = g2_select_variation(arg_i(args, 0), parse_slot(arg_s(args, 1)));
+		int slot = parse_slot(arg_s(args, 1));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_select_variation(arg_i(args, 0), slot);
 
 	} else if (strcmp(cmd, "add-cable") == 0 && n >= 9) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_add_cable(slot, loc,
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_add_cable(slot, loc,
 		                   arg_i(args, 2),
 		                   arg_i(args, 3), arg_i(args, 4), arg_i(args, 5),
 		                   arg_i(args, 6), arg_i(args, 7), arg_i(args, 8));
@@ -176,14 +185,16 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "del-cable") == 0 && n >= 8) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_del_cable(slot, loc,
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_del_cable(slot, loc,
 		                   arg_i(args, 2), arg_i(args, 3), arg_i(args, 4),
 		                   arg_i(args, 5), arg_i(args, 6), arg_i(args, 7));
 
 	} else if (strcmp(cmd, "set-cable-color") == 0 && n >= 9) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_cable_color(slot, loc,
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_cable_color(slot, loc,
 		                         arg_i(args, 2),
 		                         arg_i(args, 3), arg_i(args, 4), arg_i(args, 5),
 		                         arg_i(args, 6), arg_i(args, 7), arg_i(args, 8));
@@ -191,16 +202,21 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "del-module") == 0 && n >= 3) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_del_module(slot, loc, arg_i(args, 2));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_del_module(slot, loc, arg_i(args, 2));
 
 	} else if (strcmp(cmd, "move-module") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_move_module(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_move_module(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
 
 	} else if (strcmp(cmd, "add-module") == 0 && n >= 8) {
-		int slot      = parse_slot(arg_s(args, 0));
-		int loc       = parse_location(args, 1);
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		if (slot == SLOT_INVALID) {
+			ret = G2_ERR_INVALID_PARAM;
+		} else {
 		int type_id   = arg_i(args, 2);
 		int module_id = arg_i(args, 3);
 		int col       = arg_i(args, 4);
@@ -217,40 +233,48 @@ static void execute_cmd(const char *line) {
 		ret = g2_add_module(slot, loc, type_id, module_id, col, row, color,
 		                    num_modes, mode_vals, num_params, param_vals,
 		                    name ? name : "Module");
+		}
 
 	} else if (strcmp(cmd, "set-module-mode") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_module_mode(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_module_mode(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
 
 	} else if (strcmp(cmd, "set-module-color") == 0 && n >= 4) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_module_color(slot, loc, arg_i(args, 2), arg_i(args, 3));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_module_color(slot, loc, arg_i(args, 2), arg_i(args, 3));
 
 	} else if (strcmp(cmd, "set-module-name") == 0 && n >= 4) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_module_label(slot, loc, arg_i(args, 2), arg_s(args, 3));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_module_label(slot, loc, arg_i(args, 2), arg_s(args, 3));
 
 	} else if (strcmp(cmd, "set-param-label") == 0 && n >= 6) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4), arg_s(args, 5));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4), arg_s(args, 5));
 
 	} else if (strcmp(cmd, "set-param") == 0 && n >= 6) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
-		ret = g2_set_param(slot, loc, arg_i(args, 2), arg_i(args, 3),
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_param(slot, loc, arg_i(args, 2), arg_i(args, 3),
 		                   arg_i(args, 4), arg_i(args, 5));
 
 	} else if (strcmp(cmd, "select-patch") == 0 && n >= 3) {
 		int slot = parse_slot(arg_s(args, 0));
-		ret = g2_select_patch(slot, arg_i(args, 1), arg_i(args, 2));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_select_patch(slot, arg_i(args, 1), arg_i(args, 2));
 
 	} else if (strcmp(cmd, "upload-patch") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));
-		ret = g2_upload_patch(slot, arg_s(args, 1));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_upload_patch(slot, arg_s(args, 1));
 
 	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
 		const char *m = arg_s(args, 0);
@@ -345,7 +369,7 @@ static void *stdin_reader(void *arg) {
 /* ── entry point ───────────────────────────────────────────────────────── */
 
 int g2_daemon_run(output_format_t format) {
-	g2_daemon_mode = 1;
+	g2_set_error_callback(daemon_error_cb, NULL);
 	pthread_t tid;
 	pthread_create(&tid, NULL, stdin_reader, NULL);
 	g2_watch_tick_hook = daemon_tick;

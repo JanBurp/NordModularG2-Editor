@@ -21,7 +21,13 @@ static g2_device_t g2 = {
     .interface_claimed = 0
 };
 
-int g2_daemon_mode = 0;
+static g2_error_cb_t g2_error_cb = NULL;
+static void *g2_error_cb_ctx = NULL;
+
+void g2_set_error_callback(g2_error_cb_t cb, void *ctx) {
+    g2_error_cb = cb;
+    g2_error_cb_ctx = ctx;
+}
 
 static void g2_err(const char *fmt, ...) {
     char msg[256];
@@ -31,9 +37,8 @@ static void g2_err(const char *fmt, ...) {
     va_end(ap);
     size_t len = strlen(msg);
     if (len > 0 && msg[len - 1] == '\n') msg[--len] = '\0';
-    if (g2_daemon_mode) {
-        printf("{\"type\":\"error\",\"error\":\"%s\"}\n", msg);
-        fflush(stdout);
+    if (g2_error_cb) {
+        g2_error_cb(msg, g2_error_cb_ctx);
     } else {
         fprintf(stderr, "%s\n", msg);
     }
@@ -587,11 +592,12 @@ cJSON *g2_device_info(int debug) {
     int ret;
     uint8_t msgType;
     uint16_t size;
+    cJSON *root = NULL;
 
     if (ensure_connected(1) < 0) {
-            g2_err("Failed to connect to G2\n");
-            return NULL;
-        }
+        g2_err("Failed to connect to G2\n");
+        goto cleanup;
+    }
 
     /* Drain stale notifications left over from any prior command or session
      * before issuing GET_SYNTH_SETTINGS — same guard used in g2_get_patch(). */
@@ -600,7 +606,7 @@ cJSON *g2_device_info(int debug) {
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
         g2_err("Failed to send synth settings command\n");
-        return NULL;
+        goto cleanup;
     }
 
     usleep(USB_SEND_DELAY_US);
@@ -608,34 +614,33 @@ cJSON *g2_device_info(int debug) {
     ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No response from G2\n");
-        return NULL;
+        goto cleanup;
     }
 
     msgType = response[0] & 0x0f;
     if (msgType != RESPONSE_TYPE_EXTENDED) {
         g2_err("Unexpected response type %d\n", msgType);
-        return NULL;
+        goto cleanup;
     }
 
     size = (response[1] << 8) | response[2];
     if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
         g2_err("Unexpected synth settings size: %u\n", size);
-        return NULL;
+        goto cleanup;
     }
     bulkData = malloc(size);
     if (!bulkData) {
         g2_err("Memory allocation failed\n");
-        return NULL;
+        goto cleanup;
     }
     bulkSize = size;
 
     if (recv_bulk(bulkData, size) <= 0) {
         g2_err("Failed to read bulk data\n");
-        free(bulkData);
-        return NULL;
+        goto cleanup;
     }
 
-    if (debug && !g2_daemon_mode) {
+    if (debug) {
         fprintf(stderr, "SYNTH:%zu:", bulkSize);
         for (size_t j = 0; j < bulkSize; j++) {
             fprintf(stderr, "%02x", bulkData[j]);
@@ -660,8 +665,7 @@ cJSON *g2_device_info(int debug) {
     perfData = malloc(1024);
     if (!perfData) {
         g2_err("Memory allocation failed\n");
-        free(bulkData);
-        return NULL;
+        goto cleanup;
     }
 
     uint8_t perfInterrupt[16] = {0};
@@ -676,7 +680,7 @@ cJSON *g2_device_info(int debug) {
         }
     }
 
-    if (debug && !g2_daemon_mode) {
+    if (debug) {
         fprintf(stderr, "PERF:%zu:", perfSize);
         for (size_t j = 0; j < perfSize; j++) {
             fprintf(stderr, "%02x", perfData[j]);
@@ -685,16 +689,14 @@ cJSON *g2_device_info(int debug) {
     }
 
     /* Parse settings data and build JSON */
-    cJSON *root = g2_parse_settings(bulkData, bulkSize, perfData, perfSize);
-
-    free(bulkData);
-    free(perfData);
-
+    root = g2_parse_settings(bulkData, bulkSize, perfData, perfSize);
     if (!root) {
         g2_err("Failed to parse settings\n");
-        return NULL;
     }
 
+cleanup:
+    free(bulkData);
+    free(perfData);
     return root;
 }
 

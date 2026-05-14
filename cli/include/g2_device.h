@@ -42,8 +42,10 @@ typedef struct {
     int interface_claimed;
 } g2_device_t;
 
-/* Set to 1 when running as daemon — redirects error output to JSON stdout */
-extern int g2_daemon_mode;
+/* Error callback — set via g2_set_error_callback().
+ * When set, errors are passed to the callback instead of printed to stderr. */
+typedef void (*g2_error_cb_t)(const char *msg, void *ctx);
+void g2_set_error_callback(g2_error_cb_t cb, void *ctx);
 
 /* Initialize device library */
 int g2_init(void);
