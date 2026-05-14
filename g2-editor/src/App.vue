@@ -33,38 +33,7 @@
 			/>
 		</ToolBar>
 
-		<ToolBar v-if="patchName">
-			<ToolBarLabel class="w-8">Patch:</ToolBarLabel>
-			<ToolBarText class="w-36">{{ patchName }}</ToolBarText>
-
-			<div class="flex items-center gap-1.5">
-				<ToolBarLabel>Cat:</ToolBarLabel>
-				<Select v-model="selectedCategory" :options="soundCategories" title="Sound Category" />
-			</div>
-
-			<ToolBarDivider />
-
-			<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
-			<Select v-model="selectedVoices" :options="VOICES" title="Voice mode" :disabled="selectedVoiceMode !== 0" />
-
-			<ToolBarDivider />
-
-			<div class="flex items-center gap-2">
-				<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="handleVariationClick" />
-			</div>
-
-			<ToolBarDivider />
-
-			<ColorPicker />
-
-			<ToolBarDivider />
-
-			<CableVisibilitySelector />
-
-			<ToolBarDivider />
-
-			<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
-		</ToolBar>
+		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
@@ -152,7 +121,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
+	import { computed, onMounted, onUnmounted, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
@@ -163,9 +132,8 @@
 	import ToolBarLabel from './components/toolbar/ToolBarLabel.vue';
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
+	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
-	import ColorPicker from './components/common/ColorPicker.vue';
-	import Select from './components/common/Select.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
@@ -175,6 +143,8 @@
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { usePatchFile } from './composables/usePatchFile';
+	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
+	import { usePatchOperations } from './composables/usePatchOperations';
 	import { useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -182,11 +152,8 @@
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 
-	import { SOUND_CATEGORIES as soundCategories, SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './constants';
-	import { VOICEMODE_OPTIONS, VOICES } from './types/patch';
+	import { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS } from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
-	import CableVisibilitySelector from './components/toolbar/CableVisibilitySelector.vue';
-	import CPU from './components/toolbar/CPU.vue';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 
@@ -203,7 +170,6 @@
 	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
 	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
 	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
-	const currentCables = computed(() => (uiStore.area === 1 ? voiceCables.value : fxCables.value));
 	const patchName = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
 
 	function applySlotResult(result: { patch: any; name: string } | null): void {
@@ -212,140 +178,28 @@
 		}
 	}
 
-	// ── Cable / selection ─────────────────────────────────────────────────────
+	const {
+		showLabelDialog,
+		editingLabel,
+		showParamLabelDialog,
+		editingParamLabel,
+		handleModuleLabelEdit,
+		confirmModuleLabel,
+		handleParamLabelEdit,
+		confirmParamLabel,
+	} = useModuleLabelDialog();
 
-	async function deleteSelection(): Promise<void> {
-		try {
-			await slotsStore.deleteSelection(
-				uiStore.selectedModules,
-				uiStore.selectedCables,
-				uiStore.area === 1 ? 'voice' : 'fx',
-				currentModules.value,
-				currentCables.value,
-			);
-		} finally {
-			uiStore.clearSelection();
-			uiStore.selectedCables = [];
-		}
-	}
-
-	async function handleModuleMove({ indices, dCol, dRow }: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }): Promise<void> {
-		applySlotResult(await slotsStore.moveModulesWithCollision(indices, dCol, dRow, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
-	}
-
-	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
-		applySlotResult(await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value));
-	}
-
-	// TODO: Investigate why param changes from editor->G2 are slow. Too much commands send? Does it something extra?
-	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
-	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (device.status !== 'connected') return;
-		if (paramChangeTimer) clearTimeout(paramChangeTimer);
-		paramChangeTimer = setTimeout(async () => {
-			paramChangeTimer = null;
-			try {
-				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
-			} catch {
-				/* G2 may be temporarily busy */
-			}
-		}, 50);
-	}
-	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (device.status !== 'connected') return;
-		if (paramChangeTimer) clearTimeout(paramChangeTimer);
-		paramChangeTimer = setTimeout(async () => {
-			paramChangeTimer = null;
-			try {
-				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
-			} catch {
-				/* G2 may be temporarily busy */
-			}
-		}, 50);
-	}
-
-	// ── Module label dialog ───────────────────────────────────────────────────
-
-	const showLabelDialog = ref(false);
-	const editingLabel = ref('');
-	const editingModuleId = ref<number | null>(null);
-
-	const showParamLabelDialog = ref(false);
-	const editingParamLabel = ref('');
-	const editingParamLabelModuleId = ref<number | null>(null);
-	const editingParamLabelParamIndex = ref<number | null>(null);
-
-	function handleModuleLabelEdit({ moduleIndex, currentLabel }: { moduleIndex: number; currentLabel: string }): void {
-		editingModuleId.value = moduleIndex;
-		editingLabel.value = currentLabel;
-		showLabelDialog.value = true;
-	}
-
-	async function confirmModuleLabel(): Promise<void> {
-		if (editingModuleId.value === null) return;
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setModuleLabel(editingModuleId.value, editingLabel.value, area as 'voice' | 'fx');
-		showLabelDialog.value = false;
-	}
-
-	function handleParamLabelEdit({ moduleIndex, paramIndex, currentLabel }: { moduleIndex: number; paramIndex: number; currentLabel: string }): void {
-		editingParamLabelModuleId.value = moduleIndex;
-		editingParamLabelParamIndex.value = paramIndex;
-		editingParamLabel.value = currentLabel;
-		showParamLabelDialog.value = true;
-	}
-
-	async function confirmParamLabel(): Promise<void> {
-		if (editingParamLabelModuleId.value === null || editingParamLabelParamIndex.value === null) return;
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setParamLabel(editingParamLabelModuleId.value, editingParamLabelParamIndex.value, editingParamLabel.value, area);
-		showParamLabelDialog.value = false;
-	}
-
-	// ── Module delete / color ─────────────────────────────────────────────────
-
-	async function handleModuleDelete(moduleIndex: number): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.deleteModule(moduleIndex, area as 'voice' | 'fx');
-		uiStore.selectModules(uiStore.selectedModules.filter((i) => i !== moduleIndex));
-	}
-
-	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
-		uiStore.setModuleColor(colorId);
-		await slotsStore.setModuleColors(targets, colorId, area as 'voice' | 'fx');
-	}
-
-	// ── Jack disconnect / recolor ─────────────────────────────────────────────
-
-	async function handleJackDeleteConnected({
-		moduleIndex,
-		connectorIndex,
-		type,
-	}: {
-		moduleIndex: number;
-		connectorIndex: number;
-		type: 'input' | 'output';
-	}): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
-	}
-
-	async function handleJackSetCableColor({
-		moduleIndex,
-		connectorIndex,
-		type,
-		colorId,
-	}: {
-		moduleIndex: number;
-		connectorIndex: number;
-		type: 'input' | 'output';
-		colorId: number;
-	}): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setCableColor(moduleIndex, connectorIndex, type, colorId, area);
-	}
+	const {
+		deleteSelection,
+		handleModuleMove,
+		handleModuleDrop,
+		handleParamChange,
+		handleModeChange,
+		handleModuleDelete,
+		handleModuleColorChange,
+		handleJackDeleteConnected,
+		handleJackSetCableColor,
+	} = usePatchOperations();
 
 	// ── Keyboard ──────────────────────────────────────────────────────────────
 
@@ -385,30 +239,6 @@
 			console.error('togglePerfMode failed:', e?.message ?? e);
 		}
 	}
-
-	const selectedCategory = ref<number>(0);
-	watch(
-		() => (currentPatch.value as any)?.description?.category,
-		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
-		{ immediate: true },
-	);
-	watch(selectedCategory, (cat) => {
-		const desc = (currentPatch.value as any)?.description;
-		if (desc) desc.category = cat;
-	});
-
-	const selectedVoiceMode = computed({
-		get: () => currentPatch.value?.description?.monopoly ?? 1,
-		set: (val: number) => {
-			if (currentPatch.value?.description) currentPatch.value.description.monopoly = val;
-		},
-	});
-	const selectedVoices = computed({
-		get: () => currentPatch.value?.description?.voices ?? 0,
-		set: (val: number) => {
-			if (currentPatch.value?.description) currentPatch.value.description.voices = val;
-		},
-	});
 
 	// ── Lifecycle ─────────────────────────────────────────────────────────────
 

@@ -64,9 +64,8 @@
 	import Cables from './Cables.vue';
 	import DragGhost from './DragGhost.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
-	import { useUiStore } from '@/store/ui';
-
-	const ui = useUiStore();
+	import { useModuleDrag } from '../../composables/useModuleDrag';
+	import { useModuleDrop } from '../../composables/useModuleDrop';
 
 	const props = defineProps({
 		modules: {
@@ -156,15 +155,6 @@
 		return Math.max(maxY + 100, 600);
 	});
 
-	type DragState = {
-		indices: number[];
-		startPosByIndex: Map<number, { horiz: number; vert: number }>;
-		anchorIndex: number;
-		dxPx: number;
-		dyPx: number;
-	};
-	const dragState = ref<DragState | null>(null);
-
 	const connectedJacksMap = computed(() => {
 		const map = new Map<number, { inputs: Set<number>; outputs: Set<number> }>();
 		for (const cable of props.cables as any[]) {
@@ -194,25 +184,6 @@
 		});
 	});
 
-	const dragGhosts = computed(() => {
-		const drag = dragState.value;
-		if (!drag) return [];
-		return drag.indices
-			.map((idx) => {
-				const start = drag.startPosByIndex.get(idx);
-				const mod = (props.modules as any[]).find((m) => m.index === idx);
-				if (!start || !mod) return null;
-				const height = ((getModule(mod.type) as any)?.height ?? 2) * 16;
-				return {
-					idx,
-					x: start.horiz * 256 + drag.dxPx,
-					y: start.vert * 16 + drag.dyPx,
-					height,
-				};
-			})
-			.filter((g): g is { idx: number; x: number; y: number; height: number } => g !== null);
-	});
-
 	function onParamChange(moduleIndex: number, paramIndex: number, value: number) {
 		emit('paramChange', moduleIndex, paramIndex, value);
 	}
@@ -221,131 +192,19 @@
 		emit('modeChange', moduleIndex, index, value);
 	}
 
+	const { dragState, dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
+		() => props.modules as any[],
+		(info) => emit('moduleMove', info),
+		(index, shiftKey) => handleModuleClick(index, shiftKey),
+	);
+
+	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
+		svgRef,
+		(info) => emit('moduleDrop', info),
+	);
+
 	onUnmounted(() => {
 		clearModuleDrag();
 		clearDropGhost();
 	});
-
-	// --- Module drag (move) ---
-	type ModuleDragInfo = {
-		moduleIndex: number;
-		clientX: number;
-		clientY: number;
-	};
-	let dragModuleIndex: number | null = null;
-	let dragStartClientX = 0;
-	let dragStartClientY = 0;
-	let dragMoved = false;
-
-	function handleModuleDragStart(info: ModuleDragInfo) {
-		dragModuleIndex = info.moduleIndex;
-		dragStartClientX = info.clientX;
-		dragStartClientY = info.clientY;
-		dragMoved = false;
-		window.addEventListener('mousemove', onModuleDragMove);
-		window.addEventListener('mouseup', onModuleDragEnd);
-	}
-
-	function onModuleDragMove(e: MouseEvent) {
-		if (dragModuleIndex === null) return;
-		const dxPx = e.clientX - dragStartClientX;
-		const dyPx = e.clientY - dragStartClientY;
-		if (!dragMoved) {
-			if (Math.hypot(dxPx, dyPx) < 5) return;
-			const sel = ui.selectedModules;
-			const indices = sel.includes(dragModuleIndex) ? [...sel] : [dragModuleIndex];
-			const startPosByIndex = new Map<number, { horiz: number; vert: number }>();
-			for (const id of indices) {
-				const m = (props.modules as any[]).find((x) => x.index === id);
-				if (m) startPosByIndex.set(id, { horiz: m.horiz, vert: m.vert });
-			}
-			if (startPosByIndex.size === 0) return;
-			dragState.value = { indices, startPosByIndex, anchorIndex: dragModuleIndex, dxPx: 0, dyPx: 0 };
-			dragMoved = true;
-		}
-		dragState.value = { ...dragState.value!, dxPx, dyPx };
-	}
-
-	function onModuleDragEnd(e: MouseEvent) {
-		window.removeEventListener('mousemove', onModuleDragMove);
-		window.removeEventListener('mouseup', onModuleDragEnd);
-		const moduleIndex = dragModuleIndex;
-		dragModuleIndex = null;
-		const drag = dragState.value;
-		dragState.value = null;
-		if (drag && moduleIndex !== null) {
-			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
-			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / 256));
-			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / 16));
-			const dCol = anchorTargetCol - anchorStart.horiz;
-			const dRow = anchorTargetRow - anchorStart.vert;
-			if (dCol !== 0 || dRow !== 0) {
-				emit('moduleMove', { indices: drag.indices, dCol, dRow, anchorIndex: drag.anchorIndex });
-			}
-		} else if (moduleIndex !== null) {
-			handleModuleClick(moduleIndex, e.shiftKey);
-		}
-		dragMoved = false;
-	}
-
-	function clearModuleDrag() {
-		dragState.value = null;
-		dragModuleIndex = null;
-		dragMoved = false;
-		window.removeEventListener('mousemove', onModuleDragMove);
-		window.removeEventListener('mouseup', onModuleDragEnd);
-	}
-
-	// --- Module drop (add from ModulesPane) ---
-	let dropGhost: SVGRectElement | null = null;
-
-	function handleDragOver(e: DragEvent) {
-		if (!svgRef.value) return;
-		const mp = toSvgCoords(e as unknown as MouseEvent);
-		if (!mp) return;
-		const col = Math.max(0, Math.floor(mp.x / 256));
-		const row = Math.max(0, Math.floor(mp.y / 16));
-		const typeId = ui.draggedModuleId;
-		const modDef = typeId ? getModule(typeId) : null;
-		const modHeight = (modDef?.height || 2) * 16;
-		if (!dropGhost) {
-			dropGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-			dropGhost.setAttribute('fill', 'rgba(100,200,100,0.25)');
-			dropGhost.setAttribute('stroke', '#4ade80');
-			dropGhost.setAttribute('stroke-width', '2');
-			dropGhost.setAttribute('rx', '2');
-			dropGhost.setAttribute('pointer-events', 'none');
-			(svgRef.value as SVGElement).appendChild(dropGhost);
-		}
-		dropGhost.setAttribute('width', '256');
-		dropGhost.setAttribute('height', String(modHeight));
-		dropGhost.setAttribute('transform', `translate(${col * 256}, ${row * 16})`);
-	}
-
-	function clearDropGhost() {
-		dropGhost?.remove();
-		dropGhost = null;
-	}
-
-	function handleModuleDropOnWrapper(e: DragEvent) {
-		clearDropGhost();
-		const typeId = parseInt(e.dataTransfer?.getData('text/plain') || '0');
-		if (!typeId || !svgRef.value) return;
-		const mp = toSvgCoords(e as unknown as MouseEvent);
-		if (!mp) return;
-		const col = Math.max(0, Math.floor(mp.x / 256));
-		const row = Math.max(0, Math.floor(mp.y / 16));
-		emit('moduleDrop', { typeId, col, row });
-	}
-
-	function toSvgCoords(e: MouseEvent) {
-		const svg = svgRef.value as SVGSVGElement | null;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform(ctm.inverse());
-	}
 </script>

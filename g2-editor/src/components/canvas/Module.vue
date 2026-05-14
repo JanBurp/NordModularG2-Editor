@@ -116,7 +116,7 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed, ref, watch } from 'vue';
+	import { computed } from 'vue';
 	import ModuleBackground from './ModuleBackground.vue';
 	import ModuleKnob from './ModuleKnob.vue';
 	import ModuleTitle from './ModuleTitle.vue';
@@ -126,8 +126,8 @@
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
 	import { getModule } from '../../renderer/nmg2mods';
-	import { getParam } from '../../renderer/parammap';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { useModuleParams } from '../../composables/useModuleParams';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
@@ -136,7 +136,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ParamLabel } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
@@ -244,27 +244,6 @@
 	const x = computed(() => (instance.value.horiz || 0) * 256);
 	const y = computed(() => (instance.value.vert || 0) * 16);
 
-	// Reactive local parameter values
-	const localLv = ref<number[]>([]);
-
-	// Initialize localLv from instance
-	watch(
-		() => instance.value.lv,
-		(newLv) => {
-			if (newLv) {
-				localLv.value = [...newLv];
-			} else {
-				// Initialize with defaults
-				localLv.value =
-					moduleDef.value?.params?.map((param) => {
-						const p = getParam(param.type);
-						return p?.def ?? 64;
-					}) || [];
-			}
-		},
-		{ immediate: true },
-	);
-
 	const displayName = computed(() => {
 		return instance.value.uname || moduleDef.value?.short || 'Module';
 	});
@@ -273,59 +252,10 @@
 		return (moduleDef.value?.height || 2) * 16;
 	});
 
-	// Get parameter value from localLv or default
-	function getParamValue(index: number): number {
-		if (localLv.value.length > index) {
-			return localLv.value[index];
-		}
-		// Return default from paramMap
-		const param = moduleDef.value?.params?.[index];
-		if (param) {
-			const p = getParam(param.type);
-			return p?.def ?? 64;
-		}
-		return 64;
-	}
-
-	function getParamLabel(index: number): ParamLabel | undefined {
-		if (typeof instance.value.paramLabels === 'undefined' || instance.value.paramLabels?.length === 0) return undefined;
-		const idx = instance.value.paramLabels.findIndex((label) => label.paramIndex === index);
-		if (idx < 0) return undefined;
-		return instance.value.paramLabels[idx];
-	}
-
-	// Handle parameter change from controls
-	function onParamChange(paramIndex: number, value: number) {
-		// Clamp to param's valid range
-		const param = moduleDef.value?.params?.[paramIndex];
-		if (param) {
-			const p = getParam(param.type);
-			if (p) {
-				value = Math.min(Math.max(value, p.low), p.high);
-			}
-		}
-		// Update local state
-		localLv.value[paramIndex] = value;
-
-		// Emit to parent
-		emit('paramChange', moduleIdx.value, paramIndex, value);
-	}
-
-	// Get mode value from instance or default
-	function getModeValue(index: number): number {
-		if (instance.value.modes && instance.value.modes.length > index) {
-			return instance.value.modes[index];
-		}
-		return 0;
-	}
-
-	// Handle parameter change from mode controls
-	function onModeChange(index: number, value: number) {
-		// Update local state
-		if (instance.value.modes && instance.value.modes.length > index) {
-			instance.value.modes[index] = value;
-		}
-		// Emit to parent
-		emit('modeChange', moduleIdx.value, index, value);
-	}
+	const { localLv, getParamValue, getParamLabel, onParamChange, getModeValue, onModeChange } = useModuleParams(
+		instance,
+		moduleDef,
+		(moduleIndex, paramIndex, value) => emit('paramChange', moduleIndex, paramIndex, value),
+		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
+	);
 </script>
