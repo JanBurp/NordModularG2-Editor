@@ -1,5 +1,7 @@
 import type { ParamDefinition } from '../types/index.ts';
 
+const CLK_FORMAT = '0 ~ 1/64T, 4 ~ 1/64, 8 ~ 1/32T, 12 ~ 1/64D, 16 ~ 1/32, 20 ~ 1/16T, 24 ~ 1/32D, 28 ~ 1/16, 32 ~ 1/16, 36 ~ 1/8T, 40 ~ 1/8T, 44 ~ 1/16D, 48 ~ 1/16D, 52 ~ 1/8, 56 ~ 1/8, 60 ~ 1/4T, 64 ~ 1/4T, 68 ~ 1/8D, 72 ~ 1/8D, 76 ~ 1/4, 80 ~ 1/4, 84 ~ 1/2T, 88 ~ 1/2T, 92 ~ 1/4D, 96 ~ 1/4D, 100 ~ 1/2, 104 ~ 1/2, 108 ~ 1/1T, 112 ~ 1/2D, 116 ~ 1/1, 120 ~ 1/1D, 124 ~ 2/1';
+
 // prettier-ignore
 const parammap: Record<string, ParamDefinition> = {
 	ActiveMonitor: { names: [''], width: 11, bmp: 'pwr', low: 0, high: 1, def: 1, defin: ['0 ~ Monitor,1 ~ Active '], comments: '' },
@@ -20,9 +22,9 @@ const parammap: Record<string, ParamDefinition> = {
 	DelayRange_1: { width: 43, height: 14, low: 0, high: 2, def: 0, defin: ['0 ~ 500 m, 1 ~ 1.0 s, 2 ~ 2.0 s, 3 ~ 1.35 s'], comments: 'Determines [DelayTime_1]' },
 	DelayRange_2: { width: 43, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ 500 m, 1 ~ 1.0 s, 2 ~ 2.0 s, 3 ~ 2.7 s'], comments: 'Possibly determines [DelayTime_1], [DelayTime_2] and [DelayTime_3]' },
 	DelayRange_3: { width: 43, height: 14, low: 0, high: 6, def: 0, defin: ['0 ~ 5 m, 1 ~ 25 m, 2 ~ 100 m, 3 ~ 500 m, 4 ~ 1.0 s, 5 ~ 2.0 s, 6 ~ 2.7 s'], comments: 'Determines [DelayTime_3]' },
-	DelayTime_1: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 661 ms, 127 ~ 1.351 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=500 ms, 1.0 s, 1.35 s), Clk. Determined by [DelayRange_1] and by [TimeClk] =if present)' },
-	DelayTime_2: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=500 ms, 1.0 s, 2.0 s, 2.7 s), Clk. Determined by [DelayRange_2] and by [TimeClk] =if present)' },
-	DelayTime_3: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 2.68 m, 127 ~ 5.30 m', '0 ~ 0.01 m, 64 ~ 12.7 m, 127 ~ 25.1 m', '0 ~ 0.01 m, 64 ~ 50.7 m, 127 ~ 101 m', '0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', '0 ~ 1/64 T, 64 ~ 1/4 T, 127 ~ 2/1'], comments: 'Time=5ms, 25ms, 100ms, 500ms, 1.0s, 2.0s, 2.7s), Clk. Determined by [DelayRange_3] and [TimeClk] =if present)' },
+	DelayTime_1: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 661 ms, 127 ~ 1.351 s', CLK_FORMAT], comments: 'Time=500 ms, 1.0 s, 1.35 s), Clk. Determined by [DelayRange_1] and by [TimeClk] =if present)' },
+	DelayTime_2: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', CLK_FORMAT], comments: 'Time=500 ms, 1.0 s, 2.0 s, 2.7 s), Clk. Determined by [DelayRange_2] and by [TimeClk] =if present)' },
+	DelayTime_3: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.01 m, 64 ~ 2.68 m, 127 ~ 5.30 m', '0 ~ 0.01 m, 64 ~ 12.7 m, 127 ~ 25.1 m', '0 ~ 0.01 m, 64 ~ 50.7 m, 127 ~ 101 m', '0 ~ 0.01 m, 64 ~ 252 m, 127 ~ 500 m', '0 ~ 0.01 m, 64 ~ 504 m, 127 ~ 1.000 s', '0 ~ 0.01 m, 64 ~ 1.008 s, 127 ~ 2.000 s', '0 ~ 0.01 m, 64 ~ 1.361 s, 127 ~ 2.700 s', CLK_FORMAT], comments: 'Time=5ms, 25ms, 100ms, 500ms, 1.0s, 2.0s, 2.7s), Clk. Determined by [DelayRange_3] and [TimeClk] =if present)' },
 	DigitizerBits: { low: 0, high: 12, def: 11, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4, 4 ~ 5, 5 ~ 6, 6 ~ 7, 7 ~ 8, 8 ~ 9, 9 ~ 10, 10 ~ 11, 11 ~ 12, 12 ~ Off'], comments: '' },
 	DigitizerRate: { low: 0, high: 127, def: 64, defin: ['0 ~ 32.70 Hz, 64 ~ 1.32 kHz, 127 ~ 50.2 kHz'], comments: '' },
 	DrumSynthFreq: { low: 0, high: 127, def: 42, defin: ['0 ~ 20 Hz, 64 ~ 127 Hz, 127 ~ 784 Hz'], comments: '' },

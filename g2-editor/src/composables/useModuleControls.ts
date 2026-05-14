@@ -116,8 +116,6 @@ export function formatValue(value: number, paramType: string): string {
 	const p = getParam(paramType);
 	if (!p) return String(value);
 
-	console.log('formatValue', value, p);
-
 	if (p.f && paramFormattingFunctions[p.f]) {
 		try {
 			return paramFormattingFunctions[p.f](value) || String(value);
@@ -171,7 +169,7 @@ function getDefinIndexFromContext(context: Record<string, number>, comments: str
 	const delayValue = context[delayRangeParam];
 	if (delayValue === undefined) return 0;
 
-	const andByMatch = comments.match(/and by \[(\w+)\]/);
+	const andByMatch = comments.match(/and(?: by)? \[(\w+)\]/);
 	if (andByMatch) {
 		const timeClkParam = andByMatch[1];
 		const timeClkValue = context[timeClkParam];
@@ -192,8 +190,6 @@ export function formatCombinedValue(
 	modeDefs?: ModuleDefinition['modes']
 ): string {
 	if (!params) return '';
-
-	console.log('formatCombinedValue', values, modeValues);
 
 	const paramCount = params.length;
 	const firstParam = params[refIndices[0]];
@@ -231,14 +227,11 @@ export function formatCombinedValue(
 
 	if (p.defin && p.defin.length > 1) {
 		const context = getContextFromRef(refIndices, params, modeValues, modeDefs, values, paramCount);
-		console.log('p.comments:', p.comments, 'p.defin.length:', p.defin.length, 'modeValues:', modeValues);
 		const definIndex = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
 		const options = parseDefin([p.defin[definIndex]]);
-		console.log('context:', context, 'definIndex:', definIndex, 'options:', options);
 		const value = values[refIndices[0]];
 		const maxIndex = p.defin.length - 1;
 		const isClkMode = definIndex === maxIndex;
-		console.log('value:', value, 'calcDefinOptions result:', calcDefinOptions(value, options, undefined, isClkMode));
 		return calcDefinOptions(value, options, undefined, isClkMode);
 	}
 
