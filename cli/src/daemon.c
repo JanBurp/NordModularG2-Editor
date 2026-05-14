@@ -256,7 +256,21 @@ static void execute_cmd(const char *line) {
 		const char *m = arg_s(args, 0);
 		int mode = (m && strcmp(m, "performance") == 0) ? 0
 		         : (m && strcmp(m, "patch") == 0)       ? 1 : -1;
-		ret = (mode >= 0) ? g2_set_perf_mode(mode) : G2_ERR_INVALID_PARAM;
+		if (mode < 0) {
+			ret = G2_ERR_INVALID_PARAM;
+		} else {
+			g2_send_init();
+			cJSON *info = g2_device_info(0);
+			if (info) cJSON_Delete(info);
+			ret = g2_set_perf_mode(mode);
+			if (ret == G2_OK) {
+				/* mode 0=performance → query as perf (qmode=1)
+				 * mode 1=patch       → query as patch (qmode=0) */
+				int qmode = (mode == 0) ? 1 : 0;
+				cJSON *ps = query_perf_settings(qmode, "perf_settings");
+				if (ps) { emit(ps); cJSON_Delete(ps); }
+			}
+		}
 
 	} else if (strcmp(cmd, "set-perf-name") == 0 && n >= 1) {
 		ret = g2_set_perf_name(arg_s(args, 0));

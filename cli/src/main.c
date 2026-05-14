@@ -499,6 +499,9 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         const char *m = argv[i + 1];
         int mode = (strcmp(m, "performance") == 0) ? 0 : (strcmp(m, "patch") == 0) ? 1 : -1;
         if (mode < 0) { fprintf(stderr, "set-perf-mode: mode must be 'patch' or 'performance'\n"); return 1; }
+        if (g2_send_init() != G2_OK) return 1;
+        cJSON *info = g2_device_info(0);
+        if (info) cJSON_Delete(info);
         return g2_set_perf_mode(mode);
     }
 
