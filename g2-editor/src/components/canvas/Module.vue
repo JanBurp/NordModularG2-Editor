@@ -282,6 +282,14 @@
 
 	// Handle parameter change from controls
 	function onParamChange(paramIndex: number, value: number) {
+		// Clamp to param's valid range
+		const param = moduleDef.value?.params?.[paramIndex];
+		if (param) {
+			const p = getParam(param.type);
+			if (p) {
+				value = Math.min(Math.max(value, p.low), p.high);
+			}
+		}
 		// Update local state
 		localLv.value[paramIndex] = value;
 

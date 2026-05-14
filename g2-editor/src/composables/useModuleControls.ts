@@ -160,25 +160,28 @@ function getContextFromRef(
 	return context;
 }
 
-function getDefinIndexFromContext(context: Record<string, number>, comments: string | undefined, maxIndex: number): number {
-	if (!comments) return 0;
+function getDefinIndexFromContext(context: Record<string, number>, comments: string | undefined, maxIndex: number): { definIndex: number; isClkMode: boolean } {
+	if (!comments) return { definIndex: 0, isClkMode: false };
 	const match = comments.match(/Determined by \[(\w+)\]/);
-	if (!match) return 0;
+	if (!match) return { definIndex: 0, isClkMode: false };
 
 	const delayRangeParam = match[1];
 	const delayValue = context[delayRangeParam];
-	if (delayValue === undefined) return 0;
+	if (delayValue === undefined) return { definIndex: 0, isClkMode: false };
 
 	const andByMatch = comments.match(/and(?: by)? \[(\w+)\]/);
 	if (andByMatch) {
 		const timeClkParam = andByMatch[1];
 		const timeClkValue = context[timeClkParam];
 		if (timeClkValue !== undefined) {
-			return timeClkValue === 1 ? maxIndex : Math.min(delayValue, maxIndex);
+			if (timeClkValue === 1) {
+				return { definIndex: maxIndex, isClkMode: true };
+			}
+			return { definIndex: Math.min(delayValue, maxIndex), isClkMode: false };
 		}
 	}
 
-	return Math.min(delayValue, maxIndex);
+	return { definIndex: Math.min(delayValue, maxIndex), isClkMode: false };
 }
 
 export function formatCombinedValue(
@@ -227,11 +230,9 @@ export function formatCombinedValue(
 
 	if (p.defin && p.defin.length > 1) {
 		const context = getContextFromRef(refIndices, params, modeValues, modeDefs, values, paramCount);
-		const definIndex = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
+		const { definIndex, isClkMode } = getDefinIndexFromContext(context, p.comments, p.defin.length - 1);
 		const options = parseDefin([p.defin[definIndex]]);
-		const value = values[refIndices[0]];
-		const maxIndex = p.defin.length - 1;
-		const isClkMode = definIndex === maxIndex;
+		const value = values[refIndices[0]] ?? 64;
 		return calcDefinOptions(value, options, undefined, isClkMode);
 	}
 
