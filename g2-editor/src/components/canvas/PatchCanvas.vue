@@ -14,7 +14,7 @@
 		>
 			<Module
 				v-for="mod in modulesWithVariation"
-				:key="mod.index"
+				:key="mod.index + '-' + mod.uname"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				:connected-inputs="connectedJacksMap.get(mod.index)?.inputs"
