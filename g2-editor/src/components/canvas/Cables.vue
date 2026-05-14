@@ -107,8 +107,9 @@
 			nextTick(() => {
 				if (!svgRef?.value || !oldMods) return;
 				const movedIds = new Set<number>();
+				const oldById = new Map((oldMods as any[]).map((o: any) => [o.index, o]));
 				for (const m of newMods as any[]) {
-					const prev = (oldMods as any[]).find((o: any) => o.index === m.index);
+					const prev = oldById.get(m.index);
 					if (!prev || prev.horiz !== m.horiz || prev.vert !== m.vert) movedIds.add(m.index);
 				}
 				if (movedIds.size > 0) updateCablePaths(props.modules as CableModule[], svgRef.value as SVGElement, movedIds);

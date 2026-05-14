@@ -59,7 +59,6 @@ function findGroupOutputColor(cableList: Cable[], smod: number, scon: number, dm
 
 export const useSlotsStore = defineStore('slots', {
 	state: () => ({
-		activeSlot: 'A' as SlotLabel,
 		slotFilePaths: {
 			A: '',
 			B: '',
@@ -143,7 +142,6 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			this.activeSlot = slot;
 			if (useDeviceStore().getActiveSlot === slot) return this.loadSlot(slot);
 
 			this.slots[slot].loading = true;
@@ -164,13 +162,13 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectVariation(variation: number): Promise<void> {
-			const active = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const active = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			if (!active) return;
 			await window.cli.run(['variation', String(variation + 1), active]);
 		},
 
 		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
 
@@ -185,7 +183,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async moveModuleNoReload(moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 
@@ -198,7 +196,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async moveModule(moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
 
@@ -219,7 +217,7 @@ export const useSlotsStore = defineStore('slots', {
 			row: number,
 			area: 'voice' | 'fx',
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const uiStore = useUiStore();
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
@@ -284,7 +282,7 @@ export const useSlotsStore = defineStore('slots', {
 			area: 'voice' | 'fx',
 			color = 1,
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
 
@@ -349,7 +347,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 
@@ -364,7 +362,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 
@@ -459,7 +457,7 @@ export const useSlotsStore = defineStore('slots', {
 			currentModuleList: any[],
 		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			if (indices.length === 0) return null;
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return null;
 			const { getModule } = await import('../renderer/nmg2mods');
@@ -541,7 +539,7 @@ export const useSlotsStore = defineStore('slots', {
 
 		async setModuleColors(moduleIds: number[], color: number, area: 'voice' | 'fx'): Promise<void> {
 			if (moduleIds.length === 0) return;
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
@@ -553,7 +551,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
@@ -565,7 +563,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
@@ -579,7 +577,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
@@ -598,7 +596,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async deleteConnectedCables(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', area: 'voice' | 'fx'): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
 			if (!patch) return;
 			const areaIdx = area === 'voice' ? 1 : 0;
@@ -624,7 +622,7 @@ export const useSlotsStore = defineStore('slots', {
 			currentCableList: any[],
 		): Promise<void> {
 			if (selectedModules.length > 0 && selectedCables.length === 0) {
-				const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+				const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 				const patch = this.slots[slot].patch;
 				if (!patch) return;
 				const location = area === 'voice' ? 'va' : 'fx';
@@ -647,7 +645,7 @@ export const useSlotsStore = defineStore('slots', {
 				return;
 			}
 			if (selectedCables.length > 0) {
-				const slot = useDeviceStore().getActiveSlot ?? this.activeSlot;
+				const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 				const patch = this.slots[slot].patch;
 				if (!patch) return;
 				const location = area === 'voice' ? 'va' : 'fx';

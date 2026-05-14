@@ -22,16 +22,10 @@
 	/>
 </template>
 <script setup lang="ts">
-	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
-	import { useLedStore } from '../../store/led';
-	const props = defineProps<{
+	defineProps<{
 		ve: VisualElement;
-		area: 'fx' | 'va';
-		moduleIndex: number;
-		groupId: number;
+		ledOn: boolean;
+		activeStep: number;
 	}>();
-	const ledStore = useLedStore();
-	const ledOn = computed(() => ledStore.getLedState(props.area, props.moduleIndex, props.groupId));
-	const activeStep = computed(() => ledStore.getStripValue(props.area, props.moduleIndex, props.groupId));
 </script>

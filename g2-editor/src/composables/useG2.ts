@@ -61,46 +61,6 @@ export function useG2() {
 	const deviceStatus = computed<DeviceStatus>(() => store.status);
 	const device = computed<Device | null>(() => store.device);
 
-	const statusClass = computed(() => {
-		switch (store.status) {
-			case 'connected':
-				return 'border-green-500 bg-green-500';
-			case 'connecting':
-			case 'uploading':
-			case 'downloading':
-				return 'border-orange-300 bg-orange-300';
-			case 'error':
-			case 'unsupported':
-			case 'lost':
-				return 'border-red-500 bg-red-500';
-			default:
-				return 'border-neutral-600 bg-neutral-900';
-		}
-	});
-
-	const statusLabel = computed(() => {
-		switch (store.status) {
-			case 'connected':
-				return 'connected';
-			case 'connecting':
-				return 'connecting...';
-			case 'disconnected':
-				return 'disconnected';
-			case 'uploading':
-				return 'uploading...';
-			case 'downloading':
-				return 'downloading...';
-			case 'error':
-				return 'error';
-			case 'unsupported':
-				return 'not available';
-			case 'lost':
-				return 'lost';
-			default:
-				return 'unknown';
-		}
-	});
-
 	function formatWatchEvent(ev: any): string {
 		switch (ev.type) {
 			case 'param_change':
@@ -300,8 +260,6 @@ export function useG2() {
 	return {
 		deviceStatus,
 		device,
-		statusClass,
-		statusLabel,
 		usbLogs: logs,
 		clearLogs,
 		connectDevice,

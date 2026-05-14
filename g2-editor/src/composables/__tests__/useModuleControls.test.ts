@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDefin, calcDefinOptions, applyDefinReplacements, definReplacements } from '../useModuleControls';
+import { parseDefin, calcDefinOptions, applyDefinReplacements, definReplacements } from '../../utils/moduleControls';
 
 describe('parseDefin', () => {
 	it('parses simple string labels', () => {
