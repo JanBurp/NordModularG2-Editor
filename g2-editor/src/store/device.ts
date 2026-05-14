@@ -2,7 +2,7 @@ import { Device, PatchData, SlotLabel } from '@/types';
 
 import { defineStore } from 'pinia';
 
-export type DeviceStatus = 'connected' | 'connecting' | 'disconnected' | 'uploading' | 'downloading' | 'error' | 'unsupported' | 'lost';
+export type DeviceStatus = 'connected' | 'connecting' | 'disconnected' | 'uploading' | 'downloading' | 'error' | 'unsupported' | 'lost' | 'offline';
 
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
@@ -25,6 +25,7 @@ export const useDeviceStore = defineStore('device', {
 				case 'error':
 				case 'unsupported':
 				case 'lost':
+				case 'offline':
 					return 'border-red-500 bg-red-500';
 				default:
 					return 'border-neutral-600 bg-neutral-900 text-neutral-300';

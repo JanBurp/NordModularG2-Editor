@@ -510,8 +510,13 @@
 			}
 		});
 
-		await connectDevice();
-		if (device.status === 'connected') {
+		const isOffline = import.meta.env.DEV_OFFLINE === 'true';
+		if (isOffline) {
+			device.status = 'offline';
+		} else {
+			await connectDevice();
+		}
+		if (!isOffline && device.status === 'connected') {
 			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
 			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {

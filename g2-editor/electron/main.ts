@@ -45,6 +45,10 @@ function createWindow() {
 
 function startDaemon() {
 	if (daemonProcess) return;
+	if (!fs.existsSync(cliPath)) {
+		console.log("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
+		return;
+	}
 	const proc = spawn(cliPath, ["daemon"]);
 	daemonProcess = proc;
 	let buffer = "";
