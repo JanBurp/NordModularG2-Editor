@@ -188,8 +188,12 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'synth_settings_update') {
+					const prevMode = store.device?.mode;
 					store.updateSynthSettings(ev);
 					log('←', 'Watch', formatWatchEvent(ev));
+					if (prevMode && ev.mode !== prevMode) {
+						for (const s of SLOT_LABELS) slotsStore.loadSlot(s);
+					}
 					return;
 				}
 				if (ev.type === 'perf_settings') {
