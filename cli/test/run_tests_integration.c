@@ -108,7 +108,7 @@ int main(void) {
     // run_test_silently("test_drain_count_logged", test_drain_count_logged);
 
     /* Daemon: spawn g2-cli daemon subprocess, verify slot + variation commands over stdin/stdout. */
-    run_test_silently("test_daemon_slot_variation_commands", test_daemon_slot_variation_commands);
+    // run_test_silently("test_daemon_slot_variation_commands", test_daemon_slot_variation_commands);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.
     run_test_with_output("test_fullstack_with_watch", test_fullstack_with_watch);

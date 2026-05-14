@@ -77,6 +77,9 @@ $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_
 		$(TEST_SRC) \
 		$(OBJ_DIR)/daemon.o \
 		$(OBJ_DIR)/g2_device.o \
+		$(OBJ_DIR)/g2_io.o \
+		$(OBJ_DIR)/g2_protocol.o \
+		$(OBJ_DIR)/g2_watch.o \
 		$(OBJ_DIR)/utils.o \
 		$(OBJ_DIR)/bitstream.o \
 		$(OBJ_DIR)/cjson.o \
@@ -89,6 +92,9 @@ $(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TE
 		$(TEST_SRC) \
 		$(OBJ_DIR)/daemon.o \
 		$(OBJ_DIR)/g2_device.o \
+		$(OBJ_DIR)/g2_io.o \
+		$(OBJ_DIR)/g2_protocol.o \
+		$(OBJ_DIR)/g2_watch.o \
 		$(OBJ_DIR)/utils.o \
 		$(OBJ_DIR)/bitstream.o \
 		$(OBJ_DIR)/cjson.o \
