@@ -103,6 +103,8 @@ export function formatValue(value: number, paramType: string): string {
 	const p = getParam(paramType);
 	if (!p) return String(value);
 
+	console.log('formatValue', value, p);
+
 	if (p.f && paramFormattingFunctions[p.f]) {
 		try {
 			return paramFormattingFunctions[p.f](value) || String(value);
@@ -120,6 +122,8 @@ export function formatValue(value: number, paramType: string): string {
 
 export function formatCombinedValue(refIndices: number[], funcName: string | undefined, params: ModuleDefinition['params'], values: number[]): string {
 	if (!params) return '';
+
+	console.log('formatCombinedValue', values, refIndices, funcName, params);
 
 	const firstParam = params[refIndices[0]];
 	if (!firstParam) return '';
