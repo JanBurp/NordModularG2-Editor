@@ -38,21 +38,21 @@ export function isSpinnerH(n: string): boolean {
 	return n === 'KnobSpinH';
 }
 
-export const definPrefixReplacements: Record<string, string> = {
+export const definReplacements: Record<string, string> = {
 	'{+-}': '±',
+	'{00}': '∞',
 };
 
-export function replacePrefix(label: string, extraReplacements?: Record<string, string>): string {
+export function applyDefinReplacements(label: string, extraReplacements?: Record<string, string>): string {
 	const replacements = extraReplacements
-		? { ...definPrefixReplacements, ...extraReplacements }
-		: definPrefixReplacements;
+		? { ...definReplacements, ...extraReplacements }
+		: definReplacements;
 
+	let result = label;
 	for (const [from, to] of Object.entries(replacements)) {
-		if (label.startsWith(from)) {
-			return label.replace(from, to);
-		}
+		result = result.split(from).join(to);
 	}
-	return label;
+	return result;
 }
 
 export function parseDefin(defin: string[]): Array<{ numVal: number; label: string }> {
@@ -67,7 +67,7 @@ export function parseDefin(defin: string[]): Array<{ numVal: number; label: stri
 
 export function calcDefinOptions(value: number, options: Array<{ numVal: number; label: string }>, extraReplacements?: Record<string, string>): string {
 	const exact = options.find(o => o.numVal === value);
-	if (exact) return replacePrefix(exact.label, extraReplacements);
+	if (exact) return applyDefinReplacements(exact.label, extraReplacements);
 
 	for (let i = 0; i < options.length - 1; i++) {
 		const curr = options[i];
@@ -78,16 +78,25 @@ export function calcDefinOptions(value: number, options: Array<{ numVal: number;
 			if (!isNaN(currNum) && !isNaN(nextNum)) {
 				const t = (value - curr.numVal) / (next.numVal - curr.numVal);
 				const resultNum = currNum + t * (nextNum - currNum);
-				const hasDecimal = resultNum % 1 !== 0;
+				const nextPostfix = next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, '');
+				const nextHasDecimalAndPostfix = /\.\d/.test(next.label) && nextPostfix.length > 0;
+				const hasDecimal = resultNum % 1 !== 0 || nextHasDecimalAndPostfix;
 				const formatted = hasDecimal ? resultNum.toFixed(1) : String(Math.round(resultNum));
-				const prefix = curr.label.match(/^(\D*)/)?.[1] ?? '';
-				return replacePrefix(`${prefix}${formatted}`, extraReplacements);
+				const currNumericMatch = curr.label.match(/^(\D*)(\d+\.?\d*)(.*)$/);
+				const currHasNumeric = currNumericMatch && currNumericMatch[2].length > 0 && /^-?\d/.test(curr.label);
+				const prefix = currHasNumeric
+					? (curr.label.match(/^(\D*)/)?.[1] ?? '')
+					: (next.label.match(/^(\D*)/)?.[1] ?? '');
+				const postfix = currHasNumeric
+					? (curr.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''))
+					: (next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''));
+				return applyDefinReplacements(`${prefix}${formatted}${postfix}`, extraReplacements);
 			}
-			return replacePrefix(String(value), extraReplacements);
+			return applyDefinReplacements(String(value), extraReplacements);
 		}
 	}
 
-	return replacePrefix(String(value), extraReplacements);
+	return applyDefinReplacements(String(value), extraReplacements);
 }
 
 export function formatValue(value: number, paramType: string): string {

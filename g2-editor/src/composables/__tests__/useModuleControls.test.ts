@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { parseDefin, calcDefinOptions, replacePrefix, definPrefixReplacements } from '../useModuleControls';
+import { parseDefin, calcDefinOptions, applyDefinReplacements, definReplacements } from '../useModuleControls';
 
 describe('parseDefin', () => {
 	it('parses simple string labels', () => {
@@ -28,7 +28,6 @@ describe('parseDefin', () => {
 	});
 
 	it('returns empty array for empty defin', () => {
-		expect(parseDefin([])).toEqual([]);
 		expect(parseDefin([])).toEqual([]);
 	});
 });
@@ -181,28 +180,63 @@ describe('calcDefinOptions', () => {
 			expect(result).toBe('!0');
 		});
 	});
+
+	describe('postfix dB and {00} replacement', () => {
+		const dbOptions = parseDefin(['0 ~ -{00}, 64 ~ -6.0 dB, 127 ~ -0 dB']);
+
+		it('exact match at 0 replaces {00} with ∞', () => {
+			expect(calcDefinOptions(0, dbOptions)).toBe('-∞');
+		});
+
+		it('exact match at 64 returns -6.0 dB', () => {
+			expect(calcDefinOptions(64, dbOptions)).toBe('-6.0 dB');
+		});
+
+		it('exact match at 127 returns -0 dB', () => {
+			expect(calcDefinOptions(127, dbOptions)).toBe('-0 dB');
+		});
+
+		it('interpolates between 0 and 64 with postfix dB', () => {
+			expect(calcDefinOptions(32, dbOptions)).toBe('-3.0 dB');
+		});
+
+		it('interpolates between 64 and 127 with postfix dB', () => {
+			expect(calcDefinOptions(96, dbOptions)).toBe('-3.0 dB');
+		});
+
+		it('returns raw value when above max', () => {
+			expect(calcDefinOptions(128, dbOptions)).toBe('128');
+		});
+	});
 });
 
-describe('replacePrefix', () => {
+describe('applyDefinReplacements', () => {
 	it('replaces {+-} with ±', () => {
-		expect(replacePrefix('{+-}0')).toBe('±0');
-		expect(replacePrefix('{+-}32.5')).toBe('±32.5');
+		expect(applyDefinReplacements('{+-}0')).toBe('±0');
+		expect(applyDefinReplacements('{+-}32.5')).toBe('±32.5');
 	});
 
-	it('returns label unchanged when no prefix match', () => {
-		expect(replacePrefix('Pos')).toBe('Pos');
-		expect(replacePrefix('32')).toBe('32');
+	it('replaces {00} with ∞ anywhere in label', () => {
+		expect(applyDefinReplacements('-{00}')).toBe('-∞');
+		expect(applyDefinReplacements('-{00} dB')).toBe('-∞ dB');
+	});
+
+	it('returns label unchanged when no match', () => {
+		expect(applyDefinReplacements('Pos')).toBe('Pos');
+		expect(applyDefinReplacements('32')).toBe('32');
+		expect(applyDefinReplacements('-6.0 dB')).toBe('-6.0 dB');
 	});
 
 	it('uses extra replacements when provided', () => {
-		expect(replacePrefix('{+-}0', { '{+-}': '!' })).toBe('!0');
+		expect(applyDefinReplacements('{+-}0', { '{+-}': '!' })).toBe('!0');
 	});
 
 	it('extra replacements override defaults', () => {
-		expect(replacePrefix('{+-}0', { '{+-}': '±', '{>}': '>>' })).toBe('±0');
+		expect(applyDefinReplacements('{+-}0', { '{+-}': '±', '{00}': '∞' })).toBe('±0');
 	});
 
-	it('definPrefixReplacements is exported and contains {+-}', () => {
-		expect(definPrefixReplacements['{+-}']).toBe('±');
+	it('definReplacements is exported and contains both {+-} and {00}', () => {
+		expect(definReplacements['{+-}']).toBe('±');
+		expect(definReplacements['{00}']).toBe('∞');
 	});
 });
