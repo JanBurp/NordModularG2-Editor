@@ -3,6 +3,7 @@
  */
 
 #include "utils.h"
+#include "defs.h"
 #include <string.h>
 
 uint16_t crc_iterator(int32_t seed, int32_t val) {
@@ -59,21 +60,21 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
     if (usb_data == NULL || pch2_data == NULL || pch2_len == NULL) {
         return -1;
     }
-    
-    if (usb_len < 5) {
+
+    if (usb_len < PCH2_USB_CHUNK2_START + PCH2_USB_TAIL_SIZE) {
         return -1;
     }
-    
-    size_t first_part = 0x15 - 0x03;
-    size_t second_part = usb_len - 0x17 - 2;
-    size_t required = first_part + second_part;
+
+    size_t first_part  = PCH2_USB_CHUNK1_END - PCH2_USB_DATA_OFFSET;
+    size_t second_part = usb_len - PCH2_USB_CHUNK2_START - PCH2_USB_TAIL_SIZE;
+    size_t required    = first_part + second_part;
     if (*pch2_len < required) {
         *pch2_len = required;
         return -1;
     }
-    
-    memcpy(pch2_data, usb_data + 0x03, first_part);
-    memcpy(pch2_data + first_part, usb_data + 0x17, second_part);
+
+    memcpy(pch2_data,             usb_data + PCH2_USB_DATA_OFFSET,   first_part);
+    memcpy(pch2_data + first_part, usb_data + PCH2_USB_CHUNK2_START, second_part);
     *pch2_len = required;
     return 0;
 }
@@ -97,20 +98,20 @@ int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
         return -1;
     }
     
-    size_t required = 3 + pch2_len + 2;
+    size_t required = PCH2_USB_DATA_OFFSET + pch2_len + PCH2_USB_TAIL_SIZE;
     if (*usb_len < required) {
         *usb_len = required;
         return -1;
     }
-    
+
     usb_data[0] = 0x01;
     usb_data[1] = (pch2_len >> 8) & 0xff;
     usb_data[2] = pch2_len & 0xff;
-    memcpy(usb_data + 3, pch2_data, pch2_len);
-    
-    uint16_t crc = calc_crc16(usb_data + 3, pch2_len);
-    usb_data[3 + pch2_len] = (crc >> 8) & 0xff;
-    usb_data[3 + pch2_len + 1] = crc & 0xff;
+    memcpy(usb_data + PCH2_USB_DATA_OFFSET, pch2_data, pch2_len);
+
+    uint16_t crc = calc_crc16(usb_data + PCH2_USB_DATA_OFFSET, pch2_len);
+    usb_data[PCH2_USB_DATA_OFFSET + pch2_len]     = (crc >> 8) & 0xff;
+    usb_data[PCH2_USB_DATA_OFFSET + pch2_len + 1] = crc & 0xff;
     
     *usb_len = required;
     return 0;

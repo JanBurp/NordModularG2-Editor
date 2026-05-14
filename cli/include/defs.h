@@ -82,4 +82,16 @@ typedef enum {
 #define ENDPOINT_INTERRUPT_IN               (0x81)  /* Interrupt IN */
 #define ENDPOINT_BULK_IN                    (0x82)  /* Bulk IN */
 
+/* USB transfer timeouts (milliseconds) */
+#define USB_TIMEOUT_STALE_MS                (20)    /* drain stale interrupt data */
+#define USB_TIMEOUT_DRAIN_MS                (50)    /* drain pending notifications */
+#define USB_TIMEOUT_STANDARD_MS             (100)   /* normal command/response */
+#define USB_TIMEOUT_LONG_MS                 (2000)  /* patch name fetch, slow ops */
+
+/* Patch format byte layout (USB bulk ↔ pch2 conversion) */
+#define PCH2_USB_DATA_OFFSET                (0x03)  /* pch2 payload start in USB frame */
+#define PCH2_USB_CHUNK1_END                 (0x15)  /* exclusive end of first pch2 chunk */
+#define PCH2_USB_CHUNK2_START               (0x17)  /* start of second pch2 chunk */
+#define PCH2_USB_TAIL_SIZE                  (0x02)  /* trailing CRC bytes in USB frame */
+
 #endif /* __G2_DEFS_H__ */

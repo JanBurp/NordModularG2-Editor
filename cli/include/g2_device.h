@@ -24,17 +24,15 @@ typedef enum {
     G2_ERR_TIMEOUT = -8,
     G2_ERR_PARSE = -9,
     G2_ERR_INVALID_PARAM = -10,
-    G2_ERR_FILE_OPEN = -10,
-    G2_ERR_FILE_WRITE = -11,
-    G2_ERR_NO_MEMORY = -12,
+    G2_ERR_FILE_OPEN     = -11,
+    G2_ERR_FILE_WRITE    = -12,
+    G2_ERR_NO_MEMORY     = -13,
 } g2_error_t;
 
 /* Output format types */
 typedef enum {
     OUTPUT_DEFAULT,
     OUTPUT_JSON,
-    OUTPUT_PRETTY,
-    OUTPUT_TREE
 } output_format_t;
 
 /* G2 Device handle */
