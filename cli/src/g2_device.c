@@ -38,10 +38,6 @@ static void g2_err(const char *fmt, ...) {
         fprintf(stderr, "%s\n", msg);
     }
 }
-/* Timeout values (in ms) */
-#define USB_TIMEOUT_STANDARD 100
-#define USB_TIMEOUT_LONG    2000
-
 /* Delay after USB send (in us) */
 #define USB_SEND_DELAY_US    10000
 
@@ -188,7 +184,7 @@ static int send_init_msg(void) {
     buff[1] = msgLen & 0xff;
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLen,
-                                   &transferred, USB_TIMEOUT_STANDARD);
+                                   &transferred, USB_TIMEOUT_STANDARD_MS);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -207,7 +203,7 @@ int g2_send_init(void) {
     }
     usleep(USB_SEND_DELAY_US);
 
-    int ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    int ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No response to init message\n");
         return G2_ERR_RECV;
@@ -232,7 +228,7 @@ int g2_send_init(void) {
             g2_drain_pending();
             if (send_init_msg() < 0) { g2_err("Failed to resend init\n"); return G2_ERR_SEND; }
             usleep(USB_SEND_DELAY_US);
-            ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+            ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
             if (ret <= 0) { g2_err("No response to init retry\n"); return G2_ERR_RECV; }
             if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
             size = ((uint16_t)response[1] << 8) | response[2];
@@ -262,10 +258,10 @@ int g2_send_command(uint8_t *data, int length) {
         return G2_ERR;
     }
 
-    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
+    ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD_MS);
     if (ret == LIBUSB_ERROR_PIPE) {
         libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, data, length, &transferred, USB_TIMEOUT_STANDARD_MS);
     }
     if (ret < 0) {
         g2_err("Write failed: %s\n", libusb_error_name(ret));
@@ -316,7 +312,7 @@ static int send_system(uint8_t cmd, uint8_t subcmd) {
     buff[1] = msgLength & 0xff;
 
     int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -342,7 +338,7 @@ static int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) 
     buff[1] = msgLength & 0xff;
 
     int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -370,10 +366,10 @@ static int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
     buff[1] = msgLength & 0xff;
 
     int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     if (ret == LIBUSB_ERROR_PIPE) {
         libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     }
     return (ret < 0) ? -1 : 0;
 }
@@ -405,7 +401,7 @@ static int recv_bulk(uint8_t *data, uint16_t size) {
     int retries = 5;
     int received = 0;
     while (retries > 0 && received < size) {
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN, data + received, size - received, &transferred, USB_TIMEOUT_STANDARD);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN, data + received, size - received, &transferred, USB_TIMEOUT_STANDARD_MS);
         if (ret == 0 && transferred > 0) {
             received += transferred;
         } else {
@@ -466,10 +462,9 @@ static cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
     return root;
 }
 
-cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
-                         const uint8_t *perfData, size_t perfSize) {
-    (void)bulkSize;
-
+/* Parse performance bulk data and append "performance"/"patches" + "slots" to root. */
+static void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
+                                int mode, cJSON *root) {
     char perfName[32] = {0};
     char slotNames[4][17] = {{0}};
     int slotBanks[4] = {0}, slotPatches[4] = {0};
@@ -478,10 +473,6 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
     int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0, split = 0;
     int nameLen;
 
-    cJSON *root = build_synth_bulk_json(bulkData, NULL);
-    int mode = strcmp(cJSON_GetObjectItem(root, "mode")->valuestring, "Performance") == 0;
-
-    /* Performance data parsing */
     if (perfData[0] != 0)
         parse_name(perfData + 4, perfName, sizeof(perfName));
 
@@ -544,7 +535,14 @@ cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
         cJSON_AddItemToArray(slots, slot);
     }
     cJSON_AddItemToObject(root, "slots", slots);
+}
 
+cJSON* g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
+                         const uint8_t *perfData, size_t perfSize) {
+    (void)bulkSize;
+    cJSON *root = build_synth_bulk_json(bulkData, NULL);
+    int mode = strcmp(cJSON_GetObjectItem(root, "mode")->valuestring, "Performance") == 0;
+    perf_parse_and_add(perfData, perfSize, mode, root);
     return root;
 }
 
@@ -557,7 +555,7 @@ cJSON *query_perf_settings(int mode, const char *type) {
 
     if (send_system(0x41, 0x81) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
             recv_bulk(selsData, size);
@@ -566,7 +564,7 @@ cJSON *query_perf_settings(int mode, const char *type) {
 
     if (send_system(selsData[2], 0x10) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
             perfSize = size;
@@ -574,78 +572,9 @@ cJSON *query_perf_settings(int mode, const char *type) {
         }
     }
 
-    char perfName[32] = {0};
-    char slotNames[4][17] = {{0}};
-    int slotBanks[4] = {0}, slotPatches[4] = {0};
-    int slotActive[4] = {0}, slotKey[4] = {0}, slotHold[4] = {0};
-    int slotLow[4] = {0}, slotHigh[4] = {0};
-    int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0, split = 0;
-
-    if (perfData[0] != 0)
-        parse_name(perfData + 4, perfName, sizeof(perfName));
-
-    const uint8_t *remaining = perfData + 4;
-    char tmpName[32];
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    remaining += nameLen;
-
-    const uint8_t *perfSettings = remaining + 4;
-    uint32_t word = ((uint32_t)perfSettings[0] << 24) | ((uint32_t)perfSettings[1] << 16) |
-                    ((uint32_t)perfSettings[2] << 8)  |  (uint32_t)perfSettings[3];
-    focusSlot   = (word >> (32 - 4 - 2)) & 0x3;
-    rangeEnable = remaining[5];
-    bpm         = remaining[6];
-    split       = remaining[7] & 1;
-    clockRun    = remaining[8] & 1;
-
-    const uint8_t *slotPtr = remaining + 11;
-    const uint8_t *perfEnd = perfData + perfSize;
-    for (int i = 0; i < 4; i++) {
-        if (slotPtr >= perfEnd) break;
-        int maxName = (int)(perfEnd - slotPtr);
-        if (maxName > 17) maxName = 17;
-        nameLen = parse_name(slotPtr, slotNames[i], maxName);
-        slotPtr += nameLen;
-        if (slotPtr + 7 > perfEnd) break;
-        slotActive[i]  = slotPtr[0] & 1;
-        slotKey[i]     = slotPtr[1] & 1;
-        slotHold[i]    = slotPtr[2] & 1;
-        slotBanks[i]   = slotPtr[3];
-        slotPatches[i] = slotPtr[4];
-        slotLow[i]     = slotPtr[5];
-        slotHigh[i]    = slotPtr[6];
-        slotPtr += 10;
-    }
-
     cJSON *root = cJSON_CreateObject();
     if (type) cJSON_AddStringToObject(root, "type", type);
-    cJSON *perf = cJSON_CreateObject();
-    cJSON_AddStringToObject(perf, "name", mode ? perfName : slotNames[focusSlot]);
-    cJSON_AddStringToObject(perf, "focus", (char*[]){ "a", "b", "c", "d" }[focusSlot]);
-    cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
-    cJSON_AddNumberToObject(perf, "bpm", bpm);
-    cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
-    cJSON_AddBoolToObject(perf, "kbSplit", split);
-    cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
-
-    cJSON *slots = cJSON_CreateArray();
-    for (int i = 0; i < 4; i++) {
-        cJSON *slot = cJSON_CreateObject();
-        cJSON_AddStringToObject(slot, "slot", (char*[]){ "a", "b", "c", "d" }[i]);
-        cJSON_AddNumberToObject(slot, "bank", slotBanks[i]);
-        cJSON_AddNumberToObject(slot, "patch", slotPatches[i]);
-        cJSON_AddStringToObject(slot, "name", slotNames[i]);
-        cJSON_AddBoolToObject(slot, "active", slotActive[i]);
-        cJSON_AddBoolToObject(slot, "key", slotKey[i]);
-        cJSON_AddBoolToObject(slot, "hold", slotHold[i]);
-        cJSON *range = cJSON_CreateObject();
-        cJSON_AddNumberToObject(range, "lower", slotLow[i]);
-        cJSON_AddNumberToObject(range, "upper", slotHigh[i]);
-        cJSON_AddItemToObject(slot, "range", range);
-        cJSON_AddItemToArray(slots, slot);
-    }
-    cJSON_AddItemToObject(root, "slots", slots);
-
+    perf_parse_and_add(perfData, perfSize, mode, root);
     return root;
 }
 
@@ -676,7 +605,7 @@ cJSON *g2_device_info(int debug) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No response from G2\n");
         return NULL;
@@ -689,6 +618,10 @@ cJSON *g2_device_info(int debug) {
     }
 
     size = (response[1] << 8) | response[2];
+    if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
+        g2_err("Unexpected synth settings size: %u\n", size);
+        return NULL;
+    }
     bulkData = malloc(size);
     if (!bulkData) {
         g2_err("Memory allocation failed\n");
@@ -716,7 +649,7 @@ cJSON *g2_device_info(int debug) {
 
     if (send_system(0x41, 0x81) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD);
+        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
 
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
@@ -734,7 +667,7 @@ cJSON *g2_device_info(int debug) {
     uint8_t perfInterrupt[16] = {0};
     if (send_system(selsData[2], 0x10) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD);
+        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
 
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
@@ -773,9 +706,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     uint8_t *patchData = NULL;
     uint16_t patchSize = 0;
     int ret;
-    int connected = 0;
 
-    /* Ensure connected first */
     if (ensure_connected(1) < 0) {
             g2_err("Failed to connect to G2\n");
             return NULL;
@@ -796,7 +727,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     /* Flush any stale G2 data left in the USB FIFO from a previous command */
     {
         uint8_t stale[16]; int n, stale_count = 0;
-        while ((n = recv_interrupt(stale, sizeof(stale), 20)) > 0) {
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
             stale_count++;
             if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
                 uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
@@ -816,7 +747,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
@@ -836,7 +767,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No interrupt response for patch data\n");
         goto cleanup;
@@ -848,6 +779,10 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     patchSize = (interruptResp[1] << 8) | interruptResp[2];
+    if (patchSize == 0) {
+        g2_err("Received empty patch data\n");
+        goto cleanup;
+    }
     patchData = malloc(patchSize);
     if (!patchData) {
         g2_err("Memory allocation failed\n");
@@ -872,7 +807,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     usleep(100000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
 
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
@@ -916,20 +851,10 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     free(patchData);
-
-    if (connected) {
-        g2_disconnect();
-    }
-
     return root;
 
 cleanup:
-    if (patchData) {
-        free(patchData);
-    }
-    if (connected) {
-        g2_disconnect();
-    }
+    free(patchData);
     return NULL;
 }
 
@@ -941,12 +866,10 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     uint8_t *patchData = NULL;
     uint16_t patchSize = 0;
     int ret;
-    int connected = 0;
-
     if (ensure_connected(1) < 0) {
-            g2_err("Failed to connect to G2\n");
-            return NULL;
-        }
+        g2_err("Failed to connect to G2\n");
+        return NULL;
+    }
 
     if (slot_str == NULL) {
         g2_err("Slot required (A, B, C, or D)\n");
@@ -969,7 +892,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
@@ -983,7 +906,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) {
         g2_err("No interrupt response for patch data\n");
         goto cleanup;
@@ -1015,7 +938,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     usleep(100000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
     } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -1075,22 +998,11 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     cJSON_AddStringToObject(result, "name", patchName);
     cJSON_AddNumberToObject(result, "size", (int)pch2Size);
 
-    if (patchData) {
-        free(patchData);
-    }
-    if (connected) {
-        g2_disconnect();
-    }
-
+    free(patchData);
     return result;
 
 cleanup:
-    if (patchData) {
-        free(patchData);
-    }
-    if (connected) {
-        g2_disconnect();
-    }
+    free(patchData);
     return NULL;
 }
 
@@ -1121,7 +1033,7 @@ cJSON *g2_startup(void) {
 static int g2_drain_pending(void) {
     uint8_t response[16];
     int ret, count = 0;
-    while ((ret = recv_interrupt(response, sizeof(response), 50)) > 0) {
+    while ((ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_DRAIN_MS)) > 0) {
         count++;
         if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)response[1] << 8) | response[2];
@@ -1162,7 +1074,7 @@ int g2_select_slot(const char *slot_str) {
         uint8_t pv_resp[16] = {0};
         send_system_data(0x41, pv_cmd, 2);
         usleep(USB_SEND_DELAY_US);
-        int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
+        int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
         version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
     }
 
@@ -1176,7 +1088,7 @@ int g2_select_slot(const char *slot_str) {
         g2_err("Failed to send slot command 1\n");
         return G2_ERR_SEND;
     }
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
 
     /* Step 2: set active slot index */
     data[0] = 0x09;
@@ -1185,7 +1097,7 @@ int g2_select_slot(const char *slot_str) {
         g2_err("Failed to send slot command 2\n");
         return G2_ERR_SEND;
     }
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
     /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
      * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
     g2_drain_pending();
@@ -1198,7 +1110,7 @@ int g2_select_slot(const char *slot_str) {
         return G2_ERR_SEND;
     }
     {
-        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD);
+        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
         if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
             if (sz > 0) {
@@ -1302,7 +1214,7 @@ cJSON *g2_list(int filter, int bank_filter) {
                 return NULL;
             }
 
-            ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+            ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
             if (ret <= 0) {
                 ret = recv_bulk(response, sizeof(response));
             }
@@ -1447,7 +1359,7 @@ int g2_select_variation(int variation, int slot) {
     }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD, 5);
+    ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD_MS, 5);
     if (ret <= 0) {
         g2_err("No response from G2 for variation command 1\n");
         return G2_ERR_RECV;
@@ -1462,7 +1374,7 @@ int g2_select_variation(int variation, int slot) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD, 5);
+    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD_MS, 5);
 
     return (ret > 0) ? G2_OK : G2_ERR_RECV;
 }
@@ -1473,7 +1385,7 @@ static uint8_t cable_get_version(int slot) {
     uint8_t cmdData[2] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) return 0;
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD);
+    recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
     return slota[6];
 }
 
@@ -1512,7 +1424,7 @@ int g2_add_cable(int slot, int location, int color,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1551,7 +1463,7 @@ int g2_del_cable(int slot, int location,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1592,7 +1504,7 @@ int g2_set_cable_color(int slot, int location, int color,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1614,7 +1526,7 @@ int g2_del_module(int slot, int location, int module_id) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1636,7 +1548,7 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1686,7 +1598,7 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1709,7 +1621,7 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1740,7 +1652,7 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1785,7 +1697,7 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1807,7 +1719,7 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1822,7 +1734,7 @@ int g2_select_patch(int slot, int bank, int location) {
     if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1835,7 +1747,7 @@ int g2_set_perf_mode(int mode) {
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[16] = {0};
-    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
     if (ret <= 0) { g2_err("No response from G2 for set-perf-mode\n"); return G2_ERR; }
     /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
     if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -1861,7 +1773,7 @@ int g2_set_perf_name(const char *name) {
     uint8_t pv_resp[16] = {0};
     send_system_data(0x41, pv_cmd, 2);
     usleep(USB_SEND_DELAY_US);
-    int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD);
+    int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
     if (pv_ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
     uint8_t version = pv_resp[6];
 
@@ -1877,7 +1789,7 @@ int g2_set_perf_name(const char *name) {
     if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[16] = {0};
-    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) { g2_err("No response from G2 for set-perf-name\n"); return G2_ERR; }
     /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
     if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
@@ -1955,13 +1867,13 @@ int g2_upload_patch(int slot, const char *filepath) {
 
     g2_drain_pending();
     int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD);
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     free(buff);
     if (ret < 0) return G2_ERR_SEND;
 
     usleep(USB_SEND_DELAY_US * 5);
     uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1996,7 +1908,7 @@ int g2_set_param(int slot, int location, int module_id,
 
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD);
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     return (ret < 0) ? G2_ERR_SEND : G2_OK;
     /* No recv_interrupt — WRITE_NO_RESP */
 }
@@ -2030,7 +1942,7 @@ int g2_watch_rearm(void) {
     uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
     if (send_system_data(0x41, start_cmd, 2) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     return G2_OK;
 }
 
@@ -2157,7 +2069,7 @@ int g2_watch(output_format_t format, int debug) {
             return G2_ERR;
         }
         usleep(USB_SEND_DELAY_US);
-        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     }
 
     printf("{\"type\":\"watch_armed\"}\n");
@@ -2187,7 +2099,7 @@ int g2_watch(output_format_t format, int debug) {
                 break;
             }
             usleep(USB_SEND_DELAY_US);
-            recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+            recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
             printf("{\"type\":\"device_reconnected\"}\n");
             fflush(stdout);
             continue;
@@ -2227,7 +2139,7 @@ int g2_watch(output_format_t format, int debug) {
                             uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
                             uint8_t arm_ack[16];
                             send_system_data(0x41, arm, 2);
-                            recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD);
+                            recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS);
                         }
                     }
                     free(bulk);
@@ -2431,7 +2343,7 @@ int g2_watch(output_format_t format, int debug) {
     uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop_cmd, 2);
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD);
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     /* Flush any extended messages (with pending bulk data) that arrived before
      * STOP_COMM took effect — leaving them unread blocks subsequent commands. */
     g2_drain_pending();

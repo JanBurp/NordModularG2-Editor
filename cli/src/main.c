@@ -25,9 +25,7 @@ static void print_usage(const char *prog) {
     printf("Options:\n");
     printf("  -h, --help        Show this help\n");
     printf("  -V, --version     Show version\n");
-    printf("  --json            Output as single-line JSON (default for data commands)\n");
-    printf("  --pretty          Pretty-print JSON (default when outputting to terminal)\n");
-    printf("  --tree            Tree view output\n");
+    printf("  --json            Output as single-line JSON\n");
     printf("  --debug           Show debug info (raw USB data in hex)\n");
     printf("\nCommands (implemented):\n");
     printf("  list-devices                                                                              List USB devices (debug)\n");
@@ -60,7 +58,7 @@ static void print_usage(const char *prog) {
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
 
-static output_format_t output_format = OUTPUT_PRETTY;
+static output_format_t output_format = OUTPUT_DEFAULT;
 static int debug_mode = 0;
 
 /* Forward declaration */
@@ -84,10 +82,6 @@ int main(int argc, char *argv[]) {
             debug_mode = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             output_format = OUTPUT_JSON;
-        } else if (strcmp(argv[i], "--pretty") == 0) {
-            output_format = OUTPUT_PRETTY;
-        } else if (strcmp(argv[i], "--tree") == 0) {
-            output_format = OUTPUT_TREE;
         } else if (argv[i][0] != '-') {
             command = argv[i];
             break;
@@ -388,12 +382,14 @@ static int dispatch_command(const char *command, int argc, char **argv, int i) {
         int j = i + 8;
 
         int num_modes = (j < argc) ? atoi(argv[j++]) : 0;
-        int mode_vals[64] = {0};
+        if (num_modes < 0 || num_modes > 16) { fprintf(stderr, "add-module: num-modes must be 0-16\n"); return 1; }
+        int mode_vals[16] = {0};
         for (int m = 0; m < num_modes && j < argc - 2; m++)
             mode_vals[m] = atoi(argv[j++]);
 
         int num_params = (j < argc) ? atoi(argv[j++]) : 0;
-        int param_vals[256] = {0};
+        if (num_params < 0 || num_params > MAX_PARAMS_PER_MODULE) { fprintf(stderr, "add-module: num-params must be 0-%d\n", MAX_PARAMS_PER_MODULE); return 1; }
+        int param_vals[MAX_PARAMS_PER_MODULE] = {0};
         for (int p = 0; p < num_params && j < argc - 1; p++)
             param_vals[p] = atoi(argv[j++]);
 
