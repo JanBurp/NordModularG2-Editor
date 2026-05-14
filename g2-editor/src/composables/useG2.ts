@@ -4,8 +4,8 @@ import { Device } from '@/types';
 import type { DeviceStatus } from '@/store/device';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
-import { useSlotsStore } from '@/store/slots';
 import { useLedStore } from '@/store/led';
+import { useSlotsStore } from '@/store/slots';
 
 export type { DeviceStatus };
 
@@ -202,6 +202,12 @@ export function useG2() {
 					log('←', 'Watch', formatWatchEvent(ev), 'led');
 					return;
 				}
+				if (ev.type === 'volume_data') {
+					ledStore.parseVolumeData(ev.slot, ev.data);
+					log('←', 'Watch', formatWatchEvent(ev), 'volume');
+					return;
+				}
+
 				const category: UsbLogEntry['category'] =
 					ev.type === 'param_change' || ev.type === 'patch_param'
 						? 'param'
