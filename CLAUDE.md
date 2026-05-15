@@ -92,6 +92,12 @@ cd cli && make test     # run tests
 ```
 Key slot commands: `add-module`, `del-module`, `move-module`, `set-module-color`, `set-module-name`, `set-param`, `add-cable`, `del-cable`. All take `<slot> <va|fx> ...` as first args. Subcmd bytes documented in `doc/usb.md`.
 
+**Interactive daemon use (recommended):**
+```bash
+cd cli && ./g2tmux.sh   # tmux split: left = daemon output, right = command shell
+```
+Right pane: type commands directly (`get-patch A`, `variation 4 B`, `stop`, `start`, etc.) with TAB autocomplete. See README.md for examples.
+
 ### Electron GUI
 ```bash
 cd g2-editor
