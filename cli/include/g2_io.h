@@ -33,4 +33,7 @@ int recv_bulk(uint8_t *data, uint16_t size);
 /* Drain all pending interrupt+bulk messages from USB buffers */
 int g2_drain_pending(void);
 
+/* Re-arm G2 notification stream (send START_COMM) */
+void g2_rearm(void);
+
 #endif /* G2_IO_H */

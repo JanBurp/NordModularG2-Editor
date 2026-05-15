@@ -303,19 +303,37 @@ int send_init_msg(void) {
     return (ret < 0) ? -1 : 0;
 }
 
+/* Re-arm the G2 stream (START_COMM). Safe to call unconditionally. */
+void g2_rearm(void) {
+    uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
+    uint8_t arm_ack[16];
+    send_system_data(0x41, arm, 2);
+    recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS);
+}
+
+/* Check if bulk payload is the all-slots version update that stops the stream */
+static int bulk_needs_rearm(const uint8_t *bulk, int size) {
+    return size > 3 && bulk[1] == 0x04 && bulk[2] == 0x40 && bulk[3] == 0x1F;
+}
+
 int g2_drain_pending(void) {
     uint8_t response[16];
-    int ret, count = 0;
+    int ret, count = 0, needs_rearm = 0;
     while ((ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_DRAIN_MS)) > 0) {
         count++;
         if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)response[1] << 8) | response[2];
             if (size > 0) {
                 uint8_t *bulk = malloc(size);
-                if (bulk) { recv_bulk(bulk, size); free(bulk); }
+                if (bulk) {
+                    int bret = recv_bulk(bulk, size);
+                    if (bulk_needs_rearm(bulk, bret)) needs_rearm = 1;
+                    free(bulk);
+                }
             }
         }
     }
+    if (needs_rearm) g2_rearm();
     (void)count;
     return count;
 }
