@@ -34,7 +34,7 @@ function pch2_(data: ArrayBuffer) {
 	let aof = 0;
 	let textpadofs = 0;
 	let textpadlen = 0;
-	let bitArray: number[] = [];
+	let rawData: Uint8Array = new Uint8Array(0);
 	let bitofs = 0;
 	let bitbuf: number[] = [];
 
@@ -65,19 +65,17 @@ function pch2_(data: ArrayBuffer) {
 		return URL.createObjectURL(blob);
 	};
 
-	function getBits(numbits: number, initialData?: Uint8Array, maxreq?: number) {
+	function getBits(numbits: number, initialData?: Uint8Array) {
 		if (initialData) {
-			bitArray = [];
-			const max = maxreq || initialData.length;
-			for (let i = 0; i < max; i++) for (let j = 0x80; j > 0; j = j >> 1) bitArray.push(initialData[i] & j ? 1 : 0);
+			rawData = initialData;
 			bitofs = 0;
 		}
-		let rv = bitArray[bitofs];
-		bitofs += 1;
+		let rv = (rawData[bitofs >> 3] >> (7 - (bitofs & 7))) & 1;
+		bitofs++;
 		while (numbits > 1) {
-			rv = (rv << 1) + bitArray[bitofs];
-			bitofs += 1;
-			numbits -= 1;
+			rv = (rv << 1) | ((rawData[bitofs >> 3] >> (7 - (bitofs & 7))) & 1);
+			bitofs++;
+			numbits--;
 		}
 		return rv;
 	}
@@ -85,7 +83,7 @@ function pch2_(data: ArrayBuffer) {
 	function setBits(numbits: number, byte: number) {
 		if (bitbuf == undefined) bitbuf = [];
 		if (numbits) {
-			for (let bw = Math.pow(2, numbits - 1); bw; bw = bw >> 1) bitbuf.push(byte & bw ? 1 : 0);
+			for (let bw = 1 << (numbits - 1); bw; bw >>= 1) bitbuf.push(byte & bw ? 1 : 0);
 		} else {
 			const bytes = new Int8Array(Math.ceil(bitbuf.length / 8));
 			for (let i = 0; i < bitbuf.length; i++) {
