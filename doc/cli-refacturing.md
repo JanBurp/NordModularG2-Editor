@@ -82,3 +82,70 @@ end;
 The CLI wraps every module/cable command with STOP_COMM + START_COMM. The Delphi app does not — it sends those commands into an active streaming session and serializes via `FWaitForCmd`. **The CLI's per-command disarm/rearm has no Delphi precedent.**
 
 This suggests the STOP_COMM/START_COMM around module/cable commands may be overly conservative (defensive programming from early development). Worth testing whether those commands work correctly without disarm/rearm, which would simplify the daemon considerably and match Delphi's approach more closely.
+
+---
+
+## Investigation: Drain-Only Approach (May 2025)
+
+Attempted removing disarm/rearm from daemon commands, replacing with `g2_drain_pending()`
+before and after each send. Also added BULK_REARM detection to drain (re-arms after
+consuming any all-slots version update extended message), and filtered LED/volume events
+in `recv_interrupt` retry loops.
+
+**Result: Hardware still unresponsive after slot/variation commands.**
+
+Key observation: When the daemon appears stuck, pressing a slot button ON THE G2 HARDWARE
+wakes the watch stream back up. This means:
+- The USB connection is alive
+- The G2 is still capable of sending events
+- The watch loop is still running and reacts to hardware-initiated events
+- BUT: commands sent from the daemon are not reaching the G2 correctly
+
+Root cause (not yet fixed): Device commands (`g2_select_slot`, `g2_select_variation`) call
+`recv_interrupt()` from within `daemon_tick()`, which is called synchronously from inside
+the watch loop. Even though there is no concurrent access (the watch loop is blocked while
+daemon_tick runs), the interleaving of streaming events with command responses causes:
+1. `recv_interrupt()` in commands reads LED/volume events instead of command responses
+2. Command responses flow back to the watch loop on the next iteration (wrong context)
+3. Stream gets out of sync; subsequent commands mis-read their acknowledgments
+
+---
+
+## Delphi Thread Architecture (Reference for Future Fix)
+
+The Delphi editor (BVE.NMG2USB.pas) uses a 3-component model that avoids this entirely:
+
+### TListeningThread (background thread)
+- **Sole reader** of EP 0x81 (interrupt) and EP 0x82 (bulk)
+- Tight loop: `FUSB.InterruptRead(iin_buf, 16)` with infinite timeout
+- When EXTENDED: immediately calls `BulkRead()` on EP 0x82 to drain bulk
+- Passes each complete message to main thread via `Queue(ProcessMessageQueued)`
+  (VCL message queue — equivalent to PostMessage in Win32)
+- Never sends anything, never makes decisions about message type
+
+### Main/UI Thread (command correlator)
+- Receives messages from TListeningThread via Queue
+- In `DoResponseMessageQueued`: checks `FSendMessageCount > 0`
+  - If > 0: this interrupt is the **command response** — dequeue, advance state machine
+  - If == 0: this interrupt is a **watch event** — route to event handlers
+- LED/volume data (`IsLedData`) always bypasses the command-response path
+- Sends all commands via EP 0x03 (bulk OUT)
+- Handles BULK_REARM (all-slots version update) via `Perf.StartInit` → START_COMM
+
+### TSendParamThread (background thread)
+- Dedicated only to no-response parameter writes (S_SET_PARAM, etc.)
+- Waits on TEvent, batch-sends via EP 0x03
+- Never reads from any endpoint
+
+### Key properties
+- Only one thread ever reads EP 0x81 — no contention, no missed messages
+- Commands and events share EP 0x81 FIFO; correlation is by state (FSendMessageCount)
+  not by timing or separate channels
+- START_COMM is only sent during init sequence and after BULK_REARM — never per-command
+- FWaitForCmd serializes commands: next send blocked until response received
+
+### C equivalent design (future work)
+Move `g2_watch()` to a background thread (the "listener"). Command execution stays on
+the main thread. The listener passes received messages to the main thread via a
+mutex+condvar queue. Device functions (`g2_select_slot` etc.) send via EP 0x03, then
+wait on the queue for their response — no direct `recv_interrupt()` calls.
