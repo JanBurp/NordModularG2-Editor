@@ -78,15 +78,33 @@ g2-cli watch                            # monitor param/cable/slot changes live
 g2-cli daemon                           # persistent connection: watch + JSON commands on stdin
 ```
 
-In daemon mode, send newline-delimited JSON commands to stdin:
-```
-{"id":1,"cmd":"slot","args":["B"]}
-{"id":2,"cmd":"set-param","args":["A","va","5","0","64","0"]}
-```
-Responses: `{"id":1,"ok":true}` (action) or `{"id":1,"ok":true,"data":{...}}` (query).
-Watch events flow to stdout unchanged alongside responses.
+**Recommended: tmux dev environment**
 
-**Interactive testing from a second terminal:**
+For interactive daemon use, use the tmux launcher:
+
+```bash
+cd cli
+./g2tmux.sh
+```
+
+This opens a split-pane tmux session:
+- **Left pane**: daemon output (watch events, responses)
+- **Right pane**: command shell with autocomplete
+
+Type commands directly (no prefix needed):
+```bash
+get-patch A                             # read patch from slot A
+variation 4 B                           # select variation 4 on slot B
+verbose off                             # suppress LED/volume updates
+set-perf-mode patch                     # switch to patch mode
+stop                                    # kill daemon
+start                                   # restart daemon
+```
+
+Type command name + `TAB` to autocomplete (commands only, system commands suppressed). Arguments also autocomplete: `get-patch <TAB>` → `A B C D`.
+
+**Manual daemon mode** (if not using tmux):
+
 ```bash
 # Terminal 1 — start daemon, reading commands from a named pipe
 mkfifo /tmp/g2-cmd
@@ -95,16 +113,14 @@ mkfifo /tmp/g2-cmd
 # Terminal 2 — keep the pipe open and send commands
 exec 3>/tmp/g2-cmd
 echo '{"id":1,"cmd":"slot","args":["B"]}' >&3               # Change slot B
-echo '{"id":2,"cmd":"variation","args":["4","B"]}' >&3      # Change to variaton 4 on slot B (1)
-echo '{"id":3,"cmd":"device"}' >&3                          # device
-echo '{"id":5,"cmd":"verbose","args":["off"]}' >&3          # suppress led/volume
+echo '{"id":2,"cmd":"variation","args":["4","B"]}' >&3      # Change to variation 4 on slot B
+echo '{"id":3,"cmd":"device"}' >&3                          # device info
+echo '{"id":5,"cmd":"verbose","args":["off"]}' >&3          # suppress LED/volume
 echo '{"id":6,"cmd":"verbose","args":["on"]}' >&3           # restore
 exec 3>&-   # close when done (causes daemon to exit cleanly)
 ```
-The `exec 3>/tmp/g2-cmd` keeps the write end of the pipe open so each `echo` doesn't trigger EOF.
 
-use ./daemin.sh start ... etc
-pkill -f "g2-cli daemon"
+The `exec 3>/tmp/g2-cmd` keeps the write end open so each `echo` doesn't trigger EOF.
 
 ### Output formats
 
