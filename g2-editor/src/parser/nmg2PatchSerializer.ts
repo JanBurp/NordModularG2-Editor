@@ -40,7 +40,7 @@ class BitWriter {
 	private bits: number[] = [];
 
 	write(numbits: number, value: number): void {
-		for (let bw = Math.pow(2, numbits - 1); bw >= 1; bw >>= 1) this.bits.push(value & bw ? 1 : 0);
+		for (let bw = 1 << (numbits - 1); bw >= 1; bw >>= 1) this.bits.push(value & bw ? 1 : 0);
 	}
 
 	flush(): Uint8Array {
