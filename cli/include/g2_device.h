@@ -146,7 +146,10 @@ volatile extern int g2_watch_running;
 extern int g2_watch_verbose;
 extern void (*g2_watch_tick_hook)(void);
 void g2_watch_stop(int sig);
-int g2_watch_disarm(void);
-int g2_watch_rearm(void);
+
+/* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
+ * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
+ * Invalidated on version_update all-slots event. */
+extern uint8_t g2_slot_version[4];
 
 #endif /* __G2_DEVICE_H__ */

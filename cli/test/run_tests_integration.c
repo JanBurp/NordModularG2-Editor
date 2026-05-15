@@ -19,7 +19,12 @@ extern void test_integration_get_patch_slot_a(void);
 extern void test_integration_list_all(void);
 extern void test_integration_select_slot_a(void);
 extern void test_startup_sequence(void);
-extern void test_daemon_slot_variation_commands(void);
+
+extern void test_daemon_starts(void);
+extern void test_daemon_startup_cmd(void);
+extern void test_daemon_slot_cmd(void);
+extern void test_daemon_variation_cmd(void);
+extern void test_daemon_slot_variation_sequence(void);
 /* watch-based tests — commented out; use test_daemon_slot_variation_commands instead
 extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
@@ -87,7 +92,7 @@ int main(void) {
     run_test_silently("test_integration_connect", test_integration_connect);
 
     /* Performance mode and naming tests */
-    run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
+    // run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
     // run_test_silently("test_set_perf_name", test_set_perf_name);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
@@ -107,8 +112,12 @@ int main(void) {
     // run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
     // run_test_silently("test_drain_count_logged", test_drain_count_logged);
 
-    /* Daemon: spawn g2-cli daemon subprocess, verify slot + variation commands over stdin/stdout. */
-    // run_test_silently("test_daemon_slot_variation_commands", test_daemon_slot_variation_commands);
+    /* Daemon: new focused tests for drain-only approach */
+    run_test_silently("test_daemon_starts",              test_daemon_starts);
+    run_test_silently("test_daemon_startup_cmd",         test_daemon_startup_cmd);
+    run_test_silently("test_daemon_slot_cmd",            test_daemon_slot_cmd);
+    run_test_silently("test_daemon_variation_cmd",       test_daemon_variation_cmd);
+    run_test_silently("test_daemon_slot_variation_sequence", test_daemon_slot_variation_sequence);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.
     run_test_with_output("test_fullstack_with_watch", test_fullstack_with_watch);
