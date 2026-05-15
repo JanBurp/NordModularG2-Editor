@@ -52,6 +52,7 @@ function isSameCable(a: Cable, b: Cable): boolean {
 }
 
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
+	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
@@ -59,8 +60,8 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const destJack = cable.destJack ?? cable.dcon;
 		const dir = cable.dir ?? 1;
 
-		const smod = modules.find((m) => m.index == sourceModule);
-		const dmod = modules.find((m) => m.index == destModule);
+		const smod = modulesByIndex.get(sourceModule!);
+		const dmod = modulesByIndex.get(destModule!);
 
 		if (!smod || !dmod) {
 			console.warn(`Cable skipped: module not found (source=${sourceModule}, dest=${destModule})`);
@@ -159,6 +160,7 @@ function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: 
 // Re-paths cables whose source or destination module is in movedIds, preserving curve shape.
 export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
+	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	const borders = svgElement.querySelectorAll<SVGPathElement>('.svgcableborder[data-smod]');
 	borders.forEach((border) => {
 		const smod_i = parseInt(border.getAttribute('data-smod')!);
@@ -170,8 +172,8 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const dir = parseInt(border.getAttribute('data-dir') || '1');
 		const key = border.getAttribute('data-cable-key')!;
 
-		const smod = modules.find((m) => m.index === smod_i);
-		const dmod = modules.find((m) => m.index === dmod_i);
+		const smod = modulesByIndex.get(smod_i);
+		const dmod = modulesByIndex.get(dmod_i);
 		if (!smod || !dmod) return;
 
 		const smodDef = getModule(smod.type) as CableModuleDef | undefined;
