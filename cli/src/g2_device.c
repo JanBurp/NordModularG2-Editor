@@ -660,6 +660,7 @@ int g2_select_slot(const char *slot_str) {
                 uint8_t *bulk = malloc(sz);
                 if (bulk) { recv_bulk(bulk, sz); free(bulk); }
             }
+            g2_rearm();
         }
     }
 
@@ -901,7 +902,15 @@ int g2_select_variation(int variation, int slot) {
     }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt_with_retry(slota, 16, USB_TIMEOUT_STANDARD_MS, 5);
+    /* Skip LED (0x39) and volume (0x3A) streaming notifications to reach the version response */
+    ret = -1;
+    for (int attempt = 0; attempt < 20; attempt++) {
+        ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) break;
+        uint8_t subCmd = slota[4];
+        if (subCmd == 0x39 || subCmd == 0x3A) { ret = -1; continue; }
+        break;
+    }
     if (ret <= 0) {
         g2_err("No response from G2 for variation command 1\n");
         return G2_ERR_RECV;
@@ -917,6 +926,21 @@ int g2_select_variation(int variation, int slot) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
+
+    /* Consume any EXTENDED response (bulk data) — leaving it unread blocks the endpoint */
+    {
+        uint8_t response[16] = {0};
+        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
+        if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
+            if (sz > 0) {
+                uint8_t *bulk = malloc(sz);
+                if (bulk) { recv_bulk(bulk, sz); free(bulk); }
+            }
+            g2_rearm();
+        }
+    }
+
     g2_drain_pending();
 
     return G2_OK;
