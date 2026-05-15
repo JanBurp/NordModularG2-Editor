@@ -19,6 +19,9 @@
 static g2_error_cb_t g2_error_cb = NULL;
 static void *g2_error_cb_ctx = NULL;
 
+/* Patch version cache per slot (0-3 = A-D), 0 = unknown */
+uint8_t g2_slot_version[4] = {0};
+
 void g2_set_error_callback(g2_error_cb_t cb, void *ctx) {
     g2_error_cb = cb;
     g2_error_cb_ctx = ctx;
@@ -315,6 +318,7 @@ cJSON *g2_get_patch(const char *slot_str) {
      * g2ctl returns data starting at index 1 (after length byte), so response[5] = byte[6] of raw
      */
     version = interruptResp[6];
+    if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
@@ -455,6 +459,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
     version = interruptResp[6];
+    if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         g2_err("Failed to send get patch command\n");
@@ -587,7 +592,6 @@ cJSON *g2_startup(void) {
 
 int g2_select_slot(const char *slot_str) {
     int slot;
-    uint8_t response[16] = {0};
     uint8_t version;
     uint8_t mask;
     uint8_t data[8] = {0};
@@ -626,7 +630,7 @@ int g2_select_slot(const char *slot_str) {
         g2_err("Failed to send slot command 1\n");
         return G2_ERR_SEND;
     }
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
+    usleep(USB_SEND_DELAY_US);
 
     /* Step 2: set active slot index */
     data[0] = 0x09;
@@ -635,7 +639,7 @@ int g2_select_slot(const char *slot_str) {
         g2_err("Failed to send slot command 2\n");
         return G2_ERR_SEND;
     }
-    recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
+    usleep(USB_SEND_DELAY_US);
     /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
      * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
     g2_drain_pending();
@@ -648,6 +652,7 @@ int g2_select_slot(const char *slot_str) {
         return G2_ERR_SEND;
     }
     {
+        uint8_t response[16] = {0};
         int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
         if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
@@ -867,7 +872,6 @@ cJSON *g2_list(int filter, int bank_filter) {
 }
 
 int g2_select_variation(int variation, int slot) {
-    uint8_t response[16] = {0};
     uint8_t slota[16] = {0};
     int ret;
     uint8_t extraData[1] = {0};
@@ -903,6 +907,7 @@ int g2_select_variation(int variation, int slot) {
         return G2_ERR_RECV;
     }
     uint8_t version = slota[6];
+    if (version) g2_slot_version[slot] = version;
 
     /* Step 2: Send [CMD_A + slot, version, 0x6a, variation - 1]
      * Version comes from slota[6] (matches Python embedded_message output) */
@@ -912,26 +917,27 @@ int g2_select_variation(int variation, int slot) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt_with_retry(response, 16, USB_TIMEOUT_STANDARD_MS, 5);
+    g2_drain_pending();
 
-    return (ret > 0) ? G2_OK : G2_ERR_RECV;
+    return G2_OK;
 }
 
-/* Helper: get version for slot using GET_PATCH_VERSION (shared pattern) */
+/* Helper: get version for slot using GET_PATCH_VERSION (with cache) */
 static uint8_t cable_get_version(int slot) {
+    if (g2_slot_version[slot]) return g2_slot_version[slot];
+    /* cache miss — ask G2 (fallback for first use before get-patch) */
     uint8_t slota[16] = {0};
     uint8_t cmdData[2] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) return 0;
     usleep(USB_SEND_DELAY_US);
     recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
+    if (slota[6]) g2_slot_version[slot] = slota[6];
     return slota[6];
 }
 
 int g2_add_cable(int slot, int location, int color,
                  int from_mod, int from_con_type, int from_con_id,
                  int to_mod,   int to_con_type,   int to_con_id) {
-    uint8_t response[16] = {0};
-
     if (slot < 0 || slot > 3)                { g2_err("add-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)        { g2_err("add-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
     if (color < 0 || color > 6)              { g2_err("add-cable: color must be 0-6\n"); return G2_ERR_INVALID_PARAM; }
@@ -962,7 +968,6 @@ int g2_add_cable(int slot, int location, int color,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -970,8 +975,6 @@ int g2_add_cable(int slot, int location, int color,
 int g2_del_cable(int slot, int location,
                  int from_mod, int from_con_type, int from_con_id,
                  int to_mod,   int to_con_type,   int to_con_id) {
-    uint8_t response[16] = {0};
-
     if (slot < 0 || slot > 3)          { g2_err("del-cable: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("del-cable: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
     if (from_con_type < 0 || to_con_type < 0) { g2_err("del-cable: connector type must be 0(in) or 1(out)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1001,7 +1004,6 @@ int g2_del_cable(int slot, int location,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1009,7 +1011,6 @@ int g2_del_cable(int slot, int location,
 int g2_set_cable_color(int slot, int location, int color,
                        int from_mod, int from_con_type, int from_con_id,
                        int to_mod,   int to_con_type,   int to_con_id) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)                 { g2_err("set-cable-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)         { g2_err("set-cable-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1042,13 +1043,11 @@ int g2_set_cable_color(int slot, int location, int color,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_del_module(int slot, int location, int module_id) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)          { g2_err("del-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("del-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1064,13 +1063,11 @@ int g2_del_module(int slot, int location, int module_id) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_move_module(int slot, int location, int module_id, int col, int row) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)          { g2_err("move-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("move-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1086,7 +1083,6 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
@@ -1097,8 +1093,6 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
                   int num_params, const int *param_vals,
                   const char *name) {
     (void)num_params; (void)param_vals; /* G2 initialises params to defaults */
-
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)          { g2_err("add-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1136,13 +1130,11 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_set_module_color(int slot, int location, int module_id, int color) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)          { g2_err("set-module-color: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("set-module-color: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1159,13 +1151,11 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_set_module_label(int slot, int location, int module_id, const char *label) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)         { g2_err("set-module-name: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1) { g2_err("set-module-name: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1190,13 +1180,11 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_set_param_label(int slot, int location, int module_id, int param_idx, int label_idx, const char *label) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)         { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1) { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1235,13 +1223,11 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }
 
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val) {
-    uint8_t response[16] = {0};
 
     if (slot < 0 || slot > 3)         { g2_err("set-module-mode: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1) { g2_err("set-module-mode: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
@@ -1257,7 +1243,6 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
     g2_drain_pending();
     return G2_OK;
 }

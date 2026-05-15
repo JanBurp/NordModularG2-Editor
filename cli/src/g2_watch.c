@@ -22,30 +22,6 @@ void g2_watch_stop(int sig) {
     g2_watch_running = 0;
 }
 
-/* Send STOP_COMM so the G2 stops streaming and normal commands work again. */
-int g2_watch_disarm(void) {
-    uint8_t stop_cmd[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
-    send_system_data(0x41, stop_cmd, 2);
-    usleep(USB_SEND_DELAY_US);
-    /* Use g2_drain_pending (not a bare recv_interrupt) so that any EXTENDED
-     * interrupt arriving here has its bulk data consumed — an unread bulk
-     * blocks the G2 from sending further interrupts, including the response
-     * to GET_PATCH_VERSION in g2_select_variation. */
-    g2_drain_pending();
-    return G2_OK;
-}
-
-/* Drain stale data, send START_COMM to re-arm unsolicited notifications. */
-int g2_watch_rearm(void) {
-    uint8_t response[16];
-    g2_drain_pending();
-    uint8_t start_cmd[2] = {SUB_COMMAND_START_STOP, 0x00};
-    if (send_system_data(0x41, start_cmd, 2) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
-    return G2_OK;
-}
-
 #define BULK_REARM 1  /* caller should re-send START_COMM */
 
 /* Returns BULK_REARM if the G2 will stop sending after this message. */
@@ -62,6 +38,7 @@ static int process_bulk_event(const uint8_t *bulk, int bret) {
          * START_COMM is re-sent. */
         printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
         fflush(stdout);
+        memset(g2_slot_version, 0, sizeof(g2_slot_version));
         return BULK_REARM;
     }
 
@@ -147,13 +124,15 @@ int g2_watch(output_format_t format, int debug) {
     int ret;
     (void)format;
 
-    if (!g2_is_connected() && g2_connect_silent() < 0) {
-        fprintf(stderr, "watch: failed to connect\n");
-        return G2_ERR_CONNECT;
-    }
-
     signal(SIGINT, g2_watch_stop);
     signal(SIGTERM, g2_watch_stop);
+
+    /* Initial connection: retry every 100ms until G2 is available or we're signaled to stop.
+     * This matches the reconnect logic below so daemon stays alive while waiting for hardware. */
+    while (!g2_is_connected() && g2_connect_silent() < 0) {
+        if (!g2_watch_running) return G2_ERR_CONNECT;
+        usleep(100000);
+    }
 
     /* Cold-connect arm sequence — mirrors the reconnect path below exactly:
      * drain stale data, send START_COMM, read the ACK.  No clear_halt on a
@@ -279,6 +258,7 @@ int g2_watch(output_format_t format, int debug) {
                     case 0x38:
                         printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
                                response[5], response[6]);
+                        if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
                         break;
                     default: {
                         char hex[32] = "";
@@ -359,9 +339,11 @@ int g2_watch(output_format_t format, int debug) {
 
         /* version=0x40 means version-update message at slot level */
         if (version == 0x40) {
-            if (subCmd == 0x36 || subCmd == 0x38) /* R_PATCH_VERSION */
+            if (subCmd == 0x36 || subCmd == 0x38) /* R_PATCH_VERSION */ {
                 printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
                        response[5], response[6]);
+                if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
+            }
             else {
                 char hex[32] = "";
                 for (int i = 5; i <= lastByte && i - 5 < 15; i++)
