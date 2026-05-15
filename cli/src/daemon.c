@@ -147,7 +147,6 @@ static void execute_cmd(const char *line) {
 	int ret = G2_ERR_INVALID_PARAM;
 	cJSON *data = NULL;
 
-	/* Non-USB commands: handle before disarm/rearm. */
 	if (strcmp(cmd, "verbose") == 0 && n >= 1) {
 		const char *val = arg_s(args, 0);
 		if (strcmp(val, "on") == 0)       g2_watch_verbose = 1;
@@ -161,9 +160,6 @@ static void execute_cmd(const char *line) {
 		emit(r); cJSON_Delete(r); cJSON_Delete(req);
 		return;
 	}
-
-	/* Stop streaming so the G2 accepts normal commands, then re-arm after. */
-	g2_watch_disarm();
 
 	if (strcmp(cmd, "slot") == 0 && n >= 1) {
 		ret = g2_select_slot(arg_s(args, 0));
@@ -315,8 +311,6 @@ static void execute_cmd(const char *line) {
 		data = g2_startup();
 		ret = data ? G2_OK : G2_ERR;
 	}
-
-	g2_watch_rearm();
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
 	    ret == G2_ERR_CONNECT || ret == G2_ERR_RESET) {
