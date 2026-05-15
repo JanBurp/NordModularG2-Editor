@@ -117,6 +117,10 @@ export const useSlotsStore = defineStore('slots', {
 			const name: string = result.name;
 			const rawHex: string = result.data;
 
+			if (rawHex === this.slots[slot].rawHex && this.slots[slot].patch !== null) {
+				return { name, rawHex, patch: this.slots[slot].patch };
+			}
+
 			const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 			const nameBytes = new TextEncoder().encode(name);
 			const header = new Uint8Array(nameBytes.length + 3);
