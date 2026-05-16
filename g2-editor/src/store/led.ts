@@ -40,10 +40,7 @@ export const useLedStore = defineStore('led', () => {
 		const newFxStripList: LedEntry[] = [];
 		const newVaStripList: LedEntry[] = [];
 
-		for (const [areaIdx, areaName] of [
-			[0, 'fx'] as const,
-			[1, 'va'] as const,
-		]) {
+		for (const [areaIdx, areaName] of [[0, 'fx'] as const, [1, 'va'] as const]) {
 			const area = patch.areas[areaIdx];
 			const sortedMods = [...area.modules].sort((a, b) => a.index - b.index);
 			for (const mod of sortedMods) {
@@ -167,7 +164,9 @@ export const useLedStore = defineStore('led', () => {
 	for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
 		watch(
 			() => slotsStore.slots[slotLabel].patch,
-			(patch) => { if (patch) buildLedListFromPatch(patch); },
+			(patch) => {
+				if (patch) buildLedListFromPatch(patch);
+			},
 			{ immediate: true },
 		);
 	}

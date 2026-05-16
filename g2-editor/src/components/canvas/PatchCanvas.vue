@@ -192,16 +192,13 @@
 		emit('modeChange', moduleIndex, index, value);
 	}
 
-	const { dragState, dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
+	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
 	);
 
-	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
-		svgRef,
-		(info) => emit('moduleDrop', info),
-	);
+	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
 
 	onUnmounted(() => {
 		clearModuleDrag();

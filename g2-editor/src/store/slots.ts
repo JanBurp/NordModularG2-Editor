@@ -281,7 +281,18 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = null;
 
 			const location = area === 'voice' ? 'va' : 'fx';
-			const mainCmd = ['add-cable', slot, location, String(effectiveColor), String(fromMod), String(fromConType), String(fromCon), String(toMod), String(toConType), String(toCon)];
+			const mainCmd = [
+				'add-cable',
+				slot,
+				location,
+				String(effectiveColor),
+				String(fromMod),
+				String(fromConType),
+				String(fromCon),
+				String(toMod),
+				String(toConType),
+				String(toCon),
+			];
 
 			// Recolor dir=0 cables in the input group to match an output that was just connected or already present
 			const recolorCmds: string[][] = [];
@@ -292,9 +303,23 @@ export const useSlotsStore = defineStore('slots', {
 					// Replace cable objects (new array) so Vue's watcher detects the change
 					patch.areas[areaIdx].cableList = cableList.map((c) => {
 						if (!toRecolor.has(c)) return c;
-						const gsmod = c.smod ?? 0, gscon = c.scon ?? 0, gdmod = c.dmod ?? 0, gdcon = c.dcon ?? 0;
+						const gsmod = c.smod ?? 0,
+							gscon = c.scon ?? 0,
+							gdmod = c.dmod ?? 0,
+							gdcon = c.dcon ?? 0;
 						recolorCmds.push(['del-cable', slot, location, String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
-						recolorCmds.push(['add-cable', slot, location, String(targetColor), String(gsmod), '0', String(gscon), String(gdmod), '0', String(gdcon)]);
+						recolorCmds.push([
+							'add-cable',
+							slot,
+							location,
+							String(targetColor),
+							String(gsmod),
+							'0',
+							String(gscon),
+							String(gdmod),
+							'0',
+							String(gdcon),
+						]);
 						return { ...c, colour: targetColor };
 					});
 				}
@@ -529,13 +554,27 @@ export const useSlotsStore = defineStore('slots', {
 			const cableList = patch.areas[areaIdx].cableList ?? [];
 			const matching = cableList.filter((c) => {
 				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
-				return ((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) || ((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)));
+				return (
+					((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) ||
+					((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)))
+				);
 			});
 			if (matching.length === 0) return;
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color } : c));
 			this.slots[slot].rawHex = null;
 			await window.cli.runBatch(
-				matching.map((c) => ['set-cable-color', slot, location, String(color), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]),
+				matching.map((c) => [
+					'set-cable-color',
+					slot,
+					location,
+					String(color),
+					String(c.smod),
+					(c.dir ?? 1) === 0 ? '0' : '1',
+					String(c.scon),
+					String(c.dmod),
+					'0',
+					String(c.dcon),
+				]),
 			);
 		},
 
@@ -548,13 +587,26 @@ export const useSlotsStore = defineStore('slots', {
 			const cableList = patch.areas[areaIdx].cableList ?? [];
 			const matching = cableList.filter((c) => {
 				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
-				return ((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) || ((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)));
+				return (
+					((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) ||
+					((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)))
+				);
 			});
 			if (matching.length === 0) return;
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
 			this.slots[slot].rawHex = null;
 			await window.cli.runBatch(
-				matching.map((c) => ['del-cable', slot, location, String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]),
+				matching.map((c) => [
+					'del-cable',
+					slot,
+					location,
+					String(c.smod),
+					(c.dir ?? 1) === 0 ? '0' : '1',
+					String(c.scon),
+					String(c.dmod),
+					'0',
+					String(c.dcon),
+				]),
 			);
 		},
 
@@ -579,7 +631,17 @@ export const useSlotsStore = defineStore('slots', {
 						if (!deletedCableKeys.has(key)) {
 							deletedCableKeys.add(key);
 							mutDeleteCable(patch, area === 'voice' ? 1 : 0, c);
-							cliCmds.push(['del-cable', slot, location, String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]);
+							cliCmds.push([
+								'del-cable',
+								slot,
+								location,
+								String(c.smod),
+								c.dir === 0 ? '0' : '1',
+								String(c.scon),
+								String(c.dmod),
+								'0',
+								String(c.dcon),
+							]);
 						}
 					}
 					mutDeleteModule(patch, area === 'voice' ? 1 : 0, id);

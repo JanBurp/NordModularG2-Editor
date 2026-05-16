@@ -33,7 +33,14 @@
 				:modes="instance.modes"
 				:module-id="instance.type"
 			/>
-			<ModuleValueDisplay v-else-if="entry.ve.type === 'valueDisplay'" :ve="entry.ve" :params="moduleDef.params || []" :values="localLv" :modes="instance.modes" :modeDefs="moduleDef.modes || []" />
+			<ModuleValueDisplay
+				v-else-if="entry.ve.type === 'valueDisplay'"
+				:ve="entry.ve"
+				:params="moduleDef.params || []"
+				:values="localLv"
+				:modes="instance.modes"
+				:modeDefs="moduleDef.modes || []"
+			/>
 			<ModuleVeLed
 				v-else-if="entry.ve.type === 'led' || entry.ve.type === 'ledArray'"
 				:ve="entry.ve"

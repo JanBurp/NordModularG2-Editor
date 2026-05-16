@@ -345,10 +345,11 @@
 				case 'variation-5':
 				case 'variation-6':
 				case 'variation-7':
-				case 'variation-8':
+				case 'variation-8': {
 					const variation = parseInt(action.substring(10, 11));
 					await handleVariationClick(variation - 1);
 					break;
+				}
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
 					break;
