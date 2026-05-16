@@ -47,12 +47,9 @@ export function makeCableKey(cable: Cable): string {
 	return `${cable.smod ?? cable.sourceModule}-${cable.scon ?? cable.sourceJack}-${cable.dmod ?? cable.destModule}-${cable.dcon ?? cable.destJack}`;
 }
 
-function isSameCable(a: Cable, b: Cable): boolean {
-	return a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
-}
-
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
+	const selectedKeys = new Set(options?.selectedCables?.map(makeCableKey) ?? []);
 	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
@@ -94,7 +91,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
-		const isSelected = options?.selectedCables?.some((c) => isSameCable(cable, c)) ?? false;
+		const isSelected = selectedKeys.has(makeCableKey(cable));
 		const key = makeCableKey(cable);
 
 		// All three paths share the same data-cable-key so they can be queried/removed together.

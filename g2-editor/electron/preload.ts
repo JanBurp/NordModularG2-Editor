@@ -1,4 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
+import type { MenuAction } from "../src/types/index";
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	patches: {
@@ -7,8 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
 	},
 
-	onMenuAction: (cb: (action: string) => void) =>
-		ipcRenderer.on("menu:action", (_, action) => cb(action)),
+	onMenuAction: (cb: (action: MenuAction) => void) =>
+		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),
 	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
 
 	savePatch: (filepath: string, data: number[]) =>
