@@ -6,6 +6,8 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 import { useUiStore } from './ui';
+import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
+import { resolveColumnCollisions } from './slotHelpers';
 
 export type { SlotLabel };
 
@@ -16,45 +18,6 @@ interface SlotEntry {
 	rawHex: string | null;
 	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
-}
-
-// BFS over dir=0 (input-to-input) cables to find all cables transitively connected to a given input jack
-function findConnectedInputCables(cableList: Cable[], startMod: number, startCon: number): Cable[] {
-	const visitedJacks = new Set<string>();
-	const result: Cable[] = [];
-	const queue: { mod: number; con: number }[] = [{ mod: startMod, con: startCon }];
-	while (queue.length > 0) {
-		const { mod, con } = queue.shift()!;
-		const key = `${mod}-${con}`;
-		if (visitedJacks.has(key)) continue;
-		visitedJacks.add(key);
-		for (const cable of cableList) {
-			if ((cable.dir ?? 1) !== 0 || result.includes(cable)) continue;
-			const csmod = cable.smod ?? 0, cscon = cable.scon ?? 0, cdmod = cable.dmod ?? 0, cdcon = cable.dcon ?? 0;
-			if (csmod === mod && cscon === con) {
-				result.push(cable);
-				queue.push({ mod: cdmod, con: cdcon });
-			} else if (cdmod === mod && cdcon === con) {
-				result.push(cable);
-				queue.push({ mod: csmod, con: cscon });
-			}
-		}
-	}
-	return result;
-}
-
-// Returns the colour of any output already driving the combined input group of (smod,scon) and (dmod,dcon).
-// Falls back to 6 (white) when no output is connected.
-function findGroupOutputColor(cableList: Cable[], smod: number, scon: number, dmod: number, dcon: number): number {
-	const inputJacks = new Set<string>([`${smod}-${scon}`, `${dmod}-${dcon}`]);
-	for (const c of [...findConnectedInputCables(cableList, smod, scon), ...findConnectedInputCables(cableList, dmod, dcon)]) {
-		inputJacks.add(`${c.smod ?? 0}-${c.scon ?? 0}`);
-		inputJacks.add(`${c.dmod ?? 0}-${c.dcon ?? 0}`);
-	}
-	for (const c of cableList) {
-		if ((c.dir ?? 1) === 1 && inputJacks.has(`${c.dmod ?? 0}-${c.dcon ?? 0}`)) return c.colour;
-	}
-	return 6; // white
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -430,27 +393,7 @@ export const useSlotsStore = defineStore('slots', {
 			stationaryModules: { index: number; vert: number; height: number }[],
 			occupantRects: { row: number; height: number }[],
 		): { index: number; newRow: number }[] {
-			if (occupantRects.length === 0) return [];
-			const occupants = [...occupantRects].sort((a, b) => a.row - b.row);
-			const sorted = [...stationaryModules].sort((a, b) => a.vert - b.vert);
-			const newRows = new Map(sorted.map((m) => [m.index, m.vert]));
-			let floor = 0;
-			for (const mod of sorted) {
-				let candidate = Math.max(newRows.get(mod.index)!, floor);
-				for (const o of occupants) {
-					if (candidate < o.row + o.height && candidate + mod.height > o.row) {
-						candidate = o.row + o.height;
-					}
-				}
-				newRows.set(mod.index, candidate);
-				floor = candidate + mod.height;
-			}
-			return sorted
-				.filter((m) => newRows.get(m.index) !== m.vert)
-				.map((m) => ({
-					index: m.index,
-					newRow: newRows.get(m.index)!,
-				}));
+			return resolveColumnCollisions(stationaryModules, occupantRects);
 		},
 
 		async moveModulesWithCollision(
