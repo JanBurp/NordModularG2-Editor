@@ -38,6 +38,9 @@ const allGlobals = {
   SVGCircleElement: 'readonly',
   Node: 'readonly',
   EventTarget: 'readonly',
+  HTMLDivElement: 'readonly',
+  setInterval: 'readonly',
+  clearInterval: 'readonly',
 };
 
 export default [

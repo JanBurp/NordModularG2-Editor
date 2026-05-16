@@ -83,7 +83,10 @@ export function useJackDragInteraction(
 				if (drivenNestJacks.has(key)) continue;
 				drivenNestJacks.add(key);
 				for (const dc of dir0Cables) {
-					const sm = dc.smod ?? 0, sc = dc.scon ?? 0, dm = dc.dmod ?? 0, dc2 = dc.dcon ?? 0;
+					const sm = dc.smod ?? 0,
+						sc = dc.scon ?? 0,
+						dm = dc.dmod ?? 0,
+						dc2 = dc.dcon ?? 0;
 					if (sm === mod && sc === con) queue.push({ mod: dm, con: dc2 });
 					else if (dm === mod && dc2 === con) queue.push({ mod: sm, con: sc });
 				}
@@ -97,7 +100,7 @@ export function useJackDragInteraction(
 			const baseX = mod.horiz * 256;
 			const baseY = mod.vert * 16;
 			for (const targetType of targetTypes) {
-				const jacks = targetType === 'input' ? modDef.inputs ?? [] : modDef.outputs ?? [];
+				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 				jacks.forEach((jack, idx) => {
 					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
 					if (targetType === 'input' && src.type === 'output' && drivenNestJacks.has(`${mod.index}-${idx}`)) return;
@@ -238,10 +241,7 @@ export function useJackDragInteraction(
 				return;
 			}
 
-			const sameJack =
-				cycleJack?.moduleIndex === info.moduleIndex &&
-				cycleJack?.connectorIndex === info.connectorIndex &&
-				cycleJack?.type === info.type;
+			const sameJack = cycleJack?.moduleIndex === info.moduleIndex && cycleJack?.connectorIndex === info.connectorIndex && cycleJack?.type === info.type;
 
 			if (!sameJack) {
 				cycleJack = info;

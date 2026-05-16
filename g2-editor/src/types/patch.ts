@@ -42,7 +42,6 @@ export interface Patch {
 	mode?: { area: 0 | 1; variation: number };
 }
 
-
 export const VOICEMODE_OPTIONS = [
 	{ id: 0, name: 'Poly' },
 	{ id: 1, name: 'Mono' },

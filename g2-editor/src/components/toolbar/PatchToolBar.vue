@@ -60,7 +60,9 @@
 	const selectedCategory = ref<number>(0);
 	watch(
 		() => (currentPatch.value as any)?.description?.category,
-		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		(cat) => {
+			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+		},
 		{ immediate: true },
 	);
 	watch(selectedCategory, (cat) => {

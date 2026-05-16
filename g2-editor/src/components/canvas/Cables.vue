@@ -138,12 +138,10 @@
 			const newKeys = new Set((newCables ?? []).map(makeCableKey));
 			const oldKeys = new Set((oldCables ?? []).map(makeCableKey));
 			for (const key of oldKeys) {
-				if (!newKeys.has(key))
-					svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('selected'));
+				if (!newKeys.has(key)) svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('selected'));
 			}
 			for (const key of newKeys) {
-				if (!oldKeys.has(key))
-					svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
+				if (!oldKeys.has(key)) svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
 			}
 		},
 		{ deep: true },

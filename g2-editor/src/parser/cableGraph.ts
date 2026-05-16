@@ -12,7 +12,10 @@ export function findConnectedInputCables(cableList: Cable[], startMod: number, s
 		visitedJacks.add(key);
 		for (const cable of cableList) {
 			if ((cable.dir ?? 1) !== 0 || result.includes(cable)) continue;
-			const csmod = cable.smod ?? 0, cscon = cable.scon ?? 0, cdmod = cable.dmod ?? 0, cdcon = cable.dcon ?? 0;
+			const csmod = cable.smod ?? 0,
+				cscon = cable.scon ?? 0,
+				cdmod = cable.dmod ?? 0,
+				cdcon = cable.dcon ?? 0;
 			if (csmod === mod && cscon === con) {
 				result.push(cable);
 				queue.push({ mod: cdmod, con: cdcon });
