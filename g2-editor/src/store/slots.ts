@@ -232,11 +232,11 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { getModule } = await import('../renderer/nmg2mods');
 			const { getParam } = await import('../renderer/parammap');
-			const modDef = getModule(typeId) as any;
+			const modDef = getModule(typeId);
 			const numModes = modDef?.modes?.length ?? 0;
 			const modeVals: number[] = Array(numModes).fill(0);
 			const numParams = modDef?.params?.length ?? 0;
-			const paramVals: number[] = (modDef?.params ?? []).map((p: any) => getParam(p.type)?.def ?? 64);
+			const paramVals: number[] = (modDef?.params ?? []).map((p) => getParam(p.type)?.def ?? 64);
 			const uname = (modDef?.short ?? 'Module') + moduleId;
 
 			const lv: number[] = Array(numParams * 9);
@@ -473,14 +473,14 @@ export const useSlotsStore = defineStore('slots', {
 				.map((id) => {
 					const m = currentModuleList.find((x: any) => x.index === id);
 					if (!m) return null;
-					const height = (getModule(m.type) as any)?.height ?? 2;
+					const height = getModule(m.type)?.height ?? 2;
 					return {
 						index: id,
 						fromCol: m.horiz as number,
 						fromRow: m.vert as number,
 						toCol: Math.max(0, (m.horiz as number) + dCol),
 						toRow: Math.max(0, (m.vert as number) + dRow),
-						height: height as number,
+						height,
 					};
 				})
 				.filter((t): t is { index: number; fromCol: number; fromRow: number; toCol: number; toRow: number; height: number } => t !== null);
@@ -498,7 +498,7 @@ export const useSlotsStore = defineStore('slots', {
 					.map((m: any) => ({
 						index: m.index as number,
 						vert: m.vert as number,
-						height: ((getModule(m.type) as any)?.height ?? 2) as number,
+						height: getModule(m.type)?.height ?? 2,
 					}));
 				for (const d of this._resolveColumnCollisions(stationary, occupants)) {
 					pushDowns.push({ index: d.index, col, newRow: d.newRow });
@@ -528,13 +528,13 @@ export const useSlotsStore = defineStore('slots', {
 			const { getModule } = await import('../renderer/nmg2mods');
 			const ids = currentModuleList.map((m: any) => m.index as number);
 			const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
-			const height = (getModule(typeId) as any)?.height ?? 2;
+			const height = getModule(typeId)?.height ?? 2;
 			const colMods = currentModuleList
 				.filter((m: any) => m.horiz === col)
 				.map((m: any) => ({
 					index: m.index as number,
 					vert: m.vert as number,
-					height: ((getModule(m.type) as any)?.height ?? 2) as number,
+					height: getModule(m.type)?.height ?? 2,
 				}));
 			for (const d of this._resolveColumnCollisions(colMods, [{ row, height }])) await this.moveModuleNoReload(d.index, col, d.newRow, area);
 			return this.addModule(typeId, moduleId, col, row, area);

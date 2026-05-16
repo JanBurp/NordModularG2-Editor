@@ -1,5 +1,6 @@
 /// <reference types="vite/client" />
 import type { MenuAction } from './types/index';
+import type { CliService } from './types/cli';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -30,17 +31,6 @@ declare global {
 				error?: string;
 			}>;
 		};
-		cli: {
-			run: (args: string[]) => Promise<string>;
-			runBatch: (argsList: string[][]) => Promise<string[]>;
-			watchStart: () => Promise<void>;
-			watchStop: () => void;
-			onWatchEvent: (cb: (line: string) => void) => void;
-			offWatchEvent: () => void;
-			onWatchDone: (cb: () => void) => void;
-			offWatchDone: () => void;
-			onDeviceDisconnected: (cb: () => void) => void;
-			offDeviceDisconnected: () => void;
-		};
+		cli: CliService;
 	}
 }
