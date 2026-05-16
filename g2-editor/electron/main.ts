@@ -17,7 +17,7 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 let win: BrowserWindow | null = null;
 let daemonProcess: ChildProcess | null = null;
 let cmdId = 0;
-const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void }>();
+const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>();
 const isMac = process.platform === 'darwin';
 
 const cliPath = path.join(process.env.APP_ROOT, "resources/g2-cli");
@@ -65,6 +65,7 @@ function startDaemon() {
 				if (msg.id !== undefined) {
 					const pending = pendingCmds.get(msg.id);
 					if (pending) {
+						clearTimeout(pending.timeout);
 						pendingCmds.delete(msg.id);
 						if (msg.ok) {
 							pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
@@ -87,6 +88,7 @@ function startDaemon() {
 		const wasActive = daemonProcess === proc;
 		if (wasActive) daemonProcess = null;
 		for (const pending of pendingCmds.values()) {
+			clearTimeout(pending.timeout);
 			pending.reject(new Error("Daemon exited"));
 		}
 		pendingCmds.clear();
@@ -116,7 +118,11 @@ function sendCmd(cmd: string, args: string[]): Promise<string> {
 			return;
 		}
 		const id = ++cmdId;
-		pendingCmds.set(id, { resolve, reject });
+		const timeout = setTimeout(() => {
+			pendingCmds.delete(id);
+			reject(new Error(`CLI timeout: ${cmd}`));
+		}, 30_000);
+		pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd, args });
 		console.log('[deamon-cmd]->', json);
 		daemonProcess.stdin?.write(json + "\n");
