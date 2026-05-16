@@ -92,13 +92,13 @@ export function useJackDragInteraction(
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
 		for (const mod of getModules()) {
-			const modDef = getModule(mod.type) as any;
+			const modDef = getModule(mod.type);
 			if (!modDef) continue;
 			const baseX = mod.horiz * 256;
 			const baseY = mod.vert * 16;
 			for (const targetType of targetTypes) {
-				const jacks: any[] = targetType === 'input' ? modDef.inputs || [] : modDef.outputs || [];
-				jacks.forEach((jack: any, idx: number) => {
+				const jacks = targetType === 'input' ? modDef.inputs ?? [] : modDef.outputs ?? [];
+				jacks.forEach((jack, idx) => {
 					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
 					if (targetType === 'input' && src.type === 'output' && drivenNestJacks.has(`${mod.index}-${idx}`)) return;
 					const jx = jack.x + baseX;
@@ -141,7 +141,7 @@ export function useJackDragInteraction(
 	function getJackSvgPos(info: JackDragInfo) {
 		const mod = getModules().find((m) => m.index === info.moduleIndex);
 		if (!mod) return null;
-		const modDef = getModule(mod.type) as any;
+		const modDef = getModule(mod.type);
 		if (!modDef) return null;
 		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
 		const jack = jacks?.[info.connectorIndex];

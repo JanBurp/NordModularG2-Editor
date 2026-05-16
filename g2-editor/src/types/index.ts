@@ -102,6 +102,7 @@ export type {
 	ParamLabel,
 } from './module';
 export type { Patch, Area, Cable, PatchDescription } from './patch';
+export type { CliService } from './cli';
 
 export interface ContextMenuSwatch {
 	color: string;

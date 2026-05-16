@@ -50,7 +50,7 @@ export function useModuleSelecting(svgEl: Ref<SVGSVGElement | null>, modules: Re
 			const mx1 = (m.horiz || 0) * 256;
 			const my1 = (m.vert || 0) * 16;
 			const mx2 = mx1 + 256;
-			const mh = ((getModule(m.type) as any)?.height ?? 2) * 16;
+			const mh = (getModule(m.type)?.height ?? 2) * 16;
 			const my2 = my1 + mh;
 			if (!(mx2 < rx1 || mx1 > rx2 || my2 < ry1 || my1 > ry2)) {
 				result.push(m.index);
