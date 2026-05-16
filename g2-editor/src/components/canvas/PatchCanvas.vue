@@ -1,5 +1,5 @@
 <template>
-	<div class="overflow-auto bg-neutral-700" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+	<div class="overflow-auto bg-neutral-700 relative" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
 			font-size="9"
@@ -32,17 +32,6 @@
 				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
-			<rect
-				v-if="isDraggingSelection && selectionRect"
-				:x="selectionRect.x"
-				:y="selectionRect.y"
-				:width="Math.max(0, selectionRect.width)"
-				:height="Math.max(0, selectionRect.height)"
-				fill="none"
-				stroke="rgba(30,30,30,0.8)"
-				stroke-width="3"
-				pointer-events="none"
-			/>
 			<DragGhost :ghosts="dragGhosts" />
 		</svg>
 		<Cables
@@ -53,6 +42,7 @@
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
 		/>
+		<div ref="selectionRectEl" class="selection-rect" />
 	</div>
 </template>
 <script setup lang="ts">
@@ -127,10 +117,12 @@
 	const svgRef = ref<SVGSVGElement | null>(null);
 	provide('patchCanvasSvg', svgRef);
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
+	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
-	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
+	const { handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
 		computed(() => props.modules as any[]),
+		selectionRectEl,
 	);
 
 	const canvasWidth = computed(() => {
