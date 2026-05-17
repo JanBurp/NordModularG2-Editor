@@ -22,7 +22,12 @@
 		<ToolBarDivider />
 
 		<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
-		<Switch :value="patchParams?.[uiStore.variation]?.activeMuted ?? 1" paramType="ActiveMonitor" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)" />
+		<Switch
+			class="mt-3"
+			:value="patchParams?.[uiStore.variation]?.activeMuted ?? 1"
+			paramType="ActiveMonitor"
+			@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)"
+		/>
 
 		<ToolBarDivider />
 

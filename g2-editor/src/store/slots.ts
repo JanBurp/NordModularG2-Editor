@@ -358,7 +358,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (mod?.lv) mod.lv[variation * mod.pcnt + paramIdx] = value;
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return;
+			if (!useDeviceStore().connected) return;
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
@@ -373,7 +373,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (mod?.modes) mod.modes[modeIdx] = value;
 			this.slots[slot].rawHex = null;
 
-			if (!slot) return;
+			if (!useDeviceStore().connected) return;
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
 		},
@@ -567,7 +567,10 @@ export const useSlotsStore = defineStore('slots', {
 		setPatchParam(variation: number, key: string, value: number): void {
 			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const params = this.slots[slot]?.patch?.patchParams;
-			if (params?.[variation]) (params[variation] as Record<string, number>)[key] = value;
+			if (params?.[variation]) {
+				(params[variation] as Record<string, number>)[key] = value;
+				this.slots[slot].rawHex = null;
+			}
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {

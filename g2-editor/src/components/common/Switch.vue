@@ -27,10 +27,10 @@
 
 	const props = defineProps<{
 		value: number;
-		paramType?: string;  // parammap key — derives names/mode/bmp/width/optionCount
-		options?: string[];  // used when no paramType
+		paramType?: string; // parammap key — derives names/mode/bmp/width/optionCount
+		options?: string[]; // used when no paramType
 		mode?: 'VR' | 'HR'; // overridden by paramType
-		bmp?: string;        // overridden by paramType
+		bmp?: string; // overridden by paramType
 	}>();
 
 	const emit = defineEmits<{
