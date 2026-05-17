@@ -109,6 +109,8 @@ export const useSlotsStore = defineStore('slots', {
 		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
 
 		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
+
+		getPatchParams: (state) => (slot: SlotLabel) => state.slots[slot]?.patch?.patchParams ?? null,
 	},
 
 	actions: {
