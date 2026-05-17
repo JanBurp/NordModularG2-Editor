@@ -127,6 +127,8 @@ static int parse_location(cJSON *args, int idx) {
 	return (s && strcmp(s, "va") == 0) ? 1 : 0;
 }
 
+static cJSON *g_startup_cache = NULL;
+
 /* ── command execution ─────────────────────────────────────────────────── */
 
 static void execute_cmd(const char *line) {
@@ -314,7 +316,9 @@ static void execute_cmd(const char *line) {
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "startup") == 0) {
-		data = g2_startup();
+		data = g_startup_cache;
+		g_startup_cache = NULL;
+		if (!data) data = g2_startup();
 		ret = data ? G2_OK : G2_ERR;
 	}
 
@@ -394,6 +398,9 @@ int g2_daemon_run(output_format_t format) {
 	while (daemon_running && g2_connect_silent() < 0)
 		usleep(100000);
 	if (!daemon_running) { pthread_detach(reader); return 0; }
+
+	/* Run startup queries before COMM is armed — no unsolicited events yet. */
+	g_startup_cache = g2_startup();
 
 	g2_listener_start();
 	g2_rearm();   /* sends START_COMM; ACK consumed below */

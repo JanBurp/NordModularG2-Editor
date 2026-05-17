@@ -284,17 +284,16 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
     actual_slot = slot;
 
-    /* Flush any stale G2 data left in the USB FIFO from a previous command */
-    {
-        uint8_t stale[16]; int n, stale_count = 0;
+    /* Flush stale G2 data from a previous command (direct mode only;
+     * listener thread drains EP 0x81 continuously, so no flush needed). */
+    if (!g2_listener_active) {
+        uint8_t stale[16]; int n;
         while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            stale_count++;
             if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
                 uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
                 if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
             }
         }
-        (void)stale_count;
     }
 
     /* Step 1: Get version for the slot */
