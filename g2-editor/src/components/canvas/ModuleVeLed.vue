@@ -1,5 +1,17 @@
 <template>
-	<template v-if="ve.type === 'ledArray'">
+	<template v-if="ve.type === 'ledGroup'">
+		<rect
+			v-for="(led, i) in (ve.leds as any)"
+			:key="i"
+			:x="led.x + 1"
+			:y="led.y"
+			:width="ve.w"
+			height="6.5"
+			:fill="activeStep !== 255 && i <= activeStep ? '#0F0' : '#040'"
+			stroke="#000"
+		/>
+	</template>
+	<template v-else-if="ve.type === 'ledArray'">
 		<rect
 			v-for="i in ve.cnt || 1"
 			:key="`led-${i}`"
