@@ -576,6 +576,22 @@ void g2_rearm(void) {
     }
 }
 
+void g2_stop_comm(void) {
+    uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
+    send_system_data(0x41, stop, 2);
+    uint8_t buf[16];
+    for (int tries = 0; tries < 20; tries++) {
+        int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) break;
+        if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)buf[1] << 8) | buf[2];
+            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+        } else {
+            break;  /* EMBEDDED — STOP_COMM ACK */
+        }
+    }
+}
+
 /* Check if bulk payload is the all-slots version update that stops the stream */
 static int bulk_needs_rearm(const uint8_t *bulk, int size) {
     return size > 3 && bulk[1] == 0x04 && bulk[2] == 0x40 && bulk[3] == 0x1F;

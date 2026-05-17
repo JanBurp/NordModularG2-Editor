@@ -66,4 +66,8 @@ int g2_drain_pending(void);
  * When listener is active, the ACK is read by the listener — no recv call here. */
 void g2_rearm(void);
 
+/* Send STOP_COMM and read the embedded ACK. Call before running direct queries
+ * to guarantee the G2 is not streaming (matches Delphi InitSeq step 2). */
+void g2_stop_comm(void);
+
 #endif /* G2_IO_H */
