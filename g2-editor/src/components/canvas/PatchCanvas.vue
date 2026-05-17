@@ -12,6 +12,8 @@
 				handleCanvasClick();
 			"
 		>
+			<text :font-size="64" x="50%" y="50%" width="100%" height="100%" text-anchor="middle">{{ getAreaByShort(area) }}</text>
+
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index + '-' + mod.uname"
@@ -56,6 +58,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
+	import { getAreaByShort } from '../../constants/ui';
 
 	const props = defineProps({
 		modules: {

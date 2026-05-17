@@ -7,12 +7,12 @@
  * prf2 file is very similar but contains extra section type 0x11 at beginning which contains slot names and slot data
  */
 
-import type { Area, Cable, Patch, PatchDescription } from '../types/patch';
+import type { Area, Cable, Patch, PatchDescription, PatchParamVariation } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
 import { getModule } from '../renderer/nmg2mods';
 
-export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription };
+export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation };
 
 function pch2_(data: ArrayBuffer) {
 	const slots: string[] = [];
@@ -37,6 +37,7 @@ function pch2_(data: ArrayBuffer) {
 	let rawData: Uint8Array = new Uint8Array(0);
 	let bitofs = 0;
 	let bitbuf: number[] = [];
+	const patchParamsData: PatchParamVariation[][] = [];
 
 	this.getAllModules = (areaIdx: number) => areas[areaIdx].modules;
 
@@ -207,7 +208,42 @@ function pch2_(data: ArrayBuffer) {
 		const areaIdx = getBits(2, data);
 		const nummod = getBits(8);
 		const numvar = getBits(8);
-		if (areaIdx > 1) return 'Patch settings, whatever';
+		if (areaIdx === 2) {
+			const varCount = numvar;
+			const slotIdx = aof >> 1;
+			const params: PatchParamVariation[] = [];
+			const vp = (v: number): PatchParamVariation => {
+				if (!params[v]) params[v] = { patchVol: 0, activeMuted: 0, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0 };
+				return params[v];
+			};
+			// Section 1: Morphs — consume bits, don't store
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				getBits(8); // variation
+				for (let j = 0; j < 16; j++) getBits(7); // 8 dials + 8 modes
+			}
+			// Section 2: Volume
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).patchVol = getBits(7); vp(v).activeMuted = getBits(7); }
+			// Section 3: Glide
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).glide = getBits(7); vp(v).glideTime = getBits(7); }
+			// Section 4: Bend
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).bend = getBits(7); vp(v).semi = getBits(7); }
+			// Section 5: Vibrato
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).vibrato = getBits(7); vp(v).cents = getBits(7); vp(v).rate = getBits(7); }
+			// Section 6: Arp
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).arpeggiator = getBits(7); vp(v).arpTime = getBits(7); vp(v).arpType = getBits(7); vp(v).octaves = getBits(7); }
+			// Section 7: Octave shift
+			getBits(8); getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).octaveShift = getBits(7); vp(v).sustain = getBits(7); }
+			patchParamsData[slotIdx] = params;
+			return 'Patch settings: varCount=' + varCount;
+		}
+		if (areaIdx > 2) return 'Area=' + areaIdx;
 		areas[aof + areaIdx].paramaterDataOfs = data.byteOffset;
 		areas[aof + areaIdx].nummod = nummod;
 		for (let i = 0; i < nummod; i++) {
@@ -291,6 +327,8 @@ function pch2_(data: ArrayBuffer) {
 	}
 
 	this.getpd = (slot: number) => pd[slot];
+
+	this.getPatchParams = (slot: number) => patchParamsData[slot] ?? null;
 
 	this.writeParameters = (areanum: number) => {
 		const area = areas[areanum];
@@ -408,6 +446,7 @@ export class PatchParser {
 		return {
 			areas: [this.patcher.getArea(0) as Area, this.patcher.getArea(1) as Area],
 			description: this.patcher.getpd(0),
+			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 		};
 	}
 }
