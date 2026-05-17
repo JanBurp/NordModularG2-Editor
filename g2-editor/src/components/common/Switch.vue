@@ -99,10 +99,6 @@
 		white-space: nowrap;
 	}
 
-	.switch-btn:hover {
-		border-color: #666;
-	}
-
 	.switch-btn.active {
 		background: #6df2f2;
 	}

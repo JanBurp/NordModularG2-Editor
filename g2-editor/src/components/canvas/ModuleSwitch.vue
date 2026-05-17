@@ -91,15 +91,32 @@
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
 	}>();
 
-	const { paramDef, names, displayNames, activeIndex, singleButtonMode, activeOptionName, mode, bmp, hasBitmap, maskh, width, itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue, onContextMenu } =
-		useSwitch(
-			toRef(props, 'param'),
-			toRef(props, 'value'),
-			computed(() => props.label),
-			toRef(props, 'paramIndex'),
-			(index, value) => emit('change', index, value),
-			(info) => emit('paramLabelEdit', info),
-		);
+	const {
+		paramDef,
+		names,
+		displayNames,
+		activeIndex,
+		singleButtonMode,
+		activeOptionName,
+		mode,
+		bmp,
+		hasBitmap,
+		maskh,
+		width,
+		itemsPerRow,
+		getButtonX,
+		getButtonY,
+		onButtonClick,
+		onCycleValue,
+		onContextMenu,
+	} = useSwitch(
+		toRef(props, 'param'),
+		toRef(props, 'value'),
+		computed(() => props.label),
+		toRef(props, 'paramIndex'),
+		(index, value) => emit('change', index, value),
+		(info) => emit('paramLabelEdit', info),
+	);
 </script>
 <style scoped>
 	.switch-control {
@@ -109,10 +126,6 @@
 	.switch-bitmap {
 		cursor: pointer;
 		overflow: hidden;
-	}
-
-	.switch-bitmap:hover {
-		opacity: 0.8;
 	}
 
 	.switch-bitmap.active {
