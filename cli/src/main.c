@@ -139,6 +139,28 @@ static int cmd_get_patch(int argc, char **argv, int i) {
     return 0;
 }
 
+static int cmd_get_resources(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("slot and location (va|fx) required", output_format);
+        else
+            fprintf(stderr, "Error: slot and location (va|fx) required\n");
+        return 1;
+    }
+    int loc = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    cJSON *result = g2_get_resources(argv[i + 1], loc);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get resources", output_format);
+        else
+            fprintf(stderr, "Failed to get resources\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
 static int cmd_get_patch_file(int argc, char **argv, int i) {
     if (i + 1 >= argc) {
         if (output_format == OUTPUT_JSON)
@@ -513,6 +535,7 @@ static const cmd_entry_t commands[] = {
     { "device",           cmd_device           },
     { "get-patch",        cmd_get_patch        },
     { "get-patch-file",   cmd_get_patch_file   },
+    { "get-resources",    cmd_get_resources    },
     { "list",             cmd_list             },
     { "slot",             cmd_slot             },
     { "variation",        cmd_variation        },
