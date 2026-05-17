@@ -1,13 +1,13 @@
 import type { ModuleInstance, Patch } from '@/types';
+import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
+import { resolveColumnCollisions } from './slotHelpers';
 import { useDeviceStore } from './device';
 import { useUiStore } from './ui';
-import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
-import { resolveColumnCollisions } from './slotHelpers';
 
 export type { SlotLabel };
 
@@ -72,6 +72,8 @@ export const useSlotsStore = defineStore('slots', {
 		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
 
 		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
+
+		getPatchParams: (state) => (slot: SlotLabel) => state.slots[slot]?.patch?.patchParams ?? null,
 	},
 
 	actions: {
@@ -529,6 +531,15 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = null;
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
+		},
+
+		setPatchParam(variation: number, key: string, value: number): void {
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
+			const params = this.slots[slot]?.patch?.patchParams;
+			if (params?.[variation]) {
+				(params[variation] as Record<string, number>)[key] = value;
+				this.slots[slot].rawHex = null;
+			}
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {

@@ -42,7 +42,6 @@ export function usePatchOperations() {
 
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (device.status !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
@@ -55,7 +54,6 @@ export function usePatchOperations() {
 	}
 
 	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (device.status !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;

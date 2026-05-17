@@ -16,9 +16,14 @@ export const PANE_TAB_OPTIONS = [
 ];
 
 export const AREA_OPTIONS = [
-	{ value: 1, label: 'Voice' },
-	{ value: 0, label: 'FX' },
+	{ value: 1, short: 'va', label: 'Voice' },
+	{ value: 0, short: 'fx', label: 'FX' },
 ];
+
+export const getAreaByShort = (short: string): string => {
+	if (short === 'va') return AREA_OPTIONS[0].label;
+	return AREA_OPTIONS[1].label
+}
 
 export const VARIATION_OPTIONS = Array.from({ length: 9 }, (_, i) => ({
 	label: i < 8 ? String(i + 1) : 'INIT ',

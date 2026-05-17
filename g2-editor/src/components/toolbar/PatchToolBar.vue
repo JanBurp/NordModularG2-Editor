@@ -21,15 +21,21 @@
 
 		<ToolBarDivider />
 
+		<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
+		<Switch
+			class="mt-3"
+			:value="patchParams?.[uiStore.variation]?.activeMuted ?? 1"
+			paramType="ActiveMonitor"
+			@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)"
+		/>
+
+		<ToolBarDivider />
+
 		<ColorPicker />
 
 		<ToolBarDivider />
 
 		<CableVisibilitySelector />
-
-		<ToolBarDivider />
-
-		<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
 	</ToolBar>
 </template>
 
@@ -43,11 +49,12 @@
 	import Select from '../common/Select.vue';
 	import ColorPicker from '../common/ColorPicker.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
-	import CPU from './CPU.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
+	import Knob from '../common/Knob.vue';
+	import Switch from '../common/Switch.vue';
 
 	defineProps<{ patchName: string }>();
 	const emit = defineEmits<{ variationClick: [value: string | number | (string | number)[]] }>();
@@ -56,6 +63,7 @@
 	const uiStore = useUiStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.activeSlot));
 
 	const selectedCategory = ref<number>(0);
 	watch(
