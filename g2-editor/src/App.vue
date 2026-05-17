@@ -21,6 +21,8 @@
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
+				<ToolBarDivider />
+				<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
 			</template>
 
 			<BtnGroup
@@ -139,6 +141,7 @@
 	import { useContextMenu } from './composables/useContextMenu';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
+	import CPU from './components/toolbar/CPU.vue';
 
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
