@@ -80,6 +80,7 @@ function expectPatchEqual(a: Patch, b: Patch) {
 		expect(cabsB).toEqual(cabsA);
 	}
 	expect(b.description).toEqual(a.description);
+	expect(b.patchParams).toEqual(a.patchParams);
 }
 
 /**
@@ -528,5 +529,67 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		expect(patchB.areas[1].modules).toHaveLength(2);
 		expect(patchB.areas[1].cableList ?? []).toHaveLength(1);
 		expectPatchEqual(patch, patchB);
+	});
+});
+
+describe('patchParams round-trip', () => {
+	it('patchVol and activeMuted survive parse → serialize → parse', () => {
+		const { name, rawHex, patch: patchA } = loadFixture('Analogue NL2.pch2');
+		expect(patchA.patchParams).toBeDefined();
+		// Verified from binary: variation 0 patchVol=100, activeMuted=1
+		expect(patchA.patchParams![0].patchVol).toBe(100);
+		expect(patchA.patchParams![0].activeMuted).toBe(1);
+
+		patchA.patchParams![0].patchVol = 75;
+		patchA.patchParams![1].patchVol = 50;
+		patchA.patchParams![0].activeMuted = 0;
+		const origV2Vol = patchA.patchParams![2].patchVol;
+
+		const newHex = serializePatch(name, patchA, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.patchParams![0].patchVol).toBe(75);
+		expect(patchB.patchParams![1].patchVol).toBe(50);
+		expect(patchB.patchParams![0].activeMuted).toBe(0);
+		expect(patchB.patchParams![2].patchVol).toBe(origV2Vol);
+	});
+
+	it('morph data survives chained serialization', () => {
+		// Analogue NL2 has non-zero morphs (dial 7 = 43 at variation 0)
+		const { name, rawHex, patch: patchA } = loadFixture('Analogue NL2.pch2');
+		patchA.patchParams![0].patchVol = 99;
+
+		const hex1 = serializePatch(name, patchA, rawHex);
+		const patchB = parsePatchFromRawHex(name, hex1);
+		expect(patchB.patchParams![0].patchVol).toBe(99);
+
+		// Re-serialize using hex1 as template — morphs now come from hex1
+		const hex2 = serializePatch(name, patchB, hex1);
+		const patchC = parsePatchFromRawHex(name, hex2);
+		expect(patchC.patchParams![0].patchVol).toBe(99);
+		// Identical output means morphs were preserved intact through the chain
+		expect(hex2).toBe(hex1);
+	});
+
+	it('all PatchParamVariation fields survive round-trip', () => {
+		const { name, rawHex, patch: patchA } = loadFixture('DXBass FM4.pch2');
+		expect(patchA.patchParams).toBeDefined();
+		const snap = { ...patchA.patchParams![0] };
+
+		patchA.patchParams![0].glide = 1;
+		patchA.patchParams![0].glideTime = 30;
+		patchA.patchParams![0].bend = 0;
+		patchA.patchParams![0].arpeggiator = 1;
+
+		const newHex = serializePatch(name, patchA, rawHex);
+		const patchB = parsePatchFromRawHex(name, newHex);
+		const r = patchB.patchParams![0];
+
+		expect(r.glide).toBe(1);
+		expect(r.glideTime).toBe(30);
+		expect(r.bend).toBe(0);
+		expect(r.arpeggiator).toBe(1);
+		expect(r.patchVol).toBe(snap.patchVol);
+		expect(r.activeMuted).toBe(snap.activeMuted);
 	});
 });
