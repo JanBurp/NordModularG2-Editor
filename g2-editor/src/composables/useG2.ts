@@ -82,12 +82,32 @@ export function useG2() {
 				return `synth mode=${ev.mode} name=${ev.synthName}`;
 			case 'perf_settings':
 				return `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`;
+			case 'resources_used':
+				return `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`;
 			case 'raw_interrupt':
 				return `intr: ${ev.hex}`;
 			case 'raw_bulk':
 				return `bulk[${ev.size}]: ${ev.hex}`;
 			default:
 				return ev.type ?? '(unknown)';
+		}
+	}
+
+	async function fetchSlotResources(slotIndex: number): Promise<void> {
+		if (store.status !== 'connected') return;
+		const slotLabel = SLOT_LABELS[slotIndex];
+		if (!slotLabel) return;
+		try {
+			const [vaOut, fxOut] = await Promise.all([
+				window.cli.run(['get-resources', slotLabel, 'va']),
+				window.cli.run(['get-resources', slotLabel, 'fx']),
+			]);
+			const vaBytes: number[] = JSON.parse(vaOut).bytes;
+			const fxBytes: number[] = JSON.parse(fxOut).bytes;
+			if (Array.isArray(vaBytes)) store.updateResources(slotIndex, vaBytes);
+			if (Array.isArray(fxBytes)) store.updateResources(slotIndex, fxBytes);
+		} catch {
+			// patch may not be loaded in this slot
 		}
 	}
 
@@ -186,6 +206,16 @@ export function useG2() {
 					log('←', 'Watch', formatWatchEvent(ev), 'volume');
 					return;
 				}
+				if (ev.type === 'patch_update') {
+					log('←', 'Watch', `patch_update slot=${ev.slot}`);
+					fetchSlotResources(ev.slot as number);
+					return;
+				}
+				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
+					store.updateResources(ev.slot, ev.data);
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
 
 				const category: UsbLogEntry['category'] =
 					ev.type === 'param_change' || ev.type === 'patch_param'
@@ -228,6 +258,8 @@ export function useG2() {
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
+			const activeIdx = store.device?.slots.findIndex((s) => s.active) ?? -1;
+			if (activeIdx >= 0) fetchSlotResources(activeIdx);
 		} catch (e: any) {
 			store.status = 'disconnected';
 			log('←', 'Connect', `G2 not found: ${e.message}`);

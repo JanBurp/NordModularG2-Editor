@@ -22,7 +22,7 @@
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 				<ToolBarDivider />
-				<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
+				<CPU :va="device.activeSlotResources.va" :fx="device.activeSlotResources.fx" />
 			</template>
 
 			<BtnGroup
