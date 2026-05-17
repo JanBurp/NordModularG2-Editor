@@ -26,10 +26,6 @@
 		<ToolBarDivider />
 
 		<CableVisibilitySelector />
-
-		<ToolBarDivider />
-
-		<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
 	</ToolBar>
 </template>
 
@@ -43,7 +39,6 @@
 	import Select from '../common/Select.vue';
 	import ColorPicker from '../common/ColorPicker.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
-	import CPU from './CPU.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
@@ -60,7 +55,9 @@
 	const selectedCategory = ref<number>(0);
 	watch(
 		() => (currentPatch.value as any)?.description?.category,
-		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		(cat) => {
+			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+		},
 		{ immediate: true },
 	);
 	watch(selectedCategory, (cat) => {
