@@ -12,6 +12,20 @@ import { useUiStore } from './ui';
 
 export type { SlotLabel };
 
+const _paramDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+
+function scheduleSend(key: string, cmd: string[], delayMs = 80): void {
+	const existing = _paramDebounceTimers.get(key);
+	if (existing) clearTimeout(existing);
+	_paramDebounceTimers.set(
+		key,
+		setTimeout(() => {
+			_paramDebounceTimers.delete(key);
+			window.cli.run(cmd);
+		}, delayMs),
+	);
+}
+
 interface SlotEntry {
 	name: string;
 	loading: boolean;
@@ -354,7 +368,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = null;
 
 			const location = area === 'voice' ? 'va' : 'fx';
-			await window.cli.run(['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+			scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
@@ -543,7 +557,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
-			await window.cli.run(['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
+			scheduleSend(`${slot}:patch:2:${paramIdx}:${variation}`, ['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
