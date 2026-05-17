@@ -108,13 +108,7 @@ void test_startup_sequence(void) {
 }
 
 static void watch_for_ms(int ms) {
-    struct itimerval t = { {0,0}, {ms/1000, (ms%1000)*1000} };
-    g2_watch_running = 1;
-    signal(SIGALRM, g2_watch_stop);
-    setitimer(ITIMER_REAL, &t, NULL);
-    g2_watch(OUTPUT_DEFAULT, 0);
-    t.it_value.tv_sec = 0; t.it_value.tv_usec = 0;
-    setitimer(ITIMER_REAL, &t, NULL);
+    usleep((useconds_t)ms * 1000);
 }
 
 /*

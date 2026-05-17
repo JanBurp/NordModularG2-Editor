@@ -85,7 +85,7 @@ This suggests the STOP_COMM/START_COMM around module/cable commands may be overl
 
 ---
 
-## Investigation: Drain-Only Approach (May 2025)
+## Investigation: Drain-Only Approach (May 2026)
 
 Attempted removing disarm/rearm from daemon commands, replacing with `g2_drain_pending()`
 before and after each send. Also added BULK_REARM detection to drain (re-arms after
