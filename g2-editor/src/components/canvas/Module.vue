@@ -49,6 +49,12 @@
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 			<LevelMeter v-else-if="entry.ve.type === 'vu'" :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
+			<ModuleVeLed
+				v-else-if="entry.ve.type === 'ledGroup'"
+				:ve="entry.ve"
+				:led-on="false"
+				:active-step="ledStateMap[entry.key]?.step ?? 255"
+			/>
 		</template>
 
 		<!-- Modes -->
@@ -219,6 +225,7 @@
 		let ledIdx = 0;
 		let ledArrayIdx = 0;
 		let vuIdx = 0;
+		let ledGroupIdx = 0;
 		let veIdx = 0;
 		for (const ve of moduleDef.value.ve) {
 			if (ve.type === 'led') {
@@ -230,6 +237,9 @@
 			} else if (ve.type === 'vu') {
 				entries.push({ ve, groupId: vuIdx, key: `vu-${vuIdx}` });
 				vuIdx++;
+			} else if (ve.type === 'ledGroup') {
+				entries.push({ ve, groupId: ledGroupIdx, key: `ledGroup-${ledGroupIdx}` });
+				ledGroupIdx++;
 			} else {
 				entries.push({ ve, groupId: 0, key: `ve-${veIdx}` });
 				veIdx++;
@@ -244,7 +254,7 @@
 		const idx = moduleIdx.value;
 		const map: Record<string, { on: boolean; step: number }> = {};
 		for (const entry of visualElementsGroupedLeds.value) {
-			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray' || entry.ve.type === 'vu') {
+			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray' || entry.ve.type === 'vu' || entry.ve.type === 'ledGroup') {
 				map[entry.key] = {
 					on: ledStore.getLedState(area, idx, entry.groupId),
 					step: ledStore.getStripValue(area, idx, entry.groupId),

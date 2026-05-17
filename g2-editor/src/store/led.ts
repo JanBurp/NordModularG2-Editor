@@ -49,14 +49,14 @@ export const useLedStore = defineStore('led', () => {
 
 				const ves = modDef.ve || [];
 				// Modules with ledArray or vu VEs belong entirely to volume_data (0x3A)
-				const hasStrip = ves.some((v: any) => v.type === 'ledArray' || v.type === 'vu');
+				const hasStrip = ves.some((v: any) => v.type === 'ledArray' || v.type === 'vu' || v.type === 'ledGroup');
 				const ledList = areaName === 'fx' ? newFxList : newVaList;
 				const stripList = areaName === 'fx' ? newFxStripList : newVaStripList;
 
 				if (hasStrip) {
 					let stripGroupId = 0;
 					for (const ve of ves) {
-						if (ve.type === 'ledArray' || ve.type === 'vu') {
+						if (ve.type === 'ledArray' || ve.type === 'vu' || ve.type === 'ledGroup') {
 							stripList.push({ moduleIndex: mod.index, groupId: stripGroupId++, area: areaName });
 						}
 					}
