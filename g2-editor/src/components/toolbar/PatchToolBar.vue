@@ -21,6 +21,11 @@
 
 		<ToolBarDivider />
 
+		<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
+		<Switch :value="patchParams?.[uiStore.variation]?.activeMuted ?? 1" paramType="ActiveMonitor" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)" />
+
+		<ToolBarDivider />
+
 		<ColorPicker />
 
 		<ToolBarDivider />
@@ -43,6 +48,8 @@
 	import { useUiStore } from '../../store/ui';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
+	import Knob from '../common/Knob.vue';
+	import Switch from '../common/Switch.vue';
 
 	defineProps<{ patchName: string }>();
 	const emit = defineEmits<{ variationClick: [value: string | number | (string | number)[]] }>();
@@ -51,6 +58,7 @@
 	const uiStore = useUiStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.activeSlot));
 
 	const selectedCategory = ref<number>(0);
 	watch(
