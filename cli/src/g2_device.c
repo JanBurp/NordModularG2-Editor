@@ -53,60 +53,41 @@ int g2_send_init(void) {
 
     if (ensure_connected(1) < 0) return G2_ERR_CONNECT;
 
-    /* Drain any stale notifications before sending CMD_INIT so we don't
-     * mistake a leftover notification for the init response. */
-    g2_drain_pending();
-
+    /* Send CMD_INIT without draining first. Draining with a finite timeout
+     * loops forever when the G2 is streaming (~17 ms intervals). CMD_INIT
+     * itself stops streaming; stale events are consumed in the read loop. */
     if (send_init_msg() < 0) {
         g2_err("Failed to send init message\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
 
-    int ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) {
-        g2_err("No response to init message\n");
-        return G2_ERR_RECV;
-    }
+    /* Read responses until RESPONSE_TYPE_INIT is found. Streaming events
+     * may arrive before the init response if the G2 was streaming. */
+    for (int tries = 0; tries < 10; tries++) {
+        int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) {
+            g2_err("No response to init message\n");
+            return G2_ERR_RECV;
+        }
 
-    if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        g2_err("Unexpected response type to init: %02x\n", response[0]);
-        return G2_ERR_RECV;
-    }
+        if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
 
-    uint16_t size = ((uint16_t)response[1] << 8) | response[2];
-    if (size > 0) {
+        uint16_t size = ((uint16_t)response[1] << 8) | response[2];
+        if (size == 0) continue;
+
         uint8_t *data = malloc(size);
         if (!data) return G2_ERR_NO_MEMORY;
         recv_bulk(data, size);
         uint8_t first = data[0];
         free(data);
-        if (first != RESPONSE_TYPE_INIT) {
-            /* Stale notification bulk arrived instead of the init response
-             * (e.g. after a daemon session left the G2 in streaming mode).
-             * Drain remaining notifications and retry CMD_INIT once. */
-            g2_drain_pending();
-            if (send_init_msg() < 0) { g2_err("Failed to resend init\n"); return G2_ERR_SEND; }
-            usleep(USB_SEND_DELAY_US);
-            ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-            if (ret <= 0) { g2_err("No response to init retry\n"); return G2_ERR_RECV; }
-            if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
-            size = ((uint16_t)response[1] << 8) | response[2];
-            if (size > 0) {
-                data = malloc(size);
-                if (!data) return G2_ERR_NO_MEMORY;
-                recv_bulk(data, size);
-                first = data[0];
-                free(data);
-                if (first != RESPONSE_TYPE_INIT) {
-                    g2_err("Unexpected init response data: %02x\n", first);
-                    return G2_ERR_RECV;
-                }
-            }
-        }
+
+        if (first == RESPONSE_TYPE_INIT) return G2_OK;
+        /* else: stale streaming bulk — discard and keep reading */
     }
 
-    return G2_OK;
+    g2_err("Did not receive init response after retries\n");
+    return G2_ERR_RECV;
 }
 
 cJSON *query_perf_settings(int mode, const char *type) {
@@ -157,9 +138,18 @@ cJSON *g2_device_info(int debug) {
         goto cleanup;
     }
 
-    /* Drain stale notifications left over from any prior command or session
-     * before issuing GET_SYNTH_SETTINGS — same guard used in g2_get_patch(). */
-    g2_drain_pending();
+    /* Flush stale data before querying (direct mode only; same pattern as g2_get_patch).
+     * Avoids g2_drain_pending() which can accidentally call g2_rearm() and start
+     * streaming without a listener, contaminating subsequent query responses. */
+    if (!g2_listener_active) {
+        uint8_t stale[16]; int n;
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
+    }
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {

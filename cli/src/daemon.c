@@ -128,6 +128,7 @@ static int parse_location(cJSON *args, int idx) {
 }
 
 static cJSON *g_startup_cache = NULL;
+static cJSON *g_device_cache  = NULL;
 
 /* ── command execution ─────────────────────────────────────────────────── */
 
@@ -312,7 +313,9 @@ static void execute_cmd(const char *line) {
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "device") == 0) {
-		data = g2_device_info(0);
+		data = g_device_cache;
+		g_device_cache = NULL;
+		if (!data) data = g2_device_info(0);
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "startup") == 0) {
@@ -399,8 +402,15 @@ int g2_daemon_run(output_format_t format) {
 		usleep(100000);
 	if (!daemon_running) { pthread_detach(reader); return 0; }
 
+	/* Reset G2 state and explicitly stop streaming (matches Delphi InitSeq steps 1-2). */
+	g2_send_init();
+	g2_stop_comm();
+
 	/* Run startup queries before COMM is armed — no unsolicited events yet. */
 	g_startup_cache = g2_startup();
+	g_device_cache  = g_startup_cache
+	    ? cJSON_Duplicate(cJSON_GetObjectItem(g_startup_cache, "device"), 1)
+	    : NULL;
 
 	g2_listener_start();
 	g2_rearm();   /* sends START_COMM; ACK consumed below */
