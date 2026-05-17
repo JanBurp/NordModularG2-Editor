@@ -564,6 +564,12 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
 		},
 
+		setPatchParam(variation: number, key: string, value: number): void {
+			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
+			const params = this.slots[slot]?.patch?.patchParams;
+			if (params?.[variation]) (params[variation] as Record<string, number>)[key] = value;
+		},
+
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
 			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const patch = this.slots[slot].patch;
