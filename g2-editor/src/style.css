@@ -139,3 +139,12 @@ body {
 	pointer-events: none;
 	border: 3px solid rgba(30, 30, 30, 0.8);
 }
+
+.module-bevel {
+	background:
+		linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(210,210,210,0.15) 30%, transparent 100%) 0 0 / 100% 3px no-repeat,
+		linear-gradient(to bottom, transparent 0%, rgba(127,127,127,0.25) 80%, rgba(16,16,16,1) 100%) 0 100% / 100% 3px no-repeat,
+		linear-gradient(to right, rgba(16,16,16,1) 0%, rgba(127,127,127,0.75) 20%, transparent 100%) 0 0 / 3px 100% no-repeat,
+		linear-gradient(to right, transparent 0%, rgba(210,210,210,0.15) 70%, rgba(255,255,255,1) 100%) 100% 0 / 3px 100% no-repeat,
+		#CCC;
+}
