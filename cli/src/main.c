@@ -140,15 +140,14 @@ static int cmd_get_patch(int argc, char **argv, int i) {
 }
 
 static int cmd_get_resources(int argc, char **argv, int i) {
-    if (i + 2 >= argc) {
+    if (i + 1 >= argc) {
         if (output_format == OUTPUT_JSON)
-            output_error_json("slot and location (va|fx) required", output_format);
+            output_error_json("slot required (A, B, C, or D)", output_format);
         else
-            fprintf(stderr, "Error: slot and location (va|fx) required\n");
+            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
         return 1;
     }
-    int loc = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
-    cJSON *result = g2_get_resources(argv[i + 1], loc);
+    cJSON *result = g2_get_resources(argv[i + 1]);
     if (!result) {
         if (output_format == OUTPUT_JSON)
             output_error_json("Failed to get resources", output_format);

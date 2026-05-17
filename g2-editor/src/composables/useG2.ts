@@ -93,21 +93,22 @@ export function useG2() {
 		}
 	}
 
+	const pendingResourceFetch = new Set<number>();
+
 	async function fetchSlotResources(slotIndex: number): Promise<void> {
 		if (store.status !== 'connected') return;
+		if (pendingResourceFetch.has(slotIndex)) return;
 		const slotLabel = SLOT_LABELS[slotIndex];
 		if (!slotLabel) return;
+		pendingResourceFetch.add(slotIndex);
 		try {
-			const [vaOut, fxOut] = await Promise.all([
-				window.cli.run(['get-resources', slotLabel, 'va']),
-				window.cli.run(['get-resources', slotLabel, 'fx']),
-			]);
-			const vaBytes: number[] = JSON.parse(vaOut).bytes;
-			const fxBytes: number[] = JSON.parse(fxOut).bytes;
-			if (Array.isArray(vaBytes)) store.updateResources(slotIndex, vaBytes);
-			if (Array.isArray(fxBytes)) store.updateResources(slotIndex, fxBytes);
+			const out = await window.cli.run(['get-resources', slotLabel]);
+			const parsed = JSON.parse(out) as { bytes: number[] };
+			if (Array.isArray(parsed.bytes)) store.updateResources(slotIndex, parsed.bytes);
 		} catch {
 			// patch may not be loaded in this slot
+		} finally {
+			pendingResourceFetch.delete(slotIndex);
 		}
 	}
 

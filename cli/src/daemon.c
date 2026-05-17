@@ -294,10 +294,8 @@ static void execute_cmd(const char *line) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
 
-	} else if (strcmp(cmd, "get-resources") == 0 && n >= 2) {
-		const char *loc_str = arg_s(args, 1);
-		int loc = (loc_str && strcmp(loc_str, "va") == 0) ? 1 : 0;
-		data = g2_get_resources(arg_s(args, 0), loc);
+	} else if (strcmp(cmd, "get-resources") == 0 && n >= 1) {
+		data = g2_get_resources(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "list") == 0) {

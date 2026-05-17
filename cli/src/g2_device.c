@@ -1451,29 +1451,18 @@ int g2_set_param(int slot, int location, int module_id,
     /* No recv_interrupt — WRITE_NO_RESP */
 }
 
-cJSON *g2_get_resources(const char *slot_str, int location) {
+/* GET_RESOURCES_USED returns one bulk packet whose payload may contain two
+ * area blocks packed as: [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
+ * Return all payload bytes (CRC stripped) so the caller can parse both. */
+cJSON *g2_get_resources(const char *slot_str) {
     uint8_t interruptResp[16] = {0};
-    uint8_t *bulk = NULL;
-    uint16_t bulkSize = 0;
     uint8_t version;
     int ret;
-    cJSON *result = NULL;
 
     if (ensure_connected(1) < 0) { g2_err("Failed to connect to G2\n"); return NULL; }
 
     int slot = parse_slot(slot_str);
     if (slot < 0 || slot > 3) { g2_err("Invalid slot: %s\n", slot_str); return NULL; }
-
-    /* Drain stale data */
-    {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
 
     /* Get patch version */
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
@@ -1483,8 +1472,7 @@ cJSON *g2_get_resources(const char *slot_str, int location) {
     if (ret <= 0) { g2_err("No version response\n"); return NULL; }
     version = interruptResp[6];
 
-    /* Send GET_RESOURCES_USED (0x71) with location byte */
-    uint8_t loc = (uint8_t)location;
+    uint8_t loc = 0;
     if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
     usleep(USB_SEND_DELAY_US);
 
@@ -1493,18 +1481,19 @@ cJSON *g2_get_resources(const char *slot_str, int location) {
         g2_err("Unexpected response for get-resources\n"); return NULL;
     }
 
-    bulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-    if (bulkSize < 4) { g2_err("get-resources: bulk too small\n"); return NULL; }
-    bulk = malloc(bulkSize);
+    uint16_t bulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+    if (bulkSize < 6) { g2_err("get-resources: bulk too small\n"); return NULL; }
+    uint8_t *bulk = malloc(bulkSize);
     if (!bulk) { g2_err("Memory allocation failed\n"); return NULL; }
 
     ret = recv_bulk(bulk, bulkSize);
-    if (ret <= 0) { g2_err("Failed to read resources bulk\n"); free(bulk); return NULL; }
+    if (ret < 6) { free(bulk); g2_err("Failed to read resources bulk\n"); return NULL; }
 
-    /* Payload starts at bulk[4]: [location_byte, ...27 bytes] */
-    result = cJSON_CreateObject();
+    /* Payload: bulk[4..ret-3], last 2 bytes are CRC (same as watch event handler). */
+    cJSON *result = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateArray();
-    for (int i = 4; i < ret && i < bulkSize; i++)
+    int dataEnd = ret - 2;
+    for (int i = 4; i < dataEnd; i++)
         cJSON_AddItemToArray(arr, cJSON_CreateNumber(bulk[i]));
     cJSON_AddItemToObject(result, "bytes", arr);
 

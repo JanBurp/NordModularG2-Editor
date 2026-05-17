@@ -11,17 +11,18 @@ function emptySlotResources(): SlotResources {
 	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
 }
 
-// d is the bulk payload: d[0] = location, d[1..27] = TPatchLoadData (Delphi indices +1)
-function parseResourceCycles(d: number[]): number {
-	const red1 = d[2] + d[1] * 128;
-	const blue1 = d[4] + d[3] * 128;
+// d is the bulk payload. Each block: d[o]=location, d[o+1..o+27]=TPatchLoadData (Delphi indices +1).
+// Compound packets pack both areas: block0 at offset 0, 0x72 marker at offset 28, block1 at offset 29.
+function parseResourceCycles(d: number[], o: number): number {
+	const red1 = d[o + 2] + d[o + 1] * 128;
+	const blue1 = d[o + 4] + d[o + 3] * 128;
 	return Math.max(100 * red1 / 1372 + 100 * blue1 / 5000, 0);
 }
 
-function parseResourceMemory(d: number[]): number {
-	const internalMem = d[5];
-	const resource4 = d[9] + d[8] * 128;
-	const ram = d[22] * 16777216 + d[23] * 65536 + d[24] * 256 + d[25];
+function parseResourceMemory(d: number[], o: number): number {
+	const internalMem = d[o + 5];
+	const resource4 = d[o + 9] + d[o + 8] * 128;
+	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
 	return Math.max(Math.max(100 * internalMem / 128, 100 * ram / 260000), 100 * resource4 / 4315);
 }
 
@@ -178,11 +179,17 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		updateResources(slot: number, data: number[]) {
-			if (slot < 0 || slot > 3 || data.length < 28) return;
-			const location = data[0]; // 0 = FX, 1 = VA
-			const metrics = { cycles: parseResourceCycles(data), memory: parseResourceMemory(data) };
-			if (location === 1) this.slotResources[slot].va = metrics;
-			else if (location === 0) this.slotResources[slot].fx = metrics;
+			if (slot < 0 || slot > 3) return;
+			const applyBlock = (o: number) => {
+				if (data.length < o + 28) return;
+				const loc = data[o];
+				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
+				if (loc === 1) this.slotResources[slot].va = metrics;
+				else if (loc === 0) this.slotResources[slot].fx = metrics;
+			};
+			applyBlock(0);
+			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29
+			if (data.length >= 57 && data[28] === 0x72) applyBlock(29);
 		},
 	},
 });
