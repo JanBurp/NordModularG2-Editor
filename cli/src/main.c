@@ -404,12 +404,12 @@ static int cmd_set_module_mode(int argc, char **argv, int i) {
 
 static int cmd_set_param(int argc, char **argv, int i) {
     if (i + 6 >= argc) {
-        fprintf(stderr, "Usage: set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
+        fprintf(stderr, "Usage: set-param <slot> <va|fx|patch> <module-id> <param-idx> <value> <variation>\n");
         return 1;
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : (strcmp(argv[i + 2], "patch") == 0) ? 2 : 0;
     int mod_id   = atoi(argv[i + 3]);
     int param    = atoi(argv[i + 4]);
     int val      = atoi(argv[i + 5]);

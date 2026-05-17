@@ -118,7 +118,7 @@ static int arg_count(cJSON *args) {
 
 static int parse_location(cJSON *args, int idx) {
 	const char *s = arg_s(args, idx);
-	return (s && strcmp(s, "va") == 0) ? 1 : 0;
+	return (s && strcmp(s, "va") == 0) ? 1 : (s && strcmp(s, "patch") == 0) ? 2 : 0;
 }
 
 /* ── command execution (runs on USB thread via daemon_tick) ────────────── */

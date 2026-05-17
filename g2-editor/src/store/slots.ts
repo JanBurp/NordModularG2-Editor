@@ -1,4 +1,5 @@
-import type { ModuleInstance, Patch } from '@/types';
+import type { ModuleInstance, Patch, PatchParamVariation } from '@/types';
+import { PATCH_PARAM_KEYS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
@@ -533,13 +534,16 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
 		},
 
-		setPatchParam(variation: number, key: string, value: number): void {
+		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
 			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
 			const params = this.slots[slot]?.patch?.patchParams;
 			if (params?.[variation]) {
 				(params[variation] as Record<string, number>)[key] = value;
 				this.slots[slot].rawHex = null;
 			}
+			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
+			if (paramIdx < 0) return;
+			await window.cli.run(['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {

@@ -1419,7 +1419,7 @@ int g2_upload_patch(int slot, const char *filepath) {
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;
-    if (location < 0 || location > 1) return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 2) return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0)      return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
