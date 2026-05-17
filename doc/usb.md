@@ -784,3 +784,87 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `-10` | `G2_ERR_INVALID_PARAM` / `G2_ERR_FILE_OPEN` | Invalid parameter or file open failed |
 | `-11` | `G2_ERR_FILE_WRITE` | File write failed |
 | `-12` | `G2_ERR_NO_MEMORY` | Memory allocation failed |
+
+---
+
+## 14. Daemon Thread Architecture
+
+The daemon (`g2-cli daemon`) uses a listener-thread model matching the Delphi editor's `TListeningThread` pattern.
+
+### Components
+
+**`listener_thread` (background, in `g2_io.c`)**
+- Sole reader of EP 0x81 (interrupt) and EP 0x82 (bulk)
+- Tight loop: `recv_interrupt_with_retry(200 ms)` → on EXTENDED: `listener_recv_bulk()`
+- Pushes every message to a 64-entry mutex+condvar queue (`mq`)
+- Detects BULK_REARM (`bulk[1]==0x04, bulk[2]==0x40, bulk[3]==0x1F`): zeroes `g2_slot_version[]`, pushes `sentinel=2`
+- Detects disconnect (`LIBUSB_ERROR_NO_DEVICE`): pushes `sentinel=1`, exits
+- Updates `g2_slot_version[slot]` for embedded patch_version messages
+
+**Main thread (in `daemon.c`)**
+- Dequeues stdin commands; executes them via `execute_cmd()` → device functions
+- Device functions call `recv_interrupt()` which is shimmed: when `g2_listener_active==1`, pulls from the listener queue (skipping LED/vol bulk messages) instead of calling libusb directly
+- Between commands: pulls events from queue via `g2_msg_recv(100ms)`, routes by sentinel value
+
+### Message Flow
+
+```
+EP 0x81/0x82                listener_thread                    msg_queue
+  ←────────────────────────── recv_interrupt_with_retry()
+  ←────────────────────────── listener_recv_bulk() (if EXTENDED)
+                              push msg ──────────────────────────→  [msg]
+                                                                     [msg]
+                                                                     [msg]
+
+msg_queue                    Main thread (event loop)
+  [msg] ──────────────────→  sentinel==1?  → do_reconnect()
+  [msg] ──────────────────→  sentinel==2?  → emit version_update + g2_rearm()
+  [msg] ──────────────────→  normal msg   → g2_emit_event()
+
+msg_queue                    Main thread (inside execute_cmd)
+  [LED] ──────────────────→  recv_interrupt() shim: skip (LED/vol)
+  [LED] ──────────────────→  recv_interrupt() shim: skip
+  [resp] ─────────────────→  recv_interrupt() shim: return to device function
+```
+
+### Command Transaction (e.g. "slot B")
+
+```
+Electron       Main thread               listener_thread        G2
+   │           dequeue "slot B"               │                  │
+   │           g2_select_slot():              │                  │
+   │             send EP 0x03 ───────────────────────────────────→│
+   │                                     ←── EP 0x81 LED ────────┤
+   │                                     push msg (LED)           │
+   │             recv_interrupt() shim                            │
+   │               pull LED → skip                                │
+   │                                     ←── EP 0x81 resp ───────┤
+   │                                     push msg (resp)          │
+   │               pull resp → return                             │
+   │           emit {"id":1,"ok":true} ─────────────────────────→│
+```
+
+### BULK_REARM Flow (performance switch)
+
+```
+G2               listener_thread          Main thread
+ │                     │                       │
+ ├─ EP 0x81 EXTENDED ─→│                       │
+ ├─ EP 0x82 bulk ──────│                       │
+ │               detect BULK_REARM             │
+ │               zero g2_slot_version[]        │
+ │               push sentinel=2               │
+ │                     │    pull sentinel=2:   │
+ │                     │    emit version_update │
+ │                     │    g2_rearm() ─────────────── EP 0x03
+ ├─ EP 0x81 ACK ───────→│                      │
+ │               push ACK                      │
+ │                     │    pull ACK → emit {"type":"ok"}
+```
+
+### Key Properties
+
+- No STOP_COMM / START_COMM per command (matches Delphi)
+- `g2_listener_active` flag switches `recv_interrupt()` / `recv_bulk()` / `g2_drain_pending()` / `g2_rearm()` between direct libusb and queue-based modes
+- Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)
+- `g2_slot_version[4]` maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips

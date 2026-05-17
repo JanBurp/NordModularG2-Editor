@@ -140,13 +140,6 @@ int g2_set_perf_name(const char *name);
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
 
-/* Watch for param changes (simple single-threaded approach) */
-int g2_watch(output_format_t format, int debug);
-volatile extern int g2_watch_running;
-extern int g2_watch_verbose;
-extern void (*g2_watch_tick_hook)(void);
-void g2_watch_stop(int sig);
-
 /* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
  * Invalidated on version_update all-slots event. */

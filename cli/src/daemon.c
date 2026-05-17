@@ -1,9 +1,10 @@
 /*
  * G2 CLI - Daemon subcommand
  *
- * Runs the watch loop in the main thread while a background thread reads
- * newline-delimited JSON commands from stdin and queues them for execution.
- * Commands are dispatched between watch poll iterations (at most 100 ms delay).
+ * Listener thread (g2_io.c) is the sole reader of EP 0x81/0x82 and pushes all
+ * messages to a queue.  Main thread dequeues commands from stdin and events from
+ * the listener, routing them appropriately.  Device functions call recv_interrupt()
+ * which transparently pulls from the same queue, so no STOP/START per command.
  *
  * Protocol:
  *   Input:  {"id":1,"cmd":"add-module","args":["A","va","2","1","1"]}\n
@@ -16,8 +17,13 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <signal.h>
+#include <unistd.h>
 #include <pthread.h>
+#include "defs.h"
 #include "g2_device.h"
+#include "g2_io.h"
+#include "g2_events.h"
 #include "utils.h"
 #include "cJSON.h"
 #include "daemon.h"
@@ -121,7 +127,7 @@ static int parse_location(cJSON *args, int idx) {
 	return (s && strcmp(s, "va") == 0) ? 1 : 0;
 }
 
-/* ── command execution (runs on USB thread via daemon_tick) ────────────── */
+/* ── command execution ─────────────────────────────────────────────────── */
 
 static void execute_cmd(const char *line) {
 	cJSON *req = daemon_parse_request(line);
@@ -331,35 +337,106 @@ static void execute_cmd(const char *line) {
 	cJSON_Delete(req);
 }
 
-/* ── tick hook — called by g2_watch on each loop iteration ────────────── */
-
-static void daemon_tick(void) {
-	char *line = daemon_dequeue();
-	if (!line) return;
-	execute_cmd(line);
-	free(line);
-}
-
 /* ── stdin reader thread ───────────────────────────────────────────────── */
+
+static volatile int daemon_running = 1;
+
+static void daemon_stop(int sig) {
+	(void)sig;
+	daemon_running = 0;
+}
 
 static void *stdin_reader(void *arg) {
 	(void)arg;
 	char line[4096];
 	while (fgets(line, sizeof(line), stdin))
 		daemon_enqueue(line);
-	g2_watch_running = 0;
+	daemon_running = 0;
 	return NULL;
+}
+
+/* ── reconnect helper ──────────────────────────────────────────────────── */
+
+static void do_reconnect(void) {
+	g2_listener_stop();
+	g2_disconnect();
+	printf("{\"type\":\"device_disconnected\"}\n");
+	fflush(stdout);
+
+	while (daemon_running && g2_connect_silent() < 0)
+		usleep(100000);
+	if (!daemon_running) return;
+
+	g2_listener_start();
+	g2_rearm();
+	/* Consume START_COMM ACK from listener queue. */
+	g2_msg_t ack;
+	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
+		g2_msg_free(&ack);
+
+	printf("{\"type\":\"device_reconnected\"}\n");
+	fflush(stdout);
 }
 
 /* ── entry point ───────────────────────────────────────────────────────── */
 
 int g2_daemon_run(output_format_t format) {
+	(void)format;
 	g2_set_error_callback(daemon_error_cb, NULL);
-	pthread_t tid;
-	pthread_create(&tid, NULL, stdin_reader, NULL);
-	g2_watch_tick_hook = daemon_tick;
-	int ret = g2_watch(format, 0);
-	g2_watch_tick_hook = NULL;
-	pthread_detach(tid);
-	return ret;
+
+	signal(SIGINT, daemon_stop);
+	signal(SIGTERM, daemon_stop);
+
+	pthread_t reader;
+	pthread_create(&reader, NULL, stdin_reader, NULL);
+
+	/* Connect with retry. */
+	while (daemon_running && g2_connect_silent() < 0)
+		usleep(100000);
+	if (!daemon_running) { pthread_detach(reader); return 0; }
+
+	g2_listener_start();
+	g2_rearm();   /* sends START_COMM; ACK consumed below */
+
+	/* Wait for START_COMM ACK before declaring the daemon ready. */
+	g2_msg_t ack;
+	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
+		g2_msg_free(&ack);
+
+	printf("{\"type\":\"watch_armed\"}\n");
+	fflush(stdout);
+
+	while (daemon_running) {
+		/* Drain stdin commands first. */
+		char *line = daemon_dequeue();
+		if (line) {
+			execute_cmd(line);
+			free(line);
+			continue;
+		}
+
+		/* Wait for next event from the listener. */
+		g2_msg_t msg;
+		if (g2_msg_recv(&msg, 100) != 0) continue;
+
+		if (msg.sentinel == 1) {
+			/* Device disconnected. */
+			g2_msg_free(&msg);
+			if (daemon_running) do_reconnect();
+		} else if (msg.sentinel == 2) {
+			/* BULK_REARM: G2 stopped streaming after full performance switch. */
+			g2_msg_free(&msg);
+			printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+			fflush(stdout);
+			g2_rearm();
+			/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
+		} else {
+			g2_emit_event(&msg);
+			g2_msg_free(&msg);
+		}
+	}
+
+	g2_listener_stop();
+	pthread_detach(reader);
+	return 0;
 }

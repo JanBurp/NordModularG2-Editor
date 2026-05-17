@@ -53,7 +53,6 @@ static void print_usage(const char *prog) {
     printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
-    printf("  watch                                                                                     Monitor param/cable/slot changes live\n");
     printf("  daemon                                                                                    Persistent connection: watch + accept JSON commands on stdin\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
@@ -475,11 +474,6 @@ static int cmd_set_perf_name(int argc, char **argv, int i) {
     return ret;
 }
 
-static int cmd_watch(int argc, char **argv, int i) {
-    (void)argc; (void)argv; (void)i;
-    return g2_watch(output_format, debug_mode);
-}
-
 static int cmd_daemon(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
     int ret = g2_daemon_run(output_format);
@@ -531,7 +525,6 @@ static const cmd_entry_t commands[] = {
     { "upload-patch",     cmd_upload_patch     },
     { "set-perf-mode",    cmd_set_perf_mode    },
     { "set-perf-name",    cmd_set_perf_name    },
-    { "watch",            cmd_watch            },
     { "daemon",           cmd_daemon           },
     { "seq",              cmd_seq              },
     { NULL, NULL }

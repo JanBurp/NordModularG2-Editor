@@ -6,6 +6,9 @@
 #include <stdlib.h>
 #include <string.h>
 #include <unistd.h>
+#include <errno.h>
+#include <pthread.h>
+#include <time.h>
 #include <libusb.h>
 #include "defs.h"
 #include "g2_device.h"
@@ -250,6 +253,199 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
     return (ret < 0) ? -1 : 0;
 }
 
+/* ── Listener thread infrastructure ────────────────────────────────────── */
+
+volatile int g2_listener_active = 0;
+
+/* Pending bulk buffer: set by recv_interrupt shim when pulling extended msg from queue,
+ * consumed by recv_bulk shim. */
+static uint8_t  *pending_bulk      = NULL;
+static uint16_t  pending_bulk_size = 0;
+
+#define MSG_QUEUE_MAX 64
+
+typedef struct msg_node {
+    g2_msg_t        msg;
+    struct msg_node *next;
+} msg_node_t;
+
+static struct {
+    msg_node_t     *head;
+    msg_node_t     *tail;
+    int             count;
+    pthread_mutex_t mutex;
+    pthread_cond_t  cond;
+} mq = {
+    .head  = NULL,
+    .tail  = NULL,
+    .count = 0,
+    .mutex = PTHREAD_MUTEX_INITIALIZER,
+    .cond  = PTHREAD_COND_INITIALIZER,
+};
+
+static void mq_push_locked(g2_msg_t msg) {
+    if (mq.count >= MSG_QUEUE_MAX) {
+        /* Drop oldest message — LED/vol dominates, losing one state update is fine. */
+        msg_node_t *old = mq.head;
+        mq.head = old->next;
+        if (!mq.head) mq.tail = NULL;
+        mq.count--;
+        if (old->msg.bulk) free(old->msg.bulk);
+        free(old);
+    }
+    msg_node_t *n = malloc(sizeof(*n));
+    if (!n) { if (msg.bulk) free(msg.bulk); return; }
+    n->msg  = msg;
+    n->next = NULL;
+    if (mq.tail) mq.tail->next = n;
+    else         mq.head       = n;
+    mq.tail = n;
+    mq.count++;
+    pthread_cond_signal(&mq.cond);
+}
+
+static void mq_push(g2_msg_t msg) {
+    pthread_mutex_lock(&mq.mutex);
+    mq_push_locked(msg);
+    pthread_mutex_unlock(&mq.mutex);
+}
+
+int g2_msg_recv(g2_msg_t *out, int timeout_ms) {
+    struct timespec ts;
+    clock_gettime(CLOCK_REALTIME, &ts);
+    ts.tv_sec  += timeout_ms / 1000;
+    ts.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (ts.tv_nsec >= 1000000000L) { ts.tv_sec++; ts.tv_nsec -= 1000000000L; }
+
+    pthread_mutex_lock(&mq.mutex);
+    while (!mq.head) {
+        if (pthread_cond_timedwait(&mq.cond, &mq.mutex, &ts) == ETIMEDOUT) {
+            pthread_mutex_unlock(&mq.mutex);
+            return -1;
+        }
+    }
+    msg_node_t *n = mq.head;
+    mq.head = n->next;
+    if (!mq.head) mq.tail = NULL;
+    mq.count--;
+    *out = n->msg;
+    free(n);
+    pthread_mutex_unlock(&mq.mutex);
+    return 0;
+}
+
+void g2_msg_free(g2_msg_t *msg) {
+    if (msg && msg->bulk) {
+        free(msg->bulk);
+        msg->bulk = NULL;
+    }
+}
+
+/* Direct bulk read used only by the listener thread — bypasses recv_bulk shim. */
+static int listener_recv_bulk(uint8_t *data, uint16_t size) {
+    int transferred, ret, received = 0, retries = 5;
+    while (retries > 0 && received < size) {
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN,
+                                   data + received, size - received,
+                                   &transferred, USB_TIMEOUT_STANDARD_MS);
+        if (ret == 0 && transferred > 0) received += transferred;
+        else retries--;
+    }
+    return received;
+}
+
+static volatile int listener_running = 0;
+static pthread_t    listener_tid;
+
+static void *listener_thread(void *arg) {
+    (void)arg;
+    uint8_t hdr[16];
+
+    while (listener_running) {
+        int ret = recv_interrupt_with_retry(hdr, sizeof(hdr), 200, 1);
+        if (ret == LIBUSB_ERROR_NO_DEVICE) {
+            g2_msg_t m = {0};
+            m.sentinel = 1;
+            mq_push(m);
+            break;
+        }
+        if (ret <= 0) continue;
+
+        g2_msg_t msg = {0};
+        memcpy(msg.interrupt, hdr, sizeof(hdr));
+
+        uint8_t msgType = hdr[0] & 0x0f;
+        if (msgType == RESPONSE_TYPE_EXTENDED) {
+            uint16_t size = ((uint16_t)hdr[1] << 8) | hdr[2];
+            if (size > 0) {
+                msg.bulk = malloc(size);
+                if (msg.bulk) {
+                    msg.bulk_size = (uint16_t)listener_recv_bulk(msg.bulk, size);
+                    /* BULK_REARM: all-slots version update — G2 stops streaming after this. */
+                    if (msg.bulk_size > 3 &&
+                        msg.bulk[1] == 0x04 && msg.bulk[2] == 0x40 && msg.bulk[3] == 0x1f) {
+                        memset(g2_slot_version, 0, sizeof(g2_slot_version));
+                        free(msg.bulk);
+                        msg.bulk = NULL;
+                        msg.sentinel = 2;  /* signal daemon to re-arm */
+                        mq_push(msg);
+                        continue;
+                    }
+                }
+            }
+        } else if (msgType == RESPONSE_TYPE_EMBEDDED) {
+            /* Update slot version cache for patch_version notifications. */
+            if (hdr[3] == 0x40 && (hdr[4] == 0x36 || hdr[4] == 0x38)) {
+                uint8_t slot = hdr[5];
+                uint8_t ver  = hdr[6];
+                if (slot < 4) g2_slot_version[slot] = ver;
+            }
+        }
+
+        mq_push(msg);
+    }
+    return NULL;
+}
+
+int g2_listener_start(void) {
+    if (listener_running) return 0;
+    listener_running = 1;
+    g2_listener_active = 1;
+    int ret = pthread_create(&listener_tid, NULL, listener_thread, NULL);
+    if (ret != 0) {
+        listener_running = 0;
+        g2_listener_active = 0;
+        return -1;
+    }
+    return 0;
+}
+
+void g2_listener_stop(void) {
+    if (!listener_running) return;
+    listener_running = 0;
+    g2_listener_active = 0;
+    pthread_join(listener_tid, NULL);
+
+    /* Drain any messages left in the queue. */
+    pthread_mutex_lock(&mq.mutex);
+    msg_node_t *n = mq.head;
+    while (n) {
+        msg_node_t *next = n->next;
+        if (n->msg.bulk) free(n->msg.bulk);
+        free(n);
+        n = next;
+    }
+    mq.head = mq.tail = NULL;
+    mq.count = 0;
+    pthread_mutex_unlock(&mq.mutex);
+
+    /* Discard any pending bulk from the shim. */
+    if (pending_bulk) { free(pending_bulk); pending_bulk = NULL; }
+    pending_bulk_size = 0;
+}
+
+/* ── Low-level USB receive helpers ─────────────────────────────────────── */
+
 int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries) {
     int transferred = 0;
     int ret;
@@ -267,11 +463,60 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
     return -1;
 }
 
+/* When listener active: pull from queue, skip LED/vol extended msgs.
+ * Extended msgs store their bulk in pending_bulk for a subsequent recv_bulk() call.
+ * When listener inactive: direct libusb call (original behaviour). */
 int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
-    return recv_interrupt_with_retry(response, size, timeout_ms, 1);
+    if (!g2_listener_active)
+        return recv_interrupt_with_retry(response, size, timeout_ms, 1);
+
+    g2_msg_t msg;
+    while (g2_msg_recv(&msg, timeout_ms) == 0) {
+        if (msg.sentinel == 1) {
+            g2_msg_free(&msg);
+            return LIBUSB_ERROR_NO_DEVICE;
+        }
+        if (msg.sentinel == 2) {
+            /* BULK_REARM: not a command response; daemon main loop handles it. */
+            g2_msg_free(&msg);
+            continue;
+        }
+        /* Skip LED (0x39) and volume (0x3A) extended messages. */
+        if (msg.bulk && msg.bulk_size > 3) {
+            uint8_t sub = msg.bulk[3];
+            if (sub == 0x39 || sub == 0x3A) {
+                g2_msg_free(&msg);
+                continue;
+            }
+        }
+        /* Return this message. */
+        int copy = (size > 16) ? 16 : size;
+        memcpy(response, msg.interrupt, (size_t)copy);
+        if (msg.bulk) {
+            free(pending_bulk);
+            pending_bulk      = msg.bulk;
+            pending_bulk_size = msg.bulk_size;
+            msg.bulk          = NULL;   /* ownership transferred to pending_bulk */
+        }
+        g2_msg_free(&msg);
+        return copy;
+    }
+    return 0;   /* timeout */
 }
 
+/* When listener active: return bulk that recv_interrupt() saved in pending_bulk.
+ * When listener inactive: direct libusb loop (original behaviour). */
 int recv_bulk(uint8_t *data, uint16_t size) {
+    if (g2_listener_active) {
+        if (!pending_bulk || pending_bulk_size == 0) return 0;
+        uint16_t n = (pending_bulk_size < size) ? pending_bulk_size : size;
+        memcpy(data, pending_bulk, n);
+        free(pending_bulk);
+        pending_bulk      = NULL;
+        pending_bulk_size = 0;
+        return n;
+    }
+
     int transferred;
     int ret;
     int retries = 5;
@@ -303,12 +548,16 @@ int send_init_msg(void) {
     return (ret < 0) ? -1 : 0;
 }
 
-/* Re-arm the G2 stream (START_COMM). Safe to call unconditionally. */
+/* Send START_COMM to re-arm G2 streaming.
+ * When listener is active the ACK arrives via the listener queue — caller must
+ * drain one message from g2_msg_recv() if it needs to wait for the ACK. */
 void g2_rearm(void) {
     uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
-    uint8_t arm_ack[16];
     send_system_data(0x41, arm, 2);
-    recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS);
+    if (!g2_listener_active) {
+        uint8_t arm_ack[16];
+        recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS);
+    }
 }
 
 /* Check if bulk payload is the all-slots version update that stops the stream */
@@ -316,7 +565,11 @@ static int bulk_needs_rearm(const uint8_t *bulk, int size) {
     return size > 3 && bulk[1] == 0x04 && bulk[2] == 0x40 && bulk[3] == 0x1F;
 }
 
+/* No-op when listener is active (listener drains EP 0x81 continuously).
+ * When inactive: drain all pending interrupt+bulk messages. */
 int g2_drain_pending(void) {
+    if (g2_listener_active) return 0;
+
     uint8_t response[16];
     int ret, count = 0, needs_rearm = 0;
     while ((ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_DRAIN_MS)) > 0) {
