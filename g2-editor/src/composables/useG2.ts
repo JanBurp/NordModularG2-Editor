@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 
 import { Device } from '@/types';
+import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { DeviceStatus } from '@/store/device';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
@@ -66,7 +67,7 @@ export function useG2() {
 			case 'param_change':
 				return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
 			case 'patch_param':
-				return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
+				return `patch_param s=${ev.slot} p=${ev.param} v=${ev.value} var=${ev.variation}`;
 			case 'led_data':
 				return `led slot=${ev.slot}`;
 			case 'volume_data':
@@ -147,6 +148,17 @@ export function useG2() {
 					if (mod?.lv && mod.pcnt) {
 						const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
 						if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
+					}
+					return;
+				}
+				if (ev.type === 'patch_param') {
+					log('←', 'Watch', formatWatchEvent(ev), 'param');
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (!slotLabel) return;
+					const params = slotsStore.slots[slotLabel]?.patch?.patchParams;
+					const key = PATCH_PARAM_KEYS[ev.param as number];
+					if (params?.[ev.variation] && key) {
+						(params[ev.variation] as Record<string, number>)[key] = ev.value;
 					}
 					return;
 				}

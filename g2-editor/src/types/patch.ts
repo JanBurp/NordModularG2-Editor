@@ -54,6 +54,24 @@ export interface PatchParamVariation {
 	octaves: number;
 }
 
+export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [
+	'patchVol',
+	'activeMuted',
+	'glide',
+	'glideTime',
+	'bend',
+	'semi',
+	'vibrato',
+	'cents',
+	'rate',
+	'arpeggiator',
+	'arpTime',
+	'arpType',
+	'octaves',
+	'octaveShift',
+	'sustain',
+];
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
