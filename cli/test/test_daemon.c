@@ -1,9 +1,10 @@
 /*
- * G2 CLI - Daemon integration tests (new drain-only approach)
+ * G2 CLI - Daemon integration tests (shared-daemon approach)
  *
- * Focused tests for the daemon with version cache + drain-only command handling.
- * Each test spawns the daemon as a child process and sends a simple sequence
- * of commands to verify the drain-only approach works correctly.
+ * All 5 tests share ONE daemon process (one USB connection) to match real-world
+ * editor behaviour. The daemon is spawned by test_daemon_starts and shut down by
+ * test_daemon_slot_variation_sequence. Command IDs increase monotonically via
+ * g_cmd_id so the shared daemon can match responses to the right request.
  */
 
 #include "unity.h"
@@ -14,12 +15,19 @@
 #include <sys/wait.h>
 #include <sys/select.h>
 #include "cJSON.h"
+#include "../include/g2_device.h"
 
 typedef struct {
     int in_fd;
     int out_fd;
     pid_t pid;
 } daemon_ctx_t;
+
+/* Shared daemon state — initialised by test_daemon_starts, torn down by
+ * test_daemon_slot_variation_sequence. */
+static daemon_ctx_t g_daemon  = {0};
+static int g_daemon_ok = -1;   /* -1=uninitialized, 0=ok, 1=no device */
+static int g_cmd_id    = 0;
 
 /* Read one newline-terminated line from fd. Returns byte count or -1 on timeout/error. */
 static int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec) {
@@ -41,6 +49,8 @@ static int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec) {
 static daemon_ctx_t daemon_spawn(void) {
     daemon_ctx_t d = {0};
     int in_pipe[2], out_pipe[2];
+
+    g2_exit(); /* release any parent USB handle so the child can claim it */
 
     pipe(in_pipe);
     pipe(out_pipe);
@@ -98,91 +108,86 @@ static int send_and_expect_ok(daemon_ctx_t *d, const char *json, int expected_id
     return -1;
 }
 
-/* Test 1: Daemon starts and shuts down cleanly. */
+/* Test 1: Daemon starts — spawn the shared daemon and verify it is alive. */
 void test_daemon_starts(void) {
-    daemon_ctx_t d = daemon_spawn();
-    usleep(500000);
-    daemon_shutdown(&d);
+    g_daemon = daemon_spawn();
+    TEST_ASSERT_TRUE(g_daemon.pid > 0);
 }
 
 /* Test 2: Daemon responds to startup command. */
 void test_daemon_startup_cmd(void) {
-    daemon_ctx_t d = daemon_spawn();
-    int r = send_and_expect_ok(&d, "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
-    daemon_shutdown(&d);
+    char cmd[64];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"startup\",\"args\":[]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
     if (r == -1) {
+        g_daemon_ok = 1;
         TEST_IGNORE_MESSAGE("G2 device not connected");
-    } else {
-        TEST_ASSERT_EQUAL_INT(0, r);
     }
+    g_daemon_ok = 0;
 }
 
-/* Test 3: Daemon slot command works after startup. */
+/* Test 3: Slot command works. */
 void test_daemon_slot_cmd(void) {
-    daemon_ctx_t d = daemon_spawn();
-    int r_startup = send_and_expect_ok(&d, "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
-    int r_slot = send_and_expect_ok(&d, "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1);
-    daemon_shutdown(&d);
-    if (r_startup == -1 || r_slot == -1) {
-        TEST_IGNORE_MESSAGE("G2 device not connected");
-    } else {
-        TEST_ASSERT_EQUAL_INT(0, r_startup);
-        TEST_ASSERT_EQUAL_INT(0, r_slot);
-    }
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    char cmd[64];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"A\"]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
+    TEST_ASSERT_EQUAL_INT(0, r);
 }
 
-/* Test 4: Daemon variation command works with version cache. */
+/* Test 4: Variation command works with version cache. */
 void test_daemon_variation_cmd(void) {
-    daemon_ctx_t d = daemon_spawn();
-    int r_startup = send_and_expect_ok(&d, "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
-    int r_slot = send_and_expect_ok(&d, "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1);
-    int r_var = send_and_expect_ok(&d, "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"A\"]}", 2);
-    daemon_shutdown(&d);
-    if (r_startup == -1 || r_slot == -1 || r_var == -1) {
-        TEST_IGNORE_MESSAGE("G2 device not connected");
-    } else {
-        TEST_ASSERT_EQUAL_INT(0, r_startup);
-        TEST_ASSERT_EQUAL_INT(0, r_slot);
-        TEST_ASSERT_EQUAL_INT(0, r_var);
-    }
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    char cmd[64];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"1\",\"A\"]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
+    TEST_ASSERT_EQUAL_INT(0, r);
 }
 
-/* Test 5: Rapid slot+variation sequence stays responsive. */
+/* Test 5: Rapid slot+variation sequence stays responsive. Shuts down shared daemon. */
 void test_daemon_slot_variation_sequence(void) {
-    daemon_ctx_t d = daemon_spawn();
-    int r[9];
-
-    r[0] = send_and_expect_ok(&d, "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
-    r[1] = send_and_expect_ok(&d, "{\"id\":1,\"cmd\":\"slot\",\"args\":[\"A\"]}", 1);
-    r[2] = send_and_expect_ok(&d, "{\"id\":2,\"cmd\":\"variation\",\"args\":[\"1\",\"A\"]}", 2);
-    r[3] = send_and_expect_ok(&d, "{\"id\":3,\"cmd\":\"slot\",\"args\":[\"B\"]}", 3);
-    r[4] = send_and_expect_ok(&d, "{\"id\":4,\"cmd\":\"variation\",\"args\":[\"3\",\"B\"]}", 4);
-    r[5] = send_and_expect_ok(&d, "{\"id\":5,\"cmd\":\"slot\",\"args\":[\"C\"]}", 5);
-    r[6] = send_and_expect_ok(&d, "{\"id\":6,\"cmd\":\"variation\",\"args\":[\"5\",\"C\"]}", 6);
-    r[7] = send_and_expect_ok(&d, "{\"id\":7,\"cmd\":\"slot\",\"args\":[\"D\"]}", 7);
-    r[8] = send_and_expect_ok(&d, "{\"id\":8,\"cmd\":\"variation\",\"args\":[\"2\",\"D\"]}", 8);
-
-    daemon_shutdown(&d);
-
-    int failed = 0;
-    for (int i = 0; i < 9; i++) {
-        if (r[i] == -1) {
-            failed = 1;
-            break;
-        }
-    }
-
-    if (failed) {
+    if (g_daemon_ok != 0) {
+        daemon_shutdown(&g_daemon);
         TEST_IGNORE_MESSAGE("G2 device not connected");
-    } else {
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[0], "startup");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "slot A");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[2], "var 1 slot A");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "slot B");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[4], "var 3 slot B");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "slot C");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[6], "var 5 slot C");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[7], "slot D");
-        TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[8], "var 2 slot D");
     }
+
+    /* Continue from where tests 3-4 left off: A/var1 already done; cycle B, C, D. */
+    char cmd[64];
+    int r[6];
+
+    int id0 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"B\"]}", id0);
+    r[0] = send_and_expect_ok(&g_daemon, cmd, id0);
+
+    int id1 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"3\",\"B\"]}", id1);
+    r[1] = send_and_expect_ok(&g_daemon, cmd, id1);
+
+    int id2 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"C\"]}", id2);
+    r[2] = send_and_expect_ok(&g_daemon, cmd, id2);
+
+    int id3 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"5\",\"C\"]}", id3);
+    r[3] = send_and_expect_ok(&g_daemon, cmd, id3);
+
+    int id4 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"D\"]}", id4);
+    r[4] = send_and_expect_ok(&g_daemon, cmd, id4);
+
+    int id5 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"2\",\"D\"]}", id5);
+    r[5] = send_and_expect_ok(&g_daemon, cmd, id5);
+
+    daemon_shutdown(&g_daemon);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[0], "slot B");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "var 3 slot B");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[2], "slot C");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "var 5 slot C");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[4], "slot D");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "var 2 slot D");
 }

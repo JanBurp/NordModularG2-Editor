@@ -470,8 +470,24 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
     if (!g2_listener_active)
         return recv_interrupt_with_retry(response, size, timeout_ms, 1);
 
+    struct timespec deadline, now;
+    clock_gettime(CLOCK_REALTIME, &deadline);
+    deadline.tv_sec  += timeout_ms / 1000;
+    deadline.tv_nsec += (long)(timeout_ms % 1000) * 1000000L;
+    if (deadline.tv_nsec >= 1000000000L) {
+        deadline.tv_sec++;
+        deadline.tv_nsec -= 1000000000L;
+    }
+
     g2_msg_t msg;
-    while (g2_msg_recv(&msg, timeout_ms) == 0) {
+    for (;;) {
+        clock_gettime(CLOCK_REALTIME, &now);
+        long rem = (deadline.tv_sec - now.tv_sec) * 1000L
+                 + (deadline.tv_nsec - now.tv_nsec) / 1000000L;
+        if (rem <= 0) break;
+        int wait = (int)(rem > 50 ? 50 : rem);
+        if (g2_msg_recv(&msg, wait) != 0) break;
+
         if (msg.sentinel == 1) {
             g2_msg_free(&msg);
             return LIBUSB_ERROR_NO_DEVICE;
