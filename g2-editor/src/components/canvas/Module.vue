@@ -48,6 +48,7 @@
 				:active-step="ledStateMap[entry.key]?.step ?? 255"
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
+			<LevelMeter v-else-if="entry.ve.type === 'vu'" :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
 		</template>
 
 		<!-- Modes -->
@@ -140,6 +141,7 @@
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
+	import LevelMeter from './LevelMeter.vue';
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
@@ -216,6 +218,7 @@
 		const entries: { ve: any; groupId: number; key: string }[] = [];
 		let ledIdx = 0;
 		let ledArrayIdx = 0;
+		let vuIdx = 0;
 		let veIdx = 0;
 		for (const ve of moduleDef.value.ve) {
 			if (ve.type === 'led') {
@@ -224,6 +227,9 @@
 			} else if (ve.type === 'ledArray') {
 				entries.push({ ve, groupId: ledArrayIdx, key: `ledArray-${ledArrayIdx}` });
 				ledArrayIdx++;
+			} else if (ve.type === 'vu') {
+				entries.push({ ve, groupId: vuIdx, key: `vu-${vuIdx}` });
+				vuIdx++;
 			} else {
 				entries.push({ ve, groupId: 0, key: `ve-${veIdx}` });
 				veIdx++;
@@ -238,7 +244,7 @@
 		const idx = moduleIdx.value;
 		const map: Record<string, { on: boolean; step: number }> = {};
 		for (const entry of visualElementsGroupedLeds.value) {
-			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray') {
+			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray' || entry.ve.type === 'vu') {
 				map[entry.key] = {
 					on: ledStore.getLedState(area, idx, entry.groupId),
 					step: ledStore.getStripValue(area, idx, entry.groupId),
