@@ -395,13 +395,13 @@ static void *listener_thread(void *arg) {
                 msg.bulk = malloc(size);
                 if (msg.bulk) {
                     msg.bulk_size = (uint16_t)listener_recv_bulk(msg.bulk, size);
-                    /* BULK_REARM: all-slots version update — G2 stops streaming after this. */
+                    /* BULK_REARM: all-slots version update — G2 stops streaming after this.
+                     * Signal daemon via sentinel=2 so recv_interrupt() skips it, but keep
+                     * the bulk payload so emit_bulk_event() can process the full message. */
                     if (msg.bulk_size > 3 &&
                         msg.bulk[1] == 0x04 && msg.bulk[2] == 0x40 && msg.bulk[3] == 0x1f) {
                         memset(g2_slot_version, 0, sizeof(g2_slot_version));
-                        free(msg.bulk);
-                        msg.bulk = NULL;
-                        msg.sentinel = 2;  /* signal daemon to re-arm */
+                        msg.sentinel = 2;
                         mq_push(msg);
                         continue;
                     }
