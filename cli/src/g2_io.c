@@ -1,5 +1,9 @@
 /*
  * G2 CLI - USB transport layer
+ *
+ * Low-level USB I/O via libusb: bulk send, bulk/interrupt receive, and
+ * the background listener thread that owns EP 0x81/0x82. Also provides
+ * packet-framing helpers (send_system, send_slot, etc.) used by g2_device.c.
  */
 
 #include <stdio.h>
@@ -234,6 +238,9 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
     return (ret < 0) ? -1 : 0;
 }
 
+/* Build and send a slot-scoped G2 command.
+ * version must match the current patch version for that slot — the G2 ignores
+ * commands with a stale version byte (use g2_slot_version[] from g2_device.h). */
 int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
               const uint8_t *extra, size_t extraLen) {
     uint8_t buff[2048] = {0};
@@ -268,6 +275,8 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
 }
 
 /* ── Listener thread infrastructure ────────────────────────────────────── */
+/* Thread-safe FIFO: the listener thread pushes messages; the daemon main loop
+ * and the recv_interrupt/recv_bulk shims pop them. */
 
 volatile int g2_listener_active = 0;
 

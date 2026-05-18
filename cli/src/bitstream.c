@@ -1,3 +1,11 @@
+/*
+ * G2 CLI - Big-endian bit-stream reader
+ *
+ * Reads arbitrary-width fields from binary patch data. The G2 stores patch
+ * parameters as packed big-endian bit fields; this module provides the
+ * positional reader that the parser relies on.
+ */
+
 #include <stdlib.h>
 #include <string.h>
 #include "../include/bitstream.h"
@@ -9,11 +17,10 @@ void bitstream_init(bitstream_t *bs, const uint8_t *data, size_t len) {
 }
 
 uint32_t bitstream_read_bits(bitstream_t *bs, int nbits) {
-    /* Match Python's getbits algorithm:
-     * 1. byte = bit >> 3
-     * 2. Read 4 bytes starting at 'byte' (or less if near end)
-     * 3. Combine into 32-bit big-endian word
-     * 4. Extract nbits from word starting at position (32 - (bit&7) - nbits)
+    /* Build a 32-bit big-endian word from up to 4 bytes at the current byte
+     * position, then extract nbits from the MSB side of that word.
+     * Bit position within the current byte determines the shift amount:
+     *   shift = 32 - (bit_pos & 7) - nbits
      */
     uint32_t val = 0;
     int bit = bs->bit_pos;

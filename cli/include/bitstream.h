@@ -1,3 +1,11 @@
+/*
+ * G2 CLI - Big-endian bit-stream reader
+ *
+ * Reads arbitrary-width fields from binary patch data. The G2 stores patch
+ * parameters as packed big-endian bit fields; this module provides the
+ * positional reader that the parser relies on.
+ */
+
 #ifndef BITSTREAM_H
 #define BITSTREAM_H
 

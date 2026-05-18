@@ -1,7 +1,10 @@
 /*
  * G2 CLI - USB event formatter
- * Formats incoming g2_msg_t messages as JSON written to stdout.
- * Extracted from g2_watch.c so daemon.c can use it without the watch loop.
+ *
+ * Decodes raw g2_msg_t messages received from the listener thread and
+ * writes them as JSON lines to stdout. Handles both extended (bulk) and
+ * embedded (interrupt-only) message types. Shared by the watch loop and
+ * the daemon main loop.
  */
 
 #include <stdio.h>
@@ -18,6 +21,8 @@ int g2_watch_verbose = 1;
 
 #define BULK_REARM 1
 
+/* Handle extended (bulk) messages: synth settings, all-slots version updates,
+ * and performance events. Returns BULK_REARM if the caller must re-arm streaming. */
 static int emit_bulk_event(const uint8_t *bulk, int bret) {
     if (bret <= 6) return 0;
     uint8_t baCmd    = bulk[1];
@@ -190,6 +195,8 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
     return 0;
 }
 
+/* Handle embedded (interrupt-only) messages: param changes, slot changes,
+ * variation changes, clock events, and other G2 status notifications. */
 static void emit_embedded_event(const uint8_t *response) {
     uint8_t aCmd    = response[2];
     uint8_t version = response[3];
@@ -365,6 +372,9 @@ static void emit_embedded_event(const uint8_t *response) {
     fflush(stdout);
 }
 
+/* Route a received message to the appropriate emitter based on the response
+ * type in the interrupt header. Extended messages carry bulk payload; embedded
+ * messages are contained entirely in the 16-byte interrupt frame. */
 void g2_emit_event(const g2_msg_t *msg) {
     uint8_t msgType = msg->interrupt[0] & 0x0f;
     if (msgType == RESPONSE_TYPE_EXTENDED) {

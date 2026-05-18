@@ -1,3 +1,11 @@
+/*
+ * G2 CLI - USB event formatter
+ *
+ * Decodes raw g2_msg_t messages received from the listener thread and
+ * writes them as JSON lines to stdout. Shared by the watch loop and the
+ * daemon main loop.
+ */
+
 #ifndef G2_EVENTS_H
 #define G2_EVENTS_H
 
