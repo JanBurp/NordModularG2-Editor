@@ -285,17 +285,14 @@ function pch2_(data: ArrayBuffer) {
 	}
 
 	function parsePrfData(data: Uint8Array) {
+		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
 		let ofs = 8;
 		const slotNames: string[] = [];
 		for (let i = 0; i < 4; i++) {
 			let str = '';
-			for (let j = 0; j < 16; j++) {
-				const charcode = data[ofs + j];
-				if (charcode) str += String.fromCharCode(charcode);
-				else break;
-			}
-			ofs += 17;
-			ofs += 10;
+			while (ofs < data.length && data[ofs] !== 0) str += String.fromCharCode(data[ofs++]);
+			ofs++; // skip null terminator
+			ofs += 10; // skip extra slot data
 			slotNames.push(str);
 		}
 		slots.length = 0;
