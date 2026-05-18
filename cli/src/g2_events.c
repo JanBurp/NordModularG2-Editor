@@ -118,10 +118,12 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         printf("]}\n");
         fflush(stdout);
+        /* Query synth+perf settings now: G2 just stopped streaming so the queue
+         * is quiet and recv_interrupt() will get our response, not a streamed event. */
         cJSON *synth = query_synth_settings("synth_settings_update");
         if (synth) {
-            char *s = cJSON_PrintUnformatted(synth);
-            if (s) { printf("%s\n", s); fflush(stdout); free(s); }
+            char *ss = cJSON_PrintUnformatted(synth);
+            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
             cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
             int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
             cJSON_Delete(synth);
