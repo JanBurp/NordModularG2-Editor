@@ -1,7 +1,7 @@
 # CLAUDE.md
 
 ## Project Context
-Editor for the Nord Modular G2 synthesizer. USB communication layer in C++. And an electronjs (VueJS, TypeScript) frontend. Changes often need to flow across all layers.
+Editor for the Nord Modular G2 synthesizer. USB communication layer in C. And an electronjs (VueJS, TypeScript) frontend. Changes often need to flow across all layers.
 
 ## Coding And behavioral guidelines to reduce LLM coding mistakes
 

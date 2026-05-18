@@ -185,7 +185,7 @@ The full 4-step sequence above mirrors the Delphi editor. The `g2-cli` daemon us
 3. read the embedded ACK
 ```
 
-This works because every subsequent query goes through the daemon's disarm → body → rearm wrapper (`g2_watch_disarm()` / `g2_watch_rearm()`), which sends STOP_COMM before the query and START_COMM after. GET_PATCH_VERSION inside each query syncs the version counter on demand, so the patch-version reset that CMD_INIT performs is not needed.
+This works because GET_PATCH_VERSION inside each query syncs the version counter on demand, so the patch-version reset that CMD_INIT performs is not needed. For paths where G2 may still be streaming (e.g. editor-initiated `set-perf-mode`), the daemon calls `g2_stop_comm()` explicitly before issuing queries (see §14).
 
 **Critical:** this flow only works if `libusb_clear_halt` is **not** called between attach and START_COMM (see §1 gotcha). The reconnect-after-cable-pull path uses the same minimal sequence.
 
@@ -219,7 +219,7 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
 | `0x3D` | MIDI_DUMP | — | None |
-| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Embedded ACK |
+| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Bulk `0x0C/0x1F` version_update (see §13) |
 | `0x56 oo nn` | PLAY_NOTE | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
@@ -654,19 +654,21 @@ When `version != 0x40`:
 | `version` | `subCmd` | JSON type | Notes |
 |-----------|----------|-----------|-------|
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
-| any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent when user presses PERF button |
+| any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent by G2 when user presses PERF button (no `patches` field) |
 | any | `0x11` | `perf_settings` | — |
 | any | `0x29` | `perf_name` | `name` from bulk[4..] |
 
 ### Bulk sub-commands (`aCmd 0x0C`)
 
-Unsolicited bulk responses sent after switching PERF mode.
+Sent as the response to `SET_PERF_MODE` (editor-initiated) and unsolicited after hardware PERF button press.
 
 | `version` | `subCmd` | JSON type | Data format |
 |-----------|----------|-----------|-------------|
 | `0x40` | `0x1F` | `version_update` | `bulk[4]`=`perf_version`; then 4×`[0x36, slot, version]` — one entry per slot |
 | `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated — not yet parsed |
 | `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata — not yet parsed |
+
+**Important:** unlike the hardware path (`aCmd 0x04/0x40/0x1F`), when 0x0C/0x1F arrives the G2 is still streaming. The daemon calls `g2_stop_comm()` before querying synth/perf settings and patches, then sets `g2_pending_rearm=1` so the main loop calls `g2_rearm()` after returning.
 
 **`version_update` payload layout (version=0x40, sub=0x1F):**
 ```
@@ -676,7 +678,7 @@ bulk[8..10]  = [0x36, slot=1, version]
 bulk[11..13] = [0x36, slot=2, version]
 bulk[14..16] = [0x36, slot=3, version]
 ```
-Emitted JSON: `{"type":"version_update","perf_version":N,"slot_versions":[{"slot":0,"version":N},...]}`. Also sets `g2_pending_rearm=1` to trigger listener re-arm.
+Emitted JSON: `{"type":"version_update","perf_version":N,"slot_versions":[{"slot":0,"version":N},...]}`. After this the daemon queries synth/perf settings and all 4 slot patches, emitting `synth_settings_update` with an embedded `"patches"` array (Delphi approach: all data before START_COMM). Sets `g2_pending_rearm=1` to trigger `g2_rearm()` after the event handler returns.
 
 ### Connection events
 
@@ -853,27 +855,58 @@ Electron       Main thread               listener_thread        G2
    │           emit {"id":1,"ok":true} ─────────────────────────→│
 ```
 
-### BULK_REARM Flow (performance switch)
+### BULK_REARM Flow — hardware path (G2 PERF button)
 
 ```
 G2               listener_thread          Main thread
  │                     │                       │
  ├─ EP 0x81 EXTENDED ─→│                       │
  ├─ EP 0x82 bulk ──────│                       │
- │               detect BULK_REARM             │
+ │               detect BULK_REARM (0x04/0x40/0x1F)
  │               zero g2_slot_version[]        │
  │               push sentinel=2               │
  │                     │    pull sentinel=2:   │
- │                     │    emit version_update │
+ │                     │    emit_bulk_event():  │
+ │                     │      version_update    │
+ │                     │      query synth/perf  │
+ │                     │      g2_get_patch ×4   │
+ │                     │      synth_settings_update {patches:[...]}
+ │                     │      perf_settings     │
+ │                     │    g2_pending_rearm=1  │
  │                     │    g2_rearm() ─────────────── EP 0x03
  ├─ EP 0x81 ACK ───────→│                      │
  │               push ACK                      │
  │                     │    pull ACK → emit {"type":"ok"}
 ```
 
+### BULK_REARM Flow — editor path (set-perf-mode command)
+
+```
+Electron       Main thread                    G2
+   │            send set-perf-mode (0x3E)  ──→│
+   │                                    ←─────┤ EP 0x81 EXTENDED
+   │                                    ←─────┤ EP 0x82 bulk (0x0C/0x1F)
+   │            listener push sentinel=0       │ ← G2 still streaming!
+   │            pull: emit_bulk_event():        │
+   │              version_update                │
+   │              g2_stop_comm() ─────────────→│
+   │                       ←── streaming events draining
+   │                       ←── STOP_COMM ACK   │ ← G2 stopped
+   │              query synth/perf settings     │
+   │              g2_get_patch ×4               │
+   │              synth_settings_update {patches:[...]}
+   │              perf_settings                 │
+   │            g2_pending_rearm=1              │
+   │            g2_rearm() ───────────────────→│
+   │                       ←── START_COMM ACK  │
+```
+
+The key difference: hardware path receives 0x04/0x40/0x1F (sentinel=2, G2 already stopped streaming); editor path receives 0x0C/0x1F (sentinel=0, G2 still streaming → requires explicit `g2_stop_comm()`).
+
 ### Key Properties
 
-- No STOP_COMM / START_COMM per command (matches Delphi)
-- `g2_listener_active` flag switches `recv_interrupt()` / `recv_bulk()` / `g2_drain_pending()` / `g2_rearm()` between direct libusb and queue-based modes
+- No STOP_COMM / START_COMM per command (matches Delphi) — except when explicitly required before direct queries (see editor path above)
+- `g2_listener_active` flag switches `recv_interrupt()` / `recv_bulk()` / `g2_drain_pending()` / `g2_rearm()` between direct libusb and queue-based modes; `g2_stop_comm()` is safe to call from main thread in either mode
 - Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)
 - `g2_slot_version[4]` maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips
+- **Startup**: daemon queries all 4 slots before `g2_rearm()` and emits them as `slot_data` events; frontend applies them directly via `_applyPatchOutput` in the `slot_data` watch handler

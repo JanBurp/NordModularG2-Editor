@@ -50,6 +50,8 @@ g2-cli get-patch-file <slot> [file]    # save patch as .pch2 file
 g2-cli list [type] [bank <n>]          # list patches and performances
 g2-cli slot <A|B|C|D>                  # change active slot on device
 g2-cli variation <1-8> <A-D>           # select variation for slot
+g2-cli set-perf-mode <patch|performance>  # switch G2 between patch and performance mode
+g2-cli set-perf-name <name>            # set performance name
 ```
 
 ### Modules
