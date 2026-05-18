@@ -84,6 +84,8 @@ export function useG2() {
 				return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
 			case 'perf_name':
 				return `perf: ${ev.name}`;
+			case 'version_update':
+				return `version_update perf=${ev.perf_version} slots=[${(ev.slot_versions ?? []).map((s: any) => s.version).join(',')}]`;
 			case 'synth_settings_update':
 				return `synth mode=${ev.mode} name=${ev.synthName}`;
 			case 'perf_settings':
@@ -201,6 +203,10 @@ export function useG2() {
 					if (params?.[ev.variation] && key) {
 						(params[ev.variation] as Record<string, number>)[key] = ev.value;
 					}
+					return;
+				}
+				if (ev.type === 'version_update') {
+					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'synth_settings_update') {

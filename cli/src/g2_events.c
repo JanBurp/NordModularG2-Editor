@@ -102,12 +102,27 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
         }
+    } else if (baCmd == 0x0C && bsubCmd == 0x1F) {
+        /* Bulk version_update: bulk[4]=perf_version, then 4×[0x36, slot, version] */
+        uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
+        printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
+        int first = 1;
+        for (int i = 5; i + 2 < dataEnd; i += 3) {
+            if (bulk[i] != 0x36) continue;
+            uint8_t slot = bulk[i + 1];
+            uint8_t ver  = bulk[i + 2];
+            if (slot < 4) g2_slot_version[slot] = ver;
+            if (!first) printf(",");
+            printf("{\"slot\":%u,\"version\":%u}", slot, ver);
+            first = 0;
+        }
+        printf("]}\n");
+        fflush(stdout);
+        g2_pending_rearm = 1;
     } else {
         printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
         for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
         printf("]}\n"); fflush(stdout);
-        /* set-perf-mode response: G2 goes quiet after this, needs re-arm */
-        if (baCmd == 0x0C && bsubCmd == 0x1F) g2_pending_rearm = 1;
     }
     return 0;
 }
