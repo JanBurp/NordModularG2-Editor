@@ -23,6 +23,7 @@ g2_device_t g2 = {
 };
 
 int g2_debug = 0;
+volatile int g2_pending_rearm = 0;
 
 static void debug_send(const char *fn, const uint8_t *buf, int len) {
     if (!g2_debug) return;
@@ -499,15 +500,18 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
                  + (deadline.tv_nsec - now.tv_nsec) / 1000000L;
         if (rem <= 0) break;
         int wait = (int)(rem > 50 ? 50 : rem);
-        if (g2_msg_recv(&msg, wait) != 0) break;
+        if (g2_msg_recv(&msg, wait) != 0) continue;
 
         if (msg.sentinel == 1) {
             g2_msg_free(&msg);
             return LIBUSB_ERROR_NO_DEVICE;
         }
         if (msg.sentinel == 2) {
-            /* BULK_REARM: not a command response; daemon main loop handles it. */
-            g2_msg_free(&msg);
+            /* BULK_REARM arrived while a command handler owns recv_interrupt().
+             * Record it so the daemon main loop can call g2_rearm() after the
+             * command returns — we cannot call g2_rearm() here because we are
+             * still inside the command handler's call stack. */
+            g2_pending_rearm = 1;
             continue;
         }
         /* Skip LED (0x39) and volume (0x3A) extended messages. */

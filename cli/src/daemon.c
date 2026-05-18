@@ -293,7 +293,6 @@ static void execute_cmd(const char *line) {
 		if (mode < 0) {
 			ret = G2_ERR_INVALID_PARAM;
 		} else {
-			g2_send_init();
 			ret = g2_set_perf_mode(mode);
 		}
 
@@ -456,6 +455,18 @@ int g2_daemon_run(output_format_t format, int debug) {
 		if (line) {
 			execute_cmd(line);
 			free(line);
+			/* If a command handler's recv_interrupt() saw a BULK_REARM (sentinel=2)
+			 * while waiting for a command response, it set g2_pending_rearm instead
+			 * of discarding it silently.  Re-arm streaming now. */
+			if (g2_pending_rearm) {
+				g2_pending_rearm = 0;
+				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+				fflush(stdout);
+				g2_rearm();
+				g2_msg_t rearm_ack;
+				if (g2_msg_recv(&rearm_ack, USB_TIMEOUT_STANDARD_MS) == 0)
+					g2_msg_free(&rearm_ack);
+			}
 			continue;
 		}
 
@@ -477,6 +488,15 @@ int g2_daemon_run(output_format_t format, int debug) {
 		} else {
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
+			if (g2_pending_rearm) {
+				g2_pending_rearm = 0;
+				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+				fflush(stdout);
+				g2_rearm();
+				g2_msg_t rearm_ack;
+				if (g2_msg_recv(&rearm_ack, USB_TIMEOUT_STANDARD_MS) == 0)
+					g2_msg_free(&rearm_ack);
+			}
 		}
 	}
 
