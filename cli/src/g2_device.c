@@ -90,6 +90,18 @@ int g2_send_init(void) {
     return G2_ERR_RECV;
 }
 
+cJSON *query_synth_settings(const char *type) {
+    uint8_t intr[16] = {0}, bulk[512] = {0};
+    if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) return NULL;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(intr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (intr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return NULL;
+    uint16_t size = ((uint16_t)intr[1] << 8) | intr[2];
+    if (size == 0 || size > sizeof(bulk)) return NULL;
+    if (recv_bulk(bulk, size) <= 0) return NULL;
+    return build_synth_bulk_json(bulk, type);
+}
+
 cJSON *query_perf_settings(int mode, const char *type) {
     uint8_t selsData[1024] = {0}, selsInterrupt[16] = {0};
     uint8_t perfData[1024] = {0}, perfInterrupt[16] = {0};
