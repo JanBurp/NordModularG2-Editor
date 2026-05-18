@@ -6,7 +6,7 @@ import { PatchParser } from '../nmg2PatchParser';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
-import { serializePatch } from '../nmg2PatchSerializer';
+import { serializePatch, serializePerformance } from '../nmg2PatchSerializer';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
@@ -53,7 +53,7 @@ function modSnap(m: ModuleInstance) {
 		uprate: m.uprate,
 		leds: m.leds,
 		modes: [...(m.modes ?? [])],
-		lv: [...(m.lv ?? [])],
+		lv: [...(m.lv ?? [])].map((v) => v ?? 0),
 	};
 }
 
@@ -592,4 +592,152 @@ describe('patchParams round-trip', () => {
 		expect(r.patchVol).toBe(snap.patchVol);
 		expect(r.activeMuted).toBe(snap.activeMuted);
 	});
+});
+
+// ── prf2 helpers ──────────────────────────────────────────────────────────────
+
+function loadFixturePrf2(filename: string): { name: string; rawHex: string; slotNames: string[]; patches: Patch[] } {
+	const buf = fs.readFileSync(path.join(FIXTURES, filename));
+	const fileBytes = new Uint8Array(buf);
+	let ofs = 0;
+	while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
+	const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
+	const rawHex = Array.from(fileBytes.slice(ofs + 3))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+	const parsed = new PatchParser(fileBytes.buffer).parsePrf2()!;
+	return { name, rawHex, slotNames: parsed.slotNames, patches: parsed.patches };
+}
+
+function parsePerfFromRawHex(name: string, rawHex: string): { slotNames: string[]; patches: Patch[] } {
+	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const nameBytes = new TextEncoder().encode(name);
+	const prf2 = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
+	prf2.set(nameBytes);
+	prf2[nameBytes.length] = 0x00;
+	prf2[nameBytes.length + 1] = 0x17;
+	prf2[nameBytes.length + 2] = 0x00;
+	prf2.set(sectionBytes, nameBytes.length + 3);
+	return new PatchParser(prf2.buffer).parsePrf2()!;
+}
+
+function simulatePerfFileSaveAndLoad(name: string, rawHex: string): { rawHex: string; patches: Patch[] } {
+	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const nameBytes = new TextEncoder().encode(name);
+	const fileBytes = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
+	fileBytes.set(nameBytes);
+	fileBytes[nameBytes.length] = 0x00;
+	fileBytes[nameBytes.length + 1] = 0x17;
+	fileBytes[nameBytes.length + 2] = 0x00;
+	fileBytes.set(sectionBytes, nameBytes.length + 3);
+	let nameEnd = 0;
+	while (nameEnd < fileBytes.length && fileBytes[nameEnd] !== 0) nameEnd++;
+	const loadedRawHex = Array.from(fileBytes.slice(nameEnd + 3))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+	const parsed = new PatchParser(fileBytes.buffer).parsePrf2()!;
+	return { rawHex: loadedRawHex, patches: parsed.patches };
+}
+
+function extractSection(rawHex: string, targetType: number): string | null {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	let ofs = 0;
+	while (ofs < bytes.length - 2) {
+		const type = bytes[ofs];
+		const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+		if (type === targetType) {
+			return Array.from(bytes.slice(ofs, ofs + 3 + siz))
+				.map((b) => b.toString(16).padStart(2, '0'))
+				.join('');
+		}
+		ofs += 3 + siz;
+	}
+	return null;
+}
+
+// ── prf2 tests ────────────────────────────────────────────────────────────────
+
+describe('prf2 round-trip: parse → serializePerformance → parse', () => {
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(file, () => {
+			const { name, rawHex, patches: patchesA } = loadFixturePrf2(file);
+			const newHex = serializePerformance(patchesA, rawHex);
+			const { patches: patchesB } = parsePerfFromRawHex(name, newHex);
+			expect(patchesB).toHaveLength(4);
+			for (let s = 0; s < 4; s++) {
+				expectPatchEqual(patchesA[s], patchesB[s]);
+			}
+		});
+	}
+});
+
+describe('prf2 0x11 section preservation', () => {
+	it('perf data header (0x11) is byte-identical after round-trip', () => {
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const newHex = serializePerformance(patches, rawHex);
+		const orig11 = extractSection(rawHex, 0x11);
+		const new11 = extractSection(newHex, 0x11);
+		expect(orig11).not.toBeNull();
+		expect(new11).toBe(orig11);
+	});
+});
+
+describe('prf2 per-slot mutation round-trip', () => {
+	it('mutating slot 0 does not affect slots 1–3', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const snapsBefore = [1, 2, 3].map((s) => ({
+			mods: patches[s].areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index),
+			cabs: (patches[s].areas[1].cableList ?? []).map(cableSnap),
+		}));
+
+		const mod: ModuleInstance = {
+			type: 1, index: 200, horiz: 1, vert: 1, colour: 0,
+			uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [],
+		};
+		mutAddModule(patches[0], 1, mod);
+
+		const newHex = serializePerformance(patches, rawHex);
+		const { patches: reparsed } = parsePerfFromRawHex(name, newHex);
+
+		for (let s = 1; s <= 3; s++) {
+			const mods = reparsed[s].areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
+			const cabs = (reparsed[s].areas[1].cableList ?? []).map(cableSnap);
+			expect(mods).toEqual(snapsBefore[s - 1].mods);
+			expect(cabs).toEqual(snapsBefore[s - 1].cabs);
+		}
+
+		const slot0mods = reparsed[0].areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
+		expect(slot0mods.some((m) => m.index === 200)).toBe(true);
+	});
+
+	it('mutating slot 2 survives round-trip', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const mod: ModuleInstance = {
+			type: 1, index: 201, horiz: 2, vert: 3, colour: 0,
+			uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [],
+		};
+		mutAddModule(patches[2], 1, mod);
+
+		const newHex = serializePerformance(patches, rawHex);
+		const { patches: reparsed } = parsePerfFromRawHex(name, newHex);
+
+		const found = reparsed[2].areas[1].modules.find((m) => m.index === 201);
+		expect(found).toBeDefined();
+		expect(found!.horiz).toBe(2);
+		expect(found!.vert).toBe(3);
+	});
+});
+
+describe('prf2 file save/load round-trip', () => {
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(`unmodified — ${file}`, () => {
+			const { name, rawHex, patches: patchesA } = loadFixturePrf2(file);
+			const savedRawHex = serializePerformance(patchesA, rawHex);
+			const { rawHex: loadedRawHex, patches: patchesB } = simulatePerfFileSaveAndLoad(name, savedRawHex);
+			expect(loadedRawHex).toEqual(savedRawHex);
+			for (let s = 0; s < 4; s++) {
+				expectPatchEqual(patchesA[s], patchesB[s]);
+			}
+		});
+	}
 });

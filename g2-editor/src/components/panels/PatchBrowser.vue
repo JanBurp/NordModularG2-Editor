@@ -94,7 +94,7 @@
 								v-for="p in group.patches"
 								:key="`${p.bank}-${p.location}`"
 								class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
-								@click="selectSynth(p)"
+								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
 								<span class="text-neutral-600 text-xs shrink-0 w-5">{{ p.location }}</span>
 								<span class="text-xs text-neutral-200 truncate flex-1">{{ p.name }}</span>
@@ -122,7 +122,7 @@
 	}>();
 
 	const emit = defineEmits<{
-		select: [item: { type: 'disk'; filepath: string } | { type: 'synth'; bank: number; location: number }];
+		select: [item: { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' } | { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' }];
 	}>();
 
 	const browser = useBrowserStore();
@@ -191,24 +191,24 @@
 		if (entry.isDir) {
 			browser.loadDiskList(entry.path);
 		} else {
-			emit('select', { type: 'disk', filepath: entry.path });
+			const kind = entry.name.toLowerCase().endsWith('.prf2') ? 'performance' : 'patch';
+			emit('select', { type: 'disk', filepath: entry.path, kind });
 		}
 	}
 
-	function selectSynth(p: SynthPatch) {
-		emit('select', { type: 'synth', bank: p.bank, location: p.location });
+	function selectSynth(p: SynthPatch, kind?: 'patch' | 'performance') {
+		emit('select', { type: 'synth', bank: p.bank, location: p.location, kind });
 	}
 
 	function handleEnter() {
 		if (browser.view === 'disk' && filteredDiskFiles.value.length > 0) {
-			emit('select', {
-				type: 'disk',
-				filepath: filteredDiskFiles.value[0].path,
-			});
+			const entry = filteredDiskFiles.value[0];
+			const kind = entry.name.toLowerCase().endsWith('.prf2') ? 'performance' : 'patch';
+			emit('select', { type: 'disk', filepath: entry.path, kind });
 		} else if (browser.view === 'patches' && filteredPatches.value.length > 0) {
-			selectSynth(filteredPatches.value[0]);
+			selectSynth(filteredPatches.value[0], 'patch');
 		} else if (browser.view === 'performances' && filteredPerformances.value.length > 0) {
-			selectSynth(filteredPerformances.value[0]);
+			selectSynth(filteredPerformances.value[0], 'performance');
 		}
 	}
 

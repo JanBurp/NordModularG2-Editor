@@ -15,6 +15,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	savePatch: (filepath: string, data: number[]) =>
 		ipcRenderer.invoke("patch:save", filepath, data),
 	showSaveDialog: (defaultName?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName),
+	showSavePerfDialog: (defaultName?: string) => ipcRenderer.invoke("perf:save-dialog", defaultName),
 	openPatchDialog: () => ipcRenderer.invoke("patch:open-dialog"),
 });
 

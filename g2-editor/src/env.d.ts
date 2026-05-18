@@ -24,6 +24,7 @@ declare global {
 			offMenuAction: () => void;
 			savePatch: (filepath: string, data: number[]) => Promise<void>;
 			showSaveDialog: (defaultName?: string) => Promise<{ success: boolean; filepath?: string }>;
+			showSavePerfDialog: (defaultName?: string) => Promise<{ success: boolean; filepath?: string }>;
 			openPatchDialog: () => Promise<{
 				success: boolean;
 				filepath?: string;

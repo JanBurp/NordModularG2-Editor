@@ -452,6 +452,16 @@ static int cmd_select_patch(int argc, char **argv, int i) {
     return g2_select_patch(slot, bank, location);
 }
 
+static int cmd_select_perf(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: select-perf <bank:1-32> <location:1-127>\n");
+        return 1;
+    }
+    int bank     = atoi(argv[i + 1]);
+    int location = atoi(argv[i + 2]);
+    return g2_select_perf(bank, location);
+}
+
 static int cmd_upload_patch(int argc, char **argv, int i) {
     if (i + 2 >= argc) {
         fprintf(stderr, "Usage: upload-patch <slot> <filepath>\n");
@@ -547,6 +557,7 @@ static const cmd_entry_t commands[] = {
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },
     { "select-patch",     cmd_select_patch     },
+    { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },
     { "set-perf-mode",    cmd_set_perf_mode    },
     { "set-perf-name",    cmd_set_perf_name    },

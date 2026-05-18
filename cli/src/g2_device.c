@@ -1288,6 +1288,20 @@ int g2_select_patch(int slot, int bank, int location) {
     return G2_OK;
 }
 
+int g2_select_perf(int bank, int location) {
+    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
+    g2_drain_pending();
+    uint8_t cmd[4] = { 0x0a, 4, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
+    if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_perf_mode(int mode) {
     if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(performance) or 1(patch)\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-perf-mode: failed to connect\n"); return G2_ERR_CONNECT; }

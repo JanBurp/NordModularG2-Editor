@@ -193,6 +193,16 @@ ipcMain.handle("patch:save-dialog", async (event, defaultName?: string) => {
 	return { success: true, filepath: result.filePath };
 });
 
+ipcMain.handle("perf:save-dialog", async (event, defaultName?: string) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showSaveDialog(browserWin!, {
+		filters: [{ name: "Performance Files", extensions: ["prf2"] }],
+		defaultPath: defaultName ? `${defaultName}.prf2` : "performance.prf2",
+	});
+	if (result.canceled || !result.filePath) return { success: false };
+	return { success: true, filepath: result.filePath };
+});
+
 ipcMain.handle("patch:open-dialog", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
@@ -249,6 +259,7 @@ app.whenReady().then(async () => {
 				{ label: "New Performance", click: () => win!.webContents.send("menu:action", "new-performance") },
 				{ type: "separator" as const },
 				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
+				{ label: "Open Performance", click: () => win!.webContents.send("menu:action", "open-performance") },
 				{ type: "separator" as const },
 				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
 				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
