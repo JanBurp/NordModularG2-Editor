@@ -83,7 +83,10 @@ export function useJackDragInteraction(
 				if (drivenNestJacks.has(key)) continue;
 				drivenNestJacks.add(key);
 				for (const dc of dir0Cables) {
-					const sm = dc.smod ?? 0, sc = dc.scon ?? 0, dm = dc.dmod ?? 0, dc2 = dc.dcon ?? 0;
+					const sm = dc.smod ?? 0,
+						sc = dc.scon ?? 0,
+						dm = dc.dmod ?? 0,
+						dc2 = dc.dcon ?? 0;
 					if (sm === mod && sc === con) queue.push({ mod: dm, con: dc2 });
 					else if (dm === mod && dc2 === con) queue.push({ mod: sm, con: sc });
 				}
@@ -92,13 +95,13 @@ export function useJackDragInteraction(
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
 		for (const mod of getModules()) {
-			const modDef = getModule(mod.type) as any;
+			const modDef = getModule(mod.type);
 			if (!modDef) continue;
 			const baseX = mod.horiz * 256;
 			const baseY = mod.vert * 16;
 			for (const targetType of targetTypes) {
-				const jacks: any[] = targetType === 'input' ? modDef.inputs || [] : modDef.outputs || [];
-				jacks.forEach((jack: any, idx: number) => {
+				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
+				jacks.forEach((jack, idx) => {
 					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
 					if (targetType === 'input' && src.type === 'output' && drivenNestJacks.has(`${mod.index}-${idx}`)) return;
 					const jx = jack.x + baseX;
@@ -141,7 +144,7 @@ export function useJackDragInteraction(
 	function getJackSvgPos(info: JackDragInfo) {
 		const mod = getModules().find((m) => m.index === info.moduleIndex);
 		if (!mod) return null;
-		const modDef = getModule(mod.type) as any;
+		const modDef = getModule(mod.type);
 		if (!modDef) return null;
 		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
 		const jack = jacks?.[info.connectorIndex];
@@ -238,10 +241,7 @@ export function useJackDragInteraction(
 				return;
 			}
 
-			const sameJack =
-				cycleJack?.moduleIndex === info.moduleIndex &&
-				cycleJack?.connectorIndex === info.connectorIndex &&
-				cycleJack?.type === info.type;
+			const sameJack = cycleJack?.moduleIndex === info.moduleIndex && cycleJack?.connectorIndex === info.connectorIndex && cycleJack?.type === info.type;
 
 			if (!sameJack) {
 				cycleJack = info;

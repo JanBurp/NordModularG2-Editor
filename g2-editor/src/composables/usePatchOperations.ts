@@ -9,14 +9,10 @@ export function usePatchOperations() {
 	const device = useDeviceStore();
 
 	const currentModules = computed(() =>
-		uiStore.area === 1
-			? slotsStore.getAreaModules(uiStore.activeSlot, 1)
-			: slotsStore.getAreaModules(uiStore.activeSlot, 0),
+		uiStore.area === 1 ? slotsStore.getAreaModules(uiStore.activeSlot, 1) : slotsStore.getAreaModules(uiStore.activeSlot, 0),
 	);
 	const currentCables = computed(() =>
-		uiStore.area === 1
-			? slotsStore.getAreaCables(uiStore.activeSlot, 1)
-			: slotsStore.getAreaCables(uiStore.activeSlot, 0),
+		uiStore.area === 1 ? slotsStore.getAreaCables(uiStore.activeSlot, 1) : slotsStore.getAreaCables(uiStore.activeSlot, 0),
 	);
 
 	async function deleteSelection(): Promise<void> {
@@ -46,7 +42,6 @@ export function usePatchOperations() {
 
 	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
 	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (device.status !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
@@ -59,7 +54,6 @@ export function usePatchOperations() {
 	}
 
 	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (device.status !== 'connected') return;
 		if (paramChangeTimer) clearTimeout(paramChangeTimer);
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;

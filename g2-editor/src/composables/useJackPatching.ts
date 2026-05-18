@@ -26,7 +26,10 @@ function isNestDrivenByOutput(cableList: any[], startMod: number, startCon: numb
 		if (cableList.some((c: any) => (c.dir ?? 1) === 1 && (c.dmod ?? 0) === mod && (c.dcon ?? 0) === con)) return true;
 		for (const c of cableList) {
 			if ((c.dir ?? 1) !== 0) continue;
-			const sm = c.smod ?? 0, sc = c.scon ?? 0, dm = c.dmod ?? 0, dc = c.dcon ?? 0;
+			const sm = c.smod ?? 0,
+				sc = c.scon ?? 0,
+				dm = c.dmod ?? 0,
+				dc = c.dcon ?? 0;
 			if (sm === mod && sc === con) queue.push({ mod: dm, con: dc });
 			else if (dm === mod && dc === con) queue.push({ mod: sm, con: sc });
 		}

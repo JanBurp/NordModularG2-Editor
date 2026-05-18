@@ -45,7 +45,7 @@ export function useModuleDrag(
 				const start = drag.startPosByIndex.get(idx);
 				const mod = getModules().find((m) => m.index === idx);
 				if (!start || !mod) return null;
-				const height = ((getModule(mod.type) as any)?.height ?? 2) * 16;
+				const height = (getModule(mod.type)?.height ?? 2) * 16;
 				return {
 					idx,
 					x: start.horiz * 256 + drag.dxPx,

@@ -7,7 +7,7 @@ describe('parseDefin', () => {
 		expect(result).toEqual([
 			{ numVal: 0, label: 'Pos' },
 			{ numVal: 1, label: 'PosInv' },
-			{ numVal: 2, label: 'Neg' }
+			{ numVal: 2, label: 'Neg' },
 		]);
 	});
 
@@ -16,7 +16,7 @@ describe('parseDefin', () => {
 		expect(result).toEqual([
 			{ numVal: 0, label: '{+-}0' },
 			{ numVal: 1, label: '{+-}0.5' },
-			{ numVal: 64, label: '{+-}32' }
+			{ numVal: 64, label: '{+-}32' },
 		]);
 	});
 
@@ -40,7 +40,7 @@ describe('parseDefin interpolation cases', () => {
 			{ numVal: 1, label: '{+-}0.5' },
 			{ numVal: 64, label: '{+-}32' },
 			{ numVal: 126, label: '{+-}63.0' },
-			{ numVal: 127, label: '{+-}64.0' }
+			{ numVal: 127, label: '{+-}64.0' },
 		]);
 	});
 
@@ -52,7 +52,7 @@ describe('parseDefin interpolation cases', () => {
 			{ numVal: 2, label: 'Neg' },
 			{ numVal: 3, label: 'NegInv' },
 			{ numVal: 4, label: 'Bip' },
-			{ numVal: 5, label: 'BipInv' }
+			{ numVal: 5, label: 'BipInv' },
 		]);
 	});
 
@@ -61,7 +61,7 @@ describe('parseDefin interpolation cases', () => {
 		expect(options).toEqual([
 			{ numVal: 0, label: 'Off' },
 			{ numVal: 1, label: '1' },
-			{ numVal: 127, label: '127' }
+			{ numVal: 127, label: '127' },
 		]);
 	});
 });

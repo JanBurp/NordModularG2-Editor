@@ -40,10 +40,7 @@ export const useLedStore = defineStore('led', () => {
 		const newFxStripList: LedEntry[] = [];
 		const newVaStripList: LedEntry[] = [];
 
-		for (const [areaIdx, areaName] of [
-			[0, 'fx'] as const,
-			[1, 'va'] as const,
-		]) {
+		for (const [areaIdx, areaName] of [[0, 'fx'] as const, [1, 'va'] as const]) {
 			const area = patch.areas[areaIdx];
 			const sortedMods = [...area.modules].sort((a, b) => a.index - b.index);
 			for (const mod of sortedMods) {
@@ -51,15 +48,15 @@ export const useLedStore = defineStore('led', () => {
 				if (!modDef) continue;
 
 				const ves = modDef.ve || [];
-				// Modules with ledArray VEs belong entirely to volume_data (0x3A)
-				const hasLedArray = ves.some((v: any) => v.type === 'ledArray');
+				// Modules with ledArray or vu VEs belong entirely to volume_data (0x3A)
+				const hasStrip = ves.some((v: any) => v.type === 'ledArray' || v.type === 'vu' || v.type === 'ledGroup');
 				const ledList = areaName === 'fx' ? newFxList : newVaList;
 				const stripList = areaName === 'fx' ? newFxStripList : newVaStripList;
 
-				if (hasLedArray) {
+				if (hasStrip) {
 					let stripGroupId = 0;
 					for (const ve of ves) {
-						if (ve.type === 'ledArray') {
+						if (ve.type === 'ledArray' || ve.type === 'vu' || ve.type === 'ledGroup') {
 							stripList.push({ moduleIndex: mod.index, groupId: stripGroupId++, area: areaName });
 						}
 					}
@@ -167,7 +164,9 @@ export const useLedStore = defineStore('led', () => {
 	for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
 		watch(
 			() => slotsStore.slots[slotLabel].patch,
-			(patch) => { if (patch) buildLedListFromPatch(patch); },
+			(patch) => {
+				if (patch) buildLedListFromPatch(patch);
+			},
 			{ immediate: true },
 		);
 	}

@@ -1417,7 +1417,7 @@ int g2_upload_patch(int slot, const char *filepath) {
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;
-    if (location < 0 || location > 1) return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 2) return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0)      return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
@@ -1447,5 +1447,55 @@ int g2_set_param(int slot, int location, int module_id,
                                    msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     return (ret < 0) ? G2_ERR_SEND : G2_OK;
     /* No recv_interrupt — WRITE_NO_RESP */
+}
+
+/* GET_RESOURCES_USED returns one bulk packet whose payload may contain two
+ * area blocks packed as: [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
+ * Return all payload bytes (CRC stripped) so the caller can parse both. */
+cJSON *g2_get_resources(const char *slot_str) {
+    uint8_t interruptResp[16] = {0};
+    uint8_t version;
+    int ret;
+
+    if (ensure_connected(1) < 0) { g2_err("Failed to connect to G2\n"); return NULL; }
+
+    int slot = parse_slot(slot_str);
+    if (slot < 0 || slot > 3) { g2_err("Invalid slot: %s\n", slot_str); return NULL; }
+
+    /* Get patch version */
+    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
+    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) { g2_err("Failed to get version\n"); return NULL; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0) { g2_err("No version response\n"); return NULL; }
+    version = interruptResp[6];
+
+    uint8_t loc = 0;
+    if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
+    usleep(USB_SEND_DELAY_US);
+
+    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+        g2_err("Unexpected response for get-resources\n"); return NULL;
+    }
+
+    uint16_t bulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+    if (bulkSize < 6) { g2_err("get-resources: bulk too small\n"); return NULL; }
+    uint8_t *bulk = malloc(bulkSize);
+    if (!bulk) { g2_err("Memory allocation failed\n"); return NULL; }
+
+    ret = recv_bulk(bulk, bulkSize);
+    if (ret < 6) { free(bulk); g2_err("Failed to read resources bulk\n"); return NULL; }
+
+    /* Payload: bulk[4..ret-3], last 2 bytes are CRC (same as watch event handler). */
+    cJSON *result = cJSON_CreateObject();
+    cJSON *arr = cJSON_CreateArray();
+    int dataEnd = ret - 2;
+    for (int i = 4; i < dataEnd; i++)
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber(bulk[i]));
+    cJSON_AddItemToObject(result, "bytes", arr);
+
+    free(bulk);
+    return result;
 }
 

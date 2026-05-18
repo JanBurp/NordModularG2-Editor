@@ -19,6 +19,16 @@
 			<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="(v) => emit('variationClick', v)" />
 		</div>
 
+		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
+		<div class="module-bevel px-1 h-8 flex items-baseline">
+			<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
+			<Switch
+				:value="patchParams?.[uiStore.variation]?.activeMuted ?? 1"
+				paramType="ActiveMonitor"
+				@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)"
+			/>
+		</div>
+
 		<ToolBarDivider />
 
 		<ColorPicker />
@@ -26,10 +36,6 @@
 		<ToolBarDivider />
 
 		<CableVisibilitySelector />
-
-		<ToolBarDivider />
-
-		<CPU :va="{ cycles: 25, memory: 33 }" :fx="{ cycles: 12.3, memory: 100 }"></CPU>
 	</ToolBar>
 </template>
 
@@ -43,11 +49,12 @@
 	import Select from '../common/Select.vue';
 	import ColorPicker from '../common/ColorPicker.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
-	import CPU from './CPU.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
+	import Knob from '../common/Knob.vue';
+	import Switch from '../common/Switch.vue';
 
 	defineProps<{ patchName: string }>();
 	const emit = defineEmits<{ variationClick: [value: string | number | (string | number)[]] }>();
@@ -56,11 +63,14 @@
 	const uiStore = useUiStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.activeSlot));
 
 	const selectedCategory = ref<number>(0);
 	watch(
 		() => (currentPatch.value as any)?.description?.category,
-		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		(cat) => {
+			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+		},
 		{ immediate: true },
 	);
 	watch(selectedCategory, (cat) => {

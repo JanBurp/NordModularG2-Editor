@@ -2,10 +2,7 @@ import type { Ref } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
 
-export function useModuleDrop(
-	svgRef: Ref<SVGSVGElement | null>,
-	onDrop: (info: { typeId: number; col: number; row: number }) => void,
-) {
+export function useModuleDrop(svgRef: Ref<SVGSVGElement | null>, onDrop: (info: { typeId: number; col: number; row: number }) => void) {
 	const ui = useUiStore();
 	let dropGhost: SVGRectElement | null = null;
 

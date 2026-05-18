@@ -30,11 +30,7 @@
 		change: [index: number, value: number];
 	}>();
 
-	const {
-		onMouseDown: onTrackMouseDown,
-		onDoubleClick,
-		stopRepeat,
-	} = useSpinnerHoldInteraction(
+	const { onMouseDown: onTrackMouseDown, onDoubleClick } = useSpinnerHoldInteraction(
 		'KnobSlider',
 		props.paramIndex,
 		() => props.value,
