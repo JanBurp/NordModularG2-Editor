@@ -477,12 +477,17 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_msg_free(&msg);
 			if (daemon_running) do_reconnect();
 		} else if (msg.sentinel == 2) {
-			/* BULK_REARM: G2 stopped streaming after full performance switch. */
+			/* BULK_REARM: G2 stopped streaming after full performance switch.
+			 * Let emit_bulk_event() handle the full message (version_update +
+			 * synth/perf settings query); g2_pending_rearm triggers the rearm. */
+			g2_emit_event(&msg);
 			g2_msg_free(&msg);
-			printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
-			fflush(stdout);
-			g2_rearm();
-			/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
+			if (g2_pending_rearm) {
+				g2_pending_rearm = 0;
+				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+				fflush(stdout);
+				g2_rearm();
+			}
 		} else {
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);

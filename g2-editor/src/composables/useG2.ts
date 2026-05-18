@@ -1,6 +1,6 @@
 import { computed, ref } from 'vue';
 
-import { Device } from '@/types';
+import { Device, SlotLabel } from '@/types';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { DeviceStatus } from '@/store/device';
 import { SLOT_LABELS } from '@/constants';
@@ -147,6 +147,9 @@ export function useG2() {
 				}
 				if (ev.type === 'slot_data') {
 					log('←', 'Watch', formatWatchEvent(ev));
+					if (ev.data && ev.data.data) {
+						slotsStore._applyPatchOutput(ev.slot as SlotLabel, JSON.stringify(ev.data));
+					}
 					return;
 				}
 				if (ev.type === 'names') {
@@ -213,7 +216,14 @@ export function useG2() {
 					const prevMode = store.device?.mode;
 					store.updateSynthSettings(ev);
 					log('←', 'Watch', formatWatchEvent(ev));
-					if (prevMode && ev.mode !== prevMode) {
+					if (ev.patches && Array.isArray(ev.patches)) {
+						// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
+						for (const p of ev.patches) {
+							if (!p || !p.data) continue;
+							const slot = (p.slot as string).toUpperCase() as SlotLabel;
+							slotsStore._applyPatchOutput(slot, JSON.stringify(p));
+						}
+					} else if (prevMode && ev.mode !== prevMode) {
 						for (const s of SLOT_LABELS) slotsStore.loadSlot(s);
 					}
 					return;

@@ -26,12 +26,50 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
     int dataEnd      = bret - 2;
 
     if (baCmd == 0x04 && bversion == 0x40 && bsubCmd == 0x1f) {
-        /* All-slots version update — BULK_REARM case. Listener handles re-arm;
-         * daemon emits version_update directly when it receives sentinel==2.
-         * This branch is dead code when listener is active, kept for completeness. */
-        printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+        /* All-slots version update — G2 stopped streaming (mode/slot switch).
+         * Emit version data, then query current synth+perf settings so the
+         * frontend always sees the new mode regardless of G2 streaming state. */
+        uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
+        printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
+        int first = 1;
+        for (int i = 5; i + 2 < dataEnd; i += 3) {
+            if (bulk[i] != 0x36) continue;
+            uint8_t slot = bulk[i + 1];
+            uint8_t ver  = bulk[i + 2];
+            if (!first) printf(",");
+            printf("{\"slot\":%u,\"version\":%u}", slot, ver);
+            first = 0;
+        }
+        printf("]}\n");
         fflush(stdout);
-        memset(g2_slot_version, 0, sizeof(g2_slot_version));
+        cJSON *synth = query_synth_settings("synth_settings_update");
+        if (synth) {
+            cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
+            int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
+
+            /* Load all 4 slots before rearming (Delphi approach: all queries before START_COMM).
+             * Embed patch data in synth_settings_update so frontend applies them directly —
+             * no get-patch stdin commands are sent, eliminating the ACK race condition. */
+            const char *slot_names[] = {"a", "b", "c", "d"};
+            cJSON *patches = cJSON_CreateArray();
+            for (int s = 0; s < 4; s++) {
+                cJSON *p = g2_get_patch(slot_names[s]);
+                cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
+            }
+            cJSON_AddItemToObject(synth, "patches", patches);
+
+            char *ss = cJSON_PrintUnformatted(synth);
+            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
+            cJSON_Delete(synth);
+
+            cJSON *ps = query_perf_settings(mode, "perf_settings");
+            if (ps) {
+                char *ds = cJSON_PrintUnformatted(ps);
+                if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
+                cJSON_Delete(ps);
+            }
+        }
+        g2_pending_rearm = 1;
         return BULK_REARM;
     }
 
@@ -118,14 +156,23 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         printf("]}\n");
         fflush(stdout);
-        /* Query synth+perf settings now: G2 just stopped streaming so the queue
-         * is quiet and recv_interrupt() will get our response, not a streamed event. */
+        /* The 0x0C/0x1F response is G2's reply to set-perf-mode, but G2 is still
+         * streaming at this point. Stop streaming explicitly so the queue drains
+         * and recv_interrupt() gets our query responses rather than stream events. */
+        g2_stop_comm();
         cJSON *synth = query_synth_settings("synth_settings_update");
         if (synth) {
-            char *ss = cJSON_PrintUnformatted(synth);
-            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
             cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
             int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
+            const char *slot_names[] = {"a", "b", "c", "d"};
+            cJSON *patches = cJSON_CreateArray();
+            for (int s = 0; s < 4; s++) {
+                cJSON *p = g2_get_patch(slot_names[s]);
+                cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
+            }
+            cJSON_AddItemToObject(synth, "patches", patches);
+            char *ss = cJSON_PrintUnformatted(synth);
+            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
             cJSON_Delete(synth);
             cJSON *ps = query_perf_settings(mode, "perf_settings");
             if (ps) {
