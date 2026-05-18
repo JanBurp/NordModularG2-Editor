@@ -64,6 +64,12 @@ export function useG2() {
 
 	function formatWatchEvent(ev: any): string {
 		switch (ev.type) {
+			case 'device_info':
+				return `device_info name=${ev.data?.synthName ?? '?'}`;
+			case 'slot_data':
+				return `slot_data slot=${ev.slot}`;
+			case 'names':
+				return 'names';
 			case 'param_change':
 				return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
 			case 'patch_param':
@@ -132,6 +138,20 @@ export function useG2() {
 		window.cli.onWatchEvent((line: string) => {
 			try {
 				const ev = JSON.parse(line);
+				if (ev.type === 'device_info') {
+					store.applyDeviceInfo(ev.data);
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'slot_data') {
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'names') {
+					store.startupNames = ev.data ?? null;
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
 				if (ev.type === 'watch_armed') {
 					resolveArmed();
 					return;

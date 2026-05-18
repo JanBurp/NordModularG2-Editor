@@ -127,8 +127,13 @@ static int parse_location(cJSON *args, int idx) {
 	return (s && strcmp(s, "va") == 0) ? 1 : (s && strcmp(s, "patch") == 0) ? 2 : 0;
 }
 
-static cJSON *g_startup_cache = NULL;
-static cJSON *g_device_cache  = NULL;
+/* ── debug helpers ─────────────────────────────────────────────────────── */
+
+static void debug_status(const char *msg) {
+	if (!g2_debug) return;
+	printf("{\"debug\":\"status\",\"msg\":\"%s\"}\n", msg);
+	fflush(stdout);
+}
 
 /* ── command execution ─────────────────────────────────────────────────── */
 
@@ -303,30 +308,6 @@ static void execute_cmd(const char *line) {
 		data = g2_get_resources(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
 
-	} else if (strcmp(cmd, "list") == 0) {
-		int filter = LIST_FILTER_ALL;
-		int bank_filter = 0;
-		for (int j = 0; j < n; j++) {
-			const char *a = arg_s(args, j);
-			if (!a) continue;
-			if (strcmp(a, "patches") == 0)            filter = LIST_FILTER_PATCHES;
-			else if (strcmp(a, "performances") == 0)  filter = LIST_FILTER_PERFORMANCES;
-			else if (strcmp(a, "bank") == 0 && j + 1 < n) bank_filter = arg_i(args, ++j);
-		}
-		data = g2_list(filter, bank_filter);
-		ret = data ? G2_OK : G2_ERR;
-
-	} else if (strcmp(cmd, "device") == 0) {
-		data = g_device_cache;
-		g_device_cache = NULL;
-		if (!data) data = g2_device_info(0);
-		ret = data ? G2_OK : G2_ERR;
-
-	} else if (strcmp(cmd, "startup") == 0) {
-		data = g_startup_cache;
-		g_startup_cache = NULL;
-		if (!data) data = g2_startup();
-		ret = data ? G2_OK : G2_ERR;
 	}
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
@@ -391,8 +372,9 @@ static void do_reconnect(void) {
 
 /* ── entry point ───────────────────────────────────────────────────────── */
 
-int g2_daemon_run(output_format_t format) {
+int g2_daemon_run(output_format_t format, int debug) {
 	(void)format;
+	g2_debug = debug;
 	g2_set_error_callback(daemon_error_cb, NULL);
 
 	signal(SIGINT, daemon_stop);
@@ -402,27 +384,68 @@ int g2_daemon_run(output_format_t format) {
 	pthread_create(&reader, NULL, stdin_reader, NULL);
 
 	/* Connect with retry. */
+	debug_status("connect_wait");
 	while (daemon_running && g2_connect_silent() < 0)
 		usleep(100000);
 	if (!daemon_running) { pthread_detach(reader); return 0; }
+	debug_status("connected");
 
-	/* Reset G2 state and explicitly stop streaming (matches Delphi InitSeq steps 1-2). */
+	/* Reset G2 state and stop streaming (Delphi InitSeq steps 1-2). */
 	g2_send_init();
+	debug_status("send_init");
 	g2_stop_comm();
+	debug_status("stop_comm");
 
-	/* Run startup queries before COMM is armed — no unsolicited events yet. */
-	g_startup_cache = g2_startup();
-	g_device_cache  = g_startup_cache
-	    ? cJSON_Duplicate(cJSON_GetObjectItem(g_startup_cache, "device"), 1)
-	    : NULL;
+	/* Run all startup queries in direct mode (no listener yet) so that
+	 * g2_list() can do full-size reads from EP 0x81. Each result is emitted
+	 * immediately as a typed event so the client sees progress. */
 
+	debug_status("startup_device_info");
+	cJSON *startup_device = g2_device_info(0);
+	{
+		cJSON *ev = cJSON_CreateObject();
+		cJSON_AddStringToObject(ev, "type", "device_info");
+		cJSON_AddItemToObject(ev, "data", startup_device ? startup_device : cJSON_CreateNull());
+		emit(ev);
+		cJSON_Delete(ev);
+	}
+
+	const char *slotNames[] = {"A", "B", "C", "D"};
+	for (int i = 0; i < 4; i++) {
+		char sbuf[32];
+		snprintf(sbuf, sizeof(sbuf), "startup_slot_%s", slotNames[i]);
+		debug_status(sbuf);
+		cJSON *patch = g2_get_patch(slotNames[i]);
+		cJSON *ev = cJSON_CreateObject();
+		cJSON_AddStringToObject(ev, "type", "slot_data");
+		cJSON_AddStringToObject(ev, "slot", slotNames[i]);
+		cJSON_AddItemToObject(ev, "data", patch ? patch : cJSON_CreateNull());
+		emit(ev);
+		cJSON_Delete(ev);
+	}
+
+	debug_status("startup_list");
+	cJSON *startup_names = g2_list(LIST_FILTER_ALL, 0);
+	{
+		cJSON *ev = cJSON_CreateObject();
+		cJSON_AddStringToObject(ev, "type", "names");
+		cJSON_AddItemToObject(ev, "data", startup_names ? startup_names : cJSON_CreateNull());
+		emit(ev);
+		cJSON_Delete(ev);
+	}
+
+	/* All startup queries done. Start listener and arm streaming. */
+	debug_status("listener_start");
 	g2_listener_start();
+	debug_status("rearm");
 	g2_rearm();   /* sends START_COMM; ACK consumed below */
 
 	/* Wait for START_COMM ACK before declaring the daemon ready. */
 	g2_msg_t ack;
-	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
+	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0) {
+		debug_status("ack_received");
 		g2_msg_free(&ack);
+	}
 
 	printf("{\"type\":\"watch_armed\"}\n");
 	fflush(stdout);

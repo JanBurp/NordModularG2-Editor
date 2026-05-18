@@ -497,7 +497,7 @@ static int cmd_set_perf_name(int argc, char **argv, int i) {
 
 static int cmd_daemon(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
-    int ret = g2_daemon_run(output_format);
+    int ret = g2_daemon_run(output_format, debug_mode);
     /* Skip atexit(g2_exit): explicit libusb_close() triggers a G2 USB
      * state change that requires re-enumeration time.  The OS reclaims
      * the handle cleanly without it. */

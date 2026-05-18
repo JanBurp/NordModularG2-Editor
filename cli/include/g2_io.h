@@ -32,6 +32,9 @@ typedef struct {
 /* 1 while listener thread is running — used by recv_interrupt/recv_bulk shims */
 extern volatile int g2_listener_active;
 
+/* Set to 1 by daemon --debug; causes send_* functions to log hex to stdout */
+extern int g2_debug;
+
 /* Start/stop the background listener thread (sole reader of EP 0x81 / 0x82) */
 int  g2_listener_start(void);
 void g2_listener_stop(void);
