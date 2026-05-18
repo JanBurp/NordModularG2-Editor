@@ -118,6 +118,20 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         printf("]}\n");
         fflush(stdout);
+        cJSON *synth = query_synth_settings("synth_settings_update");
+        if (synth) {
+            char *s = cJSON_PrintUnformatted(synth);
+            if (s) { printf("%s\n", s); fflush(stdout); free(s); }
+            cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
+            int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
+            cJSON_Delete(synth);
+            cJSON *ps = query_perf_settings(mode, "perf_settings");
+            if (ps) {
+                char *ds = cJSON_PrintUnformatted(ps);
+                if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
+                cJSON_Delete(ps);
+            }
+        }
         g2_pending_rearm = 1;
     } else {
         printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
