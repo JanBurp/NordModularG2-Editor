@@ -1,5 +1,5 @@
 <template>
-	<div class="overflow-auto bg-neutral-700" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+	<div class="overflow-auto bg-neutral-700 relative" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
 			font-size="9"
@@ -12,6 +12,8 @@
 				handleCanvasClick();
 			"
 		>
+			<text :font-size="64" x="50%" y="50%" width="100%" height="100%" text-anchor="middle">{{ getAreaByShort(area) }}</text>
+
 			<Module
 				v-for="mod in modulesWithVariation"
 				:key="mod.index + '-' + mod.uname"
@@ -32,17 +34,6 @@
 				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
-			<rect
-				v-if="isDraggingSelection && selectionRect"
-				:x="selectionRect.x"
-				:y="selectionRect.y"
-				:width="Math.max(0, selectionRect.width)"
-				:height="Math.max(0, selectionRect.height)"
-				fill="none"
-				stroke="rgba(30,30,30,0.8)"
-				stroke-width="3"
-				pointer-events="none"
-			/>
 			<DragGhost :ghosts="dragGhosts" />
 		</svg>
 		<Cables
@@ -53,6 +44,7 @@
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
 		/>
+		<div ref="selectionRectEl" class="selection-rect" />
 	</div>
 </template>
 <script setup lang="ts">
@@ -66,6 +58,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
+	import { getAreaByShort } from '../../constants/ui';
 
 	const props = defineProps({
 		modules: {
@@ -127,10 +120,12 @@
 	const svgRef = ref<SVGSVGElement | null>(null);
 	provide('patchCanvasSvg', svgRef);
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
+	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
-	const { selectionRect, isDraggingSelection, handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
+	const { handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,
 		computed(() => props.modules as any[]),
+		selectionRectEl,
 	);
 
 	const canvasWidth = computed(() => {
@@ -192,16 +187,13 @@
 		emit('modeChange', moduleIndex, index, value);
 	}
 
-	const { dragState, dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
+	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
 	);
 
-	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
-		svgRef,
-		(info) => emit('moduleDrop', info),
-	);
+	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
 
 	onUnmounted(() => {
 		clearModuleDrag();

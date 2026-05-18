@@ -124,7 +124,7 @@ static int arg_count(cJSON *args) {
 
 static int parse_location(cJSON *args, int idx) {
 	const char *s = arg_s(args, idx);
-	return (s && strcmp(s, "va") == 0) ? 1 : 0;
+	return (s && strcmp(s, "va") == 0) ? 1 : (s && strcmp(s, "patch") == 0) ? 2 : 0;
 }
 
 static cJSON *g_startup_cache = NULL;
@@ -297,6 +297,10 @@ static void execute_cmd(const char *line) {
 
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
 		data = g2_get_patch(arg_s(args, 0));
+		ret = data ? G2_OK : G2_ERR;
+
+	} else if (strcmp(cmd, "get-resources") == 0 && n >= 1) {
+		data = g2_get_resources(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "list") == 0) {

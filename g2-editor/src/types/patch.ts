@@ -36,12 +36,48 @@ export interface PatchDescription {
 	category: number;
 }
 
+export interface PatchParamVariation {
+	patchVol: number;
+	activeMuted: number;
+	glide: number;
+	glideTime: number;
+	bend: number;
+	semi: number;
+	vibrato: number;
+	cents: number;
+	rate: number;
+	arpeggiator: number;
+	arpTime: number;
+	arpType: number;
+	octaveShift: number;
+	sustain: number;
+	octaves: number;
+}
+
+export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [
+	'patchVol',
+	'activeMuted',
+	'glide',
+	'glideTime',
+	'bend',
+	'semi',
+	'vibrato',
+	'cents',
+	'rate',
+	'arpeggiator',
+	'arpTime',
+	'arpType',
+	'octaves',
+	'octaveShift',
+	'sustain',
+];
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
 	mode?: { area: 0 | 1; variation: number };
+	patchParams?: PatchParamVariation[];
 }
-
 
 export const VOICEMODE_OPTIONS = [
 	{ id: 0, name: 'Poly' },

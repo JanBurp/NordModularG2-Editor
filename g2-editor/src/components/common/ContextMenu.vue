@@ -27,7 +27,11 @@
 					v-else
 					:ref="(el) => setItemRef(idx, el as HTMLElement | null)"
 					class="flex items-center justify-between px-3 py-1.5 select-none"
-					:class="[item.disabled ? 'text-neutral-500 cursor-not-allowed' : 'hover:bg-neutral-700 cursor-pointer', activeSubmenu === idx ? 'bg-neutral-700' : '', item.bgColor ? 'text-neutral-900' : '']"
+					:class="[
+						item.disabled ? 'text-neutral-500 cursor-not-allowed' : 'hover:bg-neutral-700 cursor-pointer',
+						activeSubmenu === idx ? 'bg-neutral-700' : '',
+						item.bgColor ? 'text-neutral-900' : '',
+					]"
 					:style="item.bgColor ? { backgroundColor: item.bgColor } : {}"
 					@mouseenter="onItemEnter(idx)"
 					@click.stop="onItemClick(item)"

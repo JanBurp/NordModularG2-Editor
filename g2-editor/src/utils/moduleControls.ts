@@ -10,7 +10,7 @@ export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	filterFreq,
 	filterFreq1,
 	filterFreq2,
-	MidiNote
+	MidiNote,
 };
 
 export const paramFormattingFunctionsWithArgs: Record<string, (i: number, con: unknown, tw: unknown) => string | undefined> = {
@@ -44,9 +44,7 @@ export const definReplacements: Record<string, string> = {
 };
 
 export function applyDefinReplacements(label: string, extraReplacements?: Record<string, string>): string {
-	const replacements = extraReplacements
-		? { ...definReplacements, ...extraReplacements }
-		: definReplacements;
+	const replacements = extraReplacements ? { ...definReplacements, ...extraReplacements } : definReplacements;
 
 	let result = label;
 	for (const [from, to] of Object.entries(replacements)) {
@@ -57,16 +55,22 @@ export function applyDefinReplacements(label: string, extraReplacements?: Record
 
 export function parseDefin(defin: string[]): Array<{ numVal: number; label: string }> {
 	if (!defin || defin.length === 0) return [];
-	return defin[0].split(',')
-		.map(s => {
-			const [v, label] = s.split('~').map(p => p.trim());
+	return defin[0]
+		.split(',')
+		.map((s) => {
+			const [v, label] = s.split('~').map((p) => p.trim());
 			return { numVal: Number(v), label };
 		})
 		.sort((a, b) => a.numVal - b.numVal);
 }
 
-export function calcDefinOptions(value: number, options: Array<{ numVal: number; label: string }>, extraReplacements?: Record<string, string>, isClkMode?: boolean): string {
-	const exact = options.find(o => o.numVal === value);
+export function calcDefinOptions(
+	value: number,
+	options: Array<{ numVal: number; label: string }>,
+	extraReplacements?: Record<string, string>,
+	isClkMode?: boolean,
+): string {
+	const exact = options.find((o) => o.numVal === value);
 	if (exact) return applyDefinReplacements(exact.label, extraReplacements);
 
 	if (isClkMode) {
@@ -97,12 +101,10 @@ export function calcDefinOptions(value: number, options: Array<{ numVal: number;
 				const formatted = hasDecimal ? resultNum.toFixed(1) : String(Math.round(resultNum));
 				const currNumericMatch = curr.label.match(/^(\D*)(\d+\.?\d*)(.*)$/);
 				const currHasNumeric = currNumericMatch && currNumericMatch[2].length > 0 && /^-?\d/.test(curr.label);
-				const prefix = currHasNumeric
-					? (curr.label.match(/^(\D*)/)?.[1] ?? '')
-					: (next.label.match(/^(\D*)/)?.[1] ?? '');
+				const prefix = currHasNumeric ? (curr.label.match(/^(\D*)/)?.[1] ?? '') : (next.label.match(/^(\D*)/)?.[1] ?? '');
 				const postfix = currHasNumeric
-					? (curr.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''))
-					: (next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, ''));
+					? curr.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, '')
+					: next.label.replace(/^(\D*\d+\.?\d*)/, '').replace(/^(\.\d+)/, '');
 				return applyDefinReplacements(`${prefix}${formatted}${postfix}`, extraReplacements);
 			}
 			return applyDefinReplacements(String(value), extraReplacements);
@@ -137,7 +139,7 @@ function getContextFromRef(
 	modeValues: number[] | undefined,
 	modeDefs: ModuleDefinition['modes'] | undefined,
 	values: number[],
-	paramCount: number
+	paramCount: number,
 ): Record<string, number> {
 	const context: Record<string, number> = {};
 	if (!params) return context;
@@ -190,7 +192,7 @@ export function formatCombinedValue(
 	params: ModuleDefinition['params'],
 	values: number[],
 	modeValues?: number[],
-	modeDefs?: ModuleDefinition['modes']
+	modeDefs?: ModuleDefinition['modes'],
 ): string {
 	if (!params) return '';
 

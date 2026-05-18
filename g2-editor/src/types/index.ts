@@ -1,5 +1,33 @@
 export type SlotLabel = 'A' | 'B' | 'C' | 'D';
 
+export type MenuAction =
+	| 'new-patch'
+	| 'new-performance'
+	| 'open'
+	| 'save'
+	| 'save-as'
+	| 'save-all'
+	| 'delete'
+	| 'select-all'
+	| 'toggle-modules'
+	| 'toggle-browser'
+	| 'toggle-info'
+	| 'toggle-svg-viewer'
+	| 'area-voice'
+	| 'area-fx'
+	| 'slot-A'
+	| 'slot-B'
+	| 'slot-C'
+	| 'slot-D'
+	| 'variation-1'
+	| 'variation-2'
+	| 'variation-3'
+	| 'variation-4'
+	| 'variation-5'
+	| 'variation-6'
+	| 'variation-7'
+	| 'variation-8';
+
 export interface SlotInfo {
 	slot: string;
 	bank: number;
@@ -91,7 +119,8 @@ export type {
 	VisualElement,
 	ParamLabel,
 } from './module';
-export type { Patch, Area, Cable, PatchDescription } from './patch';
+export type { Patch, Area, Cable, PatchDescription, PatchParamVariation } from './patch';
+export type { CliService } from './cli';
 
 export interface ContextMenuSwatch {
 	color: string;

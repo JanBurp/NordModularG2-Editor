@@ -21,6 +21,8 @@
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
+				<ToolBarDivider />
+				<CPU :va="device.activeSlotResources.va" :fx="device.activeSlotResources.fx" />
 			</template>
 
 			<BtnGroup
@@ -139,6 +141,7 @@
 	import { useContextMenu } from './composables/useContextMenu';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
+	import CPU from './components/toolbar/CPU.vue';
 
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
@@ -345,10 +348,11 @@
 				case 'variation-5':
 				case 'variation-6':
 				case 'variation-7':
-				case 'variation-8':
+				case 'variation-8': {
 					const variation = parseInt(action.substring(10, 11));
 					await handleVariationClick(variation - 1);
 					break;
+				}
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
 					break;

@@ -1,6 +1,7 @@
 import { computed, ref } from 'vue';
 
 import { Device } from '@/types';
+import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { DeviceStatus } from '@/store/device';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
@@ -66,7 +67,7 @@ export function useG2() {
 			case 'param_change':
 				return `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`;
 			case 'patch_param':
-				return `param s=${ev.slot} p=${ev.param} v=${ev.value}`;
+				return `patch_param s=${ev.slot} p=${ev.param} v=${ev.value} var=${ev.variation}`;
 			case 'led_data':
 				return `led slot=${ev.slot}`;
 			case 'volume_data':
@@ -81,6 +82,8 @@ export function useG2() {
 				return `synth mode=${ev.mode} name=${ev.synthName}`;
 			case 'perf_settings':
 				return `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`;
+			case 'resources_used':
+				return `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`;
 			case 'raw_interrupt':
 				return `intr: ${ev.hex}`;
 			case 'raw_bulk':
@@ -90,14 +93,33 @@ export function useG2() {
 		}
 	}
 
-	const paramWatchTimers = new Map<string, ReturnType<typeof setTimeout>>();
+	const pendingResourceFetch = new Set<number>();
+
+	async function fetchSlotResources(slotIndex: number): Promise<void> {
+		if (store.status !== 'connected') return;
+		if (pendingResourceFetch.has(slotIndex)) return;
+		const slotLabel = SLOT_LABELS[slotIndex];
+		if (!slotLabel) return;
+		pendingResourceFetch.add(slotIndex);
+		try {
+			const out = await window.cli.run(['get-resources', slotLabel]);
+			const parsed = JSON.parse(out) as { bytes: number[] };
+			if (Array.isArray(parsed.bytes)) store.updateResources(slotIndex, parsed.bytes);
+		} catch {
+			// patch may not be loaded in this slot
+		} finally {
+			pendingResourceFetch.delete(slotIndex);
+		}
+	}
 
 	async function startWatch(): Promise<void> {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
 		window.cli.offWatchDone();
 		let resolveArmed!: () => void;
-		const armed = new Promise<void>((r) => { resolveArmed = r; });
+		const armed = new Promise<void>((r) => {
+			resolveArmed = r;
+		});
 		window.cli.onDeviceDisconnected(() => {
 			isDaemonRunning.value = false;
 			store.status = 'lost';
@@ -110,7 +132,10 @@ export function useG2() {
 		window.cli.onWatchEvent((line: string) => {
 			try {
 				const ev = JSON.parse(line);
-				if (ev.type === 'watch_armed') { resolveArmed(); return; }
+				if (ev.type === 'watch_armed') {
+					resolveArmed();
+					return;
+				}
 				if (ev.type === 'device_disconnected') {
 					store.status = 'lost';
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
@@ -147,6 +172,17 @@ export function useG2() {
 					}
 					return;
 				}
+				if (ev.type === 'patch_param') {
+					log('←', 'Watch', formatWatchEvent(ev), 'param');
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (!slotLabel) return;
+					const params = slotsStore.slots[slotLabel]?.patch?.patchParams;
+					const key = PATCH_PARAM_KEYS[ev.param as number];
+					if (params?.[ev.variation] && key) {
+						(params[ev.variation] as Record<string, number>)[key] = ev.value;
+					}
+					return;
+				}
 				if (ev.type === 'synth_settings_update') {
 					const prevMode = store.device?.mode;
 					store.updateSynthSettings(ev);
@@ -169,6 +205,16 @@ export function useG2() {
 				if (ev.type === 'volume_data') {
 					ledStore.parseVolumeData(ev.slot, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev), 'volume');
+					return;
+				}
+				if (ev.type === 'patch_update') {
+					log('←', 'Watch', `patch_update slot=${ev.slot}`);
+					fetchSlotResources(ev.slot as number);
+					return;
+				}
+				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
+					store.updateResources(ev.slot, ev.data);
+					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 
@@ -213,6 +259,8 @@ export function useG2() {
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
+			const activeIdx = store.device?.slots.findIndex((s) => s.active) ?? -1;
+			if (activeIdx >= 0) fetchSlotResources(activeIdx);
 		} catch (e: any) {
 			store.status = 'disconnected';
 			log('←', 'Connect', `G2 not found: ${e.message}`);

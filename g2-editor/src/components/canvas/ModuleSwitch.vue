@@ -75,10 +75,9 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed } from 'vue';
-	import { getParam } from '../../renderer/parammap';
-	import type { ModuleParam, ParamDefinition, ParamLabel } from '../../types';
-	import { useContextMenu } from '../../composables/useContextMenu';
+	import { computed, toRef } from 'vue';
+	import type { ModuleParam, ParamLabel } from '../../types';
+	import { useSwitch } from '../../composables/useSwitch';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -92,130 +91,32 @@
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
 	}>();
 
-	const paramDef = computed<ParamDefinition>(() => {
-		return getParam(props.param.type) || ({} as ParamDefinition);
-	});
-
-	const names = computed(() => paramDef.value.names || []);
-	const defin = computed(() => paramDef.value.defin || []);
-	const width = computed(() => props.param.w || paramDef.value.width || 18);
-	const mode = computed(() => paramDef.value.mode);
-	const rows = computed(() => paramDef.value.rows || 1);
-	const bmp = computed(() => paramDef.value.bmp);
-	const hasBitmap = computed(() => !!bmp.value);
-	const maskh = computed(() => paramDef.value.maskh || 11);
-
-	const optionNames = computed(() => {
-		const def = defin.value;
-		if (def && def.length > 0) {
-			const options = def[0].split(',').map((s) => {
-				const parts = s.split('~');
-				return parts.length >= 2 ? parts[1].trim() : s.trim();
-			});
-			if (options.length > 0 && options[0] !== '') return options;
-		}
-		return names.value;
-	});
-
-	const displayNames = computed(() => {
-		if (props.label) return props.label.labels;
-		if (names.value[0] === 'Ch#' && [props.param.name][0]) {
-			const name = [props.param.name][0];
-			const last = name.substring(name.length - 1);
-			// @ts-ignore
-			if (!isNaN(last)) {
-				return ['Ch ' + last];
-			}
-		}
-		if (names.value.length === 1) {
-			if (names.value[0] === '') return '';
-			return [props.param.name];
-		}
-		if (names.value && names.value.length > 0) {
-			return names.value;
-		}
-		return optionNames.value;
-	});
-
-	const itemsPerRow = computed(() => {
-		return Math.ceil(names.value.length / rows.value);
-	});
-
-	const activeIndex = computed(() => {
-		const low = paramDef.value.low || 0;
-		const high = paramDef.value.high || names.value.length - 1 || 0;
-		// Clamp value to valid range
-		return Math.max(low, Math.min(props.value, high));
-	});
-
-	const singleButtonMode = computed(() => {
-		return mode.value !== 'VR' && mode.value !== 'HR';
-	});
-
-	const activeOptionName = computed(() => {
-		const idx = activeIndex.value;
-		return displayNames.value[idx] ?? displayNames.value[0];
-	});
-
-	function getButtonX(index: number): number {
-		if (mode.value === 'VR') {
-			// Vertical: all in one column
-			return 0;
-		}
-		// Horizontal or default
-		const col = index % itemsPerRow.value;
-		return col * width.value;
-	}
-
-	function getButtonY(index: number): number {
-		if (mode.value === 'VR') {
-			// Vertical: stack vertically
-			return index * 11;
-		}
-		if (mode.value === 'HR') {
-			// Horizontal
-			const row = Math.floor(index / itemsPerRow.value);
-			return row * 11;
-		}
-		return 0;
-	}
-
-	function onButtonClick(index: number) {
-		if (mode.value !== 'VR' && mode.value !== 'HR') {
-			onCycleValue();
-		} else {
-			const low = paramDef.value.low || 0;
-			const high = paramDef.value.high || names.value.length - 1 || 0;
-
-			// Ensure value is within bounds
-			const newValue = Math.max(low, Math.min(index, high));
-
-			if (newValue !== props.value) {
-				emit('change', props.paramIndex, newValue);
-			}
-		}
-	}
-
-	const { open: openContextMenu } = useContextMenu();
-
-	function onContextMenu(e: MouseEvent) {
-		if (!props.label) return;
-		openContextMenu(e, [
-			{ label: 'Rename label', action: () => emit('paramLabelEdit', { paramIndex: props.paramIndex, currentLabel: props.label!.labels[0] ?? '' }) },
-		]);
-	}
-
-	function onCycleValue() {
-		// Cycle to next value (for single-button switches)
-		const low = paramDef.value.low || 0;
-		const high = paramDef.value.high || names.value.length - 1 || 0;
-		const range = high - low + 1;
-
-		const current = Math.max(low, Math.min(props.value, high));
-		const newValue = low + ((current - low + 1) % range);
-
-		emit('change', props.paramIndex, newValue);
-	}
+	const {
+		paramDef,
+		names,
+		displayNames,
+		activeIndex,
+		singleButtonMode,
+		activeOptionName,
+		mode,
+		bmp,
+		hasBitmap,
+		maskh,
+		width,
+		itemsPerRow,
+		getButtonX,
+		getButtonY,
+		onButtonClick,
+		onCycleValue,
+		onContextMenu,
+	} = useSwitch(
+		toRef(props, 'param'),
+		toRef(props, 'value'),
+		computed(() => props.label),
+		toRef(props, 'paramIndex'),
+		(index, value) => emit('change', index, value),
+		(info) => emit('paramLabelEdit', info),
+	);
 </script>
 <style scoped>
 	.switch-control {
@@ -225,10 +126,6 @@
 	.switch-bitmap {
 		cursor: pointer;
 		overflow: hidden;
-	}
-
-	.switch-bitmap:hover {
-		opacity: 0.8;
 	}
 
 	.switch-bitmap.active {

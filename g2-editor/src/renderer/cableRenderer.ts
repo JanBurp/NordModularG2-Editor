@@ -32,12 +32,6 @@ export interface Jack {
 	y: number;
 }
 
-export interface CableModuleDef {
-	inputs?: Jack[];
-	outputs?: Jack[];
-	[key: string]: any;
-}
-
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
 	selectedCables?: Cable[];
@@ -47,11 +41,9 @@ export function makeCableKey(cable: Cable): string {
 	return `${cable.smod ?? cable.sourceModule}-${cable.scon ?? cable.sourceJack}-${cable.dmod ?? cable.destModule}-${cable.dcon ?? cable.destJack}`;
 }
 
-function isSameCable(a: Cable, b: Cable): boolean {
-	return a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
-}
-
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
+	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
+	const selectedKeys = new Set(options?.selectedCables?.map(makeCableKey) ?? []);
 	cables.forEach((cable) => {
 		const sourceModule = cable.sourceModule ?? cable.smod;
 		const destModule = cable.destModule ?? cable.dmod;
@@ -59,16 +51,16 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const destJack = cable.destJack ?? cable.dcon;
 		const dir = cable.dir ?? 1;
 
-		const smod = modules.find((m) => m.index == sourceModule);
-		const dmod = modules.find((m) => m.index == destModule);
+		const smod = modulesByIndex.get(sourceModule!);
+		const dmod = modulesByIndex.get(destModule!);
 
 		if (!smod || !dmod) {
 			console.warn(`Cable skipped: module not found (source=${sourceModule}, dest=${destModule})`);
 			return;
 		}
 
-		const smodDef = getModule(smod.type) as CableModuleDef | undefined;
-		const dmodDef = getModule(dmod.type) as CableModuleDef | undefined;
+		const smodDef = getModule(smod.type);
+		const dmodDef = getModule(dmod.type);
 
 		if (!smodDef || !dmodDef) {
 			console.warn(`Cable skipped: module definition not found (source=${smod.type}, dest=${dmod.type})`);
@@ -93,7 +85,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const d = pc.getCurvePath();
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
-		const isSelected = options?.selectedCables?.some((c) => isSameCable(cable, c)) ?? false;
+		const isSelected = selectedKeys.has(makeCableKey(cable));
 		const key = makeCableKey(cable);
 
 		// All three paths share the same data-cable-key so they can be queried/removed together.
@@ -159,6 +151,7 @@ function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: 
 // Re-paths cables whose source or destination module is in movedIds, preserving curve shape.
 export function updateCablePaths(modules: Module[], svgElement: SVGElement, movedIds: Set<number>): void {
 	if (movedIds.size === 0) return;
+	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	const borders = svgElement.querySelectorAll<SVGPathElement>('.svgcableborder[data-smod]');
 	borders.forEach((border) => {
 		const smod_i = parseInt(border.getAttribute('data-smod')!);
@@ -170,12 +163,12 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const dir = parseInt(border.getAttribute('data-dir') || '1');
 		const key = border.getAttribute('data-cable-key')!;
 
-		const smod = modules.find((m) => m.index === smod_i);
-		const dmod = modules.find((m) => m.index === dmod_i);
+		const smod = modulesByIndex.get(smod_i);
+		const dmod = modulesByIndex.get(dmod_i);
 		if (!smod || !dmod) return;
 
-		const smodDef = getModule(smod.type) as CableModuleDef | undefined;
-		const dmodDef = getModule(dmod.type) as CableModuleDef | undefined;
+		const smodDef = getModule(smod.type);
+		const dmodDef = getModule(dmod.type);
 		if (!smodDef || !dmodDef) return;
 
 		const dcon = dmodDef.inputs?.[dcon_i];

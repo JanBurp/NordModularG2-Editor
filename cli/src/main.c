@@ -138,6 +138,27 @@ static int cmd_get_patch(int argc, char **argv, int i) {
     return 0;
 }
 
+static int cmd_get_resources(int argc, char **argv, int i) {
+    if (i + 1 >= argc) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("slot required (A, B, C, or D)", output_format);
+        else
+            fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
+        return 1;
+    }
+    cJSON *result = g2_get_resources(argv[i + 1]);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get resources", output_format);
+        else
+            fprintf(stderr, "Failed to get resources\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
 static int cmd_get_patch_file(int argc, char **argv, int i) {
     if (i + 1 >= argc) {
         if (output_format == OUTPUT_JSON)
@@ -403,12 +424,12 @@ static int cmd_set_module_mode(int argc, char **argv, int i) {
 
 static int cmd_set_param(int argc, char **argv, int i) {
     if (i + 6 >= argc) {
-        fprintf(stderr, "Usage: set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>\n");
+        fprintf(stderr, "Usage: set-param <slot> <va|fx|patch> <module-id> <param-idx> <value> <variation>\n");
         return 1;
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : (strcmp(argv[i + 2], "patch") == 0) ? 2 : 0;
     int mod_id   = atoi(argv[i + 3]);
     int param    = atoi(argv[i + 4]);
     int val      = atoi(argv[i + 5]);
@@ -507,6 +528,7 @@ static const cmd_entry_t commands[] = {
     { "device",           cmd_device           },
     { "get-patch",        cmd_get_patch        },
     { "get-patch-file",   cmd_get_patch_file   },
+    { "get-resources",    cmd_get_resources    },
     { "list",             cmd_list             },
     { "slot",             cmd_slot             },
     { "variation",        cmd_variation        },

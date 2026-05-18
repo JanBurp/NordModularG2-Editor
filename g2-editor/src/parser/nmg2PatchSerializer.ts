@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription } from '@/types';
+import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation } from '@/types';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -40,7 +40,7 @@ class BitWriter {
 	private bits: number[] = [];
 
 	write(numbits: number, value: number): void {
-		for (let bw = Math.pow(2, numbits - 1); bw >= 1; bw >>= 1) this.bits.push(value & bw ? 1 : 0);
+		for (let bw = 1 << (numbits - 1); bw >= 1; bw >>= 1) this.bits.push(value & bw ? 1 : 0);
 	}
 
 	flush(): Uint8Array {
@@ -164,6 +164,56 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 	return makeSection(0x5a, data);
 }
 
+// Extracts morph data (sub-section 1) from a template areaIdx=2 section.
+// Morphs are not stored in PatchParamVariation so must be preserved verbatim.
+function extractMorphs(secData: Uint8Array): number[][] {
+	const bits: number[] = [];
+	for (let i = 0; i < secData.length; i++)
+		for (let b = 7; b >= 0; b--) bits.push((secData[i] >> b) & 1);
+	let pos = 0;
+	const gb = (n: number): number => { let v = 0; for (let i = 0; i < n; i++) v = (v << 1) | (bits[pos++] ?? 0); return v; };
+	gb(2); gb(8); // areaIdx, nummod (ignored)
+	const varCount = gb(8);
+	gb(8); gb(7); // sub-section id=1, cnt=16
+	const morphs: number[][] = [];
+	for (let i = 0; i < varCount; i++) {
+		const v = gb(8);
+		morphs[v] = [];
+		for (let j = 0; j < 16; j++) morphs[v].push(gb(7));
+	}
+	return morphs;
+}
+
+function writePatchParamSection(params: PatchParamVariation[], morphs: number[][]): Uint8Array {
+	const NUM_VAR = 9;
+	const bw = new BitWriter();
+	bw.write(2, 2); // areaIdx = 2
+	bw.write(8, 7); // 7 sub-sections
+	bw.write(8, NUM_VAR);
+	// Sub 1: Morphs (preserved from template)
+	bw.write(8, 1); bw.write(7, 16);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); for (let j = 0; j < 16; j++) bw.write(7, morphs[v]?.[j] ?? 0); }
+	// Sub 2: Volume
+	bw.write(8, 2); bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.patchVol ?? 0); bw.write(7, params[v]?.activeMuted ?? 0); }
+	// Sub 3: Glide
+	bw.write(8, 3); bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.glide ?? 0); bw.write(7, params[v]?.glideTime ?? 0); }
+	// Sub 4: Bend
+	bw.write(8, 4); bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.bend ?? 0); bw.write(7, params[v]?.semi ?? 0); }
+	// Sub 5: Vibrato
+	bw.write(8, 5); bw.write(7, 3);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.vibrato ?? 0); bw.write(7, params[v]?.cents ?? 0); bw.write(7, params[v]?.rate ?? 0); }
+	// Sub 6: Arp
+	bw.write(8, 6); bw.write(7, 4);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.arpeggiator ?? 0); bw.write(7, params[v]?.arpTime ?? 0); bw.write(7, params[v]?.arpType ?? 0); bw.write(7, params[v]?.octaves ?? 0); }
+	// Sub 7: OctaveShift + Sustain
+	bw.write(8, 7); bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.octaveShift ?? 0); bw.write(7, params[v]?.sustain ?? 0); }
+	return makeSection(0x4d, bw.flush());
+}
+
 function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uint8Array {
 	const bw = new BitWriter();
 	// Preserve the first 61 bits (unknown header, not stored during parsing)
@@ -218,7 +268,15 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		// Area index is always the top 2 bits of the first byte of section data
 		const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
 
-		if (type === 0x4a && areaIdx <= 1 && !written4a.has(areaIdx)) {
+		if (type === 0x4d && areaIdx === 2 && !written4d.has(2)) {
+			if (patch.patchParams) {
+				const morphs = extractMorphs(secData);
+				outSections.push(writePatchParamSection(patch.patchParams, morphs));
+			} else {
+				outSections.push(template.slice(ofs, ofs + 3 + siz));
+			}
+			written4d.add(2);
+		} else if (type === 0x4a && areaIdx <= 1 && !written4a.has(areaIdx)) {
 			outSections.push(writeModuleList(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
 			written4a.add(areaIdx);
 		} else if (type === 0x52 && areaIdx <= 1 && !written52.has(areaIdx)) {

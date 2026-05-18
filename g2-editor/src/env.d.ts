@@ -1,4 +1,6 @@
 /// <reference types="vite/client" />
+import type { MenuAction } from './types/index';
+import type { CliService } from './types/cli';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -6,38 +8,29 @@ declare module '*.vue' {
 	export default component;
 }
 
-interface Window {
-	electronAPI: {
-		patches: {
-			list: (folder: string) => Promise<{
+declare global {
+	interface Window {
+		electronAPI: {
+			patches: {
+				list: (folder: string) => Promise<{
+					success: boolean;
+					entries: { name: string; path: string; isDir: boolean }[];
+					error?: string;
+				}>;
+				load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
+				setFolder: () => Promise<{ success: boolean; folder?: string }>;
+			};
+			onMenuAction: (cb: (action: MenuAction) => void) => void;
+			offMenuAction: () => void;
+			savePatch: (filepath: string, data: number[]) => Promise<void>;
+			showSaveDialog: (defaultName?: string) => Promise<{ success: boolean; filepath?: string }>;
+			openPatchDialog: () => Promise<{
 				success: boolean;
-				entries: { name: string; path: string; isDir: boolean }[];
+				filepath?: string;
+				data?: number[];
 				error?: string;
 			}>;
-			load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
-			setFolder: () => Promise<{ success: boolean; folder?: string }>;
 		};
-		onMenuAction: (cb: (action: string) => void) => void;
-		offMenuAction: () => void;
-		savePatch: (filepath: string, data: number[]) => Promise<void>;
-		showSaveDialog: (defaultName?: string) => Promise<{ success: boolean; filepath?: string }>;
-		openPatchDialog: () => Promise<{
-			success: boolean;
-			filepath?: string;
-			data?: number[];
-			error?: string;
-		}>;
-	};
-	cli: {
-		run: (args: string[]) => Promise<string>;
-		runBatch: (argsList: string[][]) => Promise<string[]>;
-		watchStart: () => Promise<void>;
-		watchStop: () => void;
-		onWatchEvent: (cb: (line: string) => void) => void;
-		offWatchEvent: () => void;
-		onWatchDone: (cb: () => void) => void;
-		offWatchDone: () => void;
-		onDeviceDisconnected: (cb: () => void) => void;
-		offDeviceDisconnected: () => void;
-	};
+		cli: CliService;
+	}
 }
