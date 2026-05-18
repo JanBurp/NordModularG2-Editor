@@ -151,7 +151,16 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		async setPerformanceMode(name: string) {
-			if (this.device) {
+			if (!this.device) {
+				this.device = {
+					synthName: '', mode: 'Performance', patches: null,
+					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false },
+					slots: [],
+					midi: { slots: { a: 0, b: 0, c: 0, d: 0, global: 0 }, sysex: 0, local: false, prgch: '', clkse: false, clkre: false },
+					tuning: { semi: 0, cent: 0 },
+					pedal: { polarity: false, gain: 0 },
+				};
+			} else {
 				this.device.mode = 'Performance';
 				if (!this.device.performance) {
 					this.device.performance = { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false };
