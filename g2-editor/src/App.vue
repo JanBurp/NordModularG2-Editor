@@ -251,60 +251,58 @@
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			// const area = uiStore.area === 1 ? 'voice' : 'fx';
 			switch (action) {
-				case 'new-patch':
-				case 'new-performance': {
+				case 'new-patch': {
 					const emptyPatch = {
 						areas: [
-							{
-								name: 'fx',
-								modules: [],
-								cableList: [],
-								paramaterDataOfs: 0,
-							},
-							{
-								name: 'voice',
-								modules: [],
-								cableList: [],
-								paramaterDataOfs: 0,
-							},
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: {
-							voices: 1,
-							height: 0,
-							unk2: 0,
-							red: 0,
-							blue: 0,
-							yellow: 0,
-							orange: 0,
-							green: 0,
-							purple: 0,
-							white: 0,
-							monopoly: 0,
-							variation: 0,
-							category: 0,
-						},
+						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
 					};
 					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch as any, 'Untitled');
 					break;
 				}
+				case 'new-performance': {
+					const emptyPatch = {
+						areas: [
+							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
+							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
+						],
+						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+					};
+					const emptyPatches = [emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[];
+					slotsStore.loadPerformanceFile(emptyPatches, [], 'Untitled Performance', '');
+					break;
+				}
+				case 'open-performance':
 				case 'open':
 					await patchFile.openFromElectronDialog();
 					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
 					break;
 				case 'save':
-					if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex) await slotsStore.saveSlot(uiStore.activeSlot);
+					if (slotsStore.isPerformanceMode) {
+						await slotsStore.savePerformance();
+					} else if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex) {
+						await slotsStore.saveSlot(uiStore.activeSlot);
+					}
 					break;
 				case 'save-as': {
-					if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
-					const name = slotsStore.slots[uiStore.activeSlot].name;
-					const result = await window.electronAPI.showSaveDialog(name);
-					if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+					if (slotsStore.isPerformanceMode) {
+						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName);
+						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
+					} else {
+						if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
+						const name = slotsStore.slots[uiStore.activeSlot].name;
+						const result = await window.electronAPI.showSaveDialog(name);
+						if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+					}
 					break;
 				}
 				case 'save-all':
 					for (const s of SLOT_LABELS) {
 						if (slotsStore.slots[s]?.templateRawHex) await slotsStore.saveSlot(s);
 					}
+					if (slotsStore.isPerformanceMode && slotsStore.performanceRawHex) await slotsStore.savePerformance();
 					break;
 				case 'delete':
 					await deleteSelection();

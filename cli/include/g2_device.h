@@ -137,6 +137,7 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
 
 /* Patch browser commands */
 int g2_select_patch(int slot, int bank, int location);
+int g2_select_perf(int bank, int location);
 int g2_upload_patch(int slot, const char *filepath);
 
 /* Performance mode and name */

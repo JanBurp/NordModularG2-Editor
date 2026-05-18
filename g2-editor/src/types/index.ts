@@ -4,6 +4,7 @@ export type MenuAction =
 	| 'new-patch'
 	| 'new-performance'
 	| 'open'
+	| 'open-performance'
 	| 'save'
 	| 'save-as'
 	| 'save-all'

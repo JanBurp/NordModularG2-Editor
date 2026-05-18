@@ -4,8 +4,8 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 const { PatchParser } = await import('../parser/nmg2PatchParser');
 
-type DiskItem = { type: 'disk'; filepath: string };
-type SynthItem = { type: 'synth'; bank: number; location: number };
+type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
+type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
 
 function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;
@@ -47,9 +47,15 @@ export function usePatchFile() {
 		const result = await window.electronAPI.openPatchDialog();
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
-		const parsedPatch = new PatchParser(buffer).parse() as any;
 		const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
+		const parser = new PatchParser(buffer);
+		const prf2 = parser.parsePrf2();
+		if (prf2) {
+			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
+			return;
+		}
+		const parsedPatch = parser.parse() as any;
 		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
 		if (device.status === 'connected') {
@@ -61,6 +67,19 @@ export function usePatchFile() {
 		}
 	}
 
+	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
+		if (device.status !== 'connected') return;
+		try {
+			await window.cli.run(['select-perf', String(bank), String(location)]);
+			for (const slot of SLOT_LABELS) {
+				await slotsStore.loadSlot(slot);
+			}
+			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
+		} catch (err) {
+			console.error('Failed to select synth performance:', err);
+		}
+	}
+
 	async function handlePatchSelect(item: DiskItem | SynthItem): Promise<void> {
 		if (item.type === 'disk') {
 			if (!window.electronAPI) return;
@@ -68,9 +87,16 @@ export function usePatchFile() {
 				const result = await window.electronAPI.patches.load(item.filepath);
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
-				const parsedPatch = new PatchParser(buffer).parse() as any;
 				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				const rawHex = stripFileHeader(result.data as number[]);
+				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
+					const prf2 = new PatchParser(buffer).parsePrf2();
+					if (prf2) {
+						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
+						return;
+					}
+				}
+				const parsedPatch = new PatchParser(buffer).parse() as any;
 				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
 				if (device.status === 'connected') {
@@ -85,6 +111,10 @@ export function usePatchFile() {
 			}
 		} else {
 			if (device.status !== 'connected') return;
+			if (item.kind === 'performance') {
+				await handlePerformanceSynthSelect(item.bank, item.location);
+				return;
+			}
 			try {
 				await window.cli.run(['select-patch', uiStore.activeSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(uiStore.activeSlot);
@@ -97,6 +127,7 @@ export function usePatchFile() {
 	return {
 		handleFileLoad,
 		handlePatchSelect,
+		handlePerformanceSynthSelect,
 		loadSlotPatch,
 		openFromElectronDialog,
 	};

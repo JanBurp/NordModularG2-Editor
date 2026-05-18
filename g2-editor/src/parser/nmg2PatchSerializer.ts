@@ -336,3 +336,104 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 
 	return bytesToHex(result);
 }
+
+/**
+ * Re-serializes a prf2 Performance to rawHex using the same section-replacement strategy
+ * as serializePatch, but slot-aware: written* sets reset at each 0x6f boundary so all 4
+ * slots' sections are updated, not just slot 0's.
+ */
+export function serializePerformance(patches: Patch[], templateRawHex: string): string {
+	const template = hexToBytes(templateRawHex);
+	const sectionDataLen = template.length - 2;
+
+	const outSections: Uint8Array[] = [];
+
+	let slotIdx = 0;
+	let written4a = new Set<number>();
+	let written52 = new Set<number>();
+	let written4d = new Set<number>();
+	let written5a = new Set<number>();
+	let written5b = new Set<number>();
+
+	const patch = () => patches[slotIdx] ?? patches[0];
+
+	let ofs = 0;
+	while (ofs < sectionDataLen) {
+		const type = template[ofs];
+		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
+		const secData = template.slice(ofs + 3, ofs + 3 + siz);
+		const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
+
+		if (type === 0x6f) {
+			outSections.push(template.slice(ofs, ofs + 3 + siz));
+			// Advance to next slot when more data follows
+			if (ofs + 3 + siz < sectionDataLen) {
+				slotIdx++;
+				written4a = new Set();
+				written52 = new Set();
+				written4d = new Set();
+				written5a = new Set();
+				written5b = new Set();
+			}
+		} else if (type === 0x4d && areaIdx === 2 && !written4d.has(2)) {
+			if (patch().patchParams) {
+				const morphs = extractMorphs(secData);
+				outSections.push(writePatchParamSection(patch().patchParams!, morphs));
+			} else {
+				outSections.push(template.slice(ofs, ofs + 3 + siz));
+			}
+			written4d.add(2);
+		} else if (type === 0x4a && areaIdx <= 1 && !written4a.has(areaIdx)) {
+			outSections.push(writeModuleList(areaIdx as 0 | 1, patch().areas[areaIdx].modules));
+			written4a.add(areaIdx);
+		} else if (type === 0x52 && areaIdx <= 1 && !written52.has(areaIdx)) {
+			outSections.push(writeCableList(areaIdx as 0 | 1, patch().areas[areaIdx].cableList ?? []));
+			written52.add(areaIdx);
+		} else if (type === 0x4d && areaIdx <= 1 && !written4d.has(areaIdx)) {
+			outSections.push(writeParameters(areaIdx as 0 | 1, patch().areas[areaIdx].modules));
+			written4d.add(areaIdx);
+			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
+			if (paramNamesSection) outSections.push(paramNamesSection);
+			written5b.add(areaIdx);
+		} else if (type === 0x5b && areaIdx <= 1 && !written5b.has(areaIdx)) {
+			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
+			if (paramNamesSection) outSections.push(paramNamesSection);
+			written5b.add(areaIdx);
+		} else if (type === 0x5b && areaIdx <= 1 && written5b.has(areaIdx)) {
+			// skip — already emitted via 0x4d trigger
+		} else if (type === 0x5a && areaIdx <= 1 && !written5a.has(areaIdx)) {
+			const namesSection = writeModuleNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
+			if (namesSection) outSections.push(namesSection);
+			written5a.add(areaIdx);
+		} else if (type === 0x21) {
+			const newData = patch().description ? writePatchDescription(secData, patch().description!) : secData;
+			outSections.push(makeSection(0x21, newData));
+		} else {
+			// Preserve verbatim: perf data (0x11), unknown sections
+			outSections.push(template.slice(ofs, ofs + 3 + siz));
+		}
+
+		ofs += 3 + siz;
+	}
+
+	const totalLen = outSections.reduce((s, b) => s + b.length, 0);
+	const sectionBytes = new Uint8Array(totalLen);
+	let writeOfs = 0;
+	for (const sec of outSections) {
+		sectionBytes.set(sec, writeOfs);
+		writeOfs += sec.length;
+	}
+
+	const forCrc = new Uint8Array(2 + sectionBytes.length);
+	forCrc[0] = 0x17;
+	forCrc[1] = 0x00;
+	forCrc.set(sectionBytes, 2);
+	const crc = calcCrc(forCrc);
+
+	const result = new Uint8Array(sectionBytes.length + 2);
+	result.set(sectionBytes);
+	result[sectionBytes.length] = (crc >> 8) & 0xff;
+	result[sectionBytes.length + 1] = crc & 0xff;
+
+	return bytesToHex(result);
+}

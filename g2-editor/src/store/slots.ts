@@ -77,9 +77,14 @@ export const useSlotsStore = defineStore('slots', {
 				patch: null,
 			},
 		} as Record<SlotLabel, SlotEntry>,
+		performanceName: '',
+		performanceFilePath: '',
+		performanceRawHex: null as string | null,
 	}),
 
 	getters: {
+		isPerformanceMode: (state) => !!state.performanceName,
+
 		getPatchForSlot: (state) => (slot: SlotLabel) => state.slots[slot]?.patch ?? null,
 
 		getPatchName: (state) => (slot: SlotLabel) => state.slots[slot]?.name ?? '',
@@ -407,6 +412,43 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[slot].templateRawHex = rawHex;
 			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
+		},
+
+		loadPerformanceFile(patches: Patch[], slotNames: string[], name: string, rawHex: string, filepath?: string): void {
+			const labels: SlotLabel[] = ['A', 'B', 'C', 'D'];
+			for (let i = 0; i < 4; i++) {
+				const slotName = slotNames[i] || name;
+				this.slots[labels[i]].patch = patches[i];
+				this.slots[labels[i]].name = slotName;
+				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
+				this.slots[labels[i]].rawHex = null;
+				this.slots[labels[i]].templateRawHex = null;
+				this.slotFilePaths[labels[i]] = '';
+			}
+			this.performanceName = name;
+			this.performanceRawHex = rawHex;
+			this.performanceFilePath = filepath ?? '';
+		},
+
+		async savePerformance(filepath?: string): Promise<void> {
+			if (!this.performanceRawHex) return;
+			let path = filepath || this.performanceFilePath;
+			if (!path) {
+				//@ts-ignore
+				const result = await window.electronAPI.showSavePerfDialog(this.performanceName);
+				if (!result.success || !result.filepath) return;
+				path = result.filepath;
+			}
+			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].patch!).filter(Boolean);
+			if (patches.length !== 4) return;
+			const newRawHex = serializePerformance(patches, this.performanceRawHex);
+			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
+			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			await window.electronAPI.savePatch(path, data);
+			this.performanceFilePath = path;
+			this.performanceRawHex = newRawHex;
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {

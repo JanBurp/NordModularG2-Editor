@@ -449,4 +449,17 @@ export class PatchParser {
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 		};
 	}
+
+	parsePrf2(): { slotNames: string[]; patches: Patch[] } | null {
+		const slotNames = this.patcher.isPrf2();
+		if (slotNames.length === 0) return null;
+		return {
+			slotNames,
+			patches: [0, 1, 2, 3].map((slot) => ({
+				areas: [this.patcher.getArea(slot * 2) as Area, this.patcher.getArea(slot * 2 + 1) as Area],
+				description: this.patcher.getpd(slot),
+				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
+			})),
+		};
+	}
 }
