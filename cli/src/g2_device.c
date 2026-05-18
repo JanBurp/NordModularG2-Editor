@@ -1,6 +1,9 @@
 /*
- * G2 CLI - Device implementation
- * Based on usbComms.c from G2-Edit
+ * G2 CLI - Device API
+ *
+ * High-level commands for the Nord G2: connect/disconnect, patch retrieval,
+ * module and cable editing, parameter control, patch upload, and performance
+ * mode. Builds on the low-level transport in g2_io.c.
  */
 
 #include <stdio.h>
@@ -314,10 +317,8 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    /* g2ctl extracts version from embedded message.
-     * Embedded response format: [length][data...][CRC]
-     * g2ctl returns data starting at index 1 (after length byte), so response[5] = byte[6] of raw
-     */
+    /* Embedded response format: [length][data...][CRC]
+     * The version byte sits at index 6 of the raw 16-byte interrupt response. */
     version = interruptResp[6];
     if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
 
@@ -611,7 +612,7 @@ int g2_select_slot(const char *slot_str) {
     g2_drain_pending();
 
     /* Steps 1+2 use the performance version (slot=4), not the patch slot version.
-     * Per doc/usb.md §6 and g2ctl.py: SELECT_SLOT is a performance-level command. */
+     * Per doc/usb.md §6: SELECT_SLOT is a performance-level command. */
     {
         uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
         uint8_t pv_resp[16] = {0};
@@ -645,7 +646,7 @@ int g2_select_slot(const char *slot_str) {
      * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
     g2_drain_pending();
 
-    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC] (per g2ctl.py).
+    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC].
      * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
      * consume the bulk immediately — leaving it unread blocks subsequent commands. */
     if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
@@ -670,7 +671,7 @@ int g2_select_slot(const char *slot_str) {
     return G2_OK;
 }
 
-/* G2 Categories - from nord/g2/categories.py */
+/* G2 patch category names, indices 0-15 */
 static const char* g2categories[16] = {
     "no_cat",   /* 0: no_cat */
     "acoustic", /* 1: acoustic */
@@ -1356,7 +1357,7 @@ int g2_upload_patch(int slot, const char *filepath) {
     fclose(f);
 
     /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
-     * Use filename (without extension) as the patch name, like g2ctl.py does. */
+     * Use filename (without extension) as the patch name. */
     const char *base = strrchr(filepath, '/');
     base = base ? base + 1 : filepath;
     char name[16] = {0};
@@ -1371,8 +1372,8 @@ int g2_upload_patch(int slot, const char *filepath) {
 
     /* Build USB packet with dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer.
      * Packet: [len_hi][len_lo][0x01][cmd][0x53][0x37][0x00 x3][name+\0][section_data][crc_hi][crc_lo]
-     * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by Delphi editor and g2ctl.py).
-     * Name field is variable length: name chars + null byte (matches g2ctl.py format_name). */
+     * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by the Delphi editor).
+     * Name field is variable length: name characters followed by a null byte. */
     int name_write_len = ni + 1;  /* name chars + terminating null */
     size_t extraLen = 3 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;

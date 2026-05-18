@@ -74,7 +74,7 @@ void test_repeated_slot_cycle(void) {
     }
 }
 
-/* simulate editor: slot B → var 3 → get-patch B → slot C → var 1 → get-patch C */
+/* simulate client: slot B → var 3 → get-patch B → slot C → var 1 → get-patch C */
 void test_interleaved_slot_variation(void) {
     ensure_connected();
     TEST_ASSERT_EQUAL_INT(G2_OK, g2_select_slot("B"));

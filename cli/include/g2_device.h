@@ -1,5 +1,10 @@
 /*
- * G2 CLI - Device interface
+ * G2 CLI - Device API (public header)
+ *
+ * High-level commands for controlling the Nord G2: connect/disconnect,
+ * patch retrieval, module and cable editing, parameter control, patch
+ * upload, and performance mode. All operations return G2_OK (0) on
+ * success or a negative G2_ERR_* code on failure.
  */
 
 #ifndef __G2_DEVICE_H__

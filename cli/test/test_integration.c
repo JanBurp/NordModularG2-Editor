@@ -201,7 +201,7 @@ void test_stress_slot_variation_watch(void) {
 }
 
 /*
- * Mimics the exact Electron editor behaviour for each user action:
+ * Exercises the expected daemon client usage pattern for each user action:
  *
  *   startup process  : g2_startup() → g2_disconnect()
  *   watch process    : g2_connect() → watch_for_ms() → STOP_COMM → g2_disconnect()
@@ -209,7 +209,7 @@ void test_stress_slot_variation_watch(void) {
  *   watch restarted  : g2_connect() → (next iteration)
  *
  * Each step performs one slot change and one variation change as separate
- * connect/command/disconnect cycles, matching the two IPC calls the editor
+ * connect/command/disconnect cycles, matching the two IPC calls a client
  * would issue. 5 steps × 2 commands = 10 slot + 5 variation changes,
  * 10 watch sessions, ~30 USB connect/disconnect cycles total.
  */
@@ -325,9 +325,8 @@ void test_daemon_slot_variation_commands(void) {
 
     usleep(1500000); /* allow daemon to connect and arm watch */
 
-    /* Initialize exactly as the Electron editor does: startup first (CMD_INIT +
-     * device info + patches). Without this, G2 version counters are stale and
-     * g2_select_variation commands time out. */
+    /* Run startup first (CMD_INIT + device info + patches). Without this,
+     * G2 version counters are stale and g2_select_variation commands time out. */
     int r_startup = send_and_expect_ok(in_pipe[1], out_pipe[0],
         "{\"id\":0,\"cmd\":\"startup\",\"args\":[]}", 0);
 
@@ -367,7 +366,7 @@ void test_daemon_slot_variation_commands(void) {
  *   Same startup sequence as test_startup_sequence, but each step's result
  *   is printed as JSON, followed by 10 seconds of START_COMM watch output
  *   (LED data, volume data, param changes, etc.) so the stream can be
- *   observed exactly as the editor would see it.
+ *   observed exactly as a client would see it.
  */
 void test_fullstack_with_watch(void) {
     ensure_connected();

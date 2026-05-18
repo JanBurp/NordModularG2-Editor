@@ -1,5 +1,8 @@
 /*
- * G2 CLI - Output formatting implementation
+ * G2 CLI - Output formatting
+ *
+ * Thin wrappers that write cJSON objects or error strings to stdout as
+ * single-line JSON. Used by command handlers in main.c.
  */
 
 #include <stdio.h>

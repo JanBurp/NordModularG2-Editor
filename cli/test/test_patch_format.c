@@ -8,9 +8,8 @@
 #include <string.h>
 
 void test_patch_usb_to_pch2_strips_header(void) {
-    /* USB format per g2ctl: data[0x03:0x15] + data[0x17:-2]
-     * - First part: indices 3-20 (18 bytes at indices 0x03 to 0x15 exclusive)
-     * - Second part: indices 0x17 to end-2 (usb_len - 0x17 - 2 bytes)
+    /* USB frame layout: [3-byte header][payload chunk 1: 0x03..0x15)[2-byte gap][payload chunk 2: 0x17..end-2)[2-byte CRC]
+     * patch_usb_to_pch2 extracts: bytes[0x03:0x15) + bytes[0x17:end-2)
      *
      * USB structure for 28-byte test data:
      * - Indices 0-2: header (3 bytes)
@@ -61,9 +60,8 @@ void test_patch_usb_to_pch2_strips_header(void) {
 }
 
 void test_patch_usb_to_pch2_strips_trailer(void) {
-    /* USB format per g2ctl: data[0x03:0x15] + data[0x17:-2]
-     * - First part: bytes 3-20 (18 bytes, indices 0x03 to 0x15 exclusive)
-     * - Second part: bytes 23 to end-2 (skips indices 0x15 and 0x16)
+    /* USB frame layout: [3-byte header][payload chunk 1: 0x03..0x15)[2-byte gap][payload chunk 2: 0x17..end-2)[2-byte CRC]
+     * patch_usb_to_pch2 extracts: bytes[0x03:0x15) + bytes[0x17:end-2)
      *
      * USB structure for 30-byte example:
      * - Indices 0-2: header (3 bytes)
@@ -72,7 +70,7 @@ void test_patch_usb_to_pch2_strips_trailer(void) {
      * - Indices 23-27: second part (5 bytes)
      * - Indices 28-29: trailer (2 bytes)
      *
-     * Extraction: data[0x03:0x15] + data[0x17:-2]
+     * Extraction: bytes[0x03:0x15) + bytes[0x17:end-2)
      * = indices 3-20 (18 bytes) + indices 23-27 (5 bytes)
      * = 23 bytes total
      */
@@ -156,7 +154,7 @@ void test_patch_roundtrip_conversion(void) {
     };
     size_t original_len = sizeof(original);
     
-    /* Convert USB -> PCH2 using g2ctl extraction pattern */
+    /* Convert USB -> PCH2 */
     uint8_t pch2_data[32] = {0};
     size_t pch2_len = sizeof(pch2_data);
     int result = patch_usb_to_pch2(original, original_len, pch2_data, &pch2_len);

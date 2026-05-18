@@ -2,7 +2,7 @@
  * G2 CLI - Daemon integration tests (shared-daemon approach)
  *
  * All 6 tests share ONE daemon process (one USB connection) to match real-world
- * editor behaviour. The daemon is spawned by test_daemon_starts and shut down by
+ * daemon client behaviour. The daemon is spawned by test_daemon_starts and shut down by
  * test_daemon_slot_variation_sequence. Command IDs increase monotonically via
  * g_cmd_id so the shared daemon can match responses to the right request.
  */

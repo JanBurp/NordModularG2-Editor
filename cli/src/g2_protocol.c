@@ -1,5 +1,9 @@
 /*
- * G2 CLI - Protocol parsing layer
+ * G2 CLI - Protocol parser
+ *
+ * Decodes the raw synth-settings and performance-settings bulk payloads
+ * returned by the G2 into JSON objects. Used by g2_device.c (direct queries)
+ * and g2_events.c (streamed watch events).
  */
 
 #include <stdio.h>
@@ -10,6 +14,9 @@
 #include "cJSON.h"
 #include "g2_protocol.h"
 
+/* Parse the synth-settings bulk payload into a JSON object.
+ * Extracts: synth name, mode (Patch/Performance), MIDI channels, clock,
+ * tuning (semitones + cents), and pedal settings. */
 cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
     char synthName[32] = {0};
     int nameLen = parse_name(bulkData + 4, synthName, sizeof(synthName));
@@ -59,6 +66,8 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
     return root;
 }
 
+/* Parse the performance bulk payload and attach "performance" and "slots"
+ * sub-objects to an existing JSON root. mode=1 → Performance, mode=0 → Patch. */
 void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
                                 int mode, cJSON *root) {
     char perfName[32] = {0};

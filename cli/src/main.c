@@ -1,6 +1,9 @@
 /*
- * G2 CLI - Main entry point
- * CLI tool for Nord G2 synthesizer
+ * G2 CLI - Command-line entry point
+ *
+ * Parses global flags (--json, --debug), dispatches to per-command handlers,
+ * and manages output format. Each handler does one operation and returns;
+ * the daemon command is the exception — it runs a persistent loop.
  */
 
 #include <stdio.h>

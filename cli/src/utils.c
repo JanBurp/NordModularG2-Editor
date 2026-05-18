@@ -1,11 +1,15 @@
 /*
  * G2 CLI - Utility functions
+ *
+ * CRC-16/CCITT calculation, name-field parsing, slot-string conversion,
+ * patch format conversion (USB frame <-> PCH2 file), and command tokenizer.
  */
 
 #include "utils.h"
 #include "defs.h"
 #include <string.h>
 
+/* CRC-16/CCITT one-byte step: polynomial 0x1021, MSB-first. */
 uint16_t crc_iterator(int32_t seed, int32_t val) {
     int32_t k = (((seed >> 8) ^ val) & 255) << 8;
     int32_t crc = 0;
@@ -28,6 +32,9 @@ uint16_t calc_crc16(uint8_t *buff, int length) {
     return crc;
 }
 
+/* Extract a printable ASCII name from a G2 name field.
+ * Stops at the first non-printable byte (NUL or control char).
+ * Returns the number of bytes consumed including the terminating NUL (if present). */
 int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     size_t i;
     for (i = 0; i < 16 && i < bufsize - 1; i++) {
@@ -55,6 +62,9 @@ slot_t parse_slot(const char *slot_str) {
     return SLOT_INVALID;
 }
 
+/* Strip the USB frame header and CRC to extract the two PCH2 payload sections:
+ *   bytes [0x03:0x15) + bytes [0x17:end-2)
+ * The 2-byte gap at 0x15-0x16 and the 2-byte trailing CRC are discarded. */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
                       uint8_t *pch2_data, size_t *pch2_len) {
     if (usb_data == NULL || pch2_data == NULL || pch2_len == NULL) {
@@ -92,6 +102,8 @@ int tokenize_command(char *buf, char **argv_out, int max_argc) {
     return argc;
 }
 
+/* Wrap a PCH2 payload in a USB frame: prepend [0x01][size_hi][size_lo],
+ * then append a 2-byte CRC-16/CCITT over the payload. */
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
                       uint8_t *usb_data, size_t *usb_len) {
     if (pch2_data == NULL || usb_data == NULL || usb_len == NULL) {

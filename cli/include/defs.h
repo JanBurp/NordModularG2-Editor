@@ -1,13 +1,8 @@
 /*
- * G2 CLI - Protocol constants from G2-Edit defs.h
+ * G2 CLI - Protocol constants for the Nord Modular G2
  *
- * Copyright (C) 2025 Chris Turner
- * Based on G2-Edit by Chris Turner
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
+ * USB vendor/product IDs, endpoint addresses, command and response codes,
+ * patch format offsets, and timing constants used throughout the CLI.
  */
 
 #ifndef __G2_DEFS_H__
@@ -78,7 +73,7 @@ typedef enum {
 #define VENDOR_ID                           (0x0ffc)
 #define PRODUCT_ID                          (2)
 
-/* USB Endpoints (from G2-Edit) */
+/* USB Endpoints */
 #define ENDPOINT_BULK_OUT                   (0x03)  /* Bulk OUT */
 #define ENDPOINT_INTERRUPT_IN               (0x81)  /* Interrupt IN */
 #define ENDPOINT_BULK_IN                    (0x82)  /* Bulk IN */
