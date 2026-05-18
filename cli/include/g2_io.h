@@ -32,6 +32,12 @@ typedef struct {
 /* 1 while listener thread is running — used by recv_interrupt/recv_bulk shims */
 extern volatile int g2_listener_active;
 
+/* Set by recv_interrupt() when it sees a sentinel=2 (BULK_REARM) while serving a
+ * command handler.  The daemon main loop checks this after execute_cmd() and calls
+ * g2_rearm() so that streaming is restarted even when the command handler consumed
+ * the BULK_REARM message from the queue. */
+extern volatile int g2_pending_rearm;
+
 /* Set to 1 by daemon --debug; causes send_* functions to log hex to stdout */
 extern int g2_debug;
 

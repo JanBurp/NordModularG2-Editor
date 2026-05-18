@@ -106,6 +106,8 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
         for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
         printf("]}\n"); fflush(stdout);
+        /* set-perf-mode response: G2 goes quiet after this, needs re-arm */
+        if (baCmd == 0x0C && bsubCmd == 0x1F) g2_pending_rearm = 1;
     }
     return 0;
 }

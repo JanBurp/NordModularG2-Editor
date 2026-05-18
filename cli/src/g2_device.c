@@ -1281,22 +1281,9 @@ int g2_set_perf_mode(int mode) {
     g2_drain_pending();
     uint8_t cmd[3] = { 0x3E, (uint8_t)mode, 0x00 };
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    uint8_t response[16] = {0};
-    int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    if (ret <= 0) { g2_err("No response from G2 for set-perf-mode\n"); return G2_ERR; }
-    /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
-    if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-        uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
-        if (bulkSize > 0) {
-            uint8_t *bulk = malloc(bulkSize);
-            if (bulk) {
-                recv_bulk(bulk, bulkSize);
-                free(bulk);
-            }
-        }
-    }
-    g2_drain_pending();
+    /* Do not consume the response here — the listener emits it as unknown_bulk
+     * (aCmd=0x0C, sub=0x1F) which contains mode/slot data.  emit_bulk_event()
+     * sets g2_pending_rearm so the daemon main loop re-arms streaming. */
     return G2_OK;
 }
 
