@@ -658,16 +658,25 @@ When `version != 0x40`:
 | any | `0x11` | `perf_settings` | — |
 | any | `0x29` | `perf_name` | `name` from bulk[4..] |
 
-### Unknown bulk sub-commands (`aCmd 0x0C`)
+### Bulk sub-commands (`aCmd 0x0C`)
 
-Unsolicited bulk responses sent after switching PERF mode. Currently emitted as `unknown_bulk` JSON (not yet identified/handled). Known sub-commands:
+Unsolicited bulk responses sent after switching PERF mode.
 
-| `version` | `subCmd` | Observed data | Status |
-|-----------|----------|---------------|--------|
-| `0x05` | `0x80` (128) | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated | Likely slot/patch state |
-| `0x05` | `0x29` (41) | Patch names + metadata (null-terminated strings interspersed with binary) | Likely patch bank list |
+| `version` | `subCmd` | JSON type | Data format |
+|-----------|----------|-----------|-------------|
+| `0x40` | `0x1F` | `version_update` | `bulk[4]`=`perf_version`; then 4×`[0x36, slot, version]` — one entry per slot |
+| `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated — not yet parsed |
+| `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata — not yet parsed |
 
-These responses arrive automatically after PERF button press (mode switch). They are silently dropped by the CLI daemon until handlers are implemented.
+**`version_update` payload layout (version=0x40, sub=0x1F):**
+```
+bulk[4]      = perf_version
+bulk[5..7]   = [0x36, slot=0, version]
+bulk[8..10]  = [0x36, slot=1, version]
+bulk[11..13] = [0x36, slot=2, version]
+bulk[14..16] = [0x36, slot=3, version]
+```
+Emitted JSON: `{"type":"version_update","perf_version":N,"slot_versions":[{"slot":0,"version":N},...]}`. Also sets `g2_pending_rearm=1` to trigger listener re-arm.
 
 ### Connection events
 
