@@ -150,6 +150,20 @@ export const useDeviceStore = defineStore('device', {
 			await window.cli.run(['set-perf-mode', newMode]);
 		},
 
+		async setPerformanceMode(name: string) {
+			if (this.device) {
+				this.device.mode = 'Performance';
+				if (!this.device.performance) {
+					this.device.performance = { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false };
+				} else {
+					this.device.performance.name = name;
+				}
+			}
+			if (this.status === 'connected') {
+				await window.cli.run(['set-perf-mode', 'performance']);
+			}
+		},
+
 		updateSynthSettings(ev: { synthName: string; mode: string; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
 			if (!this.device) return;
 			this.device.synthName = ev.synthName;

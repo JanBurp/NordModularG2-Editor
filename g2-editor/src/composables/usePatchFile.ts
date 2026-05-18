@@ -53,6 +53,7 @@ export function usePatchFile() {
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
 			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
+			await device.setPerformanceMode(name);
 			return;
 		}
 		const parsedPatch = parser.parse() as any;
@@ -70,6 +71,7 @@ export function usePatchFile() {
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
 		if (device.status !== 'connected') return;
 		try {
+			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
 			await window.cli.run(['select-perf', String(bank), String(location)]);
 			for (const slot of SLOT_LABELS) {
 				await slotsStore.loadSlot(slot);
@@ -93,6 +95,7 @@ export function usePatchFile() {
 					const prf2 = new PatchParser(buffer).parsePrf2();
 					if (prf2) {
 						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
+						await device.setPerformanceMode(name);
 						return;
 					}
 				}
