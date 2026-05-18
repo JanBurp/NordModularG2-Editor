@@ -463,9 +463,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
 				fflush(stdout);
 				g2_rearm();
-				g2_msg_t rearm_ack;
-				if (g2_msg_recv(&rearm_ack, USB_TIMEOUT_STANDARD_MS) == 0)
-					g2_msg_free(&rearm_ack);
+				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
 			continue;
 		}
@@ -493,9 +491,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
 				fflush(stdout);
 				g2_rearm();
-				g2_msg_t rearm_ack;
-				if (g2_msg_recv(&rearm_ack, USB_TIMEOUT_STANDARD_MS) == 0)
-					g2_msg_free(&rearm_ack);
+				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
 		}
 	}
