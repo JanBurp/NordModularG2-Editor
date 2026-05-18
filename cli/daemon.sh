@@ -15,13 +15,15 @@ KEEPER_PID_FILE=/tmp/g2-daemon-keeper-pid
 
 case "$1" in
   start)
+    DEBUG_FLAG=""
+    [ "$2" = "--debug" ] && DEBUG_FLAG="--debug"
     rm -f "$FIFO"
     mkfifo "$FIFO"
     echo 0 > "$ID_FILE"
     sleep 999999999 > "$FIFO" &
     echo $! > "$KEEPER_PID_FILE"
     trap 'kill "$(cat "$KEEPER_PID_FILE")" 2>/dev/null; rm -f "$FIFO" "$ID_FILE" "$DAEMON_PID_FILE" "$KEEPER_PID_FILE"' EXIT
-    "$G2CLI" daemon < "$FIFO" &
+    "$G2CLI" $DEBUG_FLAG daemon < "$FIFO" &
     echo $! > "$DAEMON_PID_FILE"
     wait "$(cat "$DAEMON_PID_FILE")"
     ;;

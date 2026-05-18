@@ -22,6 +22,16 @@ g2_device_t g2 = {
     .interface_claimed = 0
 };
 
+int g2_debug = 0;
+
+static void debug_send(const char *fn, const uint8_t *buf, int len) {
+    if (!g2_debug) return;
+    printf("{\"debug\":\"send\",\"fn\":\"%s\",\"hex\":\"", fn);
+    for (int i = 0; i < len; i++) printf("%02x", buf[i]);
+    printf("\"}\n");
+    fflush(stdout);
+}
+
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
@@ -192,6 +202,7 @@ int send_system(uint8_t cmd, uint8_t subcmd) {
 
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    if (ret >= 0) debug_send("sys", buff, msgLength);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -218,6 +229,7 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
 
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    if (ret >= 0) debug_send("sys_data", buff, msgLength);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -250,6 +262,7 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
         libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     }
+    if (ret >= 0) debug_send("slot", buff, msgLength);
     return (ret < 0) ? -1 : 0;
 }
 
@@ -561,6 +574,7 @@ int send_init_msg(void) {
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLen,
                                    &transferred, USB_TIMEOUT_STANDARD_MS);
+    if (ret >= 0) debug_send("init", buff, msgLen);
     return (ret < 0) ? -1 : 0;
 }
 

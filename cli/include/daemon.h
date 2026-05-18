@@ -2,7 +2,7 @@
 #include "output.h"
 #include "cJSON.h"
 
-int g2_daemon_run(output_format_t format);
+int g2_daemon_run(output_format_t format, int debug);
 
 /* Exposed for unit testing */
 int    daemon_enqueue(const char *line);
