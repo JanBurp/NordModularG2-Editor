@@ -88,6 +88,7 @@ if $BUILD_X64; then
     LIBUSB_CFLAGS="-I$LIBUSB_X64_PREFIX/include/libusb-1.0" \
     LIBUSB_LIBS="-L$LIBUSB_X64_PREFIX/lib -lusb-1.0 -framework CoreFoundation -framework IOKit -framework Security -lobjc"
   cp build/bin/g2-cli "$RESOURCES_DIR/g2-cli"
+  make clean
 
   step "Packaging macOS x64 DMG"
   cd "$EDITOR_DIR"
@@ -126,6 +127,7 @@ if $BUILD_WIN; then
     LIBUSB_CFLAGS="-I$LIBUSB_WIN_PREFIX/include/libusb-1.0" \
     LIBUSB_LIBS="-L$LIBUSB_WIN_PREFIX/lib -lusb-1.0 -lsetupapi"
   cp build/bin/g2-cli.exe "$RESOURCES_DIR/g2-cli.exe"
+  make clean
 
   step "Packaging Windows NSIS installer"
   cd "$EDITOR_DIR"
