@@ -38,7 +38,7 @@ fi
 # --- Shared prerequisites ---
 step "Installing npm dependencies"
 cd "$EDITOR_DIR"
-npm ci --ignore-scripts
+npm ci
 
 step "Compiling Electron app"
 npx electron-vite build
