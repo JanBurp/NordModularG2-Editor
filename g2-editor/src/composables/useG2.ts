@@ -48,9 +48,7 @@ export function useG2() {
 			category,
 		};
 		logs.value.push(entry);
-		if (category === 'led' || category === 'volume') {
-			console.debug(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
-		} else {
+		if (category !== 'led' && category !== 'volume') {
 			console.log(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
 		}
 	}
@@ -234,12 +232,14 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'led_data') {
-					ledStore.parseLedData(ev.slot, ev.data);
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (slotLabel) ledStore.parseLedData(slotLabel, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev), 'led');
 					return;
 				}
 				if (ev.type === 'volume_data') {
-					ledStore.parseVolumeData(ev.slot, ev.data);
+					const slotLabel = SLOT_LABELS[ev.slot as number];
+					if (slotLabel) ledStore.parseVolumeData(slotLabel, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev), 'volume');
 					return;
 				}
