@@ -1,9 +1,11 @@
 # G2 CLI Makefile
 # Build C CLI tool for Nord G2 synthesizer
 
-CC = gcc
-CFLAGS = -Wall -Wextra -Iinclude -Itest -I. -I/opt/homebrew/Cellar/libusb/1.0.29/include/libusb-1.0 -g -DUNITY_OUTPUT_COLOR
-LDFLAGS = -L/opt/homebrew/Cellar/libusb/1.0.29/lib -lusb-1.0 -pthread
+CC      ?= gcc
+LIBUSB_CFLAGS ?= $(shell pkg-config --cflags libusb-1.0 2>/dev/null)
+LIBUSB_LIBS   ?= $(shell pkg-config --libs   libusb-1.0 2>/dev/null)
+CFLAGS  = -Wall -Wextra -Iinclude -Itest -I. $(LIBUSB_CFLAGS) $(ARCH_FLAGS) -g -DUNITY_OUTPUT_COLOR
+LDFLAGS = $(LIBUSB_LIBS) $(ARCH_FLAGS) -pthread
 TARGET = g2-cli
 SRC_DIR = src
 TEST_DIR = test

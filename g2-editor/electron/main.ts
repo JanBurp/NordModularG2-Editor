@@ -20,7 +20,8 @@ let cmdId = 0;
 const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>();
 const isMac = process.platform === 'darwin';
 
-const cliPath = path.join(process.env.APP_ROOT, "resources/g2-cli");
+const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
+const cliPath = path.join(process.env.APP_ROOT, "resources", cliName);
 
 function createWindow() {
 	win = new BrowserWindow({

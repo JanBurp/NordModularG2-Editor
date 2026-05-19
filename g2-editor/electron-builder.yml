@@ -8,18 +8,22 @@ files:
   - dist/**/*
   - dist-electron/**/*
   - resources/**/*
-extraResources:
-  - from: ../cli/build/bin/g2-cli
-    to: g2-cli
-    filter:
-      - "**/*"
+
 mac:
   target:
-    - dir
+    - dmg
   category: public.app-category.music
+  extraResources:
+    - from: resources/g2-cli
+      to: g2-cli
+
 win:
   target:
-    - dir
+    - nsis
+  extraResources:
+    - from: resources/g2-cli.exe
+      to: g2-cli.exe
+
 linux:
   target:
     - dir
