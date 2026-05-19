@@ -69,7 +69,7 @@ export function useJackPatching() {
 		} else {
 			const output = src.type === 'output' ? src : info;
 			const input = src.type === 'input' ? src : info;
-			const cableList = slotsStore.getAreaCables(uiStore.activeSlot, uiStore.area as 0 | 1);
+			const cableList = slotsStore.getAreaCables(uiStore.slotInFocus, uiStore.area as 0 | 1);
 			if (isNestDrivenByOutput(cableList, input.moduleIndex, input.connectorIndex)) return;
 			await slotsStore.addCable(
 				output.moduleIndex,

@@ -38,7 +38,7 @@ export function usePatchFile() {
 		const parsedPatch = new PatchParser(buffer).parse() as any;
 		const name = file.name.replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(new Uint8Array(buffer));
-		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex);
+		slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
 		applyVariation(parsedPatch);
 	}
 
@@ -57,11 +57,11 @@ export function usePatchFile() {
 			return;
 		}
 		const parsedPatch = parser.parse() as any;
-		slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, result.filepath!);
+		slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
 		if (device.status === 'connected') {
 			try {
-				await window.cli.run(['upload-patch', uiStore.activeSlot, result.filepath!]);
+				await window.cli.run(['upload-patch', uiStore.slotInFocus, result.filepath!]);
 			} catch (err) {
 				console.error('Upload to G2 failed:', err);
 			}
@@ -100,11 +100,11 @@ export function usePatchFile() {
 					}
 				}
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				slotsStore.loadPatchFile(uiStore.activeSlot, parsedPatch, name, rawHex, item.filepath);
+				slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
 				if (device.status === 'connected') {
 					try {
-						await window.cli.run(['upload-patch', uiStore.activeSlot, item.filepath]);
+						await window.cli.run(['upload-patch', uiStore.slotInFocus, item.filepath]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
 					}
@@ -119,8 +119,8 @@ export function usePatchFile() {
 				return;
 			}
 			try {
-				await window.cli.run(['select-patch', uiStore.activeSlot, String(item.bank), String(item.location)]);
-				await slotsStore.loadSlot(uiStore.activeSlot);
+				await window.cli.run(['select-patch', uiStore.slotInFocus, String(item.bank), String(item.location)]);
+				await slotsStore.loadSlot(uiStore.slotInFocus);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
 			}

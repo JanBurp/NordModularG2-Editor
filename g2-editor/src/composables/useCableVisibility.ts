@@ -23,7 +23,7 @@ export function useCableVisibility() {
 
 	// Derive cable visibility from the active slot's patch description (single source of truth)
 	const cableVisibility = computed<CableVisibility>(() => {
-		const desc = slotsStore.slots[uiStore.activeSlot]?.patch?.description;
+		const desc = slotsStore.slots[uiStore.slotInFocus]?.patch?.description;
 		return {
 			red: desc?.red !== 0,
 			blue: desc?.blue !== 0,
@@ -40,12 +40,12 @@ export function useCableVisibility() {
 	});
 
 	function toggleCableVisibility(colorName: keyof CableVisibility): void {
-		const desc = slotsStore.slots[uiStore.activeSlot]?.patch?.description;
+		const desc = slotsStore.slots[uiStore.slotInFocus]?.patch?.description;
 		if (desc) desc[colorName] = desc[colorName] === 0 ? 1 : 0;
 	}
 
 	function toggleShowHideAll(): void {
-		const desc = slotsStore.slots[uiStore.activeSlot]?.patch?.description;
+		const desc = slotsStore.slots[uiStore.slotInFocus]?.patch?.description;
 		if (!desc) return;
 		const hide = allCablesVisible.value;
 		CABLE_COLORS.forEach((color) => {

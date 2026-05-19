@@ -30,7 +30,7 @@
 	const slotsStore = useSlotsStore();
 	const device = useDeviceStore();
 
-	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
+	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
 	function areaCount(area: 'voice' | 'fx', type: 'modules' | 'cables'): number {
 		const i = area === 'voice' ? 1 : 0;

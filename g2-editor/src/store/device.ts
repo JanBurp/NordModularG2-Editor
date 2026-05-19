@@ -1,6 +1,8 @@
 import { Device, PatchData, SlotLabel } from '@/types';
+import { SLOT_LABELS } from '@/constants';
 
 import { defineStore } from 'pinia';
+import { useUiStore } from './ui';
 
 export type DeviceStatus = 'connected' | 'connecting' | 'disconnected' | 'uploading' | 'downloading' | 'error' | 'unsupported' | 'lost' | 'offline';
 
@@ -76,12 +78,6 @@ export const useDeviceStore = defineStore('device', {
 					return 'unknown';
 			}
 		},
-		getActiveSlot: (state): SlotLabel | null => {
-			if (!state.device) return null;
-			const active = state.device.slots.find((s) => s.active);
-			if (!active) return null;
-			return active.slot.toUpperCase() as SlotLabel;
-		},
 		perfName: (state): string => {
 			if (state.device?.performance) return state.device.performance.name;
 			return '---';
@@ -104,10 +100,7 @@ export const useDeviceStore = defineStore('device', {
 			});
 		},
 		activeSlotResources: (state): SlotResources => {
-			if (!state.device) return emptySlotResources();
-			const active = state.device.slots.find((s) => s.active);
-			if (!active) return emptySlotResources();
-			const idx = ['a', 'b', 'c', 'd'].indexOf(active.slot);
+			const idx = SLOT_LABELS.indexOf(useUiStore().slotInFocus);
 			return idx >= 0 ? state.slotResources[idx] : emptySlotResources();
 		},
 	},
@@ -133,14 +126,6 @@ export const useDeviceStore = defineStore('device', {
 				this.deviceName = '';
 				this.device = null;
 				this.startupNames = null;
-			}
-		},
-
-		setActiveSlot(slot: string) {
-			if (!this.device) return;
-			const lower = slot.toLowerCase();
-			for (const s of this.device.slots) {
-				s.active = s.slot === lower;
 			}
 		},
 

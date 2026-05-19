@@ -168,13 +168,13 @@
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
 
-	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
-	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 1));
-	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 1));
-	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.activeSlot, 0));
-	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.activeSlot, 0));
+	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
+	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 1));
+	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 1));
+	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 0));
+	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 0));
 	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
-	const patchName = computed(() => slotsStore.getPatchName(uiStore.activeSlot));
+	const patchName = computed(() => slotsStore.getPatchName(uiStore.slotInFocus));
 
 	function applySlotResult(result: { patch: any; name: string } | null): void {
 		if (result?.patch?.description?.variation !== undefined) {
@@ -218,7 +218,7 @@
 	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
-		uiStore.activeSlot = slot;
+		uiStore.slotInFocus = slot;
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
@@ -227,7 +227,7 @@
 	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {
 		const idx = value as number;
 		uiStore.variation = idx;
-		const patch = slotsStore.slots[uiStore.activeSlot]?.patch;
+		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (patch?.description) patch.description.variation = idx;
 		if (device.status === 'connected') await slotsStore.selectVariation(idx);
 	}
@@ -260,7 +260,7 @@
 						],
 						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
 					};
-					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch as any, 'Untitled');
+					slotsStore.loadPatchFile(uiStore.slotInFocus, emptyPatch as any, 'Untitled');
 					break;
 				}
 				case 'new-performance': {
@@ -283,8 +283,8 @@
 				case 'save':
 					if (slotsStore.isPerformanceMode) {
 						await slotsStore.savePerformance();
-					} else if (slotsStore.slots[uiStore.activeSlot]?.templateRawHex) {
-						await slotsStore.saveSlot(uiStore.activeSlot);
+					} else if (slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) {
+						await slotsStore.saveSlot(uiStore.slotInFocus);
 					}
 					break;
 				case 'save-as': {
@@ -292,10 +292,10 @@
 						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName);
 						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
 					} else {
-						if (!slotsStore.slots[uiStore.activeSlot]?.templateRawHex) break;
-						const name = slotsStore.slots[uiStore.activeSlot].name;
+						if (!slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) break;
+						const name = slotsStore.slots[uiStore.slotInFocus].name;
 						const result = await window.electronAPI.showSaveDialog(name);
-						if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.activeSlot, result.filepath);
+						if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.slotInFocus, result.filepath);
 					}
 					break;
 				}
@@ -369,7 +369,7 @@
 			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
-				uiStore.activeSlot = slot;
+				uiStore.slotInFocus = slot;
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
 			if (device.startupNames) {
@@ -391,17 +391,16 @@
 		if (slotIndex === null) return;
 		const slot = SLOT_LABELS[slotIndex];
 		if (!slot) return;
-		device.setActiveSlot(slot);
-		uiStore.activeSlot = slot;
+		uiStore.slotInFocus = slot;
 		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
 	});
 
 	watch(hardwareVariationChange, (change) => {
 		if (!change) return;
 		const changeSlot = SLOT_LABELS[change.slot];
-		if (changeSlot !== uiStore.activeSlot) return;
+		if (changeSlot !== uiStore.slotInFocus) return;
 		uiStore.variation = change.variation;
-		const activePatch = slotsStore.slots[uiStore.activeSlot]?.patch;
+		const activePatch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (activePatch?.description) activePatch.description.variation = change.variation;
 	});
 </script>

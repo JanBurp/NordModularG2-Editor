@@ -2,13 +2,12 @@ import type { Cable } from '@/renderer/cableRenderer';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
-import { useDeviceStore } from './device';
 
 export type PaneTab = 'modules' | 'info' | 'browser' | 'settings' | '';
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({
-		activeSlot: 'A' as SlotLabel,
+		slotInFocus: 'A' as SlotLabel,
 		area: 1 as number,
 		variation: 0 as number,
 		moduleColor: 0 as number,
@@ -22,10 +21,7 @@ export const useUiStore = defineStore('ui', {
 	}),
 
 	getters: {
-		selectedSlotIndex: (state) => {
-			const label = useDeviceStore().getActiveSlot;
-			return SLOT_LABELS.indexOf((label ?? state.activeSlot) as SlotLabel);
-		},
+		selectedSlotIndex: (state) => SLOT_LABELS.indexOf(state.slotInFocus),
 	},
 
 	actions: {
