@@ -16,6 +16,7 @@
 					:options="SLOT_OPTIONS"
 					:indicators="device.getSlotStatus"
 					variant="toggle"
+					testIdPrefix="slot"
 					@update:model-value="handleSlotClick"
 				/>
 				<ToolBarDivider />

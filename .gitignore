@@ -23,3 +23,5 @@ g2-editor/resources/g2-cli
 /screenshots
 /test-patches
 /.claude
+/g2-editor/test-results
+/g2-editor/playwright-report

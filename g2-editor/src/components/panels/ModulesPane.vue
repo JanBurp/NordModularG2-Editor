@@ -22,6 +22,7 @@
 							height: getModuleHeight(module) + 'px',
 							cursor: 'grab',
 						}"
+						:data-testid="`module-item-${module.short}`"
 						draggable="true"
 						@dragstart="(e) => handleModuleDragStart(e, module.id)"
 						@dragend="handleModuleDragEnd"

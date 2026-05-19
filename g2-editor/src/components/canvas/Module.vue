@@ -4,6 +4,8 @@
 		:transform="`translate(${x}, ${y})`"
 		class="cursor-default"
 		:class="{ selected: isSelected }"
+		:data-module-idx="moduleIdx"
+		:data-module-short="moduleDef.short"
 		@click.stop="onModuleClick"
 		@mousedown.stop
 		@contextmenu.stop.prevent="onContextMenu"
@@ -17,6 +19,7 @@
 			height="18"
 			fill="transparent"
 			style="cursor: grab"
+			data-drag-handle="true"
 			@mousedown.stop.prevent="onDragHandleMousedown"
 			@dblclick.stop.prevent="onTitleDblClick"
 		/>
