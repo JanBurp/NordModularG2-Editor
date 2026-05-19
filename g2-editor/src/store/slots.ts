@@ -7,7 +7,6 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { resolveColumnCollisions } from './slotHelpers';
-import { useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
 export type { SlotLabel };
@@ -131,14 +130,14 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		_getActivePatch(): { slot: SlotLabel; patch: Patch } | null {
-			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
+			const slot = useUiStore().slotInFocus;
 			if (!slot) return null;
 			const patch = this.slots[slot].patch;
 			return patch ? { slot, patch } : null;
 		},
 
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			if (useDeviceStore().getActiveSlot === slot) return this.loadSlot(slot);
+			if (useUiStore().slotInFocus === slot) return this.loadSlot(slot);
 
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
@@ -147,7 +146,6 @@ export const useSlotsStore = defineStore('slots', {
 					['slot', slot],
 					['get-patch', slot],
 				]);
-				useDeviceStore().setActiveSlot(slot);
 				return await this._applyPatchOutput(slot, patchOutput);
 			} catch (e: any) {
 				this.slots[slot].error = e.message;
@@ -158,7 +156,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectVariation(variation: number): Promise<void> {
-			const active = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
+			const active = useUiStore().slotInFocus;
 			if (!active) return;
 			await window.cli.run(['variation', String(variation + 1), active]);
 		},
@@ -591,7 +589,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
-			const slot = useDeviceStore().getActiveSlot ?? useUiStore().activeSlot;
+			const slot = useUiStore().slotInFocus;
 			const params = this.slots[slot]?.patch?.patchParams;
 			if (params?.[variation]) {
 				(params[variation] as Record<string, number>)[key] = value;

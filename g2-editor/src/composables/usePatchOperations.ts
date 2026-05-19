@@ -9,10 +9,10 @@ export function usePatchOperations() {
 	const device = useDeviceStore();
 
 	const currentModules = computed(() =>
-		uiStore.area === 1 ? slotsStore.getAreaModules(uiStore.activeSlot, 1) : slotsStore.getAreaModules(uiStore.activeSlot, 0),
+		uiStore.area === 1 ? slotsStore.getAreaModules(uiStore.slotInFocus, 1) : slotsStore.getAreaModules(uiStore.slotInFocus, 0),
 	);
 	const currentCables = computed(() =>
-		uiStore.area === 1 ? slotsStore.getAreaCables(uiStore.activeSlot, 1) : slotsStore.getAreaCables(uiStore.activeSlot, 0),
+		uiStore.area === 1 ? slotsStore.getAreaCables(uiStore.slotInFocus, 1) : slotsStore.getAreaCables(uiStore.slotInFocus, 0),
 	);
 
 	async function deleteSelection(): Promise<void> {

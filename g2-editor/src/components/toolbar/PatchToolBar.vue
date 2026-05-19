@@ -62,8 +62,8 @@
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
-	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.activeSlot));
-	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.activeSlot));
+	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
+	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.slotInFocus));
 
 	const selectedCategory = ref<number>(0);
 	watch(
