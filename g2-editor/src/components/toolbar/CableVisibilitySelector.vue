@@ -12,6 +12,7 @@
 					backgroundColor: color.hex,
 					borderColor: color.hex,
 				}"
+				:data-testid="`cable-toggle-${color.name}`"
 				:title="color.label + (getVisibility(color.name) ? ' (visible)' : ' (hidden)')"
 				@click="toggle(color.name)"
 			>
@@ -28,6 +29,7 @@
 				:class="{
 					'bg-gray-500 border-neutral-500 text-white shadow': allCablesVisible,
 				}"
+				data-testid="cable-toggle-all"
 				:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
 				@click="toggleShowHideAll"
 			>

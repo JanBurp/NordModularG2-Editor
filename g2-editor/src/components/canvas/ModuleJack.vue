@@ -1,5 +1,5 @@
 <template>
-	<g class="jack-group" :class="type" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup" @contextmenu.stop.prevent="onContextMenu">
+	<g class="jack-group" :class="type" :data-jack="`${type}-${connectorIndex}`" :data-jack-name="name" @mousedown.stop="onMousedown" @mouseup.stop="onMouseup" @contextmenu.stop.prevent="onContextMenu">
 		<!-- Larger hit area for easier clicking/dragging -->
 		<circle v-if="type === 'input'" :cx="x" :cy="y" r="10" fill="none" style="pointer-events: all" />
 		<rect v-else :x="x - 10" :y="y - 10" width="20" height="20" rx="1" fill="none" style="pointer-events: all" />

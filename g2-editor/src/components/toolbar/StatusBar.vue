@@ -7,6 +7,7 @@
 		<div
 			class="ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-30"
 			:class="device.statusClass"
+			data-testid="connection-status"
 			@click="emit('toggle-connection')"
 		>
 			<span class="text-sm">{{ device.statusLabel }}</span>

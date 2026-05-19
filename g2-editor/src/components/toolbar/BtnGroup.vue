@@ -10,6 +10,7 @@
 			:indicator="indicators ? indicators[index] !== undefined : false"
 			:indicatorValue="indicators ? !!indicators[index] : false"
 			class="btn-group-item"
+			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
 			@click="handleSelect(option.value, option.disabled)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
 		>
@@ -30,6 +31,7 @@
 		size?: 'normal' | 'small' | 'xs';
 		multiSelect?: boolean;
 		indicators?: boolean[];
+		testIdPrefix?: string;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
@@ -37,6 +39,7 @@
 		size: 'normal',
 		multiSelect: false,
 		indicators: () => [],
+		testIdPrefix: undefined,
 	});
 
 	const emit = defineEmits<{

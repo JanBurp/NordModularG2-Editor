@@ -16,7 +16,7 @@
 		<ToolBarDivider />
 
 		<div class="flex items-center gap-2">
-			<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" @update:model-value="(v) => emit('variationClick', v)" />
+			<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" testIdPrefix="variation" @update:model-value="(v) => emit('variationClick', v)" />
 		</div>
 
 		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
