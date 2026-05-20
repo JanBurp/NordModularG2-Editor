@@ -38,6 +38,7 @@ static void print_usage(const char *prog) {
     printf("  device                                                                                    Show synth device info\n");
     printf("  get-patch <slot>                                                                          Get patch from slot (A-D) as JSON\n");
     printf("  get-patch-file <slot> [file]                                                              Save patch as .pch2 file\n");
+    printf("  get-perf-file [file]                                                                      Save current performance as .prf2 file\n");
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
@@ -178,6 +179,21 @@ static int cmd_get_patch_file(int argc, char **argv, int i) {
             output_error_json("Failed to get patch file", output_format);
         else
             fprintf(stderr, "Failed to get patch file\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
+static int cmd_get_perf_file(int argc, char **argv, int i) {
+    const char *filename = (i + 1 < argc) ? argv[i + 1] : NULL;
+    cJSON *result = g2_get_perf_file(filename);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get performance file", output_format);
+        else
+            fprintf(stderr, "Failed to get performance file\n");
         return 1;
     }
     output_json(result, output_format);
@@ -547,6 +563,7 @@ static const cmd_entry_t commands[] = {
     { "device",           cmd_device           },
     { "get-patch",        cmd_get_patch        },
     { "get-patch-file",   cmd_get_patch_file   },
+    { "get-perf-file",    cmd_get_perf_file    },
     { "get-resources",    cmd_get_resources    },
     { "list",             cmd_list             },
     { "slot",             cmd_slot             },
