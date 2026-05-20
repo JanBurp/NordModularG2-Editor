@@ -39,10 +39,10 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
 
     cJSON *midi = cJSON_CreateObject();
     cJSON *midiSlots = cJSON_CreateObject();
-    cJSON_AddNumberToObject(midiSlots, "a", midiCh[0]);
-    cJSON_AddNumberToObject(midiSlots, "b", midiCh[1]);
-    cJSON_AddNumberToObject(midiSlots, "c", midiCh[2]);
-    cJSON_AddNumberToObject(midiSlots, "d", midiCh[3]);
+    cJSON_AddNumberToObject(midiSlots, "A", midiCh[0]);
+    cJSON_AddNumberToObject(midiSlots, "B", midiCh[1]);
+    cJSON_AddNumberToObject(midiSlots, "C", midiCh[2]);
+    cJSON_AddNumberToObject(midiSlots, "D", midiCh[3]);
     cJSON_AddNumberToObject(midiSlots, "global", midiCh[4]);
     cJSON_AddItemToObject(midi, "slots", midiSlots);
     cJSON_AddNumberToObject(midi, "sysex", sysexId + 1);
@@ -126,7 +126,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     cJSON *slots = cJSON_CreateArray();
     for (int i = 0; i < 4; i++) {
         cJSON *slot = cJSON_CreateObject();
-        cJSON_AddStringToObject(slot, "slot", (char*[]){ "a", "b", "c", "d" }[i]);
+        cJSON_AddStringToObject(slot, "slot", (char*[]){ "A", "B", "C", "D" }[i]);
         cJSON_AddNumberToObject(slot, "bank", slotBanks[i]);
         cJSON_AddNumberToObject(slot, "patch", slotPatches[i]);
         cJSON_AddStringToObject(slot, "name", slotNames[i]);

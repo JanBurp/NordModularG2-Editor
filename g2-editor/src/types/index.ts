@@ -30,7 +30,7 @@ export type MenuAction =
 	| 'variation-8';
 
 export interface SlotInfo {
-	slot: string;
+	slot: SlotLabel;
 	bank: number;
 	patch: number;
 	name: string;
@@ -63,7 +63,7 @@ export interface Device {
 	performance: PatchData | null;
 	slots: SlotInfo[];
 	midi: {
-		slots: { a: number; b: number; c: number; d: number; global: number };
+		slots: { A: number; B: number; C: number; D: number; global: number };
 		sysex: number;
 		local: boolean;
 		prgch: string;

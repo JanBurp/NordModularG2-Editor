@@ -32,10 +32,10 @@ export function useG2() {
 	const ledStore = useLedStore();
 	const logs = ref<UsbLogEntry[]>([]);
 	const hardwareVariationChange = ref<{
-		slot: number;
+		slot: SlotLabel;
 		variation: number;
 	} | null>(null);
-	const hardwareSlotChange = ref<number | null>(null);
+	const hardwareSlotChange = ref<SlotLabel | null>(null);
 	const isDaemonRunning = ref(false);
 
 	function log(direction: '→' | '←' | '•', event: string, message: string, category?: UsbLogEntry['category']): void {
@@ -99,22 +99,20 @@ export function useG2() {
 		}
 	}
 
-	const pendingResourceFetch = new Set<number>();
+	const pendingResourceFetch = new Set<SlotLabel>();
 
-	async function fetchSlotResources(slotIndex: number): Promise<void> {
+	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
 		if (store.status !== 'connected') return;
-		if (pendingResourceFetch.has(slotIndex)) return;
-		const slotLabel = SLOT_LABELS[slotIndex];
-		if (!slotLabel) return;
-		pendingResourceFetch.add(slotIndex);
+		if (pendingResourceFetch.has(slot)) return;
+		pendingResourceFetch.add(slot);
 		try {
-			const out = await window.cli.run(['get-resources', slotLabel]);
+			const out = await window.cli.run(['get-resources', slot]);
 			const parsed = JSON.parse(out) as { bytes: number[] };
-			if (Array.isArray(parsed.bytes)) store.updateResources(slotIndex, parsed.bytes);
+			if (Array.isArray(parsed.bytes)) store.updateResources(slot, parsed.bytes);
 		} catch {
 			// patch may not be loaded in this slot
 		} finally {
-			pendingResourceFetch.delete(slotIndex);
+			pendingResourceFetch.delete(slot);
 		}
 	}
 
@@ -170,15 +168,13 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'variation_change') {
-					hardwareVariationChange.value = {
-						slot: ev.slot,
-						variation: ev.variation,
-					};
+					const sl = SLOT_LABELS[ev.slot as number];
+					if (sl) hardwareVariationChange.value = { slot: sl, variation: ev.variation as number };
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'slot_change') {
-					hardwareSlotChange.value = ev.slot;
+					hardwareSlotChange.value = SLOT_LABELS[ev.slot as number] ?? null;
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
@@ -218,7 +214,7 @@ export function useG2() {
 						// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
 						for (const p of ev.patches) {
 							if (!p || !p.data) continue;
-							const slot = (p.slot as string).toUpperCase() as SlotLabel;
+							const slot = p.slot as SlotLabel;
 							slotsStore._applyPatchOutput(slot, JSON.stringify(p));
 						}
 					} else if (prevMode && ev.mode !== prevMode) {
@@ -245,11 +241,13 @@ export function useG2() {
 				}
 				if (ev.type === 'patch_update') {
 					log('←', 'Watch', `patch_update slot=${ev.slot}`);
-					fetchSlotResources(ev.slot as number);
+					const sl = SLOT_LABELS[ev.slot as number];
+					if (sl) fetchSlotResources(sl);
 					return;
 				}
 				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
-					store.updateResources(ev.slot, ev.data);
+					const sl = SLOT_LABELS[ev.slot as number];
+					if (sl) store.updateResources(sl, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
@@ -295,8 +293,8 @@ export function useG2() {
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
-			const activeIdx = store.device?.slots.findIndex((s) => s.active) ?? -1;
-			if (activeIdx >= 0) fetchSlotResources(activeIdx);
+			const activeSlot = store.device?.slots.find((s) => s.active)?.slot ?? null;
+			if (activeSlot) fetchSlotResources(activeSlot);
 		} catch (e: any) {
 			store.status = 'disconnected';
 			log('←', 'Connect', `G2 not found: ${e.message}`);

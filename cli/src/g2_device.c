@@ -399,7 +399,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Build JSON output */
     cJSON *root = cJSON_CreateObject();
-    cJSON_AddStringToObject(root, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
+    cJSON_AddStringToObject(root, "slot", (char*[]){ "A", "B", "C", "D" }[slot]);
     cJSON_AddStringToObject(root, "name", patchName);
     cJSON_AddNumberToObject(root, "size", patchSize);
 
@@ -558,7 +558,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     cJSON *result = cJSON_CreateObject();
     cJSON_AddStringToObject(result, "file", filename);
-    cJSON_AddStringToObject(result, "slot", (char*[]){ "a", "b", "c", "d" }[slot]);
+    cJSON_AddStringToObject(result, "slot", (char*[]){ "A", "B", "C", "D" }[slot]);
     cJSON_AddStringToObject(result, "name", patchName);
     cJSON_AddNumberToObject(result, "size", (int)pch2Size);
 

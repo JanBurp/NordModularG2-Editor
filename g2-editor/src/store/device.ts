@@ -34,7 +34,7 @@ export const useDeviceStore = defineStore('device', {
 		deviceName: '',
 		device: null as Device | null,
 		startupNames: null as any,
-		slotResources: [0, 1, 2, 3].map(() => emptySlotResources()) as SlotResources[],
+		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
 	}),
 
 	getters: {
@@ -94,14 +94,10 @@ export const useDeviceStore = defineStore('device', {
 		},
 		getSlotStatus: (state): boolean[] => {
 			if (!state.device) return [false, false, false, false];
-			return ['a', 'b', 'c', 'd'].map((s) => {
-				const slot = state.device?.slots.find((slot) => slot.slot === s);
-				return slot?.active ?? false;
-			});
+			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.active ?? false);
 		},
 		activeSlotResources: (state): SlotResources => {
-			const idx = SLOT_LABELS.indexOf(useUiStore().slotInFocus);
-			return idx >= 0 ? state.slotResources[idx] : emptySlotResources();
+			return state.slotResources[useUiStore().slotInFocus];
 		},
 	},
 
@@ -141,7 +137,7 @@ export const useDeviceStore = defineStore('device', {
 					synthName: '', mode: 'Performance', patches: null,
 					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false },
 					slots: [],
-					midi: { slots: { a: 0, b: 0, c: 0, d: 0, global: 0 }, sysex: 0, local: false, prgch: '', clkse: false, clkre: false },
+					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: '', clkse: false, clkre: false },
 					tuning: { semi: 0, cent: 0 },
 					pedal: { polarity: false, gain: 0 },
 				};
@@ -175,8 +171,7 @@ export const useDeviceStore = defineStore('device', {
 			this.device.slots = ev.slots;
 		},
 
-		updateResources(slot: number, data: number[]) {
-			if (slot < 0 || slot > 3) return;
+		updateResources(slot: SlotLabel, data: number[]) {
 			const applyBlock = (o: number) => {
 				if (data.length < o + 28) return;
 				const loc = data[o];
