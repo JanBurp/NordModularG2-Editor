@@ -79,6 +79,7 @@ export const useSlotsStore = defineStore('slots', {
 		performanceName: '',
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
+		uploadingFromFile: false,
 	}),
 
 	getters: {

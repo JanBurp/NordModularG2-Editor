@@ -40,6 +40,7 @@ static void print_usage(const char *prog) {
     printf("  get-patch-file <slot> [file]                                                              Save patch as .pch2 file\n");
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
+    printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
     printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
     printf("  set-perf-name <name>                                                                      Set the current performance name\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
@@ -472,6 +473,11 @@ static int cmd_upload_patch(int argc, char **argv, int i) {
     return g2_upload_patch(slot, argv[i + 2]);
 }
 
+static int cmd_upload_perf(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: upload-perf <filepath>\n"); return 1; }
+    return g2_upload_perf(argv[i + 1]);
+}
+
 static int cmd_set_perf_mode(int argc, char **argv, int i) {
     if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-mode <patch|performance>\n"); return 1; }
     const char *m = argv[i + 1];
@@ -559,6 +565,7 @@ static const cmd_entry_t commands[] = {
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },
+    { "upload-perf",      cmd_upload_perf      },
     { "set-perf-mode",    cmd_set_perf_mode    },
     { "set-perf-name",    cmd_set_perf_name    },
     { "daemon",           cmd_daemon           },

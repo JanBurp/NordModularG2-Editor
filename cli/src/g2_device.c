@@ -1428,6 +1428,75 @@ int g2_upload_patch(int slot, const char *filepath) {
     return G2_OK;
 }
 
+int g2_upload_perf(const char *filepath) {
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) return G2_ERR_FILE_OPEN;
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
+    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
+    fread(file_data, 1, (size_t)fsize, f);
+    fclose(f);
+
+    /* prf2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
+     * Use filename (without extension) as the performance name. */
+    const char *base = strrchr(filepath, '/');
+    base = base ? base + 1 : filepath;
+    char name[16] = {0};
+    int ni = 0;
+    while (ni < 15 && base[ni] && base[ni] != '.') { name[ni] = base[ni]; ni++; }
+
+    int name_end = 0;
+    while (name_end < fsize && file_data[name_end]) name_end++;
+    int data_offset = name_end + 3;   /* skip NUL + 0x17 + 0x00 */
+    int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
+    if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
+
+    /* Performance upload uses CMD_SYS (0x2C) and version 0x42, vs CMD_SLOT+slot and 0x53 for single patch.
+     * Section data from .prf2 is sent verbatim — same section format as .pch2. */
+    int name_write_len = ni + 1;
+    size_t extraLen = 3 + (size_t)name_write_len + (size_t)data_len;
+    size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
+    uint8_t *buff = (uint8_t *)calloc(1, totalLen);
+    if (!buff) { free(file_data); return G2_ERR_NO_MEMORY; }
+
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SYS;  /* 0x2C — performance scope */
+    buff[pos++] = 0x42;                        /* fixed version for full performance upload */
+    buff[pos++] = SUB_COMMAND_SET;             /* 0x37 */
+    pos += 3;  /* three zero bytes (calloc) */
+    memcpy(buff + pos, name, (size_t)name_write_len);
+    pos += name_write_len;
+    memcpy(buff + pos, file_data + data_offset, (size_t)data_len);
+    pos += data_len;
+    free(file_data);
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    g2_drain_pending();
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    free(buff);
+    if (ret < 0) return G2_ERR_SEND;
+
+    usleep(USB_SEND_DELAY_US * 5);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;
