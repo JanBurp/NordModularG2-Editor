@@ -51,9 +51,9 @@
 
 	const deviceStore = useDeviceStore();
 	const name = ref(deviceStore.device?.synthName);
-	const midiA = ref(deviceStore.device?.midi.slots.a as string | undefined);
-	const midiB = ref(deviceStore.device?.midi.slots.b as string | undefined);
-	const midiC = ref(deviceStore.device?.midi.slots.c as string | undefined);
-	const midiD = ref(deviceStore.device?.midi.slots.d as string | undefined);
+	const midiA = ref(deviceStore.device?.midi.slots.A as string | undefined);
+	const midiB = ref(deviceStore.device?.midi.slots.B as string | undefined);
+	const midiC = ref(deviceStore.device?.midi.slots.C as string | undefined);
+	const midiD = ref(deviceStore.device?.midi.slots.D as string | undefined);
 	const midiGlobal = ref(deviceStore.device?.midi.slots.global as string | undefined);
 </script>

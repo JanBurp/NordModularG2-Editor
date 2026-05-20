@@ -55,7 +55,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             /* Load all 4 slots before rearming (Delphi approach: all queries before START_COMM).
              * Embed patch data in synth_settings_update so frontend applies them directly —
              * no get-patch stdin commands are sent, eliminating the ACK race condition. */
-            const char *slot_names[] = {"a", "b", "c", "d"};
+            const char *slot_names[] = {"A", "B", "C", "D"};
             cJSON *patches = cJSON_CreateArray();
             for (int s = 0; s < 4; s++) {
                 cJSON *p = g2_get_patch(slot_names[s]);
@@ -169,7 +169,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         if (synth) {
             cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
             int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
-            const char *slot_names[] = {"a", "b", "c", "d"};
+            const char *slot_names[] = {"A", "B", "C", "D"};
             cJSON *patches = cJSON_CreateArray();
             for (int s = 0; s < 4; s++) {
                 cJSON *p = g2_get_patch(slot_names[s]);

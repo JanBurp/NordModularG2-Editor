@@ -387,18 +387,15 @@
 
 	// ── Watches ───────────────────────────────────────────────────────────────
 
-	watch(hardwareSlotChange, async (slotIndex) => {
-		if (slotIndex === null) return;
-		const slot = SLOT_LABELS[slotIndex];
-		if (!slot) return;
+	watch(hardwareSlotChange, async (slot) => {
+		if (slot === null) return;
 		uiStore.slotInFocus = slot;
 		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
 	});
 
 	watch(hardwareVariationChange, (change) => {
 		if (!change) return;
-		const changeSlot = SLOT_LABELS[change.slot];
-		if (changeSlot !== uiStore.slotInFocus) return;
+		if (change.slot !== uiStore.slotInFocus) return;
 		uiStore.variation = change.variation;
 		const activePatch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (activePatch?.description) activePatch.description.variation = change.variation;
