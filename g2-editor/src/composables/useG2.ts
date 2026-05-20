@@ -210,6 +210,7 @@ export function useG2() {
 					const prevMode = store.device?.mode;
 					store.updateSynthSettings(ev);
 					log('←', 'Watch', formatWatchEvent(ev));
+					if (slotsStore.uploadingFromFile) return;
 					if (ev.patches && Array.isArray(ev.patches)) {
 						// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
 						for (const p of ev.patches) {

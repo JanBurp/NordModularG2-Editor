@@ -286,6 +286,9 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_upload_patch(slot, arg_s(args, 1));
 
+	} else if (strcmp(cmd, "upload-perf") == 0 && n >= 1) {
+		ret = g2_upload_perf(arg_s(args, 0));
+
 	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
 		const char *m = arg_s(args, 0);
 		int mode = (m && strcmp(m, "performance") == 0) ? 1

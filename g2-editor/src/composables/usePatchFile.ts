@@ -53,7 +53,18 @@ export function usePatchFile() {
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
 			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
+			const connected = device.status === 'connected';
+			if (connected) slotsStore.uploadingFromFile = true;
 			await device.setPerformanceMode(name);
+			if (connected) {
+				try {
+					await window.cli.run(['upload-perf', result.filepath!]);
+				} catch (err) {
+					console.error('Upload perf to G2 failed:', err);
+				} finally {
+					slotsStore.uploadingFromFile = false;
+				}
+			}
 			return;
 		}
 		const parsedPatch = parser.parse() as any;
@@ -95,7 +106,18 @@ export function usePatchFile() {
 					const prf2 = new PatchParser(buffer).parsePrf2();
 					if (prf2) {
 						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
+						const connected = device.status === 'connected';
+						if (connected) slotsStore.uploadingFromFile = true;
 						await device.setPerformanceMode(name);
+						if (connected) {
+							try {
+								await window.cli.run(['upload-perf', item.filepath]);
+							} catch (err) {
+								console.error('Upload perf to G2 failed:', err);
+							} finally {
+								slotsStore.uploadingFromFile = false;
+							}
+						}
 						return;
 					}
 				}
