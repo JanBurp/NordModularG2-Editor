@@ -1497,6 +1497,200 @@ int g2_upload_perf(const char *filepath) {
     return G2_OK;
 }
 
+cJSON *g2_get_perf_file(const char *filename) {
+    uint8_t interruptResp[16] = {0};
+    uint8_t selsInterrupt[16] = {0};
+    uint8_t selsData[1024] = {0};
+    uint8_t perfInterrupt[16] = {0};
+    uint8_t *perfData = NULL;
+    size_t perfSize = 0;
+    uint8_t *pch2Data[4] = {NULL, NULL, NULL, NULL};
+    size_t pch2Size[4] = {0, 0, 0, 0};
+    uint8_t *outBuf = NULL;
+    cJSON *result = NULL;
+
+    if (ensure_connected(1) < 0) {
+        g2_err("Failed to connect to G2\n");
+        goto cleanup;
+    }
+
+    /* Drain stale data (same pattern as g2_get_patch_file) */
+    if (!g2_listener_active) {
+        uint8_t stale[16]; int n;
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
+    }
+
+    /* Step 1: Get performance settings raw bytes (same sequence as query_perf_settings) */
+    if (send_system(0x41, 0x81) == 0) {
+        usleep(USB_SEND_DELAY_US);
+        int ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t size = ((uint16_t)selsInterrupt[1] << 8) | selsInterrupt[2];
+            recv_bulk(selsData, size);
+        }
+    }
+
+    {
+        int ret;
+        uint16_t size;
+        if (send_system(selsData[2], 0x10) == 0) {
+            usleep(USB_SEND_DELAY_US);
+            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+            if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                size = ((uint16_t)perfInterrupt[1] << 8) | perfInterrupt[2];
+                perfData = malloc(size);
+                if (!perfData) { g2_err("Memory allocation failed\n"); goto cleanup; }
+                perfSize = size;
+                recv_bulk(perfData, size);
+            }
+        }
+    }
+
+    if (perfSize < 8) {
+        g2_err("Failed to get performance settings\n");
+        goto cleanup;
+    }
+
+    /* Extract performance name from perfData[4] */
+    char perfName[32] = {0};
+    int nameLen = parse_name(perfData + 4, perfName, sizeof(perfName));
+
+    /* Step 2: Download all 4 slot patches */
+    for (int slot = 0; slot < 4; slot++) {
+        g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
+
+        uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
+        if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+            g2_err("Failed to get patch version for slot %c\n", "ABCD"[slot]);
+            goto cleanup;
+        }
+        usleep(USB_SEND_DELAY_US);
+        int ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) { g2_err("No version response for slot %c\n", "ABCD"[slot]); goto cleanup; }
+        uint8_t version = interruptResp[6];
+
+        if (send_slot(slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+            g2_err("Failed to request patch for slot %c\n", "ABCD"[slot]);
+            goto cleanup;
+        }
+        usleep(USB_SEND_DELAY_US);
+        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0 || (interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+            g2_err("Unexpected response for slot %c patch data\n", "ABCD"[slot]);
+            goto cleanup;
+        }
+
+        uint16_t patchSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+        uint8_t *patchData = malloc(patchSize);
+        if (!patchData) { g2_err("Memory allocation failed\n"); goto cleanup; }
+        ret = recv_bulk(patchData, patchSize);
+        if (ret <= 0) {
+            free(patchData);
+            g2_err("Failed to read patch bulk for slot %c\n", "ABCD"[slot]);
+            goto cleanup;
+        }
+
+        pch2Data[slot] = malloc(patchSize);
+        if (!pch2Data[slot]) { free(patchData); g2_err("Memory allocation failed\n"); goto cleanup; }
+        pch2Size[slot] = (size_t)patchSize;
+        if (patch_usb_to_pch2(patchData, (size_t)patchSize, pch2Data[slot], &pch2Size[slot]) < 0) {
+            free(patchData);
+            g2_err("Failed to convert patch for slot %c\n", "ABCD"[slot]);
+            goto cleanup;
+        }
+        free(patchData);
+    }
+
+    /* Step 3: Determine output filename */
+    char defaultFilename[64];
+    if (filename == NULL) {
+        if (strlen(perfName) == 0)
+            snprintf(defaultFilename, sizeof(defaultFilename), "performance.prf2");
+        else
+            snprintf(defaultFilename, sizeof(defaultFilename), "%s.prf2", perfName);
+        filename = defaultFilename;
+    }
+
+    /* Step 4: Assemble .prf2 file in memory.
+     * 0x11 section content = perfData[4 + nameLen + 3 .. perfSize-1].
+     * Offset +3 skips 3 unknown header bytes after the name; byte at +3 maps to unknown2
+     * and bytes at +4..+10 map to the 8-byte performance settings header fields. */
+    size_t perf_sect_offset = (size_t)(4 + nameLen + 3);
+    size_t perf_sect_len = (perf_sect_offset < perfSize) ? (perfSize - perf_sect_offset) : 0;
+
+    size_t header_len = strlen(perfName) + 3;  /* name + null + 0x17 + 0x00 */
+    size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */
+    size_t slots_sect_len = 0;
+    for (int s = 0; s < 4; s++)
+        slots_sect_len += (pch2Size[s] > 18) ? (pch2Size[s] - 18) : 0;
+    slots_sect_len += 3 * 3;  /* three 0x6f separator sections between the 4 slots */
+
+    outBuf = malloc(header_len + sect11_total + slots_sect_len + 2);
+    if (!outBuf) { g2_err("Memory allocation failed\n"); goto cleanup; }
+
+    size_t pos = 0;
+
+    /* File header: [perfName\0][0x17][0x00] */
+    size_t pnlen = strlen(perfName);
+    memcpy(outBuf + pos, perfName, pnlen); pos += pnlen;
+    outBuf[pos++] = 0x00;
+    outBuf[pos++] = 0x17;
+    outBuf[pos++] = 0x00;
+
+    size_t crc_start = pos;  /* CRC covers from here to end-2 */
+
+    /* 0x11 performance settings section */
+    outBuf[pos++] = 0x11;
+    outBuf[pos++] = (uint8_t)((perf_sect_len >> 8) & 0xff);
+    outBuf[pos++] = (uint8_t)(perf_sect_len & 0xff);
+    if (perf_sect_len > 0) {
+        memcpy(outBuf + pos, perfData + perf_sect_offset, perf_sect_len);
+        pos += perf_sect_len;
+    }
+
+    /* Slot sections with 0x6f separators between slots */
+    static const uint8_t sep6f[3] = {0x6f, 0x00, 0x00};
+    for (int s = 0; s < 4; s++) {
+        if (pch2Size[s] > 18) {
+            memcpy(outBuf + pos, pch2Data[s] + 18, pch2Size[s] - 18);
+            pos += pch2Size[s] - 18;
+        }
+        if (s < 3) {
+            memcpy(outBuf + pos, sep6f, 3);
+            pos += 3;
+        }
+    }
+
+    /* CRC over all section bytes */
+    uint16_t crc = calc_crc16(outBuf + crc_start, pos - crc_start);
+    outBuf[pos++] = (uint8_t)((crc >> 8) & 0xff);
+    outBuf[pos++] = (uint8_t)(crc & 0xff);
+
+    {
+        FILE *f = fopen(filename, "wb");
+        if (!f) { g2_err("Failed to open file '%s' for writing\n", filename); goto cleanup; }
+        size_t written = fwrite(outBuf, 1, pos, f);
+        fclose(f);
+        if (written != pos) { g2_err("Failed to write complete file\n"); goto cleanup; }
+    }
+
+    result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "file", filename);
+    cJSON_AddStringToObject(result, "name", perfName);
+    cJSON_AddNumberToObject(result, "size", (int)pos);
+
+cleanup:
+    free(perfData);
+    for (int s = 0; s < 4; s++) free(pch2Data[s]);
+    free(outBuf);
+    return result;
+}
+
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;

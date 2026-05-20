@@ -95,6 +95,7 @@ cJSON *query_synth_settings(const char *type);
 cJSON *query_perf_settings(int mode, const char *type);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
+cJSON *g2_get_perf_file(const char *filename);
 cJSON *g2_get_resources(const char *slot_str); /* returns {"va":[...], "fx":[...]} */
 cJSON *g2_list(int filter, int bank_filter);
 

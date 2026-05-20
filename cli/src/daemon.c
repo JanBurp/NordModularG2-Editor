@@ -289,6 +289,9 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "upload-perf") == 0 && n >= 1) {
 		ret = g2_upload_perf(arg_s(args, 0));
 
+	} else if (strcmp(cmd, "get-perf-file") == 0) {
+		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);
+
 	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
 		const char *m = arg_s(args, 0);
 		int mode = (m && strcmp(m, "performance") == 0) ? 1
