@@ -207,9 +207,6 @@ static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
     int ret = g2_upload_perf(filepath);
     TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, ret, "g2_upload_perf failed");
 
-    usleep(600000);
-    g2_stop_comm();
-
     mkdir(TMP_OUT_DIR, 0755);
     char out_path[256];
     snprintf(out_path, sizeof(out_path), "%s/%s_roundtrip.prf2", TMP_OUT_DIR, label);
@@ -231,9 +228,9 @@ static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
     TEST_ASSERT_TRUE_MESSAGE(orig_len > 0, "could not read original prf2 sections");
     TEST_ASSERT_TRUE_MESSAGE(rt_len   > 0, "could not read roundtrip prf2 sections");
 
-    uint8_t orig_ids[64], rt_ids[64];
-    int orig_count = collect_section_ids(orig_sections, orig_len, orig_ids, 64);
-    int rt_count   = collect_section_ids(rt_sections,   rt_len,   rt_ids,   64);
+    uint8_t orig_ids[128], rt_ids[128];
+    int orig_count = collect_section_ids(orig_sections, orig_len, orig_ids, 128);
+    int rt_count   = collect_section_ids(rt_sections,   rt_len,   rt_ids,   128);
 
     fprintf(stderr, "  orig sections (%d bytes, %d chunks):", orig_len, orig_count);
     for (int i = 0; i < orig_count; i++) fprintf(stderr, " %02x", orig_ids[i]);
@@ -242,15 +239,22 @@ static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
     for (int i = 0; i < rt_count; i++) fprintf(stderr, " %02x", rt_ids[i]);
     fprintf(stderr, "\n");
 
-    /* Filter 0x69 (file metadata) and 0x5F (global knobs, not in get-perf-file output).
-     * 0x6f separators are kept — they appear in both original and roundtrip. */
-    uint8_t orig_filt[64], rt_filt[64];
+    /* Drop file-only / structural sections before comparing:
+     *   0x21 = C_PATCH_DESCR: file wrapper around each slot's patch — absent in USB roundtrip
+     *   0x69 = file metadata: not sent over USB
+     *   0x5f = C_KNOBS_GLOBAL: not included in g2_get_perf_file output
+     *   0x6f = slot separator: g2_get_perf_file omits it after the last slot */
+    uint8_t orig_filt[128], rt_filt[128];
     int orig_filt_count = 0, rt_filt_count = 0;
     for (int i = 0; i < orig_count; i++) {
-        if (orig_ids[i] != 0x69 && orig_ids[i] != 0x5f) orig_filt[orig_filt_count++] = orig_ids[i];
+        uint8_t id = orig_ids[i];
+        if (id != 0x21 && id != 0x69 && id != 0x5f && id != 0x6f)
+            orig_filt[orig_filt_count++] = id;
     }
     for (int i = 0; i < rt_count; i++) {
-        if (rt_ids[i] != 0x69 && rt_ids[i] != 0x5f) rt_filt[rt_filt_count++] = rt_ids[i];
+        uint8_t id = rt_ids[i];
+        if (id != 0x21 && id != 0x69 && id != 0x5f && id != 0x6f)
+            rt_filt[rt_filt_count++] = id;
     }
     qsort(orig_filt, (size_t)orig_filt_count, 1, cmp_u8);
     qsort(rt_filt,   (size_t)rt_filt_count,   1, cmp_u8);

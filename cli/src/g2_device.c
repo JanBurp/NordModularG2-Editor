@@ -1308,9 +1308,14 @@ int g2_set_perf_mode(int mode) {
     g2_drain_pending();
     uint8_t cmd[3] = { 0x3E, (uint8_t)mode, 0x00 };
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
-    /* Do not consume the response here — the listener emits it as unknown_bulk
-     * (aCmd=0x0C, sub=0x1F) which contains mode/slot data.  emit_bulk_event()
-     * sets g2_pending_rearm so the daemon main loop re-arms streaming. */
+    /* In daemon mode: listener handles the response (aCmd=0x0C, sub=0x1F mode/slot data)
+     * and sets g2_pending_rearm for the main loop.
+     * In CLI mode: drain and stop streaming to prevent the all-slots version update
+     * from triggering g2_rearm() and leaving the G2 in an unread streaming state. */
+    if (!g2_listener_active) {
+        usleep(200000);
+        g2_stop_comm();
+    }
     return G2_OK;
 }
 
@@ -1496,8 +1501,10 @@ int g2_upload_perf(const char *filepath) {
     free(buff);
     if (ret < 0) return G2_ERR_SEND;
 
-    usleep(600000);  /* let G2 finish applying all 4 slots before stopping */
-    g2_stop_comm();
+    if (!g2_listener_active) {
+        usleep(600000);  /* let G2 finish applying all 4 slots */
+        g2_stop_comm();
+    }
     return G2_OK;
 }
 
