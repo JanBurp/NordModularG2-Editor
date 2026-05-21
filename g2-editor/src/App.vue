@@ -258,7 +258,7 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
 					};
 					slotsStore.loadPatchFile(uiStore.activeSlot, emptyPatch as any, 'Untitled');
 					break;
@@ -269,7 +269,7 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 0, blue: 0, yellow: 0, orange: 0, green: 0, purple: 0, white: 0, monopoly: 0, variation: 0, category: 0 },
+						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
 					};
 					const emptyPatches = [emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[];
 					slotsStore.loadPerformanceFile(emptyPatches, [], 'Untitled Performance', '');
