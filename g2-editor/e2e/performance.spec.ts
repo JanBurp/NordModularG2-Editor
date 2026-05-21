@@ -1,4 +1,4 @@
-import { test, expect } from './fixtures/electron';
+import { expect, test } from './fixtures/electron';
 
 test.describe('performance – MorphingDrumDemo.prf2', () => {
 	test.beforeEach(async ({ page, sendMenuAction, mockOpenPatch }) => {
@@ -37,18 +37,27 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 	test.describe('variation switching', () => {
 		// VARIATION_OPTIONS values are 0-7 (label shows 1-8)
 		test('variation buttons (indices 0-7) are visible', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			for (let i = 0; i < 8; i++) {
 				await expect(page.locator(`[data-testid="variation-${i}"]`)).toBeVisible();
 			}
 		});
 
 		test('clicking variation index 2 makes it active', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			const v2 = page.locator('[data-testid="variation-2"]');
 			await v2.click();
 			await expect(v2).toHaveClass(/btn-active/);
 		});
 
 		test('can cycle through all 8 variations', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			for (let i = 0; i < 8; i++) {
 				await page.locator(`[data-testid="variation-${i}"]`).click();
 				await expect(page.locator(`[data-testid="variation-${i}"]`)).toHaveClass(/btn-active/);
@@ -58,16 +67,25 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 
 	test.describe('cable visibility', () => {
 		test('hide all cables button exists', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			await expect(page.locator('[data-testid="cable-toggle-all"]')).toBeVisible();
 		});
 
 		test('individual color toggle buttons are visible', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			for (const color of ['red', 'blue', 'yellow', 'orange', 'green', 'purple', 'white']) {
 				await expect(page.locator(`[data-testid="cable-toggle-${color}"]`)).toBeVisible();
 			}
 		});
 
 		test('toggling hide-all changes visibility of all colors consistently', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			const hideAll = page.locator('[data-testid="cable-toggle-all"]');
 			const redBtn = page.locator('[data-testid="cable-toggle-red"]');
 
@@ -88,6 +106,9 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 		});
 
 		test('toggling individual color changes only that color', async ({ page }) => {
+			const slotB = page.locator('[data-testid="slot-1"]');
+			await slotB.click();
+
 			const redBtn = page.locator('[data-testid="cable-toggle-red"]');
 			const blueBtn = page.locator('[data-testid="cable-toggle-blue"]');
 

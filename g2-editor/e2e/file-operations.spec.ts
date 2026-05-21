@@ -101,6 +101,25 @@ test.describe('file operations – offline', () => {
 		await expect(page.locator('[data-testid="slot-1"]')).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="slot-0"]')).not.toHaveClass(/btn-active/);
 
+		// On slot B: Voice is active by default
+		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await expect(page.locator('[data-testid="canvas-fx"]')).not.toBeVisible();
+
+		// Switch to FX area
+		await page.getByRole('button', { name: 'FX' }).click();
+		await page.waitForTimeout(200);
+		await expect(page.getByRole('button', { name: 'FX' })).toHaveClass(/btn-active/);
+		await expect(page.getByRole('button', { name: 'Voice' })).not.toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-fx"]')).toBeVisible();
+		await expect(page.locator('[data-testid="canvas-va"]')).not.toBeVisible();
+
+		// Switch back to Voice
+		await page.getByRole('button', { name: 'Voice' }).click();
+		await page.waitForTimeout(200);
+		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+
 		// Switch to slot C
 		await page.locator('[data-testid="slot-2"]').click();
 		await page.waitForTimeout(300);
