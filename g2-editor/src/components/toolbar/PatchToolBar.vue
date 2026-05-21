@@ -11,15 +11,21 @@
 		<ToolBarDivider />
 
 		<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
-		<div class="flex items-center gap-1">
+		<div class="flex items-center gap-1 w-20">
 			<Select v-model="selectedVoices" :options="VOICES" title="Voice count" :disabled="selectedVoiceMode !== 0" />
-			<span v-if="selectedVoiceMode === 0 && assignedVoices !== selectedVoices" class="text-xs text-neutral-400">({{ assignedVoices }})</span>
+			<ToolBarBigLabel>({{ assignedVoices }})</ToolBarBigLabel>
 		</div>
 
 		<ToolBarDivider />
 
 		<div class="flex items-center gap-2">
-			<BtnGroup v-model="uiStore.variation" :options="VARIATION_OPTIONS" variant="variation" testIdPrefix="variation" @update:model-value="(v) => emit('variationClick', v)" />
+			<BtnGroup
+				v-model="uiStore.variation"
+				:options="VARIATION_OPTIONS"
+				variant="variation"
+				testIdPrefix="variation"
+				@update:model-value="(v) => emit('variationClick', v)"
+			/>
 		</div>
 
 		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
@@ -46,6 +52,7 @@
 	import { computed, ref, watch } from 'vue';
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
+	import ToolBarBigLabel from './ToolBarBigLabel.vue';
 	import ToolBarText from './ToolBarText.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
