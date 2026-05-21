@@ -97,9 +97,9 @@ int main(void) {
     // run_test_silently("test_set_perf_name", test_set_perf_name);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
-    // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
+    run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
     // run_test_with_output("test_upload_nl2",        test_upload_nl2);
-    // run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
+    run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
     // run_test_with_output("test_upload_mixt",      test_upload_mixt);
 
     // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
