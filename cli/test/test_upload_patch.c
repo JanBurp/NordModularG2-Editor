@@ -196,3 +196,75 @@ void test_upload_dxbass(void) {
 void test_upload_mixt(void) {
     do_upload_roundtrip("Mixturtrautonium", TEST_PATCHES_DIR "/Mixturtrautonium.pch2");
 }
+
+/* ------------------------------------------------------------------ */
+
+static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
+    ensure_g2();
+    usleep(300000);
+
+    fprintf(stderr, "  upload perf: %s\n", filepath);
+    int ret = g2_upload_perf(filepath);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, ret, "g2_upload_perf failed");
+
+    usleep(600000);
+    g2_stop_comm();
+
+    mkdir(TMP_OUT_DIR, 0755);
+    char out_path[256];
+    snprintf(out_path, sizeof(out_path), "%s/%s_roundtrip.prf2", TMP_OUT_DIR, label);
+
+    cJSON *file_result = g2_get_perf_file(out_path);
+    TEST_ASSERT_NOT_NULL_MESSAGE(file_result, "g2_get_perf_file returned NULL");
+
+    cJSON *name_item = cJSON_GetObjectItem(file_result, "name");
+    const char *got_name = name_item ? cJSON_GetStringValue(name_item) : NULL;
+    fprintf(stderr, "  G2 perf name after upload: '%s'\n", got_name ? got_name : "(null)");
+    cJSON_Delete(file_result);
+    fprintf(stderr, "  saved: %s\n", out_path);
+
+    /* Both original and roundtrip are prf2 files with text-header+NUL format */
+    uint8_t orig_sections[65536], rt_sections[65536];
+    int orig_len = read_pch2_sections(filepath, orig_sections, sizeof(orig_sections));
+    int rt_len   = read_pch2_sections(out_path,  rt_sections,  sizeof(rt_sections));
+
+    TEST_ASSERT_TRUE_MESSAGE(orig_len > 0, "could not read original prf2 sections");
+    TEST_ASSERT_TRUE_MESSAGE(rt_len   > 0, "could not read roundtrip prf2 sections");
+
+    uint8_t orig_ids[64], rt_ids[64];
+    int orig_count = collect_section_ids(orig_sections, orig_len, orig_ids, 64);
+    int rt_count   = collect_section_ids(rt_sections,   rt_len,   rt_ids,   64);
+
+    fprintf(stderr, "  orig sections (%d bytes, %d chunks):", orig_len, orig_count);
+    for (int i = 0; i < orig_count; i++) fprintf(stderr, " %02x", orig_ids[i]);
+    fprintf(stderr, "\n");
+    fprintf(stderr, "  rt   sections (%d bytes, %d chunks):", rt_len, rt_count);
+    for (int i = 0; i < rt_count; i++) fprintf(stderr, " %02x", rt_ids[i]);
+    fprintf(stderr, "\n");
+
+    /* Filter 0x69 (file metadata) and 0x5F (global knobs, not in get-perf-file output).
+     * 0x6f separators are kept — they appear in both original and roundtrip. */
+    uint8_t orig_filt[64], rt_filt[64];
+    int orig_filt_count = 0, rt_filt_count = 0;
+    for (int i = 0; i < orig_count; i++) {
+        if (orig_ids[i] != 0x69 && orig_ids[i] != 0x5f) orig_filt[orig_filt_count++] = orig_ids[i];
+    }
+    for (int i = 0; i < rt_count; i++) {
+        if (rt_ids[i] != 0x69 && rt_ids[i] != 0x5f) rt_filt[rt_filt_count++] = rt_ids[i];
+    }
+    qsort(orig_filt, (size_t)orig_filt_count, 1, cmp_u8);
+    qsort(rt_filt,   (size_t)rt_filt_count,   1, cmp_u8);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(orig_filt_count, rt_filt_count, "perf section count differs");
+    TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(orig_filt, rt_filt, orig_filt_count, "perf section IDs differ");
+
+    usleep(300000);
+}
+
+void test_upload_empty_perf(void) {
+    do_upload_perf_roundtrip("EmptyPerf", TEST_PATCHES_DIR "/EmptyPerf.prf2");
+}
+
+void test_upload_morphing_drum(void) {
+    do_upload_perf_roundtrip("MorphingDrumDemo", TEST_PATCHES_DIR "/MorphingDrumDemo.prf2");
+}

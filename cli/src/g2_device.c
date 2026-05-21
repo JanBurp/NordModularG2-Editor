@@ -1455,10 +1455,12 @@ int g2_upload_perf(const char *filepath) {
     int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
     if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
 
-    /* Performance upload uses CMD_SYS (0x2C) and version 0x42, vs CMD_SLOT+slot and 0x53 for single patch.
-     * Section data from .prf2 is sent verbatim — same section format as .pch2. */
+    /* Performance upload: CMD_SYS (0x2C), version 0x42, subcommand 0x37 (S_SET_PATCH).
+     * After the name, the G2 parser expects [$1A][$29][name\0] before the section data
+     * (confirmed by Delphi AddMsgSetPerformance in BVE.NMG2Synth.pas). Without it
+     * the parser finds 0x11 (C_PERF_SETTINGS) where it expects 0x1A, hanging the G2. */
     int name_write_len = ni + 1;
-    size_t extraLen = 3 + (size_t)name_write_len + (size_t)data_len;
+    size_t extraLen = 3 + (size_t)name_write_len + 2 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
     if (!buff) { free(file_data); return G2_ERR_NO_MEMORY; }
@@ -1469,6 +1471,10 @@ int g2_upload_perf(const char *filepath) {
     buff[pos++] = 0x42;                        /* fixed version for full performance upload */
     buff[pos++] = SUB_COMMAND_SET;             /* 0x37 */
     pos += 3;  /* three zero bytes (calloc) */
+    memcpy(buff + pos, name, (size_t)name_write_len);
+    pos += name_write_len;
+    buff[pos++] = 0x1A;
+    buff[pos++] = 0x29;  /* C_PERF_NAME inline header required by G2 parser */
     memcpy(buff + pos, name, (size_t)name_write_len);
     pos += name_write_len;
     memcpy(buff + pos, file_data + data_offset, (size_t)data_len);
@@ -1490,10 +1496,8 @@ int g2_upload_perf(const char *filepath) {
     free(buff);
     if (ret < 0) return G2_ERR_SEND;
 
-    usleep(USB_SEND_DELAY_US * 5);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
+    usleep(600000);  /* let G2 finish applying all 4 slots before stopping */
+    g2_stop_comm();
     return G2_OK;
 }
 
