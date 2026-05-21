@@ -138,11 +138,14 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			if (useUiStore().slotInFocus === slot) return this.loadSlot(slot);
-
-			this.slots[slot].loading = true;
+			const hasPatch = !!this.slots[slot].patch;
+			this.slots[slot].loading = !hasPatch;
 			this.slots[slot].error = null;
 			try {
+				if (hasPatch) {
+					await window.cli.run(['slot', slot]);
+					return null;
+				}
 				const [, patchOutput] = await window.cli.runBatch([
 					['slot', slot],
 					['get-patch', slot],

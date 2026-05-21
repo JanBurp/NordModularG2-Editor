@@ -20,6 +20,7 @@
 int g2_watch_verbose = 1;
 
 #define BULK_REARM 1
+#define SLOT_LETTER(s) ((s) < 4 ? (const char*[]){"A","B","C","D"}[(s)] : "?")
 
 /* Handle extended (bulk) messages: synth settings, all-slots version updates,
  * and performance events. Returns BULK_REARM if the caller must re-arm streaming. */
@@ -42,7 +43,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             uint8_t slot = bulk[i + 1];
             uint8_t ver  = bulk[i + 2];
             if (!first) printf(",");
-            printf("{\"slot\":%u,\"version\":%u}", slot, ver);
+            printf("{\"slot\":\"%s\",\"version\":%u}", SLOT_LETTER(slot), ver);
             first = 0;
         }
         printf("]}\n");
@@ -112,32 +113,32 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         switch (bsubCmd) {
             case 0x39:
                 if (g2_watch_verbose) {
-                    printf("{\"type\":\"led_data\",\"slot\":%u,\"data\":[", bslot);
+                    printf("{\"type\":\"led_data\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                     for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                     printf("]}\n"); fflush(stdout);
                 }
                 break;
             case 0x3A:
                 if (g2_watch_verbose) {
-                    printf("{\"type\":\"volume_data\",\"slot\":%u,\"data\":[", bslot);
+                    printf("{\"type\":\"volume_data\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                     for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                     printf("]}\n"); fflush(stdout);
                 }
                 break;
             case 0x4D:
-                printf("{\"type\":\"param_list\",\"slot\":%u,\"data\":[", bslot);
+                printf("{\"type\":\"param_list\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
             case 0x5B:
-                printf("{\"type\":\"param_names\",\"slot\":%u,\"data\":[", bslot);
+                printf("{\"type\":\"param_names\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
             case 0x6F:
-                printf("{\"type\":\"patch_notes\",\"slot\":%u,\"data\":[", bslot);
+                printf("{\"type\":\"patch_notes\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
             case 0x72:
-                printf("{\"type\":\"resources_used\",\"slot\":%u,\"data\":[", bslot);
+                printf("{\"type\":\"resources_used\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
             default:
@@ -156,7 +157,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             uint8_t ver  = bulk[i + 2];
             if (slot < 4) g2_slot_version[slot] = ver;
             if (!first) printf(",");
-            printf("{\"slot\":%u,\"version\":%u}", slot, ver);
+            printf("{\"slot\":\"%s\",\"version\":%u}", SLOT_LETTER(slot), ver);
             first = 0;
         }
         printf("]}\n");
@@ -212,8 +213,8 @@ static void emit_embedded_event(const uint8_t *response) {
                     break;
                 case 0x36:
                 case 0x38:
-                    printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
-                           response[5], response[6]);
+                    printf("{\"type\":\"patch_version\",\"slot\":\"%s\",\"version\":%u}\n",
+                           SLOT_LETTER(response[5]), response[6]);
                     if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
                     break;
                 default: {
@@ -244,7 +245,7 @@ static void emit_embedded_event(const uint8_t *response) {
     if (aCmd == 0x04) {
         switch (subCmd) {
             case 0x09:
-                printf("{\"type\":\"slot_change\",\"slot\":%u}\n", response[5]);
+                printf("{\"type\":\"slot_change\",\"slot\":\"%s\"}\n", SLOT_LETTER(response[5]));
                 break;
             case 0x05:
                 printf("{\"type\":\"assigned_voices\",\"voices\":[%u,%u,%u,%u]}\n",
@@ -293,14 +294,14 @@ static void emit_embedded_event(const uint8_t *response) {
 
     if (version == 0x40) {
         if (subCmd == 0x36 || subCmd == 0x38) {
-            printf("{\"type\":\"patch_version\",\"slot\":%u,\"version\":%u}\n",
-                   response[5], response[6]);
+            printf("{\"type\":\"patch_version\",\"slot\":\"%s\",\"version\":%u}\n",
+                   SLOT_LETTER(response[5]), response[6]);
             if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
         } else {
             char hex[32] = "";
             for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                 snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-            printf("{\"type\":\"unknown_version\",\"slot\":%u,\"sub\":%u,\"data\":\"%s\"}\n", slot, subCmd, hex);
+            printf("{\"type\":\"unknown_version\",\"slot\":\"%s\",\"sub\":%u,\"data\":\"%s\"}\n", SLOT_LETTER(slot), subCmd, hex);
         }
         fflush(stdout);
         return;
@@ -309,18 +310,18 @@ static void emit_embedded_event(const uint8_t *response) {
     switch (subCmd) {
         case 0x40:
             if (response[5] == 2) {
-                printf("{\"type\":\"patch_param\",\"slot\":%u,\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                       slot, response[6], response[7], response[8], response[9]);
+                printf("{\"type\":\"patch_param\",\"slot\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                       SLOT_LETTER(slot), response[6], response[7], response[8], response[9]);
             } else {
-                printf("{\"type\":\"param_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
-                       slot, response[5] == 0 ? "fx" : "va",
+                printf("{\"type\":\"param_change\",\"slot\":\"%s\",\"area\":\"%s\",\"module\":%u,\"param\":%u,\"value\":%u,\"variation\":%u}\n",
+                       SLOT_LETTER(slot), response[5] == 0 ? "fx" : "va",
                        response[6], response[7], response[8], response[9]);
             }
             break;
         case 0x43:
-            printf("{\"type\":\"morph_change\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u,"
+            printf("{\"type\":\"morph_change\",\"slot\":\"%s\",\"area\":\"%s\",\"module\":%u,\"param\":%u,"
                    "\"morph\":%u,\"value\":%u,\"negative\":%u,\"variation\":%u}\n",
-                   slot, response[5] == 0 ? "fx" : "va",
+                   SLOT_LETTER(slot), response[5] == 0 ? "fx" : "va",
                    response[6], response[7], response[8], response[9], response[10], response[11]);
             break;
         case 0x27: {
@@ -328,44 +329,44 @@ static void emit_embedded_event(const uint8_t *response) {
             int n = 0;
             for (int i = 5; i <= lastByte && n < 16 && response[i]; i++)
                 name[n++] = (char)response[i];
-            printf("{\"type\":\"patch_name\",\"slot\":%u,\"name\":\"%s\"}\n", slot, name);
+            printf("{\"type\":\"patch_name\",\"slot\":\"%s\",\"name\":\"%s\"}\n", SLOT_LETTER(slot), name);
             break;
         }
         case 0x44:
-            printf("{\"type\":\"copy_variation\",\"slot\":%u,\"from\":%u,\"to\":%u}\n",
-                   slot, response[5], response[6]);
+            printf("{\"type\":\"copy_variation\",\"slot\":\"%s\",\"from\":%u,\"to\":%u}\n",
+                   SLOT_LETTER(slot), response[5], response[6]);
             break;
         case 0x6A:
-            printf("{\"type\":\"variation_change\",\"slot\":%u,\"variation\":%u}\n",
-                   slot, response[5]);
+            printf("{\"type\":\"variation_change\",\"slot\":\"%s\",\"variation\":%u}\n",
+                   SLOT_LETTER(slot), response[5]);
             break;
         case 0x2F:
-            printf("{\"type\":\"selected_param\",\"slot\":%u,\"area\":\"%s\",\"module\":%u,\"param\":%u}\n",
-                   slot, response[6] == 0 ? "fx" : (response[6] == 1 ? "va" : "patch"),
+            printf("{\"type\":\"selected_param\",\"slot\":\"%s\",\"area\":\"%s\",\"module\":%u,\"param\":%u}\n",
+                   SLOT_LETTER(slot), response[6] == 0 ? "fx" : (response[6] == 1 ? "va" : "patch"),
                    response[7], response[8]);
             break;
         case 0x21:
         case 0x3C:
-            printf("{\"type\":\"patch_update\",\"slot\":%u}\n", slot);
+            printf("{\"type\":\"patch_update\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
             break;
         case 0x69:
-            printf("{\"type\":\"current_note\",\"slot\":%u,\"note\":%u,\"velocity\":%u}\n",
-                   slot, response[5], response[6]);
+            printf("{\"type\":\"current_note\",\"slot\":\"%s\",\"note\":%u,\"velocity\":%u}\n",
+                   SLOT_LETTER(slot), response[5], response[6]);
             break;
         case 0x72:
-            printf("{\"type\":\"resources_used\",\"slot\":%u,\"location\":%u}\n",
-                   slot, response[5]);
+            printf("{\"type\":\"resources_used\",\"slot\":\"%s\",\"location\":%u}\n",
+                   SLOT_LETTER(slot), response[5]);
             break;
         case 0x59:
         case 0x70:
-        case 0x7F: printf("{\"type\":\"ok\",\"slot\":%u}\n", slot); break;
-        case 0x7E: printf("{\"type\":\"error\",\"slot\":%u,\"code\":%u}\n", slot, response[5]); break;
+        case 0x7F: printf("{\"type\":\"ok\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot)); break;
+        case 0x7E: printf("{\"type\":\"error\",\"slot\":\"%s\",\"code\":%u}\n", SLOT_LETTER(slot), response[5]); break;
         default: {
             char hex[32] = "";
             for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                 snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-            printf("{\"type\":\"unknown\",\"slot\":%u,\"cmd\":%u,\"sub\":%u,\"data\":\"%s\"}\n",
-                   slot, aCmd, subCmd, hex);
+            printf("{\"type\":\"unknown\",\"slot\":\"%s\",\"cmd\":%u,\"sub\":%u,\"data\":\"%s\"}\n",
+                   SLOT_LETTER(slot), aCmd, subCmd, hex);
             break;
         }
     }

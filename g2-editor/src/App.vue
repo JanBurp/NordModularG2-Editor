@@ -218,7 +218,7 @@
 	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
-		uiStore.slotInFocus = slot;
+		uiStore.setSlotInFocus(slot);
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
@@ -369,7 +369,7 @@
 			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
-				uiStore.slotInFocus = slot;
+				uiStore.setSlotInFocus(slot);
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
 			if (device.startupNames) {
@@ -389,7 +389,7 @@
 
 	watch(hardwareSlotChange, async (slot) => {
 		if (slot === null) return;
-		uiStore.slotInFocus = slot;
+		uiStore.setSlotInFocus(slot);
 		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
 	});
 

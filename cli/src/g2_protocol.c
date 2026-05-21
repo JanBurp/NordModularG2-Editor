@@ -116,7 +116,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
 
     cJSON *perf = cJSON_CreateObject();
     cJSON_AddStringToObject(perf, "name", mode ? perfName : slotNames[focusSlot]);
-    cJSON_AddStringToObject(perf, "focus", (char*[]){ "a", "b", "c", "d" }[focusSlot]);
+    cJSON_AddStringToObject(perf, "focus", (char*[]){ "A", "B", "C", "D" }[focusSlot]);
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
