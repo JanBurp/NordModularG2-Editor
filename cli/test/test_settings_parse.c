@@ -150,7 +150,7 @@ void test_parse_performance_focus_slot(void) {
     
     cJSON *focus = cJSON_GetObjectItem(perf, "focus");
     TEST_ASSERT_NOT_NULL(focus);
-    TEST_ASSERT_EQUAL_STRING("c", focus->valuestring);
+    TEST_ASSERT_EQUAL_STRING("C", focus->valuestring);
     
     cJSON_Delete(result);
 }
@@ -194,7 +194,7 @@ void test_parse_slots_data(void) {
     cJSON *slot0 = cJSON_GetArrayItem(slots, 0);
     TEST_ASSERT_NOT_NULL(slot0);
     
-    TEST_ASSERT(json_has_string(slot0, "slot", "a"));
+    TEST_ASSERT(json_has_string(slot0, "slot", "A"));
     TEST_ASSERT(json_has_number(slot0, "bank", 0));
     TEST_ASSERT(json_has_number(slot0, "patch", 5));
     TEST_ASSERT(json_has_string(slot0, "name", "SlotA"));

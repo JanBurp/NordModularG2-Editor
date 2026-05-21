@@ -102,6 +102,57 @@ int tokenize_command(char *buf, char **argv_out, int max_argc) {
     return argc;
 }
 
+/* Strip the PRF2 file header (name + NUL + 0x17 + 0x00) and 2-byte CRC trailer
+ * to extract the raw section data. Mirrors the logic in g2_upload_performance. */
+int perf_prf2_to_sections(const uint8_t *prf2, size_t prf2_len,
+                           uint8_t *sections_out, size_t *sections_len) {
+    if (!prf2 || !sections_out || !sections_len) return -1;
+
+    size_t name_end = 0;
+    while (name_end < prf2_len && prf2[name_end]) name_end++;
+
+    size_t data_offset = name_end + 3;  /* skip NUL + 0x17 + 0x00 */
+    if (data_offset + 2 > prf2_len) return -1;
+
+    size_t data_len = prf2_len - data_offset - 2;  /* exclude 2-byte CRC */
+    if (*sections_len < data_len) {
+        *sections_len = data_len;
+        return -1;
+    }
+
+    memcpy(sections_out, prf2 + data_offset, data_len);
+    *sections_len = data_len;
+    return 0;
+}
+
+/* Wrap section data in a PRF2 file: [name][NUL][0x17][0x00][sections][CRC].
+ * CRC covers the section bytes only. Mirrors the logic in g2_get_perf_file. */
+int perf_sections_to_prf2(const char *name, const uint8_t *sections, size_t sections_len,
+                           uint8_t *prf2_out, size_t *prf2_len) {
+    if (!name || !sections || !prf2_out || !prf2_len) return -1;
+
+    size_t name_len = strlen(name);
+    size_t total = name_len + 3 + sections_len + 2;  /* name + NUL + 0x17 + 0x00 + data + CRC */
+    if (*prf2_len < total) {
+        *prf2_len = total;
+        return -1;
+    }
+
+    size_t pos = 0;
+    memcpy(prf2_out + pos, name, name_len); pos += name_len;
+    prf2_out[pos++] = 0x00;
+    prf2_out[pos++] = 0x17;
+    prf2_out[pos++] = 0x00;
+    memcpy(prf2_out + pos, sections, sections_len); pos += sections_len;
+
+    uint16_t crc = calc_crc16(prf2_out + name_len + 3, (int)sections_len);
+    prf2_out[pos++] = (crc >> 8) & 0xff;
+    prf2_out[pos++] = crc & 0xff;
+
+    *prf2_len = pos;
+    return 0;
+}
+
 /* Wrap a PCH2 payload in a USB frame: prepend [0x01][size_hi][size_lo],
  * then append a 2-byte CRC-16/CCITT over the payload. */
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,

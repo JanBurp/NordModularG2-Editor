@@ -57,6 +57,7 @@ extern void test_patch_usb_to_pch2_strips_header(void);
 extern void test_patch_usb_to_pch2_strips_trailer(void);
 extern void test_patch_pch2_to_usb_adds_header_and_trailer(void);
 extern void test_patch_roundtrip_conversion(void);
+extern void test_perf_roundtrip_conversion(void);
 extern void test_patch_usb_to_pch2_buffer_too_small(void);
 extern void test_patch_pch2_to_usb_buffer_too_small(void);
 extern void test_patch_usb_to_pch2_null_inputs(void);
@@ -174,6 +175,7 @@ int main(void) {
     RUN_TEST(test_patch_usb_to_pch2_strips_trailer);
     RUN_TEST(test_patch_pch2_to_usb_adds_header_and_trailer);
     RUN_TEST(test_patch_roundtrip_conversion);
+    RUN_TEST(test_perf_roundtrip_conversion);
     RUN_TEST(test_patch_usb_to_pch2_buffer_too_small);
     RUN_TEST(test_patch_pch2_to_usb_buffer_too_small);
     RUN_TEST(test_patch_usb_to_pch2_null_inputs);
