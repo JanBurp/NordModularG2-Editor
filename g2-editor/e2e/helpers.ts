@@ -1,4 +1,4 @@
-import type { Page } from '@playwright/test';
+import type { Locator, Page } from '@playwright/test';
 
 /**
  * Drop a module from the ModulesPane onto the voice canvas by dispatching
@@ -91,6 +91,29 @@ export async function getStatusCounts(page: Page): Promise<{ voiceModules: numbe
 		fxModules: fx ? parseInt(fx[1]) : 0,
 		fxCables: fx ? parseInt(fx[2]) : 0,
 	};
+}
+
+/** Right-click a locator and wait for the context menu to appear. */
+export async function openContextMenu(page: Page, locator: Locator): Promise<void> {
+	// locator.boundingBox() returns null for SVG <g> elements; evaluate getBoundingClientRect() directly
+	const rect = await locator.evaluate((el) => {
+		const r = (el as Element).getBoundingClientRect();
+		return { x: r.left, y: r.top, width: r.width, height: r.height };
+	});
+	await page.mouse.click(rect.x + rect.width / 2, rect.y + rect.height / 2, { button: 'right' });
+	await page.waitForSelector('[data-testid="context-menu"]', { state: 'visible' });
+}
+
+/** Click a context menu item by its visible label text. */
+export async function clickContextMenuItem(page: Page, label: string): Promise<void> {
+	await page.getByRole('menuitem', { name: label, exact: true }).click();
+	await page.waitForTimeout(100);
+}
+
+/** Hover a context menu item to open its submenu. */
+export async function hoverContextMenuItem(page: Page, label: string): Promise<void> {
+	await page.getByRole('menuitem', { name: label, exact: true }).hover();
+	await page.waitForTimeout(200);
 }
 
 /** Select a module on the canvas by clicking its title bar, then press Delete. */

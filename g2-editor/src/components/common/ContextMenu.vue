@@ -4,6 +4,8 @@
 
 		<ul
 			ref="menuEl"
+			role="menu"
+			data-testid="context-menu"
 			class="fixed z-50 min-w-40 bg-neutral-800 border border-neutral-700 rounded shadow-xl py-1 text-sm text-neutral-200 list-none m-0 p-0"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px' }"
 			@mouseenter="cancelClose"
@@ -25,6 +27,7 @@
 
 				<li
 					v-else
+					role="menuitem"
 					:ref="(el) => setItemRef(idx, el as HTMLElement | null)"
 					class="flex items-center justify-between px-3 py-1.5 select-none"
 					:class="[
