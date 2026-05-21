@@ -122,7 +122,12 @@ static void do_upload_roundtrip(const char *label, const char *filepath) {
     fprintf(stderr, "  upload: %s\n", filepath);
     int ret = g2_upload_patch(SLOT_A, filepath);
     TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, ret, "g2_upload_patch failed");
-    usleep(600000);  /* G2 processes the patch */
+
+    /* g2_upload_patch's g2_drain_pending() may call g2_rearm(), leaving the G2 streaming.
+     * g2_stop_comm() drains all pending packets and sends STOP_COMM, guaranteeing the
+     * G2 is quiescent before the get-patch query (mirrors what a fresh process does). */
+    usleep(600000);
+    g2_stop_comm();
 
     /* --- Verify name via get-patch --- */
     cJSON *patch = g2_get_patch("A");

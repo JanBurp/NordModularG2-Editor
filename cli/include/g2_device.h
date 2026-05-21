@@ -77,6 +77,13 @@ int g2_is_connected(void);
 int g2_send_command(uint8_t *data, int length);
 int g2_recv_response(uint8_t *buffer, int size, int timeout_ms);
 
+/* Drain pending USB interrupt+bulk messages (no-op when listener thread is active) */
+int g2_drain_pending(void);
+
+/* Send STOP_COMM and drain until the embedded ACK — guarantees G2 is not streaming.
+ * Call before direct queries that follow a command triggering streaming. */
+void g2_stop_comm(void);
+
 /* List filter options */
 #define LIST_FILTER_ALL            0
 #define LIST_FILTER_PATCHES        1
