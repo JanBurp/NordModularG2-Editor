@@ -1,5 +1,5 @@
 <template>
-	<span class="label text text-nowrap overflow-hidden text-ellipsis" :class="bgColor">
+	<span class="label text text-nowrap overflow-hidden text-ellipsis h-8" :class="bgColor">
 		<slot></slot>
 	</span>
 </template>
