@@ -98,9 +98,9 @@ export function useSwitch(
 	const { open: openContextMenu } = useContextMenu();
 
 	function onContextMenu(e: MouseEvent) {
-		if (!label.value || !emitLabelEdit) return;
+		if (!emitLabelEdit) return;
 		openContextMenu(e, [
-			{ label: 'Rename label', action: () => emitLabelEdit!({ paramIndex: paramIndex.value, currentLabel: label.value!.labels[0] ?? '' }) },
+			{ label: 'Rename label', action: () => emitLabelEdit!({ paramIndex: paramIndex.value, currentLabel: label.value?.labels[0] ?? '' }) },
 		]);
 	}
 

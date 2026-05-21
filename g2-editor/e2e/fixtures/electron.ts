@@ -1,11 +1,14 @@
-import { test as base, _electron as electron } from '@playwright/test';
 import type { ElectronApplication, Page } from '@playwright/test';
-import path from 'path';
+import { test as base, _electron as electron } from '@playwright/test';
+
 import fs from 'fs';
 import os from 'os';
+import path from 'path';
 
 const APP_ROOT = path.join(__dirname, '..', '..');
 const FIXTURES_DIR = path.join(__dirname, '..', '..', '..', 'test-patches');
+
+const SLEEP_AFTER_TEST_MS = 1000;
 
 export type AppFixtures = {
 	app: ElectronApplication;
@@ -17,7 +20,7 @@ export type AppFixtures = {
 };
 
 export const test = base.extend<AppFixtures>({
-	app: async ({}, use) => {
+	app: async ({ }, use) => {
 		const app = await electron.launch({
 			args: [APP_ROOT],
 			env: {
@@ -34,7 +37,7 @@ export const test = base.extend<AppFixtures>({
 				ipcMain.handle(ch, async () => '');
 			}
 			ipcMain.removeHandler('cli:watch-start');
-			ipcMain.handle('cli:watch-start', async () => {});
+			ipcMain.handle('cli:watch-start', async () => { });
 		});
 
 		await use(app);
@@ -47,6 +50,7 @@ export const test = base.extend<AppFixtures>({
 		// Give Vue a moment to fully mount
 		await page.waitForTimeout(500);
 		await use(page);
+		await page.waitForTimeout(SLEEP_AFTER_TEST_MS);
 	},
 
 	sendMenuAction: async ({ app }, use) => {
