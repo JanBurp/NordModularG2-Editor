@@ -2,6 +2,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
+import { useDeviceStore } from './device';
 
 export type PaneTab = 'modules' | 'info' | 'browser' | 'settings' | '';
 
@@ -25,6 +26,13 @@ export const useUiStore = defineStore('ui', {
 	},
 
 	actions: {
+		setSlotInFocus(slot: SlotLabel) {
+			this.slotInFocus = slot;
+			const device = useDeviceStore().device;
+			if (device?.performance) device.performance.focus = slot;
+			else if (device?.patches) device.patches.focus = slot;
+		},
+
 		toggleSidebar(tab: PaneTab) {
 			if (this.rightPaneTab === tab) {
 				this.showRightPane = !this.showRightPane;

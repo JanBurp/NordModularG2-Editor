@@ -7,6 +7,7 @@ import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useLedStore } from '@/store/led';
 import { useSlotsStore } from '@/store/slots';
+import { useUiStore } from '@/store/ui';
 
 export type { DeviceStatus };
 
@@ -30,6 +31,7 @@ export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
 	const ledStore = useLedStore();
+	const uiStore = useUiStore();
 	const logs = ref<UsbLogEntry[]>([]);
 	const hardwareVariationChange = ref<{
 		slot: SlotLabel;
@@ -79,7 +81,7 @@ export function useG2() {
 			case 'slot_change':
 				return `slot → ${ev.slot}`;
 			case 'variation_change':
-				return `var ${ev.variation + 1} slot=${SLOT_LABELS[ev.slot] ?? ev.slot}`;
+				return `var ${ev.variation + 1} slot=${ev.slot}`;
 			case 'perf_name':
 				return `perf: ${ev.name}`;
 			case 'version_update':
@@ -168,19 +170,19 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'variation_change') {
-					const sl = SLOT_LABELS[ev.slot as number];
+					const sl = ev.slot as SlotLabel;
 					if (sl) hardwareVariationChange.value = { slot: sl, variation: ev.variation as number };
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'slot_change') {
-					hardwareSlotChange.value = SLOT_LABELS[ev.slot as number] ?? null;
+					hardwareSlotChange.value = ev.slot as SlotLabel ?? null;
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'param_change') {
 					log('←', 'Watch', formatWatchEvent(ev), 'param');
-					const slotLabel = SLOT_LABELS[ev.slot as number];
+					const slotLabel = ev.slot as SlotLabel;
 					if (!slotLabel) return;
 					const patch = slotsStore.slots[slotLabel]?.patch;
 					const areaIdx = ev.area === 'va' ? 1 : 0;
@@ -193,7 +195,7 @@ export function useG2() {
 				}
 				if (ev.type === 'patch_param') {
 					log('←', 'Watch', formatWatchEvent(ev), 'param');
-					const slotLabel = SLOT_LABELS[ev.slot as number];
+					const slotLabel = ev.slot as SlotLabel;
 					if (!slotLabel) return;
 					const params = slotsStore.slots[slotLabel]?.patch?.patchParams;
 					const key = PATCH_PARAM_KEYS[ev.param as number];
@@ -225,29 +227,31 @@ export function useG2() {
 				}
 				if (ev.type === 'perf_settings') {
 					store.updatePerfSettings(ev);
+					const focus = (ev.performance?.focus ?? ev.patches?.focus) as SlotLabel | undefined;
+					if (focus && SLOT_LABELS.includes(focus)) uiStore.setSlotInFocus(focus);
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'led_data') {
-					const slotLabel = SLOT_LABELS[ev.slot as number];
+					const slotLabel = ev.slot as SlotLabel;
 					if (slotLabel) ledStore.parseLedData(slotLabel, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev), 'led');
 					return;
 				}
 				if (ev.type === 'volume_data') {
-					const slotLabel = SLOT_LABELS[ev.slot as number];
+					const slotLabel = ev.slot as SlotLabel;
 					if (slotLabel) ledStore.parseVolumeData(slotLabel, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev), 'volume');
 					return;
 				}
 				if (ev.type === 'patch_update') {
 					log('←', 'Watch', `patch_update slot=${ev.slot}`);
-					const sl = SLOT_LABELS[ev.slot as number];
+					const sl = ev.slot as SlotLabel;
 					if (sl) fetchSlotResources(sl);
 					return;
 				}
 				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
-					const sl = SLOT_LABELS[ev.slot as number];
+					const sl = ev.slot as SlotLabel;
 					if (sl) store.updateResources(sl, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
