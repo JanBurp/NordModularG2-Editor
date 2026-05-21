@@ -38,6 +38,8 @@ extern void test_upload_empty_patch(void);
 extern void test_upload_nl2(void);
 extern void test_upload_dxbass(void);
 extern void test_upload_mixt(void);
+extern void test_upload_empty_perf(void);
+extern void test_upload_morphing_drum(void);
 
 extern void test_slot_then_get_patch_no_delay(void);
 extern void test_slot_cycle_with_get_patch(void);
@@ -93,16 +95,18 @@ int main(void) {
     run_test_silently("test_integration_connect", test_integration_connect);
 
     /* Performance mode and naming tests */
-    // run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
-    // run_test_silently("test_set_perf_name", test_set_perf_name);
+    run_test_silently("test_set_perf_mode_cycle", test_set_perf_mode_cycle);
+    run_test_silently("test_set_perf_name", test_set_perf_name);
 
     /* Upload / roundtrip tests — run with output so section diffs are visible */
     run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
     // run_test_with_output("test_upload_nl2",        test_upload_nl2);
     run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
     // run_test_with_output("test_upload_mixt",      test_upload_mixt);
+    run_test_with_output("test_upload_empty_perf",    test_upload_empty_perf);
+    run_test_with_output("test_upload_morphing_drum", test_upload_morphing_drum);
 
-    // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
+    run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
     // run_test_silently("test_integration_list_all", test_integration_list_all);
     // run_test_silently("test_integration_select_slot_a", test_integration_select_slot_a);
 
