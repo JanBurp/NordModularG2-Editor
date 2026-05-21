@@ -608,9 +608,13 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const areaIdx = area === 'voice' ? 1 : 0;
 			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleIndex);
-			if (!mod?.paramLabels) return;
-			const entry = (mod.paramLabels as any[]).find((pl) => pl.paramIndex === paramIndex);
-			if (!entry) return;
+			if (!mod) return;
+			if (!mod.paramLabels) mod.paramLabels = [];
+			let entry = (mod.paramLabels as any[]).find((pl: any) => pl.paramIndex === paramIndex);
+			if (!entry) {
+				entry = { paramIndex, isString: false, paramLen: 7, labels: [''] };
+				(mod.paramLabels as any[]).push(entry);
+			}
 			entry.labels[0] = label;
 			this.slots[slot].rawHex = null;
 			// TODO: CLI set-param-label command when available
