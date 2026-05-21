@@ -8,7 +8,7 @@ _G2_DIR="${${(%):-%x}:A:h}"
 
 _G2_CMDS=(
   connect disconnect list-devices startup device list
-  get-patch get-patch-file select-patch upload-patch
+  get-patch get-patch-file select-patch upload-patch upload-perf get-perf-file
   slot variation set-perf-mode set-perf-name
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
