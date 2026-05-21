@@ -276,6 +276,15 @@ static void emit_embedded_event(const uint8_t *response) {
             case 0x80:
                 printf("{\"type\":\"midi_cc\",\"cc\":%u}\n", response[6]);
                 break;
+            case 0x38: {
+                // R_PATCH_VERSION_CHANGE: patch description updated, slot version bumped
+                uint8_t sl = response[5];
+                uint8_t ver = response[6];
+                if (sl < 4 && ver) g2_slot_version[sl] = ver;
+                printf("{\"type\":\"patch_version_change\",\"slot\":\"%s\",\"version\":%u}\n",
+                       SLOT_LETTER(sl), ver);
+                break;
+            }
             case 0x7F: printf("{\"type\":\"ok\"}\n"); break;
             case 0x7E: printf("{\"type\":\"error\",\"code\":%u}\n", response[5]); break;
             default: {

@@ -603,6 +603,20 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		async setPatchDescription(): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx || !ctx.patch.description) return;
+			const { slot, patch } = ctx;
+			const description = patch.description!;
+			const templateHex = this.slots[slot].templateRawHex;
+			if (!templateHex || useDeviceStore().status !== 'connected') return;
+			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');
+			const bytes = buildPatchDescriptionBytes(templateHex, description);
+			if (!bytes) return;
+			const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+			await window.cli.run(['set-patch-description', slot, hex]);
+		},
+
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
 			const slot = useUiStore().slotInFocus;
 			const params = this.slots[slot]?.patch?.patchParams;
