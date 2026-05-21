@@ -7,6 +7,8 @@ import os from 'os';
 const APP_ROOT = path.join(__dirname, '..', '..');
 const FIXTURES_DIR = path.join(__dirname, '..', '..', '..', 'test-patches');
 
+const SLEEP_AFTER_TEST_MS = 2000;
+
 export type AppFixtures = {
 	app: ElectronApplication;
 	page: Page;
@@ -47,6 +49,7 @@ export const test = base.extend<AppFixtures>({
 		// Give Vue a moment to fully mount
 		await page.waitForTimeout(500);
 		await use(page);
+		await page.waitForTimeout(SLEEP_AFTER_TEST_MS);
 	},
 
 	sendMenuAction: async ({ app }, use) => {
