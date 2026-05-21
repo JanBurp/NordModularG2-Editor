@@ -281,6 +281,33 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_select_patch(slot, arg_i(args, 1), arg_i(args, 2));
 
+	} else if (strcmp(cmd, "select-perf") == 0 && n >= 2) {
+		ret = g2_select_perf(arg_i(args, 0), arg_i(args, 1));
+		if (ret == G2_OK) {
+			/* The G2 stops streaming while loading the performance.
+			 * Drain the listener queue until BULK_REARM so the G2 is fully
+			 * ready before we respond ok to the frontend. */
+			int deadline_ms = 3000;
+			while (deadline_ms > 0) {
+				g2_msg_t msg;
+				if (g2_msg_recv(&msg, 50) == 0) {
+					int rearm = (msg.sentinel == 2);
+					int disc  = (msg.sentinel == 1);
+					g2_emit_event(&msg);
+					g2_msg_free(&msg);
+					if (rearm) {
+						g2_pending_rearm = 0;
+						printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+						fflush(stdout);
+						g2_rearm();
+						break;
+					}
+					if (disc) { ret = G2_ERR_CONNECT; break; }
+				}
+				deadline_ms -= 50;
+			}
+		}
+
 	} else if (strcmp(cmd, "upload-patch") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
