@@ -1,7 +1,7 @@
 <template>
 	<div class="h-full overflow-y-auto p-2 bg-neutral-900">
 		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
-		<div class="text-xs text-neutral-500 py-1 px-1">{{ totalModuleCount }} modules</div>
+		<div data-testid="module-count" class="text-xs text-neutral-500 py-1 px-1">{{ totalModuleCount }} modules</div>
 		<div v-for="category in categories" :key="category" class="mb-4">
 			<div v-if="categoryMatchesSearch(category)">
 				<div
