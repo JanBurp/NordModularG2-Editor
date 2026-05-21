@@ -1,15 +1,15 @@
-import { test, expect } from './fixtures/electron';
-import { dropModuleOnCanvas, createCable, getStatusCounts, deleteModule } from './helpers';
+import { clickContextMenuItem, createCable, deleteModule, dropModuleOnCanvas, getStatusCounts, hoverContextMenuItem, openContextMenu } from './helpers';
+import { expect, test } from './fixtures/electron';
 
 // Module IDs from nmg2mods
-const MOD = { OscA: 97, FltClassic: 92, EnvADSR: 20, XFade: 18, Out2: 4 } as const;
+const MOD = { OscA: 97, FltClassic: 92, EnvADSR: 20, Mix21A: 194, Out2: 4 } as const;
 
 async function addAllSynthModules(page: import('@playwright/test').Page) {
 	await dropModuleOnCanvas(page, MOD.OscA, 0, 0);       // OscA #1
 	await dropModuleOnCanvas(page, MOD.OscA, 0, 3);       // OscA #2
 	await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 	await dropModuleOnCanvas(page, MOD.EnvADSR, 1, 4);
-	await dropModuleOnCanvas(page, MOD.XFade, 2, 0);
+	await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
 	await dropModuleOnCanvas(page, MOD.Out2, 2, 4);
 }
 
@@ -46,8 +46,32 @@ test.describe('patch editing – offline', () => {
 		expect(await canvas.locator('[data-module-short="OscA"]').count()).toBe(2);
 		await expect(canvas.locator('[data-module-short="FltClassic"]')).toBeVisible();
 		await expect(canvas.locator('[data-module-short="EnvADSR"]')).toBeVisible();
-		await expect(canvas.locator('[data-module-short="X-Fade"]')).toBeVisible();
+		await expect(canvas.locator('[data-module-short="Mix2-1A"]')).toBeVisible();
 		await expect(canvas.locator('[data-module-short="2-Out"]')).toBeVisible();
+
+		// TODO: Fix ContextMenu testing
+		// Rename the Mix2-1A module via context menu
+		// const mixEl = canvas.locator('[data-module-short="Mix2-1A"]');
+		// await openContextMenu(page, mixEl);
+		// await clickContextMenuItem(page, 'Rename…');
+		// await page.locator('input[maxlength="16"]').fill('MyMixer');
+		// await page.keyboard.press('Enter');
+		// await page.waitForTimeout(200);
+		// await expect(mixEl).toBeVisible();
+
+		// Change module color
+		// await openContextMenu(page, mixEl);
+		// await hoverContextMenuItem(page, 'Set Color');
+		// await page.locator('button.w-10').first().click();
+		// await page.waitForTimeout(200);
+
+		// Rename first switch label on Mix2-1A
+		// const switchEl = mixEl.locator('.switch-control').first();
+		// await openContextMenu(page, switchEl);
+		// await clickContextMenuItem(page, 'Rename label');
+		// await page.locator('input[maxlength="16"]').fill('Chan1');
+		// await page.keyboard.press('Enter');
+		// await page.waitForTimeout(200);
 	});
 
 	test('connect OscA output to FltClassic input', async ({ page, sendMenuAction }) => {
@@ -65,7 +89,7 @@ test.describe('patch editing – offline', () => {
 		expect(after.voiceCables).toBe(before.voiceCables + 1);
 	});
 
-	test('wire up a simple signal chain: 2×OscA → X-Fade → FltClassic → 2-Out, EnvADSR → FltClassic', async ({ page, sendMenuAction }) => {
+	test('wire up a simple signal chain: 2×OscA → Mix2-1A → FltClassic → 2-Out, EnvADSR → FltClassic', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await page.waitForTimeout(300);
 		await addAllSynthModules(page);
@@ -73,16 +97,16 @@ test.describe('patch editing – offline', () => {
 		await createCable(
 			page,
 			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0, occurrence: 0 },
-			{ moduleShort: 'X-Fade', jackType: 'input', connectorIdx: 0 },
+			{ moduleShort: 'Mix2-1A', jackType: 'input', connectorIdx: 0 },
 		);
 		await createCable(
 			page,
 			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0, occurrence: 1 },
-			{ moduleShort: 'X-Fade', jackType: 'input', connectorIdx: 1 },
+			{ moduleShort: 'Mix2-1A', jackType: 'input', connectorIdx: 1 },
 		);
 		await createCable(
 			page,
-			{ moduleShort: 'X-Fade', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'Mix2-1A', jackType: 'output', connectorIdx: 0 },
 			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
 		);
 		await createCable(
@@ -154,17 +178,9 @@ test.describe('patch editing – offline', () => {
 
 		// Right-click the connected jack
 		const jack = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] [data-jack="output-0"]');
-		await jack.dispatchEvent('contextmenu');
-		await page.waitForTimeout(200);
-
-		const deleteItem = page.getByRole('menuitem', { name: /delete connected/i });
-		if (await deleteItem.isVisible({ timeout: 1000 }).catch(() => false)) {
-			await deleteItem.click();
-			await page.waitForTimeout(200);
-			expect((await getStatusCounts(page)).voiceCables).toBe(0);
-		}
-		// If context menu didn't appear, cable count stays 1 — that's acceptable;
-		// SVG contextmenu via dispatchEvent may not fire in all environments.
+		await openContextMenu(page, jack);
+		await clickContextMenuItem(page, 'Delete connected');
+		expect((await getStatusCounts(page)).voiceCables).toBe(0);
 	});
 
 	test('select-all then Delete removes all modules', async ({ page, sendMenuAction }) => {

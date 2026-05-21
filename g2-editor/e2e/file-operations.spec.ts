@@ -58,4 +58,77 @@ test.describe('file operations – offline', () => {
 		await sendMenuAction('save');
 		await page.waitForTimeout(300);
 	});
+
+	test('switching variations after loading a patch', async ({ page, sendMenuAction, mockOpenPatch }) => {
+		await mockOpenPatch('-- Welcome G2 --.pch2');
+		await sendMenuAction('open');
+		await page.waitForTimeout(500);
+
+		// Variation 1 (index 0) is active by default
+		await expect(page.locator('[data-testid="variation-0"]')).toHaveClass(/btn-active/);
+
+		// Switch to variation 2
+		await page.locator('[data-testid="variation-1"]').click();
+		await page.waitForTimeout(200);
+		await expect(page.locator('[data-testid="variation-1"]')).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="variation-0"]')).not.toHaveClass(/btn-active/);
+
+		// Switch to variation 3
+		await page.locator('[data-testid="variation-2"]').click();
+		await page.waitForTimeout(200);
+		await expect(page.locator('[data-testid="variation-2"]')).toHaveClass(/btn-active/);
+
+		// Switch to INIT (index 8)
+		await page.locator('[data-testid="variation-8"]').click();
+		await page.waitForTimeout(200);
+		await expect(page.locator('[data-testid="variation-8"]')).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="variation-2"]')).not.toHaveClass(/btn-active/);
+	});
+
+	test('switching slots after loading a performance', async ({ page, sendMenuAction, mockOpenPatch }) => {
+		await mockOpenPatch('MorphingDrumDemo.prf2');
+		await sendMenuAction('open');
+		await page.waitForTimeout(500);
+
+		// Slot A is active by default
+		await expect(page.locator('[data-testid="slot-0"]')).toHaveClass(/btn-active/);
+		const countsA = await getStatusCounts(page);
+		expect(countsA.voiceModules + countsA.fxModules).toBeGreaterThan(0);
+
+		// Switch to slot B
+		await page.locator('[data-testid="slot-1"]').click();
+		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="slot-1"]')).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="slot-0"]')).not.toHaveClass(/btn-active/);
+
+		// On slot B: Voice is active by default
+		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await expect(page.locator('[data-testid="canvas-fx"]')).not.toBeVisible();
+
+		// Switch to FX area
+		await page.getByRole('button', { name: 'FX' }).click();
+		await page.waitForTimeout(200);
+		await expect(page.getByRole('button', { name: 'FX' })).toHaveClass(/btn-active/);
+		await expect(page.getByRole('button', { name: 'Voice' })).not.toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-fx"]')).toBeVisible();
+		await expect(page.locator('[data-testid="canvas-va"]')).not.toBeVisible();
+
+		// Switch back to Voice
+		await page.getByRole('button', { name: 'Voice' }).click();
+		await page.waitForTimeout(200);
+		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+
+		// Switch to slot C
+		await page.locator('[data-testid="slot-2"]').click();
+		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="slot-2"]')).toHaveClass(/btn-active/);
+
+		// Switch back to slot A
+		await page.locator('[data-testid="slot-0"]').click();
+		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="slot-0"]')).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="slot-2"]')).not.toHaveClass(/btn-active/);
+	});
 });
