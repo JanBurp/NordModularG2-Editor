@@ -1387,7 +1387,13 @@ int g2_set_patch_description(int slot, const uint8_t *data, int len) {
     if (ensure_connected(0) < 0) { g2_err("set-patch-description: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-    if (send_slot(slot, version, 0x21, data, len) < 0) {
+    /* G2 uses chunk format for C_PATCH_DESCR: [0x21][size_hi][size_lo][data] */
+    uint8_t payload[2 + 64];
+    if (len > 62) { g2_err("set-patch-description: data too long\n"); return G2_ERR_INVALID_PARAM; }
+    payload[0] = (len >> 8) & 0xFF;
+    payload[1] = len & 0xFF;
+    memcpy(payload + 2, data, len);
+    if (send_slot(slot, version, 0x21, payload, 2 + len) < 0) {
         g2_err("set-patch-description: failed to send\n");
         return G2_ERR_SEND;
     }
