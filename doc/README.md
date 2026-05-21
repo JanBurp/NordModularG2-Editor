@@ -20,7 +20,7 @@ A lot is working, and a lot is not working ;-)
 
 30 april 2026
 
-Video: 
+Video:
 
 [![Watch the video](https://img.youtu.be/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/watch?v=BuMu8OjTbvk)
 
@@ -29,7 +29,9 @@ Video:
 ![alt text](screenshots/G2-editor-00.jpg)
 
 
-### First goal:
+## Roadmap:
+
+### First Goal - core:
 
 - [x] Core USB Communication: connecting, disconnecting
 - [x] Startup sequence, getting device info, patches from the slots, and list of patches and performances
@@ -37,30 +39,49 @@ Video:
 - [x] Rendering of the patch (some modules and parameters needs attention)
 - [x] Switch Slots & Variations (in editor & G2, synced)
 - [x] Load & Save pch2 file
+- [x] Load patch from synth
 - [x] Adding, deleting, moving and change colors of modules. (also multiple modules)
 - [x] Rename module
 - [x] Adding and deleting cables
-- [ ] Change color of cable
+- [x] Change color of cable
 - [x] Watch params change in editor, while changed on G2 - not tested with all params
 - [x] Change params in editor and sync to G2 - not tested with all params
-- [ ] Switching perf/patch mode
-- [ ] Undo/Redo
-- [ ] Update Led's
-- [ ] Update VU meters
-- [ ] Update CPU
-- [ ] Editing synth settings
-- [ ] Editing performance settings
+- [x] Switching perf/patch mode
+- [x] Update Led's
+- [x] Update VU meters
+- [x] Update CPU
+- [ ] Editing performance / patch name
+- [ ] Starting/stopping Clock
+- [ ] Change Clock Speed
+- [ ] Loading performances (file/synth)
+
+### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
+
+- [ ] Show Morphs
 - [ ] Editing patch settings
-- [ ] ...
-- [ ] Midi CC's
-- [ ] Morphs
+- [ ] Editing performance settings
+- [ ] Editing synth settings
+- [ ] Change Morphs on params
+- [ ] Midi CC's on params
 - [ ] Parameter Pages
+- [ ] Use cursor keys to move between modules and params
+- [ ] Use cursor keys to edit params
+- [ ] Undo/Redo
+- [ ] ...
+
+### Third goal - Beyond the basics:
+
+- [ ] Patch Adjuster
+- [ ] Patch Mutator (if possible)
+- [ ] Help
+- [ ] Editing names with search/replace
 - [ ] ...
 
 ## Tech goals and stack
 
 - An editor for multiple platforms, at least macOS, Windows and if possible Linux.
 - Using tech that is widely available and used by many developers.
+- If possible, without the need to install external libraries/drivers
 
 This editor is build with electronjs, with TypeScript and VueJS.
 It uses a C++ CLI tool to handle the USB communication. Which will be part of the build.
@@ -74,21 +95,15 @@ While I did not publish the code and builds yet, feel free to contact me if you 
 
 You could contribute:
 
-- Developing:
-  - Improving the USB communication part (C++ and some node.js)
-  - Rendering the modules and parameters, not all modules/params are rendering properly.
-  - UX improvements, menu, key commands, mouse commands, all the edit flows
-  - Overal look & feel of the app.
-  - ...
-  - Adding features towards a complete basic editor
+- Developing
 - Testing on your hardware.
-- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond a working basic editor) feel free to contact me.
-- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a donation (contact me).
+- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned above) feel free to contact me.
+- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a donation.
 
-### Acknowledgement
+## Acknowledgement
 
 A lot of the code is based on work of others from the Nord G2 community at https://electro-music.com, specialy the Delphi Editor by bverhue: https://www.bverhue.nl/g2dev/ and the patchviewer by ian-s: https://electro-music.com/patchviewer/. But also the g2ools from qfingers: https://electro-music.com/forum/viewtopic.php?t=15405.
 
-#### My development setup
+### My development setup
 
 ![alt text](screenshots/development-setup.jpg)
