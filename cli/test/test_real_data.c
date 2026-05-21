@@ -67,10 +67,10 @@ static int get_focus_slot(cJSON *result) {
     if (!perf) return -1;
     cJSON *focus = cJSON_GetObjectItem(perf, "focus");
     if (!focus || !focus->valuestring) return -1;
-    if (strcmp(focus->valuestring, "a") == 0) return 0;
-    if (strcmp(focus->valuestring, "b") == 0) return 1;
-    if (strcmp(focus->valuestring, "c") == 0) return 2;
-    if (strcmp(focus->valuestring, "d") == 0) return 3;
+    if (strcmp(focus->valuestring, "A") == 0) return 0;
+    if (strcmp(focus->valuestring, "B") == 0) return 1;
+    if (strcmp(focus->valuestring, "C") == 0) return 2;
+    if (strcmp(focus->valuestring, "D") == 0) return 3;
     return -1;
 }
 

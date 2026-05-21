@@ -20,6 +20,12 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
                       uint8_t *usb_data, size_t *usb_len);
 
+/* Performance format conversion (PRF2 file <-> section data) */
+int perf_prf2_to_sections(const uint8_t *prf2, size_t prf2_len,
+                           uint8_t *sections_out, size_t *sections_len);
+int perf_sections_to_prf2(const char *name, const uint8_t *sections, size_t sections_len,
+                           uint8_t *prf2_out, size_t *prf2_len);
+
 /*
  * Split a whitespace-delimited command string into tokens in-place.
  * Writes pointers into argv_out and NUL-terminates each token in buf.

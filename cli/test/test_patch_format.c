@@ -271,6 +271,41 @@ void test_patch_usb_to_pch2_data_too_short(void) {
     TEST_ASSERT_EQUAL_INT(-1, result);  /* Should fail due to usb_len < 5 */
 }
 
+void test_perf_roundtrip_conversion(void) {
+    const char *perf_name = "TestPerf";
+    uint8_t sections[] = { 0x11, 0x00, 0x03, 0xAA, 0xBB, 0xCC };
+    size_t sections_len = sizeof(sections);
+
+    /* Step 1: assemble prf2 */
+    uint8_t prf2_buf[64] = {0};
+    size_t prf2_len = sizeof(prf2_buf);
+    int result = perf_sections_to_prf2(perf_name, sections, sections_len, prf2_buf, &prf2_len);
+    TEST_ASSERT_EQUAL_INT(0, result);
+    /* "TestPerf"(8) + NUL(1) + 0x17(1) + 0x00(1) + 6 sections + 2 CRC = 19 */
+    TEST_ASSERT_EQUAL_INT(19, prf2_len);
+    TEST_ASSERT_EQUAL_UINT8('T',  prf2_buf[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, prf2_buf[8]);   /* NUL terminator */
+    TEST_ASSERT_EQUAL_UINT8(0x17, prf2_buf[9]);   /* magic marker */
+    TEST_ASSERT_EQUAL_UINT8(0x00, prf2_buf[10]);  /* padding */
+    TEST_ASSERT_EQUAL_UINT8(0x11, prf2_buf[11]);  /* first section byte */
+
+    /* Step 2: extract sections */
+    uint8_t extracted[32] = {0};
+    size_t extracted_len = sizeof(extracted);
+    result = perf_prf2_to_sections(prf2_buf, prf2_len, extracted, &extracted_len);
+    TEST_ASSERT_EQUAL_INT(0, result);
+    TEST_ASSERT_EQUAL_INT(sections_len, extracted_len);
+    TEST_ASSERT_EQUAL_MEMORY(sections, extracted, sections_len);
+
+    /* Step 3: reassemble and verify exact match with original prf2 */
+    uint8_t reassembled[64] = {0};
+    size_t reassembled_len = sizeof(reassembled);
+    result = perf_sections_to_prf2(perf_name, extracted, extracted_len, reassembled, &reassembled_len);
+    TEST_ASSERT_EQUAL_INT(0, result);
+    TEST_ASSERT_EQUAL_INT(prf2_len, reassembled_len);
+    TEST_ASSERT_EQUAL_MEMORY(prf2_buf, reassembled, prf2_len);
+}
+
 void test_patch_usb_to_pch2_exact_size(void) {
     /* USB data with 28 bytes - extraction gives 21 bytes (18 + 3)
      * This test verifies exact buffer size works
