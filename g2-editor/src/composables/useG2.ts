@@ -90,6 +90,10 @@ export function useG2() {
 				return `clock_run=${ev.run}`;
 			case 'master_clock_bpm':
 				return `clock_bpm=${ev.bpm}`;
+			case 'assigned_voices':
+				return `assigned_voices=[${(ev.voices ?? []).join(',')}]`;
+			case 'patch_version_change':
+				return `patch_version_change slot=${ev.slot} ver=${ev.version}`;
 			case 'version_update':
 				return `version_update perf=${ev.perf_version} slots=[${(ev.slot_versions ?? []).map((s: any) => s.version).join(',')}]`;
 			case 'synth_settings_update':
@@ -283,6 +287,17 @@ export function useG2() {
 					if (store.device?.patches) store.device.patches.bpm = ev.bpm;
 					if (store.device?.performance) store.device.performance.bpm = ev.bpm;
 					log('←', 'Watch', `clock_bpm=${ev.bpm}`);
+					return;
+				}
+				if (ev.type === 'assigned_voices') {
+					if (Array.isArray(ev.voices)) store.assignedVoices = ev.voices;
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'patch_version_change') {
+					const sl = ev.slot as SlotLabel;
+					log('←', 'Watch', formatWatchEvent(ev));
+					if (sl && SLOT_LABELS.includes(sl)) slotsStore.loadSlot(sl);
 					return;
 				}
 

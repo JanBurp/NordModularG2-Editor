@@ -11,6 +11,7 @@ _G2_CMDS=(
   get-patch get-patch-file select-patch upload-patch upload-perf get-perf-file
   slot variation set-perf-mode set-perf-name set-patch-name
   set-master-clock-run set-master-clock-bpm
+  set-patch-description
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
   set-param set-param-label
@@ -66,6 +67,9 @@ _g2_complete() {
       (( CURRENT == 2 )) && compadd 0 1
       ;;
     set-master-clock-bpm)
+      ;;
+    set-patch-description)
+      (( CURRENT == 2 )) && compadd A B C D
       ;;
     set-perf-mode)
       compadd patch performance

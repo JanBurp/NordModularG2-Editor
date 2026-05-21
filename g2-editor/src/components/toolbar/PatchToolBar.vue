@@ -11,7 +11,10 @@
 		<ToolBarDivider />
 
 		<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
-		<Select v-model="selectedVoices" :options="VOICES" title="Voice mode" :disabled="selectedVoiceMode !== 0" />
+		<div class="flex items-center gap-1">
+			<Select v-model="selectedVoices" :options="VOICES" title="Voice count" :disabled="selectedVoiceMode !== 0" />
+			<span v-if="selectedVoiceMode === 0 && assignedVoices !== selectedVoices" class="text-xs text-neutral-400">({{ assignedVoices }})</span>
+		</div>
 
 		<ToolBarDivider />
 
@@ -51,6 +54,7 @@
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
+	import { useDeviceStore } from '../../store/device';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
 	import Knob from '../common/Knob.vue';
@@ -64,6 +68,7 @@
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const deviceStore = useDeviceStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.slotInFocus));
@@ -84,13 +89,20 @@
 	const selectedVoiceMode = computed({
 		get: () => currentPatch.value?.description?.monopoly ?? 1,
 		set: (val: number) => {
-			if (currentPatch.value?.description) currentPatch.value.description.monopoly = val;
+			if (currentPatch.value?.description) {
+				currentPatch.value.description.monopoly = val;
+				slotsStore.setPatchDescription();
+			}
 		},
 	});
 	const selectedVoices = computed({
 		get: () => currentPatch.value?.description?.voices ?? 0,
 		set: (val: number) => {
-			if (currentPatch.value?.description) currentPatch.value.description.voices = val;
+			if (currentPatch.value?.description) {
+				currentPatch.value.description.voices = val;
+				slotsStore.setPatchDescription();
+			}
 		},
 	});
+	const assignedVoices = computed(() => deviceStore.assignedVoicesForSlot(uiStore.slotInFocus));
 </script>

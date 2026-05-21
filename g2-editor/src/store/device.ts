@@ -35,6 +35,7 @@ export const useDeviceStore = defineStore('device', {
 		device: null as Device | null,
 		startupNames: null as any,
 		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
+		assignedVoices: [0, 0, 0, 0] as number[],
 	}),
 
 	getters: {
@@ -98,6 +99,10 @@ export const useDeviceStore = defineStore('device', {
 		},
 		activeSlotResources: (state): SlotResources => {
 			return state.slotResources[useUiStore().slotInFocus];
+		},
+		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
+			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
+			return idx >= 0 ? state.assignedVoices[idx] : 0;
 		},
 	},
 

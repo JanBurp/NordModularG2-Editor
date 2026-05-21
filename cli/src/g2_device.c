@@ -1381,6 +1381,21 @@ int g2_set_patch_name(int slot, const char *name) {
     return G2_OK;
 }
 
+int g2_set_patch_description(int slot, const uint8_t *data, int len) {
+    if (slot < 0 || slot > 3) { g2_err("set-patch-description: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (!data || len <= 0)    { g2_err("set-patch-description: no data\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-patch-description: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+    if (send_slot(slot, version, 0x21, data, len) < 0) {
+        g2_err("set-patch-description: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 static int get_perf_version(uint8_t *out_version) {
     uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
     uint8_t pv_resp[16] = {0};

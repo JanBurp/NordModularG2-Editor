@@ -214,6 +214,29 @@ function writePatchParamSection(params: PatchParamVariation[], morphs: number[][
 	return makeSection(0x4d, bw.flush());
 }
 
+export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDescription): Uint8Array | null {
+	const template = hexToBytes(templateRawHex);
+	const sectionDataLen = template.length - 2;
+	let ofs = 0;
+	while (ofs < sectionDataLen) {
+		const type = template[ofs];
+		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
+		const secData = template.slice(ofs + 3, ofs + 3 + siz);
+		if (type === 0x21) {
+			const encoded = writePatchDescription(secData, desc);
+			// G2 expects exactly the original section length (15 bytes); pad with zeros if needed
+			if (encoded.length < secData.length) {
+				const padded = new Uint8Array(secData.length);
+				padded.set(encoded);
+				return padded;
+			}
+			return encoded;
+		}
+		ofs += 3 + siz;
+	}
+	return null;
+}
+
 function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uint8Array {
 	const bw = new BitWriter();
 	// Preserve the first 61 bits (unknown header, not stored during parsing)
