@@ -7,6 +7,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { resolveColumnCollisions } from './slotHelpers';
+import { useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
 export type { SlotLabel };
@@ -590,6 +591,16 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = null;
 			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
+		},
+
+		async setPatchName(name: string): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot } = ctx;
+			this.slots[slot].name = name;
+			if (useDeviceStore().status === 'connected') {
+				await window.cli.run(['set-patch-name', slot, name]);
+			}
 		},
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {

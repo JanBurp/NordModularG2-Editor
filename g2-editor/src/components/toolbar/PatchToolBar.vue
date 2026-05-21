@@ -1,7 +1,7 @@
 <template>
 	<ToolBar v-if="patchName">
 		<ToolBarLabel class="w-8">Patch:</ToolBarLabel>
-		<ToolBarText class="w-36">{{ patchName }}</ToolBarText>
+		<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 
 		<div class="flex items-center gap-1.5">
 			<ToolBarLabel>Cat:</ToolBarLabel>
@@ -57,7 +57,10 @@
 	import Switch from '../common/Switch.vue';
 
 	defineProps<{ patchName: string }>();
-	const emit = defineEmits<{ variationClick: [value: string | number | (string | number)[]] }>();
+	const emit = defineEmits<{
+		variationClick: [value: string | number | (string | number)[]];
+		patchNameClick: [];
+	}>();
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();

@@ -6,10 +6,10 @@
 		<ToolBar>
 			<template v-if="device">
 				<ToolBarLabel class="w-8">Perf:</ToolBarLabel>
-				<ToolBarText class="w-36">{{ device.perfName }}</ToolBarText>
+				<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="handlePerfNameClick">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-13">{{ device.bpm }}</ToolBarText>
-				<Button variant="toggle" :active="device.clockRunning">Run</Button>
+				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="handleBpmClick">{{ device.bpm }}</ToolBarText>
+				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
 				<ToolBarDivider />
 				<BtnGroup
 					:model-value="uiStore.selectedSlotIndex"
@@ -36,7 +36,7 @@
 			/>
 		</ToolBar>
 
-		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" />
+		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="handlePatchNameClick" />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
@@ -120,11 +120,37 @@
 		/>
 	</Dialog>
 
+	<Dialog v-model="showPatchNameDialog" title="Rename Patch" @confirm="confirmPatchName" @cancel="showPatchNameDialog = false">
+		<input
+			v-model="editingPatchName"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			maxlength="16"
+		/>
+	</Dialog>
+
+	<Dialog v-model="showPerfNameDialog" title="Rename Performance" @confirm="confirmPerfName" @cancel="showPerfNameDialog = false">
+		<input
+			v-model="editingPerfName"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			maxlength="16"
+		/>
+	</Dialog>
+
+	<Dialog v-model="showBpmDialog" title="Set BPM" @confirm="confirmBpm" @cancel="showBpmDialog = false">
+		<input
+			v-model.number="editingBpm"
+			type="number"
+			min="30"
+			max="240"
+			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+		/>
+	</Dialog>
+
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, watch } from 'vue';
+	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
@@ -204,6 +230,49 @@
 		handleJackDeleteConnected,
 		handleJackSetCableColor,
 	} = usePatchOperations();
+
+	// ── Patch name dialog ─────────────────────────────────────────────────────
+
+	const showPatchNameDialog = ref(false);
+	const editingPatchName = ref('');
+
+	function handlePatchNameClick(): void {
+		editingPatchName.value = patchName.value;
+		showPatchNameDialog.value = true;
+	}
+	async function confirmPatchName(): Promise<void> {
+		await slotsStore.setPatchName(editingPatchName.value);
+		showPatchNameDialog.value = false;
+	}
+
+	// ── Perf name dialog ──────────────────────────────────────────────────────
+
+	const showPerfNameDialog = ref(false);
+	const editingPerfName = ref('');
+
+	function handlePerfNameClick(): void {
+		editingPerfName.value = device.perfName;
+		showPerfNameDialog.value = true;
+	}
+	async function confirmPerfName(): Promise<void> {
+		await device.setPerfName(editingPerfName.value);
+		showPerfNameDialog.value = false;
+	}
+
+	// ── BPM dialog ────────────────────────────────────────────────────────────
+
+	const showBpmDialog = ref(false);
+	const editingBpm = ref(0);
+
+	function handleBpmClick(): void {
+		editingBpm.value = device.bpm;
+		showBpmDialog.value = true;
+	}
+	async function confirmBpm(): Promise<void> {
+		const val = Math.max(30, Math.min(240, editingBpm.value));
+		await device.setBpm(val);
+		showBpmDialog.value = false;
+	}
 
 	// ── Keyboard ──────────────────────────────────────────────────────────────
 

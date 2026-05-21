@@ -278,6 +278,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
+| `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
 | `0x2A` | SET_UPRATE_MODE *(not in CLI)* | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
