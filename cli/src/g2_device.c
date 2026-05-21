@@ -1361,6 +1361,66 @@ int g2_set_perf_name(const char *name) {
     return G2_OK;
 }
 
+int g2_set_patch_name(int slot, const char *name) {
+    if (slot < 0 || slot > 3)  { g2_err("set-patch-name: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (!name || !*name)       { g2_err("set-patch-name: name must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-patch-name: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+    size_t nlen = strlen(name);
+    if (nlen > 16) nlen = 16;
+    uint8_t payload[17];
+    memcpy(payload, name, nlen);
+    payload[nlen] = 0x00;
+    if (send_slot(slot, version, 0x27, payload, (int)(nlen + 1)) < 0) {
+        g2_err("set-patch-name: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+static int get_perf_version(uint8_t *out_version) {
+    uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
+    uint8_t pv_resp[16] = {0};
+    send_system_data(0x41, pv_cmd, 2);
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
+    *out_version = pv_resp[6];
+    return G2_OK;
+}
+
+int g2_set_master_clock_run(int run) {
+    if (ensure_connected(0) < 0) { g2_err("set-master-clock-run: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version;
+    if (get_perf_version(&version) < 0) return G2_ERR;
+    uint8_t cmd[4] = { 0x3F, 0xFF, 0x00, run ? 1 : 0 };
+    if (send_system_data(version, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_set_master_clock_bpm(int bpm) {
+    if (bpm < 0 || bpm > 255) { g2_err("set-master-clock-bpm: bpm out of range\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-master-clock-bpm: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version;
+    if (get_perf_version(&version) < 0) return G2_ERR;
+    uint8_t cmd[4] = { 0x3F, 0xFF, 0x01, (uint8_t)bpm };
+    if (send_system_data(version, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_upload_patch(int slot, const char *filepath) {
     if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;

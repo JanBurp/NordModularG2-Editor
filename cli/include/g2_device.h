@@ -153,6 +153,13 @@ int g2_upload_perf(const char *filepath);
 int g2_set_perf_mode(int mode);
 int g2_set_perf_name(const char *name);
 
+/* Patch name: slot 0-3, name max 16 chars */
+int g2_set_patch_name(int slot, const char *name);
+
+/* Master clock: run=0/1, bpm=30-240 */
+int g2_set_master_clock_run(int run);
+int g2_set_master_clock_bpm(int bpm);
+
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);

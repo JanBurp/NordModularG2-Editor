@@ -332,6 +332,17 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "set-perf-name") == 0 && n >= 1) {
 		ret = g2_set_perf_name(arg_s(args, 0));
 
+	} else if (strcmp(cmd, "set-patch-name") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_patch_name(slot, arg_s(args, 1));
+
+	} else if (strcmp(cmd, "set-master-clock-run") == 0 && n >= 1) {
+		ret = g2_set_master_clock_run(arg_i(args, 0));
+
+	} else if (strcmp(cmd, "set-master-clock-bpm") == 0 && n >= 1) {
+		ret = g2_set_master_clock_bpm(arg_i(args, 0));
+
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;

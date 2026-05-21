@@ -131,6 +131,23 @@ export const useDeviceStore = defineStore('device', {
 			await window.cli.run(['set-perf-mode', newMode]);
 		},
 
+		async setPerfName(name: string): Promise<void> {
+			if (this.device?.performance) this.device.performance.name = name;
+			if (this.status === 'connected') await window.cli.run(['set-perf-name', name]);
+		},
+
+		async setClockRunning(run: boolean): Promise<void> {
+			if (this.device?.patches) this.device.patches.clockRunning = run;
+			if (this.device?.performance) this.device.performance.clockRunning = run;
+			if (this.status === 'connected') await window.cli.run(['set-master-clock-run', run ? '1' : '0']);
+		},
+
+		async setBpm(bpm: number): Promise<void> {
+			if (this.device?.patches) this.device.patches.bpm = bpm;
+			if (this.device?.performance) this.device.performance.bpm = bpm;
+			if (this.status === 'connected') await window.cli.run(['set-master-clock-bpm', String(bpm)]);
+		},
+
 		async setPerformanceMode(name: string) {
 			if (!this.device) {
 				this.device = {

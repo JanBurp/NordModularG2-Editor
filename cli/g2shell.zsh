@@ -9,7 +9,8 @@ _G2_DIR="${${(%):-%x}:A:h}"
 _G2_CMDS=(
   connect disconnect list-devices startup device list
   get-patch get-patch-file select-patch upload-patch upload-perf get-perf-file
-  slot variation set-perf-mode set-perf-name
+  slot variation set-perf-mode set-perf-name set-patch-name
+  set-master-clock-run set-master-clock-bpm
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
   set-param set-param-label
@@ -57,6 +58,14 @@ _g2_complete() {
         2) compadd 1 2 3 4 5 6 7 8 ;;
         3) compadd A B C D ;;
       esac
+      ;;
+    set-patch-name)
+      (( CURRENT == 2 )) && compadd A B C D
+      ;;
+    set-master-clock-run)
+      (( CURRENT == 2 )) && compadd 0 1
+      ;;
+    set-master-clock-bpm)
       ;;
     set-perf-mode)
       compadd patch performance

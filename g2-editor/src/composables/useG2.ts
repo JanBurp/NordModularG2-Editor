@@ -83,7 +83,13 @@ export function useG2() {
 			case 'variation_change':
 				return `var ${ev.variation + 1} slot=${ev.slot}`;
 			case 'perf_name':
-				return `perf: ${ev.name}`;
+				return `perf_name: ${ev.name}`;
+			case 'patch_name':
+				return `patch_name slot=${ev.slot} name=${ev.name}`;
+			case 'master_clock_run':
+				return `clock_run=${ev.run}`;
+			case 'master_clock_bpm':
+				return `clock_bpm=${ev.bpm}`;
 			case 'version_update':
 				return `version_update perf=${ev.perf_version} slots=[${(ev.slot_versions ?? []).map((s: any) => s.version).join(',')}]`;
 			case 'synth_settings_update':
@@ -254,6 +260,29 @@ export function useG2() {
 					const sl = ev.slot as SlotLabel;
 					if (sl) store.updateResources(sl, ev.data);
 					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'patch_name') {
+					const sl = ev.slot as SlotLabel;
+					if (sl && slotsStore.slots[sl]) slotsStore.slots[sl].name = ev.name;
+					log('←', 'Watch', `patch_name slot=${ev.slot} name=${ev.name}`);
+					return;
+				}
+				if (ev.type === 'perf_name') {
+					if (store.device?.performance) store.device.performance.name = ev.name;
+					log('←', 'Watch', formatWatchEvent(ev));
+					return;
+				}
+				if (ev.type === 'master_clock_run') {
+					if (store.device?.patches) store.device.patches.clockRunning = ev.run === 1;
+					if (store.device?.performance) store.device.performance.clockRunning = ev.run === 1;
+					log('←', 'Watch', `clock_run=${ev.run}`);
+					return;
+				}
+				if (ev.type === 'master_clock_bpm') {
+					if (store.device?.patches) store.device.patches.bpm = ev.bpm;
+					if (store.device?.performance) store.device.performance.bpm = ev.bpm;
+					log('←', 'Watch', `clock_bpm=${ev.bpm}`);
 					return;
 				}
 
