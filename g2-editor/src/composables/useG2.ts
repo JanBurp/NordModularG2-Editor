@@ -295,9 +295,9 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'patch_version_change') {
-					const sl = ev.slot as SlotLabel;
 					log('←', 'Watch', formatWatchEvent(ev));
-					if (sl && SLOT_LABELS.includes(sl)) slotsStore.loadSlot(sl);
+					const sl = ev.slot as SlotLabel;
+					if (sl) fetchSlotResources(sl);
 					return;
 				}
 
