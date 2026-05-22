@@ -58,6 +58,9 @@ static void print_usage(const char *prog) {
     printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
+    printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
+    printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
+    printf("  voice-count <slot> <1-32>                                                                 Set voice count [calls get-patch, use in tmux only]\n");
     printf("  daemon                                                                                    Persistent connection: watch + accept JSON commands on stdin\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
@@ -162,6 +165,20 @@ static int cmd_get_resources(int argc, char **argv, int i) {
     output_json(result, output_format);
     cJSON_Delete(result);
     return 0;
+}
+
+static int cmd_voice_mode(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Error: voice-mode <slot> <0-3>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "Error: invalid slot (use A, B, C, or D)\n"); return 1; }
+    return g2_set_voice_mode(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_voice_count(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Error: voice-count <slot> <1-32>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "Error: invalid slot (use A, B, C, or D)\n"); return 1; }
+    return g2_set_voice_count(slot, atoi(argv[i + 2]));
 }
 
 static int cmd_get_patch_file(int argc, char **argv, int i) {
@@ -565,6 +582,8 @@ static const cmd_entry_t commands[] = {
     { "get-patch-file",   cmd_get_patch_file   },
     { "get-perf-file",    cmd_get_perf_file    },
     { "get-resources",    cmd_get_resources    },
+    { "voice-mode",       cmd_voice_mode       },
+    { "voice-count",      cmd_voice_count      },
     { "list",             cmd_list             },
     { "slot",             cmd_slot             },
     { "variation",        cmd_variation        },
