@@ -57,6 +57,7 @@ Video:
 - [x] Change voice mode/count
 - [ ] Finishing this first goal
 - [ ] Updating this page/repo
+- [ ] Invite first small test group to test
 
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
@@ -80,19 +81,7 @@ Video:
 - [ ] Editing names with search/replace
 - [ ] ...
 
-## Tech goals and stack
-
-- An editor for multiple platforms, at least macOS, Windows and if possible Linux.
-- Using tech that is widely available and used by many developers.
-- If possible, without the need to install external libraries/drivers
-
-This editor is build with electronjs, with TypeScript and VueJS.
-It uses a C++ CLI tool to handle the USB communication. Which will be part of the build.
-
 ## How to contribute
-
-Coded and tested by me on M1 apple macOS 15.7.3 and an expanded Nord Modular G2.
-With some help from coding agents (claude & opencode) on a tight budget.
 
 While I did not publish the code and builds yet, feel free to contact me if you want to help.
 
@@ -101,7 +90,9 @@ You could contribute:
 - Developing
 - Testing on your hardware.
 - If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned above) feel free to contact me.
-- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a donation.
+- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6). See donate button at the bottom of this page.
+
+
 
 ## Acknowledgement
 
@@ -109,4 +100,12 @@ A lot of the code is based on work of others from the Nord G2 community at https
 
 ### My development setup
 
+Coded and tested by me on M1 apple macOS 15.7.3 and an expanded Nord Modular G2.
+With some help from coding agents (claude & opencode) on a tight budget.
+
 ![alt text](./screenshots/development-setup.jpg)
+
+
+## Donate
+
+[![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6)
