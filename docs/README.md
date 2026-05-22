@@ -16,21 +16,17 @@ A lot is working, and a lot is not working ;-)
 - Next goal is to have all features the original Clavia editor has.
 - Future goals could be: A small/light version that runs on a raspberry pi, batch processing of patches, modules, params, ... .
 
-### Screenshots of current status
+### Latest screenshot
 
 17 may 2026
 
-![alt text](<screenshots/screenshot - 17 mei 2026.jpg>)
+![Screenshot](<screenshots/screenshot - 17 mei 2026.jpg>)
 
 30 april 2026
 
 Video:
 
 [![Watch the video](https://img.youtu.be/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/watch?v=BuMu8OjTbvk)
-
-27 april 2026:
-
-![alt text](./screenshots/G2-editor-00.jpg)
 
 
 ## Roadmap:
