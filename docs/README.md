@@ -6,7 +6,7 @@ Editor for the Nord Modular G2 - For macOS, Windows and Linux.
 
 The original editor by Clavia does not work on macOS. A new editor, for all platforms, would benefit the future of the Nord G2.
 
-![alt text](screenshots/clavianordg2.jpg)
+![alt text](./screenshots/clavianordg2.jpg)
 
 ## Current status
 
@@ -26,7 +26,7 @@ Video:
 
 27 april 2026:
 
-![alt text](screenshots/G2-editor-00.jpg)
+![alt text](./screenshots/G2-editor-00.jpg)
 
 
 ## Roadmap:
@@ -109,4 +109,4 @@ A lot of the code is based on work of others from the Nord G2 community at https
 
 ### My development setup
 
-![alt text](screenshots/development-setup.jpg)
+![alt text](./screenshots/development-setup.jpg)
