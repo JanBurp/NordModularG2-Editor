@@ -50,10 +50,13 @@ Video:
 - [x] Update Led's
 - [x] Update VU meters
 - [x] Update CPU
-- [ ] Editing performance / patch name
-- [ ] Starting/stopping Clock
-- [ ] Change Clock Speed
-- [ ] Loading performances (file/synth)
+- [x] Editing performance / patch name
+- [x] Starting/stopping Clock
+- [x] Change Clock Speed
+- [x] Loading performances (file/synth)
+- [x] Change voice mode/count
+- [ ] Finishing this first goal
+- [ ] Updating this page/repo
 
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
