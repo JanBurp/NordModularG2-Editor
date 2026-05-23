@@ -12,7 +12,7 @@ export const SLOT_OPTIONS = [
 export const PANE_TAB_OPTIONS = [
 	{ label: 'Modules', value: 'modules' },
 	{ label: 'Browser', value: 'browser' },
-	{ label: 'Info', value: 'info' },
+	// { label: 'Info', value: 'info' },
 ];
 
 export const AREA_OPTIONS = [

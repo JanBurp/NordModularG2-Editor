@@ -104,6 +104,7 @@ export function useG2() {
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
+		store.status = 'connecting';
 		await startWatch();
 		log('→', 'Connect', 'Connecting to G2...');
 		try {

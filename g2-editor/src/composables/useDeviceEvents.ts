@@ -26,6 +26,7 @@ export function useDeviceEvents(log: LogFn) {
 			store.updateSynthSettings(ev);
 			log('←', 'Watch', `synth mode=${ev.mode} name=${ev.synthName}`);
 			if (slotsStore.uploadingFromFile) return true;
+			if (prevMode && ev.mode !== prevMode) store.modeChanging = true;
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
 				await Promise.all(
@@ -36,6 +37,7 @@ export function useDeviceEvents(log: LogFn) {
 			} else if (prevMode && ev.mode !== prevMode) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
+			store.modeChanging = false;
 			return true;
 		}
 		if (ev.type === 'perf_settings') {
