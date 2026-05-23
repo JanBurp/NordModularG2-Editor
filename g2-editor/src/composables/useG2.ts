@@ -112,6 +112,7 @@ export function useG2() {
 	}
 
 	const pendingResourceFetch = new Set<SlotLabel>();
+	const pendingSlotReload = new Set<SlotLabel>();
 
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
 		if (store.status !== 'connected') return;
@@ -262,7 +263,13 @@ export function useG2() {
 				}
 				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 					const sl = ev.slot as SlotLabel;
-					if (sl) store.updateResources(sl, ev.data);
+					if (sl) {
+						store.updateResources(sl, ev.data);
+						if (pendingSlotReload.has(sl)) {
+							pendingSlotReload.delete(sl);
+							slotsStore.loadSlot(sl);
+						}
+					}
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
@@ -290,28 +297,14 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'assigned_voices') {
-					if (Array.isArray(ev.voices)) {
-						store.assignedVoices = ev.voices;
-						for (let i = 0; i < SLOT_LABELS.length; i++) {
-							const assigned = ev.voices[i] as number;
-							const patch = slotsStore.slots[SLOT_LABELS[i]]?.patch;
-							if (!patch?.description) continue;
-							if (assigned > 0) {
-								patch.description.voices = assigned - 1;
-								patch.description.monopoly = 0;
-							} else {
-								patch.description.voices = 0;
-								if (patch.description.monopoly === 0) patch.description.monopoly = 1;
-							}
-						}
-					}
+					if (Array.isArray(ev.voices)) store.assignedVoices = ev.voices;
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
 				if (ev.type === 'patch_version_change') {
 					log('←', 'Watch', formatWatchEvent(ev));
 					const sl = ev.slot as SlotLabel;
-					if (sl) fetchSlotResources(sl);
+					if (sl) pendingSlotReload.add(sl);
 					return;
 				}
 
