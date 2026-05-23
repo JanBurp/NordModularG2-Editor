@@ -36,6 +36,7 @@ export function useDeviceEvents(log: LogFn) {
 			} else if (prevMode && ev.mode !== prevMode) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
+			store.modeChanging = false;
 			return true;
 		}
 		if (ev.type === 'perf_settings') {

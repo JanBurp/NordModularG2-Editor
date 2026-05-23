@@ -36,6 +36,7 @@ export const useDeviceStore = defineStore('device', {
 		startupNames: null as any,
 		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
 		assignedVoices: [0, 0, 0, 0] as number[],
+		modeChanging: false,
 	}),
 
 	getters: {
@@ -127,12 +128,14 @@ export const useDeviceStore = defineStore('device', {
 				this.deviceName = '';
 				this.device = null;
 				this.startupNames = null;
+				this.modeChanging = false;
 			}
 		},
 
 		async togglePerfMode() {
 			if (!this.device || this.status !== 'connected') return;
 			const newMode = this.device.mode === 'Performance' ? 'patch' : 'performance';
+			this.modeChanging = true;
 			await window.cli.run(['set-perf-mode', newMode]);
 		},
 
