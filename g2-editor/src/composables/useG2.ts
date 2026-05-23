@@ -290,7 +290,21 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'assigned_voices') {
-					if (Array.isArray(ev.voices)) store.assignedVoices = ev.voices;
+					if (Array.isArray(ev.voices)) {
+						store.assignedVoices = ev.voices;
+						for (let i = 0; i < SLOT_LABELS.length; i++) {
+							const assigned = ev.voices[i] as number;
+							const patch = slotsStore.slots[SLOT_LABELS[i]]?.patch;
+							if (!patch?.description) continue;
+							if (assigned > 0) {
+								patch.description.voices = assigned - 1;
+								patch.description.monopoly = 0;
+							} else {
+								patch.description.voices = 0;
+								if (patch.description.monopoly === 0) patch.description.monopoly = 1;
+							}
+						}
+					}
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
