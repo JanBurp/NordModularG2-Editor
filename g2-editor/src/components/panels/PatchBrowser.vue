@@ -1,9 +1,7 @@
 <template>
 	<div class="h-full flex flex-col overflow-hidden">
 		<!-- Tab switcher -->
-		<div class="p-2 border-b border-neutral-700 shrink-0">
-			<BtnGroup :options="viewOptions" :model-value="browser.view" variant="tab" size="small" @update:model-value="onViewChange" />
-		</div>
+		<BtnGroup :options="viewOptions" :model-value="browser.view" variant="tab" @update:model-value="onViewChange" class="mb-2" />
 
 		<!-- ── DISK VIEW ─────────────────────────────────────── -->
 		<template v-if="browser.view === 'disk'">
@@ -11,16 +9,16 @@
 			<div class="flex items-center gap-1 px-2 py-1.5 border-b border-neutral-700 shrink-0 min-w-0">
 				<button
 					v-if="diskParentName"
-					class="text-neutral-400 hover:text-white text-xs px-1 shrink-0"
+					class="text-neutral-400 hover:text-white px-1 shrink-0 cursor-pointer"
 					:title="`Up to ${diskParentName}`"
 					@click="browser.navigateUp()"
 				>
 					↑
 				</button>
-				<span class="text-xs text-neutral-300 truncate flex-1 min-w-0 font-medium">
+				<span class="text-neutral-300 truncate flex-1 min-w-0 font-medium">
 					{{ diskFolderName || 'No folder selected' }}
 				</span>
-				<button class="text-sm text-neutral-400 hover:text-white px-1 shrink-0" title="Choose folder" @click="browser.chooseDiskFolder()">…</button>
+				<button class="text-neutral-400 hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">…</button>
 			</div>
 
 			<template v-if="browser.diskFolder">
@@ -28,52 +26,46 @@
 					<SearchInput v-model="searchQuery" placeholder="Search files..." :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" />
 				</div>
 
-				<div v-if="browser.loading" class="p-4 text-center text-neutral-500 text-sm">Loading...</div>
-				<div v-else-if="browser.error" class="p-4 text-center text-red-500 text-xs">
-					{{ browser.error }}
-				</div>
+				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
+				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
-					<!-- Directories first -->
-					<li
+					<ListItem
 						v-for="entry in filteredDiskDirs"
 						:key="entry.path"
-						class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
 						@click="selectDisk(entry)"
 					>
-						<span class="text-neutral-400 text-xs shrink-0">▶</span>
-						<span class="text-xs text-neutral-300 truncate">{{ entry.name }}</span>
-					</li>
-					<!-- Files -->
-					<li
+						<template #icon><span class="text-neutral-400">▶</span></template>
+						<template #label>{{ entry.name }}</template>
+					</ListItem>
+					<ListItem
 						v-for="entry in filteredDiskFiles"
 						:key="entry.path"
-						class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
 						@click="selectDisk(entry)"
 					>
-						<span class="text-neutral-600 text-xs shrink-0 w-3"></span>
-						<span class="text-xs text-neutral-200 truncate flex-1">{{ formatFileName(entry) }}</span>
-						<span class="text-neutral-600 text-xs shrink-0">{{ entry.name.split('.').pop() }}</span>
-					</li>
-					<li v-if="filteredDiskDirs.length === 0 && filteredDiskFiles.length === 0" class="p-4 text-center text-neutral-500 text-sm">
-						{{ searchQuery ? 'No files match' : 'Empty folder' }}
-					</li>
+						<template #icon><span /></template>
+						<template #label>{{ formatFileName(entry) }}</template>
+						<template #meta><span class="text-neutral-600">{{ entry.name.split('.').pop() }}</span></template>
+					</ListItem>
+					<StateMessage
+						v-if="filteredDiskDirs.length === 0 && filteredDiskFiles.length === 0"
+						variant="empty"
+						:message="searchQuery ? 'No files match' : 'Empty folder'"
+					/>
 				</ul>
 			</template>
-			<div v-else class="p-4 text-center text-neutral-500 text-sm">Click … to choose a folder</div>
+			<StateMessage v-else variant="empty" message="Click … to choose a folder" />
 		</template>
 
 		<!-- ── SYNTH PATCHES / PERFORMANCES ──────────────────── -->
 		<template v-else>
-			<div v-if="!device.connected" class="p-4 text-center text-neutral-500 text-sm">Connect G2 to browse synth patches</div>
+			<StateMessage v-if="!device.connected" variant="empty" message="Connect G2 to browse synth patches" />
 			<template v-else>
 				<div class="px-2 pt-2 shrink-0">
 					<SearchInput v-model="searchQuery" placeholder="Search..." :isActive="isActive" @enter="handleEnter" />
 				</div>
 
-				<div v-if="browser.loading" class="p-4 text-center text-neutral-500 text-sm">Loading from G2...</div>
-				<div v-else-if="browser.error" class="p-4 text-center text-red-500 text-xs">
-					{{ browser.error }}
-				</div>
+				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
+				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Patches grouped by bank -->
 					<template v-for="group in browser.view === 'patches' ? patchGroups : perfGroups" :key="group.bank">
@@ -82,28 +74,29 @@
 							class="flex items-center gap-2 px-3 py-1 bg-neutral-800 cursor-pointer select-none border-b border-neutral-700 sticky top-0 z-10"
 							@click="browser.toggleBank(group.bank)"
 						>
-							<span class="text-neutral-500 text-xs w-3">
+							<span class="text-neutral-500 w-3">
 								{{ browser.isBankCollapsed(group.bank) ? '▶' : '▼' }}
 							</span>
-							<span class="text-xs text-neutral-400 font-medium">Bank {{ group.bank }}</span>
-							<span class="text-xs text-neutral-600 ml-auto">{{ group.patches.length }}</span>
+							<span class="text-neutral-400 font-medium">Bank {{ group.bank }}</span>
+							<span class="text-neutral-600 ml-auto">{{ group.patches.length }}</span>
 						</li>
 						<!-- Patch entries -->
 						<template v-if="!browser.isBankCollapsed(group.bank)">
-							<li
+							<ListItem
 								v-for="p in group.patches"
 								:key="`${p.bank}-${p.location}`"
-								class="flex items-center gap-2 py-1.5 px-3 cursor-pointer hover:bg-neutral-700 transition-colors"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
-								<span class="text-neutral-600 text-xs shrink-0 w-5">{{ p.location }}</span>
-								<span class="text-xs text-neutral-200 truncate flex-1">{{ p.name }}</span>
-							</li>
+								<template #icon><span class="text-neutral-600">{{ p.location }}</span></template>
+								<template #label>{{ p.name }}</template>
+							</ListItem>
 						</template>
 					</template>
-					<li v-if="(browser.view === 'patches' ? patchGroups : perfGroups).length === 0" class="p-4 text-center text-neutral-500 text-sm">
-						{{ searchQuery ? 'No patches match' : 'No patches found' }}
-					</li>
+					<StateMessage
+						v-if="(browser.view === 'patches' ? patchGroups : perfGroups).length === 0"
+						variant="empty"
+						:message="searchQuery ? 'No patches match' : 'No patches found'"
+					/>
 				</ul>
 			</template>
 		</template>
@@ -116,6 +109,8 @@
 	import { useDeviceStore } from '../../store/device';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import SearchInput from '../common/SearchInput.vue';
+	import StateMessage from '../browser/StateMessage.vue';
+	import ListItem from '../browser/ListItem.vue';
 
 	defineProps<{
 		isActive: boolean;

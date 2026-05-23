@@ -97,7 +97,7 @@
 		get: () => currentPatch.value?.description?.monopoly ?? 1,
 		set: (val: number) => {
 			if (currentPatch.value?.description) {
-				currentPatch.value.description.monopoly = val;
+				currentPatch.value.description.monopoly = Number(val);
 				slotsStore.setPatchDescription();
 			}
 		},
@@ -106,7 +106,7 @@
 		get: () => currentPatch.value?.description?.voices ?? 0,
 		set: (val: number) => {
 			if (currentPatch.value?.description) {
-				currentPatch.value.description.voices = val;
+				currentPatch.value.description.voices = Number(val);
 				slotsStore.setPatchDescription();
 			}
 		},
