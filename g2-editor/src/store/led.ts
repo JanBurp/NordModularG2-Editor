@@ -183,11 +183,12 @@ export const useLedStore = defineStore('led', () => {
 		watch(
 			[
 				() => slotsStore.slots[slotLabel].patch,
+				() => slotsStore.slots[slotLabel].loading,
 				() => slotsStore.slots[slotLabel].patch?.areas?.[0]?.modules,
 				() => slotsStore.slots[slotLabel].patch?.areas?.[1]?.modules,
 			],
-			([patch]) => {
-				if (patch) buildLedListForSlot(slotLabel, patch as Patch);
+			([patch, loading]) => {
+				if (patch && !loading) buildLedListForSlot(slotLabel, patch as Patch);
 			},
 			{ immediate: true },
 		);
