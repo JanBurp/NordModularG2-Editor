@@ -52,9 +52,12 @@ export function usePatchFile() {
 		const parser = new PatchParser(buffer);
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
-			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
 			const connected = device.status === 'connected';
-			if (connected) slotsStore.uploadingFromFile = true;
+			if (connected) {
+				if (slotsStore.uploadingFromFile) return;
+				slotsStore.uploadingFromFile = true;
+			}
+			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
 			await device.setPerformanceMode(name);
 			if (connected) {
 				try {
@@ -67,12 +70,13 @@ export function usePatchFile() {
 			}
 			return;
 		}
+		const targetSlot = uiStore.slotInFocus;
 		const parsedPatch = parser.parse() as any;
-		slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, result.filepath!);
+		slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
 		if (device.status === 'connected') {
 			try {
-				await window.cli.run(['upload-patch', uiStore.slotInFocus, result.filepath!]);
+				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
 			} catch (err) {
 				console.error('Upload to G2 failed:', err);
 			}
@@ -83,10 +87,10 @@ export function usePatchFile() {
 		if (device.status !== 'connected') return;
 		try {
 			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
+			SLOT_LABELS.forEach(s => { slotsStore.slots[s].loading = true; });
 			await window.cli.run(['select-perf', String(bank), String(location)]);
-			for (const slot of SLOT_LABELS) {
-				await slotsStore.loadSlot(slot);
-			}
+			SLOT_LABELS.forEach(s => { slotsStore.slots[s].loading = false; });
+			await Promise.all(SLOT_LABELS.map(s => slotsStore.loadSlot(s)));
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
@@ -105,9 +109,12 @@ export function usePatchFile() {
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
 					const prf2 = new PatchParser(buffer).parsePrf2();
 					if (prf2) {
-						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
 						const connected = device.status === 'connected';
-						if (connected) slotsStore.uploadingFromFile = true;
+						if (connected) {
+							if (slotsStore.uploadingFromFile) return;
+							slotsStore.uploadingFromFile = true;
+						}
+						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
 						await device.setPerformanceMode(name);
 						if (connected) {
 							try {
@@ -121,12 +128,13 @@ export function usePatchFile() {
 						return;
 					}
 				}
+				const targetSlot = uiStore.slotInFocus;
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, item.filepath);
+				slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
 				if (device.status === 'connected') {
 					try {
-						await window.cli.run(['upload-patch', uiStore.slotInFocus, item.filepath]);
+						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
 					}
@@ -141,8 +149,9 @@ export function usePatchFile() {
 				return;
 			}
 			try {
-				await window.cli.run(['select-patch', uiStore.slotInFocus, String(item.bank), String(item.location)]);
-				await slotsStore.loadSlot(uiStore.slotInFocus);
+				const targetSlot = uiStore.slotInFocus;
+				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
+				await slotsStore.loadSlot(targetSlot);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
 			}
