@@ -76,10 +76,13 @@ export function usePatchFile() {
 		slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
 		if (device.status === 'connected') {
+			slotsStore.uploadingFromFile = true;
 			try {
 				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
 			} catch (err) {
 				console.error('Upload to G2 failed:', err);
+			} finally {
+				slotsStore.uploadingFromFile = false;
 			}
 		}
 	}
@@ -135,10 +138,13 @@ export function usePatchFile() {
 				slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
 				if (device.status === 'connected') {
+					slotsStore.uploadingFromFile = true;
 					try {
 						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
+					} finally {
+						slotsStore.uploadingFromFile = false;
 					}
 				}
 			} catch (err) {
