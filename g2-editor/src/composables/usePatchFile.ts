@@ -67,6 +67,7 @@ export function usePatchFile() {
 				} finally {
 					slotsStore.uploadingFromFile = false;
 				}
+				if (device.device?.performance) device.device.performance.name = name;
 			}
 			return;
 		}
@@ -124,6 +125,7 @@ export function usePatchFile() {
 							} finally {
 								slotsStore.uploadingFromFile = false;
 							}
+							if (device.device?.performance) device.device.performance.name = name;
 						}
 						return;
 					}
