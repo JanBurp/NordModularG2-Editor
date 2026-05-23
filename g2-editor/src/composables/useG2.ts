@@ -146,7 +146,7 @@ export function useG2() {
 			isDaemonRunning.value = false;
 			window.cli.offWatchDone();
 		});
-		window.cli.onWatchEvent((line: string) => {
+		window.cli.onWatchEvent(async (line: string) => {
 			try {
 				const ev = JSON.parse(line);
 				if (ev.type === 'device_info') {
@@ -156,7 +156,7 @@ export function useG2() {
 				}
 				if (ev.type === 'slot_data') {
 					log('←', 'Watch', formatWatchEvent(ev));
-					if (ev.data && ev.data.data) {
+					if (ev.data && ev.data.data && !slotsStore.slots[ev.slot as SlotLabel]?.loading) {
 						slotsStore._applyPatchOutput(ev.slot as SlotLabel, JSON.stringify(ev.data));
 					}
 					return;
@@ -195,6 +195,7 @@ export function useG2() {
 					log('←', 'Watch', formatWatchEvent(ev), 'param');
 					const slotLabel = ev.slot as SlotLabel;
 					if (!slotLabel) return;
+					if (slotsStore.slots[slotLabel]?.loading) return;
 					const patch = slotsStore.slots[slotLabel]?.patch;
 					const areaIdx = ev.area === 'va' ? 1 : 0;
 					const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
@@ -208,6 +209,7 @@ export function useG2() {
 					log('←', 'Watch', formatWatchEvent(ev), 'param');
 					const slotLabel = ev.slot as SlotLabel;
 					if (!slotLabel) return;
+					if (slotsStore.slots[slotLabel]?.loading) return;
 					const params = slotsStore.slots[slotLabel]?.patch?.patchParams;
 					const key = PATCH_PARAM_KEYS[ev.param as number];
 					if (params?.[ev.variation] && key) {
@@ -226,13 +228,13 @@ export function useG2() {
 					if (slotsStore.uploadingFromFile) return;
 					if (ev.patches && Array.isArray(ev.patches)) {
 						// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
-						for (const p of ev.patches) {
-							if (!p || !p.data) continue;
-							const slot = p.slot as SlotLabel;
-							slotsStore._applyPatchOutput(slot, JSON.stringify(p));
-						}
+						await Promise.all(
+							ev.patches
+								.filter((p: any) => p?.data)
+								.map((p: any) => slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p)))
+						);
 					} else if (prevMode && ev.mode !== prevMode) {
-						for (const s of SLOT_LABELS) slotsStore.loadSlot(s);
+						await Promise.all(SLOT_LABELS.map(s => slotsStore.loadSlot(s)));
 					}
 					return;
 				}

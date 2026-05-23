@@ -21,7 +21,7 @@ function scheduleSend(key: string, cmd: string[], delayMs = 80): void {
 		key,
 		setTimeout(() => {
 			_paramDebounceTimers.delete(key);
-			window.cli.run(cmd);
+			window.cli.run(cmd).catch((err: unknown) => console.error('scheduleSend failed:', err));
 		}, delayMs),
 	);
 }
