@@ -1402,6 +1402,74 @@ int g2_set_patch_description(int slot, const uint8_t *data, int len) {
     return G2_OK;
 }
 
+/* NOTE: g2_set_voice_mode / g2_set_voice_count call g2_get_patch internally
+ * (read-modify-write). Do NOT call these from an editor that has a patch
+ * loaded in memory — use set-patch-description directly instead. */
+static int set_voice_description_field(int slot, int field, int val) {
+    const char *slot_names[] = {"A", "B", "C", "D"};
+    cJSON *patch = g2_get_patch(slot_names[slot]);
+    if (!patch) { g2_err("voice-field: failed to get patch for slot %d\n", slot); return G2_ERR; }
+
+    const char *hex = cJSON_GetStringValue(cJSON_GetObjectItem(patch, "data"));
+    if (!hex) { cJSON_Delete(patch); return G2_ERR_INVALID_PARAM; }
+
+    int hex_len = (int)strlen(hex);
+    int data_len = hex_len / 2;
+    uint8_t *data = malloc(data_len);
+    if (!data) { cJSON_Delete(patch); return G2_ERR; }
+    for (int k = 0; k < data_len; k++) {
+        char buf[3] = { hex[k*2], hex[k*2+1], 0 };
+        data[k] = (uint8_t)strtol(buf, NULL, 16);
+    }
+    cJSON_Delete(patch);
+
+    /* Find null-terminated text header */
+    int text_end = -1;
+    for (int k = 0; k < data_len; k++) {
+        if (data[k] == 0) { text_end = k; break; }
+    }
+    if (text_end < 0 || text_end + 3 > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
+
+    /* Scan sections for type 0x21 (patch description) */
+    int sec_off = text_end + 3;
+    int guard = 0;
+    while (sec_off + 3 <= data_len && guard++ < 64) {
+        uint8_t type = data[sec_off];
+        int body_len = (data[sec_off + 1] << 8) | data[sec_off + 2];
+        if (type == 0x21) {
+            uint8_t *body = data + sec_off + 3;
+            if (body_len < 14 || sec_off + 3 + body_len > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
+            if (field == 0) {
+                /* voices: bits 61-65 (5 bits) */
+                body[7] = (body[7] & 0xF8) | ((val >> 2) & 0x07);
+                body[8] = (body[8] & 0x3F) | ((val & 0x03) << 6);
+            } else {
+                /* monopoly: bits 90-91 (2 bits) */
+                body[11] = (body[11] & 0xCF) | ((val & 0x03) << 4);
+            }
+            int ret = g2_set_patch_description(slot, body, body_len);
+            free(data);
+            return ret;
+        }
+        sec_off += 3 + body_len;
+    }
+    free(data);
+    g2_err("voice-field: description section (0x21) not found\n");
+    return G2_ERR_INVALID_PARAM;
+}
+
+int g2_set_voice_mode(int slot, int mode) {
+    if (slot < 0 || slot > 3) { g2_err("voice-mode: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (mode < 0 || mode > 3) { g2_err("voice-mode: mode must be 0-3\n"); return G2_ERR_INVALID_PARAM; }
+    return set_voice_description_field(slot, 1, mode);
+}
+
+int g2_set_voice_count(int slot, int count) {
+    if (slot < 0 || slot > 3) { g2_err("voice-count: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (count < 1 || count > 32) { g2_err("voice-count: count must be 1-32\n"); return G2_ERR_INVALID_PARAM; }
+    return set_voice_description_field(slot, 0, count);
+}
+
 static int get_perf_version(uint8_t *out_version) {
     uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
     uint8_t pv_resp[16] = {0};

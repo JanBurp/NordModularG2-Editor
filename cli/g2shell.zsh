@@ -12,6 +12,7 @@ _G2_CMDS=(
   slot variation set-perf-mode set-perf-name set-patch-name
   set-master-clock-run set-master-clock-bpm
   set-patch-description
+  get-resources voice-mode voice-count
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
   set-param set-param-label
@@ -70,6 +71,15 @@ _g2_complete() {
       ;;
     set-patch-description)
       (( CURRENT == 2 )) && compadd A B C D
+      ;;
+    get-resources)
+      (( CURRENT == 2 )) && compadd A B C D
+      ;;
+    voice-mode|voice-count)
+      case $CURRENT in
+        2) compadd A B C D ;;
+        3) [[ $service == voice-mode ]] && compadd 0 1 2 3 || compadd {1..32} ;;
+      esac
       ;;
     set-perf-mode)
       compadd patch performance

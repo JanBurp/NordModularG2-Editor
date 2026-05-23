@@ -112,6 +112,7 @@ export function useG2() {
 	}
 
 	const pendingResourceFetch = new Set<SlotLabel>();
+	const pendingSlotReload = new Set<SlotLabel>();
 
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
 		if (store.status !== 'connected') return;
@@ -262,7 +263,13 @@ export function useG2() {
 				}
 				if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 					const sl = ev.slot as SlotLabel;
-					if (sl) store.updateResources(sl, ev.data);
+					if (sl) {
+						store.updateResources(sl, ev.data);
+						if (pendingSlotReload.has(sl)) {
+							pendingSlotReload.delete(sl);
+							slotsStore.loadSlot(sl);
+						}
+					}
 					log('←', 'Watch', formatWatchEvent(ev));
 					return;
 				}
@@ -295,9 +302,9 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'patch_version_change') {
-					const sl = ev.slot as SlotLabel;
 					log('←', 'Watch', formatWatchEvent(ev));
-					if (sl && SLOT_LABELS.includes(sl)) slotsStore.loadSlot(sl);
+					const sl = ev.slot as SlotLabel;
+					if (sl) pendingSlotReload.add(sl);
 					return;
 				}
 
