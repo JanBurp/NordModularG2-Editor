@@ -400,7 +400,11 @@ export const useSlotsStore = defineStore('slots', {
 				const output = await window.cli.run(['get-patch', slot]);
 				return await this._applyPatchOutput(slot, output);
 			} catch (e: any) {
-				this.slots[slot].error = e.message;
+				if (!this.slots[slot].patch) {
+					this.slots[slot].error = e.message;
+				} else {
+					console.warn(`loadSlot(${slot}) reload failed, keeping existing data:`, e.message);
+				}
 				return null;
 			} finally {
 				this.slots[slot].loading = false;
