@@ -1,0 +1,171 @@
+name: Build
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+env:
+  LIBUSB_VERSION: '1.0.27'
+  NODE_VERSION: '20'
+
+jobs:
+  # ─────────────────────────────────────────────
+  # macOS arm64 (native Apple Silicon runner)
+  # ─────────────────────────────────────────────
+  build-macos-arm64:
+    runs-on: macos-14
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build libusb (arm64, static)
+        run: |
+          curl -fsSL "https://github.com/libusb/libusb/releases/download/v${{ env.LIBUSB_VERSION }}/libusb-${{ env.LIBUSB_VERSION }}.tar.bz2" \
+            -o /tmp/libusb.tar.bz2
+          tar -xjf /tmp/libusb.tar.bz2 -C /tmp
+          cd /tmp/libusb-${{ env.LIBUSB_VERSION }}
+          CFLAGS="-arch arm64" LDFLAGS="-arch arm64" CC=clang \
+            ./configure --prefix=/tmp/libusb-arm64 --enable-static --disable-shared
+          make -j4 install
+
+      - name: Build CLI (arm64)
+        working-directory: cli
+        run: |
+          make CC=clang \
+            ARCH_FLAGS="-arch arm64" \
+            LIBUSB_CFLAGS="-I/tmp/libusb-arm64/include/libusb-1.0" \
+            LIBUSB_LIBS="-L/tmp/libusb-arm64/lib -lusb-1.0 -framework CoreFoundation -framework IOKit -framework Security -lobjc"
+          cp build/bin/g2-cli ../g2-editor/resources/g2-cli
+
+      - name: Install dependencies & build Electron app
+        working-directory: g2-editor
+        run: |
+          npm ci --ignore-scripts
+          npx electron-vite build
+          npx electron-builder --mac --arm64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G2-Editor-macOS-arm64
+          path: g2-editor/release/*.dmg
+
+  # ─────────────────────────────────────────────
+  # macOS x64 (cross-compiled from arm64 runner)
+  # ─────────────────────────────────────────────
+  build-macos-x64:
+    runs-on: macos-14
+    env:
+      CSC_IDENTITY_AUTO_DISCOVERY: false
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build libusb (x64, static)
+        run: |
+          curl -fsSL "https://github.com/libusb/libusb/releases/download/v${{ env.LIBUSB_VERSION }}/libusb-${{ env.LIBUSB_VERSION }}.tar.bz2" \
+            -o /tmp/libusb.tar.bz2
+          tar -xjf /tmp/libusb.tar.bz2 -C /tmp
+          cd /tmp/libusb-${{ env.LIBUSB_VERSION }}
+          CFLAGS="-arch x86_64" LDFLAGS="-arch x86_64" CC=clang \
+            ./configure --prefix=/tmp/libusb-x64 --enable-static --disable-shared
+          make -j4 install
+
+      - name: Build CLI (x64)
+        working-directory: cli
+        run: |
+          make CC=clang \
+            ARCH_FLAGS="-arch x86_64" \
+            LIBUSB_CFLAGS="-I/tmp/libusb-x64/include/libusb-1.0" \
+            LIBUSB_LIBS="-L/tmp/libusb-x64/lib -lusb-1.0 -framework CoreFoundation -framework IOKit -framework Security -lobjc"
+          cp build/bin/g2-cli ../g2-editor/resources/g2-cli
+
+      - name: Install dependencies & build Electron app
+        working-directory: g2-editor
+        run: |
+          npm ci --ignore-scripts
+          npx electron-vite build
+          npx electron-builder --mac --x64
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G2-Editor-macOS-x64
+          path: g2-editor/release/*.dmg
+
+  # ─────────────────────────────────────────────
+  # Windows x64 (MSYS2 + MinGW64)
+  # ─────────────────────────────────────────────
+  build-windows:
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - uses: msys2/setup-msys2@v2
+        with:
+          msystem: MINGW64
+          update: true
+          install: >-
+            make
+            mingw-w64-x86_64-gcc
+            mingw-w64-x86_64-libusb
+
+      - name: Build CLI (Windows x64)
+        shell: msys2 {0}
+        working-directory: cli
+        run: |
+          make \
+            LIBUSB_CFLAGS="-I/mingw64/include/libusb-1.0" \
+            LIBUSB_LIBS="-L/mingw64/lib -Wl,-Bstatic -lusb-1.0 -lpthread -Wl,-Bdynamic -lsetupapi"
+          cp build/bin/g2-cli.exe ../g2-editor/resources/g2-cli.exe
+
+      - name: Install dependencies & build Electron app
+        working-directory: g2-editor
+        run: |
+          npm ci --ignore-scripts
+          npx electron-vite build
+          npx electron-builder --win
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G2-Editor-Windows
+          path: g2-editor/release/*.exe
+
+  # ─────────────────────────────────────────────
+  # Linux x64 (future target — not yet enabled)
+  # ─────────────────────────────────────────────
+  # build-linux:
+  #   runs-on: ubuntu-latest
+  #   steps:
+  #     - uses: actions/checkout@v4
+  #     - uses: actions/setup-node@v4
+  #       with:
+  #         node-version: ${{ env.NODE_VERSION }}
+  #     - name: Install libusb (static)
+  #       run: sudo apt-get install -y libusb-1.0-0-dev
+  #     - name: Build CLI
+  #       working-directory: cli
+  #       run: |
+  #         make
+  #         cp build/bin/g2-cli ../g2-editor/resources/g2-cli
+  #     - name: Install dependencies & build Electron app
+  #       working-directory: g2-editor
+  #       run: |
+  #         npm ci --ignore-scripts
+  #         npx electron-vite build
+  #         npx electron-builder --linux
+  #     - uses: actions/upload-artifact@v4
+  #       with:
+  #         name: G2-Editor-Linux
+  #         path: g2-editor/release/

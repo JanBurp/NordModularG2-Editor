@@ -45,12 +45,32 @@ npx electron-vite build
 
 # ──────────────────────────────────────────
 # macOS arm64
+# Builds libusb from source for arm64 — same approach as x64.
 # ──────────────────────────────────────────
 if $BUILD_ARM64; then
+  LIBUSB_VERSION=1.0.27
+  LIBUSB_ARM64_PREFIX=/tmp/libusb-arm64
+
+  step "Building libusb $LIBUSB_VERSION for macOS arm64"
+  if [ ! -f "$LIBUSB_ARM64_PREFIX/lib/libusb-1.0.a" ]; then
+    cd /tmp
+    curl -fsSL "https://github.com/libusb/libusb/releases/download/v${LIBUSB_VERSION}/libusb-${LIBUSB_VERSION}.tar.bz2" -o libusb-arm64.tar.bz2
+    tar -xjf libusb-arm64.tar.bz2
+    cd "libusb-${LIBUSB_VERSION}"
+    CFLAGS="-arch arm64" LDFLAGS="-arch arm64" CC=clang \
+      ./configure --prefix="$LIBUSB_ARM64_PREFIX" --enable-static --disable-shared
+    make -j4 install
+  else
+    echo "libusb arm64 already built at $LIBUSB_ARM64_PREFIX — skipping."
+  fi
+
   step "Building CLI for macOS arm64"
   cd "$CLI_DIR"
   make clean
-  make CC=clang ARCH_FLAGS="-arch arm64"
+  make CC=clang \
+    ARCH_FLAGS="-arch arm64" \
+    LIBUSB_CFLAGS="-I$LIBUSB_ARM64_PREFIX/include/libusb-1.0" \
+    LIBUSB_LIBS="-L$LIBUSB_ARM64_PREFIX/lib -lusb-1.0 -framework CoreFoundation -framework IOKit -framework Security -lobjc"
   cp build/bin/g2-cli "$RESOURCES_DIR/g2-cli"
 
   step "Packaging macOS arm64 DMG"
@@ -125,7 +145,7 @@ if $BUILD_WIN; then
   make clean
   make CC=x86_64-w64-mingw32-gcc \
     LIBUSB_CFLAGS="-I$LIBUSB_WIN_PREFIX/include/libusb-1.0" \
-    LIBUSB_LIBS="-L$LIBUSB_WIN_PREFIX/lib -lusb-1.0 -lsetupapi"
+    LDFLAGS="-L$LIBUSB_WIN_PREFIX/lib -Wl,-Bstatic -lusb-1.0 -lpthread -Wl,-Bdynamic -lsetupapi -static-libgcc"
   cp build/bin/g2-cli.exe "$RESOURCES_DIR/g2-cli.exe"
   make clean
 
