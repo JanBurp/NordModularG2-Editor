@@ -1,26 +1,17 @@
-/**
- * Module Renderer for Nord Modular G2
- *
- * Handles rendering of module panels and controls
- */
-
 import { XLINK_NS, XMLNS, svgLine, svgNested, svgPath, svgRect, svgText } from './svgUtils';
-
+import type { ModuleInput, ModuleMode, ModuleOutput, ModuleParam, VisualElement } from '../types';
 import { getModuleColor } from '../constants';
 
-/**
- * Module definition interface
- */
 export interface ModuleDef {
 	id: number;
 	shortnm: string;
 	height: number;
 	colour?: number;
-	ve?: any[];
-	modes?: any[];
-	params?: any[];
-	inputs?: any[];
-	outputs?: any[];
+	ve?: VisualElement[];
+	modes?: ModuleMode[];
+	params?: ModuleParam[];
+	inputs?: ModuleInput[];
+	outputs?: ModuleOutput[];
 }
 
 /**
@@ -85,88 +76,53 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
 	o.ve?.forEach((n) => {
 		switch (n.type) {
 			case 'graph':
-			case 'graphenv':
-				s.appendChild(
-					svgRect(n.x, n.y, n.w, n.h, {
-						fill: '#088',
-					}),
-				);
-				if (n.type === 'graph') {
-					s.appendChild(
-						svgLine(n.x, n.y + n.h / 2, n.x + n.w, n.y + n.h / 2, {
-							stroke: '#0DD',
-						}),
-					);
-				}
+			case 'graphenv': {
+				const x = n.x ?? 0, y = n.y ?? 0, w = n.w ?? 0, h = n.h ?? 0;
+				s.appendChild(svgRect(x, y, w, h, { fill: '#088' }));
+				if (n.type === 'graph') s.appendChild(svgLine(x, y + h / 2, x + w, y + h / 2, { stroke: '#0DD' }));
 				break;
+			}
 			case 'line':
-				s.appendChild(svgLine(n.x1, n.y1, n.x2, n.y2, { stroke: '#333' }));
+				s.appendChild(svgLine(n.x1 ?? 0, n.y1 ?? 0, n.x2 ?? 0, n.y2 ?? 0, { stroke: '#333' }));
 				break;
 			case 'path':
-				s.appendChild(svgPath(n.d, { stroke: '#333', fill: 'none' }));
+				s.appendChild(svgPath(n.d ?? '', { stroke: '#333', fill: 'none' }));
 				break;
 			case 'valueDisplay':
-				s.appendChild(
-					svgRect(n.x, n.y, n.w, 14, {
-						fill: '#666',
-						'data-id': n.ref,
-					}),
-				);
+				s.appendChild(svgRect(n.x ?? 0, n.y ?? 0, n.w ?? 0, 14, { fill: '#666', 'data-id': n.ref }));
 				break;
 			case 'led':
 			case 'ledArray': {
-				const max = n.cnt || 1;
-				const spc = +n.xo || 0;
-				let x = 2 + n.x;
+				const max = n.cnt ?? 1;
+				const spc = n.xo ?? 0;
+				let x = 2 + (n.x ?? 0);
 				for (let i = 0; i < max; i++, x += spc) {
-					s.appendChild(
-						svgRect(x, n.y, n.w, 6.5, {
-							fill: '#040',
-							stroke: '#000',
-						}),
-					);
+					s.appendChild(svgRect(x, n.y ?? 0, n.w ?? 0, 6.5, { fill: '#040', stroke: '#000' }));
 				}
 				break;
 			}
 			case 'bmp': {
-				const t = svgNested({ x: n.x, y: n.y });
+				const t = svgNested({ x: n.x ?? 0, y: n.y ?? 0 });
 				const u = document.createElementNS(XMLNS, 'use');
-				const classn = `Bitmap${n.id}`;
-				u.setAttributeNS(XLINK_NS, 'xlink:href', `#${classn}`);
+				u.setAttributeNS(XLINK_NS, 'xlink:href', `#Bitmap${n.id}`);
 				t.appendChild(u);
 				s.appendChild(t);
 				break;
 			}
 			case 'text':
-				s.appendChild(svgText(n.x, n.y, n.t, { fill: 'black' }));
+				s.appendChild(svgText(n.x ?? 0, n.y ?? 0, n.t ?? '', { fill: 'black' }));
 				break;
 		}
 	});
 
 	o.modes?.forEach((n) => {
 		const w = n.w;
+		const h = n.h ?? 0;
 		if (w) {
-			if (w > 0) {
-				s.appendChild(
-					svgRect(n.x, n.y, w, n.h, {
-						stroke: '#222',
-						fill: '#EEE',
-					}),
-				);
-			}
+			if (w > 0) s.appendChild(svgRect(n.x, n.y, w, h, { stroke: '#222', fill: '#EEE' }));
 			const absW = Math.abs(w);
-			s.appendChild(
-				svgRect(n.x + absW, n.y, 8, n.h, {
-					stroke: '#222',
-					fill: '#CCC',
-				}),
-			);
-			s.appendChild(
-				svgPath(`M${n.x + absW + 1.5},${n.y + (n.h >> 1) - 1.5} l5,0 -2.5,3z`, {
-					stroke: 'none',
-					fill: '#000',
-				}),
-			);
+			s.appendChild(svgRect(n.x + absW, n.y, 8, h, { stroke: '#222', fill: '#CCC' }));
+			s.appendChild(svgPath(`M${n.x + absW + 1.5},${n.y + (h >> 1) - 1.5} l5,0 -2.5,3z`, { stroke: 'none', fill: '#000' }));
 		}
 	});
 

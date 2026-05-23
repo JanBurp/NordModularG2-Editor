@@ -6,7 +6,7 @@ import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModu
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
-import { resolveColumnCollisions } from './slotHelpers';
+import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions } from './slotHelpers';
 import { useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
@@ -171,10 +171,10 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return null;
 			const { slot, patch } = ctx;
 
-			mutDeleteModule(patch, area === 'voice' ? 1 : 0, moduleId);
+			const { areaIdx, location } = areaConfig(area);
+			mutDeleteModule(patch, areaIdx, moduleId);
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
@@ -185,10 +185,10 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 
-			mutMoveModule(patch, area === 'voice' ? 1 : 0, moduleId, col, row);
+			const { areaIdx, location } = areaConfig(area);
+			mutMoveModule(patch, areaIdx, moduleId, col, row);
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
 		},
 
@@ -197,10 +197,10 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return null;
 			const { slot, patch } = ctx;
 
-			mutMoveModule(patch, area === 'voice' ? 1 : 0, moduleId, col, row);
+			const { areaIdx, location } = areaConfig(area);
+			mutMoveModule(patch, areaIdx, moduleId, col, row);
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
@@ -244,10 +244,10 @@ export const useSlotsStore = defineStore('slots', {
 				uname,
 			};
 
-			mutAddModule(patch, area === 'voice' ? 1 : 0, mod);
+			const { areaIdx, location } = areaConfig(area);
+			mutAddModule(patch, areaIdx, mod);
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run([
 				'add-module',
 				slot,
@@ -288,7 +288,7 @@ export const useSlotsStore = defineStore('slots', {
 			let dmod = toMod,
 				dcon = toCon,
 				dtype = toConType;
-			const areaIdx = area === 'voice' ? 1 : 0;
+			const { areaIdx, location } = areaConfig(area);
 			let dir = 1;
 			if (stype === 0 && dtype !== 0) {
 				// source is input, dest is output: swap to normalise
@@ -305,7 +305,6 @@ export const useSlotsStore = defineStore('slots', {
 			mutAddCable(patch, areaIdx, cable);
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			const mainCmd = [
 				'add-cable',
 				slot,
@@ -370,12 +369,11 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleId);
+			const { areaIdx, location } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
 			if (mod?.lv) mod.lv[variation * mod.pcnt + paramIdx] = value;
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
 
@@ -384,12 +382,11 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleId);
+			const { areaIdx, location } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
 			if (mod?.modes) mod.modes[modeIdx] = value;
 			this.slots[slot].rawHex = null;
 
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
 		},
 
@@ -499,8 +496,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return null;
 			const { slot, patch } = ctx;
 			const { getModule } = await import('../renderer/nmg2mods');
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const location = area === 'voice' ? 'va' : 'fx';
+			const { areaIdx, location } = areaConfig(area);
 
 			const movedSet = new Set(indices);
 			const targets = indices
@@ -579,8 +575,7 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const location = area === 'voice' ? 'va' : 'fx';
+			const { areaIdx, location } = areaConfig(area);
 			for (const id of moduleIds) mutSetModuleColor(patch, areaIdx, id, color);
 			this.slots[slot].rawHex = null;
 			await window.cli.runBatch(moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]));
@@ -590,10 +585,9 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const areaIdx = area === 'voice' ? 1 : 0;
+			const { areaIdx, location } = areaConfig(area);
 			mutSetModuleLabel(patch, areaIdx, moduleId, label);
 			this.slots[slot].rawHex = null;
-			const location = area === 'voice' ? 'va' : 'fx';
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
 		},
 
@@ -637,8 +631,8 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const mod = patch.areas[areaIdx]?.modules?.find((m: any) => m.index === moduleIndex);
+			const { areaIdx } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 			if (!mod) return;
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = (mod.paramLabels as any[]).find((pl: any) => pl.paramIndex === paramIndex);
@@ -655,16 +649,9 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const location = area === 'voice' ? 'va' : 'fx';
+			const { areaIdx, location } = areaConfig(area);
 			const cableList = patch.areas[areaIdx].cableList ?? [];
-			const matching = cableList.filter((c) => {
-				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
-				return (
-					((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) ||
-					((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)))
-				);
-			});
+			const matching = cableList.filter((c) => matchesCableJack(c, moduleIndex, connectorIndex, type));
 			if (matching.length === 0) return;
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color } : c));
 			this.slots[slot].rawHex = null;
@@ -688,16 +675,9 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const areaIdx = area === 'voice' ? 1 : 0;
-			const location = area === 'voice' ? 'va' : 'fx';
+			const { areaIdx, location } = areaConfig(area);
 			const cableList = patch.areas[areaIdx].cableList ?? [];
-			const matching = cableList.filter((c) => {
-				if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
-				return (
-					((c.dir ?? 1) === 1 && c.dmod === moduleIndex && c.dcon === connectorIndex) ||
-					((c.dir ?? 1) === 0 && ((c.smod === moduleIndex && c.scon === connectorIndex) || (c.dmod === moduleIndex && c.dcon === connectorIndex)))
-				);
-			});
+			const matching = cableList.filter((c) => matchesCableJack(c, moduleIndex, connectorIndex, type));
 			if (matching.length === 0) return;
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
 			this.slots[slot].rawHex = null;
@@ -727,8 +707,8 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 
+			const { areaIdx, location } = areaConfig(area);
 			if (selectedModules.length > 0 && selectedCables.length === 0) {
-				const location = area === 'voice' ? 'va' : 'fx';
 				const cliCmds: string[][] = [];
 				const deletedCableKeys = new Set<string>();
 				for (const id of selectedModules) {
@@ -736,7 +716,7 @@ export const useSlotsStore = defineStore('slots', {
 						const key = `${c.smod}-${c.scon}-${c.dmod}-${c.dcon}`;
 						if (!deletedCableKeys.has(key)) {
 							deletedCableKeys.add(key);
-							mutDeleteCable(patch, area === 'voice' ? 1 : 0, c);
+							mutDeleteCable(patch, areaIdx, c);
 							cliCmds.push([
 								'del-cable',
 								slot,
@@ -750,7 +730,7 @@ export const useSlotsStore = defineStore('slots', {
 							]);
 						}
 					}
-					mutDeleteModule(patch, area === 'voice' ? 1 : 0, id);
+					mutDeleteModule(patch, areaIdx, id);
 					cliCmds.push(['del-module', slot, location, String(id)]);
 				}
 				this.slots[slot].rawHex = null;
@@ -758,14 +738,13 @@ export const useSlotsStore = defineStore('slots', {
 				return;
 			}
 			if (selectedCables.length > 0) {
-				const location = area === 'voice' ? 'va' : 'fx';
 				const cliCmds: string[][] = [];
 				for (const cable of selectedCables) {
 					const smod = cable.smod!;
 					const scon = cable.scon!;
 					const dmod = cable.dmod!;
 					const dcon = cable.dcon!;
-					mutDeleteCable(patch, area === 'voice' ? 1 : 0, { smod, scon, dmod, dcon });
+					mutDeleteCable(patch, areaIdx, { smod, scon, dmod, dcon });
 					cliCmds.push(['del-cable', slot, location, String(smod), cable.dir === 0 ? '0' : '1', String(scon), String(dmod), '0', String(dcon)]);
 				}
 				this.slots[slot].rawHex = null;

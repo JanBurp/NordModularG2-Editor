@@ -5,16 +5,11 @@ import { svgPath } from './svgUtils';
 
 export interface Cable {
 	colour: number;
-	sourceModule?: number;
-	smod?: number;
-	destModule?: number;
-	dmod?: number;
-	sourceJack?: number;
-	scon?: number;
-	destJack?: number;
-	dcon?: number;
+	smod: number;
+	scon: number;
+	dmod: number;
+	dcon: number;
 	dir?: number;
-	[key: string]: any;
 }
 
 export interface Module {
@@ -22,7 +17,6 @@ export interface Module {
 	type: number;
 	horiz: number;
 	vert: number;
-	[key: string]: any;
 }
 
 export interface Jack {
@@ -38,24 +32,20 @@ export interface CableRenderOptions {
 }
 
 export function makeCableKey(cable: Cable): string {
-	return `${cable.smod ?? cable.sourceModule}-${cable.scon ?? cable.sourceJack}-${cable.dmod ?? cable.destModule}-${cable.dcon ?? cable.destJack}`;
+	return `${cable.smod}-${cable.scon}-${cable.dmod}-${cable.dcon}`;
 }
 
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	const selectedKeys = new Set(options?.selectedCables?.map(makeCableKey) ?? []);
 	cables.forEach((cable) => {
-		const sourceModule = cable.sourceModule ?? cable.smod;
-		const destModule = cable.destModule ?? cable.dmod;
-		const sourceJack = cable.sourceJack ?? cable.scon;
-		const destJack = cable.destJack ?? cable.dcon;
 		const dir = cable.dir ?? 1;
 
-		const smod = modulesByIndex.get(sourceModule!);
-		const dmod = modulesByIndex.get(destModule!);
+		const smod = modulesByIndex.get(cable.smod);
+		const dmod = modulesByIndex.get(cable.dmod);
 
 		if (!smod || !dmod) {
-			console.warn(`Cable skipped: module not found (source=${sourceModule}, dest=${destModule})`);
+			console.warn(`Cable skipped: module not found (source=${cable.smod}, dest=${cable.dmod})`);
 			return;
 		}
 
@@ -68,11 +58,11 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		}
 
 		// dir: 1 = output->input, 0 = input->input; dcon is always an input
-		const dcon = dmodDef.inputs?.[destJack ?? 0];
-		const scon = dir === 1 ? smodDef.outputs?.[sourceJack ?? 0] : smodDef.inputs?.[sourceJack ?? 0];
+		const dcon = dmodDef.inputs?.[cable.dcon];
+		const scon = dir === 1 ? smodDef.outputs?.[cable.scon] : smodDef.inputs?.[cable.scon];
 
 		if (!scon || !dcon) {
-			console.warn(`Cable skipped: jack not found (sourceJack=${sourceJack}, destJack=${destJack}, dir=${dir})`);
+			console.warn(`Cable skipped: jack not found (scon=${cable.scon}, dcon=${cable.dcon}, dir=${dir})`);
 			return;
 		}
 
@@ -96,9 +86,9 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
 			'data-smod': String(smod.index),
-			'data-scon': String(sourceJack ?? 0),
+			'data-scon': String(cable.scon),
 			'data-dmod': String(dmod.index),
-			'data-dcon': String(destJack ?? 0),
+			'data-dcon': String(cable.dcon),
 			'data-dir': String(dir),
 		});
 

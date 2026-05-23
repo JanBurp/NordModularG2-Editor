@@ -14,6 +14,10 @@ export interface VisualElement {
 	func?: string;
 	lv?: number[];
 	moduleId?: number;
+	ref?: number | number[];
+	t?: string;
+	id?: string | number;
+	cnt?: number;
 	[key: string]: unknown;
 }
 

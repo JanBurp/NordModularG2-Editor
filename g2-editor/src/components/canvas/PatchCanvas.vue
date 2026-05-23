@@ -39,7 +39,7 @@
 		<Cables
 			ref="cablesRef"
 			:modules="props.modules as any[]"
-			:cables="props.cables as any[]"
+			:cables="props.cables as Cable[]"
 			:selected-cables="props.selectedCables"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
@@ -152,17 +152,13 @@
 
 	const connectedJacksMap = computed(() => {
 		const map = new Map<number, { inputs: Set<number>; outputs: Set<number> }>();
-		for (const cable of props.cables as any[]) {
-			const smod = cable.smod ?? cable.sourceModule;
-			const scon = cable.scon ?? cable.sourceJack;
-			const dmod = cable.dmod ?? cable.destModule;
-			const dcon = cable.dcon ?? cable.destJack;
+		for (const cable of props.cables as Cable[]) {
 			const dir = cable.dir ?? 1;
-			if (!map.has(dmod)) map.set(dmod, { inputs: new Set(), outputs: new Set() });
-			map.get(dmod)!.inputs.add(dcon);
-			if (!map.has(smod)) map.set(smod, { inputs: new Set(), outputs: new Set() });
-			if (dir === 1) map.get(smod)!.outputs.add(scon);
-			else map.get(smod)!.inputs.add(scon);
+			if (!map.has(cable.dmod)) map.set(cable.dmod, { inputs: new Set(), outputs: new Set() });
+			map.get(cable.dmod)!.inputs.add(cable.dcon);
+			if (!map.has(cable.smod)) map.set(cable.smod, { inputs: new Set(), outputs: new Set() });
+			if (dir === 1) map.get(cable.smod)!.outputs.add(cable.scon);
+			else map.get(cable.smod)!.inputs.add(cable.scon);
 		}
 		return map;
 	});

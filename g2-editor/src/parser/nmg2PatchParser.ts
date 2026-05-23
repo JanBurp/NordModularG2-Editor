@@ -11,6 +11,7 @@ import type { Area, Cable, Patch, PatchDescription, PatchParamVariation } from '
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
 import { getModule } from '../renderer/nmg2mods';
+import { SectionType } from './constants';
 
 export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation };
 
@@ -367,14 +368,14 @@ function pch2_(data: ArrayBuffer) {
 	};
 
 	const g2section: Record<number, [string, (data: Uint8Array) => string | undefined]> = {
-		0x21: ['Patch Description', parsePatchDesc],
-		0x5a: ['Module Names', parseModuleNames],
-		0x4a: ['Module List', parseModuleList],
-		0x6f: ['Text Pad', parseTextPad],
-		0x11: ['Perf data', parsePrfData],
-		0x52: ['Cable List', parseCableList],
-		0x4d: ['Parameters', parseModuleParameters],
-		0x5b: ['Param Names', parseParamNames],
+		[SectionType.PATCH_DESC]: ['Patch Description', parsePatchDesc],
+		[SectionType.MODULE_NAMES]: ['Module Names', parseModuleNames],
+		[SectionType.MODULE_LIST]: ['Module List', parseModuleList],
+		[SectionType.SEPARATOR]: ['Text Pad', parseTextPad],
+		[SectionType.PERF_DATA]: ['Perf data', parsePrfData],
+		[SectionType.CABLE_LIST]: ['Cable List', parseCableList],
+		[SectionType.PARAMETERS]: ['Parameters', parseModuleParameters],
+		[SectionType.PARAM_NAMES]: ['Param Names', parseParamNames],
 	};
 
 	const hdr = new Uint8Array(data, 0, 320);
@@ -398,7 +399,7 @@ function pch2_(data: ArrayBuffer) {
 			g2section[type][1]?.(new Int8Array(data, textHdrLen + ofs + 3, siz));
 		}
 		ofs += siz + 3;
-		if (type == 0x6f) {
+		if (type == SectionType.SEPARATOR) {
 			if (ofs < maxofs) {
 				areas.push(new Area('fx'));
 				areas.push(new Area('voice'));

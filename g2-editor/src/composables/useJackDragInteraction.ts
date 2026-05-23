@@ -55,14 +55,10 @@ export function useJackDragInteraction(
 	function findAllCablesForJack(info: JackDragInfo): any[] {
 		const result: any[] = [];
 		for (const cable of getCables()) {
-			const smod = cable.smod ?? cable.sourceModule;
-			const scon = cable.scon ?? cable.sourceJack;
-			const dmod = cable.dmod ?? cable.destModule;
-			const dcon = cable.dcon ?? cable.destJack;
 			const dir = cable.dir ?? 1;
-			if (info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) result.push(cable);
-			if (info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) result.push(cable);
-			if (info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex) result.push(cable);
+			if (info.type === 'output' && dir === 1 && cable.smod === info.moduleIndex && cable.scon === info.connectorIndex) result.push(cable);
+			if (info.type === 'input' && cable.dmod === info.moduleIndex && cable.dcon === info.connectorIndex) result.push(cable);
+			if (info.type === 'input' && dir === 0 && cable.smod === info.moduleIndex && cable.scon === info.connectorIndex) result.push(cable);
 		}
 		return result;
 	}

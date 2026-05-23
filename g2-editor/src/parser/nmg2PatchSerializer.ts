@@ -1,4 +1,5 @@
 import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation } from '@/types';
+import { SectionType } from './constants';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -80,7 +81,7 @@ function writeModuleList(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 		bw.write(4, nmodes);
 		for (const mode of m.modes ?? []) bw.write(6, mode);
 	}
-	return makeSection(0x4a, bw.flush());
+	return makeSection(SectionType.MODULE_LIST, bw.flush());
 }
 
 function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
@@ -96,7 +97,7 @@ function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
 		bw.write(8, c.dmod);
 		bw.write(6, c.dcon);
 	}
-	return makeSection(0x52, bw.flush());
+	return makeSection(SectionType.CABLE_LIST, bw.flush());
 }
 
 function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array {
@@ -113,7 +114,7 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 			for (let p = 0; p < m.pcnt; p++) bw.write(7, m.lv[v * m.pcnt + p] ?? 0);
 		}
 	}
-	return makeSection(0x4d, bw.flush());
+	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
 function writeParamNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
@@ -136,7 +137,7 @@ function writeParamNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 			}
 		}
 	}
-	return makeSection(0x5b, bw.flush());
+	return makeSection(SectionType.PARAM_NAMES, bw.flush());
 }
 
 function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
@@ -161,7 +162,7 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 		ofs += 1 + nameLen + (nameLen < 16 ? 1 : 0);
 	}
 
-	return makeSection(0x5a, data);
+	return makeSection(SectionType.MODULE_NAMES, data);
 }
 
 // Extracts morph data (sub-section 1) from a template areaIdx=2 section.
@@ -211,7 +212,7 @@ function writePatchParamSection(params: PatchParamVariation[], morphs: number[][
 	// Sub 7: OctaveShift + Sustain
 	bw.write(8, 7); bw.write(7, 2);
 	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.octaveShift ?? 0); bw.write(7, params[v]?.sustain ?? 0); }
-	return makeSection(0x4d, bw.flush());
+	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
 export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDescription): Uint8Array | null {
@@ -222,7 +223,7 @@ export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDe
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		if (type === 0x21) {
+		if (type === SectionType.PATCH_DESC) {
 			const encoded = writePatchDescription(secData, desc);
 			// G2 expects exactly the original section length (15 bytes); pad with zeros if needed
 			if (encoded.length < secData.length) {
@@ -260,6 +261,88 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 	return bw.flush();
 }
 
+// Concatenates sections, computes CRC, returns rawHex string.
+function buildRawHex(sections: Uint8Array[]): string {
+	const totalLen = sections.reduce((s, b) => s + b.length, 0);
+	const sectionBytes = new Uint8Array(totalLen);
+	let writeOfs = 0;
+	for (const sec of sections) { sectionBytes.set(sec, writeOfs); writeOfs += sec.length; }
+	// CRC covers [0x17][0x00][sectionBytes] (same range as parser's filedataArray)
+	const forCrc = new Uint8Array(2 + sectionBytes.length);
+	forCrc[0] = 0x17; forCrc[1] = 0x00;
+	forCrc.set(sectionBytes, 2);
+	const crc = calcCrc(forCrc);
+	const result = new Uint8Array(sectionBytes.length + 2);
+	result.set(sectionBytes);
+	result[sectionBytes.length] = (crc >> 8) & 0xff;
+	result[sectionBytes.length + 1] = crc & 0xff;
+	return bytesToHex(result);
+}
+
+// Tracks which area sections have already been written (prevents duplicates within one slot).
+interface WrittenSets {
+	m4a: Set<number>; m52: Set<number>; m4d: Set<number>; m5a: Set<number>; m5b: Set<number>;
+}
+
+function newWrittenSets(): WrittenSets {
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set() };
+}
+
+/**
+ * Processes one section from the template, appending the regenerated (or verbatim)
+ * output to `out`. Mutates `w` to track what has been written.
+ *
+ * mutable sections (module list, cable list, parameters, names) are regenerated
+ * from `patch`; all other sections are preserved verbatim from the template.
+ */
+function processSection(
+	type: number, siz: number, secData: Uint8Array, verbatim: Uint8Array,
+	patch: Patch, out: Uint8Array[], w: WrittenSets,
+): void {
+	const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
+
+	if (type === SectionType.PARAMETERS && areaIdx === 2 && !w.m4d.has(2)) {
+		if (patch.patchParams) {
+			const morphs = extractMorphs(secData);
+			out.push(writePatchParamSection(patch.patchParams, morphs));
+		} else {
+			out.push(verbatim);
+		}
+		w.m4d.add(2);
+	} else if (type === SectionType.MODULE_LIST && areaIdx <= 1 && !w.m4a.has(areaIdx)) {
+		out.push(writeModuleList(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
+		w.m4a.add(areaIdx);
+	} else if (type === SectionType.CABLE_LIST && areaIdx <= 1 && !w.m52.has(areaIdx)) {
+		out.push(writeCableList(areaIdx as 0 | 1, patch.areas[areaIdx].cableList ?? []));
+		w.m52.add(areaIdx);
+	} else if (type === SectionType.PARAMETERS && areaIdx <= 1 && !w.m4d.has(areaIdx)) {
+		out.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
+		w.m4d.add(areaIdx);
+		// Param names follow params in Delphi write order; emit here so
+		// labels survive even if the template predates them.
+		const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+		if (paramNamesSection) out.push(paramNamesSection);
+		w.m5b.add(areaIdx);
+	} else if (type === SectionType.PARAM_NAMES && areaIdx <= 1) {
+		if (!w.m5b.has(areaIdx)) {
+			const sec = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+			if (sec) out.push(sec);
+			w.m5b.add(areaIdx);
+		}
+		// If already written via PARAMETERS trigger, skip (don't preserve verbatim)
+	} else if (type === SectionType.MODULE_NAMES && areaIdx <= 1 && !w.m5a.has(areaIdx)) {
+		const namesSection = writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+		if (namesSection) out.push(namesSection);
+		w.m5a.add(areaIdx);
+	} else if (type === SectionType.PATCH_DESC) {
+		const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
+		out.push(makeSection(SectionType.PATCH_DESC, newData));
+	} else {
+		// Preserve verbatim: text pad (SEPARATOR), perf data (PERF_DATA), unknown sections
+		out.push(verbatim);
+	}
+}
+
 /**
  * Re-serializes a Patch to rawHex using section-replacement:
  * mutable sections (module list, cable list, parameters, names) are regenerated
@@ -273,190 +356,43 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 export function serializePatch(name: string, patch: Patch, templateRawHex: string): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2; // exclude trailing CRC bytes
-
-	const outSections: Uint8Array[] = [];
-
-	// Track which areas have had their sections written (to handle duplicates gracefully)
-	const written4a = new Set<number>();
-	const written52 = new Set<number>();
-	const written4d = new Set<number>();
-	const written5a = new Set<number>();
-	const written5b = new Set<number>();
-
+	const out: Uint8Array[] = [];
+	const w = newWrittenSets();
 	let ofs = 0;
 	while (ofs < sectionDataLen) {
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		// Area index is always the top 2 bits of the first byte of section data
-		const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
-
-		if (type === 0x4d && areaIdx === 2 && !written4d.has(2)) {
-			if (patch.patchParams) {
-				const morphs = extractMorphs(secData);
-				outSections.push(writePatchParamSection(patch.patchParams, morphs));
-			} else {
-				outSections.push(template.slice(ofs, ofs + 3 + siz));
-			}
-			written4d.add(2);
-		} else if (type === 0x4a && areaIdx <= 1 && !written4a.has(areaIdx)) {
-			outSections.push(writeModuleList(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
-			written4a.add(areaIdx);
-		} else if (type === 0x52 && areaIdx <= 1 && !written52.has(areaIdx)) {
-			outSections.push(writeCableList(areaIdx as 0 | 1, patch.areas[areaIdx].cableList ?? []));
-			written52.add(areaIdx);
-		} else if (type === 0x4d && areaIdx <= 1 && !written4d.has(areaIdx)) {
-			outSections.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
-			written4d.add(areaIdx);
-			// Param names follow params in Delphi write order; emit here so
-			// labels survive even if the template predates them.
-			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
-			if (paramNamesSection) outSections.push(paramNamesSection);
-			written5b.add(areaIdx);
-		} else if (type === 0x5b && areaIdx <= 1 && !written5b.has(areaIdx)) {
-			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
-			if (paramNamesSection) outSections.push(paramNamesSection);
-			written5b.add(areaIdx);
-		} else if (type === 0x5b && areaIdx <= 1 && written5b.has(areaIdx)) {
-			// Already emitted via 0x4d trigger; skip the template's 0x5b.
-		} else if (type === 0x5a && areaIdx <= 1 && !written5a.has(areaIdx)) {
-			const namesSection = writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
-			// Only emit if there are named modules; if none, omit the section entirely
-			if (namesSection) outSections.push(namesSection);
-			written5a.add(areaIdx);
-		} else if (type === 0x21) {
-			const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
-			outSections.push(makeSection(0x21, newData));
-		} else {
-			// Preserve verbatim: text pad (0x6f), perf data (0x11), etc.
-			outSections.push(template.slice(ofs, ofs + 3 + siz));
-		}
-
+		processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patch, out, w);
 		ofs += 3 + siz;
 	}
-
-	// Concatenate all sections
-	const totalLen = outSections.reduce((s, b) => s + b.length, 0);
-	const sectionBytes = new Uint8Array(totalLen);
-	let writeOfs = 0;
-	for (const sec of outSections) {
-		sectionBytes.set(sec, writeOfs);
-		writeOfs += sec.length;
-	}
-
-	// CRC covers [0x17][0x00][sectionBytes] (same range as parser's filedataArray)
-	const forCrc = new Uint8Array(2 + sectionBytes.length);
-	forCrc[0] = 0x17;
-	forCrc[1] = 0x00;
-	forCrc.set(sectionBytes, 2);
-	const crc = calcCrc(forCrc);
-
-	// rawHex = sectionBytes + 2-byte CRC
-	const result = new Uint8Array(sectionBytes.length + 2);
-	result.set(sectionBytes);
-	result[sectionBytes.length] = (crc >> 8) & 0xff;
-	result[sectionBytes.length + 1] = crc & 0xff;
-
-	return bytesToHex(result);
+	return buildRawHex(out);
 }
 
 /**
  * Re-serializes a prf2 Performance to rawHex using the same section-replacement strategy
- * as serializePatch, but slot-aware: written* sets reset at each 0x6f boundary so all 4
+ * as serializePatch, but slot-aware: written sets reset at each SEPARATOR boundary so all 4
  * slots' sections are updated, not just slot 0's.
  */
 export function serializePerformance(patches: Patch[], templateRawHex: string): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
-
-	const outSections: Uint8Array[] = [];
-
+	const out: Uint8Array[] = [];
 	let slotIdx = 0;
-	let written4a = new Set<number>();
-	let written52 = new Set<number>();
-	let written4d = new Set<number>();
-	let written5a = new Set<number>();
-	let written5b = new Set<number>();
-
-	const patch = () => patches[slotIdx] ?? patches[0];
-
+	let w = newWrittenSets();
 	let ofs = 0;
 	while (ofs < sectionDataLen) {
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
-
-		if (type === 0x6f) {
-			outSections.push(template.slice(ofs, ofs + 3 + siz));
+		if (type === SectionType.SEPARATOR) {
+			out.push(template.slice(ofs, ofs + 3 + siz));
 			// Advance to next slot when more data follows
-			if (ofs + 3 + siz < sectionDataLen) {
-				slotIdx++;
-				written4a = new Set();
-				written52 = new Set();
-				written4d = new Set();
-				written5a = new Set();
-				written5b = new Set();
-			}
-		} else if (type === 0x4d && areaIdx === 2 && !written4d.has(2)) {
-			if (patch().patchParams) {
-				const morphs = extractMorphs(secData);
-				outSections.push(writePatchParamSection(patch().patchParams!, morphs));
-			} else {
-				outSections.push(template.slice(ofs, ofs + 3 + siz));
-			}
-			written4d.add(2);
-		} else if (type === 0x4a && areaIdx <= 1 && !written4a.has(areaIdx)) {
-			outSections.push(writeModuleList(areaIdx as 0 | 1, patch().areas[areaIdx].modules));
-			written4a.add(areaIdx);
-		} else if (type === 0x52 && areaIdx <= 1 && !written52.has(areaIdx)) {
-			outSections.push(writeCableList(areaIdx as 0 | 1, patch().areas[areaIdx].cableList ?? []));
-			written52.add(areaIdx);
-		} else if (type === 0x4d && areaIdx <= 1 && !written4d.has(areaIdx)) {
-			outSections.push(writeParameters(areaIdx as 0 | 1, patch().areas[areaIdx].modules));
-			written4d.add(areaIdx);
-			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
-			if (paramNamesSection) outSections.push(paramNamesSection);
-			written5b.add(areaIdx);
-		} else if (type === 0x5b && areaIdx <= 1 && !written5b.has(areaIdx)) {
-			const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
-			if (paramNamesSection) outSections.push(paramNamesSection);
-			written5b.add(areaIdx);
-		} else if (type === 0x5b && areaIdx <= 1 && written5b.has(areaIdx)) {
-			// skip — already emitted via 0x4d trigger
-		} else if (type === 0x5a && areaIdx <= 1 && !written5a.has(areaIdx)) {
-			const namesSection = writeModuleNames(areaIdx as 0 | 1, patch().areas[areaIdx].modules);
-			if (namesSection) outSections.push(namesSection);
-			written5a.add(areaIdx);
-		} else if (type === 0x21) {
-			const newData = patch().description ? writePatchDescription(secData, patch().description!) : secData;
-			outSections.push(makeSection(0x21, newData));
+			if (ofs + 3 + siz < sectionDataLen) { slotIdx++; w = newWrittenSets(); }
 		} else {
-			// Preserve verbatim: perf data (0x11), unknown sections
-			outSections.push(template.slice(ofs, ofs + 3 + siz));
+			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w);
 		}
-
 		ofs += 3 + siz;
 	}
-
-	const totalLen = outSections.reduce((s, b) => s + b.length, 0);
-	const sectionBytes = new Uint8Array(totalLen);
-	let writeOfs = 0;
-	for (const sec of outSections) {
-		sectionBytes.set(sec, writeOfs);
-		writeOfs += sec.length;
-	}
-
-	const forCrc = new Uint8Array(2 + sectionBytes.length);
-	forCrc[0] = 0x17;
-	forCrc[1] = 0x00;
-	forCrc.set(sectionBytes, 2);
-	const crc = calcCrc(forCrc);
-
-	const result = new Uint8Array(sectionBytes.length + 2);
-	result.set(sectionBytes);
-	result[sectionBytes.length] = (crc >> 8) & 0xff;
-	result[sectionBytes.length + 1] = crc & 0xff;
-
-	return bytesToHex(result);
+	return buildRawHex(out);
 }
