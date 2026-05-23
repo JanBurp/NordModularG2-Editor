@@ -146,6 +146,8 @@
 		/>
 	</Dialog>
 
+	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
+
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 </template>
 
@@ -164,6 +166,7 @@
 	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import Dialog from './components/common/Dialog.vue';
+	import LoadingOverlay from './components/common/LoadingOverlay.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
@@ -193,6 +196,19 @@
 	const browserStore = useBrowserStore();
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
+
+	const isLoading = computed(() =>
+		device.status === 'connecting' ||
+		device.modeChanging ||
+		slotsStore.uploadingFromFile ||
+		Object.values(slotsStore.slots).some((s) => s.loading),
+	);
+	const loadingMessage = computed(() => {
+		if (device.status === 'connecting') return 'Connecting...';
+		if (device.modeChanging) return 'Loading performance...';
+		if (slotsStore.uploadingFromFile) return 'Loading file...';
+		return 'Loading patch...';
+	});
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 1));
