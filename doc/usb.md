@@ -441,6 +441,7 @@ The patch binary (from GET_PATCH / SET_PATCH) is composed of typed sections. Eac
 
 | Code | Name | Content |
 |------|------|---------|
+| `0x21` | PatchDescription | Voice count, monopoly mode, variation settings (see below) |
 | `0x4A` | ModuleList | List of modules with positions and parameters |
 | `0x4D` | ParameterList | Module parameter values |
 | `0x52` | CableList | Cable connections |
@@ -450,6 +451,29 @@ The patch binary (from GET_PATCH / SET_PATCH) is composed of typed sections. Eac
 | `0x62` | Knobs | Knob assignments |
 | `0x65` | MorphParameters | Morph range settings |
 | `0x69` | CurrentNote | Current note info |
+
+### PatchDescription (0x21) bit layout
+
+Body is 14 bytes. Relevant fields (bit numbers are 0-based from the start of the body):
+
+| Bit range | Field | Encoding |
+|-----------|-------|----------|
+| 61–65 | `voices` | 5-bit raw value, **0-based**: 0 = 1 voice, 15 = 16 voices, 31 = 32 voices |
+| 90–91 | `monopoly` | 2-bit: 0=Poly, 1=Mono, 2=Legato, 3=Slgt |
+
+`voices` byte layout (body bytes 7–8):
+```
+body[7] bits 2-0 = voices >> 2   (high 3 bits)
+body[8] bits 7-6 = voices & 0x03 (low 2 bits)
+```
+`monopoly` byte layout (body byte 11):
+```
+body[11] bits 5-4 = monopoly & 0x03
+```
+
+To set via USB, use `SET_PATCH_DESCRIPTION` (subCmd `0x21`) with the full 14-byte body.
+
+**Note on assigned_voices vs description.voices:** The `assigned_voices` watch event carries **1-based** counts (G2 allocates 16 voices → value 16), while `description.voices` is the **0-based** raw bitfield (16 voices → 15). Formula: `description.voices = assigned - 1` when poly. `assigned = 0` means non-poly (Mono/Legato/Slgt) — the exact mode is only in the description bitfield, not derivable from `assigned_voices` alone.
 
 ---
 
@@ -607,7 +631,7 @@ bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
 
 | `subCmd` | JSON type | Extra fields |
 |----------|-----------|--------------|
-| `0x05` | `assigned_voices` | `voices`: [r[5], r[6], r[7], r[8]] |
+| `0x05` | `assigned_voices` | `voices`: [r[5], r[6], r[7], r[8]] — **1-based** counts; 0 = non-poly slot |
 | `0x09` | `slot_change` | `slot` = response[5] |
 | `0x10` or `0x11` | `perf_settings_update` | — |
 | `0x29` | `perf_name` | `name` (null-terminated from response[5]) |
@@ -911,3 +935,17 @@ The key difference: hardware path receives 0x04/0x40/0x1F (sentinel=2, G2 alread
 - Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)
 - `g2_slot_version[4]` maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips
 - **Startup**: daemon queries all 4 slots before `g2_rearm()` and emits them as `slot_data` events; frontend applies them directly via `_applyPatchOutput` in the `slot_data` watch handler
+
+### recv_interrupt() skip list and follow-up race
+
+`recv_interrupt()` in listener mode only skips LED (`0x39`) and volume (`0x3A`) bulk messages. All other message types — including `patch_version_change` (`0x38`), `assigned_voices` (`0x05`), and `resources_used` (`0x72`) — are returned to the caller as-is.
+
+This creates a race: when the G2 changes voice mode/count it emits three events in sequence:
+
+```
+patch_version_change (0x38) → assigned_voices (0x05) → resources_used (0x72)
+```
+
+If the frontend reacts to `patch_version_change` by immediately issuing a `get-patch` command, the `0x05`/`0x72` messages may still be sitting in `g2_msg_queue`. `g2_get_patch()` calls `recv_interrupt()` which returns the wrong message, `patchSize` is misread, and the parser crashes.
+
+**Safe pattern:** delay `get-patch` until the last event in the sequence (`resources_used`) has been received by the frontend. The IPC channel is ordered — by the time the frontend receives `resources_used`, the daemon has fully dequeued all three messages and the queue is empty. See `useG2.ts` (`pendingSlotReload` set) for implementation.
