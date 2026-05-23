@@ -1,6 +1,6 @@
 # G2 Editor Help
 
-## Top Toolbar
+## Performance & Patch Setup
 
 - **Performance name** — click to rename (max 16 chars)
 - **BPM** — click to set tempo (30–240)
@@ -8,38 +8,39 @@
 - **Slots A/B/C/D** — select slot in focus
 - **Perf** — toggle patch ↔ performance mode
 
-## Patch Toolbar
+### Patch Toolbar
 
 - **Patch name** — click to rename (max 16 chars)
 - **Category** — dropdown to set sound category
-- **Voice mode** — mono/legat/poly (dropdown)
+- **Voice mode** — mono/legato/poly (dropdown)
 - **Voice count** — number of voices (dropdown)
 - **Variations 1–8** — click to switch variation
 - **Level** — master patch volume (knob)
 - **Active/Monitor** — toggle patch monitoring
 - **Color picker** — set color of selected modules
-- **Cable visibility** — 8 color toggles; **H** hides all cables, **S** shuffles routing
+- **Voice/FX** — toggle editing area (status bar)
 
-## Status Bar
-
-- **Voice/FX** — toggle editing area
-- Module & cable counts (read-only)
-- **Connection indicator** — click to connect/disconnect G2
-
-## Canvas
+## Canvas & Selection
 
 | Action | Result |
 |---|---|
 | Click empty area | Deselect all |
-| Click+drag empty area | Rubber-band select |
 | Click module | Select |
 | Shift+click module | Add/remove from selection |
-| Drag module title bar | Move module |
 | Double-click module title | Rename module label |
 | Drag from module list | Add module to canvas |
+
+## Patch Editing
+
+### Rubber-Band & Module Selection
+
+| Action | Result |
+|---|---|
+| Click+drag empty area | Rubber-band select |
+| Drag module title bar | Move module |
 | Delete / Backspace | Delete selected modules/cables |
 
-## Module Context Menu (right-click)
+### Module Context Menu (right-click)
 
 - **Rename…** — edit module label
 - **Delete** — remove module
@@ -54,7 +55,7 @@
 | Switch | Click to cycle/select | — |
 | Spinner | Hold to repeat inc/dec | Reset to default |
 
-## Jacks & Cables
+## Cabling
 
 | Action | Result |
 |---|---|
@@ -63,25 +64,30 @@
 | → Set Cable Color | Pick from 8 colors |
 | → Delete connected | Remove all cables on this jack |
 
-## Right Panel
+### Cable Visibility
 
-### Modules
+- **Cable visibility** — 8 color toggles; **H** hides all cables, **S** shuffles routing
+
+## Modules Panel
+
 - **Search** — filter by name or category (Esc to clear)
 - Click category header — expand/collapse
 - Drag module onto canvas — add to patch
 
-### Browser
+## Patch Browser
+
+### Onboard Memory
+
 - **Patches / Performances** — browse onboard G2 memory; click entry to load
-- **Disk** — file system browser
+
+### Disk
+
+- File system browser
   - `↑` — navigate to parent folder
   - `…` — open system folder picker
   - **Search** — filter files (Esc to clear)
   - Click folder — navigate into it
   - Click `.pch2` / `.prf2` — load file
-
-### Settings
-- **Synth name** — editable text field
-- **MIDI channels** — per slot (A–D) and global
 
 ## Keyboard Shortcuts
 
