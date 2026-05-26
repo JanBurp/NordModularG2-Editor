@@ -5,6 +5,7 @@
     "name": "Jan den Besten",
     "url": "https://janburp.github.io/NordModularG2-Editor/"
   },
+  "license": "AGPL-3.0-or-later",
   "description": "Modern Editor for Nord Modular G2",
   "main": "dist-electron/main/main.js",
   "scripts": {
