@@ -1,3 +1,6 @@
+// Copyright (C) 2026 Jan den Besten
+// SPDX-License-Identifier: AGPL-3.0-or-later
+
 /*
  * G2 CLI - Command-line entry point
  *
