@@ -307,6 +307,11 @@
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
 		uiStore.setSlotInFocus(slot);
+		if (device.device?.slots) {
+			for (const entry of device.device.slots) {
+				entry.key = entry.slot === slot;
+			}
+		}
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));

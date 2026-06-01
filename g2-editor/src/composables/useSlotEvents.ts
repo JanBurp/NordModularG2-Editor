@@ -44,8 +44,14 @@ export function useSlotEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'slot_change') {
-			hardwareSlotChange.value = (ev.slot as SlotLabel) ?? null;
+			const sl = ev.slot as SlotLabel;
+			hardwareSlotChange.value = sl ?? null;
 			log('←', 'Watch', `slot → ${ev.slot}`);
+			if (sl && store.device?.slots) {
+				for (const entry of store.device.slots) {
+					entry.key = entry.slot === sl;
+				}
+			}
 			return true;
 		}
 		if (ev.type === 'param_change') {
