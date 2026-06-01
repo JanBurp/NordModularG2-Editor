@@ -12,8 +12,9 @@
 		:disabled="disabled"
 		@click="handleClick"
 	>
-		<span v-if="indicator" class="indicator-strip" :class="indicatorValue ? 'indicator-bright' : 'indicator-dimmed'" />
+		<span v-if="topIndicator" class="indicator-strip indicator-top" :class="topIndicatorValue ? 'indicator-bright' : 'indicator-dimmed'" />
 		<slot />
+		<span v-if="bottomIndicator" class="indicator-strip indicator-bottom" :class="bottomIndicatorValue ? 'indicator-bright' : 'indicator-dimmed'" />
 	</button>
 </template>
 
@@ -25,16 +26,20 @@
 		active?: boolean;
 		disabled?: boolean;
 		size?: 'normal' | 'small' | 'xs';
-		indicator?: boolean;
-		indicatorValue?: boolean;
+		topIndicator?: boolean;
+		topIndicatorValue?: boolean;
+		bottomIndicator?: boolean;
+		bottomIndicatorValue?: boolean;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
 		active: false,
 		disabled: false,
 		size: 'normal',
-		indicator: false,
-		indicatorValue: false,
+		topIndicator: false,
+		topIndicatorValue: false,
+		bottomIndicator: false,
+		bottomIndicatorValue: false,
 	});
 
 	const sizeClass = computed(() => {
@@ -61,10 +66,17 @@
 
 	.indicator-strip {
 		position: absolute;
-		top: 0px;
 		left: 0px;
 		right: 0px;
 		height: 4px;
+	}
+
+	.indicator-top {
+		top: 0px;
+	}
+
+	.indicator-bottom {
+		bottom: 0px;
 	}
 
 	.indicator-strip.indicator-bright {

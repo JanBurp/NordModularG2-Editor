@@ -7,11 +7,13 @@
 			:active="isActive(option.value)"
 			:disabled="option.disabled"
 			:size="size"
-			:indicator="indicators ? indicators[index] !== undefined : false"
-			:indicatorValue="indicators ? !!indicators[index] : false"
+			:topIndicator="topIndicators ? topIndicators[index] !== undefined : false"
+			:topIndicatorValue="topIndicators ? !!topIndicators[index] : false"
+			:bottomIndicator="bottomIndicators ? bottomIndicators[index] !== undefined : false"
+			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
 			class="btn-group-item"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
-			@click="handleSelect(option.value, option.disabled)"
+			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
 		>
 			{{ option.label }}
@@ -30,7 +32,8 @@
 		variant?: 'toggle' | 'variation' | 'tab';
 		size?: 'normal' | 'small' | 'xs';
 		multiSelect?: boolean;
-		indicators?: boolean[];
+		topIndicators?: boolean[];
+		bottomIndicators?: boolean[];
 		testIdPrefix?: string;
 	}
 
@@ -38,13 +41,16 @@
 		variant: 'toggle',
 		size: 'normal',
 		multiSelect: false,
-		indicators: () => [],
+		topIndicators: () => [],
+		bottomIndicators: () => [],
 		testIdPrefix: undefined,
 	});
 
 	const emit = defineEmits<{
 		'update:modelValue': [value: string | number | (string | number)[]];
 		'toggle-off': [value: string | number];
+		'shift-click': [value: string | number];
+		'ctrl-click': [value: string | number];
 	}>();
 
 	const normalizedOptions = computed(() => {
@@ -64,8 +70,11 @@
 		return props.modelValue === value;
 	};
 
-	const handleSelect = (value: string | number, disabled?: boolean) => {
+	const handleSelect = (value: string | number, disabled?: boolean, event?: MouseEvent) => {
 		if (disabled) return;
+
+		if (event?.shiftKey) { emit('shift-click', value); return; }
+		if (event?.ctrlKey || event?.metaKey) { emit('ctrl-click', value); return; }
 
 		if (props.multiSelect && Array.isArray(props.modelValue)) {
 			const newValue = props.modelValue.includes(value) ? props.modelValue.filter((v) => v !== value) : [...props.modelValue, value];
