@@ -466,8 +466,9 @@
 			await connectDevice();
 		}
 		if (!isOffline && device.status === 'connected') {
-			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
-			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
+			const focusedEntry = device.device?.slots?.find(s => s.key);
+			const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
+			const idx = SLOT_LABELS.indexOf(focusLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
 				uiStore.setSlotInFocus(slot);
