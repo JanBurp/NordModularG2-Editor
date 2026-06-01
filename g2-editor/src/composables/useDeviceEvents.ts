@@ -2,13 +2,11 @@ import type { SlotLabel } from '@/types';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
-import { useUiStore } from '@/store/ui';
 import type { LogFn } from './useG2';
 
 export function useDeviceEvents(log: LogFn) {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
-	const uiStore = useUiStore();
 
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
@@ -42,8 +40,6 @@ export function useDeviceEvents(log: LogFn) {
 		}
 		if (ev.type === 'perf_settings') {
 			store.updatePerfSettings(ev);
-			const focus = (ev.performance?.focus ?? ev.patches?.focus) as SlotLabel | undefined;
-			if (focus && SLOT_LABELS.includes(focus)) uiStore.setSlotInFocus(focus);
 			log('←', 'Watch', `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`);
 			return true;
 		}

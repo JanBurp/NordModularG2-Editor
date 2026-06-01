@@ -86,7 +86,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
     remaining += nameLen;
 
-    const uint8_t *perfSettings = remaining + 4;
+    const uint8_t *perfSettings = remaining + 3;
     uint32_t word = ((uint32_t)perfSettings[0] << 24) | ((uint32_t)perfSettings[1] << 16) |
                     ((uint32_t)perfSettings[2] << 8)  |  (uint32_t)perfSettings[3];
     focusSlot   = (word >> (32 - 4 - 2)) & 0x3;
