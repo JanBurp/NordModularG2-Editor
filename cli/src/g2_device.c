@@ -595,8 +595,7 @@ cJSON *g2_startup(void) {
 int g2_select_slot(const char *slot_str) {
     int slot;
     uint8_t version;
-    uint8_t mask;
-    uint8_t data[8] = {0};
+    uint8_t data[2] = {0};
 
     if (ensure_connected(0) < 0) {
         g2_err("Failed to connect to G2\n");
@@ -611,7 +610,7 @@ int g2_select_slot(const char *slot_str) {
 
     g2_drain_pending();
 
-    /* Steps 1+2 use the performance version (slot=4), not the patch slot version.
+    /* SELECT_SLOT uses the performance version (slot=4), not the patch slot version.
      * Per doc/usb.md §6: SELECT_SLOT is a performance-level command. */
     {
         uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
@@ -622,50 +621,18 @@ int g2_select_slot(const char *slot_str) {
         version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
     }
 
-    /* Step 1: select bitmask */
-    mask = 0x08 >> slot;
-    data[0] = 0x07;
-    data[1] = mask;
-    data[2] = 0x0f;
-    data[3] = mask;
-    if (send_system_data(version, data, 4) < 0) {
-        g2_err("Failed to send slot command 1\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-
-    /* Step 2: set active slot index */
+    /* Send SELECT_SLOT (0x09): [01][2C][perf_version][09][slot][CRC].
+     * Matches the Delphi editor (PerfSelectSlot / AddMsgSelectSlot) which sends
+     * only this command. The g2ctl.py three-step sequence (sub-cmds 0x07/0x09
+     * plus a slot-scoped 0x0a/0x70 commit) resets all slots' active/key state
+     * as a side effect and must not be used. */
     data[0] = 0x09;
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
-        g2_err("Failed to send slot command 2\n");
+        g2_err("Failed to send slot select command\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
-     * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
-    g2_drain_pending();
-
-    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC].
-     * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
-     * consume the bulk immediately — leaving it unread blocks subsequent commands. */
-    if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
-        g2_err("Failed to send slot command 3\n");
-        return G2_ERR_SEND;
-    }
-    {
-        uint8_t response[16] = {0};
-        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-        if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
-            if (sz > 0) {
-                uint8_t *bulk = malloc(sz);
-                if (bulk) { recv_bulk(bulk, sz); free(bulk); }
-            }
-            g2_rearm();
-        }
-    }
-
     g2_drain_pending();
 
     return G2_OK;

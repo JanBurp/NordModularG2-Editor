@@ -244,23 +244,19 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x59` | UNKNOWN_2 (perf init query) | — | Embedded ACK |
 | `0x5E` | GET_GLOBAL_KNOBS | — | Extended bulk |
 
-### SELECT_SLOT full sequence
+### SELECT_SLOT command
 
-Selecting a slot requires two system commands plus one slot command. The `version` byte for steps 1 and 2 comes from byte [3] of the START_COMM (`0x7D 0x00`) response — **not** from GET_PATCH_VERSION:
+Selecting a slot requires a single performance-level system command:
 
 ```
-Step 1 (sys):   [01][2C][version][07][mask][0F][mask][CRC]
-                mask = 0x08 >> slot   (A=0x08, B=0x04, C=0x02, D=0x01)
-
-Step 2 (sys):   [01][2C][version][09][slot][CRC]
-
-Step 3 (slot):  [01][28+slot][0x0a][70][CRC]
-                version for step 3 is constant 0x0a (per g2ctl.py)
+[01][2C][perf_version][09][slot][CRC]
 ```
 
-After all three commands, drain any pending notifications (`g2_drain_pending`).
+The `perf_version` byte comes from GET_PATCH_VERSION with slot=4. Drain pending notifications (`g2_drain_pending`) after sending to consume the `slot_change` / `assigned_voices` responses the G2 emits.
 
-> **CLI note:** `g2_select_slot` implements all three steps. Steps 1+2 use the performance version obtained via GET_PATCH_VERSION with slot=4.
+> **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
+
+> **CLI note:** `g2_select_slot` uses the perf version obtained via GET_PATCH_VERSION with slot=4.
 
 ---
 
