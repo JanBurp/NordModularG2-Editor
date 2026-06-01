@@ -14,10 +14,13 @@
 				<BtnGroup
 					:model-value="uiStore.selectedSlotIndex"
 					:options="SLOT_OPTIONS"
-					:indicators="device.getSlotStatus"
+					:top-indicators="device.getSlotsKeyStatus"
+					:bottom-indicators="device.getSlotsActiveStatus"
 					variant="toggle"
 					testIdPrefix="slot"
 					@update:model-value="handleSlotClick"
+					@shift-click="handleSlotShiftClick"
+					@ctrl-click="handleSlotCtrlClick"
 				/>
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
@@ -307,6 +310,14 @@
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
+	}
+
+	function handleSlotShiftClick(value: string | number): void {
+		device.toggleSlotActive(SLOT_LABELS[value as number]);
+	}
+
+	function handleSlotCtrlClick(value: string | number): void {
+		device.toggleSlotKey(SLOT_LABELS[value as number]);
 	}
 
 	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {

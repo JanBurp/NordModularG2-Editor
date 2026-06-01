@@ -94,9 +94,13 @@ export const useDeviceStore = defineStore('device', {
 			if (state.device?.performance) return state.device.performance.clockRunning;
 			return false;
 		},
-		getSlotStatus: (state): boolean[] => {
+		getSlotsActiveStatus: (state): boolean[] => {
 			if (!state.device) return [false, false, false, false];
 			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.active ?? false);
+		},
+		getSlotsKeyStatus: (state): boolean[] => {
+			if (!state.device) return [false, false, false, false];
+			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.key ?? false);
 		},
 		activeSlotResources: (state): SlotResources => {
 			return state.slotResources[useUiStore().slotInFocus];
@@ -194,6 +198,16 @@ export const useDeviceStore = defineStore('device', {
 			this.device.performance = ev.performance ?? null;
 			this.device.patches = ev.patches ?? null;
 			this.device.slots = ev.slots;
+		},
+
+		toggleSlotActive(slot: SlotLabel) {
+			const entry = this.device?.slots.find((s) => s.slot === slot);
+			if (entry) entry.active = !entry.active;
+		},
+
+		toggleSlotKey(slot: SlotLabel) {
+			const entry = this.device?.slots.find((s) => s.slot === slot);
+			if (entry) entry.key = !entry.key;
 		},
 
 		updateResources(slot: SlotLabel, data: number[]) {
