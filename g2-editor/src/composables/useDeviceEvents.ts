@@ -73,6 +73,13 @@ export function useDeviceEvents(log: LogFn) {
 			log('←', 'Watch', `version_update perf=${ev.perf_version} slots=[${(ev.slot_versions ?? []).map((s: any) => s.version).join(',')}]`);
 			return true;
 		}
+		if (ev.type === 'perf_settings_update') {
+			log('←', 'Watch', 'perf_settings_update');
+			const raw = await window.cli.run(['get-perf-settings']);
+			const parsed = JSON.parse(raw);
+			store.updatePerfSettings(parsed.data ?? parsed);
+			return true;
+		}
 		return false;
 	}
 

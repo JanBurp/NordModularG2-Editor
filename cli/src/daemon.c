@@ -377,6 +377,20 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) { ret = G2_ERR_INVALID_PARAM; }
 		else { ret = g2_set_voice_count(slot, arg_i(args, 1)); }
 
+	} else if (strcmp(cmd, "get-perf-settings") == 0) {
+		data = query_perf_settings(1, NULL);
+		ret = data ? G2_OK : G2_ERR;
+
+	} else if (strcmp(cmd, "set-slot-enabled") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_slot_enabled(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "set-slot-key") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_slot_key(slot, arg_i(args, 1));
+
 	}
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
