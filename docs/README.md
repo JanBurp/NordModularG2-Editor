@@ -62,12 +62,13 @@ Video:
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
 - [ ] Show Morphs
+- [ ] Change Morphs on params
 - [ ] Editing patch settings
 - [ ] Editing performance settings
 - [ ] Editing synth settings
-- [ ] Change Morphs on params
 - [ ] Midi CC's on params
 - [ ] Parameter Pages
+- [ ] Modules: some graphs missing, some graphics missing, change some mode switches.
 - [ ] Use cursor keys to move between modules and params
 - [ ] Use cursor keys to edit params
 - [ ] Undo/Redo
@@ -107,5 +108,9 @@ With some help from coding agents (claude & opencode) on a tight budget.
 
 
 ## Donate
+
+Although i'm not in it for making money with this editor, donations will help with the development in a few ways:
+- Subscriptions to coding agents which speeds up development a lot. (Now i use Claude Code & Opencode, but i'm open for good quality agents that are more friendly for out world).
+- If donations grow substantial i may buy myself a second hand Nord G2 Engine for testing purposes.
 
 [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6)
