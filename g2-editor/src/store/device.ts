@@ -202,12 +202,18 @@ export const useDeviceStore = defineStore('device', {
 
 		toggleSlotActive(slot: SlotLabel) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
-			if (entry) entry.active = !entry.active;
+			if (!entry) return;
+			entry.active = !entry.active;
+			if (this.status === 'connected')
+				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']);
 		},
 
 		toggleSlotKey(slot: SlotLabel) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
-			if (entry) entry.key = !entry.key;
+			if (!entry) return;
+			entry.key = !entry.key;
+			if (this.status === 'connected')
+				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
 		},
 
 		updateResources(slot: SlotLabel, data: number[]) {

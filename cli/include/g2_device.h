@@ -177,4 +177,9 @@ int g2_set_param(int slot, int location, int module_id,
  * Invalidated on version_update all-slots event. */
 extern uint8_t g2_slot_version[4];
 
+/* Slot active/key: read-modify-write on C_PERF_SETTINGS (0x11).
+ * slot_idx 0-3 (A-D), value 0 or 1. */
+int g2_set_slot_enabled(int slot_idx, int value);
+int g2_set_slot_key(int slot_idx, int value);
+
 #endif /* __G2_DEVICE_H__ */

@@ -237,6 +237,7 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 |---------|------|-------------|----------|
 | `0x09 ss` | SELECT_SLOT | `ss`=slot (0-3) | Embedded ACK |
 | `0x10` | GET_PERF_SETTINGS | — | Extended bulk (performance settings) |
+| `0x11` | SET_PERF_SETTINGS | `[0x11][sizeHi][sizeLo][80 bytes settings]` | Embedded ACK |
 | `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
@@ -508,14 +509,16 @@ After GET_SYNTH_SETTINGS the CLI issues two more system commands to get performa
 1. `send_system(0x41, 0x81)` → extended bulk → `selsData`
 2. `send_system(selsData[2], 0x10)` → extended bulk → `perfData`
 
-`perfData` layout (parsed starting at `perfData[4]`):
-- Null-terminated performance name
-- At offset +4 relative to remaining: focus slot (2 bits at bit position 36 of a 32-bit word)
-- `remaining[5]` = rangeEnable
-- `remaining[6]` = BPM
-- `remaining[7]` bit 0 = keyboard split
-- `remaining[8]` bit 0 = clock running
-- `remaining + 11`: 4 × slot blocks, each: null-terminated name + 7 bytes (active, key, hold, bank, patch, MIDI low, MIDI high) + 3 padding bytes
+`perfData` bulk response layout (95 bytes typical):
+- `[0..3]` 4-byte outer header
+- `[4..]` null-terminated performance name
+- `[name_end]` = `0x11` (C_PERF_SETTINGS chunk type)
+- `[name_end+1..2]` = inner_size (big-endian, typically `0x00 0x50` = 80)
+- `[name_end+3..10]` = 8 bytes perf settings: focus slot, rangeEnable, BPM, kbSplit, clockRun
+- `[name_end+11..]` = 4 × slot blocks, each: null-terminated name + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, 3 padding)
+- `[last 2]` 2-byte bulk trailer
+
+For SET_PERF_SETTINGS, send only the chunk: `[0x11][sizeHi][sizeLo][80 bytes]` (83 bytes total). Do **not** include the outer 4-byte header, perf name, or 2-byte trailer.
 
 ---
 

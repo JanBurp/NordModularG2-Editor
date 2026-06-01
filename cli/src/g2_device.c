@@ -1936,3 +1936,83 @@ cJSON *g2_get_resources(const char *slot_str) {
     return result;
 }
 
+/* Read the current perf settings, patch one byte for the target slot, and
+ * write the full blob back using SET_PERF_SETTINGS (sub-cmd 0x11).
+ * field_offset: 0 = active (bit 0), 1 = key (bit 0). */
+static int g2_set_slot_perf_field(int slot_idx, int field_offset, int value) {
+    if (slot_idx < 0 || slot_idx > 3) { g2_err("set-slot-perf: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-slot-perf: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+
+    /* Step 1: UNKNOWN_1 (0x81) → perf version at selsData[2] */
+    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
+    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
+    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
+    uint8_t perf_version = selsData[2];
+
+    /* Step 2: GET_PERF_SETTINGS (0x10) */
+    uint8_t perfIntr[16] = {0};
+    uint8_t *perfData = malloc(2048);
+    if (!perfData) return G2_ERR_NO_MEMORY;
+    size_t perfSize = 0;
+    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
+    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
+    perfSize = size;
+    recv_bulk(perfData, perfSize);
+
+    /* Step 3: navigate binary (same path as perf_parse_and_add) to find the
+     * target slot's field byte and patch it in-place. */
+    char tmpName[32];
+    const uint8_t *remaining = perfData + 4;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+    const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd = perfData + perfSize;
+    int found = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slotPtr >= perfEnd) break;
+        int maxName = (int)(perfEnd - slotPtr);
+        if (maxName > 17) maxName = 17;
+        nameLen = parse_name(slotPtr, tmpName, maxName);
+        if (slotPtr + nameLen + 7 > perfEnd) break;
+        if (i == slot_idx) {
+            size_t byte_offset = (size_t)(slotPtr - perfData) + (size_t)nameLen + (size_t)field_offset;
+            perfData[byte_offset] = (uint8_t)(value & 1);
+            found = 1;
+            break;
+        }
+        slotPtr += nameLen + 10;
+    }
+    if (!found) { free(perfData); return G2_ERR_PARSE; }
+
+    /* Step 4: send the C_PERF_SETTINGS chunk — matches Delphi CreateSetPerfSettingsMessage:
+     * [0x11][sizeHi][sizeLo][settings data]. 'remaining' points to the 0x11 byte. */
+    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
+    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
+    free(perfData);
+    if (send_ret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+
+    /* Step 5: read ACK */
+    uint8_t ackResp[16] = {0};
+    recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_set_slot_enabled(int slot_idx, int value) {
+    return g2_set_slot_perf_field(slot_idx, 0, value);
+}
+
+int g2_set_slot_key(int slot_idx, int value) {
+    return g2_set_slot_perf_field(slot_idx, 1, value);
+}
+

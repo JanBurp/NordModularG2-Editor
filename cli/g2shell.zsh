@@ -13,6 +13,7 @@ _G2_CMDS=(
   set-master-clock-run set-master-clock-bpm
   set-patch-description
   get-resources voice-mode voice-count
+  get-perf-settings set-slot-enabled set-slot-key
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
   set-param set-param-label
@@ -83,6 +84,12 @@ _g2_complete() {
       ;;
     set-perf-mode)
       compadd patch performance
+      ;;
+    set-slot-enabled|set-slot-key)
+      case $CURRENT in
+        2) compadd A B C D ;;
+        3) compadd 0 1 ;;
+      esac
       ;;
     list)
       (( CURRENT == 2 )) && compadd patches performances
