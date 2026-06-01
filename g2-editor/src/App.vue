@@ -29,14 +29,14 @@
 				<CPU :va="device.activeSlotResources.va" :fx="device.activeSlotResources.fx" />
 			</template>
 
-			<BtnGroup
-				class="ml-auto"
-				:model-value="uiStore.rightPaneTab"
-				:options="PANE_TAB_OPTIONS"
-				variant="tab"
-				@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
-				@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
-			/>
+			<div
+				class="rounded ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-20"
+				:class="device.statusClass"
+				data-testid="connection-status"
+				@click="toggleConnection"
+			>
+				<span class="text-sm">{{ device.statusLabel }}</span>
+			</div>
 		</ToolBar>
 
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="handlePatchNameClick" />
@@ -102,7 +102,7 @@
 			</SidePanel>
 		</div>
 
-		<StatusBar @toggle-connection="toggleConnection" />
+		<StatusBar />
 
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
@@ -184,11 +184,10 @@
 	import { useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
-	import type { PaneTab } from './store/ui';
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 
-	import { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS } from './constants';
+	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 	import SettingsPane from './components/panels/SettingsPane.vue';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();

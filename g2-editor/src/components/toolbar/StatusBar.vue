@@ -1,17 +1,20 @@
 <template>
-	<div class="flex items-center h-6 gap-2 bg-neutral-500 border-b border-neutral-700 text-xs text-neutral-900">
+	<div class="flex items-center justify-between h-6 gap-2 bg-neutral-500 border-b border-neutral-700 text-xs text-neutral-900">
 		<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
+
+		<div class="flex items-center gap-2 text-neutral-300">
 		<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
-		<StatusBarDivider />
 		<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
-		<div
-			class="ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-30"
-			:class="device.statusClass"
-			data-testid="connection-status"
-			@click="emit('toggle-connection')"
-		>
-			<span class="text-sm">{{ device.statusLabel }}</span>
 		</div>
+
+		<BtnGroup
+			:model-value="uiStore.rightPaneTab"
+			:options="PANE_TAB_OPTIONS"
+			variant="tab"
+			size="small"
+			@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
+			@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
+		/>
 	</div>
 </template>
 
@@ -19,16 +22,13 @@
 	import { computed } from 'vue';
 	import { useUiStore } from '../../store/ui';
 	import { useSlotsStore } from '../../store/slots';
-	import { useDeviceStore } from '../../store/device';
 	import BtnGroup from './BtnGroup.vue';
 	import StatusBarDivider from './StatusBarDivider.vue';
-	import { AREA_OPTIONS } from '../../constants';
-
-	const emit = defineEmits<{ 'toggle-connection': [] }>();
+	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
+	import type { PaneTab } from '../../store/ui';
 
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
-	const device = useDeviceStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
