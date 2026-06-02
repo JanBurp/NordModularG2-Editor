@@ -61,7 +61,14 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'assigned_voices') {
-			if (Array.isArray(ev.voices)) store.assignedVoices = ev.voices;
+			if (Array.isArray(ev.voices)) {
+				store.assignedVoices = ev.voices;
+				const slotLabels = ['A', 'B', 'C', 'D'] as const;
+				for (let i = 0; i < ev.voices.length && i < slotLabels.length; i++) {
+					const entry = store.device?.slots.find((s) => s.slot === slotLabels[i]);
+					if (entry) entry.active = ev.voices[i] > 0;
+				}
+			}
 			log('←', 'Watch', `assigned_voices=[${(ev.voices ?? []).join(',')}]`);
 			return true;
 		}
