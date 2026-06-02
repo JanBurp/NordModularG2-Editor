@@ -38,8 +38,6 @@
 			/>
 		</div>
 
-		<ToolBarDivider />
-
 		<ColorPicker />
 
 		<ToolBarDivider />
