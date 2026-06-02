@@ -199,11 +199,8 @@
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
 
-	const isLoading = computed(() =>
-		device.status === 'connecting' ||
-		device.modeChanging ||
-		slotsStore.uploadingFromFile ||
-		Object.values(slotsStore.slots).some((s) => s.loading),
+	const isLoading = computed(
+		() => device.status === 'connecting' || device.modeChanging || slotsStore.uploadingFromFile || Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === 'connecting') return 'Connecting...';
@@ -305,6 +302,29 @@
 	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
+
+		const slots = device.device?.slots;
+		if (slots) {
+			const activeCount = slots.filter((s) => s.active).length;
+			const target = slots.find((s) => s.slot === slot);
+
+			// Case 2: multiple active slots – inactive slots cannot receive focus
+			if (activeCount > 1 && !target?.active) return;
+
+			if (activeCount <= 1) {
+				// Case 1: single (or zero) active – clicked slot becomes the only active+key slot
+				slots.forEach((s) => {
+					s.active = s.slot === slot;
+					s.key = s.slot === slot;
+				});
+			} else if (!target?.key) {
+				// Case 3: multiple active, clicked slot lacks key – give it exclusive key
+				slots.forEach((s) => {
+					s.key = s.slot === slot;
+				});
+			}
+		}
+
 		uiStore.setSlotInFocus(slot);
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
@@ -353,7 +373,21 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 1,
+							blue: 1,
+							yellow: 1,
+							orange: 1,
+							green: 1,
+							purple: 1,
+							white: 1,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
 					};
 					slotsStore.loadPatchFile(uiStore.slotInFocus, emptyPatch as any, 'Untitled');
 					break;
@@ -364,7 +398,21 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 1,
+							blue: 1,
+							yellow: 1,
+							orange: 1,
+							green: 1,
+							purple: 1,
+							white: 1,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
 					};
 					const emptyPatches = [emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[];
 					slotsStore.loadPerformanceFile(emptyPatches, [], 'Untitled Performance', '');
@@ -460,7 +508,7 @@
 			await connectDevice();
 		}
 		if (!isOffline && device.status === 'connected') {
-			const focusedEntry = device.device?.slots?.find(s => s.key);
+			const focusedEntry = device.device?.slots?.find((s) => s.key);
 			const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
 			const idx = SLOT_LABELS.indexOf(focusLabel);
 			if (idx >= 0) {
