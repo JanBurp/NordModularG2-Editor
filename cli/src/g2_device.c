@@ -611,7 +611,9 @@ int g2_select_slot(const char *slot_str) {
     g2_drain_pending();
 
     /* SELECT_SLOT uses the performance version (slot=4), not the patch slot version.
-     * Per doc/usb.md §6: SELECT_SLOT is a performance-level command. */
+     * Per doc/usb.md §6: SELECT_SLOT is a performance-level command.
+     * Send only sub-cmd 0x09 (Delphi PerfSelectSlot). The g2ctl.py 0x07 bitmask
+     * step resets all slots' active/key state as a side effect and must not be used. */
     {
         uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
         uint8_t pv_resp[16] = {0};
@@ -621,11 +623,6 @@ int g2_select_slot(const char *slot_str) {
         version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
     }
 
-    /* Send SELECT_SLOT (0x09): [01][2C][perf_version][09][slot][CRC].
-     * Matches the Delphi editor (PerfSelectSlot / AddMsgSelectSlot) which sends
-     * only this command. The g2ctl.py three-step sequence (sub-cmds 0x07/0x09
-     * plus a slot-scoped 0x0a/0x70 commit) resets all slots' active/key state
-     * as a side effect and must not be used. */
     data[0] = 0x09;
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
@@ -1968,10 +1965,13 @@ static int g2_set_slot_perf_field(int slot_idx, int field_offset, int value) {
     if (send_ret < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
 
-    /* Step 5: read ACK */
-    uint8_t ackResp[16] = {0};
-    recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
-    g2_drain_pending();
+    /* Step 5: drain ACK in direct mode; in daemon mode the listener handles it
+     * and consuming here would silently swallow slot_change/perf_name events. */
+    if (!g2_listener_active) {
+        uint8_t ackResp[16] = {0};
+        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
+        g2_drain_pending();
+    }
     return G2_OK;
 }
 

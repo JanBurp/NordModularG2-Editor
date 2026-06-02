@@ -177,6 +177,16 @@ static void execute_cmd(const char *line) {
 
 	if (strcmp(cmd, "slot") == 0 && n >= 1) {
 		ret = g2_select_slot(arg_s(args, 0));
+		/* 0x09 alone (Delphi approach) doesn't trigger G2 notifications,
+		 * so emit slot_change synthetically when the command succeeds. */
+		if (ret == G2_OK) {
+			int slot = parse_slot(arg_s(args, 0));
+			if (slot >= 0 && slot <= 3) {
+				static const char *sn[] = {"A","B","C","D"};
+				printf("{\"type\":\"slot_change\",\"slot\":\"%s\"}\n", sn[slot]);
+				fflush(stdout);
+			}
+		}
 
 	} else if (strcmp(cmd, "variation") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 1));
@@ -378,7 +388,14 @@ static void execute_cmd(const char *line) {
 		else { ret = g2_set_voice_count(slot, arg_i(args, 1)); }
 
 	} else if (strcmp(cmd, "get-perf-settings") == 0) {
-		data = query_perf_settings(1, NULL);
+		cJSON *synth = query_synth_settings(NULL);
+		int mode = 0;
+		if (synth) {
+			cJSON *m = cJSON_GetObjectItem(synth, "mode");
+			mode = m && strcmp(m->valuestring, "Performance") == 0;
+			cJSON_Delete(synth);
+		}
+		data = query_perf_settings(mode, NULL);
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-slot-enabled") == 0 && n >= 2) {
