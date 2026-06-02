@@ -47,10 +47,14 @@ export function useSlotEvents(log: LogFn) {
 			const sl = ev.slot as SlotLabel;
 			hardwareSlotChange.value = sl ?? null;
 			log('←', 'Watch', `slot → ${ev.slot}`);
-			if (sl && store.device?.slots) {
-				for (const entry of store.device.slots) {
-					entry.key = entry.slot === sl;
-				}
+			// Refresh actual slot state (key, active) from G2 — slot_change alone
+			// doesn't carry full info since multiple slots can hold key=true.
+			if (sl && store.status === 'connected') {
+				try {
+					const raw = await window.cli.run(['get-perf-settings']);
+					const parsed = JSON.parse(raw);
+					store.updatePerfSettings(parsed.data ?? parsed);
+				} catch { /* state will sync on next perf_settings event */ }
 			}
 			return true;
 		}
