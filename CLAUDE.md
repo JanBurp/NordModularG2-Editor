@@ -10,8 +10,6 @@ Editor for the Nord Modular G2 synthesizer. USB communication layer in C. And an
 - For code review requests, ask whether to review a specific commit, branch range, or working tree before starting.
 
 ## Verification Before Done
-- For C/firmware bit-field parsing changes, request a raw byte dump from the connected G2 and verify each field (including inverted bits like clkse) before claiming the fix is complete.
-- For Vue/SVG refactors, run the test suite AND check for ID collisions when components are duplicated (e.g., gradient defs should live at App root).
 - Always run `npm run typecheck` (or equivalent) after multi-file TypeScript edits before reporting success.
 
 ### 1. Think Before Coding
@@ -33,15 +31,12 @@ Before implementing:
 - No error handling for impossible scenarios.
 - If you write 200 lines and it could be 50, rewrite it.
 
-Ask yourself: "Would a senior engineer say this is overcomplicated?" If yes, simplify.
-
 ### 3. Surgical Changes
 
 **Touch only what you must.**
 
 When editing existing code:
 - If you see code that could be improved (simpler, less code), don't change, metion it.
-- Don't refactor things that aren't broken.
 - Match existing style, even if you'd do it differently.
 - If you notice unrelated dead code, mention it - don't delete it.
 - If you notice code that could be simpler or more abstracted, mention it.
@@ -70,11 +65,6 @@ For multi-step tasks, state a brief plan:
 
 Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
 
----
-
-**These guidelines are working if:** fewer unnecessary changes in diffs, fewer rewrites due to overcomplication, and clarifying questions come before implementation rather than after mistakes.
-
-
 ## Repository Structure
 
 - `cli/` — C CLI tool for USB communication with the Nord G2 hardware
@@ -90,7 +80,6 @@ cd cli && make          # build
 cd cli && make test     # run tests
 ./cli/build/bin/g2-cli --help
 ```
-Key slot commands: `add-module`, `del-module`, `move-module`, `set-module-color`, `set-module-name`, `set-param`, `add-cable`, `del-cable`. All take `<slot> <va|fx> ...` as first args. Subcmd bytes documented in `doc/usb.md`.
 
 **Interactive daemon use (recommended):**
 ```bash
