@@ -256,8 +256,13 @@
 		showPatchNameDialog.value = true;
 	}
 	async function confirmPatchName(): Promise<void> {
-		await slotsStore.setPatchName(editingPatchName.value);
-		showPatchNameDialog.value = false;
+		try {
+			await slotsStore.setPatchName(editingPatchName.value);
+		} catch (e: any) {
+			console.error('setPatchName failed:', e?.message ?? e);
+		} finally {
+			showPatchNameDialog.value = false;
+		}
 	}
 
 	// ── Perf name dialog ──────────────────────────────────────────────────────
@@ -270,8 +275,13 @@
 		showPerfNameDialog.value = true;
 	}
 	async function confirmPerfName(): Promise<void> {
-		await device.setPerfName(editingPerfName.value);
-		showPerfNameDialog.value = false;
+		try {
+			await device.setPerfName(editingPerfName.value);
+		} catch (e: any) {
+			console.error('setPerfName failed:', e?.message ?? e);
+		} finally {
+			showPerfNameDialog.value = false;
+		}
 	}
 
 	// ── BPM dialog ────────────────────────────────────────────────────────────
@@ -284,9 +294,14 @@
 		showBpmDialog.value = true;
 	}
 	async function confirmBpm(): Promise<void> {
-		const val = Math.max(30, Math.min(240, editingBpm.value));
-		await device.setBpm(val);
-		showBpmDialog.value = false;
+		try {
+			const val = Math.max(30, Math.min(240, editingBpm.value));
+			await device.setBpm(val);
+		} catch (e: any) {
+			console.error('setBpm failed:', e?.message ?? e);
+		} finally {
+			showBpmDialog.value = false;
+		}
 	}
 
 	// ── Keyboard ──────────────────────────────────────────────────────────────
@@ -344,7 +359,13 @@
 		uiStore.variation = idx;
 		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (patch?.description) patch.description.variation = idx;
-		if (device.status === DeviceStatus.Connected) await slotsStore.selectVariation(idx);
+		if (device.status === DeviceStatus.Connected) {
+			try {
+				await slotsStore.selectVariation(idx);
+			} catch (e: any) {
+				console.error('selectVariation failed:', e?.message ?? e);
+			}
+		}
 	}
 
 	// ── G2 connection ─────────────────────────────────────────────────────────
