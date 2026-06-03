@@ -1,5 +1,10 @@
 import type { SlotLabel } from '@/types';
 
+/** SVG pixel width of one module column. */
+export const MODULE_WIDTH = 256;
+/** SVG pixel height of one module row unit. */
+export const MODULE_ROW_HEIGHT = 16;
+
 export const SLOT_LABELS: readonly SlotLabel[] = ['A', 'B', 'C', 'D'] as const;
 
 export const SLOT_OPTIONS = [

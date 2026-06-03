@@ -21,5 +21,5 @@ export { MODULE_COLORS, DEFAULT_MODULE_COLOR, getModuleColor, type ModuleColor }
 // Sound categories
 export { SOUND_CATEGORIES, CATEGORY_COUNT, DEFAULT_CATEGORY_ID, getCategoryName, isValidCategoryId, type SoundCategory } from './categories';
 
-// UI option arrays and slot labels
-export { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS } from './ui';
+// UI option arrays, slot labels, and module grid dimensions
+export { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS, MODULE_WIDTH, MODULE_ROW_HEIGHT } from './ui';

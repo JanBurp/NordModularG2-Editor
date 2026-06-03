@@ -58,7 +58,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
-	import { getAreaByShort } from '../../constants/ui';
+	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 
 	const props = defineProps({
 		modules: {
@@ -132,7 +132,7 @@
 		if (props.modules.length === 0) return 1280;
 		let maxX = 0;
 		(props.modules as any[]).forEach((m: any) => {
-			const mx = (m.horiz + 1) * 256;
+			const mx = (m.horiz + 1) * MODULE_WIDTH;
 			if (mx > maxX) maxX = mx;
 		});
 		return Math.max(maxX + 100, 1280);
@@ -144,7 +144,7 @@
 		(props.modules as any[]).forEach((m: any) => {
 			const modDef = getModule(m.type);
 			const modHeight = modDef?.height || 2;
-			const my = (m.vert + modHeight) * 16;
+			const my = (m.vert + modHeight) * MODULE_ROW_HEIGHT;
 			if (my > maxY) maxY = my;
 		});
 		return Math.max(maxY + 100, 600);
