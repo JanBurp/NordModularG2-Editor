@@ -47,9 +47,16 @@ static void print_usage(const char *prog) {
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
     printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
     printf("  set-perf-name <name>                                                                      Set the current performance name\n");
+    printf("  get-perf-settings                                                                         Get current performance settings\n");
+    printf("  set-patch-name <slot> <name>                                                              Set patch name for a slot\n");
+    printf("  set-patch-description <slot> <hexdata>                                                    Set patch description (hex-encoded binary)\n");
+    printf("  set-master-clock-run <0|1>                                                                Start (1) or stop (0) the master clock\n");
+    printf("  set-master-clock-bpm <30-240>                                                             Set master clock BPM\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
-    printf("  slot <A|B|C|D>                                                                            Change active slot\n");
+    printf("  slot <A|B|C|D>                                                                            Change active slot (activates if inactive)\n");
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
+    printf("  set-slot-enabled <slot> <0|1>                                                             Enable or disable a slot\n");
+    printf("  set-slot-key <slot> <0|1>                                                                 Assign or unassign keyboard to a slot\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>              Delete a cable\n");
     printf("  set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Set color of an existing cable\n");
@@ -271,7 +278,7 @@ static int cmd_slot(int argc, char **argv, int i) {
             fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
         return 1;
     }
-    return g2_select_slot(argv[i + 1]);
+    return g2_switch_slot(argv[i + 1]);
 }
 
 static int cmd_variation(int argc, char **argv, int i) {
@@ -304,7 +311,7 @@ static int cmd_add_cable(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "add-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int color    = atoi(argv[i + 3]);
     int from_mod = atoi(argv[i + 4]);
     int from_ct  = atoi(argv[i + 5]);
@@ -322,7 +329,7 @@ static int cmd_del_cable(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "del-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int from_mod = atoi(argv[i + 3]);
     int from_ct  = atoi(argv[i + 4]);
     int from_con = atoi(argv[i + 5]);
@@ -339,7 +346,7 @@ static int cmd_set_cable_color(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-cable-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int color    = atoi(argv[i + 3]);
     int from_mod = atoi(argv[i + 4]);
     int from_ct  = atoi(argv[i + 5]);
@@ -357,7 +364,7 @@ static int cmd_del_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "del-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     return g2_del_module(slot, location, module_id);
 }
@@ -369,7 +376,7 @@ static int cmd_move_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "move-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int col       = atoi(argv[i + 4]);
     int row       = atoi(argv[i + 5]);
@@ -384,7 +391,7 @@ static int cmd_add_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "add-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int type_id   = atoi(argv[i + 3]);
     int module_id = atoi(argv[i + 4]);
     int col       = atoi(argv[i + 5]);
@@ -416,7 +423,7 @@ static int cmd_set_module_color(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int color     = atoi(argv[i + 4]);
     return g2_set_module_color(slot, location, module_id, color);
@@ -429,7 +436,7 @@ static int cmd_set_module_name(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-name: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     return g2_set_module_label(slot, location, module_id, argv[i + 4]);
 }
@@ -441,7 +448,7 @@ static int cmd_set_param_label(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param-label: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int param_idx = atoi(argv[i + 4]);
     int label_idx = atoi(argv[i + 5]);
@@ -455,7 +462,7 @@ static int cmd_set_module_mode(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-mode: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int param     = atoi(argv[i + 4]);
     int val       = atoi(argv[i + 5]);
@@ -469,12 +476,77 @@ static int cmd_set_param(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : (strcmp(argv[i + 2], "patch") == 0) ? 2 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int mod_id   = atoi(argv[i + 3]);
     int param    = atoi(argv[i + 4]);
     int val      = atoi(argv[i + 5]);
     int var      = atoi(argv[i + 6]);
     return g2_set_param(slot, location, mod_id, param, val, var);
+}
+
+static int cmd_get_perf_settings(int argc, char **argv, int i) {
+    (void)argc; (void)argv; (void)i;
+    cJSON *synth = query_synth_settings(NULL);
+    int mode = 0;
+    if (synth) {
+        cJSON *m = cJSON_GetObjectItem(synth, "mode");
+        mode = (m && cJSON_IsString(m) && strcmp(m->valuestring, "Performance") == 0);
+        cJSON_Delete(synth);
+    }
+    cJSON *result = query_perf_settings(mode, NULL);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get performance settings", output_format);
+        else
+            fprintf(stderr, "Failed to get performance settings\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
+static int cmd_set_patch_name(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-name <slot> <name>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-name: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_patch_name(slot, argv[i + 2]);
+}
+
+static int cmd_set_master_clock_run(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-master-clock-run <0|1>\n"); return 1; }
+    return g2_set_master_clock_run(atoi(argv[i + 1]));
+}
+
+static int cmd_set_master_clock_bpm(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-master-clock-bpm <30-240>\n"); return 1; }
+    return g2_set_master_clock_bpm(atoi(argv[i + 1]));
+}
+
+static int cmd_set_slot_enabled(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-enabled <slot> <0|1>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-enabled: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_enabled(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_set_slot_key(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-key <slot> <0|1>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-key: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_key(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_set_patch_description(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-description <slot> <hexdata>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-description: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    uint8_t *data;
+    int nbytes = hex_to_bytes(argv[i + 2], &data);
+    if (nbytes < 0) { fprintf(stderr, "set-patch-description: out of memory\n"); return 1; }
+    int ret = g2_set_patch_description(slot, data, nbytes);
+    free(data);
+    return ret;
 }
 
 static int cmd_select_patch(int argc, char **argv, int i) {
@@ -605,9 +677,16 @@ static const cmd_entry_t commands[] = {
     { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },
     { "upload-perf",      cmd_upload_perf      },
-    { "set-perf-mode",    cmd_set_perf_mode    },
-    { "set-perf-name",    cmd_set_perf_name    },
-    { "daemon",           cmd_daemon           },
+    { "set-perf-mode",         cmd_set_perf_mode         },
+    { "set-perf-name",         cmd_set_perf_name         },
+    { "get-perf-settings",     cmd_get_perf_settings     },
+    { "set-patch-name",        cmd_set_patch_name        },
+    { "set-patch-description", cmd_set_patch_description },
+    { "set-master-clock-run",  cmd_set_master_clock_run  },
+    { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
+    { "set-slot-enabled",      cmd_set_slot_enabled      },
+    { "set-slot-key",          cmd_set_slot_key          },
+    { "daemon",                cmd_daemon                },
     { "seq",              cmd_seq              },
     { NULL, NULL }
 };

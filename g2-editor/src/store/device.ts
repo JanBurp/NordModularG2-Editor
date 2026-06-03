@@ -1,58 +1,36 @@
 import { Device, PatchData, SlotLabel } from '@/types';
+
 import { SLOT_LABELS } from '@/constants';
-
 import { defineStore } from 'pinia';
-import { useUiStore } from './ui';
 
-export type DeviceStatus = 'connected' | 'connecting' | 'disconnected' | 'uploading' | 'downloading' | 'error' | 'unsupported' | 'lost' | 'offline';
-
-type ResourceMetrics = { cycles: number; memory: number };
-type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
-
-function emptySlotResources(): SlotResources {
-	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
-}
-
-// d is the bulk payload. Each block: d[o]=location, d[o+1..o+27]=TPatchLoadData (Delphi indices +1).
-// Compound packets pack both areas: block0 at offset 0, 0x72 marker at offset 28, block1 at offset 29.
-function parseResourceCycles(d: number[], o: number): number {
-	const red1 = d[o + 2] + d[o + 1] * 128;
-	const blue1 = d[o + 4] + d[o + 3] * 128;
-	return Math.max(100 * red1 / 1372 + 100 * blue1 / 5000, 0);
-}
-
-function parseResourceMemory(d: number[], o: number): number {
-	const internalMem = d[o + 5];
-	const resource4 = d[o + 9] + d[o + 8] * 128;
-	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
-	return Math.max(Math.max(100 * internalMem / 128, 100 * ram / 260000), 100 * resource4 / 4315);
+export enum DeviceStatus {
+	Connected = 'connected',
+	Connecting = 'connecting',
+	Disconnected = 'disconnected',
+	Lost = 'lost',
+	Unsupported = 'unsupported',
+	Offline = 'offline',
 }
 
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
-		status: 'disconnected' as DeviceStatus,
+		status: DeviceStatus.Disconnected,
 		deviceName: '',
 		device: null as Device | null,
-		startupNames: null as any,
-		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
-		assignedVoices: [0, 0, 0, 0] as number[],
 		modeChanging: false,
 	}),
 
 	getters: {
-		connected: (state) => state.status === 'connected',
+		connected: (state) => state.status === DeviceStatus.Connected,
 		statusClass: (state): string => {
 			switch (state.status) {
-				case 'connected':
+				case DeviceStatus.Connected:
 					return 'border-green-500 bg-green-500';
-				case 'connecting':
-				case 'uploading':
-				case 'downloading':
-					return 'border-orange-300 bg-orange-300';
-				case 'error':
-				case 'unsupported':
-				case 'lost':
-				case 'offline':
+				case DeviceStatus.Connecting:
+					return 'border-orange-300 bg-orange-300 text-neutral-900';
+				case DeviceStatus.Unsupported:
+				case DeviceStatus.Lost:
+				case DeviceStatus.Offline:
 					return 'border-red-500 bg-red-500';
 				default:
 					return 'border-neutral-600 bg-neutral-900 text-neutral-300';
@@ -60,24 +38,13 @@ export const useDeviceStore = defineStore('device', {
 		},
 		statusLabel: (state): string => {
 			switch (state.status) {
-				case 'connected':
-					return 'connected';
-				case 'connecting':
-					return 'connecting...';
-				case 'disconnected':
-					return 'disconnected';
-				case 'uploading':
-					return 'uploading...';
-				case 'downloading':
-					return 'downloading...';
-				case 'error':
-					return 'error';
-				case 'unsupported':
-					return 'not available';
-				case 'lost':
-					return 'lost';
-				default:
-					return 'unknown';
+				case DeviceStatus.Connected: return 'connected';
+				case DeviceStatus.Connecting: return 'connecting';
+				case DeviceStatus.Disconnected: return 'disconnected';
+				case DeviceStatus.Unsupported: return 'not available';
+				case DeviceStatus.Lost: return 'lost';
+				case DeviceStatus.Offline: return 'offline';
+				default: return 'unknown';
 			}
 		},
 		perfName: (state): string => {
@@ -102,19 +69,12 @@ export const useDeviceStore = defineStore('device', {
 			if (!state.device) return [false, false, false, false];
 			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.key ?? false);
 		},
-		activeSlotResources: (state): SlotResources => {
-			return state.slotResources[useUiStore().slotInFocus];
-		},
-		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
-			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
-			return idx >= 0 ? state.assignedVoices[idx] : 0;
-		},
 	},
 
 	actions: {
 		async connect() {
 			// Device/slot/names data arrives as startup events in useG2.startWatch()
-			this.status = 'connected';
+			this.status = DeviceStatus.Connected;
 		},
 
 		applyDeviceInfo(data: Device) {
@@ -128,16 +88,15 @@ export const useDeviceStore = defineStore('device', {
 			} catch {
 				// ignore errors on disconnect
 			} finally {
-				this.status = 'disconnected';
+				this.status = DeviceStatus.Disconnected;
 				this.deviceName = '';
 				this.device = null;
-				this.startupNames = null;
 				this.modeChanging = false;
 			}
 		},
 
 		async togglePerfMode() {
-			if (!this.device || this.status !== 'connected') return;
+			if (!this.device || this.status !== DeviceStatus.Connected) return;
 			const newMode = this.device.mode === 'Performance' ? 'patch' : 'performance';
 			this.modeChanging = true;
 			await window.cli.run(['set-perf-mode', newMode]);
@@ -145,19 +104,19 @@ export const useDeviceStore = defineStore('device', {
 
 		async setPerfName(name: string): Promise<void> {
 			if (this.device?.performance) this.device.performance.name = name;
-			if (this.status === 'connected') await window.cli.run(['set-perf-name', name]);
+			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-perf-name', name]);
 		},
 
 		async setClockRunning(run: boolean): Promise<void> {
 			if (this.device?.patches) this.device.patches.clockRunning = run;
 			if (this.device?.performance) this.device.performance.clockRunning = run;
-			if (this.status === 'connected') await window.cli.run(['set-master-clock-run', run ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-master-clock-run', run ? '1' : '0']);
 		},
 
 		async setBpm(bpm: number): Promise<void> {
 			if (this.device?.patches) this.device.patches.bpm = bpm;
 			if (this.device?.performance) this.device.performance.bpm = bpm;
-			if (this.status === 'connected') await window.cli.run(['set-master-clock-bpm', String(bpm)]);
+			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-master-clock-bpm', String(bpm)]);
 		},
 
 		async setPerformanceMode(name: string) {
@@ -178,7 +137,7 @@ export const useDeviceStore = defineStore('device', {
 					this.device.performance.name = name;
 				}
 			}
-			if (this.status === 'connected') {
+			if (this.status === DeviceStatus.Connected) {
 				await window.cli.run(['set-perf-mode', 'performance']);
 			}
 		},
@@ -204,7 +163,7 @@ export const useDeviceStore = defineStore('device', {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.active = !entry.active;
-			if (this.status === 'connected')
+			if (this.status === DeviceStatus.Connected)
 				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']);
 		},
 
@@ -212,21 +171,9 @@ export const useDeviceStore = defineStore('device', {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.key = !entry.key;
-			if (this.status === 'connected')
+			if (this.status === DeviceStatus.Connected)
 				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
 		},
 
-		updateResources(slot: SlotLabel, data: number[]) {
-			const applyBlock = (o: number) => {
-				if (data.length < o + 28) return;
-				const loc = data[o];
-				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
-				if (loc === 1) this.slotResources[slot].va = metrics;
-				else if (loc === 0) this.slotResources[slot].fx = metrics;
-			};
-			applyBlock(0);
-			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29
-			if (data.length >= 57 && data[28] === 0x72) applyBlock(29);
-		},
 	},
 });

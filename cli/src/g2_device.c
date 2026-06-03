@@ -595,8 +595,7 @@ cJSON *g2_startup(void) {
 int g2_select_slot(const char *slot_str) {
     int slot;
     uint8_t version;
-    uint8_t mask;
-    uint8_t data[8] = {0};
+    uint8_t data[2] = {0};
 
     if (ensure_connected(0) < 0) {
         g2_err("Failed to connect to G2\n");
@@ -611,8 +610,10 @@ int g2_select_slot(const char *slot_str) {
 
     g2_drain_pending();
 
-    /* Steps 1+2 use the performance version (slot=4), not the patch slot version.
-     * Per doc/usb.md §6: SELECT_SLOT is a performance-level command. */
+    /* SELECT_SLOT uses the performance version (slot=4), not the patch slot version.
+     * Per doc/usb.md §6: SELECT_SLOT is a performance-level command.
+     * Send only sub-cmd 0x09 (Delphi PerfSelectSlot). The g2ctl.py 0x07 bitmask
+     * step resets all slots' active/key state as a side effect and must not be used. */
     {
         uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
         uint8_t pv_resp[16] = {0};
@@ -622,50 +623,13 @@ int g2_select_slot(const char *slot_str) {
         version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
     }
 
-    /* Step 1: select bitmask */
-    mask = 0x08 >> slot;
-    data[0] = 0x07;
-    data[1] = mask;
-    data[2] = 0x0f;
-    data[3] = mask;
-    if (send_system_data(version, data, 4) < 0) {
-        g2_err("Failed to send slot command 1\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-
-    /* Step 2: set active slot index */
     data[0] = 0x09;
     data[1] = slot;
     if (send_system_data(version, data, 2) < 0) {
-        g2_err("Failed to send slot command 2\n");
+        g2_err("Failed to send slot select command\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);
-    /* Drain slot_change/assigned_voices notifications that steps 1&2 trigger;
-     * leaving them unread can stall the bulk-OUT endpoint when step 3 sends. */
-    g2_drain_pending();
-
-    /* Step 3: slot-scoped commit — [01][28+slot][0x0a][0x70][CRC].
-     * If the G2 responds with an EXTENDED message (bulk data on endpoint 0x82),
-     * consume the bulk immediately — leaving it unread blocks subsequent commands. */
-    if (send_slot(slot, 0x0a, 0x70, NULL, 0) < 0) {
-        g2_err("Failed to send slot command 3\n");
-        return G2_ERR_SEND;
-    }
-    {
-        uint8_t response[16] = {0};
-        int n = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-        if (n > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
-            if (sz > 0) {
-                uint8_t *bulk = malloc(sz);
-                if (bulk) { recv_bulk(bulk, sz); free(bulk); }
-            }
-            g2_rearm();
-        }
-    }
-
     g2_drain_pending();
 
     return G2_OK;
@@ -1886,9 +1850,10 @@ int g2_set_param(int slot, int location, int module_id,
     /* No recv_interrupt — WRITE_NO_RESP */
 }
 
-/* GET_RESOURCES_USED returns one bulk packet whose payload may contain two
- * area blocks packed as: [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
- * Return all payload bytes (CRC stripped) so the caller can parse both. */
+/* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
+ * plain JSON array matching the "data" field of the resources_used watch event:
+ * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).
+ * Falls back to FX-only (28 bytes) if the VA query fails. */
 cJSON *g2_get_resources(const char *slot_str) {
     uint8_t interruptResp[16] = {0};
     uint8_t version;
@@ -1907,6 +1872,7 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (ret <= 0) { g2_err("No version response\n"); return NULL; }
     version = interruptResp[6];
 
+    /* Query FX area (loc=0) */
     uint8_t loc = 0;
     if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
     usleep(USB_SEND_DELAY_US);
@@ -1916,24 +1882,51 @@ cJSON *g2_get_resources(const char *slot_str) {
         g2_err("Unexpected response for get-resources\n"); return NULL;
     }
 
-    uint16_t bulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-    if (bulkSize < 6) { g2_err("get-resources: bulk too small\n"); return NULL; }
-    uint8_t *bulk = malloc(bulkSize);
-    if (!bulk) { g2_err("Memory allocation failed\n"); return NULL; }
+    uint16_t fxBulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+    if (fxBulkSize < 6) { g2_err("get-resources: FX bulk too small\n"); return NULL; }
+    uint8_t *fxBulk = malloc(fxBulkSize);
+    if (!fxBulk) { g2_err("Memory allocation failed\n"); return NULL; }
 
-    ret = recv_bulk(bulk, bulkSize);
-    if (ret < 6) { free(bulk); g2_err("Failed to read resources bulk\n"); return NULL; }
+    int fxRet = recv_bulk(fxBulk, fxBulkSize);
+    if (fxRet < 6) { free(fxBulk); g2_err("Failed to read resources FX bulk\n"); return NULL; }
+    int fxDataEnd = fxRet - 2;  /* strip 2-byte CRC */
 
-    /* Payload: bulk[4..ret-3], last 2 bytes are CRC (same as watch event handler). */
-    cJSON *result = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateArray();
-    int dataEnd = ret - 2;
-    for (int i = 4; i < dataEnd; i++)
-        cJSON_AddItemToArray(arr, cJSON_CreateNumber(bulk[i]));
-    cJSON_AddItemToObject(result, "bytes", arr);
 
-    free(bulk);
-    return result;
+    /* Query VA area (loc=1) and build compound packet if successful */
+    uint8_t loc1 = 1;
+    if (send_slot(slot, version, 0x71, &loc1, 1) == 0) {
+        usleep(USB_SEND_DELAY_US);
+        uint8_t vaInterrupt[16] = {0};
+        int ret2 = recv_interrupt(vaInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret2 > 0 && (vaInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t vaBulkSize = ((uint16_t)vaInterrupt[1] << 8) | vaInterrupt[2];
+            if (vaBulkSize >= 6) {
+                uint8_t *vaBulk = malloc(vaBulkSize);
+                if (vaBulk) {
+                    int vaRet = recv_bulk(vaBulk, vaBulkSize);
+                    if (vaRet >= 6) {
+                        int vaDataEnd = vaRet - 2;
+                        for (int i = 4; i < fxDataEnd; i++)
+                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
+                        cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
+                        for (int i = 4; i < vaDataEnd; i++)
+                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(vaBulk[i]));
+                        free(vaBulk);
+                        free(fxBulk);
+                        return arr;
+                    }
+                    free(vaBulk);
+                }
+            }
+        }
+    }
+
+    /* Fall back: return FX data only */
+    for (int i = 4; i < fxDataEnd; i++)
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
+    free(fxBulk);
+    return arr;
 }
 
 /* Read the current perf settings, patch one byte for the target slot, and
@@ -2001,10 +1994,13 @@ static int g2_set_slot_perf_field(int slot_idx, int field_offset, int value) {
     if (send_ret < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
 
-    /* Step 5: read ACK */
-    uint8_t ackResp[16] = {0};
-    recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
-    g2_drain_pending();
+    /* Step 5: drain ACK in direct mode; in daemon mode the listener handles it
+     * and consuming here would silently swallow slot_change/perf_name events. */
+    if (!g2_listener_active) {
+        uint8_t ackResp[16] = {0};
+        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
+        g2_drain_pending();
+    }
     return G2_OK;
 }
 
@@ -2014,5 +2010,101 @@ int g2_set_slot_enabled(int slot_idx, int value) {
 
 int g2_set_slot_key(int slot_idx, int value) {
     return g2_set_slot_perf_field(slot_idx, 1, value);
+}
+
+/* Select a slot, activating it if it is currently inactive.
+ * Sends SET_PERF_SETTINGS to enable/key the target and disable/unkey the
+ * currently-focused slot, then sends SELECT_SLOT (0x09).
+ * If the target slot is already active, skips the perf settings write. */
+int g2_switch_slot(const char *slot_str) {
+    int target = parse_slot(slot_str);
+    if (target < 0 || target > 3) { g2_err("switch-slot: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+    g2_drain_pending();
+
+    /* Step 1: UNKNOWN_1 (0x81) → perf version at selsData[2] */
+    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
+    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
+    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
+    uint8_t perf_version = selsData[2];
+
+    /* Step 2: GET_PERF_SETTINGS (0x10) */
+    uint8_t perfIntr[16] = {0};
+    uint8_t *perfData = malloc(2048);
+    if (!perfData) return G2_ERR_NO_MEMORY;
+    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
+    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
+    recv_bulk(perfData, size);
+
+    /* Step 3: navigate binary to find the focused slot and per-slot active/key bytes.
+     * perfData+4 → perf name (variable) → 0x11 chunk header:
+     *   [3]=FUnknown2(8b), [4]=FUnknown3(4b)|FSelectedSlot(2b)|FUnknown4(2b)
+     * Slot data at remaining+11: each slot = name(variable) + 10 bytes
+     *   [+0]=active, [+1]=key, rest=hold/bank/patch/range/pad */
+    char tmpName[32];
+    const uint8_t *remaining = perfData + 4;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+    int focused = (remaining[4] >> 2) & 0x3;
+
+    const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd  = perfData + size;
+    size_t target_off = 0, focused_off = 0;
+    int target_active = 0, found_target = 0, found_focused = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slotPtr >= perfEnd) break;
+        int mx = (int)(perfEnd - slotPtr); if (mx > 17) mx = 17;
+        nameLen = parse_name(slotPtr, tmpName, mx);
+        if (slotPtr + nameLen + 7 > perfEnd) break;
+        size_t base = (size_t)(slotPtr - perfData) + (size_t)nameLen;
+        if (i == target)  { target_off  = base; target_active = perfData[base] & 1; found_target  = 1; }
+        if (i == focused) { focused_off = base;                                      found_focused = 1; }
+        slotPtr += nameLen + 10;
+    }
+    if (!found_target) { free(perfData); return G2_ERR_PARSE; }
+
+    /* Fast path: slot already active — just focus it */
+    if (target_active) { free(perfData); return g2_select_slot(slot_str); }
+
+    /* Activate target slot, deactivate currently-focused slot */
+    perfData[target_off + 0] = 1;
+    perfData[target_off + 1] = 1;
+    if (found_focused && focused != target) {
+        perfData[focused_off + 0] = 0;
+        perfData[focused_off + 1] = 0;
+    }
+
+    /* Step 4: send SET_PERF_SETTINGS (0x11); chunk starts at `remaining` (the 0x11 byte) */
+    uint16_t inner = ((uint16_t)remaining[1] << 8) | remaining[2];
+    int sret = send_system_data(perf_version, remaining, (size_t)3 + inner);
+    free(perfData);
+    if (sret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    /* Drain SET_PERF_SETTINGS ACK from listener queue. */
+    {
+        uint8_t ack[16] = {0};
+        recv_interrupt(ack, 16, USB_TIMEOUT_STANDARD_MS);
+        if (!g2_listener_active) g2_drain_pending();
+    }
+
+    /* Step 5: SELECT_SLOT (0x09) — send directly, no GET_PATCH_VERSION.
+     * In daemon mode, perf_settings_update sits in the queue after the ACK;
+     * g2_select_slot's recv_interrupt would pop it instead of the version
+     * response, leaving that response orphaned as a spurious patch_version event.
+     * Delphi never queries GET_PATCH_VERSION before SELECT_SLOT; 0x41 is
+     * accepted unconditionally by the G2 for this command. */
+    uint8_t sel[2] = {0x09, (uint8_t)target};
+    if (send_system_data(0x41, sel, 2) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    if (!g2_listener_active) g2_drain_pending();
+    return G2_OK;
 }
 

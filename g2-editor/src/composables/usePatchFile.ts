@@ -1,5 +1,5 @@
 import { SLOT_LABELS } from '../constants';
-import { useDeviceStore } from '../store/device';
+import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 const { PatchParser } = await import('../parser/nmg2PatchParser');
@@ -52,7 +52,7 @@ export function usePatchFile() {
 		const parser = new PatchParser(buffer);
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
-			const connected = device.status === 'connected';
+			const connected = device.status === DeviceStatus.Connected;
 			if (connected) {
 				if (slotsStore.uploadingFromFile) return;
 				slotsStore.uploadingFromFile = true;
@@ -75,7 +75,7 @@ export function usePatchFile() {
 		const parsedPatch = parser.parse() as any;
 		slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
 		applyVariation(parsedPatch);
-		if (device.status === 'connected') {
+		if (device.status === DeviceStatus.Connected) {
 			slotsStore.uploadingFromFile = true;
 			try {
 				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
@@ -88,7 +88,7 @@ export function usePatchFile() {
 	}
 
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
-		if (device.status !== 'connected') return;
+		if (device.status !== DeviceStatus.Connected) return;
 		try {
 			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
 			SLOT_LABELS.forEach(s => { slotsStore.slots[s].loading = true; });
@@ -113,7 +113,7 @@ export function usePatchFile() {
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
 					const prf2 = new PatchParser(buffer).parsePrf2();
 					if (prf2) {
-						const connected = device.status === 'connected';
+						const connected = device.status === DeviceStatus.Connected;
 						if (connected) {
 							if (slotsStore.uploadingFromFile) return;
 							slotsStore.uploadingFromFile = true;
@@ -137,7 +137,7 @@ export function usePatchFile() {
 				const parsedPatch = new PatchParser(buffer).parse() as any;
 				slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
-				if (device.status === 'connected') {
+				if (device.status === DeviceStatus.Connected) {
 					slotsStore.uploadingFromFile = true;
 					try {
 						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
@@ -151,7 +151,7 @@ export function usePatchFile() {
 				console.error('Failed to load patch:', err);
 			}
 		} else {
-			if (device.status !== 'connected') return;
+			if (device.status !== DeviceStatus.Connected) return;
 			if (item.kind === 'performance') {
 				await handlePerformanceSynthSelect(item.bank, item.location);
 				return;

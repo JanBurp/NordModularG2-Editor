@@ -25,7 +25,7 @@ export const test = base.extend<AppFixtures>({
 			args: [APP_ROOT],
 			env: {
 				...process.env,
-				DEV_OFFLINE: 'true',
+				VITE_DEV_OFFLINE: 'true',
 				NODE_ENV: 'test',
 			},
 		});
