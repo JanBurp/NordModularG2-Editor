@@ -1,5 +1,3 @@
-// @ts-nocheck
-
 /**
  * Clavia Nord Modular G2 pch2 file reader writer
  * Adapted from g2ools python utility at https://github.com/msg/g2-tools
@@ -15,103 +13,200 @@ import { SectionType } from './constants';
 
 export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation };
 
-function pch2_(data: ArrayBuffer) {
-	const slots: string[] = [];
-	const self = this;
+class G2Area implements Area {
+	name: string;
+	modules: ModuleInstance[] = [];
+	cableList: Cable[] = [];
+	paramaterDataOfs = 0;
+	nummod?: number;
+	numcab?: number;
+	[key: string]: unknown;
 
-	class Area implements Area {
-		name: string;
-		modules: ModuleInstance[] = [];
-		paramaterDataOfs = 0;
-		nummod?: number;
-		numcab?: number;
+	constructor(name: string) {
+		this.name = name;
+	}
+}
 
-		constructor(name: string) {
-			this.name = name;
+class G2Parser {
+	private areas: G2Area[] = [new G2Area('fx'), new G2Area('voice')];
+	private slots: string[] = [];
+	private aof = 0;
+	private textpadofs = 0;
+	private textpadlen = 0;
+	private rawData: Uint8Array = new Uint8Array(0);
+	private bitofs = 0;
+	private bitbuf: number[] = [];
+	private patchParamsData: PatchParamVariation[][] = [];
+	private pd: (PatchDescription | null)[] = [];
+	readonly data: ArrayBuffer;
+	ofs = 0;
+
+	constructor(data: ArrayBuffer) {
+		this.data = data;
+
+		const g2section: Record<number, [string, (data: Uint8Array) => string | undefined | void]> = {
+			[SectionType.PATCH_DESC]: ['Patch Description', (d) => this.parsePatchDesc(d)],
+			[SectionType.MODULE_NAMES]: ['Module Names', (d) => this.parseModuleNames(d)],
+			[SectionType.MODULE_LIST]: ['Module List', (d) => this.parseModuleList(d)],
+			[SectionType.SEPARATOR]: ['Text Pad', (d) => this.parseTextPad(d)],
+			[SectionType.PERF_DATA]: ['Perf data', (d) => this.parsePrfData(d)],
+			[SectionType.CABLE_LIST]: ['Cable List', (d) => this.parseCableList(d)],
+			[SectionType.PARAMETERS]: ['Parameters', (d) => this.parseModuleParameters(d)],
+			[SectionType.PARAM_NAMES]: ['Param Names', (d) => this.parseParamNames(d)],
+		};
+
+		const hdr = new Uint8Array(data, 0, 320);
+		const str = String.fromCharCode.apply(null, hdr as unknown as number[]);
+		let ofs = str.indexOf('\0');
+		const textHdrLen = ofs + 3;
+		const fileCRC = new DataView(data).getInt16(data.byteLength - 2) & 0xffff;
+		const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
+		this.ofs = ofs;
+		const filedataArray = new Uint8Array(data, ofs + 1, data.byteLength - ofs - 3);
+		if (fileCRC !== calcCrc(filedataArray)) {
+			console.warn('PCH2 WARNING: CRC mismatch');
+		}
+
+		const maxofs = filedata.byteLength;
+		ofs = 0;
+		while (ofs < maxofs) {
+			const type = filedata.getInt8(ofs);
+			const siz = filedata.getInt16(ofs + 1);
+			if (type in g2section) {
+				g2section[type][1]?.(new Uint8Array(data, textHdrLen + ofs + 3, siz));
+			}
+			ofs += siz + 3;
+			if (type == SectionType.SEPARATOR) {
+				if (ofs < maxofs) {
+					this.areas.push(new G2Area('fx'));
+					this.areas.push(new G2Area('voice'));
+					this.aof += 2;
+				}
+			}
 		}
 	}
 
-	const areas = [new Area('fx'), new Area('voice')];
-	let aof = 0;
-	let textpadofs = 0;
-	let textpadlen = 0;
-	let rawData: Uint8Array = new Uint8Array(0);
-	let bitofs = 0;
-	let bitbuf: number[] = [];
-	const patchParamsData: PatchParamVariation[][] = [];
+	getAllModules(areaIdx: number): ModuleInstance[] {
+		return this.areas[areaIdx].modules;
+	}
 
-	this.getAllModules = (areaIdx: number) => areas[areaIdx].modules;
+	getAllCables(areaIdx: number): Cable[] {
+		return this.areas[areaIdx].cableList;
+	}
 
-	this.getAllCables = (areaIdx: number) => areas[areaIdx].cableList;
-
-	this.getTextPad = () => {
-		if (textpadlen == 0) return null;
+	getTextPad(): string | null {
+		if (this.textpadlen == 0) return null;
 		let rv = '';
-		const dv = new DataView(self.data);
-		for (let i = 0; i < textpadlen; i++) rv += String.fromCharCode(dv.getUint8(textpadofs + i));
+		const dv = new DataView(this.data);
+		for (let i = 0; i < this.textpadlen; i++) rv += String.fromCharCode(dv.getUint8(this.textpadofs + i));
 		return rv;
-	};
+	}
 
-	this.setTextPad = (str: string) => {
-		if (textpadlen == 0) return;
-		const dv = new DataView(self.data);
-		for (let i = 0; i < Math.min(str.length, textpadlen); i++) dv.setUint8(textpadofs + i, str.charCodeAt(i));
-	};
+	setTextPad(str: string): void {
+		if (this.textpadlen == 0) return;
+		const dv = new DataView(this.data);
+		for (let i = 0; i < Math.min(str.length, this.textpadlen); i++) dv.setUint8(this.textpadofs + i, str.charCodeAt(i));
+	}
 
-	this.getArea = (areaIndex: number) => areas[areaIndex];
+	getArea(areaIndex: number): G2Area {
+		return this.areas[areaIndex];
+	}
 
-	this.getUrl = () => {
-		const blob = new Blob([self.data], {
-			type: 'application/octet-binary',
-		});
+	getUrl(): string {
+		const blob = new Blob([this.data], { type: 'application/octet-binary' });
 		return URL.createObjectURL(blob);
-	};
+	}
 
-	function getBits(numbits: number, initialData?: Uint8Array) {
-		if (initialData) {
-			rawData = initialData;
-			bitofs = 0;
+	isPrf2(): string[] {
+		return this.slots;
+	}
+
+	getpd(slot: number): PatchDescription | null {
+		return this.pd[slot] ?? null;
+	}
+
+	getPatchParams(slot: number): PatchParamVariation[] | null {
+		return this.patchParamsData[slot] ?? null;
+	}
+
+	writeParameters(areanum: number): void {
+		const area = this.areas[areanum];
+		this.setBits(2, areanum);
+		this.setBits(8, area.nummod || 0);
+		this.setBits(8, area.nummod ? 9 : 0);
+		for (let i = 0; i < area.modules.length; i++) {
+			const m = area.modules[i];
+			if (m.pcnt == 0) continue;
+			this.setBits(8, m.index);
+			this.setBits(7, m.pcnt);
+			for (let v = 0; v < 9; v++) {
+				this.setBits(8, v);
+				for (let p = 0; p < m.pcnt; p++) this.setBits(7, m.lv[v * m.pcnt + p]);
+			}
 		}
-		let rv = (rawData[bitofs >> 3] >> (7 - (bitofs & 7))) & 1;
-		bitofs++;
+		const dataArray = new Int8Array(this.data);
+		dataArray.set(this.setBits(0)!, area.paramaterDataOfs);
+		const ofs = this.ofs;
+		const filedataArray = new Uint8Array(this.data, ofs + 1, this.data.byteLength - ofs - 3);
+		const calcCRC = calcCrc(filedataArray);
+		dataArray.set([Math.floor(calcCRC / 256), calcCRC % 256], this.data.byteLength - 2);
+	}
+
+	getModuleArray(areaIdx: number, basename: string): ModuleInstance[] {
+		const array: ModuleInstance[] = [];
+		let i = 0;
+		let m: ModuleInstance | null;
+		while ((m = this.getModuleByName(areaIdx, basename + i))) {
+			i += 1;
+			array.push(m);
+		}
+		return array;
+	}
+
+	private getBits(numbits: number, initialData?: Uint8Array): number {
+		if (initialData) {
+			this.rawData = initialData;
+			this.bitofs = 0;
+		}
+		let rv = (this.rawData[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1;
+		this.bitofs++;
 		while (numbits > 1) {
-			rv = (rv << 1) | ((rawData[bitofs >> 3] >> (7 - (bitofs & 7))) & 1);
-			bitofs++;
+			rv = (rv << 1) | ((this.rawData[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1);
+			this.bitofs++;
 			numbits--;
 		}
 		return rv;
 	}
 
-	function setBits(numbits: number, byte: number) {
-		if (bitbuf == undefined) bitbuf = [];
+	private setBits(numbits: number, byte?: number): Int8Array | undefined {
 		if (numbits) {
-			for (let bw = 1 << (numbits - 1); bw; bw >>= 1) bitbuf.push(byte & bw ? 1 : 0);
+			for (let bw = 1 << (numbits - 1); bw; bw >>= 1) this.bitbuf.push((byte ?? 0) & bw ? 1 : 0);
 		} else {
-			const bytes = new Int8Array(Math.ceil(bitbuf.length / 8));
-			for (let i = 0; i < bitbuf.length; i++) {
+			const bytes = new Int8Array(Math.ceil(this.bitbuf.length / 8));
+			for (let i = 0; i < this.bitbuf.length; i++) {
 				const bofs = Math.floor(i / 8);
-				if (bitbuf[i]) bytes[bofs] |= Math.pow(2, 7 - (i % 8));
+				if (this.bitbuf[i]) bytes[bofs] |= Math.pow(2, 7 - (i % 8));
 			}
-			bitbuf = [];
+			this.bitbuf = [];
 			return bytes;
 		}
 	}
 
-	function findModule(areaIdx: number, index: number): ModuleInstance | null {
-		for (let i = 0; i < areas[areaIdx].modules.length; i++) {
-			if (areas[areaIdx].modules[i].index == index) return areas[areaIdx].modules[i];
+	private findModule(areaIdx: number, index: number): ModuleInstance | null {
+		for (let i = 0; i < this.areas[areaIdx].modules.length; i++) {
+			if (this.areas[areaIdx].modules[i].index == index) return this.areas[areaIdx].modules[i];
 		}
 		return null;
 	}
 
-	function setModuleName(areaIdx: number, index: number, name: string) {
-		findModule(aof + areaIdx, index)!.uname = name;
+	private setModuleName(areaIdx: number, index: number, name: string): void {
+		this.findModule(this.aof + areaIdx, index)!.uname = name;
 	}
 
-	function parseModuleNames(data: Uint8Array) {
-		const areaIdx = getBits(2, data, 2);
-		getBits(6);
-		const nummod = getBits(8);
+	private parseModuleNames(data: Uint8Array): string {
+		const areaIdx = this.getBits(2, data);
+		this.getBits(6);
+		const nummod = this.getBits(8);
 		let ofs = 2;
 		for (let i = 0; i < nummod; i++) {
 			const index = data[ofs];
@@ -124,24 +219,24 @@ function pch2_(data: ArrayBuffer) {
 			}
 			ofs += j + 1;
 			if (charcode) ofs--;
-			setModuleName(areaIdx, index, str);
+			this.setModuleName(areaIdx, index, str);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
 
-	function parseParamNames(data: Uint8Array) {
-		const areaIdx = getBits(2, data);
-		const nummod = getBits(8);
+	private parseParamNames(data: Uint8Array): string {
+		const areaIdx = this.getBits(2, data);
+		const nummod = this.getBits(8);
 		if (areaIdx > 1) return 'Area=' + areaIdx;
 		for (let i = 0; i < nummod; i++) {
-			const modIdx = getBits(8);
-			const moduleLen = getBits(8);
+			const modIdx = this.getBits(8);
+			const moduleLen = this.getBits(8);
 			const entries: ParamLabel[] = [];
 			let bytesRemaining = moduleLen;
 			while (bytesRemaining > 0) {
-				const isString = getBits(8);
-				const paramLen = getBits(8);
-				const paramIndex = getBits(8);
+				const isString = this.getBits(8);
+				const paramLen = this.getBits(8);
+				const paramIndex = this.getBits(8);
 				bytesRemaining -= 3;
 				const entry: ParamLabel = {
 					paramIndex,
@@ -154,7 +249,7 @@ function pch2_(data: ArrayBuffer) {
 					for (let j = 0; j < labelCount; j++) {
 						let str = '';
 						for (let k = 0; k < 7; k++) {
-							const c = getBits(8);
+							const c = this.getBits(8);
 							if (c) str += String.fromCharCode(c);
 						}
 						entry.labels.push(str);
@@ -164,18 +259,18 @@ function pch2_(data: ArrayBuffer) {
 				entries.push(entry);
 			}
 			if (entries.length > 0) {
-				const m = findModule(aof + areaIdx, modIdx);
+				const m = this.findModule(this.aof + areaIdx, modIdx);
 				if (m) m.paramLabels = entries;
 			}
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
 
-	function parseModuleList(data: Uint8Array) {
-		const areaIdx = getBits(2, data);
-		const nummod = getBits(8);
+	private parseModuleList(data: Uint8Array): string {
+		const areaIdx = this.getBits(2, data);
+		const nummod = this.getBits(8);
 		for (let i = 0; i < nummod; i++) {
-			const modtype = getBits(8);
+			const modtype = this.getBits(8);
 			const modDef = getModule(modtype);
 			if (!modDef) {
 				console.error(`Module type ${modtype} not found in module definitions`);
@@ -184,108 +279,108 @@ function pch2_(data: ArrayBuffer) {
 			const mod: ModuleInstance = Object.create(modDef) as ModuleInstance;
 			mod.pcnt = modDef.params?.length || 0;
 			mod.lv = Array(mod.pcnt * 9);
-			mod.index = getBits(8);
+			mod.index = this.getBits(8);
 			mod.type = modtype;
-			mod.horiz = getBits(7);
-			mod.vert = getBits(7);
-			mod.colour = getBits(8);
-			mod.uprate = getBits(1);
-			mod.leds = getBits(1);
-			getBits(6);
-			const nmodes = getBits(4);
+			mod.horiz = this.getBits(7);
+			mod.vert = this.getBits(7);
+			mod.colour = this.getBits(8);
+			mod.uprate = this.getBits(1);
+			mod.leds = this.getBits(1);
+			this.getBits(6);
+			const nmodes = this.getBits(4);
 			mod.modes = [];
-			for (let j = 0; j < nmodes; j++) mod.modes.push(getBits(6));
-			areas[aof + areaIdx].modules.push(mod);
+			for (let j = 0; j < nmodes; j++) mod.modes.push(this.getBits(6));
+			this.areas[this.aof + areaIdx].modules.push(mod);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
 	}
 
-	function parseTextPad(data: Uint8Array) {
-		textpadlen = data.length;
-		textpadofs = data.byteOffset;
+	private parseTextPad(data: Uint8Array): void {
+		this.textpadlen = data.length;
+		this.textpadofs = data.byteOffset;
 	}
 
-	function parseModuleParameters(data: Uint8Array) {
-		const areaIdx = getBits(2, data);
-		const nummod = getBits(8);
-		const numvar = getBits(8);
+	private parseModuleParameters(data: Uint8Array): string {
+		const areaIdx = this.getBits(2, data);
+		const nummod = this.getBits(8);
+		const numvar = this.getBits(8);
 		if (areaIdx === 2) {
 			const varCount = numvar;
-			const slotIdx = aof >> 1;
+			const slotIdx = this.aof >> 1;
 			const params: PatchParamVariation[] = [];
 			const vp = (v: number): PatchParamVariation => {
 				if (!params[v]) params[v] = { patchVol: 0, activeMuted: 0, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0 };
 				return params[v];
 			};
 			// Section 1: Morphs — consume bits, don't store
-			getBits(8); getBits(7);
+			this.getBits(8); this.getBits(7);
 			for (let i = 0; i < varCount; i++) {
-				getBits(8); // variation
-				for (let j = 0; j < 16; j++) getBits(7); // 8 dials + 8 modes
+				this.getBits(8); // variation
+				for (let j = 0; j < 16; j++) this.getBits(7); // 8 dials + 8 modes
 			}
 			// Section 2: Volume
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).patchVol = getBits(7); vp(v).activeMuted = getBits(7); }
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).patchVol = this.getBits(7); vp(v).activeMuted = this.getBits(7); }
 			// Section 3: Glide
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).glide = getBits(7); vp(v).glideTime = getBits(7); }
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).glide = this.getBits(7); vp(v).glideTime = this.getBits(7); }
 			// Section 4: Bend
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).bend = getBits(7); vp(v).semi = getBits(7); }
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).bend = this.getBits(7); vp(v).semi = this.getBits(7); }
 			// Section 5: Vibrato
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).vibrato = getBits(7); vp(v).cents = getBits(7); vp(v).rate = getBits(7); }
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).vibrato = this.getBits(7); vp(v).cents = this.getBits(7); vp(v).rate = this.getBits(7); }
 			// Section 6: Arp
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).arpeggiator = getBits(7); vp(v).arpTime = getBits(7); vp(v).arpType = getBits(7); vp(v).octaves = getBits(7); }
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).arpeggiator = this.getBits(7); vp(v).arpTime = this.getBits(7); vp(v).arpType = this.getBits(7); vp(v).octaves = this.getBits(7); }
 			// Section 7: Octave shift
-			getBits(8); getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = getBits(8); vp(v).octaveShift = getBits(7); vp(v).sustain = getBits(7); }
-			patchParamsData[slotIdx] = params;
+			this.getBits(8); this.getBits(7);
+			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).octaveShift = this.getBits(7); vp(v).sustain = this.getBits(7); }
+			this.patchParamsData[slotIdx] = params;
 			return 'Patch settings: varCount=' + varCount;
 		}
 		if (areaIdx > 2) return 'Area=' + areaIdx;
-		areas[aof + areaIdx].paramaterDataOfs = data.byteOffset;
-		areas[aof + areaIdx].nummod = nummod;
+		this.areas[this.aof + areaIdx].paramaterDataOfs = data.byteOffset;
+		this.areas[this.aof + areaIdx].nummod = nummod;
 		for (let i = 0; i < nummod; i++) {
-			const index = getBits(8);
-			const m = findModule(aof + areaIdx, index);
+			const index = this.getBits(8);
+			const m = this.findModule(this.aof + areaIdx, index);
 			if (!m) continue;
-			const paramcnt = getBits(7);
+			const paramcnt = this.getBits(7);
 			for (let v = 0; v < numvar; v++) {
-				const variation = getBits(8);
+				const variation = this.getBits(8);
 				for (let p = 0; p < paramcnt; p++) {
-					if (p < m.pcnt) m.lv[variation * m.pcnt + p] = getBits(7);
-					else getBits(7);
+					if (p < m.pcnt) m.lv[variation * m.pcnt + p] = this.getBits(7);
+					else this.getBits(7);
 				}
 			}
 		}
 		return 'Area=' + areaIdx + ':ModuleCount=' + nummod + ':VariationCount=' + numvar;
 	}
 
-	function parseCableList(data: Uint8Array) {
-		const areaIdx = getBits(2, data);
-		getBits(6);
-		const numcab = getBits(16);
+	private parseCableList(data: Uint8Array): string {
+		const areaIdx = this.getBits(2, data);
+		this.getBits(6);
+		const numcab = this.getBits(16);
 		if (areaIdx > 1) return 'Patch settings, whatever';
-		areas[aof + areaIdx].numcab = numcab;
+		this.areas[this.aof + areaIdx].numcab = numcab;
 		const cableList: Cable[] = [];
 		for (let i = 0; i < numcab; i++) {
 			const cable: Cable = {
-				colour: getBits(3),
-				smod: getBits(8),
-				scon: getBits(6),
-				dir: getBits(1),
-				dmod: getBits(8),
-				dcon: getBits(6),
+				colour: this.getBits(3),
+				smod: this.getBits(8),
+				scon: this.getBits(6),
+				dir: this.getBits(1),
+				dmod: this.getBits(8),
+				dcon: this.getBits(6),
 			};
 			cableList.push(cable);
 		}
-		areas[aof + areaIdx].cableList = cableList;
+		this.areas[this.aof + areaIdx].cableList = cableList;
 		return 'Area=' + areaIdx + ':CableCount=' + numcab;
 	}
 
-	function parsePrfData(data: Uint8Array) {
+	private parsePrfData(data: Uint8Array): void {
 		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
 		let ofs = 8;
 		const slotNames: string[] = [];
@@ -296,14 +391,11 @@ function pch2_(data: ArrayBuffer) {
 			ofs += 10; // skip extra slot data
 			slotNames.push(str);
 		}
-		slots.length = 0;
-		slots.push(...slotNames);
+		this.slots.length = 0;
+		this.slots.push(...slotNames);
 	}
 
-	this.isPrf2 = (): string[] => slots;
-
-	const pd: (PatchDescription | null)[] = [];
-	function parsePatchDesc(data: Uint8Array) {
+	private parsePatchDesc(data: Uint8Array): void {
 		const description_attrs: Record<string, number> = {
 			voices: 5,
 			height: 14,
@@ -319,95 +411,15 @@ function pch2_(data: ArrayBuffer) {
 			variation: 8,
 			category: 8,
 		};
-		getBits(7 * 8 + 5, data);
-		for (const a in description_attrs) description_attrs[a] = getBits(description_attrs[a]);
-		pd[aof >> 1] = description_attrs as PatchDescription;
+		this.getBits(7 * 8 + 5, data);
+		for (const a in description_attrs) description_attrs[a] = this.getBits(description_attrs[a]);
+		this.pd[this.aof >> 1] = description_attrs as unknown as PatchDescription;
 	}
 
-	this.getpd = (slot: number) => pd[slot];
-
-	this.getPatchParams = (slot: number) => patchParamsData[slot] ?? null;
-
-	this.writeParameters = (areanum: number) => {
-		const area = areas[areanum];
-		setBits(2, areanum);
-		setBits(8, area.nummod || 0);
-		setBits(8, area.nummod ? 9 : 0);
-		for (let i = 0; i < area.modules.length; i++) {
-			const m = area.modules[i];
-			if (m.pcnt == 0) continue;
-			setBits(8, m.index);
-			setBits(7, m.pcnt);
-			for (let v = 0; v < 9; v++) {
-				setBits(8, v);
-				for (let p = 0; p < m.pcnt; p++) setBits(7, m.lv[v * m.pcnt + p]);
-			}
-		}
-		const dataArray = new Int8Array(self.data);
-		dataArray.set(setBits(0) as Int8Array, area.paramaterDataOfs);
-		const ofs = this.ofs;
-		const filedataArray = new Uint8Array(self.data, ofs + 1, dataArray.byteLength - ofs - 3);
-		const calcCRC = calcCrc(filedataArray);
-		dataArray.set([Math.floor(calcCRC / 256), calcCRC % 256], self.data.byteLength - 2);
-	};
-
-	function getModuleByName(areaIdx: number, name: string): ModuleInstance | null {
-		for (let i = 0; i < areas[areaIdx].modules.length; i++) if (areas[areaIdx].modules[i].uname == name) return areas[areaIdx].modules[i];
+	private getModuleByName(areaIdx: number, name: string): ModuleInstance | null {
+		for (let i = 0; i < this.areas[areaIdx].modules.length; i++) if (this.areas[areaIdx].modules[i].uname == name) return this.areas[areaIdx].modules[i];
 		return null;
 	}
-
-	this.getModuleArray = (areaIdx: number, basename: string): ModuleInstance[] => {
-		const array: ModuleInstance[] = [];
-		let i = 0;
-		let m: ModuleInstance | null;
-		while ((m = getModuleByName(areaIdx, basename + i))) {
-			i += 1;
-			array.push(m);
-		}
-		return array;
-	};
-
-	const g2section: Record<number, [string, (data: Uint8Array) => string | undefined]> = {
-		[SectionType.PATCH_DESC]: ['Patch Description', parsePatchDesc],
-		[SectionType.MODULE_NAMES]: ['Module Names', parseModuleNames],
-		[SectionType.MODULE_LIST]: ['Module List', parseModuleList],
-		[SectionType.SEPARATOR]: ['Text Pad', parseTextPad],
-		[SectionType.PERF_DATA]: ['Perf data', parsePrfData],
-		[SectionType.CABLE_LIST]: ['Cable List', parseCableList],
-		[SectionType.PARAMETERS]: ['Parameters', parseModuleParameters],
-		[SectionType.PARAM_NAMES]: ['Param Names', parseParamNames],
-	};
-
-	const hdr = new Uint8Array(data, 0, 320);
-	const str = String.fromCharCode.apply(null, hdr as unknown as number[]);
-	let ofs = str.indexOf('\0');
-	const textHdrLen = ofs + 3;
-	const fileCRC = new DataView(data).getInt16(data.byteLength - 2) & 0xffff;
-	const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
-	this.ofs = ofs;
-	const filedataArray = new Uint8Array(data, ofs + 1, data.byteLength - ofs - 3);
-	if (fileCRC !== calcCrc(filedataArray)) {
-		console.warn('PCH2 WARNING: CRC mismatch');
-	}
-
-	const maxofs = filedata.byteLength;
-	ofs = 0;
-	while (ofs < maxofs) {
-		const type = filedata.getInt8(ofs);
-		const siz = filedata.getInt16(ofs + 1);
-		if (type in g2section) {
-			g2section[type][1]?.(new Int8Array(data, textHdrLen + ofs + 3, siz));
-		}
-		ofs += siz + 3;
-		if (type == SectionType.SEPARATOR) {
-			if (ofs < maxofs) {
-				areas.push(new Area('fx'));
-				areas.push(new Area('voice'));
-				aof += 2;
-			}
-		}
-	}
-	return this;
 }
 
 const crctab = [
@@ -434,16 +446,16 @@ function calcCrc(data: Uint8Array): number {
 }
 
 export class PatchParser {
-	private patcher: ReturnType<typeof pch2_>;
+	private patcher: G2Parser;
 
 	constructor(buffer: ArrayBuffer) {
-		this.patcher = new pch2_(buffer) as unknown as ReturnType<typeof pch2_>;
+		this.patcher = new G2Parser(buffer);
 	}
 
 	parse(): Patch {
 		return {
-			areas: [this.patcher.getArea(0) as Area, this.patcher.getArea(1) as Area],
-			description: this.patcher.getpd(0),
+			areas: [this.patcher.getArea(0), this.patcher.getArea(1)],
+			description: this.patcher.getpd(0) ?? undefined,
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 		};
 	}
@@ -454,8 +466,8 @@ export class PatchParser {
 		return {
 			slotNames,
 			patches: [0, 1, 2, 3].map((slot) => ({
-				areas: [this.patcher.getArea(slot * 2) as Area, this.patcher.getArea(slot * 2 + 1) as Area],
-				description: this.patcher.getpd(slot),
+				areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
+				description: this.patcher.getpd(slot) ?? undefined,
 				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
 			})),
 		};
