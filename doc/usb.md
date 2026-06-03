@@ -246,17 +246,44 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 
 ### SELECT_SLOT command
 
-Selecting a slot requires a single performance-level system command:
+There are two distinct slot-selection paths depending on whether the target slot is already active:
 
-```
-[01][2C][perf_version][09][slot][CRC]
-```
+#### Simple focus — `g2_select_slot` (target slot already active)
 
-The `perf_version` byte comes from GET_PATCH_VERSION with slot=4. Drain pending notifications (`g2_drain_pending`) after sending to consume the `slot_change` / `assigned_voices` responses the G2 emits.
+1. GET_PATCH_VERSION with slot=4 → `perf_version`
+2. Send `[01][2C][perf_version][09][slot][CRC]`
+3. Drain pending notifications (`g2_drain_pending`) to consume `slot_change` / `assigned_voices`
+
+#### Full activate-then-focus — `g2_switch_slot` (target slot inactive)
+
+Use this when the target slot needs to be activated before focusing. Steps:
+
+1. **UNKNOWN_1** (`send_system(0x41, 0x81)`) → extended bulk → `perf_version = selsData[2]`
+2. **GET_PERF_SETTINGS** (`send_system(perf_version, 0x10)`) → extended bulk (`perfData`) containing current slot active/key/focus state
+3. **Parse perfData** to find per-slot active/key offsets and the currently-focused slot:
+   ```
+   perfData+4  → perf name (null-terminated)  → remaining
+   remaining[0]  = 0x11 (C_PERF_SETTINGS chunk type)
+   remaining[4] >> 2 & 0x3  = focused_slot_index
+   remaining+11 → slot 0: name(variable) + 10 bytes
+     [+0] active  (0/1)
+     [+1] key     (0/1)
+     [+2..9] hold, bank, patch, rangeLow, rangeHigh, padding
+   Subsequent slots follow immediately
+   ```
+4. **Modify perfData in-memory:**
+   - `target_slot.active = 1`, `target_slot.key = 1`
+   - `focused_slot.active = 0`, `focused_slot.key = 0` (if focused ≠ target)
+5. **SET_PERF_SETTINGS** — send the chunk starting at the `0x11` byte using `perf_version` as cmd_id: `[0x11][sizeHi][sizeLo][80 bytes]`; drain ACK
+6. **SELECT_SLOT** — `[01][2C][0x41][09][slot][CRC]` — **use `0x41`, NOT `perf_version`** (see gotcha below)
+
+> **Gotcha — SELECT_SLOT cmd_id after SET_PERF_SETTINGS in daemon mode:** In daemon mode, a `perf_settings_update` message sits in the listener queue immediately after the SET_PERF_SETTINGS ACK. If you query GET_PATCH_VERSION before SELECT_SLOT, `recv_interrupt()` pops `perf_settings_update` instead of the version response, leaving the version response orphaned as a spurious event. The Delphi reference editor never queries GET_PATCH_VERSION before SELECT_SLOT — `0x41` is accepted unconditionally by the G2 for this command.
 
 > **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
 
-> **CLI note:** `g2_select_slot` uses the perf version obtained via GET_PATCH_VERSION with slot=4.
+#### Single-field slot updates — `set-slot-enabled` / `set-slot-key`
+
+Setting only the `active` or `key` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step.
 
 ---
 

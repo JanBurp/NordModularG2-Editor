@@ -47,9 +47,16 @@ static void print_usage(const char *prog) {
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
     printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
     printf("  set-perf-name <name>                                                                      Set the current performance name\n");
+    printf("  get-perf-settings                                                                         Get current performance settings\n");
+    printf("  set-patch-name <slot> <name>                                                              Set patch name for a slot\n");
+    printf("  set-patch-description <slot> <hexdata>                                                    Set patch description (hex-encoded binary)\n");
+    printf("  set-master-clock-run <0|1>                                                                Start (1) or stop (0) the master clock\n");
+    printf("  set-master-clock-bpm <30-240>                                                             Set master clock BPM\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
-    printf("  slot <A|B|C|D>                                                                            Change active slot\n");
+    printf("  slot <A|B|C|D>                                                                            Change active slot (activates if inactive)\n");
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
+    printf("  set-slot-enabled <slot> <0|1>                                                             Enable or disable a slot\n");
+    printf("  set-slot-key <slot> <0|1>                                                                 Assign or unassign keyboard to a slot\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>              Delete a cable\n");
     printf("  set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Set color of an existing cable\n");
@@ -271,7 +278,7 @@ static int cmd_slot(int argc, char **argv, int i) {
             fprintf(stderr, "Error: slot required (A, B, C, or D)\n");
         return 1;
     }
-    return g2_select_slot(argv[i + 1]);
+    return g2_switch_slot(argv[i + 1]);
 }
 
 static int cmd_variation(int argc, char **argv, int i) {
@@ -477,6 +484,77 @@ static int cmd_set_param(int argc, char **argv, int i) {
     return g2_set_param(slot, location, mod_id, param, val, var);
 }
 
+static int cmd_get_perf_settings(int argc, char **argv, int i) {
+    (void)argc; (void)argv; (void)i;
+    cJSON *synth = query_synth_settings(NULL);
+    int mode = 0;
+    if (synth) {
+        cJSON *m = cJSON_GetObjectItem(synth, "mode");
+        mode = (m && cJSON_IsString(m) && strcmp(m->valuestring, "Performance") == 0);
+        cJSON_Delete(synth);
+    }
+    cJSON *result = query_perf_settings(mode, NULL);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get performance settings", output_format);
+        else
+            fprintf(stderr, "Failed to get performance settings\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
+static int cmd_set_patch_name(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-name <slot> <name>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-name: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_patch_name(slot, argv[i + 2]);
+}
+
+static int cmd_set_master_clock_run(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-master-clock-run <0|1>\n"); return 1; }
+    return g2_set_master_clock_run(atoi(argv[i + 1]));
+}
+
+static int cmd_set_master_clock_bpm(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-master-clock-bpm <30-240>\n"); return 1; }
+    return g2_set_master_clock_bpm(atoi(argv[i + 1]));
+}
+
+static int cmd_set_slot_enabled(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-enabled <slot> <0|1>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-enabled: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_enabled(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_set_slot_key(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-key <slot> <0|1>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-key: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_key(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_set_patch_description(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-description <slot> <hexdata>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-description: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    const char *hex = argv[i + 2];
+    int hexlen = (int)strlen(hex);
+    int nbytes = hexlen / 2;
+    uint8_t *data = malloc(nbytes);
+    if (!data) { fprintf(stderr, "set-patch-description: out of memory\n"); return 1; }
+    for (int j = 0; j < nbytes; j++) {
+        char buf[3] = { hex[j*2], hex[j*2+1], 0 };
+        data[j] = (uint8_t)strtol(buf, NULL, 16);
+    }
+    int ret = g2_set_patch_description(slot, data, nbytes);
+    free(data);
+    return ret;
+}
+
 static int cmd_select_patch(int argc, char **argv, int i) {
     if (i + 3 >= argc) {
         fprintf(stderr, "Usage: select-patch <slot> <bank:1-32> <location:1-127>\n");
@@ -605,9 +683,16 @@ static const cmd_entry_t commands[] = {
     { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },
     { "upload-perf",      cmd_upload_perf      },
-    { "set-perf-mode",    cmd_set_perf_mode    },
-    { "set-perf-name",    cmd_set_perf_name    },
-    { "daemon",           cmd_daemon           },
+    { "set-perf-mode",         cmd_set_perf_mode         },
+    { "set-perf-name",         cmd_set_perf_name         },
+    { "get-perf-settings",     cmd_get_perf_settings     },
+    { "set-patch-name",        cmd_set_patch_name        },
+    { "set-patch-description", cmd_set_patch_description },
+    { "set-master-clock-run",  cmd_set_master_clock_run  },
+    { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
+    { "set-slot-enabled",      cmd_set_slot_enabled      },
+    { "set-slot-key",          cmd_set_slot_key          },
+    { "daemon",                cmd_daemon                },
     { "seq",              cmd_seq              },
     { NULL, NULL }
 };
