@@ -1851,8 +1851,8 @@ int g2_set_param(int slot, int location, int module_id,
 }
 
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
- * compound 57-byte packet matching the resources_used watch event format:
- * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
+ * plain JSON array matching the "data" field of the resources_used watch event:
+ * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).
  * Falls back to FX-only (28 bytes) if the VA query fails. */
 cJSON *g2_get_resources(const char *slot_str) {
     uint8_t interruptResp[16] = {0};
@@ -1891,7 +1891,6 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (fxRet < 6) { free(fxBulk); g2_err("Failed to read resources FX bulk\n"); return NULL; }
     int fxDataEnd = fxRet - 2;  /* strip 2-byte CRC */
 
-    cJSON *result = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateArray();
 
     /* Query VA area (loc=1) and build compound packet if successful */
@@ -1915,8 +1914,7 @@ cJSON *g2_get_resources(const char *slot_str) {
                             cJSON_AddItemToArray(arr, cJSON_CreateNumber(vaBulk[i]));
                         free(vaBulk);
                         free(fxBulk);
-                        cJSON_AddItemToObject(result, "bytes", arr);
-                        return result;
+                        return arr;
                     }
                     free(vaBulk);
                 }
@@ -1927,9 +1925,8 @@ cJSON *g2_get_resources(const char *slot_str) {
     /* Fall back: return FX data only */
     for (int i = 4; i < fxDataEnd; i++)
         cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
-    cJSON_AddItemToObject(result, "bytes", arr);
     free(fxBulk);
-    return result;
+    return arr;
 }
 
 /* Read the current perf settings, patch one byte for the target slot, and
