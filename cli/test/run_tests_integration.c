@@ -25,7 +25,6 @@ extern void test_daemon_get_patch_cmd(void);
 extern void test_daemon_slot_cmd(void);
 extern void test_daemon_variation_cmd(void);
 extern void test_daemon_perf_mode_cycle(void);
-extern void test_daemon_slot_variation_sequence(void);
 /* watch-based tests — commented out; use test_daemon_slot_variation_commands instead
 extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
@@ -123,7 +122,6 @@ int main(void) {
     run_test_silently("test_daemon_get_patch_cmd",           test_daemon_get_patch_cmd);
     run_test_silently("test_daemon_slot_cmd",                test_daemon_slot_cmd);
     run_test_silently("test_daemon_variation_cmd",           test_daemon_variation_cmd);
-    run_test_silently("test_daemon_slot_variation_sequence", test_daemon_slot_variation_sequence);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.

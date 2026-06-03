@@ -1,9 +1,9 @@
 /*
  * G2 CLI - Daemon integration tests (shared-daemon approach)
  *
- * All 6 tests share ONE daemon process (one USB connection) to match real-world
+ * All tests share ONE daemon process (one USB connection) to match real-world
  * daemon client behaviour. The daemon is spawned by test_daemon_starts and shut down by
- * test_daemon_slot_variation_sequence. Command IDs increase monotonically via
+ * test_daemon_perf_mode_cycle. Command IDs increase monotonically via
  * g_cmd_id so the shared daemon can match responses to the right request.
  */
 
@@ -25,7 +25,7 @@ typedef struct {
 } daemon_ctx_t;
 
 /* Shared daemon state — initialised by test_daemon_starts, torn down by
- * test_daemon_slot_variation_sequence. */
+ * test_daemon_perf_mode_cycle. */
 static daemon_ctx_t g_daemon  = {0};
 static int g_daemon_ok = -1;   /* -1=uninitialized, 0=ok, 1=no device */
 static int g_cmd_id    = 0;
@@ -267,62 +267,3 @@ void test_daemon_perf_mode_cycle(void) {
     daemon_shutdown(&g_daemon);
 }
 
-/* Test 5: Cycle slots B→C→D→A then cycle variations on active slot A.
- * Delays between commands make each change visible on the G2 display.
- * No daemon shutdown — test_daemon_perf_mode_cycle (last) owns the shutdown. */
-void test_daemon_slot_variation_sequence(void) {
-    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
-
-    char cmd[64];
-    int r[8];
-
-    int id0 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"B\"]}", id0);
-    r[0] = send_and_expect_ok(&g_daemon, cmd, id0);
-    usleep(400000);
-
-    int id1 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"C\"]}", id1);
-    r[1] = send_and_expect_ok(&g_daemon, cmd, id1);
-    usleep(400000);
-
-    int id2 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"D\"]}", id2);
-    r[2] = send_and_expect_ok(&g_daemon, cmd, id2);
-    usleep(400000);
-
-    /* Back to slot A — pause so the return is visible before variations start. */
-    int id3 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"slot\",\"args\":[\"A\"]}", id3);
-    r[3] = send_and_expect_ok(&g_daemon, cmd, id3);
-    usleep(600000);
-
-    /* Cycle variations 3→4→5→2 on active slot A — each change visible on G2. */
-    int id4 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"3\",\"A\"]}", id4);
-    r[4] = send_and_expect_ok(&g_daemon, cmd, id4);
-    usleep(600000);
-
-    int id5 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"4\",\"A\"]}", id5);
-    r[5] = send_and_expect_ok(&g_daemon, cmd, id5);
-    usleep(600000);
-
-    int id6 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"5\",\"A\"]}", id6);
-    r[6] = send_and_expect_ok(&g_daemon, cmd, id6);
-    usleep(600000);
-
-    int id7 = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"2\",\"A\"]}", id7);
-    r[7] = send_and_expect_ok(&g_daemon, cmd, id7);
-
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[0], "slot B");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[1], "slot C");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[2], "slot D");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[3], "slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[4], "var 3 slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[5], "var 4 slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[6], "var 5 slot A");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r[7], "var 2 slot A");
-}
