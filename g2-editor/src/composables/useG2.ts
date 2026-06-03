@@ -110,8 +110,8 @@ export function useG2() {
 		try {
 			await store.connect();
 			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
-			const activeSlot = store.device?.slots.find((s) => s.active)?.slot ?? null;
-			if (activeSlot) slotEvents.fetchSlotResources(activeSlot);
+			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
+			for (const slot of activeSlots) slotEvents.fetchSlotResources(slot);
 		} catch (e: any) {
 			store.status = 'disconnected';
 			log('←', 'Connect', `G2 not found: ${e.message}`);
