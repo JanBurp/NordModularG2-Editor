@@ -177,16 +177,8 @@ static void execute_cmd(const char *line) {
 
 	if (strcmp(cmd, "slot") == 0 && n >= 1) {
 		ret = g2_select_slot(arg_s(args, 0));
-		/* 0x09 alone (Delphi approach) doesn't trigger G2 notifications,
-		 * so emit slot_change synthetically when the command succeeds. */
-		if (ret == G2_OK) {
-			int slot = parse_slot(arg_s(args, 0));
-			if (slot >= 0 && slot <= 3) {
-				static const char *sn[] = {"A","B","C","D"};
-				printf("{\"type\":\"slot_change\",\"slot\":\"%s\"}\n", sn[slot]);
-				fflush(stdout);
-			}
-		}
+		/* G2 emits slot_change + assigned_voices after SELECT_SLOT (0x09);
+		 * listener thread queues them and the watch loop emits them. */
 
 	} else if (strcmp(cmd, "variation") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 1));
