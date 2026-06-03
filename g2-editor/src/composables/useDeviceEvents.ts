@@ -29,11 +29,14 @@ export function useDeviceEvents(log: LogFn) {
 			if (prevMode && ev.mode !== prevMode) store.modeChanging = true;
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
-				await Promise.all(
+				const results = await Promise.allSettled(
 					ev.patches
 						.filter((p: any) => p?.data)
 						.map((p: any) => slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p))),
 				);
+				results.forEach((r, i) => {
+					if (r.status === 'rejected') console.error(`Watch: patch load failed for index ${i}:`, r.reason);
+				});
 			} else if (prevMode && ev.mode !== prevMode) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
