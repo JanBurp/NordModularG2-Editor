@@ -311,7 +311,7 @@ static int cmd_add_cable(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "add-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int color    = atoi(argv[i + 3]);
     int from_mod = atoi(argv[i + 4]);
     int from_ct  = atoi(argv[i + 5]);
@@ -329,7 +329,7 @@ static int cmd_del_cable(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "del-cable: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int from_mod = atoi(argv[i + 3]);
     int from_ct  = atoi(argv[i + 4]);
     int from_con = atoi(argv[i + 5]);
@@ -346,7 +346,7 @@ static int cmd_set_cable_color(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-cable-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int color    = atoi(argv[i + 3]);
     int from_mod = atoi(argv[i + 4]);
     int from_ct  = atoi(argv[i + 5]);
@@ -364,7 +364,7 @@ static int cmd_del_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "del-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     return g2_del_module(slot, location, module_id);
 }
@@ -376,7 +376,7 @@ static int cmd_move_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "move-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int col       = atoi(argv[i + 4]);
     int row       = atoi(argv[i + 5]);
@@ -391,7 +391,7 @@ static int cmd_add_module(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "add-module: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int type_id   = atoi(argv[i + 3]);
     int module_id = atoi(argv[i + 4]);
     int col       = atoi(argv[i + 5]);
@@ -423,7 +423,7 @@ static int cmd_set_module_color(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-color: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int color     = atoi(argv[i + 4]);
     return g2_set_module_color(slot, location, module_id, color);
@@ -436,7 +436,7 @@ static int cmd_set_module_name(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-name: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     return g2_set_module_label(slot, location, module_id, argv[i + 4]);
 }
@@ -448,7 +448,7 @@ static int cmd_set_param_label(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param-label: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int param_idx = atoi(argv[i + 4]);
     int label_idx = atoi(argv[i + 5]);
@@ -462,7 +462,7 @@ static int cmd_set_module_mode(int argc, char **argv, int i) {
     }
     int slot      = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-mode: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = (strcmp(argv[i + 2], "va") == 0) ? 1 : 0;
+    int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int param     = atoi(argv[i + 4]);
     int val       = atoi(argv[i + 5]);
@@ -476,7 +476,7 @@ static int cmd_set_param(int argc, char **argv, int i) {
     }
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-param: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location = (strcmp(argv[i + 2], "va") == 0) ? 1 : (strcmp(argv[i + 2], "patch") == 0) ? 2 : 0;
+    int location = parse_location_str(argv[i + 2]);
     int mod_id   = atoi(argv[i + 3]);
     int param    = atoi(argv[i + 4]);
     int val      = atoi(argv[i + 5]);
@@ -541,15 +541,9 @@ static int cmd_set_patch_description(int argc, char **argv, int i) {
     if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-description <slot> <hexdata>\n"); return 1; }
     int slot = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-description: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    const char *hex = argv[i + 2];
-    int hexlen = (int)strlen(hex);
-    int nbytes = hexlen / 2;
-    uint8_t *data = malloc(nbytes);
-    if (!data) { fprintf(stderr, "set-patch-description: out of memory\n"); return 1; }
-    for (int j = 0; j < nbytes; j++) {
-        char buf[3] = { hex[j*2], hex[j*2+1], 0 };
-        data[j] = (uint8_t)strtol(buf, NULL, 16);
-    }
+    uint8_t *data;
+    int nbytes = hex_to_bytes(argv[i + 2], &data);
+    if (nbytes < 0) { fprintf(stderr, "set-patch-description: out of memory\n"); return 1; }
     int ret = g2_set_patch_description(slot, data, nbytes);
     free(data);
     return ret;

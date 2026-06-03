@@ -123,8 +123,7 @@ static int arg_count(cJSON *args) {
 }
 
 static int parse_location(cJSON *args, int idx) {
-	const char *s = arg_s(args, idx);
-	return (s && strcmp(s, "va") == 0) ? 1 : (s && strcmp(s, "patch") == 0) ? 2 : 0;
+	return parse_location_str(arg_s(args, idx));
 }
 
 /* ── debug helpers ─────────────────────────────────────────────────────── */
@@ -133,6 +132,12 @@ static void debug_status(const char *msg) {
 	if (!g2_debug) return;
 	printf("{\"debug\":\"status\",\"msg\":\"%s\"}\n", msg);
 	fflush(stdout);
+}
+
+static void rearm_with_version_update(void) {
+	printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
+	fflush(stdout);
+	g2_rearm();
 }
 
 /* ── command execution ─────────────────────────────────────────────────── */
@@ -300,9 +305,7 @@ static void execute_cmd(const char *line) {
 					g2_msg_free(&msg);
 					if (rearm) {
 						g2_pending_rearm = 0;
-						printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
-						fflush(stdout);
-						g2_rearm();
+						rearm_with_version_update();
 						break;
 					}
 					if (disc) { ret = G2_ERR_CONNECT; break; }
@@ -350,16 +353,14 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) { ret = G2_ERR_INVALID_PARAM; }
 		else {
-			const char *hex = arg_s(args, 1);
-			int hexlen = (int)strlen(hex);
-			int nbytes = hexlen / 2;
-			uint8_t *descdata = malloc(nbytes);
-			for (int i = 0; i < nbytes; i++) {
-				char buf[3] = { hex[i*2], hex[i*2+1], 0 };
-				descdata[i] = (uint8_t)strtol(buf, NULL, 16);
+			uint8_t *descdata;
+			int nbytes = hex_to_bytes(arg_s(args, 1), &descdata);
+			if (nbytes >= 0) {
+				ret = g2_set_patch_description(slot, descdata, nbytes);
+				free(descdata);
+			} else {
+				ret = G2_ERR_NO_MEMORY;
 			}
-			ret = g2_set_patch_description(slot, descdata, nbytes);
-			free(descdata);
 		}
 
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
@@ -554,9 +555,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 			 * of discarding it silently.  Re-arm streaming now. */
 			if (g2_pending_rearm) {
 				g2_pending_rearm = 0;
-				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
-				fflush(stdout);
-				g2_rearm();
+				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
 			continue;
@@ -578,18 +577,14 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_msg_free(&msg);
 			if (g2_pending_rearm) {
 				g2_pending_rearm = 0;
-				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
-				fflush(stdout);
-				g2_rearm();
+				rearm_with_version_update();
 			}
 		} else {
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
 			if (g2_pending_rearm) {
 				g2_pending_rearm = 0;
-				printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
-				fflush(stdout);
-				g2_rearm();
+				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
 		}
