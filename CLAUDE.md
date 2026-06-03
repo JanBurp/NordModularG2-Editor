@@ -1,76 +1,38 @@
 # CLAUDE.md
 
 ## Project Context
-Editor for the Nord Modular G2 synthesizer. USB communication layer in C. And an electronjs (VueJS, TypeScript) frontend. Changes often need to flow across all layers.
-
-## Coding And behavioral guidelines to reduce LLM coding mistakes
+Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + TypeScript) frontend. Changes often flow across all layers.
 
 ## Workflow Discipline
-- When fixing a specific bug, stay focused on the file/command mentioned. Do NOT explore unrelated files unless the user explicitly asks.
-- For code review requests, ask whether to review a specific commit, branch range, or working tree before starting.
+- Bug fixes: stay focused on the file/command mentioned. Don't explore unrelated files.
+- Code review: clarify scope (commit, branch range, or working tree) before starting.
+- After multi-file TypeScript edits: run `npm run typecheck` before reporting success.
 
-## Verification Before Done
-- Always run `npm run typecheck` (or equivalent) after multi-file TypeScript edits before reporting success.
+## Coding Guidelines
 
 ### 1. Think Before Coding
-
-**Don't assume. Don't hide confusion. Surface tradeoffs.**
-
-Before implementing:
-- State your assumptions explicitly. If uncertain, ask.
-- If multiple interpretations exist, present them - don't pick silently.
-- If a simpler approach exists, say so. Push back when warranted.
-- If something is unclear, stop. Name what's confusing. Ask. Even when user makes typos.
+- State assumptions explicitly. If uncertain or multiple interpretations exist, ask.
+- If something is unclear, name it and ask — even for typos.
 
 ### 2. Simplicity First
-
-**Minimum code that solves the problem. Nothing speculative.**
-
-- No features beyond what was asked.
-- No "flexibility" or "configurability" that wasn't requested.
-- No error handling for impossible scenarios.
+- Minimum code that solves the problem. Nothing speculative.
+- No features, flexibility, or error handling beyond what was asked.
 - If you write 200 lines and it could be 50, rewrite it.
 
 ### 3. Surgical Changes
-
-**Touch only what you must.**
-
-When editing existing code:
-- If you see code that could be improved (simpler, less code), don't change, metion it.
-- Match existing style, even if you'd do it differently.
-- If you notice unrelated dead code, mention it - don't delete it.
-- If you notice code that could be simpler or more abstracted, mention it.
-
-When your changes create orphans:
-- Remove imports/variables/functions that YOUR changes made unused.
-- Don't remove pre-existing dead code, only mention it.
-
-The test: Every changed line should trace directly to the user's request.
+- Touch only what the task requires. Match existing style.
+- Mention (don't fix) unrelated improvements, dead code, or simplification opportunities you notice.
+- Remove imports/variables YOUR changes made unused; leave pre-existing dead code alone.
 
 ### 4. Goal-Driven Execution
-
-**Define success criteria. Loop until verified.**
-
-Transform tasks into verifiable goals:
-- "Add validation" → "Write tests for invalid inputs, then make them pass"
-- "Fix the bug" → "Write a test that reproduces it, then make it pass"
-- "Refactor X" → "Ensure tests pass before and after"
-
-For multi-step tasks, state a brief plan:
-```
-1. [Step] → verify: [check]
-2. [Step] → verify: [check]
-3. [Step] → verify: [check]
-```
-
-Strong success criteria let you loop independently. Weak criteria ("make it work") require constant clarification.
+- For multi-step tasks, state a brief plan with verify steps before starting.
+- Loop until criteria are met. Avoid weak criteria like "make it work".
 
 ## Repository Structure
-
 - `cli/` — C CLI tool for USB communication with the Nord G2 hardware
 - `g2-editor/` — Electron desktop app (Vue 3 + TypeScript)
 - `test-patches/` — Sample `.pch2` patch files for testing
-- `doc` - For architecural documentation
+- `doc/` — Architectural documentation
 
 ## Commands
 
@@ -79,29 +41,22 @@ Strong success criteria let you loop independently. Weak criteria ("make it work
 cd cli && make          # build
 cd cli && make test     # run tests
 ./cli/build/bin/g2-cli --help
+cd cli && ./g2tmux.sh   # tmux split: daemon output + command shell (recommended)
 ```
-
-**Interactive daemon use (recommended):**
-```bash
-cd cli && ./g2tmux.sh   # tmux split: left = daemon output, right = command shell
-```
-Right pane: type commands directly (`get-patch A`, `variation 4 B`, `stop`, `start`, etc.) with TAB autocomplete. See README.md for examples.
 
 ### Electron GUI
 ```bash
-cd g2-editor
-npm install
+cd g2-editor && npm install
 cd ../cli && make && cd ../g2-editor   # rebuild CLI first
 npm run postinstall     # copies CLI binary into Electron app
 npm run dev             # development server
 npm run build           # production build + package
-npm run preview         # preview production build
-npm test                # run Vitest unit tests
+npm test                # Vitest unit tests
 ```
-The `@/` path alias resolves to `g2-editor/src/`.
+`@/` resolves to `g2-editor/src/`.
 
-### State & Business Logic
-State lives in **Pinia stores** (`src/store/`). Stores are the single source of truth.
+## State & Business Logic
+Pinia stores (`src/store/`) are the single source of truth.
 
 | Store | File | Purpose |
 |-------|------|---------|
@@ -111,7 +66,7 @@ State lives in **Pinia stores** (`src/store/`). Stores are the single source of 
 | browser | `browser.ts` | Patch browser state, synth patches, performances, disk nav |
 
 ### Key Composables (`src/composables/`)
-- `useG2.ts` — main device connection/startup/status polling
+- `useG2.ts` — device connection/startup/status polling
 - `usePatchFile.ts` — file load/save via IPC bridge
 - `useJackPatching.ts` — cable add/delete logic
 - `useCableVisibility.ts` — cable filtering/visibility
@@ -120,22 +75,22 @@ State lives in **Pinia stores** (`src/store/`). Stores are the single source of 
 ### Parser & Mutations (`src/parser/`)
 - `nmg2PatchParser.ts` — parses `.pch2` binary format into JS objects
 - `nmg2PatchSerializer.ts` — serializes patches back to binary
-- `patchMutations.ts` — immutable patch mutations (add/delete/move modules & cables, set color/label)
+- `patchMutations.ts` — immutable mutations (add/delete/move modules & cables, set color/label)
 - `g2usb.ts` — USB protocol abstraction
 
 ### Renderer Data (`src/renderer/`)
-- `nmg2mods.ts` — complete module definition database (200+ modules, ~162KB)
+- `nmg2mods.ts` — module definition database (200+ modules, ~162KB)
 - `parammap.ts` — parameter metadata mappings
 - `moduleRenderer.ts` / `cableRenderer.ts` — SVG rendering logic
 
 ### Components (`src/components/`)
-- `canvas/` — `PatchCanvas.vue`, `Module.vue`, `ModuleKnob`, `ModuleSlider`, `ModuleSwitch`, `ModuleJack`, `ModuleVe*` visual elements
+- `canvas/` — `PatchCanvas.vue`, `Module.vue`, knob/slider/switch/jack/visual elements
 - `panels/` — `SidePanel.vue`, `ModulesPane.vue`, `PatchBrowser.vue`
 - `toolbar/` — `ToolBar.vue`, `StatusBar.vue`, `Button.vue`, `BtnGroup.vue`
-- `common/` — `ColorPicker.vue`, `TreeNode.vue`, `Dialog.vue` (generic modal: title, slot, OK/Cancel, ESC/Enter)
+- `common/` — `ColorPicker.vue`, `TreeNode.vue`, `Dialog.vue` (title, slot, OK/Cancel, ESC/Enter)
 
 ### Styling
-Tailwind CSS v4 (via `@tailwindcss/vite` plugin). Global styles in `src/style.css`. No separate Tailwind config file — configuration is done in CSS. Use only inline classes when it is unique. Otherwise add class to `src/style.css`.
+Tailwind CSS v4 (`@tailwindcss/vite`). Global styles in `src/style.css`. No separate config file. Use inline classes for unique styles; add shared styles to `src/style.css`.
 
 ### Testing
 Vitest (`npm test` in `g2-editor/`). Parser unit tests in `src/parser/__tests__/`.
