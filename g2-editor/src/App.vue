@@ -6,9 +6,9 @@
 		<ToolBar>
 			<template v-if="device">
 				<ToolBarLabel class="w-8">Perf:</ToolBarLabel>
-				<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="handlePerfNameClick">{{ device.perfName }}</ToolBarText>
+				<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="handleBpmClick">{{ device.bpm }}</ToolBarText>
+				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
 				<ToolBarDivider />
 				<BtnGroup
@@ -39,7 +39,7 @@
 			</div>
 		</ToolBar>
 
-		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="handlePatchNameClick" />
+		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div class="flex-1 overflow-auto bg-neutral-900 relative">
@@ -123,7 +123,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showPatchNameDialog" title="Rename Patch" @confirm="confirmPatchName" @cancel="showPatchNameDialog = false">
+	<Dialog v-model="showPatchNameDialog" title="Rename Patch" @confirm="confirmPatchName" @cancel="cancelPatchNameDialog">
 		<input
 			v-model="editingPatchName"
 			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
@@ -131,7 +131,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showPerfNameDialog" title="Rename Performance" @confirm="confirmPerfName" @cancel="showPerfNameDialog = false">
+	<Dialog v-model="showPerfNameDialog" title="Rename Performance" @confirm="confirmPerfName" @cancel="cancelPerfNameDialog">
 		<input
 			v-model="editingPerfName"
 			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
@@ -139,7 +139,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showBpmDialog" title="Set BPM" @confirm="confirmBpm" @cancel="showBpmDialog = false">
+	<Dialog v-model="showBpmDialog" title="Set BPM" @confirm="confirmBpm" @cancel="cancelBpmDialog">
 		<input
 			v-model.number="editingBpm"
 			type="number"
@@ -155,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+	import { computed, onMounted, onUnmounted } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
@@ -181,6 +181,11 @@
 	import { usePatchFile } from './composables/usePatchFile';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
+	import { usePatchNameDialog } from './composables/usePatchNameDialog';
+	import { usePerfNameDialog } from './composables/usePerfNameDialog';
+	import { useBpmDialog } from './composables/useBpmDialog';
+	import { useSlotManagement } from './composables/useSlotManagement';
+	import { useElectronMenuActions } from './composables/useElectronMenuActions';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -217,12 +222,6 @@
 	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
 	const patchName = computed(() => slotsStore.getPatchName(uiStore.slotInFocus));
 
-	function applySlotResult(result: { patch: any; name: string } | null): void {
-		if (result?.patch?.description?.variation !== undefined) {
-			uiStore.variation = result.patch.description.variation;
-		}
-	}
-
 	const {
 		showLabelDialog,
 		editingLabel,
@@ -246,131 +245,38 @@
 		handleJackSetCableColor,
 	} = usePatchOperations();
 
-	// ── Patch name dialog ─────────────────────────────────────────────────────
+	const {
+		showDialog: showPatchNameDialog,
+		editingName: editingPatchName,
+		open: openPatchNameDialog,
+		confirm: confirmPatchName,
+		cancel: cancelPatchNameDialog,
+	} = usePatchNameDialog();
 
-	const showPatchNameDialog = ref(false);
-	const editingPatchName = ref('');
+	const {
+		showDialog: showPerfNameDialog,
+		editingName: editingPerfName,
+		open: openPerfNameDialog,
+		confirm: confirmPerfName,
+		cancel: cancelPerfNameDialog,
+	} = usePerfNameDialog();
 
-	function handlePatchNameClick(): void {
-		editingPatchName.value = patchName.value;
-		showPatchNameDialog.value = true;
-	}
-	async function confirmPatchName(): Promise<void> {
-		try {
-			await slotsStore.setPatchName(editingPatchName.value);
-		} catch (e: any) {
-			console.error('setPatchName failed:', e?.message ?? e);
-		} finally {
-			showPatchNameDialog.value = false;
-		}
-	}
-
-	// ── Perf name dialog ──────────────────────────────────────────────────────
-
-	const showPerfNameDialog = ref(false);
-	const editingPerfName = ref('');
-
-	function handlePerfNameClick(): void {
-		editingPerfName.value = device.perfName;
-		showPerfNameDialog.value = true;
-	}
-	async function confirmPerfName(): Promise<void> {
-		try {
-			await device.setPerfName(editingPerfName.value);
-		} catch (e: any) {
-			console.error('setPerfName failed:', e?.message ?? e);
-		} finally {
-			showPerfNameDialog.value = false;
-		}
-	}
-
-	// ── BPM dialog ────────────────────────────────────────────────────────────
-
-	const showBpmDialog = ref(false);
-	const editingBpm = ref(0);
-
-	function handleBpmClick(): void {
-		editingBpm.value = device.bpm;
-		showBpmDialog.value = true;
-	}
-	async function confirmBpm(): Promise<void> {
-		try {
-			const val = Math.max(30, Math.min(240, editingBpm.value));
-			await device.setBpm(val);
-		} catch (e: any) {
-			console.error('setBpm failed:', e?.message ?? e);
-		} finally {
-			showBpmDialog.value = false;
-		}
-	}
-
-	// ── Keyboard ──────────────────────────────────────────────────────────────
-
-	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
-		if (showLabelDialog.value) return;
-		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-		await deleteSelection();
-	}
-
-	// ── Slot / variation ──────────────────────────────────────────────────────
-
-	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
-		const idx = value as number;
-		const slot = SLOT_LABELS[idx];
-
-		const slots = device.device?.slots;
-		if (slots) {
-			const activeCount = slots.filter((s) => s.active).length;
-			const target = slots.find((s) => s.slot === slot);
-
-			// Case 2: multiple active slots – inactive slots cannot receive focus
-			if (activeCount > 1 && !target?.active) return;
-
-			if (activeCount <= 1) {
-				// Case 1: single (or zero) active – clicked slot becomes the only active+key slot
-				slots.forEach((s) => {
-					s.active = s.slot === slot;
-					s.key = s.slot === slot;
-				});
-			} else if (!target?.key) {
-				// Case 3: multiple active, clicked slot lacks key – give it exclusive key
-				slots.forEach((s) => {
-					s.key = s.slot === slot;
-				});
-			}
-		}
-
-		uiStore.setSlotInFocus(slot);
-		const patch = slotsStore.slots[slot]?.patch;
-		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
-		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.selectSlot(slot));
-	}
-
-	function handleSlotShiftClick(value: string | number): void {
-		device.toggleSlotActive(SLOT_LABELS[value as number]);
-	}
-
-	function handleSlotCtrlClick(value: string | number): void {
-		device.toggleSlotKey(SLOT_LABELS[value as number]);
-	}
-
-	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {
-		const idx = value as number;
-		uiStore.variation = idx;
-		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
-		if (patch?.description) patch.description.variation = idx;
-		if (device.status === DeviceStatus.Connected) {
-			try {
-				await slotsStore.selectVariation(idx);
-			} catch (e: any) {
-				console.error('selectVariation failed:', e?.message ?? e);
-			}
-		}
-	}
-
-	// ── G2 connection ─────────────────────────────────────────────────────────
+	const {
+		showDialog: showBpmDialog,
+		editingBpm,
+		open: openBpmDialog,
+		confirm: confirmBpm,
+		cancel: cancelBpmDialog,
+	} = useBpmDialog();
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
+
+	const { handleSlotClick, handleSlotShiftClick, handleSlotCtrlClick, handleVariationClick, applySlotResult } = useSlotManagement(
+		hardwareSlotChange,
+		hardwareVariationChange,
+	);
+
+	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick });
 
 	async function handlePerfModeToggle(): Promise<void> {
 		try {
@@ -380,147 +286,14 @@
 		}
 	}
 
-	// ── Lifecycle ─────────────────────────────────────────────────────────────
+	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
+		if (showLabelDialog.value) return;
+		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+		await deleteSelection();
+	}
 
 	onMounted(async () => {
 		window.addEventListener('keydown', handleDeleteKey);
-
-		window.electronAPI?.onMenuAction(async (action: string) => {
-			// const area = uiStore.area === 1 ? 'voice' : 'fx';
-			switch (action) {
-				case 'new-patch': {
-					const emptyPatch = {
-						areas: [
-							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
-							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
-						],
-						description: {
-							voices: 1,
-							height: 0,
-							unk2: 0,
-							red: 1,
-							blue: 1,
-							yellow: 1,
-							orange: 1,
-							green: 1,
-							purple: 1,
-							white: 1,
-							monopoly: 0,
-							variation: 0,
-							category: 0,
-						},
-					};
-					slotsStore.loadPatchFile(uiStore.slotInFocus, emptyPatch as any, 'Untitled');
-					break;
-				}
-				case 'new-performance': {
-					const emptyPatch = {
-						areas: [
-							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
-							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
-						],
-						description: {
-							voices: 1,
-							height: 0,
-							unk2: 0,
-							red: 1,
-							blue: 1,
-							yellow: 1,
-							orange: 1,
-							green: 1,
-							purple: 1,
-							white: 1,
-							monopoly: 0,
-							variation: 0,
-							category: 0,
-						},
-					};
-					const emptyPatches = [emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[];
-					slotsStore.loadPerformanceFile(emptyPatches, [], 'Untitled Performance', '');
-					break;
-				}
-				case 'open-performance':
-				case 'open':
-					await patchFile.openFromElectronDialog();
-					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
-					break;
-				case 'save':
-					if (slotsStore.isPerformanceMode) {
-						await slotsStore.savePerformance();
-					} else if (slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) {
-						await slotsStore.saveSlot(uiStore.slotInFocus);
-					}
-					break;
-				case 'save-as': {
-					if (slotsStore.isPerformanceMode) {
-						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName);
-						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
-					} else {
-						if (!slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) break;
-						const name = slotsStore.slots[uiStore.slotInFocus].name;
-						const result = await window.electronAPI.showSaveDialog(name);
-						if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.slotInFocus, result.filepath);
-					}
-					break;
-				}
-				case 'save-all':
-					for (const s of SLOT_LABELS) {
-						if (slotsStore.slots[s]?.templateRawHex) await slotsStore.saveSlot(s);
-					}
-					if (slotsStore.isPerformanceMode && slotsStore.performanceRawHex) await slotsStore.savePerformance();
-					break;
-				case 'delete':
-					await deleteSelection();
-					break;
-				case 'select-all':
-					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number));
-					break;
-				case 'toggle-modules':
-					uiStore.toggleSidebar('modules');
-					break;
-				case 'toggle-browser':
-					uiStore.toggleSidebar('browser');
-					break;
-				case 'toggle-info':
-					uiStore.toggleSidebar('info');
-					break;
-				case 'area-voice':
-				case 'area-fx':
-					if (uiStore.area === 1) {
-						uiStore.area = 0;
-					} else {
-						uiStore.area = 1;
-					}
-					break;
-				case 'slot-A':
-					handleSlotClick(0);
-					break;
-				case 'slot-B':
-					handleSlotClick(1);
-					break;
-				case 'slot-C':
-					handleSlotClick(2);
-					break;
-				case 'slot-D':
-					handleSlotClick(3);
-					break;
-				case 'variation-1':
-				case 'variation-2':
-				case 'variation-3':
-				case 'variation-4':
-				case 'variation-5':
-				case 'variation-6':
-				case 'variation-7':
-				case 'variation-8': {
-					const variation = parseInt(action.substring(10, 11));
-					await handleVariationClick(variation - 1);
-					break;
-				}
-				case 'toggle-svg-viewer':
-					uiStore.toggleSvgViewer();
-					break;
-			}
-		});
 
 		const isOffline = import.meta.env.VITE_DEV_OFFLINE === 'true';
 		if (isOffline) {
@@ -545,22 +318,5 @@
 
 	onUnmounted(() => {
 		window.removeEventListener('keydown', handleDeleteKey);
-		window.electronAPI?.offMenuAction();
-	});
-
-	// ── Watches ───────────────────────────────────────────────────────────────
-
-	watch(hardwareSlotChange, async (slot) => {
-		if (slot === null) return;
-		uiStore.setSlotInFocus(slot);
-		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.loadSlot(slot));
-	});
-
-	watch(hardwareVariationChange, (change) => {
-		if (!change) return;
-		if (change.slot !== uiStore.slotInFocus) return;
-		uiStore.variation = change.variation;
-		const activePatch = slotsStore.slots[uiStore.slotInFocus]?.patch;
-		if (activePatch?.description) activePatch.description.variation = change.variation;
 	});
 </script>
