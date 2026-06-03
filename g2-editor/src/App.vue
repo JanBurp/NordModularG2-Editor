@@ -29,14 +29,15 @@
 				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 			</template>
 
-			<div
-				class="rounded ml-auto h-full flex items-center justify-center gap-2 px-2 border-l-4 border-r-4 cursor-pointer w-20"
+			<button
+				class="status-badge ml-auto"
 				:class="device.statusClass"
 				data-testid="connection-status"
 				@click="toggleConnection"
 			>
-				<span class="text-sm">{{ device.statusLabel }}</span>
-			</div>
+				<span class="status-dot" :class="device.dotClass" />
+				<span>{{ device.statusLabel }}</span>
+			</button>
 		</ToolBar>
 
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />

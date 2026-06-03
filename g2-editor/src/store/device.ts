@@ -24,16 +24,24 @@ export const useDeviceStore = defineStore('device', {
 		connected: (state) => state.status === DeviceStatus.Connected,
 		statusClass: (state): string => {
 			switch (state.status) {
-				case DeviceStatus.Connected:
-					return 'border-green-500 bg-green-500';
-				case DeviceStatus.Connecting:
-					return 'border-orange-300 bg-orange-300 text-neutral-900';
+				case DeviceStatus.Connected: return 'text-green-400';
+				case DeviceStatus.Connecting: return 'text-orange-300';
 				case DeviceStatus.Unsupported:
 				case DeviceStatus.Lost:
 				case DeviceStatus.Offline:
-					return 'border-red-500 bg-red-500';
-				default:
-					return 'border-neutral-600 bg-neutral-900 text-neutral-300';
+					return 'text-red-400';
+				default: return 'text-neutral-400';
+			}
+		},
+		dotClass: (state): string => {
+			switch (state.status) {
+				case DeviceStatus.Connected: return 'bg-green-500';
+				case DeviceStatus.Connecting: return 'bg-orange-400 animate-pulse';
+				case DeviceStatus.Unsupported:
+				case DeviceStatus.Lost:
+				case DeviceStatus.Offline:
+					return 'bg-red-500';
+				default: return 'bg-neutral-600';
 			}
 		},
 		statusLabel: (state): string => {

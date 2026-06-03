@@ -1,8 +1,8 @@
 <template>
-	<div class="flex items-center justify-between h-6 gap-2 bg-neutral-500 border-b border-neutral-700 text-xs text-neutral-900">
+	<div class="flex items-center justify-between h-6 gap-2 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
 		<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
 
-		<div class="flex items-center gap-2 text-neutral-300">
+		<div v-if="currentPatch" class="flex items-center gap-2">
 		<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
 		<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
 		</div>
