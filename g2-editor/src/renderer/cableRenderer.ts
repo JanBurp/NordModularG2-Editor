@@ -1,4 +1,4 @@
-import { CABLE_SVG_COLORS, CABLE_COLOR_INDEX_MAP } from '../constants';
+import { CABLE_SVG_COLORS, CABLE_COLOR_INDEX_MAP, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../constants';
 import { Patchcord } from './patchcord';
 import { getModule } from './nmg2mods';
 import { svgPath } from './svgUtils';
@@ -66,10 +66,10 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			return;
 		}
 
-		const sx = scon.x + smod.horiz * 256;
-		const sy = scon.y + smod.vert * 16;
-		const dx = dcon.x + dmod.horiz * 256;
-		const dy = dcon.y + dmod.vert * 16;
+		const sx = scon.x + smod.horiz * MODULE_WIDTH;
+		const sy = scon.y + smod.vert * MODULE_ROW_HEIGHT;
+		const dx = dcon.x + dmod.horiz * MODULE_WIDTH;
+		const dy = dcon.y + dmod.vert * MODULE_ROW_HEIGHT;
 
 		const pc = new Patchcord(sx, sy, dx, dy);
 		const d = pc.getCurvePath();
@@ -165,10 +165,10 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 		const scon = dir === 1 ? smodDef.outputs?.[scon_i] : smodDef.inputs?.[scon_i];
 		if (!scon || !dcon) return;
 
-		const newSx = scon.x + smod.horiz * 256;
-		const newSy = scon.y + smod.vert * 16;
-		const newDx = dcon.x + dmod.horiz * 256;
-		const newDy = dcon.y + dmod.vert * 16;
+		const newSx = scon.x + smod.horiz * MODULE_WIDTH;
+		const newSy = scon.y + smod.vert * MODULE_ROW_HEIGHT;
+		const newDx = dcon.x + dmod.horiz * MODULE_WIDTH;
+		const newDy = dcon.y + dmod.vert * MODULE_ROW_HEIGHT;
 
 		const d = shiftCablePath(border.getAttribute('d') || '', newSx, newSy, newDx, newDy);
 		svgElement.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`).forEach((el) => el.setAttribute('d', d));

@@ -3,6 +3,7 @@ import type { ComputedRef, Ref } from 'vue';
 import { getModule } from '@/renderer/nmg2mods';
 import { ref } from 'vue';
 import { useUiStore } from '@/store/ui';
+import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
 
 interface ModuleInstance {
 	index?: number;
@@ -62,10 +63,10 @@ export function useModuleSelecting(
 		const result: number[] = [];
 		for (const m of modules.value) {
 			if (m.index === undefined) continue;
-			const mx1 = (m.horiz || 0) * 256;
-			const my1 = (m.vert || 0) * 16;
-			const mx2 = mx1 + 256;
-			const mh = (getModule(m.type)?.height ?? 2) * 16;
+			const mx1 = (m.horiz || 0) * MODULE_WIDTH;
+			const my1 = (m.vert || 0) * MODULE_ROW_HEIGHT;
+			const mx2 = mx1 + MODULE_WIDTH;
+			const mh = (getModule(m.type)?.height ?? 2) * MODULE_ROW_HEIGHT;
 			const my2 = my1 + mh;
 			if (!(mx2 < rx1 || mx1 > rx2 || my2 < ry1 || my1 > ry2)) {
 				result.push(m.index);
