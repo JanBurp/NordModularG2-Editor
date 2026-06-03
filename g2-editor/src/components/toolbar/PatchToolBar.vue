@@ -29,8 +29,12 @@
 		</div>
 
 		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
-		<div class="module-bevel px-1 h-8 flex items-baseline">
-			<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
+		<div class="module-bevel px-1 h-6 flex items-baseline">
+			<Knob
+				class="-mt-1"
+				:value="patchParams?.[uiStore.variation]?.patchVol ?? 100"
+				@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)"
+			/>
 			<Switch
 				:value="patchParams?.[uiStore.variation]?.activeMuted ?? 1"
 				paramType="ActiveMonitor"

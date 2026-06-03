@@ -1,10 +1,10 @@
 <template>
-	<div class="flex items-center justify-between h-6 gap-2 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
+	<div class="flex items-center justify-between gap-2 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
 		<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
 
 		<div v-if="currentPatch" class="flex items-center gap-2">
-		<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
-		<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
+			<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
+			<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
 		</div>
 
 		<BtnGroup
@@ -23,7 +23,6 @@
 	import { useUiStore } from '../../store/ui';
 	import { useSlotsStore } from '../../store/slots';
 	import BtnGroup from './BtnGroup.vue';
-	import StatusBarDivider from './StatusBarDivider.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
 	import type { PaneTab } from '../../store/ui';
 
