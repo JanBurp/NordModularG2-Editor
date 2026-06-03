@@ -29,12 +29,7 @@
 				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 			</template>
 
-			<button
-				class="status-badge ml-auto"
-				:class="device.statusClass"
-				data-testid="connection-status"
-				@click="toggleConnection"
-			>
+			<button class="status-badge ml-auto" :class="device.statusClass" data-testid="connection-status" @click="toggleConnection">
 				<span class="status-dot" :class="device.dotClass" />
 				<span>{{ device.statusLabel }}</span>
 			</button>
@@ -43,7 +38,7 @@
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div class="flex-1 overflow-auto bg-neutral-900 relative">
+			<div class="flex-1 bg-neutral-700 relative">
 				<template v-if="currentPatch">
 					<PatchCanvas
 						v-show="uiStore.area === 1"
@@ -206,7 +201,11 @@
 	const patchFile = usePatchFile();
 
 	const isLoading = computed(
-		() => device.status === DeviceStatus.Connecting || device.modeChanging || slotsStore.uploadingFromFile || Object.values(slotsStore.slots).some((s) => s.loading),
+		() =>
+			device.status === DeviceStatus.Connecting ||
+			device.modeChanging ||
+			slotsStore.uploadingFromFile ||
+			Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
@@ -262,13 +261,7 @@
 		cancel: cancelPerfNameDialog,
 	} = usePerfNameDialog();
 
-	const {
-		showDialog: showBpmDialog,
-		editingBpm,
-		open: openBpmDialog,
-		confirm: confirmBpm,
-		cancel: cancelBpmDialog,
-	} = useBpmDialog();
+	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
 

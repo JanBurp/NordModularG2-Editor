@@ -1,5 +1,5 @@
 <template>
-	<div class="overflow-auto bg-neutral-700 relative" :data-testid="`canvas-${area}`" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
+	<div class="overflow-auto bg-neutral-700 relative h-full w-full" :data-testid="`canvas-${area}`" @dragover.prevent="handleDragOver" @dragleave="clearDropGhost" @drop.prevent="handleModuleDropOnWrapper">
 		<svg
 			ref="svgRef"
 			font-size="9"
