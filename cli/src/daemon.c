@@ -248,9 +248,13 @@ static void execute_cmd(const char *line) {
 		int param_vals[256] = {0};
 		for (int p = 0; p < num_params && p < 256; p++) param_vals[p] = arg_i(args, j++);
 		const char *name = arg_s(args, j);
-		ret = g2_add_module(slot, loc, type_id, module_id, col, row, color,
-		                    num_modes, mode_vals, num_params, param_vals,
-		                    name ? name : "Module");
+		if (name && strlen(name) > 16) {
+			ret = G2_ERR_INVALID_PARAM;
+		} else {
+			ret = g2_add_module(slot, loc, type_id, module_id, col, row, color,
+			                    num_modes, mode_vals, num_params, param_vals,
+			                    name ? name : "Module");
+		}
 		}
 
 	} else if (strcmp(cmd, "set-module-mode") == 0 && n >= 5) {
@@ -425,7 +429,7 @@ static void execute_cmd(const char *line) {
 
 /* ── stdin reader thread ───────────────────────────────────────────────── */
 
-static volatile int daemon_running = 1;
+static volatile sig_atomic_t daemon_running = 1;
 
 static void daemon_stop(int sig) {
 	(void)sig;

@@ -164,6 +164,9 @@ ipcMain.handle("patches:list", async (_, folder: string) => {
 
 ipcMain.handle("patches:load", async (_, filepath: string) => {
 	try {
+		const lower = filepath.toLowerCase();
+		if (!lower.endsWith('.pch2') && !lower.endsWith('.prf2'))
+			return { success: false, error: 'Invalid file type' };
 		const buf = fs.readFileSync(filepath);
 		return { success: true, data: Array.from(buf) };
 	} catch (e: any) {

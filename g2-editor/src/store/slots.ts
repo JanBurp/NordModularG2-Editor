@@ -138,7 +138,9 @@ export const useSlotsStore = defineStore('slots', {
 				return { name, rawHex, patch: this.slots[slot].patch };
 			}
 
-			const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+			const hexPairs = rawHex.match(/.{2}/g);
+			if (!hexPairs) throw new Error(`Invalid patch hex for slot ${slot}`);
+			const sectionBytes = new Uint8Array(hexPairs.map((b) => parseInt(b, 16)));
 			const nameBytes = new TextEncoder().encode(name);
 			const header = new Uint8Array(nameBytes.length + 3);
 			header.set(nameBytes);
