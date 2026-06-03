@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { SlotLabel } from '@/types';
-import { useDeviceStore } from '@/store/device';
+import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import type { LogFn } from './useG2';
 
@@ -15,7 +15,7 @@ export function useSlotEvents(log: LogFn) {
 	const pendingResourceFetch = new Set<SlotLabel>();
 
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
-		if (store.status !== 'connected') return;
+		if (store.status !== DeviceStatus.Connected) return;
 		if (pendingResourceFetch.has(slot)) return;
 		pendingResourceFetch.add(slot);
 		try {
@@ -49,7 +49,7 @@ export function useSlotEvents(log: LogFn) {
 			log('←', 'Watch', `slot → ${ev.slot}`);
 			// Refresh actual slot state (key, active) from G2 — slot_change alone
 			// doesn't carry full info since multiple slots can hold key=true.
-			if (sl && store.status === 'connected') {
+			if (sl && store.status === DeviceStatus.Connected) {
 				try {
 					const raw = await window.cli.run(['get-perf-settings']);
 					const parsed = JSON.parse(raw);

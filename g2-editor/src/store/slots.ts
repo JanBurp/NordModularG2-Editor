@@ -7,7 +7,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions } from './slotHelpers';
-import { useDeviceStore } from './device';
+import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
 export type { SlotLabel };
@@ -596,7 +596,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot } = ctx;
 			this.slots[slot].name = name;
-			if (useDeviceStore().status === 'connected') {
+			if (useDeviceStore().status === DeviceStatus.Connected) {
 				await window.cli.run(['set-patch-name', slot, name]);
 			}
 		},
@@ -607,7 +607,7 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const description = patch.description!;
 			const templateHex = this.slots[slot].templateRawHex;
-			if (!templateHex || useDeviceStore().status !== 'connected') return;
+			if (!templateHex || useDeviceStore().status !== DeviceStatus.Connected) return;
 			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');
 			const bytes = buildPatchDescriptionBytes(templateHex, description);
 			if (!bytes) return;
