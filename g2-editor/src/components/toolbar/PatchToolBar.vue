@@ -59,7 +59,6 @@
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
-	import { useDeviceStore } from '../../store/device';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
 	import Knob from '../common/Knob.vue';
@@ -73,7 +72,6 @@
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
-	const deviceStore = useDeviceStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.slotInFocus));
@@ -109,5 +107,5 @@
 			}
 		},
 	});
-	const assignedVoices = computed(() => deviceStore.assignedVoicesForSlot(uiStore.slotInFocus));
+	const assignedVoices = computed(() => slotsStore.assignedVoicesForSlot(uiStore.slotInFocus));
 </script>

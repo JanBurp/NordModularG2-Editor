@@ -26,7 +26,7 @@
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 				<ToolBarDivider />
-				<CPU :va="device.activeSlotResources.va" :fx="device.activeSlotResources.fx" />
+				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 			</template>
 
 			<div
@@ -516,9 +516,7 @@
 				uiStore.setSlotInFocus(slot);
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
-			if (device.startupNames) {
-				browserStore.applyNamesData(device.startupNames);
-			} else {
+			if (!browserStore.synthPatches.length) {
 				browserStore.loadSynthList();
 			}
 		}
