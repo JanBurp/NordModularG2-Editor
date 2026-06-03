@@ -1,8 +1,7 @@
 import { computed, ref } from 'vue';
 
 import { Device, SlotLabel } from '@/types';
-import type { DeviceStatus } from '@/store/device';
-import { useDeviceStore } from '@/store/device';
+import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useDeviceEvents } from './useDeviceEvents';
 import { useLedEvents } from './useLedEvents';
 import { useSlotEvents } from './useSlotEvents';
@@ -60,7 +59,7 @@ export function useG2() {
 
 		window.cli.onDeviceDisconnected(() => {
 			isDaemonRunning.value = false;
-			store.status = 'lost';
+			store.status = DeviceStatus.Lost;
 			log('•', 'Connect', 'Daemon exited unexpectedly');
 		});
 		window.cli.onWatchDone(() => {
@@ -72,8 +71,8 @@ export function useG2() {
 			try {
 				const ev = JSON.parse(line);
 				if (ev.type === 'watch_armed') { resolveArmed(); return; }
-				if (ev.type === 'device_disconnected') { store.status = 'lost'; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
-				if (ev.type === 'device_reconnected') { store.status = 'connected'; log('•', 'Connect', 'G2 reconnected'); return; }
+				if (ev.type === 'device_disconnected') { store.status = DeviceStatus.Lost; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
+				if (ev.type === 'device_reconnected') { store.status = DeviceStatus.Connected; log('•', 'Connect', 'G2 reconnected'); return; }
 				if (ledEvents.handleEvent(ev)) return;
 				if (await deviceEvents.handleEvent(ev)) return;
 				if (await slotEvents.handleEvent(ev)) return;
@@ -100,11 +99,11 @@ export function useG2() {
 
 	async function connectDevice(): Promise<void> {
 		if (typeof window === 'undefined' || !window.cli) {
-			store.status = 'unsupported';
+			store.status = DeviceStatus.Unsupported;
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
-		store.status = 'connecting';
+		store.status = DeviceStatus.Connecting;
 		await startWatch();
 		log('→', 'Connect', 'Connecting to G2...');
 		try {
@@ -113,7 +112,7 @@ export function useG2() {
 			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
 			for (const slot of activeSlots) slotEvents.fetchSlotResources(slot);
 		} catch (e: any) {
-			store.status = 'disconnected';
+			store.status = DeviceStatus.Disconnected;
 			log('←', 'Connect', `G2 not found: ${e.message}`);
 		}
 	}
@@ -130,18 +129,18 @@ export function useG2() {
 	}
 
 	async function toggleConnection(): Promise<void> {
-		if (store.status === 'connected') return await disconnectDevice();
+		if (store.status === DeviceStatus.Connected) return await disconnectDevice();
 		return await connectDevice();
 	}
 
 	async function uploadToG2<T extends Record<string, any>>(patch: T | null): Promise<void> {
 		if (!patch) { log('•', 'Upload', 'No patch to upload'); return; }
-		if (store.status !== 'connected') { log('•', 'Upload', 'G2 not connected'); return; }
+		if (store.status !== DeviceStatus.Connected) { log('•', 'Upload', 'G2 not connected'); return; }
 		log('→', 'Upload', 'Upload not yet implemented');
 	}
 
 	async function downloadFromG2(): Promise<void> {
-		if (store.status !== 'connected') { log('•', 'Download', 'G2 not connected'); return; }
+		if (store.status !== DeviceStatus.Connected) { log('•', 'Download', 'G2 not connected'); return; }
 		log('→', 'Download', 'Download not yet implemented');
 	}
 

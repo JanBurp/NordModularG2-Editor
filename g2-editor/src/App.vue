@@ -181,7 +181,7 @@
 	import { usePatchFile } from './composables/usePatchFile';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
-	import { useDeviceStore } from './store/device';
+	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
 	import type { SlotLabel } from './store/slots';
@@ -200,10 +200,10 @@
 	const patchFile = usePatchFile();
 
 	const isLoading = computed(
-		() => device.status === 'connecting' || device.modeChanging || slotsStore.uploadingFromFile || Object.values(slotsStore.slots).some((s) => s.loading),
+		() => device.status === DeviceStatus.Connecting || device.modeChanging || slotsStore.uploadingFromFile || Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
-		if (device.status === 'connecting') return 'Connecting...';
+		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
 		return 'Loading patch...';
@@ -328,7 +328,7 @@
 		uiStore.setSlotInFocus(slot);
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
-		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
+		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.selectSlot(slot));
 	}
 
 	function handleSlotShiftClick(value: string | number): void {
@@ -344,7 +344,7 @@
 		uiStore.variation = idx;
 		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (patch?.description) patch.description.variation = idx;
-		if (device.status === 'connected') await slotsStore.selectVariation(idx);
+		if (device.status === DeviceStatus.Connected) await slotsStore.selectVariation(idx);
 	}
 
 	// ── G2 connection ─────────────────────────────────────────────────────────
@@ -503,11 +503,11 @@
 
 		const isOffline = import.meta.env.DEV_OFFLINE === 'true';
 		if (isOffline) {
-			device.status = 'offline';
+			device.status = DeviceStatus.Offline;
 		} else {
 			await connectDevice();
 		}
-		if (!isOffline && device.status === 'connected') {
+		if (!isOffline && device.status === DeviceStatus.Connected) {
 			const focusedEntry = device.device?.slots?.find((s) => s.key);
 			const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
 			const idx = SLOT_LABELS.indexOf(focusLabel);
@@ -534,7 +534,7 @@
 	watch(hardwareSlotChange, async (slot) => {
 		if (slot === null) return;
 		uiStore.setSlotInFocus(slot);
-		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
+		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.loadSlot(slot));
 	});
 
 	watch(hardwareVariationChange, (change) => {
