@@ -21,7 +21,7 @@ export function useSlotEvents(log: LogFn) {
 		try {
 			const out = await window.cli.run(['get-resources', slot]);
 			const parsed = JSON.parse(out) as { data: number[] };
-			if (Array.isArray(parsed.data)) store.updateResources(slot, parsed.data);
+			if (Array.isArray(parsed.data)) slotsStore.updateResources(slot, parsed.data);
 		} catch {
 			// patch may not be loaded in this slot
 		} finally {
@@ -103,7 +103,7 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 			const sl = ev.slot as SlotLabel;
 			if (sl) {
-				store.updateResources(sl, ev.data);
+				slotsStore.updateResources(sl, ev.data);
 				if (pendingSlotReload.has(sl)) {
 					pendingSlotReload.delete(sl);
 					slotsStore.loadSlot(sl);

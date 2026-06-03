@@ -2,7 +2,6 @@ import { Device, PatchData, SlotLabel } from '@/types';
 
 import { SLOT_LABELS } from '@/constants';
 import { defineStore } from 'pinia';
-import { useUiStore } from './ui';
 
 export enum DeviceStatus {
 	Connected = 'connected',
@@ -13,36 +12,11 @@ export enum DeviceStatus {
 	Offline = 'offline',
 }
 
-type ResourceMetrics = { cycles: number; memory: number };
-type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
-
-function emptySlotResources(): SlotResources {
-	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
-}
-
-// d is the bulk payload. Each block: d[o]=location, d[o+1..o+27]=TPatchLoadData (Delphi indices +1).
-// Compound packets pack both areas: block0 at offset 0, 0x72 marker at offset 28, block1 at offset 29.
-function parseResourceCycles(d: number[], o: number): number {
-	const red1 = d[o + 2] + d[o + 1] * 128;
-	const blue1 = d[o + 4] + d[o + 3] * 128;
-	return Math.max(100 * red1 / 1372 + 100 * blue1 / 5000, 0);
-}
-
-function parseResourceMemory(d: number[], o: number): number {
-	const internalMem = d[o + 5];
-	const resource4 = d[o + 9] + d[o + 8] * 128;
-	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
-	return Math.max(Math.max(100 * internalMem / 128, 100 * ram / 260000), 100 * resource4 / 4315);
-}
-
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
 		status: DeviceStatus.Disconnected,
 		deviceName: '',
 		device: null as Device | null,
-		startupNames: null as any,
-		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
-		assignedVoices: [0, 0, 0, 0] as number[],
 		modeChanging: false,
 	}),
 
@@ -95,13 +69,6 @@ export const useDeviceStore = defineStore('device', {
 			if (!state.device) return [false, false, false, false];
 			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.key ?? false);
 		},
-		activeSlotResources: (state): SlotResources => {
-			return state.slotResources[useUiStore().slotInFocus];
-		},
-		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
-			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
-			return idx >= 0 ? state.assignedVoices[idx] : 0;
-		},
 	},
 
 	actions: {
@@ -124,7 +91,6 @@ export const useDeviceStore = defineStore('device', {
 				this.status = DeviceStatus.Disconnected;
 				this.deviceName = '';
 				this.device = null;
-				this.startupNames = null;
 				this.modeChanging = false;
 			}
 		},
@@ -209,17 +175,5 @@ export const useDeviceStore = defineStore('device', {
 				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
 		},
 
-		updateResources(slot: SlotLabel, data: number[]) {
-			const applyBlock = (o: number) => {
-				if (data.length < o + 28) return;
-				const loc = data[o];
-				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
-				if (loc === 1) this.slotResources[slot].va = metrics;
-				else if (loc === 0) this.slotResources[slot].fx = metrics;
-			};
-			applyBlock(0);
-			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29
-			if (data.length >= 57 && data[28] === 0x72) applyBlock(29);
-		},
 	},
 });

@@ -2,11 +2,13 @@ import type { SlotLabel } from '@/types';
 import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
+import { useBrowserStore } from '@/store/browser';
 import type { LogFn } from './useG2';
 
 export function useDeviceEvents(log: LogFn) {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
+	const browserStore = useBrowserStore();
 
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
@@ -15,7 +17,7 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'names') {
-			store.startupNames = ev.data ?? null;
+			if (ev.data) browserStore.applyNamesData(ev.data);
 			log('←', 'Watch', 'names');
 			return true;
 		}
@@ -62,7 +64,7 @@ export function useDeviceEvents(log: LogFn) {
 		}
 		if (ev.type === 'assigned_voices') {
 			if (Array.isArray(ev.voices)) {
-				store.assignedVoices = ev.voices;
+				slotsStore.assignedVoices = ev.voices;
 				const slotLabels = ['A', 'B', 'C', 'D'] as const;
 				for (let i = 0; i < ev.voices.length && i < slotLabels.length; i++) {
 					const entry = store.device?.slots.find((s) => s.slot === slotLabels[i]);
