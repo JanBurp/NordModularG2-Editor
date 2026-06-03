@@ -2059,13 +2059,23 @@ int g2_switch_slot(const char *slot_str) {
     free(perfData);
     if (sret < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    if (!g2_listener_active) {
+    /* Drain SET_PERF_SETTINGS ACK from listener queue. */
+    {
         uint8_t ack[16] = {0};
         recv_interrupt(ack, 16, USB_TIMEOUT_STANDARD_MS);
-        g2_drain_pending();
+        if (!g2_listener_active) g2_drain_pending();
     }
 
-    /* Step 5: SELECT_SLOT (0x09) — g2_select_slot fetches a fresh perf version */
-    return g2_select_slot(slot_str);
+    /* Step 5: SELECT_SLOT (0x09) — send directly, no GET_PATCH_VERSION.
+     * In daemon mode, perf_settings_update sits in the queue after the ACK;
+     * g2_select_slot's recv_interrupt would pop it instead of the version
+     * response, leaving that response orphaned as a spurious patch_version event.
+     * Delphi never queries GET_PATCH_VERSION before SELECT_SLOT; 0x41 is
+     * accepted unconditionally by the G2 for this command. */
+    uint8_t sel[2] = {0x09, (uint8_t)target};
+    if (send_system_data(0x41, sel, 2) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    if (!g2_listener_active) g2_drain_pending();
+    return G2_OK;
 }
 
