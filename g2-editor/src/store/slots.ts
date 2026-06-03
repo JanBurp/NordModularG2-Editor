@@ -7,8 +7,30 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions } from './slotHelpers';
-import { useDeviceStore } from './device';
+import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
+
+type ResourceMetrics = { cycles: number; memory: number };
+export type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
+
+function emptySlotResources(): SlotResources {
+	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
+}
+
+// d is the bulk payload. Each block: d[o]=location, d[o+1..o+27]=TPatchLoadData (Delphi indices +1).
+// Compound packets pack both areas: block0 at offset 0, 0x72 marker at offset 28, block1 at offset 29.
+function parseResourceCycles(d: number[], o: number): number {
+	const red1 = d[o + 2] + d[o + 1] * 128;
+	const blue1 = d[o + 4] + d[o + 3] * 128;
+	return Math.max(100 * red1 / 1372 + 100 * blue1 / 5000, 0);
+}
+
+function parseResourceMemory(d: number[], o: number): number {
+	const internalMem = d[o + 5];
+	const resource4 = d[o + 9] + d[o + 8] * 128;
+	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
+	return Math.max(Math.max(100 * internalMem / 128, 100 * ram / 260000), 100 * resource4 / 4315);
+}
 
 export type { SlotLabel };
 
@@ -81,6 +103,8 @@ export const useSlotsStore = defineStore('slots', {
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
 		uploadingFromFile: false,
+		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
+		assignedVoices: [0, 0, 0, 0] as number[],
 	}),
 
 	getters: {
@@ -95,6 +119,13 @@ export const useSlotsStore = defineStore('slots', {
 		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
 
 		getPatchParams: (state) => (slot: SlotLabel) => state.slots[slot]?.patch?.patchParams ?? null,
+
+		activeSlotResources: (state): SlotResources => state.slotResources[useUiStore().slotInFocus],
+
+		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
+			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
+			return idx >= 0 ? state.assignedVoices[idx] : 0;
+		},
 	},
 
 	actions: {
@@ -596,7 +627,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot } = ctx;
 			this.slots[slot].name = name;
-			if (useDeviceStore().status === 'connected') {
+			if (useDeviceStore().status === DeviceStatus.Connected) {
 				await window.cli.run(['set-patch-name', slot, name]);
 			}
 		},
@@ -607,7 +638,7 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const description = patch.description!;
 			const templateHex = this.slots[slot].templateRawHex;
-			if (!templateHex || useDeviceStore().status !== 'connected') return;
+			if (!templateHex || useDeviceStore().status !== DeviceStatus.Connected) return;
 			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');
 			const bytes = buildPatchDescriptionBytes(templateHex, description);
 			if (!bytes) return;
@@ -694,6 +725,19 @@ export const useSlotsStore = defineStore('slots', {
 					String(c.dcon),
 				]),
 			);
+		},
+
+		updateResources(slot: SlotLabel, data: number[]): void {
+			const applyBlock = (o: number) => {
+				if (data.length < o + 28) return;
+				const loc = data[o];
+				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
+				if (loc === 1) this.slotResources[slot].va = metrics;
+				else if (loc === 0) this.slotResources[slot].fx = metrics;
+			};
+			applyBlock(0);
+			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29
+			if (data.length >= 57 && data[28] === 0x72) applyBlock(29);
 		},
 
 		async deleteSelection(

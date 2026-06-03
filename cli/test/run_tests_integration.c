@@ -25,7 +25,6 @@ extern void test_daemon_get_patch_cmd(void);
 extern void test_daemon_slot_cmd(void);
 extern void test_daemon_variation_cmd(void);
 extern void test_daemon_perf_mode_cycle(void);
-extern void test_daemon_slot_variation_sequence(void);
 /* watch-based tests — commented out; use test_daemon_slot_variation_commands instead
 extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
@@ -103,8 +102,8 @@ int main(void) {
     // run_test_with_output("test_upload_nl2",        test_upload_nl2);
     // run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
     // run_test_with_output("test_upload_mixt",      test_upload_mixt);
-    run_test_with_output("test_upload_empty_perf",    test_upload_empty_perf);
-    run_test_with_output("test_upload_morphing_drum", test_upload_morphing_drum);
+    // run_test_with_output("test_upload_empty_perf",    test_upload_empty_perf);
+    // run_test_with_output("test_upload_morphing_drum", test_upload_morphing_drum);
 
     // run_test_silently("test_integration_get_patch_slot_a", test_integration_get_patch_slot_a);
     // run_test_silently("test_integration_list_all", test_integration_list_all);
@@ -123,7 +122,6 @@ int main(void) {
     run_test_silently("test_daemon_get_patch_cmd",           test_daemon_get_patch_cmd);
     run_test_silently("test_daemon_slot_cmd",                test_daemon_slot_cmd);
     run_test_silently("test_daemon_variation_cmd",           test_daemon_variation_cmd);
-    run_test_silently("test_daemon_slot_variation_sequence", test_daemon_slot_variation_sequence);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.

@@ -244,23 +244,46 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x59` | UNKNOWN_2 (perf init query) | — | Embedded ACK |
 | `0x5E` | GET_GLOBAL_KNOBS | — | Extended bulk |
 
-### SELECT_SLOT full sequence
+### SELECT_SLOT command
 
-Selecting a slot requires two system commands plus one slot command. The `version` byte for steps 1 and 2 comes from byte [3] of the START_COMM (`0x7D 0x00`) response — **not** from GET_PATCH_VERSION:
+There are two distinct slot-selection paths depending on whether the target slot is already active:
 
-```
-Step 1 (sys):   [01][2C][version][07][mask][0F][mask][CRC]
-                mask = 0x08 >> slot   (A=0x08, B=0x04, C=0x02, D=0x01)
+#### Simple focus — `g2_select_slot` (target slot already active)
 
-Step 2 (sys):   [01][2C][version][09][slot][CRC]
+1. GET_PATCH_VERSION with slot=4 → `perf_version`
+2. Send `[01][2C][perf_version][09][slot][CRC]`
+3. Drain pending notifications (`g2_drain_pending`) to consume `slot_change` / `assigned_voices`
 
-Step 3 (slot):  [01][28+slot][0x0a][70][CRC]
-                version for step 3 is constant 0x0a (per g2ctl.py)
-```
+#### Full activate-then-focus — `g2_switch_slot` (target slot inactive)
 
-After all three commands, drain any pending notifications (`g2_drain_pending`).
+Use this when the target slot needs to be activated before focusing. Steps:
 
-> **CLI note:** `g2_select_slot` implements all three steps. Steps 1+2 use the performance version obtained via GET_PATCH_VERSION with slot=4.
+1. **UNKNOWN_1** (`send_system(0x41, 0x81)`) → extended bulk → `perf_version = selsData[2]`
+2. **GET_PERF_SETTINGS** (`send_system(perf_version, 0x10)`) → extended bulk (`perfData`) containing current slot active/key/focus state
+3. **Parse perfData** to find per-slot active/key offsets and the currently-focused slot:
+   ```
+   perfData+4  → perf name (null-terminated)  → remaining
+   remaining[0]  = 0x11 (C_PERF_SETTINGS chunk type)
+   remaining[4] >> 2 & 0x3  = focused_slot_index
+   remaining+11 → slot 0: name(variable) + 10 bytes
+     [+0] active  (0/1)
+     [+1] key     (0/1)
+     [+2..9] hold, bank, patch, rangeLow, rangeHigh, padding
+   Subsequent slots follow immediately
+   ```
+4. **Modify perfData in-memory:**
+   - `target_slot.active = 1`, `target_slot.key = 1`
+   - `focused_slot.active = 0`, `focused_slot.key = 0` (if focused ≠ target)
+5. **SET_PERF_SETTINGS** — send the chunk starting at the `0x11` byte using `perf_version` as cmd_id: `[0x11][sizeHi][sizeLo][80 bytes]`; drain ACK
+6. **SELECT_SLOT** — `[01][2C][0x41][09][slot][CRC]` — **use `0x41`, NOT `perf_version`** (see gotcha below)
+
+> **Gotcha — SELECT_SLOT cmd_id after SET_PERF_SETTINGS in daemon mode:** In daemon mode, a `perf_settings_update` message sits in the listener queue immediately after the SET_PERF_SETTINGS ACK. If you query GET_PATCH_VERSION before SELECT_SLOT, `recv_interrupt()` pops `perf_settings_update` instead of the version response, leaving the version response orphaned as a spurious event. The Delphi reference editor never queries GET_PATCH_VERSION before SELECT_SLOT — `0x41` is accepted unconditionally by the G2 for this command.
+
+> **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
+
+#### Single-field slot updates — `set-slot-enabled` / `set-slot-key`
+
+Setting only the `active` or `key` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step.
 
 ---
 

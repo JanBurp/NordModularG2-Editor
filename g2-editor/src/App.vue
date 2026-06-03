@@ -26,7 +26,7 @@
 				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 				<ToolBarDivider />
-				<CPU :va="device.activeSlotResources.va" :fx="device.activeSlotResources.fx" />
+				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 			</template>
 
 			<div
@@ -181,7 +181,7 @@
 	import { usePatchFile } from './composables/usePatchFile';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
-	import { useDeviceStore } from './store/device';
+	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
 	import type { SlotLabel } from './store/slots';
@@ -199,14 +199,11 @@
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
 
-	const isLoading = computed(() =>
-		device.status === 'connecting' ||
-		device.modeChanging ||
-		slotsStore.uploadingFromFile ||
-		Object.values(slotsStore.slots).some((s) => s.loading),
+	const isLoading = computed(
+		() => device.status === DeviceStatus.Connecting || device.modeChanging || slotsStore.uploadingFromFile || Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
-		if (device.status === 'connecting') return 'Connecting...';
+		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
 		return 'Loading patch...';
@@ -305,10 +302,33 @@
 	async function handleSlotClick(value: string | number | (string | number)[]): Promise<void> {
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
+
+		const slots = device.device?.slots;
+		if (slots) {
+			const activeCount = slots.filter((s) => s.active).length;
+			const target = slots.find((s) => s.slot === slot);
+
+			// Case 2: multiple active slots – inactive slots cannot receive focus
+			if (activeCount > 1 && !target?.active) return;
+
+			if (activeCount <= 1) {
+				// Case 1: single (or zero) active – clicked slot becomes the only active+key slot
+				slots.forEach((s) => {
+					s.active = s.slot === slot;
+					s.key = s.slot === slot;
+				});
+			} else if (!target?.key) {
+				// Case 3: multiple active, clicked slot lacks key – give it exclusive key
+				slots.forEach((s) => {
+					s.key = s.slot === slot;
+				});
+			}
+		}
+
 		uiStore.setSlotInFocus(slot);
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
-		if (device.status === 'connected') applySlotResult(await slotsStore.selectSlot(slot));
+		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.selectSlot(slot));
 	}
 
 	function handleSlotShiftClick(value: string | number): void {
@@ -324,7 +344,7 @@
 		uiStore.variation = idx;
 		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
 		if (patch?.description) patch.description.variation = idx;
-		if (device.status === 'connected') await slotsStore.selectVariation(idx);
+		if (device.status === DeviceStatus.Connected) await slotsStore.selectVariation(idx);
 	}
 
 	// ── G2 connection ─────────────────────────────────────────────────────────
@@ -353,7 +373,21 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 1,
+							blue: 1,
+							yellow: 1,
+							orange: 1,
+							green: 1,
+							purple: 1,
+							white: 1,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
 					};
 					slotsStore.loadPatchFile(uiStore.slotInFocus, emptyPatch as any, 'Untitled');
 					break;
@@ -364,7 +398,21 @@
 							{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
 							{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
 						],
-						description: { voices: 1, height: 0, unk2: 0, red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1, monopoly: 0, variation: 0, category: 0 },
+						description: {
+							voices: 1,
+							height: 0,
+							unk2: 0,
+							red: 1,
+							blue: 1,
+							yellow: 1,
+							orange: 1,
+							green: 1,
+							purple: 1,
+							white: 1,
+							monopoly: 0,
+							variation: 0,
+							category: 0,
+						},
 					};
 					const emptyPatches = [emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[];
 					slotsStore.loadPerformanceFile(emptyPatches, [], 'Untitled Performance', '');
@@ -453,23 +501,22 @@
 			}
 		});
 
-		const isOffline = import.meta.env.DEV_OFFLINE === 'true';
+		const isOffline = import.meta.env.VITE_DEV_OFFLINE === 'true';
 		if (isOffline) {
-			device.status = 'offline';
+			device.status = DeviceStatus.Offline;
 		} else {
 			await connectDevice();
 		}
-		if (!isOffline && device.status === 'connected') {
-			const focusLabel = (device.device?.patches?.focus ?? device.device?.performance?.focus ?? 'a').toUpperCase();
-			const idx = SLOT_LABELS.indexOf(focusLabel as SlotLabel);
+		if (!isOffline && device.status === DeviceStatus.Connected) {
+			const focusedEntry = device.device?.slots?.find((s) => s.key);
+			const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
+			const idx = SLOT_LABELS.indexOf(focusLabel);
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
 				uiStore.setSlotInFocus(slot);
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
-			if (device.startupNames) {
-				browserStore.applyNamesData(device.startupNames);
-			} else {
+			if (!browserStore.synthPatches.length) {
 				browserStore.loadSynthList();
 			}
 		}
@@ -485,7 +532,7 @@
 	watch(hardwareSlotChange, async (slot) => {
 		if (slot === null) return;
 		uiStore.setSlotInFocus(slot);
-		if (device.status === 'connected') applySlotResult(await slotsStore.loadSlot(slot));
+		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.loadSlot(slot));
 	});
 
 	watch(hardwareVariationChange, (change) => {

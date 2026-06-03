@@ -108,6 +108,7 @@ cJSON *g2_list(int filter, int bank_filter);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);
+int g2_switch_slot(const char *slot_str);
 int g2_select_variation(int variation, int slot);
 
 /* Cable commands: slot 0-3, location 0=fx/1=va, color 0-6,

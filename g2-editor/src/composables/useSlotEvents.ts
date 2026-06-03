@@ -1,7 +1,7 @@
 import { ref } from 'vue';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { SlotLabel } from '@/types';
-import { useDeviceStore } from '@/store/device';
+import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import type { LogFn } from './useG2';
 
@@ -15,13 +15,13 @@ export function useSlotEvents(log: LogFn) {
 	const pendingResourceFetch = new Set<SlotLabel>();
 
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
-		if (store.status !== 'connected') return;
+		if (store.status !== DeviceStatus.Connected) return;
 		if (pendingResourceFetch.has(slot)) return;
 		pendingResourceFetch.add(slot);
 		try {
 			const out = await window.cli.run(['get-resources', slot]);
-			const parsed = JSON.parse(out) as { bytes: number[] };
-			if (Array.isArray(parsed.bytes)) store.updateResources(slot, parsed.bytes);
+			const parsed = JSON.parse(out) as { data: number[] };
+			if (Array.isArray(parsed.data)) slotsStore.updateResources(slot, parsed.data);
 		} catch {
 			// patch may not be loaded in this slot
 		} finally {
@@ -44,8 +44,18 @@ export function useSlotEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'slot_change') {
-			hardwareSlotChange.value = (ev.slot as SlotLabel) ?? null;
+			const sl = ev.slot as SlotLabel;
+			hardwareSlotChange.value = sl ?? null;
 			log('←', 'Watch', `slot → ${ev.slot}`);
+			// Refresh actual slot state (key, active) from G2 — slot_change alone
+			// doesn't carry full info since multiple slots can hold key=true.
+			if (sl && store.status === DeviceStatus.Connected) {
+				try {
+					const raw = await window.cli.run(['get-perf-settings']);
+					const parsed = JSON.parse(raw);
+					store.updatePerfSettings(parsed.data ?? parsed);
+				} catch { /* state will sync on next perf_settings event */ }
+			}
 			return true;
 		}
 		if (ev.type === 'param_change') {
@@ -93,7 +103,7 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 			const sl = ev.slot as SlotLabel;
 			if (sl) {
-				store.updateResources(sl, ev.data);
+				slotsStore.updateResources(sl, ev.data);
 				if (pendingSlotReload.has(sl)) {
 					pendingSlotReload.delete(sl);
 					slotsStore.loadSlot(sl);

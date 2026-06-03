@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "defs.h"
 #include <string.h>
+#include <stdlib.h>
 
 /* CRC-16/CCITT one-byte step: polynomial 0x1021, MSB-first. */
 uint16_t crc_iterator(int32_t seed, int32_t val) {
@@ -87,6 +88,25 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
     memcpy(pch2_data + first_part, usb_data + PCH2_USB_CHUNK2_START, second_part);
     *pch2_len = required;
     return 0;
+}
+
+int parse_location_str(const char *s) {
+    if (s && strcmp(s, "va") == 0)    return 1;
+    if (s && strcmp(s, "patch") == 0) return 2;
+    return 0;
+}
+
+/* Decode a hex string into a newly-allocated byte array.
+ * Returns the number of bytes, or -1 on allocation failure. Caller must free *out. */
+int hex_to_bytes(const char *hex, uint8_t **out) {
+    int nbytes = (int)(strlen(hex) / 2);
+    *out = malloc(nbytes);
+    if (!*out) return -1;
+    for (int i = 0; i < nbytes; i++) {
+        char buf[3] = { hex[i*2], hex[i*2+1], 0 };
+        (*out)[i] = (uint8_t)strtol(buf, NULL, 16);
+    }
+    return nbytes;
 }
 
 int tokenize_command(char *buf, char **argv_out, int max_argc) {
