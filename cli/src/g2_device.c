@@ -1850,9 +1850,10 @@ int g2_set_param(int slot, int location, int module_id,
     /* No recv_interrupt — WRITE_NO_RESP */
 }
 
-/* GET_RESOURCES_USED returns one bulk packet whose payload may contain two
- * area blocks packed as: [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
- * Return all payload bytes (CRC stripped) so the caller can parse both. */
+/* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
+ * compound 57-byte packet matching the resources_used watch event format:
+ * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes].
+ * Falls back to FX-only (28 bytes) if the VA query fails. */
 cJSON *g2_get_resources(const char *slot_str) {
     uint8_t interruptResp[16] = {0};
     uint8_t version;
@@ -1871,6 +1872,7 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (ret <= 0) { g2_err("No version response\n"); return NULL; }
     version = interruptResp[6];
 
+    /* Query FX area (loc=0) */
     uint8_t loc = 0;
     if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
     usleep(USB_SEND_DELAY_US);
@@ -1880,23 +1882,53 @@ cJSON *g2_get_resources(const char *slot_str) {
         g2_err("Unexpected response for get-resources\n"); return NULL;
     }
 
-    uint16_t bulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-    if (bulkSize < 6) { g2_err("get-resources: bulk too small\n"); return NULL; }
-    uint8_t *bulk = malloc(bulkSize);
-    if (!bulk) { g2_err("Memory allocation failed\n"); return NULL; }
+    uint16_t fxBulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+    if (fxBulkSize < 6) { g2_err("get-resources: FX bulk too small\n"); return NULL; }
+    uint8_t *fxBulk = malloc(fxBulkSize);
+    if (!fxBulk) { g2_err("Memory allocation failed\n"); return NULL; }
 
-    ret = recv_bulk(bulk, bulkSize);
-    if (ret < 6) { free(bulk); g2_err("Failed to read resources bulk\n"); return NULL; }
+    int fxRet = recv_bulk(fxBulk, fxBulkSize);
+    if (fxRet < 6) { free(fxBulk); g2_err("Failed to read resources FX bulk\n"); return NULL; }
+    int fxDataEnd = fxRet - 2;  /* strip 2-byte CRC */
 
-    /* Payload: bulk[4..ret-3], last 2 bytes are CRC (same as watch event handler). */
     cJSON *result = cJSON_CreateObject();
     cJSON *arr = cJSON_CreateArray();
-    int dataEnd = ret - 2;
-    for (int i = 4; i < dataEnd; i++)
-        cJSON_AddItemToArray(arr, cJSON_CreateNumber(bulk[i]));
-    cJSON_AddItemToObject(result, "bytes", arr);
 
-    free(bulk);
+    /* Query VA area (loc=1) and build compound packet if successful */
+    uint8_t loc1 = 1;
+    if (send_slot(slot, version, 0x71, &loc1, 1) == 0) {
+        usleep(USB_SEND_DELAY_US);
+        uint8_t vaInterrupt[16] = {0};
+        int ret2 = recv_interrupt(vaInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret2 > 0 && (vaInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t vaBulkSize = ((uint16_t)vaInterrupt[1] << 8) | vaInterrupt[2];
+            if (vaBulkSize >= 6) {
+                uint8_t *vaBulk = malloc(vaBulkSize);
+                if (vaBulk) {
+                    int vaRet = recv_bulk(vaBulk, vaBulkSize);
+                    if (vaRet >= 6) {
+                        int vaDataEnd = vaRet - 2;
+                        for (int i = 4; i < fxDataEnd; i++)
+                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
+                        cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
+                        for (int i = 4; i < vaDataEnd; i++)
+                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(vaBulk[i]));
+                        free(vaBulk);
+                        free(fxBulk);
+                        cJSON_AddItemToObject(result, "bytes", arr);
+                        return result;
+                    }
+                    free(vaBulk);
+                }
+            }
+        }
+    }
+
+    /* Fall back: return FX data only */
+    for (int i = 4; i < fxDataEnd; i++)
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
+    cJSON_AddItemToObject(result, "bytes", arr);
+    free(fxBulk);
     return result;
 }
 
