@@ -1983,3 +1983,89 @@ int g2_set_slot_key(int slot_idx, int value) {
     return g2_set_slot_perf_field(slot_idx, 1, value);
 }
 
+/* Select a slot, activating it if it is currently inactive.
+ * Sends SET_PERF_SETTINGS to enable/key the target and disable/unkey the
+ * currently-focused slot, then sends SELECT_SLOT (0x09).
+ * If the target slot is already active, skips the perf settings write. */
+int g2_switch_slot(const char *slot_str) {
+    int target = parse_slot(slot_str);
+    if (target < 0 || target > 3) { g2_err("switch-slot: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+    g2_drain_pending();
+
+    /* Step 1: UNKNOWN_1 (0x81) → perf version at selsData[2] */
+    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
+    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
+    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
+    uint8_t perf_version = selsData[2];
+
+    /* Step 2: GET_PERF_SETTINGS (0x10) */
+    uint8_t perfIntr[16] = {0};
+    uint8_t *perfData = malloc(2048);
+    if (!perfData) return G2_ERR_NO_MEMORY;
+    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
+    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
+    recv_bulk(perfData, size);
+
+    /* Step 3: navigate binary to find the focused slot and per-slot active/key bytes.
+     * perfData+4 → perf name (variable) → 0x11 chunk header:
+     *   [3]=FUnknown2(8b), [4]=FUnknown3(4b)|FSelectedSlot(2b)|FUnknown4(2b)
+     * Slot data at remaining+11: each slot = name(variable) + 10 bytes
+     *   [+0]=active, [+1]=key, rest=hold/bank/patch/range/pad */
+    char tmpName[32];
+    const uint8_t *remaining = perfData + 4;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+    int focused = (remaining[4] >> 2) & 0x3;
+
+    const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd  = perfData + size;
+    size_t target_off = 0, focused_off = 0;
+    int target_active = 0, found_target = 0, found_focused = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slotPtr >= perfEnd) break;
+        int mx = (int)(perfEnd - slotPtr); if (mx > 17) mx = 17;
+        nameLen = parse_name(slotPtr, tmpName, mx);
+        if (slotPtr + nameLen + 7 > perfEnd) break;
+        size_t base = (size_t)(slotPtr - perfData) + (size_t)nameLen;
+        if (i == target)  { target_off  = base; target_active = perfData[base] & 1; found_target  = 1; }
+        if (i == focused) { focused_off = base;                                      found_focused = 1; }
+        slotPtr += nameLen + 10;
+    }
+    if (!found_target) { free(perfData); return G2_ERR_PARSE; }
+
+    /* Fast path: slot already active — just focus it */
+    if (target_active) { free(perfData); return g2_select_slot(slot_str); }
+
+    /* Activate target slot, deactivate currently-focused slot */
+    perfData[target_off + 0] = 1;
+    perfData[target_off + 1] = 1;
+    if (found_focused && focused != target) {
+        perfData[focused_off + 0] = 0;
+        perfData[focused_off + 1] = 0;
+    }
+
+    /* Step 4: send SET_PERF_SETTINGS (0x11); chunk starts at `remaining` (the 0x11 byte) */
+    uint16_t inner = ((uint16_t)remaining[1] << 8) | remaining[2];
+    int sret = send_system_data(perf_version, remaining, (size_t)3 + inner);
+    free(perfData);
+    if (sret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    if (!g2_listener_active) {
+        uint8_t ack[16] = {0};
+        recv_interrupt(ack, 16, USB_TIMEOUT_STANDARD_MS);
+        g2_drain_pending();
+    }
+
+    /* Step 5: SELECT_SLOT (0x09) — g2_select_slot fetches a fresh perf version */
+    return g2_select_slot(slot_str);
+}
+

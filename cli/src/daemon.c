@@ -176,9 +176,10 @@ static void execute_cmd(const char *line) {
 	}
 
 	if (strcmp(cmd, "slot") == 0 && n >= 1) {
-		ret = g2_select_slot(arg_s(args, 0));
-		/* G2 emits slot_change + assigned_voices after SELECT_SLOT (0x09);
-		 * listener thread queues them and the watch loop emits them. */
+		ret = g2_switch_slot(arg_s(args, 0));
+		/* Inactive target: sends SET_PERF_SETTINGS then SELECT_SLOT (0x09).
+		 * Active target: sends SELECT_SLOT only. G2 emits perf_settings_update
+		 * and/or slot_change; listener queues them and watch loop emits them. */
 
 	} else if (strcmp(cmd, "variation") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 1));
