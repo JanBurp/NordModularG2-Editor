@@ -152,6 +152,28 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
 /* Set module mode: slot 0-3, location 0=fx/1=va, param index, value */
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val);
 
+/* Payload builders: fill op->cmd/payload/len from typed C args into caller-supplied buf.
+ * Cable builders include the output→input connector swap. Used by both single-op
+ * functions (which then call send_slot) and execute_seq (which batches into one frame). */
+void g2_build_del_cable_op(G2Op *op, uint8_t *buf, int loc,
+    int fm, int fct, int fci, int tm, int tct, int tci);
+void g2_build_add_cable_op(G2Op *op, uint8_t *buf, int loc, int color,
+    int fm, int fct, int fci, int tm, int tct, int tci);
+void g2_build_set_cable_color_op(G2Op *op, uint8_t *buf, int loc, int color,
+    int fm, int fct, int fci, int tm, int tct, int tci);
+void g2_build_del_module_op(G2Op *op, uint8_t *buf, int loc, int module_id);
+void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
+    int module_id, int col, int row);
+int  g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
+    int type_id, int module_id, int col, int row, int color,
+    int num_modes, const int *mode_vals, const char *name);
+void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int color);
+void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, const char *label);
+void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int param_idx, int label_idx, const char *label);
+
 /* Send multiple patch mutations as a single compound USB frame.
  * All ops must target the same slot. Version is fetched once; drain+delay happen once. */
 int g2_batch_ops(int slot, const G2Op *ops, int n_ops);
