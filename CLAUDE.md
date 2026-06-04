@@ -76,7 +76,6 @@ Pinia stores (`src/store/`) are the single source of truth.
 - `nmg2PatchParser.ts` — parses `.pch2` binary format into JS objects
 - `nmg2PatchSerializer.ts` — serializes patches back to binary
 - `patchMutations.ts` — immutable mutations (add/delete/move modules & cables, set color/label)
-- `g2usb.ts` — USB protocol abstraction
 
 ### Renderer Data (`src/renderer/`)
 - `nmg2mods.ts` — module definition database (200+ modules, ~162KB)
@@ -87,7 +86,7 @@ Pinia stores (`src/store/`) are the single source of truth.
 - `canvas/` — `PatchCanvas.vue`, `Module.vue`, knob/slider/switch/jack/visual elements
 - `panels/` — `SidePanel.vue`, `ModulesPane.vue`, `PatchBrowser.vue`
 - `toolbar/` — `ToolBar.vue`, `StatusBar.vue`, `Button.vue`, `BtnGroup.vue`
-- `common/` — `ColorPicker.vue`, `TreeNode.vue`, `Dialog.vue` (title, slot, OK/Cancel, ESC/Enter)
+- `common/` — `ColorPicker.vue`, `Dialog.vue` (title, slot, OK/Cancel, ESC/Enter)
 
 ### Styling
 Tailwind CSS v4 (`@tailwindcss/vite`). Global styles in `src/style.css`. No separate config file. Use inline classes for unique styles; add shared styles to `src/style.css`.
