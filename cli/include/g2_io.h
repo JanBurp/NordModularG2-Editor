@@ -59,6 +59,7 @@ int send_system(uint8_t cmd, uint8_t subcmd);
 int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
 int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
               const uint8_t *extra, size_t extraLen);
+int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops);
 
 /* Low-level USB receive helpers.
  * When g2_listener_active == 1 these route through the listener queue so that

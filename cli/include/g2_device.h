@@ -52,6 +52,14 @@ typedef struct {
 typedef void (*g2_error_cb_t)(const char *msg, void *ctx);
 void g2_set_error_callback(g2_error_cb_t cb, void *ctx);
 
+/* Batch operation descriptor: one USB sub-command with pre-built payload bytes.
+ * Used by g2_batch_ops() to send multiple mutations in a single USB frame. */
+typedef struct {
+    uint8_t        cmd;
+    const uint8_t *payload;
+    int            len;
+} G2Op;
+
 /* Initialize device library */
 int g2_init(void);
 
@@ -143,6 +151,10 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
 
 /* Set module mode: slot 0-3, location 0=fx/1=va, param index, value */
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val);
+
+/* Send multiple patch mutations as a single compound USB frame.
+ * All ops must target the same slot. Version is fetched once; drain+delay happen once. */
+int g2_batch_ops(int slot, const G2Op *ops, int n_ops);
 
 /* Patch browser commands */
 int g2_select_patch(int slot, int bank, int location);

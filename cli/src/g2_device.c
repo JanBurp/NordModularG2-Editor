@@ -1215,6 +1215,23 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
     return G2_OK;
 }
 
+int g2_batch_ops(int slot, const G2Op *ops, int n_ops) {
+    if (slot < 0 || slot > 3)    { g2_err("seq: invalid slot\n");      return G2_ERR_INVALID_PARAM; }
+    if (n_ops <= 0)               return G2_OK;
+    if (ensure_connected(0) < 0) { g2_err("seq: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    if (send_slot_batch((uint8_t)slot, version, ops, n_ops) < 0) {
+        g2_err("seq: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val) {
 
     if (slot < 0 || slot > 3)         { g2_err("set-module-mode: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
