@@ -316,7 +316,6 @@ cJSON *g2_get_patch(const char *slot_str) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
     }
-
     /* Embedded response format: [length][data...][CRC]
      * The version byte sits at index 6 of the raw 16-byte interrupt response. */
     version = interruptResp[6];
@@ -335,7 +334,6 @@ cJSON *g2_get_patch(const char *slot_str) {
         g2_err("No interrupt response for patch data\n");
         goto cleanup;
     }
-
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
         g2_err("Unexpected response type for patch data\n");
         goto cleanup;
