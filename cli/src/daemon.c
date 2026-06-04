@@ -142,6 +142,14 @@ static void rearm_with_version_update(void) {
 
 /* ── command execution ─────────────────────────────────────────────────── */
 
+/* Set by select-patch to trigger a rearm after the immediately-following
+ * get-patch completes.  select-patch silently stops G2 streaming (no
+ * sentinel-2/BULK_REARM is emitted), so we must rearm manually.  We defer
+ * the rearm until after get-patch because g2_rearm() puts a START_COMM ack
+ * in the listener queue that would otherwise pollute g2_get_patch's
+ * recv_interrupt calls. */
+static int rearm_after_get_patch = 0;
+
 static void execute_cmd(const char *line) {
 	cJSON *req = daemon_parse_request(line);
 	if (!req) {
@@ -292,6 +300,9 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_select_patch(slot, arg_i(args, 1), arg_i(args, 2));
+		/* select-patch silently stops G2 streaming (no BULK_REARM is emitted).
+		 * Set the flag so the next get-patch triggers a rearm after it returns. */
+		if (ret == G2_OK) rearm_after_get_patch = 1;
 
 	} else if (strcmp(cmd, "select-perf") == 0 && n >= 2) {
 		ret = g2_select_perf(arg_i(args, 0), arg_i(args, 1));
@@ -370,6 +381,10 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
+		if (rearm_after_get_patch) {
+			rearm_after_get_patch = 0;
+			g2_pending_rearm = 1;
+		}
 
 	} else if (strcmp(cmd, "get-resources") == 0 && n >= 1) {
 		data = g2_get_resources(arg_s(args, 0));
@@ -574,15 +589,14 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_msg_free(&msg);
 			if (daemon_running) do_reconnect();
 		} else if (msg.sentinel == 2) {
-			/* BULK_REARM: G2 stopped streaming after full performance switch.
-			 * Let emit_bulk_event() handle the full message (version_update +
-			 * synth/perf settings query); g2_pending_rearm triggers the rearm. */
+			/* BULK_REARM: G2 stopped streaming (select-patch or select-perf).
+			 * Always rearm — if recv_interrupt() already consumed a sentinel=2
+			 * and set g2_pending_rearm=1, it removes the message from the queue
+			 * so the main loop never sees it here (no double-rearm risk). */
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
-			if (g2_pending_rearm) {
-				g2_pending_rearm = 0;
-				rearm_with_version_update();
-			}
+			g2_pending_rearm = 0;
+			rearm_with_version_update();
 		} else {
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);

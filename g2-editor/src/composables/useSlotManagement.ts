@@ -73,6 +73,7 @@ export function useSlotManagement(
 
 	watch(hardwareSlotChange, async (slot) => {
 		if (slot === null) return;
+		hardwareSlotChange.value = null;
 		uiStore.setSlotInFocus(slot);
 		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.loadSlot(slot));
 	});
