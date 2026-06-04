@@ -38,52 +38,65 @@
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div class="flex-1 min-w-0 bg-neutral-700 relative">
+			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-neutral-700 flex flex-col overflow-hidden">
 				<template v-if="currentPatch">
-					<PatchCanvas
-						v-show="uiStore.area === 1"
-						:key="patchName + '-voice'"
-						:modules="voiceModules"
-						:cables="voiceCables"
-						:variation="uiStore.variation"
-						area="va"
-						:selected-cables="uiStore.selectedCables"
-						:selected-module-indices="uiStore.selectedModules"
-						@jack-drag-start="jackPatching.handleJackDragStart"
-						@jack-drag-end="jackPatching.handleJackDragEnd"
-						@module-move="handleModuleMove"
-						@module-drop="handleModuleDrop"
-						@mode-change="handleModeChange"
-						@param-change="handleParamChange"
-						@module-label-edit="handleModuleLabelEdit"
-						@module-delete="handleModuleDelete"
-						@module-color-change="handleModuleColorChange"
-						@jack-delete-connected="handleJackDeleteConnected"
-						@jack-set-cable-color="handleJackSetCableColor"
-						@param-label-edit="handleParamLabelEdit"
-					/>
-					<PatchCanvas
-						v-show="uiStore.area === 0"
-						:key="patchName + '-fx'"
-						:modules="fxModules"
-						:cables="fxCables"
-						:variation="uiStore.variation"
-						area="fx"
-						:selected-cables="uiStore.selectedCables"
-						:selected-module-indices="uiStore.selectedModules"
-						@jack-drag-start="jackPatching.handleJackDragStart"
-						@jack-drag-end="jackPatching.handleJackDragEnd"
-						@module-move="handleModuleMove"
-						@module-drop="handleModuleDrop"
-						@mode-change="handleModeChange"
-						@param-change="handleParamChange"
-						@module-label-edit="handleModuleLabelEdit"
-						@module-delete="handleModuleDelete"
-						@module-color-change="handleModuleColorChange"
-						@jack-delete-connected="handleJackDeleteConnected"
-						@jack-set-cable-color="handleJackSetCableColor"
-						@param-label-edit="handleParamLabelEdit"
-					/>
+					<div
+						v-show="showVoice"
+						class="relative overflow-hidden min-h-0"
+						:class="{ 'flex-1': !isSplit }"
+						:style="voiceWrapperStyle"
+					>
+						<PatchCanvas
+							:key="patchName + '-voice'"
+							:modules="voiceModules"
+							:cables="voiceCables"
+							:variation="uiStore.variation"
+							area="va"
+							:selected-cables="uiStore.selectedCables"
+							:selected-module-indices="uiStore.selectedModules"
+							@jack-drag-start="jackPatching.handleJackDragStart"
+							@jack-drag-end="jackPatching.handleJackDragEnd"
+							@module-move="voiceOps.handleModuleMove"
+							@module-drop="voiceOps.handleModuleDrop"
+							@mode-change="voiceOps.handleModeChange"
+							@param-change="voiceOps.handleParamChange"
+							@module-label-edit="handleModuleLabelEdit"
+							@module-delete="voiceOps.handleModuleDelete"
+							@module-color-change="voiceOps.handleModuleColorChange"
+							@jack-delete-connected="voiceOps.handleJackDeleteConnected"
+							@jack-set-cable-color="voiceOps.handleJackSetCableColor"
+							@param-label-edit="handleParamLabelEdit"
+						/>
+					</div>
+
+					<div v-if="isSplit" class="divider-handle" @mousedown="startDividerDrag" />
+
+					<div
+						v-show="showFx"
+						class="relative overflow-hidden min-h-0 flex-1"
+					>
+						<PatchCanvas
+							:key="patchName + '-fx'"
+							:modules="fxModules"
+							:cables="fxCables"
+							:variation="uiStore.variation"
+							area="fx"
+							:selected-cables="uiStore.selectedCables"
+							:selected-module-indices="uiStore.selectedModules"
+							@jack-drag-start="jackPatching.handleJackDragStart"
+							@jack-drag-end="jackPatching.handleJackDragEnd"
+							@module-move="fxOps.handleModuleMove"
+							@module-drop="fxOps.handleModuleDrop"
+							@mode-change="fxOps.handleModeChange"
+							@param-change="fxOps.handleParamChange"
+							@module-label-edit="handleModuleLabelEdit"
+							@module-delete="fxOps.handleModuleDelete"
+							@module-color-change="fxOps.handleModuleColorChange"
+							@jack-delete-connected="fxOps.handleJackDeleteConnected"
+							@jack-set-cable-color="fxOps.handleJackSetCableColor"
+							@param-label-edit="handleParamLabelEdit"
+						/>
+					</div>
 				</template>
 			</div>
 
@@ -151,7 +164,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted } from 'vue';
+	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
@@ -172,6 +185,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 	import CPU from './components/toolbar/CPU.vue';
 
+	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { usePatchFile } from './composables/usePatchFile';
@@ -200,6 +214,9 @@
 	const jackPatching = useJackPatching();
 	const patchFile = usePatchFile();
 
+	const canvasAreaRef = ref<HTMLElement | null>(null);
+	const { isSplit, showVoice, showFx, voiceWrapperStyle, startDividerDrag } = useAreaMode(canvasAreaRef);
+
 	const isLoading = computed(
 		() =>
 			device.status === DeviceStatus.Connecting ||
@@ -219,7 +236,7 @@
 	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 1));
 	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 0));
 	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 0));
-	const currentModules = computed(() => (uiStore.area === 1 ? voiceModules.value : fxModules.value));
+	const currentModules = computed(() => (uiStore.activeArea === 1 ? voiceModules.value : fxModules.value));
 	const patchName = computed(() => slotsStore.getPatchName(uiStore.slotInFocus));
 
 	const {
@@ -233,17 +250,9 @@
 		confirmParamLabel,
 	} = useModuleLabelDialog();
 
-	const {
-		deleteSelection,
-		handleModuleMove,
-		handleModuleDrop,
-		handleParamChange,
-		handleModeChange,
-		handleModuleDelete,
-		handleModuleColorChange,
-		handleJackDeleteConnected,
-		handleJackSetCableColor,
-	} = usePatchOperations();
+	const voiceOps = usePatchOperations(() => 'voice');
+	const fxOps = usePatchOperations(() => 'fx');
+	const { deleteSelection } = usePatchOperations();
 
 	const {
 		showDialog: showPatchNameDialog,

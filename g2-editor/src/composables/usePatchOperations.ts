@@ -3,27 +3,23 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useDeviceStore } from '../store/device';
 
-export function usePatchOperations() {
+export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const device = useDeviceStore();
 
+	const getArea = areaGetter ?? (() => (uiStore.activeArea === 1 ? 'voice' : 'fx'));
+
 	const currentModules = computed(() =>
-		uiStore.area === 1 ? slotsStore.getAreaModules(uiStore.slotInFocus, 1) : slotsStore.getAreaModules(uiStore.slotInFocus, 0),
+		getArea() === 'voice' ? slotsStore.getAreaModules(uiStore.slotInFocus, 1) : slotsStore.getAreaModules(uiStore.slotInFocus, 0),
 	);
 	const currentCables = computed(() =>
-		uiStore.area === 1 ? slotsStore.getAreaCables(uiStore.slotInFocus, 1) : slotsStore.getAreaCables(uiStore.slotInFocus, 0),
+		getArea() === 'voice' ? slotsStore.getAreaCables(uiStore.slotInFocus, 1) : slotsStore.getAreaCables(uiStore.slotInFocus, 0),
 	);
 
 	async function deleteSelection(): Promise<void> {
 		try {
-			await slotsStore.deleteSelection(
-				uiStore.selectedModules,
-				uiStore.selectedCables,
-				uiStore.area === 1 ? 'voice' : 'fx',
-				currentModules.value,
-				currentCables.value,
-			);
+			await slotsStore.deleteSelection(uiStore.selectedModules, uiStore.selectedCables, getArea(), currentModules.value, currentCables.value);
 		} finally {
 			uiStore.clearSelection();
 			uiStore.selectedCables = [];
@@ -31,12 +27,12 @@ export function usePatchOperations() {
 	}
 
 	async function handleModuleMove({ indices, dCol, dRow }: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }): Promise<void> {
-		const result = await slotsStore.moveModulesWithCollision(indices, dCol, dRow, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value);
+		const result = await slotsStore.moveModulesWithCollision(indices, dCol, dRow, getArea(), currentModules.value);
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
 	}
 
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
-		const result = await slotsStore.dropModuleWithCollision(typeId, col, row, uiStore.area === 1 ? 'voice' : 'fx', currentModules.value);
+		const result = await slotsStore.dropModuleWithCollision(typeId, col, row, getArea(), currentModules.value);
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
 	}
 
@@ -46,7 +42,7 @@ export function usePatchOperations() {
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
 			try {
-				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
+				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, getArea());
 			} catch {
 				/* G2 may be temporarily busy */
 			}
@@ -58,7 +54,7 @@ export function usePatchOperations() {
 		paramChangeTimer = setTimeout(async () => {
 			paramChangeTimer = null;
 			try {
-				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, uiStore.area === 1 ? 'voice' : 'fx');
+				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
 			} catch {
 				/* G2 may be temporarily busy */
 			}
@@ -66,16 +62,14 @@ export function usePatchOperations() {
 	}
 
 	async function handleModuleDelete(moduleIndex: number): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.deleteModule(moduleIndex, area as 'voice' | 'fx');
+		await slotsStore.deleteModule(moduleIndex, getArea());
 		uiStore.selectModules(uiStore.selectedModules.filter((i) => i !== moduleIndex));
 	}
 
 	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
 		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
 		uiStore.setModuleColor(colorId);
-		await slotsStore.setModuleColors(targets, colorId, area as 'voice' | 'fx');
+		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
 
 	async function handleJackDeleteConnected({
@@ -87,8 +81,7 @@ export function usePatchOperations() {
 		connectorIndex: number;
 		type: 'input' | 'output';
 	}): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
+		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, getArea());
 	}
 
 	async function handleJackSetCableColor({
@@ -102,8 +95,7 @@ export function usePatchOperations() {
 		type: 'input' | 'output';
 		colorId: number;
 	}): Promise<void> {
-		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setCableColor(moduleIndex, connectorIndex, type, colorId, area);
+		await slotsStore.setCableColor(moduleIndex, connectorIndex, type, colorId, getArea());
 	}
 
 	return {

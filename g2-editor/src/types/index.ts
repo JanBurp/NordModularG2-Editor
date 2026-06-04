@@ -16,6 +16,7 @@ export type MenuAction =
 	| 'toggle-svg-viewer'
 	| 'area-voice'
 	| 'area-fx'
+	| 'area-split'
 	| 'slot-A'
 	| 'slot-B'
 	| 'slot-C'
