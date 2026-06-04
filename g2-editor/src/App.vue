@@ -38,7 +38,7 @@
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div class="flex-1 bg-neutral-700 relative">
+			<div class="flex-1 min-w-0 bg-neutral-700 relative">
 				<template v-if="currentPatch">
 					<PatchCanvas
 						v-show="uiStore.area === 1"
