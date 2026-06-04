@@ -88,6 +88,18 @@ body {
 	border: 3px solid rgba(30, 30, 30, 0.8);
 }
 
+.divider-handle {
+	flex-shrink: 0;
+	height: 5px;
+	background: theme('colors.neutral.800');
+	cursor: row-resize;
+	user-select: none;
+}
+
+.divider-handle:hover {
+	background: theme('colors.neutral.300');
+}
+
 .module-bevel {
 	background:
 		linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(210, 210, 210, 0.15) 30%, transparent 100%) 0 0 / 100% 3px no-repeat,

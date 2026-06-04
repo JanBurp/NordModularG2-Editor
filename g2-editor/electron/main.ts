@@ -285,6 +285,7 @@ app.whenReady().then(async () => {
 				{ label: "Info", click: () => win!.webContents.send("menu:action", "toggle-info"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "Option+V" },
+				{ label: "Split View", click: () => win!.webContents.send("menu:action", "area-split"), accelerator: "Option+S" },
 				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "Option+F" },
 				{ type: "separator" as const },
 				{ label: "Slot A", click: () => win!.webContents.send("menu:action", "slot-A"), accelerator: "Option+A" },
