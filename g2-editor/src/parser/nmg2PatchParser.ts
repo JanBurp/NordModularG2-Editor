@@ -8,8 +8,8 @@
 import type { Area, Cable, Patch, PatchDescription, PatchParamVariation } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
-import { getModule } from '../renderer/nmg2mods';
 import { SectionType } from './constants';
+import { getModule } from '../renderer/nmg2mods';
 
 export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation };
 
