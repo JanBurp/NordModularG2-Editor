@@ -160,27 +160,6 @@ export function makeSubElements(s: SVGElement, o: ModuleDef): void {
 }
 
 /**
- * Creates a module template and caches it
- *
- * @param moduleDef - Module definition
- * @param defs - SVG defs element to append to
- * @returns The created template
- */
-// function createModuleTemplate(moduleDef: ModuleDef, defs: SVGElement): SVGSVGElement {
-// 	const cached = templateCache.get(moduleDef.id);
-// 	if (cached) return cached;
-
-// 	const h = moduleDef.height * 16;
-// 	const s = document.createElementNS(XMLNS, 'svg');
-// 	s.setAttributeNS(null, 'id', moduleDef.shortnm);
-// 	makeBasicPanel(s, h);
-// 	makeSubElements(s, moduleDef);
-// 	defs.appendChild(s);
-// 	templateCache.set(moduleDef.id, s);
-// 	return s;
-// }
-
-/**
  * Removes all modules from an SVG element
  *
  * @param svgElement - SVG element to remove modules from

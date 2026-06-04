@@ -8,19 +8,6 @@
 
 			<SearchInput v-model="searchQuery" :is-active="true"></SearchInput>
 
-			<!-- <h2 class="text-xl font-semibold text-neutral-300 mb-4">Gradients</h2>
-			<div class="grid grid-cols-3 gap-6 mb-8">
-				<div v-for="grad in gradients" :key="grad.id" class="bg-neutral-800 p-4 rounded">
-					<p class="text-neutral-400 text-sm mb-2">{{ grad.id }}</p>
-					<svg width="100" height="60" class="border border-neutral-600">
-						<defs>
-							<component :is="grad.component" v-bind="grad.props" />
-						</defs>
-						<rect x="5" y="5" width="90" height="50" :fill="'url(#' + grad.id + ')'" />
-					</svg>
-				</div>
-			</div> -->
-
 			<h2 class="text-xl font-semibold text-neutral-300 mb-4">Paths & Icons</h2>
 			<div class="grid grid-cols-4 gap-6">
 				<div v-for="path in filteredPaths" :key="path.id" class="bg-neutral-800 p-4 rounded">

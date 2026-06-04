@@ -195,7 +195,6 @@ export const useLedStore = defineStore('led', () => {
 	}
 
 	return {
-		lastLedData,
 		parseLedData,
 		parseVolumeData,
 		getLedState,

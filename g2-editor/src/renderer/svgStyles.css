@@ -150,18 +150,8 @@ ul#variationselect li span.currentbutton {
 	background-color: orange;
 }
 
-.buttonbg {
-	background-repeat: repeat-x;
-	background-size: contain;
-	background-image: url(data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAIAAAAgCAYAAAA40qkZAAAABHNCSVQICAgIfAhkiAAAAAlwSFlzAAABOAAAATgBsmZOHAAAABl0RVh0U29mdHdhcmUAd3d3Lmlua3NjYXBlLm9yZ5vuPBoAAABRSURBVBiVlY9BCsAwCASnkn/3SXlZPImnsPSQEkgLJfUkMyuyR631NDOKu7MurbUHiQgAiiQAjHt2iC1E0r/zrRcfqveOJEpmjkxEjF6TvNQF9XRDKy9nNs4AAAAASUVORK5CYII=);
-}
-
 fieldset {
 	border: 1px solid silver;
-}
-
-.nope {
-	display: none;
 }
 
 .cable-hidden {
