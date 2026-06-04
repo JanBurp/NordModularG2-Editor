@@ -70,19 +70,54 @@
 		<!-- Parameters -->
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
-				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleKnob
+					v-if="isKnob(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-dbl-click="onParamDblClick"
+					@param-hover="onParamHover"
+				/>
+				<ModuleSlider
+					v-else-if="isSlider(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-hover="onParamHover"
+				/>
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:param="param"
 					:value="getParamValue(index)"
 					:label="getParamLabel(index)"
 					:param-index="index"
+					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
+					@param-hover="onParamHover"
 				/>
-				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleKnobSpin
+					v-else-if="isSpinner(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-hover="onParamHover"
+				/>
+				<ModuleKnobSpinH
+					v-else-if="isSpinnerH(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-hover="onParamHover"
+				/>
 			</template>
 		</g>
 
@@ -129,6 +164,7 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import { useUiStore } from '../../store/ui';
 	import ModuleBackground from './ModuleBackground.vue';
 	import ModuleKnob from './ModuleKnob.vue';
 	import ModuleTitle from './ModuleTitle.vue';
@@ -174,6 +210,7 @@
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
 		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
+		paramDblClick: [info: { moduleIndex: number; paramIndex: number; paramType: string; currentValue: number; area: 'fx' | 'va' }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
@@ -281,4 +318,19 @@
 		(moduleIndex, paramIndex, value) => emit('paramChange', moduleIndex, paramIndex, value),
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
+
+	const uiStore = useUiStore();
+	const selectedParamIndex = computed(() =>
+		uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1,
+	);
+
+	function onParamDblClick(paramIndex: number) {
+		const paramType = moduleDef.value?.params?.[paramIndex]?.type ?? '';
+		const currentValue = getParamValue(paramIndex);
+		emit('paramDblClick', { moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+	}
+
+	function onParamHover(paramIndex: number) {
+		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
+	}
 </script>
