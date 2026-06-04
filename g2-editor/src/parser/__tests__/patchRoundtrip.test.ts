@@ -7,6 +7,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
 import { serializePatch, serializePerformance } from '../nmg2PatchSerializer';
+import { extractVariations } from '../../store/slotHelpers';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
@@ -117,7 +118,7 @@ describe('patch round-trip: parse → serialize → parse', () => {
 	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
 		it(file, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
-			const newHex = serializePatch(name, patchA, rawHex);
+			const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 			const patchB = parsePatchFromRawHex(name, newHex);
 			expectPatchEqual(patchA, patchB);
 		});
@@ -133,7 +134,7 @@ describe('deleteCable', () => {
 		const remainingCount = cables.length - 1;
 
 		mutDeleteCable(patch, 1, target);
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const cabsB = patchB.areas[1].cableList ?? [];
@@ -159,7 +160,7 @@ describe('deleteModule', () => {
 		const expectedCables = cables.length - connectedCables;
 
 		mutDeleteModule(patch, 1, target.index);
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		expect(patchB.areas[1].modules).toHaveLength(expectedMods);
@@ -181,7 +182,7 @@ describe('moveModule', () => {
 
 		const before = modSnap(target);
 		mutMoveModule(patch, 1, target.index, newCol, newRow);
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const moved = patchB.areas[1].modules.find((m) => m.index === target.index)!;
@@ -216,7 +217,7 @@ describe('addModule', () => {
 			modes: [],
 		};
 		mutAddModule(patch, 1, mod);
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		expect(patchB.areas[1].modules).toHaveLength(1);
@@ -250,7 +251,7 @@ describe('addModule', () => {
 			modes: [],
 		};
 		mutAddModule(patch, 1, mod);
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const added = patchB.areas[1].modules.find((m) => m.index === 2)!;
@@ -276,7 +277,7 @@ describe('addCable', () => {
 		};
 		mutAddCable(patch, 1, newCable);
 
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const cables = patchB.areas[1].cableList ?? [];
@@ -333,7 +334,7 @@ describe('chained edits round-trip', () => {
 		const cablesBeforeSerialize = (patch.areas[1].cableList ?? []).map(cableSnap);
 
 		// Serialize → re-parse
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const modulesAfterParse = patchB.areas[1].modules.map(modSnap).sort((a, b) => a.index - b.index);
@@ -355,7 +356,7 @@ describe('paramLabels round-trip', () => {
 		expect(fixture).toBeDefined();
 
 		const { name, rawHex, patch: patchA } = loadFixture(fixture!);
-		const newHex = serializePatch(name, patchA, rawHex);
+		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		for (const i of [0, 1] as const) {
@@ -392,7 +393,7 @@ describe('paramLabels round-trip', () => {
 		};
 		mutAddModule(patch, 1, mod);
 
-		const newHex = serializePatch(name, patch, rawHex);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		const added = patchB.areas[1].modules.find((m) => m.index === 1);
@@ -403,7 +404,7 @@ describe('paramLabels round-trip', () => {
 	it('omits 0x5b chunk when no module has labels', () => {
 		// EmptyPatch starts with no labels; round-trip should not introduce any
 		const { name, rawHex, patch: patchA } = loadFixture('EmptyPatch.pch2');
-		const newHex = serializePatch(name, patchA, rawHex);
+		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		for (const i of [0, 1] as const) {
@@ -418,7 +419,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 			const { name, rawHex, patch: patchA } = loadFixture(file);
 
 			// Serialize (as saveSlot does after mutations)
-			const savedRawHex = serializePatch(name, patchA, rawHex);
+			const savedRawHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 
 			// Simulate save then load: prepend name header, strip it back
 			const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
@@ -444,7 +445,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		desc.purple = 0;
 		desc.white = 0;
 
-		const savedRawHex = serializePatch(name, patch, rawHex);
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
 
 		expect(patchB.description!.red).toBe(0);
@@ -462,7 +463,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		const newVariation = (desc.variation + 3) % 9;
 		desc.variation = newVariation;
 
-		const savedRawHex = serializePatch(name, patch, rawHex);
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
 
 		expect(patchB.description!.variation).toBe(newVariation);
@@ -474,7 +475,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		desc.monopoly = 1;
 		desc.category = 7;
 
-		const savedRawHex = serializePatch(name, patch, rawHex);
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const { patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
 
 		expect(patchB.description!.monopoly).toBe(1);
@@ -522,7 +523,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 		};
 		mutAddCable(patch, 1, cable);
 
-		const savedRawHex = serializePatch(name, patch, rawHex);
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 		const { rawHex: loadedRawHex, patch: patchB } = simulateFileSaveAndLoad(name, savedRawHex);
 
 		expect(loadedRawHex).toEqual(savedRawHex);
@@ -545,7 +546,7 @@ describe('patchParams round-trip', () => {
 		patchA.patchParams![0].activeMuted = 0;
 		const origV2Vol = patchA.patchParams![2].patchVol;
 
-		const newHex = serializePatch(name, patchA, rawHex);
+		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		expect(patchB.patchParams![0].patchVol).toBe(75);
@@ -559,12 +560,12 @@ describe('patchParams round-trip', () => {
 		const { name, rawHex, patch: patchA } = loadFixture('Analogue NL2.pch2');
 		patchA.patchParams![0].patchVol = 99;
 
-		const hex1 = serializePatch(name, patchA, rawHex);
+		const hex1 = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 		const patchB = parsePatchFromRawHex(name, hex1);
 		expect(patchB.patchParams![0].patchVol).toBe(99);
 
 		// Re-serialize using hex1 as template — morphs now come from hex1
-		const hex2 = serializePatch(name, patchB, hex1);
+		const hex2 = serializePatch(name, patchB, hex1, extractVariations(patchB));
 		const patchC = parsePatchFromRawHex(name, hex2);
 		expect(patchC.patchParams![0].patchVol).toBe(99);
 		// Identical output means morphs were preserved intact through the chain
@@ -581,7 +582,7 @@ describe('patchParams round-trip', () => {
 		patchA.patchParams![0].bend = 0;
 		patchA.patchParams![0].arpeggiator = 1;
 
-		const newHex = serializePatch(name, patchA, rawHex);
+		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 		const patchB = parsePatchFromRawHex(name, newHex);
 		const r = patchB.patchParams![0];
 
@@ -661,7 +662,7 @@ describe('prf2 round-trip: parse → serializePerformance → parse', () => {
 	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
 		it(file, () => {
 			const { name, rawHex, patches: patchesA } = loadFixturePrf2(file);
-			const newHex = serializePerformance(patchesA, rawHex);
+			const newHex = serializePerformance(patchesA, rawHex, patchesA.map(extractVariations));
 			const { patches: patchesB } = parsePerfFromRawHex(name, newHex);
 			expect(patchesB).toHaveLength(4);
 			for (let s = 0; s < 4; s++) {
@@ -674,7 +675,7 @@ describe('prf2 round-trip: parse → serializePerformance → parse', () => {
 describe('prf2 0x11 section preservation', () => {
 	it('perf data header (0x11) is byte-identical after round-trip', () => {
 		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
-		const newHex = serializePerformance(patches, rawHex);
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
 		const orig11 = extractSection(rawHex, 0x11);
 		const new11 = extractSection(newHex, 0x11);
 		expect(orig11).not.toBeNull();
@@ -696,7 +697,7 @@ describe('prf2 per-slot mutation round-trip', () => {
 		};
 		mutAddModule(patches[0], 1, mod);
 
-		const newHex = serializePerformance(patches, rawHex);
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
 		const { patches: reparsed } = parsePerfFromRawHex(name, newHex);
 
 		for (let s = 1; s <= 3; s++) {
@@ -718,7 +719,7 @@ describe('prf2 per-slot mutation round-trip', () => {
 		};
 		mutAddModule(patches[2], 1, mod);
 
-		const newHex = serializePerformance(patches, rawHex);
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
 		const { patches: reparsed } = parsePerfFromRawHex(name, newHex);
 
 		const found = reparsed[2].areas[1].modules.find((m) => m.index === 201);
@@ -732,7 +733,7 @@ describe('prf2 file save/load round-trip', () => {
 	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
 		it(`unmodified — ${file}`, () => {
 			const { name, rawHex, patches: patchesA } = loadFixturePrf2(file);
-			const savedRawHex = serializePerformance(patchesA, rawHex);
+			const savedRawHex = serializePerformance(patchesA, rawHex, patchesA.map(extractVariations));
 			const { rawHex: loadedRawHex, patches: patchesB } = simulatePerfFileSaveAndLoad(name, savedRawHex);
 			expect(loadedRawHex).toEqual(savedRawHex);
 			for (let s = 0; s < 4; s++) {

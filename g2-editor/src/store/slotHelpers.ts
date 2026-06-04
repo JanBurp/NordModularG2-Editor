@@ -40,20 +40,6 @@ export function extractVariations(patch: Patch): VariationState[] {
 	}));
 }
 
-export function syncVariationsToLv(patch: Patch, variations: VariationState[]): void {
-	for (const [aIdx, aKey] of [[0, 'fx'], [1, 'voice']] as const) {
-		for (const mod of patch.areas[aIdx]?.modules ?? []) {
-			if (mod.pcnt === 0) continue;
-			for (let v = 0; v < NUM_VARIATIONS; v++) {
-				const params = variations[v]?.[aKey]?.[mod.index];
-				if (!params) continue;
-				for (let p = 0; p < mod.pcnt; p++) mod.lv[v * mod.pcnt + p] = params[p] ?? mod.lv[v * mod.pcnt + p];
-			}
-		}
-	}
-	if (!patch.patchParams) patch.patchParams = [];
-	for (let v = 0; v < NUM_VARIATIONS; v++) if (variations[v]) patch.patchParams[v] = { ...variations[v].patch };
-}
 
 export function removeModuleFromVariations(variations: VariationState[] | null, moduleId: number, areaKey: 'fx' | 'voice'): void {
 	if (!variations) return;

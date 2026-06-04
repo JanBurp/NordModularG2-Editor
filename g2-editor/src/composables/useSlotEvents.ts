@@ -62,14 +62,6 @@ export function useSlotEvents(log: LogFn) {
 			log('←', 'Watch', `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`, 'param');
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
-			const patch = slotsStore.slots[slotLabel]?.patch;
-			const areaIdx = ev.area === 'va' ? 1 : 0;
-			const mod = (patch?.areas?.[areaIdx]?.modules as any[])?.find((m: any) => m.index === ev.module);
-			if (mod?.lv && mod.pcnt) {
-				const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
-				if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
-			}
-			// mirror to variations
 			const areaKey = ev.area === 'va' ? 'voice' : 'fx';
 			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
 			if (vState?.[areaKey]?.[ev.module as number]) vState[areaKey][ev.module as number][ev.param as number] = ev.value;
@@ -79,12 +71,7 @@ export function useSlotEvents(log: LogFn) {
 			log('←', 'Watch', `patch_param s=${ev.slot} p=${ev.param} v=${ev.value} var=${ev.variation}`, 'param');
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
-			const params = slotsStore.slots[slotLabel]?.patch?.patchParams;
 			const key = PATCH_PARAM_KEYS[ev.param as number];
-			if (params?.[ev.variation] && key) {
-				(params[ev.variation] as Record<string, number>)[key] = ev.value;
-			}
-			// mirror to variations
 			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
 			if (vState && key) (vState.patch as Record<string, number>)[key] = ev.value;
 			return true;
