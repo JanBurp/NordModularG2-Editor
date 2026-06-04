@@ -1,7 +1,4 @@
 /**
- * Clavia Nord Modular G2 pch2 file reader writer
- * Adapted from g2ools python utility at https://github.com/msg/g2-tools
- *
  * prf2 file is very similar but contains extra section type 0x11 at beginning which contains slot names and slot data
  */
 
