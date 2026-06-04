@@ -111,10 +111,6 @@
 		});
 	}
 
-	// Label positioning
-	// const labelX = computed(() => {
-	// 	return props.type === 'input' ? props.x + 10 : props.x - 10;
-	// });
 </script>
 <style scoped>
 	.jack {

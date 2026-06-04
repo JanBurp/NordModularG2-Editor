@@ -1,20 +1,7 @@
-/**
- * SVG Utilities for Nord Modular G2 Editor
- *
- * Provides helper functions for creating SVG elements with proper namespaces
- */
-
 export const XMLNS = 'http://www.w3.org/2000/svg';
 export const XLINK_NS = 'http://www.w3.org/1999/xlink';
 
-/**
- * Creates an SVG element with the specified tag and attributes
- *
- * @param tag - SVG tag name or existing element
- * @param attrs - Object containing attributes to set
- * @returns The created or modified SVG element
- */
-export function svgNSGet(tag: string | SVGElement, attrs?: Record<string, any>): SVGElement {
+function svgNSGet(tag: string | SVGElement, attrs?: Record<string, any>): SVGElement {
 	const se = typeof tag === 'object' ? tag : document.createElementNS(XMLNS, tag);
 	if (attrs) {
 		for (const a in attrs) {
@@ -26,34 +13,6 @@ export function svgNSGet(tag: string | SVGElement, attrs?: Record<string, any>):
 		}
 	}
 	return se;
-}
-
-/**
- * Creates a USE element referencing a symbol
- *
- * @param href - Reference ID (e.g., '#input' or '#output')
- * @param attrs - Additional attributes
- * @returns SVG use element
- */
-export function svgUse(href: string, attrs?: Record<string, any>): SVGUseElement {
-	const use = document.createElementNS(XMLNS, 'use');
-	use.setAttributeNS(XLINK_NS, 'xlink:href', href);
-	if (attrs) {
-		for (const a in attrs) {
-			use.setAttributeNS(null, a, attrs[a]);
-		}
-	}
-	return use;
-}
-
-/**
- * Creates an SVG group element
- *
- * @param attrs - Attributes for the group
- * @returns SVG group element
- */
-export function svgGroup(attrs?: Record<string, any>): SVGGElement {
-	return svgNSGet('g', attrs) as SVGGElement;
 }
 
 /**
@@ -130,18 +89,6 @@ export function svgText(x: number, y: number, text: string, attrs?: Record<strin
 		textContent: text,
 		...attrs,
 	}) as SVGTextElement;
-}
-
-/**
- * Creates an SVG clipPath element
- *
- * @param id - Clip path ID
- * @returns SVG clipPath element
- */
-export function svgClipPath(id: string): SVGClipPathElement {
-	const clip = document.createElementNS(XMLNS, 'clipPath');
-	clip.setAttribute('id', id);
-	return clip;
 }
 
 /**
