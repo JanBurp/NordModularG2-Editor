@@ -1,17 +1,16 @@
 <template>
-	<div class="flex items-center justify-between h-6 gap-2 bg-neutral-500 border-b border-neutral-700 text-xs text-neutral-900">
-		<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
+	<div class="status-bar flex items-center justify-between gap-3 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
+		<BtnGroup v-model="uiStore.area" :options="AREA_OPTIONS" variant="toggle" />
 
-		<div class="flex items-center gap-2 text-neutral-300">
-		<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
-		<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
+		<div v-if="currentPatch" class="flex items-center gap-2">
+			<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
+			<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
 		</div>
 
 		<BtnGroup
 			:model-value="uiStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="tab"
-			size="small"
 			@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 			@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 		/>
@@ -23,7 +22,6 @@
 	import { useUiStore } from '../../store/ui';
 	import { useSlotsStore } from '../../store/slots';
 	import BtnGroup from './BtnGroup.vue';
-	import StatusBarDivider from './StatusBarDivider.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
 	import type { PaneTab } from '../../store/ui';
 

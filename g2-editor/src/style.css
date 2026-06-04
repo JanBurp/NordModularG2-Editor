@@ -34,23 +34,23 @@ body {
 }
 
 .btn {
-	@apply inline-flex items-center justify-center bg-neutral-700 border border-neutral-600 rounded text-neutral-200 font-normal focus-visible:outline-2 focus-visible:outline-[#2563eb] focus-visible:outline-offset-2 cursor-pointer;
+	@apply inline-flex items-center justify-center bg-neutral-700 border border-neutral-600 rounded text-neutral-200 font-normal focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-neutral-900 focus-visible:outline-none cursor-pointer;
 }
 
 .btn-default {
-	@apply h-8 px-3 text-sm;
+	@apply h-6 px-3 text-sm;
 }
 
 .btn-toggle {
-	@apply h-8 px-2.5 text-sm bg-neutral-800 border-neutral-700;
+	@apply h-6 px-2 text-sm bg-neutral-800 border-neutral-700;
 }
 
 .btn-variation {
-	@apply min-w-8 h-8 px-2 text-sm bg-neutral-800;
+	@apply min-w-7 h-6 px-1.5 text-sm bg-neutral-800;
 }
 
 .btn-active {
-	@apply !bg-green-500 !text-white;
+	@apply bg-green-600! text-white!;
 }
 
 .btn-disabled {
@@ -58,19 +58,23 @@ body {
 }
 
 .btn-hover {
-	@apply hover:bg-neutral-600;
+	@apply hover:bg-neutral-600 transition-colors duration-150;
 }
 
 .btn-xs {
-	@apply !h-4 !px-1 !text-xs !rounded-none;
+	@apply h-4! px-1! text-xs! rounded-none! transition-none!;
 }
 
 .btn-small {
-	@apply h-6 px-1.5 text-xs;
+	@apply h-5 px-1 text-xs;
 }
 
 .btn-group-item {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
+}
+
+.btn-cable-select {
+	@apply border-neutral-700!;
 }
 
 .search-input {
@@ -86,11 +90,23 @@ body {
 }
 
 .toolbar-divider {
-	@apply w-px h-6 bg-neutral-700 mx-1;
+	@apply w-px h-6 bg-neutral-600/60 mx-1;
+}
+
+.status-bar .btn {
+	@apply rounded-none!;
+}
+
+.status-badge {
+	@apply inline-flex items-center gap-1.5 px-2.5 py-1 rounded-full text-xs font-medium border border-neutral-700 bg-neutral-800/80 cursor-pointer hover:bg-neutral-700/80 transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-blue-500/60;
+}
+
+.status-dot {
+	@apply w-2 h-2 rounded-full shrink-0;
 }
 
 .text {
-	@apply border border-black text-black inline-block px-1 py-1 text-center rounded;
+	@apply border border-black text-black inline-block px-1 py-1 text-center rounded-xs text-xs;
 }
 
 .panel {
@@ -142,9 +158,9 @@ body {
 
 .module-bevel {
 	background:
-		linear-gradient(to bottom, rgba(255,255,255,1) 0%, rgba(210,210,210,0.15) 30%, transparent 100%) 0 0 / 100% 3px no-repeat,
-		linear-gradient(to bottom, transparent 0%, rgba(127,127,127,0.25) 80%, rgba(16,16,16,1) 100%) 0 100% / 100% 3px no-repeat,
-		linear-gradient(to right, rgba(16,16,16,1) 0%, rgba(127,127,127,0.75) 20%, transparent 100%) 0 0 / 3px 100% no-repeat,
-		linear-gradient(to right, transparent 0%, rgba(210,210,210,0.15) 70%, rgba(255,255,255,1) 100%) 100% 0 / 3px 100% no-repeat,
-		#CCC;
+		linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(210, 210, 210, 0.15) 30%, transparent 100%) 0 0 / 100% 3px no-repeat,
+		linear-gradient(to bottom, transparent 0%, rgba(127, 127, 127, 0.25) 80%, rgba(16, 16, 16, 1) 100%) 0 100% / 100% 3px no-repeat,
+		linear-gradient(to right, rgba(16, 16, 16, 1) 0%, rgba(127, 127, 127, 0.75) 20%, transparent 100%) 0 0 / 3px 100% no-repeat,
+		linear-gradient(to right, transparent 0%, rgba(210, 210, 210, 0.15) 70%, rgba(255, 255, 255, 1) 100%) 100% 0 / 3px 100% no-repeat,
+		#ccc;
 }

@@ -1,5 +1,5 @@
 <template>
-	<div class="h-8 flex gap-1 bg-neutral-700 rounded px-2 items-center">
+	<div class="h-6 flex gap-1 bg-neutral-700 rounded px-2 items-center">
 		<span class="w-4 text-xs text-neutral-400">VA</span>
 		<CPUpart :value="va.cycles" />
 		<CPUpart :value="va.memory" />
