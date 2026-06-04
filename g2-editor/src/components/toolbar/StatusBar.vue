@@ -1,6 +1,6 @@
 <template>
-	<div class="flex items-center justify-between gap-2 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
-		<BtnGroup v-model="uiStore.area" size="small" :options="AREA_OPTIONS" variant="toggle" />
+	<div class="status-bar flex items-center justify-between gap-3 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
+		<BtnGroup v-model="uiStore.area" :options="AREA_OPTIONS" variant="toggle" />
 
 		<div v-if="currentPatch" class="flex items-center gap-2">
 			<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
@@ -11,7 +11,6 @@
 			:model-value="uiStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="tab"
-			size="small"
 			@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 			@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
 		/>

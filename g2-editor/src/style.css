@@ -66,11 +66,15 @@ body {
 }
 
 .btn-small {
-	@apply h-5 px-1 text-xs rounded-none!;
+	@apply h-5 px-1 text-xs;
 }
 
 .btn-group-item {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
+}
+
+.btn-cable-select {
+	@apply border-neutral-700!;
 }
 
 .search-input {
@@ -87,6 +91,10 @@ body {
 
 .toolbar-divider {
 	@apply w-px h-6 bg-neutral-600/60 mx-1;
+}
+
+.status-bar .btn {
+	@apply rounded-none!;
 }
 
 .status-badge {
