@@ -67,11 +67,11 @@ export function useDeviceEvents(log: LogFn) {
 		}
 		if (ev.type === 'assigned_voices') {
 			if (Array.isArray(ev.voices)) {
-				slotsStore.assignedVoices = ev.voices;
 				const slotLabels = ['A', 'B', 'C', 'D'] as const;
-				for (let i = 0; i < ev.voices.length && i < slotLabels.length; i++) {
+				for (let i = 0; i < 4; i++) {
+					slotsStore.slots[slotLabels[i]].assignedVoices = ev.voices[i] ?? 0;
 					const entry = store.device?.slots.find((s) => s.slot === slotLabels[i]);
-					if (entry) entry.active = ev.voices[i] > 0;
+					if (entry) entry.active = (ev.voices[i] ?? 0) > 0;
 				}
 			}
 			log('←', 'Watch', `assigned_voices=[${(ev.voices ?? []).join(',')}]`);
