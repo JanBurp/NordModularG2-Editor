@@ -93,8 +93,13 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					uiStore.toggleSidebar('info');
 					break;
 				case 'area-voice':
+					uiStore.setAreaMode(1);
+					break;
 				case 'area-fx':
-					uiStore.area = uiStore.area === 1 ? 0 : 1;
+					uiStore.setAreaMode(0);
+					break;
+				case 'area-split':
+					uiStore.toggleSplit();
 					break;
 				case 'slot-A': handleSlotClick(0); break;
 				case 'slot-B': handleSlotClick(1); break;
