@@ -140,6 +140,166 @@ static void rearm_with_version_update(void) {
 	g2_rearm();
 }
 
+/* ── seq: compound-frame batch execution ───────────────────────────────── */
+
+#define SEQ_MAX_OPS   128
+#define SEQ_OP_BUFSZ 1024  /* large enough for set-param-label worst case */
+
+static int execute_seq(cJSON *args) {
+    int n_subs = cJSON_GetArraySize(args);
+    if (n_subs == 0) return G2_OK;
+    int limit = n_subs < SEQ_MAX_OPS ? n_subs : SEQ_MAX_OPS;
+
+    G2Op    *ops  = calloc((size_t)limit, sizeof(G2Op));
+    uint8_t *pool = malloc((size_t)limit * SEQ_OP_BUFSZ);
+    if (!ops || !pool) { free(ops); free(pool); return G2_ERR_NO_MEMORY; }
+
+    int n_ops = 0, batch_slot = -1, ret = G2_OK;
+
+    for (int si = 0; si < limit && ret == G2_OK; si++) {
+        cJSON *sub = cJSON_GetArrayItem(args, si);
+        if (!cJSON_IsArray(sub) || cJSON_GetArraySize(sub) < 3) {
+            ret = G2_ERR_INVALID_PARAM; break;
+        }
+
+        const char *scmd = arg_s(sub, 0);
+        int s_slot = parse_slot(arg_s(sub, 1));
+        if (s_slot == SLOT_INVALID || !scmd) { ret = G2_ERR_INVALID_PARAM; break; }
+        if (batch_slot == -1) batch_slot = s_slot;
+        else if (batch_slot != s_slot) { ret = G2_ERR_INVALID_PARAM; break; }
+
+        int s_loc = parse_location_str(arg_s(sub, 2));
+        int sn    = cJSON_GetArraySize(sub);
+
+        G2Op    *op = &ops[n_ops];
+        uint8_t *p  = pool + n_ops * SEQ_OP_BUFSZ;
+
+        if (strcmp(scmd, "del-cable") == 0 && sn >= 9) {
+            int fm = arg_i(sub,3), fct = arg_i(sub,4), fci = arg_i(sub,5);
+            int tm = arg_i(sub,6), tct = arg_i(sub,7), tci = arg_i(sub,8);
+            if (fct == 0) {
+                int t;
+                t = fm; fm = tm; tm = t; t = fct; fct = tct; tct = t; t = fci; fci = tci; tci = t;
+            }
+            p[0] = (uint8_t)((1 << 1) | (s_loc & 1));
+            p[1] = (uint8_t)fm;
+            p[2] = (uint8_t)(((fct & 3) << 6) | (fci & 0x3f));
+            p[3] = (uint8_t)tm;
+            p[4] = (uint8_t)(((tct & 3) << 6) | (tci & 0x3f));
+            op->cmd = 0x51; op->payload = p; op->len = 5; n_ops++;
+
+        } else if (strcmp(scmd, "add-cable") == 0 && sn >= 10) {
+            int color = arg_i(sub,3);
+            int fm = arg_i(sub,4), fct = arg_i(sub,5), fci = arg_i(sub,6);
+            int tm = arg_i(sub,7), tct = arg_i(sub,8), tci = arg_i(sub,9);
+            if (fct == 0) {
+                int t;
+                t = fm; fm = tm; tm = t; t = fct; fct = tct; tct = t; t = fci; fci = tci; tci = t;
+            }
+            p[0] = (uint8_t)((1 << 4) | ((s_loc & 1) << 3) | (color & 7));
+            p[1] = (uint8_t)fm;
+            p[2] = (uint8_t)(((fct & 3) << 6) | (fci & 0x3f));
+            p[3] = (uint8_t)tm;
+            p[4] = (uint8_t)(((tct & 3) << 6) | (tci & 0x3f));
+            op->cmd = 0x50; op->payload = p; op->len = 5; n_ops++;
+
+        } else if (strcmp(scmd, "set-cable-color") == 0 && sn >= 10) {
+            int color = arg_i(sub,3);
+            int fm = arg_i(sub,4), fct = arg_i(sub,5), fci = arg_i(sub,6);
+            int tm = arg_i(sub,7), tct = arg_i(sub,8), tci = arg_i(sub,9);
+            if (fct == 0) {
+                int t;
+                t = fm; fm = tm; tm = t; t = fct; fct = tct; tct = t; t = fci; fci = tci; tci = t;
+            }
+            p[0] = (uint8_t)((1 << 1) | (s_loc & 1));
+            p[1] = (uint8_t)fm;
+            p[2] = (uint8_t)(((fct & 3) << 6) | (fci & 0x3f));
+            p[3] = (uint8_t)tm;
+            p[4] = (uint8_t)(((tct & 3) << 6) | (tci & 0x3f));
+            p[5] = (uint8_t)color;
+            op->cmd = 0x54; op->payload = p; op->len = 6; n_ops++;
+
+        } else if (strcmp(scmd, "del-module") == 0 && sn >= 4) {
+            p[0] = (uint8_t)s_loc;
+            p[1] = (uint8_t)arg_i(sub, 3);
+            op->cmd = 0x32; op->payload = p; op->len = 2; n_ops++;
+
+        } else if (strcmp(scmd, "move-module") == 0 && sn >= 6) {
+            p[0] = (uint8_t)s_loc;
+            p[1] = (uint8_t)arg_i(sub, 3);
+            p[2] = (uint8_t)arg_i(sub, 4);
+            p[3] = (uint8_t)arg_i(sub, 5);
+            op->cmd = 0x34; op->payload = p; op->len = 4; n_ops++;
+
+        } else if (strcmp(scmd, "add-module") == 0 && sn >= 9) {
+            int pos = 0;
+            p[pos++] = (uint8_t)arg_i(sub, 3);  /* type_id */
+            p[pos++] = (uint8_t)s_loc;
+            p[pos++] = (uint8_t)arg_i(sub, 4);  /* module_id */
+            p[pos++] = (uint8_t)arg_i(sub, 5);  /* col */
+            p[pos++] = (uint8_t)arg_i(sub, 6);  /* row */
+            p[pos++] = (uint8_t)(arg_i(sub, 7) & 0xff); /* color */
+            p[pos++] = 0x00; /* upRate */
+            p[pos++] = 0x00; /* isLed */
+            int j = 8, num_modes = arg_i(sub, j++);
+            for (int m = 0; m < num_modes && m < 64; m++) p[pos++] = (uint8_t)arg_i(sub, j++);
+            int num_params = arg_i(sub, j++);
+            j += num_params;  /* skip param_vals — G2 initialises to defaults */
+            const char *name = arg_s(sub, j);
+            if (name && *name) {
+                size_t nlen = strlen(name); if (nlen > 16) nlen = 16;
+                memcpy(p + pos, name, nlen + 1); pos += (int)nlen + 1;
+            } else { p[pos++] = 0x00; }
+            op->cmd = 0x30; op->payload = p; op->len = pos; n_ops++;
+
+        } else if (strcmp(scmd, "set-module-color") == 0 && sn >= 5) {
+            p[0] = (uint8_t)s_loc;
+            p[1] = (uint8_t)arg_i(sub, 3);
+            p[2] = (uint8_t)arg_i(sub, 4);
+            op->cmd = 0x31; op->payload = p; op->len = 3; n_ops++;
+
+        } else if (strcmp(scmd, "set-module-name") == 0 && sn >= 5) {
+            const char *label = arg_s(sub, 4);
+            size_t nlen = label ? strlen(label) : 0; if (nlen > 16) nlen = 16;
+            p[0] = (uint8_t)s_loc;
+            p[1] = (uint8_t)arg_i(sub, 3);
+            if (label && nlen > 0) { memcpy(p + 2, label, nlen); p[2 + nlen] = 0x00; }
+            else { p[2] = 0x00; nlen = 0; }
+            op->cmd = 0x33; op->payload = p; op->len = (int)(3 + nlen); n_ops++;
+
+        } else if (strcmp(scmd, "set-param-label") == 0 && sn >= 7) {
+            int module_id = arg_i(sub, 3), param_idx = arg_i(sub, 4), label_idx = arg_i(sub, 5);
+            const char *label = arg_s(sub, 6);
+            int num_labels = label_idx + 1;
+            int payload_len = 6 + 7 * num_labels;
+            int idx = 0;
+            p[idx++] = (uint8_t)s_loc;
+            p[idx++] = (uint8_t)module_id;
+            p[idx++] = (uint8_t)(3 + 7 * num_labels);  /* module_len */
+            p[idx++] = 1;
+            p[idx++] = (uint8_t)(1 + 7 * num_labels);  /* param_len */
+            p[idx++] = (uint8_t)param_idx;
+            for (int i = 0; i < label_idx; i++) for (int jj = 0; jj < 7; jj++) p[idx++] = 0;
+            if (label) {
+                size_t llen = strlen(label); if (llen > 7) llen = 7;
+                for (int jj = 0; jj < 7; jj++) p[idx++] = (jj < (int)llen) ? (uint8_t)label[jj] : 0;
+            }
+            if (idx < payload_len) memset(p + idx, 0, (size_t)(payload_len - idx));
+            op->cmd = 0x42; op->payload = p; op->len = payload_len; n_ops++;
+
+        } else {
+            ret = G2_ERR_INVALID_PARAM;
+        }
+    }
+
+    if (ret == G2_OK && n_ops > 0)
+        ret = g2_batch_ops(batch_slot, ops, n_ops);
+
+    free(ops);
+    free(pool);
+    return ret;
+}
+
 /* ── command execution ─────────────────────────────────────────────────── */
 
 /* Set by select-patch to trigger a rearm after the immediately-following
@@ -420,6 +580,9 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_slot_key(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "seq") == 0) {
+		ret = execute_seq(args);
 
 	}
 

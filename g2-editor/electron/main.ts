@@ -136,13 +136,28 @@ ipcMain.handle("cli:run", async (_, args: string[]) => {
 	return await sendCmd(cmd, rest);
 });
 
+function sendSeq(ops: string[][]): Promise<string> {
+	return new Promise((resolve, reject) => {
+		if (!daemonProcess) { reject(new Error("Daemon not running")); return; }
+		const id = ++cmdId;
+		const timeout = setTimeout(() => {
+			pendingCmds.delete(id);
+			reject(new Error("CLI timeout: seq"));
+		}, 30_000);
+		pendingCmds.set(id, { resolve, reject, timeout });
+		const json = JSON.stringify({ id, cmd: "seq", args: ops });
+		console.log('[deamon-cmd]->', json);
+		daemonProcess.stdin?.write(json + "\n");
+	});
+}
+
 ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
-	const results: string[] = [];
-	for (const args of argsList) {
-		const [cmd, ...rest] = args;
-		results.push(await sendCmd(cmd, rest));
+	if (argsList.length === 0) return [];
+	if (argsList.length === 1) {
+		const [cmd, ...rest] = argsList[0];
+		return [await sendCmd(cmd, rest)];
 	}
-	return results;
+	return [await sendSeq(argsList)];
 });
 
 ipcMain.handle("cli:watch-start", () => { startDaemon(); });
