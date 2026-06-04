@@ -1,7 +1,6 @@
 /**
  * Sound category definitions for Nord Modular G2
  *
- * Based on the official g2ools categories.py
  * Categories are stored as 8-bit values in patch data (0-15)
  */
 
