@@ -53,7 +53,7 @@
 							:variation="uiStore.variation"
 							area="va"
 							:selected-cables="uiStore.selectedCables"
-							:selected-module-indices="uiStore.selectedModules"
+							:selected-module-indices="canvasSelectedModules(1)"
 							@jack-drag-start="jackPatching.handleJackDragStart"
 							@jack-drag-end="jackPatching.handleJackDragEnd"
 							@module-move="voiceOps.handleModuleMove"
@@ -66,6 +66,7 @@
 							@jack-delete-connected="voiceOps.handleJackDeleteConnected"
 							@jack-set-cable-color="voiceOps.handleJackSetCableColor"
 							@param-label-edit="handleParamLabelEdit"
+							@param-dbl-click="handleParamDblClick"
 						/>
 					</div>
 
@@ -82,7 +83,7 @@
 							:variation="uiStore.variation"
 							area="fx"
 							:selected-cables="uiStore.selectedCables"
-							:selected-module-indices="uiStore.selectedModules"
+							:selected-module-indices="canvasSelectedModules(0)"
 							@jack-drag-start="jackPatching.handleJackDragStart"
 							@jack-drag-end="jackPatching.handleJackDragEnd"
 							@module-move="fxOps.handleModuleMove"
@@ -95,6 +96,7 @@
 							@jack-delete-connected="fxOps.handleJackDeleteConnected"
 							@jack-set-cable-color="fxOps.handleJackSetCableColor"
 							@param-label-edit="handleParamLabelEdit"
+							@param-dbl-click="handleParamDblClick"
 						/>
 					</div>
 				</template>
@@ -160,6 +162,8 @@
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
+	<ParamEditDialog />
+
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 </template>
 
@@ -196,6 +200,9 @@
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
+	import { useParamEditDialog } from './composables/useParamEditDialog';
+	import { useModuleKeyboard } from './composables/useModuleKeyboard';
+	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -280,6 +287,14 @@
 	);
 
 	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick });
+	useModuleKeyboard();
+
+	function canvasSelectedModules(canvasArea: 0 | 1): number[] {
+		if (uiStore.area !== 2) return uiStore.selectedModules;
+		const sa = uiStore.selectedModulesArea;
+		return sa === null || sa === canvasArea ? uiStore.selectedModules : [];
+	}
+	const { handleParamDblClick } = useParamEditDialog();
 
 	async function handlePerfModeToggle(): Promise<void> {
 		try {
@@ -290,8 +305,9 @@
 	}
 
 	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
-		if (showLabelDialog.value) return;
 		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
+		const active = document.activeElement;
+		if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return;
 		await deleteSelection();
 	}
 

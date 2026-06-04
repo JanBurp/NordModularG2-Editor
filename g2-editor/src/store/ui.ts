@@ -26,6 +26,8 @@ export const useUiStore = defineStore('ui', {
 		showRightPane: true as boolean,
 		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
+		selectedModulesArea: null as 0 | 1 | null,
+		selectedParam: null as { moduleId: number; paramIndex: number } | null,
 		showSvgViewer: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
@@ -83,6 +85,20 @@ export const useUiStore = defineStore('ui', {
 
 		clearSelection() {
 			this.selectedModules = [];
+			this.selectedModulesArea = null;
+		},
+
+		selectModulesInArea(indices: number[], area: 0 | 1) {
+			this.selectedModules = indices;
+			this.selectedModulesArea = area;
+		},
+
+		setSelectedParam(moduleId: number, paramIndex: number) {
+			this.selectedParam = { moduleId, paramIndex };
+		},
+
+		clearSelectedParam() {
+			this.selectedParam = null;
 		},
 
 		toggleSvgViewer() {
@@ -98,6 +114,7 @@ export const useUiStore = defineStore('ui', {
 			if (mode !== 2) s.lastNonSplitArea = mode;
 			s.areaMode = mode;
 			this.selectedModules = [];
+			this.selectedModulesArea = null;
 			this.selectedCables = [];
 		},
 
@@ -110,6 +127,7 @@ export const useUiStore = defineStore('ui', {
 				s.areaMode = 2;
 			}
 			this.selectedModules = [];
+			this.selectedModulesArea = null;
 			this.selectedCables = [];
 		},
 

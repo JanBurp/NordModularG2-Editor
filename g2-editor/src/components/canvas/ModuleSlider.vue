@@ -1,7 +1,7 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control" @mouseover.stop="emit('paramHover', props.paramIndex)">
 		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
-		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" @dblclick="onDoubleClick" />
+		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" />
 
 		<!-- Handle -->
 		<rect
@@ -12,6 +12,9 @@
 			@mousedown="onDragMouseDown"
 			@touchstart.passive="onDragMouseDown"
 		/>
+
+		<!-- Selected param underline -->
+		<rect v-if="highlight" x="0" y="63" width="10" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -24,13 +27,15 @@
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
+		highlight?: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
+		paramHover: [paramIndex: number];
 	}>();
 
-	const { onMouseDown: onTrackMouseDown, onDoubleClick } = useSpinnerHoldInteraction(
+	const { onMouseDown: onTrackMouseDown } = useSpinnerHoldInteraction(
 		'KnobSlider',
 		props.paramIndex,
 		() => props.value,
@@ -62,4 +67,5 @@
 		stroke: #666;
 		stroke-width: 1;
 	}
+
 </style>
