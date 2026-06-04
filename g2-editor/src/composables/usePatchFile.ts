@@ -68,6 +68,21 @@ export function usePatchFile() {
 					slotsStore.uploadingFromFile = false;
 				}
 				if (device.device?.performance) device.device.performance.name = name;
+			} else if (prf2.slotMeta.length === 4) {
+				const slots = prf2.slotMeta.map((m, i) => ({
+					slot: SLOT_LABELS[i],
+					name: prf2.slotNames[i],
+					active: m.active,
+					key: m.key,
+					hold: m.hold,
+					bank: m.bank,
+					patch: m.patch,
+					range: { lower: m.rangeLow, upper: m.rangeHigh },
+				}));
+				const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
+				const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
+				device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false }, patches: null, slots });
+				uiStore.setSlotInFocus(focusLabel);
 			}
 			return;
 		}
@@ -129,6 +144,21 @@ export function usePatchFile() {
 								slotsStore.uploadingFromFile = false;
 							}
 							if (device.device?.performance) device.device.performance.name = name;
+						} else if (prf2.slotMeta.length === 4) {
+							const slots = prf2.slotMeta.map((m, i) => ({
+								slot: SLOT_LABELS[i],
+								name: prf2.slotNames[i],
+								active: m.active,
+								key: m.key,
+								hold: m.hold,
+								bank: m.bank,
+								patch: m.patch,
+								range: { lower: m.rangeLow, upper: m.rangeHigh },
+							}));
+							const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
+							const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
+							device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false }, patches: null, slots });
+							uiStore.setSlotInFocus(focusLabel);
 						}
 						return;
 					}

@@ -30,6 +30,7 @@ class G2Area implements Area {
 class G2Parser {
 	private areas: G2Area[] = [new G2Area('fx'), new G2Area('voice')];
 	private slots: string[] = [];
+	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
 	private aof = 0;
 	private textpadofs = 0;
 	private textpadlen = 0;
@@ -382,18 +383,33 @@ class G2Parser {
 
 	private parsePrfData(data: Uint8Array): void {
 		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
+		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, 3×padding
 		let ofs = 8;
 		const slotNames: string[] = [];
+		this.slotMeta.length = 0;
 		for (let i = 0; i < 4; i++) {
 			let str = '';
 			while (ofs < data.length && data[ofs] !== 0) str += String.fromCharCode(data[ofs++]);
 			ofs++; // skip null terminator
-			ofs += 10; // skip extra slot data
+			if (ofs + 10 <= data.length) {
+				this.slotMeta.push({
+					active: data[ofs] !== 0,
+					key: data[ofs + 1] !== 0,
+					hold: data[ofs + 2] !== 0,
+					bank: data[ofs + 3],
+					patch: data[ofs + 4],
+					rangeLow: data[ofs + 5],
+					rangeHigh: data[ofs + 6],
+				});
+			}
+			ofs += 10;
 			slotNames.push(str);
 		}
 		this.slots.length = 0;
 		this.slots.push(...slotNames);
 	}
+
+	getSlotMeta() { return this.slotMeta; }
 
 	private parsePatchDesc(data: Uint8Array): void {
 		const description_attrs: Record<string, number> = {
@@ -460,7 +476,7 @@ export class PatchParser {
 		};
 	}
 
-	parsePrf2(): { slotNames: string[]; patches: Patch[] } | null {
+	parsePrf2(): { slotNames: string[]; patches: Patch[]; slotMeta: ReturnType<G2Parser['getSlotMeta']> } | null {
 		const slotNames = this.patcher.isPrf2();
 		if (slotNames.length === 0) return null;
 		return {
@@ -470,6 +486,7 @@ export class PatchParser {
 				description: this.patcher.getpd(slot) ?? undefined,
 				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
 			})),
+			slotMeta: this.patcher.getSlotMeta(),
 		};
 	}
 }
