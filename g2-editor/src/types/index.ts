@@ -120,7 +120,8 @@ export type {
 	VisualElement,
 	ParamLabel,
 } from './module';
-export type { Patch, Area, Cable, PatchDescription, PatchParamVariation } from './patch';
+export type { Patch, Area, Cable, PatchDescription, PatchParamVariation, VariationState } from './patch';
+export { NUM_VARIATIONS } from './patch';
 export type { CliService } from './cli';
 
 export interface ContextMenuSwatch {

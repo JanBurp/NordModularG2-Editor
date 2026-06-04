@@ -1,31 +1,31 @@
-import { ref, watch } from 'vue';
+import { computed } from 'vue';
 import type { ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
+import { useSlotsStore } from '../store/slots';
+import { useUiStore } from '../store/ui';
 
 export function useModuleParams(
 	instance: ComputedRef<ModuleInstance>,
 	moduleDef: ComputedRef<ModuleDefinition | null>,
+	areaLabel: 'fx' | 'va',
 	emitParamChange: (moduleIndex: number, paramIndex: number, value: number) => void,
 	emitModeChange: (moduleIndex: number, index: number, value: number) => void,
 ) {
-	const localLv = ref<number[]>([]);
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
+	const areaKey = areaLabel === 'va' ? 'voice' : 'fx';
 
-	watch(
-		() => instance.value.lv,
-		(newLv) => {
-			if (newLv) {
-				localLv.value = [...newLv];
-			} else {
-				localLv.value =
-					moduleDef.value?.params?.map((param) => {
-						const p = getParam(param.type);
-						return p?.def ?? 64;
-					}) || [];
-			}
-		},
-		{ immediate: true },
-	);
+	const localLv = computed<number[]>(() => {
+		const params = slotsStore.slots[uiStore.slotInFocus]
+			?.variations?.[uiStore.variation]
+			?.[areaKey]?.[instance.value.index];
+		if (params) return params;
+		return moduleDef.value?.params?.map((param) => {
+			const p = getParam(param.type);
+			return p?.def ?? 64;
+		}) ?? [];
+	});
 
 	function getParamValue(index: number): number {
 		if (localLv.value.length > index) {
@@ -54,7 +54,6 @@ export function useModuleParams(
 				value = Math.min(Math.max(value, p.low), p.high);
 			}
 		}
-		localLv.value[paramIndex] = value;
 		emitParamChange(instance.value.index || 0, paramIndex, value);
 	}
 

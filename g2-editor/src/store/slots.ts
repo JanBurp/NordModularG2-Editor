@@ -1,4 +1,4 @@
-import type { ModuleInstance, Patch, PatchParamVariation } from '@/types';
+import type { ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
@@ -6,7 +6,7 @@ import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModu
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
-import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions } from './slotHelpers';
+import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions, extractVariations, syncVariationsToLv, removeModuleFromVariations } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
@@ -55,6 +55,7 @@ interface SlotEntry {
 	rawHex: string | null;
 	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
+	variations: VariationState[] | null; // 9 elements (0-8); null when no patch loaded
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -73,6 +74,7 @@ export const useSlotsStore = defineStore('slots', {
 				rawHex: null,
 				templateRawHex: null,
 				patch: null,
+				variations: null,
 			},
 			B: {
 				name: '',
@@ -81,6 +83,7 @@ export const useSlotsStore = defineStore('slots', {
 				rawHex: null,
 				templateRawHex: null,
 				patch: null,
+				variations: null,
 			},
 			C: {
 				name: '',
@@ -89,6 +92,7 @@ export const useSlotsStore = defineStore('slots', {
 				rawHex: null,
 				templateRawHex: null,
 				patch: null,
+				variations: null,
 			},
 			D: {
 				name: '',
@@ -97,6 +101,7 @@ export const useSlotsStore = defineStore('slots', {
 				rawHex: null,
 				templateRawHex: null,
 				patch: null,
+				variations: null,
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
@@ -118,7 +123,9 @@ export const useSlotsStore = defineStore('slots', {
 
 		getAreaCables: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.cableList ?? [],
 
-		getPatchParams: (state) => (slot: SlotLabel) => state.slots[slot]?.patch?.patchParams ?? null,
+		getPatchParams: (state) => (slot: SlotLabel) => state.slots[slot]?.variations?.map((v) => v.patch) ?? null,
+
+		getVariations: (state) => (slot: SlotLabel) => state.slots[slot]?.variations ?? null,
 
 		activeSlotResources: (state): SlotResources => state.slotResources[useUiStore().slotInFocus],
 
@@ -157,6 +164,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = rawHex;
 			this.slots[slot].templateRawHex = rawHex;
 			this.slots[slot].patch = patch;
+			this.slots[slot].variations = extractVariations(patch);
 			patch.mode = {
 				area: 1,
 				variation: patch.description?.variation ?? 0,
@@ -206,6 +214,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { areaIdx, location } = areaConfig(area);
 			mutDeleteModule(patch, areaIdx, moduleId);
+			removeModuleFromVariations(this.slots[slot].variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			this.slots[slot].rawHex = null;
 
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
@@ -279,7 +288,12 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { areaIdx, location } = areaConfig(area);
 			mutAddModule(patch, areaIdx, mod);
-			this.slots[slot].rawHex = null;
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const entry = this.slots[slot];
+			if (entry.variations) {
+				for (const vState of entry.variations) vState[areaKey][moduleId] = [...paramVals];
+			}
+			entry.rawHex = null;
 
 			await window.cli.run([
 				'add-module',
@@ -403,9 +417,15 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 
 			const { areaIdx, location } = areaConfig(area);
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const entry = this.slots[slot];
+			if (entry.variations?.[variation]?.[areaKey]?.[moduleId]) {
+				entry.variations[variation][areaKey][moduleId][paramIdx] = value;
+			}
+			// mirror to lv for serializer
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
 			if (mod?.lv) mod.lv[variation * mod.pcnt + paramIdx] = value;
-			this.slots[slot].rawHex = null;
+			entry.rawHex = null;
 
 			scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
 		},
@@ -443,6 +463,7 @@ export const useSlotsStore = defineStore('slots', {
 
 		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
 			this.slots[slot].patch = patch;
+			this.slots[slot].variations = extractVariations(patch);
 			this.slots[slot].name = name;
 			if (rawHex) {
 				this.slots[slot].rawHex = rawHex;
@@ -456,6 +477,7 @@ export const useSlotsStore = defineStore('slots', {
 			for (let i = 0; i < 4; i++) {
 				const slotName = slotNames[i] || name;
 				this.slots[labels[i]].patch = patches[i];
+				this.slots[labels[i]].variations = extractVariations(patches[i]);
 				this.slots[labels[i]].name = slotName;
 				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
 				this.slots[labels[i]].rawHex = null;
@@ -477,6 +499,10 @@ export const useSlotsStore = defineStore('slots', {
 				path = result.filepath;
 			}
 			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
+				const e = this.slots[s];
+				if (e.variations && e.patch) syncVariationsToLv(e.patch, e.variations);
+			}
 			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].patch!).filter(Boolean);
 			if (patches.length !== 4) return;
 			const newRawHex = serializePerformance(patches, this.performanceRawHex);
@@ -500,6 +526,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			if (!entry.rawHex) {
 				if (!entry.templateRawHex) return;
+				if (entry.variations) syncVariationsToLv(entry.patch, entry.variations);
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
 				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
 			}
@@ -650,11 +677,14 @@ export const useSlotsStore = defineStore('slots', {
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
 			const slot = useUiStore().slotInFocus;
-			const params = this.slots[slot]?.patch?.patchParams;
-			if (params?.[variation]) {
-				(params[variation] as Record<string, number>)[key] = value;
-				this.slots[slot].rawHex = null;
+			const entry = this.slots[slot];
+			if (entry?.variations?.[variation]) {
+				(entry.variations[variation].patch as Record<string, number>)[key] = value;
+				entry.rawHex = null;
 			}
+			// mirror to patch.patchParams for serializer
+			const params = entry?.patch?.patchParams;
+			if (params?.[variation]) (params[variation] as Record<string, number>)[key] = value;
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
 			scheduleSend(`${slot}:patch:2:${paramIdx}:${variation}`, ['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
@@ -777,6 +807,7 @@ export const useSlotsStore = defineStore('slots', {
 						}
 					}
 					mutDeleteModule(patch, areaIdx, id);
+					removeModuleFromVariations(this.slots[slot].variations, id, areaIdx === 0 ? 'fx' : 'voice');
 					cliCmds.push(['del-module', slot, location, String(id)]);
 				}
 				this.slots[slot].rawHex = null;

@@ -72,6 +72,17 @@ export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [
 	'sustain',
 ];
 
+export const NUM_VARIATIONS = 9;
+
+export interface VariationState {
+	/** moduleIndex → params[paramIdx], areaIdx=0 (fx) */
+	fx: Record<number, number[]>;
+	/** moduleIndex → params[paramIdx], areaIdx=1 (voice) */
+	voice: Record<number, number[]>;
+	/** Global patch-level parameters for this variation */
+	patch: PatchParamVariation;
+}
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;

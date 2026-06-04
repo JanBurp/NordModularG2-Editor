@@ -69,6 +69,10 @@ export function useSlotEvents(log: LogFn) {
 				const lvIdx = (ev.variation as number) * (mod.pcnt as number) + (ev.param as number);
 				if (lvIdx >= 0 && lvIdx < mod.lv.length) mod.lv[lvIdx] = ev.value;
 			}
+			// mirror to variations
+			const areaKey = ev.area === 'va' ? 'voice' : 'fx';
+			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
+			if (vState?.[areaKey]?.[ev.module as number]) vState[areaKey][ev.module as number][ev.param as number] = ev.value;
 			return true;
 		}
 		if (ev.type === 'patch_param') {
@@ -80,6 +84,9 @@ export function useSlotEvents(log: LogFn) {
 			if (params?.[ev.variation] && key) {
 				(params[ev.variation] as Record<string, number>)[key] = ev.value;
 			}
+			// mirror to variations
+			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
+			if (vState && key) (vState.patch as Record<string, number>)[key] = ev.value;
 			return true;
 		}
 		if (ev.type === 'patch_name') {

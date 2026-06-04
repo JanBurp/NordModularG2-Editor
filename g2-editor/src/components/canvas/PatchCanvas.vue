@@ -15,7 +15,7 @@
 			<text :font-size="64" x="50%" y="50%" width="100%" height="100%" text-anchor="middle">{{ getAreaByShort(area) }}</text>
 
 			<Module
-				v-for="mod in modulesWithVariation"
+				v-for="mod in (props.modules as any[])"
 				:key="mod.index + '-' + mod.uname"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
@@ -161,18 +161,6 @@
 			else map.get(cable.smod)!.inputs.add(cable.scon);
 		}
 		return map;
-	});
-
-	const modulesWithVariation = computed(() => {
-		return (props.modules as any[]).map((m: any) => {
-			if (!m.lv || !m.pcnt) return m;
-			const startIdx = props.variation * m.pcnt;
-			const endIdx = startIdx + m.pcnt;
-			return {
-				...m,
-				lv: m.lv.slice(startIdx, endIdx),
-			};
-		});
 	});
 
 	function onParamChange(moduleIndex: number, paramIndex: number, value: number) {
