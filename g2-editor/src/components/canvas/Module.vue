@@ -52,12 +52,7 @@
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 			<LevelMeter v-else-if="entry.ve.type === 'vu'" :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
-			<ModuleVeLed
-				v-else-if="entry.ve.type === 'ledGroup'"
-				:ve="entry.ve"
-				:led-on="false"
-				:active-step="ledStateMap[entry.key]?.step ?? 255"
-			/>
+			<ModuleVeLed v-else-if="entry.ve.type === 'ledGroup'" :ve="entry.ve" :led-on="false" :active-step="ledStateMap[entry.key]?.step ?? 255" />
 		</template>
 
 		<!-- Modes -->
@@ -271,7 +266,8 @@
 	const y = computed(() => (instance.value.vert || 0) * 16);
 
 	const displayName = computed(() => {
-		return instance.value.uname || moduleDef.value?.short || 'Module';
+		if (typeof instance.value.uname !== 'undefined') return instance.value.uname;
+		return moduleDef.value?.short || 'Module';
 	});
 
 	const height = computed(() => {
