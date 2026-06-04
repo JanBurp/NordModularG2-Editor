@@ -277,6 +277,7 @@
 	const { localLv, getParamValue, getParamLabel, onParamChange, getModeValue, onModeChange } = useModuleParams(
 		instance,
 		moduleDef,
+		props.areaLabel ?? 'fx',
 		(moduleIndex, paramIndex, value) => emit('paramChange', moduleIndex, paramIndex, value),
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
