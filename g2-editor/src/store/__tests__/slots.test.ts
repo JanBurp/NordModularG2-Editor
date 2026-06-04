@@ -42,19 +42,18 @@ describe('_applyPatchOutput — malformed binary', () => {
 describe('assignedVoicesForSlot', () => {
 	it('returns the correct count for each slot label', () => {
 		const store = useSlotsStore();
-		store.assignedVoices = [2, 3, 4, 5];
+		store.slots.A.assignedVoices = 2;
+		store.slots.B.assignedVoices = 3;
+		store.slots.C.assignedVoices = 4;
+		store.slots.D.assignedVoices = 5;
 		expect(store.assignedVoicesForSlot('A')).toBe(2);
 		expect(store.assignedVoicesForSlot('B')).toBe(3);
 		expect(store.assignedVoicesForSlot('C')).toBe(4);
 		expect(store.assignedVoicesForSlot('D')).toBe(5);
 	});
 
-	it('returns 0 for a valid slot when its array entry is absent', () => {
+	it('returns 0 for a slot with no voices assigned', () => {
 		const store = useSlotsStore();
-		store.assignedVoices = [] as any;
-		// The guard `idx >= 0` only covers invalid labels (prevented by TypeScript).
-		// A valid label with an empty array returns undefined — same as reading [0] on [].
-		// In practice assignedVoices is always 4 elements; this test documents the edge case.
-		expect(store.assignedVoicesForSlot('A')).toBeUndefined();
+		expect(store.assignedVoicesForSlot('A')).toBe(0);
 	});
 });

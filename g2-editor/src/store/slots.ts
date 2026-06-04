@@ -56,6 +56,8 @@ interface SlotEntry {
 	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
 	variations: VariationState[] | null; // 9 elements (0-8); null when no patch loaded
+	resources: SlotResources;
+	assignedVoices: number;
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -75,6 +77,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			B: {
 				name: '',
@@ -84,6 +88,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			C: {
 				name: '',
@@ -93,6 +99,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			D: {
 				name: '',
@@ -102,14 +110,14 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
 		uploadingFromFile: false,
-		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
-		assignedVoices: [0, 0, 0, 0] as number[],
 	}),
 
 	getters: {
@@ -127,12 +135,9 @@ export const useSlotsStore = defineStore('slots', {
 
 		getVariations: (state) => (slot: SlotLabel) => state.slots[slot]?.variations ?? null,
 
-		activeSlotResources: (state): SlotResources => state.slotResources[useUiStore().slotInFocus],
+		activeSlotResources: (state): SlotResources => state.slots[useUiStore().slotInFocus].resources,
 
-		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
-			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
-			return idx >= 0 ? state.assignedVoices[idx] : 0;
-		},
+		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => state.slots[slot].assignedVoices,
 	},
 
 	actions: {
@@ -754,8 +759,8 @@ export const useSlotsStore = defineStore('slots', {
 				if (data.length < o + 28) return;
 				const loc = data[o];
 				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
-				if (loc === 1) this.slotResources[slot].va = metrics;
-				else if (loc === 0) this.slotResources[slot].fx = metrics;
+				if (loc === 1) this.slots[slot].resources.va = metrics;
+				else if (loc === 0) this.slots[slot].resources.fx = metrics;
 			};
 			applyBlock(0);
 			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29
