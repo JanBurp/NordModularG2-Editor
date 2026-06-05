@@ -52,6 +52,7 @@ export function useModuleKeyboard() {
 
 	function selectInArea(module: ModuleInstance, area: 0 | 1) {
 		uiStore.selectModules([module.index], area === 1 ? 'va' : 'fx');
+		uiStore.setSelectedParam(module.index, 0);
 	}
 
 	function navigateModule(key: string) {
@@ -138,9 +139,11 @@ export function useModuleKeyboard() {
 		if (next) selectInArea(next, nextArea);
 	}
 
-	// Find module across both areas
+	// Find module across both areas, preferring the area that owns the current selection.
 	function findModuleAnywhere(moduleId: number): { module: ModuleInstance; area: 0 | 1 } | undefined {
-		for (const a of [0, 1] as const) {
+		const preferred: 0 | 1 = uiStore.selectedModulesArea === 'va' ? 1 : 0;
+		const other: 0 | 1 = preferred === 1 ? 0 : 1;
+		for (const a of [preferred, other]) {
 			const m = getModulesInArea(a).find((m) => m.index === moduleId);
 			if (m) return { module: m, area: a };
 		}

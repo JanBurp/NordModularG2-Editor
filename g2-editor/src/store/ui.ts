@@ -52,6 +52,10 @@ export const useUiStore = defineStore('ui', {
 	actions: {
 		setSlotInFocus(slot: SlotLabel) {
 			this.slotInFocus = slot;
+			this.selectedModules = [];
+			this.selectedModulesArea = null;
+			this.selectedCables = [];
+			this.selectedParam = null;
 			const device = useDeviceStore().device;
 			if (device?.performance) device.performance.focus = slot;
 			else if (device?.patches) device.patches.focus = slot;
@@ -88,6 +92,7 @@ export const useUiStore = defineStore('ui', {
 		clearSelection() {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
+			this.selectedParam = null;
 		},
 
 		setSelectedParam(moduleId: number, paramIndex: number) {
@@ -113,6 +118,7 @@ export const useUiStore = defineStore('ui', {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
 			this.selectedCables = [];
+			this.selectedParam = null;
 		},
 
 		toggleSplit() {
@@ -126,6 +132,7 @@ export const useUiStore = defineStore('ui', {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
 			this.selectedCables = [];
+			this.selectedParam = null;
 		},
 
 		setDividerPos(pos: number) {

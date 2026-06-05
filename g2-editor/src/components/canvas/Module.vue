@@ -78,8 +78,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					@param-hover="onParamHover"
-				/>
+					/>
 				<ModuleSlider
 					v-else-if="isSlider(param.n)"
 					:param="param"
@@ -88,8 +87,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					@param-hover="onParamHover"
-				/>
+					/>
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:param="param"
@@ -100,8 +98,7 @@
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
 					@param-context-menu="onParamContextMenu"
-					@param-hover="onParamHover"
-				/>
+					/>
 				<ModuleKnobSpin
 					v-else-if="isSpinner(param.n)"
 					:param="param"
@@ -110,8 +107,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					@param-hover="onParamHover"
-				/>
+					/>
 				<ModuleKnobSpinH
 					v-else-if="isSpinnerH(param.n)"
 					:param="param"
@@ -120,8 +116,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					@param-hover="onParamHover"
-				/>
+					/>
 			</template>
 		</g>
 
@@ -325,9 +320,10 @@
 	);
 
 	const uiStore = useUiStore();
-	const selectedParamIndex = computed(() =>
-		uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1,
-	);
+	const selectedParamIndex = computed(() => {
+		if (uiStore.selectedModulesArea !== props.areaLabel) return -1;
+		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
+	});
 
 	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
 		const param = moduleDef.value?.params?.[paramIndex];
@@ -347,7 +343,4 @@
 		openContextMenu(event, items);
 	}
 
-	function onParamHover(paramIndex: number) {
-		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
-	}
 </script>

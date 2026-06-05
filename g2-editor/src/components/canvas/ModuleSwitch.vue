@@ -3,7 +3,6 @@
 		:transform="`translate(${param.x}, ${param.y})`"
 		class="switch-control"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
-		@mouseover.stop="emit('paramHover', props.paramIndex)"
 	>
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
@@ -99,7 +98,6 @@
 		change: [index: number, value: number];
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
-		paramHover: [paramIndex: number];
 	}>();
 
 	const {
