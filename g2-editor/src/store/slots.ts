@@ -6,7 +6,7 @@ import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModu
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
-import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions, extractVariations, syncVariationsToLv, removeModuleFromVariations } from './slotHelpers';
+import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions, extractVariations, removeModuleFromVariations } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 
@@ -56,6 +56,8 @@ interface SlotEntry {
 	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
 	variations: VariationState[] | null; // 9 elements (0-8); null when no patch loaded
+	resources: SlotResources;
+	assignedVoices: number;
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -75,6 +77,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			B: {
 				name: '',
@@ -84,6 +88,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			C: {
 				name: '',
@@ -93,6 +99,8 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 			D: {
 				name: '',
@@ -102,14 +110,14 @@ export const useSlotsStore = defineStore('slots', {
 				templateRawHex: null,
 				patch: null,
 				variations: null,
+				resources: emptySlotResources(),
+				assignedVoices: 0,
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
 		uploadingFromFile: false,
-		slotResources: { A: emptySlotResources(), B: emptySlotResources(), C: emptySlotResources(), D: emptySlotResources() } as Record<SlotLabel, SlotResources>,
-		assignedVoices: [0, 0, 0, 0] as number[],
 	}),
 
 	getters: {
@@ -127,12 +135,9 @@ export const useSlotsStore = defineStore('slots', {
 
 		getVariations: (state) => (slot: SlotLabel) => state.slots[slot]?.variations ?? null,
 
-		activeSlotResources: (state): SlotResources => state.slotResources[useUiStore().slotInFocus],
+		activeSlotResources: (state): SlotResources => state.slots[useUiStore().slotInFocus].resources,
 
-		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => {
-			const idx = ['A', 'B', 'C', 'D'].indexOf(slot);
-			return idx >= 0 ? state.assignedVoices[idx] : 0;
-		},
+		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => state.slots[slot].assignedVoices,
 	},
 
 	actions: {
@@ -422,9 +427,6 @@ export const useSlotsStore = defineStore('slots', {
 			if (entry.variations?.[variation]?.[areaKey]?.[moduleId]) {
 				entry.variations[variation][areaKey][moduleId][paramIdx] = value;
 			}
-			// mirror to lv for serializer
-			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
-			if (mod?.lv) mod.lv[variation * mod.pcnt + paramIdx] = value;
 			entry.rawHex = null;
 
 			scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
@@ -499,13 +501,10 @@ export const useSlotsStore = defineStore('slots', {
 				path = result.filepath;
 			}
 			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
-			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
-				const e = this.slots[s];
-				if (e.variations && e.patch) syncVariationsToLv(e.patch, e.variations);
-			}
 			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].patch!).filter(Boolean);
 			if (patches.length !== 4) return;
-			const newRawHex = serializePerformance(patches, this.performanceRawHex);
+			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
+			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray);
 			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
@@ -526,9 +525,8 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			if (!entry.rawHex) {
 				if (!entry.templateRawHex) return;
-				if (entry.variations) syncVariationsToLv(entry.patch, entry.variations);
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
-				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex);
+				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex, entry.variations ?? []);
 			}
 			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
@@ -682,9 +680,6 @@ export const useSlotsStore = defineStore('slots', {
 				(entry.variations[variation].patch as Record<string, number>)[key] = value;
 				entry.rawHex = null;
 			}
-			// mirror to patch.patchParams for serializer
-			const params = entry?.patch?.patchParams;
-			if (params?.[variation]) (params[variation] as Record<string, number>)[key] = value;
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
 			scheduleSend(`${slot}:patch:2:${paramIdx}:${variation}`, ['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
@@ -764,8 +759,8 @@ export const useSlotsStore = defineStore('slots', {
 				if (data.length < o + 28) return;
 				const loc = data[o];
 				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
-				if (loc === 1) this.slotResources[slot].va = metrics;
-				else if (loc === 0) this.slotResources[slot].fx = metrics;
+				if (loc === 1) this.slots[slot].resources.va = metrics;
+				else if (loc === 0) this.slots[slot].resources.fx = metrics;
 			};
 			applyBlock(0);
 			// Compound packet: 0x72 sub-command marker at offset 28 → second block at offset 29

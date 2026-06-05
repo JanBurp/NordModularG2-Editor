@@ -140,6 +140,104 @@ static void rearm_with_version_update(void) {
 	g2_rearm();
 }
 
+/* ── seq: compound-frame batch execution ───────────────────────────────── */
+
+#define SEQ_MAX_OPS   128
+#define SEQ_OP_BUFSZ 1024  /* large enough for set-param-label worst case */
+
+static int execute_seq(cJSON *args) {
+    int n_subs = cJSON_GetArraySize(args);
+    if (n_subs == 0) return G2_OK;
+    int limit = n_subs < SEQ_MAX_OPS ? n_subs : SEQ_MAX_OPS;
+
+    G2Op    *ops  = calloc((size_t)limit, sizeof(G2Op));
+    uint8_t *pool = malloc((size_t)limit * SEQ_OP_BUFSZ);
+    if (!ops || !pool) { free(ops); free(pool); return G2_ERR_NO_MEMORY; }
+
+    int n_ops = 0, batch_slot = -1, ret = G2_OK;
+
+    for (int si = 0; si < limit && ret == G2_OK; si++) {
+        cJSON *sub = cJSON_GetArrayItem(args, si);
+        if (!cJSON_IsArray(sub) || cJSON_GetArraySize(sub) < 3) {
+            ret = G2_ERR_INVALID_PARAM; break;
+        }
+
+        const char *scmd = arg_s(sub, 0);
+        int s_slot = parse_slot(arg_s(sub, 1));
+        if (s_slot == SLOT_INVALID || !scmd) { ret = G2_ERR_INVALID_PARAM; break; }
+        if (batch_slot == -1) batch_slot = s_slot;
+        else if (batch_slot != s_slot) { ret = G2_ERR_INVALID_PARAM; break; }
+
+        int s_loc = parse_location_str(arg_s(sub, 2));
+        int sn    = cJSON_GetArraySize(sub);
+
+        G2Op    *op = &ops[n_ops];
+        uint8_t *p  = pool + n_ops * SEQ_OP_BUFSZ;
+
+        if (strcmp(scmd, "del-cable") == 0 && sn >= 9) {
+            g2_build_del_cable_op(op, p, s_loc,
+                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5),
+                arg_i(sub,6), arg_i(sub,7), arg_i(sub,8));
+            n_ops++;
+
+        } else if (strcmp(scmd, "add-cable") == 0 && sn >= 10) {
+            g2_build_add_cable_op(op, p, s_loc, arg_i(sub,3),
+                arg_i(sub,4), arg_i(sub,5), arg_i(sub,6),
+                arg_i(sub,7), arg_i(sub,8), arg_i(sub,9));
+            n_ops++;
+
+        } else if (strcmp(scmd, "set-cable-color") == 0 && sn >= 10) {
+            g2_build_set_cable_color_op(op, p, s_loc, arg_i(sub,3),
+                arg_i(sub,4), arg_i(sub,5), arg_i(sub,6),
+                arg_i(sub,7), arg_i(sub,8), arg_i(sub,9));
+            n_ops++;
+
+        } else if (strcmp(scmd, "del-module") == 0 && sn >= 4) {
+            g2_build_del_module_op(op, p, s_loc, arg_i(sub, 3));
+            n_ops++;
+
+        } else if (strcmp(scmd, "move-module") == 0 && sn >= 6) {
+            g2_build_move_module_op(op, p, s_loc,
+                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5));
+            n_ops++;
+
+        } else if (strcmp(scmd, "add-module") == 0 && sn >= 9) {
+            int j = 8, num_modes = arg_i(sub, j++);
+            int mode_vals[64] = {0};
+            for (int m = 0; m < num_modes && m < 64; m++) mode_vals[m] = arg_i(sub, j++);
+            int num_params = arg_i(sub, j++);
+            j += num_params;  /* skip param_vals — G2 initialises to defaults */
+            g2_build_add_module_op(op, p, s_loc,
+                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), arg_i(sub,7),
+                num_modes, mode_vals, arg_s(sub, j));
+            n_ops++;
+
+        } else if (strcmp(scmd, "set-module-color") == 0 && sn >= 5) {
+            g2_build_set_module_color_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
+            n_ops++;
+
+        } else if (strcmp(scmd, "set-module-name") == 0 && sn >= 5) {
+            g2_build_set_module_label_op(op, p, s_loc, arg_i(sub,3), arg_s(sub,4));
+            n_ops++;
+
+        } else if (strcmp(scmd, "set-param-label") == 0 && sn >= 7) {
+            g2_build_set_param_label_op(op, p, s_loc,
+                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_s(sub,6));
+            n_ops++;
+
+        } else {
+            ret = G2_ERR_INVALID_PARAM;
+        }
+    }
+
+    if (ret == G2_OK && n_ops > 0)
+        ret = g2_batch_ops(batch_slot, ops, n_ops);
+
+    free(ops);
+    free(pool);
+    return ret;
+}
+
 /* ── command execution ─────────────────────────────────────────────────── */
 
 /* Set by select-patch to trigger a rearm after the immediately-following
@@ -420,6 +518,9 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_slot_key(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "seq") == 0) {
+		ret = execute_seq(args);
 
 	}
 
