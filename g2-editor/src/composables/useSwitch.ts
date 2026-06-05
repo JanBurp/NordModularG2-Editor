@@ -34,7 +34,12 @@ export function useSwitch(
 	});
 
 	const displayNames = computed(() => {
-		if (label.value) return label.value.labels;
+		if (label.value) {
+			const customLabels = label.value.labels;
+			const baseNames = names.value.length > 0 ? names.value : optionNames.value;
+			if (!Array.isArray(baseNames) || customLabels.length >= baseNames.length) return customLabels;
+			return (baseNames as string[]).map((n, i) => customLabels[i] ?? n);
+		}
 		if (names.value[0] === 'Ch#' && param.value.name) {
 			const name = param.value.name;
 			const last = name.substring(name.length - 1);

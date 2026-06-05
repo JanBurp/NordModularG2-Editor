@@ -695,10 +695,11 @@ export const useSlotsStore = defineStore('slots', {
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = (mod.paramLabels as any[]).find((pl: any) => pl.paramIndex === paramIndex);
 			if (!entry) {
-				entry = { paramIndex, isString: false, paramLen: 7, labels: [''] };
+				entry = { paramIndex, isString: false, paramLen: 7, labels: [label] };
 				(mod.paramLabels as any[]).push(entry);
+			} else {
+				entry.labels[0] = label;
 			}
-			entry.labels[0] = label;
 			this.slots[slot].rawHex = null;
 			// TODO: CLI set-param-label command when available
 		},

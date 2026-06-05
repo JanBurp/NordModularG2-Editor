@@ -174,6 +174,7 @@
 	import ModuleGraph from './ModuleGraph.vue';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { getParam } from '../../renderer/parammap';
 	import { useModuleParams } from '../../composables/useModuleParams';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
@@ -328,7 +329,7 @@
 	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
 		const param = moduleDef.value?.params?.[paramIndex];
 		const items: any[] = [];
-		if (param && isSwitch(param.n)) {
+		if (param && isSwitch(param.n) && getParam(param.type)?.canLabel) {
 			const label = getParamLabel(paramIndex);
 			items.push({ label: 'Rename label', action: () =>
 				emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })

@@ -98,6 +98,7 @@ export interface ParamDefinition {
 	rows?: number;
 	img?: string;
 	h?: number;
+	canLabel?: boolean;
 }
 
 export type ParamMap = Record<string, ParamDefinition>;
