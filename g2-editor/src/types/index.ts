@@ -12,7 +12,7 @@ export type MenuAction =
 	| 'select-all'
 	| 'toggle-modules'
 	| 'toggle-browser'
-	| 'toggle-info'
+	| 'toggle-settings'
 	| 'toggle-svg-viewer'
 	| 'area-voice'
 	| 'area-fx'
