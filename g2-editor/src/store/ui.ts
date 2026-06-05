@@ -1,11 +1,11 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import { SLOT_LABELS } from '@/constants';
-import type { SlotLabel } from '@/types';
 import type { SlotAreaState } from '@/types/ui';
+import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'info' | 'browser' | 'settings' | '';
+export type PaneTab = 'modules' | 'browser' | 'settings' | '';
 
 function defaultSlotAreaState(): SlotAreaState {
 	return { areaMode: 1, dividerPos: 50, lastNonSplitArea: 1 };
@@ -22,7 +22,7 @@ export const useUiStore = defineStore('ui', {
 		} as Record<SlotLabel, SlotAreaState>,
 		variation: 0 as number,
 		moduleColor: 0 as number,
-		rightPaneTab: 'modules' as PaneTab,
+		rightPaneTab: 'settings' as PaneTab,
 		showRightPane: true as boolean,
 		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
