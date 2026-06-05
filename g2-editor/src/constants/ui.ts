@@ -15,9 +15,9 @@ export const SLOT_OPTIONS = [
 ];
 
 export const PANE_TAB_OPTIONS = [
+	{ label: 'Settings', value: 'settings' },
 	{ label: 'Modules', value: 'modules' },
 	{ label: 'Browser', value: 'browser' },
-	// { label: 'Info', value: 'info' },
 ];
 
 export const AREA_OPTIONS = [

@@ -40,12 +40,7 @@
 		<div class="flex-1 flex overflow-hidden">
 			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-neutral-700 flex flex-col overflow-hidden">
 				<template v-if="currentPatch">
-					<div
-						v-show="showVoice"
-						class="relative overflow-hidden min-h-0"
-						:class="{ 'flex-1': !isSplit }"
-						:style="voiceWrapperStyle"
-					>
+					<div v-show="showVoice" class="relative overflow-hidden min-h-0" :class="{ 'flex-1': !isSplit }" :style="voiceWrapperStyle">
 						<PatchCanvas
 							:key="patchName + '-voice'"
 							:modules="voiceModules"
@@ -71,10 +66,7 @@
 
 					<div v-if="isSplit" class="divider-handle" @mousedown="startDividerDrag" />
 
-					<div
-						v-show="showFx"
-						class="relative overflow-hidden min-h-0 flex-1"
-					>
+					<div v-show="showFx" class="relative overflow-hidden min-h-0 flex-1">
 						<PatchCanvas
 							:key="patchName + '-fx'"
 							:modules="fxModules"
@@ -101,13 +93,13 @@
 			</div>
 
 			<SidePanel v-if="uiStore.showRightPane">
+				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
 				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
 				<PatchBrowser
 					v-show="uiStore.rightPaneTab === 'browser'"
 					:isActive="uiStore.rightPaneTab === 'browser'"
 					@select="patchFile.handlePatchSelect"
 				/>
-				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
 			</SidePanel>
 		</div>
 
