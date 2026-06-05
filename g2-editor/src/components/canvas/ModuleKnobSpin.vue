@@ -5,7 +5,6 @@
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
-		@mouseover.stop="emit('paramHover', props.paramIndex)"
 	>
 		<use href="#KnobSpin" width="10" height="10" />
 		<rect v-if="highlight" x="0" y="11" width="10" height="2" fill="white" pointer-events="none" />
@@ -25,7 +24,6 @@
 	const emit = defineEmits<{
 		change: [index: number, value: number];
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
-		paramHover: [paramIndex: number];
 	}>();
 
 	const { onMouseDown } = useSpinnerHoldInteraction(
