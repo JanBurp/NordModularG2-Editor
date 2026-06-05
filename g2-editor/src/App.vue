@@ -144,6 +144,8 @@
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
+	<ParamEditDialog />
+
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 </template>
 
@@ -177,6 +179,8 @@
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
+	import { useModuleKeyboard } from './composables/useModuleKeyboard';
+	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -261,6 +265,7 @@
 	);
 
 	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick });
+	useModuleKeyboard();
 
 	async function handlePerfModeToggle(): Promise<void> {
 		try {
@@ -270,14 +275,7 @@
 		}
 	}
 
-	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
-		if (showLabelDialog.value) return;
-		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-		await deleteSelection();
-	}
-
 	onMounted(async () => {
-		window.addEventListener('keydown', handleDeleteKey);
 
 		const isOffline = import.meta.env.VITE_DEV_OFFLINE === 'true';
 		if (isOffline) {
@@ -300,7 +298,4 @@
 		}
 	});
 
-	onUnmounted(() => {
-		window.removeEventListener('keydown', handleDeleteKey);
-	});
 </script>

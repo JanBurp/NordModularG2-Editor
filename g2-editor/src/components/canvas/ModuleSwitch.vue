@@ -1,5 +1,9 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="onContextMenu">
+	<g
+		:transform="`translate(${param.x}, ${param.y})`"
+		class="switch-control"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
+	>
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
@@ -72,6 +76,9 @@
 				</text>
 			</g>
 		</template>
+
+		<!-- Selected param underline -->
+		<rect v-if="highlight" x="0" y="12" :width="width" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -84,11 +91,13 @@
 		value: number;
 		paramIndex: number;
 		label?: ParamLabel;
+		highlight?: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
+		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
 	const {
@@ -108,7 +117,6 @@
 		getButtonY,
 		onButtonClick,
 		onCycleValue,
-		onContextMenu,
 	} = useSwitch(
 		toRef(props, 'param'),
 		toRef(props, 'value'),
@@ -145,4 +153,5 @@
 		stroke: #333;
 		stroke-width: 1;
 	}
+
 </style>

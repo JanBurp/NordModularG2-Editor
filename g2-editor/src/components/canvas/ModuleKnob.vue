@@ -4,7 +4,7 @@
 		class="knob-control"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
-		@dblclick="onDoubleClick()"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 	>
 		<!-- Invisible hit area for easier grabbing -->
 		<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" class="hit-area" />
@@ -31,6 +31,9 @@
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
 		<path v-if="isReset" d="M-3,-2 L3,-2 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" />
+
+		<!-- Selected param underline -->
+		<rect v-if="highlight" :x="0" :y="radius * 2 + 3" :width="radius * 2 + 4" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -42,13 +45,15 @@
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
+		highlight?: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
+		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const { radius, angle, isReset, isDragging, onMouseDown, onDoubleClick } = useKnob(
+	const { radius, angle, isReset, isDragging, onMouseDown } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),

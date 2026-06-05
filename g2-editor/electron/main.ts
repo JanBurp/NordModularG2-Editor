@@ -288,8 +288,8 @@ app.whenReady().then(async () => {
 		{
 			label: "Edit",
 			submenu: [
-				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete") },
-				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all") },
+				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
+				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
 			],
 		},
 		{

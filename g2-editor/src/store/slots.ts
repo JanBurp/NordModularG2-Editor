@@ -689,18 +689,19 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const { areaIdx } = areaConfig(area);
+			const { areaIdx, location } = areaConfig(area);
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 			if (!mod) return;
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = (mod.paramLabels as any[]).find((pl: any) => pl.paramIndex === paramIndex);
 			if (!entry) {
-				entry = { paramIndex, isString: false, paramLen: 7, labels: [''] };
+				entry = { paramIndex, isString: false, paramLen: 7, labels: [label] };
 				(mod.paramLabels as any[]).push(entry);
+			} else {
+				entry.labels[0] = label;
 			}
-			entry.labels[0] = label;
 			this.slots[slot].rawHex = null;
-			// TODO: CLI set-param-label command when available
+			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), '0', label]);
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

@@ -147,6 +147,7 @@ export function useModuleSelecting(
 			uiStore.toggleModuleSelection(index, a);
 		} else {
 			uiStore.selectModules([index], a);
+			uiStore.setSelectedParam(index, 0);
 		}
 		uiStore.selectedCables = [];
 	}

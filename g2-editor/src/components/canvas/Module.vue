@@ -70,19 +70,53 @@
 		<!-- Parameters -->
 		<g class="params">
 			<template v-for="(param, index) in moduleDef.params" :key="param.name">
-				<ModuleKnob v-if="isKnob(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-				<ModuleSlider v-else-if="isSlider(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+				<ModuleKnob
+					v-if="isKnob(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
+					/>
+				<ModuleSlider
+					v-else-if="isSlider(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
+					/>
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:param="param"
 					:value="getParamValue(index)"
 					:label="getParamLabel(index)"
 					:param-index="index"
+					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
-				/>
-				<ModuleKnobSpin v-else-if="isSpinner(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
-				<ModuleKnobSpinH v-else-if="isSpinnerH(param.n)" :param="param" :value="getParamValue(index)" :param-index="index" @change="onParamChange" />
+					@param-context-menu="onParamContextMenu"
+					/>
+				<ModuleKnobSpin
+					v-else-if="isSpinner(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
+					/>
+				<ModuleKnobSpinH
+					v-else-if="isSpinnerH(param.n)"
+					:param="param"
+					:value="getParamValue(index)"
+					:param-index="index"
+					:highlight="index === selectedParamIndex"
+					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
+					/>
 			</template>
 		</g>
 
@@ -129,6 +163,7 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import { useUiStore } from '../../store/ui';
 	import ModuleBackground from './ModuleBackground.vue';
 	import ModuleKnob from './ModuleKnob.vue';
 	import ModuleTitle from './ModuleTitle.vue';
@@ -139,6 +174,7 @@
 	import ModuleGraph from './ModuleGraph.vue';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { getParam } from '../../renderer/parammap';
 	import { useModuleParams } from '../../composables/useModuleParams';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
@@ -151,6 +187,7 @@
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 
@@ -177,6 +214,7 @@
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
+	const { handleParamDblClick } = useParamEditDialog();
 
 	function onModuleClick(e: MouseEvent) {
 		if (e.altKey) onContextMenu(e);
@@ -281,4 +319,31 @@
 		(moduleIndex, paramIndex, value) => emit('paramChange', moduleIndex, paramIndex, value),
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
+
+	const uiStore = useUiStore();
+	const selectedParamIndex = computed(() => {
+		if (uiStore.selectedModulesArea !== props.areaLabel) return -1;
+		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
+	});
+
+	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
+		const param = moduleDef.value?.params?.[paramIndex];
+		const items: any[] = [];
+		if (param && isSwitch(param.n)) {
+			if (getParam(param.type)?.canLabel) {
+				const label = getParamLabel(paramIndex);
+				items.push({ label: 'Rename label', action: () =>
+					emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })
+				});
+			}
+		} else {
+			items.push({ label: 'Set Value', action: () => {
+				const paramType = param?.type ?? '';
+				const currentValue = getParamValue(paramIndex);
+				handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+			}});
+		}
+		openContextMenu(event, items);
+	}
+
 </script>
