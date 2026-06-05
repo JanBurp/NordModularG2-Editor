@@ -261,6 +261,7 @@ app.whenReady().then(async () => {
 			label: "G2 Editor",
 			submenu: [
 				{ role: "about" as const },
+				{ label: "Preferences...", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ role: "services" as const },
 				{ type: "separator" as const },
@@ -297,7 +298,7 @@ app.whenReady().then(async () => {
 			submenu: [
 				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
 				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
-				{ label: "Info", click: () => win!.webContents.send("menu:action", "toggle-info"), accelerator: "CommandOrControl+I" },
+				{ label: "Settings", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "Option+V" },
 				{ label: "Split View", click: () => win!.webContents.send("menu:action", "area-split"), accelerator: "Option+S" },
