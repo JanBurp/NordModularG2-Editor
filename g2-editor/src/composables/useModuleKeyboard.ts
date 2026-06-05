@@ -11,8 +11,18 @@ function isInputFocused(): boolean {
 	return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
-function closestVert(modules: ModuleInstance[], targetVert: number): ModuleInstance {
+function closestByVert(modules: ModuleInstance[], targetVert: number): ModuleInstance {
 	return modules.reduce((best, m) => (Math.abs(m.vert - targetVert) < Math.abs(best.vert - targetVert) ? m : best));
+}
+
+function buildColumnMap(modules: ModuleInstance[]): { columns: Map<number, ModuleInstance[]>; sortedKeys: number[] } {
+	const columns = new Map<number, ModuleInstance[]>();
+	for (const m of modules) {
+		if (!columns.has(m.horiz)) columns.set(m.horiz, []);
+		columns.get(m.horiz)!.push(m);
+	}
+	const sortedKeys = Array.from(columns.keys()).sort((a, b) => a - b);
+	return { columns, sortedKeys };
 }
 
 export function useModuleKeyboard() {
@@ -74,12 +84,7 @@ export function useModuleKeyboard() {
 		const cur = modules.find((m) => m.index === originId);
 		if (!cur) return;
 
-		const columns = new Map<number, ModuleInstance[]>();
-		for (const m of modules) {
-			if (!columns.has(m.horiz)) columns.set(m.horiz, []);
-			columns.get(m.horiz)!.push(m);
-		}
-		const sortedColKeys = Array.from(columns.keys()).sort((a, b) => a - b);
+		const { columns, sortedKeys: sortedColKeys } = buildColumnMap(modules);
 
 		let next: ModuleInstance | undefined;
 		let nextArea = area;
@@ -121,7 +126,7 @@ export function useModuleKeyboard() {
 		} else if (key === 'ArrowRight') {
 			const nextColKey = sortedColKeys.find((c) => c > cur.horiz);
 			if (nextColKey !== undefined) {
-				next = closestVert(columns.get(nextColKey)!, cur.vert);
+				next = closestByVert(columns.get(nextColKey)!, cur.vert);
 			} else if (isSplit && area === 1) {
 				const target = getTopLeftModule(0);
 				if (target) { next = target; nextArea = 0; }
@@ -129,7 +134,7 @@ export function useModuleKeyboard() {
 		} else if (key === 'ArrowLeft') {
 			const prevColKey = [...sortedColKeys].reverse().find((c) => c < cur.horiz);
 			if (prevColKey !== undefined) {
-				next = closestVert(columns.get(prevColKey)!, cur.vert);
+				next = closestByVert(columns.get(prevColKey)!, cur.vert);
 			} else if (isSplit && area === 0) {
 				const target = getBottomRightModule(1);
 				if (target) { next = target; nextArea = 1; }

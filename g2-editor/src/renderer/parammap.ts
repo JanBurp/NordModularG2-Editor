@@ -307,9 +307,21 @@ export function filterFreq1(i: number): string {
 	return r < 1000 ? r.toFixed((r < 100 && 3) || 2) + 'Hz' : (r / 1000).toFixed((r < 10000 && 3) || 2) + 'kHz';
 }
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
 export function MidiNote(i: number): string {
-	const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 	const octave = Math.floor(i / 12) - 1;
-	const noteName = noteNames[i % 12];
-	return noteName + String(octave);
+	return NOTE_NAMES[i % 12] + String(octave);
+}
+
+export function parseMidiNote(text: string): number | null {
+	const trimmed = text.trim();
+	if (/^\d+$/.test(trimmed)) return Math.max(0, Math.min(127, parseInt(trimmed, 10)));
+	const match = trimmed.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+	if (!match) return null;
+	const flatToSharp: Record<string, string> = { Db: 'C#', Eb: 'D#', Fb: 'E', Gb: 'F#', Ab: 'G#', Bb: 'A#', Cb: 'B' };
+	const notePart = match[1].toUpperCase() + match[2];
+	const noteIdx = NOTE_NAMES.indexOf(flatToSharp[notePart] ?? notePart);
+	if (noteIdx < 0) return null;
+	return Math.max(0, Math.min(127, (parseInt(match[3], 10) + 1) * 12 + noteIdx));
 }
