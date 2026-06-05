@@ -92,15 +92,7 @@
 				</template>
 			</div>
 
-			<SidePanel v-if="uiStore.showRightPane">
-				<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
-				<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-				<PatchBrowser
-					v-show="uiStore.rightPaneTab === 'browser'"
-					:isActive="uiStore.rightPaneTab === 'browser'"
-					@select="patchFile.handlePatchSelect"
-				/>
-			</SidePanel>
+			<SidePanel v-if="uiStore.showRightPane" />
 		</div>
 
 		<StatusBar />
@@ -158,9 +150,7 @@
 <script setup lang="ts">
 	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
-	import PatchBrowser from './components/panels/PatchBrowser.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
-	import ModulesPane from './components/panels/ModulesPane.vue';
 	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';
 	import ToolBar from './components/toolbar/ToolBar.vue';
@@ -180,7 +170,6 @@
 	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
-	import { usePatchFile } from './composables/usePatchFile';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
@@ -195,7 +184,6 @@
 	import { useBrowserStore } from './store/browser';
 
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
-	import SettingsPane from './components/panels/SettingsPane.vue';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 
@@ -204,7 +192,6 @@
 	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
 	const jackPatching = useJackPatching();
-	const patchFile = usePatchFile();
 
 	const canvasAreaRef = ref<HTMLElement | null>(null);
 	const { isSplit, showVoice, showFx, voiceWrapperStyle, startDividerDrag } = useAreaMode(canvasAreaRef);
