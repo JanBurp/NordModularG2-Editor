@@ -2,7 +2,6 @@ import { computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
 import type { ModuleParam, ParamDefinition, ParamLabel } from '../types';
-import { useContextMenu } from './useContextMenu';
 
 export function useSwitch(
 	param: Ref<ModuleParam> | ComputedRef<ModuleParam>,
@@ -95,18 +94,9 @@ export function useSwitch(
 		}
 	}
 
-	const { open: openContextMenu } = useContextMenu();
-
-	function onContextMenu(e: MouseEvent) {
-		if (!emitLabelEdit) return;
-		openContextMenu(e, [
-			{ label: 'Rename label', action: () => emitLabelEdit!({ paramIndex: paramIndex.value, currentLabel: label.value?.labels[0] ?? '' }) },
-		]);
-	}
-
 	return {
 		paramDef, names, defin, width, mode, rows, bmp, hasBitmap, maskh,
 		optionNames, displayNames, activeIndex, singleButtonMode, activeOptionName,
-		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue, onContextMenu,
+		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue,
 	};
 }

@@ -77,7 +77,7 @@
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
-					@param-dbl-click="onParamDblClick"
+					@param-context-menu="onParamContextMenu"
 					@param-hover="onParamHover"
 				/>
 				<ModuleSlider
@@ -87,6 +87,7 @@
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
 					@param-hover="onParamHover"
 				/>
 				<ModuleSwitch
@@ -98,6 +99,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
+					@param-context-menu="onParamContextMenu"
 					@param-hover="onParamHover"
 				/>
 				<ModuleKnobSpin
@@ -107,6 +109,7 @@
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
 					@param-hover="onParamHover"
 				/>
 				<ModuleKnobSpinH
@@ -116,6 +119,7 @@
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
 					@param-hover="onParamHover"
 				/>
 			</template>
@@ -187,6 +191,7 @@
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 
@@ -210,10 +215,10 @@
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
 		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
-		paramDblClick: [info: { moduleIndex: number; paramIndex: number; paramType: string; currentValue: number; area: 'fx' | 'va' }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
+	const { handleParamDblClick } = useParamEditDialog();
 
 	function onModuleClick(e: MouseEvent) {
 		if (e.altKey) onContextMenu(e);
@@ -324,10 +329,22 @@
 		uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1,
 	);
 
-	function onParamDblClick(paramIndex: number) {
-		const paramType = moduleDef.value?.params?.[paramIndex]?.type ?? '';
-		const currentValue = getParamValue(paramIndex);
-		emit('paramDblClick', { moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
+		const param = moduleDef.value?.params?.[paramIndex];
+		const items: any[] = [];
+		if (param && isSwitch(param.n)) {
+			const label = getParamLabel(paramIndex);
+			items.push({ label: 'Rename label', action: () =>
+				emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })
+			});
+			items.push({ type: 'separator' });
+		}
+		items.push({ label: 'Set Value', action: () => {
+			const paramType = param?.type ?? '';
+			const currentValue = getParamValue(paramIndex);
+			handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+		}});
+		openContextMenu(event, items);
 	}
 
 	function onParamHover(paramIndex: number) {

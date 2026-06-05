@@ -4,7 +4,7 @@
 		class="knob-control"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
-		@dblclick.stop.prevent="emit('paramDblClick', props.paramIndex)"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 		@mouseover.stop="emit('paramHover', props.paramIndex)"
 	>
 		<!-- Invisible hit area for easier grabbing -->
@@ -51,7 +51,7 @@
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
-		paramDblClick: [paramIndex: number];
+		paramContextMenu: [paramIndex: number, event: MouseEvent];
 		paramHover: [paramIndex: number];
 	}>();
 

@@ -3,7 +3,6 @@ import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
 import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
-import { isSwitch } from '../utils/moduleControls';
 import { useParamEditDialog } from './useParamEditDialog';
 import type { ModuleInstance } from '../types';
 
@@ -180,50 +179,27 @@ export function useModuleKeyboard() {
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 
-	async function cycleSelectedParamSwitch() {
-		const sel = uiStore.selectedParam;
-		if (!sel) return;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
-		const moduleDef = getModule(found.module.type);
-		const param = moduleDef?.params?.[sel.paramIndex];
-		if (!param || !isSwitch(param.n)) return;
-		const paramDef = getParam(param.type);
-		if (!paramDef) return;
-
-		const areaKey = found.area === 1 ? 'voice' : 'fx';
-		const variation = uiStore.variation;
-		const current = slotsStore.slots[uiStore.slotInFocus]?.variations?.[variation]?.[areaKey]?.[sel.moduleId]?.[sel.paramIndex] ?? paramDef.def;
-		const range = paramDef.high - paramDef.low + 1;
-		const newValue = paramDef.low + ((current - paramDef.low + 1) % range);
-		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
-	}
-
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (isInputFocused()) return;
 
 		const { key, shiftKey, altKey } = e;
 
-		if (key === ' ') {
-			cycleSelectedParamSwitch();
-			e.preventDefault();
-			return;
-		}
-
 		const isArrow = key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight';
 		if (!isArrow) return;
 
-		if (shiftKey && (key === 'ArrowLeft' || key === 'ArrowRight')) {
-			navigateParam(key === 'ArrowRight' ? 1 : -1);
-			e.preventDefault();
-		} else if ((shiftKey || altKey) && (key === 'ArrowUp' || key === 'ArrowDown')) {
-			const delta = (key === 'ArrowUp' ? 1 : -1) * (altKey ? 16 : 1);
-			changeParamValue(delta);
-			e.preventDefault();
-		} else if (!shiftKey && !altKey) {
+		if (shiftKey && !altKey) {
 			navigateModule(key);
 			e.preventDefault();
+		} else if (!shiftKey && uiStore.selectedModules.length > 0) {
+			if (key === 'ArrowLeft' || key === 'ArrowRight') {
+				navigateParam(key === 'ArrowRight' ? 1 : -1);
+				e.preventDefault();
+			} else {
+				const delta = (key === 'ArrowUp' ? 1 : -1) * (altKey ? 16 : 1);
+				changeParamValue(delta);
+				e.preventDefault();
+			}
 		}
 	}
 

@@ -33,7 +33,6 @@
 				@jack-delete-connected="(info) => emit('jackDeleteConnected', info)"
 				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
-				@param-dbl-click="(info) => emit('paramDblClick', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
 		</svg>
@@ -116,7 +115,6 @@
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
 		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
-		paramDblClick: [info: { moduleIndex: number; paramIndex: number; paramType: string; currentValue: number; area: 'fx' | 'va' }];
 	}>();
 
 	const svgRef = ref<SVGSVGElement | null>(null);

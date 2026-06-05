@@ -1,5 +1,5 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control" @mouseover.stop="emit('paramHover', props.paramIndex)">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)" @mouseover.stop="emit('paramHover', props.paramIndex)">
 		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
 		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" />
 
@@ -32,6 +32,7 @@
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
+		paramContextMenu: [paramIndex: number, event: MouseEvent];
 		paramHover: [paramIndex: number];
 	}>();
 
