@@ -16,6 +16,7 @@ export function useModuleSelecting(
 	svgEl: Ref<SVGSVGElement | null>,
 	modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>,
 	rectEl: Ref<HTMLDivElement | null>,
+	area: string,
 ) {
 	const uiStore = useUiStore();
 	const shiftHeld = ref(false);
@@ -110,10 +111,11 @@ export function useModuleSelecting(
 
 		if (isDragging) {
 			const inside = getModulesInRect(startX, startY, lastX, lastY);
+			const a = area as 'va' | 'fx';
 			if (shiftHeld.value) {
-				inside.forEach((idx) => uiStore.toggleModuleSelection(idx));
+				inside.forEach((idx) => uiStore.toggleModuleSelection(idx, a));
 			} else {
-				uiStore.selectModules(inside);
+				uiStore.selectModules(inside, a);
 			}
 			suppressNextClick.value = true;
 		} else {
@@ -140,10 +142,11 @@ export function useModuleSelecting(
 	}
 
 	function handleModuleClick(index: number, shiftKey: boolean) {
+		const a = area as 'va' | 'fx';
 		if (shiftKey) {
-			uiStore.toggleModuleSelection(index);
+			uiStore.toggleModuleSelection(index, a);
 		} else {
-			uiStore.selectModules([index]);
+			uiStore.selectModules([index], a);
 		}
 		uiStore.selectedCables = [];
 	}
