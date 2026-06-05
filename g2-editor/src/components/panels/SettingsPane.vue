@@ -2,111 +2,67 @@
 	<div class="flex flex-col gap-1">
 		<Collapsible title="Synth Settings">
 			<div class="flex flex-col gap-1">
-				<div class="settings-row">
-					<span>{{ L.synthName }}</span>
-					<input
-						:value="device.device?.synthName ?? ''"
-						class="settings-input"
-						@input="device.setSynthName(($event.target as HTMLInputElement).value)"
-					/>
-				</div>
+				<SettingsRow :label="L.synthName">
+					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">MIDI Channels</p>
-				<div v-for="slot in MIDI_SLOTS" :key="slot.key" class="settings-row">
-					<span>{{ slot.label }}</span>
-					<input
-						type="number"
-						:value="device.device?.midi.slots[slot.key]"
-						class="settings-input w-16"
-						@change="device.setMidiSlot(slot.key, +($event.target as HTMLInputElement).value)"
-					/>
-				</div>
+				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
+					<NumberInput :model-value="device.device?.midi.slots[slot.key] ?? 1" :min="1" :max="16" class="w-16" @update:model-value="device.setMidiSlot(slot.key, $event)" />
+				</SettingsRow>
 
 				<!-- <p class="settings-subheader">MIDI Settings</p>
-				<div class="settings-row">
-					<span>{{ L.midiSysex }}</span>
-					<input type="number" :value="device.device?.midi.sysex" class="settings-input w-16" @change="device.setMidiSysex(+($event.target as HTMLInputElement).value)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.midiPrgCh }}</span>
-					<input :value="device.device?.midi.prgch ?? ''" class="settings-input w-16" @input="device.setMidiPrgCh(($event.target as HTMLInputElement).value)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.midiLocal }}</span>
-					<input type="checkbox" :checked="device.device?.midi.local" @change="device.setMidiLocal(($event.target as HTMLInputElement).checked)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.midiClkSend }}</span>
-					<input type="checkbox" :checked="device.device?.midi.clkse" @change="device.setMidiClkSend(($event.target as HTMLInputElement).checked)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.midiClkReceive }}</span>
-					<input type="checkbox" :checked="device.device?.midi.clkre" @change="device.setMidiClkReceive(($event.target as HTMLInputElement).checked)" />
-				</div>
+				<SettingsRow :label="L.midiSysex">
+					<NumberInput :model-value="device.device?.midi.sysex ?? 0" class="w-16" @update:model-value="device.setMidiSysex($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.midiPrgCh">
+					<TextInput :model-value="device.device?.midi.prgch ?? ''" class="w-16" @update:model-value="device.setMidiPrgCh($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.midiLocal">
+					<CheckBox :model-value="device.device?.midi.local ?? false" @update:model-value="device.setMidiLocal($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.midiClkSend">
+					<CheckBox :model-value="device.device?.midi.clkse ?? false" @update:model-value="device.setMidiClkSend($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.midiClkReceive">
+					<CheckBox :model-value="device.device?.midi.clkre ?? false" @update:model-value="device.setMidiClkReceive($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">Tuning</p>
-				<div class="settings-row">
-					<span>{{ L.tuningSemi }}</span>
-					<input type="number" :value="device.device?.tuning.semi" class="settings-input w-16" @change="device.setTuningSemi(+($event.target as HTMLInputElement).value)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.tuningCent }}</span>
-					<input type="number" :value="device.device?.tuning.cent" class="settings-input w-16" @change="device.setTuningCent(+($event.target as HTMLInputElement).value)" />
-				</div>
+				<SettingsRow :label="L.tuningSemi">
+					<NumberInput :model-value="device.device?.tuning.semi ?? 0" class="w-16" @update:model-value="device.setTuningSemi($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.tuningCent">
+					<NumberInput :model-value="device.device?.tuning.cent ?? 0" class="w-16" @update:model-value="device.setTuningCent($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">Pedal</p>
-				<div class="settings-row">
-					<span>{{ L.pedalPolarity }}</span>
-					<input type="checkbox" :checked="device.device?.pedal.polarity" @change="device.setPedalPolarity(($event.target as HTMLInputElement).checked)" />
-				</div>
-				<div class="settings-row">
-					<span>{{ L.pedalGain }}</span>
-					<input type="number" :value="device.device?.pedal.gain" class="settings-input w-16" @change="device.setPedalGain(+($event.target as HTMLInputElement).value)" />
-				</div> -->
+				<SettingsRow :label="L.pedalPolarity">
+					<CheckBox :model-value="device.device?.pedal.polarity ?? false" @update:model-value="device.setPedalPolarity($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.pedalGain">
+					<NumberInput :model-value="device.device?.pedal.gain ?? 0" class="w-16" @update:model-value="device.setPedalGain($event)" />
+				</SettingsRow> -->
 			</div>
 		</Collapsible>
 
 		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
 			<div class="flex flex-col gap-1">
-				<div class="settings-row">
-					<span>{{ L.perfName }}</span>
-					<input
-						:value="device.device?.performance?.name ?? ''"
-						class="settings-input"
-						@input="device.setPerfName(($event.target as HTMLInputElement).value)"
-					/>
-				</div>
-				<div class="settings-row">
-					<span>{{ L.bpm }}</span>
-					<input
-						type="number"
-						min="30"
-						max="240"
-						:value="device.bpm"
-						class="settings-input w-16"
-						@change="device.setBpm(+($event.target as HTMLInputElement).value)"
-					/>
-				</div>
-				<div class="settings-row">
-					<span>{{ L.clockRunning }}</span>
-					<input type="checkbox" :checked="device.clockRunning" @change="device.setClockRunning(($event.target as HTMLInputElement).checked)" />
-				</div>
-				<!-- <div class="settings-row">
-					<span>{{ L.kbSplit }}</span>
-					<input
-						type="checkbox"
-						:checked="device.device?.performance?.kbSplit"
-						@change="device.setKbSplit(($event.target as HTMLInputElement).checked)"
-					/>
-				</div> -->
-				<div class="settings-row">
-					<span>{{ L.rangeEnable }}</span>
-					<input
-						type="checkbox"
-						:checked="device.device?.performance?.rangeEnable"
-						@change="device.setRangeEnable(($event.target as HTMLInputElement).checked)"
-					/>
-				</div>
+				<SettingsRow :label="L.perfName">
+					<TextInput :model-value="device.device?.performance?.name ?? ''" @update:model-value="device.setPerfName($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.bpm">
+					<NumberInput :model-value="device.bpm" :min="30" :max="240" class="w-16" @update:model-value="device.setBpm($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.clockRunning">
+					<CheckBox :model-value="device.clockRunning" @update:model-value="device.setClockRunning($event)" />
+				</SettingsRow>
+				<!-- <SettingsRow :label="L.kbSplit">
+					<CheckBox :model-value="device.device?.performance?.kbSplit ?? false" @update:model-value="device.setKbSplit($event)" />
+				</SettingsRow> -->
+				<SettingsRow :label="L.rangeEnable">
+					<CheckBox :model-value="device.device?.performance?.rangeEnable ?? false" @update:model-value="device.setRangeEnable($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">Slot Info</p>
 				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
@@ -124,57 +80,31 @@
 					style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem"
 				>
 					<span class="text-neutral-300 font-medium">{{ slot }}</span>
-					<span class="flex justify-center"
-						><input type="checkbox" :checked="slotEntry(slot)?.active" @change="device.toggleSlotActive(slot)"
-					/></span>
-					<span class="flex justify-center"><input type="checkbox" :checked="slotEntry(slot)?.key" @change="device.toggleSlotKey(slot)" /></span>
-					<span class="flex justify-center"
-						><input
-							type="checkbox"
-							:checked="slotEntry(slot)?.hold"
-							@change="device.setSlotHold(slot, ($event.target as HTMLInputElement).checked)"
-					/></span>
-					<input
-						type="number"
-						min="0"
-						max="127"
-						:value="slotEntry(slot)?.range?.lower ?? 0"
-						class="settings-input px-0 min-w-12"
-						@change="device.setSlotRangeLower(slot, +($event.target as HTMLInputElement).value)"
-					/>
-					<input
-						type="number"
-						min="0"
-						max="127"
-						:value="slotEntry(slot)?.range?.upper ?? 127"
-						class="settings-input px-0 min-w-12"
-						@change="device.setSlotRangeUpper(slot, +($event.target as HTMLInputElement).value)"
-					/>
+					<span class="flex justify-center">
+						<CheckBox :model-value="slotEntry(slot)?.active ?? false" @update:model-value="device.toggleSlotActive(slot)" />
+					</span>
+					<span class="flex justify-center">
+						<CheckBox :model-value="slotEntry(slot)?.key ?? false" @update:model-value="device.toggleSlotKey(slot)" />
+					</span>
+					<span class="flex justify-center">
+						<CheckBox :model-value="slotEntry(slot)?.hold ?? false" @update:model-value="device.setSlotHold(slot, $event)" />
+					</span>
+					<NumberInput :model-value="slotEntry(slot)?.range?.lower ?? 0" :min="0" :max="127" class="px-0 min-w-12" @update:model-value="device.setSlotRangeLower(slot, $event)" />
+					<NumberInput :model-value="slotEntry(slot)?.range?.upper ?? 127" :min="0" :max="127" class="px-0 min-w-12" @update:model-value="device.setSlotRangeUpper(slot, $event)" />
 				</div>
 			</div>
 		</Collapsible>
 
 		<Collapsible v-if="currentPatch" title="Patch Settings">
 			<div class="flex flex-col gap-1">
-				<div class="settings-row">
-					<span>{{ L.patchName }}</span>
-					<input
-						:value="slotsStore.getPatchName(uiStore.slotInFocus)"
-						class="settings-input"
-						@input="slotsStore.setPatchName(($event.target as HTMLInputElement).value)"
-					/>
-				</div>
+				<SettingsRow :label="L.patchName">
+					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" @update:model-value="slotsStore.setPatchName($event)" />
+				</SettingsRow>
 
 				<!-- <p class="settings-subheader">Variation Parameters</p>
-				<div v-for="param in PATCH_PARAMS" :key="param.key" class="settings-row">
-					<span>{{ param.label }}</span>
-					<input
-						type="number"
-						:value="patchParam(param.key)"
-						class="settings-input w-16"
-						@change="slotsStore.setPatchParam(uiStore.variation, param.key, +($event.target as HTMLInputElement).value)"
-					/>
-				</div> -->
+				<SettingsRow v-for="param in PATCH_PARAMS" :key="param.key" :label="param.label">
+					<NumberInput :model-value="patchParam(param.key)" class="w-16" @update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)" />
+				</SettingsRow> -->
 			</div>
 		</Collapsible>
 	</div>
@@ -183,6 +113,10 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
+	import SettingsRow from '@/components/common/SettingsRow.vue';
+	import TextInput from '@/components/common/TextInput.vue';
+	import NumberInput from '@/components/common/NumberInput.vue';
+	import CheckBox from '@/components/common/CheckBox.vue';
 	import { useDeviceStore } from '@/store/device';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';

@@ -101,7 +101,7 @@ body {
 }
 
 .settings-input {
-	@apply w-full px-1.5 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-100 focus:outline-none focus:border-neutral-400;
+	@apply w-full px-1 text-xs bg-neutral-300 border border-black text-black rounded-xs h-6 overflow-hidden text-ellipsis text-nowrap focus:outline-none focus:bg-neutral-100;
 }
 
 .settings-row {
