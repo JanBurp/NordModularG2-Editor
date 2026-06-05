@@ -188,5 +188,123 @@ export const useDeviceStore = defineStore('device', {
 				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
 		},
 
+		setSlotHold(slot: SlotLabel, value: boolean) {
+			const entry = this.device?.slots.find((s) => s.slot === slot);
+			if (!entry) return;
+			entry.hold = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-hold', slot, value ? '1' : '0']);
+		},
+
+		setSlotRangeLower(slot: SlotLabel, lower: number) {
+			const entry = this.device?.slots.find((s) => s.slot === slot);
+			if (!entry) return;
+			entry.range.lower = lower;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]);
+		},
+
+		setSlotRangeUpper(slot: SlotLabel, upper: number) {
+			const entry = this.device?.slots.find((s) => s.slot === slot);
+			if (!entry) return;
+			entry.range.upper = upper;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]);
+		},
+
+		setSynthName(name: string) {
+			if (!this.device) return;
+			this.device.synthName = name;
+			this.deviceName = name;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-synth-name', name]);
+		},
+
+		setMidiSlot(slot: 'A' | 'B' | 'C' | 'D' | 'global', channel: number) {
+			if (!this.device) return;
+			this.device.midi.slots[slot] = channel;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-channel', slot, String(channel)]);
+		},
+
+		setMidiSysex(value: number) {
+			if (!this.device) return;
+			this.device.midi.sysex = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-sysex', String(value)]);
+		},
+
+		setMidiLocal(value: boolean) {
+			if (!this.device) return;
+			this.device.midi.local = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-local', value ? '1' : '0']);
+		},
+
+		setMidiPrgCh(value: string) {
+			if (!this.device) return;
+			this.device.midi.prgch = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-prgch', value]);
+		},
+
+		setMidiClkSend(value: boolean) {
+			if (!this.device) return;
+			this.device.midi.clkse = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-clkse', value ? '1' : '0']);
+		},
+
+		setMidiClkReceive(value: boolean) {
+			if (!this.device) return;
+			this.device.midi.clkre = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-midi-clkre', value ? '1' : '0']);
+		},
+
+		setTuningSemi(value: number) {
+			if (!this.device) return;
+			this.device.tuning.semi = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-tuning', String(value), String(this.device.tuning.cent)]);
+		},
+
+		setTuningCent(value: number) {
+			if (!this.device) return;
+			this.device.tuning.cent = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-tuning', String(this.device.tuning.semi), String(value)]);
+		},
+
+		setPedalPolarity(value: boolean) {
+			if (!this.device) return;
+			this.device.pedal.polarity = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-pedal-polarity', value ? '1' : '0']);
+		},
+
+		setPedalGain(value: number) {
+			if (!this.device) return;
+			this.device.pedal.gain = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-pedal-gain', String(value)]);
+		},
+
+		setRangeEnable(value: boolean) {
+			if (!this.device) return;
+			if (this.device.performance) this.device.performance.rangeEnable = value;
+			if (this.device.patches) this.device.patches.rangeEnable = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-range-enable', value ? '1' : '0']);
+		},
+
+		setKbSplit(value: boolean) {
+			if (!this.device) return;
+			if (this.device.performance) this.device.performance.kbSplit = value;
+			if (this.device.patches) this.device.patches.kbSplit = value;
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-kb-split', value ? '1' : '0']);
+		},
+
 	},
 });
