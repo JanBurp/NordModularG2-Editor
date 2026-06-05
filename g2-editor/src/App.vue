@@ -66,7 +66,6 @@
 							@jack-delete-connected="voiceOps.handleJackDeleteConnected"
 							@jack-set-cable-color="voiceOps.handleJackSetCableColor"
 							@param-label-edit="handleParamLabelEdit"
-							@param-dbl-click="handleParamDblClick"
 						/>
 					</div>
 
@@ -96,7 +95,6 @@
 							@jack-delete-connected="fxOps.handleJackDeleteConnected"
 							@jack-set-cable-color="fxOps.handleJackSetCableColor"
 							@param-label-edit="handleParamLabelEdit"
-							@param-dbl-click="handleParamDblClick"
 						/>
 					</div>
 				</template>
@@ -200,7 +198,6 @@
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
-	import { useParamEditDialog } from './composables/useParamEditDialog';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
 	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
@@ -291,8 +288,6 @@
 	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick });
 	useModuleKeyboard();
 
-const { handleParamDblClick } = useParamEditDialog();
-
 	async function handlePerfModeToggle(): Promise<void> {
 		try {
 			await device.togglePerfMode();
@@ -301,15 +296,7 @@ const { handleParamDblClick } = useParamEditDialog();
 		}
 	}
 
-	async function handleDeleteKey(e: KeyboardEvent): Promise<void> {
-		if (e.key !== 'Delete' && e.key !== 'Backspace') return;
-		const active = document.activeElement;
-		if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return;
-		await deleteSelection();
-	}
-
 	onMounted(async () => {
-		window.addEventListener('keydown', handleDeleteKey);
 
 		const isOffline = import.meta.env.VITE_DEV_OFFLINE === 'true';
 		if (isOffline) {
@@ -332,7 +319,4 @@ const { handleParamDblClick } = useParamEditDialog();
 		}
 	});
 
-	onUnmounted(() => {
-		window.removeEventListener('keydown', handleDeleteKey);
-	});
 </script>
