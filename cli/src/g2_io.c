@@ -274,6 +274,43 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
     return (ret < 0) ? -1 : 0;
 }
 
+/* Build and send a slot-scoped compound G2 command containing multiple sub-operations.
+ * Each G2Op contributes one [cmd][payload...] segment; they are concatenated in the
+ * frame in order, matching the Delphi editor's TG2SendMessage batching approach. */
+int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops) {
+    uint8_t buff[4096] = {0};
+    int pos = COMMAND_OFFSET;
+
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;
+    buff[pos++] = version;
+
+    for (int i = 0; i < n_ops; i++) {
+        if (pos + 1 + ops[i].len > (int)sizeof(buff) - 2) break;
+        buff[pos++] = ops[i].cmd;
+        memcpy(buff + pos, ops[i].payload, (size_t)ops[i].len);
+        pos += ops[i].len;
+    }
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    if (ret == LIBUSB_ERROR_PIPE) {
+        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    }
+    if (ret >= 0) debug_send("slot_batch", buff, msgLength);
+    return (ret < 0) ? -1 : 0;
+}
+
 /* ── Listener thread infrastructure ────────────────────────────────────── */
 /* Thread-safe FIFO: the listener thread pushes messages; the daemon main loop
  * and the recv_interrupt/recv_bulk shims pop them. */

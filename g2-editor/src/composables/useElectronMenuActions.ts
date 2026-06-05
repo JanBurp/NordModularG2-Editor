@@ -81,7 +81,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					await deleteSelection();
 					break;
 				case 'select-all':
-					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number));
+					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number), uiStore.activeArea === 1 ? 'va' : 'fx');
 					break;
 				case 'toggle-modules':
 					uiStore.toggleSidebar('modules');

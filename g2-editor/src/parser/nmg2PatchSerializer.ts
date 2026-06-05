@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation } from '@/types';
+import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState } from '@/types';
 import { SectionType } from './constants';
 
 // CRC-16 lookup table (same polynomial as parser)
@@ -100,8 +100,9 @@ function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
 	return makeSection(SectionType.CABLE_LIST, bw.flush());
 }
 
-function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array {
+function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: VariationState[]): Uint8Array {
 	const withParams = modules.filter((m) => m.pcnt > 0);
+	const aKey = areaIdx === 0 ? 'fx' : 'voice';
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
 	bw.write(8, withParams.length);
@@ -111,7 +112,7 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 		bw.write(7, m.pcnt);
 		for (let v = 0; v < 9; v++) {
 			bw.write(8, v);
-			for (let p = 0; p < m.pcnt; p++) bw.write(7, m.lv[v * m.pcnt + p] ?? 0);
+			for (let p = 0; p < m.pcnt; p++) bw.write(7, variations[v]?.[aKey]?.[m.index]?.[p] ?? 0);
 		}
 	}
 	return makeSection(SectionType.PARAMETERS, bw.flush());
@@ -297,14 +298,14 @@ function newWrittenSets(): WrittenSets {
  */
 function processSection(
 	type: number, siz: number, secData: Uint8Array, verbatim: Uint8Array,
-	patch: Patch, out: Uint8Array[], w: WrittenSets,
+	patch: Patch, out: Uint8Array[], w: WrittenSets, variations: VariationState[],
 ): void {
 	const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
 
 	if (type === SectionType.PARAMETERS && areaIdx === 2 && !w.m4d.has(2)) {
-		if (patch.patchParams) {
+		if (variations.length) {
 			const morphs = extractMorphs(secData);
-			out.push(writePatchParamSection(patch.patchParams, morphs));
+			out.push(writePatchParamSection(variations.map((v) => v.patch), morphs));
 		} else {
 			out.push(verbatim);
 		}
@@ -316,7 +317,7 @@ function processSection(
 		out.push(writeCableList(areaIdx as 0 | 1, patch.areas[areaIdx].cableList ?? []));
 		w.m52.add(areaIdx);
 	} else if (type === SectionType.PARAMETERS && areaIdx <= 1 && !w.m4d.has(areaIdx)) {
-		out.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
+		out.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules, variations));
 		w.m4d.add(areaIdx);
 		// Param names follow params in Delphi write order; emit here so
 		// labels survive even if the template predates them.
@@ -353,7 +354,7 @@ function processSection(
  * it is used to copy preserved sections (especially the patch description whose
  * first 61 bits are discarded during parsing and cannot be reconstructed).
  */
-export function serializePatch(name: string, patch: Patch, templateRawHex: string): string {
+export function serializePatch(name: string, patch: Patch, templateRawHex: string, variations: VariationState[]): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2; // exclude trailing CRC bytes
 	const out: Uint8Array[] = [];
@@ -363,7 +364,7 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patch, out, w);
+		processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patch, out, w, variations);
 		ofs += 3 + siz;
 	}
 	return buildRawHex(out);
@@ -374,7 +375,7 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
  * as serializePatch, but slot-aware: written sets reset at each SEPARATOR boundary so all 4
  * slots' sections are updated, not just slot 0's.
  */
-export function serializePerformance(patches: Patch[], templateRawHex: string): string {
+export function serializePerformance(patches: Patch[], templateRawHex: string, variationsArray: VariationState[][]): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
 	const out: Uint8Array[] = [];
@@ -390,7 +391,7 @@ export function serializePerformance(patches: Patch[], templateRawHex: string): 
 			// Advance to next slot when more data follows
 			if (ofs + 3 + siz < sectionDataLen) { slotIdx++; w = newWrittenSets(); }
 		} else {
-			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w);
+			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w, variationsArray[slotIdx] ?? []);
 		}
 		ofs += 3 + siz;
 	}

@@ -910,7 +910,107 @@ int g2_select_variation(int variation, int slot) {
     return G2_OK;
 }
 
-/* Helper: get version for slot using GET_PATCH_VERSION (with cache) */
+/* ── Payload builders ───────────────────────────────────────────────────
+ * Each builder encodes one USB sub-command into op->cmd/payload/len using
+ * the caller-supplied buf.  These are the single source of truth for byte
+ * layout; both the single-op functions and execute_seq call them. */
+
+static void swap_connectors(int *fm, int *fct, int *fci, int *tm, int *tct, int *tci) {
+    int t; t=*fm; *fm=*tm; *tm=t; t=*fct; *fct=*tct; *tct=t; t=*fci; *fci=*tci; *tci=t;
+}
+
+void g2_build_del_cable_op(G2Op *op, uint8_t *buf, int loc,
+                            int fm, int fct, int fci, int tm, int tct, int tci) {
+    if (fct == 0) swap_connectors(&fm, &fct, &fci, &tm, &tct, &tci);
+    buf[0]=(uint8_t)((1<<1)|(loc&1)); buf[1]=(uint8_t)fm;
+    buf[2]=(uint8_t)(((fct&3)<<6)|(fci&0x3f));
+    buf[3]=(uint8_t)tm; buf[4]=(uint8_t)(((tct&3)<<6)|(tci&0x3f));
+    op->cmd=0x51; op->payload=buf; op->len=5;
+}
+
+void g2_build_add_cable_op(G2Op *op, uint8_t *buf, int loc, int color,
+                            int fm, int fct, int fci, int tm, int tct, int tci) {
+    if (fct == 0) swap_connectors(&fm, &fct, &fci, &tm, &tct, &tci);
+    buf[0]=(uint8_t)((1<<4)|((loc&1)<<3)|(color&7)); buf[1]=(uint8_t)fm;
+    buf[2]=(uint8_t)(((fct&3)<<6)|(fci&0x3f));
+    buf[3]=(uint8_t)tm; buf[4]=(uint8_t)(((tct&3)<<6)|(tci&0x3f));
+    op->cmd=0x50; op->payload=buf; op->len=5;
+}
+
+void g2_build_set_cable_color_op(G2Op *op, uint8_t *buf, int loc, int color,
+                                  int fm, int fct, int fci, int tm, int tct, int tci) {
+    if (fct == 0) swap_connectors(&fm, &fct, &fci, &tm, &tct, &tci);
+    buf[0]=(uint8_t)((1<<1)|(loc&1)); buf[1]=(uint8_t)fm;
+    buf[2]=(uint8_t)(((fct&3)<<6)|(fci&0x3f));
+    buf[3]=(uint8_t)tm; buf[4]=(uint8_t)(((tct&3)<<6)|(tci&0x3f));
+    buf[5]=(uint8_t)color;
+    op->cmd=0x54; op->payload=buf; op->len=6;
+}
+
+void g2_build_del_module_op(G2Op *op, uint8_t *buf, int loc, int module_id) {
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id;
+    op->cmd=0x32; op->payload=buf; op->len=2;
+}
+
+void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
+                              int module_id, int col, int row) {
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id;
+    buf[2]=(uint8_t)col; buf[3]=(uint8_t)row;
+    op->cmd=0x34; op->payload=buf; op->len=4;
+}
+
+int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
+                            int type_id, int module_id, int col, int row, int color,
+                            int num_modes, const int *mode_vals, const char *name) {
+    int pos = 0;
+    buf[pos++]=(uint8_t)type_id; buf[pos++]=(uint8_t)loc;
+    buf[pos++]=(uint8_t)module_id; buf[pos++]=(uint8_t)col;
+    buf[pos++]=(uint8_t)row; buf[pos++]=(uint8_t)(color&0xff);
+    buf[pos++]=0x00; buf[pos++]=0x00; /* upRate, isLed */
+    for (int m=0; m<num_modes; m++)
+        buf[pos++]=(uint8_t)(mode_vals ? mode_vals[m] : 0);
+    if (name && *name) {
+        size_t nlen=strlen(name); if (nlen>16) nlen=16;
+        memcpy(buf+pos, name, nlen+1); pos+=(int)nlen+1;
+    } else { buf[pos++]=0x00; }
+    op->cmd=0x30; op->payload=buf; op->len=pos;
+    return pos;
+}
+
+void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
+                                   int loc, int module_id, int color) {
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)color;
+    op->cmd=0x31; op->payload=buf; op->len=3;
+}
+
+void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
+                                   int loc, int module_id, const char *label) {
+    size_t nlen = label ? strlen(label) : 0; if (nlen>16) nlen=16;
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id;
+    if (label && nlen>0) { memcpy(buf+2, label, nlen); buf[2+nlen]=0x00; }
+    else { buf[2]=0x00; nlen=0; }
+    op->cmd=0x33; op->payload=buf; op->len=(int)(3+nlen);
+}
+
+void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
+                                  int loc, int module_id, int param_idx,
+                                  int label_idx, const char *label) {
+    int num_labels=label_idx+1;
+    int payload_len=6+7*num_labels;
+    int idx=0;
+    buf[idx++]=(uint8_t)loc; buf[idx++]=(uint8_t)module_id;
+    buf[idx++]=(uint8_t)(3+7*num_labels); buf[idx++]=1;
+    buf[idx++]=(uint8_t)(1+7*num_labels); buf[idx++]=(uint8_t)param_idx;
+    for (int i=0; i<label_idx; i++) for (int j=0; j<7; j++) buf[idx++]=0;
+    if (label) {
+        size_t llen=strlen(label); if (llen>7) llen=7;
+        for (int j=0; j<7; j++) buf[idx++]=(j<(int)llen)?(uint8_t)label[j]:0;
+    }
+    if (idx<payload_len) memset(buf+idx, 0, (size_t)(payload_len-idx));
+    op->cmd=0x42; op->payload=buf; op->len=payload_len;
+}
+
+/* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
 static uint8_t cable_get_version(int slot) {
     if (g2_slot_version[slot]) return g2_slot_version[slot];
     /* cache miss — ask G2 (fallback for first use before get-patch) */
@@ -933,25 +1033,13 @@ int g2_add_cable(int slot, int location, int color,
 
     if (ensure_connected(0) < 0) { g2_err("add-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    /* Enforce output→input: swap if from is an input */
-    if (from_con_type == 0) {
-        int tmp;
-        tmp = from_mod;      from_mod      = to_mod;       to_mod       = tmp;
-        tmp = from_con_type; from_con_type = to_con_type;  to_con_type  = tmp;
-        tmp = from_con_id;   from_con_id   = to_con_id;    to_con_id    = tmp;
-    }
-
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[5] = {
-        (uint8_t)((1 << 4) | ((location & 1) << 3) | (color & 7)),
-        (uint8_t)from_mod,
-        (uint8_t)(((from_con_type & 3) << 6) | (from_con_id & 0x3f)),
-        (uint8_t)to_mod,
-        (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
-    };
-    if (send_slot(slot, version, 0x50, extra, 5) < 0) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_add_cable_op(&op, buf, location, color,
+                          from_mod, from_con_type, from_con_id,
+                          to_mod, to_con_type, to_con_id);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("add-cable: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -969,25 +1057,13 @@ int g2_del_cable(int slot, int location,
 
     if (ensure_connected(0) < 0) { g2_err("del-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    /* Enforce output→input: swap if from is an input */
-    if (from_con_type == 0) {
-        int tmp;
-        tmp = from_mod;      from_mod      = to_mod;       to_mod       = tmp;
-        tmp = from_con_type; from_con_type = to_con_type;  to_con_type  = tmp;
-        tmp = from_con_id;   from_con_id   = to_con_id;    to_con_id    = tmp;
-    }
-
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[5] = {
-        (uint8_t)((1 << 1) | (location & 1)),
-        (uint8_t)from_mod,
-        (uint8_t)(((from_con_type & 3) << 6) | (from_con_id & 0x3f)),
-        (uint8_t)to_mod,
-        (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
-    };
-    if (send_slot(slot, version, 0x51, extra, 5) < 0) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_del_cable_op(&op, buf, location,
+                          from_mod, from_con_type, from_con_id,
+                          to_mod, to_con_type, to_con_id);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("del-cable: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1007,26 +1083,13 @@ int g2_set_cable_color(int slot, int location, int color,
 
     if (ensure_connected(0) < 0) { g2_err("set-cable-color: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    /* Enforce output→input: swap if from is an input */
-    if (from_con_type == 0) {
-        int tmp;
-        tmp = from_mod;      from_mod      = to_mod;       to_mod       = tmp;
-        tmp = from_con_type; from_con_type = to_con_type;  to_con_type  = tmp;
-        tmp = from_con_id;   from_con_id   = to_con_id;    to_con_id    = tmp;
-    }
-
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[6] = {
-        (uint8_t)((1 << 1) | (location & 1)),
-        (uint8_t)from_mod,
-        (uint8_t)(((from_con_type & 3) << 6) | (from_con_id & 0x3f)),
-        (uint8_t)to_mod,
-        (uint8_t)(((to_con_type & 3) << 6) | (to_con_id & 0x3f)),
-        (uint8_t)color,
-    };
-    if (send_slot(slot, version, 0x54, extra, 6) < 0) {
+    uint8_t buf[6]; G2Op op;
+    g2_build_set_cable_color_op(&op, buf, location, color,
+                                from_mod, from_con_type, from_con_id,
+                                to_mod, to_con_type, to_con_id);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("set-cable-color: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1044,9 +1107,9 @@ int g2_del_module(int slot, int location, int module_id) {
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[2] = { (uint8_t)location, (uint8_t)module_id };
-    if (send_slot(slot, version, 0x32, extra, 2) < 0) {
+    uint8_t buf[2]; G2Op op;
+    g2_build_del_module_op(&op, buf, location, module_id);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("del-module: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1064,9 +1127,9 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)col, (uint8_t)row };
-    if (send_slot(slot, version, 0x34, extra, 4) < 0) {
+    uint8_t buf[4]; G2Op op;
+    g2_build_move_module_op(&op, buf, location, module_id, col, row);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("move-module: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1087,33 +1150,12 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 
     if (ensure_connected(0) < 0) { g2_err("add-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    uint8_t payload[512];
-    int pos = 0;
-
-    payload[pos++] = (uint8_t)type_id;
-    payload[pos++] = (uint8_t)location;
-    payload[pos++] = (uint8_t)module_id;
-    payload[pos++] = (uint8_t)col;
-    payload[pos++] = (uint8_t)row;
-    payload[pos++] = (uint8_t)(color & 0xff); /* colour */
-    payload[pos++] = 0x00; /* upRate */
-    payload[pos++] = 0x00; /* isLed */
-
-    for (int m = 0; m < num_modes; m++)
-        payload[pos++] = (uint8_t)(mode_vals ? mode_vals[m] : 0);
-
-    if (name && *name) {
-        size_t nlen = strlen(name);
-        memcpy(payload + pos, name, nlen + 1);
-        pos += (int)nlen + 1;
-    } else {
-        payload[pos++] = 0x00;
-    }
-
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    if (send_slot(slot, version, 0x30, payload, pos) < 0) {
+    uint8_t buf[512]; G2Op op;
+    g2_build_add_module_op(&op, buf, location, type_id, module_id, col, row, color,
+                           num_modes, mode_vals, name);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("add-module: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1132,9 +1174,9 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    uint8_t extra[3] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)color };
-    if (send_slot(slot, version, 0x31, extra, 3) < 0) {
+    uint8_t buf[3]; G2Op op;
+    g2_build_set_module_color_op(&op, buf, location, module_id, color);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("set-module-color: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1153,17 +1195,9 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    size_t nlen = strlen(label);
-    if (nlen > 16) nlen = 16;
-
-    uint8_t payload[20];
-    payload[0] = (uint8_t)location;
-    payload[1] = (uint8_t)module_id;
-    memcpy(payload + 2, label, nlen);
-    payload[2 + nlen] = 0x00;
-
-    if (send_slot(slot, version, 0x33, payload, (int)(3 + nlen)) < 0) {
+    uint8_t buf[20]; G2Op op;
+    g2_build_set_module_label_op(&op, buf, location, module_id, label);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("set-module-name: failed to send\n");
         return G2_ERR_SEND;
     }
@@ -1183,31 +1217,27 @@ int g2_set_param_label(int slot, int location, int module_id, int param_idx, int
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-
-    int num_labels = label_idx + 1;
-    int module_len = 3 + 7 * num_labels;
-    int param_len  = 1 + 7 * num_labels;
-    int payload_len = 6 + 7 * num_labels;
-
-    uint8_t payload[6 + 7 * 128];
-    int idx = 0;
-    payload[idx++] = (uint8_t)location;
-    payload[idx++] = (uint8_t)module_id;
-    payload[idx++] = (uint8_t)module_len;
-    payload[idx++] = 1;
-    payload[idx++] = (uint8_t)param_len;
-    payload[idx++] = (uint8_t)param_idx;
-
-    for (int i = 0; i < label_idx; i++)
-        for (int j = 0; j < 7; j++) payload[idx++] = 0;
-
-    size_t llen = strlen(label);
-    if (llen > 7) llen = 7;
-    for (int j = 0; j < 7; j++)
-        payload[idx++] = (j < (int)llen) ? (uint8_t)label[j] : 0;
-
-    if (send_slot(slot, version, 0x42, payload, payload_len) < 0) {
+    uint8_t buf[6 + 7 * 128]; G2Op op;
+    g2_build_set_param_label_op(&op, buf, location, module_id, param_idx, label_idx, label);
+    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("set-param-label: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_batch_ops(int slot, const G2Op *ops, int n_ops) {
+    if (slot < 0 || slot > 3)    { g2_err("seq: invalid slot\n");      return G2_ERR_INVALID_PARAM; }
+    if (n_ops <= 0)               return G2_OK;
+    if (ensure_connected(0) < 0) { g2_err("seq: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+
+    if (send_slot_batch((uint8_t)slot, version, ops, n_ops) < 0) {
+        g2_err("seq: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);

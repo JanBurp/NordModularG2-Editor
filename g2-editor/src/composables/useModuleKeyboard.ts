@@ -25,13 +25,9 @@ export function useModuleKeyboard() {
 		return slotsStore.getAreaModules(uiStore.slotInFocus, area) as ModuleInstance[];
 	}
 
-	// Which area the currently selected module belongs to (defaults to activeArea if no selection)
 	function getSelectedArea(): 0 | 1 {
-		if (uiStore.selectedModules.length > 0) {
-			const id = uiStore.selectedModules[0];
-			const voiceMods = getModulesInArea(1);
-			return voiceMods.some((m) => m.index === id) ? 1 : 0;
-		}
+		if (uiStore.selectedModulesArea === 'va') return 1;
+		if (uiStore.selectedModulesArea === 'fx') return 0;
 		return uiStore.activeArea;
 	}
 
@@ -56,7 +52,7 @@ export function useModuleKeyboard() {
 	}
 
 	function selectInArea(module: ModuleInstance, area: 0 | 1) {
-		uiStore.selectModulesInArea([module.index], area);
+		uiStore.selectModules([module.index], area === 1 ? 'va' : 'fx');
 	}
 
 	function navigateModule(key: string) {
