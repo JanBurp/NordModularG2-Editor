@@ -126,6 +126,7 @@
 		svgRef,
 		computed(() => props.modules as any[]),
 		selectionRectEl,
+		props.area,
 	);
 
 	const canvasWidth = computed(() => {

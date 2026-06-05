@@ -53,7 +53,7 @@
 							:variation="uiStore.variation"
 							area="va"
 							:selected-cables="uiStore.selectedCables"
-							:selected-module-indices="uiStore.selectedModules"
+							:selected-module-indices="voiceSelectedModules"
 							@jack-drag-start="jackPatching.handleJackDragStart"
 							@jack-drag-end="jackPatching.handleJackDragEnd"
 							@module-move="voiceOps.handleModuleMove"
@@ -82,7 +82,7 @@
 							:variation="uiStore.variation"
 							area="fx"
 							:selected-cables="uiStore.selectedCables"
-							:selected-module-indices="uiStore.selectedModules"
+							:selected-module-indices="fxSelectedModules"
 							@jack-drag-start="jackPatching.handleJackDragStart"
 							@jack-drag-end="jackPatching.handleJackDragEnd"
 							@module-move="fxOps.handleModuleMove"
@@ -236,6 +236,8 @@
 	const voiceCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 1));
 	const fxModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 0));
 	const fxCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, 0));
+	const voiceSelectedModules = computed(() => (uiStore.selectedModulesArea === 'va' ? uiStore.selectedModules : []));
+	const fxSelectedModules = computed(() => (uiStore.selectedModulesArea === 'fx' ? uiStore.selectedModules : []));
 	const currentModules = computed(() => (uiStore.activeArea === 1 ? voiceModules.value : fxModules.value));
 	const patchName = computed(() => slotsStore.getPatchName(uiStore.slotInFocus));
 
