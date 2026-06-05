@@ -4,16 +4,25 @@
 			<div class="flex flex-col gap-1">
 				<div class="settings-row">
 					<span>{{ L.synthName }}</span>
-					<input :value="device.device?.synthName ?? ''" class="settings-input" @input="device.setSynthName(($event.target as HTMLInputElement).value)" />
+					<input
+						:value="device.device?.synthName ?? ''"
+						class="settings-input"
+						@input="device.setSynthName(($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 
 				<p class="settings-subheader">MIDI Channels</p>
 				<div v-for="slot in MIDI_SLOTS" :key="slot.key" class="settings-row">
 					<span>{{ slot.label }}</span>
-					<input type="number" :value="device.device?.midi.slots[slot.key]" class="settings-input w-16" @change="device.setMidiSlot(slot.key, +($event.target as HTMLInputElement).value)" />
+					<input
+						type="number"
+						:value="device.device?.midi.slots[slot.key]"
+						class="settings-input w-16"
+						@change="device.setMidiSlot(slot.key, +($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 
-				<p class="settings-subheader">MIDI Settings</p>
+				<!-- <p class="settings-subheader">MIDI Settings</p>
 				<div class="settings-row">
 					<span>{{ L.midiSysex }}</span>
 					<input type="number" :value="device.device?.midi.sysex" class="settings-input w-16" @change="device.setMidiSysex(+($event.target as HTMLInputElement).value)" />
@@ -53,7 +62,7 @@
 				<div class="settings-row">
 					<span>{{ L.pedalGain }}</span>
 					<input type="number" :value="device.device?.pedal.gain" class="settings-input w-16" @change="device.setPedalGain(+($event.target as HTMLInputElement).value)" />
-				</div>
+				</div> -->
 			</div>
 		</Collapsible>
 
@@ -61,28 +70,47 @@
 			<div class="flex flex-col gap-1">
 				<div class="settings-row">
 					<span>{{ L.perfName }}</span>
-					<input :value="device.device?.performance?.name ?? ''" class="settings-input" @input="device.setPerfName(($event.target as HTMLInputElement).value)" />
+					<input
+						:value="device.device?.performance?.name ?? ''"
+						class="settings-input"
+						@input="device.setPerfName(($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 				<div class="settings-row">
 					<span>{{ L.bpm }}</span>
-					<input type="number" min="30" max="240" :value="device.bpm" class="settings-input w-16" @change="device.setBpm(+($event.target as HTMLInputElement).value)" />
+					<input
+						type="number"
+						min="30"
+						max="240"
+						:value="device.bpm"
+						class="settings-input w-16"
+						@change="device.setBpm(+($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 				<div class="settings-row">
 					<span>{{ L.clockRunning }}</span>
 					<input type="checkbox" :checked="device.clockRunning" @change="device.setClockRunning(($event.target as HTMLInputElement).checked)" />
 				</div>
-				<div class="settings-row">
+				<!-- <div class="settings-row">
 					<span>{{ L.kbSplit }}</span>
-					<input type="checkbox" :checked="device.device?.performance?.kbSplit" @change="device.setKbSplit(($event.target as HTMLInputElement).checked)" />
-				</div>
+					<input
+						type="checkbox"
+						:checked="device.device?.performance?.kbSplit"
+						@change="device.setKbSplit(($event.target as HTMLInputElement).checked)"
+					/>
+				</div> -->
 				<div class="settings-row">
 					<span>{{ L.rangeEnable }}</span>
-					<input type="checkbox" :checked="device.device?.performance?.rangeEnable" @change="device.setRangeEnable(($event.target as HTMLInputElement).checked)" />
+					<input
+						type="checkbox"
+						:checked="device.device?.performance?.rangeEnable"
+						@change="device.setRangeEnable(($event.target as HTMLInputElement).checked)"
+					/>
 				</div>
 
 				<p class="settings-subheader">Slot Info</p>
 				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
-					<span></span><span></span>
+					<span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
 					<span class="text-center">{{ L.slotHold }}</span>
@@ -96,12 +124,32 @@
 					style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem"
 				>
 					<span class="text-neutral-300 font-medium">{{ slot }}</span>
-					<span class="text-neutral-500 truncate text-xs">{{ slotEntry(slot)?.name ?? '' }}</span>
-					<span class="flex justify-center"><input type="checkbox" :checked="slotEntry(slot)?.active" @change="device.toggleSlotActive(slot)" /></span>
+					<span class="flex justify-center"
+						><input type="checkbox" :checked="slotEntry(slot)?.active" @change="device.toggleSlotActive(slot)"
+					/></span>
 					<span class="flex justify-center"><input type="checkbox" :checked="slotEntry(slot)?.key" @change="device.toggleSlotKey(slot)" /></span>
-					<span class="flex justify-center"><input type="checkbox" :checked="slotEntry(slot)?.hold" @change="device.setSlotHold(slot, ($event.target as HTMLInputElement).checked)" /></span>
-					<input type="number" min="0" max="127" :value="slotEntry(slot)?.range?.lower ?? 0" class="settings-input text-center px-0" @change="device.setSlotRangeLower(slot, +($event.target as HTMLInputElement).value)" />
-					<input type="number" min="0" max="127" :value="slotEntry(slot)?.range?.upper ?? 127" class="settings-input text-center px-0" @change="device.setSlotRangeUpper(slot, +($event.target as HTMLInputElement).value)" />
+					<span class="flex justify-center"
+						><input
+							type="checkbox"
+							:checked="slotEntry(slot)?.hold"
+							@change="device.setSlotHold(slot, ($event.target as HTMLInputElement).checked)"
+					/></span>
+					<input
+						type="number"
+						min="0"
+						max="127"
+						:value="slotEntry(slot)?.range?.lower ?? 0"
+						class="settings-input px-0 min-w-12"
+						@change="device.setSlotRangeLower(slot, +($event.target as HTMLInputElement).value)"
+					/>
+					<input
+						type="number"
+						min="0"
+						max="127"
+						:value="slotEntry(slot)?.range?.upper ?? 127"
+						class="settings-input px-0 min-w-12"
+						@change="device.setSlotRangeUpper(slot, +($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 			</div>
 		</Collapsible>
@@ -110,10 +158,14 @@
 			<div class="flex flex-col gap-1">
 				<div class="settings-row">
 					<span>{{ L.patchName }}</span>
-					<input :value="slotsStore.getPatchName(uiStore.slotInFocus)" class="settings-input" @input="slotsStore.setPatchName(($event.target as HTMLInputElement).value)" />
+					<input
+						:value="slotsStore.getPatchName(uiStore.slotInFocus)"
+						class="settings-input"
+						@input="slotsStore.setPatchName(($event.target as HTMLInputElement).value)"
+					/>
 				</div>
 
-				<p class="settings-subheader">Variation Parameters</p>
+				<!-- <p class="settings-subheader">Variation Parameters</p>
 				<div v-for="param in PATCH_PARAMS" :key="param.key" class="settings-row">
 					<span>{{ param.label }}</span>
 					<input
@@ -122,7 +174,7 @@
 						class="settings-input w-16"
 						@change="slotsStore.setPatchParam(uiStore.variation, param.key, +($event.target as HTMLInputElement).value)"
 					/>
-				</div>
+				</div> -->
 			</div>
 		</Collapsible>
 	</div>
@@ -181,4 +233,3 @@
 		return slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.patch?.[key] ?? 0;
 	}
 </script>
-
