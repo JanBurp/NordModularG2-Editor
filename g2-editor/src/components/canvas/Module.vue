@@ -329,18 +329,20 @@
 	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
 		const param = moduleDef.value?.params?.[paramIndex];
 		const items: any[] = [];
-		if (param && isSwitch(param.n) && getParam(param.type)?.canLabel) {
-			const label = getParamLabel(paramIndex);
-			items.push({ label: 'Rename label', action: () =>
-				emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })
-			});
-			items.push({ type: 'separator' });
+		if (param && isSwitch(param.n)) {
+			if (getParam(param.type)?.canLabel) {
+				const label = getParamLabel(paramIndex);
+				items.push({ label: 'Rename label', action: () =>
+					emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })
+				});
+			}
+		} else {
+			items.push({ label: 'Set Value', action: () => {
+				const paramType = param?.type ?? '';
+				const currentValue = getParamValue(paramIndex);
+				handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+			}});
 		}
-		items.push({ label: 'Set Value', action: () => {
-			const paramType = param?.type ?? '';
-			const currentValue = getParamValue(paramIndex);
-			handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
-		}});
 		openContextMenu(event, items);
 	}
 
