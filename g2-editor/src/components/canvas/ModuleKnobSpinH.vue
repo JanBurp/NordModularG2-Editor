@@ -4,9 +4,10 @@
 		class="knob-spin-h"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
-		@dblclick="onDoubleClick"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 	>
 		<use href="#KnobSpinH" width="20" height="10" />
+		<rect v-if="highlight" x="0" y="11" width="20" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -17,13 +18,15 @@
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
+		highlight?: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];
+		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const { onMouseDown, onDoubleClick } = useSpinnerHoldInteraction(
+	const { onMouseDown } = useSpinnerHoldInteraction(
 		'KnobSpinH',
 		props.paramIndex,
 		() => props.value,
@@ -35,4 +38,5 @@
 		cursor: pointer;
 		user-select: none;
 	}
+
 </style>

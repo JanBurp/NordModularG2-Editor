@@ -27,6 +27,7 @@ export const useUiStore = defineStore('ui', {
 		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
+		selectedParam: null as { moduleId: number; paramIndex: number } | null,
 		showSvgViewer: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
@@ -51,6 +52,10 @@ export const useUiStore = defineStore('ui', {
 	actions: {
 		setSlotInFocus(slot: SlotLabel) {
 			this.slotInFocus = slot;
+			this.selectedModules = [];
+			this.selectedModulesArea = null;
+			this.selectedCables = [];
+			this.selectedParam = null;
 			const device = useDeviceStore().device;
 			if (device?.performance) device.performance.focus = slot;
 			else if (device?.patches) device.patches.focus = slot;
@@ -87,6 +92,15 @@ export const useUiStore = defineStore('ui', {
 		clearSelection() {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
+			this.selectedParam = null;
+		},
+
+		setSelectedParam(moduleId: number, paramIndex: number) {
+			this.selectedParam = { moduleId, paramIndex };
+		},
+
+		clearSelectedParam() {
+			this.selectedParam = null;
 		},
 
 		toggleSvgViewer() {
@@ -104,6 +118,7 @@ export const useUiStore = defineStore('ui', {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
 			this.selectedCables = [];
+			this.selectedParam = null;
 		},
 
 		toggleSplit() {
@@ -117,6 +132,7 @@ export const useUiStore = defineStore('ui', {
 			this.selectedModules = [];
 			this.selectedModulesArea = null;
 			this.selectedCables = [];
+			this.selectedParam = null;
 		},
 
 		setDividerPos(pos: number) {

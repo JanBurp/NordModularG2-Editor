@@ -113,7 +113,7 @@ const parammap: Record<string, ParamDefinition> = {
 	NoteQuantNotes: { low: 0, high: 127, def: 0, defin: ['0 ~ Off, 1 ~ 1, 127 ~ 127'], comments: '' },
 	NoteRange: { low: 0, high: 127, def: 0, defin: ['0 ~ {+-}0, 1 ~ {+-}0.5, 64 ~ {+-}32, 126 ~ {+-}63.0, 127 ~ {+-}64.0'], comments: '' },
 	NoteZoneThru: { width: 50, low: 0, high: 1, def: 0, defin: ['0 ~ Notes Only, 1 ~ Note+Ctrls'], comments: '' },
-	OffOn: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
+	OffOn: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], canLabel: true, comments: '' },
 	OffOn2: { names: ['Off', 'On'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: 'Alternative for punch etc' },
 	OffOnBlank: { names: [''], width: 12, low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },
 	OpAmod: { low: 0, high: 7, def: 0, defin: ['0 ~ 0, 7 ~ 7'], comments: '' },
@@ -176,9 +176,9 @@ const parammap: Record<string, ParamDefinition> = {
 	Source_3: { mode: 'HR', names: ['In', 'Bus'], width: 19, low: 0, high: 1, def: 0, defin: ['0 ~ In, 1 ~ Bus'], comments: '' },
 	SustainMode_1: { low: 0, high: 1, def: 1, defin: ['0 ~ L1, 1 ~ L2'], comments: '' },
 	SustainMode_2: { low: 0, high: 3, def: 2, defin: ['0 ~ L1, 1 ~ L2, 2 ~ L3, 3 ~ Trg'], comments: '' },
-	Sw_1: { mode: 'HR', names: ['1', '2'], width: 44, low: 0, high: 1, def: 0, defin: ['0 ~ sw1, 1 ~ sw2'], comments: '' },
-	sw_2: { mode: 'HR', names: ['1', '2', '3', '4'], width: 42, low: 0, high: 3, def: 0, defin: ['0 ~ sw1, 1 ~ sw2, 2 ~ sw3, 3 ~ sw4'], comments: '' },
-	sw_3: { mode: 'HR', names: ['1', '2', '3', '4', '5', '6', '7', '8'], rows: 2, width: 42, low: 0, high: 7, def: 0, defin: ['0 ~ sw1, 1 ~ sw2, 2 ~ sw3, 3 ~ sw4, 4 ~ sw5, 5 ~ sw6, 6 ~ sw7, 7 ~ sw8'], comments: '' },
+	Sw_1: { mode: 'HR', names: ['1', '2'], width: 44, low: 0, high: 1, def: 0, defin: ['0 ~ sw1, 1 ~ sw2'], canLabel: true, comments: '' },
+	sw_2: { mode: 'HR', names: ['1', '2', '3', '4'], width: 42, low: 0, high: 3, def: 0, defin: ['0 ~ sw1, 1 ~ sw2, 2 ~ sw3, 3 ~ sw4'], canLabel: true, comments: '' },
+	sw_3: { mode: 'HR', names: ['1', '2', '3', '4', '5', '6', '7', '8'], rows: 2, width: 42, low: 0, high: 7, def: 0, defin: ['0 ~ sw1, 1 ~ sw2, 2 ~ sw3, 3 ~ sw4, 4 ~ sw5, 5 ~ sw6, 6 ~ sw7, 7 ~ sw8'], canLabel: true, comments: '' },
 	Threshold_127: { low: 0, high: 127, def: 0, defin: ['0 ~ -{00}, 64 ~ -6.0 dB, 127 ~ -0 dB'], comments: '' },
 	Threshold_42: { low: 0, high: 42, def: 18, defin: ['0 ~ -30 dB, 18 ~ -12 dB, 42 ~ Off'], comments: '' },
 	TimeClk: { width: 40, low: 0, high: 1, def: 0, defin: ['0 ~ Time, 1 ~ Clk'], comments: '' },
@@ -307,9 +307,21 @@ export function filterFreq1(i: number): string {
 	return r < 1000 ? r.toFixed((r < 100 && 3) || 2) + 'Hz' : (r / 1000).toFixed((r < 10000 && 3) || 2) + 'kHz';
 }
 
+const NOTE_NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
+
 export function MidiNote(i: number): string {
-	const noteNames = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 	const octave = Math.floor(i / 12) - 1;
-	const noteName = noteNames[i % 12];
-	return noteName + String(octave);
+	return NOTE_NAMES[i % 12] + String(octave);
+}
+
+export function parseMidiNote(text: string): number | null {
+	const trimmed = text.trim();
+	if (/^\d+$/.test(trimmed)) return Math.max(0, Math.min(127, parseInt(trimmed, 10)));
+	const match = trimmed.match(/^([A-Ga-g])([#b]?)(-?\d+)$/);
+	if (!match) return null;
+	const flatToSharp: Record<string, string> = { Db: 'C#', Eb: 'D#', Fb: 'E', Gb: 'F#', Ab: 'G#', Bb: 'A#', Cb: 'B' };
+	const notePart = match[1].toUpperCase() + match[2];
+	const noteIdx = NOTE_NAMES.indexOf(flatToSharp[notePart] ?? notePart);
+	if (noteIdx < 0) return null;
+	return Math.max(0, Math.min(127, (parseInt(match[3], 10) + 1) * 12 + noteIdx));
 }

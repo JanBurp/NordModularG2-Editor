@@ -2,7 +2,6 @@ import { computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
 import type { ModuleParam, ParamDefinition, ParamLabel } from '../types';
-import { useContextMenu } from './useContextMenu';
 
 export function useSwitch(
 	param: Ref<ModuleParam> | ComputedRef<ModuleParam>,
@@ -35,7 +34,12 @@ export function useSwitch(
 	});
 
 	const displayNames = computed(() => {
-		if (label.value) return label.value.labels;
+		if (label.value) {
+			const customLabels = label.value.labels;
+			const baseNames = names.value.length > 0 ? names.value : optionNames.value;
+			if (!Array.isArray(baseNames) || customLabels.length >= baseNames.length) return customLabels;
+			return (baseNames as string[]).map((n, i) => customLabels[i] ?? n);
+		}
 		if (names.value[0] === 'Ch#' && param.value.name) {
 			const name = param.value.name;
 			const last = name.substring(name.length - 1);
@@ -95,18 +99,9 @@ export function useSwitch(
 		}
 	}
 
-	const { open: openContextMenu } = useContextMenu();
-
-	function onContextMenu(e: MouseEvent) {
-		if (!emitLabelEdit) return;
-		openContextMenu(e, [
-			{ label: 'Rename label', action: () => emitLabelEdit!({ paramIndex: paramIndex.value, currentLabel: label.value?.labels[0] ?? '' }) },
-		]);
-	}
-
 	return {
 		paramDef, names, defin, width, mode, rows, bmp, hasBitmap, maskh,
 		optionNames, displayNames, activeIndex, singleButtonMode, activeOptionName,
-		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue, onContextMenu,
+		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue,
 	};
 }
