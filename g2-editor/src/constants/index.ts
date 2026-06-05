@@ -23,3 +23,6 @@ export { SOUND_CATEGORIES, CATEGORY_COUNT, DEFAULT_CATEGORY_ID, getCategoryName,
 
 // UI option arrays, slot labels, and module grid dimensions
 export { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OPTIONS, MODULE_WIDTH, MODULE_ROW_HEIGHT } from './ui';
+
+// Human-readable labels for settings fields
+export { SETTINGS_LABELS } from './settingsLabels';

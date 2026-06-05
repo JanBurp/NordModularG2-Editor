@@ -100,6 +100,22 @@ body {
 	background: theme('colors.neutral.300');
 }
 
+.settings-input {
+	@apply w-full px-1.5 py-0.5 text-xs bg-neutral-700 border border-neutral-600 rounded text-neutral-100 focus:outline-none focus:border-neutral-400;
+}
+
+.settings-row {
+	@apply flex gap-2 items-center py-0.5;
+}
+
+.settings-row > span:first-child {
+	@apply w-28 text-neutral-400 text-xs shrink-0;
+}
+
+.settings-subheader {
+	@apply mt-1 mb-0.5 text-xs text-neutral-500;
+}
+
 .module-bevel {
 	background:
 		linear-gradient(to bottom, rgba(255, 255, 255, 1) 0%, rgba(210, 210, 210, 0.15) 30%, transparent 100%) 0 0 / 100% 3px no-repeat,
