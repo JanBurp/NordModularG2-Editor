@@ -148,20 +148,22 @@
 					<Select v-model="selectedCategory" :options="soundCategories" />
 				</SettingsRow>
 
-				<p class="settings-subheader">Variation Parameters</p>
-				<SettingsRow v-for="param in PATCH_PARAMS" :key="param.key" :label="param.label">
-					<CheckBox
-						v-if="param.boolean"
-						:model-value="!!patchParam(param.key)"
-						@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event ? 1 : 0)"
-					/>
-					<NumberInput
-						v-else
-						:model-value="patchParam(param.key)"
-						class="w-16"
-						@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)"
-					/>
-				</SettingsRow>
+				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
+					<p class="settings-subheader">{{ group.header }}</p>
+					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
+						<CheckBox
+							v-if="param.boolean"
+							:model-value="!!patchParam(param.key)"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event ? 1 : 0)"
+						/>
+						<NumberInput
+							v-else
+							:model-value="patchParam(param.key)"
+							class="w-16"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)"
+						/>
+					</SettingsRow>
+				</template>
 			</div>
 		</Collapsible>
 	</div>
@@ -214,22 +216,32 @@
 		{ key: 'global', label: L.midiGlobal },
 	];
 
-	const PATCH_PARAMS: { key: keyof PatchParamVariation; label: string; boolean?: boolean }[] = [
-		{ key: 'patchVol', label: L.patchVol },
-		{ key: 'activeMuted', label: L.patchActiveMuted, boolean: true },
-		{ key: 'glide', label: L.patchGlide, boolean: true },
-		{ key: 'glideTime', label: L.patchGlideTime },
-		{ key: 'bend', label: L.patchBend },
-		{ key: 'semi', label: L.patchSemi },
-		{ key: 'vibrato', label: L.patchVibrato },
-		{ key: 'cents', label: L.patchCents },
-		{ key: 'rate', label: L.patchRate },
-		{ key: 'arpeggiator', label: L.patchArpeggiator, boolean: true },
-		{ key: 'arpTime', label: L.patchArpTime },
-		{ key: 'arpType', label: L.patchArpType },
-		{ key: 'octaveShift', label: L.patchOctaveShift },
-		{ key: 'sustain', label: L.patchSustain, boolean: true },
-		{ key: 'octaves', label: L.patchOctaves },
+	const PATCH_PARAM_GROUPS: { header: string; params: { key: keyof PatchParamVariation; label: string; boolean?: boolean }[] }[] = [
+		{ header: 'Arpeggiator', params: [
+			{ key: 'arpeggiator', label: 'On/Off', boolean: true },
+			{ key: 'arpTime',     label: 'Time' },
+			{ key: 'arpType',     label: 'Mode' },
+			{ key: 'octaves',     label: 'Octaves' },
+		]},
+		{ header: 'Vibrato', params: [
+			{ key: 'vibrato', label: 'Source' },
+			{ key: 'cents',   label: 'Rate' },
+		]},
+		{ header: 'Glide', params: [
+			{ key: 'glide',     label: 'Type' },
+			{ key: 'glideTime', label: 'Time' },
+		]},
+		{ header: 'Bend', params: [
+			{ key: 'bend', label: 'On/Off', boolean: true },
+			{ key: 'semi', label: 'Semitones' },
+		]},
+		{ header: 'Octave Shift', params: [
+			{ key: 'octaveShift', label: 'Shift' },
+		]},
+		{ header: 'Level', params: [
+			{ key: 'patchVol',    label: 'Volume' },
+			{ key: 'activeMuted', label: 'Active', boolean: true },
+		]},
 	];
 
 	function slotEntry(slot: SlotLabel) {

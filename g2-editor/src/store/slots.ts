@@ -683,7 +683,26 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
-			scheduleSend(`${slot}:patch:2:${paramIdx}:${variation}`, ['set-param', slot, 'patch', '2', String(paramIdx), String(value), String(variation)]);
+			// Convert global index to section + local index (inverse of SECTION_OFFSETS in useSlotEvents.ts)
+			const SECTION_STARTS = [
+				{ section: 2, start: 0 },
+				{ section: 3, start: 2 },
+				{ section: 4, start: 4 },
+				{ section: 5, start: 6 },
+				{ section: 6, start: 9 },
+				{ section: 7, start: 13 },
+				{ section: 8, start: 15 },
+			];
+			let section = 2, local = paramIdx;
+			for (let i = 0; i < SECTION_STARTS.length - 1; i++) {
+				if (paramIdx >= SECTION_STARTS[i].start && paramIdx < SECTION_STARTS[i + 1].start) {
+					section = SECTION_STARTS[i].section;
+					local = paramIdx - SECTION_STARTS[i].start;
+					break;
+				}
+			}
+			scheduleSend(`${slot}:patch:${section}:${local}:${variation}`,
+				['set-param', slot, 'patch', String(section), String(local), String(value), String(variation)]);
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
