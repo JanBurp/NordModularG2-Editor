@@ -149,12 +149,21 @@
 				</SettingsRow>
 
 				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
-					<p class="settings-subheader">{{ group.header }}</p>
-					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
+					<div class="settings-subheader flex items-center">
 						<CheckBox
-							v-if="param.boolean"
-							:model-value="!!patchParam(param.key)"
-							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event ? 1 : 0)"
+							class="mr-2"
+							v-if="group.toggleKey"
+							:model-value="!!patchParam(group.toggleKey)"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, group.toggleKey!, $event ? 1 : 0)"
+						/>
+						<span>{{ group.header }}</span>
+					</div>
+					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
+						<BtnGroup
+							v-if="param.btnOptions"
+							:model-value="patchParam(param.key)"
+							:options="param.btnOptions"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, Number($event))"
 						/>
 						<NumberInput
 							v-else
@@ -177,6 +186,7 @@
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
 	import Select from '@/components/common/Select.vue';
+	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore } from '@/store/settings';
 	import { useBrowserStore } from '@/store/browser';
@@ -200,12 +210,17 @@
 	const selectedCategory = ref<number>(0);
 	watch(
 		() => (currentPatch.value as any)?.description?.category,
-		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		(cat) => {
+			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+		},
 		{ immediate: true },
 	);
 	watch(selectedCategory, (cat) => {
 		const desc = (currentPatch.value as any)?.description;
-		if (desc) { desc.category = cat; slotsStore.setPatchDescription(); }
+		if (desc) {
+			desc.category = cat;
+			slotsStore.setPatchDescription();
+		}
 	});
 
 	const MIDI_SLOTS: { key: 'A' | 'B' | 'C' | 'D' | 'global'; label: string }[] = [
@@ -216,32 +231,96 @@
 		{ key: 'global', label: L.midiGlobal },
 	];
 
-	const PATCH_PARAM_GROUPS: { header: string; params: { key: keyof PatchParamVariation; label: string; boolean?: boolean }[] }[] = [
-		{ header: 'Arpeggiator', params: [
-			{ key: 'arpeggiator', label: 'On/Off', boolean: true },
-			{ key: 'arpTime',     label: 'Time' },
-			{ key: 'arpType',     label: 'Mode' },
-			{ key: 'octaves',     label: 'Octaves' },
-		]},
-		{ header: 'Vibrato', params: [
-			{ key: 'vibrato', label: 'Source' },
-			{ key: 'cents',   label: 'Rate' },
-		]},
-		{ header: 'Glide', params: [
-			{ key: 'glide',     label: 'Type' },
-			{ key: 'glideTime', label: 'Time' },
-		]},
-		{ header: 'Bend', params: [
-			{ key: 'bend', label: 'On/Off', boolean: true },
-			{ key: 'semi', label: 'Semitones' },
-		]},
-		{ header: 'Octave Shift', params: [
-			{ key: 'octaveShift', label: 'Shift' },
-		]},
-		{ header: 'Level', params: [
-			{ key: 'patchVol',    label: 'Volume' },
-			{ key: 'activeMuted', label: 'Active', boolean: true },
-		]},
+	type BtnOpt = { label: string; value: number };
+	const PATCH_PARAM_GROUPS: {
+		header: string;
+		toggleKey?: keyof PatchParamVariation;
+		params: { key: keyof PatchParamVariation; label: string; btnOptions?: BtnOpt[] }[];
+	}[] = [
+		{
+			header: 'Arpeggiator',
+			toggleKey: 'arpeggiator',
+			params: [
+				{
+					key: 'arpTime',
+					label: 'Time',
+					btnOptions: [
+						{ label: '1/8', value: 0 },
+						{ label: '1/8T', value: 1 },
+						{ label: '1/16', value: 2 },
+						{ label: '1/16T', value: 3 },
+					],
+				},
+				{
+					key: 'arpType',
+					label: 'Mode',
+					btnOptions: [
+						{ label: 'Up', value: 0 },
+						{ label: 'Dn', value: 1 },
+						{ label: 'Up/Dn', value: 2 },
+						{ label: 'Rnd', value: 3 },
+					],
+				},
+				{
+					key: 'octaves',
+					label: 'Octaves',
+					btnOptions: [
+						{ label: '1', value: 0 },
+						{ label: '2', value: 1 },
+						{ label: '3', value: 2 },
+						{ label: '4', value: 3 },
+					],
+				},
+			],
+		},
+		{
+			header: 'Vibrato',
+			params: [
+				{
+					key: 'vibrato',
+					label: 'Source',
+					btnOptions: [
+						{ label: 'Off', value: 0 },
+						{ label: 'AfTch', value: 1 },
+						{ label: 'Wheel', value: 2 },
+					],
+				},
+				{ key: 'cents', label: 'Rate' },
+			],
+		},
+		{
+			header: 'Glide',
+			params: [
+				{
+					key: 'glide',
+					label: 'Type',
+					btnOptions: [
+						{ label: 'Off', value: 0 },
+						{ label: 'Normal', value: 1 },
+						{ label: 'Auto', value: 2 },
+					],
+				},
+				{ key: 'glideTime', label: 'Time' },
+			],
+		},
+		{ header: 'Bend', toggleKey: 'bend', params: [{ key: 'semi', label: 'Semitones' }] },
+		{
+			header: 'Octave Shift',
+			params: [
+				{
+					key: 'octaveShift',
+					label: 'Shift',
+					btnOptions: [
+						{ label: '-2', value: 0 },
+						{ label: '-1', value: 1 },
+						{ label: '0', value: 2 },
+						{ label: '+1', value: 3 },
+						{ label: '+2', value: 4 },
+					],
+				},
+			],
+		},
+		// { header: 'Level', toggleKey: 'activeMuted', params: [{ key: 'patchVol', label: 'Volume' }] },
 	];
 
 	function slotEntry(slot: SlotLabel) {

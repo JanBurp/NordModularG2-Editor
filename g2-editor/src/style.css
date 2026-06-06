@@ -109,7 +109,7 @@ body {
 }
 
 .settings-row > span:first-child {
-	@apply w-28 text-neutral-400 text-xs shrink-0;
+	@apply w-18 text-neutral-400 text-xs shrink-0;
 }
 
 .settings-subheader {
