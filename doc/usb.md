@@ -281,9 +281,17 @@ Use this when the target slot needs to be activated before focusing. Steps:
 
 > **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
 
-#### Single-field slot updates — `set-slot-enabled` / `set-slot-key`
+#### Single-field slot updates — `set-slot-enabled` / `set-slot-key` / `set-slot-hold`
 
-Setting only the `active` or `key` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step.
+Setting only the `active`, `key`, or `hold` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step. Field offsets in the slot block: `active`=0, `key`=1, `hold`=2.
+
+#### Two-field slot update — `set-slot-range`
+
+`g2_set_slot_range` patches both the range-lower (field offset 5) and range-upper (field offset 6) bytes in **one** read-modify-write round-trip. Do not call `g2_set_slot_perf_field` twice in sequence: the first SET_PERF_SETTINGS write causes the G2 to emit a `perf_settings_update` event and briefly stop responding; a second immediate round-trip hits `G2_ERR_RECV` (-7).
+
+#### Performance header field update — `set-range-enable`
+
+`g2_set_rangeEnable(value)` modifies the `rangeEnable` (KB Split on/off) byte at **perf header offset 5** — the 8-byte block that immediately follows the C_PERF_SETTINGS chunk header (`remaining[5]` after the `0x11` type byte). This is a different byte from the slot block's `rangeLow`/`rangeHigh` fields. Uses the same GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS pattern. No SELECT_SLOT step.
 
 ---
 
@@ -537,7 +545,7 @@ After GET_SYNTH_SETTINGS the CLI issues two more system commands to get performa
 - `[4..]` null-terminated performance name
 - `[name_end]` = `0x11` (C_PERF_SETTINGS chunk type)
 - `[name_end+1..2]` = inner_size (big-endian, typically `0x00 0x50` = 80)
-- `[name_end+3..10]` = 8 bytes perf settings: focus slot, rangeEnable, BPM, kbSplit, clockRun
+- `[name_end+3..10]` = 8 bytes perf settings: [3]=unknown2, [4]=selectedSlot(packed), [5]=rangeEnable (KB Split), [6]=BPM, [7]=unknown5, [8]=clockRun, [9-10]=unknown
 - `[name_end+11..]` = 4 × slot blocks, each: null-terminated name + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, 3 padding)
 - `[last 2]` 2-byte bulk trailer
 
@@ -707,7 +715,26 @@ When `version != 0x40`:
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
 | any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent by G2 when user presses PERF button (no `patches` field) |
 | any | `0x11` | `perf_settings` | — |
-| any | `0x29` | `perf_name` | `name` from bulk[4..] |
+| any | `0x29` | `perf_name` + `perf_settings` | Compound message: null-terminated name at bulk[4..], followed by a full C_PERF_SETTINGS (0x11) chunk. Emitted by G2 when Hold or KB Split changes on hardware. Also emitted as embedded when only the name changes (no settings chunk). |
+
+**C_PERF_NAME compound bulk layout:**
+
+```
+bulk[0..3]  = standard bulk header (0x01, aCmd=0x04, version, subCmd=0x29)
+bulk[4..]   = null-terminated performance name (up to 16 chars)
+bulk[4+nameLen]   = 0x11  (C_PERF_SETTINGS chunk type)
+bulk[4+nameLen+1..2] = inner size (big-endian, typically 0x00 0x50 = 80)
+bulk[4+nameLen+3] = unknown
+bulk[4+nameLen+4] = selectedSlot (packed)
+bulk[4+nameLen+5] = rangeEnable (KB Split)
+bulk[4+nameLen+6] = BPM
+bulk[4+nameLen+7] = unknown5
+bulk[4+nameLen+8] = clockRun (bit 0)
+bulk[4+nameLen+9..10] = unknown
+bulk[4+nameLen+11..] = 4 × slot blocks (same layout as GET_PERF_SETTINGS response)
+```
+
+The inline settings block is byte-for-byte identical to the `GET_PERF_SETTINGS` query response (§10), so `perf_parse_and_add(bulk, bret, mode, root)` works on it unchanged. The Delphi editor's `C_PERF_NAME, C_PERF_SETTINGS:` combined case reflects this — both chunk types arrive in the same stream and are parsed together. Delphi never called `DoPerfSettingsUpdate()` after parsing, so Hold/KB Split never synced to its UI (unfinished feature in the original editor).
 
 ### Bulk sub-commands (`aCmd 0x0C`)
 
@@ -843,9 +870,10 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `-7` | `G2_ERR_RECV` | USB read failed |
 | `-8` | `G2_ERR_TIMEOUT` | USB timeout |
 | `-9` | `G2_ERR_PARSE` | Parse error |
-| `-10` | `G2_ERR_INVALID_PARAM` / `G2_ERR_FILE_OPEN` | Invalid parameter or file open failed |
-| `-11` | `G2_ERR_FILE_WRITE` | File write failed |
-| `-12` | `G2_ERR_NO_MEMORY` | Memory allocation failed |
+| `-10` | `G2_ERR_INVALID_PARAM` | Invalid parameter |
+| `-11` | `G2_ERR_FILE_OPEN` | File open failed |
+| `-12` | `G2_ERR_FILE_WRITE` | File write failed |
+| `-13` | `G2_ERR_NO_MEMORY` | Memory allocation failed |
 
 ---
 
@@ -953,6 +981,26 @@ Electron       Main thread                    G2
 ```
 
 The key difference: hardware path receives 0x04/0x40/0x1F (sentinel=2, G2 already stopped streaming); editor path receives 0x0C/0x1F (sentinel=0, G2 still streaming → requires explicit `g2_stop_comm()`).
+
+### `seq` — Batch slot mutations in one USB frame
+
+The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_ops()` call, which builds one USB frame containing all sub-commands. All operations must target the **same slot**; mixing slots returns `G2_ERR_INVALID_PARAM (-10)`.
+
+```json
+{"id": 1, "cmd": "seq", "args": [
+  ["del-cable",        "<slot>", "<loc>", fm, fcon_t, fcon_id, tm, tcon_t, tcon_id],
+  ["add-cable",        "<slot>", "<loc>", color, fm, fcon_t, fcon_id, tm, tcon_t, tcon_id],
+  ["set-cable-color",  "<slot>", "<loc>", color, fm, fcon_t, fcon_id, tm, tcon_t, tcon_id],
+  ["del-module",       "<slot>", "<loc>", module_id],
+  ["move-module",      "<slot>", "<loc>", module_id, col, row],
+  ["add-module",       "<slot>", "<loc>", type, id, col, row, colour, n_modes, mode0..., n_params, param0..., "name"],
+  ["set-module-color", "<slot>", "<loc>", module_id, color],
+  ["set-module-name",  "<slot>", "<loc>", module_id, "name"],
+  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, label_idx, "label"]
+]}
+```
+
+Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
 
 ### Key Properties
 
