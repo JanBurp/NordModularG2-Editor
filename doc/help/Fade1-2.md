@@ -1,0 +1,3 @@
+# Fade1-2
+
+This is a fader with one input and two outputs, and a fader rotary knob to fade the input signal between the two outputs.
