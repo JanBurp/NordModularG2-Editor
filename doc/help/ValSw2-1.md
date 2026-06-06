@@ -1,0 +1,1 @@
+# ValSw2-1 - 2-1 Value Switch that switches between two inputs at a definable Control signal input value. CTRL VALUE: sets the lower limit where the switch changes to the On input channel (0–64 units).
