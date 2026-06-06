@@ -107,6 +107,7 @@
 	import { ref, computed } from 'vue';
 	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
 	import { useDeviceStore } from '../../store/device';
+	import { useSettingsStore } from '@/store/settings';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
@@ -122,6 +123,7 @@
 
 	const browser = useBrowserStore();
 	const device = useDeviceStore();
+	const settings = useSettingsStore();
 
 	const searchQuery = ref('');
 
@@ -179,6 +181,9 @@
 		searchQuery.value = '';
 		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && device.connected) {
 			await browser.loadSynthList();
+		}
+		if (v === 'disk' && !browser.diskFolder && settings.path) {
+			await browser.loadDiskList(settings.path);
 		}
 	}
 
