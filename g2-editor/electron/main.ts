@@ -27,6 +27,7 @@ function createWindow() {
 	win = new BrowserWindow({
 		width: 800,
 		height: 600,
+		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/preload.js"),
 			nodeIntegration: false,
@@ -222,6 +223,16 @@ ipcMain.handle("perf:save-dialog", async (event, defaultName?: string) => {
 	return { success: true, filepath: result.filePath };
 });
 
+ipcMain.handle("help:load", (_, shortName: string) => {
+	const helpDir = path.join(process.env.APP_ROOT!, "..", "doc", "help");
+	const filePath = path.join(helpDir, `${shortName}.md`);
+	try {
+		return fs.readFileSync(filePath, "utf-8");
+	} catch {
+		return null;
+	}
+});
+
 ipcMain.handle("patch:open-dialog", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
@@ -245,6 +256,10 @@ app.on("before-quit", (e) => {
 });
 
 app.whenReady().then(async () => {
+	if (isMac) {
+		app.dock.setIcon(path.join(process.env.APP_ROOT!, "resources", "icon.png"));
+	}
+
 	if (VITE_DEV_SERVER_URL) {
 		try {
 			const name = await installExtension(VUEJS_DEVTOOLS);
@@ -329,6 +344,8 @@ app.whenReady().then(async () => {
 		{
 			label: "Help",
 			submenu: [
+				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },
+				{ type: "separator" as const },
 				{ role: "about" as const },
 			],
 		},

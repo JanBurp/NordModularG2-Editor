@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col gap-1">
-		<Collapsible title="Editor Settings">
+		<Collapsible title="Editor Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorPath">
 					<div class="flex gap-1 flex-1 items-center">
@@ -17,13 +17,13 @@
 				</SettingsRow>
 			</div>
 		</Collapsible>
-		<Collapsible title="Synth Settings">
+		<Collapsible title="Synth Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">MIDI Channels</p>
+				<p class="settings-subheader">MIDI Channels:</p>
 				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
 					<NumberInput
 						:model-value="device.device?.midi.slots[slot.key] ?? 1"
@@ -72,7 +72,12 @@
 		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
-					<TextInput :model-value="device.device?.performance?.name ?? ''" @update:model-value="device.setPerfName($event)" />
+					<TextInput
+						:model-value="device.device?.performance?.name ?? ''"
+						maxlength="16"
+						:debounce="500"
+						@update:model-value="device.setPerfName($event)"
+					/>
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
 					<NumberInput :model-value="device.bpm" :min="30" :max="240" class="w-16" @update:model-value="device.setBpm($event)" />
@@ -80,16 +85,13 @@
 				<SettingsRow :label="L.clockRunning">
 					<CheckBox :model-value="device.clockRunning" @update:model-value="device.setClockRunning($event)" />
 				</SettingsRow>
-				<!-- <SettingsRow :label="L.kbSplit">
-					<CheckBox :model-value="device.device?.performance?.kbSplit ?? false" @update:model-value="device.setKbSplit($event)" />
-				</SettingsRow> -->
 				<SettingsRow :label="L.rangeEnable">
 					<CheckBox :model-value="device.device?.performance?.rangeEnable ?? false" @update:model-value="device.setRangeEnable($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">Slot Info</p>
+				<p class="settings-subheader">Slot Info:</p>
 				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
-					<span></span><span></span>
+					<span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
 					<span class="text-center">{{ L.slotHold }}</span>
@@ -116,14 +118,16 @@
 						:model-value="slotEntry(slot)?.range?.lower ?? 0"
 						:min="0"
 						:max="127"
-						class="px-0 min-w-12"
+						:midi-note="true"
+						class="px-0 min-w-14"
 						@update:model-value="device.setSlotRangeLower(slot, $event)"
 					/>
 					<NumberInput
 						:model-value="slotEntry(slot)?.range?.upper ?? 127"
 						:min="0"
 						:max="127"
-						class="px-0 min-w-12"
+						:midi-note="true"
+						class="px-0 min-w-14"
 						@update:model-value="device.setSlotRangeUpper(slot, $event)"
 					/>
 				</div>
@@ -133,31 +137,62 @@
 		<Collapsible v-if="currentPatch" title="Patch Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
-					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" @update:model-value="slotsStore.setPatchName($event)" />
+					<TextInput
+						:model-value="slotsStore.getPatchName(uiStore.slotInFocus)"
+						maxlength="16"
+						:debounce="500"
+						@update:model-value="slotsStore.setPatchName($event)"
+					/>
+				</SettingsRow>
+				<SettingsRow :label="L.patchCategory">
+					<Select v-model="selectedCategory" :options="soundCategories" />
 				</SettingsRow>
 
-				<!-- <p class="settings-subheader">Variation Parameters</p>
-				<SettingsRow v-for="param in PATCH_PARAMS" :key="param.key" :label="param.label">
-					<NumberInput :model-value="patchParam(param.key)" class="w-16" @update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)" />
-				</SettingsRow> -->
+				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
+					<div class="settings-subheader flex items-center">
+						<CheckBox
+							class="mr-2"
+							v-if="group.toggleKey"
+							:model-value="!!patchParam(group.toggleKey)"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, group.toggleKey!, $event ? 1 : 0)"
+						/>
+						<span>{{ group.header }}</span>
+					</div>
+					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
+						<BtnGroup
+							v-if="param.btnOptions"
+							:model-value="patchParam(param.key)"
+							:options="param.btnOptions"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, Number($event))"
+						/>
+						<NumberInput
+							v-else
+							:model-value="patchParam(param.key)"
+							class="w-16"
+							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)"
+						/>
+					</SettingsRow>
+				</template>
 			</div>
 		</Collapsible>
 	</div>
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref, watch } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
 	import TextInput from '@/components/common/TextInput.vue';
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
+	import Select from '@/components/common/Select.vue';
+	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore } from '@/store/settings';
 	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
-	import { SLOT_LABELS, SETTINGS_LABELS } from '@/constants';
+	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
 	import type { SlotLabel } from '@/types';
 	import type { PatchParamVariation } from '@/types/patch';
 
@@ -172,6 +207,22 @@
 	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
+	const selectedCategory = ref<number>(0);
+	watch(
+		() => (currentPatch.value as any)?.description?.category,
+		(cat) => {
+			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+		},
+		{ immediate: true },
+	);
+	watch(selectedCategory, (cat) => {
+		const desc = (currentPatch.value as any)?.description;
+		if (desc) {
+			desc.category = cat;
+			slotsStore.setPatchDescription();
+		}
+	});
+
 	const MIDI_SLOTS: { key: 'A' | 'B' | 'C' | 'D' | 'global'; label: string }[] = [
 		{ key: 'A', label: L.midiSlotA },
 		{ key: 'B', label: L.midiSlotB },
@@ -180,22 +231,96 @@
 		{ key: 'global', label: L.midiGlobal },
 	];
 
-	const PATCH_PARAMS: { key: keyof PatchParamVariation; label: string }[] = [
-		{ key: 'patchVol', label: L.patchVol },
-		{ key: 'activeMuted', label: L.patchActiveMuted },
-		{ key: 'glide', label: L.patchGlide },
-		{ key: 'glideTime', label: L.patchGlideTime },
-		{ key: 'bend', label: L.patchBend },
-		{ key: 'semi', label: L.patchSemi },
-		{ key: 'vibrato', label: L.patchVibrato },
-		{ key: 'cents', label: L.patchCents },
-		{ key: 'rate', label: L.patchRate },
-		{ key: 'arpeggiator', label: L.patchArpeggiator },
-		{ key: 'arpTime', label: L.patchArpTime },
-		{ key: 'arpType', label: L.patchArpType },
-		{ key: 'octaveShift', label: L.patchOctaveShift },
-		{ key: 'sustain', label: L.patchSustain },
-		{ key: 'octaves', label: L.patchOctaves },
+	type BtnOpt = { label: string; value: number };
+	const PATCH_PARAM_GROUPS: {
+		header: string;
+		toggleKey?: keyof PatchParamVariation;
+		params: { key: keyof PatchParamVariation; label: string; btnOptions?: BtnOpt[] }[];
+	}[] = [
+		{
+			header: 'Arpeggiator',
+			toggleKey: 'arpeggiator',
+			params: [
+				{
+					key: 'arpTime',
+					label: 'Time',
+					btnOptions: [
+						{ label: '1/8', value: 0 },
+						{ label: '1/8T', value: 1 },
+						{ label: '1/16', value: 2 },
+						{ label: '1/16T', value: 3 },
+					],
+				},
+				{
+					key: 'arpType',
+					label: 'Mode',
+					btnOptions: [
+						{ label: 'Up', value: 0 },
+						{ label: 'Dn', value: 1 },
+						{ label: 'Up/Dn', value: 2 },
+						{ label: 'Rnd', value: 3 },
+					],
+				},
+				{
+					key: 'octaves',
+					label: 'Octaves',
+					btnOptions: [
+						{ label: '1', value: 0 },
+						{ label: '2', value: 1 },
+						{ label: '3', value: 2 },
+						{ label: '4', value: 3 },
+					],
+				},
+			],
+		},
+		{
+			header: 'Vibrato',
+			params: [
+				{
+					key: 'vibrato',
+					label: 'Source',
+					btnOptions: [
+						{ label: 'Off', value: 0 },
+						{ label: 'AfTch', value: 1 },
+						{ label: 'Wheel', value: 2 },
+					],
+				},
+				{ key: 'cents', label: 'Rate' },
+			],
+		},
+		{
+			header: 'Glide',
+			params: [
+				{
+					key: 'glide',
+					label: 'Type',
+					btnOptions: [
+						{ label: 'Off', value: 0 },
+						{ label: 'Normal', value: 1 },
+						{ label: 'Auto', value: 2 },
+					],
+				},
+				{ key: 'glideTime', label: 'Time' },
+			],
+		},
+		{ header: 'Bend', toggleKey: 'bend', params: [{ key: 'semi', label: 'Semitones' }] },
+		{
+			header: 'Octave Shift',
+			params: [
+				{
+					key: 'octaveShift',
+					label: 'Shift',
+					btnOptions: [
+						{ label: '-2', value: 0 },
+						{ label: '-1', value: 1 },
+						{ label: '0', value: 2 },
+						{ label: '+1', value: 3 },
+						{ label: '+2', value: 4 },
+					],
+				},
+			],
+		},
+		// { header: 'Level', toggleKey: 'activeMuted', params: [{ key: 'patchVol', label: 'Volume' }] },
 	];
 
 	function slotEntry(slot: SlotLabel) {

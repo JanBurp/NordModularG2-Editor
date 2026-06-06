@@ -222,6 +222,8 @@
 
 	function onContextMenu(e: MouseEvent) {
 		openContextMenu(e, [
+			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
+			{ type: 'separator' },
 			{ label: 'Rename…', action: () => onTitleDblClick() },
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },

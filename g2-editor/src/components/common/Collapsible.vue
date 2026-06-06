@@ -4,7 +4,7 @@
 			<span class="text-neutral-500 text-xs w-2.5">{{ open ? '▼' : '▶' }}</span>
 			<span class="font-medium">{{ title }}</span>
 		</div>
-		<div v-show="open" class="px-2 py-2">
+		<div v-show="open" class="px-2 py-2 mb-4">
 			<slot />
 		</div>
 	</div>

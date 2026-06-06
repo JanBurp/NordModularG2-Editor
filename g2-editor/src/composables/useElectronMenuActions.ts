@@ -132,6 +132,17 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
 					break;
+				case 'show-module-help': {
+					if (!uiStore.selectedModules.length) {
+						uiStore.toggleAllModuleHelp();
+						break;
+					}
+					const idx = uiStore.selectedModules[0];
+					const mod = currentModules.value.find((m: any) => m.index === idx);
+					if (!mod) break;
+					uiStore.showModuleHelp(mod.type as number);
+					break;
+				}
 			}
 		});
 	});
