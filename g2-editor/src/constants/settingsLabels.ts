@@ -24,6 +24,7 @@ export const SETTINGS_LABELS = {
 	slotRangeLower: 'Lower',
 	slotRangeUpper: 'Upper',
 	patchName: 'Name',
+	patchCategory: 'Category',
 	patchVol: 'Volume',
 	patchActiveMuted: 'Active',
 	patchGlide: 'Glide',

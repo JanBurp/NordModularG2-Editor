@@ -72,7 +72,12 @@
 		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
-					<TextInput :model-value="device.device?.performance?.name ?? ''" maxlength="16" :debounce="500" @update:model-value="device.setPerfName($event)" />
+					<TextInput
+						:model-value="device.device?.performance?.name ?? ''"
+						maxlength="16"
+						:debounce="500"
+						@update:model-value="device.setPerfName($event)"
+					/>
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
 					<NumberInput :model-value="device.bpm" :min="30" :max="240" class="w-16" @update:model-value="device.setBpm($event)" />
@@ -132,31 +137,50 @@
 		<Collapsible v-if="currentPatch" title="Patch Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
-					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" maxlength="16" :debounce="500" @update:model-value="slotsStore.setPatchName($event)" />
+					<TextInput
+						:model-value="slotsStore.getPatchName(uiStore.slotInFocus)"
+						maxlength="16"
+						:debounce="500"
+						@update:model-value="slotsStore.setPatchName($event)"
+					/>
+				</SettingsRow>
+				<SettingsRow :label="L.patchCategory">
+					<Select v-model="selectedCategory" :options="soundCategories" />
 				</SettingsRow>
 
-				<!-- <p class="settings-subheader">Variation Parameters</p>
+				<p class="settings-subheader">Variation Parameters</p>
 				<SettingsRow v-for="param in PATCH_PARAMS" :key="param.key" :label="param.label">
-					<NumberInput :model-value="patchParam(param.key)" class="w-16" @update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)" />
-				</SettingsRow> -->
+					<CheckBox
+						v-if="param.boolean"
+						:model-value="!!patchParam(param.key)"
+						@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event ? 1 : 0)"
+					/>
+					<NumberInput
+						v-else
+						:model-value="patchParam(param.key)"
+						class="w-16"
+						@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)"
+					/>
+				</SettingsRow>
 			</div>
 		</Collapsible>
 	</div>
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref, watch } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
 	import TextInput from '@/components/common/TextInput.vue';
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
+	import Select from '@/components/common/Select.vue';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore } from '@/store/settings';
 	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
-	import { SLOT_LABELS, SETTINGS_LABELS } from '@/constants';
+	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
 	import type { SlotLabel } from '@/types';
 	import type { PatchParamVariation } from '@/types/patch';
 
@@ -171,6 +195,17 @@
 	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
+	const selectedCategory = ref<number>(0);
+	watch(
+		() => (currentPatch.value as any)?.description?.category,
+		(cat) => { if (cat !== undefined && cat !== null) selectedCategory.value = cat; },
+		{ immediate: true },
+	);
+	watch(selectedCategory, (cat) => {
+		const desc = (currentPatch.value as any)?.description;
+		if (desc) { desc.category = cat; slotsStore.setPatchDescription(); }
+	});
+
 	const MIDI_SLOTS: { key: 'A' | 'B' | 'C' | 'D' | 'global'; label: string }[] = [
 		{ key: 'A', label: L.midiSlotA },
 		{ key: 'B', label: L.midiSlotB },
@@ -179,21 +214,21 @@
 		{ key: 'global', label: L.midiGlobal },
 	];
 
-	const PATCH_PARAMS: { key: keyof PatchParamVariation; label: string }[] = [
+	const PATCH_PARAMS: { key: keyof PatchParamVariation; label: string; boolean?: boolean }[] = [
 		{ key: 'patchVol', label: L.patchVol },
-		{ key: 'activeMuted', label: L.patchActiveMuted },
-		{ key: 'glide', label: L.patchGlide },
+		{ key: 'activeMuted', label: L.patchActiveMuted, boolean: true },
+		{ key: 'glide', label: L.patchGlide, boolean: true },
 		{ key: 'glideTime', label: L.patchGlideTime },
 		{ key: 'bend', label: L.patchBend },
 		{ key: 'semi', label: L.patchSemi },
 		{ key: 'vibrato', label: L.patchVibrato },
 		{ key: 'cents', label: L.patchCents },
 		{ key: 'rate', label: L.patchRate },
-		{ key: 'arpeggiator', label: L.patchArpeggiator },
+		{ key: 'arpeggiator', label: L.patchArpeggiator, boolean: true },
 		{ key: 'arpTime', label: L.patchArpTime },
 		{ key: 'arpType', label: L.patchArpType },
 		{ key: 'octaveShift', label: L.patchOctaveShift },
-		{ key: 'sustain', label: L.patchSustain },
+		{ key: 'sustain', label: L.patchSustain, boolean: true },
 		{ key: 'octaves', label: L.patchOctaves },
 	];
 
