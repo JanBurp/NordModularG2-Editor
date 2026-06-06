@@ -537,7 +537,7 @@ After GET_SYNTH_SETTINGS the CLI issues two more system commands to get performa
 - `[4..]` null-terminated performance name
 - `[name_end]` = `0x11` (C_PERF_SETTINGS chunk type)
 - `[name_end+1..2]` = inner_size (big-endian, typically `0x00 0x50` = 80)
-- `[name_end+3..10]` = 8 bytes perf settings: focus slot, rangeEnable, BPM, kbSplit, clockRun
+- `[name_end+3..10]` = 8 bytes perf settings: [3]=unknown2, [4]=selectedSlot(packed), [5]=rangeEnable (KB Split), [6]=BPM, [7]=unknown5, [8]=clockRun, [9-10]=unknown
 - `[name_end+11..]` = 4 × slot blocks, each: null-terminated name + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, 3 padding)
 - `[last 2]` 2-byte bulk trailer
 

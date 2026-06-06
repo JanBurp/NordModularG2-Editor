@@ -54,7 +54,6 @@ export interface PatchData {
 	rangeEnable: boolean;
 	bpm: number;
 	clockRunning: boolean;
-	kbSplit: boolean;
 }
 
 export interface Device {
