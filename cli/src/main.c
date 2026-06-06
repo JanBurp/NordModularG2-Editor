@@ -537,6 +537,25 @@ static int cmd_set_slot_key(int argc, char **argv, int i) {
     return g2_set_slot_key(slot, atoi(argv[i + 2]));
 }
 
+static int cmd_set_slot_hold(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-hold <slot> <0|1>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-hold: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_hold(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_set_slot_range(int argc, char **argv, int i) {
+    if (i + 3 >= argc) { fprintf(stderr, "Usage: set-slot-range <slot> <lower:0-127> <upper:0-127>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-slot-range: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_slot_range(slot, atoi(argv[i + 2]), atoi(argv[i + 3]));
+}
+
+static int cmd_set_range_enable(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-range-enable <0|1>\n"); return 1; }
+    return g2_set_rangeEnable(atoi(argv[i + 1]));
+}
+
 static int cmd_set_patch_description(int argc, char **argv, int i) {
     if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-description <slot> <hexdata>\n"); return 1; }
     int slot = parse_slot(argv[i + 1]);
@@ -686,6 +705,9 @@ static const cmd_entry_t commands[] = {
     { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
     { "set-slot-enabled",      cmd_set_slot_enabled      },
     { "set-slot-key",          cmd_set_slot_key          },
+    { "set-slot-hold",         cmd_set_slot_hold         },
+    { "set-slot-range",        cmd_set_slot_range        },
+    { "set-range-enable",      cmd_set_range_enable      },
     { "daemon",                cmd_daemon                },
     { "seq",              cmd_seq              },
     { NULL, NULL }

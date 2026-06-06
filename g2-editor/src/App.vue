@@ -276,7 +276,6 @@
 	}
 
 	onMounted(async () => {
-
 		const isOffline = import.meta.env.VITE_DEV_OFFLINE === 'true';
 		if (isOffline) {
 			device.status = DeviceStatus.Offline;
@@ -297,5 +296,4 @@
 			}
 		}
 	});
-
 </script>

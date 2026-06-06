@@ -75,7 +75,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     int slotBanks[4] = {0}, slotPatches[4] = {0};
     int slotActive[4] = {0}, slotKey[4] = {0}, slotHold[4] = {0};
     int slotLow[4] = {0}, slotHigh[4] = {0};
-    int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0, split = 0;
+    int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0;
     int nameLen;
 
     if (perfData[0] != 0)
@@ -92,7 +92,6 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     focusSlot   = (word >> (32 - 4 - 2)) & 0x3;
     rangeEnable = remaining[5];
     bpm         = remaining[6];
-    split       = remaining[7] & 1;
     clockRun    = remaining[8] & 1;
 
     const uint8_t *slotPtr = remaining + 11;
@@ -120,7 +119,6 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
-    cJSON_AddBoolToObject(perf, "kbSplit", split);
     cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
 
     cJSON *slots = cJSON_CreateArray();

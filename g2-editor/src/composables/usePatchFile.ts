@@ -81,7 +81,7 @@ export function usePatchFile() {
 				}));
 				const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
 				const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
-				device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false }, patches: null, slots });
+				device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, patches: null, slots });
 				uiStore.setSlotInFocus(focusLabel);
 			}
 			return;
@@ -157,7 +157,7 @@ export function usePatchFile() {
 							}));
 							const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
 							const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
-							device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false }, patches: null, slots });
+							device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, patches: null, slots });
 							uiStore.setSlotInFocus(focusLabel);
 						}
 						return;
