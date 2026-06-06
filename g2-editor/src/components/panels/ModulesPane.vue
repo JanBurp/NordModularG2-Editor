@@ -45,10 +45,15 @@
 	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
+	import { useSettingsStore } from '@/store/settings';
 
 	const ui = useUiStore();
+	const settings = useSettingsStore();
 
-	const categories = computed(() => getAllCategories());
+	const categories = computed(() => {
+		const all = getAllCategories();
+		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
+	});
 	const expandedCategories = ref(getAllCategories());
 	const searchQuery = ref('');
 

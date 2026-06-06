@@ -1,5 +1,26 @@
 <template>
 	<div class="flex flex-col gap-1">
+		<Collapsible title="Editor Settings">
+			<div class="flex flex-col gap-1">
+				<div class="settings-row">
+					<span>{{ L.editorPath }}</span>
+					<div class="flex gap-1">
+						<div class="w-2/3">
+							<TextInput :model-value="settings.path" @update:model-value="settings.setPath(($event.target as HTMLInputElement).value)" />
+						</div>
+						<button class="flex-1 w-1/3 settings-input px-2 cursor-pointer" @click="browser.chooseDiskFolder()">…</button>
+					</div>
+				</div>
+				<div class="settings-row">
+					<span>{{ L.editorHiddenModules }}</span>
+					<input
+						type="checkbox"
+						:checked="settings.hidden_modules"
+						@change="settings.setHiddenModules(($event.target as HTMLInputElement).checked)"
+					/>
+				</div>
+			</div>
+		</Collapsible>
 		<Collapsible title="Synth Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
@@ -8,7 +29,13 @@
 
 				<p class="settings-subheader">MIDI Channels</p>
 				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
-					<NumberInput :model-value="device.device?.midi.slots[slot.key] ?? 1" :min="1" :max="16" class="w-16" @update:model-value="device.setMidiSlot(slot.key, $event)" />
+					<NumberInput
+						:model-value="device.device?.midi.slots[slot.key] ?? 1"
+						:min="1"
+						:max="16"
+						class="w-16"
+						@update:model-value="device.setMidiSlot(slot.key, $event)"
+					/>
 				</SettingsRow>
 
 				<!-- <p class="settings-subheader">MIDI Settings</p>
@@ -66,7 +93,7 @@
 
 				<p class="settings-subheader">Slot Info</p>
 				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
-					<span></span>
+					<span></span><span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
 					<span class="text-center">{{ L.slotHold }}</span>
@@ -89,8 +116,20 @@
 					<span class="flex justify-center">
 						<CheckBox :model-value="slotEntry(slot)?.hold ?? false" @update:model-value="device.setSlotHold(slot, $event)" />
 					</span>
-					<NumberInput :model-value="slotEntry(slot)?.range?.lower ?? 0" :min="0" :max="127" class="px-0 min-w-12" @update:model-value="device.setSlotRangeLower(slot, $event)" />
-					<NumberInput :model-value="slotEntry(slot)?.range?.upper ?? 127" :min="0" :max="127" class="px-0 min-w-12" @update:model-value="device.setSlotRangeUpper(slot, $event)" />
+					<NumberInput
+						:model-value="slotEntry(slot)?.range?.lower ?? 0"
+						:min="0"
+						:max="127"
+						class="px-0 min-w-12"
+						@update:model-value="device.setSlotRangeLower(slot, $event)"
+					/>
+					<NumberInput
+						:model-value="slotEntry(slot)?.range?.upper ?? 127"
+						:min="0"
+						:max="127"
+						class="px-0 min-w-12"
+						@update:model-value="device.setSlotRangeUpper(slot, $event)"
+					/>
 				</div>
 			</div>
 		</Collapsible>
@@ -118,6 +157,8 @@
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
 	import { useDeviceStore } from '@/store/device';
+	import { useSettingsStore } from '@/store/settings';
+	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS } from '@/constants';
@@ -127,6 +168,8 @@
 	const L = SETTINGS_LABELS;
 
 	const device = useDeviceStore();
+	const settings = useSettingsStore();
+	const browser = useBrowserStore();
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
