@@ -116,6 +116,7 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		async setPerfName(name: string): Promise<void> {
+			name = name.trim();
 			if (this.device?.performance) this.device.performance.name = name;
 			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-perf-name', name]);
 		},
