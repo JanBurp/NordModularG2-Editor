@@ -922,6 +922,91 @@ function sampleResponse(w: number, h: number, mag: (hz: number) => number, dbRan
 
 const FILTER_FILL = GRAPH_COLORS.filterFill;
 
+// ---------------------------------------------------------------------------
+// Waveshaper transfer-function helper
+// ---------------------------------------------------------------------------
+
+function sampleShaper(w: number, h: number, transfer: (x: number) => number, n = 64): string {
+	const cx = w / 2;
+	const parts: string[] = [`M${cx.toFixed(2)},0 L${cx.toFixed(2)},${h}`];
+	for (let i = 0; i <= n; i++) {
+		const px = (i / n) * w;
+		const input = (i / n) * 2 - 1;
+		const output = Math.max(-1, Math.min(1, transfer(input)));
+		const py = (h / 2) * (1 - output);
+		parts.push(`${i === 0 ? 'M' : 'L'}${px.toFixed(2)},${py.toFixed(2)}`);
+	}
+	return parts.join(' ');
+}
+
+// --- Clip (id 61) ---
+function clipGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const clipLevel = lv(vals, 1, 64) / 127;
+	const isAsym = lv(vals, 2, 0) === 0; // 0=Asym, 1=Sym
+	const d = sampleShaper(ve.w!, ve.h!, (x) => {
+		if (isAsym) return Math.min(x, clipLevel);
+		return Math.max(-clipLevel, Math.min(clipLevel, x));
+	});
+	return { kind: 'path', d, zeroLine: true };
+}
+
+// --- Overdrive (id 62) ---
+function overdriveGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const amount = lv(vals, 1, 0) / 127;
+	const type = lv(vals, 3, 0); // 0=Soft,1=Hard,2=Fat,3=Heavy
+	const isAsym = lv(vals, 4, 0) === 0;
+	const maxDrive = [4, 10, 7, 20][Math.max(0, Math.min(3, type))];
+	const drive = 1 + amount * maxDrive;
+	const norm = Math.tanh(drive);
+	const d = sampleShaper(ve.w!, ve.h!, (x) => {
+		if (isAsym && x <= 0) return x;
+		return Math.tanh(drive * x) / norm;
+	});
+	return { kind: 'path', d, zeroLine: true };
+}
+
+// --- Saturate (id 28) ---
+function saturateGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const amount = lv(vals, 0, 0) / 127;
+	const curve = lv(vals, 3, 0);
+	const strength = [1, 3, 7, 20][Math.max(0, Math.min(3, curve))];
+	const drive = Math.max(0.01, amount * strength);
+	const norm = Math.log(1 + drive);
+	const d = sampleShaper(ve.w!, ve.h!, (x) => {
+		const sign = x < 0 ? -1 : 1;
+		return (sign * Math.log(1 + drive * Math.abs(x))) / norm;
+	});
+	return { kind: 'path', d, zeroLine: true };
+}
+
+// --- ShpExp (id 34) ---
+function shpExpGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const amount = lv(vals, 0, 0) / 127;
+	const expBase = [2, 3, 4, 5][Math.max(0, Math.min(3, lv(vals, 3, 0)))];
+	const e = 1 + (expBase - 1) * amount;
+	const d = sampleShaper(ve.w!, ve.h!, (x) => {
+		const sign = x < 0 ? -1 : 1;
+		return sign * Math.pow(Math.abs(x), e);
+	});
+	return { kind: 'path', d, zeroLine: true };
+}
+
+// --- WaveWrap (id 74) ---
+function waveWrapGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const amount = lv(vals, 1, 0) / 127;
+	const gain = 1 + amount * 3;
+	const fold = (v: number): number => {
+		let w = v;
+		for (let i = 0; i < 16 && Math.abs(w) > 1; i++) {
+			if (w > 1) w = 2 - w;
+			if (w < -1) w = -2 - w;
+		}
+		return w;
+	};
+	const d = sampleShaper(ve.w!, ve.h!, (x) => fold(x * gain), 128);
+	return { kind: 'path', d, zeroLine: true };
+}
+
 function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
 	return { text, x: w - 2, y: 9 };
 }
@@ -1135,6 +1220,11 @@ const moduleIdRegistry: Record<number, (ve: VisualElement, vals: number[], modes
 	102: filterPhase,
 	162: filterComb,
 	108: vocoder,
+	61: clipGraph,
+	62: overdriveGraph,
+	28: saturateGraph,
+	34: shpExpGraph,
+	74: waveWrapGraph,
 };
 
 export function getGraph(ve: VisualElement, lvVals: number[] | undefined, modes: number[] | undefined, moduleId?: number): GraphResult | null {
