@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col gap-1">
-		<Collapsible title="Editor Settings">
+		<Collapsible title="Editor Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorPath">
 					<div class="flex gap-1 flex-1 items-center">
@@ -17,13 +17,13 @@
 				</SettingsRow>
 			</div>
 		</Collapsible>
-		<Collapsible title="Synth Settings">
+		<Collapsible title="Synth Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">MIDI Channels</p>
+				<p class="settings-subheader">MIDI Channels:</p>
 				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
 					<NumberInput
 						:model-value="device.device?.midi.slots[slot.key] ?? 1"
@@ -80,16 +80,16 @@
 				<SettingsRow :label="L.clockRunning">
 					<CheckBox :model-value="device.clockRunning" @update:model-value="device.setClockRunning($event)" />
 				</SettingsRow>
-				<!-- <SettingsRow :label="L.kbSplit">
+				<SettingsRow :label="L.kbSplit">
 					<CheckBox :model-value="device.device?.performance?.kbSplit ?? false" @update:model-value="device.setKbSplit($event)" />
-				</SettingsRow> -->
+				</SettingsRow>
 				<SettingsRow :label="L.rangeEnable">
 					<CheckBox :model-value="device.device?.performance?.rangeEnable ?? false" @update:model-value="device.setRangeEnable($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">Slot Info</p>
+				<p class="settings-subheader">Slot Info:</p>
 				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
-					<span></span><span></span>
+					<span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
 					<span class="text-center">{{ L.slotHold }}</span>

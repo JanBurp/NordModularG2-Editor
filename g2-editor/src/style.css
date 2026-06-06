@@ -113,7 +113,7 @@ body {
 }
 
 .settings-subheader {
-	@apply mt-1 mb-0.5 text-xs text-neutral-500;
+	@apply mt-2 mb-1 text-sm text-neutral-400 border-t border-neutral-700 pt-2;
 }
 
 .module-bevel {
