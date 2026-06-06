@@ -11,11 +11,13 @@ Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + Ty
 ## Coding Guidelines
 
 ### 1. Think Before Coding
+- Never guess.
 - State assumptions explicitly. If uncertain or multiple interpretations exist, ask.
 - If something is unclear, name it and ask — even for typos.
 
 ### 2. Simplicity First
 - Minimum code that solves the problem. Nothing speculative.
+- If similar code exist allready, propose a refacturing, goal is minimal code redundancy.
 - No features, flexibility, or error handling beyond what was asked.
 - If you write 200 lines and it could be 50, rewrite it.
 
@@ -32,7 +34,7 @@ Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + Ty
 - `cli/` — C CLI tool for USB communication with the Nord G2 hardware
 - `g2-editor/` — Electron desktop app (Vue 3 + TypeScript)
 - `test-patches/` — Sample `.pch2` patch files for testing
-- `doc/` — Architectural documentation
+- `doc/` — Documentation and help
 
 ## Commands
 
