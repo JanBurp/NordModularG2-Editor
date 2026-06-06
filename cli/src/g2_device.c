@@ -2045,9 +2045,68 @@ int g2_set_slot_hold(int slot_idx, int value) {
 }
 
 int g2_set_slot_range(int slot_idx, int lower, int upper) {
-    int ret = g2_set_slot_perf_field(slot_idx, 5, lower);
-    if (ret != G2_OK) return ret;
-    return g2_set_slot_perf_field(slot_idx, 6, upper);
+    if (slot_idx < 0 || slot_idx > 3) { g2_err("set-slot-range: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-slot-range: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+
+    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
+    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
+    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
+    uint8_t perf_version = selsData[2];
+
+    uint8_t perfIntr[16] = {0};
+    uint8_t *perfData = malloc(2048);
+    if (!perfData) return G2_ERR_NO_MEMORY;
+    size_t perfSize = 0;
+    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
+    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
+    perfSize = size;
+    recv_bulk(perfData, perfSize);
+
+    char tmpName[32];
+    const uint8_t *remaining = perfData + 4;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+    const uint8_t *slotPtr = remaining + 11;
+    const uint8_t *perfEnd = perfData + perfSize;
+    int found = 0;
+    for (int i = 0; i < 4; i++) {
+        if (slotPtr >= perfEnd) break;
+        int maxName = (int)(perfEnd - slotPtr);
+        if (maxName > 17) maxName = 17;
+        nameLen = parse_name(slotPtr, tmpName, maxName);
+        if (slotPtr + nameLen + 7 > perfEnd) break;
+        if (i == slot_idx) {
+            size_t base = (size_t)(slotPtr - perfData) + (size_t)nameLen;
+            perfData[base + 5] = (uint8_t)(lower & 0xFF);
+            perfData[base + 6] = (uint8_t)(upper & 0xFF);
+            found = 1;
+            break;
+        }
+        slotPtr += nameLen + 10;
+    }
+    if (!found) { free(perfData); return G2_ERR_PARSE; }
+
+    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
+    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
+    free(perfData);
+    if (send_ret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+
+    if (!g2_listener_active) {
+        uint8_t ackResp[16] = {0};
+        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
+        g2_drain_pending();
+    }
+    return G2_OK;
 }
 
 /* Modify a single byte in the performance header (at remaining[offset]):
