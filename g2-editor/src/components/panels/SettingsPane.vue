@@ -2,23 +2,19 @@
 	<div class="flex flex-col gap-1">
 		<Collapsible title="Editor Settings">
 			<div class="flex flex-col gap-1">
-				<div class="settings-row">
-					<span>{{ L.editorPath }}</span>
-					<div class="flex gap-1">
-						<div class="w-2/3">
-							<TextInput :model-value="settings.path" @update:model-value="settings.setPath(($event.target as HTMLInputElement).value)" />
+				<SettingsRow :label="L.editorPath">
+					<div class="flex gap-1 flex-1 items-center">
+						<div class="w-1/4">
+							<button class="settings-input px-2 cursor-pointer" @click="browser.chooseDiskFolder()">…</button>
 						</div>
-						<button class="flex-1 w-1/3 settings-input px-2 cursor-pointer" @click="browser.chooseDiskFolder()">…</button>
+						<div class="w-3/4">
+							<TextInput :model-value="settings.path" @update:model-value="settings.setPath($event)" />
+						</div>
 					</div>
-				</div>
-				<div class="settings-row">
-					<span>{{ L.editorHiddenModules }}</span>
-					<input
-						type="checkbox"
-						:checked="settings.hidden_modules"
-						@change="settings.setHiddenModules(($event.target as HTMLInputElement).checked)"
-					/>
-				</div>
+				</SettingsRow>
+				<SettingsRow :label="L.editorHiddenModules">
+					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
+				</SettingsRow>
 			</div>
 		</Collapsible>
 		<Collapsible title="Synth Settings">
