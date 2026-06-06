@@ -35,6 +35,7 @@
 			</button>
 		</ToolBar>
 
+		<MorphToolBar :patch-name="patchName" />
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
@@ -159,6 +160,7 @@
 	import ToolBarLabel from './components/toolbar/ToolBarLabel.vue';
 	import ToolBarText from './components/toolbar/ToolBarText.vue';
 	import ToolBarDivider from './components/toolbar/ToolBarDivider.vue';
+	import MorphToolBar from './components/toolbar/MorphToolBar.vue';
 	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import Dialog from './components/common/Dialog.vue';

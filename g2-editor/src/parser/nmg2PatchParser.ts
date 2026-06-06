@@ -307,14 +307,15 @@ class G2Parser {
 			const slotIdx = this.aof >> 1;
 			const params: PatchParamVariation[] = [];
 			const vp = (v: number): PatchParamVariation => {
-				if (!params[v]) params[v] = { patchVol: 0, activeMuted: 0, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0 };
+				if (!params[v]) params[v] = { patchVol: 0, activeMuted: 0, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0, morphDials: [0,0,0,0,0,0,0,0], morphModes: [0,0,0,0,0,0,0,0] };
 				return params[v];
 			};
-			// Section 1: Morphs — consume bits, don't store
-			this.getBits(8); this.getBits(7);
+			// Section 1: Morphs
+			this.getBits(8); this.getBits(7); // sub-section ID + count
 			for (let i = 0; i < varCount; i++) {
-				this.getBits(8); // variation
-				for (let j = 0; j < 16; j++) this.getBits(7); // 8 dials + 8 modes
+				const v = this.getBits(8);
+				for (let j = 0; j < 8; j++) vp(v).morphDials[j] = this.getBits(7);
+				for (let j = 0; j < 8; j++) vp(v).morphModes[j] = this.getBits(7);
 			}
 			// Section 2: Volume
 			this.getBits(8); this.getBits(7);

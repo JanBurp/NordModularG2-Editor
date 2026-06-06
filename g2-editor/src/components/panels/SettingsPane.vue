@@ -203,6 +203,7 @@
 	}
 
 	function patchParam(key: keyof PatchParamVariation): number {
-		return slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.patch?.[key] ?? 0;
+		const val = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.patch?.[key];
+		return typeof val === 'number' ? val : 0;
 	}
 </script>

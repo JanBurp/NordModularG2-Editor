@@ -166,35 +166,19 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 	return makeSection(SectionType.MODULE_NAMES, data);
 }
 
-// Extracts morph data (sub-section 1) from a template areaIdx=2 section.
-// Morphs are not stored in PatchParamVariation so must be preserved verbatim.
-function extractMorphs(secData: Uint8Array): number[][] {
-	const bits: number[] = [];
-	for (let i = 0; i < secData.length; i++)
-		for (let b = 7; b >= 0; b--) bits.push((secData[i] >> b) & 1);
-	let pos = 0;
-	const gb = (n: number): number => { let v = 0; for (let i = 0; i < n; i++) v = (v << 1) | (bits[pos++] ?? 0); return v; };
-	gb(2); gb(8); // areaIdx, nummod (ignored)
-	const varCount = gb(8);
-	gb(8); gb(7); // sub-section id=1, cnt=16
-	const morphs: number[][] = [];
-	for (let i = 0; i < varCount; i++) {
-		const v = gb(8);
-		morphs[v] = [];
-		for (let j = 0; j < 16; j++) morphs[v].push(gb(7));
-	}
-	return morphs;
-}
-
-function writePatchParamSection(params: PatchParamVariation[], morphs: number[][]): Uint8Array {
+function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	const NUM_VAR = 9;
 	const bw = new BitWriter();
 	bw.write(2, 2); // areaIdx = 2
 	bw.write(8, 7); // 7 sub-sections
 	bw.write(8, NUM_VAR);
-	// Sub 1: Morphs (preserved from template)
+	// Sub 1: Morphs
 	bw.write(8, 1); bw.write(7, 16);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); for (let j = 0; j < 16; j++) bw.write(7, morphs[v]?.[j] ?? 0); }
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphDials?.[j] ?? 0);
+		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphModes?.[j] ?? 0);
+	}
 	// Sub 2: Volume
 	bw.write(8, 2); bw.write(7, 2);
 	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.patchVol ?? 0); bw.write(7, params[v]?.activeMuted ?? 0); }
@@ -304,8 +288,7 @@ function processSection(
 
 	if (type === SectionType.PARAMETERS && areaIdx === 2 && !w.m4d.has(2)) {
 		if (variations.length) {
-			const morphs = extractMorphs(secData);
-			out.push(writePatchParamSection(variations.map((v) => v.patch), morphs));
+			out.push(writePatchParamSection(variations.map((v) => v.patch)));
 		} else {
 			out.push(verbatim);
 		}
