@@ -55,30 +55,28 @@ Video:
 - [x] Change Clock Speed
 - [x] Loading performances (file/synth)
 - [x] Change voice mode/count
-- [ ] Finishing this first goal
+- [x] Editing patch settings
+- [x] Editing performance settings
+- [ ] Editing synth settings
+- [x] Use cursor keys to move between modules and params
+- [x] Use cursor keys to edit params
+- [x] Help (modules)
 - [ ] Updating this page/repo
-- [ ] Invite first small test group to test
 
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
+- [ ] Undo/Redo
+- [ ] Modules: some graphs missing, some graphics missing, change some mode switches.
 - [ ] Show Morphs
 - [ ] Change Morphs on params
-- [ ] Editing patch settings
-- [ ] Editing performance settings
-- [ ] Editing synth settings
 - [ ] Midi CC's on params
 - [ ] Parameter Pages
-- [ ] Modules: some graphs missing, some graphics missing, change some mode switches.
-- [ ] Use cursor keys to move between modules and params
-- [ ] Use cursor keys to edit params
-- [ ] Undo/Redo
 - [ ] ...
 
 ### Third goal - Beyond the basics:
 
 - [ ] Patch Adjuster
 - [ ] Patch Mutator (if possible)
-- [ ] Help
 - [ ] Editing names with search/replace
 - [ ] ...
 
