@@ -73,7 +73,7 @@ export function useSlotEvents(log: LogFn) {
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
 			const key = PATCH_PARAM_KEYS[ev.param as number];
 			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
-			if (vState && key) (vState.patch as Record<string, number>)[key] = ev.value;
+			if (vState && key) (vState.patch as unknown as Record<string, number>)[key] = ev.value;
 			return true;
 		}
 		if (ev.type === 'patch_name') {

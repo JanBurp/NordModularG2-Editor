@@ -673,11 +673,21 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-patch-description', slot, hex]);
 		},
 
+		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {
+			const slot = useUiStore().slotInFocus;
+			const entry = this.slots[slot];
+			if (!entry?.variations?.[variation]) return;
+			const patch = entry.variations[variation].patch;
+			if (field === 'dial') patch.morphDials[morphIdx] = value;
+			else patch.morphModes[morphIdx] = value;
+			entry.rawHex = null;
+		},
+
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
 			const slot = useUiStore().slotInFocus;
 			const entry = this.slots[slot];
 			if (entry?.variations?.[variation]) {
-				(entry.variations[variation].patch as Record<string, number>)[key] = value;
+				(entry.variations[variation].patch as unknown as Record<string, number>)[key] = value;
 				entry.rawHex = null;
 			}
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
