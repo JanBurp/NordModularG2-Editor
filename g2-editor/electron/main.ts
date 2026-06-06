@@ -339,6 +339,8 @@ app.whenReady().then(async () => {
 		{
 			label: "Help",
 			submenu: [
+				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },
+				{ type: "separator" as const },
 				{ role: "about" as const },
 			],
 		},

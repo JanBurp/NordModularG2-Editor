@@ -28,7 +28,8 @@ export type MenuAction =
 	| 'variation-5'
 	| 'variation-6'
 	| 'variation-7'
-	| 'variation-8';
+	| 'variation-8'
+	| 'show-module-help';
 
 export interface SlotInfo {
 	slot: SlotLabel;
