@@ -14,23 +14,29 @@
 				</div>
 
 				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
-					<div
-						v-for="module in getModulesByCategory(category)"
-						:key="module.id"
-						class="w-64 bg-neutral-600 rounded overflow-visible shadow"
-						:style="{
-							height: getModuleHeight(module) + 'px',
-							cursor: 'grab',
-						}"
-						:data-testid="`module-item-${module.short}`"
-						draggable="true"
-						@dragstart="(e) => handleModuleDragStart(e, module.id)"
-						@dragend="handleModuleDragEnd"
-					>
-						<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
-							<Module :instance="getModuleInstance(module.id)" />
-						</svg>
-					</div>
+					<template v-for="module in getModulesByCategory(category)" :key="module.id">
+						<div
+							class="w-64 bg-neutral-600 rounded overflow-visible shadow"
+							:style="{
+								height: getModuleHeight(module) + 'px',
+								cursor: 'grab',
+							}"
+							:data-testid="`module-item-${module.short}`"
+							draggable="true"
+							@dragstart="(e) => handleModuleDragStart(e, module.id)"
+							@dragend="handleModuleDragEnd"
+							@click="handleModuleClick(module.id)"
+						>
+							<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
+								<Module :instance="getModuleInstance(module.id)" />
+							</svg>
+						</div>
+						<div
+							v-if="helpModule?.id === module.id && helpHtml"
+							class="module-help w-64 bg-neutral-800 rounded p-3 text-xs text-neutral-300"
+							v-html="helpHtml"
+						/>
+					</template>
 				</div>
 			</div>
 		</div>
@@ -38,7 +44,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed } from 'vue';
+	import { ref, reactive, computed, watch } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
@@ -46,9 +52,11 @@
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
 	import { useSettingsStore } from '@/store/settings';
+	import { useModuleHelp } from '../../composables/useModuleHelp';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
+	const { helpHtml, loadHelp } = useModuleHelp();
 
 	const categories = computed(() => {
 		const all = getAllCategories();
@@ -56,6 +64,7 @@
 	});
 	const expandedCategories = ref(getAllCategories());
 	const searchQuery = ref('');
+	const selectedModuleId = ref<number | null>(null);
 
 	defineProps<{
 		isActive: boolean;
@@ -69,6 +78,30 @@
 			}
 		}
 		return count;
+	});
+
+	const helpModule = computed<ModuleDefinition | null>(() => {
+		if (selectedModuleId.value !== null) {
+			return getModule(selectedModuleId.value) ?? null;
+		}
+		if (totalModuleCount.value === 1) {
+			for (const cat of categories.value) {
+				if (categoryMatchesSearch(cat)) {
+					const mods = getModulesByCategory(cat);
+					if (mods.length === 1) return mods[0];
+				}
+			}
+		}
+		return null;
+	});
+
+	watch(helpModule, (mod) => {
+		if (mod) loadHelp(mod.short);
+		else helpHtml.value = '';
+	});
+
+	watch(searchQuery, () => {
+		selectedModuleId.value = null;
 	});
 
 	const moduleInstances = reactive(new Map());
@@ -168,6 +201,10 @@
 		return moduleInstances.get(moduleId);
 	}
 
+	function handleModuleClick(moduleId: number) {
+		selectedModuleId.value = selectedModuleId.value === moduleId ? null : moduleId;
+	}
+
 	function handleModuleDragStart(e: DragEvent, moduleId: number) {
 		if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
 		ui.draggedModuleId = moduleId;
@@ -177,3 +214,36 @@
 		ui.draggedModuleId = null;
 	}
 </script>
+
+<style scoped>
+.module-help :deep(h1) {
+	font-size: 0.85rem;
+	font-weight: 600;
+	color: #e5e5e5;
+	margin-bottom: 0.5rem;
+}
+.module-help :deep(h2) {
+	font-size: 0.75rem;
+	font-weight: 600;
+	color: #d4d4d4;
+	margin-top: 0.75rem;
+	margin-bottom: 0.25rem;
+}
+.module-help :deep(p) {
+	margin-bottom: 0.5rem;
+	line-height: 1.5;
+}
+.module-help :deep(strong) {
+	color: #e5e5e5;
+	font-weight: 600;
+}
+.module-help :deep(ul) {
+	list-style: disc;
+	padding-left: 1rem;
+	margin-bottom: 0.5rem;
+}
+.module-help :deep(li) {
+	margin-bottom: 0.2rem;
+	line-height: 1.5;
+}
+</style>
