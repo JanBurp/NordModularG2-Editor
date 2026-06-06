@@ -8,6 +8,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
 	},
 
+	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),
+
 	onMenuAction: (cb: (action: MenuAction) => void) =>
 		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),
 	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),

@@ -31,6 +31,8 @@ export const useUiStore = defineStore('ui', {
 		showSvgViewer: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
+		helpModuleTypeId: null as number | null,
+		helpAllModules: false as boolean,
 	}),
 
 	getters: {
@@ -105,6 +107,28 @@ export const useUiStore = defineStore('ui', {
 
 		toggleSvgViewer() {
 			this.showSvgViewer = !this.showSvgViewer;
+		},
+
+		showModuleHelp(typeId: number) {
+			this.helpAllModules = false;
+			if (this.helpModuleTypeId === typeId) {
+				this.helpModuleTypeId = null;
+				return;
+			}
+			this.helpModuleTypeId = typeId;
+			if (!this.showRightPane || this.rightPaneTab !== 'modules') {
+				this.rightPaneTab = 'modules';
+				this.showRightPane = true;
+			}
+		},
+
+		toggleAllModuleHelp() {
+			this.helpModuleTypeId = null;
+			this.helpAllModules = !this.helpAllModules;
+			if (this.helpAllModules && (!this.showRightPane || this.rightPaneTab !== 'modules')) {
+				this.rightPaneTab = 'modules';
+				this.showRightPane = true;
+			}
 		},
 
 		shakeCables() {
