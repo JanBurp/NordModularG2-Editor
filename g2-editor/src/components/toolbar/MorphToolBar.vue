@@ -7,11 +7,9 @@
 					:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 					@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
 				/>
-				<Select
+				<MorphSourceSelect
 					:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
-					:options="MORPH_OPTIONS"
-					:title="name"
-					@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', Number(val))"
+					@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
 				/>
 			</div>
 		</template>
@@ -41,14 +39,12 @@
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import Knob from '../common/Knob.vue';
 	import Switch from '../common/Switch.vue';
-	import Select from '../common/Select.vue';
+	import MorphSourceSelect from './MorphSourceSelect.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { MORPH_NAMES } from '../../types/patch';
 
 	defineProps<{ patchName: string }>();
-
-	const MORPH_OPTIONS = MORPH_NAMES.map((name, i) => ({ id: i, name }));
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
