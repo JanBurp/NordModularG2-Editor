@@ -72,7 +72,7 @@
 		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
-					<TextInput :model-value="device.device?.performance?.name ?? ''" maxlength="16" @update:model-value="device.setPerfName($event)" />
+					<TextInput :model-value="device.device?.performance?.name ?? ''" maxlength="16" :debounce="500" @update:model-value="device.setPerfName($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
 					<NumberInput :model-value="device.bpm" :min="30" :max="240" class="w-16" @update:model-value="device.setBpm($event)" />
@@ -113,14 +113,16 @@
 						:model-value="slotEntry(slot)?.range?.lower ?? 0"
 						:min="0"
 						:max="127"
-						class="px-0 min-w-12"
+						:midi-note="true"
+						class="px-0 min-w-14"
 						@update:model-value="device.setSlotRangeLower(slot, $event)"
 					/>
 					<NumberInput
 						:model-value="slotEntry(slot)?.range?.upper ?? 127"
 						:min="0"
 						:max="127"
-						class="px-0 min-w-12"
+						:midi-note="true"
+						class="px-0 min-w-14"
 						@update:model-value="device.setSlotRangeUpper(slot, $event)"
 					/>
 				</div>
@@ -130,7 +132,7 @@
 		<Collapsible v-if="currentPatch" title="Patch Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
-					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" maxlength="16" @update:model-value="slotsStore.setPatchName($event)" />
+					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" maxlength="16" :debounce="500" @update:model-value="slotsStore.setPatchName($event)" />
 				</SettingsRow>
 
 				<!-- <p class="settings-subheader">Variation Parameters</p>

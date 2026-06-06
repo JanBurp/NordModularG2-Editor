@@ -650,6 +650,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setPatchName(name: string): Promise<void> {
+			name = name.trim();
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot } = ctx;

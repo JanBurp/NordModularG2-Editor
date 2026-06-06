@@ -9,25 +9,20 @@
 				{{ name || String(editingParamDef.low + i) }}
 			</option>
 		</select>
-		<input
-			v-else-if="isMidiNoteParam"
-			v-model="editingNoteText"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
-			placeholder="e.g. C4"
-		/>
-		<input
+		<NumberInput
 			v-else
-			v-model.number="editingValue"
-			type="number"
+			v-model="editingValue"
 			:min="editingParamDef?.low ?? 0"
 			:max="editingParamDef?.high ?? 127"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			:midi-note="isMidiNoteParam"
+			class="w-full"
 		/>
 	</Dialog>
 </template>
 <script setup lang="ts">
 	import Dialog from './Dialog.vue';
+	import NumberInput from './NumberInput.vue';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 
-	const { showDialog, editingParamDef, editingValue, editingNoteText, isEnumParam, isMidiNoteParam, confirmParamEdit } = useParamEditDialog();
+	const { showDialog, editingParamDef, editingValue, isEnumParam, isMidiNoteParam, confirmParamEdit } = useParamEditDialog();
 </script>
