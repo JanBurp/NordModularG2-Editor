@@ -1,5 +1,18 @@
 <template>
 	<div class="flex flex-col gap-1">
+		<Collapsible title="Editor Settings">
+			<div class="flex flex-col gap-1">
+				<div class="settings-row">
+					<span>{{ L.editorPath }}</span>
+					<input :value="settings.path" class="settings-input" @input="settings.setPath(($event.target as HTMLInputElement).value)" />
+				</div>
+				<div class="settings-row">
+					<span>{{ L.editorHiddenModules }}</span>
+					<input type="checkbox" :checked="settings.hidden_modules" @change="settings.setHiddenModules(($event.target as HTMLInputElement).checked)" />
+				</div>
+			</div>
+		</Collapsible>
+
 		<Collapsible title="Synth Settings">
 			<div class="flex flex-col gap-1">
 				<div class="settings-row">
@@ -132,6 +145,7 @@
 	import { computed } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import { useDeviceStore } from '@/store/device';
+	import { useSettingsStore } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS } from '@/constants';
@@ -141,6 +155,7 @@
 	const L = SETTINGS_LABELS;
 
 	const device = useDeviceStore();
+	const settings = useSettingsStore();
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 

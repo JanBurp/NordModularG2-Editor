@@ -40,4 +40,6 @@ export const SETTINGS_LABELS = {
 	patchOctaveShift: 'Octave Shift',
 	patchSustain: 'Sustain',
 	patchOctaves: 'Octaves',
+	editorPath: 'Browser Path',
+	editorHiddenModules: 'Show Hidden Modules',
 } as const;
