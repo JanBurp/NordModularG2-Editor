@@ -1007,6 +1007,30 @@ function waveWrapGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	return { kind: 'path', d, zeroLine: true };
 }
 
+function levScalerGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const w = ve.w!;
+	const h = ve.h!;
+	const slopeL = (lv(vals, 0, 64) - 64) / 64 * 8.0;
+	const bpNote = lv(vals, 1, 64);
+	const slopeR = (lv(vals, 2, 64) - 64) / 64 * 8.0;
+
+	const MAX_DB = 40;
+	const bpX = (bpNote / 127) * w;
+	const bpY = h / 2;
+
+	const gainLeft  = slopeL * (bpNote / 12);
+	const gainRight = slopeR * ((127 - bpNote) / 12);
+	const yLeft  = Math.max(0, Math.min(h, bpY * (1 - gainLeft  / MAX_DB)));
+	const yRight = Math.max(0, Math.min(h, bpY * (1 - gainRight / MAX_DB)));
+
+	const d = [
+		`M${bpX.toFixed(2)},0 L${bpX.toFixed(2)},${h}`,
+		`M0,${yLeft.toFixed(2)} L${bpX.toFixed(2)},${bpY.toFixed(2)} L${w},${yRight.toFixed(2)}`
+	].join(' ');
+
+	return { kind: 'path', d, zeroLine: true };
+}
+
 function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
 	return { text, x: w - 2, y: 9 };
 }
@@ -1225,6 +1249,7 @@ const moduleIdRegistry: Record<number, (ve: VisualElement, vals: number[], modes
 	28: saturateGraph,
 	34: shpExpGraph,
 	74: waveWrapGraph,
+	115: levScalerGraph,
 };
 
 export function getGraph(ve: VisualElement, lvVals: number[] | undefined, modes: number[] | undefined, moduleId?: number): GraphResult | null {
