@@ -285,6 +285,10 @@ Use this when the target slot needs to be activated before focusing. Steps:
 
 Setting only the `active` or `key` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step.
 
+#### Two-field slot update — `set-slot-range`
+
+`g2_set_slot_range` patches both the range-lower (field offset 5) and range-upper (field offset 6) bytes in **one** read-modify-write round-trip. Do not call `g2_set_slot_perf_field` twice in sequence: the first SET_PERF_SETTINGS write causes the G2 to emit a `perf_settings_update` event and briefly stop responding; a second immediate round-trip hits `G2_ERR_RECV` (-7).
+
 ---
 
 ## 7. Slot Commands
