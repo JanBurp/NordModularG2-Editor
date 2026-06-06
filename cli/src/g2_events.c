@@ -101,7 +101,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
             fflush(stdout);
         } else if (bsubCmd == 0x11) {
-            printf("{\"type\":\"perf_settings\"}\n");
+            printf("{\"type\":\"perf_settings_update\"}\n");
             fflush(stdout);
         } else {
             printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);

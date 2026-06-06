@@ -2006,7 +2006,7 @@ static int g2_set_slot_perf_field(int slot_idx, int field_offset, int value) {
         if (slotPtr + nameLen + 7 > perfEnd) break;
         if (i == slot_idx) {
             size_t byte_offset = (size_t)(slotPtr - perfData) + (size_t)nameLen + (size_t)field_offset;
-            perfData[byte_offset] = (uint8_t)(value & 1);
+            perfData[byte_offset] = (uint8_t)(value & 0xFF);
             found = 1;
             break;
         }
@@ -2039,6 +2039,69 @@ int g2_set_slot_enabled(int slot_idx, int value) {
 int g2_set_slot_key(int slot_idx, int value) {
     return g2_set_slot_perf_field(slot_idx, 1, value);
 }
+
+int g2_set_slot_hold(int slot_idx, int value) {
+    return g2_set_slot_perf_field(slot_idx, 2, value);
+}
+
+int g2_set_slot_range(int slot_idx, int lower, int upper) {
+    int ret = g2_set_slot_perf_field(slot_idx, 5, lower);
+    if (ret != G2_OK) return ret;
+    return g2_set_slot_perf_field(slot_idx, 6, upper);
+}
+
+/* Modify a single byte in the performance header (at remaining[offset]):
+ * remaining[5]=rangeEnable (KB Split) */
+static int g2_set_perf_header_byte(int offset, int value) {
+    if (ensure_connected(0) < 0) { g2_err("set-perf-header: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+
+    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
+    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
+    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
+    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
+    uint8_t perf_version = selsData[2];
+
+    uint8_t perfIntr[16] = {0};
+    uint8_t *perfData = malloc(2048);
+    if (!perfData) return G2_ERR_NO_MEMORY;
+    size_t perfSize = 0;
+    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    usleep(USB_SEND_DELAY_US);
+    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
+    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
+    perfSize = size;
+    recv_bulk(perfData, perfSize);
+
+    char tmpName[32];
+    const uint8_t *remaining = perfData + 4;
+    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
+    remaining += nameLen;
+
+    size_t byte_offset = (size_t)(remaining - perfData) + (size_t)offset;
+    if (byte_offset >= perfSize) { free(perfData); return G2_ERR_PARSE; }
+    perfData[byte_offset] = (uint8_t)(value & 0xFF);
+
+    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
+    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
+    free(perfData);
+    if (send_ret < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+
+    if (!g2_listener_active) {
+        uint8_t ackResp[16] = {0};
+        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
+        g2_drain_pending();
+    }
+    return G2_OK;
+}
+
+int g2_set_rangeEnable(int value) { return g2_set_perf_header_byte(5, value); }
 
 /* Select a slot, activating it if it is currently inactive.
  * Sends SET_PERF_SETTINGS to enable/key the target and disable/unkey the

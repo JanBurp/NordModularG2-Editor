@@ -72,16 +72,13 @@
 		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
-					<TextInput :model-value="device.device?.performance?.name ?? ''" @update:model-value="device.setPerfName($event)" />
+					<TextInput :model-value="device.device?.performance?.name ?? ''" maxlength="16" @update:model-value="device.setPerfName($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
 					<NumberInput :model-value="device.bpm" :min="30" :max="240" class="w-16" @update:model-value="device.setBpm($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.clockRunning">
 					<CheckBox :model-value="device.clockRunning" @update:model-value="device.setClockRunning($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.kbSplit">
-					<CheckBox :model-value="device.device?.performance?.kbSplit ?? false" @update:model-value="device.setKbSplit($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.rangeEnable">
 					<CheckBox :model-value="device.device?.performance?.rangeEnable ?? false" @update:model-value="device.setRangeEnable($event)" />
@@ -133,7 +130,7 @@
 		<Collapsible v-if="currentPatch" title="Patch Settings">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
-					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" @update:model-value="slotsStore.setPatchName($event)" />
+					<TextInput :model-value="slotsStore.getPatchName(uiStore.slotInFocus)" maxlength="16" @update:model-value="slotsStore.setPatchName($event)" />
 				</SettingsRow>
 
 				<!-- <p class="settings-subheader">Variation Parameters</p>

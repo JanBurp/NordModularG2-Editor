@@ -519,6 +519,19 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_slot_key(slot, arg_i(args, 1));
 
+	} else if (strcmp(cmd, "set-slot-hold") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_slot_hold(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "set-slot-range") == 0 && n >= 3) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_slot_range(slot, arg_i(args, 1), arg_i(args, 2));
+
+	} else if (strcmp(cmd, "set-range-enable") == 0 && n >= 1) {
+		ret = g2_set_rangeEnable(arg_i(args, 0));
+
 	} else if (strcmp(cmd, "seq") == 0) {
 		ret = execute_seq(args);
 

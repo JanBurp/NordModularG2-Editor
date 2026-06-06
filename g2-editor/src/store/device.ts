@@ -136,7 +136,7 @@ export const useDeviceStore = defineStore('device', {
 			if (!this.device) {
 				this.device = {
 					synthName: '', mode: 'Performance', patches: null,
-					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false },
+					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false },
 					slots: [],
 					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: '', clkse: false, clkre: false },
 					tuning: { semi: 0, cent: 0 },
@@ -145,7 +145,7 @@ export const useDeviceStore = defineStore('device', {
 			} else {
 				this.device.mode = 'Performance';
 				if (!this.device.performance) {
-					this.device.performance = { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false, kbSplit: false };
+					this.device.performance = { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false };
 				} else {
 					this.device.performance.name = name;
 				}
@@ -296,14 +296,6 @@ export const useDeviceStore = defineStore('device', {
 			if (this.device.patches) this.device.patches.rangeEnable = value;
 			if (this.status === DeviceStatus.Connected)
 				window.cli.run(['set-range-enable', value ? '1' : '0']);
-		},
-
-		setKbSplit(value: boolean) {
-			if (!this.device) return;
-			if (this.device.performance) this.device.performance.kbSplit = value;
-			if (this.device.patches) this.device.patches.kbSplit = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-kb-split', value ? '1' : '0']);
 		},
 
 	},
