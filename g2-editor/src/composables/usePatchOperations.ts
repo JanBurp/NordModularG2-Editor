@@ -40,23 +40,19 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
 	}
 
-	let paramChangeTimer: ReturnType<typeof setTimeout> | null = null;
-	function handleParamChange(moduleIndex: number, paramIndex: number, value: number): void {
-		if (paramChangeTimer) clearTimeout(paramChangeTimer);
-		paramChangeTimer = setTimeout(async () => {
-			paramChangeTimer = null;
-			try {
-				await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, getArea());
-			} catch {
-				/* G2 may be temporarily busy */
-			}
-		}, 50);
+	async function handleParamChange(moduleIndex: number, paramIndex: number, value: number): Promise<void> {
+		try {
+			await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, getArea());
+		} catch {
+			/* G2 may be temporarily busy */
+		}
 	}
 
+	let modeChangeTimer: ReturnType<typeof setTimeout> | null = null;
 	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (paramChangeTimer) clearTimeout(paramChangeTimer);
-		paramChangeTimer = setTimeout(async () => {
-			paramChangeTimer = null;
+		if (modeChangeTimer) clearTimeout(modeChangeTimer);
+		modeChangeTimer = setTimeout(async () => {
+			modeChangeTimer = null;
 			try {
 				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
 			} catch {
