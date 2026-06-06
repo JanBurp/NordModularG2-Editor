@@ -27,6 +27,7 @@ function createWindow() {
 	win = new BrowserWindow({
 		width: 800,
 		height: 600,
+		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/preload.js"),
 			nodeIntegration: false,
@@ -255,6 +256,10 @@ app.on("before-quit", (e) => {
 });
 
 app.whenReady().then(async () => {
+	if (isMac) {
+		app.dock.setIcon(path.join(process.env.APP_ROOT!, "resources", "icon.png"));
+	}
+
 	if (VITE_DEV_SERVER_URL) {
 		try {
 			const name = await installExtension(VUEJS_DEVTOOLS);
