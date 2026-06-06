@@ -18,6 +18,7 @@
 #include "cJSON.h"
 
 int g2_watch_verbose = 1;
+static int g_events_perf_mode = 1; /* 1=Performance, 0=Patch; updated by C_SYNTH_SETTINGS bulk event */
 
 #define BULK_REARM 1
 #define SLOT_LETTER(s) ((s) < 4 ? (const char*[]){"A","B","C","D"}[(s)] : "?")
@@ -85,6 +86,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             char *s = cJSON_PrintUnformatted(ev);
             if (s) { printf("%s\n", s); fflush(stdout); free(s); }
             int mode = strcmp(cJSON_GetObjectItem(ev, "mode")->valuestring, "Performance") == 0;
+            g_events_perf_mode = mode;
             cJSON_Delete(ev);
 
             cJSON *ps = query_perf_settings(mode, "perf_settings");
@@ -95,16 +97,32 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             }
         } else if (bsubCmd == 0x29) {
             char name[17] = {0};
-            int n = 0;
-            for (int i = 4; i < dataEnd && n < 16 && bulk[i]; i++)
+            int n = 0, i;
+            for (i = 4; i < dataEnd && n < 16 && bulk[i]; i++)
                 name[n++] = (char)bulk[i];
             printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
             fflush(stdout);
+            int settingsStart = i + 1;
+            if (settingsStart < dataEnd && bulk[settingsStart] == 0x11) {
+                cJSON *root = cJSON_CreateObject();
+                cJSON_AddStringToObject(root, "type", "perf_settings");
+                perf_parse_and_add(bulk, (size_t)bret, g_events_perf_mode, root);
+                char *s = cJSON_PrintUnformatted(root);
+                if (s) { printf("%s\n", s); fflush(stdout); free(s); }
+                cJSON_Delete(root);
+            } else {
+                printf("{\"type\":\"perf_settings_update\"}\n");
+                fflush(stdout);
+            }
         } else if (bsubCmd == 0x11) {
-            printf("{\"type\":\"perf_settings_update\"}\n");
-            fflush(stdout);
+            cJSON *root = cJSON_CreateObject();
+            cJSON_AddStringToObject(root, "type", "perf_settings");
+            perf_parse_and_add(bulk, (size_t)bret, g_events_perf_mode, root);
+            char *s = cJSON_PrintUnformatted(root);
+            if (s) { printf("%s\n", s); fflush(stdout); free(s); }
+            cJSON_Delete(root);
         } else {
-            printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+            printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
             for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
             printf("]}\n"); fflush(stdout);
         }
@@ -147,7 +165,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
                        SLOT_LETTER(bslot));
                 fflush(stdout); break;
             default:
-                printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+                printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
                 printf("]}\n"); fflush(stdout); break;
         }
@@ -194,7 +212,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         g2_pending_rearm = 1;
     } else {
-        printf("{\"type\":\"unknown_bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
+        printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
         for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
         printf("]}\n"); fflush(stdout);
     }
@@ -226,7 +244,7 @@ static void emit_embedded_event(const uint8_t *response) {
                     char hex[32] = "";
                     for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                         snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-                    printf("{\"type\":\"unknown_sys\",\"version\":64,\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
+                    printf("{\"type\":\"unknown\",\"subtype\":\"sys\",\"version\":64,\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                     break;
                 }
             }
@@ -238,7 +256,7 @@ static void emit_embedded_event(const uint8_t *response) {
                     char hex[32] = "";
                     for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                         snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-                    printf("{\"type\":\"unknown_sys\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
+                    printf("{\"type\":\"unknown\",\"subtype\":\"sys\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                     break;
                 }
             }
@@ -262,6 +280,7 @@ static void emit_embedded_event(const uint8_t *response) {
                 for (int i = 5; i <= lastByte && n < 16 && response[i]; i++)
                     name[n++] = (char)response[i];
                 printf("{\"type\":\"perf_name\",\"name\":\"%s\"}\n", name);
+                printf("{\"type\":\"perf_settings_update\"}\n");
                 break;
             }
             case 0x11:
@@ -296,7 +315,7 @@ static void emit_embedded_event(const uint8_t *response) {
                 char hex[32] = "";
                 for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                     snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-                printf("{\"type\":\"unknown_perf\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
+                printf("{\"type\":\"unknown\",\"subtype\":\"perf\",\"sub\":%u,\"data\":\"%s\"}\n", subCmd, hex);
                 break;
             }
         }
@@ -315,7 +334,7 @@ static void emit_embedded_event(const uint8_t *response) {
             char hex[32] = "";
             for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                 snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-            printf("{\"type\":\"unknown_version\",\"slot\":\"%s\",\"sub\":%u,\"data\":\"%s\"}\n", SLOT_LETTER(slot), subCmd, hex);
+            printf("{\"type\":\"unknown\",\"subtype\":\"version\",\"slot\":\"%s\",\"sub\":%u,\"data\":\"%s\"}\n", SLOT_LETTER(slot), subCmd, hex);
         }
         fflush(stdout);
         return;
@@ -379,7 +398,7 @@ static void emit_embedded_event(const uint8_t *response) {
             char hex[32] = "";
             for (int i = 5; i <= lastByte && i - 5 < 15; i++)
                 snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
-            printf("{\"type\":\"unknown\",\"slot\":\"%s\",\"cmd\":%u,\"sub\":%u,\"data\":\"%s\"}\n",
+            printf("{\"type\":\"unknown\",\"subtype\":\"slot\",\"slot\":\"%s\",\"cmd\":%u,\"sub\":%u,\"data\":\"%s\"}\n",
                    SLOT_LETTER(slot), aCmd, subCmd, hex);
             break;
         }

@@ -707,7 +707,26 @@ When `version != 0x40`:
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
 | any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent by G2 when user presses PERF button (no `patches` field) |
 | any | `0x11` | `perf_settings` | — |
-| any | `0x29` | `perf_name` | `name` from bulk[4..] |
+| any | `0x29` | `perf_name` + `perf_settings` | Compound message: null-terminated name at bulk[4..], followed by a full C_PERF_SETTINGS (0x11) chunk. Emitted by G2 when Hold or KB Split changes on hardware. Also emitted as embedded when only the name changes (no settings chunk). |
+
+**C_PERF_NAME compound bulk layout:**
+
+```
+bulk[0..3]  = standard bulk header (0x01, aCmd=0x04, version, subCmd=0x29)
+bulk[4..]   = null-terminated performance name (up to 16 chars)
+bulk[4+nameLen]   = 0x11  (C_PERF_SETTINGS chunk type)
+bulk[4+nameLen+1..2] = inner size (big-endian, typically 0x00 0x50 = 80)
+bulk[4+nameLen+3] = unknown
+bulk[4+nameLen+4] = selectedSlot (packed)
+bulk[4+nameLen+5] = rangeEnable (KB Split)
+bulk[4+nameLen+6] = BPM
+bulk[4+nameLen+7] = unknown5
+bulk[4+nameLen+8] = clockRun (bit 0)
+bulk[4+nameLen+9..10] = unknown
+bulk[4+nameLen+11..] = 4 × slot blocks (same layout as GET_PERF_SETTINGS response)
+```
+
+The inline settings block is byte-for-byte identical to the `GET_PERF_SETTINGS` query response (§10), so `perf_parse_and_add(bulk, bret, mode, root)` works on it unchanged. The Delphi editor's `C_PERF_NAME, C_PERF_SETTINGS:` combined case reflects this — both chunk types arrive in the same stream and are parsed together. Delphi never called `DoPerfSettingsUpdate()` after parsing, so Hold/KB Split never synced to its UI (unfinished feature in the original editor).
 
 ### Bulk sub-commands (`aCmd 0x0C`)
 
