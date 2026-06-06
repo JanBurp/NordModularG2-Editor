@@ -1,4 +1,6 @@
-# NoteSend - Sends MIDI Note messages to external devices or software
+# NoteSend
+
+Sends MIDI Note messages to external devices or software.
 
 ## Parameters
 

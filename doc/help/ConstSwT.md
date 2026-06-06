@@ -1,4 +1,6 @@
-# ConstSwT - Constant value output when toggle switch is active, 0 when inactive.
+# ConstSwT
+
+Constant value output when toggle switch is active, 0 when inactive.
 
 ## VALUE KNOB
 

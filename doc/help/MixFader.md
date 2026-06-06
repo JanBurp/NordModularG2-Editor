@@ -1,4 +1,6 @@
-# MixFader - Eight-channel mixer with per-channel attenuation and mute
+# MixFader
+
+Eight-channel mixer with per-channel attenuation and mute.
 
 ## Overview
 

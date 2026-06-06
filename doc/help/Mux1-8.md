@@ -1,4 +1,6 @@
-# Mux1-8 - 1-to-8 Multiplexer
+# Mux1-8
+
+1-to-8 Multiplexer.
 
 ## Overview
 

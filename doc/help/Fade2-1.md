@@ -1,4 +1,6 @@
-# Fade2-1 - Fader with two inputs and one output, fades between input signals
+# Fade2-1
+
+Fader with two inputs and one output, fades between input signals.
 
 ## Inputs
 

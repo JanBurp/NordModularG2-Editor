@@ -1,4 +1,6 @@
-# LevAmp - Amplifies or attenuates an incoming control signal.
+# LevAmp
+
+Amplifies or attenuates an incoming control signal.
 
 GAIN KNOB
 Set the amount of amplification/attenuation. Range: 0-127 units.

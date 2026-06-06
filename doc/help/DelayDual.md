@@ -1,4 +1,6 @@
-# DelayDual - Two independent tempo-synced delay lines.
+# DelayDual
+
+Two independent tempo-synced delay lines.
 
 ## Parameters
 

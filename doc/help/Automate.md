@@ -1,4 +1,6 @@
-# Automate - Records and plays back control movements over time.
+# Automate
+
+Records and plays back control movements over time.
 
 ## Record Button
 Start/stop recording automation.

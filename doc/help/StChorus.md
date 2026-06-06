@@ -1,4 +1,6 @@
-# StChorus - Stereo Chorus module
+# StChorus
+
+Stereo Chorus module.
 
 The Stereo Chorus module creates a rich, detuned stereo effect by combining multiple modulated delay lines.
 

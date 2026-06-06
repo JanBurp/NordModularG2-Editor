@@ -1,4 +1,6 @@
-# DelayQuad - Four independent tempo-synced delay lines for complex spatial effects.
+# DelayQuad
+
+Four independent tempo-synced delay lines for complex spatial effects.
 
 ## Parameters
 

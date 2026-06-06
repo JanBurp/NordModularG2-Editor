@@ -1,4 +1,6 @@
-# CompSig - Compresses the dynamic range of an incoming signal.
+# CompSig
+
+Compresses the dynamic range of an incoming signal.
 
 RATIO KNOB
 Set the compression ratio. Range: 1:1 to 20:1.

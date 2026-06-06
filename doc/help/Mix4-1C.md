@@ -1,4 +1,6 @@
-# Mix4-1C - Four-channel mixer with per-channel attenuation and mute
+# Mix4-1C
+
+Four-channel mixer with per-channel attenuation and mute.
 
 ## Overview
 

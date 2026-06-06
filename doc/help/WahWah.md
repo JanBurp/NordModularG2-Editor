@@ -1,4 +1,6 @@
-# WahWah - Lowpass/bandpass filter swept by modulation
+# WahWah
+
+Lowpass/bandpass filter swept by modulation.
 
 Wah-Wah modulation is often used for electric guitars to get that funky "talking guitar" sound. Basically, the Wah-Wah modulation is a lowpass/bandpass type of filter that can be swept across the frequency range. During the sweep, the filter's characteristics change slightly.
 

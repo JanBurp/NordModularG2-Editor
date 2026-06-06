@@ -1,4 +1,6 @@
-# CtrlSend - Send MIDI CC messages to external devices
+# CtrlSend
+
+Send MIDI CC messages to external devices.
 
 ## Parameters
 

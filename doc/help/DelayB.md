@@ -1,4 +1,6 @@
-# DelayB - Clean, precise delay with tempo sync.
+# DelayB
+
+Clean, precise delay with tempo sync.
 
 ## Parameters
 

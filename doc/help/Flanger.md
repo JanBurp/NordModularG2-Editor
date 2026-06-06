@@ -1,4 +1,6 @@
-# Flanger - Creates a flanging effect using modulated delay lines
+# Flanger
+
+Creates a flanging effect using modulated delay lines.
 
 ## Controls
 

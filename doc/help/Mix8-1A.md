@@ -1,4 +1,6 @@
-# Mix8-1A - Eight-channel mixer with dynamic control/audio inputs and one output
+# Mix8-1A
+
+Eight-channel mixer with dynamic control/audio inputs and one output.
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# FltNord - Dynamic synthesizer filter with 12 or 24 dB/octave slope, offering highpass, lowpass, bandpass, and bandreject modes.
+# FltNord
+
+Dynamic synthesizer filter with 12 or 24 dB/octave slope, offering highpass, lowpass, bandpass, and bandreject modes.
 
 ## FM LIN
 

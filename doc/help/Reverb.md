@@ -1,4 +1,6 @@
-# Reverb - Creates spacious reverberation using multiple comb and all-pass filters
+# Reverb
+
+Creates spacious reverberation using multiple comb and all-pass filters.
 
 ## Controls
 

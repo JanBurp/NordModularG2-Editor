@@ -1,4 +1,6 @@
-# SeqCtr - Provides multiple synchronized control signal outputs in a sequenced pattern.
+# SeqCtr
+
+Provides multiple synchronized control signal outputs in a sequenced pattern.
 
 ## Parameters
 

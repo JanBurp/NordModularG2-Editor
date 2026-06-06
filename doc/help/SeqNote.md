@@ -1,4 +1,6 @@
-# SeqNote - Outputs note values in a sequence determined by clock input and step values.
+# SeqNote
+
+Outputs note values in a sequence determined by clock input and step values.
 
 ## Parameters
 

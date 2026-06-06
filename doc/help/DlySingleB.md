@@ -1,4 +1,6 @@
-# DlySingleB - Tempo-synced mono delay with character B (cleaner, more precise).
+# DlySingleB
+
+Tempo-synced mono delay with character B (cleaner, more precise).
 
 ## Parameters
 

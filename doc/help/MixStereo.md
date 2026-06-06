@@ -1,4 +1,6 @@
-# MixStereo - Six-channel stereo mixer with per-channel attenuation and pan
+# MixStereo
+
+Six-channel stereo mixer with per-channel attenuation and pan.
 
 ## Overview
 

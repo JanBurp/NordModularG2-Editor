@@ -1,4 +1,6 @@
-# Digitizer - Digital distortion via bit depth and sample rate reduction
+# Digitizer
+
+Digital distortion via bit depth and sample rate reduction.
 
 ## Parameters
 
