@@ -100,7 +100,11 @@ export const useBrowserStore = defineStore('browser', {
 
 		async chooseDiskFolder(): Promise<void> {
 			const result = await window.electronAPI.patches.setFolder();
-			if (result.success && result.folder) await this.loadDiskList(result.folder);
+			if (result.success && result.folder) {
+				const { useSettingsStore } = await import('./settings');
+				useSettingsStore().setPath(result.folder);
+				await this.loadDiskList(result.folder);
+			}
 		},
 	},
 });
