@@ -1,4 +1,6 @@
-# ShpExp - Exponential shaper module
+# ShpExp
+
+Exponential shaper module.
 
 ## Parameters
 

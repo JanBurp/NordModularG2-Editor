@@ -1,4 +1,6 @@
-# SeqVal - Outputs control values in a sequence determined by clock input and step values.
+# SeqVal
+
+Outputs control values in a sequence determined by clock input and step values.
 
 ## Parameters
 

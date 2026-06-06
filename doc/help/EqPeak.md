@@ -1,4 +1,6 @@
-# EqPeak - Parametric equalizer module with center frequency, gain, and bandwidth control.
+# EqPeak
+
+Parametric equalizer module with center frequency, gain, and bandwidth control.
 
 ## FREQ Knob
 

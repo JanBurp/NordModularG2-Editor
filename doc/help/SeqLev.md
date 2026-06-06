@@ -1,4 +1,6 @@
-# SeqLev - Outputs a level value that changes over time in a sequence.
+# SeqLev
+
+Outputs a level value that changes over time in a sequence.
 
 ## Parameters
 

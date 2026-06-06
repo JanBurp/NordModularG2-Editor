@@ -1,4 +1,6 @@
-# Mix8-1B - Eight-channel mixer with per-channel attenuation and global -6 dB attenuation
+# Mix8-1B
+
+Eight-channel mixer with per-channel attenuation and global -6 dB attenuation.
 
 ## Overview
 

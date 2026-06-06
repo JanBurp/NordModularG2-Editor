@@ -1,4 +1,6 @@
-# Mix2-1A - Dual-input mixer with per-channel attenuation and mute
+# Mix2-1A
+
+Dual-input mixer with per-channel attenuation and mute.
 
 ## Overview
 

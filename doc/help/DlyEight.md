@@ -1,4 +1,6 @@
-# DlyEight - Eight tap delay providing rhythmic delay patterns from multiple taps.
+# DlyEight
+
+Eight tap delay providing rhythmic delay patterns from multiple taps.
 
 ## Parameters
 

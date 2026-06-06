@@ -1,4 +1,6 @@
-# Delay - Delay an incoming logic signal by a settable amount of time
+# Delay
+
+Delay an incoming logic signal by a settable amount of time.
 
 ## Parameters
 

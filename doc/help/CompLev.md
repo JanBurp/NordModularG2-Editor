@@ -1,4 +1,6 @@
-# CompLev - Amplifies or attenuates an incoming signal to reach a target level.
+# CompLev
+
+Amplifies or attenuates an incoming signal to reach a target level.
 
 ## Parameters
 

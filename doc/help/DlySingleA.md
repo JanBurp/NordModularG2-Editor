@@ -1,4 +1,6 @@
-# DlySingleA - Tempo-synced mono delay with character A (smoother, warmer).
+# DlySingleA
+
+Tempo-synced mono delay with character A (smoother, warmer).
 
 ## Inputs
 

@@ -1,4 +1,6 @@
-# ClkDiv - Clock Divider
+# ClkDiv
+
+Clock Divider.
 
 Divides an incoming clock signal by a settable ratio.
 

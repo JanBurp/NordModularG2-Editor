@@ -1,4 +1,6 @@
-# SeqEvent - Outputs gate signals in a sequence determined by clock input and step values.
+# SeqEvent
+
+Outputs gate signals in a sequence determined by clock input and step values.
 
 ## Parameters
 

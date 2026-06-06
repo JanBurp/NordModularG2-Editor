@@ -1,4 +1,6 @@
-# Eq3Band - 3-band equalizer with sweepable mid and level control
+# Eq3Band
+
+3-band equalizer with sweepable mid and level control.
 
 ## Parameters
 

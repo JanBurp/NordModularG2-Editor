@@ -1,4 +1,6 @@
-# DlyStereo - Stereo delay with independent L/R tempo-synced delay lines.
+# DlyStereo
+
+Stereo delay with independent L/R tempo-synced delay lines.
 
 ## Parameters
 

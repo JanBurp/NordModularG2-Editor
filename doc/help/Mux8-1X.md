@@ -1,4 +1,6 @@
-# Mux8-1X - Eight-input crossfade multiplexer with Ctrl-based channel selection and adjustable X-Fade
+# Mux8-1X
+
+Eight-input crossfade multiplexer with Ctrl-based channel selection and adjustable X-Fade.
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# Mux8-1 - 8-1 Multiplexer with control signal channel selection
+# Mux8-1
+
+8-1 Multiplexer with control signal channel selection.
 
 ## Overview
 

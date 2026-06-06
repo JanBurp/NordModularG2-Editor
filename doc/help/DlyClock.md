@@ -1,4 +1,6 @@
-# DlyClock - Tempo-synced delay module with clock divisions.
+# DlyClock
+
+Tempo-synced delay module with clock divisions.
 
 ## Inputs
 

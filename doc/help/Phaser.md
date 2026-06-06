@@ -1,4 +1,6 @@
-# Phaser - Creates a sweeping phase effect by modulating a series of all-pass filters.
+# Phaser
+
+Creates a sweeping phase effect by modulating a series of all-pass filters.
 
 ## Parameters
 

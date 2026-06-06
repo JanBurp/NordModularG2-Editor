@@ -1,4 +1,6 @@
-# WindSw - Window Switch that closes when a control signal is within a specified range
+# WindSw
+
+Window Switch that closes when a control signal is within a specified range.
 
 ## Overview
 

@@ -1,4 +1,6 @@
-# DelayA - Warm, character-rich delay with tempo sync.
+# DelayA
+
+Warm, character-rich delay with tempo sync.
 
 ## Parameters
 

@@ -1,4 +1,6 @@
-# NoiseGate - Gate an incoming signal based on a threshold level
+# NoiseGate
+
+Gate an incoming signal based on a threshold level.
 
 ## Parameters
 

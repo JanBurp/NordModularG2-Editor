@@ -1,4 +1,6 @@
-# DlyShiftReg - Combines delay with a shift register for unique rhythmic effects
+# DlyShiftReg
+
+Combines delay with a shift register for unique rhythmic effects.
 
 ## Parameters
 
