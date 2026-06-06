@@ -222,6 +222,16 @@ ipcMain.handle("perf:save-dialog", async (event, defaultName?: string) => {
 	return { success: true, filepath: result.filePath };
 });
 
+ipcMain.handle("help:load", (_, shortName: string) => {
+	const helpDir = path.join(process.env.APP_ROOT!, "..", "doc", "help");
+	const filePath = path.join(helpDir, `${shortName}.md`);
+	try {
+		return fs.readFileSync(filePath, "utf-8");
+	} catch {
+		return null;
+	}
+});
+
 ipcMain.handle("patch:open-dialog", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
