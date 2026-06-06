@@ -32,9 +32,9 @@
 							</svg>
 						</div>
 						<div
-							v-if="helpModule?.id === module.id && helpHtml"
+							v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
 							class="module-help w-64 bg-neutral-800 rounded p-3 text-xs text-neutral-300"
-							v-html="helpHtml"
+							v-html="ui.helpAllModules ? (helpCache.get(module.id) || '') : helpHtml"
 						/>
 					</template>
 				</div>
@@ -102,6 +102,52 @@
 
 	watch(searchQuery, () => {
 		selectedModuleId.value = null;
+	});
+
+	watch(() => ui.helpModuleTypeId, (typeId) => {
+		if (typeId === null) {
+			selectedModuleId.value = null;
+			return;
+		}
+		selectedModuleId.value = typeId;
+		for (const cat of getAllCategories()) {
+			if (getModulesByCategoryRaw(cat).some(m => m.id === typeId)) {
+				if (!expandedCategories.value.includes(cat)) {
+					expandedCategories.value.push(cat);
+				}
+				break;
+			}
+		}
+		requestAnimationFrame(() => {
+			const mod = getModule(typeId);
+			if (mod) {
+				document
+					.querySelector(`[data-testid="module-item-${mod.short}"]`)
+					?.scrollIntoView({ behavior: 'instant', block: 'start' });
+			}
+		});
+	}, { flush: 'post' });
+
+	const helpCache = reactive(new Map<number, string>());
+
+	async function loadAllHelp() {
+		const { marked } = await import('marked');
+		const allMods = getAllCategories().flatMap(cat => getModulesByCategoryRaw(cat));
+		await Promise.all(allMods.map(async mod => {
+			if (helpCache.has(mod.id)) return;
+			const raw = await window.electronAPI.loadHelp(mod.short);
+			if (!raw) return;
+			helpCache.set(mod.id, await marked(raw) as string);
+		}));
+	}
+
+	// Pre-load cache whenever the modules pane becomes visible so F1 "show all" is instant
+	watch([() => ui.showRightPane, () => ui.rightPaneTab], ([show, tab]) => {
+		if (show && tab === 'modules') loadAllHelp();
+	}, { immediate: true });
+
+	watch(() => ui.helpAllModules, (val) => {
+		if (val) loadAllHelp();
 	});
 
 	const moduleInstances = reactive(new Map());
