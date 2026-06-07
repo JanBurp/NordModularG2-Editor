@@ -184,6 +184,10 @@ int g2_select_perf(int bank, int location);
 int g2_upload_patch(int slot, const char *filepath);
 int g2_upload_perf(const char *filepath);
 
+/* Synth settings: takes a cJSON params object matching the JSON emitted by
+ * build_synth_bulk_json (synthName, midi, tuning, pedal, memProtect, etc.) */
+int g2_set_synth_settings(cJSON *params);
+
 /* Performance mode and name */
 int g2_set_perf_mode(int mode);
 int g2_set_perf_name(const char *name);

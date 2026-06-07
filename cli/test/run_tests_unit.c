@@ -45,6 +45,11 @@ extern void test_parse_slots_data(void);
 extern void test_parse_local_on(void);
 extern void test_parse_prgch_values(void);
 extern void test_parse_clock_settings(void);
+extern void test_parse_controllers(void);
+extern void test_parse_tuning_cent(void);
+extern void test_parse_global_octave_shift(void);
+extern void test_parse_pedal(void);
+extern void test_parse_mem_protect(void);
 
 extern void test_patch_focus_c(void);
 extern void test_perf_focus_c(void);
@@ -161,6 +166,11 @@ int main(void) {
     RUN_TEST(test_parse_local_on);
     RUN_TEST(test_parse_prgch_values);
     RUN_TEST(test_parse_clock_settings);
+    RUN_TEST(test_parse_controllers);
+    RUN_TEST(test_parse_tuning_cent);
+    RUN_TEST(test_parse_global_octave_shift);
+    RUN_TEST(test_parse_pedal);
+    RUN_TEST(test_parse_mem_protect);
 
     /* Real G2 data tests - require mock files in test/mocks/ */
     RUN_TEST(test_patch_focus_c);
