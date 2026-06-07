@@ -74,7 +74,8 @@ void test_parse_mode_performance(void) {
     bulkData[0] = 0x00;
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
-    bulkData[9] = 0x80;   /* mode = Performance: bulkData[4 + nameLen], nameLen=5 ("Test\0") */
+    /* "Test"\0 = 5 bytes → nameLen=5, base=9; mode at base+0 = bulk[9] */
+    bulkData[9] = 0x80;   /* mode = Performance (bit 7) */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -94,12 +95,12 @@ void test_parse_midi_channels(void) {
     bulkData[0] = 0x00;
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
-    bulkData[13] = 0x00;
-    bulkData[17] = 0x09;  /* MIDI A stored 9 (0-indexed) → output 10 */
-    bulkData[18] = 0x0A;  /* MIDI B stored 10 → output 11 */
-    bulkData[19] = 0x0B;  /* MIDI C stored 11 → output 12 */
-    bulkData[20] = 0x0C;  /* MIDI D stored 12 → output 13 */
-    bulkData[21] = 0x0E;  /* MIDI global stored 14 → output 15 */
+    /* nameLen=5, base=9; MIDI slots at base+5..9 = bulk[14..18] */
+    bulkData[14] = 0x09;  /* MIDI A stored 9 (0-indexed) → output 10 */
+    bulkData[15] = 0x0A;  /* MIDI B stored 10 → output 11 */
+    bulkData[16] = 0x0B;  /* MIDI C stored 11 → output 12 */
+    bulkData[17] = 0x0C;  /* MIDI D stored 12 → output 13 */
+    bulkData[18] = 0x0E;  /* MIDI global stored 14 → output 15 */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -210,7 +211,8 @@ void test_parse_local_on(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[23] = 0x80;  /* local = on (bit 7) */
+    /* nameLen=5, base=9; local at base+11 = bulk[20] */
+    bulkData[20] = 0x80;  /* local = on (bit 7) */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -234,7 +236,8 @@ void test_parse_prgch_values(void) {
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
     bulkData[13] = 0x00;
-    bulkData[24] = 0x02;  /* prgch = recv (bit 1 = 1, bit 0 = 0) => value 2 */
+    /* nameLen=5, base=9; prgch at base+12 = bulk[21] */
+    bulkData[21] = 0x02;  /* prgch = recv (bit 1 = 1, bit 0 = 0) => value 2 */
     
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -247,7 +250,7 @@ void test_parse_prgch_values(void) {
     
     cJSON *prgch = cJSON_GetObjectItem(midi, "prgch");
     TEST_ASSERT_NOT_NULL(prgch);
-    TEST_ASSERT_EQUAL_STRING("recv", prgch->valuestring);
+    TEST_ASSERT(json_has_number(midi, "prgch", 2));  /* 0x02 = bit1=recv, bit0=send → value 2 */
     
     cJSON_Delete(result);
 }
@@ -257,10 +260,9 @@ void test_parse_clock_settings(void) {
     bulkData[0] = 0x00;
     bulkData[1] = 0x40;
     strcpy((char *)&bulkData[4], "Test");
-    bulkData[13] = 0x00;
-    /* clkse uses inverted encoding: bit1=0 means on, bit1=1 means off
-     * 0x01 = bit0=1 (clkre=on), bit1=0 (clkse=on via inversion) */
-    bulkData[25] = 0x01;
+    /* nameLen=5, base=9; clock at base+14 = bulk[23]
+     * 0x40 = bit6=1 → clkSend=1; bit5=0 → IgnoreExtClock=0 → clkRecv=1 */
+    bulkData[23] = 0x40;
 
     uint8_t perfData[64] = {0};
     perfData[0] = 0x01;
@@ -273,6 +275,113 @@ void test_parse_clock_settings(void) {
 
     TEST_ASSERT(json_has_bool(midi, "clkse", 1));
     TEST_ASSERT(json_has_bool(midi, "clkre", 1));
-    
+
+    cJSON_Delete(result);
+}
+
+void test_parse_controllers(void) {
+    uint8_t bulkData[64] = {0};
+    bulkData[0] = 0x00;
+    bulkData[1] = 0x40;
+    strcpy((char *)&bulkData[4], "Test");
+    /* nameLen=5, base=9; controllers at base+13 = bulk[22] */
+    bulkData[22] = 0x03;  /* bit1=ctrlsRecv=1, bit0=ctrlsSend=1 */
+
+    uint8_t perfData[64] = {0};
+    perfData[0] = 0x01;
+
+    cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
+    TEST_ASSERT_NOT_NULL(result);
+
+    cJSON *midi = cJSON_GetObjectItem(result, "midi");
+    TEST_ASSERT_NOT_NULL(midi);
+
+    TEST_ASSERT(json_has_bool(midi, "ctrlsRecv", 1));
+    TEST_ASSERT(json_has_bool(midi, "ctrlsSend", 1));
+
+    cJSON_Delete(result);
+}
+
+void test_parse_tuning_cent(void) {
+    uint8_t bulkData[64] = {0};
+    bulkData[0] = 0x00;
+    bulkData[1] = 0x40;
+    strcpy((char *)&bulkData[4], "Test");
+    /* nameLen=5, base=9; tuneCent at base+15 = bulk[24] */
+    bulkData[24] = (uint8_t)(int8_t)-50;  /* -50 cents */
+
+    uint8_t perfData[64] = {0};
+    perfData[0] = 0x01;
+
+    cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
+    TEST_ASSERT_NOT_NULL(result);
+
+    cJSON *tuning = cJSON_GetObjectItem(result, "tuning");
+    TEST_ASSERT_NOT_NULL(tuning);
+    TEST_ASSERT(json_has_number(tuning, "cent", -50));
+
+    cJSON_Delete(result);
+}
+
+void test_parse_global_octave_shift(void) {
+    uint8_t bulkData[64] = {0};
+    bulkData[0] = 0x00;
+    bulkData[1] = 0x40;
+    strcpy((char *)&bulkData[4], "Test");
+    /* nameLen=5, base=9; gOctActive at base+16 = bulk[25], gOctShift at base+17 = bulk[26] */
+    bulkData[25] = 0x80;                    /* active = 1 (bit 7) */
+    bulkData[26] = (uint8_t)(int8_t)-2;     /* shift = -2 */
+
+    uint8_t perfData[64] = {0};
+    perfData[0] = 0x01;
+
+    cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
+    TEST_ASSERT_NOT_NULL(result);
+
+    TEST_ASSERT(json_has_bool(result, "globalOctaveShiftActive", 1));
+    TEST_ASSERT(json_has_number(result, "globalOctaveShift", -2));
+
+    cJSON_Delete(result);
+}
+
+void test_parse_pedal(void) {
+    uint8_t bulkData[64] = {0};
+    bulkData[0] = 0x00;
+    bulkData[1] = 0x40;
+    strcpy((char *)&bulkData[4], "Test");
+    /* nameLen=5, base=9; pedalPol at base+20 = bulk[29], pedalGain at base+21 = bulk[30] */
+    bulkData[29] = 0x80;  /* polarity = 1 (bit 7) */
+    bulkData[30] = 24;    /* gain = 24 */
+
+    uint8_t perfData[64] = {0};
+    perfData[0] = 0x01;
+
+    cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
+    TEST_ASSERT_NOT_NULL(result);
+
+    cJSON *pedal = cJSON_GetObjectItem(result, "pedal");
+    TEST_ASSERT_NOT_NULL(pedal);
+    TEST_ASSERT(json_has_bool(pedal, "polarity", 1));
+    TEST_ASSERT(json_has_number(pedal, "gain", 24));
+
+    cJSON_Delete(result);
+}
+
+void test_parse_mem_protect(void) {
+    uint8_t bulkData[64] = {0};
+    bulkData[0] = 0x00;
+    bulkData[1] = 0x40;
+    strcpy((char *)&bulkData[4], "Test");
+    /* nameLen=5, base=9; memProtect at base+4 = bulk[13] */
+    bulkData[13] = 0x80;
+
+    uint8_t perfData[64] = {0};
+    perfData[0] = 0x01;
+
+    cJSON *result = g2_parse_settings(bulkData, 64, perfData, 64);
+    TEST_ASSERT_NOT_NULL(result);
+
+    TEST_ASSERT(json_has_bool(result, "memProtect", 1));
+
     cJSON_Delete(result);
 }

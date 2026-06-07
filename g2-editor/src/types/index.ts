@@ -60,6 +60,11 @@ export interface PatchData {
 export interface Device {
 	synthName: string;
 	mode: string;
+	perfBank: number;
+	perfLoc: number;
+	memProtect: boolean;
+	globalOctaveShiftActive: boolean;
+	globalOctaveShift: number;
 	patches: PatchData | null;
 	performance: PatchData | null;
 	slots: SlotInfo[];
@@ -67,7 +72,9 @@ export interface Device {
 		slots: { A: number; B: number; C: number; D: number; global: number };
 		sysex: number;
 		local: boolean;
-		prgch: string;
+		prgch: number;
+		ctrlsRecv: boolean;
+		ctrlsSend: boolean;
 		clkse: boolean;
 		clkre: boolean;
 	};

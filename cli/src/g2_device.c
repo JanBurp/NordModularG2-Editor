@@ -1294,6 +1294,23 @@ int g2_select_perf(int bank, int location) {
     return G2_OK;
 }
 
+int g2_set_synth_settings(cJSON *params) {
+    if (!params) { g2_err("set-synth-settings: NULL params\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-synth-settings: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t data[56]; size_t len;
+    if (g2_build_synth_set_msg(params, data, &len) < 0) {
+        g2_err("set-synth-settings: failed to build message\n");
+        return G2_ERR_INVALID_PARAM;
+    }
+    if (send_system_data(0x41, data, len) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_perf_mode(int mode) {
     if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(performance) or 1(patch)\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-perf-mode: failed to connect\n"); return G2_ERR_CONNECT; }

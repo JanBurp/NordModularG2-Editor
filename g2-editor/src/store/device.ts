@@ -136,10 +136,11 @@ export const useDeviceStore = defineStore('device', {
 		async setPerformanceMode(name: string) {
 			if (!this.device) {
 				this.device = {
-					synthName: '', mode: 'Performance', patches: null,
+					synthName: '', mode: 'Performance', perfBank: 0, perfLoc: 0, memProtect: false, globalOctaveShiftActive: false, globalOctaveShift: 0,
+					patches: null,
 					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false },
 					slots: [],
-					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: '', clkse: false, clkre: false },
+					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: 0, ctrlsRecv: false, ctrlsSend: false, clkse: false, clkre: false },
 					tuning: { semi: 0, cent: 0 },
 					pedal: { polarity: false, gain: 0 },
 				};
@@ -156,10 +157,15 @@ export const useDeviceStore = defineStore('device', {
 			}
 		},
 
-		updateSynthSettings(ev: { synthName: string; mode: string; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
+		updateSynthSettings(ev: { synthName: string; mode: string; perfBank?: number; perfLoc?: number; memProtect?: boolean; globalOctaveShiftActive?: boolean; globalOctaveShift?: number; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
 			if (!this.device) return;
 			this.device.synthName = ev.synthName;
 			this.device.mode = ev.mode;
+			this.device.perfBank = ev.perfBank ?? 0;
+			this.device.perfLoc  = ev.perfLoc  ?? 0;
+			this.device.memProtect = ev.memProtect ?? false;
+			this.device.globalOctaveShiftActive = ev.globalOctaveShiftActive ?? false;
+			this.device.globalOctaveShift = ev.globalOctaveShift ?? 0;
 			this.device.midi = ev.midi;
 			this.device.tuning = ev.tuning;
 			this.device.pedal = ev.pedal;
@@ -213,82 +219,122 @@ export const useDeviceStore = defineStore('device', {
 				window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]);
 		},
 
+		buildSynthPayload() {
+			const d = this.device!;
+			return {
+				synthName: d.synthName,
+				mode: d.mode,
+				perfBank: d.perfBank,
+				perfLoc:  d.perfLoc,
+				memProtect: d.memProtect,
+				globalOctaveShiftActive: d.globalOctaveShiftActive,
+				globalOctaveShift: d.globalOctaveShift,
+				midi: d.midi,
+				tuning: d.tuning,
+				pedal: d.pedal,
+			};
+		},
+
+		sendSynthSettings() {
+			if (this.device && this.status === DeviceStatus.Connected)
+				window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]);
+		},
+
 		setSynthName(name: string) {
 			if (!this.device) return;
 			this.device.synthName = name;
 			this.deviceName = name;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-synth-name', name]);
+			this.sendSynthSettings();
 		},
 
 		setMidiSlot(slot: 'A' | 'B' | 'C' | 'D' | 'global', channel: number) {
 			if (!this.device) return;
 			this.device.midi.slots[slot] = channel;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-channel', slot, String(channel)]);
+			this.sendSynthSettings();
 		},
 
 		setMidiSysex(value: number) {
 			if (!this.device) return;
 			this.device.midi.sysex = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-sysex', String(value)]);
+			this.sendSynthSettings();
 		},
 
 		setMidiLocal(value: boolean) {
 			if (!this.device) return;
 			this.device.midi.local = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-local', value ? '1' : '0']);
+			this.sendSynthSettings();
 		},
 
-		setMidiPrgCh(value: string) {
+		setMidiPrgCh(value: number) {
 			if (!this.device) return;
 			this.device.midi.prgch = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-prgch', value]);
+			this.sendSynthSettings();
+		},
+
+		setMidiCtrlsRecv(value: boolean) {
+			if (!this.device) return;
+			this.device.midi.ctrlsRecv = value;
+			this.sendSynthSettings();
+		},
+
+		setMidiCtrlsSend(value: boolean) {
+			if (!this.device) return;
+			this.device.midi.ctrlsSend = value;
+			this.sendSynthSettings();
 		},
 
 		setMidiClkSend(value: boolean) {
 			if (!this.device) return;
 			this.device.midi.clkse = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-clkse', value ? '1' : '0']);
+			this.sendSynthSettings();
 		},
 
 		setMidiClkReceive(value: boolean) {
 			if (!this.device) return;
 			this.device.midi.clkre = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-midi-clkre', value ? '1' : '0']);
+			this.sendSynthSettings();
 		},
 
 		setTuningSemi(value: number) {
 			if (!this.device) return;
 			this.device.tuning.semi = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-tuning', String(value), String(this.device.tuning.cent)]);
+			this.sendSynthSettings();
 		},
 
 		setTuningCent(value: number) {
 			if (!this.device) return;
 			this.device.tuning.cent = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-tuning', String(this.device.tuning.semi), String(value)]);
+			this.sendSynthSettings();
+		},
+
+		setMemProtect(value: boolean) {
+			if (!this.device) return;
+			this.device.memProtect = value;
+			this.sendSynthSettings();
+		},
+
+		setGlobalOctaveShiftActive(value: boolean) {
+			if (!this.device) return;
+			this.device.globalOctaveShiftActive = value;
+			this.sendSynthSettings();
+		},
+
+		setGlobalOctaveShift(value: number) {
+			if (!this.device) return;
+			this.device.globalOctaveShift = value;
+			this.sendSynthSettings();
 		},
 
 		setPedalPolarity(value: boolean) {
 			if (!this.device) return;
 			this.device.pedal.polarity = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-pedal-polarity', value ? '1' : '0']);
+			this.sendSynthSettings();
 		},
 
 		setPedalGain(value: number) {
 			if (!this.device) return;
 			this.device.pedal.gain = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-pedal-gain', String(value)]);
+			this.sendSynthSettings();
 		},
 
 		setRangeEnable(value: boolean) {
