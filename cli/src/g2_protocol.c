@@ -123,7 +123,7 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
  *
  * data[0]        0x03 (S_SYNTH_SETTINGS subcommand)
  * data[1..nLen]  synthName (nameLen = strlen + 1, includes null)
- * base+0         0x80 (required SET marker; Delphi always $80 regardless of mode)
+ * base+0         bit7 = mode (1=Performance, 0=Patch); Delphi always $80 but we read from params
  * base+1         0x00
  * base+2         PerfBank (cached from last GET)
  * base+3         PerfLocation (cached from last GET)
@@ -183,7 +183,8 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
     memcpy(out + 1, name, nameLen);
     /* out[1+nameLen] = 0x00 from memset */
 
-    out[base +  0] = 0x80;   /* required SET marker */
+    const char *modeStr = cJSON_GetStringValue(cJSON_GetObjectItem(params, "mode"));
+    out[base +  0] = (modeStr && strcmp(modeStr, "Performance") == 0) ? 0x80 : 0x00;
     /* out[base + 1] = 0x00 */
     cJSON *jPerfBank = cJSON_GetObjectItem(params, "perfBank");
     cJSON *jPerfLoc  = cJSON_GetObjectItem(params, "perfLoc");
