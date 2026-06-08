@@ -18,6 +18,7 @@
 #include "output.h"
 #include "utils.h"
 #include "daemon.h"
+#include "cJSON.h"
 
 #define PROGRAM_NAME "g2-cli"
 #define PROGRAM_VERSION "1.0.0"
@@ -45,6 +46,7 @@ static void print_usage(const char *prog) {
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
+    printf("  set-synth-settings <json>                                                                 Set all synth settings from JSON object\n");
     printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
     printf("  set-perf-name <name>                                                                      Set the current performance name\n");
     printf("  get-perf-settings                                                                         Get current performance settings\n");
@@ -625,6 +627,25 @@ static int cmd_set_perf_mode(int argc, char **argv, int i) {
     return ret;
 }
 
+static int cmd_set_synth_settings(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-synth-settings <json>\n"); return 1; }
+    cJSON *params = cJSON_Parse(argv[i + 1]);
+    if (!params) { fprintf(stderr, "set-synth-settings: invalid JSON\n"); return 1; }
+    int ret = g2_set_synth_settings(params);
+    cJSON_Delete(params);
+    if (ret == G2_OK) {
+        if (output_format == OUTPUT_JSON) {
+            cJSON *r = cJSON_CreateObject();
+            cJSON_AddBoolToObject(r, "ok", 1);
+            output_json(r, output_format);
+            cJSON_Delete(r);
+        } else {
+            fprintf(stderr, "OK\n");
+        }
+    }
+    return ret;
+}
+
 static int cmd_set_perf_name(int argc, char **argv, int i) {
     if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-name <name>\n"); return 1; }
     int ret = g2_set_perf_name(argv[i + 1]);
@@ -696,6 +717,7 @@ static const cmd_entry_t commands[] = {
     { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },
     { "upload-perf",      cmd_upload_perf      },
+    { "set-synth-settings",    cmd_set_synth_settings    },
     { "set-perf-mode",         cmd_set_perf_mode         },
     { "set-perf-name",         cmd_set_perf_name         },
     { "get-perf-settings",     cmd_get_perf_settings     },

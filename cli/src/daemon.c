@@ -137,6 +137,7 @@ static void debug_status(const char *msg) {
 static void rearm_with_version_update(void) {
 	printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
 	fflush(stdout);
+	g2_emit_rearm_data();
 	g2_rearm();
 }
 
@@ -438,6 +439,14 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "get-perf-file") == 0) {
 		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);
 
+	} else if (strcmp(cmd, "set-synth-settings") == 0 && n >= 1) {
+		cJSON *params = cJSON_Parse(arg_s(args, 0));
+		if (!params) { ret = G2_ERR_INVALID_PARAM; }
+		else {
+			ret = g2_set_synth_settings(params);
+			cJSON_Delete(params);
+		}
+
 	} else if (strcmp(cmd, "set-perf-mode") == 0 && n >= 1) {
 		const char *m = arg_s(args, 0);
 		int mode = (m && strcmp(m, "performance") == 0) ? 1
@@ -659,6 +668,13 @@ int g2_daemon_run(output_format_t format, int debug) {
 		cJSON_AddItemToObject(ev, "data", startup_names ? startup_names : cJSON_CreateNull());
 		emit(ev);
 		cJSON_Delete(ev);
+	}
+
+	debug_status("startup_synth_settings");
+	cJSON *startup_synth = query_synth_settings("synth_settings_update");
+	if (startup_synth) {
+		emit(startup_synth);
+		cJSON_Delete(startup_synth);
 	}
 
 	/* All startup queries done. Start listener and arm streaming. */

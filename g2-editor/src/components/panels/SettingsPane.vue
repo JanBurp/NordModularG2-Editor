@@ -23,53 +23,116 @@
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">MIDI Channels:</p>
-				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
-					<NumberInput
-						:model-value="device.device?.midi.slots[slot.key] ?? 1"
-						:min="1"
-						:max="16"
-						class="w-16"
-						@update:model-value="device.setMidiSlot(slot.key, $event)"
-					/>
+				<SettingsRow label="Memory Protect">
+					<CheckBox :model-value="device.device?.memProtect ?? false" @update:model-value="device.setMemProtect($event)" />
 				</SettingsRow>
 
-				<!-- <p class="settings-subheader">MIDI Settings</p>
-				<SettingsRow :label="L.midiSysex">
-					<NumberInput :model-value="device.device?.midi.sysex ?? 0" class="w-16" @update:model-value="device.setMidiSysex($event)" />
+				<p class="settings-subheader">MIDI Channels:</p>
+				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
+					<div class="flex items-center gap-2">
+						<NumberInput
+							:model-value="midiChannelDisplay(slot.key)"
+							:min="1"
+							:max="16"
+							:disabled="isMidiOff(slot.key)"
+							class="w-16"
+							@update:model-value="device.setMidiSlot(slot.key, $event)"
+						/>
+						<CheckBox :model-value="isMidiOff(slot.key)" @update:model-value="setMidiOff(slot.key, $event)" />
+						<span class="text-xs text-neutral-400">Off</span>
+					</div>
 				</SettingsRow>
-				<SettingsRow :label="L.midiPrgCh">
-					<TextInput :model-value="device.device?.midi.prgch ?? ''" class="w-16" @update:model-value="device.setMidiPrgCh($event)" />
-				</SettingsRow>
+
+				<p class="settings-subheader">MIDI Settings</p>
 				<SettingsRow :label="L.midiLocal">
 					<CheckBox :model-value="device.device?.midi.local ?? false" @update:model-value="device.setMidiLocal($event)" />
 				</SettingsRow>
-				<SettingsRow :label="L.midiClkSend">
-					<CheckBox :model-value="device.device?.midi.clkse ?? false" @update:model-value="device.setMidiClkSend($event)" />
+				<SettingsRow label="Clock">
+					<BtnGroup :model-value="clockValue" :options="OFF_SEND_RECV_BOTH" @update:model-value="setClock(Number($event))" />
 				</SettingsRow>
-				<SettingsRow :label="L.midiClkReceive">
-					<CheckBox :model-value="device.device?.midi.clkre ?? false" @update:model-value="device.setMidiClkReceive($event)" />
+				<SettingsRow :label="L.midiPrgCh">
+					<BtnGroup
+						:model-value="device.device?.midi.prgch ?? 0"
+						:options="OFF_SEND_RECV_BOTH"
+						@update:model-value="device.setMidiPrgCh(Number($event))"
+					/>
+				</SettingsRow>
+				<SettingsRow label="CC">
+					<BtnGroup :model-value="ccValue" :options="OFF_SEND_RECV_BOTH" @update:model-value="setCC(Number($event))" />
+				</SettingsRow>
+				<SettingsRow :label="L.midiSysex">
+					<div class="flex items-center gap-2">
+						<NumberInput
+							:model-value="sysex.display()"
+							:min="1"
+							:max="16"
+							:disabled="sysex.isOff()"
+							class="w-16"
+							@update:model-value="device.setMidiSysex($event)"
+						/>
+						<CheckBox :model-value="sysex.isOff()" @update:model-value="sysex.setOff($event)" />
+						<span class="text-xs text-neutral-400">All</span>
+					</div>
 				</SettingsRow>
 
-				<p class="settings-subheader">Tuning</p>
-				<SettingsRow :label="L.tuningSemi">
-					<NumberInput :model-value="device.device?.tuning.semi ?? 0" class="w-16" @update:model-value="device.setTuningSemi($event)" />
+				<SettingsRowDuo label="Tuning" label1="Semi" label2="Cents">
+					<template #first>
+						<NumberInput
+							:model-value="device.device?.tuning.semi ?? 0"
+							:min="-6"
+							:max="6"
+							class="w-16"
+							@update:model-value="device.setTuningSemi($event)"
+						/>
+					</template>
+					<template #second>
+						<NumberInput
+							:model-value="device.device?.tuning.cent ?? 0"
+							:min="-100"
+							:max="100"
+							class="w-16"
+							@update:model-value="device.setTuningCent($event)"
+						/>
+					</template>
+				</SettingsRowDuo>
+				<SettingsRowDuo label="Pedal" label1="Polarity" label2="Gain">
+					<template #first>
+						<CheckBox :model-value="device.device?.pedal.polarity ?? false" @update:model-value="device.setPedalPolarity($event)" />
+					</template>
+					<template #second>
+						<NumberInput
+							:model-value="device.device?.pedal.gain ?? 0"
+							:min="0"
+							:max="32"
+							class="w-16"
+							@update:model-value="device.setPedalGain($event)"
+						/>
+					</template>
+				</SettingsRowDuo>
+				<SettingsRow label="Global Oct.">
+					<div class="flex items-center gap-2">
+						<BtnGroup
+							:model-value="device.device?.globalOctaveShift ?? 0"
+							:options="[
+								{ label: '-2', value: -2 },
+								{ label: '-1', value: -1 },
+								{ label: '0', value: 0 },
+								{ label: '+1', value: 1 },
+								{ label: '+2', value: 2 },
+							]"
+							@update:model-value="device.setGlobalOctaveShift(Number($event))"
+						/>
+						<CheckBox
+							:model-value="device.device?.globalOctaveShiftActive ?? false"
+							@update:model-value="device.setGlobalOctaveShiftActive($event)"
+						/>
+						<span class="text-xs text-neutral-400">Active</span>
+					</div>
 				</SettingsRow>
-				<SettingsRow :label="L.tuningCent">
-					<NumberInput :model-value="device.device?.tuning.cent ?? 0" class="w-16" @update:model-value="device.setTuningCent($event)" />
-				</SettingsRow>
-
-				<p class="settings-subheader">Pedal</p>
-				<SettingsRow :label="L.pedalPolarity">
-					<CheckBox :model-value="device.device?.pedal.polarity ?? false" @update:model-value="device.setPedalPolarity($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.pedalGain">
-					<NumberInput :model-value="device.device?.pedal.gain ?? 0" class="w-16" @update:model-value="device.setPedalGain($event)" />
-				</SettingsRow> -->
 			</div>
 		</Collapsible>
 
-		<Collapsible v-if="isPerformanceMode" title="Performance Settings">
+		<Collapsible title="Performance Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
 					<TextInput
@@ -77,6 +140,7 @@
 						maxlength="16"
 						:debounce="500"
 						@update:model-value="device.setPerfName($event)"
+						:disabled="!isPerformanceMode"
 					/>
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
@@ -150,13 +214,13 @@
 
 				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
 					<div class="settings-subheader flex items-center">
+						<span class="w-20">{{ group.header }}</span>
 						<CheckBox
-							class="mr-2"
+							class="ml-px"
 							v-if="group.toggleKey"
 							:model-value="!!patchParam(group.toggleKey)"
 							@update:model-value="slotsStore.setPatchParam(uiStore.variation, group.toggleKey!, $event ? 1 : 0)"
 						/>
-						<span>{{ group.header }}</span>
 					</div>
 					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
 						<BtnGroup
@@ -179,9 +243,10 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref, watch } from 'vue';
+	import { computed, ref } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
+	import SettingsRowDuo from '@/components/common/SettingsRowDuo.vue';
 	import TextInput from '@/components/common/TextInput.vue';
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
@@ -207,20 +272,15 @@
 	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
-	const selectedCategory = ref<number>(0);
-	watch(
-		() => (currentPatch.value as any)?.description?.category,
-		(cat) => {
-			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+	const selectedCategory = computed({
+		get: () => (currentPatch.value as any)?.description?.category ?? 0,
+		set: (cat: number) => {
+			const desc = (currentPatch.value as any)?.description;
+			if (desc) {
+				desc.category = cat;
+				slotsStore.setPatchDescription();
+			}
 		},
-		{ immediate: true },
-	);
-	watch(selectedCategory, (cat) => {
-		const desc = (currentPatch.value as any)?.description;
-		if (desc) {
-			desc.category = cat;
-			slotsStore.setPatchDescription();
-		}
 	});
 
 	const MIDI_SLOTS: { key: 'A' | 'B' | 'C' | 'D' | 'global'; label: string }[] = [
@@ -322,6 +382,69 @@
 		},
 		// { header: 'Level', toggleKey: 'activeMuted', params: [{ key: 'patchVol', label: 'Volume' }] },
 	];
+
+	const OFF_SEND_RECV_BOTH = [
+		{ label: 'Off', value: 0 },
+		{ label: 'Send', value: 1 },
+		{ label: 'Recv', value: 2 },
+		{ label: 'Both', value: 3 },
+	];
+
+	const OFF_SENTINEL = 17;
+
+	function makeOffMemory(getter: () => number, setter: (v: number) => void, defaultVal = 1) {
+		const memory = ref(defaultVal);
+		const isOff = () => getter() === OFF_SENTINEL;
+		const display = () => (isOff() ? memory.value : getter());
+		const setOff = (off: boolean) => {
+			if (off) {
+				const cur = getter();
+				if (cur !== OFF_SENTINEL) memory.value = cur;
+				setter(OFF_SENTINEL);
+			} else {
+				setter(memory.value);
+			}
+		};
+		return { isOff, display, setOff };
+	}
+
+	type MidiKey = 'A' | 'B' | 'C' | 'D' | 'global';
+	const midiSlots = Object.fromEntries(
+		MIDI_SLOTS.map(({ key }) => [
+			key,
+			makeOffMemory(
+				() => device.device?.midi.slots[key] ?? 1,
+				(v) => device.setMidiSlot(key, v),
+			),
+		]),
+	) as Record<MidiKey, ReturnType<typeof makeOffMemory>>;
+
+	function isMidiOff(key: MidiKey) {
+		return midiSlots[key].isOff();
+	}
+	function midiChannelDisplay(key: MidiKey) {
+		return midiSlots[key].display();
+	}
+	function setMidiOff(key: MidiKey, off: boolean) {
+		midiSlots[key].setOff(off);
+	}
+
+	const sysex = makeOffMemory(
+		() => device.device?.midi.sysex ?? 1,
+		(v) => device.setMidiSysex(v),
+	);
+
+	const clockValue = computed(() => (device.device?.midi.clkse ? 1 : 0) + (device.device?.midi.clkre ? 2 : 0));
+	function setClock(value: number) {
+		device.setMidiClkSend(!!(value & 1));
+		device.setMidiClkReceive(!!(value & 2));
+	}
+
+	const ccValue = computed(() => (device.device?.midi.ctrlsSend ? 1 : 0) + (device.device?.midi.ctrlsRecv ? 2 : 0));
+	function setCC(value: number) {
+		device.setMidiCtrlsSend(!!(value & 1));
+		device.setMidiCtrlsRecv(!!(value & 2));
+	}
 
 	function slotEntry(slot: SlotLabel) {
 		return device.device?.slots.find((s) => s.slot === slot);
