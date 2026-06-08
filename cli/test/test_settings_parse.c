@@ -146,7 +146,7 @@ void test_parse_performance_focus_slot(void) {
     cJSON *result = g2_parse_settings(bulkData, 64, perfData, 256);
     TEST_ASSERT_NOT_NULL(result);
     
-    cJSON *perf = cJSON_GetObjectItem(result, "patches");
+    cJSON *perf = cJSON_GetObjectItem(result, "performance");
     TEST_ASSERT_NOT_NULL(perf);
     
     cJSON *focus = cJSON_GetObjectItem(perf, "focus");

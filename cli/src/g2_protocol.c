@@ -215,7 +215,7 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
 }
 
 /* Parse the performance bulk payload and attach "performance" and "slots"
- * sub-objects to an existing JSON root. mode=1 → Performance, mode=0 → Patch. */
+ * sub-objects to an existing JSON root. */
 void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
                                 int mode, cJSON *root) {
     char perfName[32] = {0};
@@ -267,7 +267,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
-    cJSON_AddItemToObject(root, mode ? "performance" : "patches", perf);
+    cJSON_AddItemToObject(root, "performance", perf);
 
     cJSON *slots = cJSON_CreateArray();
     for (int i = 0; i < 4; i++) {

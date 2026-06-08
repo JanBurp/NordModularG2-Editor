@@ -1,4 +1,4 @@
-import { Device, PatchData, SlotLabel } from '@/types';
+import { Device, PerformanceData, SlotLabel } from '@/types';
 
 import { SLOT_LABELS } from '@/constants';
 import { defineStore } from 'pinia';
@@ -15,7 +15,6 @@ export enum DeviceStatus {
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
 		status: DeviceStatus.Disconnected,
-		deviceName: '',
 		device: null as Device | null,
 		modeChanging: false,
 	}),
@@ -56,19 +55,11 @@ export const useDeviceStore = defineStore('device', {
 			}
 		},
 		perfName: (state): string => {
-			if (state.device?.performance) return state.device.performance.name;
+			if (state.device?.mode === 'Performance') return state.device.performance?.name ?? '---';
 			return '---';
 		},
-		bpm: (state): number => {
-			if (state.device?.patches) return state.device.patches.bpm;
-			if (state.device?.performance) return state.device.performance.bpm;
-			return 0;
-		},
-		clockRunning: (state): boolean => {
-			if (state.device?.patches) return state.device.patches.clockRunning;
-			if (state.device?.performance) return state.device.performance.clockRunning;
-			return false;
-		},
+		bpm: (state): number => state.device?.performance?.bpm ?? 0,
+		clockRunning: (state): boolean => state.device?.performance?.clockRunning ?? false,
 		getSlotsActiveStatus: (state): boolean[] => {
 			if (!state.device) return [false, false, false, false];
 			return SLOT_LABELS.map((s) => state.device?.slots.find((slot) => slot.slot === s)?.active ?? false);
@@ -87,7 +78,6 @@ export const useDeviceStore = defineStore('device', {
 
 		applyDeviceInfo(data: Device) {
 			this.device = data;
-			this.deviceName = data.synthName;
 		},
 
 		async disconnect() {
@@ -97,7 +87,6 @@ export const useDeviceStore = defineStore('device', {
 				// ignore errors on disconnect
 			} finally {
 				this.status = DeviceStatus.Disconnected;
-				this.deviceName = '';
 				this.device = null;
 				this.modeChanging = false;
 			}
@@ -122,13 +111,11 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		async setClockRunning(run: boolean): Promise<void> {
-			if (this.device?.patches) this.device.patches.clockRunning = run;
 			if (this.device?.performance) this.device.performance.clockRunning = run;
 			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-master-clock-run', run ? '1' : '0']);
 		},
 
 		async setBpm(bpm: number): Promise<void> {
-			if (this.device?.patches) this.device.patches.bpm = bpm;
 			if (this.device?.performance) this.device.performance.bpm = bpm;
 			if (this.status === DeviceStatus.Connected) await window.cli.run(['set-master-clock-bpm', String(bpm)]);
 		},
@@ -137,7 +124,6 @@ export const useDeviceStore = defineStore('device', {
 			if (!this.device) {
 				this.device = {
 					synthName: '', mode: 'Performance', perfBank: 0, perfLoc: 0, memProtect: false, globalOctaveShiftActive: false, globalOctaveShift: 0,
-					patches: null,
 					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false },
 					slots: [],
 					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: 0, ctrlsRecv: false, ctrlsSend: false, clkse: false, clkre: false },
@@ -169,13 +155,11 @@ export const useDeviceStore = defineStore('device', {
 			this.device.midi = ev.midi;
 			this.device.tuning = ev.tuning;
 			this.device.pedal = ev.pedal;
-			this.deviceName = ev.synthName;
 		},
 
-		updatePerfSettings(ev: { performance?: PatchData | null; patches?: PatchData | null; slots: Device['slots'] }) {
+		updatePerfSettings(ev: { performance?: PerformanceData | null; slots: Device['slots'] }) {
 			if (!this.device) return;
 			this.device.performance = ev.performance ?? null;
-			this.device.patches = ev.patches ?? null;
 			this.device.slots = ev.slots;
 		},
 
@@ -243,7 +227,6 @@ export const useDeviceStore = defineStore('device', {
 		setSynthName(name: string) {
 			if (!this.device) return;
 			this.device.synthName = name;
-			this.deviceName = name;
 			this.sendSynthSettings();
 		},
 
@@ -340,7 +323,6 @@ export const useDeviceStore = defineStore('device', {
 		setRangeEnable(value: boolean) {
 			if (!this.device) return;
 			if (this.device.performance) this.device.performance.rangeEnable = value;
-			if (this.device.patches) this.device.patches.rangeEnable = value;
 			if (this.status === DeviceStatus.Connected)
 				window.cli.run(['set-range-enable', value ? '1' : '0']);
 		},
