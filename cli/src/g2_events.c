@@ -23,6 +23,25 @@ static int g_events_perf_mode = 1; /* 1=Performance, 0=Patch; updated by C_SYNTH
 #define BULK_REARM 1
 #define SLOT_LETTER(s) ((s) < 4 ? (const char*[]){"A","B","C","D"}[(s)] : "?")
 
+/* Emit version_update JSON from a bulk 0x1F payload.
+ * update_cache=1 also writes the slot versions into g2_slot_version[]. */
+static void emit_version_update_json(const uint8_t *bulk, int dataEnd, int update_cache) {
+    uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
+    printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
+    int first = 1;
+    for (int i = 5; i + 2 < dataEnd; i += 3) {
+        if (bulk[i] != 0x36) continue;
+        uint8_t slot = bulk[i + 1];
+        uint8_t ver  = bulk[i + 2];
+        if (update_cache && slot < 4) g2_slot_version[slot] = ver;
+        if (!first) printf(",");
+        printf("{\"slot\":\"%s\",\"version\":%u}", SLOT_LETTER(slot), ver);
+        first = 0;
+    }
+    printf("]}\n");
+    fflush(stdout);
+}
+
 /* Handle extended (bulk) messages: synth settings, all-slots version updates,
  * and performance events. Returns BULK_REARM if the caller must re-arm streaming. */
 static int emit_bulk_event(const uint8_t *bulk, int bret) {
@@ -36,19 +55,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         /* All-slots version update — G2 stopped streaming (mode/slot switch).
          * Emit version data; queries (synth+patches+perf) happen in
          * rearm_with_version_update() via g2_emit_rearm_data(). */
-        uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
-        printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
-        int first = 1;
-        for (int i = 5; i + 2 < dataEnd; i += 3) {
-            if (bulk[i] != 0x36) continue;
-            uint8_t slot = bulk[i + 1];
-            uint8_t ver  = bulk[i + 2];
-            if (!first) printf(",");
-            printf("{\"slot\":\"%s\",\"version\":%u}", SLOT_LETTER(slot), ver);
-            first = 0;
-        }
-        printf("]}\n");
-        fflush(stdout);
+        emit_version_update_json(bulk, dataEnd, 0);
         g2_pending_rearm = 1;
         return BULK_REARM;
     }
@@ -146,20 +153,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         /* Bulk version_update: bulk[4]=perf_version, then 4×[0x36, slot, version].
          * G2's reply to set-perf-mode while G2 is still streaming — stop streaming
          * explicitly so queries in g2_emit_rearm_data() succeed. */
-        uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
-        printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
-        int first = 1;
-        for (int i = 5; i + 2 < dataEnd; i += 3) {
-            if (bulk[i] != 0x36) continue;
-            uint8_t slot = bulk[i + 1];
-            uint8_t ver  = bulk[i + 2];
-            if (slot < 4) g2_slot_version[slot] = ver;
-            if (!first) printf(",");
-            printf("{\"slot\":\"%s\",\"version\":%u}", SLOT_LETTER(slot), ver);
-            first = 0;
-        }
-        printf("]}\n");
-        fflush(stdout);
+        emit_version_update_json(bulk, dataEnd, 1);
         g2_stop_comm();
         g2_pending_rearm = 1;
     } else {

@@ -985,11 +985,11 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
 
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
                                    int loc, int module_id, const char *label) {
-    size_t nlen = label ? strlen(label) : 0; if (nlen>16) nlen=16;
-    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id;
-    if (label && nlen>0) { memcpy(buf+2, label, nlen); buf[2+nlen]=0x00; }
-    else { buf[2]=0x00; nlen=0; }
-    op->cmd=0x33; op->payload=buf; op->len=(int)(3+nlen);
+    size_t nlen = label ? strlen(label) : 0; if (nlen > 16) nlen = 16;
+    buf[0] = (uint8_t)loc; buf[1] = (uint8_t)module_id;
+    if (label && nlen > 0) memcpy(buf+2, label, nlen);
+    if (nlen < 16) buf[2+nlen] = 0x00;
+    op->cmd = 0x33; op->payload = buf; op->len = (int)(2 + nlen + (nlen < 16 ? 1 : 0));
 }
 
 void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
@@ -1348,7 +1348,7 @@ int g2_set_perf_name(const char *name) {
     cmd[pos++] = 0x29;
     memcpy(cmd + pos, name, nlen);
     pos += (int)nlen;
-    cmd[pos++] = 0;
+    if (nlen < 16) cmd[pos++] = 0;
 
     if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
@@ -1378,10 +1378,10 @@ int g2_set_patch_name(int slot, const char *name) {
     uint8_t version = cable_get_version(slot);
     size_t nlen = strlen(name);
     if (nlen > 16) nlen = 16;
-    uint8_t payload[17];
+    uint8_t payload[16];
     memcpy(payload, name, nlen);
-    payload[nlen] = 0x00;
-    if (send_slot(slot, version, 0x27, payload, (int)(nlen + 1)) < 0) {
+    if (nlen < 16) payload[nlen] = 0x00;
+    if (send_slot(slot, version, 0x27, payload, (int)(nlen + (nlen < 16 ? 1 : 0))) < 0) {
         g2_err("set-patch-name: failed to send\n");
         return G2_ERR_SEND;
     }
