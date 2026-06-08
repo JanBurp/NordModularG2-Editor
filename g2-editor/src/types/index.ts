@@ -49,7 +49,7 @@ export interface Slots {
 	D: SlotInfo | null;
 }
 
-export interface PatchData {
+export interface PerformanceData {
 	name: string;
 	focus: string;
 	rangeEnable: boolean;
@@ -65,8 +65,7 @@ export interface Device {
 	memProtect: boolean;
 	globalOctaveShiftActive: boolean;
 	globalOctaveShift: number;
-	patches: PatchData | null;
-	performance: PatchData | null;
+	performance: PerformanceData | null;
 	slots: SlotInfo[];
 	midi: {
 		slots: { A: number; B: number; C: number; D: number; global: number };
@@ -84,7 +83,6 @@ export interface Device {
 
 export interface DeviceState {
 	connected: boolean;
-	deviceName: string;
 	device: Device | null;
 }
 

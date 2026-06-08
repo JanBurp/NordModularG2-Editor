@@ -108,7 +108,7 @@ export function useG2() {
 		log('→', 'Connect', 'Connecting to G2...');
 		try {
 			await store.connect();
-			log('←', 'Connect', `${store.deviceName} (${store.device?.mode})`);
+			log('←', 'Connect', `${store.device?.synthName ?? ''} (${store.device?.mode})`);
 			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
 			for (const slot of activeSlots) slotEvents.fetchSlotResources(slot);
 		} catch (e: any) {
