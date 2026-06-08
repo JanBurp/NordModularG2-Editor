@@ -214,13 +214,13 @@
 
 				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
 					<div class="settings-subheader flex items-center">
+						<span class="w-20">{{ group.header }}</span>
 						<CheckBox
-							class="mr-2"
+							class="ml-px"
 							v-if="group.toggleKey"
 							:model-value="!!patchParam(group.toggleKey)"
 							@update:model-value="slotsStore.setPatchParam(uiStore.variation, group.toggleKey!, $event ? 1 : 0)"
 						/>
-						<span>{{ group.header }}</span>
 					</div>
 					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
 						<BtnGroup
