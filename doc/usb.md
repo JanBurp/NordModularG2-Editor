@@ -206,7 +206,7 @@ However, some commands that need to be version-matched use the **performance ver
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
 | `0x02` | GET_SYNTH_SETTINGS | — | Extended bulk (§10) |
-| `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10) | Embedded ACK |
+| `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10a) | Embedded ACK |
 | `0x04` | GET_ASSIGNED_VOICES | — | Embedded; 4 voice counts at `[5..8]` |
 | `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
 | `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
@@ -553,6 +553,50 @@ For SET_PERF_SETTINGS, send only the chunk: `[0x11][sizeHi][sizeLo][80 bytes]` (
 
 ---
 
+## 10a. SET_SYNTH_SETTINGS Request Format
+
+Sent as the variable-length payload for system command `0x03` (after the `[01][2C][41][03]` header).
+
+```
+[0]          = 0x03  (sub-command byte, part of payload)
+[1..nameLen] = synthName  (up to 16 chars, NOT null-terminated if nameLen == 16)
+[1+nameLen]  = 0x00  (null terminator, omitted when nameLen == 16)
+
+base = 1 + nameLen + (nameLen < 16 ? 1 : 0)
+
+base+0   bit 7: mode (1=Performance, 0=Patch) — read from current mode, G2 stays in that mode
+base+1   0x00
+base+2   PerfBank      (preserved from last GET response)
+base+3   PerfLocation  (preserved from last GET response)
+base+4   MemoryProtect (bit 7)
+base+5   MIDI slot A channel (0-indexed; 1-indexed in JSON)
+base+6   MIDI slot B channel
+base+7   MIDI slot C channel
+base+8   MIDI slot D channel
+base+9   MIDI global channel
+base+10  SysEx ID (0-indexed; 1-indexed in JSON)
+base+11  LocalOn (bit 7)
+base+12  PrgChange (bit 0=send, bit 1=recv)
+base+13  Controllers (bit 0=send, bit 1=recv)
+base+14  Clock (bit 6=send; bit 5=NOT recv — 0 means recv-on)
+base+15  TuneCent (signed int8)
+base+16  GlobalOctaveShiftActive (bit 7)
+base+17  GlobalOctaveShift (signed int8)
+base+18  TuneSemi (signed int8)
+base+19  0x00
+base+20  PedalPolarity (bit 7) | 0x40
+base+21  ControlPedalGain (0–32)
+base+22..37  0x00 (16 trailing zeros)
+
+Total payload length = base + 38 bytes.
+```
+
+This is the ClaviaString encoding used throughout the protocol: name chars, null terminator only if the name is shorter than 16 chars.
+
+> **Note:** The Delphi editor hardcodes `base+0 = 0x80` (always Performance). The CLI reads the current mode from params so the G2 stays in its current mode.
+
+---
+
 ## 11. Patch List Response
 
 Command: system cmd `0x41 0x14 mode bank patch`
@@ -713,7 +757,7 @@ When `version != 0x40`:
 | `version` | `subCmd` | JSON type | Notes |
 |-----------|----------|-----------|-------|
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
-| any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance"; sent by G2 when user presses PERF button (no `patches` field) |
+| any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance". Two variants: (1) **hardware** — G2 PERF button or unsolicited mode change: no `patches` field; (2) **daemon rearm** — emitted by `g2_emit_rearm_data()` after BULK_REARM: includes `"patches":[…]` array (4 entries, one per slot) so the frontend can apply all slots without separate `get-patch` commands. |
 | any | `0x11` | `perf_settings` | — |
 | any | `0x29` | `perf_name` + `perf_settings` | Compound message: null-terminated name at bulk[4..], followed by a full C_PERF_SETTINGS (0x11) chunk. Emitted by G2 when Hold or KB Split changes on hardware. Also emitted as embedded when only the name changes (no settings chunk). |
 
