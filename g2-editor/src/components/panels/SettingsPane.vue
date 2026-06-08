@@ -44,59 +44,84 @@
 				</SettingsRow>
 
 				<p class="settings-subheader">MIDI Settings</p>
-				<SettingsRow :label="L.midiSysex">
-					<div class="flex items-center gap-2">
-						<NumberInput :model-value="sysexDisplay()" :min="1" :max="16" :disabled="isSysexAll()" class="w-16" @update:model-value="setSysex($event)" />
-						<CheckBox :model-value="isSysexAll()" @update:model-value="setSysexAll($event)" />
-						<span class="text-xs text-neutral-400">All</span>
-					</div>
+				<SettingsRow :label="L.midiLocal">
+					<CheckBox :model-value="device.device?.midi.local ?? false" @update:model-value="device.setMidiLocal($event)" />
+				</SettingsRow>
+				<SettingsRow label="Clock">
+					<BtnGroup
+						:model-value="clockValue"
+						:options="[
+							{ label: 'Off', value: 0 },
+							{ label: 'Send', value: 1 },
+							{ label: 'Recv', value: 2 },
+							{ label: 'Both', value: 3 },
+						]"
+						@update:model-value="setClock(Number($event))"
+					/>
 				</SettingsRow>
 				<SettingsRow :label="L.midiPrgCh">
 					<BtnGroup
 						:model-value="device.device?.midi.prgch ?? 0"
-						:options="[{label:'Off',value:0},{label:'Send',value:1},{label:'Recv',value:2},{label:'Both',value:3}]"
+						:options="[
+							{ label: 'Off', value: 0 },
+							{ label: 'Send', value: 1 },
+							{ label: 'Recv', value: 2 },
+							{ label: 'Both', value: 3 },
+						]"
 						@update:model-value="device.setMidiPrgCh(Number($event))"
 					/>
 				</SettingsRow>
-				<SettingsRow :label="L.midiLocal">
-					<CheckBox :model-value="device.device?.midi.local ?? false" @update:model-value="device.setMidiLocal($event)" />
+				<SettingsRow label="CC">
+					<BtnGroup
+						:model-value="ccValue"
+						:options="[
+							{ label: 'Off', value: 0 },
+							{ label: 'Send', value: 1 },
+							{ label: 'Recv', value: 2 },
+							{ label: 'Both', value: 3 },
+						]"
+						@update:model-value="setCC(Number($event))"
+					/>
 				</SettingsRow>
-				<SettingsRow label="CC Recv">
-					<CheckBox :model-value="device.device?.midi.ctrlsRecv ?? false" @update:model-value="device.setMidiCtrlsRecv($event)" />
-				</SettingsRow>
-				<SettingsRow label="CC Send">
-					<CheckBox :model-value="device.device?.midi.ctrlsSend ?? false" @update:model-value="device.setMidiCtrlsSend($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.midiClkSend">
-					<CheckBox :model-value="device.device?.midi.clkse ?? false" @update:model-value="device.setMidiClkSend($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.midiClkReceive">
-					<CheckBox :model-value="device.device?.midi.clkre ?? false" @update:model-value="device.setMidiClkReceive($event)" />
-				</SettingsRow>
-
-				<p class="settings-subheader">Tuning</p>
-				<SettingsRow :label="L.tuningSemi">
-					<NumberInput :model-value="device.device?.tuning.semi ?? 0" :min="-6" :max="6" class="w-16" @update:model-value="device.setTuningSemi($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.tuningCent">
-					<NumberInput :model-value="device.device?.tuning.cent ?? 0" :min="-100" :max="100" class="w-16" @update:model-value="device.setTuningCent($event)" />
-				</SettingsRow>
-
-				<p class="settings-subheader">Global Octave Shift</p>
-				<SettingsRow label="Active">
-					<CheckBox :model-value="device.device?.globalOctaveShiftActive ?? false" @update:model-value="device.setGlobalOctaveShiftActive($event)" />
-				</SettingsRow>
-				<SettingsRow label="Shift">
-					<NumberInput :model-value="device.device?.globalOctaveShift ?? 0" :min="-2" :max="2" class="w-16" @update:model-value="device.setGlobalOctaveShift($event)" />
+				<SettingsRow :label="L.midiSysex">
+					<div class="flex items-center gap-2">
+						<NumberInput
+							:model-value="sysexDisplay()"
+							:min="1"
+							:max="16"
+							:disabled="isSysexAll()"
+							class="w-16"
+							@update:model-value="setSysex($event)"
+						/>
+						<CheckBox :model-value="isSysexAll()" @update:model-value="setSysexAll($event)" />
+						<span class="text-xs text-neutral-400">All</span>
+					</div>
 				</SettingsRow>
 
-				<p class="settings-subheader">Pedal</p>
-				<SettingsRow :label="L.pedalPolarity">
-					<CheckBox :model-value="device.device?.pedal.polarity ?? false" @update:model-value="device.setPedalPolarity($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.pedalGain">
-					<NumberInput :model-value="device.device?.pedal.gain ?? 0" :min="0" :max="32" class="w-16" @update:model-value="device.setPedalGain($event)" />
-				</SettingsRow>
+				<SettingsRowDuo label="Tuning" label1="Semi" label2="Cents">
+					<template #first>
+						<NumberInput :model-value="device.device?.tuning.semi ?? 0" :min="-6" :max="6" class="w-16" @update:model-value="device.setTuningSemi($event)" />
+					</template>
+					<template #second>
+						<NumberInput :model-value="device.device?.tuning.cent ?? 0" :min="-100" :max="100" class="w-16" @update:model-value="device.setTuningCent($event)" />
+					</template>
+				</SettingsRowDuo>
+				<SettingsRowDuo label="Pedal" label1="Polarity" label2="Gain">
+					<template #first>
+						<CheckBox :model-value="device.device?.pedal.polarity ?? false" @update:model-value="device.setPedalPolarity($event)" />
+					</template>
+					<template #second>
+						<NumberInput :model-value="device.device?.pedal.gain ?? 0" :min="0" :max="32" class="w-16" @update:model-value="device.setPedalGain($event)" />
+					</template>
+				</SettingsRowDuo>
+				<SettingsRowDuo label="Global Oct." label1="Active" label2="Shift">
+					<template #first>
+						<CheckBox :model-value="device.device?.globalOctaveShiftActive ?? false" @update:model-value="device.setGlobalOctaveShiftActive($event)" />
+					</template>
+					<template #second>
+						<NumberInput :model-value="device.device?.globalOctaveShift ?? 0" :min="-2" :max="2" class="w-16" @update:model-value="device.setGlobalOctaveShift($event)" />
+					</template>
+				</SettingsRowDuo>
 			</div>
 		</Collapsible>
 
@@ -213,6 +238,7 @@
 	import { computed, ref, watch } from 'vue';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
+	import SettingsRowDuo from '@/components/common/SettingsRowDuo.vue';
 	import TextInput from '@/components/common/TextInput.vue';
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
@@ -385,6 +411,18 @@
 
 	function setSysex(value: number) {
 		device.setMidiSysex(value);
+	}
+
+	const clockValue = computed(() => (device.device?.midi.clkse ? 1 : 0) + (device.device?.midi.clkre ? 2 : 0));
+	function setClock(value: number) {
+		device.setMidiClkSend(!!(value & 1));
+		device.setMidiClkReceive(!!(value & 2));
+	}
+
+	const ccValue = computed(() => (device.device?.midi.ctrlsSend ? 1 : 0) + (device.device?.midi.ctrlsRecv ? 2 : 0));
+	function setCC(value: number) {
+		device.setMidiCtrlsSend(!!(value & 1));
+		device.setMidiCtrlsRecv(!!(value & 2));
 	}
 
 	function setSysexAll(all: boolean) {
