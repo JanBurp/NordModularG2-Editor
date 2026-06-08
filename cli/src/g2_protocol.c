@@ -176,7 +176,7 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
 
     int nameLen = (int)strlen(name);
     if (nameLen > 16) nameLen = 16;
-    int base = 1 + nameLen + 1;   /* subcommand + name chars + null */
+    int base = 1 + nameLen + (nameLen < 16 ? 1 : 0);   /* subcommand + name + null (omitted for 16-char names) */
 
     memset(out, 0, 56);
     out[0] = 0x03;
@@ -209,7 +209,7 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
     out[base + 21] = (uint8_t)pedalGain;
     /* out[base + 22..37] = 0x00 */
 
-    *out_len = 56;
+    *out_len = (size_t)(base + 38);   /* subcmd + name + optional null + 22 fields + 16 trailing zeros */
     return 0;
 }
 
