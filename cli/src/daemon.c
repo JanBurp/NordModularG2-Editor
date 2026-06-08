@@ -137,6 +137,7 @@ static void debug_status(const char *msg) {
 static void rearm_with_version_update(void) {
 	printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
 	fflush(stdout);
+	g2_emit_rearm_data();
 	g2_rearm();
 }
 

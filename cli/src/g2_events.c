@@ -34,8 +34,8 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
 
     if (baCmd == 0x04 && bversion == 0x40 && bsubCmd == 0x1f) {
         /* All-slots version update — G2 stopped streaming (mode/slot switch).
-         * Emit version data, then query current synth+perf settings so the
-         * frontend always sees the new mode regardless of G2 streaming state. */
+         * Emit version data; queries (synth+patches+perf) happen in
+         * rearm_with_version_update() via g2_emit_rearm_data(). */
         uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
         printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
         int first = 1;
@@ -49,33 +49,6 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         printf("]}\n");
         fflush(stdout);
-        cJSON *synth = query_synth_settings("synth_settings_update");
-        if (synth) {
-            cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
-            int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
-
-            /* Load all 4 slots before rearming (Delphi approach: all queries before START_COMM).
-             * Embed patch data in synth_settings_update so frontend applies them directly —
-             * no get-patch stdin commands are sent, eliminating the ACK race condition. */
-            const char *slot_names[] = {"A", "B", "C", "D"};
-            cJSON *patches = cJSON_CreateArray();
-            for (int s = 0; s < 4; s++) {
-                cJSON *p = g2_get_patch(slot_names[s]);
-                cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
-            }
-            cJSON_AddItemToObject(synth, "patches", patches);
-
-            char *ss = cJSON_PrintUnformatted(synth);
-            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
-            cJSON_Delete(synth);
-
-            cJSON *ps = query_perf_settings(mode, "perf_settings");
-            if (ps) {
-                char *ds = cJSON_PrintUnformatted(ps);
-                if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
-                cJSON_Delete(ps);
-            }
-        }
         g2_pending_rearm = 1;
         return BULK_REARM;
     }
@@ -170,7 +143,9 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
                 printf("]}\n"); fflush(stdout); break;
         }
     } else if (baCmd == 0x0C && bsubCmd == 0x1F) {
-        /* Bulk version_update: bulk[4]=perf_version, then 4×[0x36, slot, version] */
+        /* Bulk version_update: bulk[4]=perf_version, then 4×[0x36, slot, version].
+         * G2's reply to set-perf-mode while G2 is still streaming — stop streaming
+         * explicitly so queries in g2_emit_rearm_data() succeed. */
         uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
         printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
         int first = 1;
@@ -185,31 +160,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         }
         printf("]}\n");
         fflush(stdout);
-        /* The 0x0C/0x1F response is G2's reply to set-perf-mode, but G2 is still
-         * streaming at this point. Stop streaming explicitly so the queue drains
-         * and recv_interrupt() gets our query responses rather than stream events. */
         g2_stop_comm();
-        cJSON *synth = query_synth_settings("synth_settings_update");
-        if (synth) {
-            cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
-            int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
-            const char *slot_names[] = {"A", "B", "C", "D"};
-            cJSON *patches = cJSON_CreateArray();
-            for (int s = 0; s < 4; s++) {
-                cJSON *p = g2_get_patch(slot_names[s]);
-                cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
-            }
-            cJSON_AddItemToObject(synth, "patches", patches);
-            char *ss = cJSON_PrintUnformatted(synth);
-            if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
-            cJSON_Delete(synth);
-            cJSON *ps = query_perf_settings(mode, "perf_settings");
-            if (ps) {
-                char *ds = cJSON_PrintUnformatted(ps);
-                if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
-                cJSON_Delete(ps);
-            }
-        }
         g2_pending_rearm = 1;
     } else {
         printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
@@ -404,6 +355,38 @@ static void emit_embedded_event(const uint8_t *response) {
         }
     }
     fflush(stdout);
+}
+
+/* Query synth settings (with patches embedded) and perf settings, emitting
+ * synth_settings_update and perf_settings events. Called from daemon.c's
+ * rearm_with_version_update() so all BULK_REARM paths do a full re-query. */
+void g2_emit_rearm_data(void) {
+    cJSON *synth = query_synth_settings("synth_settings_update");
+    if (!synth) return;
+    cJSON *mode_item = cJSON_GetObjectItem(synth, "mode");
+    int mode = mode_item && strcmp(mode_item->valuestring, "Performance") == 0;
+
+    /* Load all 4 slots before rearming (Delphi approach: all queries before START_COMM).
+     * Embed patch data in synth_settings_update so frontend applies them directly —
+     * no get-patch stdin commands are sent, eliminating the ACK race condition. */
+    const char *slot_names[] = {"A", "B", "C", "D"};
+    cJSON *patches = cJSON_CreateArray();
+    for (int s = 0; s < 4; s++) {
+        cJSON *p = g2_get_patch(slot_names[s]);
+        cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
+    }
+    cJSON_AddItemToObject(synth, "patches", patches);
+
+    char *ss = cJSON_PrintUnformatted(synth);
+    if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
+    cJSON_Delete(synth);
+
+    cJSON *ps = query_perf_settings(mode, "perf_settings");
+    if (ps) {
+        char *ds = cJSON_PrintUnformatted(ps);
+        if (ds) { printf("%s\n", ds); fflush(stdout); free(ds); }
+        cJSON_Delete(ps);
+    }
 }
 
 /* Route a received message to the appropriate emitter based on the response

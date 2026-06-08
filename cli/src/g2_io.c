@@ -558,6 +558,7 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
              * command returns — we cannot call g2_rearm() here because we are
              * still inside the command handler's call stack. */
             g2_pending_rearm = 1;
+            g2_msg_free(&msg);
             continue;
         }
         /* Skip LED (0x39) and volume (0x3A) extended messages. */
