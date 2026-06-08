@@ -23,4 +23,8 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
 cJSON *g2_parse_settings(const uint8_t *bulkData, size_t bulkSize,
                          const uint8_t *perfData, size_t perfSize);
 
+/* Build a 56-byte SET payload from a JSON params object.
+ * Returns 0 on success, -1 if required fields are missing. */
+int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len);
+
 #endif /* G2_PROTOCOL_H */
