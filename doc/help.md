@@ -63,12 +63,12 @@ With any module selected, use `Shift+Arrow` keys to jump to adjacent modules on 
 
 ## Editing Parameters
 
-| Control | Drag / Click | Double-click |
+| Control | Mouse interaction | Double-click |
 |---|---|---|
-| Knob | Up/down to change value | Reset to default |
+| Knob | Drag up/down to change value | Reset to default |
 | Slider | Drag handle; click track to step | Reset to default |
 | Switch | Click to cycle | — |
-| Spinner | Hold +/− to inc/dec | Reset to default |
+| Spinner | Click/hold the +/− buttons to inc/dec | Reset to default |
 
 ### Right-click a parameter → edit dialog
 
