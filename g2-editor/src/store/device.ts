@@ -157,9 +157,9 @@ export const useDeviceStore = defineStore('device', {
 			this.device.pedal = ev.pedal;
 		},
 
-		updatePerfSettings(ev: { performance?: PerformanceData | null; patches?: PerformanceData | null; slots: Device['slots'] }) {
+		updatePerfSettings(ev: { performance?: PerformanceData | null; slots: Device['slots'] }) {
 			if (!this.device) return;
-			this.device.performance = ev.performance ?? ev.patches ?? null;
+			this.device.performance = ev.performance ?? null;
 			this.device.slots = ev.slots;
 		},
 
