@@ -1,4 +1,5 @@
 import type { Cable } from '@/renderer/cableRenderer';
+import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotAreaState } from '@/types/ui';
 import type { SlotLabel } from '@/types';
@@ -33,6 +34,8 @@ export const useUiStore = defineStore('ui', {
 		draggedModuleId: null as number | null,
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
+		clipboard: null as ClipboardEntry | null,
+		lastMousePos: null as { col: number; row: number; area: 'va' | 'fx' } | null,
 	}),
 
 	getters: {

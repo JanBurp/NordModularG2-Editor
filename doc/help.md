@@ -54,6 +54,12 @@
 
 With any module selected, use `Shift+Arrow` keys to jump to adjacent modules on the canvas. Navigation wraps at area edges and crosses Voice↔FX in split view.
 
+### Cut / Copy / Paste
+
+- **Copy** (`Cmd+C`) — copies selected modules and any cables connecting them to an in-memory clipboard
+- **Cut** (`Cmd+X`) — copies modules then deletes selection; for cables, deletes without copying
+- **Paste** (`Cmd+V`) — places modules at the mouse cursor (top-left of group) with new IDs; relative layout, all parameters, variation values, and inter-module cables are preserved; cross-area paste (Voice ↔ FX) is supported
+
 ### Renaming & Coloring
 
 - **Rename** — double-click module title, or right-click → Rename…
@@ -213,6 +219,9 @@ The toolbar shows real-time CPU and memory usage from the connected G2:
 
 | Key | Action |
 |---|---|
+| `Cmd+C` | Copy selected modules (with inter-module cables) |
+| `Cmd+X` | Cut selected modules; cut cables (delete only — no paste) |
+| `Cmd+V` | Paste modules at mouse cursor; layout, parameters and cables preserved |
 | `Cmd+A` | Select all modules |
 | `Delete` / `Backspace` | Delete selection |
 
