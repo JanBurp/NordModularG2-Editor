@@ -23,7 +23,7 @@
 					@ctrl-click="handleSlotCtrlClick"
 				/>
 				<ToolBarDivider />
-				<ToolBarText class="w-32">{{ device.deviceName || '---' }}</ToolBarText>
+				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 				<ToolBarDivider />
 				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />

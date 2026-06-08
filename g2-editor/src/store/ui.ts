@@ -60,7 +60,6 @@ export const useUiStore = defineStore('ui', {
 			this.selectedParam = null;
 			const device = useDeviceStore().device;
 			if (device?.performance) device.performance.focus = slot;
-			else if (device?.patches) device.patches.focus = slot;
 		},
 
 		toggleSidebar(tab: PaneTab) {

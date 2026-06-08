@@ -54,13 +54,11 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'master_clock_run') {
-			if (store.device?.patches) store.device.patches.clockRunning = ev.run === 1;
 			if (store.device?.performance) store.device.performance.clockRunning = ev.run === 1;
 			log('←', 'Watch', `clock_run=${ev.run}`);
 			return true;
 		}
 		if (ev.type === 'master_clock_bpm') {
-			if (store.device?.patches) store.device.patches.bpm = ev.bpm;
 			if (store.device?.performance) store.device.performance.bpm = ev.bpm;
 			log('←', 'Watch', `clock_bpm=${ev.bpm}`);
 			return true;
