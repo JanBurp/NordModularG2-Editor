@@ -242,21 +242,39 @@ export const useSlotsStore = defineStore('slots', {
 						.map((c) => ({ ...c }));
 					hist.record(slot, {
 						undo: async () => {
-							hist.lock(slot);
-							await this.addModuleWithData(modSnap, moduleId, modSnap.horiz, modSnap.vert, area);
+							mutAddModule(patch, areaIdx, { ...modSnap, lv: [...modSnap.lv], modes: [...modSnap.modes] });
+							const slotE = this.slots[slot];
+							if (slotE.variations) {
+								for (let v = 0; v < slotE.variations.length; v++) {
+									const start = v * modSnap.pcnt;
+									slotE.variations[v][areaKey][moduleId] = modSnap.lv.slice(start, start + modSnap.pcnt);
+								}
+							}
+							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
+							slotE.rawHex = null;
+							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
+							const allCmds: string[][] = [['add-module', slot, location,
+								String(modSnap.type), String(moduleId), String(modSnap.horiz), String(modSnap.vert),
+								String(modSnap.colour), String(modSnap.modes.length), ...modSnap.modes.map(String),
+								String(modSnap.pcnt), ...paramVals0.map(String), modSnap.uname ?? '']];
+							if (slotE.variations) {
+								for (let v = 1; v < slotE.variations.length; v++) {
+									for (let p = 0; p < modSnap.pcnt; p++) {
+										const val = modSnap.lv[v * modSnap.pcnt + p];
+										if (val !== undefined && val !== paramVals0[p])
+											allCmds.push(['set-param', slot, location, String(moduleId), String(p), String(val), String(v)]);
+									}
+								}
+							}
 							for (const c of cableSnap) {
-								mutAddCable(patch, areaIdx, c);
-								this.slots[slot].rawHex = null;
-								await window.cli.run(['add-cable', slot, location, String(c.colour),
+								allCmds.push(['add-cable', slot, location, String(c.colour),
 									String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon),
 									String(c.dmod), '0', String(c.dcon)]);
 							}
-							hist.unlock(slot);
+							if (allCmds.length > 0) await window.cli.runBatch(allCmds);
 						},
 						redo: async () => {
-							hist.lock(slot);
 							await this.deleteModule(moduleId, area);
-							hist.unlock(slot);
 						},
 					});
 				}
@@ -365,14 +383,10 @@ export const useSlotsStore = defineStore('slots', {
 				const modSnap = { ...mod, lv: [...mod.lv], modes: [...mod.modes] };
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						await this.deleteModule(moduleId, area);
-						hist.unlock(slot);
 					},
 					redo: async () => {
-						hist.lock(slot);
 						await this.addModuleWithData(modSnap, moduleId, col, row, area);
-						hist.unlock(slot);
 					},
 				});
 			}
@@ -443,14 +457,10 @@ export const useSlotsStore = defineStore('slots', {
 				const modSnap = { ...mod, lv: [...mod.lv], modes: [...mod.modes] };
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						await this.deleteModule(newId, area);
-						hist.unlock(slot);
 					},
 					redo: async () => {
-						hist.lock(slot);
 						await this.addModuleWithData(modSnap, newId, col, row, area);
-						hist.unlock(slot);
 					},
 				});
 			}
@@ -564,7 +574,6 @@ export const useSlotsStore = defineStore('slots', {
 					const addedIds = entries.map((e) => e.newId);
 					hist.record(slot, {
 						undo: async () => {
-							hist.lock(slot);
 							// Delete added cables first
 							const delCableCmds = addedCables.map((c) => ['del-cable', slot, location, String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]);
 							for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
@@ -580,12 +589,10 @@ export const useSlotsStore = defineStore('slots', {
 							this.slots[slot].rawHex = null;
 							const allUndoCmds = [...delCableCmds, ...delModCmds, ...moveCmds];
 							if (allUndoCmds.length > 0) {
-								try { await window.cli.runBatch(allUndoCmds); } catch (err) { console.warn('paste undo CLI failed:', err); }
+								await window.cli.runBatch(allUndoCmds);
 							}
-							hist.unlock(slot);
 						},
 						redo: async () => {
-							hist.lock(slot);
 							const currentCtx = this._getActivePatch();
 							if (currentCtx) {
 								const currentMods = currentCtx.patch.areas[areaIdx].modules;
@@ -593,7 +600,6 @@ export const useSlotsStore = defineStore('slots', {
 								const reEntries = entries.filter((e) => !currentIdSet.has(e.newId));
 								if (reEntries.length > 0) await this.paste(reEntries, cables, area);
 							}
-							hist.unlock(slot);
 						},
 					});
 				}
@@ -712,7 +718,6 @@ export const useSlotsStore = defineStore('slots', {
 				});
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
 						this.slots[slot].rawHex = null;
@@ -733,12 +738,9 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							await window.cli.runBatch(restoreCmds);
 						}
-						hist.unlock(slot);
 					},
 					redo: async () => {
-						hist.lock(slot);
 						await this.addCable(fromMod, fromConType, fromCon, toMod, toConType, toCon, area, color);
-						hist.unlock(slot);
 					},
 				});
 			}
@@ -763,8 +765,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `param:${area}:${moduleId}:${paramIdx}:${variation}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { hist.lock(slot); await this.setParam(moduleId, paramIdx, box.initial as number, variation, area); hist.unlock(slot); },
-					redo: async () => { hist.lock(slot); await this.setParam(moduleId, paramIdx, box.latest as number, variation, area); hist.unlock(slot); },
+					undo: async () => { await this.setParam(moduleId, paramIdx, box.initial as number, variation, area); },
+					redo: async () => { await this.setParam(moduleId, paramIdx, box.latest as number, variation, area); },
 				}, cKey, box);
 			}
 
@@ -790,8 +792,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `mode:${area}:${moduleId}:${modeIdx}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { hist.lock(slot); await this.setMode(moduleId, modeIdx, box.initial as number, variation, area); hist.unlock(slot); },
-					redo: async () => { hist.lock(slot); await this.setMode(moduleId, modeIdx, box.latest as number, variation, area); hist.unlock(slot); },
+					undo: async () => { await this.setMode(moduleId, modeIdx, box.initial as number, variation, area); },
+					redo: async () => { await this.setMode(moduleId, modeIdx, box.latest as number, variation, area); },
 				}, cKey, box);
 			}
 
@@ -972,7 +974,6 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						const undoCmds: string[][] = [];
 						for (const m of pushedBack) {
 							mutMoveModule(patch, areaIdx, m.index, m.col, m.fromRow);
@@ -984,16 +985,13 @@ export const useSlotsStore = defineStore('slots', {
 						}
 						this.slots[slot].rawHex = null;
 						if (undoCmds.length > 0) await window.cli.runBatch(undoCmds);
-						hist.unlock(slot);
 					},
 					redo: async () => {
-						hist.lock(slot);
 						const currentCtx = this._getActivePatch();
 						if (currentCtx) {
 							const currentMods = currentCtx.patch.areas[areaIdx].modules;
 							await this.moveModulesWithCollision(indices, dCol, dRow, area, currentMods);
 						}
-						hist.unlock(slot);
 					},
 				});
 			}
@@ -1042,17 +1040,13 @@ export const useSlotsStore = defineStore('slots', {
 
 					hist.record(slot, {
 						undo: async () => {
-							hist.lock(slot);
 							await this.deleteModule(moduleId, area);
 							for (const m of movedBack) await this.moveModuleNoReload(m.index, m.col, m.fromRow, area);
-							hist.unlock(slot);
 						},
 						redo: async () => {
-							hist.lock(slot);
 							for (const m of movedBack) await this.moveModuleNoReload(m.index, m.col, m.toRow, area);
 							if (modSnap) await this.addModuleWithData(modSnap, moduleId, col, row, area);
 							else await this.addModule(typeId, moduleId, col, row, area);
-							hist.unlock(slot);
 						},
 					});
 				}
@@ -1078,16 +1072,12 @@ export const useSlotsStore = defineStore('slots', {
 				});
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						for (const { id, prevColor } of prevColors) {
 							await this.setModuleColors([id], prevColor, area);
 						}
-						hist.unlock(slot);
 					},
 					redo: async () => {
-						hist.lock(slot);
 						await this.setModuleColors(moduleIds, color, area);
-						hist.unlock(slot);
 					},
 				});
 			}
@@ -1108,8 +1098,8 @@ export const useSlotsStore = defineStore('slots', {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
 				const prevLabel = mod?.uname ?? '';
 				hist.record(slot, {
-					undo: async () => { hist.lock(slot); await this.setModuleLabel(moduleId, prevLabel, area); hist.unlock(slot); },
-					redo: async () => { hist.lock(slot); await this.setModuleLabel(moduleId, label, area); hist.unlock(slot); },
+					undo: async () => { await this.setModuleLabel(moduleId, prevLabel, area); },
+					redo: async () => { await this.setModuleLabel(moduleId, label, area); },
 				});
 			}
 
@@ -1156,8 +1146,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `morph:${variation}:${morphIdx}:${field}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: () => { hist.lock(slot); this.setMorphParam(variation, morphIdx, field, box.initial as number); hist.unlock(slot); return Promise.resolve(); },
-					redo: () => { hist.lock(slot); this.setMorphParam(variation, morphIdx, field, box.latest as number); hist.unlock(slot); return Promise.resolve(); },
+					undo: () => { this.setMorphParam(variation, morphIdx, field, box.initial as number); return Promise.resolve(); },
+					redo: () => { this.setMorphParam(variation, morphIdx, field, box.latest as number); return Promise.resolve(); },
 				}, cKey, box);
 			}
 
@@ -1181,8 +1171,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `patchparam:${variation}:${key}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { hist.lock(slot); await this.setPatchParam(variation, key, box.initial as number); hist.unlock(slot); },
-					redo: async () => { hist.lock(slot); await this.setPatchParam(variation, key, box.latest as number); hist.unlock(slot); },
+					undo: async () => { await this.setPatchParam(variation, key, box.initial as number); },
+					redo: async () => { await this.setPatchParam(variation, key, box.latest as number); },
 				}, cKey, box);
 			}
 
@@ -1226,8 +1216,8 @@ export const useSlotsStore = defineStore('slots', {
 				const existingLabel = (mod?.paramLabels as any[])?.find((pl: any) => pl.paramIndex === paramIndex);
 				const prevLabel = existingLabel?.labels?.[0] ?? '';
 				hist.record(slot, {
-					undo: async () => { hist.lock(slot); await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area); hist.unlock(slot); },
-					redo: async () => { hist.lock(slot); await this.setParamLabel(moduleIndex, paramIndex, label, area); hist.unlock(slot); },
+					undo: async () => { await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area); },
+					redo: async () => { await this.setParamLabel(moduleIndex, paramIndex, label, area); },
 				});
 			}
 
@@ -1259,7 +1249,6 @@ export const useSlotsStore = defineStore('slots', {
 				const prevColorMap = matching.map((c) => ({ ...c }));
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
 							const orig = prevColorMap.find((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon);
 							return orig ? { ...c, colour: orig.colour } : c;
@@ -1268,9 +1257,8 @@ export const useSlotsStore = defineStore('slots', {
 						await window.cli.runBatch(prevColorMap.map((b) => ['set-cable-color', slot, location, String(b.colour),
 							String(b.smod), (b.dir ?? 1) === 0 ? '0' : '1', String(b.scon),
 							String(b.dmod), '0', String(b.dcon)]));
-						hist.unlock(slot);
 					},
-					redo: async () => { hist.lock(slot); await this.setCableColor(moduleIndex, connectorIndex, type, color, area); hist.unlock(slot); },
+					redo: async () => { await this.setCableColor(moduleIndex, connectorIndex, type, color, area); },
 				});
 			}
 
@@ -1306,15 +1294,13 @@ export const useSlotsStore = defineStore('slots', {
 				const deletedCables = matching.map((c) => ({ ...c }));
 				hist.record(slot, {
 					undo: async () => {
-						hist.lock(slot);
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this.slots[slot].rawHex = null;
 						await window.cli.runBatch(deletedCables.map((c) => ['add-cable', slot, location, String(c.colour),
 							String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon),
 							String(c.dmod), '0', String(c.dcon)]));
-						hist.unlock(slot);
 					},
-					redo: async () => { hist.lock(slot); await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area); hist.unlock(slot); },
+					redo: async () => { await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area); },
 				});
 			}
 
@@ -1435,31 +1421,56 @@ export const useSlotsStore = defineStore('slots', {
 				}
 
 				if (shouldRecord) {
+					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 					hist.record(slot, {
 						undo: async () => {
-							hist.lock(slot);
 							for (const mod of modSnaps) {
-								await this.addModuleWithData(mod, mod.index, mod.horiz, mod.vert, area);
+								mutAddModule(patch, areaIdx, { ...mod, lv: [...mod.lv], modes: [...mod.modes] });
+								const slotE = this.slots[slot];
+								if (slotE.variations) {
+									for (let v = 0; v < slotE.variations.length; v++) {
+										const start = v * mod.pcnt;
+										slotE.variations[v][areaKey][mod.index] = mod.lv.slice(start, start + mod.pcnt);
+									}
+								}
+							}
+							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
+							this.slots[slot].rawHex = null;
+							const allCmds: string[][] = [];
+							for (const mod of modSnaps) {
+								const paramVals0 = mod.lv.slice(0, mod.pcnt);
+								allCmds.push(['add-module', slot, location,
+									String(mod.type), String(mod.index), String(mod.horiz), String(mod.vert),
+									String(mod.colour), String(mod.modes.length), ...mod.modes.map(String),
+									String(mod.pcnt), ...paramVals0.map(String), mod.uname ?? '']);
+								const slotE = this.slots[slot];
+								if (slotE.variations) {
+									for (let v = 1; v < slotE.variations.length; v++) {
+										for (let p = 0; p < mod.pcnt; p++) {
+											const val = mod.lv[v * mod.pcnt + p];
+											if (val !== undefined && val !== paramVals0[p])
+												allCmds.push(['set-param', slot, location, String(mod.index), String(p), String(val), String(v)]);
+										}
+									}
+								}
 							}
 							for (const c of cableSnaps) {
-								const cNorm = { ...c, dir: c.dir ?? 1 };
-								mutAddCable(patch, areaIdx, cNorm);
-								this.slots[slot].rawHex = null;
-								await window.cli.run(['add-cable', slot, location, String(cNorm.colour),
-									String(cNorm.smod), cNorm.dir === 0 ? '0' : '1', String(cNorm.scon),
-									String(cNorm.dmod), '0', String(cNorm.dcon)]);
+								const cn = { ...c, dir: c.dir ?? 1 };
+								allCmds.push(['add-cable', slot, location, String(cn.colour),
+									String(cn.smod), cn.dir === 0 ? '0' : '1', String(cn.scon),
+									String(cn.dmod), '0', String(cn.dcon)]);
 							}
-							hist.unlock(slot);
+							for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
+								await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
+							}
 						},
 						redo: async () => {
-							hist.lock(slot);
 							const currentCtx = this._getActivePatch();
 							if (currentCtx) {
 								const currentMods = currentCtx.patch.areas[areaIdx].modules;
 								const currentCables = currentCtx.patch.areas[areaIdx].cableList ?? [];
 								await this.deleteSelection(selectedModules, selectedCables, area, currentMods, currentCables);
 							}
-							hist.unlock(slot);
 						},
 					});
 				}
@@ -1472,14 +1483,30 @@ export const useSlotsStore = defineStore('slots', {
 			const slot = useUiStore().slotInFocus;
 			const hist = useHistoryStore();
 			const entry = hist.popUndo(slot);
-			if (entry) await entry.undo();
+			if (!entry) return;
+			hist.lock(slot);
+			try {
+				await entry.undo();
+			} catch (err) {
+				console.warn('[undo] CLI failed (offline?):', err);
+			} finally {
+				hist.unlock(slot);
+			}
 		},
 
 		async redo(): Promise<void> {
 			const slot = useUiStore().slotInFocus;
 			const hist = useHistoryStore();
 			const entry = hist.popRedo(slot);
-			if (entry) await entry.redo();
+			if (!entry) return;
+			hist.lock(slot);
+			try {
+				await entry.redo();
+			} catch (err) {
+				console.warn('[redo] CLI failed (offline?):', err);
+			} finally {
+				hist.unlock(slot);
+			}
 		},
 	},
 });
