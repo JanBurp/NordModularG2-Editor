@@ -9,6 +9,10 @@ files:
   - dist-electron/**/*
   - resources/**/*
 
+extraResources:
+  - from: ../doc/help
+    to: doc/help
+
 mac:
   target:
     - dmg
