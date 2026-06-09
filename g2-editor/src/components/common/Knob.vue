@@ -1,12 +1,6 @@
 <template>
 	<div class="knob-wrapper" @dblclick="onDoubleClick()">
-		<svg
-			:width="radius * 2 + 10"
-			:height="radius + 16"
-			class="knob-svg"
-			@mousedown="onMouseDown"
-			@touchstart.passive="onMouseDown"
-		>
+		<svg :width="radius + 16" :height="radius + 16" class="knob-svg" @mousedown="onMouseDown" @touchstart.passive="onMouseDown">
 			<defs>
 				<!-- Local copy of the g120 radial gradient (avoids dependency on canvas SVG defs) -->
 				<radialGradient id="knob-gradient" gradientUnits="objectBoundingBox" cx="50%" cy="50%" r="70%">
@@ -16,9 +10,17 @@
 				</radialGradient>
 			</defs>
 			<!-- Offset group: matches ModuleKnob coordinate space, shifted by (1,4) for padding -->
-			<g transform="translate(1, 4)">
+			<g>
 				<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" />
-				<circle :r="radius" :cx="radius + 2" :cy="radius + 2" fill="url(#knob-gradient)" stroke="#333" stroke-width="0.5" :class="{ dragging: isDragging }" />
+				<circle
+					:r="radius"
+					:cx="radius + 2"
+					:cy="radius + 2"
+					fill="url(#knob-gradient)"
+					stroke="#333"
+					stroke-width="0.5"
+					:class="{ dragging: isDragging }"
+				/>
 				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
 				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
 				<line

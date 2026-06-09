@@ -1,32 +1,29 @@
 <template>
 	<ToolBar v-if="patchName">
 		<ToolBarLabel>Morph:</ToolBarLabel>
-		<template v-for="(name, i) in MORPH_NAMES" :key="i">
-			<div class="flex flex-col items-center gap-1">
-				<Knob
-					class="-mt-2"
-					:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
-					@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
-				/>
-				<MorphSourceSelect
-					:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
-					:morph-idx="i"
-					@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
-				/>
-			</div>
-		</template>
+		<div class="flex items-center gap-2">
+			<template v-for="(name, i) in MORPH_NAMES" :key="i">
+				<div class="flex flex-col items-center">
+					<Knob
+						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
+						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
+					/>
+					<MorphSourceSelect
+						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
+						:morph-idx="i"
+						@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
+					/>
+				</div>
+			</template>
+		</div>
 
-		<ToolBarLabel class="ml-auto">Patch<br />Level:</ToolBarLabel>
-		<div class="h-6 flex items-baseline">
-			<Knob
-				class="-mt-1"
-				:value="patchParams?.[uiStore.variation]?.patchVol ?? 100"
-				@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)"
-			/>
-			<Switch
-				:value="patchParams?.[uiStore.variation]?.activeMuted ?? 1"
-				paramType="ActiveMonitor"
-				@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val)"
+		<span class="ml-auto"></span>
+		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
+		<div class="h-6 flex items-center">
+			<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
+			<CheckBox
+				:model-value="(patchParams?.[uiStore.variation]?.activeMuted ?? 1) === 1"
+				@update:model-value="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val ? 1 : 0)"
 			/>
 		</div>
 	</ToolBar>
@@ -38,7 +35,7 @@
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import Knob from '../common/Knob.vue';
-	import Switch from '../common/Switch.vue';
+	import CheckBox from '../common/CheckBox.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
