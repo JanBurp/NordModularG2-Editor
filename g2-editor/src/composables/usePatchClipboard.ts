@@ -80,13 +80,10 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		await slotsStore.pasteModules(entries, area);
 
-		for (const cable of clipboard.cables) {
-			const newSmod = idMap.get(cable.smod);
-			const newDmod = idMap.get(cable.dmod);
-			if (newSmod === undefined || newDmod === undefined) continue;
-			const stype = cable.dir === 1 ? 1 : 0;
-			await slotsStore.addCable(newSmod, stype, cable.scon, newDmod, 0, cable.dcon, area, cable.colour);
-		}
+		const remappedCables = clipboard.cables
+			.filter((c) => idMap.has(c.smod) && idMap.has(c.dmod))
+			.map((c) => ({ newSmod: idMap.get(c.smod)!, newDmod: idMap.get(c.dmod)!, colour: c.colour, scon: c.scon, dcon: c.dcon, dir: c.dir }));
+		await slotsStore.pasteCables(remappedCables, area);
 
 		uiStore.selectModules(entries.map((e) => e.newId), destAreaKey);
 	}

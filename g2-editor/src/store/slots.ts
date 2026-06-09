@@ -419,8 +419,78 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 
+			const entry = this.slots[slot];
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const allCmds: string[][] = [];
+
 			for (const { src, newId, col, row } of entries) {
-				await this.addModuleWithData(src, newId, col, row, area);
+				const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+				mutAddModule(patch, areaIdx, mod);
+				if (entry.variations) {
+					for (let v = 0; v < entry.variations.length; v++) {
+						const start = v * src.pcnt;
+						entry.variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
+					}
+				}
+				const paramVals0 = src.lv.slice(0, src.pcnt);
+				allCmds.push([
+					'add-module', slot, location,
+					String(src.type), String(newId), String(col), String(row),
+					String(src.colour),
+					String(src.modes.length), ...src.modes.map(String),
+					String(src.pcnt), ...paramVals0.map(String),
+					src.uname ?? '',
+				]);
+				if (src.pcnt > 0 && entry.variations) {
+					for (let v = 1; v < entry.variations.length; v++) {
+						for (let p = 0; p < src.pcnt; p++) {
+							const val = src.lv[v * src.pcnt + p];
+							if (val !== undefined && val !== paramVals0[p]) {
+								allCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
+							}
+						}
+					}
+				}
+			}
+			entry.rawHex = null;
+
+			const CHUNK = 128;
+			try {
+				for (let i = 0; i < allCmds.length; i += CHUNK) {
+					await window.cli.runBatch(allCmds.slice(i, i + CHUNK));
+				}
+			} catch (err) {
+				console.warn('pasteModules batch CLI failed:', err);
+			}
+		},
+
+		async pasteCables(
+			cables: { newSmod: number; newDmod: number; colour: number; scon: number; dcon: number; dir: number }[],
+			area: 'voice' | 'fx',
+		): Promise<void> {
+			if (cables.length === 0) return;
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+
+			const cmds: string[][] = [];
+			for (const { newSmod, newDmod, colour, scon, dcon, dir } of cables) {
+				mutAddCable(patch, areaIdx, { colour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
+				const fromConType = dir === 1 ? 1 : 0;
+				cmds.push(['add-cable', slot, location, String(colour),
+					String(newSmod), String(fromConType), String(scon),
+					String(newDmod), '0', String(dcon)]);
+			}
+			this.slots[slot].rawHex = null;
+
+			const CHUNK = 128;
+			try {
+				for (let i = 0; i < cmds.length; i += CHUNK) {
+					await window.cli.runBatch(cmds.slice(i, i + CHUNK));
+				}
+			} catch (err) {
+				console.warn('pasteCables batch CLI failed:', err);
 			}
 		},
 
