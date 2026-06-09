@@ -29,7 +29,9 @@ export type MenuAction =
 	| 'variation-6'
 	| 'variation-7'
 	| 'variation-8'
-	| 'show-module-help';
+	| 'show-module-help'
+	| 'undo'
+	| 'redo';
 
 export interface SlotInfo {
 	slot: SlotLabel;

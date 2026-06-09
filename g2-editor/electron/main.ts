@@ -306,6 +306,9 @@ app.whenReady().then(async () => {
 		{
 			label: "Edit",
 			submenu: [
+				{ label: "Undo",       click: () => win!.webContents.send("menu:action", "undo"),       accelerator: "CommandOrControl+Z" },
+				{ label: "Redo",       click: () => win!.webContents.send("menu:action", "redo"),       accelerator: "Shift+CommandOrControl+Z" },
+				{ type: "separator" as const },
 				{ label: "Cut",        click: () => win!.webContents.send("menu:action", "cut"),        accelerator: "CommandOrControl+X" },
 				{ label: "Copy",       click: () => win!.webContents.send("menu:action", "copy"),       accelerator: "CommandOrControl+C" },
 				{ label: "Paste",      click: () => win!.webContents.send("menu:action", "paste"),      accelerator: "CommandOrControl+V" },

@@ -146,6 +146,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
 					break;
+				case 'undo': await slotsStore.undo(); break;
+				case 'redo': await slotsStore.redo(); break;
 				case 'show-module-help': {
 					if (!uiStore.selectedModules.length) {
 						uiStore.toggleAllModuleHelp();
