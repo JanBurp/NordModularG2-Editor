@@ -9,6 +9,7 @@
 				/>
 				<MorphSourceSelect
 					:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
+					:morph-idx="i"
 					@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
 				/>
 			</div>
