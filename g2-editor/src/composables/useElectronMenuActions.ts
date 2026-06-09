@@ -28,6 +28,11 @@ function makeEmptyPatch() {
 	};
 }
 
+function isInputFocused(): boolean {
+	const el = document.activeElement;
+	return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+}
+
 export function useElectronMenuActions(options: MenuActionOptions): void {
 	const { currentModules, currentPatch, handleSlotClick, handleVariationClick } = options;
 	const uiStore = useUiStore();
@@ -80,41 +85,27 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					if (slotsStore.isPerformanceMode && slotsStore.performanceRawHex) await slotsStore.savePerformance();
 					break;
 				case 'copy': {
-					const active = document.activeElement;
-					if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) break;
+					if (isInputFocused()) break;
 					copySelection();
 					break;
 				}
 				case 'cut': {
-					const active = document.activeElement;
-					if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) {
-						document.execCommand('cut');
-						break;
-					}
+					if (isInputFocused()) { document.execCommand('cut'); break; }
 					await cutSelection();
 					break;
 				}
 				case 'paste': {
-					const active = document.activeElement;
-					if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) break;
+					if (isInputFocused()) break;
 					await pasteClipboard();
 					break;
 				}
 				case 'delete': {
-					const active = document.activeElement;
-					if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) {
-						document.execCommand('delete');
-						break;
-					}
+					if (isInputFocused()) { document.execCommand('delete'); break; }
 					await deleteSelection();
 					break;
 				}
 				case 'select-all': {
-					const active = document.activeElement;
-					if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) {
-						(active as HTMLInputElement).select();
-						break;
-					}
+					if (isInputFocused()) { (document.activeElement as HTMLInputElement).select(); break; }
 					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number), uiStore.activeArea === 1 ? 'va' : 'fx');
 					break;
 				}
