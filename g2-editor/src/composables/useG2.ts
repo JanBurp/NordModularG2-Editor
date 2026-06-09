@@ -55,22 +55,42 @@ export function useG2() {
 		window.cli.offDeviceDisconnected();
 		window.cli.offWatchDone();
 		let resolveArmed!: () => void;
-		const armed = new Promise<void>((r) => { resolveArmed = r; });
+		let rejectArmed!: (e: Error) => void;
+		const armed = new Promise<void>((resolve, reject) => { resolveArmed = resolve; rejectArmed = reject; });
+		let activityTimer: ReturnType<typeof setTimeout> | null = null;
 
 		window.cli.onDeviceDisconnected(() => {
+			const wasRunning = isDaemonRunning.value;
 			isDaemonRunning.value = false;
-			store.status = DeviceStatus.Lost;
-			log('•', 'Connect', 'Daemon exited unexpectedly');
+			if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+			if (wasRunning) {
+				store.status = DeviceStatus.Lost;
+				log('•', 'Connect', 'Daemon exited unexpectedly');
+			} else {
+				rejectArmed(new Error('Daemon exited'));
+			}
 		});
 		window.cli.onWatchDone(() => {
+			const wasRunning = isDaemonRunning.value;
 			isDaemonRunning.value = false;
 			window.cli.offWatchDone();
+			if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+			if (!wasRunning) rejectArmed(new Error('Daemon finished'));
 		});
 
 		window.cli.onWatchEvent(async (line: string) => {
+			// Reset inactivity timer on every event — allows startup sequences longer than 2s
+			if (activityTimer !== null) {
+				clearTimeout(activityTimer);
+				activityTimer = setTimeout(() => rejectArmed(new Error('Connection timeout')), 2000);
+			}
 			try {
 				const ev = JSON.parse(line);
-				if (ev.type === 'watch_armed') { resolveArmed(); return; }
+				if (ev.type === 'watch_armed') {
+					if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+					resolveArmed();
+					return;
+				}
 				if (ev.type === 'device_disconnected') { store.status = DeviceStatus.Lost; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
 				if (ev.type === 'device_reconnected') { store.status = DeviceStatus.Connected; log('•', 'Connect', 'G2 reconnected'); return; }
 				if (ledEvents.handleEvent(ev)) return;
@@ -85,12 +105,15 @@ export function useG2() {
 		});
 
 		await window.cli.watchStart();
+		activityTimer = setTimeout(() => rejectArmed(new Error('Connection timeout')), 2000);
 		await armed;
+		// activityTimer already null'd when watch_armed was handled (or null'd by error paths)
 		isDaemonRunning.value = true;
 		log('•', 'Watch', 'Started');
 	}
 
 	function stopWatch(): void {
+		isDaemonRunning.value = false;
 		window.cli.watchStop();
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
@@ -104,9 +127,9 @@ export function useG2() {
 			return;
 		}
 		store.status = DeviceStatus.Connecting;
-		await startWatch();
-		log('→', 'Connect', 'Connecting to G2...');
 		try {
+			await startWatch();
+			log('→', 'Connect', 'Connecting to G2...');
 			await store.connect();
 			log('←', 'Connect', `${store.device?.synthName ?? ''} (${store.device?.mode})`);
 			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
@@ -114,6 +137,7 @@ export function useG2() {
 		} catch (e: any) {
 			store.status = DeviceStatus.Disconnected;
 			log('←', 'Connect', `G2 not found: ${e.message}`);
+			stopWatch();
 		}
 	}
 
