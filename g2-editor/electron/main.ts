@@ -224,7 +224,9 @@ ipcMain.handle("perf:save-dialog", async (event, defaultName?: string) => {
 });
 
 ipcMain.handle("help:load", (_, shortName: string) => {
-	const helpDir = path.join(process.env.APP_ROOT!, "..", "doc", "help");
+	const helpDir = app.isPackaged
+		? path.join(process.resourcesPath, "doc", "help")
+		: path.join(process.env.APP_ROOT!, "..", "doc", "help");
 	const filePath = path.join(helpDir, `${shortName}.md`);
 	try {
 		return fs.readFileSync(filePath, "utf-8");
