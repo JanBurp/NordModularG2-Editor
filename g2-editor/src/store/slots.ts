@@ -34,6 +34,8 @@ function parseResourceMemory(d: number[], o: number): number {
 
 export type { SlotLabel };
 
+const BATCH_CHUNK = 128;
+
 const _paramDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function scheduleSend(key: string, cmd: string[], delayMs = 80): void {
@@ -317,6 +319,159 @@ export const useSlotsStore = defineStore('slots', {
 			]);
 
 			return { name: this.slots[slot].name, rawHex: '', patch };
+		},
+
+		async addModuleWithData(
+			src: ModuleInstance,
+			newId: number,
+			col: number,
+			row: number,
+			area: 'voice' | 'fx',
+		): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+
+			const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+			mutAddModule(patch, areaIdx, mod);
+
+			const paramVals0 = src.lv.slice(0, src.pcnt);
+			const entry = this.slots[slot];
+			if (entry.variations) {
+				for (let v = 0; v < entry.variations.length; v++) {
+					const start = v * src.pcnt;
+					entry.variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
+				}
+			}
+			entry.rawHex = null;
+
+			try {
+				await window.cli.run([
+					'add-module', slot, location,
+					String(src.type), String(newId), String(col), String(row),
+					String(src.colour),
+					String(src.modes.length), ...src.modes.map(String),
+					String(src.pcnt), ...paramVals0.map(String),
+					src.uname ?? '',
+				]);
+			} catch (err) {
+				console.warn('add-module CLI failed:', err);
+			}
+
+			if (src.pcnt > 0 && entry.variations) {
+				const varCmds: string[][] = [];
+				for (let v = 1; v < entry.variations.length; v++) {
+					for (let p = 0; p < src.pcnt; p++) {
+						const val = src.lv[v * src.pcnt + p];
+						if (val !== undefined && val !== paramVals0[p]) {
+							varCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
+						}
+					}
+				}
+				if (varCmds.length > 0) {
+					try {
+						await window.cli.runBatch(varCmds);
+					} catch (err) {
+						console.warn('set-param batch CLI failed:', err);
+					}
+				}
+			}
+		},
+
+		async paste(
+			entries: { src: ModuleInstance; newId: number; col: number; row: number }[],
+			cables: { newSmod: number; newDmod: number; colour: number; scon: number; dcon: number; dir: number }[],
+			area: 'voice' | 'fx',
+		): Promise<void> {
+			if (entries.length === 0) return;
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+			const { getModule } = await import('../renderer/nmg2mods');
+			const currentModules = patch.areas[areaIdx].modules;
+			const newIdSet = new Set(entries.map((e) => e.newId));
+
+			// Collect occupant rects per target column
+			const occupantsByCol = new Map<number, { row: number; height: number }[]>();
+			for (const e of entries) {
+				const height = getModule(e.src.type)?.height ?? 2;
+				if (!occupantsByCol.has(e.col)) occupantsByCol.set(e.col, []);
+				occupantsByCol.get(e.col)!.push({ row: e.row, height });
+			}
+
+			// Resolve collisions: push existing modules down to make room
+			const pushDowns: { index: number; col: number; newRow: number }[] = [];
+			for (const [col, occupants] of occupantsByCol) {
+				const stationary = currentModules
+					.filter((m) => m.horiz === col && !newIdSet.has(m.index))
+					.map((m) => ({ index: m.index, vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
+				for (const d of resolveColumnCollisions(stationary, occupants)) {
+					pushDowns.push({ index: d.index, col, newRow: d.newRow });
+				}
+			}
+			if (pushDowns.length > 0) {
+				for (const p of pushDowns) mutMoveModule(patch, areaIdx, p.index, p.col, p.newRow);
+				this.slots[slot].rawHex = null;
+				try {
+					await window.cli.runBatch(pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]));
+				} catch (err) {
+					console.warn('move-module batch CLI failed:', err);
+				}
+			}
+
+			const entry = this.slots[slot];
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const allCmds: string[][] = [];
+
+			for (const { src, newId, col, row } of entries) {
+				const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+				mutAddModule(patch, areaIdx, mod);
+				if (entry.variations) {
+					for (let v = 0; v < entry.variations.length; v++) {
+						const start = v * src.pcnt;
+						entry.variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
+					}
+				}
+				const paramVals0 = src.lv.slice(0, src.pcnt);
+				allCmds.push([
+					'add-module', slot, location,
+					String(src.type), String(newId), String(col), String(row),
+					String(src.colour),
+					String(src.modes.length), ...src.modes.map(String),
+					String(src.pcnt), ...paramVals0.map(String),
+					src.uname ?? '',
+				]);
+				if (src.pcnt > 0 && entry.variations) {
+					for (let v = 1; v < entry.variations.length; v++) {
+						for (let p = 0; p < src.pcnt; p++) {
+							const val = src.lv[v * src.pcnt + p];
+							if (val !== undefined && val !== paramVals0[p]) {
+								allCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
+							}
+						}
+					}
+				}
+			}
+
+			for (const { newSmod, newDmod, colour, scon, dcon, dir } of cables) {
+				mutAddCable(patch, areaIdx, { colour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
+				const fromConType = dir === 1 ? 1 : 0;
+				allCmds.push(['add-cable', slot, location, String(colour),
+					String(newSmod), String(fromConType), String(scon),
+					String(newDmod), '0', String(dcon)]);
+			}
+
+			entry.rawHex = null;
+			try {
+				for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
+					await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
+				}
+			} catch (err) {
+				console.warn('paste batch CLI failed:', err);
+			}
 		},
 
 		async addCable(

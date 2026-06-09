@@ -94,6 +94,12 @@ export interface Patch {
 	patchParams?: PatchParamVariation[];
 }
 
+export interface ClipboardEntry {
+	modules: ModuleInstance[];
+	cables: Cable[];
+	area: 'va' | 'fx';
+}
+
 export const VOICEMODE_OPTIONS = [
 	{ id: 0, name: 'Poly' },
 	{ id: 1, name: 'Mono' },

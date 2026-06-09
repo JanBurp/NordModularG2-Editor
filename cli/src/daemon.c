@@ -146,6 +146,8 @@ static void rearm_with_version_update(void) {
 #define SEQ_MAX_OPS   128
 #define SEQ_OP_BUFSZ 1024  /* large enough for set-param-label worst case */
 
+typedef struct { int loc, mod, param, val, var; } SetParamEntry;
+
 static int execute_seq(cJSON *args) {
     int n_subs = cJSON_GetArraySize(args);
     if (n_subs == 0) return G2_OK;
@@ -155,7 +157,8 @@ static int execute_seq(cJSON *args) {
     uint8_t *pool = malloc((size_t)limit * SEQ_OP_BUFSZ);
     if (!ops || !pool) { free(ops); free(pool); return G2_ERR_NO_MEMORY; }
 
-    int n_ops = 0, batch_slot = -1, ret = G2_OK;
+    SetParamEntry sp_entries[SEQ_MAX_OPS];
+    int n_ops = 0, n_sp = 0, batch_slot = -1, ret = G2_OK;
 
     for (int si = 0; si < limit && ret == G2_OK; si++) {
         cJSON *sub = cJSON_GetArrayItem(args, si);
@@ -226,6 +229,11 @@ static int execute_seq(cJSON *args) {
                 arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_s(sub,6));
             n_ops++;
 
+        } else if (strcmp(scmd, "set-param") == 0 && sn >= 7) {
+            /* CMD_NO_RESP — cannot go in the compound frame; queued for after */
+            if (n_sp < SEQ_MAX_OPS)
+                sp_entries[n_sp++] = (SetParamEntry){ s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6) };
+
         } else {
             ret = G2_ERR_INVALID_PARAM;
         }
@@ -233,6 +241,10 @@ static int execute_seq(cJSON *args) {
 
     if (ret == G2_OK && n_ops > 0)
         ret = g2_batch_ops(batch_slot, ops, n_ops);
+
+    for (int i = 0; i < n_sp && ret == G2_OK; i++)
+        ret = g2_set_param(batch_slot, sp_entries[i].loc, sp_entries[i].mod,
+                           sp_entries[i].param, sp_entries[i].val, sp_entries[i].var);
 
     free(ops);
     free(pool);
