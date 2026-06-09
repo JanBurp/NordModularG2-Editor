@@ -1,6 +1,5 @@
-import { computed, ref } from 'vue';
+import { ref } from 'vue';
 
-import { Device, SlotLabel } from '@/types';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useDeviceEvents } from './useDeviceEvents';
 import { useLedEvents } from './useLedEvents';
@@ -19,8 +18,6 @@ export interface UsbLogEntry {
 
 export type LogFn = (direction: '→' | '←' | '•', event: string, message: string, category?: UsbLogEntry['category']) => void;
 
-let logId = 0;
-
 function now(): string {
 	const d = new Date();
 	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
@@ -28,23 +25,13 @@ function now(): string {
 
 export function useG2() {
 	const store = useDeviceStore();
-	const logs = ref<UsbLogEntry[]>([]);
 	const isDaemonRunning = ref(false);
 
 	const log: LogFn = (direction, event, message, category) => {
-		const entry: UsbLogEntry = { id: ++logId, timestamp: now(), direction, event, message, category };
-		logs.value.push(entry);
 		if (category !== 'led' && category !== 'volume') {
-			console.log(`[USB] ${entry.timestamp} ${entry.direction} ${entry.event} ${entry.message}`);
+			console.log(`[USB] ${now()} ${direction} ${event} ${message}`);
 		}
 	};
-
-	function clearLogs(): void {
-		logs.value = [];
-	}
-
-	const deviceStatus = computed<DeviceStatus>(() => store.status);
-	const device = computed<Device | null>(() => store.device);
 
 	const deviceEvents = useDeviceEvents(log);
 	const slotEvents = useSlotEvents(log);
@@ -130,7 +117,7 @@ export function useG2() {
 		try {
 			await startWatch();
 			log('→', 'Connect', 'Connecting to G2...');
-			await store.connect();
+			store.status = DeviceStatus.Connected;
 			log('←', 'Connect', `${store.device?.synthName ?? ''} (${store.device?.mode})`);
 			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
 			for (const slot of activeSlots) slotEvents.fetchSlotResources(slot);
@@ -157,31 +144,10 @@ export function useG2() {
 		return await connectDevice();
 	}
 
-	async function uploadToG2<T extends Record<string, any>>(patch: T | null): Promise<void> {
-		if (!patch) { log('•', 'Upload', 'No patch to upload'); return; }
-		if (store.status !== DeviceStatus.Connected) { log('•', 'Upload', 'G2 not connected'); return; }
-		log('→', 'Upload', 'Upload not yet implemented');
-	}
-
-	async function downloadFromG2(): Promise<void> {
-		if (store.status !== DeviceStatus.Connected) { log('•', 'Download', 'G2 not connected'); return; }
-		log('→', 'Download', 'Download not yet implemented');
-	}
-
 	return {
-		deviceStatus,
-		device,
-		usbLogs: logs,
-		clearLogs,
 		connectDevice,
-		disconnectDevice,
 		toggleConnection,
-		startWatch,
-		stopWatch,
-		uploadToG2,
-		downloadFromG2,
 		hardwareVariationChange: slotEvents.hardwareVariationChange,
 		hardwareSlotChange: slotEvents.hardwareSlotChange,
-		isDaemonRunning,
 	};
 }
