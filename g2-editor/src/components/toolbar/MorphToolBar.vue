@@ -1,5 +1,6 @@
 <template>
 	<ToolBar v-if="patchName">
+		<ToolBarLabel>Morph:</ToolBarLabel>
 		<template v-for="(name, i) in MORPH_NAMES" :key="i">
 			<div class="flex flex-col items-center gap-1">
 				<Knob
@@ -15,10 +16,8 @@
 			</div>
 		</template>
 
-		<ToolBarDivider />
-
-		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
-		<div class="module-bevel px-1 h-6 flex items-baseline">
+		<ToolBarLabel class="ml-auto">Patch<br />Level:</ToolBarLabel>
+		<div class="h-6 flex items-baseline">
 			<Knob
 				class="-mt-1"
 				:value="patchParams?.[uiStore.variation]?.patchVol ?? 100"
