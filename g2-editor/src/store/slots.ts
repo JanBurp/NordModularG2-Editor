@@ -34,6 +34,8 @@ function parseResourceMemory(d: number[], o: number): number {
 
 export type { SlotLabel };
 
+const BATCH_CHUNK = 128;
+
 const _paramDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
 
 function scheduleSend(key: string, cmd: string[], delayMs = 80): void {
@@ -378,8 +380,9 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		async pasteModules(
+		async paste(
 			entries: { src: ModuleInstance; newId: number; col: number; row: number }[],
+			cables: { newSmod: number; newDmod: number; colour: number; scon: number; dcon: number; dir: number }[],
 			area: 'voice' | 'fx',
 		): Promise<void> {
 			if (entries.length === 0) return;
@@ -452,45 +455,22 @@ export const useSlotsStore = defineStore('slots', {
 					}
 				}
 			}
-			entry.rawHex = null;
 
-			const CHUNK = 128;
-			try {
-				for (let i = 0; i < allCmds.length; i += CHUNK) {
-					await window.cli.runBatch(allCmds.slice(i, i + CHUNK));
-				}
-			} catch (err) {
-				console.warn('pasteModules batch CLI failed:', err);
-			}
-		},
-
-		async pasteCables(
-			cables: { newSmod: number; newDmod: number; colour: number; scon: number; dcon: number; dir: number }[],
-			area: 'voice' | 'fx',
-		): Promise<void> {
-			if (cables.length === 0) return;
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot, patch } = ctx;
-			const { areaIdx, location } = areaConfig(area);
-
-			const cmds: string[][] = [];
 			for (const { newSmod, newDmod, colour, scon, dcon, dir } of cables) {
 				mutAddCable(patch, areaIdx, { colour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
 				const fromConType = dir === 1 ? 1 : 0;
-				cmds.push(['add-cable', slot, location, String(colour),
+				allCmds.push(['add-cable', slot, location, String(colour),
 					String(newSmod), String(fromConType), String(scon),
 					String(newDmod), '0', String(dcon)]);
 			}
-			this.slots[slot].rawHex = null;
 
-			const CHUNK = 128;
+			entry.rawHex = null;
 			try {
-				for (let i = 0; i < cmds.length; i += CHUNK) {
-					await window.cli.runBatch(cmds.slice(i, i + CHUNK));
+				for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
+					await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
 				}
 			} catch (err) {
-				console.warn('pasteCables batch CLI failed:', err);
+				console.warn('paste batch CLI failed:', err);
 			}
 		},
 

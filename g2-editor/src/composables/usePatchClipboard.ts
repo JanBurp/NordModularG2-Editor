@@ -45,9 +45,6 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const clipboard = uiStore.clipboard;
 		if (!clipboard || clipboard.modules.length === 0) return;
 
-		const active = document.activeElement;
-		if (active instanceof HTMLInputElement || active instanceof HTMLTextAreaElement || active instanceof HTMLSelectElement) return;
-
 		// Destination area: use mouse position's area if known, else active area
 		const mousePos = uiStore.lastMousePos;
 		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : (uiStore.activeArea === 1 ? 'va' : 'fx');
@@ -78,12 +75,10 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 			row: Math.max(0, mod.vert + dRow),
 		}));
 
-		await slotsStore.pasteModules(entries, area);
-
 		const remappedCables = clipboard.cables
 			.filter((c) => idMap.has(c.smod) && idMap.has(c.dmod))
 			.map((c) => ({ newSmod: idMap.get(c.smod)!, newDmod: idMap.get(c.dmod)!, colour: c.colour, scon: c.scon, dcon: c.dcon, dir: c.dir }));
-		await slotsStore.pasteCables(remappedCables, area);
+		await slotsStore.paste(entries, remappedCables, area);
 
 		uiStore.selectModules(entries.map((e) => e.newId), destAreaKey);
 	}

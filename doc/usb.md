@@ -1040,11 +1040,14 @@ The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_
   ["add-module",       "<slot>", "<loc>", type, id, col, row, colour, n_modes, mode0..., n_params, param0..., "name"],
   ["set-module-color", "<slot>", "<loc>", module_id, color],
   ["set-module-name",  "<slot>", "<loc>", module_id, "name"],
-  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, label_idx, "label"]
+  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, label_idx, "label"],
+  ["set-param",        "<slot>", "<loc>", module_id, param_idx, value, variation]
 ]}
 ```
 
 Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
+
+> **`set-param` in `seq` — deferred execution:** `set-param` uses `COMMAND_WRITE_NO_RESP` and cannot be packed into the compound USB frame. The daemon queues all `set-param` entries into a `SetParamEntry[]` array and executes them sequentially via `g2_set_param()` **after** `g2_batch_ops()` returns. This keeps structural mutations (add/del/move module, add/del cable) atomic in one frame while still allowing parameter values in the same `seq` call — essential for copy/paste of modules with non-default variation values.
 
 ### Key Properties
 
