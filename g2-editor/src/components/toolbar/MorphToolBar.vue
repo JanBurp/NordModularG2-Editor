@@ -1,6 +1,6 @@
 <template>
 	<ToolBar v-if="patchName">
-		<ToolBarLabel>Morph:</ToolBarLabel>
+		<ToolBarLabel class="w-10">Morphs:</ToolBarLabel>
 		<div class="flex items-center gap-2">
 			<template v-for="(name, i) in MORPH_NAMES" :key="i">
 				<div class="flex flex-col items-center">
@@ -18,8 +18,8 @@
 		</div>
 
 		<span class="ml-auto"></span>
-		<ToolBarLabel>Patch<br />Level:</ToolBarLabel>
-		<div class="h-6 flex items-center">
+		<ToolBarLabel>Patch Level:</ToolBarLabel>
+		<div class="h-6 flex items-center gap-2">
 			<Knob :value="patchParams?.[uiStore.variation]?.patchVol ?? 100" @change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)" />
 			<CheckBox
 				:model-value="(patchParams?.[uiStore.variation]?.activeMuted ?? 1) === 1"

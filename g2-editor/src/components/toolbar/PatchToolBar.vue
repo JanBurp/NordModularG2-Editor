@@ -1,6 +1,6 @@
 <template>
 	<ToolBar v-if="patchName">
-		<ToolBarLabel class="w-8">Patch:</ToolBarLabel>
+		<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
 		<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 
 		<div class="flex items-center gap-1.5">
