@@ -5,7 +5,7 @@
 	<div class="flex flex-col h-screen">
 		<ToolBar>
 			<template v-if="device">
-				<ToolBarLabel class="w-8">Perf:</ToolBarLabel>
+				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
 				<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
 				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
