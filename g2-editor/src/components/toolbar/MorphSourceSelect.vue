@@ -1,13 +1,13 @@
 <template>
-	<div class="morph-source-btn" @click="emit('update:modelValue', (modelValue + 1) % 8)">
-		{{ MORPH_NAMES[modelValue] }}
+	<div class="morph-source-btn" @click="emit('update:modelValue', (modelValue + 1) % MORPH_MODE_OPTIONS[morphIdx].length)">
+		{{ MORPH_MODE_OPTIONS[morphIdx][modelValue] }}
 	</div>
 </template>
 
 <script setup lang="ts">
-	import { MORPH_NAMES } from '../../types/patch';
+	import { MORPH_MODE_OPTIONS } from '../../types/patch';
 
-	defineProps<{ modelValue: number }>();
+	defineProps<{ modelValue: number; morphIdx: number }>();
 	const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
 </script>
 

@@ -71,6 +71,15 @@ export function useSlotEvents(log: LogFn) {
 			log('←', 'Watch', `patch_param s=${ev.slot} m=${ev.module} p=${ev.param} v=${ev.value} var=${ev.variation}`, 'param');
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
+			if (ev.module === 1) {
+				// Section 1 = morphs: params 0–7 are dials, 8–15 are modes
+				const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
+				if (vState) {
+					if ((ev.param as number) < 8) vState.patch.morphDials[ev.param as number] = ev.value as number;
+					else vState.patch.morphModes[(ev.param as number) - 8] = ev.value as number;
+				}
+				return true;
+			}
 			// Hardware sends section-local param indices; ev.module holds the section ID (2–7).
 			// Section offsets map to global PATCH_PARAM_KEYS indices.
 			const SECTION_OFFSETS: Record<number, number> = { 2: 0, 3: 2, 4: 4, 5: 6, 6: 9, 7: 13 };

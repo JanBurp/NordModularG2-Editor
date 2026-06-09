@@ -837,6 +837,9 @@ export const useSlotsStore = defineStore('slots', {
 			if (field === 'dial') patch.morphDials[morphIdx] = value;
 			else patch.morphModes[morphIdx] = value;
 			entry.rawHex = null;
+			const param = field === 'dial' ? morphIdx : 8 + morphIdx;
+			scheduleSend(`${slot}:patch:1:${param}:${variation}`,
+				['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
