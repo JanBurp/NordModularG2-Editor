@@ -20,8 +20,8 @@ export function useSlotEvents(log: LogFn) {
 		pendingResourceFetch.add(slot);
 		try {
 			const out = await window.cli.run(['get-resources', slot]);
-			const parsed = JSON.parse(out) as { data: number[] };
-			if (Array.isArray(parsed.data)) slotsStore.updateResources(slot, parsed.data);
+			const parsed = JSON.parse(out);
+			if (Array.isArray(parsed)) slotsStore.updateResources(slot, parsed);
 		} catch {
 			// patch may not be loaded in this slot
 		} finally {
