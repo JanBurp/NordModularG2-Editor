@@ -71,11 +71,6 @@ export const useDeviceStore = defineStore('device', {
 	},
 
 	actions: {
-		async connect() {
-			// Device/slot/names data arrives as startup events in useG2.startWatch()
-			this.status = DeviceStatus.Connected;
-		},
-
 		applyDeviceInfo(data: Device) {
 			this.device = data;
 		},
