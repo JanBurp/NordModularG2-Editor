@@ -13,6 +13,7 @@
 			:height="canvasHeight"
 			xmlns="http://www.w3.org/2000/svg"
 			@mousedown="handleCanvasMousedown"
+			@mousemove="handleSvgMouseMove"
 			@click="
 				emit('canvasClick');
 				handleCanvasClick();
@@ -64,6 +65,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
+	import { useUiStore } from '../../store/ui';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 
 	const props = defineProps({
@@ -185,6 +187,24 @@
 	);
 
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
+
+	const uiStore = useUiStore();
+
+	function handleSvgMouseMove(e: MouseEvent) {
+		const svg = svgRef.value;
+		if (!svg?.getScreenCTM) return;
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return;
+		const pt = svg.createSVGPoint();
+		pt.x = e.clientX;
+		pt.y = e.clientY;
+		const svgPt = pt.matrixTransform(ctm.inverse());
+		uiStore.lastMousePos = {
+			col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
+			row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),
+			area: props.area as 'va' | 'fx',
+		};
+	}
 
 	onUnmounted(() => {
 		clearModuleDrag();
