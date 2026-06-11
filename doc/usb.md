@@ -205,20 +205,20 @@ However, some commands that need to be version-matched use the **performance ver
 |---------|------|-------------|----------|
 | `0x02` | GET_SYNTH_SETTINGS | — | Extended bulk (§10) |
 | `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10a) | Embedded ACK |
-| `0x04` | GET_ASSIGNED_VOICES | — | Embedded; 4 voice counts at `[5..8]` |
+| `0x04` | GET_ASSIGNED_VOICES *(not implemented yet)* | — | Embedded; 4 voice counts at `[5..8]` |
 | `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
-| `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
+| `0x0B ss bb ll` | STORE (slot→bank) *(not implemented yet)* | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0C tt bb ll 00` | CLEAR *(not implemented yet)* | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
+| `0x0E tt bb ff tt 00` | CLEAR_BANK *(not implemented yet)* | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
-| `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
-| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not in CLI)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
+| `0x17 tt bb ll` | PATCH_BANK_UPLOAD *(not implemented yet)* | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
+| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not implemented yet)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
-| `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
-| `0x3D` | MIDI_DUMP | — | None |
+| `0x3B` | GET_MASTER_CLOCK *(not implemented yet)* | — | Embedded (`R_EXT_MASTER_CLOCK`) |
+| `0x3D` | MIDI_DUMP *(not implemented yet)* | — | None |
 | `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Bulk `0x0C/0x1F` version_update (see §13) |
-| `0x56 oo nn` | PLAY_NOTE | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
+| `0x56 oo nn` | PLAY_NOTE *(not implemented yet)* | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
 | `0x81` | UNKNOWN_1 (init query) | — | Extended bulk |
@@ -239,8 +239,8 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
-| `0x59` | UNKNOWN_2 (perf init query) | — | Embedded ACK |
-| `0x5E` | GET_GLOBAL_KNOBS | — | Extended bulk |
+| `0x59` | UNKNOWN_2 (perf init query) *(not implemented yet)* | — | Embedded ACK |
+| `0x5E` | GET_GLOBAL_KNOBS *(not implemented yet)* | — | Extended bulk |
 
 ### SELECT_SLOT command
 
@@ -310,10 +310,10 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 |---------|------|-------------|----------|
 | `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
-| `0x2A` | SET_UPRATE_MODE *(not in CLI)* | `loc mod uprate` | Embedded ACK |
+| `0x2A` | SET_UPRATE_MODE *(not implemented yet)* | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
-| `0x2E` | GET_SELECTED_PARAM | — | Embedded; area/module/param at `[5..7]` |
-| `0x2F` | SEL_PARAM | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
+| `0x2E` | GET_SELECTED_PARAM *(not implemented yet)* | — | Embedded; area/module/param at `[5..7]` |
+| `0x2F` | SEL_PARAM *(not implemented yet)* | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
 | `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
 | `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
 | `0x32` | DEL_MODULE | `loc mod_id` | Embedded ACK |
@@ -324,22 +324,24 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
 | `0x42` | SET_PARAM_LABEL | `loc mod_id param_idx label_idx label` | Embedded ACK |
-| `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
-| `0x44` | COPY_VARIATION | `from to` | Embedded ACK |
-| `0x4C` | GET_PARAMS | `location` | Extended bulk |
-| `0x4F` | GET_PARAM_NAMES | `location` | Extended bulk |
+| `0x43` | SET_MORPH_RANGE *(not implemented yet)* | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
+| `0x44` | COPY_VARIATION *(not implemented yet)* | `from to` | Embedded ACK |
+| `0x4C` | GET_PARAMS *(not implemented yet)* | `location` | Extended bulk |
+| `0x4F` | GET_PARAM_NAMES *(not implemented yet)* | `location` | Extended bulk |
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con color` | Embedded ACK |
-| `0x55` | CTRL_SNAPSHOT | — | Embedded ACK |
-| `0x68` | GET_CURRENT_NOTE | — | Embedded; note/velocity at `[5..6]` |
+| `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
+| `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
-| `0x6E` | GET_PATCH_NOTES *(not in CLI)* | — | Extended bulk (patch notes text) |
-| `0x6F` | SET_PATCH_NOTES | patch notes chunk | Embedded ACK |
-| `0x70` | UNKNOWN_6 | — | Embedded ACK |
+| `0x6E` | GET_PATCH_NOTES *(not implemented yet)* | — | Extended bulk (patch notes text) |
+| `0x6F` | SET_PATCH_NOTES *(not implemented yet)* | patch notes chunk | Embedded ACK |
+| `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
 
 ### Knob & MIDI Assignment Sub-Commands
+
+*(None of these are implemented in the CLI.)*
 
 These are combined into slot-command messages. Each message can contain multiple sub-operations via `AddXxxMessage` calls:
 
