@@ -21,7 +21,7 @@ All commands are send to the Daemon (or CLI) via stdin.
 This CLI / Daemon approach makes it possible to use the CLI/Daemon on it's own, or to be used in a different editor.
 There are commands for connecting, transfering patches, editing patches, editing settings etc.
 
-###
+### ElectronJS
 
 ElectronJS is used for the actual editor. It can run in an offline mode without the daemon (so without connected G2) to edit only files. In the default online mode it communicates with the G2 through the daemon.
 
@@ -29,6 +29,11 @@ ElectronJS is used for the actual editor. It can run in an offline mode without 
 
 - `cli/` — C CLI tool for USB communication with the G2 hardware
 - `g2-editor/` — Electron desktop app (Vue 3 + TypeScript)
+
+## Documentation
+
+- [USB Protocol](doc/usb.md) — USB framing, commands, watch events, daemon architecture
+- [Patch File Format](doc/parsing.md) — PCH2/PRF2 binary format, sections, bit encoding
 
 ## Build
 

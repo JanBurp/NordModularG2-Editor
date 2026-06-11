@@ -1,6 +1,6 @@
 # Nord G2 USB Protocol
 
-Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the original Delphi editor (`BVE.NMG2USB.pas`), and cross-checked with the Python tool `g2ools/g2ctl.py`.
+Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the Delphi editor and cross-checked with the g2ools Python tool.
 
 ---
 
