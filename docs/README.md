@@ -30,7 +30,13 @@ Download the latest version from the [Releases page](https://github.com/JanBurp/
 
 ### macOS
 1. Open the `.dmg` and drag **G2 Editor** to your Applications folder.
-2. On first launch macOS may block the app because it is not signed. Right-click (or Control-click) the app icon and choose **Open**, then confirm.
+2. On first launch macOS may block the app because it is not notarized:
+   - If you see **"unidentified developer"**: Right-click (or Control-click) the app icon, choose **Open**, then confirm.
+   - If you see **"damaged and can't be opened"**: open Terminal and run:
+     ```
+     xattr -cr /Applications/G2\ Editor.app
+     ```
+     Then launch the app normally.
 
 ### Windows
 Run the `.exe` installer and follow the steps.
