@@ -1,5 +1,7 @@
 # Nord Modular G2 - Editor
 
+[GitHub Page](https://github.com/JanBurp/NordModularG2-Editor)
+
 Editor for the Nord Modular G2 - For macOS, Windows and (later) Linux.
 
 The original editor by Clavia does not work on macOS. A new editor, for all platforms, would benefit the future of the Nord G2.
@@ -42,7 +44,7 @@ Download the latest version from the [Releases page](https://github.com/JanBurp/
 Run the `.exe` installer and follow the steps.
 
 ### Help
-See the [help file](../doc/help.md) for keyboard shortcuts, module editing, cabling, and more.
+See the [help file](help.md) for keyboard shortcuts, module editing, cabling, and more.
 
 ## How to contribute
 
