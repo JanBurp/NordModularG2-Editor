@@ -53,41 +53,34 @@ You could contribute:
 
 - [x] Core USB Communication: connecting, disconnecting
 - [x] Startup sequence, getting device info, patches from the slots, and list of patches and performances
-- [x] Parsing of the patch data
-- [x] Rendering of the patch (some modules and parameters needs attention)
+- [x] Parsing patch data
+- [x] Basic rendering of a patch
 - [x] Switch Slots & Variations (in editor & G2, synced)
-- [x] Load & Save pch2 file
-- [x] Load patch from synth
-- [x] Adding, deleting, moving and change colors of modules. (also multiple modules)
-- [x] Rename module
-- [x] Adding and deleting cables
-- [x] Change color of cable
-- [x] Watch params change in editor, while changed on G2 - not tested with all params
-- [x] Change params in editor and sync to G2 - not tested with all params
-- [x] Switching perf/patch mode
-- [x] Update Led's
-- [x] Update VU meters
-- [x] Update CPU
-- [x] Editing performance / patch name
-- [x] Starting/stopping Clock
-- [x] Change Clock Speed
+- [x] Load & Save pch2 file (and from synth)
 - [x] Loading performances (file/synth)
+- [x] Editing modules: adding, deleting, moving, change colors (also multiple modules)
+- [x] Editing cables: adding, deleting, change color of cable
+- [x] Watch params change in editor, while changed on G2
+- [x] Change params in editor and sync to G2
+- [x] Switching perf/patch mode
+- [x] Update Led's & VU meters
+- [x] Update CPU
+- [x] Starting/stopping Clock
+- [x] Editing performance / patch settings
 - [x] Change voice mode/count
-- [x] Editing patch settings
-- [x] Editing performance settings
 - [x] Editing synth settings
-- [x] Use cursor keys to move between modules and params
-- [x] Use cursor keys to edit params
-- [x] Help (modules)
 
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
 - [ ] Undo/Redo
+- [x] Use cursor keys to move between modules and params
+- [x] Use cursor keys to edit params
 - [ ] Modules: some graphs missing, some graphics missing, change some mode switches.
 - [x] Show Morphs
 - [ ] Change Morphs on params
 - [ ] Midi CC's on params
 - [ ] Parameter Pages
+- [x] Help (modules)
 - [ ] ...
 
 ### Third goal - Beyond the basics:
