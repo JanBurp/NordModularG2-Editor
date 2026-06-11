@@ -3,6 +3,7 @@ name: Build
 on:
   push:
     branches: [main]
+    tags: ['v*.*.*']
   workflow_dispatch:
 
 env:
@@ -53,7 +54,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: G2-Editor-macOS-arm64
-          path: g2-editor/release/*.dmg
+          path: |
+            g2-editor/release/*.dmg
+            g2-editor/release/*.dmg.blockmap
 
   # ─────────────────────────────────────────────
   # macOS x64 (cross-compiled from arm64 runner)
@@ -98,7 +101,9 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: G2-Editor-macOS-x64
-          path: g2-editor/release/*.dmg
+          path: |
+            g2-editor/release/*.dmg
+            g2-editor/release/*.dmg.blockmap
 
   # ─────────────────────────────────────────────
   # Windows x64 (MSYS2 + MinGW64)
@@ -140,7 +145,28 @@ jobs:
       - uses: actions/upload-artifact@v4
         with:
           name: G2-Editor-Windows
-          path: g2-editor/release/*.exe
+          path: |
+            g2-editor/release/*.exe
+            g2-editor/release/*.exe.blockmap
+
+  # ─────────────────────────────────────────────
+  # Publish to GitHub Releases (tag pushes only)
+  # ─────────────────────────────────────────────
+  publish:
+    needs: [build-macos-arm64, build-macos-x64, build-windows]
+    if: startsWith(github.ref, 'refs/tags/v')
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          path: dist/
+
+      - uses: softprops/action-gh-release@v2
+        with:
+          files: dist/**/*
+          generate_release_notes: true
 
   # ─────────────────────────────────────────────
   # Linux x64 (future target — not yet enabled)

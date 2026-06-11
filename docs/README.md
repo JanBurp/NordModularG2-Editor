@@ -1,5 +1,7 @@
 # Nord Modular G2 - Editor
 
+[GitHub Page](https://github.com/JanBurp/NordModularG2-Editor)
+
 Editor for the Nord Modular G2 - For macOS, Windows and (later) Linux.
 
 The original editor by Clavia does not work on macOS. A new editor, for all platforms, would benefit the future of the Nord G2.
@@ -30,13 +32,19 @@ Download the latest version from the [Releases page](https://github.com/JanBurp/
 
 ### macOS
 1. Open the `.dmg` and drag **G2 Editor** to your Applications folder.
-2. On first launch macOS may block the app because it is not signed. Right-click (or Control-click) the app icon and choose **Open**, then confirm.
+2. On first launch macOS may block the app because it is not notarized:
+   - If you see **"unidentified developer"**: Right-click (or Control-click) the app icon, choose **Open**, then confirm.
+   - If you see **"damaged and can't be opened"**: open Terminal and run:
+     ```
+     xattr -cr /Applications/G2\ Editor.app
+     ```
+     Then launch the app normally.
 
 ### Windows
 Run the `.exe` installer and follow the steps.
 
 ### Help
-See the [help file](../doc/help.md) for keyboard shortcuts, module editing, cabling, and more.
+See the [help file](help.md) for keyboard shortcuts, module editing, cabling, and more.
 
 ## How to contribute
 
