@@ -4,7 +4,7 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 	test.beforeEach(async ({ page, sendMenuAction, mockOpenPatch }) => {
 		await mockOpenPatch('MorphingDrumDemo.prf2');
 		await sendMenuAction('open');
-		await page.waitForTimeout(500);
+		await expect(page.getByText('MorphingDrumDemo')).toBeVisible();
 	});
 
 	test.describe('slot switching', () => {
