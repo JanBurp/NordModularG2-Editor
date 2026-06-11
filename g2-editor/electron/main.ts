@@ -21,7 +21,9 @@ const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: 
 const isMac = process.platform === 'darwin';
 
 const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
-const cliPath = path.join(process.env.APP_ROOT, "resources", cliName);
+const cliPath = app.isPackaged
+	? path.join(process.resourcesPath, cliName)
+	: path.join(process.env.APP_ROOT!, "resources", cliName);
 
 function createWindow() {
 	const headless = process.env.HEADLESS === '1';
