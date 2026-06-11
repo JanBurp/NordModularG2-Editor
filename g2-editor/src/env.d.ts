@@ -11,6 +11,7 @@ declare module '*.vue' {
 declare global {
 	interface Window {
 		electronAPI: {
+			isOffline: boolean;
 			patches: {
 				list: (folder: string) => Promise<{
 					success: boolean;
