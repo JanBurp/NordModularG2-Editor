@@ -90,18 +90,18 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 			const redBtn = page.locator('[data-testid="cable-toggle-red"]');
 
 			// Record initial state
-			const initiallyVisible = await redBtn.evaluate((el) => el.classList.contains('opacity-100'));
+			const initiallyVisible = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 
 			// First click flips the state
 			await hideAll.click();
 			await page.waitForTimeout(200);
-			const afterFirstClick = await redBtn.evaluate((el) => el.classList.contains('opacity-100'));
+			const afterFirstClick = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 			expect(afterFirstClick).toBe(!initiallyVisible);
 
 			// Second click restores
 			await hideAll.click();
 			await page.waitForTimeout(200);
-			const afterSecondClick = await redBtn.evaluate((el) => el.classList.contains('opacity-100'));
+			const afterSecondClick = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 			expect(afterSecondClick).toBe(initiallyVisible);
 		});
 
@@ -112,14 +112,14 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 			const redBtn = page.locator('[data-testid="cable-toggle-red"]');
 			const blueBtn = page.locator('[data-testid="cable-toggle-blue"]');
 
-			const redInitial = await redBtn.evaluate((el) => el.classList.contains('opacity-100'));
-			const blueInitial = await blueBtn.evaluate((el) => el.classList.contains('opacity-100'));
+			const redInitial = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
+			const blueInitial = await blueBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 
 			await redBtn.click();
 			await page.waitForTimeout(150);
 
-			const redAfter = await redBtn.evaluate((el) => el.classList.contains('opacity-100'));
-			const blueAfter = await blueBtn.evaluate((el) => el.classList.contains('opacity-100'));
+			const redAfter = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
+			const blueAfter = await blueBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 
 			expect(redAfter).toBe(!redInitial);     // red flipped
 			expect(blueAfter).toBe(blueInitial);   // blue unchanged
