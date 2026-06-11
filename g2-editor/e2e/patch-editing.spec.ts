@@ -153,7 +153,7 @@ test.describe('patch editing – offline', () => {
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 
-		await deleteModule(page, 'OscA');
+		await deleteModule(page, 'OscA', 0, () => sendMenuAction('delete'));
 
 		const counts = await getStatusCounts(page);
 		expect(counts.voiceModules).toBe(1);
@@ -188,7 +188,7 @@ test.describe('patch editing – offline', () => {
 
 		await sendMenuAction('select-all');
 		await page.waitForTimeout(100);
-		await page.keyboard.press('Delete');
+		await sendMenuAction('delete');
 
 		await expect(page.locator('[data-testid="canvas-va"] [data-module-short]')).toHaveCount(0);
 		const counts = await getStatusCounts(page);

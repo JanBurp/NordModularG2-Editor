@@ -8,8 +8,8 @@ test.describe('file operations – offline', () => {
 		await sendMenuAction('open');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 
-		// Patch toolbar should show a patch name
-		await expect(page.getByText(/Patch:/)).toBeVisible();
+		// Patch toolbar is loaded (label hidden at 800px viewport; variation buttons are always visible)
+		await expect(page.locator('[data-testid="variation-0"]')).toBeVisible();
 
 		// Status bar should report at least one module
 		const counts = await getStatusCounts(page);
