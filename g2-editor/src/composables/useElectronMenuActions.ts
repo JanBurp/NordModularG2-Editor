@@ -12,6 +12,7 @@ interface MenuActionOptions {
 	currentPatch: ComputedRef<any>;
 	handleSlotClick: (idx: number) => void;
 	handleVariationClick: (idx: number) => Promise<void>;
+	showAbout?: () => void;
 }
 
 function makeEmptyPatch() {
@@ -145,6 +146,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
+					break;
+				case 'show-about':
+					options.showAbout?.();
 					break;
 				case 'show-module-help': {
 					if (!uiStore.selectedModules.length) {
