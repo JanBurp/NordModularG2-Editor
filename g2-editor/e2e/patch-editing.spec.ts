@@ -16,9 +16,8 @@ async function addAllSynthModules(page: import('@playwright/test').Page) {
 test.describe('patch editing – offline', () => {
 	test('create new patch shows empty canvas', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
-
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+
 		const counts = await getStatusCounts(page);
 		expect(counts.voiceModules).toBe(0);
 		expect(counts.voiceCables).toBe(0);
@@ -26,7 +25,7 @@ test.describe('patch editing – offline', () => {
 
 	test('drag OscA onto canvas adds one module', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		const counts = await getStatusCounts(page);
@@ -36,7 +35,7 @@ test.describe('patch editing – offline', () => {
 
 	test('add all 6 synth modules', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 
 		await addAllSynthModules(page);
 
@@ -76,7 +75,7 @@ test.describe('patch editing – offline', () => {
 
 	test('connect OscA output to FltClassic input', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await addAllSynthModules(page);
 
 		const before = await getStatusCounts(page);
@@ -91,7 +90,7 @@ test.describe('patch editing – offline', () => {
 
 	test('wire up a simple signal chain: 2×OscA → Mix2-1A → FltClassic → 2-Out, EnvADSR → FltClassic', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await addAllSynthModules(page);
 
 		await createCable(
@@ -126,7 +125,7 @@ test.describe('patch editing – offline', () => {
 
 	test('move a module by dragging its title bar', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 
 		const modEl = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]').first();
@@ -141,7 +140,6 @@ test.describe('patch editing – offline', () => {
 		await page.mouse.down();
 		await page.mouse.move(handleX + 256, handleY + 48, { steps: 10 });
 		await page.mouse.up();
-		await page.waitForTimeout(200);
 
 		// Module still visible after move
 		await expect(modEl).toBeVisible();
@@ -151,11 +149,11 @@ test.describe('patch editing – offline', () => {
 
 	test('delete a module with the Delete key', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 
-		await deleteModule(page, 'OscA');
+		await deleteModule(page, 'OscA', 0, () => sendMenuAction('delete'));
 
 		const counts = await getStatusCounts(page);
 		expect(counts.voiceModules).toBe(1);
@@ -164,7 +162,7 @@ test.describe('patch editing – offline', () => {
 
 	test('delete a cable via context-menu on a connected jack', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 
@@ -185,14 +183,14 @@ test.describe('patch editing – offline', () => {
 
 	test('select-all then Delete removes all modules', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
-		await page.waitForTimeout(300);
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await addAllSynthModules(page);
 
 		await sendMenuAction('select-all');
 		await page.waitForTimeout(100);
-		await page.keyboard.press('Delete');
-		await page.waitForTimeout(300);
+		await sendMenuAction('delete');
 
+		await expect(page.locator('[data-testid="canvas-va"] [data-module-short]')).toHaveCount(0);
 		const counts = await getStatusCounts(page);
 		expect(counts.voiceModules).toBe(0);
 	});

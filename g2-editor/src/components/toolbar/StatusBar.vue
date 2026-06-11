@@ -8,7 +8,7 @@
 			@toggle-off="handleAreaToggleOff"
 		/>
 
-		<div v-if="currentPatch" class="flex items-center gap-2">
+		<div v-if="currentPatch" class="flex items-center gap-2" data-testid="status-counts">
 			<span>Voice: {{ areaCount('voice', 'modules') }} modules / {{ areaCount('voice', 'cables') }} cables</span>
 			<span>FX: {{ areaCount('fx', 'modules') }} modules / {{ areaCount('fx', 'cables') }} cables</span>
 		</div>

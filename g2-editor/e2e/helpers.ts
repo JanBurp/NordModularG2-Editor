@@ -82,7 +82,7 @@ export async function createCable(
 
 /** Read the module/cable count shown in the status bar for the given area. */
 export async function getStatusCounts(page: Page): Promise<{ voiceModules: number; voiceCables: number; fxModules: number; fxCables: number }> {
-	const text = await page.locator('.flex.items-center.h-6.gap-2').innerText();
+	const text = await page.locator('[data-testid="status-counts"]').innerText();
 	const vm = text.match(/Voice:\s*(\d+)\s*modules\s*\/\s*(\d+)\s*cables/);
 	const fx = text.match(/FX:\s*(\d+)\s*modules\s*\/\s*(\d+)\s*cables/);
 	return {
@@ -116,19 +116,28 @@ export async function hoverContextMenuItem(page: Page, label: string): Promise<v
 	await page.waitForTimeout(200);
 }
 
-/** Select a module on the canvas by clicking its title bar, then press Delete. */
-export async function deleteModule(page: Page, moduleShort: string, occurrence = 0): Promise<void> {
-	// Click the drag handle rect (title bar) to select the module
+/** Select a module on the canvas by clicking its title bar, then delete it.
+ *  Pass deleteAction to use sendMenuAction('delete') — required in Electron tests because
+ *  page.keyboard.press('Delete') dispatches DOM events that don't trigger menu accelerators. */
+export async function deleteModule(
+	page: Page,
+	moduleShort: string,
+	occurrence = 0,
+	deleteAction?: () => Promise<void>,
+): Promise<void> {
 	const handle = page.locator(`[data-testid^="canvas-"] [data-module-short="${moduleShort}"] [data-drag-handle]`).nth(occurrence);
 	const box = await handle.boundingBox();
 	if (!box) throw new Error(`Module drag handle not found: ${moduleShort}[${occurrence}]`);
 
-	// Mousedown then immediate mouseup on the handle — no move, so useModuleDrag calls onModuleClick
 	await page.mouse.move(box.x + 64, box.y + 8);
 	await page.mouse.down();
 	await page.mouse.up();
 	await page.waitForTimeout(100);
 
-	await page.keyboard.press('Delete');
+	if (deleteAction) {
+		await deleteAction();
+	} else {
+		await page.keyboard.press('Delete');
+	}
 	await page.waitForTimeout(100);
 }

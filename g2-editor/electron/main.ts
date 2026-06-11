@@ -24,9 +24,11 @@ const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
 const cliPath = path.join(process.env.APP_ROOT, "resources", cliName);
 
 function createWindow() {
+	const headless = process.env.HEADLESS === '1';
 	win = new BrowserWindow({
 		width: 800,
 		height: 600,
+		show: !headless,
 		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/preload.js"),
@@ -35,8 +37,10 @@ function createWindow() {
 		},
 	});
 
-	win.maximize();
-	win.show();
+	if (!headless) {
+		win.maximize();
+		win.show();
+	}
 
 	if (VITE_DEV_SERVER_URL) {
 		win.loadURL(VITE_DEV_SERVER_URL);
