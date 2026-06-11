@@ -22,7 +22,7 @@ Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/def
 
 > Note: the interrupt endpoint (`0x81`) is polled with `libusb_bulk_transfer`, not `libusb_interrupt_transfer`. On macOS, interrupt_transfer can ignore timeouts after rapid transfers and hang the watch loop.
 
-> **`libusb_clear_halt` gotcha:** Do NOT call `libusb_clear_halt` on a freshly cold-reset G2. With no halt present, the resulting CLEAR_FEATURE(ENDPOINT_HALT) request puts the device in a state where streaming notifications still flow (e.g. `assigned_voices`) but direct queries time out (`recv_interrupt` returns nothing) and BULK_OUT eventually stalls on the next send. Only issue `libusb_clear_halt` after a verified halt condition (e.g. a prior bulk transfer returned `LIBUSB_ERROR_PIPE`).
+> **`libusb_clear_halt` gotcha:** Do NOT call on a freshly cold-reset G2. Without a prior halt, it puts the device in a broken state: streaming events still flow but direct queries time out and BULK_OUT eventually stalls. Only issue after a verified halt condition (e.g. a prior bulk transfer returned `LIBUSB_ERROR_PIPE`).
 
 ---
 
@@ -51,8 +51,6 @@ crc = calc_crc16([01 2C 41 02])
 full packet: 00 08  01 2C 41 02  CRC_HI CRC_LO
              └─len─┘└────payload + CRC────────┘
 ```
-
-Length field = 8 (4 payload bytes + 4 framing: 2 length bytes not counted, but length covers header+payload+CRC = 4+2+2 = 8 - wait, see below for exact formula).
 
 **Length formula (from code):**
 ```
@@ -277,9 +275,9 @@ Use this when the target slot needs to be activated before focusing. Steps:
 5. **SET_PERF_SETTINGS** — send the chunk starting at the `0x11` byte using `perf_version` as cmd_id: `[0x11][sizeHi][sizeLo][80 bytes]`; drain ACK
 6. **SELECT_SLOT** — `[01][2C][0x41][09][slot][CRC]` — **use `0x41`, NOT `perf_version`** (see gotcha below)
 
-> **Gotcha — SELECT_SLOT cmd_id after SET_PERF_SETTINGS in daemon mode:** In daemon mode, a `perf_settings_update` message sits in the listener queue immediately after the SET_PERF_SETTINGS ACK. If you query GET_PATCH_VERSION before SELECT_SLOT, `recv_interrupt()` pops `perf_settings_update` instead of the version response, leaving the version response orphaned as a spurious event. The Delphi reference editor never queries GET_PATCH_VERSION before SELECT_SLOT — `0x41` is accepted unconditionally by the G2 for this command.
+> **Gotcha — SELECT_SLOT after SET_PERF_SETTINGS:** A `perf_settings_update` message sits in the listener queue after the ACK. Querying GET_PATCH_VERSION before SELECT_SLOT causes `recv_interrupt()` to dequeue that update instead. Use `0x41` directly — accepted unconditionally by the G2.
 
-> **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
+> **g2ctl.py three-step sequence (do not use):** Uses `0x07` → `0x09` → `0x0a/0x70`; the `0x07` step resets all slots' active/key state as a side effect. Use only `0x09`.
 
 #### Single-field slot updates — `set-slot-enabled` / `set-slot-key` / `set-slot-hold`
 
@@ -787,8 +785,8 @@ Sent as the response to `SET_PERF_MODE` (editor-initiated) and unsolicited after
 | `version` | `subCmd` | JSON type | Data format |
 |-----------|----------|-----------|-------------|
 | `0x40` | `0x1F` | `version_update` | `bulk[4]`=`perf_version`; then 4×`[0x36, slot, version]` — one entry per slot |
-| `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated — not yet parsed |
-| `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata — not yet parsed |
+| `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated *(not implemented)* |
+| `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata *(not implemented)* |
 
 **Important:** unlike the hardware path (`aCmd 0x04/0x40/0x1F`), when 0x0C/0x1F arrives the G2 is still streaming. The daemon calls `g2_stop_comm()` before querying synth/perf settings and patches, then sets `g2_pending_rearm=1` so the main loop calls `g2_rearm()` after returning.
 
@@ -1059,14 +1057,8 @@ Arg layout per sub-command is identical to the individual daemon commands (posit
 
 ### recv_interrupt() skip list and follow-up race
 
-`recv_interrupt()` in listener mode only skips LED (`0x39`) and volume (`0x3A`) bulk messages. All other message types — including `patch_version_change` (`0x38`), `assigned_voices` (`0x05`), and `resources_used` (`0x72`) — are returned to the caller as-is.
+`recv_interrupt()` in listener mode skips only LED (`0x39`) and volume (`0x3A`) bulk messages; all other types are returned to the caller.
 
-This creates a race: when the G2 changes voice mode/count it emits three events in sequence:
+After a voice-count change the G2 emits: `patch_version_change (0x38)` → `assigned_voices (0x05)` → `resources_used (0x72)`. Issuing `get-patch` on `patch_version_change` causes `g2_get_patch()` to pop `0x05`/`0x72` instead of its expected response, crashing the parser.
 
-```
-patch_version_change (0x38) → assigned_voices (0x05) → resources_used (0x72)
-```
-
-If the frontend reacts to `patch_version_change` by immediately issuing a `get-patch` command, the `0x05`/`0x72` messages may still be sitting in `g2_msg_queue`. `g2_get_patch()` calls `recv_interrupt()` which returns the wrong message, `patchSize` is misread, and the parser crashes.
-
-**Safe pattern:** delay `get-patch` until the last event in the sequence (`resources_used`) has been received by the frontend. The IPC channel is ordered — by the time the frontend receives `resources_used`, the daemon has fully dequeued all three messages and the queue is empty. See `useG2.ts` (`pendingSlotReload` set) for implementation.
+**Safe pattern:** wait for `resources_used` before issuing `get-patch` (see `useG2.ts`, `pendingSlotReload`).
