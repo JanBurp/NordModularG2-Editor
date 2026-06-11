@@ -18,7 +18,25 @@ Video of first proof of concept (30 april 2026):
 
 [![Watch the video](https://img.youtube.com/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/BuMu8OjTbvk)
 
+## Download & Run
 
+Download the latest version from the [Releases page](https://github.com/JanBurp/Nord-Modular-G2---Editor/releases/latest).
+
+| Platform | File to download |
+|---|---|
+| macOS Apple Silicon (M1/M2/M3/M4) | `G2 Editor-*-arm64.dmg` |
+| macOS Intel | `G2 Editor-*-x64.dmg` |
+| Windows | `G2 Editor Setup *.exe` |
+
+### macOS
+1. Open the `.dmg` and drag **G2 Editor** to your Applications folder.
+2. On first launch macOS may block the app because it is not signed. Right-click (or Control-click) the app icon and choose **Open**, then confirm.
+
+### Windows
+Run the `.exe` installer and follow the steps.
+
+### Help
+See the [help file](../doc/help.md) for keyboard shortcuts, module editing, cabling, and more.
 
 ## How to contribute
 
@@ -26,7 +44,7 @@ You could contribute:
 
 - Developing
 - Testing on your hardware (see these [testing guidelines](testing.md))
-- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned above) feel free to contact me.
+- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned below) feel free to contact me.
 - If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6). See donate button at the bottom of this page.
 
 ## Roadmap:
