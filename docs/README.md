@@ -1,12 +1,10 @@
-
-
 # Nord Modular G2 - Editor
 
-Editor for the Nord Modular G2 - For macOS, Windows and Linux.
+Editor for the Nord Modular G2 - For macOS, Windows and (later) Linux.
 
 The original editor by Clavia does not work on macOS. A new editor, for all platforms, would benefit the future of the Nord G2.
 
-![New Editor for Nord Modular G2](screenshots/NewG2Editor.png)
+![New Editor for Nord Modular G2](screenshots/editor-11062026.png)
 
 ## Current status
 
@@ -14,20 +12,22 @@ A lot is working, and a lot is not working ;-)
 
 - First goal is to have a basic working editor.
 - Next goal is to have all features the original Clavia editor has.
-- Future goals could be: A small/light version that runs on a raspberry pi, batch processing of patches, modules, params, ... .
+- Future goals could be: A small/light version that runs on a raspberry pi, batch processing, midi messages via USB, ...
 
-### Latest screenshot
+Video of first proof of concept (30 april 2026):
 
-17 may 2026
+[![Watch the video](https://img.youtube.com/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/BuMu8OjTbvk)
 
-![Screenshot](<screenshots/screenshot - 17 mei 2026.jpg>)
 
-30 april 2026
 
-Video:
+## How to contribute
 
-[![Watch the video](https://img.youtu.be/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/watch?v=BuMu8OjTbvk)
+You could contribute:
 
+- Developing
+- Testing on your hardware (see these [testing guidelines](testing.md))
+- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned above) feel free to contact me.
+- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6). See donate button at the bottom of this page.
 
 ## Roadmap:
 
@@ -57,17 +57,16 @@ Video:
 - [x] Change voice mode/count
 - [x] Editing patch settings
 - [x] Editing performance settings
-- [ ] Editing synth settings
+- [x] Editing synth settings
 - [x] Use cursor keys to move between modules and params
 - [x] Use cursor keys to edit params
 - [x] Help (modules)
-- [ ] Updating this page/repo
 
 ### Second Goal - basics - (except Help, Patch Mutator/Adjuster etc.):
 
 - [ ] Undo/Redo
 - [ ] Modules: some graphs missing, some graphics missing, change some mode switches.
-- [ ] Show Morphs
+- [x] Show Morphs
 - [ ] Change Morphs on params
 - [ ] Midi CC's on params
 - [ ] Parameter Pages
@@ -80,22 +79,13 @@ Video:
 - [ ] Editing names with search/replace
 - [ ] ...
 
-## How to contribute
+## Disclaimer
 
-While I did not publish the code and builds yet, feel free to contact me if you want to help.
-
-You could contribute:
-
-- Developing
-- Testing on your hardware.
-- If you have any other ideas how to contribute (apart from requesting features you can't develop yourself or are beyond the goals i mentioned above) feel free to contact me.
-- If you can't contribute whatsoever, but realy wan't to support this editor and appreciate the investment in time and subscriptions I make for this, consider a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6). See donate button at the bottom of this page.
-
-
+Use this editor at your own risk. I cannot be held responsible in any way for any damage, data loss, or issues that may arise from its use.
 
 ## Acknowledgement
 
-A lot of the code is based on work of others from the Nord G2 community at https://electro-music.com, specialy the Delphi Editor by bverhue: https://www.bverhue.nl/g2dev/ and the patchviewer by ian-s: https://electro-music.com/patchviewer/. But also the g2ools from qfingers: https://electro-music.com/forum/viewtopic.php?t=15405.
+A lot of the code is based on work of others from the Nord G2 community at [electro-music.com](https://electro-music.com), especially the [Delphi Editor by bverhue](https://www.bverhue.nl/g2dev/) and the [patchviewer by ian-s](https://electro-music.com/patchviewer/). But also the [g2ools by qfingers](https://electro-music.com/forum/viewtopic.php?t=15405).
 
 ### My development setup
 
@@ -104,11 +94,10 @@ With some help from coding agents (claude & opencode) on a tight budget.
 
 ![alt text](./screenshots/development-setup.jpg)
 
-
 ## Donate
 
 Although i'm not in it for making money with this editor, donations will help with the development in a few ways:
-- Subscriptions to coding agents which speeds up development a lot. (Now i use Claude Code & Opencode, but i'm open for good quality agents that are more friendly for out world).
+- Subscriptions to coding agents which speeds up development a lot. (Now i use Claude Code & Opencode, but i'm open for good quality agents that are more friendly).
 - If donations grow substantial i may buy myself a second hand Nord G2 Engine for testing purposes.
 
 [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6)
