@@ -1,6 +1,6 @@
 # Nord G2 USB Protocol
 
-Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the original Delphi editor (`BVE.NMG2USB.pas`), and cross-checked with the Python tool `g2ools/g2ctl.py`.
+Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the Delphi editor and cross-checked with the g2ools Python tool.
 
 ---
 
@@ -22,7 +22,7 @@ Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/def
 
 > Note: the interrupt endpoint (`0x81`) is polled with `libusb_bulk_transfer`, not `libusb_interrupt_transfer`. On macOS, interrupt_transfer can ignore timeouts after rapid transfers and hang the watch loop.
 
-> **`libusb_clear_halt` gotcha:** Do NOT call `libusb_clear_halt` on a freshly cold-reset G2. With no halt present, the resulting CLEAR_FEATURE(ENDPOINT_HALT) request puts the device in a state where streaming notifications still flow (e.g. `assigned_voices`) but direct queries time out (`recv_interrupt` returns nothing) and BULK_OUT eventually stalls on the next send. Only issue `libusb_clear_halt` after a verified halt condition (e.g. a prior bulk transfer returned `LIBUSB_ERROR_PIPE`).
+> **`libusb_clear_halt` gotcha:** Do NOT call on a freshly cold-reset G2. Without a prior halt, it puts the device in a broken state: streaming events still flow but direct queries time out and BULK_OUT eventually stalls. Only issue after a verified halt condition (e.g. a prior bulk transfer returned `LIBUSB_ERROR_PIPE`).
 
 ---
 
@@ -51,8 +51,6 @@ crc = calc_crc16([01 2C 41 02])
 full packet: 00 08  01 2C 41 02  CRC_HI CRC_LO
              └─len─┘└────payload + CRC────────┘
 ```
-
-Length field = 8 (4 payload bytes + 4 framing: 2 length bytes not counted, but length covers header+payload+CRC = 4+2+2 = 8 - wait, see below for exact formula).
 
 **Length formula (from code):**
 ```
@@ -207,20 +205,20 @@ However, some commands that need to be version-matched use the **performance ver
 |---------|------|-------------|----------|
 | `0x02` | GET_SYNTH_SETTINGS | — | Extended bulk (§10) |
 | `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10a) | Embedded ACK |
-| `0x04` | GET_ASSIGNED_VOICES | — | Embedded; 4 voice counts at `[5..8]` |
+| `0x04` | GET_ASSIGNED_VOICES *(not implemented yet)* | — | Embedded; 4 voice counts at `[5..8]` |
 | `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
-| `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
+| `0x0B ss bb ll` | STORE (slot→bank) *(not implemented yet)* | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0C tt bb ll 00` | CLEAR *(not implemented yet)* | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
+| `0x0E tt bb ff tt 00` | CLEAR_BANK *(not implemented yet)* | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
-| `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
-| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not in CLI)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
+| `0x17 tt bb ll` | PATCH_BANK_UPLOAD *(not implemented yet)* | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
+| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not implemented yet)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
-| `0x3B` | GET_MASTER_CLOCK | — | Embedded (`R_EXT_MASTER_CLOCK`) |
-| `0x3D` | MIDI_DUMP | — | None |
+| `0x3B` | GET_MASTER_CLOCK *(not implemented yet)* | — | Embedded (`R_EXT_MASTER_CLOCK`) |
+| `0x3D` | MIDI_DUMP *(not implemented yet)* | — | None |
 | `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Bulk `0x0C/0x1F` version_update (see §13) |
-| `0x56 oo nn` | PLAY_NOTE | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
+| `0x56 oo nn` | PLAY_NOTE *(not implemented yet)* | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
 | `0x81` | UNKNOWN_1 (init query) | — | Extended bulk |
@@ -241,8 +239,8 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
-| `0x59` | UNKNOWN_2 (perf init query) | — | Embedded ACK |
-| `0x5E` | GET_GLOBAL_KNOBS | — | Extended bulk |
+| `0x59` | UNKNOWN_2 (perf init query) *(not implemented yet)* | — | Embedded ACK |
+| `0x5E` | GET_GLOBAL_KNOBS *(not implemented yet)* | — | Extended bulk |
 
 ### SELECT_SLOT command
 
@@ -277,9 +275,9 @@ Use this when the target slot needs to be activated before focusing. Steps:
 5. **SET_PERF_SETTINGS** — send the chunk starting at the `0x11` byte using `perf_version` as cmd_id: `[0x11][sizeHi][sizeLo][80 bytes]`; drain ACK
 6. **SELECT_SLOT** — `[01][2C][0x41][09][slot][CRC]` — **use `0x41`, NOT `perf_version`** (see gotcha below)
 
-> **Gotcha — SELECT_SLOT cmd_id after SET_PERF_SETTINGS in daemon mode:** In daemon mode, a `perf_settings_update` message sits in the listener queue immediately after the SET_PERF_SETTINGS ACK. If you query GET_PATCH_VERSION before SELECT_SLOT, `recv_interrupt()` pops `perf_settings_update` instead of the version response, leaving the version response orphaned as a spurious event. The Delphi reference editor never queries GET_PATCH_VERSION before SELECT_SLOT — `0x41` is accepted unconditionally by the G2 for this command.
+> **Gotcha — SELECT_SLOT after SET_PERF_SETTINGS:** A `perf_settings_update` message sits in the listener queue after the ACK. Querying GET_PATCH_VERSION before SELECT_SLOT causes `recv_interrupt()` to dequeue that update instead. Use `0x41` directly — accepted unconditionally by the G2.
 
-> **g2ctl.py three-step sequence (do not use):** g2ctl.py sends a sub-cmd `0x07` bitmask step, then `0x09`, then a slot-scoped `0x0a/0x70` commit. The `0x07` step resets all slots' active/key state as a side effect. The Delphi reference editor (`PerfSelectSlot`) sends only the `0x09` command, which is the correct approach.
+> **g2ctl.py three-step sequence (do not use):** Uses `0x07` → `0x09` → `0x0a/0x70`; the `0x07` step resets all slots' active/key state as a side effect. Use only `0x09`.
 
 #### Single-field slot updates — `set-slot-enabled` / `set-slot-key` / `set-slot-hold`
 
@@ -312,10 +310,10 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 |---------|------|-------------|----------|
 | `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
-| `0x2A` | SET_UPRATE_MODE *(not in CLI)* | `loc mod uprate` | Embedded ACK |
+| `0x2A` | SET_UPRATE_MODE *(not implemented yet)* | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
-| `0x2E` | GET_SELECTED_PARAM | — | Embedded; area/module/param at `[5..7]` |
-| `0x2F` | SEL_PARAM | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
+| `0x2E` | GET_SELECTED_PARAM *(not implemented yet)* | — | Embedded; area/module/param at `[5..7]` |
+| `0x2F` | SEL_PARAM *(not implemented yet)* | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
 | `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
 | `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
 | `0x32` | DEL_MODULE | `loc mod_id` | Embedded ACK |
@@ -326,22 +324,24 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
 | `0x42` | SET_PARAM_LABEL | `loc mod_id param_idx label_idx label` | Embedded ACK |
-| `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
-| `0x44` | COPY_VARIATION | `from to` | Embedded ACK |
-| `0x4C` | GET_PARAMS | `location` | Extended bulk |
-| `0x4F` | GET_PARAM_NAMES | `location` | Extended bulk |
+| `0x43` | SET_MORPH_RANGE *(not implemented yet)* | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
+| `0x44` | COPY_VARIATION *(not implemented yet)* | `from to` | Embedded ACK |
+| `0x4C` | GET_PARAMS *(not implemented yet)* | `location` | Extended bulk |
+| `0x4F` | GET_PARAM_NAMES *(not implemented yet)* | `location` | Extended bulk |
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con color` | Embedded ACK |
-| `0x55` | CTRL_SNAPSHOT | — | Embedded ACK |
-| `0x68` | GET_CURRENT_NOTE | — | Embedded; note/velocity at `[5..6]` |
+| `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
+| `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
-| `0x6E` | GET_PATCH_NOTES *(not in CLI)* | — | Extended bulk (patch notes text) |
-| `0x6F` | SET_PATCH_NOTES | patch notes chunk | Embedded ACK |
-| `0x70` | UNKNOWN_6 | — | Embedded ACK |
+| `0x6E` | GET_PATCH_NOTES *(not implemented yet)* | — | Extended bulk (patch notes text) |
+| `0x6F` | SET_PATCH_NOTES *(not implemented yet)* | patch notes chunk | Embedded ACK |
+| `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
 
 ### Knob & MIDI Assignment Sub-Commands
+
+*(None of these are implemented in the CLI.)*
 
 These are combined into slot-command messages. Each message can contain multiple sub-operations via `AddXxxMessage` calls:
 
@@ -787,8 +787,8 @@ Sent as the response to `SET_PERF_MODE` (editor-initiated) and unsolicited after
 | `version` | `subCmd` | JSON type | Data format |
 |-----------|----------|-----------|-------------|
 | `0x40` | `0x1F` | `version_update` | `bulk[4]`=`perf_version`; then 4×`[0x36, slot, version]` — one entry per slot |
-| `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated — not yet parsed |
-| `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata — not yet parsed |
+| `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated *(not implemented)* |
+| `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata *(not implemented)* |
 
 **Important:** unlike the hardware path (`aCmd 0x04/0x40/0x1F`), when 0x0C/0x1F arrives the G2 is still streaming. The daemon calls `g2_stop_comm()` before querying synth/perf settings and patches, then sets `g2_pending_rearm=1` so the main loop calls `g2_rearm()` after returning.
 
@@ -1059,14 +1059,8 @@ Arg layout per sub-command is identical to the individual daemon commands (posit
 
 ### recv_interrupt() skip list and follow-up race
 
-`recv_interrupt()` in listener mode only skips LED (`0x39`) and volume (`0x3A`) bulk messages. All other message types — including `patch_version_change` (`0x38`), `assigned_voices` (`0x05`), and `resources_used` (`0x72`) — are returned to the caller as-is.
+`recv_interrupt()` in listener mode skips only LED (`0x39`) and volume (`0x3A`) bulk messages; all other types are returned to the caller.
 
-This creates a race: when the G2 changes voice mode/count it emits three events in sequence:
+After a voice-count change the G2 emits: `patch_version_change (0x38)` → `assigned_voices (0x05)` → `resources_used (0x72)`. Issuing `get-patch` on `patch_version_change` causes `g2_get_patch()` to pop `0x05`/`0x72` instead of its expected response, crashing the parser.
 
-```
-patch_version_change (0x38) → assigned_voices (0x05) → resources_used (0x72)
-```
-
-If the frontend reacts to `patch_version_change` by immediately issuing a `get-patch` command, the `0x05`/`0x72` messages may still be sitting in `g2_msg_queue`. `g2_get_patch()` calls `recv_interrupt()` which returns the wrong message, `patchSize` is misread, and the parser crashes.
-
-**Safe pattern:** delay `get-patch` until the last event in the sequence (`resources_used`) has been received by the frontend. The IPC channel is ordered — by the time the frontend receives `resources_used`, the daemon has fully dequeued all three messages and the queue is empty. See `useG2.ts` (`pendingSlotReload` set) for implementation.
+**Safe pattern:** wait for `resources_used` before issuing `get-patch` (see `useG2.ts`, `pendingSlotReload`).

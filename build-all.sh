@@ -52,9 +52,10 @@ if $BUILD_ARM64; then
   LIBUSB_ARM64_PREFIX=/tmp/libusb-arm64
 
   step "Building libusb $LIBUSB_VERSION for macOS arm64"
-  if [ ! -f "$LIBUSB_ARM64_PREFIX/lib/libusb-1.0.a" ]; then
+  if ! { [ -f "$LIBUSB_ARM64_PREFIX/lib/libusb-1.0.a" ] && lipo -info "$LIBUSB_ARM64_PREFIX/lib/libusb-1.0.a" 2>/dev/null | grep -q 'arm64'; }; then
     cd /tmp
     curl -fsSL "https://github.com/libusb/libusb/releases/download/v${LIBUSB_VERSION}/libusb-${LIBUSB_VERSION}.tar.bz2" -o libusb-arm64.tar.bz2
+    rm -rf "libusb-${LIBUSB_VERSION}"
     tar -xjf libusb-arm64.tar.bz2
     cd "libusb-${LIBUSB_VERSION}"
     CFLAGS="-arch arm64" LDFLAGS="-arch arm64" CC=clang \
@@ -88,9 +89,10 @@ if $BUILD_X64; then
   LIBUSB_X64_PREFIX=/tmp/libusb-x64
 
   step "Building libusb $LIBUSB_VERSION for macOS x64"
-  if [ ! -f "$LIBUSB_X64_PREFIX/lib/libusb-1.0.a" ]; then
+  if ! { [ -f "$LIBUSB_X64_PREFIX/lib/libusb-1.0.a" ] && lipo -info "$LIBUSB_X64_PREFIX/lib/libusb-1.0.a" 2>/dev/null | grep -q 'x86_64'; }; then
     cd /tmp
     curl -fsSL "https://github.com/libusb/libusb/releases/download/v${LIBUSB_VERSION}/libusb-${LIBUSB_VERSION}.tar.bz2" -o libusb.tar.bz2
+    rm -rf "libusb-${LIBUSB_VERSION}"
     tar -xjf libusb.tar.bz2
     cd "libusb-${LIBUSB_VERSION}"
     CFLAGS="-arch x86_64" LDFLAGS="-arch x86_64" CC=clang \

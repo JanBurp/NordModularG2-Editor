@@ -1,17 +1,19 @@
-import type { ComputedRef } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
-import { useUiStore } from '@/store/ui';
-import { useSlotsStore } from '@/store/slots';
+
+import type { ComputedRef } from 'vue';
+import { SLOT_LABELS } from '@/constants';
+import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
-import { usePatchClipboard } from '@/composables/usePatchClipboard';
-import { SLOT_LABELS } from '@/constants';
+import { useSlotsStore } from '@/store/slots';
+import { useUiStore } from '@/store/ui';
 
 interface MenuActionOptions {
 	currentModules: ComputedRef<any[]>;
 	currentPatch: ComputedRef<any>;
 	handleSlotClick: (idx: number) => void;
 	handleVariationClick: (idx: number) => Promise<void>;
+	showAbout?: () => void;
 }
 
 function makeEmptyPatch() {
@@ -148,6 +150,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'undo': await slotsStore.undo(); break;
 				case 'redo': await slotsStore.redo(); break;
+				case 'show-about':
+					options.showAbout?.();
+					break;
 				case 'show-module-help': {
 					if (!uiStore.selectedModules.length) {
 						uiStore.toggleAllModuleHelp();
