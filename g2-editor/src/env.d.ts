@@ -33,6 +33,8 @@ declare global {
 				data?: number[];
 				error?: string;
 			}>;
+			getAppInfo: () => Promise<{ version: string; iconDataUrl: string }>;
+			openExternal: (url: string) => void;
 		};
 		cli: CliService;
 	}

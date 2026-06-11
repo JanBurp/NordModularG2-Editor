@@ -143,6 +143,8 @@
 		/>
 	</Dialog>
 
+	<AboutDialog v-model="showAboutDialog" />
+
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
 	<ParamEditDialog />
@@ -183,6 +185,7 @@
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
 	import ParamEditDialog from './components/common/ParamEditDialog.vue';
+	import AboutDialog from './components/common/AboutDialog.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -266,7 +269,9 @@
 		hardwareVariationChange,
 	);
 
-	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick });
+	const showAboutDialog = ref(false);
+
+	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick, showAbout: () => { showAboutDialog.value = true; } });
 	useModuleKeyboard();
 
 	async function handlePerfModeToggle(): Promise<void> {

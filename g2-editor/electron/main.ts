@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, dialog, Menu } from "electron";
+import { BrowserWindow, app, ipcMain, dialog, Menu, shell } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 import { fileURLToPath } from "node:url";
@@ -251,6 +251,13 @@ ipcMain.handle("patch:open-dialog", async (event) => {
 	return { success: true, filepath, data: Array.from(buf) };
 });
 
+ipcMain.handle("app:info", () => ({
+	version: app.getVersion(),
+	iconDataUrl: `data:image/png;base64,${fs.readFileSync(path.join(process.env.APP_ROOT!, "resources", "icon.png")).toString("base64")}`,
+}));
+
+ipcMain.on("shell:openExternal", (_, url: string) => { shell.openExternal(url); });
+
 app.on("before-quit", (e) => {
 	e.preventDefault();
 	(async () => {
@@ -281,7 +288,7 @@ app.whenReady().then(async () => {
 		...(isMac ? [{
 			label: "G2 Editor",
 			submenu: [
-				{ role: "about" as const },
+				{ label: "About G2 Editor...", click: () => win!.webContents.send("menu:action", "show-about") },
 				{ label: "Preferences...", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ role: "services" as const },
@@ -356,7 +363,7 @@ app.whenReady().then(async () => {
 			submenu: [
 				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },
 				{ type: "separator" as const },
-				{ role: "about" as const },
+				{ label: "About G2 Editor...", click: () => win!.webContents.send("menu:action", "show-about") },
 			],
 		},
 	];

@@ -20,6 +20,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	showSaveDialog: (defaultName?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName),
 	showSavePerfDialog: (defaultName?: string) => ipcRenderer.invoke("perf:save-dialog", defaultName),
 	openPatchDialog: () => ipcRenderer.invoke("patch:open-dialog"),
+	getAppInfo: () => ipcRenderer.invoke("app:info"),
+	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
 });
 
 contextBridge.exposeInMainWorld("cli", {
