@@ -23,7 +23,7 @@ export const useUiStore = defineStore('ui', {
 		} as Record<SlotLabel, SlotAreaState>,
 		variation: 0 as number,
 		moduleColor: 0 as number,
-		rightPaneTab: 'settings' as PaneTab,
+		rightPaneTab: 'modules' as PaneTab,
 		showRightPane: true as boolean,
 		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
