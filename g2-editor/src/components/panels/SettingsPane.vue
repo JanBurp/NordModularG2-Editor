@@ -17,7 +17,7 @@
 				</SettingsRow>
 			</div>
 		</Collapsible>
-		<Collapsible title="Synth Settings" :default-open="false">
+		<Collapsible v-if="device.connected" title="Synth Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
@@ -132,7 +132,7 @@
 			</div>
 		</Collapsible>
 
-		<Collapsible title="Performance Settings" :default-open="false">
+		<Collapsible v-if="device.device || anyPatchLoaded" title="Performance Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
 					<TextInput
@@ -271,6 +271,7 @@
 
 	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
+	const anyPatchLoaded = computed(() => SLOT_LABELS.some((slot) => !!slotsStore.getPatchForSlot(slot as SlotLabel)));
 
 	const selectedCategory = computed({
 		get: () => (currentPatch.value as any)?.description?.category ?? 0,
