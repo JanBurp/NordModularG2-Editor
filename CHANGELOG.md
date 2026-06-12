@@ -10,6 +10,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Added
 - Extensive logging and help output for CLI tool
+- CLI and daemon binaries available as downloads
+- Content-Security-Policy header for Electron renderer
+
+### Fixed
+- Settings panel now only shows options relevant to the current context
+- Color picker was not area-aware; UX improved
+- Save As dialog did not open for new (unsaved) patches
 
 ---
 
