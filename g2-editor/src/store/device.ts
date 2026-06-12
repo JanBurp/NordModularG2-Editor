@@ -14,6 +14,17 @@ export enum DeviceStatus {
 	DriverError = 'driver_error',
 }
 
+const STATUS_MAP: Record<DeviceStatus, { textClass: string; dotClass: string; label: string }> = {
+	[DeviceStatus.Connected]:    { textClass: 'text-green-400',   dotClass: 'bg-green-500',                label: 'connected' },
+	[DeviceStatus.Connecting]:   { textClass: 'text-orange-300',  dotClass: 'bg-orange-400 animate-pulse', label: 'connecting' },
+	[DeviceStatus.Loading]:      { textClass: 'text-blue-300',    dotClass: 'bg-blue-400 animate-pulse',   label: 'loading' },
+	[DeviceStatus.Disconnected]: { textClass: 'text-neutral-400', dotClass: 'bg-neutral-600',              label: 'disconnected' },
+	[DeviceStatus.Lost]:         { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'lost' },
+	[DeviceStatus.Unsupported]:  { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'not available' },
+	[DeviceStatus.Offline]:      { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'offline' },
+	[DeviceStatus.DriverError]:  { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'driver error' },
+};
+
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
 		status: DeviceStatus.Disconnected,
@@ -23,45 +34,9 @@ export const useDeviceStore = defineStore('device', {
 
 	getters: {
 		connected: (state) => state.status === DeviceStatus.Connected,
-		statusClass: (state): string => {
-			switch (state.status) {
-				case DeviceStatus.Connected: return 'text-green-400';
-				case DeviceStatus.Connecting: return 'text-orange-300';
-				case DeviceStatus.Loading: return 'text-blue-300';
-				case DeviceStatus.Unsupported:
-				case DeviceStatus.Lost:
-				case DeviceStatus.Offline:
-				case DeviceStatus.DriverError:
-					return 'text-red-400';
-				default: return 'text-neutral-400';
-			}
-		},
-		dotClass: (state): string => {
-			switch (state.status) {
-				case DeviceStatus.Connected: return 'bg-green-500';
-				case DeviceStatus.Connecting: return 'bg-orange-400 animate-pulse';
-				case DeviceStatus.Loading: return 'bg-blue-400 animate-pulse';
-				case DeviceStatus.Unsupported:
-				case DeviceStatus.Lost:
-				case DeviceStatus.Offline:
-				case DeviceStatus.DriverError:
-					return 'bg-red-500';
-				default: return 'bg-neutral-600';
-			}
-		},
-		statusLabel: (state): string => {
-			switch (state.status) {
-				case DeviceStatus.Connected: return 'connected';
-				case DeviceStatus.Connecting: return 'connecting';
-				case DeviceStatus.Loading: return 'loading';
-				case DeviceStatus.Disconnected: return 'disconnected';
-				case DeviceStatus.Unsupported: return 'not available';
-				case DeviceStatus.Lost: return 'lost';
-				case DeviceStatus.Offline: return 'offline';
-				case DeviceStatus.DriverError: return 'driver error';
-				default: return 'unknown';
-			}
-		},
+		statusClass: (state): string => STATUS_MAP[state.status]?.textClass ?? 'text-neutral-400',
+		dotClass: (state): string => STATUS_MAP[state.status]?.dotClass ?? 'bg-neutral-600',
+		statusLabel: (state): string => STATUS_MAP[state.status]?.label ?? 'unknown',
 		perfName: (state): string => {
 			if (state.device?.mode === 'Performance') return state.device.performance?.name ?? '---';
 			return '---';

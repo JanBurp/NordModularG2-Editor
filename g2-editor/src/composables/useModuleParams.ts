@@ -4,6 +4,7 @@ import { getParam } from '../renderer/parammap';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { clamp } from '@/utils/math';
 
 export function useModuleParams(
 	instance: ComputedRef<ModuleInstance>,
@@ -51,7 +52,7 @@ export function useModuleParams(
 		if (param) {
 			const p = getParam(param.type);
 			if (p) {
-				value = Math.min(Math.max(value, p.low), p.high);
+				value = clamp(value, p.low, p.high);
 			}
 		}
 		emitParamChange(instance.value.index || 0, paramIndex, value);

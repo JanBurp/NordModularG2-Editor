@@ -2,6 +2,7 @@ import { computed } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
 import type { ModuleParam, ParamDefinition, ParamLabel } from '../types';
+import { clamp } from '@/utils/math';
 
 export function useSwitch(
 	param: Ref<ModuleParam> | ComputedRef<ModuleParam>,
@@ -58,7 +59,7 @@ export function useSwitch(
 	const activeIndex = computed(() => {
 		const low = paramDef.value.low || 0;
 		const high = paramDef.value.high || names.value.length - 1 || 0;
-		return Math.max(low, Math.min(value.value, high));
+		return clamp(value.value, low, high);
 	});
 
 	const singleButtonMode = computed(() => mode.value !== 'VR' && mode.value !== 'HR');
@@ -84,7 +85,7 @@ export function useSwitch(
 		const low = paramDef.value.low || 0;
 		const high = paramDef.value.high || names.value.length - 1 || 0;
 		const range = high - low + 1;
-		const current = Math.max(low, Math.min(value.value, high));
+		const current = clamp(value.value, low, high);
 		emitChange(paramIndex.value, low + ((current - low + 1) % range));
 	}
 
@@ -94,7 +95,7 @@ export function useSwitch(
 		} else {
 			const low = paramDef.value.low || 0;
 			const high = paramDef.value.high || names.value.length - 1 || 0;
-			const newValue = Math.max(low, Math.min(index, high));
+			const newValue = clamp(index, low, high);
 			if (newValue !== value.value) emitChange(paramIndex.value, newValue);
 		}
 	}
