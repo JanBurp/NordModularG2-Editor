@@ -47,6 +47,16 @@ Most people don't need this. In some cases it could be helpfull for testing with
 ### Windows
 Run the `.exe` installer and follow the steps.
 
+#### USB Driver
+
+The editor requires the **WinUSB** driver for the Nord G2. If the app reports a USB driver problem, install it using [Zadig](https://zadig.akeo.ie/):
+
+1. Open Zadig and select the **Nord G2** device.
+2. Choose **WinUSB** as the driver.
+3. Click **Replace Driver**.
+
+> **Note:** This replaces Clavia's original USB driver.
+
 ### Help
 See the [help file](help.md) for keyboard shortcuts, module editing, cabling, and more.
 
