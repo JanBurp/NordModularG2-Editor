@@ -63,7 +63,7 @@ With any module selected, use `Shift+Arrow` keys to jump to adjacent modules on 
 ### Renaming & Coloring
 
 - **Rename** — double-click module title, or right-click → Rename…
-- **Set color** — right-click → Set Color (10 swatches); double-click the toolbar color picker to reset selected modules to default color
+- **Set color** — select modules, then either click the **color swatch** in the toolbar to apply the current color instantly, or click the **▾ chevron** next to it to open the color picker and choose a different color
 
 ---
 
