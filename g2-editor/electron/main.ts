@@ -211,21 +211,23 @@ ipcMain.handle("patch:save", async (_, filepath: string, data: number[]) => {
 	fs.writeFileSync(filepath, Buffer.from(data));
 });
 
-ipcMain.handle("patch:save-dialog", async (event, defaultName?: string) => {
+ipcMain.handle("patch:save-dialog", async (event, defaultName?: string, folder?: string) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const filename = defaultName ? `${defaultName}.pch2` : "patch.pch2";
 	const result = await dialog.showSaveDialog(browserWin!, {
 		filters: [{ name: "Patch Files", extensions: ["pch2"] }],
-		defaultPath: defaultName ? `${defaultName}.pch2` : "patch.pch2",
+		defaultPath: folder ? path.join(folder, filename) : filename,
 	});
 	if (result.canceled || !result.filePath) return { success: false };
 	return { success: true, filepath: result.filePath };
 });
 
-ipcMain.handle("perf:save-dialog", async (event, defaultName?: string) => {
+ipcMain.handle("perf:save-dialog", async (event, defaultName?: string, folder?: string) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const filename = defaultName ? `${defaultName}.prf2` : "performance.prf2";
 	const result = await dialog.showSaveDialog(browserWin!, {
 		filters: [{ name: "Performance Files", extensions: ["prf2"] }],
-		defaultPath: defaultName ? `${defaultName}.prf2` : "performance.prf2",
+		defaultPath: folder ? path.join(folder, filename) : filename,
 	});
 	if (result.canceled || !result.filePath) return { success: false };
 	return { success: true, filepath: result.filePath };
