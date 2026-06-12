@@ -54,9 +54,10 @@ function createWindow() {
 function startDaemon() {
 	if (daemonProcess) return;
 	if (!fs.existsSync(cliPath)) {
-		console.log("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
+		console.error("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
 		return;
 	}
+	console.error('[daemon] Starting daemon process...');
 	const proc = spawn(cliPath, ["daemon"]);
 	daemonProcess = proc;
 	let buffer = "";
@@ -90,10 +91,11 @@ function startDaemon() {
 		}
 	});
 	proc.stderr?.on("data", (data: Buffer) => {
-		console.log(`[daemon-error] ${data.toString().trim()}`);
+		console.error(`[daemon-error] ${data.toString().trim()}`);
 	});
 	proc.on("close", (code) => {
 		const wasActive = daemonProcess === proc;
+		console.error(`[daemon] Exited with code ${code ?? 'null'}`);
 		if (wasActive) daemonProcess = null;
 		for (const pending of pendingCmds.values()) {
 			clearTimeout(pending.timeout);
@@ -132,7 +134,7 @@ function sendCmd(cmd: string, args: string[]): Promise<string> {
 		}, 30_000);
 		pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd, args });
-		console.log('[deamon-cmd]->', json);
+		console.log('[daemon-cmd]->', json);
 		daemonProcess.stdin?.write(json + "\n");
 	});
 }
@@ -153,7 +155,7 @@ function sendSeq(ops: string[][]): Promise<string> {
 		}, 30_000);
 		pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd: "seq", args: ops });
-		console.log('[deamon-cmd]->', json);
+		console.log('[daemon-cmd]->', json);
 		daemonProcess.stdin?.write(json + "\n");
 	});
 }

@@ -61,10 +61,6 @@ class G2Parser {
 		const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
 		this.ofs = ofs;
 		const filedataArray = new Uint8Array(data, ofs + 1, data.byteLength - ofs - 3);
-		if (fileCRC !== calcCrc(filedataArray)) {
-			console.warn('PCH2 WARNING: CRC mismatch');
-		}
-
 		const maxofs = filedata.byteLength;
 		ofs = 0;
 		while (ofs < maxofs) {

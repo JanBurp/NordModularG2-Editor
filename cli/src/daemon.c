@@ -631,6 +631,16 @@ int g2_daemon_run(output_format_t format, int debug) {
 	pthread_t reader;
 	pthread_create(&reader, NULL, stdin_reader, NULL);
 
+	/* Enumerate USB devices before connecting and emit the list as an event. */
+	{
+		cJSON *devlist = g2_list_devices_json();
+		cJSON *ev = cJSON_CreateObject();
+		cJSON_AddStringToObject(ev, "type", "usb_devices");
+		cJSON_AddItemToObject(ev, "data", devlist ? devlist : cJSON_CreateNull());
+		emit(ev);
+		cJSON_Delete(ev);
+	}
+
 	/* Connect with retry. */
 	debug_status("connect_wait");
 	while (daemon_running && g2_connect_silent() < 0)

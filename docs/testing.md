@@ -21,3 +21,16 @@ The more detail you provide, the better. If I cannot replicate the issue, I cann
 - Try to find the **minimal steps** to reproduce — the simpler, the better
 - Check if the issue is already reported before filing a new one
 - One issue per report — don't combine multiple problems in one ticket
+
+## Viewing the console log
+
+The editor logs USB traffic, connection status, and commands to the DevTools console. Including this output in a bug report is very helpful.
+
+**To open the console:**
+- From the menu: **View → Toggle DevTools** (or press `Cmd+Shift+I` on Mac, `Ctrl+Shift+I` on Windows/Linux)
+- Click the **Console** tab in the panel that opens
+
+**To save the log:**
+1. Right-click anywhere inside the console panel
+2. Choose **Save as...** and save the file
+3. Attach the saved file to your issue report

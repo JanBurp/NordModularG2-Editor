@@ -69,6 +69,9 @@ void g2_exit(void);
 /* List all USB devices (debug) */
 int g2_list_devices(void);
 
+/* List all USB devices as JSON; returns a cJSON object with "all", "g2_count", "chosen" */
+cJSON *g2_list_devices_json(void);
+
 /* Connect to G2 (auto-detect) */
 int g2_connect(void);
 

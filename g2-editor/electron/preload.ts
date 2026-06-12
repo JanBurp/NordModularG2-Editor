@@ -1,6 +1,11 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { MenuAction } from "../src/types/index";
 
+function now(): string {
+	const d = new Date();
+	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
+}
+
 contextBridge.exposeInMainWorld("electronAPI", {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
 	patches: {
@@ -25,8 +30,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 });
 
 contextBridge.exposeInMainWorld("cli", {
-	run: (args: string[]) => ipcRenderer.invoke("cli:run", args),
-	runBatch: (argsList: string[][]) => ipcRenderer.invoke("cli:run-batch", argsList),
+	run: (args: string[]) => {
+		console.log(`[USB] ${now()} → Cmd ${args.join(' ')}`);
+		return ipcRenderer.invoke("cli:run", args);
+	},
+	runBatch: (argsList: string[][]) => {
+		argsList.forEach((a) => console.log(`[USB] ${now()} → Cmd ${a.join(' ')}`));
+		return ipcRenderer.invoke("cli:run-batch", argsList);
+	},
 	watchStart: () => ipcRenderer.invoke("cli:watch-start"),
 	watchStop: () => ipcRenderer.send("cli:watch-stop"),
 	onWatchEvent: (cb: (line: string) => void) => ipcRenderer.on("cli:watch-event", (_event, line) => cb(line)),

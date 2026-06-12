@@ -85,6 +85,52 @@ int g2_list_devices(void) {
     return 0;
 }
 
+cJSON *g2_list_devices_json(void) {
+    libusb_device **devices;
+    ssize_t count = libusb_get_device_list(g2.ctx, &devices);
+    cJSON *root = cJSON_CreateObject();
+    cJSON *all = cJSON_CreateArray();
+    cJSON *chosen = NULL;
+    int g2_count = 0;
+
+    if (count >= 0) {
+        for (ssize_t i = 0; i < count; i++) {
+            struct libusb_device_descriptor desc;
+            if (libusb_get_device_descriptor(devices[i], &desc) != 0) continue;
+            int isG2 = (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID);
+            cJSON *entry = cJSON_CreateObject();
+            char vid[5], pid[5];
+            snprintf(vid, sizeof(vid), "%04x", desc.idVendor);
+            snprintf(pid, sizeof(pid), "%04x", desc.idProduct);
+            cJSON_AddStringToObject(entry, "vid", vid);
+            cJSON_AddStringToObject(entry, "pid", pid);
+            cJSON_AddNumberToObject(entry, "bus", libusb_get_bus_number(devices[i]));
+            cJSON_AddNumberToObject(entry, "device", libusb_get_device_address(devices[i]));
+            cJSON_AddBoolToObject(entry, "isG2", isG2);
+            cJSON_AddItemToArray(all, entry);
+            if (isG2) {
+                g2_count++;
+                if (!chosen) chosen = entry;
+            }
+        }
+        libusb_free_device_list(devices, 1);
+    }
+
+    cJSON_AddItemToObject(root, "all", all);
+    cJSON_AddNumberToObject(root, "g2_count", g2_count);
+    if (chosen) {
+        cJSON *c = cJSON_CreateObject();
+        cJSON_AddStringToObject(c, "vid", cJSON_GetStringValue(cJSON_GetObjectItem(chosen, "vid")));
+        cJSON_AddStringToObject(c, "pid", cJSON_GetStringValue(cJSON_GetObjectItem(chosen, "pid")));
+        cJSON_AddNumberToObject(c, "bus", cJSON_GetObjectItem(chosen, "bus")->valuedouble);
+        cJSON_AddNumberToObject(c, "device", cJSON_GetObjectItem(chosen, "device")->valuedouble);
+        cJSON_AddItemToObject(root, "chosen", c);
+    } else {
+        cJSON_AddNullToObject(root, "chosen");
+    }
+    return root;
+}
+
 int g2_connect(void) {
     int ret;
 
