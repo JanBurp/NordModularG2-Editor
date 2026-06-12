@@ -294,6 +294,9 @@
 	}
 
 	onMounted(async () => {
+		const { version, platform } = await window.electronAPI.getAppInfo();
+		console.log(`[startup] G2 Editor v${version} — ${platform}`);
+
 		const isOffline = window.electronAPI.isOffline;
 		if (isOffline) {
 			device.status = DeviceStatus.Offline;
