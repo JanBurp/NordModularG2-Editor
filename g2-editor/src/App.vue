@@ -211,12 +211,14 @@
 	const isLoading = computed(
 		() =>
 			device.status === DeviceStatus.Connecting ||
+			device.status === DeviceStatus.Loading ||
 			device.modeChanging ||
 			slotsStore.uploadingFromFile ||
 			Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
+		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
 		return 'Loading patch...';

@@ -6,6 +6,7 @@ import { defineStore } from 'pinia';
 export enum DeviceStatus {
 	Connected = 'connected',
 	Connecting = 'connecting',
+	Loading = 'loading',
 	Disconnected = 'disconnected',
 	Lost = 'lost',
 	Unsupported = 'unsupported',
@@ -26,6 +27,7 @@ export const useDeviceStore = defineStore('device', {
 			switch (state.status) {
 				case DeviceStatus.Connected: return 'text-green-400';
 				case DeviceStatus.Connecting: return 'text-orange-300';
+				case DeviceStatus.Loading: return 'text-blue-300';
 				case DeviceStatus.Unsupported:
 				case DeviceStatus.Lost:
 				case DeviceStatus.Offline:
@@ -38,6 +40,7 @@ export const useDeviceStore = defineStore('device', {
 			switch (state.status) {
 				case DeviceStatus.Connected: return 'bg-green-500';
 				case DeviceStatus.Connecting: return 'bg-orange-400 animate-pulse';
+				case DeviceStatus.Loading: return 'bg-blue-400 animate-pulse';
 				case DeviceStatus.Unsupported:
 				case DeviceStatus.Lost:
 				case DeviceStatus.Offline:
@@ -50,6 +53,7 @@ export const useDeviceStore = defineStore('device', {
 			switch (state.status) {
 				case DeviceStatus.Connected: return 'connected';
 				case DeviceStatus.Connecting: return 'connecting';
+				case DeviceStatus.Loading: return 'loading';
 				case DeviceStatus.Disconnected: return 'disconnected';
 				case DeviceStatus.Unsupported: return 'not available';
 				case DeviceStatus.Lost: return 'lost';
