@@ -155,6 +155,8 @@ g2-cli watch                            # monitor G2 messages
 g2-cli daemon                           # persistent connection: watch (stout) + commands on stdin
 ```
 
+#### Daemon
+
 **Recommended: [tmux](https://github.com/tmux/tmux/wiki/Installing) dev environment**
 
 For interactive daemon use, use the tmux launcher (needs tmux installed on your machine):
