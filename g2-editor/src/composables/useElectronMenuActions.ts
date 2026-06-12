@@ -1,10 +1,11 @@
 import { onMounted, onUnmounted } from 'vue';
 
 import type { ComputedRef } from 'vue';
-import { SLOT_LABELS } from '@/constants';
+import { EMPTY_PATCH_HEX, SLOT_LABELS } from '@/constants';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
+import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 
@@ -47,7 +48,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			switch (action) {
 				case 'new-patch': {
-					slotsStore.loadPatchFile(uiStore.slotInFocus, makeEmptyPatch() as any, 'Untitled');
+					slotsStore.loadPatchFile(uiStore.slotInFocus, makeEmptyPatch() as any, 'Untitled', EMPTY_PATCH_HEX);
 					break;
 				}
 				case 'new-performance': {
@@ -69,13 +70,14 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					}
 					break;
 				case 'save-as': {
+					const folder = useSettingsStore().path || undefined;
 					if (slotsStore.isPerformanceMode) {
-						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName);
+						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName, folder);
 						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
 					} else {
 						if (!slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) break;
 						const name = slotsStore.slots[uiStore.slotInFocus].name;
-						const result = await window.electronAPI.showSaveDialog(name);
+						const result = await window.electronAPI.showSaveDialog(name, folder);
 						if (result.success && result.filepath) await slotsStore.saveSlot(uiStore.slotInFocus, result.filepath);
 					}
 					break;
