@@ -98,6 +98,12 @@ export function useG2() {
 				}
 				if (ev.type === 'device_disconnected') { store.status = DeviceStatus.Lost; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
 				if (ev.type === 'device_reconnected') { store.status = DeviceStatus.Connected; log('•', 'Connect', 'G2 reconnected'); return; }
+				if (ev.type === 'usb_driver_error') {
+					store.status = DeviceStatus.DriverError;
+					log('←', 'Connect', `USB driver error: ${ev.code ?? 'unknown'}`);
+					rejectArmed(new Error('usb_driver_error'));
+					return;
+				}
 				if (ledEvents.handleEvent(ev)) return;
 				if (await deviceEvents.handleEvent(ev)) return;
 				if (await slotEvents.handleEvent(ev)) return;
@@ -141,8 +147,10 @@ export function useG2() {
 			const activeSlots = store.device?.slots.filter((s) => s.active).map((s) => s.slot) ?? [];
 			for (const slot of activeSlots) slotEvents.fetchSlotResources(slot);
 		} catch (e: any) {
-			store.status = DeviceStatus.Disconnected;
-			log('←', 'Connect', `G2 not found: ${e.message}`);
+			if (e.message !== 'usb_driver_error') {
+				store.status = DeviceStatus.Disconnected;
+				log('←', 'Connect', `G2 not found: ${e.message}`);
+			}
 			stopWatch();
 		}
 	}

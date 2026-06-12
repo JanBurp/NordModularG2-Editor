@@ -643,8 +643,21 @@ int g2_daemon_run(output_format_t format, int debug) {
 
 	/* Connect with retry. */
 	debug_status("connect_wait");
-	while (daemon_running && g2_connect_silent() < 0)
-		usleep(100000);
+	{
+		int conn_err;
+		while (daemon_running && (conn_err = g2_connect_silent()) < 0) {
+			if (conn_err == G2_ERR_CLAIM_INTERFACE) {
+				cJSON *ev = cJSON_CreateObject();
+				cJSON_AddStringToObject(ev, "type", "usb_driver_error");
+				cJSON_AddStringToObject(ev, "code", libusb_error_name(g2_get_last_claim_error()));
+				emit(ev);
+				cJSON_Delete(ev);
+				pthread_detach(reader);
+				return 1;
+			}
+			usleep(100000);
+		}
+	}
 	if (!daemon_running) { pthread_detach(reader); return 0; }
 	debug_status("connected");
 

@@ -29,6 +29,9 @@ g2_device_t g2 = {
 int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
 
+static int g2_last_claim_error = 0;
+int g2_get_last_claim_error(void) { return g2_last_claim_error; }
+
 static void debug_send(const char *fn, const uint8_t *buf, int len) {
     if (!g2_debug) return;
     printf("{\"debug\":\"send\",\"fn\":\"%s\",\"hex\":\"", fn);
@@ -165,6 +168,7 @@ int g2_connect_silent(void) {
 
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
+        g2_last_claim_error = ret;
         libusb_close(g2.handle);
         g2.handle = NULL;
         return G2_ERR_CLAIM_INTERFACE;

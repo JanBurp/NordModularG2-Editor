@@ -10,6 +10,7 @@ export enum DeviceStatus {
 	Lost = 'lost',
 	Unsupported = 'unsupported',
 	Offline = 'offline',
+	DriverError = 'driver_error',
 }
 
 export const useDeviceStore = defineStore('device', {
@@ -28,6 +29,7 @@ export const useDeviceStore = defineStore('device', {
 				case DeviceStatus.Unsupported:
 				case DeviceStatus.Lost:
 				case DeviceStatus.Offline:
+				case DeviceStatus.DriverError:
 					return 'text-red-400';
 				default: return 'text-neutral-400';
 			}
@@ -39,6 +41,7 @@ export const useDeviceStore = defineStore('device', {
 				case DeviceStatus.Unsupported:
 				case DeviceStatus.Lost:
 				case DeviceStatus.Offline:
+				case DeviceStatus.DriverError:
 					return 'bg-red-500';
 				default: return 'bg-neutral-600';
 			}
@@ -51,6 +54,7 @@ export const useDeviceStore = defineStore('device', {
 				case DeviceStatus.Unsupported: return 'not available';
 				case DeviceStatus.Lost: return 'lost';
 				case DeviceStatus.Offline: return 'offline';
+				case DeviceStatus.DriverError: return 'driver error';
 				default: return 'unknown';
 			}
 		},
