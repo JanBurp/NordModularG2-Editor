@@ -19,6 +19,8 @@ let daemonProcess: ChildProcess | null = null;
 let cmdId = 0;
 const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>();
 const isMac = process.platform === 'darwin';
+const platformNames: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
+const platformLabel = `${platformNames[process.platform] ?? process.platform} ${process.getSystemVersion()}`;
 
 const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
 const cliPath = app.isPackaged
@@ -259,6 +261,7 @@ ipcMain.handle("patch:open-dialog", async (event) => {
 
 ipcMain.handle("app:info", () => ({
 	version: app.getVersion(),
+	platform: platformLabel,
 	iconDataUrl: `data:image/png;base64,${fs.readFileSync(path.join(process.env.APP_ROOT!, "resources", "icon.png")).toString("base64")}`,
 }));
 
@@ -275,6 +278,8 @@ app.on("before-quit", (e) => {
 });
 
 app.whenReady().then(async () => {
+	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
+
 	if (isMac) {
 		app.dock.setIcon(path.join(process.env.APP_ROOT!, "resources", "icon.png"));
 	}

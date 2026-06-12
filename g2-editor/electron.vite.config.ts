@@ -29,6 +29,12 @@ export default defineConfig({
     }
   },
   renderer: {
+    server: {
+      headers: {
+        'Content-Security-Policy':
+          "default-src 'self'; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob:; connect-src 'self' ws://localhost:*"
+      }
+    },
     root: '.',
     resolve: {
       alias: {

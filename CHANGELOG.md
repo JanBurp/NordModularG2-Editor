@@ -8,12 +8,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+---
+
+## [0.5.5] - 2026-06-12
+
+
 ### Added
 - Extensive logging and help output for CLI tool
+- CLI and daemon binaries available as downloads
+- Content-Security-Policy header for Electron renderer
+
+### Fixed
+- Settings panel now only shows options relevant to the current context
+- Color picker was not area-aware; UX improved
+- Save As dialog did not open for new (unsaved) patches
 
 ---
 
-## [0.5.4] - 2025-01-01
+## [0.5.4] - 2026-06-11
 
 ### Fixed
 - Help link on documentation page
@@ -21,7 +33,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
-## [0.5.0] - 2024-12-01
+## [0.5.0] - 2026-06-11
 
 ### Added
 - About dialog

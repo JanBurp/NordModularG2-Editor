@@ -147,6 +147,8 @@
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
+	<DriverErrorDialog @retry="toggleConnection" />
+
 	<ParamEditDialog />
 
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
@@ -186,6 +188,7 @@
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
 	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import AboutDialog from './components/common/AboutDialog.vue';
+	import DriverErrorDialog from './components/common/DriverErrorDialog.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -208,12 +211,14 @@
 	const isLoading = computed(
 		() =>
 			device.status === DeviceStatus.Connecting ||
+			device.status === DeviceStatus.Loading ||
 			device.modeChanging ||
 			slotsStore.uploadingFromFile ||
 			Object.values(slotsStore.slots).some((s) => s.loading),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
+		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
 		return 'Loading patch...';
@@ -271,7 +276,15 @@
 
 	const showAboutDialog = ref(false);
 
-	useElectronMenuActions({ currentModules, currentPatch, handleSlotClick, handleVariationClick, showAbout: () => { showAboutDialog.value = true; } });
+	useElectronMenuActions({
+		currentModules,
+		currentPatch,
+		handleSlotClick,
+		handleVariationClick,
+		showAbout: () => {
+			showAboutDialog.value = true;
+		},
+	});
 	useModuleKeyboard();
 
 	async function handlePerfModeToggle(): Promise<void> {
@@ -283,6 +296,9 @@
 	}
 
 	onMounted(async () => {
+		const { version, platform } = await window.electronAPI.getAppInfo();
+		console.log(`[startup] G2 Editor v${version} — ${platform}`);
+
 		const isOffline = window.electronAPI.isOffline;
 		if (isOffline) {
 			device.status = DeviceStatus.Offline;
