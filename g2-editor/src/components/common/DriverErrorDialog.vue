@@ -11,8 +11,13 @@
 					replace Clavia's USB Driver.
 				</p>
 				<p v-else class="text-sm text-neutral-300 leading-relaxed">
-					The G2 was found on USB but its interface could not be claimed.<br /><br />
-					Try unplugging the G2 and plugging it back in. If that doesn't help, restart your Mac to reset the USB subsystem.
+					The G2 was found on USB but its interface could not be claimed. Possible solutions:
+					<ul class="list-disc pl-4">
+					<li>G2 is claimed by another application. Quit other app and retry.</li>
+					<li>Try unplugging the G2 and plugging it back in.</li>
+					<li>Restart your Mac to reset the USB subsystem.</li>
+					</ul>
+
 				</p>
 				<div class="flex justify-end">
 					<button
