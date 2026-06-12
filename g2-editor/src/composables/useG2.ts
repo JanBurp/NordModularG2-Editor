@@ -29,7 +29,8 @@ export function useG2() {
 
 	const log: LogFn = (direction, event, message, category) => {
 		if (category !== 'led' && category !== 'volume') {
-			console.log(`[USB] ${now()} ${direction} ${event} ${message}`);
+			const fn = (event === 'Daemon' || event === 'USB' || event === 'Connect' || event === 'Disconnect') ? console.error : console.log;
+			fn(`[USB] ${now()} ${direction} ${event} ${message}`);
 		}
 	};
 
@@ -62,7 +63,12 @@ export function useG2() {
 			isDaemonRunning.value = false;
 			window.cli.offWatchDone();
 			if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
-			if (!wasRunning) rejectArmed(new Error('Daemon finished'));
+			if (wasRunning) {
+				store.status = DeviceStatus.Disconnected;
+				log('•', 'Daemon', 'Daemon stopped');
+			} else {
+				rejectArmed(new Error('Daemon finished'));
+			}
 		});
 
 		window.cli.onWatchEvent(async (line: string) => {
@@ -76,6 +82,18 @@ export function useG2() {
 				if (ev.type === 'watch_armed') {
 					if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
 					resolveArmed();
+					return;
+				}
+				if (ev.type === 'usb_devices') {
+					const all: any[] = ev.data?.all ?? [];
+					log('•', 'USB', `${all.length} USB device(s) found`);
+					const g2s = all.filter((d: any) => d.isG2);
+					if (g2s.length === 0) {
+						log('•', 'USB', 'No Nord G2 devices found');
+					} else {
+						log('•', 'USB', `${g2s.length} Nord G2 device(s): ${g2s.map((d: any) => `bus=${d.bus} dev=${d.device}`).join(', ')}`);
+						if (g2s.length > 1 && ev.data?.chosen) log('•', 'USB', `Using first: bus=${ev.data.chosen.bus} device=${ev.data.chosen.device}`);
+					}
 					return;
 				}
 				if (ev.type === 'device_disconnected') { store.status = DeviceStatus.Lost; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
@@ -96,7 +114,7 @@ export function useG2() {
 		await armed;
 		// activityTimer already null'd when watch_armed was handled (or null'd by error paths)
 		isDaemonRunning.value = true;
-		log('•', 'Watch', 'Started');
+		log('•', 'Daemon', 'Ready');
 	}
 
 	function stopWatch(): void {
@@ -114,6 +132,7 @@ export function useG2() {
 			return;
 		}
 		store.status = DeviceStatus.Connecting;
+		log('•', 'Daemon', 'Starting...');
 		try {
 			await startWatch();
 			log('→', 'Connect', 'Connecting to G2...');
