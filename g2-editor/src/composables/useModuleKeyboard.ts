@@ -5,6 +5,7 @@ import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { useParamEditDialog } from './useParamEditDialog';
 import type { ModuleInstance } from '../types';
+import { clamp } from '@/utils/math';
 
 function isInputFocused(): boolean {
 	const el = document.activeElement;
@@ -183,7 +184,7 @@ export function useModuleKeyboard() {
 		const areaKey = found.area === 1 ? 'voice' : 'fx';
 		const variation = uiStore.variation;
 		const current = slotsStore.slots[uiStore.slotInFocus]?.variations?.[variation]?.[areaKey]?.[sel.moduleId]?.[sel.paramIndex] ?? paramDef.def;
-		const newValue = Math.max(paramDef.low, Math.min(paramDef.high, current + delta));
+		const newValue = clamp(current + delta, paramDef.low, paramDef.high);
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 

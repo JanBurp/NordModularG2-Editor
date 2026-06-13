@@ -14,7 +14,7 @@ extraResources:
     to: doc/help
 
 mac:
-  artifactName: "${productName}-${version}-${arch}.${ext}"
+  artifactName: "G2-Editor-${arch}.${ext}"
   target:
     - dmg
   category: public.app-category.music
@@ -23,6 +23,7 @@ mac:
       to: g2-cli
 
 win:
+  artifactName: "G2-Editor-Setup.${ext}"
   target:
     - nsis
   extraResources:

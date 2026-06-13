@@ -105,6 +105,15 @@ static void emit(cJSON *resp) {
 	if (s) { printf("%s\n", s); fflush(stdout); free(s); }
 }
 
+/* Emit a typed event: {"type":<type>,"data":<data>}. Takes ownership of data. */
+static void emit_event(const char *type, cJSON *data) {
+	cJSON *ev = cJSON_CreateObject();
+	cJSON_AddStringToObject(ev, "type", type);
+	cJSON_AddItemToObject(ev, "data", data ? data : cJSON_CreateNull());
+	emit(ev);
+	cJSON_Delete(ev);
+}
+
 /* ── argument helpers ──────────────────────────────────────────────────── */
 
 static const char *arg_s(cJSON *args, int idx) {
@@ -632,14 +641,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 	pthread_create(&reader, NULL, stdin_reader, NULL);
 
 	/* Enumerate USB devices before connecting and emit the list as an event. */
-	{
-		cJSON *devlist = g2_list_devices_json();
-		cJSON *ev = cJSON_CreateObject();
-		cJSON_AddStringToObject(ev, "type", "usb_devices");
-		cJSON_AddItemToObject(ev, "data", devlist ? devlist : cJSON_CreateNull());
-		emit(ev);
-		cJSON_Delete(ev);
-	}
+	emit_event("usb_devices", g2_list_devices_json());
 
 	/* Connect with retry. */
 	debug_status("connect_wait");
@@ -672,14 +674,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 	 * immediately as a typed event so the client sees progress. */
 
 	debug_status("startup_device_info");
-	cJSON *startup_device = g2_device_info(0);
-	{
-		cJSON *ev = cJSON_CreateObject();
-		cJSON_AddStringToObject(ev, "type", "device_info");
-		cJSON_AddItemToObject(ev, "data", startup_device ? startup_device : cJSON_CreateNull());
-		emit(ev);
-		cJSON_Delete(ev);
-	}
+	emit_event("device_info", g2_device_info(0));
 
 	const char *slotNames[] = {"A", "B", "C", "D"};
 	for (int i = 0; i < 4; i++) {
@@ -696,14 +691,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 	}
 
 	debug_status("startup_list");
-	cJSON *startup_names = g2_list(LIST_FILTER_ALL, 0);
-	{
-		cJSON *ev = cJSON_CreateObject();
-		cJSON_AddStringToObject(ev, "type", "names");
-		cJSON_AddItemToObject(ev, "data", startup_names ? startup_names : cJSON_CreateNull());
-		emit(ev);
-		cJSON_Delete(ev);
-	}
+	emit_event("names", g2_list(LIST_FILTER_ALL, 0));
 
 	debug_status("startup_synth_settings");
 	cJSON *startup_synth = query_synth_settings("synth_settings_update");

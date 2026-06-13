@@ -28,6 +28,10 @@ export const test = base.extend<AppFixtures>({
 			},
 		});
 
+		// Wait for the window's initial navigation to settle before stubbing handlers,
+		// preventing "Execution context was destroyed" race with page load.
+		await (await app.firstWindow()).waitForLoadState('domcontentloaded');
+
 		// Stub out CLI handlers so no binary is needed
 		await app.evaluate(({ ipcMain }) => {
 			for (const ch of ['cli:run', 'cli:run-batch']) {

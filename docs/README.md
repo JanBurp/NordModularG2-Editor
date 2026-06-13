@@ -22,13 +22,17 @@ Video of first proof of concept (30 april 2026):
 
 ## Download & Run
 
-Download the latest version from the [Releases page](https://github.com/JanBurp/Nord-Modular-G2---Editor/releases/latest).
+Download the latest version:
 
-| Platform | File to download |
-|---|---|
-| macOS Apple Silicon (M1/M2/M3/M4) | `G2 Editor-*-arm64.dmg` |
-| macOS Intel | `G2 Editor-*-x64.dmg` |
-| Windows | `G2 Editor Setup *.exe` |
+| Platform | Editor | CLI |
+|---|---|---|
+| macOS Apple Silicon (M1/M2/M3/M4) | [G2-Editor-arm64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-arm64.dmg) | [g2-cli-macos-arm64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-arm64) |
+| macOS Intel | [G2-Editor-x64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-x64.dmg) | [g2-cli-macos-x64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-x64) |
+| Windows | [G2-Editor-Setup.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-Setup.exe) | [g2-cli-windows-x64.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-windows-x64.exe) |
+
+### CLI
+
+Most people don't need this. In some cases it could be helpfull for testing without the whole UX editor. Or if you like to control your G2 from the terminal. Look at [GitHub Page](https://github.com/JanBurp/NordModularG2-Editor) for more info.
 
 ### macOS
 1. Open the `.dmg` and drag **G2 Editor** to your Applications folder.
@@ -42,6 +46,16 @@ Download the latest version from the [Releases page](https://github.com/JanBurp/
 
 ### Windows
 Run the `.exe` installer and follow the steps.
+
+#### USB Driver
+
+The editor requires the **WinUSB** driver for the Nord G2. If the app reports a USB driver problem, install it using [Zadig](https://zadig.akeo.ie/):
+
+1. Open Zadig and select the **Nord G2** device.
+2. Choose **WinUSB** as the driver.
+3. Click **Replace Driver**.
+
+> **Note:** This replaces Clavia's original USB driver.
 
 ### Help
 See the [help file](help.md) for keyboard shortcuts, module editing, cabling, and more.

@@ -3,6 +3,7 @@ import { getParam } from '../renderer/parammap';
 import type { ParamDefinition } from '../types/index';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { clamp } from '@/utils/math';
 
 // Singleton state shared between the keyboard composable (opener) and the dialog component (renderer)
 const showDialog = ref(false);
@@ -36,7 +37,7 @@ export function useParamEditDialog() {
 	async function confirmParamEdit() {
 		if (editingModuleIndex.value === null || editingParamIndex.value === null || !editingParamDef.value) return;
 		const def = editingParamDef.value;
-		const value = Math.max(def.low, Math.min(def.high, editingValue.value));
+		const value = clamp(editingValue.value, def.low, def.high);
 		await slotsStore.setParam(editingModuleIndex.value, editingParamIndex.value, value, uiStore.variation, editingArea.value);
 		showDialog.value = false;
 	}
