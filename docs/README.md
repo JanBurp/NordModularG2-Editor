@@ -30,6 +30,13 @@ Download the latest version:
 | macOS Intel | [G2-Editor-x64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-x64.dmg) | [g2-cli-macos-x64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-x64) |
 | Windows | [G2-Editor-Setup.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-Setup.exe) | [g2-cli-windows-x64.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-windows-x64.exe) |
 
+### System Requirements
+
+| Platform | Minimum OS |
+|---|---|
+| macOS (Apple Silicon & Intel) | macOS 11 (Big Sur) |
+| Windows | Windows 10 (64-bit) |
+
 ### CLI
 
 Most people don't need this. In some cases it could be helpfull for testing without the whole UX editor. Or if you like to control your G2 from the terminal. Look at [GitHub Page](https://github.com/JanBurp/NordModularG2-Editor) for more info.
