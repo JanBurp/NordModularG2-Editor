@@ -35,6 +35,11 @@ ElectronJS is used for the actual editor. It can run in an offline mode without 
 - [USB Protocol](doc/usb.md) — USB framing, commands, watch events, daemon architecture
 - [Patch File Format](doc/parsing.md) — PCH2/PRF2 binary format, sections, bit encoding
 
+## Prerequisites
+
+- **macOS**: `brew install libusb`
+- **Windows**: handled via the release build script (MinGW cross-compile)
+
 ## Build
 
 ### CLI
