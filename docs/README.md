@@ -20,6 +20,13 @@ Video of first proof of concept (30 april 2026):
 
 [![Watch the video](https://img.youtube.com/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/BuMu8OjTbvk)
 
+### System Requirements
+
+| Platform | Minimum OS |
+|---|---|
+| macOS (Apple Silicon & Intel) | macOS 11 (Big Sur) |
+| Windows | Windows 10 (64-bit) |
+
 ## Download & Run
 
 Download the latest version:
@@ -29,13 +36,6 @@ Download the latest version:
 | macOS Apple Silicon (M1/M2/M3/M4) | [G2-Editor-arm64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-arm64.dmg) | [g2-cli-macos-arm64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-arm64) |
 | macOS Intel | [G2-Editor-x64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-x64.dmg) | [g2-cli-macos-x64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-x64) |
 | Windows | [G2-Editor-Setup.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-Setup.exe) | [g2-cli-windows-x64.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-windows-x64.exe) |
-
-### System Requirements
-
-| Platform | Minimum OS |
-|---|---|
-| macOS (Apple Silicon & Intel) | macOS 11 (Big Sur) |
-| Windows | Windows 10 (64-bit) |
 
 ### CLI
 
@@ -58,11 +58,23 @@ Run the `.exe` installer and follow the steps.
 
 The editor requires the **WinUSB** driver for the Nord G2. If the app reports a USB driver problem, install it using [Zadig](https://zadig.akeo.ie/):
 
+> **Important:** Run Zadig as Administrator (right-click → *Run as administrator*), otherwise it cannot replace/install the driver.
+
 1. Open Zadig and select the **Nord G2** device.
 2. Choose **WinUSB** as the driver.
-3. Click **Replace Driver**.
+3. Click **Replace/Install Driver**.
 
 > **Note:** This replaces Clavia's original USB driver.
+
+#### Windows 11: Driver Signature Enforcement
+
+Windows 11 may block the unsigned WinUSB driver. If Zadig fails to install the driver, boot with signature enforcement disabled:
+
+1. **Start → Power**, hold **Shift** and click **Restart**.
+2. Go to **Troubleshoot → Advanced options → Startup Settings → Restart**.
+3. Press **F7** — *Disable driver signature enforcement*.
+4. Once Windows has booted, run Zadig as Administrator and install the driver as described above.
+5. Reboot normally — the driver persists across reboots.
 
 ### Help
 See the [help file](help.md) for keyboard shortcuts, module editing, cabling, and more.
