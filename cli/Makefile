@@ -2,8 +2,16 @@
 # Build C CLI tool for Nord G2 synthesizer
 
 CC      ?= gcc
-LIBUSB_CFLAGS ?= $(shell pkg-config --cflags libusb-1.0 2>/dev/null)
-LIBUSB_LIBS   ?= $(shell pkg-config --libs   libusb-1.0 2>/dev/null)
+LIBUSB_CFLAGS ?= $(shell \
+  pkg-config --cflags libusb-1.0 2>/dev/null || \
+  (test -d /opt/homebrew/include/libusb-1.0 && echo "-I/opt/homebrew/include/libusb-1.0") || \
+  (test -d /usr/local/include/libusb-1.0 && echo "-I/usr/local/include/libusb-1.0") || \
+  (test -d /opt/local/include/libusb-1.0 && echo "-I/opt/local/include/libusb-1.0"))
+LIBUSB_LIBS   ?= $(shell \
+  pkg-config --libs libusb-1.0 2>/dev/null || \
+  (test -f /opt/homebrew/lib/libusb-1.0.dylib && echo "-L/opt/homebrew/lib -lusb-1.0") || \
+  (test -f /usr/local/lib/libusb-1.0.dylib && echo "-L/usr/local/lib -lusb-1.0") || \
+  (test -f /opt/local/lib/libusb-1.0.dylib && echo "-L/opt/local/lib -lusb-1.0"))
 CFLAGS  = -Wall -Wextra -Iinclude -Itest -I. $(LIBUSB_CFLAGS) $(ARCH_FLAGS) -g -DUNITY_OUTPUT_COLOR
 LDFLAGS = $(LIBUSB_LIBS) $(ARCH_FLAGS) -pthread
 TARGET = g2-cli
