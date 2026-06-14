@@ -10,6 +10,24 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ---
 
+## [0.5.6] - 2026-06-14
+
+### Added
+- System requirements section in documentation
+- USB driver documentation for Windows
+- Download links for latest builds in documentation (no need to look at Releases)
+- All remaining CLI commands wired up in doc
+- Loading status indicator during connection
+- Editor version and platform logged on startup
+
+### Fixed
+- libusb detection on older macOS versions (make build)
+- Cleaner usb-could-not-claim error messages on macOS and Windows
+- More robust error logging when USB device cannot be claimed
+
+
+---
+
 ## [0.5.5] - 2026-06-12
 
 
