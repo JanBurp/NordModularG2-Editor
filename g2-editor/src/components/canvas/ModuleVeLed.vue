@@ -7,7 +7,7 @@
 			:y="led.y"
 			:width="ve.w"
 			height="6.5"
-			:fill="activeStep !== 255 && i <= activeStep ? '#0F0' : '#040'"
+			:fill="activeStep !== 255 && ((ve as any).exclusive ? i === activeStep : i <= activeStep) ? '#0F0' : '#040'"
 			stroke="#000"
 		/>
 	</template>

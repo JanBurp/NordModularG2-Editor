@@ -7,32 +7,55 @@ import { useUiStore } from '@/store/ui';
 import { getModule } from '@/renderer/nmg2mods';
 
 export interface LedEntry {
-	moduleIndex: number;
-	groupId: number;
 	area: 'fx' | 'va';
+	moduleIndex: number;
+	// Per-type visual-element key, matching Module.vue (e.g. 'led-0', 'ledArray-0', 'vu-0', 'ledGroup-0').
+	key: string;
+}
+
+const stateKey = (e: LedEntry): string => `${e.area}-${e.moduleIndex}-${e.key}`;
+
+// Pure parsers, ordered exactly as the hardware streams the bytes (see buildLedListForSlot).
+
+// led_data (0x39): one leading byte, then 2 bits per single LED, 4 LEDs per byte. on = value 1.
+export function parseLedBytes(ledList: LedEntry[], data: number[]): Map<string, boolean> {
+	const result = new Map<string, boolean>();
+	if (data.length < 2) return result;
+	let idx = 0;
+	for (let i = 1; i < data.length && idx < ledList.length; i++) {
+		const byte = data[i];
+		for (let bits = 0; bits < 4 && idx < ledList.length; bits++) {
+			const value = (byte >> (bits * 2)) & 0x03;
+			result.set(stateKey(ledList[idx++]), value === 1);
+		}
+	}
+	return result;
+}
+
+// volume_data (0x3A): pairs of [unknown, value] bytes, one pair per strip entry.
+// Value = active step index for sequencers (0..cnt-1), or level for VU meters.
+export function parseVolumeBytes(stripList: LedEntry[], data: number[]): Map<string, number> {
+	const result = new Map<string, number>();
+	let idx = 0;
+	for (let i = 0; i + 1 < data.length && idx < stripList.length; i += 2) {
+		result.set(stateKey(stripList[idx++]), data[i + 1]);
+	}
+	return result;
 }
 
 type SlotLedData = {
-	fxLedList: LedEntry[];
-	vaLedList: LedEntry[];
-	fxLedStates: Map<string, boolean>;
-	vaLedStates: Map<string, boolean>;
-	fxStripList: LedEntry[];
-	vaStripList: LedEntry[];
-	fxStripValues: Map<string, number>;
-	vaStripValues: Map<string, number>;
+	ledList: LedEntry[];
+	stripList: LedEntry[];
+	ledStates: Map<string, boolean>;
+	stripValues: Map<string, number>;
 };
 
 function makeSlotData(): SlotLedData {
 	return {
-		fxLedList: [],
-		vaLedList: [],
-		fxLedStates: new Map(),
-		vaLedStates: new Map(),
-		fxStripList: [],
-		vaStripList: [],
-		fxStripValues: new Map(),
-		vaStripValues: new Map(),
+		ledList: [],
+		stripList: [],
+		ledStates: new Map(),
+		stripValues: new Map(),
 	};
 }
 
@@ -49,134 +72,68 @@ export const useLedStore = defineStore('led', () => {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
+	// Build the ordered LED lists for a slot, mirroring the hardware byte order:
+	// area VA (areas[1]) before FX (areas[0]), modules by index ascending, then visual-element order.
 	function buildLedListForSlot(slot: SlotLabel, patch: Patch): void {
 		const d = slotData[slot];
-		d.fxLedStates.clear();
-		d.vaLedStates.clear();
-		d.fxStripValues.clear();
-		d.vaStripValues.clear();
 
-		const newFxList: LedEntry[] = [];
-		const newVaList: LedEntry[] = [];
-		const newFxStripList: LedEntry[] = [];
-		const newVaStripList: LedEntry[] = [];
+		const ledList: LedEntry[] = [];
+		const stripList: LedEntry[] = [];
 
-		for (const [areaIdx, areaName] of [[0, 'fx'] as const, [1, 'va'] as const]) {
+		for (const [areaIdx, areaName] of [[1, 'va'] as const, [0, 'fx'] as const]) {
 			const area = patch.areas[areaIdx];
+			if (!area) continue;
 			const sortedMods = [...area.modules].sort((a, b) => a.index - b.index);
 			for (const mod of sortedMods) {
 				const modDef = getModule(mod.type);
 				if (!modDef) continue;
 
 				const ves = modDef.ve || [];
-				const hasStrip = ves.some((v: any) => v.type === 'ledArray' || v.type === 'vu' || v.type === 'ledGroup');
-				const ledList = areaName === 'fx' ? newFxList : newVaList;
-				const stripList = areaName === 'fx' ? newFxStripList : newVaStripList;
+				// In sequencer modules the lone `led` is the Park LED, which the hardware groups with the step
+				// `ledArray` (one strip entry) rather than streaming it as a single `led_data` LED. So a single
+				// `led` only counts in led_data when the module has no step array. (Sequencers are the only
+				// module class with both a `led` and a `ledArray`.)
+				const hasStepArray = ves.some((v: any) => v.type === 'ledArray');
 
-				if (hasStrip) {
-					let stripGroupId = 0;
-					for (const ve of ves) {
-						if (ve.type === 'ledArray' || ve.type === 'vu' || ve.type === 'ledGroup') {
-							stripList.push({ moduleIndex: mod.index, groupId: stripGroupId++, area: areaName });
-						}
-					}
-				} else {
-					let ledGroupId = 0;
-					for (const ve of ves) {
-						if (ve.type === 'led') {
-							ledList.push({ moduleIndex: mod.index, groupId: ledGroupId++, area: areaName });
-						}
+				let ledIdx = 0;
+				let ledArrayIdx = 0;
+				let vuIdx = 0;
+				let ledGroupIdx = 0;
+				for (const ve of ves) {
+					if (ve.type === 'led') {
+						if (!hasStepArray) ledList.push({ area: areaName, moduleIndex: mod.index, key: `led-${ledIdx++}` });
+					} else if (ve.type === 'ledArray') {
+						stripList.push({ area: areaName, moduleIndex: mod.index, key: `ledArray-${ledArrayIdx++}` });
+					} else if (ve.type === 'vu') {
+						stripList.push({ area: areaName, moduleIndex: mod.index, key: `vu-${vuIdx++}` });
+					} else if (ve.type === 'ledGroup') {
+						stripList.push({ area: areaName, moduleIndex: mod.index, key: `ledGroup-${ledGroupIdx++}` });
 					}
 				}
 			}
 		}
 
-		d.fxLedList = newFxList;
-		d.vaLedList = newVaList;
-		d.fxStripList = newFxStripList;
-		d.vaStripList = newVaStripList;
+		d.ledList = ledList;
+		d.stripList = stripList;
+		d.ledStates = new Map();
+		d.stripValues = new Map();
 	}
 
 	function parseLedData(slot: SlotLabel, data: number[]): void {
 		lastLedData.value = { slot, data };
-
-		if (data.length < 2) return;
-
-		const d = slotData[slot];
-		let fxIdx = 0;
-		let vaIdx = 0;
-
-		for (let i = 1; i < data.length; i++) {
-			const byte = data[i];
-
-			for (let bits = 0; bits < 4; bits++) {
-				const shift = bits * 2;
-				const value = (byte >> shift) & 0x03;
-				const on = value === 1;
-
-				let key: string;
-				let statesMap: Map<string, boolean>;
-
-				if (fxIdx < d.fxLedList.length) {
-					const entry = d.fxLedList[fxIdx];
-					key = `${entry.moduleIndex}-${entry.groupId}`;
-					statesMap = d.fxLedStates;
-					fxIdx++;
-				} else if (vaIdx < d.vaLedList.length) {
-					const entry = d.vaLedList[vaIdx];
-					key = `${entry.moduleIndex}-${entry.groupId}`;
-					statesMap = d.vaLedStates;
-					vaIdx++;
-				} else {
-					continue;
-				}
-
-				statesMap.set(key, on);
-			}
-		}
+		slotData[slot].ledStates = parseLedBytes(slotData[slot].ledList, data);
 	}
 
-	// Volume data (0x3A): pairs of [unknown, value] bytes, FX strip list then VA strip list.
-	// Value = active step index for sequencers (0..cnt-1), or level for VU meters.
 	function parseVolumeData(slot: SlotLabel, data: number[]): void {
-		const d = slotData[slot];
-		let fxIdx = 0;
-		let vaIdx = 0;
-
-		for (let i = 0; i + 1 < data.length; i += 2) {
-			const value = data[i + 1];
-
-			let key: string;
-			let valuesMap: Map<string, number>;
-
-			if (fxIdx < d.fxStripList.length) {
-				const entry = d.fxStripList[fxIdx];
-				key = `${entry.moduleIndex}-${entry.groupId}`;
-				valuesMap = d.fxStripValues;
-				fxIdx++;
-			} else if (vaIdx < d.vaStripList.length) {
-				const entry = d.vaStripList[vaIdx];
-				key = `${entry.moduleIndex}-${entry.groupId}`;
-				valuesMap = d.vaStripValues;
-				vaIdx++;
-			} else {
-				break;
-			}
-
-			valuesMap.set(key, value);
-		}
+		slotData[slot].stripValues = parseVolumeBytes(slotData[slot].stripList, data);
 	}
 
-	function getLedState(area: 'fx' | 'va', moduleIndex: number, groupId: number): boolean {
-		const key = `${moduleIndex}-${groupId}`;
-		const d = slotData[uiStore.slotInFocus];
-		return (area === 'fx' ? d.fxLedStates : d.vaLedStates).get(key) ?? false;
+	function getLedState(area: 'fx' | 'va', moduleIndex: number, key: string): boolean {
+		return slotData[uiStore.slotInFocus].ledStates.get(`${area}-${moduleIndex}-${key}`) ?? false;
 	}
 
-	function getStripValue(area: 'fx' | 'va', moduleIndex: number, groupId: number): number {
-		const key = `${moduleIndex}-${groupId}`;
-		const d = slotData[uiStore.slotInFocus];
-		return (area === 'fx' ? d.fxStripValues : d.vaStripValues).get(key) ?? 255;
+	function getStripValue(area: 'fx' | 'va', moduleIndex: number, key: string): number {
+		return slotData[uiStore.slotInFocus].stripValues.get(`${area}-${moduleIndex}-${key}`) ?? 255;
 	}
 
 	for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {
