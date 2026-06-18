@@ -69,16 +69,6 @@ export const useHistoryStore = defineStore('history', {
 			h.past = [...h.past.slice(-(MAX_HISTORY - 1)), entry];
 		},
 
-		updateCoalesce(slot: SlotLabel, key: string, latestValue: unknown): boolean {
-			const h = this.slots[slot];
-			const state = h.coalescing.get(key);
-			if (!state) return false;
-			state.box.latest = latestValue;
-			if (state.timer !== null) clearTimeout(state.timer);
-			state.timer = setTimeout(() => h.coalescing.delete(key), COALESCE_MS);
-			return true;
-		},
-
 		popUndo(slot: SlotLabel): HistoryEntry | null {
 			const h = this.slots[slot];
 			if (!h.past.length) return null;

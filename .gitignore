@@ -24,3 +24,6 @@ g2-editor/resources/g2-cli
 /g2-editor/test-results
 /g2-editor/playwright-report
 *.exe
+
+# Docs (Jekyll build output — committed for Pages but excluded from future builds)
+docs/_site/

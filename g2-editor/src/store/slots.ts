@@ -1026,6 +1026,7 @@ export const useSlotsStore = defineStore('slots', {
 			try {
 				const { getModule } = await import('../renderer/nmg2mods');
 				const ids = currentModuleList.map((m: any) => m.index as number);
+				// Redo relies on this ID being free; if the user adds a module after undoing, the same ID may be reused and redo will conflict.
 				const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
 				const height = getModule(typeId)?.height ?? 2;
 				const colMods = currentModuleList
@@ -1500,6 +1501,7 @@ export const useSlotsStore = defineStore('slots', {
 				await entry.undo();
 			} catch (err) {
 				console.warn('[undo] CLI failed (offline?):', err);
+				// TODO: push entry back onto stack on failure so it isn't silently lost
 			} finally {
 				hist.unlock(slot);
 			}
@@ -1515,6 +1517,7 @@ export const useSlotsStore = defineStore('slots', {
 				await entry.redo();
 			} catch (err) {
 				console.warn('[redo] CLI failed (offline?):', err);
+				// TODO: push entry back onto stack on failure so it isn't silently lost
 			} finally {
 				hist.unlock(slot);
 			}
