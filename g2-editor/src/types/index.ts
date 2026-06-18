@@ -104,6 +104,7 @@ export interface ParamDefinition {
 	img?: string;
 	h?: number;
 	canLabel?: boolean;
+	trigger?: boolean;
 }
 
 export type ParamMap = Record<string, ParamDefinition>;

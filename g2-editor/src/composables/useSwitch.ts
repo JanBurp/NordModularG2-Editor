@@ -1,4 +1,4 @@
-import { computed } from 'vue';
+import { computed, ref } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
 import type { ModuleParam, ParamDefinition, ParamLabel } from '../types';
@@ -56,7 +56,11 @@ export function useSwitch(
 
 	const itemsPerRow = computed(() => Math.ceil(names.value.length / rows.value));
 
+	const isTrigger = computed(() => paramDef.value.trigger === true);
+	const triggerActive = ref(false);
+
 	const activeIndex = computed(() => {
+		if (isTrigger.value) return triggerActive.value ? 1 : 0;
 		const low = paramDef.value.low || 0;
 		const high = paramDef.value.high || names.value.length - 1 || 0;
 		return clamp(value.value, low, high);
@@ -100,9 +104,20 @@ export function useSwitch(
 		}
 	}
 
+	function onTriggerDown() {
+		triggerActive.value = true;
+		emitChange(paramIndex.value, 1);
+	}
+
+	function onTriggerUp() {
+		triggerActive.value = false;
+		emitChange(paramIndex.value, 0);
+	}
+
 	return {
 		paramDef, names, defin, width, mode, rows, bmp, hasBitmap, maskh,
 		optionNames, displayNames, activeIndex, singleButtonMode, activeOptionName,
 		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue,
+		isTrigger, onTriggerDown, onTriggerUp,
 	};
 }
