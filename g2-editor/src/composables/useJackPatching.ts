@@ -8,6 +8,7 @@ type JackInfo = {
 	connectorIndex: number;
 	type: 'input' | 'output';
 	colour: string;
+	area?: 0 | 1;
 };
 
 function jackColourToIndex(colour: string): number {
@@ -54,6 +55,7 @@ export function useJackPatching() {
 		if (src.moduleIndex === info.moduleIndex && src.connectorIndex === info.connectorIndex && src.type === info.type) return;
 		if (src.type === 'output' && info.type === 'output') return; // output→output not allowed
 
+		const srcArea = src.area ?? 0;
 		if (src.type === info.type) {
 			// input-to-input: white cable, dir=0
 			await slotsStore.addCable(
@@ -63,13 +65,13 @@ export function useJackPatching() {
 				info.moduleIndex,
 				0,
 				info.connectorIndex,
-				uiStore.area === 1 ? 'voice' : 'fx',
+				srcArea === 1 ? 'voice' : 'fx',
 				6, // white
 			);
 		} else {
 			const output = src.type === 'output' ? src : info;
 			const input = src.type === 'input' ? src : info;
-			const cableList = slotsStore.getAreaCables(uiStore.slotInFocus, uiStore.area as 0 | 1);
+			const cableList = slotsStore.getAreaCables(uiStore.slotInFocus, srcArea);
 			if (isNestDrivenByOutput(cableList, input.moduleIndex, input.connectorIndex)) return;
 			await slotsStore.addCable(
 				output.moduleIndex,
@@ -78,7 +80,7 @@ export function useJackPatching() {
 				input.moduleIndex,
 				0,
 				input.connectorIndex,
-				uiStore.area === 1 ? 'voice' : 'fx',
+				srcArea === 1 ? 'voice' : 'fx',
 				jackColourToIndex(output.colour),
 			);
 		}
