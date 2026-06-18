@@ -1,0 +1,15 @@
+remote_theme: just-the-docs/just-the-docs
+title: Nord Modular G2 Editor
+description: Cross-platform editor for the Nord Modular G2 synthesizer
+
+url: https://janburp.github.io
+baseurl: /NordModularG2-Editor
+
+search_enabled: true
+heading_anchors: true
+
+nav_external_links:
+  - title: GitHub Repository
+    url: https://github.com/JanBurp/NordModularG2-Editor
+
+footer_content: "Nord Modular G2 Editor — open source, cross-platform."

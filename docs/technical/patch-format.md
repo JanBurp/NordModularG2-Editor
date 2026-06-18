@@ -1,3 +1,9 @@
+---
+title: Patch File Format
+parent: Technical Reference
+nav_order: 4
+---
+
 # Nord G2 Patch File Format (PCH2 / PRF2)
 
 Reference derived from `g2-editor/src/parser/nmg2PatchParser.ts`, `nmg2PatchSerializer.ts`, `constants.ts`, and `src/types/patch.ts`.

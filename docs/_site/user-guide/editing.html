@@ -1,0 +1,185 @@
+<h1 id="editing-modules--cables">Editing Modules &amp; Cables</h1>
+
+<h2 id="adding-modules">Adding Modules</h2>
+
+<ol>
+  <li>Open the <strong>Modules pane</strong> (<code class="language-plaintext highlighter-rouge">Cmd+M</code>)</li>
+  <li>Search by name or category, or scroll the list</li>
+  <li>Drag a module onto the canvas (Voice or FX area)</li>
+</ol>
+
+<hr />
+
+<h2 id="selecting--moving">Selecting &amp; Moving</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Click module</td>
+      <td>Select</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Shift+click</code> module</td>
+      <td>Add/remove from selection</td>
+    </tr>
+    <tr>
+      <td>Drag on empty canvas</td>
+      <td>Rubber-band select</td>
+    </tr>
+    <tr>
+      <td>Drag module title bar</td>
+      <td>Move module(s)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Cmd+A</code></td>
+      <td>Select all modules in current area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Delete</code> / <code class="language-plaintext highlighter-rouge">Backspace</code></td>
+      <td>Delete selected modules and their cables</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="keyboard-navigation-between-modules">Keyboard Navigation Between Modules</h3>
+
+<p>With any module selected, use <code class="language-plaintext highlighter-rouge">Shift+Arrow</code> keys to jump to adjacent modules on the canvas. Navigation wraps at area edges and crosses Voice↔FX in split view.</p>
+
+<hr />
+
+<h2 id="cut--copy--paste">Cut / Copy / Paste</h2>
+
+<ul>
+  <li><strong>Copy</strong> (<code class="language-plaintext highlighter-rouge">Cmd+C</code>) — copies selected modules and any cables connecting them</li>
+  <li><strong>Cut</strong> (<code class="language-plaintext highlighter-rouge">Cmd+X</code>) — copies modules then deletes selection; cables are deleted without copying</li>
+  <li><strong>Paste</strong> (<code class="language-plaintext highlighter-rouge">Cmd+V</code>) — places modules at the mouse cursor; relative layout, all parameters, variation values, and inter-module cables are preserved; cross-area paste (Voice ↔ FX) is supported</li>
+</ul>
+
+<hr />
+
+<h2 id="renaming--coloring">Renaming &amp; Coloring</h2>
+
+<ul>
+  <li><strong>Rename</strong> — double-click module title, or right-click → Rename…</li>
+  <li><strong>Set color</strong> — select modules, then click the <strong>color swatch</strong> in the toolbar to apply the current color, or click <strong>▾</strong> next to it to pick a different color</li>
+</ul>
+
+<hr />
+
+<h2 id="editing-parameters">Editing Parameters</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Control</th>
+      <th>Mouse interaction</th>
+      <th>Double-click</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Knob</td>
+      <td>Drag up/down</td>
+      <td>Reset to default</td>
+    </tr>
+    <tr>
+      <td>Slider</td>
+      <td>Drag handle; click track to step</td>
+      <td>Reset to default</td>
+    </tr>
+    <tr>
+      <td>Switch</td>
+      <td>Click to cycle</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>Spinner</td>
+      <td>Click/hold +/− to inc/dec</td>
+      <td>Reset to default</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="right-click-a-parameter--edit-dialog">Right-click a parameter → edit dialog</h3>
+
+<p>Opens a precise-entry dialog: enum parameters show a dropdown; numeric parameters show a number field (with optional MIDI note display).</p>
+
+<h3 id="keyboard-module-selected">Keyboard (module selected)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Key</th>
+      <th>Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">←</code> / <code class="language-plaintext highlighter-rouge">→</code></td>
+      <td>Navigate to previous/next parameter</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">↑</code> / <code class="language-plaintext highlighter-rouge">↓</code></td>
+      <td>Increase / decrease value by 1</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">Alt+↑</code> / <code class="language-plaintext highlighter-rouge">Alt+↓</code></td>
+      <td>Increase / decrease value by 16</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="parameter-labels">Parameter Labels</h3>
+
+<p>Right-click a parameter → <strong>Rename label</strong> to set a custom display name.</p>
+
+<hr />
+
+<h2 id="cabling">Cabling</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>Result</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Drag output jack → input jack</td>
+      <td>Create cable</td>
+    </tr>
+    <tr>
+      <td>Right-click connected jack → Set Cable Color</td>
+      <td>Pick from 8 colors</td>
+    </tr>
+    <tr>
+      <td>Right-click connected jack → Delete Connected</td>
+      <td>Remove all cables on this jack</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="cable-visibility-toolbar">Cable Visibility (toolbar)</h3>
+
+<ul>
+  <li><strong>8 color buttons</strong> — toggle visibility per color</li>
+  <li><strong>H</strong> — hide / show all cables</li>
+  <li><strong>S</strong> — shuffle cable routing</li>
+</ul>
+
+<hr />
+
+<h2 id="module-help">Module Help</h2>
+
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">F1</code> — show help for the selected module (or all visible modules)</li>
+  <li>Right-click module on canvas → <strong>Show Help</strong> — opens Modules pane to that module’s docs</li>
+  <li>In the <strong>Modules pane</strong>: click a module to toggle its help text; enable <strong>Show all help</strong> to display docs for every visible module</li>
+</ul>

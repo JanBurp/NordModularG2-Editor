@@ -1,0 +1,29 @@
+<h1 id="windows-usb-driver">Windows USB Driver</h1>
+
+<p>The editor requires the <strong>WinUSB</strong> driver for the Nord G2. If the app reports a USB driver problem, install it using <a href="https://zadig.akeo.ie/">Zadig</a>.</p>
+
+<blockquote>
+  <p><strong>Important:</strong> Run Zadig as Administrator (right-click → <em>Run as administrator</em>), otherwise it cannot replace or install the driver.</p>
+</blockquote>
+
+<ol>
+  <li>Open Zadig and select the <strong>Nord G2</strong> device.</li>
+  <li>Choose <strong>WinUSB</strong> as the driver.</li>
+  <li>Click <strong>Replace/Install Driver</strong>.</li>
+</ol>
+
+<blockquote>
+  <p><strong>Note:</strong> This replaces Clavia’s original USB driver. You will need to reinstall the original Clavia driver if you want to use the original editor again.</p>
+</blockquote>
+
+<h2 id="windows-11-driver-signature-enforcement">Windows 11: Driver Signature Enforcement</h2>
+
+<p>Windows 11 may block the unsigned WinUSB driver. If Zadig fails to install it, boot with signature enforcement disabled:</p>
+
+<ol>
+  <li><strong>Start → Power</strong>, hold <strong>Shift</strong> and click <strong>Restart</strong>.</li>
+  <li>Go to <strong>Troubleshoot → Advanced options → Startup Settings → Restart</strong>.</li>
+  <li>Press <strong>F7</strong> — <em>Disable driver signature enforcement</em>.</li>
+  <li>Once Windows has booted, run Zadig as Administrator and install the driver as described above.</li>
+  <li>Reboot normally — the driver persists across reboots.</li>
+</ol>

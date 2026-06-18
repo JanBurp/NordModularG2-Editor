@@ -1,0 +1,2114 @@
+<h1 id="nord-g2-usb-protocol">Nord G2 USB Protocol</h1>
+
+<p>Reference derived from the CLI source in <code class="language-plaintext highlighter-rouge">cli/src/g2_device.c</code>, <code class="language-plaintext highlighter-rouge">cli/include/defs.h</code>, <code class="language-plaintext highlighter-rouge">cli/src/utils.c</code>, confirmed against the Delphi editor and cross-checked with the g2ools Python tool.</p>
+
+<hr />
+
+<h2 id="1-usb-device">1. USB Device</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Property</th>
+      <th>Value</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Vendor ID</td>
+      <td><code class="language-plaintext highlighter-rouge">0x0ffc</code></td>
+    </tr>
+    <tr>
+      <td>Product ID</td>
+      <td><code class="language-plaintext highlighter-rouge">0x0002</code></td>
+    </tr>
+    <tr>
+      <td>Interface</td>
+      <td>0</td>
+    </tr>
+    <tr>
+      <td>Bulk OUT endpoint</td>
+      <td><code class="language-plaintext highlighter-rouge">0x03</code></td>
+    </tr>
+    <tr>
+      <td>Interrupt IN endpoint</td>
+      <td><code class="language-plaintext highlighter-rouge">0x81</code></td>
+    </tr>
+    <tr>
+      <td>Bulk IN endpoint</td>
+      <td><code class="language-plaintext highlighter-rouge">0x82</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Timeouts:</strong></p>
+<ul>
+  <li>Standard: 100 ms</li>
+  <li>Long (patch name): 2000 ms</li>
+  <li>Send delay (after every bulk write): 10 ms (<code class="language-plaintext highlighter-rouge">usleep(10000)</code>)</li>
+</ul>
+
+<blockquote>
+  <p>Note: the interrupt endpoint (<code class="language-plaintext highlighter-rouge">0x81</code>) is polled with <code class="language-plaintext highlighter-rouge">libusb_bulk_transfer</code>, not <code class="language-plaintext highlighter-rouge">libusb_interrupt_transfer</code>. On macOS, interrupt_transfer can ignore timeouts after rapid transfers and hang the watch loop.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong><code class="language-plaintext highlighter-rouge">libusb_clear_halt</code> gotcha:</strong> Do NOT call on a freshly cold-reset G2. Without a prior halt, it puts the device in a broken state: streaming events still flow but direct queries time out and BULK_OUT eventually stalls. Only issue after a verified halt condition (e.g. a prior bulk transfer returned <code class="language-plaintext highlighter-rouge">LIBUSB_ERROR_PIPE</code>).</p>
+</blockquote>
+
+<hr />
+
+<h2 id="2-packet-framing">2. Packet Framing</h2>
+
+<p>Every outgoing packet has the same envelope:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Offset  Bytes  Description
+──────  ─────  ────────────────────────────────────────────────────
+0       2      Length (big-endian uint16).  Covers bytes [2..end].
+                Does NOT include these 2 length bytes themselves.
+2       1      Message header — always 0x01
+                (Exception: CMD_INIT uses 0x80, no 0x01 header)
+3       1      Scope byte  (see §4)
+4       1      Command ID  (0x41 for most system commands)
+5+      N      Sub-command + payload
+N-2     2      CRC-16/CCITT (big-endian), computed over bytes [2..N-3]
+</code></pre></div></div>
+
+<p><strong>Example — GET_SYNTH_SETTINGS built step by step:</strong></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>payload bytes (before CRC):  01 2C 41 02
+crc = calc_crc16([01 2C 41 02])
+full packet: 00 08  01 2C 41 02  CRC_HI CRC_LO
+             └─len─┘└────payload + CRC────────┘
+</code></pre></div></div>
+
+<p><strong>Length formula (from code):</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>msgLength = (number of payload bytes including 0x01 header)
+msgLength += 4   ← always added after CRC is appended (accounts for length field + 2 CRC bytes + padding)
+buff[0] = (msgLength &gt;&gt; 8) &amp; 0xff
+buff[1] = msgLength &amp; 0xff
+</code></pre></div></div>
+
+<p>So length = (header + scope + cmd_id + subcmd + extra) + 4.</p>
+
+<hr />
+
+<h2 id="3-crc-16ccitt">3. CRC-16/CCITT</h2>
+
+<p>Polynomial <code class="language-plaintext highlighter-rouge">0x1021</code>, seed <code class="language-plaintext highlighter-rouge">0x0000</code>. Computed over the payload bytes starting at offset 2 (the <code class="language-plaintext highlighter-rouge">0x01</code> header), <strong>not</strong> including the 2-byte length field.</p>
+
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="kt">uint16_t</span> <span class="nf">crc_iterator</span><span class="p">(</span><span class="kt">int32_t</span> <span class="n">seed</span><span class="p">,</span> <span class="kt">int32_t</span> <span class="n">val</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kt">int32_t</span> <span class="n">k</span> <span class="o">=</span> <span class="p">(((</span><span class="n">seed</span> <span class="o">&gt;&gt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">^</span> <span class="n">val</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">255</span><span class="p">)</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">;</span>
+    <span class="kt">int32_t</span> <span class="n">crc</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="mi">8</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+        <span class="k">if</span> <span class="p">((</span><span class="n">crc</span> <span class="o">^</span> <span class="n">k</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0x8000</span><span class="p">)</span>
+            <span class="n">crc</span> <span class="o">=</span> <span class="p">(</span><span class="n">crc</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">)</span> <span class="o">^</span> <span class="mh">0x1021</span><span class="p">;</span>
+        <span class="k">else</span>
+            <span class="n">crc</span> <span class="o">=</span> <span class="n">crc</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">;</span>
+        <span class="n">k</span> <span class="o">=</span> <span class="n">k</span> <span class="o">&lt;&lt;</span> <span class="mi">1</span><span class="p">;</span>
+    <span class="p">}</span>
+    <span class="k">return</span> <span class="p">(</span><span class="kt">uint16_t</span><span class="p">)((</span><span class="n">seed</span> <span class="o">&lt;&lt;</span> <span class="mi">8</span><span class="p">)</span> <span class="o">^</span> <span class="n">crc</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mh">0xFFFF</span><span class="p">;</span>
+<span class="p">}</span>
+
+<span class="kt">uint16_t</span> <span class="nf">calc_crc16</span><span class="p">(</span><span class="kt">uint8_t</span> <span class="o">*</span><span class="n">buff</span><span class="p">,</span> <span class="kt">int</span> <span class="n">length</span><span class="p">)</span> <span class="p">{</span>
+    <span class="kt">uint16_t</span> <span class="n">crc</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span>
+    <span class="k">for</span> <span class="p">(</span><span class="kt">int</span> <span class="n">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="n">i</span> <span class="o">&lt;</span> <span class="n">length</span><span class="p">;</span> <span class="n">i</span><span class="o">++</span><span class="p">)</span>
+        <span class="n">crc</span> <span class="o">=</span> <span class="n">crc_iterator</span><span class="p">(</span><span class="n">crc</span><span class="p">,</span> <span class="n">buff</span><span class="p">[</span><span class="n">i</span><span class="p">]);</span>
+    <span class="k">return</span> <span class="n">crc</span><span class="p">;</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<p>CRC bytes are appended big-endian: <code class="language-plaintext highlighter-rouge">[crc &gt;&gt; 8, crc &amp; 0xff]</code>.</p>
+
+<hr />
+
+<h2 id="4-scope-byte">4. Scope Byte</h2>
+
+<p>The scope byte at offset 3 encodes request type (high nibble) and target (low nibble):</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Bit 5-4  Request type
+  0x20   COMMAND_REQ          — G2 sends a response
+  0x30   COMMAND_WRITE_NO_RESP — no response (used for SET_PARAM)
+
+Bit 3-0  Target
+  0x0C   COMMAND_SYS          — system / global
+  0x08   COMMAND_SLOT         — slot specific (OR with slot 0-3 for A-D)
+</code></pre></div></div>
+
+<p>Combined scope values:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Scope</th>
+      <th>Hex</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>System request</td>
+      <td><code class="language-plaintext highlighter-rouge">0x2C</code> (<code class="language-plaintext highlighter-rouge">0x20\|0x0C</code>)</td>
+      <td>System command, expects reply</td>
+    </tr>
+    <tr>
+      <td>Slot A request</td>
+      <td><code class="language-plaintext highlighter-rouge">0x28</code> (<code class="language-plaintext highlighter-rouge">0x20\|0x08\|0</code>)</td>
+      <td>Slot A command, expects reply</td>
+    </tr>
+    <tr>
+      <td>Slot B request</td>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td>Slot B</td>
+    </tr>
+    <tr>
+      <td>Slot C request</td>
+      <td><code class="language-plaintext highlighter-rouge">0x2A</code></td>
+      <td>Slot C</td>
+    </tr>
+    <tr>
+      <td>Slot D request</td>
+      <td><code class="language-plaintext highlighter-rouge">0x2B</code></td>
+      <td>Slot D</td>
+    </tr>
+    <tr>
+      <td>Slot A write</td>
+      <td><code class="language-plaintext highlighter-rouge">0x38</code> (<code class="language-plaintext highlighter-rouge">0x30\|0x08\|0</code>)</td>
+      <td>Slot A, no reply (SET_PARAM)</td>
+    </tr>
+    <tr>
+      <td>Slot B write</td>
+      <td><code class="language-plaintext highlighter-rouge">0x39</code></td>
+      <td>Slot B</td>
+    </tr>
+    <tr>
+      <td>Slot C write</td>
+      <td><code class="language-plaintext highlighter-rouge">0x3A</code></td>
+      <td>Slot C</td>
+    </tr>
+    <tr>
+      <td>Slot D write</td>
+      <td><code class="language-plaintext highlighter-rouge">0x3B</code></td>
+      <td>Slot D</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="5-initialization-sequence">5. Initialization Sequence</h2>
+
+<p>On first connect the startup sequence is:</p>
+
+<h3 id="step-1--cmd_init-0x80">Step 1 — CMD_INIT (<code class="language-plaintext highlighter-rouge">0x80</code>)</h3>
+
+<p>Resets the G2’s patch version counters. Does not use the standard <code class="language-plaintext highlighter-rouge">0x01</code> header.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Packet:  00 05  80  CRC_HI CRC_LO
+</code></pre></div></div>
+
+<p>Response: Extended message. Bulk data starts with <code class="language-plaintext highlighter-rouge">0x80</code> (RESPONSE_TYPE_INIT).</p>
+
+<h3 id="step-2--stop_notifications">Step 2 — STOP_NOTIFICATIONS</h3>
+
+<p>Disarm any leftover streaming state from a previous session.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Packet:  00 09  01 2C 41 7D 01  CRC_HI CRC_LO
+                         ↑  ↑
+                         │  └── STOP_COMM = 0x01
+                         └───── SUB_COMMAND_START_STOP = 0x7D
+</code></pre></div></div>
+
+<p>Response: Embedded ACK.</p>
+
+<h3 id="step-3--get_synth_settings">Step 3 — GET_SYNTH_SETTINGS</h3>
+
+<p>Query device configuration (see §10 for response layout).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Packet:  00 08  01 2C 41 02  CRC_HI CRC_LO
+</code></pre></div></div>
+
+<p>Response: Extended bulk containing synth/MIDI/tuning settings.</p>
+
+<h3 id="step-4--start_notifications">Step 4 — START_NOTIFICATIONS</h3>
+
+<p>Arm the G2 to send unsolicited watch events.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Packet:  00 09  01 2C 41 7D 00  CRC_HI CRC_LO
+                               ↑
+                               START_COMM = 0x00
+</code></pre></div></div>
+
+<p>Response: Embedded ACK.</p>
+
+<h3 id="minimal-cold-connect-daemon-flow">Minimal cold-connect (daemon flow)</h3>
+
+<p>The full 4-step sequence above mirrors the Delphi editor. The <code class="language-plaintext highlighter-rouge">g2-cli</code> daemon uses a simpler cold-connect that <strong>skips CMD_INIT entirely</strong>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>1. drain pending interrupts (consume any stale stream from a prior session)
+2. send START_NOTIFICATIONS (0x7D 0x00)
+3. read the embedded ACK
+</code></pre></div></div>
+
+<p>This works because GET_PATCH_VERSION inside each query syncs the version counter on demand, so the patch-version reset that CMD_INIT performs is not needed. For paths where G2 may still be streaming (e.g. editor-initiated <code class="language-plaintext highlighter-rouge">set-perf-mode</code>), the daemon calls <code class="language-plaintext highlighter-rouge">g2_stop_comm()</code> explicitly before issuing queries (see §14).</p>
+
+<p><strong>Critical:</strong> this flow only works if <code class="language-plaintext highlighter-rouge">libusb_clear_halt</code> is <strong>not</strong> called between attach and START_COMM (see §1 gotcha). The reconnect-after-cable-pull path uses the same minimal sequence.</p>
+
+<hr />
+
+<h2 id="6-system-commands">6. System Commands</h2>
+
+<p>Most system commands use <code class="language-plaintext highlighter-rouge">0x41</code> as the cmd_id byte:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[01][2C][41][sub_cmd][...extra][CRC]
+</code></pre></div></div>
+
+<p>However, some commands that need to be version-matched use the <strong>performance version</strong> in place of <code class="language-plaintext highlighter-rouge">0x41</code> — notably SELECT_SLOT and all performance-level commands (see §6b).</p>
+
+<h3 id="6a-system-commands-cmd_id--0x41">6a. System Commands (cmd_id = <code class="language-plaintext highlighter-rouge">0x41</code>)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sub-cmd</th>
+      <th>Name</th>
+      <th>Extra bytes</th>
+      <th>Response</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x02</code></td>
+      <td>GET_SYNTH_SETTINGS</td>
+      <td>—</td>
+      <td>Extended bulk (§10)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x03</code></td>
+      <td>SET_SYNTH_SETTINGS</td>
+      <td>synth settings payload (§10a)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x04</code></td>
+      <td>GET_ASSIGNED_VOICES <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded; 4 voice counts at <code class="language-plaintext highlighter-rouge">[5..8]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x0A ss bb ll</code></td>
+      <td>RETRIEVE (bank→slot)</td>
+      <td>slot (0-3), bank (0-based), location (0-based)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x0B ss bb ll</code></td>
+      <td>STORE (slot→bank) <em>(not implemented yet)</em></td>
+      <td>slot (0-3), bank (0-based), location (0-based)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x0C tt bb ll 00</code></td>
+      <td>CLEAR <em>(not implemented yet)</em></td>
+      <td>file_type (0=patch,1=perf), bank, location, <code class="language-plaintext highlighter-rouge">0x00</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x0E tt bb ff tt 00</code></td>
+      <td>CLEAR_BANK <em>(not implemented yet)</em></td>
+      <td>file_type, bank, from_loc, bank, to_loc, <code class="language-plaintext highlighter-rouge">0x00</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x14 mm bb ll</code></td>
+      <td>LIST_PATCHES</td>
+      <td>mode (0=patches,1=perfs), bank, patch start</td>
+      <td>Embedded or bulk (§11)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x17 tt bb ll</code></td>
+      <td>PATCH_BANK_UPLOAD <em>(not implemented yet)</em></td>
+      <td>file_type, bank, location</td>
+      <td>Extended bulk (<code class="language-plaintext highlighter-rouge">R_PATCH_BANK_UPLOAD</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x19 tt bb ll</code></td>
+      <td>PATCH_BANK_DATA (download) <em>(not implemented yet)</em></td>
+      <td>file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x28 ss</code></td>
+      <td>GET_PATCH_NAME (sys)</td>
+      <td><code class="language-plaintext highlighter-rouge">ss</code>=slot (0-3)</td>
+      <td>Embedded; name at <code class="language-plaintext highlighter-rouge">response[5+]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x35 ss</code></td>
+      <td>GET_PATCH_VERSION</td>
+      <td><code class="language-plaintext highlighter-rouge">ss</code>=slot (0-3)</td>
+      <td>Embedded; version at <code class="language-plaintext highlighter-rouge">response[6]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3B</code></td>
+      <td>GET_MASTER_CLOCK <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded (<code class="language-plaintext highlighter-rouge">R_EXT_MASTER_CLOCK</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3D</code></td>
+      <td>MIDI_DUMP <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3E mm 00</code></td>
+      <td>SET_PERF_MODE</td>
+      <td><code class="language-plaintext highlighter-rouge">mm</code>=mode (0=patch, 1=performance)</td>
+      <td>Bulk <code class="language-plaintext highlighter-rouge">0x0C/0x1F</code> version_update (see §13)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x56 oo nn</code></td>
+      <td>PLAY_NOTE <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">oo</code>=on/off (0=on,1=off), <code class="language-plaintext highlighter-rouge">nn</code>=MIDI note</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7D 0x00</code></td>
+      <td>START_NOTIFICATIONS</td>
+      <td>—</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7D 0x01</code></td>
+      <td>STOP_NOTIFICATIONS</td>
+      <td>—</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x81</code></td>
+      <td>UNKNOWN_1 (init query)</td>
+      <td>—</td>
+      <td>Extended bulk</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="6b-performance-version-system-commands-cmd_id--perf_version">6b. Performance-Version System Commands (cmd_id = perf_version)</h3>
+
+<p>These use the same scope (<code class="language-plaintext highlighter-rouge">0x2C</code>) but put the <strong>performance version</strong> at the cmd_id position instead of <code class="language-plaintext highlighter-rouge">0x41</code>. Obtain the perf version from GET_PATCH_VERSION with slot=4 or from the init response.</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[01][2C][perf_version][sub_cmd][...extra][CRC]
+</code></pre></div></div>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sub-cmd</th>
+      <th>Name</th>
+      <th>Extra bytes</th>
+      <th>Response</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x09 ss</code></td>
+      <td>SELECT_SLOT</td>
+      <td><code class="language-plaintext highlighter-rouge">ss</code>=slot (0-3)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x10</code></td>
+      <td>GET_PERF_SETTINGS</td>
+      <td>—</td>
+      <td>Extended bulk (performance settings)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x11</code></td>
+      <td>SET_PERF_SETTINGS</td>
+      <td><code class="language-plaintext highlighter-rouge">[0x11][sizeHi][sizeLo][80 bytes settings]</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td>SET_PERF_NAME</td>
+      <td>perf_name (null-terminated)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3F FF 01 bpm</code></td>
+      <td>SET_MASTER_CLOCK_BPM</td>
+      <td><code class="language-plaintext highlighter-rouge">FF</code> unknown, <code class="language-plaintext highlighter-rouge">01</code>=BPM mode, <code class="language-plaintext highlighter-rouge">bpm</code>=value</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3F FF 00 run</code></td>
+      <td>SET_MASTER_CLOCK_RUN</td>
+      <td><code class="language-plaintext highlighter-rouge">FF</code> unknown, <code class="language-plaintext highlighter-rouge">00</code>=run mode, <code class="language-plaintext highlighter-rouge">run</code>=0/1</td>
+      <td>None</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x59</code></td>
+      <td>UNKNOWN_2 (perf init query) <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5E</code></td>
+      <td>GET_GLOBAL_KNOBS <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Extended bulk</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="select_slot-command">SELECT_SLOT command</h3>
+
+<p>There are two distinct slot-selection paths depending on whether the target slot is already active:</p>
+
+<h4 id="simple-focus--g2_select_slot-target-slot-already-active">Simple focus — <code class="language-plaintext highlighter-rouge">g2_select_slot</code> (target slot already active)</h4>
+
+<ol>
+  <li>GET_PATCH_VERSION with slot=4 → <code class="language-plaintext highlighter-rouge">perf_version</code></li>
+  <li>Send <code class="language-plaintext highlighter-rouge">[01][2C][perf_version][09][slot][CRC]</code></li>
+  <li>Drain pending notifications (<code class="language-plaintext highlighter-rouge">g2_drain_pending</code>) to consume <code class="language-plaintext highlighter-rouge">slot_change</code> / <code class="language-plaintext highlighter-rouge">assigned_voices</code></li>
+</ol>
+
+<h4 id="full-activate-then-focus--g2_switch_slot-target-slot-inactive">Full activate-then-focus — <code class="language-plaintext highlighter-rouge">g2_switch_slot</code> (target slot inactive)</h4>
+
+<p>Use this when the target slot needs to be activated before focusing. Steps:</p>
+
+<ol>
+  <li><strong>UNKNOWN_1</strong> (<code class="language-plaintext highlighter-rouge">send_system(0x41, 0x81)</code>) → extended bulk → <code class="language-plaintext highlighter-rouge">perf_version = selsData[2]</code></li>
+  <li><strong>GET_PERF_SETTINGS</strong> (<code class="language-plaintext highlighter-rouge">send_system(perf_version, 0x10)</code>) → extended bulk (<code class="language-plaintext highlighter-rouge">perfData</code>) containing current slot active/key/focus state</li>
+  <li><strong>Parse perfData</strong> to find per-slot active/key offsets and the currently-focused slot:
+    <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>perfData+4  → perf name (null-terminated)  → remaining
+remaining[0]  = 0x11 (C_PERF_SETTINGS chunk type)
+remaining[4] &gt;&gt; 2 &amp; 0x3  = focused_slot_index
+remaining+11 → slot 0: name(variable) + 10 bytes
+  [+0] active  (0/1)
+  [+1] key     (0/1)
+  [+2..9] hold, bank, patch, rangeLow, rangeHigh, padding
+Subsequent slots follow immediately
+</code></pre></div>    </div>
+  </li>
+  <li><strong>Modify perfData in-memory:</strong>
+    <ul>
+      <li><code class="language-plaintext highlighter-rouge">target_slot.active = 1</code>, <code class="language-plaintext highlighter-rouge">target_slot.key = 1</code></li>
+      <li><code class="language-plaintext highlighter-rouge">focused_slot.active = 0</code>, <code class="language-plaintext highlighter-rouge">focused_slot.key = 0</code> (if focused ≠ target)</li>
+    </ul>
+  </li>
+  <li><strong>SET_PERF_SETTINGS</strong> — send the chunk starting at the <code class="language-plaintext highlighter-rouge">0x11</code> byte using <code class="language-plaintext highlighter-rouge">perf_version</code> as cmd_id: <code class="language-plaintext highlighter-rouge">[0x11][sizeHi][sizeLo][80 bytes]</code>; drain ACK</li>
+  <li><strong>SELECT_SLOT</strong> — <code class="language-plaintext highlighter-rouge">[01][2C][0x41][09][slot][CRC]</code> — <strong>use <code class="language-plaintext highlighter-rouge">0x41</code>, NOT <code class="language-plaintext highlighter-rouge">perf_version</code></strong> (see gotcha below)</li>
+</ol>
+
+<blockquote>
+  <p><strong>Gotcha — SELECT_SLOT after SET_PERF_SETTINGS:</strong> A <code class="language-plaintext highlighter-rouge">perf_settings_update</code> message sits in the listener queue after the ACK. Querying GET_PATCH_VERSION before SELECT_SLOT causes <code class="language-plaintext highlighter-rouge">recv_interrupt()</code> to dequeue that update instead. Use <code class="language-plaintext highlighter-rouge">0x41</code> directly — accepted unconditionally by the G2.</p>
+</blockquote>
+
+<blockquote>
+  <p><strong>g2ctl.py three-step sequence (do not use):</strong> Uses <code class="language-plaintext highlighter-rouge">0x07</code> → <code class="language-plaintext highlighter-rouge">0x09</code> → <code class="language-plaintext highlighter-rouge">0x0a/0x70</code>; the <code class="language-plaintext highlighter-rouge">0x07</code> step resets all slots’ active/key state as a side effect. Use only <code class="language-plaintext highlighter-rouge">0x09</code>.</p>
+</blockquote>
+
+<h4 id="single-field-slot-updates--set-slot-enabled--set-slot-key--set-slot-hold">Single-field slot updates — <code class="language-plaintext highlighter-rouge">set-slot-enabled</code> / <code class="language-plaintext highlighter-rouge">set-slot-key</code> / <code class="language-plaintext highlighter-rouge">set-slot-hold</code></h4>
+
+<p>Setting only the <code class="language-plaintext highlighter-rouge">active</code>, <code class="language-plaintext highlighter-rouge">key</code>, or <code class="language-plaintext highlighter-rouge">hold</code> field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step. Field offsets in the slot block: <code class="language-plaintext highlighter-rouge">active</code>=0, <code class="language-plaintext highlighter-rouge">key</code>=1, <code class="language-plaintext highlighter-rouge">hold</code>=2.</p>
+
+<h4 id="two-field-slot-update--set-slot-range">Two-field slot update — <code class="language-plaintext highlighter-rouge">set-slot-range</code></h4>
+
+<p><code class="language-plaintext highlighter-rouge">g2_set_slot_range</code> patches both the range-lower (field offset 5) and range-upper (field offset 6) bytes in <strong>one</strong> read-modify-write round-trip. Do not call <code class="language-plaintext highlighter-rouge">g2_set_slot_perf_field</code> twice in sequence: the first SET_PERF_SETTINGS write causes the G2 to emit a <code class="language-plaintext highlighter-rouge">perf_settings_update</code> event and briefly stop responding; a second immediate round-trip hits <code class="language-plaintext highlighter-rouge">G2_ERR_RECV</code> (-7).</p>
+
+<h4 id="performance-header-field-update--set-range-enable">Performance header field update — <code class="language-plaintext highlighter-rouge">set-range-enable</code></h4>
+
+<p><code class="language-plaintext highlighter-rouge">g2_set_rangeEnable(value)</code> modifies the <code class="language-plaintext highlighter-rouge">rangeEnable</code> (KB Split on/off) byte at <strong>perf header offset 5</strong> — the 8-byte block that immediately follows the C_PERF_SETTINGS chunk header (<code class="language-plaintext highlighter-rouge">remaining[5]</code> after the <code class="language-plaintext highlighter-rouge">0x11</code> type byte). This is a different byte from the slot block’s <code class="language-plaintext highlighter-rouge">rangeLow</code>/<code class="language-plaintext highlighter-rouge">rangeHigh</code> fields. Uses the same GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS pattern. No SELECT_SLOT step.</p>
+
+<hr />
+
+<h2 id="7-slot-commands">7. Slot Commands</h2>
+
+<p>Slot commands include the patch version byte at offset 4 (instead of a fixed <code class="language-plaintext highlighter-rouge">0x41</code>):</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[01][scope][version][sub_cmd][...extra][CRC]
+     ↑
+     0x28-0x2B for slots A-D (COMMAND_REQ | COMMAND_SLOT | slot)
+     0x38-0x3B for write-only (COMMAND_WRITE_NO_RESP | COMMAND_SLOT | slot)
+</code></pre></div></div>
+
+<p>The <code class="language-plaintext highlighter-rouge">version</code> byte is obtained by GET_PATCH_VERSION before each slot command.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sub-cmd</th>
+      <th>Name</th>
+      <th>Extra bytes</th>
+      <th>Response</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x27</code></td>
+      <td>SET_PATCH_NAME</td>
+      <td><code class="language-plaintext highlighter-rouge">name\0</code> (null-terminated, max 16 chars)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x28</code></td>
+      <td>GET_PATCH_NAME</td>
+      <td>—</td>
+      <td>Embedded; name at <code class="language-plaintext highlighter-rouge">response[5+]</code> or bulk at <code class="language-plaintext highlighter-rouge">bulkData[4+]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2A</code></td>
+      <td>SET_UPRATE_MODE <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod uprate</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2B</code></td>
+      <td>SET_MODULE_MODE</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod param val</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2E</code></td>
+      <td>GET_SELECTED_PARAM <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded; area/module/param at <code class="language-plaintext highlighter-rouge">[5..7]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2F</code></td>
+      <td>SEL_PARAM <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">00 loc mod param</code></td>
+      <td>No response (<code class="language-plaintext highlighter-rouge">WRITE_NO_RESP</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x30</code></td>
+      <td>ADD_MODULE</td>
+      <td><code class="language-plaintext highlighter-rouge">type loc id col row colour uprate isled [modes...] name\0</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x31</code></td>
+      <td>SET_MODULE_COLOR</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod color</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x32</code></td>
+      <td>DEL_MODULE</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod_id</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x33</code></td>
+      <td>SET_MODULE_LABEL</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod name\0</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x34</code></td>
+      <td>MOVE_MODULE</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod_id col row</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x35 ss</code></td>
+      <td>GET_PATCH_VERSION</td>
+      <td><code class="language-plaintext highlighter-rouge">ss</code>=slot</td>
+      <td>Embedded; version at <code class="language-plaintext highlighter-rouge">response[6]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x37</code></td>
+      <td>SET_PATCH (upload)</td>
+      <td>see §9</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3C</code></td>
+      <td>GET_PATCH</td>
+      <td>—</td>
+      <td>Extended bulk (patch binary, §9)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code></td>
+      <td>SET_PARAM</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod par val var</code></td>
+      <td>No response (<code class="language-plaintext highlighter-rouge">WRITE_NO_RESP</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x42</code></td>
+      <td>SET_PARAM_LABEL</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod_id param_idx label_idx label</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x43</code></td>
+      <td>SET_MORPH_RANGE <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod param morph val neg var</code></td>
+      <td>No response (<code class="language-plaintext highlighter-rouge">WRITE_NO_RESP</code>)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x44</code></td>
+      <td>COPY_VARIATION <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">from to</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4C</code></td>
+      <td>GET_PARAMS <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">location</code></td>
+      <td>Extended bulk</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4F</code></td>
+      <td>GET_PARAM_NAMES <em>(not implemented yet)</em></td>
+      <td><code class="language-plaintext highlighter-rouge">location</code></td>
+      <td>Extended bulk</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x50</code></td>
+      <td>ADD_CABLE</td>
+      <td><code class="language-plaintext highlighter-rouge">flags from_mod from_con to_mod to_con</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x51</code></td>
+      <td>DEL_CABLE</td>
+      <td><code class="language-plaintext highlighter-rouge">flags from_mod from_con to_mod to_con</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x54</code></td>
+      <td>SET_CABLE_COLOR</td>
+      <td><code class="language-plaintext highlighter-rouge">flags from_mod from_con to_mod to_con color</code></td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x55</code></td>
+      <td>CTRL_SNAPSHOT <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x68</code></td>
+      <td>GET_CURRENT_NOTE <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded; note/velocity at <code class="language-plaintext highlighter-rouge">[5..6]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6A vv</code></td>
+      <td>SELECT_VARIATION</td>
+      <td><code class="language-plaintext highlighter-rouge">vv</code>=variation index (0-7)</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6E</code></td>
+      <td>GET_PATCH_NOTES <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Extended bulk (patch notes text)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6F</code></td>
+      <td>SET_PATCH_NOTES <em>(not implemented yet)</em></td>
+      <td>patch notes chunk</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x70</code></td>
+      <td>UNKNOWN_6 <em>(not implemented yet)</em></td>
+      <td>—</td>
+      <td>Embedded ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x71</code></td>
+      <td>GET_RESOURCES_USED</td>
+      <td><code class="language-plaintext highlighter-rouge">location</code></td>
+      <td>Extended bulk</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="knob--midi-assignment-sub-commands">Knob &amp; MIDI Assignment Sub-Commands</h3>
+
+<p><em>(None of these are implemented in the CLI.)</em></p>
+
+<p>These are combined into slot-command messages. Each message can contain multiple sub-operations via <code class="language-plaintext highlighter-rouge">AddXxxMessage</code> calls:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Sub-cmd</th>
+      <th>Name</th>
+      <th>Payload bytes</th>
+      <th>Response</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x1C</code></td>
+      <td>ASSIGN_GLOBAL_KNOB</td>
+      <td><code class="language-plaintext highlighter-rouge">mod param loc 00 knob_index</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x1D</code></td>
+      <td>DEASSIGN_GLOBAL_KNOB</td>
+      <td><code class="language-plaintext highlighter-rouge">00 knob_index</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x1E</code></td>
+      <td>SEL_GLOBAL_PAGE</td>
+      <td><code class="language-plaintext highlighter-rouge">page</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x22</code></td>
+      <td>ASSIGN_MIDICC</td>
+      <td><code class="language-plaintext highlighter-rouge">loc mod param cc</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x23</code></td>
+      <td>DEASSIGN_MIDICC</td>
+      <td><code class="language-plaintext highlighter-rouge">cc</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x25</code></td>
+      <td>ASSIGN_KNOB</td>
+      <td><code class="language-plaintext highlighter-rouge">mod param loc 00 knob_index</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x26</code></td>
+      <td>DEASSIGN_KNOB</td>
+      <td><code class="language-plaintext highlighter-rouge">00 knob_index</code></td>
+      <td>via parent message</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2D</code></td>
+      <td>SEL_PARAM_PAGE</td>
+      <td><code class="language-plaintext highlighter-rouge">page</code></td>
+      <td>via parent message</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="8-cable--connector-encoding">8. Cable &amp; Connector Encoding</h2>
+
+<h3 id="add_cable-flags-byte">ADD_CABLE flags byte</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(1 &lt;&lt; 4) | ((location &amp; 1) &lt;&lt; 3) | (color &amp; 7)
+
+Bit 4  : always 1
+Bit 3  : location  0=FX, 1=VA
+Bits 2-0: color    0-6
+</code></pre></div></div>
+
+<h3 id="del_cable-flags-byte">DEL_CABLE flags byte</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>(1 &lt;&lt; 1) | (location &amp; 1)
+
+Bit 1  : always 1
+Bit 0  : location  0=FX, 1=VA
+</code></pre></div></div>
+
+<h3 id="connector-byte-from_con--to_con">Connector byte (from_con / to_con)</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>((con_type &amp; 3) &lt;&lt; 6) | (con_id &amp; 0x3F)
+
+Bits 7-6: connector type  0=input, 1=output
+Bits 5-0: connector id    0-63
+</code></pre></div></div>
+
+<p>The CLI enforces <strong>output → input</strong> direction: if <code class="language-plaintext highlighter-rouge">from_con_type == 0</code> (input), the from/to pair is swapped before sending.</p>
+
+<hr />
+
+<h2 id="8b-set_param_label-wire-format">8b. SET_PARAM_LABEL Wire Format</h2>
+
+<p>Slot command <code class="language-plaintext highlighter-rouge">0x42</code> sets a text label for a parameter’s value slot(s).</p>
+
+<p><strong>Payload structure (passed to <code class="language-plaintext highlighter-rouge">send_slot</code>):</strong></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[0]  location            (0=FX, 1=VA)
+[1]  module_id
+[2]  module_len          = 3 + 7 * (label_idx + 1)
+[3]  is_string           = 1
+[4]  param_len           = 1 + 7 * (label_idx + 1)
+[5]  param_idx
+[6 .. 6+7*label_idx-1]   empty label slots (zeros), one per position 0..label_idx-1
+[6+7*label_idx .. +6]    target label text, null-padded to exactly 7 bytes
+</code></pre></div></div>
+
+<p><strong>Key points:</strong></p>
+<ul>
+  <li>Labels are <strong>null-padded</strong> (not space-padded) to 7 bytes each</li>
+  <li><code class="language-plaintext highlighter-rouge">label_idx</code> (0–127) determines which slot within the parameter to set</li>
+  <li>Empty slots before the target are sent as all zeros</li>
+  <li>Label text longer than 7 chars is truncated</li>
+  <li>Sending <code class="language-plaintext highlighter-rouge">label_idx=0</code> with one label is the simplest case: <code class="language-plaintext highlighter-rouge">module_len=10</code>, <code class="language-plaintext highlighter-rouge">param_len=8</code>, payload_len=13</li>
+</ul>
+
+<p><strong>Example:</strong> Set parameter 2’s label at index 0 to “Gate”:</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>module_len = 3 + 7*1 = 10
+param_len  = 1 + 7*1 = 8
+payload = [location, module_id, 10, 1, 8, param_idx, 'G', 'a', 't', 'e', 0, 0, 0]
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="9-patch-retrieval--upload">9. Patch Retrieval &amp; Upload</h2>
+
+<h3 id="retrieve-sequence">Retrieve sequence</h3>
+
+<ol>
+  <li><strong>GET_PATCH_VERSION</strong> (system cmd <code class="language-plaintext highlighter-rouge">0x41 0x35 slot</code>) → version from <code class="language-plaintext highlighter-rouge">response[6]</code></li>
+  <li><strong>GET_PATCH</strong> (slot cmd <code class="language-plaintext highlighter-rouge">0x3C</code>, scope <code class="language-plaintext highlighter-rouge">0x28+slot</code>, version) → Extended bulk → raw USB binary</li>
+  <li><strong>GET_PATCH_NAME</strong> (slot cmd <code class="language-plaintext highlighter-rouge">0x28</code>) → name string</li>
+</ol>
+
+<h3 id="usb-binary--pch2-conversion">USB binary → PCH2 conversion</h3>
+
+<p>The raw USB bulk data is not identical to the <code class="language-plaintext highlighter-rouge">.pch2</code> file format. Conversion (<code class="language-plaintext highlighter-rouge">patch_usb_to_pch2</code>):</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pch2 = usb[0x03 .. 0x14]   (18 bytes, indices 3-20 inclusive)
+     + usb[0x17 .. end-3]  (remaining bytes, excluding last 2 CRC bytes)
+</code></pre></div></div>
+
+<p>In C:</p>
+<div class="language-c highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="n">first_part</span>  <span class="o">=</span> <span class="mh">0x15</span> <span class="o">-</span> <span class="mh">0x03</span><span class="p">;</span>              <span class="c1">// 18 bytes</span>
+<span class="n">second_part</span> <span class="o">=</span> <span class="n">usb_len</span> <span class="o">-</span> <span class="mh">0x17</span> <span class="o">-</span> <span class="mi">2</span><span class="p">;</span>
+<span class="n">memcpy</span><span class="p">(</span><span class="n">pch2</span><span class="p">,</span> <span class="n">usb</span> <span class="o">+</span> <span class="mh">0x03</span><span class="p">,</span> <span class="n">first_part</span><span class="p">);</span>
+<span class="n">memcpy</span><span class="p">(</span><span class="n">pch2</span> <span class="o">+</span> <span class="n">first_part</span><span class="p">,</span> <span class="n">usb</span> <span class="o">+</span> <span class="mh">0x17</span><span class="p">,</span> <span class="n">second_part</span><span class="p">);</span>
+</code></pre></div></div>
+
+<h3 id="upload-set_patch">Upload (SET_PATCH)</h3>
+
+<p>Uses a fixed version byte <code class="language-plaintext highlighter-rouge">0x53</code> (not the dynamic patch version). Packet layout:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[01][scope][0x53][0x37][00 00 00][name\0][section_data][CRC_HI][CRC_LO]
+            ↑     ↑    └─ 3 pad ─┘
+            │     └── SUB_COMMAND_SET
+            └── fixed version for SET_PATCH
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">scope</code> = <code class="language-plaintext highlighter-rouge">COMMAND_REQ | COMMAND_SLOT | slot</code> (<code class="language-plaintext highlighter-rouge">0x28-0x2B</code>).</p>
+
+<p><code class="language-plaintext highlighter-rouge">section_data</code> = file bytes starting at <code class="language-plaintext highlighter-rouge">name_end + 3</code> (skip NUL + <code class="language-plaintext highlighter-rouge">0x17</code> + <code class="language-plaintext highlighter-rouge">0x00</code>), excluding the trailing 2-byte PCH2 CRC.</p>
+
+<p>After sending, wait <code class="language-plaintext highlighter-rouge">5 × 10 ms = 50 ms</code> then read one interrupt response + drain pending.</p>
+
+<h3 id="patch-binary-chunk-types">Patch Binary Chunk Types</h3>
+
+<p>The patch binary (from GET_PATCH / SET_PATCH) is composed of typed sections. Each section starts with a 1-byte type identifier:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Name</th>
+      <th>Content</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x21</code></td>
+      <td>PatchDescription</td>
+      <td>Voice count, monopoly mode, variation settings (see below)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4A</code></td>
+      <td>ModuleList</td>
+      <td>List of modules with positions and parameters</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4D</code></td>
+      <td>ParameterList</td>
+      <td>Module parameter values</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x52</code></td>
+      <td>CableList</td>
+      <td>Cable connections</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5A</code></td>
+      <td>ModuleNames</td>
+      <td>Module name strings</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5B</code></td>
+      <td>ParameterNames</td>
+      <td>Parameter name strings</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x60</code></td>
+      <td>Controllers</td>
+      <td>MIDI CC assignments</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x62</code></td>
+      <td>Knobs</td>
+      <td>Knob assignments</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x65</code></td>
+      <td>MorphParameters</td>
+      <td>Morph range settings</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x69</code></td>
+      <td>CurrentNote</td>
+      <td>Current note info</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="patchdescription-0x21-bit-layout">PatchDescription (0x21) bit layout</h3>
+
+<p>Body is 14 bytes. Relevant fields (bit numbers are 0-based from the start of the body):</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bit range</th>
+      <th>Field</th>
+      <th>Encoding</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>61–65</td>
+      <td><code class="language-plaintext highlighter-rouge">voices</code></td>
+      <td>5-bit raw value, <strong>0-based</strong>: 0 = 1 voice, 15 = 16 voices, 31 = 32 voices</td>
+    </tr>
+    <tr>
+      <td>90–91</td>
+      <td><code class="language-plaintext highlighter-rouge">monopoly</code></td>
+      <td>2-bit: 0=Poly, 1=Mono, 2=Legato, 3=Slgt</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><code class="language-plaintext highlighter-rouge">voices</code> byte layout (body bytes 7–8):</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>body[7] bits 2-0 = voices &gt;&gt; 2   (high 3 bits)
+body[8] bits 7-6 = voices &amp; 0x03 (low 2 bits)
+</code></pre></div></div>
+<p><code class="language-plaintext highlighter-rouge">monopoly</code> byte layout (body byte 11):</p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>body[11] bits 5-4 = monopoly &amp; 0x03
+</code></pre></div></div>
+
+<p>To set via USB, use <code class="language-plaintext highlighter-rouge">SET_PATCH_DESCRIPTION</code> (subCmd <code class="language-plaintext highlighter-rouge">0x21</code>) with the full 14-byte body.</p>
+
+<p><strong>Note on assigned_voices vs description.voices:</strong> The <code class="language-plaintext highlighter-rouge">assigned_voices</code> watch event carries <strong>1-based</strong> counts (G2 allocates 16 voices → value 16), while <code class="language-plaintext highlighter-rouge">description.voices</code> is the <strong>0-based</strong> raw bitfield (16 voices → 15). Formula: <code class="language-plaintext highlighter-rouge">description.voices = assigned - 1</code> when poly. <code class="language-plaintext highlighter-rouge">assigned = 0</code> means non-poly (Mono/Legato/Slgt) — the exact mode is only in the description bitfield, not derivable from <code class="language-plaintext highlighter-rouge">assigned_voices</code> alone.</p>
+
+<hr />
+
+<h2 id="10-synth-settings-response">10. Synth Settings Response</h2>
+
+<p>The bulk data from GET_SYNTH_SETTINGS (<code class="language-plaintext highlighter-rouge">0x02</code>) is parsed at fixed byte offsets:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Offset</th>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>4+</td>
+      <td>Synth name</td>
+      <td>Variable length, null-terminated (up to 16 chars); use <code class="language-plaintext highlighter-rouge">parse_name(bulkData + 4, name, size)</code> to extract</td>
+    </tr>
+    <tr>
+      <td>4 + nameLen</td>
+      <td>Mode</td>
+      <td>Bit 7: 0=Patch, 1=Performance; where <code class="language-plaintext highlighter-rouge">nameLen</code> is the return value from <code class="language-plaintext highlighter-rouge">parse_name()</code></td>
+    </tr>
+    <tr>
+      <td>4 + nameLen + 1</td>
+      <td>Perf Bank</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>4 + nameLen + 2</td>
+      <td>Perf Location</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>17</td>
+      <td>MIDI Slot A channel</td>
+      <td>Stored 0-indexed; CLI outputs +1 (= channel 1-16)</td>
+    </tr>
+    <tr>
+      <td>18</td>
+      <td>MIDI Slot B channel</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>19</td>
+      <td>MIDI Slot C channel</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>20</td>
+      <td>MIDI Slot D channel</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>21</td>
+      <td>MIDI global channel</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>22</td>
+      <td>Sysex ID</td>
+      <td>CLI adds 1 when reporting</td>
+    </tr>
+    <tr>
+      <td>23</td>
+      <td>Local On</td>
+      <td>Bit 7</td>
+    </tr>
+    <tr>
+      <td>24</td>
+      <td>Prog Change</td>
+      <td>Bit 0=recv, Bit 1=send</td>
+    </tr>
+    <tr>
+      <td>25</td>
+      <td>Clock</td>
+      <td>Bit 0=recv (1=on); Bit 1=send (inverted: 0=on, 1=off)</td>
+    </tr>
+    <tr>
+      <td>28</td>
+      <td>Tune cents</td>
+      <td>Raw byte</td>
+    </tr>
+    <tr>
+      <td>30</td>
+      <td>Tune semitones</td>
+      <td>Raw byte</td>
+    </tr>
+    <tr>
+      <td>32</td>
+      <td>Pedal polarity</td>
+      <td>Bit 0</td>
+    </tr>
+    <tr>
+      <td>34</td>
+      <td>Control pedal gain</td>
+      <td><code class="language-plaintext highlighter-rouge">gain = 1.0 + 0.5 * val / 32.0</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="performance-settings-second-query">Performance settings (second query)</h3>
+
+<p>After GET_SYNTH_SETTINGS the CLI issues two more system commands to get performance/slot data:</p>
+
+<ol>
+  <li><code class="language-plaintext highlighter-rouge">send_system(0x41, 0x81)</code> → extended bulk → <code class="language-plaintext highlighter-rouge">selsData</code></li>
+  <li><code class="language-plaintext highlighter-rouge">send_system(selsData[2], 0x10)</code> → extended bulk → <code class="language-plaintext highlighter-rouge">perfData</code></li>
+</ol>
+
+<p><code class="language-plaintext highlighter-rouge">perfData</code> bulk response layout (95 bytes typical):</p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">[0..3]</code> 4-byte outer header</li>
+  <li><code class="language-plaintext highlighter-rouge">[4..]</code> null-terminated performance name</li>
+  <li><code class="language-plaintext highlighter-rouge">[name_end]</code> = <code class="language-plaintext highlighter-rouge">0x11</code> (C_PERF_SETTINGS chunk type)</li>
+  <li><code class="language-plaintext highlighter-rouge">[name_end+1..2]</code> = inner_size (big-endian, typically <code class="language-plaintext highlighter-rouge">0x00 0x50</code> = 80)</li>
+  <li><code class="language-plaintext highlighter-rouge">[name_end+3..10]</code> = 8 bytes perf settings: [3]=unknown2, [4]=selectedSlot(packed), [5]=rangeEnable (KB Split), [6]=BPM, [7]=unknown5, [8]=clockRun, [9-10]=unknown</li>
+  <li><code class="language-plaintext highlighter-rouge">[name_end+11..]</code> = 4 × slot blocks, each: null-terminated name + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, 3 padding)</li>
+  <li><code class="language-plaintext highlighter-rouge">[last 2]</code> 2-byte bulk trailer</li>
+</ul>
+
+<p>For SET_PERF_SETTINGS, send only the chunk: <code class="language-plaintext highlighter-rouge">[0x11][sizeHi][sizeLo][80 bytes]</code> (83 bytes total). Do <strong>not</strong> include the outer 4-byte header, perf name, or 2-byte trailer.</p>
+
+<hr />
+
+<h2 id="10a-set_synth_settings-request-format">10a. SET_SYNTH_SETTINGS Request Format</h2>
+
+<p>Sent as the variable-length payload for system command <code class="language-plaintext highlighter-rouge">0x03</code> (after the <code class="language-plaintext highlighter-rouge">[01][2C][41][03]</code> header).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[0]          = 0x03  (sub-command byte, part of payload)
+[1..nameLen] = synthName  (up to 16 chars, NOT null-terminated if nameLen == 16)
+[1+nameLen]  = 0x00  (null terminator, omitted when nameLen == 16)
+
+base = 1 + nameLen + (nameLen &lt; 16 ? 1 : 0)
+
+base+0   bit 7: mode (1=Performance, 0=Patch) — read from current mode, G2 stays in that mode
+base+1   0x00
+base+2   PerfBank      (preserved from last GET response)
+base+3   PerfLocation  (preserved from last GET response)
+base+4   MemoryProtect (bit 7)
+base+5   MIDI slot A channel (0-indexed; 1-indexed in JSON)
+base+6   MIDI slot B channel
+base+7   MIDI slot C channel
+base+8   MIDI slot D channel
+base+9   MIDI global channel
+base+10  SysEx ID (0-indexed; 1-indexed in JSON)
+base+11  LocalOn (bit 7)
+base+12  PrgChange (bit 0=send, bit 1=recv)
+base+13  Controllers (bit 0=send, bit 1=recv)
+base+14  Clock (bit 6=send; bit 5=NOT recv — 0 means recv-on)
+base+15  TuneCent (signed int8)
+base+16  GlobalOctaveShiftActive (bit 7)
+base+17  GlobalOctaveShift (signed int8)
+base+18  TuneSemi (signed int8)
+base+19  0x00
+base+20  PedalPolarity (bit 7) | 0x40
+base+21  ControlPedalGain (0–32)
+base+22..37  0x00 (16 trailing zeros)
+
+Total payload length = base + 38 bytes.
+</code></pre></div></div>
+
+<p>This is the ClaviaString encoding used throughout the protocol: name chars, null terminator only if the name is shorter than 16 chars.</p>
+
+<blockquote>
+  <p><strong>Note:</strong> The Delphi editor hardcodes <code class="language-plaintext highlighter-rouge">base+0 = 0x80</code> (always Performance). The CLI reads the current mode from params so the G2 stays in its current mode.</p>
+</blockquote>
+
+<hr />
+
+<h2 id="11-patch-list-response">11. Patch List Response</h2>
+
+<p>Command: system cmd <code class="language-plaintext highlighter-rouge">0x41 0x14 mode bank patch</code></p>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">mode</code>: 0=patches, 1=performances</li>
+</ul>
+
+<p>Response data starting at <code class="language-plaintext highlighter-rouge">response[9]</code> contains a sequence of control codes:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Name</th>
+      <th>Meaning</th>
+      <th>Following bytes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">&gt; 5</code></td>
+      <td>Name</td>
+      <td>Patch/perf name</td>
+      <td>null-terminated string; for patches: next byte is category index (0-15)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x01</code></td>
+      <td>LIST_JUMP</td>
+      <td>Jump to patch number</td>
+      <td><code class="language-plaintext highlighter-rouge">[1]</code>=patch location</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x02</code></td>
+      <td>LIST_SKIP</td>
+      <td>Skip one slot</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x03</code></td>
+      <td>LIST_BANK</td>
+      <td>Switch bank</td>
+      <td><code class="language-plaintext highlighter-rouge">[1]</code>=new bank, <code class="language-plaintext highlighter-rouge">[2]</code>=new patch location</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x04</code></td>
+      <td>LIST_MODE</td>
+      <td>Switch mode (patches↔perfs)</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x05</code></td>
+      <td>LIST_CONTINUE</td>
+      <td>Continue current bank</td>
+      <td>—</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Categories</strong> (index 0-15):</p>
+
+<p><code class="language-plaintext highlighter-rouge">no_cat</code>, <code class="language-plaintext highlighter-rouge">acoustic</code>, <code class="language-plaintext highlighter-rouge">sequencer</code>, <code class="language-plaintext highlighter-rouge">bass</code>, <code class="language-plaintext highlighter-rouge">classic</code>, <code class="language-plaintext highlighter-rouge">drum</code>, <code class="language-plaintext highlighter-rouge">fantasy</code>, <code class="language-plaintext highlighter-rouge">fx</code>, <code class="language-plaintext highlighter-rouge">lead</code>, <code class="language-plaintext highlighter-rouge">organ</code>, <code class="language-plaintext highlighter-rouge">pad</code>, <code class="language-plaintext highlighter-rouge">piano</code>, <code class="language-plaintext highlighter-rouge">synth</code>, <code class="language-plaintext highlighter-rouge">audio_in</code>, <code class="language-plaintext highlighter-rouge">user_1</code>, <code class="language-plaintext highlighter-rouge">user_2</code></p>
+
+<hr />
+
+<h2 id="12-response-messages">12. Response Messages</h2>
+
+<p>All incoming messages arrive first as a 16-byte interrupt packet on EP <code class="language-plaintext highlighter-rouge">0x81</code>:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Byte [0] low nibble = message type:
+  0x01  RESPONSE_TYPE_EXTENDED  — bulk data follows on EP 0x82
+  0x02  RESPONSE_TYPE_EMBEDDED  — data is inline in the 16-byte packet
+  0x80  RESPONSE_TYPE_INIT      — init response (bulk data follows)
+</code></pre></div></div>
+
+<h3 id="extended-response">Extended response</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[0]  (size_hi &lt;&lt; 4) | 0x01
+[1]  size_hi   ─┐ big-endian uint16: number of bytes to read from EP 0x82
+[2]  size_lo   ─┘
+[3..15]  unused
+</code></pre></div></div>
+
+<p>Read exactly <code class="language-plaintext highlighter-rouge">size</code> bytes from EP <code class="language-plaintext highlighter-rouge">0x82</code> (bulk in).</p>
+
+<h3 id="embedded-response">Embedded response</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[0]  (len &lt;&lt; 4) | 0x02   len = number of bytes in [1..len] (last 2 are CRC)
+[1]  routing byte         always 0x01
+[2]  aCmd                 command source (see notification layout)
+[3]  version              patch/perf version (or 0x40 for version-update msgs)
+[4]  subCmd               response sub-command
+[5+] data
+[last-1, last]  CRC-16
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="13-watch--notification-events">13. Watch / Notification Events</h2>
+
+<h3 id="arming-and-disarming">Arming and disarming</h3>
+
+<p>Start: system cmd <code class="language-plaintext highlighter-rouge">0x41 0x7D 0x00</code> (START_COMM)
+Stop:  system cmd <code class="language-plaintext highlighter-rouge">0x41 0x7D 0x01</code> (STOP_COMM)</p>
+
+<p>After a complete performance switch the G2 sends a <code class="language-plaintext highlighter-rouge">version_update</code> (all_slots) bulk event and <strong>stops streaming</strong>. The CLI automatically re-arms by sending START_COMM again.</p>
+
+<h3 id="embedded-notification-layout">Embedded notification layout</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>response[0]  = (len &lt;&lt; 4) | 0x02
+response[1]  = 0x01  (routing)
+response[2]  = aCmd
+               0x00/0x08 = slot A
+               0x01/0x09 = slot B
+               0x02/0x0A = slot C
+               0x03/0x0B = slot D
+               0x04      = performance
+               0x0C      = system
+response[3]  = version   (0x40 = version-update class message)
+response[4]  = subCmd
+response[5+] = data
+</code></pre></div></div>
+
+<h3 id="extended-bulk-notification-layout">Extended (bulk) notification layout</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bulk[0] = 0x01       type marker
+bulk[1] = aCmd       (same values as embedded)
+bulk[2] = version
+bulk[3] = subCmd
+bulk[4 .. end-3] = data
+bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="14-all-watch-events-json-output">14. All Watch Events (JSON output)</h2>
+
+<h3 id="system-messages-acmd--0x0c">System messages (<code class="language-plaintext highlighter-rouge">aCmd == 0x0C</code>)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">version</code></th>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Extra fields</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x1F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">version_update</code></td>
+      <td><code class="language-plaintext highlighter-rouge">perf_version</code> = response[5]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x36</code> or <code class="language-plaintext highlighter-rouge">0x38</code></td>
+      <td><code class="language-plaintext highlighter-rouge">patch_version</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">version</code> = response[5], [6]</td>
+    </tr>
+    <tr>
+      <td>other</td>
+      <td><code class="language-plaintext highlighter-rouge">0x7F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ok</code></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>other</td>
+      <td><code class="language-plaintext highlighter-rouge">0x7E</code></td>
+      <td><code class="language-plaintext highlighter-rouge">error</code></td>
+      <td><code class="language-plaintext highlighter-rouge">code</code> = response[5]</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="performance-messages-acmd--0x04">Performance messages (<code class="language-plaintext highlighter-rouge">aCmd == 0x04</code>)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Extra fields</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x05</code></td>
+      <td><code class="language-plaintext highlighter-rouge">assigned_voices</code></td>
+      <td><code class="language-plaintext highlighter-rouge">voices</code>: [r[5], r[6], r[7], r[8]] — <strong>1-based</strong> counts; 0 = non-poly slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x09</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot_change</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code> = response[5]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x10</code> or <code class="language-plaintext highlighter-rouge">0x11</code></td>
+      <td><code class="language-plaintext highlighter-rouge">perf_settings_update</code></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td><code class="language-plaintext highlighter-rouge">perf_name</code></td>
+      <td><code class="language-plaintext highlighter-rouge">name</code> (null-terminated from response[5])</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">master_clock_run</code> or <code class="language-plaintext highlighter-rouge">master_clock_bpm</code></td>
+      <td><code class="language-plaintext highlighter-rouge">run</code>/<code class="language-plaintext highlighter-rouge">bpm</code> = response[7]; type determined by response[6] (<code class="language-plaintext highlighter-rouge">0x00</code>=run, else bpm)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5D</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ext_master_clock</code></td>
+      <td><code class="language-plaintext highlighter-rouge">value</code> = (response[6]«8)|response[7]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7E</code></td>
+      <td><code class="language-plaintext highlighter-rouge">error</code></td>
+      <td><code class="language-plaintext highlighter-rouge">code</code> = response[5]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ok</code></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x80</code></td>
+      <td><code class="language-plaintext highlighter-rouge">midi_cc</code></td>
+      <td><code class="language-plaintext highlighter-rouge">cc</code> = response[6]</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="slot-messages-acmd-0x00-0x03-or-0x08-0x0b-slot--acmd--0x03">Slot messages (<code class="language-plaintext highlighter-rouge">aCmd 0x00-0x03</code> or <code class="language-plaintext highlighter-rouge">0x08-0x0B</code>, <code class="language-plaintext highlighter-rouge">slot = aCmd &amp; 0x03</code>)</h3>
+
+<p>When <code class="language-plaintext highlighter-rouge">version == 0x40</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Extra fields</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x36</code> or <code class="language-plaintext highlighter-rouge">0x38</code></td>
+      <td><code class="language-plaintext highlighter-rouge">patch_version</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">version</code> = response[5], [6]</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>When <code class="language-plaintext highlighter-rouge">version != 0x40</code>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Extra fields</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x21</code> or <code class="language-plaintext highlighter-rouge">0x3C</code></td>
+      <td><code class="language-plaintext highlighter-rouge">patch_update</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x27</code></td>
+      <td><code class="language-plaintext highlighter-rouge">patch_name</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">name</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x2F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">selected_param</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">area</code> (“fx”/”va”/”patch”), <code class="language-plaintext highlighter-rouge">module</code>=r[7], <code class="language-plaintext highlighter-rouge">param</code>=r[8]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code> (location==2)</td>
+      <td><code class="language-plaintext highlighter-rouge">patch_param</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">module</code>=r[6], <code class="language-plaintext highlighter-rouge">param</code>=r[7], <code class="language-plaintext highlighter-rouge">value</code>=r[8], <code class="language-plaintext highlighter-rouge">variation</code>=r[9]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code> (location 0/1)</td>
+      <td><code class="language-plaintext highlighter-rouge">param_change</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">area</code> (“fx”/”va”), <code class="language-plaintext highlighter-rouge">module</code>=r[6], <code class="language-plaintext highlighter-rouge">param</code>=r[7], <code class="language-plaintext highlighter-rouge">value</code>=r[8], <code class="language-plaintext highlighter-rouge">variation</code>=r[9]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x43</code></td>
+      <td><code class="language-plaintext highlighter-rouge">morph_change</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">area</code> (“fx”/”va”), <code class="language-plaintext highlighter-rouge">module</code>=r[6], <code class="language-plaintext highlighter-rouge">param</code>=r[7], <code class="language-plaintext highlighter-rouge">morph</code>=r[8], <code class="language-plaintext highlighter-rouge">value</code>=r[9], <code class="language-plaintext highlighter-rouge">negative</code>=r[10], <code class="language-plaintext highlighter-rouge">variation</code>=r[11]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x44</code></td>
+      <td><code class="language-plaintext highlighter-rouge">copy_variation</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">from</code>=r[5], <code class="language-plaintext highlighter-rouge">to</code>=r[6]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x59</code> or <code class="language-plaintext highlighter-rouge">0x70</code> or <code class="language-plaintext highlighter-rouge">0x7F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">ok</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x69</code></td>
+      <td><code class="language-plaintext highlighter-rouge">current_note</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">note</code>=r[5], <code class="language-plaintext highlighter-rouge">velocity</code>=r[6]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6A</code></td>
+      <td><code class="language-plaintext highlighter-rouge">variation_change</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">variation</code>=r[5]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x72</code></td>
+      <td><code class="language-plaintext highlighter-rouge">resources_used</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">location</code>=r[5]</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7E</code></td>
+      <td><code class="language-plaintext highlighter-rouge">error</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">code</code>=r[5]</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="bulk-notification-sub-commands-acmd-0x00-0x03">Bulk notification sub-commands (<code class="language-plaintext highlighter-rouge">aCmd 0x00-0x03</code>)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Data</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x39</code></td>
+      <td><code class="language-plaintext highlighter-rouge">led_data</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">data[]</code> — raw bytes, see §15</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3A</code></td>
+      <td><code class="language-plaintext highlighter-rouge">volume_data</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">data[]</code> — raw bytes, see §16</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x72</code></td>
+      <td><code class="language-plaintext highlighter-rouge">resources_used</code></td>
+      <td><code class="language-plaintext highlighter-rouge">slot</code>, <code class="language-plaintext highlighter-rouge">data[]</code> — raw bytes</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="performance-bulk-sub-commands-acmd-0x04">Performance bulk sub-commands (<code class="language-plaintext highlighter-rouge">aCmd 0x04</code>)</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">version</code></th>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x1F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">version_update</code></td>
+      <td><code class="language-plaintext highlighter-rouge">scope</code>=”all_slots”; triggers re-arm</td>
+    </tr>
+    <tr>
+      <td>any</td>
+      <td><code class="language-plaintext highlighter-rouge">0x03</code></td>
+      <td><code class="language-plaintext highlighter-rouge">synth_settings_update</code></td>
+      <td><code class="language-plaintext highlighter-rouge">mode</code>=”Patch”|”Performance”. Two variants: (1) <strong>hardware</strong> — G2 PERF button or unsolicited mode change: no <code class="language-plaintext highlighter-rouge">patches</code> field; (2) <strong>daemon rearm</strong> — emitted by <code class="language-plaintext highlighter-rouge">g2_emit_rearm_data()</code> after BULK_REARM: includes <code class="language-plaintext highlighter-rouge">"patches":[…]</code> array (4 entries, one per slot) so the frontend can apply all slots without separate <code class="language-plaintext highlighter-rouge">get-patch</code> commands.</td>
+    </tr>
+    <tr>
+      <td>any</td>
+      <td><code class="language-plaintext highlighter-rouge">0x11</code></td>
+      <td><code class="language-plaintext highlighter-rouge">perf_settings</code></td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>any</td>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td><code class="language-plaintext highlighter-rouge">perf_name</code> + <code class="language-plaintext highlighter-rouge">perf_settings</code></td>
+      <td>Compound message: null-terminated name at bulk[4..], followed by a full C_PERF_SETTINGS (0x11) chunk. Emitted by G2 when Hold or KB Split changes on hardware. Also emitted as embedded when only the name changes (no settings chunk).</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>C_PERF_NAME compound bulk layout:</strong></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bulk[0..3]  = standard bulk header (0x01, aCmd=0x04, version, subCmd=0x29)
+bulk[4..]   = null-terminated performance name (up to 16 chars)
+bulk[4+nameLen]   = 0x11  (C_PERF_SETTINGS chunk type)
+bulk[4+nameLen+1..2] = inner size (big-endian, typically 0x00 0x50 = 80)
+bulk[4+nameLen+3] = unknown
+bulk[4+nameLen+4] = selectedSlot (packed)
+bulk[4+nameLen+5] = rangeEnable (KB Split)
+bulk[4+nameLen+6] = BPM
+bulk[4+nameLen+7] = unknown5
+bulk[4+nameLen+8] = clockRun (bit 0)
+bulk[4+nameLen+9..10] = unknown
+bulk[4+nameLen+11..] = 4 × slot blocks (same layout as GET_PERF_SETTINGS response)
+</code></pre></div></div>
+
+<p>The inline settings block is byte-for-byte identical to the <code class="language-plaintext highlighter-rouge">GET_PERF_SETTINGS</code> query response (§10), so <code class="language-plaintext highlighter-rouge">perf_parse_and_add(bulk, bret, mode, root)</code> works on it unchanged. The Delphi editor’s <code class="language-plaintext highlighter-rouge">C_PERF_NAME, C_PERF_SETTINGS:</code> combined case reflects this — both chunk types arrive in the same stream and are parsed together. Delphi never called <code class="language-plaintext highlighter-rouge">DoPerfSettingsUpdate()</code> after parsing, so Hold/KB Split never synced to its UI (unfinished feature in the original editor).</p>
+
+<h3 id="bulk-sub-commands-acmd-0x0c">Bulk sub-commands (<code class="language-plaintext highlighter-rouge">aCmd 0x0C</code>)</h3>
+
+<p>Sent as the response to <code class="language-plaintext highlighter-rouge">SET_PERF_MODE</code> (editor-initiated) and unsolicited after hardware PERF button press.</p>
+
+<table>
+  <thead>
+    <tr>
+      <th><code class="language-plaintext highlighter-rouge">version</code></th>
+      <th><code class="language-plaintext highlighter-rouge">subCmd</code></th>
+      <th>JSON type</th>
+      <th>Data format</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x40</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x1F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">version_update</code></td>
+      <td><code class="language-plaintext highlighter-rouge">bulk[4]</code>=<code class="language-plaintext highlighter-rouge">perf_version</code>; then 4×<code class="language-plaintext highlighter-rouge">[0x36, slot, version]</code> — one entry per slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x05</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x80</code></td>
+      <td><code class="language-plaintext highlighter-rouge">unknown_bulk</code></td>
+      <td>4 slot entries: <code class="language-plaintext highlighter-rouge">[slot_idx, 255, 128, ...]</code> repeated <em>(not implemented)</em></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x05</code></td>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td><code class="language-plaintext highlighter-rouge">unknown_bulk</code></td>
+      <td>Patch names + metadata <em>(not implemented)</em></td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Important:</strong> unlike the hardware path (<code class="language-plaintext highlighter-rouge">aCmd 0x04/0x40/0x1F</code>), when 0x0C/0x1F arrives the G2 is still streaming. The daemon calls <code class="language-plaintext highlighter-rouge">g2_stop_comm()</code> before querying synth/perf settings and patches, then sets <code class="language-plaintext highlighter-rouge">g2_pending_rearm=1</code> so the main loop calls <code class="language-plaintext highlighter-rouge">g2_rearm()</code> after returning.</p>
+
+<p><strong><code class="language-plaintext highlighter-rouge">version_update</code> payload layout (version=0x40, sub=0x1F):</strong></p>
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>bulk[4]      = perf_version
+bulk[5..7]   = [0x36, slot=0, version]
+bulk[8..10]  = [0x36, slot=1, version]
+bulk[11..13] = [0x36, slot=2, version]
+bulk[14..16] = [0x36, slot=3, version]
+</code></pre></div></div>
+<p>Emitted JSON: <code class="language-plaintext highlighter-rouge">{"type":"version_update","perf_version":N,"slot_versions":[{"slot":0,"version":N},...]}</code>. After this the daemon queries synth/perf settings and all 4 slot patches, emitting <code class="language-plaintext highlighter-rouge">synth_settings_update</code> with an embedded <code class="language-plaintext highlighter-rouge">"patches"</code> array (Delphi approach: all data before START_COMM). Sets <code class="language-plaintext highlighter-rouge">g2_pending_rearm=1</code> to trigger <code class="language-plaintext highlighter-rouge">g2_rearm()</code> after the event handler returns.</p>
+
+<h3 id="connection-events">Connection events</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>JSON type</th>
+      <th>Trigger</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">device_disconnected</code></td>
+      <td><code class="language-plaintext highlighter-rouge">LIBUSB_ERROR_NO_DEVICE</code> during poll</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">device_reconnected</code></td>
+      <td>Successful reconnect after disconnect</td>
+    </tr>
+  </tbody>
+</table>
+
+<h3 id="debug-only-events">Debug-only events</h3>
+
+<table>
+  <thead>
+    <tr>
+      <th>JSON type</th>
+      <th>Fields</th>
+      <th>When emitted</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">raw_interrupt</code></td>
+      <td><code class="language-plaintext highlighter-rouge">hex</code></td>
+      <td>Any interrupt packet (debug mode only)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">raw_bulk</code></td>
+      <td><code class="language-plaintext highlighter-rouge">size</code>, <code class="language-plaintext highlighter-rouge">hex</code></td>
+      <td>Any bulk packet (debug mode only)</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="15-led-data-parsing-led_datadata">15. LED Data Parsing (<code class="language-plaintext highlighter-rouge">led_data.data[]</code>)</h2>
+
+<p>Source: Delphi <code class="language-plaintext highlighter-rouge">TG2Patch.ReadLedData</code> in <code class="language-plaintext highlighter-rouge">BVE.NMG2Patch.pas</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>data[0]      — unknown prefix byte (skip)
+data[1..N]   — 4 LEDs packed per byte, 2 bits each:
+               bits 7-6 = LED 0
+               bits 5-4 = LED 1
+               bits 3-2 = LED 2
+               bits 1-0 = LED 3
+
+LED values: 0=off, 1=on, 2=unknown
+Order: FX LedList entries first, then VA LedList entries
+</code></pre></div></div>
+
+<p>Pseudocode to unpack:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for</span> <span class="p">(</span><span class="kd">let</span> <span class="nx">i</span> <span class="o">=</span> <span class="mi">1</span><span class="p">;</span> <span class="nx">i</span> <span class="o">&lt;</span> <span class="nx">data</span><span class="p">.</span><span class="nx">length</span><span class="p">;</span> <span class="nx">i</span><span class="o">++</span><span class="p">)</span> <span class="p">{</span>
+  <span class="kd">const</span> <span class="nx">byte</span> <span class="o">=</span> <span class="nx">data</span><span class="p">[</span><span class="nx">i</span><span class="p">];</span>
+  <span class="nx">leds</span><span class="p">.</span><span class="nx">push</span><span class="p">((</span><span class="nx">byte</span> <span class="o">&gt;&gt;</span> <span class="mi">6</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">3</span><span class="p">);</span>
+  <span class="nx">leds</span><span class="p">.</span><span class="nx">push</span><span class="p">((</span><span class="nx">byte</span> <span class="o">&gt;&gt;</span> <span class="mi">4</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">3</span><span class="p">);</span>
+  <span class="nx">leds</span><span class="p">.</span><span class="nx">push</span><span class="p">((</span><span class="nx">byte</span> <span class="o">&gt;&gt;</span> <span class="mi">2</span><span class="p">)</span> <span class="o">&amp;</span> <span class="mi">3</span><span class="p">);</span>
+  <span class="nx">leds</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span> <span class="nx">byte</span>       <span class="o">&amp;</span> <span class="mi">3</span><span class="p">);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="16-volume-data-parsing-volume_datadata">16. Volume Data Parsing (<code class="language-plaintext highlighter-rouge">volume_data.data[]</code>)</h2>
+
+<p>Source: Delphi <code class="language-plaintext highlighter-rouge">TG2Patch.ReadVolumeData</code> in <code class="language-plaintext highlighter-rouge">BVE.NMG2Patch.pas</code></p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>data comes in 2-byte pairs: (unknown_byte, value_byte) per LedStrip entry
+Order: FX LedStripList entries first, then VA LedStripList entries
+value_byte = level/volume to display on that strip
+</code></pre></div></div>
+
+<p>Pseudocode:</p>
+
+<div class="language-js highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="k">for</span> <span class="p">(</span><span class="kd">let</span> <span class="nx">i</span> <span class="o">=</span> <span class="mi">0</span><span class="p">;</span> <span class="nx">i</span> <span class="o">&lt;</span> <span class="nx">data</span><span class="p">.</span><span class="nx">length</span><span class="p">;</span> <span class="nx">i</span> <span class="o">+=</span> <span class="mi">2</span><span class="p">)</span> <span class="p">{</span>
+  <span class="c1">// data[i]     = unknown (skip)</span>
+  <span class="c1">// data[i + 1] = volume level for strip (i / 2)</span>
+  <span class="nx">strips</span><span class="p">.</span><span class="nx">push</span><span class="p">(</span><span class="nx">data</span><span class="p">[</span><span class="nx">i</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]);</span>
+<span class="p">}</span>
+</code></pre></div></div>
+
+<hr />
+
+<h2 id="17-response-sub-command-codes">17. Response Sub-Command Codes</h2>
+
+<p>Codes carried in <code class="language-plaintext highlighter-rouge">subCmd</code> (response[4] in embedded messages) that identify what a response is answering:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Name</th>
+      <th>Source command</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x03</code></td>
+      <td>R_SYNTH_SETTINGS</td>
+      <td>GET_SYNTH_SETTINGS</td>
+      <td>Synth settings data</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x05</code></td>
+      <td>R_ASSIGNED_VOICES</td>
+      <td>GET_ASSIGNED_VOICES</td>
+      <td>4 voice counts (one per slot)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x0D</code></td>
+      <td>R_STORE</td>
+      <td>STORE / PATCH_BANK_DATA</td>
+      <td>Bank store confirmed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x12</code></td>
+      <td>R_CLEAR_BANK</td>
+      <td>CLEAR_BANK</td>
+      <td>Bank range cleared</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x13</code></td>
+      <td>R_LIST_NAMES</td>
+      <td>LIST_PATCHES</td>
+      <td>Patch/perf name list entry</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x15</code></td>
+      <td>R_CLEAR</td>
+      <td>CLEAR</td>
+      <td>Single entry cleared</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x16</code></td>
+      <td>R_ADD_NAMES</td>
+      <td>LIST_PATCHES</td>
+      <td>Additional name list data</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x18</code></td>
+      <td>R_PATCH_BANK_UPLOAD</td>
+      <td>PATCH_BANK_UPLOAD</td>
+      <td>Bank upload data</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x21</code></td>
+      <td>C_PATCH_DESCR</td>
+      <td>SET_PATCH</td>
+      <td>Patch description received</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x27</code></td>
+      <td>S_PATCH_NAME</td>
+      <td>—</td>
+      <td>Patch name notification</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x29</code></td>
+      <td>C_PERF_NAME</td>
+      <td>—</td>
+      <td>Performance name notification</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x36</code></td>
+      <td>R_PATCH_VERSION</td>
+      <td>GET_PATCH_VERSION</td>
+      <td>Patch version value</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x38</code></td>
+      <td>R_PATCH_VERSION_CHANGE</td>
+      <td>—</td>
+      <td>Patch version changed (watch)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x39</code></td>
+      <td>R_LED_DATA</td>
+      <td>—</td>
+      <td>LED states (bulk, watch only)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x3A</code></td>
+      <td>R_VOLUME_DATA</td>
+      <td>—</td>
+      <td>Volume/level data (bulk, watch only)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5F</code></td>
+      <td>C_KNOBS_GLOBAL</td>
+      <td>GET_GLOBAL_KNOBS</td>
+      <td>Global knob assignments</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6F</code></td>
+      <td>C_PATCH_NOTES</td>
+      <td>—</td>
+      <td>Patch text notes</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x72</code></td>
+      <td>R_RESOURCES_USED</td>
+      <td>GET_RESOURCES_USED</td>
+      <td>DSP resource usage</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7E</code></td>
+      <td>R_ERROR</td>
+      <td>any</td>
+      <td>Error response; code at <code class="language-plaintext highlighter-rouge">[5]</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x7F</code></td>
+      <td>R_OK</td>
+      <td>any</td>
+      <td>Generic ACK</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x80</code></td>
+      <td>R_MIDI_CC</td>
+      <td>—</td>
+      <td>MIDI CC event (watch)</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="18-error-codes">18. Error Codes</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Code</th>
+      <th>Name</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_OK</code></td>
+      <td>Success</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-1</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR</code></td>
+      <td>Generic error</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-2</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_NOT_FOUND</code></td>
+      <td>Device not found</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-3</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_CONNECT</code></td>
+      <td>Connection failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-4</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_RESET</code></td>
+      <td>Reset failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-5</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_CLAIM_INTERFACE</code></td>
+      <td>Failed to claim USB interface</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-6</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_SEND</code></td>
+      <td>USB bulk write failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-7</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_RECV</code></td>
+      <td>USB read failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-8</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_TIMEOUT</code></td>
+      <td>USB timeout</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-9</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_PARSE</code></td>
+      <td>Parse error</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-10</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_INVALID_PARAM</code></td>
+      <td>Invalid parameter</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-11</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_FILE_OPEN</code></td>
+      <td>File open failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-12</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_FILE_WRITE</code></td>
+      <td>File write failed</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">-13</code></td>
+      <td><code class="language-plaintext highlighter-rouge">G2_ERR_NO_MEMORY</code></td>
+      <td>Memory allocation failed</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="14-daemon-thread-architecture">14. Daemon Thread Architecture</h2>
+
+<p>The daemon (<code class="language-plaintext highlighter-rouge">g2-cli daemon</code>) uses a listener-thread model matching the Delphi editor’s <code class="language-plaintext highlighter-rouge">TListeningThread</code> pattern.</p>
+
+<h3 id="components">Components</h3>
+
+<p><strong><code class="language-plaintext highlighter-rouge">listener_thread</code> (background, in <code class="language-plaintext highlighter-rouge">g2_io.c</code>)</strong></p>
+<ul>
+  <li>Sole reader of EP 0x81 (interrupt) and EP 0x82 (bulk)</li>
+  <li>Tight loop: <code class="language-plaintext highlighter-rouge">recv_interrupt_with_retry(200 ms)</code> → on EXTENDED: <code class="language-plaintext highlighter-rouge">listener_recv_bulk()</code></li>
+  <li>Pushes every message to a 64-entry mutex+condvar queue (<code class="language-plaintext highlighter-rouge">mq</code>)</li>
+  <li>Detects BULK_REARM (<code class="language-plaintext highlighter-rouge">bulk[1]==0x04, bulk[2]==0x40, bulk[3]==0x1F</code>): zeroes <code class="language-plaintext highlighter-rouge">g2_slot_version[]</code>, pushes <code class="language-plaintext highlighter-rouge">sentinel=2</code></li>
+  <li>Detects disconnect (<code class="language-plaintext highlighter-rouge">LIBUSB_ERROR_NO_DEVICE</code>): pushes <code class="language-plaintext highlighter-rouge">sentinel=1</code>, exits</li>
+  <li>Updates <code class="language-plaintext highlighter-rouge">g2_slot_version[slot]</code> for embedded patch_version messages</li>
+</ul>
+
+<p><strong>Main thread (in <code class="language-plaintext highlighter-rouge">daemon.c</code>)</strong></p>
+<ul>
+  <li>Dequeues stdin commands; executes them via <code class="language-plaintext highlighter-rouge">execute_cmd()</code> → device functions</li>
+  <li>Device functions call <code class="language-plaintext highlighter-rouge">recv_interrupt()</code> which is shimmed: when <code class="language-plaintext highlighter-rouge">g2_listener_active==1</code>, pulls from the listener queue (skipping LED/vol bulk messages) instead of calling libusb directly</li>
+  <li>Between commands: pulls events from queue via <code class="language-plaintext highlighter-rouge">g2_msg_recv(100ms)</code>, routes by sentinel value</li>
+</ul>
+
+<h3 id="message-flow">Message Flow</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>EP 0x81/0x82                listener_thread                    msg_queue
+  ←────────────────────────── recv_interrupt_with_retry()
+  ←────────────────────────── listener_recv_bulk() (if EXTENDED)
+                              push msg ──────────────────────────→  [msg]
+                                                                     [msg]
+                                                                     [msg]
+
+msg_queue                    Main thread (event loop)
+  [msg] ──────────────────→  sentinel==1?  → do_reconnect()
+  [msg] ──────────────────→  sentinel==2?  → emit version_update + g2_rearm()
+  [msg] ──────────────────→  normal msg   → g2_emit_event()
+
+msg_queue                    Main thread (inside execute_cmd)
+  [LED] ──────────────────→  recv_interrupt() shim: skip (LED/vol)
+  [LED] ──────────────────→  recv_interrupt() shim: skip
+  [resp] ─────────────────→  recv_interrupt() shim: return to device function
+</code></pre></div></div>
+
+<h3 id="command-transaction-eg-slot-b">Command Transaction (e.g. “slot B”)</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Electron       Main thread               listener_thread        G2
+   │           dequeue "slot B"               │                  │
+   │           g2_select_slot():              │                  │
+   │             send EP 0x03 ───────────────────────────────────→│
+   │                                     ←── EP 0x81 LED ────────┤
+   │                                     push msg (LED)           │
+   │             recv_interrupt() shim                            │
+   │               pull LED → skip                                │
+   │                                     ←── EP 0x81 resp ───────┤
+   │                                     push msg (resp)          │
+   │               pull resp → return                             │
+   │           emit {"id":1,"ok":true} ─────────────────────────→│
+</code></pre></div></div>
+
+<h3 id="bulk_rearm-flow--hardware-path-g2-perf-button">BULK_REARM Flow — hardware path (G2 PERF button)</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>G2               listener_thread          Main thread
+ │                     │                       │
+ ├─ EP 0x81 EXTENDED ─→│                       │
+ ├─ EP 0x82 bulk ──────│                       │
+ │               detect BULK_REARM (0x04/0x40/0x1F)
+ │               zero g2_slot_version[]        │
+ │               push sentinel=2               │
+ │                     │    pull sentinel=2:   │
+ │                     │    emit_bulk_event():  │
+ │                     │      version_update    │
+ │                     │      query synth/perf  │
+ │                     │      g2_get_patch ×4   │
+ │                     │      synth_settings_update {patches:[...]}
+ │                     │      perf_settings     │
+ │                     │    g2_pending_rearm=1  │
+ │                     │    g2_rearm() ─────────────── EP 0x03
+ ├─ EP 0x81 ACK ───────→│                      │
+ │               push ACK                      │
+ │                     │    pull ACK → emit {"type":"ok"}
+</code></pre></div></div>
+
+<h3 id="bulk_rearm-flow--editor-path-set-perf-mode-command">BULK_REARM Flow — editor path (set-perf-mode command)</h3>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Electron       Main thread                    G2
+   │            send set-perf-mode (0x3E)  ──→│
+   │                                    ←─────┤ EP 0x81 EXTENDED
+   │                                    ←─────┤ EP 0x82 bulk (0x0C/0x1F)
+   │            listener push sentinel=0       │ ← G2 still streaming!
+   │            pull: emit_bulk_event():        │
+   │              version_update                │
+   │              g2_stop_comm() ─────────────→│
+   │                       ←── streaming events draining
+   │                       ←── STOP_COMM ACK   │ ← G2 stopped
+   │              query synth/perf settings     │
+   │              g2_get_patch ×4               │
+   │              synth_settings_update {patches:[...]}
+   │              perf_settings                 │
+   │            g2_pending_rearm=1              │
+   │            g2_rearm() ───────────────────→│
+   │                       ←── START_COMM ACK  │
+</code></pre></div></div>
+
+<p>The key difference: hardware path receives 0x04/0x40/0x1F (sentinel=2, G2 already stopped streaming); editor path receives 0x0C/0x1F (sentinel=0, G2 still streaming → requires explicit <code class="language-plaintext highlighter-rouge">g2_stop_comm()</code>).</p>
+
+<h3 id="seq--batch-slot-mutations-in-one-usb-frame"><code class="language-plaintext highlighter-rouge">seq</code> — Batch slot mutations in one USB frame</h3>
+
+<p>The daemon <code class="language-plaintext highlighter-rouge">seq</code> command packs up to 128 slot mutations into a single <code class="language-plaintext highlighter-rouge">g2_batch_ops()</code> call, which builds one USB frame containing all sub-commands. All operations must target the <strong>same slot</strong>; mixing slots returns <code class="language-plaintext highlighter-rouge">G2_ERR_INVALID_PARAM (-10)</code>.</p>
+
+<div class="language-json highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="p">{</span><span class="nl">"id"</span><span class="p">:</span><span class="w"> </span><span class="mi">1</span><span class="p">,</span><span class="w"> </span><span class="nl">"cmd"</span><span class="p">:</span><span class="w"> </span><span class="s2">"seq"</span><span class="p">,</span><span class="w"> </span><span class="nl">"args"</span><span class="p">:</span><span class="w"> </span><span class="p">[</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"del-cable"</span><span class="p">,</span><span class="w">        </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">fm</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_id</span><span class="p">,</span><span class="w"> </span><span class="err">tm</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_id</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"add-cable"</span><span class="p">,</span><span class="w">        </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">color</span><span class="p">,</span><span class="w"> </span><span class="err">fm</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_id</span><span class="p">,</span><span class="w"> </span><span class="err">tm</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_id</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"set-cable-color"</span><span class="p">,</span><span class="w">  </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">color</span><span class="p">,</span><span class="w"> </span><span class="err">fm</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">fcon_id</span><span class="p">,</span><span class="w"> </span><span class="err">tm</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_t</span><span class="p">,</span><span class="w"> </span><span class="err">tcon_id</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"del-module"</span><span class="p">,</span><span class="w">       </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"move-module"</span><span class="p">,</span><span class="w">      </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">,</span><span class="w"> </span><span class="err">col</span><span class="p">,</span><span class="w"> </span><span class="err">row</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"add-module"</span><span class="p">,</span><span class="w">       </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">type</span><span class="p">,</span><span class="w"> </span><span class="err">id</span><span class="p">,</span><span class="w"> </span><span class="err">col</span><span class="p">,</span><span class="w"> </span><span class="err">row</span><span class="p">,</span><span class="w"> </span><span class="err">colour</span><span class="p">,</span><span class="w"> </span><span class="err">n_modes</span><span class="p">,</span><span class="w"> </span><span class="err">mode</span><span class="mi">0</span><span class="err">...</span><span class="p">,</span><span class="w"> </span><span class="err">n_params</span><span class="p">,</span><span class="w"> </span><span class="err">param</span><span class="mi">0</span><span class="err">...</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"set-module-color"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">,</span><span class="w"> </span><span class="err">color</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"set-module-name"</span><span class="p">,</span><span class="w">  </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">,</span><span class="w"> </span><span class="s2">"name"</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"set-param-label"</span><span class="p">,</span><span class="w">  </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">,</span><span class="w"> </span><span class="err">param_idx</span><span class="p">,</span><span class="w"> </span><span class="err">label_idx</span><span class="p">,</span><span class="w"> </span><span class="s2">"label"</span><span class="p">],</span><span class="w">
+  </span><span class="p">[</span><span class="s2">"set-param"</span><span class="p">,</span><span class="w">        </span><span class="s2">"&lt;slot&gt;"</span><span class="p">,</span><span class="w"> </span><span class="s2">"&lt;loc&gt;"</span><span class="p">,</span><span class="w"> </span><span class="err">module_id</span><span class="p">,</span><span class="w"> </span><span class="err">param_idx</span><span class="p">,</span><span class="w"> </span><span class="err">value</span><span class="p">,</span><span class="w"> </span><span class="err">variation</span><span class="p">]</span><span class="w">
+</span><span class="p">]}</span><span class="w">
+</span></code></pre></div></div>
+
+<p>Arg layout per sub-command is identical to the individual daemon commands (positional args with <code class="language-plaintext highlighter-rouge">slot</code> and <code class="language-plaintext highlighter-rouge">location</code> as args 0 and 1 of each sub-array). Max 128 ops per <code class="language-plaintext highlighter-rouge">seq</code> call.</p>
+
+<blockquote>
+  <p><strong><code class="language-plaintext highlighter-rouge">set-param</code> in <code class="language-plaintext highlighter-rouge">seq</code> — deferred execution:</strong> <code class="language-plaintext highlighter-rouge">set-param</code> uses <code class="language-plaintext highlighter-rouge">COMMAND_WRITE_NO_RESP</code> and cannot be packed into the compound USB frame. The daemon queues all <code class="language-plaintext highlighter-rouge">set-param</code> entries into a <code class="language-plaintext highlighter-rouge">SetParamEntry[]</code> array and executes them sequentially via <code class="language-plaintext highlighter-rouge">g2_set_param()</code> <strong>after</strong> <code class="language-plaintext highlighter-rouge">g2_batch_ops()</code> returns. This keeps structural mutations (add/del/move module, add/del cable) atomic in one frame while still allowing parameter values in the same <code class="language-plaintext highlighter-rouge">seq</code> call — essential for copy/paste of modules with non-default variation values.</p>
+</blockquote>
+
+<h3 id="key-properties">Key Properties</h3>
+
+<ul>
+  <li>No STOP_COMM / START_COMM per command (matches Delphi) — except when explicitly required before direct queries (see editor path above)</li>
+  <li><code class="language-plaintext highlighter-rouge">g2_listener_active</code> flag switches <code class="language-plaintext highlighter-rouge">recv_interrupt()</code> / <code class="language-plaintext highlighter-rouge">recv_bulk()</code> / <code class="language-plaintext highlighter-rouge">g2_drain_pending()</code> / <code class="language-plaintext highlighter-rouge">g2_rearm()</code> between direct libusb and queue-based modes; <code class="language-plaintext highlighter-rouge">g2_stop_comm()</code> is safe to call from main thread in either mode</li>
+  <li>Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)</li>
+  <li><code class="language-plaintext highlighter-rouge">g2_slot_version[4]</code> maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips</li>
+  <li><strong>Startup</strong>: daemon queries all 4 slots before <code class="language-plaintext highlighter-rouge">g2_rearm()</code> and emits them as <code class="language-plaintext highlighter-rouge">slot_data</code> events; frontend applies them directly via <code class="language-plaintext highlighter-rouge">_applyPatchOutput</code> in the <code class="language-plaintext highlighter-rouge">slot_data</code> watch handler</li>
+</ul>
+
+<h3 id="recv_interrupt-skip-list-and-follow-up-race">recv_interrupt() skip list and follow-up race</h3>
+
+<p><code class="language-plaintext highlighter-rouge">recv_interrupt()</code> in listener mode skips only LED (<code class="language-plaintext highlighter-rouge">0x39</code>) and volume (<code class="language-plaintext highlighter-rouge">0x3A</code>) bulk messages; all other types are returned to the caller.</p>
+
+<p>After a voice-count change the G2 emits: <code class="language-plaintext highlighter-rouge">patch_version_change (0x38)</code> → <code class="language-plaintext highlighter-rouge">assigned_voices (0x05)</code> → <code class="language-plaintext highlighter-rouge">resources_used (0x72)</code>. Issuing <code class="language-plaintext highlighter-rouge">get-patch</code> on <code class="language-plaintext highlighter-rouge">patch_version_change</code> causes <code class="language-plaintext highlighter-rouge">g2_get_patch()</code> to pop <code class="language-plaintext highlighter-rouge">0x05</code>/<code class="language-plaintext highlighter-rouge">0x72</code> instead of its expected response, crashing the parser.</p>
+
+<p><strong>Safe pattern:</strong> wait for <code class="language-plaintext highlighter-rouge">resources_used</code> before issuing <code class="language-plaintext highlighter-rouge">get-patch</code> (see <code class="language-plaintext highlighter-rouge">useG2.ts</code>, <code class="language-plaintext highlighter-rouge">pendingSlotReload</code>).</p>

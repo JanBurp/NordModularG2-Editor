@@ -1,0 +1,970 @@
+<h1 id="nord-g2-patch-file-format-pch2--prf2">Nord G2 Patch File Format (PCH2 / PRF2)</h1>
+
+<p>Reference derived from <code class="language-plaintext highlighter-rouge">g2-editor/src/parser/nmg2PatchParser.ts</code>, <code class="language-plaintext highlighter-rouge">nmg2PatchSerializer.ts</code>, <code class="language-plaintext highlighter-rouge">constants.ts</code>, and <code class="language-plaintext highlighter-rouge">src/types/patch.ts</code>.</p>
+
+<hr />
+
+<h2 id="1-file-types">1. File Types</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Extension</th>
+      <th>Name</th>
+      <th>Contents</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">.pch2</code></td>
+      <td>Patch</td>
+      <td>One patch: FX area + Voice area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">.prf2</code></td>
+      <td>Performance</td>
+      <td>Four slots (A–D), each a patch (FX + Voice), plus a performance header</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Both formats use the same section grammar. The prf2 adds a leading <code class="language-plaintext highlighter-rouge">PERF_DATA</code> section and three <code class="language-plaintext highlighter-rouge">SEPARATOR</code> sections to delimit slots.</p>
+
+<hr />
+
+<h2 id="2-file-wrapper">2. File Wrapper</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[Patch name — variable length, null-terminated]
+[0x17 0x00   — magic bytes]
+[Section data]
+[CRC-16/CCITT — 2 bytes, big-endian]
+</code></pre></div></div>
+
+<p>The name header is stripped on load and re-prepended on save. CRC is computed over <code class="language-plaintext highlighter-rouge">[0x17, 0x00, section data]</code> — the same CRC-16/CCITT algorithm as the USB protocol (polynomial <code class="language-plaintext highlighter-rouge">0x1021</code>, seed <code class="language-plaintext highlighter-rouge">0x0000</code>). The 2-byte CRC itself is excluded from the CRC input.</p>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:56–84</code>.</p>
+
+<hr />
+
+<h2 id="3-section-framing">3. Section Framing</h2>
+
+<p>Every section:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>Offset  Bytes  Description
+──────  ─────  ────────────────────────
+0       1      Section type
+1       2      Data length (big-endian)
+3+      N      Section data
+</code></pre></div></div>
+
+<p>The parser walks sections sequentially until the end of the section data (excluding the trailing 2-byte CRC).</p>
+
+<hr />
+
+<h2 id="4-section-types">4. Section Types</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Hex</th>
+      <th>Constant</th>
+      <th>Name</th>
+      <th>Scope</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x11</code></td>
+      <td><code class="language-plaintext highlighter-rouge">PERF_DATA</code></td>
+      <td>Performance header</td>
+      <td>prf2 only, first section</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x21</code></td>
+      <td><code class="language-plaintext highlighter-rouge">PATCH_DESC</code></td>
+      <td>Patch description</td>
+      <td>per patch</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4A</code></td>
+      <td><code class="language-plaintext highlighter-rouge">MODULE_LIST</code></td>
+      <td>Module list</td>
+      <td>per area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x4D</code></td>
+      <td><code class="language-plaintext highlighter-rouge">PARAMETERS</code></td>
+      <td>Parameter values</td>
+      <td>per area + global</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x52</code></td>
+      <td><code class="language-plaintext highlighter-rouge">CABLE_LIST</code></td>
+      <td>Cable list</td>
+      <td>per area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5A</code></td>
+      <td><code class="language-plaintext highlighter-rouge">MODULE_NAMES</code></td>
+      <td>Module labels</td>
+      <td>per area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x5B</code></td>
+      <td><code class="language-plaintext highlighter-rouge">PARAM_NAMES</code></td>
+      <td>Parameter value labels</td>
+      <td>per area</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x6F</code></td>
+      <td><code class="language-plaintext highlighter-rouge">SEPARATOR</code></td>
+      <td>Text pad (patch notes)</td>
+      <td>per patch</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="5-bit-encoding">5. Bit Encoding</h2>
+
+<p>Most sections use MSB-first bit packing: fields are written consecutively with no byte alignment between them. Bit 0 is the MSB of the first byte.</p>
+
+<ul>
+  <li><strong>7-bit fields</strong> → unsigned, range 0–127 (used for parameter values, positions, colours)</li>
+  <li><strong>8-bit fields</strong> → unsigned, range 0–255 (used for indices, counts, mode values)</li>
+</ul>
+
+<p><code class="language-plaintext highlighter-rouge">getBits(n)</code> in the parser, <code class="language-plaintext highlighter-rouge">BitWriter.write(n, v)</code> in the serializer implement this scheme.</p>
+
+<p>Exception: <code class="language-plaintext highlighter-rouge">MODULE_NAMES</code> (§6.6) is byte-encoded, not bit-packed.</p>
+
+<hr />
+
+<h2 id="6-section-details">6. Section Details</h2>
+
+<h3 id="61-perf_data-0x11--prf2-only">6.1 PERF_DATA (<code class="language-plaintext highlighter-rouge">0x11</code>) — prf2 only</h3>
+
+<p>Byte-encoded. Appears once at the start of a prf2 file. Mirrors the USB <code class="language-plaintext highlighter-rouge">GET_PERF_SETTINGS</code> response (see <code class="language-plaintext highlighter-rouge">usb.md §10</code>).</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[8-byte header — unknown / settings]
+[Slot A: name\0 + 10 bytes]
+[Slot B: name\0 + 10 bytes]
+[Slot C: name\0 + 10 bytes]
+[Slot D: name\0 + 10 bytes]
+</code></pre></div></div>
+
+<p>Slot block (10 bytes):</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Offset</th>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td><code class="language-plaintext highlighter-rouge">active</code></td>
+      <td>0 or 1</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td><code class="language-plaintext highlighter-rouge">key</code></td>
+      <td>0 or 1</td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td><code class="language-plaintext highlighter-rouge">hold</code></td>
+      <td>0 or 1</td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td><code class="language-plaintext highlighter-rouge">bank</code></td>
+      <td>bank index</td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td><code class="language-plaintext highlighter-rouge">patch</code></td>
+      <td>patch location</td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td><code class="language-plaintext highlighter-rouge">rangeLow</code></td>
+      <td>MIDI note low</td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td><code class="language-plaintext highlighter-rouge">rangeHigh</code></td>
+      <td>MIDI note high</td>
+    </tr>
+    <tr>
+      <td>7–9</td>
+      <td>padding</td>
+      <td>ignored</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parsePrfData</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:382–408</code>).</p>
+
+<hr />
+
+<h3 id="62-patch_desc-0x21">6.2 PATCH_DESC (<code class="language-plaintext highlighter-rouge">0x21</code>)</h3>
+
+<p>Bit-packed. Section data is 14 bytes (112 bits; bits 108–111 are trailing zeros).</p>
+
+<p>The first <strong>61 bits</strong> are unknown/reserved and are preserved verbatim during serialization — they are never decoded.</p>
+
+<p>Decoded fields (bit positions 0-based from start of section data):</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–60</td>
+      <td><em>(reserved)</em></td>
+      <td>61</td>
+      <td>Preserved as-is</td>
+    </tr>
+    <tr>
+      <td>61–65</td>
+      <td><code class="language-plaintext highlighter-rouge">voices</code></td>
+      <td>5</td>
+      <td><strong>0-based</strong>: 0 = 1 voice, 31 = 32 voices</td>
+    </tr>
+    <tr>
+      <td>66–79</td>
+      <td><code class="language-plaintext highlighter-rouge">height</code></td>
+      <td>14</td>
+      <td>—</td>
+    </tr>
+    <tr>
+      <td>80–82</td>
+      <td><code class="language-plaintext highlighter-rouge">unk2</code></td>
+      <td>3</td>
+      <td>Unknown</td>
+    </tr>
+    <tr>
+      <td>83</td>
+      <td><code class="language-plaintext highlighter-rouge">red</code></td>
+      <td>1</td>
+      <td>Cable colour visibility</td>
+    </tr>
+    <tr>
+      <td>84</td>
+      <td><code class="language-plaintext highlighter-rouge">blue</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>85</td>
+      <td><code class="language-plaintext highlighter-rouge">yellow</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>86</td>
+      <td><code class="language-plaintext highlighter-rouge">orange</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>87</td>
+      <td><code class="language-plaintext highlighter-rouge">green</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>88</td>
+      <td><code class="language-plaintext highlighter-rouge">purple</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>89</td>
+      <td><code class="language-plaintext highlighter-rouge">white</code></td>
+      <td>1</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>90–91</td>
+      <td><code class="language-plaintext highlighter-rouge">monopoly</code></td>
+      <td>2</td>
+      <td>0=Poly, 1=Mono, 2=Legato</td>
+    </tr>
+    <tr>
+      <td>92–99</td>
+      <td><code class="language-plaintext highlighter-rouge">variation</code></td>
+      <td>8</td>
+      <td>Active variation (0–8)</td>
+    </tr>
+    <tr>
+      <td>100–107</td>
+      <td><code class="language-plaintext highlighter-rouge">category</code></td>
+      <td>8</td>
+      <td>Category index (0–15)</td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p><strong>Note on voices:</strong> <code class="language-plaintext highlighter-rouge">description.voices</code> is 0-based; the USB <code class="language-plaintext highlighter-rouge">assigned_voices</code> event is 1-based. Formula: <code class="language-plaintext highlighter-rouge">description.voices = assigned − 1</code> when poly. See <code class="language-plaintext highlighter-rouge">usb.md §9</code>.</p>
+</blockquote>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parsePatchDesc</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:412–431</code>).</p>
+
+<hr />
+
+<h3 id="63-module_list-0x4a">6.3 MODULE_LIST (<code class="language-plaintext highlighter-rouge">0x4A</code>)</h3>
+
+<p>Bit-packed. One section per area (areaIdx 0 = FX, 1 = Voice).</p>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–1</td>
+      <td><code class="language-plaintext highlighter-rouge">areaIdx</code></td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>2–9</td>
+      <td><code class="language-plaintext highlighter-rouge">moduleCount</code></td>
+      <td>8</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per module:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>+0–7</td>
+      <td><code class="language-plaintext highlighter-rouge">type</code></td>
+      <td>8</td>
+      <td>Module type ID (maps to module definition database)</td>
+    </tr>
+    <tr>
+      <td>+8–15</td>
+      <td><code class="language-plaintext highlighter-rouge">index</code></td>
+      <td>8</td>
+      <td>Unique ID within area</td>
+    </tr>
+    <tr>
+      <td>+16–22</td>
+      <td><code class="language-plaintext highlighter-rouge">horiz</code></td>
+      <td>7</td>
+      <td>Column position (0–19)</td>
+    </tr>
+    <tr>
+      <td>+23–29</td>
+      <td><code class="language-plaintext highlighter-rouge">vert</code></td>
+      <td>7</td>
+      <td>Row position</td>
+    </tr>
+    <tr>
+      <td>+30–37</td>
+      <td><code class="language-plaintext highlighter-rouge">colour</code></td>
+      <td>8</td>
+      <td>Module colour</td>
+    </tr>
+    <tr>
+      <td>+38</td>
+      <td><code class="language-plaintext highlighter-rouge">uprate</code></td>
+      <td>1</td>
+      <td>High-rate processing flag</td>
+    </tr>
+    <tr>
+      <td>+39</td>
+      <td><code class="language-plaintext highlighter-rouge">leds</code></td>
+      <td>1</td>
+      <td>Has LED outputs</td>
+    </tr>
+    <tr>
+      <td>+40–45</td>
+      <td><em>(padding)</em></td>
+      <td>6</td>
+      <td>Discarded</td>
+    </tr>
+    <tr>
+      <td>+46–49</td>
+      <td><code class="language-plaintext highlighter-rouge">nmodes</code></td>
+      <td>4</td>
+      <td>Number of mode values</td>
+    </tr>
+    <tr>
+      <td>+50…</td>
+      <td><code class="language-plaintext highlighter-rouge">modes[i]</code></td>
+      <td>6×nmodes</td>
+      <td>Mode values</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parseModuleList</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:267–294</code>).</p>
+
+<hr />
+
+<h3 id="64-parameters-0x4d">6.4 PARAMETERS (<code class="language-plaintext highlighter-rouge">0x4D</code>)</h3>
+
+<p>Two distinct layouts depending on <code class="language-plaintext highlighter-rouge">areaIdx</code>.</p>
+
+<h4 id="areaidx-0-or-1--module-parameters-fx--voice">areaIdx 0 or 1 — Module parameters (FX / Voice)</h4>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–1</td>
+      <td><code class="language-plaintext highlighter-rouge">areaIdx</code></td>
+      <td>2</td>
+      <td>0=FX, 1=Voice</td>
+    </tr>
+    <tr>
+      <td>2–9</td>
+      <td><code class="language-plaintext highlighter-rouge">moduleCount</code></td>
+      <td>8</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>10–17</td>
+      <td><code class="language-plaintext highlighter-rouge">variationCount</code></td>
+      <td>8</td>
+      <td>Always 9</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per module:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">index</code></td>
+      <td>8</td>
+      <td>Module index</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">paramCount</code></td>
+      <td>7</td>
+      <td>Number of parameters</td>
+    </tr>
+    <tr>
+      <td>9× variation blocks</td>
+      <td>—</td>
+      <td>One block per variation (0–8)</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per variation block:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>variation index</td>
+      <td>8</td>
+    </tr>
+    <tr>
+      <td>paramCount × value</td>
+      <td>7 each</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Storage in <code class="language-plaintext highlighter-rouge">ModuleInstance</code>: <code class="language-plaintext highlighter-rouge">lv[variation × pcnt + paramIdx]</code>.</p>
+
+<h4 id="areaidx-2--global-patch-parameters">areaIdx 2 — Global patch parameters</h4>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–1</td>
+      <td><code class="language-plaintext highlighter-rouge">areaIdx</code></td>
+      <td>2</td>
+      <td>= 2</td>
+    </tr>
+    <tr>
+      <td>2–9</td>
+      <td><em>(sub-section count)</em></td>
+      <td>8</td>
+      <td>Always 7</td>
+    </tr>
+    <tr>
+      <td>10–17</td>
+      <td><code class="language-plaintext highlighter-rouge">variationCount</code></td>
+      <td>8</td>
+      <td>Always 9</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Followed by 7 sub-sections. Each sub-section:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>sub-section ID</td>
+      <td>8</td>
+      <td>1–7</td>
+    </tr>
+    <tr>
+      <td>field count</td>
+      <td>7</td>
+      <td>fields per variation</td>
+    </tr>
+    <tr>
+      <td>9× variation blocks</td>
+      <td>—</td>
+      <td> </td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per variation block:</strong> 8-bit variation index + fieldCount × 7-bit values.</p>
+
+<p>Sub-sections in order:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>ID</th>
+      <th>Fields</th>
+      <th><code class="language-plaintext highlighter-rouge">PatchParamVariation</code> keys</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1</td>
+      <td>16</td>
+      <td><code class="language-plaintext highlighter-rouge">morphDials[0..7]</code>, <code class="language-plaintext highlighter-rouge">morphModes[0..7]</code></td>
+    </tr>
+    <tr>
+      <td>2</td>
+      <td>2</td>
+      <td><code class="language-plaintext highlighter-rouge">patchVol</code>, <code class="language-plaintext highlighter-rouge">activeMuted</code></td>
+    </tr>
+    <tr>
+      <td>3</td>
+      <td>2</td>
+      <td><code class="language-plaintext highlighter-rouge">glide</code>, <code class="language-plaintext highlighter-rouge">glideTime</code></td>
+    </tr>
+    <tr>
+      <td>4</td>
+      <td>2</td>
+      <td><code class="language-plaintext highlighter-rouge">bend</code>, <code class="language-plaintext highlighter-rouge">semi</code></td>
+    </tr>
+    <tr>
+      <td>5</td>
+      <td>3</td>
+      <td><code class="language-plaintext highlighter-rouge">vibrato</code>, <code class="language-plaintext highlighter-rouge">cents</code>, <code class="language-plaintext highlighter-rouge">rate</code></td>
+    </tr>
+    <tr>
+      <td>6</td>
+      <td>4</td>
+      <td><code class="language-plaintext highlighter-rouge">arpeggiator</code>, <code class="language-plaintext highlighter-rouge">arpTime</code>, <code class="language-plaintext highlighter-rouge">arpType</code>, <code class="language-plaintext highlighter-rouge">octaves</code></td>
+    </tr>
+    <tr>
+      <td>7</td>
+      <td>2</td>
+      <td><code class="language-plaintext highlighter-rouge">octaveShift</code>, <code class="language-plaintext highlighter-rouge">sustain</code></td>
+    </tr>
+  </tbody>
+</table>
+
+<p>The 8 morph names are: <code class="language-plaintext highlighter-rouge">Wheel</code>, <code class="language-plaintext highlighter-rouge">Vel</code>, <code class="language-plaintext highlighter-rouge">Keyb</code>, <code class="language-plaintext highlighter-rouge">Aft.Tch</code>, <code class="language-plaintext highlighter-rouge">Sust.Pd</code>, <code class="language-plaintext highlighter-rouge">Ctrl.Pd</code>, <code class="language-plaintext highlighter-rouge">P.Stick</code>, <code class="language-plaintext highlighter-rouge">G.Wh 2</code> (defined in <code class="language-plaintext highlighter-rouge">MORPH_NAMES</code> in <code class="language-plaintext highlighter-rouge">patch.ts</code>).</p>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parseModuleParameters</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:301–358</code>).</p>
+
+<hr />
+
+<h3 id="65-cable_list-0x52">6.5 CABLE_LIST (<code class="language-plaintext highlighter-rouge">0x52</code>)</h3>
+
+<p>Bit-packed. One section per area.</p>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–1</td>
+      <td><code class="language-plaintext highlighter-rouge">areaIdx</code></td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>2–7</td>
+      <td><em>(padding)</em></td>
+      <td>6</td>
+    </tr>
+    <tr>
+      <td>8–23</td>
+      <td><code class="language-plaintext highlighter-rouge">cableCount</code></td>
+      <td>16</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per cable:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">colour</code></td>
+      <td>3</td>
+      <td>0–7</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">smod</code></td>
+      <td>8</td>
+      <td>Source module index</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">scon</code></td>
+      <td>6</td>
+      <td>Source connector index (0–63)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">dir</code></td>
+      <td>1</td>
+      <td>Direction flag</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">dmod</code></td>
+      <td>8</td>
+      <td>Destination module index</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">dcon</code></td>
+      <td>6</td>
+      <td>Destination connector index</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parseCableList</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:360–379</code>).</p>
+
+<hr />
+
+<h3 id="66-module_names-0x5a">6.6 MODULE_NAMES (<code class="language-plaintext highlighter-rouge">0x5A</code>)</h3>
+
+<p>Byte-encoded (not bit-packed). One section per area.</p>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Offset</th>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0</td>
+      <td>areaIdx (bits 7–6)</td>
+      <td>Top 2 bits of byte</td>
+    </tr>
+    <tr>
+      <td>1</td>
+      <td><code class="language-plaintext highlighter-rouge">moduleCount</code></td>
+      <td> </td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per entry:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>1-byte module index</td>
+      <td> </td>
+    </tr>
+    <tr>
+      <td>Name bytes</td>
+      <td>Max 16 characters</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">0x00</code> null terminator</td>
+      <td>Omitted when name is exactly 16 chars</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parseModuleNames</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:204–223</code>).</p>
+
+<hr />
+
+<h3 id="67-param_names-0x5b">6.7 PARAM_NAMES (<code class="language-plaintext highlighter-rouge">0x5B</code>)</h3>
+
+<p>Bit-packed. One section per area. Stores user-defined text labels for parameter value slots (e.g. labelling an integer knob’s positions).</p>
+
+<p><strong>Header:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Bits</th>
+      <th>Field</th>
+      <th>Width</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>0–1</td>
+      <td><code class="language-plaintext highlighter-rouge">areaIdx</code></td>
+      <td>2</td>
+    </tr>
+    <tr>
+      <td>2–9</td>
+      <td><code class="language-plaintext highlighter-rouge">moduleCount</code></td>
+      <td>8</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per module:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">modIdx</code></td>
+      <td>8</td>
+      <td>Module index</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">moduleLen</code></td>
+      <td>8</td>
+      <td>Total bytes consumed by following label entries</td>
+    </tr>
+    <tr>
+      <td>label entries</td>
+      <td>—</td>
+      <td>Repeated until <code class="language-plaintext highlighter-rouge">moduleLen</code> bytes consumed</td>
+    </tr>
+  </tbody>
+</table>
+
+<p><strong>Per label entry:</strong></p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Field</th>
+      <th>Width</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">isString</code></td>
+      <td>8</td>
+      <td>1 if text labels, 0 otherwise</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">paramLen</code></td>
+      <td>8</td>
+      <td><code class="language-plaintext highlighter-rouge">1 + labelCount × 7</code></td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">paramIndex</code></td>
+      <td>8</td>
+      <td>Which parameter these labels belong to</td>
+    </tr>
+    <tr>
+      <td>label slots</td>
+      <td>7×8 each</td>
+      <td><code class="language-plaintext highlighter-rouge">floor((paramLen − 1) / 7)</code> slots; each is exactly 7 bytes, null-padded</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>Each label slot is 7 characters, null-padded. <code class="language-plaintext highlighter-rouge">paramLen − 1</code> must be a multiple of 7.</p>
+
+<blockquote>
+  <p>This mirrors the USB <code class="language-plaintext highlighter-rouge">SET_PARAM_LABEL</code> wire format described in <code class="language-plaintext highlighter-rouge">usb.md §8b</code>.</p>
+</blockquote>
+
+<p>Parser: <code class="language-plaintext highlighter-rouge">parseParamNames</code> (<code class="language-plaintext highlighter-rouge">nmg2PatchParser.ts:225–265</code>).</p>
+
+<hr />
+
+<h3 id="68-separator-0x6f">6.8 SEPARATOR (<code class="language-plaintext highlighter-rouge">0x6F</code>)</h3>
+
+<p>Raw bytes. Contains the patch notes text for the preceding patch. Length varies; may be 0.</p>
+
+<p>In the parser, encountering a <code class="language-plaintext highlighter-rouge">SEPARATOR</code> increments <code class="language-plaintext highlighter-rouge">aof</code> (area offset) by 2, so subsequent sections are assigned to the next slot’s FX and Voice areas. This is the mechanism that divides a prf2 into 4 independent patches.</p>
+
+<hr />
+
+<h2 id="7-prf2-full-layout">7. PRF2 Full Layout</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>[PERF_DATA (0x11)]        ← performance header: slot names &amp; settings
+[PATCH_DESC (0x21)]       ← slot 0 description
+[MODULE_LIST (0x4A) FX]   ┐
+[MODULE_LIST (0x4A) VA]   │
+[PARAMETERS (0x4D) FX]    │ slot 0
+[PARAMETERS (0x4D) VA]    │
+[PARAMETERS (0x4D) global]│
+[CABLE_LIST (0x52) FX]    │
+[CABLE_LIST (0x52) VA]    │
+[MODULE_NAMES (0x5A) ...]  │ (optional)
+[PARAM_NAMES (0x5B) ...]   ┘ (optional)
+[SEPARATOR (0x6F)]         ← text pad + slot boundary: aof += 2
+
+[PATCH_DESC (0x21)]        ← slot 1
+...
+[SEPARATOR (0x6F)]
+
+[PATCH_DESC (0x21)]        ← slot 2
+...
+[SEPARATOR (0x6F)]
+
+[PATCH_DESC (0x21)]        ← slot 3
+...
+
+[CRC-16 (2 bytes)]
+</code></pre></div></div>
+
+<p>Section order within each slot is not strictly mandated; the parser dispatches by type. The above order matches the Delphi reference editor’s write order and is what the serializer produces.</p>
+
+<hr />
+
+<h2 id="8-variation-system">8. Variation System</h2>
+
+<ul>
+  <li>9 variations, indexed 0–8 (hardware labels them A–I; UI shows 1–9)</li>
+  <li>All 9 are always stored, even if not all are used</li>
+  <li><code class="language-plaintext highlighter-rouge">PatchDescription.variation</code> — the active variation when the patch was saved</li>
+  <li>Module parameter storage: <code class="language-plaintext highlighter-rouge">lv[variation × pcnt + paramIdx]</code> (<code class="language-plaintext highlighter-rouge">ModuleInstance.lv</code>)</li>
+  <li>Global patch parameter storage: <code class="language-plaintext highlighter-rouge">patchParams[variation]</code> (array of <code class="language-plaintext highlighter-rouge">PatchParamVariation</code>)</li>
+  <li>Constant <code class="language-plaintext highlighter-rouge">NUM_VARIATIONS = 9</code> defined in <code class="language-plaintext highlighter-rouge">patch.ts</code></li>
+</ul>
+
+<hr />
+
+<h2 id="9-serialization-strategy">9. Serialization Strategy</h2>
+
+<p><code class="language-plaintext highlighter-rouge">serializePatch</code> and <code class="language-plaintext highlighter-rouge">serializePerformance</code> (in <code class="language-plaintext highlighter-rouge">nmg2PatchSerializer.ts</code>) use <strong>section replacement</strong>, not full reconstruction:</p>
+
+<ul>
+  <li><strong>Mutable sections</strong> (MODULE_LIST, CABLE_LIST, PARAMETERS, MODULE_NAMES, PARAM_NAMES, PATCH_DESC) are regenerated from the in-memory <code class="language-plaintext highlighter-rouge">Patch</code> object.</li>
+  <li><strong>Immutable sections</strong> (SEPARATOR text, PERF_DATA) are copied verbatim from the template.</li>
+  <li>The first 61 bits of PATCH_DESC are also preserved verbatim (they are never decoded during parsing).</li>
+</ul>
+
+<p>This ensures unknown bits survive round-trips without data loss.</p>
+
+<div class="language-typescript highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nx">serializePatch</span><span class="p">(</span><span class="nx">name</span><span class="p">,</span> <span class="nx">patch</span><span class="p">,</span> <span class="nx">templateRawHex</span><span class="p">,</span> <span class="nx">variations</span><span class="p">):</span> <span class="kr">string</span>
+<span class="nx">serializePerformance</span><span class="p">(</span><span class="nx">patches</span><span class="p">,</span> <span class="nx">templateRawHex</span><span class="p">,</span> <span class="nx">variationsArray</span><span class="p">):</span> <span class="kr">string</span>
+</code></pre></div></div>
+
+<p><code class="language-plaintext highlighter-rouge">templateRawHex</code> must be the last valid rawHex from a hardware GET_PATCH or file load — it supplies the preserved sections.</p>
+
+<p>For prf2, <code class="language-plaintext highlighter-rouge">serializePerformance</code> resets the written-section tracking at each SEPARATOR boundary so all 4 slots’ sections are independently updated.</p>
+
+<hr />
+
+<h2 id="10-usb-binary-vs-pch2">10. USB Binary vs PCH2</h2>
+
+<p>The raw binary returned by the USB <code class="language-plaintext highlighter-rouge">GET_PATCH</code> command is not identical to the <code class="language-plaintext highlighter-rouge">.pch2</code> file format. The conversion (<code class="language-plaintext highlighter-rouge">patch_usb_to_pch2</code>) slices two ranges from the USB bulk data:</p>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>pch2 = usb[0x03..0x14]   (18 bytes)
+     + usb[0x17..end-2]  (remaining, excluding 2-byte USB CRC)
+</code></pre></div></div>
+
+<p>See <code class="language-plaintext highlighter-rouge">usb.md §9</code> for the exact formula and the upload (<code class="language-plaintext highlighter-rouge">SET_PATCH</code>) wire format.</p>

@@ -1,3 +1,9 @@
+---
+title: USB Protocol
+parent: Technical Reference
+nav_order: 3
+---
+
 # Nord G2 USB Protocol
 
 Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/defs.h`, `cli/src/utils.c`, confirmed against the Delphi editor and cross-checked with the g2ools Python tool.
