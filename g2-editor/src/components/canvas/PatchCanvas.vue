@@ -96,7 +96,7 @@
 	});
 
 	const emit = defineEmits<{
-		paramChange: [moduleIndex: number, paramIndex: number, value: number];
+		paramChange: [moduleIndex: number, paramIndex: number, value: number, immediate?: boolean];
 		modeChange: [moduleIndex: number, index: number, value: number];
 		jackDragStart: [
 			info: {
@@ -172,8 +172,8 @@
 		return map;
 	});
 
-	function onParamChange(moduleIndex: number, paramIndex: number, value: number) {
-		emit('paramChange', moduleIndex, paramIndex, value);
+	function onParamChange(moduleIndex: number, paramIndex: number, value: number, immediate?: boolean) {
+		emit('paramChange', moduleIndex, paramIndex, value, immediate);
 	}
 
 	function onModeChange(moduleIndex: number, index: number, value: number) {

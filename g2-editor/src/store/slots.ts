@@ -571,7 +571,7 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
+		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx', immediate = false): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
@@ -584,7 +584,12 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			entry.rawHex = null;
 
-			scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)]);
+			const cmd = ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)];
+			if (immediate) {
+				window.cli.run(cmd).catch((err: unknown) => console.error('setParam failed:', err));
+			} else {
+				scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, cmd);
+			}
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {

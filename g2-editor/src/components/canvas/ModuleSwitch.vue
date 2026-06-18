@@ -95,7 +95,7 @@
 	}>();
 
 	const emit = defineEmits<{
-		change: [index: number, value: number];
+		change: [index: number, value: number, immediate?: boolean];
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
@@ -125,7 +125,7 @@
 		toRef(props, 'value'),
 		computed(() => props.label),
 		toRef(props, 'paramIndex'),
-		(index, value) => emit('change', index, value),
+		(index, value) => emit('change', index, value, true),
 		(info) => emit('paramLabelEdit', info),
 	);
 </script>

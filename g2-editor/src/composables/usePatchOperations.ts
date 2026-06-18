@@ -40,9 +40,9 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
 	}
 
-	async function handleParamChange(moduleIndex: number, paramIndex: number, value: number): Promise<void> {
+	async function handleParamChange(moduleIndex: number, paramIndex: number, value: number, immediate = false): Promise<void> {
 		try {
-			await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, getArea());
+			await slotsStore.setParam(moduleIndex, paramIndex, value, uiStore.variation, getArea(), immediate);
 		} catch {
 			/* G2 may be temporarily busy */
 		}
