@@ -36,18 +36,25 @@ export type { SlotLabel };
 
 const BATCH_CHUNK = 128;
 
-const _paramDebounceTimers = new Map<string, ReturnType<typeof setTimeout>>();
+const _paramInFlight = new Set<string>();
+const _paramPending = new Map<string, string[]>();
 
-function scheduleSend(key: string, cmd: string[], delayMs = 80): void {
-	const existing = _paramDebounceTimers.get(key);
-	if (existing) clearTimeout(existing);
-	_paramDebounceTimers.set(
-		key,
-		setTimeout(() => {
-			_paramDebounceTimers.delete(key);
-			window.cli.run(cmd).catch((err: unknown) => console.error('scheduleSend failed:', err));
-		}, delayMs),
-	);
+function sendCoalesced(key: string, cmd: string[]): void {
+	if (_paramInFlight.has(key)) {
+		_paramPending.set(key, cmd);
+		return;
+	}
+	_paramInFlight.add(key);
+	window.cli.run(cmd)
+		.catch((err: unknown) => console.error('setParam failed:', err))
+		.finally(() => {
+			_paramInFlight.delete(key);
+			const pending = _paramPending.get(key);
+			if (pending) {
+				_paramPending.delete(key);
+				sendCoalesced(key, pending);
+			}
+		});
 }
 
 interface SlotEntry {
@@ -588,7 +595,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (immediate) {
 				window.cli.run(cmd).catch((err: unknown) => console.error('setParam failed:', err));
 			} else {
-				scheduleSend(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, cmd);
+				sendCoalesced(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, cmd);
 			}
 		},
 
@@ -843,9 +850,8 @@ export const useSlotsStore = defineStore('slots', {
 			else patch.morphModes[morphIdx] = value;
 			entry.rawHex = null;
 			const param = field === 'dial' ? morphIdx : 8 + morphIdx;
-			const delay = field === 'dial' ? 16 : 0;
-			scheduleSend(`${slot}:patch:1:${param}:${variation}`,
-				['set-param', slot, 'patch', '1', String(param), String(value), String(variation)], delay);
+			sendCoalesced(`${slot}:patch:1:${param}:${variation}`,
+				['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
@@ -875,7 +881,7 @@ export const useSlotsStore = defineStore('slots', {
 					break;
 				}
 			}
-			scheduleSend(`${slot}:patch:${section}:${local}:${variation}`,
+			sendCoalesced(`${slot}:patch:${section}:${local}:${variation}`,
 				['set-param', slot, 'patch', String(section), String(local), String(value), String(variation)]);
 		},
 
