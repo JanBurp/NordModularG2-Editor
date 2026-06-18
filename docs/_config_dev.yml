@@ -1,0 +1,3 @@
+# Local development override — overrides _config.yml for local Jekyll serve
+# Use: bundle exec jekyll serve --config _config.yml,_config_dev.yml
+theme: just-the-docs

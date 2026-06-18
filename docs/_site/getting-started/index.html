@@ -1,0 +1,77 @@
+<h1 id="getting-started">Getting Started</h1>
+
+<h2 id="system-requirements">System Requirements</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Minimum OS</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>macOS (Apple Silicon &amp; Intel)</td>
+      <td>macOS 11 (Big Sur)</td>
+    </tr>
+    <tr>
+      <td>Windows</td>
+      <td>Windows 10 (64-bit)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="download">Download</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Platform</th>
+      <th>Editor</th>
+      <th>CLI (optional)</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>macOS Apple Silicon (M1/M2/M3/M4)</td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-arm64.dmg">G2-Editor-arm64.dmg</a></td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-arm64">g2-cli-macos-arm64</a></td>
+    </tr>
+    <tr>
+      <td>macOS Intel</td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-x64.dmg">G2-Editor-x64.dmg</a></td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-x64">g2-cli-macos-x64</a></td>
+    </tr>
+    <tr>
+      <td>Windows</td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-Setup.exe">G2-Editor-Setup.exe</a></td>
+      <td><a href="https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-windows-x64.exe">g2-cli-windows-x64.exe</a></td>
+    </tr>
+  </tbody>
+</table>
+
+<blockquote>
+  <p>The CLI is optional — most users only need the editor app. See <a href="../technical/cli-commands">Technical Reference</a> for CLI details.</p>
+</blockquote>
+
+<h2 id="install-macos">Install: macOS</h2>
+
+<ol>
+  <li>Open the <code class="language-plaintext highlighter-rouge">.dmg</code> and drag <strong>G2 Editor</strong> to your Applications folder.</li>
+  <li>On first launch macOS may block the app because it is not notarized:
+    <ul>
+      <li><strong>“unidentified developer”</strong>: Right-click the app icon → <strong>Open</strong> → confirm.</li>
+      <li><strong>“damaged and can’t be opened”</strong>: open Terminal and run:
+        <div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>xattr -cr /Applications/G2\ Editor.app
+</code></pre></div>        </div>
+        <p>Then launch the app normally.</p>
+      </li>
+    </ul>
+  </li>
+</ol>
+
+<h2 id="install-windows">Install: Windows</h2>
+
+<p>Run the <code class="language-plaintext highlighter-rouge">.exe</code> installer and follow the steps.</p>
+
+<p>Windows requires a USB driver for the G2. If the app reports a USB driver problem, see <a href="windows-driver">Windows USB Driver</a>.</p>

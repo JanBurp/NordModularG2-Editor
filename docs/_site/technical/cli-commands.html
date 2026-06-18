@@ -1,0 +1,395 @@
+<h1 id="cli-commands">CLI Commands</h1>
+
+<p>The <code class="language-plaintext highlighter-rouge">g2-cli</code> tool handles all USB communication with the G2 hardware. All G2 responses go to stdout as JSON; all commands are sent via stdin.</p>
+
+<h2 id="connection">Connection</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">connect</code></td>
+      <td> </td>
+      <td>Connect to G2</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">disconnect</code></td>
+      <td> </td>
+      <td>Close connection</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">startup</code></td>
+      <td> </td>
+      <td>Full startup (init + device + all slots + names)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">device</code></td>
+      <td> </td>
+      <td>Show device info</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">list-devices</code></td>
+      <td> </td>
+      <td>List USB devices (debug)</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="patches--performances">Patches &amp; Performances</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">get-patch</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt;</code></td>
+      <td>Get patch from slot as JSON</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">get-patch-file</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; [file]</code></td>
+      <td>Save patch as .pch2 file</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">get-perf-file</code></td>
+      <td><code class="language-plaintext highlighter-rouge">[file]</code></td>
+      <td>Save current performance as .prf2 file</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">upload-patch</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;filepath&gt;</code></td>
+      <td>Upload .pch2 to slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">upload-perf</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;filepath&gt;</code></td>
+      <td>Upload .prf2 performance</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">select-patch</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;bank&gt; &lt;loc&gt;</code></td>
+      <td>Load bank patch into slot (bank 1–32, loc 1–127)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">select-perf</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;bank&gt; &lt;loc&gt;</code></td>
+      <td>Load bank performance</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">list</code></td>
+      <td><code class="language-plaintext highlighter-rouge">[type] [bank &lt;n&gt;]</code></td>
+      <td>List patches/performances (optionally filter by type or bank)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">get-perf-settings</code></td>
+      <td> </td>
+      <td>Get current performance settings</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-perf-mode</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;patch\|performance&gt;</code></td>
+      <td>Switch between patch and performance mode</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-perf-name</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;name&gt;</code></td>
+      <td>Set performance name</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-patch-name</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;name&gt;</code></td>
+      <td>Set patch name</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-patch-description</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;hexdata&gt;</code></td>
+      <td>Set patch description (hex-encoded)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-synth-settings</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;json&gt;</code></td>
+      <td>Set all synth settings from JSON</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="slots">Slots</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">slot</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;A\|B\|C\|D&gt;</code></td>
+      <td>Change active slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">variation</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;1–8&gt; [slot]</code></td>
+      <td>Select variation for slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-slot-enabled</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;0\|1&gt;</code></td>
+      <td>Enable/disable a slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-slot-key</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;0\|1&gt;</code></td>
+      <td>Assign/unassign keyboard to slot</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-slot-hold</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;0\|1&gt;</code></td>
+      <td>Set slot hold mode</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-slot-range</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;lower&gt; &lt;upper&gt;</code></td>
+      <td>Set note range for slot (0–127)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-range-enable</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;0\|1&gt;</code></td>
+      <td>Enable/disable slot range</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="voice">Voice</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">voice-mode</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;0–3&gt;</code></td>
+      <td>Set voice mode (0=poly 1=mono 2=legato 3=slgt)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">voice-count</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;1–32&gt;</code></td>
+      <td>Set voice count</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="clock">Clock</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-master-clock-run</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;0\|1&gt;</code></td>
+      <td>Start/stop master clock</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-master-clock-bpm</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;30–240&gt;</code></td>
+      <td>Set master clock BPM</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="modules">Modules</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">add-module</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;type-id&gt; &lt;module-id&gt; &lt;col&gt; &lt;row&gt; &lt;color&gt; &lt;num-modes&gt; [modes] &lt;num-params&gt; [params] &lt;name&gt;</code></td>
+      <td>Add module to patch</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">del-module</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt;</code></td>
+      <td>Delete module (delete cables first)</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">move-module</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt; &lt;col&gt; &lt;row&gt;</code></td>
+      <td>Move module to grid position</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-module-color</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt; &lt;color:0–24&gt;</code></td>
+      <td>Set module color</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-module-name</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt; &lt;name&gt;</code></td>
+      <td>Set module label</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-module-mode</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt; &lt;param-idx&gt; &lt;value&gt;</code></td>
+      <td>Set module mode parameter</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="cables">Cables</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">add-cable</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;color:0–6&gt; &lt;from-mod&gt; &lt;0\|1&gt; &lt;from-con&gt; &lt;to-mod&gt; &lt;0\|1&gt; &lt;to-con&gt;</code></td>
+      <td>Add cable between jacks</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">del-cable</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;from-mod&gt; &lt;0\|1&gt; &lt;from-con&gt; &lt;to-mod&gt; &lt;0\|1&gt; &lt;to-con&gt;</code></td>
+      <td>Delete cable</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-cable-color</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;color:0–6&gt; &lt;from-mod&gt; &lt;0\|1&gt; &lt;from-con&gt; &lt;to-mod&gt; &lt;0\|1&gt; &lt;to-con&gt;</code></td>
+      <td>Set cable color</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="parameters">Parameters</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-param</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx\|patch&gt; &lt;module-id&gt; &lt;param-idx&gt; &lt;value&gt; &lt;variation&gt;</code></td>
+      <td>Set module parameter value</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">set-param-label</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt; &lt;va\|fx&gt; &lt;module-id&gt; &lt;param-idx&gt; &lt;label-idx&gt; &lt;label&gt;</code></td>
+      <td>Set parameter label</td>
+    </tr>
+  </tbody>
+</table>
+
+<h2 id="resources--daemon">Resources &amp; Daemon</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Command</th>
+      <th>Arguments</th>
+      <th>Description</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">get-resources</code></td>
+      <td><code class="language-plaintext highlighter-rouge">&lt;slot&gt;</code></td>
+      <td>Get CPU/memory resource usage</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">daemon</code></td>
+      <td> </td>
+      <td>Persistent: watch events + accept JSON commands on stdin</td>
+    </tr>
+    <tr>
+      <td><code class="language-plaintext highlighter-rouge">seq</code></td>
+      <td><code class="language-plaintext highlighter-rouge">"&lt;cmd1&gt;" "&lt;cmd2&gt;" ...</code></td>
+      <td>Run multiple commands sequentially</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="daemon-mode">Daemon Mode</h2>
+
+<p>The daemon maintains a persistent connection: it streams watch events to stdout and accepts JSON commands on stdin.</p>
+
+<h3 id="recommended-tmux-launcher">Recommended: tmux launcher</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd </span>cli
+./g2tmux.sh
+</code></pre></div></div>
+
+<p>Opens a split-pane tmux session — left pane: daemon output; right pane: command shell with autocomplete.</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>slot A                  <span class="c"># switch focus to slot A</span>
+get-patch A             <span class="c"># read patch from slot A</span>
+variation 4 B           <span class="c"># select variation 4 on slot B</span>
+verbose off             <span class="c"># suppress LED/volume updates</span>
+set-perf-mode patch     <span class="c"># switch to patch mode</span>
+stop                    <span class="c"># kill daemon</span>
+start                   <span class="c"># restart daemon</span>
+</code></pre></div></div>
+
+<p>Type command name + <code class="language-plaintext highlighter-rouge">TAB</code> to autocomplete. Arguments also autocomplete: <code class="language-plaintext highlighter-rouge">get-patch &lt;TAB&gt;</code> → <code class="language-plaintext highlighter-rouge">A B C D</code>.</p>
+
+<h3 id="manual-daemon-mode">Manual daemon mode</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="c"># Terminal 1 — start daemon reading from a named pipe</span>
+<span class="nb">mkfifo</span> /tmp/g2-cmd
+./build/bin/g2-cli daemon &lt; /tmp/g2-cmd
+
+<span class="c"># Terminal 2 — keep the pipe open and send commands</span>
+<span class="nb">exec </span>3&gt;/tmp/g2-cmd
+<span class="nb">echo</span> <span class="s1">'{"id":1,"cmd":"slot","args":["B"]}'</span> <span class="o">&gt;</span>&amp;3
+<span class="nb">echo</span> <span class="s1">'{"id":2,"cmd":"variation","args":["4","B"]}'</span> <span class="o">&gt;</span>&amp;3
+<span class="nb">echo</span> <span class="s1">'{"id":3,"cmd":"device"}'</span> <span class="o">&gt;</span>&amp;3
+<span class="nb">echo</span> <span class="s1">'{"id":5,"cmd":"verbose","args":["off"]}'</span> <span class="o">&gt;</span>&amp;3
+<span class="nb">exec </span>3&gt;&amp;-   <span class="c"># close when done (causes daemon to exit cleanly)</span>
+</code></pre></div></div>
+
+<h3 id="monitoring">Monitoring</h3>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code>g2-cli watch     <span class="c"># monitor G2 messages (one-shot)</span>
+g2-cli daemon    <span class="c"># persistent: watch (stdout) + commands on stdin</span>
+</code></pre></div></div>

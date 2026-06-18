@@ -34,7 +34,8 @@ Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + Ty
 - `cli/` — C CLI tool for USB communication with the Nord G2 hardware
 - `g2-editor/` — Electron desktop app (Vue 3 + TypeScript)
 - `test-patches/` — Sample `.pch2` patch files for testing
-- `doc/` — Documentation and help
+- `doc/` — Module help files (used by in-app help system)
+- `docs/` — GitHub Pages documentation (Just-the-Docs Jekyll site)
 
 ## Commands
 

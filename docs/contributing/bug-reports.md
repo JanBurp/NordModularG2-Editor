@@ -1,12 +1,18 @@
-# Testing Guidelines
+---
+title: Bug Reports
+parent: Contributing
+nav_order: 1
+---
 
-First of all: thank you for testing! Your feedback is invaluable for improving the editor.
+# Bug Reports
 
-## How to report an issue
+Thank you for testing! Your feedback is invaluable for improving the editor.
+
+## How to Report an Issue
 
 Please file issues in the [GitHub issue tracker](https://github.com/janburp/NordModularG2-Editor/issues).
 
-When filing an issue, include as much information as possible:
+When filing an issue, include:
 
 - **What you did** — step-by-step instructions to reproduce the problem
 - **What you expected** — what should have happened
@@ -16,19 +22,19 @@ When filing an issue, include as much information as possible:
 
 The more detail you provide, the better. If I cannot replicate the issue, I cannot investigate or fix it.
 
-## Tips for good bug reports
+## Tips for Good Bug Reports
 
-- Try to find the **minimal steps** to reproduce — the simpler, the better
+- Find the **minimal steps** to reproduce — simpler is better
 - Check if the issue is already reported before filing a new one
 - One issue per report — don't combine multiple problems in one ticket
 
-## Viewing the console log
+## Viewing the Console Log
 
 The editor logs USB traffic, connection status, and commands to the DevTools console. Including this output in a bug report is very helpful.
 
 **To open the console:**
-- From the menu: **View → Toggle DevTools** (or press `Cmd+Shift+I` on Mac, `Ctrl+Shift+I` on Windows/Linux)
-- Click the **Console** tab in the panel that opens
+- Menu: **View → Toggle DevTools** (or `Cmd+Shift+I` on Mac, `Ctrl+Shift+I` on Windows/Linux)
+- Click the **Console** tab
 
 **To save the log:**
 1. Right-click anywhere inside the console panel

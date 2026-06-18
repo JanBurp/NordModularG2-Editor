@@ -1,0 +1,59 @@
+<h1 id="development-setup">Development Setup</h1>
+
+<h2 id="tech-stack">Tech Stack</h2>
+
+<ul>
+  <li><strong>CLI</strong> (<code class="language-plaintext highlighter-rouge">cli/</code>) — C tool handling all USB communication with the G2 hardware. Outputs JSON to stdout; accepts JSON commands on stdin.</li>
+  <li><strong>Electron app</strong> (<code class="language-plaintext highlighter-rouge">g2-editor/</code>) — Vue 3 + TypeScript desktop app. Communicates with the G2 through the CLI daemon.</li>
+</ul>
+
+<h2 id="prerequisites">Prerequisites</h2>
+
+<ul>
+  <li><strong>macOS</strong>: <code class="language-plaintext highlighter-rouge">brew install libusb</code></li>
+  <li><strong>Windows</strong>: handled via the release build script (MinGW cross-compile)</li>
+</ul>
+
+<h2 id="building-the-cli">Building the CLI</h2>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd </span>cli
+make                    <span class="c"># build</span>
+make <span class="nb">test</span>               <span class="c"># run all tests</span>
+make test-unit          <span class="c"># unit tests (no G2 needed)</span>
+make test-integration   <span class="c"># integration tests (needs connected G2)</span>
+</code></pre></div></div>
+
+<h2 id="building-the-electron-app">Building the Electron App</h2>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd </span>g2-editor
+npm <span class="nb">install
+cd</span> ../cli <span class="o">&amp;&amp;</span> make <span class="o">&amp;&amp;</span> <span class="nb">cd</span> ../g2-editor   <span class="c"># rebuild CLI first</span>
+npm run postinstall                     <span class="c"># copies CLI binary into app resources</span>
+npm run dev                             <span class="c"># development server</span>
+npm run build                           <span class="c"># production build + package</span>
+npm <span class="nb">test</span>                                <span class="c"># Vitest unit tests</span>
+</code></pre></div></div>
+
+<h2 id="development-environment">Development Environment</h2>
+
+<h3 id="my-setup">My Setup</h3>
+
+<p><img src="../screenshots/development-setup.jpg" alt="Development setup" /></p>
+
+<p>Developed on M1 Apple Silicon, macOS 15.7.3, with an expanded Nord Modular G2.</p>
+
+<h3 id="daemon-development-tmux">Daemon Development (tmux)</h3>
+
+<p>For interactive daemon testing, use the tmux launcher (requires <a href="https://github.com/tmux/tmux/wiki/Installing">tmux</a>):</p>
+
+<div class="language-bash highlighter-rouge"><div class="highlight"><pre class="highlight"><code><span class="nb">cd </span>cli
+./g2tmux.sh
+</code></pre></div></div>
+
+<p>This opens a split-pane tmux session:</p>
+<ul>
+  <li><strong>Left pane</strong>: daemon output (watch events, responses)</li>
+  <li><strong>Right pane</strong>: command shell with autocomplete</li>
+</ul>
+
+<p>See <a href="cli-commands">CLI Commands</a> for available commands.</p>

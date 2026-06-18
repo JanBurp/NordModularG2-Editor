@@ -1,0 +1,21 @@
+<h1 id="technical-reference">Technical Reference</h1>
+
+<p>Documentation for developers working on or with the Nord Modular G2 Editor.</p>
+
+<h2 id="sections">Sections</h2>
+
+<ul>
+  <li><a href="development-setup">Development Setup</a> — build instructions for CLI and Electron app</li>
+  <li><a href="cli-commands">CLI Commands</a> — full reference for the <code class="language-plaintext highlighter-rouge">g2-cli</code> command-line tool</li>
+  <li><a href="usb-protocol">USB Protocol</a> — USB framing, commands, watch events, daemon architecture</li>
+  <li><a href="patch-format">Patch File Format</a> — PCH2/PRF2 binary format, sections, bit encoding</li>
+</ul>
+
+<h2 id="repository-structure">Repository Structure</h2>
+
+<div class="language-plaintext highlighter-rouge"><div class="highlight"><pre class="highlight"><code>cli/             C CLI tool for USB communication with the G2 hardware
+g2-editor/       Electron desktop app (Vue 3 + TypeScript)
+test-patches/    Sample .pch2 files for testing
+doc/             Module help files (used by the in-app help system)
+docs/            This documentation site
+</code></pre></div></div>

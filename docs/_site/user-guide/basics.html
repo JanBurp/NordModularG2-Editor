@@ -1,0 +1,181 @@
+<h1 id="basics">Basics</h1>
+
+<h2 id="file-operations">File Operations</h2>
+
+<table>
+  <thead>
+    <tr>
+      <th>Action</th>
+      <th>How</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>New patch</td>
+      <td><code class="language-plaintext highlighter-rouge">Cmd+N</code></td>
+    </tr>
+    <tr>
+      <td>New performance</td>
+      <td>File menu → New Performance</td>
+    </tr>
+    <tr>
+      <td>Open file</td>
+      <td><code class="language-plaintext highlighter-rouge">Cmd+O</code></td>
+    </tr>
+    <tr>
+      <td>Save</td>
+      <td><code class="language-plaintext highlighter-rouge">Cmd+S</code></td>
+    </tr>
+    <tr>
+      <td>Save As</td>
+      <td><code class="language-plaintext highlighter-rouge">Cmd+Shift+S</code></td>
+    </tr>
+    <tr>
+      <td>Save all slots</td>
+      <td>File menu → Save All</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="patch-settings-toolbar">Patch Settings (toolbar)</h2>
+
+<ul>
+  <li><strong>Patch name</strong> — click to rename</li>
+  <li><strong>Category</strong> — dropdown to set sound category</li>
+  <li><strong>Voice mode</strong> — mono / legato / poly</li>
+  <li><strong>Voice count</strong> — number of voices</li>
+  <li><strong>Variations 1–8</strong> — click to switch variation</li>
+  <li><strong>Level</strong> — master patch volume (knob)</li>
+  <li><strong>Active/Monitor</strong> — toggle patch monitoring</li>
+</ul>
+
+<hr />
+
+<h2 id="slots-a--b--c--d">Slots (A / B / C / D)</h2>
+
+<ul>
+  <li>Click a slot button to make it active</li>
+  <li>Top indicator: keyboard status; bottom indicator: active status</li>
+  <li><code class="language-plaintext highlighter-rouge">Shift+click</code> — toggle slot active; <code class="language-plaintext highlighter-rouge">Ctrl+click</code> — toggle slot keyboard</li>
+</ul>
+
+<hr />
+
+<h2 id="performance-mode">Performance Mode</h2>
+
+<p>Click <strong>Perf</strong> in the toolbar to switch between patch and performance mode.</p>
+
+<ul>
+  <li><strong>Performance name</strong> — click to rename (max 16 chars)</li>
+  <li><strong>BPM</strong> — click to set tempo (30–240)</li>
+  <li><strong>Run</strong> — toggle master clock</li>
+</ul>
+
+<p>Per-slot configuration is in the <strong>Settings pane → Performance Settings</strong>:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Column</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>Active</td>
+      <td>Slot plays audio</td>
+    </tr>
+    <tr>
+      <td>Key</td>
+      <td>Slot receives MIDI</td>
+    </tr>
+    <tr>
+      <td>Hold</td>
+      <td>Slot holds notes when not key-active</td>
+    </tr>
+    <tr>
+      <td>Range</td>
+      <td>MIDI note range (0–127) for this slot</td>
+    </tr>
+  </tbody>
+</table>
+
+<hr />
+
+<h2 id="settings-pane-cmd">Settings Pane (<code class="language-plaintext highlighter-rouge">Cmd+,</code>)</h2>
+
+<h3 id="editor-settings">Editor Settings</h3>
+<ul>
+  <li><strong>Disk path</strong> — default folder for the patch browser</li>
+  <li><strong>Hidden modules</strong> — show/hide hidden (not recognised by Clavia editor) modules in patch browser</li>
+</ul>
+
+<h3 id="synth-settings-requires-g2-connected">Synth Settings (requires G2 connected)</h3>
+<ul>
+  <li><strong>Synth name</strong></li>
+  <li><strong>MIDI channels</strong> — per slot (A/B/C/D) and global</li>
+</ul>
+
+<h3 id="patch-settings">Patch Settings</h3>
+<ul>
+  <li><strong>Arpeggiator</strong> — on/off, Time, Mode, Octaves</li>
+  <li><strong>Vibrato</strong> — Source, Rate</li>
+  <li><strong>Glide</strong> — Type, Time</li>
+  <li><strong>Bend</strong> — on/off, Semitones</li>
+  <li><strong>Octave Shift</strong> — −2 to +2</li>
+</ul>
+
+<hr />
+
+<h2 id="patch-browser-cmdb">Patch Browser (<code class="language-plaintext highlighter-rouge">Cmd+B</code>)</h2>
+
+<h3 id="disk-tab">Disk Tab</h3>
+<ul>
+  <li><code class="language-plaintext highlighter-rouge">↑</code> — navigate to parent folder</li>
+  <li><code class="language-plaintext highlighter-rouge">…</code> — open system folder picker</li>
+  <li><strong>Search</strong> — filter files (Esc to clear)</li>
+  <li>Click folder — navigate into it</li>
+  <li>Click <code class="language-plaintext highlighter-rouge">.pch2</code> / <code class="language-plaintext highlighter-rouge">.prf2</code> — load file</li>
+</ul>
+
+<h3 id="synth-tab-g2-connected">Synth Tab (G2 connected)</h3>
+<ul>
+  <li>Browse patches and performances stored in the G2</li>
+  <li>Click bank header to expand/collapse</li>
+  <li>Click entry to load</li>
+</ul>
+
+<hr />
+
+<h2 id="resource-monitor">Resource Monitor</h2>
+
+<p>The toolbar shows real-time CPU and memory usage from the connected G2:</p>
+
+<table>
+  <thead>
+    <tr>
+      <th>Indicator</th>
+      <th>Meaning</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td>VA cycles</td>
+      <td>Voice-area DSP load</td>
+    </tr>
+    <tr>
+      <td>VA mem</td>
+      <td>Voice-area RAM usage</td>
+    </tr>
+    <tr>
+      <td>FX cycles</td>
+      <td>FX-area DSP load</td>
+    </tr>
+    <tr>
+      <td>FX mem</td>
+      <td>FX-area internal memory</td>
+    </tr>
+  </tbody>
+</table>
