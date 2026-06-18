@@ -200,7 +200,7 @@
 	}>();
 
 	const emit = defineEmits<{
-		paramChange: [moduleIndex: number, paramIndex: number, value: number];
+		paramChange: [moduleIndex: number, paramIndex: number, value: number, immediate?: boolean];
 		modeChange: [moduleIndex: number, index: number, value: number];
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd: [info: JackDragInfo];
@@ -318,7 +318,7 @@
 		instance,
 		moduleDef,
 		props.areaLabel ?? 'fx',
-		(moduleIndex, paramIndex, value) => emit('paramChange', moduleIndex, paramIndex, value),
+		(moduleIndex, paramIndex, value, immediate) => emit('paramChange', moduleIndex, paramIndex, value, immediate),
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
 

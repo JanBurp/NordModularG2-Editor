@@ -10,7 +10,7 @@ export function useModuleParams(
 	instance: ComputedRef<ModuleInstance>,
 	moduleDef: ComputedRef<ModuleDefinition | null>,
 	areaLabel: 'fx' | 'va',
-	emitParamChange: (moduleIndex: number, paramIndex: number, value: number) => void,
+	emitParamChange: (moduleIndex: number, paramIndex: number, value: number, immediate?: boolean) => void,
 	emitModeChange: (moduleIndex: number, index: number, value: number) => void,
 ) {
 	const slotsStore = useSlotsStore();
@@ -47,7 +47,7 @@ export function useModuleParams(
 		return instance.value.paramLabels[idx];
 	}
 
-	function onParamChange(paramIndex: number, value: number) {
+	function onParamChange(paramIndex: number, value: number, immediate?: boolean) {
 		const param = moduleDef.value?.params?.[paramIndex];
 		if (param) {
 			const p = getParam(param.type);
@@ -55,7 +55,7 @@ export function useModuleParams(
 				value = clamp(value, p.low, p.high);
 			}
 		}
-		emitParamChange(instance.value.index || 0, paramIndex, value);
+		emitParamChange(instance.value.index || 0, paramIndex, value, immediate);
 	}
 
 	function getModeValue(index: number): number {
