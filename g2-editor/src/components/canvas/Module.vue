@@ -259,7 +259,7 @@
 
 	const visualElementsGroupedLeds = computed(() => {
 		if (!moduleDef.value?.ve) return [];
-		const entries: { ve: any; groupId: number; key: string }[] = [];
+		const entries: { ve: any; key: string }[] = [];
 		let ledIdx = 0;
 		let ledArrayIdx = 0;
 		let vuIdx = 0;
@@ -267,19 +267,19 @@
 		let veIdx = 0;
 		for (const ve of moduleDef.value.ve) {
 			if (ve.type === 'led') {
-				entries.push({ ve, groupId: ledIdx, key: `led-${ledIdx}` });
+				entries.push({ ve, key: `led-${ledIdx}` });
 				ledIdx++;
 			} else if (ve.type === 'ledArray') {
-				entries.push({ ve, groupId: ledArrayIdx, key: `ledArray-${ledArrayIdx}` });
+				entries.push({ ve, key: `ledArray-${ledArrayIdx}` });
 				ledArrayIdx++;
 			} else if (ve.type === 'vu') {
-				entries.push({ ve, groupId: vuIdx, key: `vu-${vuIdx}` });
+				entries.push({ ve, key: `vu-${vuIdx}` });
 				vuIdx++;
 			} else if (ve.type === 'ledGroup') {
-				entries.push({ ve, groupId: ledGroupIdx, key: `ledGroup-${ledGroupIdx}` });
+				entries.push({ ve, key: `ledGroup-${ledGroupIdx}` });
 				ledGroupIdx++;
 			} else {
-				entries.push({ ve, groupId: 0, key: `ve-${veIdx}` });
+				entries.push({ ve, key: `ve-${veIdx}` });
 				veIdx++;
 			}
 		}
@@ -294,8 +294,8 @@
 		for (const entry of visualElementsGroupedLeds.value) {
 			if (entry.ve.type === 'led' || entry.ve.type === 'ledArray' || entry.ve.type === 'vu' || entry.ve.type === 'ledGroup') {
 				map[entry.key] = {
-					on: ledStore.getLedState(area, idx, entry.groupId),
-					step: ledStore.getStripValue(area, idx, entry.groupId),
+					on: ledStore.getLedState(area, idx, entry.key),
+					step: ledStore.getStripValue(area, idx, entry.key),
 				};
 			}
 		}
