@@ -10,7 +10,7 @@
 					<strong class="text-white">WinUSB</strong>, and click <strong class="text-white">Replace Driver</strong>. Then click Retry. NOTE: This will
 					replace Clavia's USB Driver.
 				</p>
-				<p v-else class="text-sm text-neutral-300 leading-relaxed">
+				<div v-else class="text-sm text-neutral-300 leading-relaxed">
 					The G2 was found on USB but its interface could not be claimed. Possible solutions:
 					<ul class="list-disc pl-4">
 					<li>G2 is claimed by another application. Quit other app and retry.</li>
@@ -18,7 +18,7 @@
 					<li>Restart your Mac to reset the USB subsystem.</li>
 					</ul>
 
-				</p>
+				</div>
 				<div class="flex justify-end">
 					<button
 						class="px-3 py-1 text-xs border border-neutral-500 rounded bg-gray-300 text-gray-800 hover:bg-gray-200 cursor-pointer"
