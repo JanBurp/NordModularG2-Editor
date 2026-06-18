@@ -36,16 +36,10 @@
 
 		<ToolBarDivider />
 		<Button variant="default" size="small" :disabled="!canUndo" @click="slotsStore.undo()" title="Undo (⌘Z)">
-			<svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M3 9a5.5 5.5 0 1 0 1.5-3.5"/>
-				<polyline points="1,3 3,6 6,4"/>
-			</svg>
+			<Icon name="undo" class="w-3.5 h-3.5" />
 		</Button>
 		<Button variant="default" size="small" :disabled="!canRedo" @click="slotsStore.redo()" title="Redo (⇧⌘Z)">
-			<svg viewBox="0 0 16 16" class="w-3.5 h-3.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-				<path d="M13 9a5.5 5.5 0 1 1-1.5-3.5"/>
-				<polyline points="15,3 13,6 10,4"/>
-			</svg>
+			<Icon name="redo" class="w-3.5 h-3.5" />
 		</Button>
 	</ToolBar>
 </template>
@@ -63,6 +57,7 @@
 	import ColorPicker from '../common/ColorPicker.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
 	import Button from './Button.vue';
+	import Icon from '../common/Icon.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useHistoryStore } from '../../store/history';
 	import { useUiStore } from '../../store/ui';
