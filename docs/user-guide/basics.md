@@ -25,7 +25,10 @@ nav_order: 1
 - **Category** — dropdown to set sound category
 - **Voice mode** — mono / legato / poly
 - **Voice count** — number of voices
-- **Variations 1–8** — click to switch variation
+- **Variations 1–8 / Init** — click to switch variation
+  - **Right-click** any variation button to copy its parameters to another variation or to Init
+  - Non-Init variations also offer **Set to Init** (overwrites this variation with Init parameters)
+  - **Drag** a variation button onto another to copy (asks for confirmation)
 - **Level** — master patch volume (knob)
 - **Active/Monitor** — toggle patch monitoring
 

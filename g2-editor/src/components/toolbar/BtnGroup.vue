@@ -13,8 +13,13 @@
 			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
 			class="btn-group-item"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
+			:draggable="draggable ? 'true' : undefined"
 			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
+			@dragstart.stop="draggable && emit('btn-dragstart', option.value)"
+			@dragover.prevent
+			@drop.prevent.stop="draggable && emit('btn-drop', option.value)"
+			@contextmenu.prevent.stop="emit('btn-contextmenu', option.value, $event)"
 		>
 			{{ option.label }}
 		</Button>
@@ -35,6 +40,7 @@
 		topIndicators?: boolean[];
 		bottomIndicators?: boolean[];
 		testIdPrefix?: string;
+		draggable?: boolean;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
@@ -44,6 +50,7 @@
 		topIndicators: () => [],
 		bottomIndicators: () => [],
 		testIdPrefix: undefined,
+		draggable: false,
 	});
 
 	const emit = defineEmits<{
@@ -51,6 +58,9 @@
 		'toggle-off': [value: string | number];
 		'shift-click': [value: string | number];
 		'ctrl-click': [value: string | number];
+		'btn-dragstart': [value: string | number];
+		'btn-drop': [value: string | number];
+		'btn-contextmenu': [value: string | number, event: MouseEvent];
 	}>();
 
 	const normalizedOptions = computed(() => {

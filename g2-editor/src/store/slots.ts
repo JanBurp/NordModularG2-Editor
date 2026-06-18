@@ -58,6 +58,63 @@ function sendCoalesced(key: string, cmd: string[]): void {
 		});
 }
 
+function deepCloneVariationState(v: VariationState): VariationState {
+	return {
+		fx: Object.fromEntries(Object.entries(v.fx).map(([k, arr]) => [k, [...arr]])),
+		voice: Object.fromEntries(Object.entries(v.voice).map(([k, arr]) => [k, [...arr]])),
+		patch: { ...v.patch, morphDials: [...v.patch.morphDials], morphModes: [...v.patch.morphModes] },
+	};
+}
+
+function buildVariationHardwareCmds(slot: SlotLabel, variations: VariationState[], varIdx: number): string[][] {
+	const vState = variations[varIdx];
+	const cmds: string[][] = [];
+	const v = String(varIdx);
+
+	for (const [moduleId, params] of Object.entries(vState.fx)) {
+		for (let p = 0; p < params.length; p++) {
+			cmds.push(['set-param', slot, 'fx', moduleId, String(p), String(params[p]), v]);
+		}
+	}
+	for (const [moduleId, params] of Object.entries(vState.voice)) {
+		for (let p = 0; p < params.length; p++) {
+			cmds.push(['set-param', slot, 'va', moduleId, String(p), String(params[p]), v]);
+		}
+	}
+
+	for (let i = 0; i < 8; i++) {
+		cmds.push(['set-param', slot, 'patch', '1', String(i), String(vState.patch.morphDials[i] ?? 0), v]);
+		cmds.push(['set-param', slot, 'patch', '1', String(8 + i), String(vState.patch.morphModes[i] ?? 0), v]);
+	}
+
+	const SECTION_STARTS = [
+		{ section: 2, start: 0 },
+		{ section: 3, start: 2 },
+		{ section: 4, start: 4 },
+		{ section: 5, start: 6 },
+		{ section: 6, start: 9 },
+		{ section: 7, start: 13 },
+		{ section: 8, start: 15 },
+	];
+	const patch = vState.patch as unknown as Record<string, number>;
+	for (let pi = 0; pi < PATCH_PARAM_KEYS.length; pi++) {
+		const key = PATCH_PARAM_KEYS[pi];
+		const value = patch[key as string] ?? 0;
+		let section = SECTION_STARTS[SECTION_STARTS.length - 1].section;
+		let local = pi - SECTION_STARTS[SECTION_STARTS.length - 1].start;
+		for (let si = 0; si < SECTION_STARTS.length - 1; si++) {
+			if (pi >= SECTION_STARTS[si].start && pi < SECTION_STARTS[si + 1].start) {
+				section = SECTION_STARTS[si].section;
+				local = pi - SECTION_STARTS[si].start;
+				break;
+			}
+		}
+		cmds.push(['set-param', slot, 'patch', String(section), String(local), String(value), v]);
+	}
+
+	return cmds;
+}
+
 interface SlotEntry {
 	name: string;
 	loading: boolean;
@@ -221,6 +278,40 @@ export const useSlotsStore = defineStore('slots', {
 			const active = useUiStore().slotInFocus;
 			if (!active) return;
 			await window.cli.run(['variation', String(variation + 1), active]);
+		},
+
+		async copyVariation(fromVar: number, toVar: number): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot } = ctx;
+			const slotEntry = this.slots[slot];
+			if (!slotEntry.variations) return;
+
+			const prevState = deepCloneVariationState(slotEntry.variations[toVar]);
+			const newState = deepCloneVariationState(slotEntry.variations[fromVar]);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						slotEntry.variations![toVar] = deepCloneVariationState(prevState);
+						slotEntry.rawHex = null;
+						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
+						if (cmds.length > 0) await window.cli.runBatch(cmds);
+					},
+					redo: async () => {
+						slotEntry.variations![toVar] = deepCloneVariationState(newState);
+						slotEntry.rawHex = null;
+						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
+						if (cmds.length > 0) await window.cli.runBatch(cmds);
+					},
+				});
+			}
+
+			slotEntry.variations[toVar] = newState;
+			slotEntry.rawHex = null;
+			const cmds = buildVariationHardwareCmds(slot, slotEntry.variations, toVar);
+			if (cmds.length > 0) await window.cli.runBatch(cmds);
 		},
 
 		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
