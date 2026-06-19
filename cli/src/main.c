@@ -480,7 +480,9 @@ static int cmd_copy_variation(int argc, char **argv, int i) {
     int slot     = parse_slot(argv[i + 1]);
     if (slot == SLOT_INVALID) { fprintf(stderr, "copy-variation: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
     int from_var = atoi(argv[i + 2]);
+    if (from_var < 0 || from_var > 8) { fprintf(stderr, "copy-variation: from must be 0-8\n"); return 1; }
     int to_var   = atoi(argv[i + 3]);
+    if (to_var < 0 || to_var > 8)     { fprintf(stderr, "copy-variation: to must be 0-8\n");   return 1; }
     return g2_copy_variation(slot, from_var, to_var);
 }
 

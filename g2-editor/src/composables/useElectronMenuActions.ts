@@ -1,7 +1,7 @@
-import { EMPTY_PATCH_HEX, SLOT_LABELS } from '@/constants';
+import type { ComputedRef } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 
-import type { ComputedRef } from 'vue';
+import { EMPTY_PATCH_HEX, SLOT_LABELS } from '@/constants';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';

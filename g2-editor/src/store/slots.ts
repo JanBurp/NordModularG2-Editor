@@ -58,10 +58,21 @@ function sendCoalesced(key: string, cmd: string[]): void {
 		});
 }
 
+const SECTION_STARTS = [
+	{ section: 2, start: 0 },
+	{ section: 3, start: 2 },
+	{ section: 4, start: 4 },
+	{ section: 5, start: 6 },
+	{ section: 6, start: 9 },
+	{ section: 7, start: 13 },
+	{ section: 8, start: 15 },
+];
+
 function deepCloneVariationState(v: VariationState): VariationState {
 	return {
 		fx: Object.fromEntries(Object.entries(v.fx).map(([k, arr]) => [k, [...arr]])),
 		voice: Object.fromEntries(Object.entries(v.voice).map(([k, arr]) => [k, [...arr]])),
+		// PatchParamVariation has only two array fields; shallow spread handles the rest
 		patch: { ...v.patch, morphDials: [...v.patch.morphDials], morphModes: [...v.patch.morphModes] },
 	};
 }
@@ -87,15 +98,6 @@ function buildVariationHardwareCmds(slot: SlotLabel, variations: VariationState[
 		cmds.push(['set-param', slot, 'patch', '1', String(8 + i), String(vState.patch.morphModes[i] ?? 0), v]);
 	}
 
-	const SECTION_STARTS = [
-		{ section: 2, start: 0 },
-		{ section: 3, start: 2 },
-		{ section: 4, start: 4 },
-		{ section: 5, start: 6 },
-		{ section: 6, start: 9 },
-		{ section: 7, start: 13 },
-		{ section: 8, start: 15 },
-	];
 	const patch = vState.patch as unknown as Record<string, number>;
 	for (let pi = 0; pi < PATCH_PARAM_KEYS.length; pi++) {
 		const key = PATCH_PARAM_KEYS[pi];
@@ -878,8 +880,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `param:${area}:${moduleId}:${paramIdx}:${variation}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { await this.setParam(moduleId, paramIdx, box.initial as number, variation, area); },
-					redo: async () => { await this.setParam(moduleId, paramIdx, box.latest as number, variation, area); },
+					undo: async () => { await this.setParam(moduleId, paramIdx, box.initial, variation, area); },
+					redo: async () => { await this.setParam(moduleId, paramIdx, box.latest, variation, area); },
 				}, cKey, box);
 			}
 
@@ -910,8 +912,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `mode:${area}:${moduleId}:${modeIdx}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { await this.setMode(moduleId, modeIdx, box.initial as number, variation, area); },
-					redo: async () => { await this.setMode(moduleId, modeIdx, box.latest as number, variation, area); },
+					undo: async () => { await this.setMode(moduleId, modeIdx, box.initial, variation, area); },
+					redo: async () => { await this.setMode(moduleId, modeIdx, box.latest, variation, area); },
 				}, cKey, box);
 			}
 
@@ -1265,8 +1267,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `morph:${variation}:${morphIdx}:${field}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: () => { this.setMorphParam(variation, morphIdx, field, box.initial as number); return Promise.resolve(); },
-					redo: () => { this.setMorphParam(variation, morphIdx, field, box.latest as number); return Promise.resolve(); },
+					undo: () => { this.setMorphParam(variation, morphIdx, field, box.initial); return Promise.resolve(); },
+					redo: () => { this.setMorphParam(variation, morphIdx, field, box.latest); return Promise.resolve(); },
 				}, cKey, box);
 			}
 
@@ -1289,8 +1291,8 @@ export const useSlotsStore = defineStore('slots', {
 				const cKey = `patchparam:${variation}:${key}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(slot, {
-					undo: async () => { await this.setPatchParam(variation, key, box.initial as number); },
-					redo: async () => { await this.setPatchParam(variation, key, box.latest as number); },
+					undo: async () => { await this.setPatchParam(variation, key, box.initial); },
+					redo: async () => { await this.setPatchParam(variation, key, box.latest); },
 				}, cKey, box);
 			}
 
@@ -1301,15 +1303,6 @@ export const useSlotsStore = defineStore('slots', {
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
 			// Convert global index to section + local index (inverse of SECTION_OFFSETS in useSlotEvents.ts)
-			const SECTION_STARTS = [
-				{ section: 2, start: 0 },
-				{ section: 3, start: 2 },
-				{ section: 4, start: 4 },
-				{ section: 5, start: 6 },
-				{ section: 6, start: 9 },
-				{ section: 7, start: 13 },
-				{ section: 8, start: 15 },
-			];
 			let section = 2, local = paramIdx;
 			for (let i = 0; i < SECTION_STARTS.length - 1; i++) {
 				if (paramIdx >= SECTION_STARTS[i].start && paramIdx < SECTION_STARTS[i + 1].start) {

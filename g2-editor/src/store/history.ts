@@ -8,7 +8,7 @@ export interface HistoryEntry {
 
 interface CoalesceState {
 	entry: HistoryEntry;
-	box: { initial: unknown; latest: unknown };
+	box: { initial: number; latest: number };
 	timer: ReturnType<typeof setTimeout> | null;
 }
 
@@ -49,7 +49,7 @@ export const useHistoryStore = defineStore('history', {
 			this.slots[slot].locked = false;
 		},
 
-		record(slot: SlotLabel, entry: HistoryEntry, coalesceKey?: string, box?: { initial: unknown; latest: unknown }): void {
+		record(slot: SlotLabel, entry: HistoryEntry, coalesceKey?: string, box?: { initial: number; latest: number }): void {
 			const h = this.slots[slot];
 			if (coalesceKey) {
 				const existing = h.coalescing.get(coalesceKey);
@@ -61,7 +61,7 @@ export const useHistoryStore = defineStore('history', {
 				}
 				h.coalescing.set(coalesceKey, {
 					entry,
-					box: box ?? { initial: undefined, latest: undefined },
+					box: box ?? { initial: 0, latest: 0 },
 					timer: setTimeout(() => h.coalescing.delete(coalesceKey), COALESCE_MS),
 				});
 			}
