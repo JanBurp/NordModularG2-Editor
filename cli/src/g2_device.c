@@ -1860,6 +1860,24 @@ cleanup:
     return result;
 }
 
+int g2_copy_variation(int slot, int from_var, int to_var) {
+    if (slot < 0 || slot > 3)         { g2_err("copy-variation: invalid slot\n");     return G2_ERR_INVALID_PARAM; }
+    if (from_var < 0 || from_var > 8) { g2_err("copy-variation: from must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
+    if (to_var < 0 || to_var > 8)     { g2_err("copy-variation: to must be 0-8\n");   return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0)      { g2_err("copy-variation: not connected\n");    return G2_ERR_CONNECT; }
+
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[2] = { (uint8_t)from_var, (uint8_t)to_var };
+    if (send_slot(slot, version, 0x44, payload, 2) < 0) {
+        g2_err("copy-variation: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;

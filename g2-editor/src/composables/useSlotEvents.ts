@@ -37,6 +37,11 @@ export function useSlotEvents(log: LogFn) {
 			}
 			return true;
 		}
+		if (ev.type === 'copy_variation') {
+			slotsStore.handleCopyVariationEvent(ev.slot as SlotLabel, ev.from as number, ev.to as number);
+			log('←', 'Watch', `copy_variation slot=${ev.slot} from=${ev.from} to=${ev.to}`);
+			return true;
+		}
 		if (ev.type === 'variation_change') {
 			const sl = ev.slot as SlotLabel;
 			if (sl) hardwareVariationChange.value = { slot: sl, variation: ev.variation as number };

@@ -70,6 +70,7 @@ static void print_usage(const char *prog) {
     printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
+    printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
     printf("  voice-count <slot> <1-32>                                                                 Set voice count [calls get-patch, use in tmux only]\n");
@@ -471,6 +472,18 @@ static int cmd_set_module_mode(int argc, char **argv, int i) {
     return g2_set_module_mode(slot, location, module_id, param, val);
 }
 
+static int cmd_copy_variation(int argc, char **argv, int i) {
+    if (i + 3 >= argc) {
+        fprintf(stderr, "Usage: copy-variation <slot> <from:0-8> <to:0-8>\n");
+        return 1;
+    }
+    int slot     = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "copy-variation: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int from_var = atoi(argv[i + 2]);
+    int to_var   = atoi(argv[i + 3]);
+    return g2_copy_variation(slot, from_var, to_var);
+}
+
 static int cmd_set_param(int argc, char **argv, int i) {
     if (i + 6 >= argc) {
         fprintf(stderr, "Usage: set-param <slot> <va|fx|patch> <module-id> <param-idx> <value> <variation>\n");
@@ -713,6 +726,7 @@ static const cmd_entry_t commands[] = {
     { "set-param-label",  cmd_set_param_label  },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },
+    { "copy-variation",   cmd_copy_variation   },
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },
     { "upload-patch",     cmd_upload_patch     },

@@ -331,7 +331,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
 | `0x42` | SET_PARAM_LABEL | `loc mod_id param_idx label_idx label` | Embedded ACK |
 | `0x43` | SET_MORPH_RANGE *(not implemented yet)* | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
-| `0x44` | COPY_VARIATION *(not implemented yet)* | `from to` | Embedded ACK |
+| `0x44` | COPY_VARIATION | `from to` | Embedded ACK (also broadcast as `copy_variation` watch event to all listeners) |
 | `0x4C` | GET_PARAMS *(not implemented yet)* | `location` | Extended bulk |
 | `0x4F` | GET_PARAM_NAMES *(not implemented yet)* | `location` | Extended bulk |
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |

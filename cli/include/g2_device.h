@@ -213,6 +213,7 @@ int g2_set_master_clock_bpm(int bpm);
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
+int g2_copy_variation(int slot, int from_var, int to_var);
 
 /* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.

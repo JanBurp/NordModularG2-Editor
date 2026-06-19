@@ -185,6 +185,7 @@ export const useSlotsStore = defineStore('slots', {
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
 		uploadingFromFile: false,
+		pendingCopyVariation: {} as Record<string, number>,
 	}),
 
 	getters: {
@@ -308,10 +309,24 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 
+			const key = `${slot}:${fromVar}:${toVar}`;
+			this.pendingCopyVariation[key] = (this.pendingCopyVariation[key] ?? 0) + 1;
 			slotEntry.variations[toVar] = newState;
 			slotEntry.rawHex = null;
-			const cmds = buildVariationHardwareCmds(slot, slotEntry.variations, toVar);
-			if (cmds.length > 0) await window.cli.runBatch(cmds);
+			await window.cli.run(['copy-variation', slot, String(fromVar), String(toVar)]);
+		},
+
+		handleCopyVariationEvent(slot: SlotLabel, fromVar: number, toVar: number) {
+			const key = `${slot}:${fromVar}:${toVar}`;
+			if ((this.pendingCopyVariation[key] ?? 0) > 0) {
+				this.pendingCopyVariation[key]--;
+				if (this.pendingCopyVariation[key] === 0) delete this.pendingCopyVariation[key];
+				return;
+			}
+			const slotEntry = this.slots[slot];
+			if (!slotEntry.variations) return;
+			slotEntry.variations[toVar] = deepCloneVariationState(slotEntry.variations[fromVar]);
+			slotEntry.rawHex = null;
 		},
 
 		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {

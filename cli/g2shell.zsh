@@ -16,7 +16,7 @@ _G2_CMDS=(
   get-perf-settings set-slot-enabled set-slot-key
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
-  set-param set-param-label
+  set-param set-param-label copy-variation
   verbose
 )
 
@@ -54,6 +54,12 @@ _g2_complete() {
       case $CURRENT in
         2) compadd A B C D ;;
         3) compadd va fx ;;
+      esac
+      ;;
+    copy-variation)
+      case $CURRENT in
+        2) compadd A B C D ;;
+        3|4) compadd 0 1 2 3 4 5 6 7 8 ;;
       esac
       ;;
     variation)
