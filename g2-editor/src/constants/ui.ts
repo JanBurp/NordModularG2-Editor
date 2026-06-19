@@ -18,6 +18,7 @@ export const PANE_TAB_OPTIONS = [
 	{ label: 'Modules', value: 'modules' },
 	{ label: 'Browser', value: 'browser' },
 	{ label: 'Settings', value: 'settings' },
+	{ label: 'Midi CC', value: 'midicc' },
 ];
 
 export const AREA_OPTIONS = [

@@ -2,13 +2,13 @@
  * prf2 file is very similar but contains extra section type 0x11 at beginning which contains slot names and slot data
  */
 
-import type { Area, Cable, Patch, PatchDescription, PatchParamVariation } from '../types/patch';
+import type { Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
 import { SectionType } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 
-export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation };
+export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment };
 
 class G2Area implements Area {
 	name: string;
@@ -36,6 +36,7 @@ class G2Parser {
 	private bitbuf: number[] = [];
 	private patchParamsData: PatchParamVariation[][] = [];
 	private pd: (PatchDescription | null)[] = [];
+	private controllersData: MidiCCAssignment[] = [];
 	readonly data: ArrayBuffer;
 	ofs = 0;
 
@@ -51,6 +52,7 @@ class G2Parser {
 			[SectionType.CABLE_LIST]: ['Cable List', (d) => this.parseCableList(d)],
 			[SectionType.PARAMETERS]: ['Parameters', (d) => this.parseModuleParameters(d)],
 			[SectionType.PARAM_NAMES]: ['Param Names', (d) => this.parseParamNames(d)],
+			[SectionType.CONTROLLERS]: ['Controllers', (d) => this.parseControllers(d)],
 		};
 
 		const hdr = new Uint8Array(data, 0, 320);
@@ -405,6 +407,21 @@ class G2Parser {
 
 	getSlotMeta() { return this.slotMeta; }
 
+	getControllers(): MidiCCAssignment[] { return this.controllersData; }
+
+	private parseControllers(data: Uint8Array): void {
+		const count = this.getBits(7, data);
+		const list: MidiCCAssignment[] = [];
+		for (let i = 0; i < count; i++) {
+			const cc = this.getBits(7);
+			const location = this.getBits(2) as 0 | 1 | 2;
+			const moduleIndex = this.getBits(8);
+			const paramIndex = this.getBits(7);
+			list.push({ cc, location, moduleIndex, paramIndex });
+		}
+		this.controllersData = list;
+	}
+
 	private parsePatchDesc(data: Uint8Array): void {
 		const description_attrs: Record<string, number> = {
 			voices: 5,
@@ -463,22 +480,26 @@ export class PatchParser {
 	}
 
 	parse(): Patch {
+		const controllers = this.patcher.getControllers();
 		return {
 			areas: [this.patcher.getArea(0), this.patcher.getArea(1)],
 			description: this.patcher.getpd(0) ?? undefined,
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
+			controllers: controllers.length > 0 ? controllers : undefined,
 		};
 	}
 
 	parsePrf2(): { slotNames: string[]; patches: Patch[]; slotMeta: ReturnType<G2Parser['getSlotMeta']> } | null {
 		const slotNames = this.patcher.isPrf2();
 		if (slotNames.length === 0) return null;
+		const controllers = this.patcher.getControllers();
 		return {
 			slotNames,
 			patches: [0, 1, 2, 3].map((slot) => ({
 				areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
 				description: this.patcher.getpd(slot) ?? undefined,
 				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
+				controllers: controllers.length > 0 ? controllers : undefined,
 			})),
 			slotMeta: this.patcher.getSlotMeta(),
 		};

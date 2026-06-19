@@ -6,7 +6,7 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 
-export type PaneTab = 'modules' | 'browser' | 'settings' | '';
+export type PaneTab = 'modules' | 'browser' | 'settings' | 'midicc' | '';
 
 function defaultSlotAreaState(): SlotAreaState {
 	return { areaMode: 1, dividerPos: 50, lastNonSplitArea: 1 };

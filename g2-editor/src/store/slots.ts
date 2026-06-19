@@ -1,4 +1,4 @@
-import type { ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
+import type { MidiCCAssignment, ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
@@ -127,6 +127,7 @@ interface SlotEntry {
 	variations: VariationState[] | null; // 9 elements (0-8); null when no patch loaded
 	resources: SlotResources;
 	assignedVoices: number;
+	controllers: MidiCCAssignment[];
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -148,6 +149,7 @@ export const useSlotsStore = defineStore('slots', {
 				variations: null,
 				resources: emptySlotResources(),
 				assignedVoices: 0,
+				controllers: [],
 			},
 			B: {
 				name: '',
@@ -159,6 +161,7 @@ export const useSlotsStore = defineStore('slots', {
 				variations: null,
 				resources: emptySlotResources(),
 				assignedVoices: 0,
+				controllers: [],
 			},
 			C: {
 				name: '',
@@ -170,6 +173,7 @@ export const useSlotsStore = defineStore('slots', {
 				variations: null,
 				resources: emptySlotResources(),
 				assignedVoices: 0,
+				controllers: [],
 			},
 			D: {
 				name: '',
@@ -181,6 +185,7 @@ export const useSlotsStore = defineStore('slots', {
 				variations: null,
 				resources: emptySlotResources(),
 				assignedVoices: 0,
+				controllers: [],
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
@@ -239,6 +244,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].rawHex = rawHex;
 			this.slots[slot].templateRawHex = rawHex;
 			this.slots[slot].patch = patch;
+			this.slots[slot].controllers = patch.controllers ? [...patch.controllers] : [];
 			this.slots[slot].variations = extractVariations(patch);
 			patch.mode = {
 				area: 1,
@@ -1619,6 +1625,44 @@ export const useSlotsStore = defineStore('slots', {
 				// TODO: push entry back onto stack on failure so it isn't silently lost
 			} finally {
 				hist.unlock(slot);
+			}
+		},
+
+		async assignMidiCC(slot: SlotLabel, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number, cc: number): Promise<void> {
+			const locStr = location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
+			this.slots[slot].controllers = [
+				...this.slots[slot].controllers.filter((c) => c.cc !== cc),
+				{ cc, location, moduleIndex, paramIndex },
+			];
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected)
+				await window.cli.run(['assign-midicc', slot, locStr, String(moduleIndex), String(paramIndex), String(cc)]);
+		},
+
+		async deassignMidiCC(slot: SlotLabel, cc: number): Promise<void> {
+			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => c.cc !== cc);
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected)
+				await window.cli.run(['deassign-midicc', slot, String(cc)]);
+		},
+
+		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
+			const ccs = this.slots[slot].controllers.map((c) => c.cc);
+			this.slots[slot].controllers = [];
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected)
+				await Promise.all(ccs.map((cc) => window.cli.run(['deassign-midicc', slot, String(cc)])));
+		},
+
+		async autoAssignMidiCC(slot: SlotLabel, targets: { location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[]): Promise<void> {
+			const RESERVED = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97]);
+			const usedCCs = new Set(this.slots[slot].controllers.map((c) => c.cc));
+			for (const t of targets) {
+				let cc = 2;
+				while (cc <= 119 && (usedCCs.has(cc) || RESERVED.has(cc))) cc++;
+				if (cc > 119) break;
+				usedCCs.add(cc);
+				await this.assignMidiCC(slot, t.location, t.moduleIndex, t.paramIndex, cc);
 			}
 		},
 	},

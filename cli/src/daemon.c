@@ -416,6 +416,17 @@ static void execute_cmd(const char *line) {
 		else ret = g2_set_param(slot, loc, arg_i(args, 2), arg_i(args, 3),
 		                   arg_i(args, 4), arg_i(args, 5));
 
+	} else if (strcmp(cmd, "assign-midicc") == 0 && n >= 5) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_assign_midicc(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+
+	} else if (strcmp(cmd, "deassign-midicc") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_deassign_midicc(slot, arg_i(args, 1));
+
 	} else if (strcmp(cmd, "copy-variation") == 0 && n >= 3) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;

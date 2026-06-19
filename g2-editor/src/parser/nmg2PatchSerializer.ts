@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState } from '@/types';
+import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment } from '@/types';
 import { SectionType } from './constants';
 
 // CRC-16 lookup table (same polynomial as parser)
@@ -264,13 +264,26 @@ function buildRawHex(sections: Uint8Array[]): string {
 	return bytesToHex(result);
 }
 
+function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
+	const bw = new BitWriter();
+	bw.write(7, controllers.length);
+	for (const c of controllers) {
+		bw.write(7, c.cc);
+		bw.write(2, c.location);
+		bw.write(8, c.moduleIndex);
+		bw.write(7, c.paramIndex);
+	}
+	return makeSection(SectionType.CONTROLLERS, bw.flush());
+}
+
 // Tracks which area sections have already been written (prevents duplicates within one slot).
 interface WrittenSets {
 	m4a: Set<number>; m52: Set<number>; m4d: Set<number>; m5a: Set<number>; m5b: Set<number>;
+	m60: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set() };
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false };
 }
 
 /**
@@ -321,6 +334,10 @@ function processSection(
 	} else if (type === SectionType.PATCH_DESC) {
 		const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
 		out.push(makeSection(SectionType.PATCH_DESC, newData));
+	} else if (type === SectionType.CONTROLLERS && !w.m60) {
+		const controllers = patch.controllers ?? [];
+		if (controllers.length > 0) out.push(writeControllers(controllers));
+		w.m60 = true;
 	} else {
 		// Preserve verbatim: text pad (SEPARATOR), perf data (PERF_DATA), unknown sections
 		out.push(verbatim);
@@ -350,6 +367,9 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patch, out, w, variations);
 		ofs += 3 + siz;
 	}
+	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
+		out.push(writeControllers(patch.controllers));
+	}
 	return buildRawHex(out);
 }
 
@@ -370,6 +390,10 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
 		if (type === SectionType.SEPARATOR) {
+			const patch = patches[slotIdx] ?? patches[0];
+			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
+				out.push(writeControllers(patch.controllers));
+			}
 			out.push(template.slice(ofs, ofs + 3 + siz));
 			// Advance to next slot when more data follows
 			if (ofs + 3 + siz < sectionDataLen) { slotIdx++; w = newWrittenSets(); }
@@ -377,6 +401,10 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w, variationsArray[slotIdx] ?? []);
 		}
 		ofs += 3 + siz;
+	}
+	const lastPatch = patches[slotIdx] ?? patches[0];
+	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
+		out.push(writeControllers(lastPatch.controllers));
 	}
 	return buildRawHex(out);
 }

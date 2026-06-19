@@ -97,11 +97,19 @@ export interface VariationState {
 	patch: PatchParamVariation;
 }
 
+export interface MidiCCAssignment {
+	cc: number; // 0–119
+	location: 0 | 1 | 2; // 0=FX, 1=Voice, 2=Patch (incl. morphs)
+	moduleIndex: number;
+	paramIndex: number;
+}
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
 	mode?: { area: 0 | 1; variation: number };
 	patchParams?: PatchParamVariation[];
+	controllers?: MidiCCAssignment[];
 }
 
 export interface ClipboardEntry {

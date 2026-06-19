@@ -30,6 +30,7 @@ export const useDeviceStore = defineStore('device', {
 		status: DeviceStatus.Disconnected,
 		device: null as Device | null,
 		modeChanging: false,
+		lastMidiCC: null as number | null,
 	}),
 
 	getters: {

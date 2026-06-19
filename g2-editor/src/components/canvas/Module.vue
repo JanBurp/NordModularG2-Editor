@@ -120,6 +120,31 @@
 			</template>
 		</g>
 
+		<!-- F8 CC badge overlay: shows CC number on params when F8 is held -->
+		<template v-if="showCCOverlay">
+			<template v-for="(param, index) in moduleDef.params" :key="`cc-${param.name}`">
+				<template v-if="getParamCC(index) !== null">
+					<rect
+						:x="param.x - 1"
+						:y="param.y - 10"
+						:width="30"
+						height="9"
+						fill="#1a1a2e"
+						rx="1"
+						pointer-events="none"
+					/>
+					<text
+						:x="param.x"
+						:y="param.y - 3"
+						fill="#f0c040"
+						font-size="7"
+						font-weight="bold"
+						pointer-events="none"
+					>CC:{{ getParamCC(index) }}</text>
+				</template>
+			</template>
+		</template>
+
 		<!-- Input jacks -->
 		<ModuleJack
 			v-for="(input, idx) in moduleDef.inputs"
@@ -190,6 +215,9 @@
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
+	import { useSlotsStore } from '../../store/slots';
+	import { useDeviceStore } from '../../store/device';
+	import { useMidiCCOverlay, ccLabel, getAllowedCCs } from '../../composables/useMidiCC';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -323,14 +351,51 @@
 	);
 
 	const uiStore = useUiStore();
+	const slotsStore = useSlotsStore();
+	const deviceStore = useDeviceStore();
+	const { showCCOverlay } = useMidiCCOverlay();
+
 	const selectedParamIndex = computed(() => {
 		if (uiStore.selectedModulesArea !== props.areaLabel) return -1;
 		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
 	});
 
+	const ccAssignments = computed(() => {
+		const slot = uiStore.slotInFocus;
+		if (!slot) return [];
+		return slotsStore.slots[slot].controllers;
+	});
+
+	function getParamCC(paramIndex: number): number | null {
+		const location = props.areaLabel === 'va' ? 1 : 0;
+		const found = ccAssignments.value.find(
+			(c) => c.location === location && c.moduleIndex === moduleIdx.value && c.paramIndex === paramIndex,
+		);
+		return found ? found.cc : null;
+	}
+
 	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
 		const param = moduleDef.value?.params?.[paramIndex];
+		const slot = uiStore.slotInFocus;
+		const location = props.areaLabel === 'va' ? 1 : 0;
 		const items: any[] = [];
+
+		// MIDI CC items
+		const lastCC = deviceStore.lastMidiCC;
+		items.push({
+			label: lastCC !== null ? `Assign CC (${lastCC})` : 'Assign CC (none)',
+			disabled: lastCC === null || !slot,
+			action: () => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, lastCC!),
+		});
+		items.push({
+			label: 'Assign CC…',
+			children: getAllowedCCs().map((cc) => ({
+				label: ccLabel(cc),
+				action: () => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
+			})),
+		});
+		items.push({ type: 'separator' });
+
 		if (param && isSwitch(param.n)) {
 			if (getParam(param.type)?.canLabel) {
 				const label = getParamLabel(paramIndex);

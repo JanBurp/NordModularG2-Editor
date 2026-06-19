@@ -70,6 +70,8 @@ static void print_usage(const char *prog) {
     printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
+    printf("  assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>                      Assign a MIDI CC number to a parameter\n");
+    printf("  deassign-midicc <slot> <cc-num>                                                          Remove a MIDI CC assignment\n");
     printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
@@ -501,6 +503,31 @@ static int cmd_set_param(int argc, char **argv, int i) {
     return g2_set_param(slot, location, mod_id, param, val, var);
 }
 
+static int cmd_assign_midicc(int argc, char **argv, int i) {
+    if (i + 5 >= argc) {
+        fprintf(stderr, "Usage: assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>\n");
+        return 1;
+    }
+    int slot     = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "assign-midicc: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location = parse_location_str(argv[i + 2]);
+    int mod_id   = atoi(argv[i + 3]);
+    int param    = atoi(argv[i + 4]);
+    int cc_num   = atoi(argv[i + 5]);
+    return g2_assign_midicc(slot, location, mod_id, param, cc_num);
+}
+
+static int cmd_deassign_midicc(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: deassign-midicc <slot> <cc-num>\n");
+        return 1;
+    }
+    int slot   = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "deassign-midicc: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int cc_num = atoi(argv[i + 2]);
+    return g2_deassign_midicc(slot, cc_num);
+}
+
 static int cmd_get_perf_settings(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
     cJSON *synth = query_synth_settings(NULL);
@@ -725,6 +752,8 @@ static const cmd_entry_t commands[] = {
     { "add-module",       cmd_add_module       },
     { "set-module-color", cmd_set_module_color },
     { "set-module-name",  cmd_set_module_name  },
+    { "assign-midicc",    cmd_assign_midicc    },
+    { "deassign-midicc",  cmd_deassign_midicc  },
     { "set-param-label",  cmd_set_param_label  },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },

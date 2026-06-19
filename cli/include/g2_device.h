@@ -215,6 +215,10 @@ int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
 int g2_copy_variation(int slot, int from_var, int to_var);
 
+/* MIDI CC assignment commands */
+int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int cc_num);
+int g2_deassign_midicc(int slot, int cc_num);
+
 /* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
  * Invalidated on version_update all-slots event. */

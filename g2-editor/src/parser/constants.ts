@@ -5,6 +5,7 @@ export const SectionType = {
 	PARAMETERS: 0x4d,
 	PARAM_NAMES: 0x5b,
 	MODULE_NAMES: 0x5a,
+	CONTROLLERS: 0x60,
 	SEPARATOR: 0x6f,
 	PERF_DATA: 0x11,
 } as const;

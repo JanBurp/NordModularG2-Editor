@@ -1913,6 +1913,68 @@ int g2_set_param(int slot, int location, int module_id,
     /* No recv_interrupt — WRITE_NO_RESP */
 }
 
+int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int cc_num) {
+    if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 2)   return G2_ERR_INVALID_PARAM;
+    if (cc_num < 0 || cc_num > 119)     return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)        return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = 0x22; /* S_ASSIGN_MIDICC */
+    buff[pos++] = (uint8_t)location;
+    buff[pos++] = (uint8_t)module_id;
+    buff[pos++] = (uint8_t)param_idx;
+    buff[pos++] = (uint8_t)cc_num;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+}
+
+int g2_deassign_midicc(int slot, int cc_num) {
+    if (slot < 0 || slot > 3)       return G2_ERR_INVALID_PARAM;
+    if (cc_num < 0 || cc_num > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)    return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = 0x23; /* S_DEASSIGN_MIDICC */
+    buff[pos++] = (uint8_t)cc_num;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+}
+
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
  * plain JSON array matching the "data" field of the resources_used watch event:
  * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).

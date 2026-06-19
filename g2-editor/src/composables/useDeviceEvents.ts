@@ -86,6 +86,11 @@ export function useDeviceEvents(log: LogFn) {
 			store.updatePerfSettings(parsed.data ?? parsed);
 			return true;
 		}
+		if (ev.type === 'midi_cc') {
+			store.lastMidiCC = ev.cc;
+			log('←', 'Watch', `midi_cc=${ev.cc}`);
+			return true;
+		}
 		return false;
 	}
 
