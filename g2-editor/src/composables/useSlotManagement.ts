@@ -9,6 +9,7 @@ import { SLOT_LABELS } from '@/constants';
 export function useSlotManagement(
 	hardwareSlotChange: Ref<SlotLabel | null>,
 	hardwareVariationChange: Ref<{ slot: SlotLabel; variation: number } | null>,
+	requestKeyFocus: (slot: SlotLabel, previouslyKeyed: SlotLabel[]) => void,
 ) {
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -25,18 +26,23 @@ export function useSlotManagement(
 		const slot = SLOT_LABELS[idx];
 
 		const slots = device.device?.slots;
+		let previouslyKeyed: SlotLabel[] = [];
+		let needsKeyChange = false;
 		if (slots) {
 			const activeCount = slots.filter((s) => s.active).length;
 			const target = slots.find((s) => s.slot === slot);
 
 			if (activeCount > 1 && !target?.active) return;
 
+			needsKeyChange = !target?.key;
+			if (needsKeyChange) previouslyKeyed = slots.filter((s) => s.key && s.slot !== slot).map((s) => s.slot);
+
 			if (activeCount <= 1) {
 				slots.forEach((s) => {
 					s.active = s.slot === slot;
 					s.key = s.slot === slot;
 				});
-			} else if (!target?.key) {
+			} else if (needsKeyChange) {
 				slots.forEach((s) => {
 					s.key = s.slot === slot;
 				});
@@ -46,7 +52,10 @@ export function useSlotManagement(
 		uiStore.setSlotInFocus(slot);
 		const patch = slotsStore.slots[slot]?.patch;
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
-		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.selectSlot(slot));
+		if (device.status === DeviceStatus.Connected) {
+			applySlotResult(await slotsStore.selectSlot(slot));
+			if (needsKeyChange) requestKeyFocus(slot, previouslyKeyed);
+		}
 	}
 
 	function handleSlotShiftClick(value: string | number): void {
