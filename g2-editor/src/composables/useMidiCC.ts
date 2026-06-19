@@ -4,24 +4,19 @@ import type { MidiCCAssignment } from '@/types';
 const RESERVED_CC = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97, 120, 121, 122, 123, 124, 125, 126, 127]);
 
 const CC_NAMES: Record<number, string> = {
-	1: 'Modwheel',
 	2: 'Breath',
 	4: 'Foot',
 	5: 'Port.Time',
 	6: 'Data Entry',
-	7: 'Volume',
 	8: 'Balance',
 	10: 'Pan',
-	11: 'Expression',
 	12: 'Effect 1',
 	13: 'Effect 2',
-	64: 'Sustain',
 	65: 'Portamento',
 	66: 'Sostenuto',
 	67: 'Soft Pedal',
 	68: 'Legato',
 	69: 'Hold 2',
-	70: 'Variation',
 	71: 'Timbre',
 	72: 'Release',
 	73: 'Attack',
@@ -32,8 +27,6 @@ const CC_NAMES: Record<number, string> = {
 	93: 'FX3 Depth',
 	94: 'FX4 Depth',
 	95: 'FX5 Depth',
-	96: 'Data Inc',
-	97: 'Data Dec',
 };
 
 export function isAllowedCC(n: number): boolean {

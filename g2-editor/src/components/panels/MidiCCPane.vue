@@ -31,15 +31,14 @@
 				<thead class="sticky top-0 bg-neutral-800 text-neutral-400">
 					<tr>
 						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-10">CC</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-20">Name</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-14">Area</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-12">Mod</th>
+						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-16">Name</th>
+						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-20">Module</th>
 						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700">Param</th>
 					</tr>
 				</thead>
 				<tbody>
 					<tr v-if="controllers.length === 0">
-						<td colspan="5" class="text-center text-neutral-500 py-4">No CC assignments</td>
+						<td colspan="4" class="text-center text-neutral-500 py-4">No CC assignments</td>
 					</tr>
 					<tr
 						v-for="c in sortedControllers"
@@ -57,9 +56,8 @@
 					>
 						<td class="px-2 py-0.5">{{ c.cc }}</td>
 						<td class="px-2 py-0.5 text-neutral-400">{{ ccShortName(c.cc) }}</td>
-						<td class="px-2 py-0.5">{{ locationLabel(c.location) }}</td>
-						<td class="px-2 py-0.5">{{ c.moduleIndex }}</td>
-						<td class="px-2 py-0.5">{{ c.paramIndex }}</td>
+						<td class="px-2 py-0.5">{{ getModuleName(c) }}</td>
+						<td class="px-2 py-0.5">{{ getParamName(c) }}</td>
 					</tr>
 				</tbody>
 			</table>
@@ -79,6 +77,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useDeviceStore } from '@/store/device';
+	import { getModule } from '@/renderer/nmg2mods';
 	import type { MidiCCAssignment } from '@/types';
 
 	defineProps<{ isActive?: boolean }>();
@@ -101,10 +100,6 @@
 		[...controllers.value].sort((a, b) => a.cc - b.cc),
 	);
 
-	function locationLabel(loc: 0 | 1 | 2): string {
-		return loc === 0 ? 'FX' : loc === 1 ? 'Voice' : 'Patch';
-	}
-
 	const CC_SHORT: Record<number, string> = {
 		2: 'Breath', 4: 'Foot', 5: 'Port.T', 6: 'DataEnt',
 		8: 'Balance', 10: 'Pan', 12: 'FX1', 13: 'FX2',
@@ -116,6 +111,26 @@
 
 	function ccShortName(cc: number): string {
 		return CC_SHORT[cc] ?? '';
+	}
+
+	function getModuleName(c: MidiCCAssignment): string {
+		if (c.location === 2) return 'Morph';
+		const patch = slot.value ? slotsStore.slots[slot.value]?.patch : null;
+		if (!patch) return String(c.moduleIndex);
+		const areaIdx = c.location === 0 ? 0 : 1;
+		const mod = patch.areas[areaIdx]?.modules.find((m) => m.index === c.moduleIndex);
+		if (!mod) return String(c.moduleIndex);
+		return getModule(mod.type)?.short ?? String(c.moduleIndex);
+	}
+
+	function getParamName(c: MidiCCAssignment): string {
+		if (c.location === 2) return `Morph ${c.paramIndex + 1}`;
+		const patch = slot.value ? slotsStore.slots[slot.value]?.patch : null;
+		if (!patch) return String(c.paramIndex);
+		const areaIdx = c.location === 0 ? 0 : 1;
+		const mod = patch.areas[areaIdx]?.modules.find((m) => m.index === c.moduleIndex);
+		if (!mod) return String(c.paramIndex);
+		return getModule(mod.type)?.params?.[c.paramIndex]?.name ?? String(c.paramIndex);
 	}
 
 	// Selection

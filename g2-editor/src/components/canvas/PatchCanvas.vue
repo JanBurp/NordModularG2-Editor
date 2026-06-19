@@ -42,6 +42,7 @@
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
+			<CCBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 		</svg>
 		<Cables
 			ref="cablesRef"
@@ -57,11 +58,13 @@
 <script setup lang="ts">
 	import { ref, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
+	import type { ModuleInstance } from '../../types';
 	import { getModule } from '../../renderer/nmg2mods';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
 	import Cables from './Cables.vue';
 	import DragGhost from './DragGhost.vue';
+	import CCBadgesOverlay from './CCBadgesOverlay.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';

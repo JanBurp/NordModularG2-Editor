@@ -6,7 +6,7 @@
 			ref="menuEl"
 			role="menu"
 			data-testid="context-menu"
-			class="fixed z-50 min-w-40 bg-neutral-800 border border-neutral-700 rounded shadow-xl py-1 text-sm text-neutral-200 list-none m-0 p-0"
+			class="fixed z-50 min-w-40 max-h-[90vh] overflow-y-auto bg-neutral-800 border border-neutral-700 rounded shadow-xl py-1 text-sm text-neutral-200 list-none m-0 p-0"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px' }"
 			@mouseenter="cancelClose"
 			@mouseleave="scheduleClose(300)"
