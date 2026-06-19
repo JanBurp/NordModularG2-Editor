@@ -68,11 +68,11 @@
 		>
 			Hold F8 to show CC badges · Right-click params to assign
 		</div>
-	</div>
 
-	<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
-		<p class="text-sm text-neutral-200">Remove all {{ controllers.length }} CC assignments?</p>
-	</Dialog>
+		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
+			<p class="text-sm text-neutral-200">Remove all {{ controllers.length }} CC assignments?</p>
+		</Dialog>
+	</div>
 </template>
 
 <script setup lang="ts">
@@ -173,7 +173,7 @@
 		if (!s) return;
 		const ccs = [...selectedRows.value];
 		selectedRows.value = new Set();
-		await Promise.all(ccs.map((cc) => slotsStore.deassignMidiCC(s, cc)));
+		await slotsStore.deassignMidiCCs(s, ccs);
 	}
 
 	function removeAll() {

@@ -1646,24 +1646,44 @@ export const useSlotsStore = defineStore('slots', {
 				await window.cli.run(['deassign-midicc', slot, String(cc)]);
 		},
 
+		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {
+			const ccSet = new Set(ccs);
+			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSet.has(c.cc));
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected)
+				for (const cc of ccs) await window.cli.run(['deassign-midicc', slot, String(cc)]);
+		},
+
 		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
 			const ccs = this.slots[slot].controllers.map((c) => c.cc);
 			this.slots[slot].controllers = [];
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
-				await Promise.all(ccs.map((cc) => window.cli.run(['deassign-midicc', slot, String(cc)])));
+				for (const cc of ccs) await window.cli.run(['deassign-midicc', slot, String(cc)]);
 		},
 
 		async autoAssignMidiCC(slot: SlotLabel, targets: { location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[]): Promise<void> {
 			const RESERVED = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97]);
 			const usedCCs = new Set(this.slots[slot].controllers.map((c) => c.cc));
+			const newAssignments: MidiCCAssignment[] = [];
 			for (const t of targets) {
 				let cc = 2;
 				while (cc <= 119 && (usedCCs.has(cc) || RESERVED.has(cc))) cc++;
 				if (cc > 119) break;
 				usedCCs.add(cc);
-				await this.assignMidiCC(slot, t.location, t.moduleIndex, t.paramIndex, cc);
+				newAssignments.push({ cc, location: t.location, moduleIndex: t.moduleIndex, paramIndex: t.paramIndex });
 			}
+			const newCCSet = new Set(newAssignments.map((a) => a.cc));
+			this.slots[slot].controllers = [
+				...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)),
+				...newAssignments,
+			];
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected)
+				for (const a of newAssignments) {
+					const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+					await window.cli.run(['assign-midicc', slot, locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)]);
+				}
 		},
 	},
 });
