@@ -19,12 +19,13 @@ export function useModuleDrop(svgRef: Ref<SVGSVGElement | null>, onDrop: (info: 
 
 	function handleDragOver(e: DragEvent) {
 		if (!svgRef.value) return;
+		const typeId = ui.draggedModuleId;
+		if (!typeId) { clearDropGhost(); return; }
 		const mp = toSvgCoords(e as unknown as MouseEvent);
 		if (!mp) return;
 		const col = Math.max(0, Math.floor(mp.x / 256));
 		const row = Math.max(0, Math.floor(mp.y / 16));
-		const typeId = ui.draggedModuleId;
-		const modDef = typeId ? getModule(typeId) : null;
+		const modDef = getModule(typeId);
 		const modHeight = (modDef?.height || 2) * 16;
 		if (!dropGhost) {
 			dropGhost = document.createElementNS('http://www.w3.org/2000/svg', 'rect');

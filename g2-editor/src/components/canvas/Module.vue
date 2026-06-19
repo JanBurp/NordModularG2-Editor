@@ -68,8 +68,8 @@
 		</g>
 
 		<!-- Parameters -->
-		<g class="params">
-			<template v-for="(param, index) in moduleDef.params" :key="param.name">
+		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
+			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index">
 				<ModuleKnob
 					v-if="isKnob(param.n)"
 					:param="param"
@@ -117,7 +117,7 @@
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 					/>
-			</template>
+			</g>
 		</g>
 
 		<!-- Input jacks -->
@@ -333,6 +333,27 @@
 		if (uiStore.selectedModulesArea !== props.areaLabel) return -1;
 		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
 	});
+
+	function onParamCCDragOver(e: DragEvent) {
+		e.preventDefault();
+	}
+
+	function onParamCCDrop(e: DragEvent) {
+		const raw = e.dataTransfer?.getData('text/plain');
+		if (!raw) return;
+		let data: any;
+		try { data = JSON.parse(raw); } catch { return; }
+		if (data.type !== 'cc') return;
+		const slot = uiStore.slotInFocus;
+		if (!slot) return;
+		let el = e.target as Element | null;
+		while (el && !el.hasAttribute('data-param-index')) el = el.parentElement;
+		if (!el) return;
+		const paramIndex = parseInt(el.getAttribute('data-param-index') ?? '');
+		if (isNaN(paramIndex)) return;
+		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
+		slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+	}
 
 	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
 		const param = moduleDef.value?.params?.[paramIndex];

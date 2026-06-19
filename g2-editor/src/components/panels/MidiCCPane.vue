@@ -25,41 +25,37 @@
 			>Auto Assign</button>
 		</div>
 
-		<!-- Table -->
-		<div class="flex-1 overflow-y-auto">
-			<table class="w-full border-collapse">
-				<thead class="sticky top-0 bg-neutral-800 text-neutral-400">
-					<tr>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-10">CC</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-16">Name</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700 w-20">Module</th>
-						<th class="text-left px-2 py-1 font-normal border-b border-neutral-700">Param</th>
-					</tr>
-				</thead>
-				<tbody>
-					<tr
-						v-for="row in allCCRows"
-						:key="row.cc"
-						class="border-b border-neutral-800"
-						:class="row.assignment
-							? (selectedRows.has(row.cc) ? 'bg-blue-900/50 cursor-pointer' : 'hover:bg-neutral-800 cursor-pointer')
-							: 'opacity-40 cursor-default'"
-						:draggable="!!row.assignment"
-						@click.exact="row.assignment && selectRow(row.cc)"
-						@click.ctrl.exact="row.assignment && toggleRow(row.cc)"
-						@click.meta.exact="row.assignment && toggleRow(row.cc)"
-						@click.shift.exact="row.assignment && shiftSelectRow(row.cc)"
-						@dragstart="row.assignment && onRowDragStart(row.cc, $event)"
-						@dragover.prevent
-						@drop="onRowDrop(row.cc, row.assignment, $event)"
-					>
-						<td class="px-2 py-0.5">{{ row.cc }}</td>
-						<td class="px-2 py-0.5 text-neutral-400">{{ ccShortName(row.cc) }}</td>
-						<td class="px-2 py-0.5">{{ row.assignment ? getModuleName(row.assignment) : '' }}</td>
-						<td class="px-2 py-0.5">{{ row.assignment ? getParamName(row.assignment) : '' }}</td>
-					</tr>
-				</tbody>
-			</table>
+		<!-- List -->
+		<div class="flex-1 overflow-y-auto select-none">
+			<!-- Header -->
+			<div class="grid grid-cols-[2.5rem_4rem_5rem_1fr] sticky top-0 bg-neutral-800 text-neutral-400 border-b border-neutral-700 py-1">
+				<span class="px-2">CC</span>
+				<span class="px-2">Name</span>
+				<span class="px-2">Module</span>
+				<span class="px-2">Param</span>
+			</div>
+			<!-- Rows -->
+			<div
+				v-for="row in allCCRows"
+				:key="row.cc"
+				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-neutral-800 cursor-grab"
+				:class="row.assignment
+					? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-neutral-800')
+					: 'opacity-40'"
+				draggable="true"
+				@click.exact="row.assignment && selectRow(row.cc)"
+				@click.ctrl.exact="row.assignment && toggleRow(row.cc)"
+				@click.meta.exact="row.assignment && toggleRow(row.cc)"
+				@click.shift.exact="row.assignment && shiftSelectRow(row.cc)"
+				@dragstart="onRowDragStart(row.cc, $event)"
+				@dragover.prevent
+				@drop="onRowDrop(row.cc, row.assignment, $event)"
+			>
+				<span class="px-2 py-0.5">{{ row.cc }}</span>
+				<span class="px-2 py-0.5 text-neutral-400">{{ ccShortName(row.cc) }}</span>
+				<span class="px-2 py-0.5">{{ row.assignment ? getModuleName(row.assignment) : '' }}</span>
+				<span class="px-2 py-0.5">{{ row.assignment ? getParamName(row.assignment) : '' }}</span>
+			</div>
 		</div>
 
 		<!-- Drop zone hint -->
@@ -240,7 +236,38 @@
 
 	// Drag-and-drop (within panel)
 	function onRowDragStart(cc: number, e: DragEvent) {
-		e.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
+		if (!e.dataTransfer) return;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
+
+		// Custom drag image — mirrors ModuleCCBadge ghost styling
+		const w = cc >= 100 ? 52 : cc >= 10 ? 46 : 40;
+		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
+		svg.setAttribute('width', String(w));
+		svg.setAttribute('height', '15');
+		svg.style.cssText = 'position:fixed;top:-200px;left:-200px;pointer-events:none;';
+		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		rect.setAttribute('width', String(w));
+		rect.setAttribute('height', '15');
+		rect.setAttribute('fill', '#FFE55C');
+		rect.setAttribute('stroke', '#000');
+		rect.setAttribute('stroke-width', '0.8');
+		rect.setAttribute('rx', '2');
+		rect.setAttribute('opacity', '0.8');
+		const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
+		text.setAttribute('x', String(w / 2));
+		text.setAttribute('y', '11');
+		text.setAttribute('fill', '#000');
+		text.setAttribute('font-size', '11');
+		text.setAttribute('font-weight', 'bold');
+		text.setAttribute('font-family', 'monospace');
+		text.setAttribute('text-anchor', 'middle');
+		text.textContent = `CC# ${cc}`;
+		svg.appendChild(rect);
+		svg.appendChild(text);
+		document.body.appendChild(svg);
+		e.dataTransfer.setDragImage(svg, w / 2, 7);
+		requestAnimationFrame(() => document.body.removeChild(svg));
 	}
 
 	async function onRowDrop(targetCC: number, targetAssignment: MidiCCAssignment | null, e: DragEvent) {
@@ -261,9 +288,6 @@
 				await slotsStore.deassignMidiCC(s, dragged.cc);
 				await slotsStore.assignMidiCC(s, dragged.location, dragged.moduleIndex, dragged.paramIndex, targetCC);
 			}
-		} else if (data.type === 'param') {
-			// Assign this row's CC to the dropped param
-			await slotsStore.assignMidiCC(s, data.location, data.moduleIndex, data.paramIndex, targetCC);
 		}
 	}
 
