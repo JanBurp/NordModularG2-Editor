@@ -25,8 +25,10 @@ export function useSlotEvents(log: LogFn) {
 		keyFocusTimer = setTimeout(async () => {
 			keyFocusTimer = null;
 			if (store.status !== DeviceStatus.Connected) return;
-			for (const sl of previouslyKeyed) await window.cli.run(['set-slot-key', sl, '0']);
-			await window.cli.run(['set-slot-key', slot, '1']);
+			try {
+				for (const sl of previouslyKeyed) await window.cli.run(['set-slot-key', sl, '0']);
+				await window.cli.run(['set-slot-key', slot, '1']);
+			} catch { /* device may have disconnected mid-debounce; state resyncs on next event */ }
 		}, 100);
 	}
 
