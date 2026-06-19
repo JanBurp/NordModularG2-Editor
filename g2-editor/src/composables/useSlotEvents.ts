@@ -1,9 +1,10 @@
-import { ref } from 'vue';
+import { DeviceStatus, useDeviceStore } from '@/store/device';
+
+import type { LogFn } from './useG2';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { SlotLabel } from '@/types';
-import { DeviceStatus, useDeviceStore } from '@/store/device';
+import { ref } from 'vue';
 import { useSlotsStore } from '@/store/slots';
-import type { LogFn } from './useG2';
 
 export function useSlotEvents(log: LogFn) {
 	const store = useDeviceStore();
@@ -13,6 +14,23 @@ export function useSlotEvents(log: LogFn) {
 	const hardwareSlotChange = ref<SlotLabel | null>(null);
 	const pendingSlotReload = new Set<SlotLabel>();
 	const pendingResourceFetch = new Set<SlotLabel>();
+	let keyFocusTimer: ReturnType<typeof setTimeout> | null = null;
+
+	/* The G2 doesn't reliably emit a watch event after a software slot switch
+	 * (it depends on whether the target slot was already active), so we can't
+	 * key off a specific event without risking a stale/misfired command later.
+	 * A short debounced delay gives the device time to settle instead. */
+	function requestKeyFocus(slot: SlotLabel, previouslyKeyed: SlotLabel[]): void {
+		if (keyFocusTimer) clearTimeout(keyFocusTimer);
+		keyFocusTimer = setTimeout(async () => {
+			keyFocusTimer = null;
+			if (store.status !== DeviceStatus.Connected) return;
+			try {
+				for (const sl of previouslyKeyed) await window.cli.run(['set-slot-key', sl, '0']);
+				await window.cli.run(['set-slot-key', slot, '1']);
+			} catch { /* device may have disconnected mid-debounce; state resyncs on next event */ }
+		}, 100);
+	}
 
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
 		if (store.status !== DeviceStatus.Connected) return;
@@ -127,5 +145,5 @@ export function useSlotEvents(log: LogFn) {
 		return false;
 	}
 
-	return { hardwareVariationChange, hardwareSlotChange, fetchSlotResources, handleEvent };
+	return { hardwareVariationChange, hardwareSlotChange, fetchSlotResources, requestKeyFocus, handleEvent };
 }

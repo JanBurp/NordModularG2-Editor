@@ -267,11 +267,12 @@
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 
-	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange } = useG2();
+	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange, requestKeyFocus } = useG2();
 
 	const { handleSlotClick, handleSlotShiftClick, handleSlotCtrlClick, handleVariationClick, applySlotResult } = useSlotManagement(
 		hardwareSlotChange,
 		hardwareVariationChange,
+		requestKeyFocus,
 	);
 
 	const showAboutDialog = ref(false);

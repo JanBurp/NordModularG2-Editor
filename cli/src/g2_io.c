@@ -619,6 +619,21 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
                 continue;
             }
         }
+        /* Skip generic ok/error acks (aCmd 0x04/0x0C, subCmd 0x7F/0x7E) for
+         * embedded messages — these are async confirmations of an earlier
+         * fire-and-forget command (e.g. set-slot-key) meant for the main
+         * loop's event drain (see g2_events.c emit_embedded_event), not for
+         * whichever command currently owns this recv_interrupt() call. A
+         * caller actually waiting on its own embedded response expects a
+         * different aCmd/subCmd, so this can't be mistaken for real data. */
+        if ((msg.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+            uint8_t aCmd = msg.interrupt[2];
+            uint8_t subCmd = msg.interrupt[4];
+            if ((aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
+                g2_msg_free(&msg);
+                continue;
+            }
+        }
         /* Return this message. */
         int copy = (size > 16) ? 16 : size;
         memcpy(response, msg.interrupt, (size_t)copy);

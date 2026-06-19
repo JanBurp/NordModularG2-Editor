@@ -177,5 +177,6 @@ export function useG2() {
 		toggleConnection,
 		hardwareVariationChange: slotEvents.hardwareVariationChange,
 		hardwareSlotChange: slotEvents.hardwareSlotChange,
+		requestKeyFocus: slotEvents.requestKeyFocus,
 	};
 }
