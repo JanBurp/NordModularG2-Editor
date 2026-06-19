@@ -56,16 +56,26 @@ let listenerCount = 0;
 export const showCCOverlay = ref(false);
 
 function onKeyDown(e: KeyboardEvent) {
-	if (e.key === 'F8') showCCOverlay.value = true;
+	if (e.key === 'F8') {
+		e.preventDefault(); // stop browser/Electron from intercepting F8 before keyup fires
+		if (!e.repeat) showCCOverlay.value = true;
+	}
+	if (e.key === 'Escape') showCCOverlay.value = false;
 }
 function onKeyUp(e: KeyboardEvent) {
 	if (e.key === 'F8') showCCOverlay.value = false;
+}
+// Safety net: if F8 triggered a system action and the window lost focus,
+// we never get keyup — reset overlay on blur so it doesn't stay on indefinitely.
+function onWindowBlur() {
+	showCCOverlay.value = false;
 }
 
 export function useMidiCCOverlay() {
 	if (listenerCount === 0) {
 		window.addEventListener('keydown', onKeyDown);
 		window.addEventListener('keyup', onKeyUp);
+		window.addEventListener('blur', onWindowBlur);
 	}
 	listenerCount++;
 
@@ -74,6 +84,7 @@ export function useMidiCCOverlay() {
 		if (listenerCount === 0) {
 			window.removeEventListener('keydown', onKeyDown);
 			window.removeEventListener('keyup', onKeyUp);
+			window.removeEventListener('blur', onWindowBlur);
 		}
 	});
 

@@ -37,27 +37,26 @@
 					</tr>
 				</thead>
 				<tbody>
-					<tr v-if="controllers.length === 0">
-						<td colspan="4" class="text-center text-neutral-500 py-4">No CC assignments</td>
-					</tr>
 					<tr
-						v-for="c in sortedControllers"
-						:key="c.cc"
-						class="cursor-pointer border-b border-neutral-800"
-						:class="selectedRows.has(c.cc) ? 'bg-blue-900/50' : 'hover:bg-neutral-800'"
-						draggable="true"
-						@click.exact="selectRow(c.cc)"
-						@click.ctrl.exact="toggleRow(c.cc)"
-						@click.meta.exact="toggleRow(c.cc)"
-						@click.shift.exact="shiftSelectRow(c.cc)"
-						@dragstart="onRowDragStart(c, $event)"
+						v-for="row in allCCRows"
+						:key="row.cc"
+						class="border-b border-neutral-800"
+						:class="row.assignment
+							? (selectedRows.has(row.cc) ? 'bg-blue-900/50 cursor-pointer' : 'hover:bg-neutral-800 cursor-pointer')
+							: 'opacity-40 cursor-default'"
+						:draggable="!!row.assignment"
+						@click.exact="row.assignment && selectRow(row.cc)"
+						@click.ctrl.exact="row.assignment && toggleRow(row.cc)"
+						@click.meta.exact="row.assignment && toggleRow(row.cc)"
+						@click.shift.exact="row.assignment && shiftSelectRow(row.cc)"
+						@dragstart="row.assignment && onRowDragStart(row.cc, $event)"
 						@dragover.prevent
-						@drop="onRowDrop(c, $event)"
+						@drop="onRowDrop(row.cc, row.assignment, $event)"
 					>
-						<td class="px-2 py-0.5">{{ c.cc }}</td>
-						<td class="px-2 py-0.5 text-neutral-400">{{ ccShortName(c.cc) }}</td>
-						<td class="px-2 py-0.5">{{ getModuleName(c) }}</td>
-						<td class="px-2 py-0.5">{{ getParamName(c) }}</td>
+						<td class="px-2 py-0.5">{{ row.cc }}</td>
+						<td class="px-2 py-0.5 text-neutral-400">{{ ccShortName(row.cc) }}</td>
+						<td class="px-2 py-0.5">{{ row.assignment ? getModuleName(row.assignment) : '' }}</td>
+						<td class="px-2 py-0.5">{{ row.assignment ? getParamName(row.assignment) : '' }}</td>
 					</tr>
 				</tbody>
 			</table>
@@ -70,6 +69,10 @@
 			Hold F8 to show CC badges · Right-click params to assign
 		</div>
 	</div>
+
+	<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
+		<p class="text-sm text-neutral-200">Remove all {{ controllers.length }} CC assignments?</p>
+	</Dialog>
 </template>
 
 <script setup lang="ts">
@@ -78,7 +81,11 @@
 	import { useUiStore } from '@/store/ui';
 	import { useDeviceStore } from '@/store/device';
 	import { getModule } from '@/renderer/nmg2mods';
+	import { getAllowedCCs } from '@/composables/useMidiCC';
 	import type { MidiCCAssignment } from '@/types';
+	import Dialog from '@/components/common/Dialog.vue';
+
+	type CCRow = { cc: number; assignment: MidiCCAssignment | null };
 
 	defineProps<{ isActive?: boolean }>();
 
@@ -88,6 +95,7 @@
 
 	const selectedRows = ref<Set<number>>(new Set());
 	let lastSelectedCC: number | null = null;
+	const showRemoveAllDialog = ref(false);
 
 	const slot = computed(() => uiStore.slotInFocus);
 
@@ -96,9 +104,10 @@
 		return slotsStore.slots[slot.value].controllers;
 	});
 
-	const sortedControllers = computed(() =>
-		[...controllers.value].sort((a, b) => a.cc - b.cc),
-	);
+	const allCCRows = computed<CCRow[]>(() => {
+		const assignedMap = new Map(controllers.value.map((c) => [c.cc, c]));
+		return getAllowedCCs().map((cc) => ({ cc, assignment: assignedMap.get(cc) ?? null }));
+	});
 
 	const CC_SHORT: Record<number, string> = {
 		2: 'Breath', 4: 'Foot', 5: 'Port.T', 6: 'DataEnt',
@@ -149,13 +158,12 @@
 
 	function shiftSelectRow(cc: number) {
 		if (lastSelectedCC === null) { selectRow(cc); return; }
-		const sorted = sortedControllers.value.map((c) => c.cc);
-		const from = sorted.indexOf(lastSelectedCC);
-		const to = sorted.indexOf(cc);
-		if (from === -1 || to === -1) { selectRow(cc); return; }
-		const [lo, hi] = from < to ? [from, to] : [to, from];
+		const lo = Math.min(lastSelectedCC, cc);
+		const hi = Math.max(lastSelectedCC, cc);
 		const next = new Set(selectedRows.value);
-		for (let i = lo; i <= hi; i++) next.add(sorted[i]);
+		for (const row of allCCRows.value) {
+			if (row.cc >= lo && row.cc <= hi && row.assignment) next.add(row.cc);
+		}
 		selectedRows.value = next;
 	}
 
@@ -168,10 +176,14 @@
 		await Promise.all(ccs.map((cc) => slotsStore.deassignMidiCC(s, cc)));
 	}
 
-	async function removeAll() {
+	function removeAll() {
+		if (!slot.value || controllers.value.length === 0) return;
+		showRemoveAllDialog.value = true;
+	}
+
+	async function confirmRemoveAll() {
 		const s = slot.value;
-		if (!s || controllers.value.length === 0) return;
-		if (!window.confirm(`Remove all ${controllers.value.length} CC assignments?`)) return;
+		if (!s) return;
 		selectedRows.value = new Set();
 		await slotsStore.deassignAllMidiCC(s);
 	}
@@ -226,26 +238,32 @@
 		await slotsStore.autoAssignMidiCC(s, targets);
 	}
 
-	// Drag-and-drop (row → row within panel: swap assignments)
-	function onRowDragStart(c: MidiCCAssignment, e: DragEvent) {
-		e.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'cc', cc: c.cc }));
+	// Drag-and-drop (within panel)
+	function onRowDragStart(cc: number, e: DragEvent) {
+		e.dataTransfer?.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
 	}
 
-	async function onRowDrop(target: MidiCCAssignment, e: DragEvent) {
+	async function onRowDrop(targetCC: number, targetAssignment: MidiCCAssignment | null, e: DragEvent) {
 		const raw = e.dataTransfer?.getData('text/plain');
 		if (!raw || !slot.value) return;
 		let data: any;
 		try { data = JSON.parse(raw); } catch { return; }
 		const s = slot.value;
-		if (data.type === 'cc' && data.cc !== target.cc) {
-			// Swap: reassign dragged CC to target's param, and target CC to dragged param
+		if (data.type === 'cc' && data.cc !== targetCC) {
 			const dragged = controllers.value.find((c) => c.cc === data.cc);
 			if (!dragged) return;
-			await slotsStore.assignMidiCC(s, target.location, target.moduleIndex, target.paramIndex, dragged.cc);
-			await slotsStore.assignMidiCC(s, dragged.location, dragged.moduleIndex, dragged.paramIndex, target.cc);
+			if (targetAssignment) {
+				// Swap: both rows are assigned, exchange their CC numbers
+				await slotsStore.assignMidiCC(s, targetAssignment.location, targetAssignment.moduleIndex, targetAssignment.paramIndex, dragged.cc);
+				await slotsStore.assignMidiCC(s, dragged.location, dragged.moduleIndex, dragged.paramIndex, targetCC);
+			} else {
+				// Move: reassign dragged param to the target CC, deassign old CC
+				await slotsStore.deassignMidiCC(s, dragged.cc);
+				await slotsStore.assignMidiCC(s, dragged.location, dragged.moduleIndex, dragged.paramIndex, targetCC);
+			}
 		} else if (data.type === 'param') {
-			// Assign this row's CC to dropped param
-			await slotsStore.assignMidiCC(s, data.location, data.moduleIndex, data.paramIndex, target.cc);
+			// Assign this row's CC to the dropped param
+			await slotsStore.assignMidiCC(s, data.location, data.moduleIndex, data.paramIndex, targetCC);
 		}
 	}
 
