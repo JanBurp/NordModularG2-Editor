@@ -72,6 +72,8 @@ static void print_usage(const char *prog) {
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>                      Assign a MIDI CC number to a parameter\n");
     printf("  deassign-midicc <slot> <cc-num>                                                          Remove a MIDI CC assignment\n");
+    printf("  assign-midicc-batch <slot> [<va|fx|patch> <mod> <par> <cc>]...                          Assign multiple MIDI CCs in one USB frame\n");
+    printf("  deassign-midicc-batch <slot> <cc-num>...                                                Remove multiple MIDI CC assignments in one USB frame\n");
     printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
@@ -528,6 +530,45 @@ static int cmd_deassign_midicc(int argc, char **argv, int i) {
     return g2_deassign_midicc(slot, cc_num);
 }
 
+static int cmd_assign_midicc_batch(int argc, char **argv, int i) {
+    int remaining = argc - i - 2;
+    if (remaining < 4 || remaining % 4 != 0) {
+        fprintf(stderr, "Usage: assign-midicc-batch <slot> <va|fx|patch> <module-id> <param-idx> <cc-num> [...]\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "assign-midicc-batch: invalid slot '%s'\n", argv[i + 1]); return 1; }
+    int count = remaining / 4;
+    G2MidiCCEntry *entries = malloc((size_t)count * sizeof(G2MidiCCEntry));
+    if (!entries) return G2_ERR_NO_MEMORY;
+    for (int j = 0; j < count; j++) {
+        int base = i + 2 + j * 4;
+        entries[j].location  = parse_location_str(argv[base]);
+        entries[j].module_id = atoi(argv[base + 1]);
+        entries[j].param_idx = atoi(argv[base + 2]);
+        entries[j].cc_num    = atoi(argv[base + 3]);
+    }
+    int ret = g2_assign_midicc_batch(slot, entries, count);
+    free(entries);
+    return ret;
+}
+
+static int cmd_deassign_midicc_batch(int argc, char **argv, int i) {
+    int count = argc - i - 2;
+    if (count < 1) {
+        fprintf(stderr, "Usage: deassign-midicc-batch <slot> <cc-num> [...]\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "deassign-midicc-batch: invalid slot '%s'\n", argv[i + 1]); return 1; }
+    int *cc_nums = malloc((size_t)count * sizeof(int));
+    if (!cc_nums) return G2_ERR_NO_MEMORY;
+    for (int j = 0; j < count; j++) cc_nums[j] = atoi(argv[i + 2 + j]);
+    int ret = g2_deassign_midicc_batch(slot, cc_nums, count);
+    free(cc_nums);
+    return ret;
+}
+
 static int cmd_get_perf_settings(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
     cJSON *synth = query_synth_settings(NULL);
@@ -752,8 +793,10 @@ static const cmd_entry_t commands[] = {
     { "add-module",       cmd_add_module       },
     { "set-module-color", cmd_set_module_color },
     { "set-module-name",  cmd_set_module_name  },
-    { "assign-midicc",    cmd_assign_midicc    },
-    { "deassign-midicc",  cmd_deassign_midicc  },
+    { "assign-midicc",         cmd_assign_midicc         },
+    { "deassign-midicc",       cmd_deassign_midicc       },
+    { "assign-midicc-batch",   cmd_assign_midicc_batch   },
+    { "deassign-midicc-batch", cmd_deassign_midicc_batch },
     { "set-param-label",  cmd_set_param_label  },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },

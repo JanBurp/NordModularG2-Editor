@@ -427,6 +427,36 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_deassign_midicc(slot, arg_i(args, 1));
 
+	} else if (strcmp(cmd, "assign-midicc-batch") == 0 && n >= 5 && (n - 1) % 4 == 0) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) { ret = G2_ERR_INVALID_PARAM; } else {
+			int count = (n - 1) / 4;
+			G2MidiCCEntry *entries = malloc((size_t)count * sizeof(G2MidiCCEntry));
+			if (!entries) { ret = G2_ERR_NO_MEMORY; } else {
+				for (int j = 0; j < count; j++) {
+					int base = 1 + j * 4;
+					entries[j].location  = parse_location(args, base);
+					entries[j].module_id = arg_i(args, base + 1);
+					entries[j].param_idx = arg_i(args, base + 2);
+					entries[j].cc_num    = arg_i(args, base + 3);
+				}
+				ret = g2_assign_midicc_batch(slot, entries, count);
+				free(entries);
+			}
+		}
+
+	} else if (strcmp(cmd, "deassign-midicc-batch") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) { ret = G2_ERR_INVALID_PARAM; } else {
+			int count = n - 1;
+			int *cc_nums = malloc((size_t)count * sizeof(int));
+			if (!cc_nums) { ret = G2_ERR_NO_MEMORY; } else {
+				for (int j = 0; j < count; j++) cc_nums[j] = arg_i(args, 1 + j);
+				ret = g2_deassign_midicc_batch(slot, cc_nums, count);
+				free(cc_nums);
+			}
+		}
+
 	} else if (strcmp(cmd, "copy-variation") == 0 && n >= 3) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;

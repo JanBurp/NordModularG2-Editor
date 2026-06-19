@@ -219,6 +219,11 @@ int g2_copy_variation(int slot, int from_var, int to_var);
 int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int cc_num);
 int g2_deassign_midicc(int slot, int cc_num);
 
+/* Batch MIDI CC commands — pack N sub-commands into one USB frame */
+typedef struct { int location, module_id, param_idx, cc_num; } G2MidiCCEntry;
+int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count);
+int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
+
 /* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
  * Invalidated on version_update all-slots event. */
