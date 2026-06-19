@@ -125,7 +125,7 @@
 		const areaIdx = c.location === 0 ? 0 : 1;
 		const mod = patch.areas[areaIdx]?.modules.find((m) => m.index === c.moduleIndex);
 		if (!mod) return String(c.moduleIndex);
-		return getModule(mod.type)?.short ?? String(c.moduleIndex);
+		return mod.uname || getModule(mod.type)?.short || String(c.moduleIndex);
 	}
 
 	function getParamName(c: MidiCCAssignment): string {
