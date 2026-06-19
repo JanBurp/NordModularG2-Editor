@@ -684,9 +684,15 @@ export const useSlotsStore = defineStore('slots', {
 
 				slotEntry.rawHex = null;
 				try {
-					for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
-						await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
-					}
+					// Send module commands first (add-module + set-param), then cable commands.
+					// The G2 firmware cannot reference a newly-added module in the same compound
+					// frame as add-cable — splitting into two sequential batches avoids G2_ERR_SEND.
+					const moduleCmds = allCmds.filter((c) => c[0] !== 'add-cable');
+					const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
+					for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK)
+						await window.cli.runBatch(moduleCmds.slice(i, i + BATCH_CHUNK));
+					for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK)
+						await window.cli.runBatch(cableCmds.slice(i, i + BATCH_CHUNK));
 				} catch (err) {
 					console.warn('paste batch CLI failed:', err);
 				}
