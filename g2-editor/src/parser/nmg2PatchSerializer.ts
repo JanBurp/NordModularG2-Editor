@@ -243,7 +243,11 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 	bw.write(2, desc.monopoly);
 	bw.write(8, desc.variation);
 	bw.write(8, desc.category);
-	return bw.flush();
+	const result = bw.flush();
+	if (result.length >= secData.length) return result;
+	const padded = new Uint8Array(secData.length);
+	padded.set(result);
+	return padded;
 }
 
 // Concatenates sections, computes CRC, returns rawHex string.
