@@ -51,7 +51,11 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'slot_data') {
 			log('←', 'Watch', `slot_data slot=${ev.slot}`);
 			if (ev.data && ev.data.data && !slotsStore.slots[ev.slot as SlotLabel]?.loading) {
-				slotsStore._applyPatchOutput(ev.slot as SlotLabel, JSON.stringify(ev.data));
+				try {
+					await slotsStore._applyPatchOutput(ev.slot as SlotLabel, JSON.stringify(ev.data));
+				} catch (e) {
+					console.error(`Failed to apply patch data for slot ${ev.slot}:`, e);
+				}
 			}
 			return true;
 		}

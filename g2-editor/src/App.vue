@@ -313,7 +313,12 @@
 			if (idx >= 0) {
 				const slot = SLOT_LABELS[idx];
 				uiStore.setSlotInFocus(slot);
-				applySlotResult(await slotsStore.loadSlot(slot));
+				const slotEntry = slotsStore.slots[slot];
+				if (slotEntry.patch) {
+					applySlotResult({ patch: slotEntry.patch, name: slotEntry.name });
+				} else {
+					applySlotResult(await slotsStore.loadSlot(slot));
+				}
 			}
 			if (!browserStore.synthPatches.length) {
 				browserStore.loadSynthList();

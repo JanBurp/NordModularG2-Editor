@@ -1663,12 +1663,14 @@ export const useSlotsStore = defineStore('slots', {
 				{ cc, location, moduleIndex, paramIndex },
 			];
 			this.slots[slot].rawHex = null;
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
 						this.slots[slot].rawHex = null;
+						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
 							const oldAssignment = prevControllers.find((c) => c.cc === cc);
@@ -1692,12 +1694,14 @@ export const useSlotsStore = defineStore('slots', {
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => c.cc !== cc);
 			this.slots[slot].rawHex = null;
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
 						this.slots[slot].rawHex = null;
+						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const restored = prevControllers.find((c) => c.cc === cc);
 						if (restored) {
 							const deviceStore = useDeviceStore();
@@ -1720,12 +1724,14 @@ export const useSlotsStore = defineStore('slots', {
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSet.has(c.cc));
 			this.slots[slot].rawHex = null;
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
 						this.slots[slot].rawHex = null;
+						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const restored = prevControllers.filter((c) => ccSet.has(c.cc));
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && restored.length > 0) {
@@ -1749,12 +1755,14 @@ export const useSlotsStore = defineStore('slots', {
 			const ccs = prevControllers.map((c) => c.cc);
 			this.slots[slot].controllers = [];
 			this.slots[slot].rawHex = null;
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
 						this.slots[slot].rawHex = null;
+						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && prevControllers.length > 0) {
 							const flatArgs = prevControllers.flatMap((a) => {
