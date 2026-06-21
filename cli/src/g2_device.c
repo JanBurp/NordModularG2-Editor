@@ -1920,30 +1920,8 @@ int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int c
     if (ensure_connected(0) < 0)        return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
-    buff[pos++] = 0x22; /* S_ASSIGN_MIDICC */
-    buff[pos++] = (uint8_t)location;
-    buff[pos++] = (uint8_t)module_id;
-    buff[pos++] = (uint8_t)param_idx;
-    buff[pos++] = (uint8_t)cc_num;
-
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+    uint8_t payload[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)param_idx, (uint8_t)cc_num };
+    return send_slot((uint8_t)slot, version, 0x22, payload, 4) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_deassign_midicc(int slot, int cc_num) {
@@ -1952,27 +1930,8 @@ int g2_deassign_midicc(int slot, int cc_num) {
     if (ensure_connected(0) < 0)    return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
-    buff[pos++] = 0x23; /* S_DEASSIGN_MIDICC */
-    buff[pos++] = (uint8_t)cc_num;
-
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+    uint8_t cc_byte = (uint8_t)cc_num;
+    return send_slot((uint8_t)slot, version, 0x23, &cc_byte, 1) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count) {
@@ -1981,30 +1940,18 @@ int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count) {
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
+    uint8_t entry_bufs[count][4];
+    G2Op ops[count];
     for (int i = 0; i < count; i++) {
-        buff[pos++] = 0x22; /* S_ASSIGN_MIDICC */
-        buff[pos++] = (uint8_t)entries[i].location;
-        buff[pos++] = (uint8_t)entries[i].module_id;
-        buff[pos++] = (uint8_t)entries[i].param_idx;
-        buff[pos++] = (uint8_t)entries[i].cc_num;
+        entry_bufs[i][0] = (uint8_t)entries[i].location;
+        entry_bufs[i][1] = (uint8_t)entries[i].module_id;
+        entry_bufs[i][2] = (uint8_t)entries[i].param_idx;
+        entry_bufs[i][3] = (uint8_t)entries[i].cc_num;
+        ops[i].cmd     = 0x22;
+        ops[i].payload = entry_bufs[i];
+        ops[i].len     = 4;
     }
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred2;
-    int ret2 = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                    msgLength, &transferred2, USB_TIMEOUT_STANDARD_MS);
-    return (ret2 < 0) ? G2_ERR_SEND : G2_OK;
+    return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
@@ -2013,27 +1960,15 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
+    uint8_t cc_bytes[count];
+    G2Op ops[count];
     for (int i = 0; i < count; i++) {
-        buff[pos++] = 0x23; /* S_DEASSIGN_MIDICC */
-        buff[pos++] = (uint8_t)cc_nums[i];
+        cc_bytes[i]    = (uint8_t)cc_nums[i];
+        ops[i].cmd     = 0x23;
+        ops[i].payload = &cc_bytes[i];
+        ops[i].len     = 1;
     }
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred2;
-    int ret2 = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                    msgLength, &transferred2, USB_TIMEOUT_STANDARD_MS);
-    return (ret2 < 0) ? G2_ERR_SEND : G2_OK;
+    return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
