@@ -10,4 +10,4 @@ LED_FIFO=/tmp/g2-ledvu-fifo
 
 cd "$DIR" && ./daemon.sh start "$@" \
   | tee >(jq --unbuffered -c 'select(.type=="led_data" or .type=="volume_data")' > "$LED_FIFO") \
-  | jq --unbuffered -r -f "$DIR/fold.jq"
+  | jq --unbuffered -n -r -f "$DIR/fold.jq"
