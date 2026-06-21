@@ -27,13 +27,15 @@ __g2_send() {
   local args_json=""
   for arg in "$@"; do args_json+="\"$arg\","; done
   echo "{\"id\":$id,\"cmd\":\"$cmd\",\"args\":[${args_json%,}]}" > "$_G2_FIFO"
+  print -- $'\e[2m['"$(date +%H:%M:%S)"$']\e[0m -> id '"$id"
 }
 
 stop()  { kill "$(cat "$_G2_DAEMON_PID_FILE")" 2>/dev/null; }
 start() {
-  tmux send-keys -t g2:0.0 "cd '$_G2_DIR' && ./daemon.sh start" Enter 2>/dev/null \
-    || print "Run './daemon.sh start' manually in the left pane."
+  tmux send-keys -t g2:0.1 "cd '$_G2_DIR' && ./g2-daemon-view.sh" Enter 2>/dev/null \
+    || print "Run './g2-daemon-view.sh' manually in the daemon pane."
 }
+help()  { "$_G2_DIR/build/bin/g2-cli" -h }
 
 for _g2_cmd in "${_G2_CMDS[@]}"; do
   eval "function $_g2_cmd() { __g2_send $_g2_cmd \"\$@\"; }"
@@ -107,12 +109,12 @@ _g2_complete() {
 }
 
 (( $+functions[compdef] )) || { autoload -Uz compinit && compinit; }
-compdef _g2_complete "${_G2_CMDS[@]}" stop start
+compdef _g2_complete "${_G2_CMDS[@]}" stop start help
 
 # TAB completion: at command position only offer G2 commands, not all system commands
 _g2_tab_complete() {
   if (( CURRENT == 1 )); then
-    compadd -- "${_G2_CMDS[@]}" stop start
+    compadd -- "${_G2_CMDS[@]}" stop start help
   else
     _main_complete "$@"
   fi
@@ -120,4 +122,10 @@ _g2_tab_complete() {
 zle -C _g2_complete_widget complete-word _g2_tab_complete
 bindkey '^I' _g2_complete_widget
 
-print "G2 shell ready. 'start'/'stop' to control daemon."
+# Minimal prompt: drop theme hooks (e.g. powerlevel10k) and path/git info, just '>'
+precmd_functions=("${(@)precmd_functions:#_p9k_*}")
+preexec_functions=("${(@)preexec_functions:#_p9k_*}")
+unset RPROMPT RPS1
+PROMPT='> '
+
+print "G2 shell ready. 'start'/'stop' to control daemon, 'help' to list commands."
