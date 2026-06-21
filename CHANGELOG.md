@@ -11,16 +11,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Added
 - Undo/Redo
 - Copy Variation
+- Midi CC assignments
 - Themes: System, Light, Dark
-- Graphics & Params for several modules improved/finished
 - Missing VU meter's on Modules
+- Graphics & Params for several modules improved/finished
 
 ### Changed
 - Parameter sending smoother
 - Documentation restructured
 
 ### Fixed
-- Cable editing bug
+- Cable editing bug (split area)
 - Swapped Gate LEDs
 - Sequencer and VU LED rendering issues
 - Sequencer Random/Clear buttons not working

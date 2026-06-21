@@ -347,20 +347,46 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 
 ### Knob & MIDI Assignment Sub-Commands
 
-*(None of these are implemented in the CLI.)*
-
 These are combined into slot-command messages. Each message can contain multiple sub-operations via `AddXxxMessage` calls:
 
 | Sub-cmd | Name | Payload bytes | Response |
 |---------|------|---------------|----------|
-| `0x1C` | ASSIGN_GLOBAL_KNOB | `mod param loc 00 knob_index` | via parent message |
-| `0x1D` | DEASSIGN_GLOBAL_KNOB | `00 knob_index` | via parent message |
-| `0x1E` | SEL_GLOBAL_PAGE | `page` | via parent message |
-| `0x22` | ASSIGN_MIDICC | `loc mod param cc` | via parent message |
-| `0x23` | DEASSIGN_MIDICC | `cc` | via parent message |
-| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | via parent message |
-| `0x26` | DEASSIGN_KNOB | `00 knob_index` | via parent message |
-| `0x2D` | SEL_PARAM_PAGE | `page` | via parent message |
+| `0x1C` | ASSIGN_GLOBAL_KNOB *(not implemented yet)* | `mod param loc 00 knob_index` | via parent message |
+| `0x1D` | DEASSIGN_GLOBAL_KNOB *(not implemented yet)* | `00 knob_index` | via parent message |
+| `0x1E` | SEL_GLOBAL_PAGE *(not implemented yet)* | `page` | via parent message |
+| `0x22` | ASSIGN_MIDICC | `loc mod param cc` | Embedded ACK |
+| `0x23` | DEASSIGN_MIDICC | `cc` | Embedded ACK |
+| `0x25` | ASSIGN_KNOB *(not implemented yet)* | `mod param loc 00 knob_index` | via parent message |
+| `0x26` | DEASSIGN_KNOB *(not implemented yet)* | `00 knob_index` | via parent message |
+| `0x2D` | SEL_PARAM_PAGE *(not implemented yet)* | `page` | via parent message |
+
+### MIDI CC Commands
+
+**ASSIGN_MIDICC (`0x22`)** — 4-byte payload:
+
+```
+[0] location   (0=FX, 1=VA, 2=Patch)
+[1] module_id
+[2] param_idx
+[3] cc_num     (0–119)
+```
+
+**DEASSIGN_MIDICC (`0x23`)** — 1-byte payload:
+
+```
+[0] cc_num     (0–119)
+```
+
+Both commands use the standard versioned slot-scoped frame (scope = `COMMAND_REQ | COMMAND_SLOT | slot`, version = cached `g2_slot_version[slot]`). Batch variants pack multiple `[cmd + payload]` entries into one USB frame via `send_slot_batch()`.
+
+**Daemon commands:**
+
+```
+assign-midicc         <slot> <va|fx|patch> <module_id> <param_idx> <cc_num>
+deassign-midicc       <slot> <cc_num>
+assign-midicc-batch   <slot> <loc> <mod> <param> <cc> [<loc> <mod> <param> <cc> ...]
+deassign-midicc-batch <slot> <cc> [<cc> ...]
+```
 
 ---
 
