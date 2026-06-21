@@ -6,23 +6,23 @@
 				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="selectedRows.size === 0"
 				@click="removeSelected"
-			>Remove</button>
+			>
+				Remove
+			</button>
 			<button
 				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="controllers.length === 0"
 				@click="removeAll"
-			>Remove All</button>
-			<button
-				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
-				:disabled="assignDisabled"
-				@click="assignLastCC"
-				:title="assignTitle"
-			>{{ assignLabel }}</button>
+			>
+				Remove All
+			</button>
 			<button
 				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="autoAssignDisabled"
 				@click="autoAssign"
-			>Auto Assign</button>
+			>
+				Auto Assign
+			</button>
 		</div>
 
 		<!-- List -->
@@ -39,9 +39,7 @@
 				v-for="row in allCCRows"
 				:key="row.cc"
 				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-neutral-800 cursor-grab"
-				:class="row.assignment
-					? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-neutral-800')
-					: 'opacity-40'"
+				:class="row.assignment ? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-neutral-800') : 'opacity-40'"
 				draggable="true"
 				@click.exact="row.assignment && selectRow(row.cc)"
 				@click.ctrl.exact="row.assignment && toggleRow(row.cc)"
@@ -59,10 +57,8 @@
 		</div>
 
 		<!-- Drop zone hint -->
-		<div
-			class="shrink-0 py-1 px-2 text-center text-neutral-500 border-t border-neutral-700 text-[10px]"
-		>
-			Hold F8 to show CC badges · Right-click params to assign
+		<div class="shrink-0 py-1 px-2 text-center text-neutral-500 border-t border-neutral-700 text-[10px]">
+			F8 - show CC's on params<span v-if="deviceStore.lastMidiCC"> | Last CC: #{{ deviceStore.lastMidiCC }} </span>
 		</div>
 
 		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
@@ -144,7 +140,10 @@
 	}
 
 	function shiftSelectRow(cc: number) {
-		if (lastSelectedCC === null) { selectRow(cc); return; }
+		if (lastSelectedCC === null) {
+			selectRow(cc);
+			return;
+		}
 		const lo = Math.min(lastSelectedCC, cc);
 		const hi = Math.max(lastSelectedCC, cc);
 		const next = new Set(selectedRows.value);
@@ -175,36 +174,7 @@
 		await slotsStore.deassignAllMidiCC(s);
 	}
 
-	const assignLabel = computed(() => {
-		const cc = deviceStore.lastMidiCC;
-		return cc !== null ? `Assign (CC:${cc})` : 'Assign (#–)';
-	});
-
-	const assignTitle = computed(() => {
-		const p = uiStore.selectedParam;
-		if (!p) return 'Select a param on the canvas first';
-		if (deviceStore.lastMidiCC === null) return 'Send a MIDI CC from your keyboard first';
-		return `Assign CC ${deviceStore.lastMidiCC} to param ${p.paramIndex} of module ${p.moduleId}`;
-	});
-
-	const assignDisabled = computed(() =>
-		deviceStore.lastMidiCC === null || !uiStore.selectedParam || !slot.value,
-	);
-
-	async function assignLastCC() {
-		const s = slot.value;
-		const p = uiStore.selectedParam;
-		const cc = deviceStore.lastMidiCC;
-		if (!s || !p || cc === null) return;
-		// Location: derive from selectedModulesArea
-		const area = uiStore.selectedModulesArea;
-		const location: 0 | 1 | 2 = area === 'va' ? 1 : 0;
-		await slotsStore.assignMidiCC(s, location, p.moduleId, p.paramIndex, cc);
-	}
-
-	const autoAssignDisabled = computed(() =>
-		!slot.value || uiStore.selectedModules.length === 0,
-	);
+	const autoAssignDisabled = computed(() => !slot.value || uiStore.selectedModules.length === 0);
 
 	async function autoAssign() {
 		const s = slot.value;
@@ -265,7 +235,11 @@
 		const raw = e.dataTransfer?.getData('text/plain');
 		if (!raw || !slot.value) return;
 		let data: any;
-		try { data = JSON.parse(raw); } catch { return; }
+		try {
+			data = JSON.parse(raw);
+		} catch {
+			return;
+		}
 		const s = slot.value;
 		if (data.type === 'cc' && data.cc !== targetCC) {
 			const dragged = controllers.value.find((c) => c.cc === data.cc);
@@ -281,5 +255,4 @@
 			}
 		}
 	}
-
 </script>
