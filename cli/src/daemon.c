@@ -308,6 +308,21 @@ static void execute_cmd(const char *line) {
 		return;
 	}
 
+	if (strcmp(cmd, "debug") == 0 && n >= 1) {
+		const char *val = arg_s(args, 0);
+		if (strcmp(val, "on") == 0)       g2_debug = 1;
+		else if (strcmp(val, "off") == 0) g2_debug = 0;
+		else {
+			cJSON *r = daemon_make_error(id, G2_ERR_INVALID_PARAM);
+			emit(r); cJSON_Delete(r); cJSON_Delete(req);
+			return;
+		}
+		cJSON *r = daemon_make_ok(id);
+		cJSON_AddBoolToObject(r, "debugOn", g2_debug);
+		emit(r); cJSON_Delete(r); cJSON_Delete(req);
+		return;
+	}
+
 	if (strcmp(cmd, "slot") == 0 && n >= 1) {
 		ret = g2_switch_slot(arg_s(args, 0));
 		/* Inactive target: sends SET_PERF_SETTINGS then SELECT_SLOT (0x09).
