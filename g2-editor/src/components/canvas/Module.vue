@@ -53,6 +53,7 @@
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 			<LevelMeter v-else-if="entry.ve.type === 'vu'" :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
 			<ModuleVeLed v-else-if="entry.ve.type === 'ledGroup'" :ve="entry.ve" :led-on="false" :active-step="ledStateMap[entry.key]?.step ?? 255" />
+			<ModuleVeGroupLabel v-else-if="entry.ve.type === 'groupLabel'" :ve="entry.ve"></ModuleVeGroupLabel>
 		</template>
 
 		<!-- Modes -->
@@ -180,6 +181,7 @@
 	import ModuleVeLine from './ModuleVeLine.vue';
 	import ModuleVePaths from './ModuleVePaths.vue';
 	import ModuleVeLed from './ModuleVeLed.vue';
+	import ModuleVeGroupLabel from './ModuleVeGroupLabel.vue';
 	import ModuleBitmap from './ModuleBitmap.vue';
 	import LevelMeter from './LevelMeter.vue';
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
