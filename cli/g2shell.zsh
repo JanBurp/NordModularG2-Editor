@@ -32,10 +32,19 @@ __g2_send() {
 
 stop()  { kill "$(cat "$_G2_DAEMON_PID_FILE")" 2>/dev/null; }
 start() {
-  tmux send-keys -t g2:0.1 "cd '$_G2_DIR' && ./g2-daemon-view.sh" Enter 2>/dev/null \
-    || print "Run './g2-daemon-view.sh' manually in the daemon pane."
+  tmux send-keys -t g2:0.1 "cd '$_G2_DIR' && ./g2-daemon-view.sh $1" Enter 2>/dev/null \
+    || print "Run './g2-daemon-view.sh $1' manually in the daemon pane."
+}
+debug() {
+  if [[ "$1" != "on" && "$1" != "off" ]]; then
+    print "Usage: debug on|off"
+    return
+  fi
+  stop
+  start "$([[ "$1" == "on" ]] && print -- --debug)"
 }
 help()  { "$_G2_DIR/build/bin/g2-cli" -h }
+exit()  { tmux kill-session -t g2 2>/dev/null || builtin exit }
 
 for _g2_cmd in "${_G2_CMDS[@]}"; do
   eval "function $_g2_cmd() { __g2_send $_g2_cmd \"\$@\"; }"
@@ -102,19 +111,19 @@ _g2_complete() {
     list)
       (( CURRENT == 2 )) && compadd patches performances
       ;;
-    verbose)
+    verbose|debug)
       (( CURRENT == 2 )) && compadd on off
       ;;
   esac
 }
 
 (( $+functions[compdef] )) || { autoload -Uz compinit && compinit; }
-compdef _g2_complete "${_G2_CMDS[@]}" stop start help
+compdef _g2_complete "${_G2_CMDS[@]}" stop start help exit debug
 
 # TAB completion: at command position only offer G2 commands, not all system commands
 _g2_tab_complete() {
   if (( CURRENT == 1 )); then
-    compadd -- "${_G2_CMDS[@]}" stop start help
+    compadd -- "${_G2_CMDS[@]}" stop start help exit debug
   else
     _main_complete "$@"
   fi
@@ -128,4 +137,4 @@ preexec_functions=("${(@)preexec_functions:#_p9k_*}")
 unset RPROMPT RPS1
 PROMPT='> '
 
-print "G2 shell ready. 'start'/'stop' to control daemon, 'help' to list commands."
+print "G2 shell ready. 'start'/'stop' to control daemon, 'debug on'/'debug off' for send-message logging, 'help' to list commands, 'exit' to quit."

@@ -17,11 +17,11 @@ mkfifo "$LED_FIFO"
 tmux new-session -d -s "$SESSION"
 tmux rename-window -t "$SESSION:0" "G2"
 tmux split-window -h -t "$SESSION:0"
-tmux split-window -v -b -l 6 -t "$SESSION:0.0"
+tmux split-window -v -b -l 3 -t "$SESSION:0.0"
 
 # After splitting, panes settle as: 0.0 = LED/VU (top-left), 0.1 = daemon (bottom-left), 0.2 = shell (right)
 tmux send-keys -t "$SESSION:0.0" "cat '$LED_FIFO' | jq --unbuffered -c ." Enter
-tmux send-keys -t "$SESSION:0.1" "cd '$DIR' && ./g2-daemon-view.sh --debug" Enter
+tmux send-keys -t "$SESSION:0.1" "cd '$DIR' && ./g2-daemon-view.sh" Enter
 tmux send-keys -t "$SESSION:0.2" "cd '$DIR' && source ./g2shell.zsh" Enter
 
 tmux select-pane -t "$SESSION:0.2"
