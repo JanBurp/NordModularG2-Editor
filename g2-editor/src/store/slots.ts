@@ -10,6 +10,7 @@ import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollision
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 import { useHistoryStore } from './history';
+import { isAllowedCC } from '@/composables/useMidiCC';
 
 type ResourceMetrics = { cycles: number; memory: number };
 export type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
@@ -346,6 +347,10 @@ export const useSlotsStore = defineStore('slots', {
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 			const slotEntry = this.slots[slot];
 			const hist = useHistoryStore();
+			const ccLocation = areaIdx === 0 ? 0 : 1;
+			const removedCCSnap = slotEntry.controllers.filter(
+				(c) => c.location === ccLocation && c.moduleIndex === moduleId,
+			);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -372,6 +377,8 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
+							if (removedCCSnap.length > 0)
+								slotE.controllers = [...slotE.controllers, ...removedCCSnap];
 							slotE.rawHex = null;
 							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
 							const allCmds: string[][] = [['add-module', slot, location,
@@ -392,6 +399,13 @@ export const useSlotsStore = defineStore('slots', {
 									String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon),
 									String(c.dmod), '0', String(c.dcon)]);
 							}
+							if (removedCCSnap.length > 0) {
+								const flatArgs = removedCCSnap.flatMap((a) => {
+									const locStr = a.location === 1 ? 'va' : 'fx';
+									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
+								});
+								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
+							}
 							if (allCmds.length > 0) await window.cli.runBatch(allCmds);
 						},
 						redo: async () => {
@@ -403,6 +417,10 @@ export const useSlotsStore = defineStore('slots', {
 
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
+			if (removedCCSnap.length > 0)
+				slotEntry.controllers = slotEntry.controllers.filter(
+					(c) => !(c.location === ccLocation && c.moduleIndex === moduleId),
+				);
 			slotEntry.rawHex = null;
 
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
@@ -1639,19 +1657,59 @@ export const useSlotsStore = defineStore('slots', {
 
 		async assignMidiCC(slot: SlotLabel, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number, cc: number): Promise<void> {
 			const locStr = location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
+			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [
 				...this.slots[slot].controllers.filter((c) => c.cc !== cc),
 				{ cc, location, moduleIndex, paramIndex },
 			];
 			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].controllers = prevControllers;
+						this.slots[slot].rawHex = null;
+						const deviceStore = useDeviceStore();
+						if (deviceStore.status === DeviceStatus.Connected) {
+							const oldAssignment = prevControllers.find((c) => c.cc === cc);
+							if (oldAssignment) {
+								const oldLocStr = oldAssignment.location === 1 ? 'va' : oldAssignment.location === 2 ? 'patch' : 'fx';
+								await window.cli.run(['assign-midicc', slot, oldLocStr, String(oldAssignment.moduleIndex), String(oldAssignment.paramIndex), String(cc)]);
+							} else {
+								await window.cli.run(['deassign-midicc', slot, String(cc)]);
+							}
+						}
+					},
+					redo: async () => { await this.assignMidiCC(slot, location, moduleIndex, paramIndex, cc); },
+				});
+			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
 				await window.cli.run(['assign-midicc', slot, locStr, String(moduleIndex), String(paramIndex), String(cc)]);
 		},
 
 		async deassignMidiCC(slot: SlotLabel, cc: number): Promise<void> {
+			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => c.cc !== cc);
 			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].controllers = prevControllers;
+						this.slots[slot].rawHex = null;
+						const restored = prevControllers.find((c) => c.cc === cc);
+						if (restored) {
+							const deviceStore = useDeviceStore();
+							if (deviceStore.status === DeviceStatus.Connected) {
+								const locStr = restored.location === 1 ? 'va' : restored.location === 2 ? 'patch' : 'fx';
+								await window.cli.run(['assign-midicc', slot, locStr, String(restored.moduleIndex), String(restored.paramIndex), String(cc)]);
+							}
+						}
+					},
+					redo: async () => { await this.deassignMidiCC(slot, cc); },
+				});
+			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
 				await window.cli.run(['deassign-midicc', slot, String(cc)]);
@@ -1659,39 +1717,101 @@ export const useSlotsStore = defineStore('slots', {
 
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {
 			const ccSet = new Set(ccs);
+			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSet.has(c.cc));
 			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].controllers = prevControllers;
+						this.slots[slot].rawHex = null;
+						const restored = prevControllers.filter((c) => ccSet.has(c.cc));
+						const deviceStore = useDeviceStore();
+						if (deviceStore.status === DeviceStatus.Connected && restored.length > 0) {
+							const flatArgs = restored.flatMap((a) => {
+								const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
+							});
+							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
+						}
+					},
+					redo: async () => { await this.deassignMidiCCs(slot, ccs); },
+				});
+			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
 				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
 		},
 
 		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
-			const ccs = this.slots[slot].controllers.map((c) => c.cc);
+			const prevControllers = [...this.slots[slot].controllers];
+			const ccs = prevControllers.map((c) => c.cc);
 			this.slots[slot].controllers = [];
 			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].controllers = prevControllers;
+						this.slots[slot].rawHex = null;
+						const deviceStore = useDeviceStore();
+						if (deviceStore.status === DeviceStatus.Connected && prevControllers.length > 0) {
+							const flatArgs = prevControllers.flatMap((a) => {
+								const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
+							});
+							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
+						}
+					},
+					redo: async () => { await this.deassignAllMidiCC(slot); },
+				});
+			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
 				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
 		},
 
 		async autoAssignMidiCC(slot: SlotLabel, targets: { location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[]): Promise<void> {
-			const RESERVED = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97]);
 			const usedCCs = new Set(this.slots[slot].controllers.map((c) => c.cc));
 			const newAssignments: MidiCCAssignment[] = [];
 			for (const t of targets) {
 				let cc = 2;
-				while (cc <= 119 && (usedCCs.has(cc) || RESERVED.has(cc))) cc++;
+				while (cc <= 119 && (usedCCs.has(cc) || !isAllowedCC(cc))) cc++;
 				if (cc > 119) break;
 				usedCCs.add(cc);
 				newAssignments.push({ cc, location: t.location, moduleIndex: t.moduleIndex, paramIndex: t.paramIndex });
 			}
 			const newCCSet = new Set(newAssignments.map((a) => a.cc));
+			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [
 				...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)),
 				...newAssignments,
 			];
 			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot) && newAssignments.length > 0) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].controllers = prevControllers;
+						this.slots[slot].rawHex = null;
+						const deviceStore = useDeviceStore();
+						if (deviceStore.status === DeviceStatus.Connected) {
+							const cmds: string[][] = [['deassign-midicc-batch', slot, ...newAssignments.map((a) => String(a.cc))]];
+							const restored = prevControllers.filter((c) => newCCSet.has(c.cc));
+							if (restored.length > 0) {
+								const flatArgs = restored.flatMap((a) => {
+									const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
+								});
+								cmds.push(['assign-midicc-batch', slot, ...flatArgs]);
+							}
+							await window.cli.runBatch(cmds);
+						}
+					},
+					redo: async () => { await this.autoAssignMidiCC(slot, targets); },
+				});
+			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && newAssignments.length > 0) {
 				const flatArgs = newAssignments.flatMap((a) => {

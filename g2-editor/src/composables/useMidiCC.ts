@@ -46,6 +46,15 @@ export function getFreeCCs(controllers: MidiCCAssignment[]): number[] {
 	return getAllowedCCs().filter((cc) => !used.has(cc));
 }
 
+export const CC_SHORT: Record<number, string> = {
+	2: 'Breath', 4: 'Foot', 5: 'Port.T', 6: 'DataEnt',
+	8: 'Balance', 10: 'Pan', 12: 'FX1', 13: 'FX2',
+	65: 'Portam', 66: 'Sosnut', 67: 'Soft', 68: 'Legato',
+	69: 'Hold2', 71: 'Timbre', 72: 'Release', 73: 'Attack',
+	74: 'Bright', 84: 'Port.C', 91: 'FX1D', 92: 'FX2D',
+	93: 'FX3D', 94: 'FX4D', 95: 'FX5D',
+};
+
 export function ccLabel(n: number): string {
 	const name = CC_NAMES[n];
 	return name ? `CC ${n}: ${name}` : `CC ${n}`;

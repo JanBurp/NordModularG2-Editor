@@ -77,7 +77,7 @@
 	import { useUiStore } from '@/store/ui';
 	import { useDeviceStore } from '@/store/device';
 	import { getModule } from '@/renderer/nmg2mods';
-	import { getAllowedCCs } from '@/composables/useMidiCC';
+	import { getAllowedCCs, CC_SHORT } from '@/composables/useMidiCC';
 	import type { MidiCCAssignment } from '@/types';
 	import Dialog from '@/components/common/Dialog.vue';
 
@@ -104,15 +104,6 @@
 		const assignedMap = new Map(controllers.value.map((c) => [c.cc, c]));
 		return getAllowedCCs().map((cc) => ({ cc, assignment: assignedMap.get(cc) ?? null }));
 	});
-
-	const CC_SHORT: Record<number, string> = {
-		2: 'Breath', 4: 'Foot', 5: 'Port.T', 6: 'DataEnt',
-		8: 'Balance', 10: 'Pan', 12: 'FX1', 13: 'FX2',
-		65: 'Portam', 66: 'Sosnut', 67: 'Soft', 68: 'Legato',
-		69: 'Hold2', 71: 'Timbre', 72: 'Release', 73: 'Attack',
-		74: 'Bright', 84: 'Port.C', 91: 'FX1D', 92: 'FX2D',
-		93: 'FX3D', 94: 'FX4D', 95: 'FX5D',
-	};
 
 	function ccShortName(cc: number): string {
 		return CC_SHORT[cc] ?? '';
