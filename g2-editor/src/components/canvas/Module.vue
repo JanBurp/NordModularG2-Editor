@@ -377,6 +377,16 @@
 				action: () => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
 			})),
 		});
+		const existing = slot
+			? slotsStore.slots[slot].controllers.find(
+					(c) => c.location === location && c.moduleIndex === moduleIdx.value && c.paramIndex === paramIndex
+				)
+			: undefined;
+		items.push({
+			label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',
+			disabled: !existing,
+			action: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
+		});
 		items.push({ type: 'separator' });
 
 		if (param && isSwitch(param.n)) {
