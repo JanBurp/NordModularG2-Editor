@@ -42,4 +42,5 @@ export const SETTINGS_LABELS = {
 	patchOctaves: 'Octaves',
 	editorPath: 'Browser Path',
 	editorHiddenModules: 'Show Hidden Modules',
+	editorTheme: 'Theme',
 } as const;

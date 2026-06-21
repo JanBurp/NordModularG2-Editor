@@ -7,9 +7,6 @@ export { Patchcord, FastVector, createFastVector } from './patchcord';
 // Cable Renderer
 export { makePatchCables, removeAllCables, type Cable, type Module, type Jack } from './cableRenderer';
 
-// Module Renderer
-export { makeBasicPanel, makeSubElements, clearTemplateCache, removeAllModules, type ModuleDef, type ModuleInstance } from './moduleRenderer';
-
 // Re-export from old renderer for backwards compatibility
 // These will be gradually phased out as components migrate to the new structure
 export { CABLE_COLORS, MODULE_COLORS } from '../constants';

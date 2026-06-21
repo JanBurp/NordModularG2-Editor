@@ -19,7 +19,7 @@
 			case 'loading':
 			case 'empty':
 			default:
-				return 'text-neutral-500';
+				return 'text-content-muted';
 		}
 	});
 </script>

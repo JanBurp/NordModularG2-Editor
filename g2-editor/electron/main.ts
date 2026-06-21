@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, dialog, Menu, shell } from "electron";
+import { BrowserWindow, app, ipcMain, dialog, Menu, shell, nativeTheme } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 import { fileURLToPath } from "node:url";
@@ -266,6 +266,10 @@ ipcMain.handle("app:info", () => ({
 }));
 
 ipcMain.on("shell:openExternal", (_, url: string) => { shell.openExternal(url); });
+
+ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {
+	nativeTheme.themeSource = mode;
+});
 
 app.on("before-quit", (e) => {
 	e.preventDefault();

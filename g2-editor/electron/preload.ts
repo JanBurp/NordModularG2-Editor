@@ -27,6 +27,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	openPatchDialog: () => ipcRenderer.invoke("patch:open-dialog"),
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
+	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),
 });
 
 contextBridge.exposeInMainWorld("cli", {

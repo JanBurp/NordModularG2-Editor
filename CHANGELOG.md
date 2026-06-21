@@ -8,6 +8,23 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Undo/Redo
+- Copy Variation
+- Themes: System, Light, Dark
+- Graphics & Params for several modules improved/finished
+- Missing VU meter's on Modules
+
+### Changed
+- Parameter sending smoother
+- Documentation restructured
+
+### Fixed
+- Cable editing bug
+- Swapped Gate LEDs
+- Sequencer and VU LED rendering issues
+- Sequencer Random/Clear buttons not working
+
 ---
 
 ## [0.5.6] - 2026-06-14

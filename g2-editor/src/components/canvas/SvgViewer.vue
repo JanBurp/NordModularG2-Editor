@@ -1,18 +1,18 @@
 <template>
-	<div class="absolute inset-0 bg-neutral-900 z-50 overflow-auto p-8">
+	<div class="absolute inset-0 bg-surface-0 z-50 overflow-auto p-8">
 		<div class="max-w-7xl mx-auto">
 			<div class="flex items-center justify-between mb-6">
-				<h1 class="text-2xl font-bold text-neutral-100">SVG Element Viewer</h1>
-				<button @click="uiStore.toggleSvgViewer()" class="px-4 py-2 bg-neutral-700 hover:bg-neutral-600 text-neutral-200 rounded">Close</button>
+				<h1 class="text-2xl font-bold text-content-primary">SVG Element Viewer</h1>
+				<button @click="uiStore.toggleSvgViewer()" class="px-4 py-2 bg-surface-2 hover:bg-surface-3 text-content-primary rounded">Close</button>
 			</div>
 
 			<SearchInput v-model="searchQuery" :is-active="true"></SearchInput>
 
-			<h2 class="text-xl font-semibold text-neutral-300 mb-4">Paths & Icons</h2>
+			<h2 class="text-xl font-semibold text-content-secondary mb-4">Paths & Icons</h2>
 			<div class="grid grid-cols-4 gap-6">
-				<div v-for="path in filteredPaths" :key="path.id" class="bg-neutral-800 p-4 rounded">
-					<p class="text-neutral-400 text-sm mb-2">{{ path.id }}</p>
-					<svg width="128" height="160" class="border border-neutral-600 bg-neutral-200">
+				<div v-for="path in filteredPaths" :key="path.id" class="bg-surface-1 p-4 rounded">
+					<p class="text-content-secondary text-sm mb-2">{{ path.id }}</p>
+					<svg width="128" height="160" class="border border-line-default bg-neutral-200">
 						<use :href="'#' + path.id" />
 					</svg>
 				</div>

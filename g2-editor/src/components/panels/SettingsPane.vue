@@ -15,6 +15,13 @@
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
 				</SettingsRow>
+				<SettingsRow :label="L.editorTheme">
+					<BtnGroup
+						:model-value="settings.theme"
+						:options="THEME_OPTIONS"
+						@update:model-value="settings.setTheme($event as ThemeMode)"
+					/>
+				</SettingsRow>
 			</div>
 		</Collapsible>
 		<Collapsible v-if="device.connected" title="Synth Settings" :default-open="false">
@@ -39,7 +46,7 @@
 							@update:model-value="device.setMidiSlot(slot.key, $event)"
 						/>
 						<CheckBox :model-value="isMidiOff(slot.key)" @update:model-value="setMidiOff(slot.key, $event)" />
-						<span class="text-xs text-neutral-400">Off</span>
+						<span class="text-xs text-content-secondary">Off</span>
 					</div>
 				</SettingsRow>
 
@@ -71,7 +78,7 @@
 							@update:model-value="device.setMidiSysex($event)"
 						/>
 						<CheckBox :model-value="sysex.isOff()" @update:model-value="sysex.setOff($event)" />
-						<span class="text-xs text-neutral-400">All</span>
+						<span class="text-xs text-content-secondary">All</span>
 					</div>
 				</SettingsRow>
 
@@ -126,7 +133,7 @@
 							:model-value="device.device?.globalOctaveShiftActive ?? false"
 							@update:model-value="device.setGlobalOctaveShiftActive($event)"
 						/>
-						<span class="text-xs text-neutral-400">Active</span>
+						<span class="text-xs text-content-secondary">Active</span>
 					</div>
 				</SettingsRow>
 			</div>
@@ -154,7 +161,7 @@
 				</SettingsRow>
 
 				<p class="settings-subheader">Slot Info:</p>
-				<div class="grid text-xs text-neutral-500 mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
+				<div class="grid text-xs text-content-muted mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
 					<span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
@@ -168,7 +175,7 @@
 					class="grid items-center text-xs px-0.5 py-0.5"
 					style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem"
 				>
-					<span class="text-neutral-300 font-medium">{{ slot }}</span>
+					<span class="text-content-secondary font-medium">{{ slot }}</span>
 					<span class="flex justify-center">
 						<CheckBox :model-value="slotEntry(slot)?.active ?? false" @update:model-value="device.toggleSlotActive(slot)" />
 					</span>
@@ -253,7 +260,7 @@
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
-	import { useSettingsStore } from '@/store/settings';
+	import { useSettingsStore, type ThemeMode } from '@/store/settings';
 	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
@@ -382,6 +389,12 @@
 			],
 		},
 		// { header: 'Level', toggleKey: 'activeMuted', params: [{ key: 'patchVol', label: 'Volume' }] },
+	];
+
+	const THEME_OPTIONS = [
+		{ label: 'System', value: 'system' },
+		{ label: 'Light', value: 'light' },
+		{ label: 'Dark', value: 'dark' },
 	];
 
 	const OFF_SEND_RECV_BOTH = [
