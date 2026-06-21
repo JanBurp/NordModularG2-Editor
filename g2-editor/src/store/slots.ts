@@ -957,6 +957,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].patch = patch;
 			this.slots[slot].variations = extractVariations(patch);
 			this.slots[slot].name = name;
+			this.slots[slot].controllers = patch.controllers ? [...patch.controllers] : [];
 			if (rawHex) {
 				this.slots[slot].rawHex = rawHex;
 				this.slots[slot].templateRawHex = rawHex;
@@ -973,6 +974,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].patch = patches[i];
 				this.slots[labels[i]].variations = extractVariations(patches[i]);
 				this.slots[labels[i]].name = slotName;
+				this.slots[labels[i]].controllers = patches[i].controllers ? [...patches[i].controllers] : [];
 				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
 				this.slots[labels[i]].rawHex = null;
 				this.slots[labels[i]].templateRawHex = null;
@@ -1019,6 +1021,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!entry.rawHex) {
 				if (!entry.templateRawHex) return;
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
+				entry.patch.controllers = [...entry.controllers];
 				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex, entry.variations ?? []);
 			}
 			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
@@ -1640,6 +1643,7 @@ export const useSlotsStore = defineStore('slots', {
 				...this.slots[slot].controllers.filter((c) => c.cc !== cc),
 				{ cc, location, moduleIndex, paramIndex },
 			];
+			this.slots[slot].rawHex = null;
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
 				await window.cli.run(['assign-midicc', slot, locStr, String(moduleIndex), String(paramIndex), String(cc)]);
@@ -1647,6 +1651,7 @@ export const useSlotsStore = defineStore('slots', {
 
 		async deassignMidiCC(slot: SlotLabel, cc: number): Promise<void> {
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => c.cc !== cc);
+			this.slots[slot].rawHex = null;
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
 				await window.cli.run(['deassign-midicc', slot, String(cc)]);
@@ -1655,6 +1660,7 @@ export const useSlotsStore = defineStore('slots', {
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {
 			const ccSet = new Set(ccs);
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSet.has(c.cc));
+			this.slots[slot].rawHex = null;
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
 				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
@@ -1663,6 +1669,7 @@ export const useSlotsStore = defineStore('slots', {
 		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
 			const ccs = this.slots[slot].controllers.map((c) => c.cc);
 			this.slots[slot].controllers = [];
+			this.slots[slot].rawHex = null;
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
 				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
@@ -1684,6 +1691,7 @@ export const useSlotsStore = defineStore('slots', {
 				...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)),
 				...newAssignments,
 			];
+			this.slots[slot].rawHex = null;
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && newAssignments.length > 0) {
 				const flatArgs = newAssignments.flatMap((a) => {
