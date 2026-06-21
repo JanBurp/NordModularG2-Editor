@@ -1,5 +1,5 @@
 <template>
-	<div class="status-bar flex items-center justify-between gap-3 bg-neutral-800 border-t border-neutral-700 text-xs text-neutral-400">
+	<div class="status-bar flex items-center justify-between gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary">
 		<BtnGroup
 			:model-value="uiStore.area"
 			:options="AREA_OPTIONS"

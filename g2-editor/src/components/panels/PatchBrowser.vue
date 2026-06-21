@@ -6,19 +6,19 @@
 		<!-- ── DISK VIEW ─────────────────────────────────────── -->
 		<template v-if="browser.view === 'disk'">
 			<!-- Folder header -->
-			<div class="flex items-center gap-1 px-2 py-1.5 border-b border-neutral-700 shrink-0 min-w-0">
+			<div class="flex items-center gap-1 px-2 py-1.5 border-b border-line-subtle shrink-0 min-w-0">
 				<button
 					v-if="diskParentName"
-					class="text-neutral-400 hover:text-white px-1 shrink-0 cursor-pointer"
+					class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer"
 					:title="`Up to ${diskParentName}`"
 					@click="browser.navigateUp()"
 				>
 					↑
 				</button>
-				<span class="text-neutral-300 truncate flex-1 min-w-0 font-medium">
+				<span class="text-content-secondary truncate flex-1 min-w-0 font-medium">
 					{{ diskFolderName || 'No folder selected' }}
 				</span>
-				<button class="text-neutral-400 hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">…</button>
+				<button class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">…</button>
 			</div>
 
 			<template v-if="browser.diskFolder">
@@ -34,7 +34,7 @@
 						:key="entry.path"
 						@click="selectDisk(entry)"
 					>
-						<template #icon><span class="text-neutral-400">▶</span></template>
+						<template #icon><span class="text-content-secondary">▶</span></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
 					<ListItem
@@ -44,7 +44,7 @@
 					>
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
-						<template #meta><span class="text-neutral-600">{{ entry.name.split('.').pop() }}</span></template>
+						<template #meta><span class="text-content-secondary">{{ entry.name.split('.').pop() }}</span></template>
 					</ListItem>
 					<StateMessage
 						v-if="filteredDiskDirs.length === 0 && filteredDiskFiles.length === 0"
@@ -71,14 +71,14 @@
 					<template v-for="group in browser.view === 'patches' ? patchGroups : perfGroups" :key="group.bank">
 						<!-- Bank header (collapsible) -->
 						<li
-							class="flex items-center gap-2 px-3 py-1 bg-neutral-800 cursor-pointer select-none border-b border-neutral-700 sticky top-0 z-10"
+							class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
 							@click="browser.toggleBank(group.bank)"
 						>
-							<span class="text-neutral-500 w-3">
+							<span class="text-content-muted w-3">
 								{{ browser.isBankCollapsed(group.bank) ? '▶' : '▼' }}
 							</span>
-							<span class="text-neutral-400 font-medium">Bank {{ group.bank }}</span>
-							<span class="text-neutral-600 ml-auto">{{ group.patches.length }}</span>
+							<span class="text-content-secondary font-medium">Bank {{ group.bank }}</span>
+							<span class="text-content-secondary ml-auto">{{ group.patches.length }}</span>
 						</li>
 						<!-- Patch entries -->
 						<template v-if="!browser.isBankCollapsed(group.bank)">
@@ -87,7 +87,7 @@
 								:key="`${p.bank}-${p.location}`"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
-								<template #icon><span class="text-neutral-600">{{ p.location }}</span></template>
+								<template #icon><span class="text-content-secondary">{{ p.location }}</span></template>
 								<template #label>{{ p.name }}</template>
 							</ListItem>
 						</template>

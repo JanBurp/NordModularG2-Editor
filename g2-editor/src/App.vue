@@ -39,7 +39,7 @@
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-neutral-700 flex flex-col overflow-hidden">
+			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden">
 				<template v-if="currentPatch">
 					<div v-show="showVoice" class="relative overflow-hidden min-h-0" :class="{ 'flex-1': !isSplit }" :style="voiceWrapperStyle">
 						<PatchCanvas
@@ -104,7 +104,7 @@
 	<Dialog v-model="showParamLabelDialog" title="Rename Label" @confirm="confirmParamLabel" @cancel="showParamLabelDialog = false">
 		<input
 			v-model="editingParamLabel"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 			maxlength="16"
 		/>
 	</Dialog>
@@ -112,7 +112,7 @@
 	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
 		<input
 			v-model="editingLabel"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 			maxlength="16"
 		/>
 	</Dialog>
@@ -120,7 +120,7 @@
 	<Dialog v-model="showPatchNameDialog" title="Rename Patch" @confirm="confirmPatchName" @cancel="cancelPatchNameDialog">
 		<input
 			v-model="editingPatchName"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 			maxlength="16"
 		/>
 	</Dialog>
@@ -128,7 +128,7 @@
 	<Dialog v-model="showPerfNameDialog" title="Rename Performance" @confirm="confirmPerfName" @cancel="cancelPerfNameDialog">
 		<input
 			v-model="editingPerfName"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 			maxlength="16"
 		/>
 	</Dialog>
@@ -139,7 +139,7 @@
 			type="number"
 			min="30"
 			max="240"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 		/>
 	</Dialog>
 

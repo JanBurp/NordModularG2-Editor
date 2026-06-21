@@ -3,7 +3,7 @@
 		<select
 			v-if="isEnumParam && editingParamDef"
 			v-model="editingValue"
-			class="w-full px-2 py-1 text-sm border border-neutral-500 rounded bg-neutral-700 text-neutral-100 focus:outline-none focus:border-neutral-400"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 		>
 			<option v-for="(name, i) in editingParamDef.names" :key="i" :value="editingParamDef.low + i">
 				{{ name || String(editingParamDef.low + i) }}

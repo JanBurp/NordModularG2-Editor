@@ -1,9 +1,9 @@
 <template>
-	<div class="h-6 flex gap-1 bg-neutral-700 rounded px-2 items-center">
-		<span class="w-4 text-xs text-neutral-400">VA</span>
+	<div class="h-6 flex gap-1 bg-surface-2 rounded px-2 items-center">
+		<span class="w-4 text-xs text-content-secondary">VA</span>
 		<CPUpart :value="va.cycles" />
 		<CPUpart :value="va.memory" />
-		<span class="w-4 text-xs text-neutral-400">FX</span>
+		<span class="w-4 text-xs text-content-secondary">FX</span>
 		<CPUpart :value="fx.cycles" />
 		<CPUpart :value="fx.memory" />
 	</div>

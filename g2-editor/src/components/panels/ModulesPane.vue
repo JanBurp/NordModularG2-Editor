@@ -1,22 +1,22 @@
 <template>
-	<div class="h-full overflow-y-auto p-2 bg-neutral-900">
+	<div class="h-full overflow-y-auto p-2 bg-surface-0">
 		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
-		<div data-testid="module-count" class="text-xs text-neutral-500 py-1 px-1">{{ totalModuleCount }} modules</div>
+		<div data-testid="module-count" class="text-xs text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
 		<div v-for="category in categories" :key="category" class="mb-4">
 			<div v-if="categoryMatchesSearch(category)">
 				<div
-					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-neutral-400 border-b border-neutral-700 hover:text-neutral-200"
+					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
 					@click="toggleCategory(category)"
 				>
-					<span class="text-xs w-3 text-neutral-500">{{ isExpanded(category) ? '▼' : '▶' }}</span>
+					<span class="text-xs w-3 text-content-muted">{{ isExpanded(category) ? '▼' : '▶' }}</span>
 					{{ category }}
-					<span class="font-normal text-neutral-500 text-xs">({{ getModulesByCategory(category).length }})</span>
+					<span class="font-normal text-content-muted text-xs">({{ getModulesByCategory(category).length }})</span>
 				</div>
 
 				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 					<template v-for="module in getModulesByCategory(category)" :key="module.id">
 						<div
-							class="w-64 bg-neutral-600 rounded overflow-visible shadow"
+							class="w-64 bg-surface-3 rounded overflow-visible shadow"
 							:style="{
 								height: getModuleHeight(module) + 'px',
 								cursor: 'grab',
@@ -33,7 +33,7 @@
 						</div>
 						<div
 							v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
-							class="module-help w-64 bg-neutral-800 rounded p-3 text-xs text-neutral-300"
+							class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
 							v-html="ui.helpAllModules ? (helpCache.get(module.id) || '') : helpHtml"
 						/>
 					</template>

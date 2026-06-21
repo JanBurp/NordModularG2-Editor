@@ -18,7 +18,7 @@ const STATUS_MAP: Record<DeviceStatus, { textClass: string; dotClass: string; la
 	[DeviceStatus.Connected]:    { textClass: 'text-green-400',   dotClass: 'bg-green-500',                label: 'connected' },
 	[DeviceStatus.Connecting]:   { textClass: 'text-orange-300',  dotClass: 'bg-orange-400 animate-pulse', label: 'connecting' },
 	[DeviceStatus.Loading]:      { textClass: 'text-blue-300',    dotClass: 'bg-blue-400 animate-pulse',   label: 'loading' },
-	[DeviceStatus.Disconnected]: { textClass: 'text-neutral-400', dotClass: 'bg-neutral-600',              label: 'disconnected' },
+	[DeviceStatus.Disconnected]: { textClass: 'text-content-secondary', dotClass: 'bg-surface-3',          label: 'disconnected' },
 	[DeviceStatus.Lost]:         { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'lost' },
 	[DeviceStatus.Unsupported]:  { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'not available' },
 	[DeviceStatus.Offline]:      { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'offline' },
@@ -34,8 +34,8 @@ export const useDeviceStore = defineStore('device', {
 
 	getters: {
 		connected: (state) => state.status === DeviceStatus.Connected,
-		statusClass: (state): string => STATUS_MAP[state.status]?.textClass ?? 'text-neutral-400',
-		dotClass: (state): string => STATUS_MAP[state.status]?.dotClass ?? 'bg-neutral-600',
+		statusClass: (state): string => STATUS_MAP[state.status]?.textClass ?? 'text-content-secondary',
+		dotClass: (state): string => STATUS_MAP[state.status]?.dotClass ?? 'bg-surface-3',
 		statusLabel: (state): string => STATUS_MAP[state.status]?.label ?? 'unknown',
 		perfName: (state): string => {
 			if (state.device?.mode === 'Performance') return state.device.performance?.name ?? '---';

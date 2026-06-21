@@ -1,6 +1,6 @@
 <template>
 	<div
-		class="overflow-auto bg-neutral-700 relative h-full w-full"
+		class="overflow-auto bg-surface-2 relative h-full w-full"
 		:data-testid="`canvas-${area}`"
 		@dragover.prevent="handleDragOver"
 		@dragleave="clearDropGhost"
