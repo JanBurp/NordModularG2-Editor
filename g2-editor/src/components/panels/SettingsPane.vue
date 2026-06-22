@@ -2,6 +2,28 @@
 	<div class="flex flex-col gap-1">
 		<Collapsible title="Editor Settings" :default-open="false">
 			<div class="flex flex-col gap-1">
+				<SettingsRow :label="L.editorTheme">
+					<BtnGroup :model-value="settings.theme" :options="THEME_OPTIONS" @update:model-value="settings.setTheme($event as ThemeMode)" />
+				</SettingsRow>
+
+				<p class="settings-subheader">Cable rendering:</p>
+				<SettingsRow :label="L.cableGravity">
+					<RangeInput :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.cableOpacity">
+					<RangeInput :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
+				</SettingsRow>
+				<SettingsRow :label="L.cableThickness">
+					<RangeInput
+						:model-value="settings.cableThickness"
+						:min="0"
+						:max="6.5"
+						:step="0.5"
+						@update:model-value="settings.setCableThickness($event)"
+					/>
+				</SettingsRow>
+
+				<p class="settings-subheader">Settings:</p>
 				<SettingsRow :label="L.editorPath">
 					<div class="flex gap-1 flex-1 items-center">
 						<div class="w-1/4">
@@ -14,22 +36,6 @@
 				</SettingsRow>
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.editorTheme">
-					<BtnGroup
-						:model-value="settings.theme"
-						:options="THEME_OPTIONS"
-						@update:model-value="settings.setTheme($event as ThemeMode)"
-					/>
-				</SettingsRow>
-				<SettingsRow :label="L.cableGravity">
-					<RangeInput :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.cableOpacity">
-					<RangeInput :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
-				</SettingsRow>
-				<SettingsRow :label="L.cableThickness">
-					<RangeInput :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
 				</SettingsRow>
 			</div>
 		</Collapsible>
@@ -170,7 +176,10 @@
 				</SettingsRow>
 
 				<p class="settings-subheader">Slot Info:</p>
-				<div class="grid text-xs text-content-muted mb-0.5 px-0.5" style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem">
+				<div
+					class="grid text-xs text-content-muted mb-0.5 px-0.5"
+					style="grid-template-columns: 1.25rem 3rem 1fr 1fr 1fr 1.75rem 1.75rem; gap: 0.25rem"
+				>
 					<span></span>
 					<span class="text-center">{{ L.slotActive }}</span>
 					<span class="text-center">{{ L.slotKey }}</span>
