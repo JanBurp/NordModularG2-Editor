@@ -677,6 +677,10 @@ static void do_reconnect(void) {
 		usleep(100000);
 	if (!daemon_running) return;
 
+	/* Reset G2 firmware state — same as startup init sequence (Delphi InitSeq steps 1-2). */
+	g2_send_init();
+	g2_stop_comm();
+
 	g2_listener_start();
 	g2_rearm();
 	/* Consume START_COMM ACK from listener queue. */

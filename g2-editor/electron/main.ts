@@ -174,7 +174,7 @@ ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
 	return [await sendSeq(argsList)];
 });
 
-ipcMain.handle("cli:watch-start", () => { startDaemon(); });
+ipcMain.handle("cli:watch-start", async () => { await stopDaemon(); startDaemon(); });
 ipcMain.on("cli:watch-stop", () => { stopDaemon(); });
 
 ipcMain.handle("patches:list", async (_, folder: string) => {
