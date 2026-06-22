@@ -992,7 +992,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].patch = patches[i];
 				this.slots[labels[i]].variations = extractVariations(patches[i]);
 				this.slots[labels[i]].name = slotName;
-				this.slots[labels[i]].controllers = patches[i].controllers ? [...patches[i].controllers] : [];
+				this.slots[labels[i]].controllers = patches[i].controllers ? [...patches[i].controllers!] : [];
 				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
 				this.slots[labels[i]].rawHex = null;
 				this.slots[labels[i]].templateRawHex = null;
