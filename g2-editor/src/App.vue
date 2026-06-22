@@ -155,7 +155,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, ref } from 'vue';
+	import { computed, onMounted, ref } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
@@ -247,7 +247,6 @@
 
 	const voiceOps = usePatchOperations(() => 'voice');
 	const fxOps = usePatchOperations(() => 'fx');
-	const { deleteSelection } = usePatchOperations();
 
 	const {
 		showDialog: showPatchNameDialog,

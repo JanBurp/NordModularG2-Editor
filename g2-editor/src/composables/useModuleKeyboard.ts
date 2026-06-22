@@ -41,10 +41,6 @@ export function useModuleKeyboard() {
 		return uiStore.activeArea;
 	}
 
-	function getActiveModules(): ModuleInstance[] {
-		return getModulesInArea(getSelectedArea());
-	}
-
 	function getTopLeftModule(area: 0 | 1): ModuleInstance | undefined {
 		const mods = getModulesInArea(area);
 		if (mods.length === 0) return undefined;

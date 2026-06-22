@@ -10,7 +10,7 @@ export function useSwitch(
 	label: Ref<ParamLabel | undefined> | ComputedRef<ParamLabel | undefined>,
 	paramIndex: Ref<number> | ComputedRef<number>,
 	emitChange: (index: number, value: number) => void,
-	emitLabelEdit?: (info: { paramIndex: number; currentLabel: string }) => void,
+	_emitLabelEdit?: (info: { paramIndex: number; currentLabel: string }) => void,
 ) {
 	const paramDef = computed<ParamDefinition>(() => getParam(param.value.type) || ({} as ParamDefinition));
 	const names = computed(() => paramDef.value.names || []);

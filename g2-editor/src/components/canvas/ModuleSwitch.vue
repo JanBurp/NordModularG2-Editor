@@ -121,18 +121,14 @@
 	}>();
 
 	const {
-		paramDef,
-		names,
 		displayNames,
 		activeIndex,
 		singleButtonMode,
 		activeOptionName,
-		mode,
 		bmp,
 		hasBitmap,
 		maskh,
 		width,
-		itemsPerRow,
 		getButtonX,
 		getButtonY,
 		onButtonClick,

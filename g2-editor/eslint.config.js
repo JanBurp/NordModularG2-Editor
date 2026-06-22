@@ -41,6 +41,12 @@ const allGlobals = {
   HTMLDivElement: 'readonly',
   setInterval: 'readonly',
   clearInterval: 'readonly',
+  requestAnimationFrame: 'readonly',
+  cancelAnimationFrame: 'readonly',
+  HTMLTextAreaElement: 'readonly',
+  HTMLSelectElement: 'readonly',
+  DOMMatrix: 'readonly',
+  SVGPoint: 'readonly',
 };
 
 export default [

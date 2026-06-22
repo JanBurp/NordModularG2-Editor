@@ -1,12 +1,10 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { useDeviceStore } from '../store/device';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
-	const device = useDeviceStore();
 
 	const getArea =
 		areaGetter ??

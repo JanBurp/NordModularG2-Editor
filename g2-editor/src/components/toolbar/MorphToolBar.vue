@@ -33,7 +33,6 @@
 	import { computed } from 'vue';
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
-	import ToolBarDivider from './ToolBarDivider.vue';
 	import Knob from '../common/Knob.vue';
 	import CheckBox from '../common/CheckBox.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';

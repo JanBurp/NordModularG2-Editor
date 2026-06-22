@@ -59,10 +59,8 @@ class G2Parser {
 		const str = String.fromCharCode.apply(null, hdr as unknown as number[]);
 		let ofs = str.indexOf('\0');
 		const textHdrLen = ofs + 3;
-		const fileCRC = new DataView(data).getInt16(data.byteLength - 2) & 0xffff;
 		const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);
 		this.ofs = ofs;
-		const filedataArray = new Uint8Array(data, ofs + 1, data.byteLength - ofs - 3);
 		const maxofs = filedata.byteLength;
 		ofs = 0;
 		while (ofs < maxofs) {
