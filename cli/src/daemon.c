@@ -812,6 +812,14 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_pending_rearm = 0;
 			rearm_with_version_update();
 		} else {
+			/* patch_version_change arrives while streaming is active.  The following
+			 * get-patch command will issue GET_PATCH_SLOT (0x36), which silently stops
+			 * G2 streaming just like select-patch.  Arm the deferred rearm now so the
+			 * main loop restarts streaming after get-patch returns. */
+			if ((msg.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED
+				? (msg.interrupt[2] == 0x04 && msg.interrupt[4] == 0x38)
+				: (msg.bulk && msg.bulk_size > 3 && msg.bulk[1] == 0x01 && msg.bulk[3] == 0x21))
+				rearm_after_get_patch = 1;
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
 			if (g2_pending_rearm) {
