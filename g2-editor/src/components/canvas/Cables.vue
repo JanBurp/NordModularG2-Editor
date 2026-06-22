@@ -3,7 +3,7 @@
 <script setup lang="ts">
 	import { inject, watch, onMounted, nextTick } from 'vue';
 	import type { Ref } from 'vue';
-	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility } from '../../renderer/cableRenderer';
+	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility, updateCableStyles, updateCableGravity } from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
@@ -136,11 +136,23 @@
 		},
 	);
 
-	// Re-render when cable visual settings change.
+	// Gravity: shift existing control points — no re-randomization.
 	watch(
-		() => [settings.cableGravity, settings.cableOpacity, settings.cableThickness],
+		() => settings.cableGravity,
+		(newVal, oldVal) => {
+			nextTick(() => {
+				if (svgRef?.value) updateCableGravity(svgRef.value, oldVal, newVal);
+			});
+		},
+	);
+
+	// Opacity / thickness: update styles on existing elements — no re-randomization.
+	watch(
+		() => [settings.cableOpacity, settings.cableThickness] as const,
 		() => {
-			nextTick(() => renderCables());
+			nextTick(() => {
+				if (svgRef?.value) updateCableStyles(svgRef.value, settings.cableOpacity, settings.cableThickness);
+			});
 		},
 	);
 

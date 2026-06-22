@@ -29,7 +29,7 @@
 					<RangeInput :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.cableThickness">
-					<RangeInput :model-value="settings.cableThickness" :min="0" :max="10" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
+					<RangeInput :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
 				</SettingsRow>
 			</div>
 		</Collapsible>
