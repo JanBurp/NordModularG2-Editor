@@ -1,7 +1,10 @@
 <template>
 	<div class="h-full overflow-y-auto p-2 bg-surface-0">
 		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
-		<div data-testid="module-count" class="text-xs text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
+		<div class="flex justify-between items-center">
+			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
+			<Button variant="toggle" size="xs" @click="toggleAllCategories">{{ allExpanded ? 'Collapse All' : 'Expand All' }}</Button>
+		</div>
 		<div v-for="category in categories" :key="category" class="mb-4">
 			<div v-if="categoryMatchesSearch(category)">
 				<div
@@ -47,6 +50,7 @@
 	import { ref, reactive, computed, watch } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
+	import Button from '../toolbar/Button.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';
@@ -62,7 +66,7 @@
 		const all = getAllCategories();
 		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
 	});
-	const expandedCategories = ref(getAllCategories());
+	const expandedCategories = ref(settings.categoriesExpanded ? getAllCategories() : []);
 	const searchQuery = ref('');
 	const selectedModuleId = ref<number | null>(null);
 
@@ -162,6 +166,14 @@
 	);
 
 	const moduleInstances = reactive(new Map());
+
+	const allExpanded = computed(() => categories.value.every((c) => expandedCategories.value.includes(c)));
+
+	function toggleAllCategories() {
+		const next = !allExpanded.value;
+		expandedCategories.value = next ? [...categories.value] : [];
+		settings.setCategoriesExpanded(next);
+	}
 
 	function toggleCategory(category: string) {
 		const idx = expandedCategories.value.indexOf(category);

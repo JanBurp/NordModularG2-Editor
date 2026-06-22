@@ -6,6 +6,7 @@ export const useSettingsStore = defineStore('settings', {
 	state: () => ({
 		path: '' as string,
 		hidden_modules: false as boolean,
+		categoriesExpanded: true as boolean,
 		theme: 'system' as ThemeMode,
 		cableGravity: 50 as number,
 		cableOpacity: 90 as number,
@@ -17,6 +18,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;
+		},
+		setCategoriesExpanded(value: boolean) {
+			this.categoriesExpanded = value;
 		},
 		setTheme(value: ThemeMode) {
 			this.theme = value;
