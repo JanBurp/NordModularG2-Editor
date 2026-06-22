@@ -93,7 +93,7 @@
 				</template>
 			</div>
 
-			<SidePanel v-if="uiStore.showRightPane" />
+			<SidePanel v-if="settingsStore.showRightPane" />
 		</div>
 
 		<StatusBar />
@@ -194,6 +194,7 @@
 	import { useUiStore } from './store/ui';
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
+	import { useSettingsStore } from './store/settings';
 
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 
@@ -203,6 +204,7 @@
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
+	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
 
 	const canvasAreaRef = ref<HTMLElement | null>(null);

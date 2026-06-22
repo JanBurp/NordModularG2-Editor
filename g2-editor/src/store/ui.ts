@@ -5,8 +5,7 @@ import type { SlotAreaState } from '@/types/ui';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
-
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'settings' | '';
+import { useSettingsStore } from './settings';
 
 function defaultSlotAreaState(): SlotAreaState {
 	return { areaMode: 1, dividerPos: 50, lastNonSplitArea: 1 };
@@ -23,8 +22,6 @@ export const useUiStore = defineStore('ui', {
 		} as Record<SlotLabel, SlotAreaState>,
 		variation: 0 as number,
 		moduleColor: 0 as number,
-		rightPaneTab: '' as PaneTab,
-		showRightPane: false as boolean,
 		selectedCables: [] as Cable[],
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
@@ -60,18 +57,6 @@ export const useUiStore = defineStore('ui', {
 			this.clearSelection();
 			const device = useDeviceStore().device;
 			if (device?.performance) device.performance.focus = slot;
-		},
-
-		toggleSidebar(tab: PaneTab) {
-			if (this.rightPaneTab === tab) {
-				this.showRightPane = !this.showRightPane;
-				if (this.showRightPane === false) {
-					this.rightPaneTab = '';
-				}
-			} else {
-				this.rightPaneTab = tab;
-				this.showRightPane = true;
-			}
 		},
 
 		setModuleColor(index: number) {
@@ -116,18 +101,20 @@ export const useUiStore = defineStore('ui', {
 				return;
 			}
 			this.helpModuleTypeId = typeId;
-			if (!this.showRightPane || this.rightPaneTab !== 'modules') {
-				this.rightPaneTab = 'modules';
-				this.showRightPane = true;
+			const settings = useSettingsStore();
+			if (!settings.showRightPane || settings.rightPaneTab !== 'modules') {
+				settings.rightPaneTab = 'modules';
+				settings.showRightPane = true;
 			}
 		},
 
 		toggleAllModuleHelp() {
 			this.helpModuleTypeId = null;
 			this.helpAllModules = !this.helpAllModules;
-			if (this.helpAllModules && (!this.showRightPane || this.rightPaneTab !== 'modules')) {
-				this.rightPaneTab = 'modules';
-				this.showRightPane = true;
+			const settings = useSettingsStore();
+			if (this.helpAllModules && (!settings.showRightPane || settings.rightPaneTab !== 'modules')) {
+				settings.rightPaneTab = 'modules';
+				settings.showRightPane = true;
 			}
 		},
 

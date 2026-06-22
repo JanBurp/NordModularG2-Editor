@@ -112,13 +112,13 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				}
 				case 'toggle-modules':
-					uiStore.toggleSidebar('modules');
+					useSettingsStore().toggleSidebar('modules');
 					break;
 				case 'toggle-browser':
-					uiStore.toggleSidebar('browser');
+					useSettingsStore().toggleSidebar('browser');
 					break;
 				case 'toggle-settings':
-					uiStore.toggleSidebar('settings');
+					useSettingsStore().toggleSidebar('settings');
 					break;
 				case 'area-voice':
 					uiStore.setAreaMode(1);

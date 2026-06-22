@@ -14,11 +14,11 @@
 		</div>
 
 		<BtnGroup
-			:model-value="uiStore.rightPaneTab"
+			:model-value="settingsStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="tab"
-			@update:model-value="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
-			@toggle-off="(tab) => uiStore.toggleSidebar(tab as PaneTab)"
+			@update:model-value="(tab) => settingsStore.toggleSidebar(tab as PaneTab)"
+			@toggle-off="(tab) => settingsStore.toggleSidebar(tab as PaneTab)"
 		/>
 	</div>
 </template>
@@ -29,11 +29,13 @@
 	import { useSlotsStore } from '../../store/slots';
 	import BtnGroup from './BtnGroup.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
-	import type { PaneTab } from '../../store/ui';
+	import { useSettingsStore } from '../../store/settings';
+	import type { PaneTab } from '../../store/settings';
 	import { useAreaMode } from '../../composables/useAreaMode';
 
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
+	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));

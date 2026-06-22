@@ -151,7 +151,7 @@
 
 	// Pre-load cache whenever the modules pane becomes visible so F1 "show all" is instant
 	watch(
-		[() => ui.showRightPane, () => ui.rightPaneTab],
+		[() => settings.showRightPane, () => settings.rightPaneTab],
 		([show, tab]) => {
 			if (show && tab === 'modules') loadAllHelp();
 		},

@@ -1,10 +1,10 @@
 <template>
 	<div class="w-68 bg-surface-1 border-l border-line-subtle flex flex-col">
 		<div class="flex-1 overflow-hidden overflow-y-auto">
-			<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
-			<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
-			<MidiCCPane v-show="uiStore.rightPaneTab === 'midicc'" :isActive="uiStore.rightPaneTab === 'midicc'" />
-			<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" :isActive="uiStore.rightPaneTab === 'settings'" />
+			<PatchBrowser v-show="settingsStore.rightPaneTab === 'browser'" :isActive="settingsStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
+			<ModulesPane v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
+			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
+			<SettingsPane v-show="settingsStore.rightPaneTab === 'settings'" :isActive="settingsStore.rightPaneTab === 'settings'" />
 		</div>
 	</div>
 </template>
@@ -14,9 +14,9 @@
 	import ModulesPane from './ModulesPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
-	import { useUiStore } from '@/store/ui';
+	import { useSettingsStore } from '@/store/settings';
 	import { usePatchFile } from '@/composables/usePatchFile';
 
-	const uiStore = useUiStore();
+	const settingsStore = useSettingsStore();
 	const patchFile = usePatchFile();
 </script>
