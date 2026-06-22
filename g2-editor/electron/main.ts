@@ -62,6 +62,9 @@ function startDaemon() {
 	console.error('[daemon] Starting daemon process...');
 	const proc = spawn(cliPath, ["daemon"]);
 	daemonProcess = proc;
+	proc.stdin?.on("error", () => {
+		// swallow EPIPE — expected when daemon exits while a write is in flight
+	});
 	let buffer = "";
 	proc.stdout?.on("data", (data: Buffer) => {
 		buffer += data.toString();
