@@ -29,6 +29,9 @@ export interface Jack {
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
 	selectedCables?: Cable[];
+	gravity?: number;
+	opacity?: number;
+	thickness?: number;
 }
 
 export function makeCableKey(cable: Cable): string {
@@ -38,6 +41,10 @@ export function makeCableKey(cable: Cable): string {
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	const selectedKeys = new Set(options?.selectedCables?.map(makeCableKey) ?? []);
+	const mainStroke = 1 + (options?.thickness ?? 1) * 1.5;
+	const borderStroke = mainStroke + 2 + (options?.thickness ?? 1) * 0.3;
+	const opacity = (options?.opacity ?? 90) / 100;
+	const gravity = options?.gravity ?? 50;
 	cables.forEach((cable) => {
 		const dir = cable.dir ?? 1;
 
@@ -72,7 +79,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const dy = dcon.y + dmod.vert * MODULE_ROW_HEIGHT;
 
 		const pc = new Patchcord(sx, sy, dx, dy);
-		const d = pc.getCurvePath();
+		const d = pc.getCurvePath(gravity);
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
 		const isSelected = selectedKeys.has(makeCableKey(cable));
@@ -90,6 +97,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-dmod': String(dmod.index),
 			'data-dcon': String(cable.dcon),
 			'data-dir': String(dir),
+			style: `stroke-width: ${borderStroke};`,
 		});
 
 		const main = svgPath(d, {
@@ -98,6 +106,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			class: 'svgcable nomouse',
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
+			style: `stroke-width: ${mainStroke}; opacity: ${opacity};`,
 		});
 		const hitArea = svgPath(d, {
 			stroke: 'transparent',
@@ -177,4 +186,34 @@ export function updateCablePaths(modules: Module[], svgElement: SVGElement, move
 
 export function removeAllCables(svgElement: SVGElement): void {
 	svgElement.querySelectorAll('.svgcable, .svgcableborder, .cable-hit').forEach((el) => el.remove());
+}
+
+// Updates opacity and stroke-width on existing cable elements without re-rendering.
+export function updateCableStyles(svgElement: SVGElement, opacity: number, thickness: number): void {
+	const mainStroke = 1 + thickness * 1.5;
+	const borderStroke = mainStroke + 2 + thickness * 0.3;
+	const o = opacity / 100;
+	svgElement.querySelectorAll<SVGPathElement>('.svgcable').forEach((el) => {
+		el.setAttribute('style', `stroke-width: ${mainStroke}; opacity: ${o};`);
+	});
+	svgElement.querySelectorAll<SVGPathElement>('.svgcableborder').forEach((el) => {
+		el.setAttribute('style', `stroke-width: ${borderStroke};`);
+	});
+}
+
+// Shifts control point y-coordinates on all cable paths by the delta between old and new gravity,
+// preserving the random organic shape and only changing the downward droop.
+export function updateCableGravity(svgElement: SVGElement, oldGravity: number, newGravity: number): void {
+	svgElement.querySelectorAll<SVGPathElement>('[data-cable-key]').forEach((el) => {
+		const d = el.getAttribute('d');
+		if (!d) return;
+		const m = d.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
+		if (!m) return;
+		const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = m.slice(1).map(Number);
+		const diffX = sx - dx, diffY = sy - dy;
+		const length = Math.sqrt(diffX * diffX + diffY * diffY);
+		const base = Math.max(sy, dy) - (sy + dy) / 2 + length * 0.2;
+		const delta = ((newGravity - oldGravity) / 100) * base * (4 / 3);
+		el.setAttribute('d', `M${dx} ${dy}C${cp1x} ${cp1y + delta},${cp2x} ${cp2y + delta},${sx} ${sy}`);
+	});
 }

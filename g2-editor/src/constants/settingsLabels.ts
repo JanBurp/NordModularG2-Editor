@@ -43,4 +43,7 @@ export const SETTINGS_LABELS = {
 	editorPath: 'Browser Path',
 	editorHiddenModules: 'Show Hidden Modules',
 	editorTheme: 'Theme',
+	cableGravity: 'Gravity',
+	cableOpacity: 'Opacity',
+	cableThickness: 'Thickness',
 } as const;

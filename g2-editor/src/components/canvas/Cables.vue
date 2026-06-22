@@ -3,10 +3,11 @@
 <script setup lang="ts">
 	import { inject, watch, onMounted, nextTick } from 'vue';
 	import type { Ref } from 'vue';
-	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility } from '../../renderer/cableRenderer';
+	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility, updateCableStyles, updateCableGravity } from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
+	import { useSettingsStore } from '../../store/settings';
 	import { useJackDragInteraction } from '../../composables/useJackDragInteraction';
 	import type { JackDragInfo } from '../../types';
 
@@ -34,6 +35,7 @@
 
 	const { cableVisibility } = useCableVisibility();
 	const uiStore = useUiStore();
+	const settings = useSettingsStore();
 
 	function renderCables() {
 		if (!svgRef?.value) return;
@@ -43,6 +45,9 @@
 		if (props.cables.length > 0) {
 			makePatchCables(props.modules as CableModule[], props.cables as Cable[], svg, {
 				selectedCables: props.selectedCables as Cable[],
+				gravity: settings.cableGravity,
+				opacity: settings.cableOpacity,
+				thickness: settings.cableThickness,
 			});
 		}
 		applyCableVisibility(svg, cableVisibility.value as unknown as Record<string, boolean>);
@@ -71,19 +76,21 @@
 					if (!wantedMap.has(key)) removeCableByKey(svg, key);
 				}
 
+				const cableOptions = {
+					selectedCables: props.selectedCables,
+					gravity: settings.cableGravity,
+					opacity: settings.cableOpacity,
+					thickness: settings.cableThickness,
+				};
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
-						makePatchCables(props.modules as CableModule[], [cable], svg, {
-							selectedCables: props.selectedCables,
-						});
+						makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
 					} else {
 						// Re-render if colour changed
 						const border = svg.querySelector<SVGPathElement>(`.svgcableborder[data-cable-key="${key}"]`);
 						if (border && border.getAttribute('data-cable-color') !== String(cable.colour)) {
 							removeCableByKey(svg, key);
-							makePatchCables(props.modules as CableModule[], [cable], svg, {
-								selectedCables: props.selectedCables,
-							});
+							makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
 						}
 					}
 				}
@@ -126,6 +133,26 @@
 		() => uiStore.cableShakeCount,
 		() => {
 			nextTick(() => renderCables());
+		},
+	);
+
+	// Gravity: shift existing control points — no re-randomization.
+	watch(
+		() => settings.cableGravity,
+		(newVal, oldVal) => {
+			nextTick(() => {
+				if (svgRef?.value) updateCableGravity(svgRef.value, oldVal, newVal);
+			});
+		},
+	);
+
+	// Opacity / thickness: update styles on existing elements — no re-randomization.
+	watch(
+		() => [settings.cableOpacity, settings.cableThickness] as const,
+		() => {
+			nextTick(() => {
+				if (svgRef?.value) updateCableStyles(svgRef.value, settings.cableOpacity, settings.cableThickness);
+			});
 		},
 	);
 

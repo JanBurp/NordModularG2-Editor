@@ -111,25 +111,43 @@ export class Patchcord {
 	}
 
 	/**
-	 * Shake the cable to add organic variation
-	 * Creates two control points for the Bezier curve
+	 * Set Bezier control points combining random organic variation with a gravity-based downward bias.
+	 * gravity=0: straight line (no variation, no droop).
+	 * gravity=100: full random variation + maximum downward droop.
 	 */
-	shake(): void {
+	shake(gravity: number): void {
+		const t = gravity / 100;
+
+		// Random organic variation scaled by gravity (0 at gravity=0 → straight).
 		const angle1 = (Math.random() - 0.5) * 2;
-		const strength1 = Math.random() * 0.38;
+		const strength1 = Math.random() * 0.7 * t;
 		const angle2 = (Math.random() - 0.5) * 2;
-		const strength2 = Math.random() * 0.38;
+		const strength2 = Math.random() * 0.7 * t;
 		const dir1 = this.points[0].subtract(this.points[3]).rotate(angle1);
 		const dir2 = this.points[0].subtract(this.points[3]).rotate(angle2);
 		this.points[1] = this.points[0].subtract(dir1.multiply(strength1));
 		this.points[2] = this.points[3].add(dir2.multiply(strength2));
+
+		// Add gravity downward bias on top of the organic variation.
+		if (t > 0) {
+			const src = this.points[3];
+			const dst = this.points[0];
+			const dx = src.x - dst.x;
+			const dy = src.y - dst.y;
+			const length = Math.sqrt(dx * dx + dy * dy);
+			const midY = (src.y + dst.y) / 2;
+			const maxY = Math.max(src.y, dst.y);
+			const d = t * (maxY - midY + length * 0.2) * (4 / 3);
+			this.points[1] = new FastVector(this.points[1].x, this.points[1].y + d);
+			this.points[2] = new FastVector(this.points[2].x, this.points[2].y + d);
+		}
 	}
 
 	/**
-	 * Generate SVG path data for the cable (with random organic droop via shake())
+	 * Generate SVG path data for the cable using gravity-based droop.
 	 */
-	getCurvePath(): string {
-		this.shake();
+	getCurvePath(gravity = 50): string {
+		this.shake(gravity);
 		return this.points[0].toString('M') + this.points[1]!.toString('C') + this.points[2]!.toString(',') + this.points[3].toString(',');
 	}
 }
