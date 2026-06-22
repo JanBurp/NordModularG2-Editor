@@ -13,6 +13,10 @@ has_children: true
 | macOS (Apple Silicon & Intel) | macOS 11 (Big Sur) |
 | Windows | Windows 10 (64-bit) |
 
+## Latest version
+
+**v0.5.6** — released 2026-06-14
+
 ## Download
 
 | Platform | Editor | CLI (optional) |
