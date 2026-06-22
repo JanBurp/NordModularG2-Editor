@@ -1288,9 +1288,18 @@ int g2_select_perf(int bank, int location) {
     uint8_t cmd[4] = { 0x0a, 4, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
     if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
+    /* In daemon mode the listener queue is the only consumer; the daemon's
+     * select-perf dispatch already drains the whole post-select cascade
+     * (ACK, synth/perf settings, version updates, final BULK_REARM) and emits
+     * each as a watch event. Calling recv_interrupt() here too would race it
+     * for the same messages, silently swallowing whichever one it grabs
+     * first (e.g. perf_settings) without emitting it or freeing its bulk
+     * payload — see select-perf dispatch in daemon.c. */
+    if (!g2_listener_active) {
+        uint8_t response[64] = {0};
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+        g2_drain_pending();
+    }
     return G2_OK;
 }
 
