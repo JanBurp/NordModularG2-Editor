@@ -12,7 +12,6 @@ export function useSlotEvents(log: LogFn) {
 
 	const hardwareVariationChange = ref<{ slot: SlotLabel; variation: number } | null>(null);
 	const hardwareSlotChange = ref<SlotLabel | null>(null);
-	const pendingSlotReload = new Set<SlotLabel>();
 	const pendingResourceFetch = new Set<SlotLabel>();
 	let keyFocusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -129,7 +128,7 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'patch_version_change') {
 			log('←', 'Watch', `patch_version_change slot=${ev.slot} ver=${ev.version}`);
 			const sl = ev.slot as SlotLabel;
-			if (sl) pendingSlotReload.add(sl);
+			if (sl) slotsStore.loadSlot(sl);
 			return true;
 		}
 		if (ev.type === 'patch_update') {
@@ -140,13 +139,7 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 			const sl = ev.slot as SlotLabel;
-			if (sl) {
-				slotsStore.updateResources(sl, ev.data);
-				if (pendingSlotReload.has(sl)) {
-					pendingSlotReload.delete(sl);
-					slotsStore.loadSlot(sl);
-				}
-			}
+			if (sl) slotsStore.updateResources(sl, ev.data);
 			log('←', 'Watch', `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`);
 			return true;
 		}
