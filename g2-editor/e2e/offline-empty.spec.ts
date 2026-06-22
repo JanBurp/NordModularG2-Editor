@@ -17,17 +17,17 @@ test.describe('offline – no patch loaded', () => {
 		await expect(page.locator('[data-testid="canvas-va"]')).not.toBeVisible();
 	});
 
-	test('modules panel is open by default and can be toggled closed', async ({ page, sendMenuAction }) => {
-		// Modules pane is open by default (showRightPane=true, rightPaneTab='modules')
+	test('modules panel is closed by default and can be toggled open and closed', async ({ page, sendMenuAction }) => {
+		// Modules pane is closed by default (showRightPane=false, rightPaneTab='')
+		await expect(page.locator('[data-testid="module-item-OscA"]')).not.toBeVisible();
+
+		// Toggle it open
+		await sendMenuAction('toggle-modules');
 		await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 
 		// Toggle it closed
 		await sendMenuAction('toggle-modules');
 		await expect(page.locator('[data-testid="module-item-OscA"]')).not.toBeVisible();
-
-		// Toggle it back open
-		await sendMenuAction('toggle-modules');
-		await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 	});
 
 	test('tab buttons for Modules and Browser are visible', async ({ page }) => {
@@ -37,6 +37,10 @@ test.describe('offline – no patch loaded', () => {
 	});
 
 	test.describe('sidepane tab switching', () => {
+		test.beforeEach(async ({ sendMenuAction }) => {
+			await sendMenuAction('toggle-modules');
+		});
+
 		test('Browser tab hides module list and shows browser content', async ({ page }) => {
 			await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 
@@ -56,6 +60,10 @@ test.describe('offline – no patch loaded', () => {
 	});
 
 	test.describe('module search / filter', () => {
+		test.beforeEach(async ({ sendMenuAction }) => {
+			await sendMenuAction('toggle-modules');
+		});
+
 		test('typing a module name shows only matching modules', async ({ page }) => {
 			await page.getByPlaceholder('Search modules...').fill('OscA');
 
