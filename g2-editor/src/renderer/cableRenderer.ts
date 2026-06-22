@@ -29,6 +29,9 @@ export interface Jack {
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
 	selectedCables?: Cable[];
+	gravity?: number;
+	opacity?: number;
+	thickness?: number;
 }
 
 export function makeCableKey(cable: Cable): string {
@@ -38,6 +41,10 @@ export function makeCableKey(cable: Cable): string {
 export function makePatchCables(modules: Module[], cables: Cable[], svgElement: SVGElement, options?: CableRenderOptions): void {
 	const modulesByIndex = new Map(modules.map((m) => [m.index, m]));
 	const selectedKeys = new Set(options?.selectedCables?.map(makeCableKey) ?? []);
+	const mainStroke = 1 + (options?.thickness ?? 1) * 1.5;
+	const borderStroke = mainStroke + 2;
+	const opacity = (options?.opacity ?? 90) / 100;
+	const gravity = options?.gravity ?? 50;
 	cables.forEach((cable) => {
 		const dir = cable.dir ?? 1;
 
@@ -72,7 +79,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const dy = dcon.y + dmod.vert * MODULE_ROW_HEIGHT;
 
 		const pc = new Patchcord(sx, sy, dx, dy);
-		const d = pc.getCurvePath();
+		const d = pc.getCurvePath(gravity);
 		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
 
 		const isSelected = selectedKeys.has(makeCableKey(cable));
@@ -90,6 +97,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-dmod': String(dmod.index),
 			'data-dcon': String(cable.dcon),
 			'data-dir': String(dir),
+			style: `stroke-width: ${borderStroke};`,
 		});
 
 		const main = svgPath(d, {
@@ -98,6 +106,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			class: 'svgcable nomouse',
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
+			style: `stroke-width: ${mainStroke}; opacity: ${opacity};`,
 		});
 		const hitArea = svgPath(d, {
 			stroke: 'transparent',
