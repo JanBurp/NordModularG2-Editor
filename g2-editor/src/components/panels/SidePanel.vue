@@ -1,10 +1,10 @@
 <template>
 	<div class="w-68 bg-surface-1 border-l border-line-subtle flex flex-col">
 		<div class="flex-1 overflow-hidden overflow-y-auto">
-			<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" />
-			<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
 			<PatchBrowser v-show="uiStore.rightPaneTab === 'browser'" :isActive="uiStore.rightPaneTab === 'browser'" @select="patchFile.handlePatchSelect" />
+			<ModulesPane v-show="uiStore.rightPaneTab === 'modules'" :isActive="uiStore.rightPaneTab === 'modules'" />
 			<MidiCCPane v-show="uiStore.rightPaneTab === 'midicc'" :isActive="uiStore.rightPaneTab === 'midicc'" />
+			<SettingsPane v-show="uiStore.rightPaneTab === 'settings'" :isActive="uiStore.rightPaneTab === 'settings'" />
 		</div>
 	</div>
 </template>

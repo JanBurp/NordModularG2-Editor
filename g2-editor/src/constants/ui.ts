@@ -15,10 +15,10 @@ export const SLOT_OPTIONS = [
 ];
 
 export const PANE_TAB_OPTIONS = [
-	{ label: 'Modules', value: 'modules' },
 	{ label: 'Browser', value: 'browser' },
-	{ label: 'Settings', value: 'settings' },
+	{ label: 'Modules', value: 'modules' },
 	{ label: 'Midi CC', value: 'midicc' },
+	{ label: 'Settings', value: 'settings' },
 ];
 
 export const AREA_OPTIONS = [
