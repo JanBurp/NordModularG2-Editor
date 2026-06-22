@@ -79,8 +79,6 @@
 
 	type CCRow = { cc: number; assignment: MidiCCAssignment | null };
 
-	defineProps<{ isActive?: boolean }>();
-
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const deviceStore = useDeviceStore();
@@ -96,10 +94,9 @@
 		return slotsStore.slots[slot.value].controllers;
 	});
 
-	const allCCRows = computed<CCRow[]>(() => {
-		const assignedMap = new Map(controllers.value.map((c) => [c.cc, c]));
-		return getAllowedCCs().map((cc) => ({ cc, assignment: assignedMap.get(cc) ?? null }));
-	});
+	const ccAssignmentMap = computed(() => new Map(controllers.value.map((c) => [c.cc, c])));
+
+	const allCCRows = computed<CCRow[]>(() => getAllowedCCs().map((cc) => ({ cc, assignment: ccAssignmentMap.value.get(cc) ?? null })));
 
 	function ccShortName(cc: number): string {
 		return CC_SHORT[cc] ?? '';

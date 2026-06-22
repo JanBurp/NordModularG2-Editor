@@ -268,7 +268,8 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref } from 'vue';
+	import { computed } from 'vue';
+	import { makeOffMemory, OFF_SENTINEL } from '@/composables/useOffMemory';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import RangeInput from '@/components/common/RangeInput.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
@@ -407,7 +408,6 @@
 				},
 			],
 		},
-		// { header: 'Level', toggleKey: 'activeMuted', params: [{ key: 'patchVol', label: 'Volume' }] },
 	];
 
 	const THEME_OPTIONS = [
@@ -422,24 +422,6 @@
 		{ label: 'Recv', value: 2 },
 		{ label: 'Both', value: 3 },
 	];
-
-	const OFF_SENTINEL = 17;
-
-	function makeOffMemory(getter: () => number, setter: (v: number) => void, defaultVal = 1) {
-		const memory = ref(defaultVal);
-		const isOff = () => getter() === OFF_SENTINEL;
-		const display = () => (isOff() ? memory.value : getter());
-		const setOff = (off: boolean) => {
-			if (off) {
-				const cur = getter();
-				if (cur !== OFF_SENTINEL) memory.value = cur;
-				setter(OFF_SENTINEL);
-			} else {
-				setter(memory.value);
-			}
-		};
-		return { isOff, display, setOff };
-	}
 
 	type MidiKey = 'A' | 'B' | 'C' | 'D' | 'global';
 	const midiSlots = Object.fromEntries(

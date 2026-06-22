@@ -87,6 +87,20 @@ export const useHistoryStore = defineStore('history', {
 			return entry;
 		},
 
+		restoreUndo(slot: SlotLabel, entry: HistoryEntry): void {
+			const h = this.slots[slot];
+			// popUndo moved entry from past[-1] to future[0]; reverse that
+			if (h.future[0] === entry) h.future = h.future.slice(1);
+			h.past = [...h.past, entry];
+		},
+
+		restoreRedo(slot: SlotLabel, entry: HistoryEntry): void {
+			const h = this.slots[slot];
+			// popRedo moved entry from future[0] to past[-1]; reverse that
+			if (h.past[h.past.length - 1] === entry) h.past = h.past.slice(0, -1);
+			h.future = [entry, ...h.future];
+		},
+
 		clearHistory(slot: SlotLabel): void {
 			const h = this.slots[slot];
 			for (const state of h.coalescing.values()) {

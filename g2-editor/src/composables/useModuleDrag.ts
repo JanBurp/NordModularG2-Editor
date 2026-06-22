@@ -2,6 +2,7 @@ import { ref, computed, onUnmounted } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
+import { MODULE_ROW_HEIGHT } from '@/constants';
 
 type DragState = {
 	indices: number[];
@@ -45,11 +46,11 @@ export function useModuleDrag(
 				const start = drag.startPosByIndex.get(idx);
 				const mod = getModules().find((m) => m.index === idx);
 				if (!start || !mod) return null;
-				const height = (getModule(mod.type)?.height ?? 2) * 16;
+				const height = (getModule(mod.type)?.height ?? 2) * MODULE_ROW_HEIGHT;
 				return {
 					idx,
 					x: start.horiz * 256 + drag.dxPx,
-					y: start.vert * 16 + drag.dyPx,
+					y: start.vert * MODULE_ROW_HEIGHT + drag.dyPx,
 					height,
 				};
 			})
@@ -95,7 +96,7 @@ export function useModuleDrag(
 		if (drag && moduleIndex !== null) {
 			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
 			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / 256));
-			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / 16));
+			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / MODULE_ROW_HEIGHT));
 			const dCol = anchorTargetCol - anchorStart.horiz;
 			const dRow = anchorTargetRow - anchorStart.vert;
 			if (dCol !== 0 || dRow !== 0) {

@@ -133,8 +133,8 @@
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
 			:connected="connectedInputs?.has(idx)"
-			@jackDragStart="(info) => emit('jackDragStart', info)"
-			@jackDragEnd="(info) => emit('jackDragEnd', info)"
+			@jackDragStart="onJackDragStart"
+			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
 			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
 		/>
@@ -151,8 +151,8 @@
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
 			:connected="connectedOutputs?.has(idx)"
-			@jackDragStart="(info) => emit('jackDragStart', info)"
-			@jackDragEnd="(info) => emit('jackDragEnd', info)"
+			@jackDragStart="onJackDragStart"
+			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
 			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
 		/>
@@ -238,6 +238,14 @@
 				children: [{ type: 'swatches', swatches: buildColorSwatches((id) => emit('moduleColorChange', moduleIdx.value, id)) }],
 			},
 		]);
+	}
+
+	function onJackDragStart(info: JackDragInfo) {
+		emit('jackDragStart', info);
+	}
+
+	function onJackDragEnd(info: JackDragInfo) {
+		emit('jackDragEnd', info);
 	}
 
 	function onDragHandleMousedown(e: MouseEvent) {

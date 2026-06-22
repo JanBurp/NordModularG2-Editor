@@ -130,9 +130,7 @@
 	watch(
 		cableVisibility,
 		() => {
-			nextTick(() => {
-				if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
-			});
+			if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
 		},
 		{ deep: true },
 	);
@@ -159,9 +157,7 @@
 	watch(
 		() => [settings.cableOpacity, settings.cableThickness] as const,
 		() => {
-			nextTick(() => {
-				if (svgRef?.value) updateCableStyles(svgRef.value, settings.cableOpacity, settings.cableThickness);
-			});
+			if (svgRef?.value) updateCableStyles(svgRef.value, settings.cableOpacity, settings.cableThickness);
 		},
 	);
 

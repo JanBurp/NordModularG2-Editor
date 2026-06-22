@@ -2,6 +2,7 @@ import { ref } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { CABLE_COLOR_INDEX_MAP } from '../constants';
+import { isNestDrivenByOutput } from '../parser/cableGraph';
 
 type JackInfo = {
 	moduleIndex: number;
@@ -14,28 +15,6 @@ type JackInfo = {
 function jackColourToIndex(colour: string): number {
 	const entry = Object.entries(CABLE_COLOR_INDEX_MAP).find(([, name]) => name === colour);
 	return entry ? Number(entry[0]) : 1;
-}
-
-function isNestDrivenByOutput(cableList: any[], startMod: number, startCon: number): boolean {
-	const visited = new Set<string>();
-	const queue: { mod: number; con: number }[] = [{ mod: startMod, con: startCon }];
-	while (queue.length > 0) {
-		const { mod, con } = queue.shift()!;
-		const key = `${mod}-${con}`;
-		if (visited.has(key)) continue;
-		visited.add(key);
-		if (cableList.some((c: any) => (c.dir ?? 1) === 1 && (c.dmod ?? 0) === mod && (c.dcon ?? 0) === con)) return true;
-		for (const c of cableList) {
-			if ((c.dir ?? 1) !== 0) continue;
-			const sm = c.smod ?? 0,
-				sc = c.scon ?? 0,
-				dm = c.dmod ?? 0,
-				dc = c.dcon ?? 0;
-			if (sm === mod && sc === con) queue.push({ mod: dm, con: dc });
-			else if (dm === mod && dc === con) queue.push({ mod: sm, con: sc });
-		}
-	}
-	return false;
 }
 
 export function useJackPatching() {

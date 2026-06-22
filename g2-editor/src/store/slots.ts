@@ -1142,13 +1142,6 @@ export const useSlotsStore = defineStore('slots', {
 			this.slotFilePaths[slot] = path;
 		},
 
-		_resolveColumnCollisions(
-			stationaryModules: { index: number; vert: number; height: number }[],
-			occupantRects: { row: number; height: number }[],
-		): { index: number; newRow: number }[] {
-			return resolveColumnCollisions(stationaryModules, occupantRects);
-		},
-
 		async moveModulesWithCollision(
 			indices: number[],
 			dCol: number,
@@ -1195,7 +1188,7 @@ export const useSlotsStore = defineStore('slots', {
 						vert: m.vert as number,
 						height: getModule(m.type)?.height ?? 2,
 					}));
-				for (const d of this._resolveColumnCollisions(stationary, occupants)) {
+				for (const d of resolveColumnCollisions(stationary, occupants)) {
 					pushDowns.push({ index: d.index, col, newRow: d.newRow });
 				}
 			}
@@ -1270,7 +1263,7 @@ export const useSlotsStore = defineStore('slots', {
 						vert: m.vert as number,
 						height: getModule(m.type)?.height ?? 2,
 					}));
-				const pushDowns = this._resolveColumnCollisions(colMods, [{ row, height }]);
+				const pushDowns = resolveColumnCollisions(colMods, [{ row, height }]);
 				const movedBack = pushDowns.map((d) => {
 					const orig = colMods.find((m) => m.index === d.index);
 					return { index: d.index, col, fromRow: orig?.vert ?? d.newRow, toRow: d.newRow };
@@ -1705,7 +1698,7 @@ export const useSlotsStore = defineStore('slots', {
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
 					this.slots[slot].rawHex = null;
-					if (slot && cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				} else if (selectedCables.length > 0) {
 					const cliCmds: string[][] = [];
 					for (const cable of selectedCables) {
@@ -1717,7 +1710,7 @@ export const useSlotsStore = defineStore('slots', {
 						cliCmds.push(['del-cable', slot, location, String(smod), cable.dir === 0 ? '0' : '1', String(scon), String(dmod), '0', String(dcon)]);
 					}
 					this.slots[slot].rawHex = null;
-					if (slot && cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				}
 
 				if (shouldRecord) {
@@ -1809,7 +1802,7 @@ export const useSlotsStore = defineStore('slots', {
 				await entry.undo();
 			} catch (err) {
 				console.warn('[undo] CLI failed (offline?):', err);
-				// TODO: push entry back onto stack on failure so it isn't silently lost
+				hist.restoreUndo(slot, entry);
 			} finally {
 				hist.unlock(slot);
 			}
@@ -1825,7 +1818,7 @@ export const useSlotsStore = defineStore('slots', {
 				await entry.redo();
 			} catch (err) {
 				console.warn('[redo] CLI failed (offline?):', err);
-				// TODO: push entry back onto stack on failure so it isn't silently lost
+				hist.restoreRedo(slot, entry);
 			} finally {
 				hist.unlock(slot);
 			}

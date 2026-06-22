@@ -26,6 +26,3 @@ export { SLOT_LABELS, SLOT_OPTIONS, PANE_TAB_OPTIONS, AREA_OPTIONS, VARIATION_OP
 
 // Human-readable labels for settings fields
 export { SETTINGS_LABELS } from './settingsLabels';
-
-// Empty patch binary template for new patches
-export { EMPTY_PATCH_HEX } from './emptyPatchHex';

@@ -130,17 +130,17 @@
 		{ flush: 'post' },
 	);
 
-	const helpCache = reactive(new Map<number, string>());
+	const helpCache = ref(new Map<number, string>());
 
 	async function loadAllHelp() {
 		const { marked } = await import('marked');
 		const allMods = getAllCategories().flatMap((cat) => getModulesByCategoryRaw(cat));
 		await Promise.all(
 			allMods.map(async (mod) => {
-				if (helpCache.has(mod.id)) return;
+				if (helpCache.value.has(mod.id)) return;
 				const raw = await window.electronAPI.loadHelp(mod.short);
 				if (!raw) return;
-				helpCache.set(mod.id, (await marked(raw)) as string);
+				helpCache.value.set(mod.id, (await marked(raw)) as string);
 			}),
 		);
 	}

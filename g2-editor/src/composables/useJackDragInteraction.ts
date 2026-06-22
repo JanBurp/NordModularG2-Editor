@@ -23,7 +23,6 @@ export function useJackDragInteraction(
 
 	let previewCable: SVGPathElement | null = null;
 	let dragSrcPos: { x: number; y: number } | null = null;
-	let dragSrcColour = '';
 	let dragSrcInfo: JackDragInfo | null = null;
 	let hasDragged = false;
 	let snapJack: SnapJack | null = null;
@@ -215,7 +214,6 @@ export function useJackDragInteraction(
 		const pos = getJackSvgPos(info);
 		if (pos) {
 			dragSrcPos = pos;
-			dragSrcColour = info.colour;
 			dragSrcInfo = info;
 			hasDragged = false;
 			window.addEventListener('mousemove', onMouseMovePreview);
@@ -263,10 +261,6 @@ export function useJackDragInteraction(
 	onUnmounted(() => {
 		clearDragPreview();
 	});
-
-	// suppress unused warning — dragSrcColour is set but the preview cable color
-	// is hardcoded black; kept for future use when colored preview is added
-	void dragSrcColour;
 
 	return { handleJackDragStart, handleJackDragEnd };
 }
