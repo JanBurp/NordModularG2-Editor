@@ -1,7 +1,7 @@
 import type { ComputedRef } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 
-import { EMPTY_PATCH_HEX, SLOT_LABELS } from '@/constants';
+import { SLOT_LABELS } from '@/constants';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
@@ -15,20 +15,6 @@ interface MenuActionOptions {
 	handleSlotClick: (idx: number) => void;
 	handleVariationClick: (idx: number) => Promise<void>;
 	showAbout?: () => void;
-}
-
-function makeEmptyPatch() {
-	return {
-		areas: [
-			{ name: 'fx', modules: [], cableList: [], paramaterDataOfs: 0 },
-			{ name: 'voice', modules: [], cableList: [], paramaterDataOfs: 0 },
-		],
-		description: {
-			voices: 1, height: 0, unk2: 0,
-			red: 1, blue: 1, yellow: 1, orange: 1, green: 1, purple: 1, white: 1,
-			monopoly: 0, variation: 0, category: 0,
-		},
-	};
 }
 
 function isInputFocused(): boolean {
@@ -48,12 +34,13 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			switch (action) {
 				case 'new-patch': {
-					slotsStore.loadPatchFile(uiStore.slotInFocus, makeEmptyPatch() as any, 'Untitled', EMPTY_PATCH_HEX);
+					const filepath = await window.electronAPI.patches.builtinPath('EmptyPatch.pch2');
+					await patchFile.handlePatchSelect({ type: 'disk', filepath });
 					break;
 				}
 				case 'new-performance': {
-					const emptyPatch = makeEmptyPatch();
-					slotsStore.loadPerformanceFile([emptyPatch, emptyPatch, emptyPatch, emptyPatch] as any[], [], 'Untitled Performance', '');
+					const filepath = await window.electronAPI.patches.builtinPath('EmptyPerf.prf2');
+					await patchFile.handlePatchSelect({ type: 'disk', filepath });
 					break;
 				}
 				case 'open-performance':

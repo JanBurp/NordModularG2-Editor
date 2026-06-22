@@ -20,6 +20,7 @@ declare global {
 				}>;
 				load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
 				setFolder: () => Promise<{ success: boolean; folder?: string }>;
+				builtinPath: (name: string) => Promise<string>;
 			};
 			loadHelp: (shortName: string) => Promise<string | null>;
 			onMenuAction: (cb: (action: MenuAction) => void) => void;

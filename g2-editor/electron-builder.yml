@@ -12,6 +12,8 @@ files:
 extraResources:
   - from: ../doc/help
     to: doc/help
+  - from: resources/patches
+    to: patches
 
 mac:
   artifactName: "G2-Editor-${arch}.${ext}"

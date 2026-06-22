@@ -200,6 +200,13 @@ ipcMain.handle("patches:load", async (_, filepath: string) => {
 	}
 });
 
+ipcMain.handle("patches:builtin-path", (_, name: string) => {
+	const patchesDir = app.isPackaged
+		? path.join(process.resourcesPath, "patches")
+		: path.join(process.env.APP_ROOT!, "resources", "patches");
+	return path.join(patchesDir, name);
+});
+
 ipcMain.handle("patches:set-folder", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {

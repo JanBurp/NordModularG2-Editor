@@ -12,6 +12,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		list: (folder: string) => ipcRenderer.invoke("patches:list", folder),
 		load: (filepath: string) => ipcRenderer.invoke("patches:load", filepath),
 		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
+		builtinPath: (name: string) => ipcRenderer.invoke("patches:builtin-path", name),
 	},
 
 	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),
