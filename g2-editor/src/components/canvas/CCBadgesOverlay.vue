@@ -1,12 +1,6 @@
 <template>
 	<g v-if="showCCOverlay" class="cc-badges-overlay">
-		<ModuleCCBadge
-			v-for="b in badges"
-			:key="`cc-${b.cc}`"
-			:cc="b.cc"
-			:x="b.x"
-			:y="b.y"
-		/>
+		<ModuleCCBadge v-for="b in badges" :key="`cc-${b.cc}`" :cc="b.cc" :x="b.x" :y="b.y" />
 	</g>
 </template>
 

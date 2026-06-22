@@ -18,14 +18,14 @@ export function useModuleParams(
 	const areaKey = areaLabel === 'va' ? 'voice' : 'fx';
 
 	const localLv = computed<number[]>(() => {
-		const params = slotsStore.slots[uiStore.slotInFocus]
-			?.variations?.[uiStore.variation]
-			?.[areaKey]?.[instance.value.index];
+		const params = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[instance.value.index];
 		if (params) return params;
-		return moduleDef.value?.params?.map((param) => {
-			const p = getParam(param.type);
-			return p?.def ?? 64;
-		}) ?? [];
+		return (
+			moduleDef.value?.params?.map((param) => {
+				const p = getParam(param.type);
+				return p?.def ?? 64;
+			}) ?? []
+		);
 	});
 
 	function getParamValue(index: number): number {

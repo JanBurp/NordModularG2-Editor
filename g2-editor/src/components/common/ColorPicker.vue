@@ -1,9 +1,14 @@
 <template>
 	<div class="relative flex items-center" @mouseleave="closePicker()">
-		<div :style="currentColorStyle" class="border border-neutral-600 rounded w-6 h-6 cursor-pointer" title="Apply color" @click.stop="setColor(uiStore.moduleColor)"></div>
+		<div
+			:style="currentColorStyle"
+			class="border border-neutral-600 rounded w-6 h-6 cursor-pointer"
+			title="Apply color"
+			@click.stop="setColor(uiStore.moduleColor)"
+		></div>
 		<div class="cursor-pointer px-0.5 text-neutral-400 hover:text-neutral-200" title="Choose color" @click.stop="togglePicker()">
 			<svg viewBox="0 0 10 10" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
-				<polyline points="2,3 5,7 8,3"/>
+				<polyline points="2,3 5,7 8,3" />
 			</svg>
 		</div>
 		<div v-if="pickerOpen" class="z-50 absolute top-full left-0 bg-neutral-200 grid grid-cols-4 border border-neutral-600 rounded w-40">

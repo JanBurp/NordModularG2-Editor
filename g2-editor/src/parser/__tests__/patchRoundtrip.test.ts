@@ -693,8 +693,16 @@ describe('prf2 per-slot mutation round-trip', () => {
 		}));
 
 		const mod: ModuleInstance = {
-			type: 1, index: 200, horiz: 1, vert: 1, colour: 0,
-			uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [],
+			type: 1,
+			index: 200,
+			horiz: 1,
+			vert: 1,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
 		};
 		mutAddModule(patches[0], 1, mod);
 
@@ -715,8 +723,16 @@ describe('prf2 per-slot mutation round-trip', () => {
 	it('mutating slot 2 survives round-trip', () => {
 		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
 		const mod: ModuleInstance = {
-			type: 1, index: 201, horiz: 2, vert: 3, colour: 0,
-			uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [],
+			type: 1,
+			index: 201,
+			horiz: 2,
+			vert: 3,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: 0,
+			lv: [],
+			modes: [],
 		};
 		mutAddModule(patches[2], 1, mod);
 

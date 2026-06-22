@@ -1,7 +1,7 @@
 <template>
 	<template v-if="ve.type === 'ledGroup'">
 		<rect
-			v-for="(led, i) in (ve.leds as any)"
+			v-for="(led, i) in ve.leds as any"
 			:key="i"
 			:x="led.x + 1"
 			:y="led.y"

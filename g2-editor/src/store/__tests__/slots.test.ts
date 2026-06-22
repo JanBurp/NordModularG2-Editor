@@ -9,9 +9,7 @@ beforeEach(() => {
 describe('_applyPatchOutput — malformed binary', () => {
 	it('rejects empty data (null regex match)', async () => {
 		const store = useSlotsStore();
-		await expect(store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: 'test', data: '' }))).rejects.toThrow(
-			'Invalid patch hex for slot A',
-		);
+		await expect(store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: 'test', data: '' }))).rejects.toThrow('Invalid patch hex for slot A');
 	});
 
 	it('rejects data that is too short for a valid patch', async () => {

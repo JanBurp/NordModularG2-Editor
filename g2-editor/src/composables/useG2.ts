@@ -29,7 +29,7 @@ export function useG2() {
 
 	const log: LogFn = (direction, event, message, category) => {
 		if (category !== 'led' && category !== 'volume') {
-			const fn = (event === 'Daemon' || event === 'USB' || event === 'Connect' || event === 'Disconnect') ? console.error : console.log;
+			const fn = event === 'Daemon' || event === 'USB' || event === 'Connect' || event === 'Disconnect' ? console.error : console.log;
 			fn(`[USB] ${now()} ${direction} ${event} ${message}`);
 		}
 	};
@@ -44,13 +44,19 @@ export function useG2() {
 		window.cli.offWatchDone();
 		let resolveArmed!: () => void;
 		let rejectArmed!: (e: Error) => void;
-		const armed = new Promise<void>((resolve, reject) => { resolveArmed = resolve; rejectArmed = reject; });
+		const armed = new Promise<void>((resolve, reject) => {
+			resolveArmed = resolve;
+			rejectArmed = reject;
+		});
 		let activityTimer: ReturnType<typeof setTimeout> | null = null;
 
 		window.cli.onDeviceDisconnected(() => {
 			const wasRunning = isDaemonRunning.value;
 			isDaemonRunning.value = false;
-			if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+			if (activityTimer !== null) {
+				clearTimeout(activityTimer);
+				activityTimer = null;
+			}
 			if (wasRunning) {
 				store.status = DeviceStatus.Lost;
 				log('•', 'Connect', 'Daemon exited unexpectedly');
@@ -62,7 +68,10 @@ export function useG2() {
 			const wasRunning = isDaemonRunning.value;
 			isDaemonRunning.value = false;
 			window.cli.offWatchDone();
-			if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+			if (activityTimer !== null) {
+				clearTimeout(activityTimer);
+				activityTimer = null;
+			}
 			if (wasRunning) {
 				store.status = DeviceStatus.Disconnected;
 				log('•', 'Daemon', 'Daemon stopped');
@@ -80,7 +89,10 @@ export function useG2() {
 			try {
 				const ev = JSON.parse(line);
 				if (ev.type === 'watch_armed') {
-					if (activityTimer !== null) { clearTimeout(activityTimer); activityTimer = null; }
+					if (activityTimer !== null) {
+						clearTimeout(activityTimer);
+						activityTimer = null;
+					}
 					resolveArmed();
 					return;
 				}
@@ -96,8 +108,16 @@ export function useG2() {
 					}
 					return;
 				}
-				if (ev.type === 'device_disconnected') { store.status = DeviceStatus.Lost; log('•', 'Connect', 'G2 disconnected — cable unplugged?'); return; }
-				if (ev.type === 'device_reconnected') { store.status = DeviceStatus.Connected; log('•', 'Connect', 'G2 reconnected'); return; }
+				if (ev.type === 'device_disconnected') {
+					store.status = DeviceStatus.Lost;
+					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
+					return;
+				}
+				if (ev.type === 'device_reconnected') {
+					store.status = DeviceStatus.Connected;
+					log('•', 'Connect', 'G2 reconnected');
+					return;
+				}
 				if (ev.type === 'usb_driver_error') {
 					store.status = DeviceStatus.DriverError;
 					log('←', 'Connect', `USB driver error: ${ev.code ?? 'unknown'}`);
@@ -109,7 +129,8 @@ export function useG2() {
 				if (await deviceEvents.handleEvent(ev)) return;
 				if (await slotEvents.handleEvent(ev)) return;
 				// Unrecognised events
-				const category: UsbLogEntry['category'] = ev.type === 'raw_interrupt' || ev.type === 'raw_bulk' ? 'raw' : ev.type?.startsWith('unknown') ? 'unknown' : undefined;
+				const category: UsbLogEntry['category'] =
+					ev.type === 'raw_interrupt' || ev.type === 'raw_bulk' ? 'raw' : ev.type?.startsWith('unknown') ? 'unknown' : undefined;
 				log('←', 'Watch', ev.type ?? '(unknown)', category);
 			} catch {
 				log('←', 'Watch', line);

@@ -305,34 +305,87 @@ class G2Parser {
 			const slotIdx = this.aof >> 1;
 			const params: PatchParamVariation[] = [];
 			const vp = (v: number): PatchParamVariation => {
-				if (!params[v]) params[v] = { patchVol: 0, activeMuted: 0, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0, morphDials: [0,0,0,0,0,0,0,0], morphModes: [0,0,0,0,0,0,0,0] };
+				if (!params[v])
+					params[v] = {
+						patchVol: 0,
+						activeMuted: 0,
+						glide: 0,
+						glideTime: 0,
+						bend: 0,
+						semi: 0,
+						vibrato: 0,
+						cents: 0,
+						rate: 0,
+						arpeggiator: 0,
+						arpTime: 0,
+						arpType: 0,
+						octaveShift: 0,
+						sustain: 0,
+						octaves: 0,
+						morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
+						morphModes: [0, 0, 0, 0, 0, 0, 0, 0],
+					};
 				return params[v];
 			};
 			// Section 1: Morphs
-			this.getBits(8); this.getBits(7); // sub-section ID + count
+			this.getBits(8);
+			this.getBits(7); // sub-section ID + count
 			for (let i = 0; i < varCount; i++) {
 				const v = this.getBits(8);
 				for (let j = 0; j < 8; j++) vp(v).morphDials[j] = this.getBits(7);
 				for (let j = 0; j < 8; j++) vp(v).morphModes[j] = this.getBits(7);
 			}
 			// Section 2: Volume
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).patchVol = this.getBits(7); vp(v).activeMuted = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).patchVol = this.getBits(7);
+				vp(v).activeMuted = this.getBits(7);
+			}
 			// Section 3: Glide
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).glide = this.getBits(7); vp(v).glideTime = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).glide = this.getBits(7);
+				vp(v).glideTime = this.getBits(7);
+			}
 			// Section 4: Bend
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).bend = this.getBits(7); vp(v).semi = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).bend = this.getBits(7);
+				vp(v).semi = this.getBits(7);
+			}
 			// Section 5: Vibrato
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).vibrato = this.getBits(7); vp(v).cents = this.getBits(7); vp(v).rate = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).vibrato = this.getBits(7);
+				vp(v).cents = this.getBits(7);
+				vp(v).rate = this.getBits(7);
+			}
 			// Section 6: Arp
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).arpeggiator = this.getBits(7); vp(v).arpTime = this.getBits(7); vp(v).arpType = this.getBits(7); vp(v).octaves = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).arpeggiator = this.getBits(7);
+				vp(v).arpTime = this.getBits(7);
+				vp(v).arpType = this.getBits(7);
+				vp(v).octaves = this.getBits(7);
+			}
 			// Section 7: Octave shift
-			this.getBits(8); this.getBits(7);
-			for (let i = 0; i < varCount; i++) { const v = this.getBits(8); vp(v).octaveShift = this.getBits(7); vp(v).sustain = this.getBits(7); }
+			this.getBits(8);
+			this.getBits(7);
+			for (let i = 0; i < varCount; i++) {
+				const v = this.getBits(8);
+				vp(v).octaveShift = this.getBits(7);
+				vp(v).sustain = this.getBits(7);
+			}
 			this.patchParamsData[slotIdx] = params;
 			return 'Patch settings: varCount=' + varCount;
 		}
@@ -405,9 +458,13 @@ class G2Parser {
 		this.slots.push(...slotNames);
 	}
 
-	getSlotMeta() { return this.slotMeta; }
+	getSlotMeta() {
+		return this.slotMeta;
+	}
 
-	getControllers(): MidiCCAssignment[] { return this.controllersData; }
+	getControllers(): MidiCCAssignment[] {
+		return this.controllersData;
+	}
 
 	private parseControllers(data: Uint8Array): void {
 		const count = this.getBits(7, data);

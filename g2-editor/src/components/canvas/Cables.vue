@@ -3,7 +3,16 @@
 <script setup lang="ts">
 	import { inject, watch, onMounted, nextTick } from 'vue';
 	import type { Ref } from 'vue';
-	import { makePatchCables, removeAllCables, removeCableByKey, updateCablePaths, makeCableKey, applyCableVisibility, updateCableStyles, updateCableGravity } from '../../renderer/cableRenderer';
+	import {
+		makePatchCables,
+		removeAllCables,
+		removeCableByKey,
+		updateCablePaths,
+		makeCableKey,
+		applyCableVisibility,
+		updateCableStyles,
+		updateCableGravity,
+	} from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';

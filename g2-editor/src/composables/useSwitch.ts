@@ -115,9 +115,27 @@ export function useSwitch(
 	}
 
 	return {
-		paramDef, names, defin, width, mode, rows, bmp, hasBitmap, maskh,
-		optionNames, displayNames, activeIndex, singleButtonMode, activeOptionName,
-		itemsPerRow, getButtonX, getButtonY, onButtonClick, onCycleValue,
-		isTrigger, onTriggerDown, onTriggerUp,
+		paramDef,
+		names,
+		defin,
+		width,
+		mode,
+		rows,
+		bmp,
+		hasBitmap,
+		maskh,
+		optionNames,
+		displayNames,
+		activeIndex,
+		singleButtonMode,
+		activeOptionName,
+		itemsPerRow,
+		getButtonX,
+		getButtonY,
+		onButtonClick,
+		onCycleValue,
+		isTrigger,
+		onTriggerDown,
+		onTriggerUp,
 	};
 }

@@ -38,5 +38,4 @@
 		cursor: pointer;
 		user-select: none;
 	}
-
 </style>

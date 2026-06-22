@@ -210,7 +210,8 @@ export function updateCableGravity(svgElement: SVGElement, oldGravity: number, n
 		const m = d.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
 		if (!m) return;
 		const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = m.slice(1).map(Number);
-		const diffX = sx - dx, diffY = sy - dy;
+		const diffX = sx - dx,
+			diffY = sy - dy;
 		const length = Math.sqrt(diffX * diffX + diffY * diffY);
 		const base = Math.max(sy, dy) - (sy + dy) / 2 + length * 0.2;
 		const delta = ((newGravity - oldGravity) / 100) * base * (4 / 3);

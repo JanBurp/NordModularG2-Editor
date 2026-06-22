@@ -10,7 +10,7 @@
 </template>
 
 <script setup lang="ts">
-import Spinner from './Spinner.vue';
+	import Spinner from './Spinner.vue';
 
-defineProps<{ show: boolean; message?: string }>();
+	defineProps<{ show: boolean; message?: string }>();
 </script>

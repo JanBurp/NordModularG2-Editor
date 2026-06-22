@@ -34,7 +34,7 @@
 						<div
 							v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
 							class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
-							v-html="ui.helpAllModules ? (helpCache.get(module.id) || '') : helpHtml"
+							v-html="ui.helpAllModules ? helpCache.get(module.id) || '' : helpHtml"
 						/>
 					</template>
 				</div>
@@ -104,51 +104,62 @@
 		selectedModuleId.value = null;
 	});
 
-	watch(() => ui.helpModuleTypeId, (typeId) => {
-		if (typeId === null) {
-			selectedModuleId.value = null;
-			return;
-		}
-		selectedModuleId.value = typeId;
-		for (const cat of getAllCategories()) {
-			if (getModulesByCategoryRaw(cat).some(m => m.id === typeId)) {
-				if (!expandedCategories.value.includes(cat)) {
-					expandedCategories.value.push(cat);
+	watch(
+		() => ui.helpModuleTypeId,
+		(typeId) => {
+			if (typeId === null) {
+				selectedModuleId.value = null;
+				return;
+			}
+			selectedModuleId.value = typeId;
+			for (const cat of getAllCategories()) {
+				if (getModulesByCategoryRaw(cat).some((m) => m.id === typeId)) {
+					if (!expandedCategories.value.includes(cat)) {
+						expandedCategories.value.push(cat);
+					}
+					break;
 				}
-				break;
 			}
-		}
-		requestAnimationFrame(() => {
-			const mod = getModule(typeId);
-			if (mod) {
-				document
-					.querySelector(`[data-testid="module-item-${mod.short}"]`)
-					?.scrollIntoView({ behavior: 'instant', block: 'start' });
-			}
-		});
-	}, { flush: 'post' });
+			requestAnimationFrame(() => {
+				const mod = getModule(typeId);
+				if (mod) {
+					document.querySelector(`[data-testid="module-item-${mod.short}"]`)?.scrollIntoView({ behavior: 'instant', block: 'start' });
+				}
+			});
+		},
+		{ flush: 'post' },
+	);
 
 	const helpCache = reactive(new Map<number, string>());
 
 	async function loadAllHelp() {
 		const { marked } = await import('marked');
-		const allMods = getAllCategories().flatMap(cat => getModulesByCategoryRaw(cat));
-		await Promise.all(allMods.map(async mod => {
-			if (helpCache.has(mod.id)) return;
-			const raw = await window.electronAPI.loadHelp(mod.short);
-			if (!raw) return;
-			helpCache.set(mod.id, await marked(raw) as string);
-		}));
+		const allMods = getAllCategories().flatMap((cat) => getModulesByCategoryRaw(cat));
+		await Promise.all(
+			allMods.map(async (mod) => {
+				if (helpCache.has(mod.id)) return;
+				const raw = await window.electronAPI.loadHelp(mod.short);
+				if (!raw) return;
+				helpCache.set(mod.id, (await marked(raw)) as string);
+			}),
+		);
 	}
 
 	// Pre-load cache whenever the modules pane becomes visible so F1 "show all" is instant
-	watch([() => ui.showRightPane, () => ui.rightPaneTab], ([show, tab]) => {
-		if (show && tab === 'modules') loadAllHelp();
-	}, { immediate: true });
+	watch(
+		[() => ui.showRightPane, () => ui.rightPaneTab],
+		([show, tab]) => {
+			if (show && tab === 'modules') loadAllHelp();
+		},
+		{ immediate: true },
+	);
 
-	watch(() => ui.helpAllModules, (val) => {
-		if (val) loadAllHelp();
-	});
+	watch(
+		() => ui.helpAllModules,
+		(val) => {
+			if (val) loadAllHelp();
+		},
+	);
 
 	const moduleInstances = reactive(new Map());
 
@@ -262,34 +273,34 @@
 </script>
 
 <style scoped>
-.module-help :deep(h1) {
-	font-size: 0.85rem;
-	font-weight: 600;
-	color: #e5e5e5;
-	margin-bottom: 0.5rem;
-}
-.module-help :deep(h2) {
-	font-size: 0.75rem;
-	font-weight: 600;
-	color: #d4d4d4;
-	margin-top: 0.75rem;
-	margin-bottom: 0.25rem;
-}
-.module-help :deep(p) {
-	margin-bottom: 0.5rem;
-	line-height: 1.5;
-}
-.module-help :deep(strong) {
-	color: #e5e5e5;
-	font-weight: 600;
-}
-.module-help :deep(ul) {
-	list-style: disc;
-	padding-left: 1rem;
-	margin-bottom: 0.5rem;
-}
-.module-help :deep(li) {
-	margin-bottom: 0.2rem;
-	line-height: 1.5;
-}
+	.module-help :deep(h1) {
+		font-size: 0.85rem;
+		font-weight: 600;
+		color: #e5e5e5;
+		margin-bottom: 0.5rem;
+	}
+	.module-help :deep(h2) {
+		font-size: 0.75rem;
+		font-weight: 600;
+		color: #d4d4d4;
+		margin-top: 0.75rem;
+		margin-bottom: 0.25rem;
+	}
+	.module-help :deep(p) {
+		margin-bottom: 0.5rem;
+		line-height: 1.5;
+	}
+	.module-help :deep(strong) {
+		color: #e5e5e5;
+		font-weight: 600;
+	}
+	.module-help :deep(ul) {
+		list-style: disc;
+		padding-left: 1rem;
+		margin-bottom: 0.5rem;
+	}
+	.module-help :deep(li) {
+		margin-bottom: 0.2rem;
+		line-height: 1.5;
+	}
 </style>

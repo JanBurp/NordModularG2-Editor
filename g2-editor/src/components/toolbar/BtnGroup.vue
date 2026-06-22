@@ -83,8 +83,14 @@
 	const handleSelect = (value: string | number, disabled?: boolean, event?: MouseEvent) => {
 		if (disabled) return;
 
-		if (event?.shiftKey) { emit('shift-click', value); return; }
-		if (event?.ctrlKey || event?.metaKey) { emit('ctrl-click', value); return; }
+		if (event?.shiftKey) {
+			emit('shift-click', value);
+			return;
+		}
+		if (event?.ctrlKey || event?.metaKey) {
+			emit('ctrl-click', value);
+			return;
+		}
 
 		if (props.multiSelect && Array.isArray(props.modelValue)) {
 			const newValue = props.modelValue.includes(value) ? props.modelValue.filter((v) => v !== value) : [...props.modelValue, value];

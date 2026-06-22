@@ -67,5 +67,4 @@
 		stroke: #666;
 		stroke-width: 1;
 	}
-
 </style>

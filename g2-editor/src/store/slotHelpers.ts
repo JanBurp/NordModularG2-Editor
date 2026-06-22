@@ -19,27 +19,42 @@ export function matchesCableJack(c: Cable, moduleIndex: number, connectorIndex: 
 }
 
 function defaultPatchParams(): PatchParamVariation {
-	return { patchVol: 100, activeMuted: 1, glide: 0, glideTime: 0, bend: 0, semi: 0, vibrato: 0, cents: 0, rate: 0, arpeggiator: 0, arpTime: 0, arpType: 0, octaveShift: 0, sustain: 0, octaves: 0, morphDials: [0,0,0,0,0,0,0,0], morphModes: [0,0,0,0,0,0,0,0] };
+	return {
+		patchVol: 100,
+		activeMuted: 1,
+		glide: 0,
+		glideTime: 0,
+		bend: 0,
+		semi: 0,
+		vibrato: 0,
+		cents: 0,
+		rate: 0,
+		arpeggiator: 0,
+		arpTime: 0,
+		arpType: 0,
+		octaveShift: 0,
+		sustain: 0,
+		octaves: 0,
+		morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
+		morphModes: [0, 0, 0, 0, 0, 0, 0, 0],
+	};
 }
 
 export function extractVariations(patch: Patch): VariationState[] {
 	return Array.from({ length: NUM_VARIATIONS }, (_, v) => ({
 		fx: Object.fromEntries(
-			(patch.areas[0]?.modules ?? []).filter((m) => m.pcnt > 0).map((m) => [
-				m.index,
-				Array.from({ length: m.pcnt }, (_, p) => m.lv[v * m.pcnt + p] ?? 0),
-			]),
+			(patch.areas[0]?.modules ?? [])
+				.filter((m) => m.pcnt > 0)
+				.map((m) => [m.index, Array.from({ length: m.pcnt }, (_, p) => m.lv[v * m.pcnt + p] ?? 0)]),
 		),
 		voice: Object.fromEntries(
-			(patch.areas[1]?.modules ?? []).filter((m) => m.pcnt > 0).map((m) => [
-				m.index,
-				Array.from({ length: m.pcnt }, (_, p) => m.lv[v * m.pcnt + p] ?? 0),
-			]),
+			(patch.areas[1]?.modules ?? [])
+				.filter((m) => m.pcnt > 0)
+				.map((m) => [m.index, Array.from({ length: m.pcnt }, (_, p) => m.lv[v * m.pcnt + p] ?? 0)]),
 		),
 		patch: patch.patchParams?.[v] ? { ...patch.patchParams[v] } : defaultPatchParams(),
 	}));
 }
-
 
 export function removeModuleFromVariations(variations: VariationState[] | null, moduleId: number, areaKey: 'fx' | 'voice'): void {
 	if (!variations) return;

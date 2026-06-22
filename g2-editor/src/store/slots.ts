@@ -24,14 +24,14 @@ function emptySlotResources(): SlotResources {
 function parseResourceCycles(d: number[], o: number): number {
 	const red1 = d[o + 2] + d[o + 1] * 128;
 	const blue1 = d[o + 4] + d[o + 3] * 128;
-	return Math.max(100 * red1 / 1372 + 100 * blue1 / 5000, 0);
+	return Math.max((100 * red1) / 1372 + (100 * blue1) / 5000, 0);
 }
 
 function parseResourceMemory(d: number[], o: number): number {
 	const internalMem = d[o + 5];
 	const resource4 = d[o + 9] + d[o + 8] * 128;
 	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
-	return Math.max(Math.max(100 * internalMem / 128, 100 * ram / 260000), 100 * resource4 / 4315);
+	return Math.max(Math.max((100 * internalMem) / 128, (100 * ram) / 260000), (100 * resource4) / 4315);
 }
 
 export type { SlotLabel };
@@ -47,7 +47,8 @@ function sendCoalesced(key: string, cmd: string[]): void {
 		return;
 	}
 	_paramInFlight.add(key);
-	window.cli.run(cmd)
+	window.cli
+		.run(cmd)
 		.catch((err: unknown) => console.error('setParam failed:', err))
 		.finally(() => {
 			_paramInFlight.delete(key);
@@ -213,7 +214,10 @@ export const useSlotsStore = defineStore('slots', {
 
 		activeSlotResources: (state): SlotResources => state.slots[useUiStore().slotInFocus].resources,
 
-		assignedVoicesForSlot: (state) => (slot: SlotLabel): number => state.slots[slot].assignedVoices,
+		assignedVoicesForSlot:
+			(state) =>
+			(slot: SlotLabel): number =>
+				state.slots[slot].assignedVoices,
 	},
 
 	actions: {
@@ -348,9 +352,7 @@ export const useSlotsStore = defineStore('slots', {
 			const slotEntry = this.slots[slot];
 			const hist = useHistoryStore();
 			const ccLocation = areaIdx === 0 ? 0 : 1;
-			const removedCCSnap = slotEntry.controllers.filter(
-				(c) => c.location === ccLocation && c.moduleIndex === moduleId,
-			);
+			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -363,9 +365,7 @@ export const useSlotsStore = defineStore('slots', {
 						for (let p = 0; p < pcnt; p++) lvSnap[v * pcnt + p] = varParams[p] ?? 0;
 					}
 					const modSnap = { ...mod, lv: lvSnap, modes: [...mod.modes] };
-					const cableSnap = (patch.areas[areaIdx].cableList ?? [])
-						.filter((c) => c.smod === moduleId || c.dmod === moduleId)
-						.map((c) => ({ ...c }));
+					const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
 					hist.record(slot, {
 						undo: async () => {
 							mutAddModule(patch, areaIdx, { ...modSnap, lv: [...modSnap.lv], modes: [...modSnap.modes] });
@@ -377,14 +377,26 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
-							if (removedCCSnap.length > 0)
-								slotE.controllers = [...slotE.controllers, ...removedCCSnap];
+							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
 							slotE.rawHex = null;
 							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
-							const allCmds: string[][] = [['add-module', slot, location,
-								String(modSnap.type), String(moduleId), String(modSnap.horiz), String(modSnap.vert),
-								String(modSnap.colour), String(modSnap.modes.length), ...modSnap.modes.map(String),
-								String(modSnap.pcnt), ...paramVals0.map(String), modSnap.uname ?? '']];
+							const allCmds: string[][] = [
+								[
+									'add-module',
+									slot,
+									location,
+									String(modSnap.type),
+									String(moduleId),
+									String(modSnap.horiz),
+									String(modSnap.vert),
+									String(modSnap.colour),
+									String(modSnap.modes.length),
+									...modSnap.modes.map(String),
+									String(modSnap.pcnt),
+									...paramVals0.map(String),
+									modSnap.uname ?? '',
+								],
+							];
 							if (slotE.variations) {
 								for (let v = 1; v < slotE.variations.length; v++) {
 									for (let p = 0; p < modSnap.pcnt; p++) {
@@ -395,9 +407,18 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnap) {
-								allCmds.push(['add-cable', slot, location, String(c.colour),
-									String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon),
-									String(c.dmod), '0', String(c.dcon)]);
+								allCmds.push([
+									'add-cable',
+									slot,
+									location,
+									String(c.colour),
+									String(c.smod),
+									c.dir === 0 ? '0' : '1',
+									String(c.scon),
+									String(c.dmod),
+									'0',
+									String(c.dcon),
+								]);
 							}
 							if (removedCCSnap.length > 0) {
 								const flatArgs = removedCCSnap.flatMap((a) => {
@@ -418,9 +439,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			if (removedCCSnap.length > 0)
-				slotEntry.controllers = slotEntry.controllers.filter(
-					(c) => !(c.location === ccLocation && c.moduleIndex === moduleId),
-				);
+				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
 			slotEntry.rawHex = null;
 
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
@@ -533,13 +552,7 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async addModuleWithData(
-			src: ModuleInstance,
-			newId: number,
-			col: number,
-			row: number,
-			area: 'voice' | 'fx',
-		): Promise<void> {
+		async addModuleWithData(src: ModuleInstance, newId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
@@ -561,11 +574,18 @@ export const useSlotsStore = defineStore('slots', {
 
 			try {
 				await window.cli.run([
-					'add-module', slot, location,
-					String(src.type), String(newId), String(col), String(row),
+					'add-module',
+					slot,
+					location,
+					String(src.type),
+					String(newId),
+					String(col),
+					String(row),
 					String(src.colour),
-					String(src.modes.length), ...src.modes.map(String),
-					String(src.pcnt), ...paramVals0.map(String),
+					String(src.modes.length),
+					...src.modes.map(String),
+					String(src.pcnt),
+					...paramVals0.map(String),
 					src.uname ?? '',
 				]);
 			} catch (err) {
@@ -672,11 +692,18 @@ export const useSlotsStore = defineStore('slots', {
 					}
 					const paramVals0 = src.lv.slice(0, src.pcnt);
 					allCmds.push([
-						'add-module', slot, location,
-						String(src.type), String(newId), String(col), String(row),
+						'add-module',
+						slot,
+						location,
+						String(src.type),
+						String(newId),
+						String(col),
+						String(row),
 						String(src.colour),
-						String(src.modes.length), ...src.modes.map(String),
-						String(src.pcnt), ...paramVals0.map(String),
+						String(src.modes.length),
+						...src.modes.map(String),
+						String(src.pcnt),
+						...paramVals0.map(String),
 						src.uname ?? '',
 					]);
 					if (src.pcnt > 0 && slotEntry.variations) {
@@ -695,9 +722,18 @@ export const useSlotsStore = defineStore('slots', {
 				for (const { newSmod, newDmod, colour, scon, dcon, dir } of cables) {
 					mutAddCable(patch, areaIdx, { colour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
 					const fromConType = dir === 1 ? 1 : 0;
-					allCmds.push(['add-cable', slot, location, String(colour),
-						String(newSmod), String(fromConType), String(scon),
-						String(newDmod), '0', String(dcon)]);
+					allCmds.push([
+						'add-cable',
+						slot,
+						location,
+						String(colour),
+						String(newSmod),
+						String(fromConType),
+						String(scon),
+						String(newDmod),
+						'0',
+						String(dcon),
+					]);
 				}
 
 				slotEntry.rawHex = null;
@@ -707,10 +743,8 @@ export const useSlotsStore = defineStore('slots', {
 					// frame as add-cable — splitting into two sequential batches avoids G2_ERR_SEND.
 					const moduleCmds = allCmds.filter((c) => c[0] !== 'add-cable');
 					const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
-					for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK)
-						await window.cli.runBatch(moduleCmds.slice(i, i + BATCH_CHUNK));
-					for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK)
-						await window.cli.runBatch(cableCmds.slice(i, i + BATCH_CHUNK));
+					for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK) await window.cli.runBatch(moduleCmds.slice(i, i + BATCH_CHUNK));
+					for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK) await window.cli.runBatch(cableCmds.slice(i, i + BATCH_CHUNK));
 				} catch (err) {
 					console.warn('paste batch CLI failed:', err);
 				}
@@ -720,7 +754,17 @@ export const useSlotsStore = defineStore('slots', {
 					hist.record(slot, {
 						undo: async () => {
 							// Delete added cables first
-							const delCableCmds = addedCables.map((c) => ['del-cable', slot, location, String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)]);
+							const delCableCmds = addedCables.map((c) => [
+								'del-cable',
+								slot,
+								location,
+								String(c.smod),
+								c.dir === 0 ? '0' : '1',
+								String(c.scon),
+								String(c.dmod),
+								'0',
+								String(c.dcon),
+							]);
 							for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 							// Delete added modules
 							const delModCmds = addedIds.map((id) => ['del-module', slot, location, String(id)]);
@@ -855,7 +899,9 @@ export const useSlotsStore = defineStore('slots', {
 			if (shouldRecord) {
 				const postCableList = patch.areas[areaIdx].cableList ?? [];
 				// Added cable = in post but not in pre
-				const addedCable = postCableList.find((c) => !preCableList.some((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon)) ?? cable;
+				const addedCable =
+					postCableList.find((c) => !preCableList.some((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon)) ??
+					cable;
 				// Recolored cables = in both pre and post but with different colour
 				const recoloredOrig = preCableList.filter((b) => {
 					const after = postCableList.find((a) => a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon);
@@ -866,9 +912,17 @@ export const useSlotsStore = defineStore('slots', {
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
 						this.slots[slot].rawHex = null;
-						await window.cli.run(['del-cable', slot, location, String(addedCable.smod),
-							addedCable.dir === 0 ? '0' : '1', String(addedCable.scon),
-							String(addedCable.dmod), '0', String(addedCable.dcon)]);
+						await window.cli.run([
+							'del-cable',
+							slot,
+							location,
+							String(addedCable.smod),
+							addedCable.dir === 0 ? '0' : '1',
+							String(addedCable.scon),
+							String(addedCable.dmod),
+							'0',
+							String(addedCable.dcon),
+						]);
 						// Restore recolored cables
 						if (recoloredOrig.length > 0) {
 							patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
@@ -878,8 +932,29 @@ export const useSlotsStore = defineStore('slots', {
 							this.slots[slot].rawHex = null;
 							const restoreCmds: string[][] = [];
 							for (const b of recoloredOrig) {
-								restoreCmds.push(['del-cable', slot, location, String(b.smod), b.dir === 0 ? '0' : '1', String(b.scon), String(b.dmod), '0', String(b.dcon)]);
-								restoreCmds.push(['add-cable', slot, location, String(b.colour), String(b.smod), b.dir === 0 ? '0' : '1', String(b.scon), String(b.dmod), '0', String(b.dcon)]);
+								restoreCmds.push([
+									'del-cable',
+									slot,
+									location,
+									String(b.smod),
+									b.dir === 0 ? '0' : '1',
+									String(b.scon),
+									String(b.dmod),
+									'0',
+									String(b.dcon),
+								]);
+								restoreCmds.push([
+									'add-cable',
+									slot,
+									location,
+									String(b.colour),
+									String(b.smod),
+									b.dir === 0 ? '0' : '1',
+									String(b.scon),
+									String(b.dmod),
+									'0',
+									String(b.dcon),
+								]);
 							}
 							await window.cli.runBatch(restoreCmds);
 						}
@@ -909,10 +984,19 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const cKey = `param:${area}:${moduleId}:${paramIdx}:${variation}`;
 				const box = { initial: prevValue, latest: value };
-				hist.record(slot, {
-					undo: async () => { await this.setParam(moduleId, paramIdx, box.initial, variation, area); },
-					redo: async () => { await this.setParam(moduleId, paramIdx, box.latest, variation, area); },
-				}, cKey, box);
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							await this.setParam(moduleId, paramIdx, box.initial, variation, area);
+						},
+						redo: async () => {
+							await this.setParam(moduleId, paramIdx, box.latest, variation, area);
+						},
+					},
+					cKey,
+					box,
+				);
 			}
 
 			if (slotEntry.variations?.[variation]?.[areaKey]?.[moduleId]) {
@@ -941,10 +1025,19 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const cKey = `mode:${area}:${moduleId}:${modeIdx}`;
 				const box = { initial: prevValue, latest: value };
-				hist.record(slot, {
-					undo: async () => { await this.setMode(moduleId, modeIdx, box.initial, variation, area); },
-					redo: async () => { await this.setMode(moduleId, modeIdx, box.latest, variation, area); },
-				}, cKey, box);
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							await this.setMode(moduleId, modeIdx, box.initial, variation, area);
+						},
+						redo: async () => {
+							await this.setMode(moduleId, modeIdx, box.latest, variation, area);
+						},
+					},
+					cKey,
+					box,
+				);
 			}
 
 			if (mod?.modes) mod.modes[modeIdx] = value;
@@ -1252,8 +1345,12 @@ export const useSlotsStore = defineStore('slots', {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
 				const prevLabel = mod?.uname ?? '';
 				hist.record(slot, {
-					undo: async () => { await this.setModuleLabel(moduleId, prevLabel, area); },
-					redo: async () => { await this.setModuleLabel(moduleId, label, area); },
+					undo: async () => {
+						await this.setModuleLabel(moduleId, prevLabel, area);
+					},
+					redo: async () => {
+						await this.setModuleLabel(moduleId, label, area);
+					},
 				});
 			}
 
@@ -1283,7 +1380,9 @@ export const useSlotsStore = defineStore('slots', {
 			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');
 			const bytes = buildPatchDescriptionBytes(templateHex, description);
 			if (!bytes) return;
-			const hex = Array.from(bytes).map((b) => b.toString(16).padStart(2, '0')).join('');
+			const hex = Array.from(bytes)
+				.map((b) => b.toString(16).padStart(2, '0'))
+				.join('');
 			await window.cli.run(['set-patch-description', slot, hex]);
 		},
 
@@ -1299,18 +1398,28 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const cKey = `morph:${variation}:${morphIdx}:${field}`;
 				const box = { initial: prevValue, latest: value };
-				hist.record(slot, {
-					undo: () => { this.setMorphParam(variation, morphIdx, field, box.initial); return Promise.resolve(); },
-					redo: () => { this.setMorphParam(variation, morphIdx, field, box.latest); return Promise.resolve(); },
-				}, cKey, box);
+				hist.record(
+					slot,
+					{
+						undo: () => {
+							this.setMorphParam(variation, morphIdx, field, box.initial);
+							return Promise.resolve();
+						},
+						redo: () => {
+							this.setMorphParam(variation, morphIdx, field, box.latest);
+							return Promise.resolve();
+						},
+					},
+					cKey,
+					box,
+				);
 			}
 
 			if (field === 'dial') patch.morphDials[morphIdx] = value;
 			else patch.morphModes[morphIdx] = value;
 			entry.rawHex = null;
 			const param = field === 'dial' ? morphIdx : 8 + morphIdx;
-			sendCoalesced(`${slot}:patch:1:${param}:${variation}`,
-				['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
+			sendCoalesced(`${slot}:patch:1:${param}:${variation}`, ['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
 		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
@@ -1323,10 +1432,19 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const cKey = `patchparam:${variation}:${key}`;
 				const box = { initial: prevValue, latest: value };
-				hist.record(slot, {
-					undo: async () => { await this.setPatchParam(variation, key, box.initial); },
-					redo: async () => { await this.setPatchParam(variation, key, box.latest); },
-				}, cKey, box);
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							await this.setPatchParam(variation, key, box.initial);
+						},
+						redo: async () => {
+							await this.setPatchParam(variation, key, box.latest);
+						},
+					},
+					cKey,
+					box,
+				);
 			}
 
 			if (entry?.variations?.[variation]) {
@@ -1336,7 +1454,8 @@ export const useSlotsStore = defineStore('slots', {
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
 			if (paramIdx < 0) return;
 			// Convert global index to section + local index (inverse of SECTION_OFFSETS in useSlotEvents.ts)
-			let section = 2, local = paramIdx;
+			let section = 2,
+				local = paramIdx;
 			for (let i = 0; i < SECTION_STARTS.length - 1; i++) {
 				if (paramIdx >= SECTION_STARTS[i].start && paramIdx < SECTION_STARTS[i + 1].start) {
 					section = SECTION_STARTS[i].section;
@@ -1344,8 +1463,15 @@ export const useSlotsStore = defineStore('slots', {
 					break;
 				}
 			}
-			sendCoalesced(`${slot}:patch:${section}:${local}:${variation}`,
-				['set-param', slot, 'patch', String(section), String(local), String(value), String(variation)]);
+			sendCoalesced(`${slot}:patch:${section}:${local}:${variation}`, [
+				'set-param',
+				slot,
+				'patch',
+				String(section),
+				String(local),
+				String(value),
+				String(variation),
+			]);
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
@@ -1360,8 +1486,12 @@ export const useSlotsStore = defineStore('slots', {
 				const existingLabel = (mod?.paramLabels as any[])?.find((pl: any) => pl.paramIndex === paramIndex);
 				const prevLabel = existingLabel?.labels?.[0] ?? '';
 				hist.record(slot, {
-					undo: async () => { await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area); },
-					redo: async () => { await this.setParamLabel(moduleIndex, paramIndex, label, area); },
+					undo: async () => {
+						await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area);
+					},
+					redo: async () => {
+						await this.setParamLabel(moduleIndex, paramIndex, label, area);
+					},
 				});
 			}
 
@@ -1398,11 +1528,24 @@ export const useSlotsStore = defineStore('slots', {
 							return orig ? { ...c, colour: orig.colour } : c;
 						});
 						this.slots[slot].rawHex = null;
-						await window.cli.runBatch(prevColorMap.map((b) => ['set-cable-color', slot, location, String(b.colour),
-							String(b.smod), (b.dir ?? 1) === 0 ? '0' : '1', String(b.scon),
-							String(b.dmod), '0', String(b.dcon)]));
+						await window.cli.runBatch(
+							prevColorMap.map((b) => [
+								'set-cable-color',
+								slot,
+								location,
+								String(b.colour),
+								String(b.smod),
+								(b.dir ?? 1) === 0 ? '0' : '1',
+								String(b.scon),
+								String(b.dmod),
+								'0',
+								String(b.dcon),
+							]),
+						);
 					},
-					redo: async () => { await this.setCableColor(moduleIndex, connectorIndex, type, color, area); },
+					redo: async () => {
+						await this.setCableColor(moduleIndex, connectorIndex, type, color, area);
+					},
 				});
 			}
 
@@ -1440,11 +1583,24 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this.slots[slot].rawHex = null;
-						await window.cli.runBatch(deletedCables.map((c) => ['add-cable', slot, location, String(c.colour),
-							String(c.smod), c.dir === 0 ? '0' : '1', String(c.scon),
-							String(c.dmod), '0', String(c.dcon)]));
+						await window.cli.runBatch(
+							deletedCables.map((c) => [
+								'add-cable',
+								slot,
+								location,
+								String(c.colour),
+								String(c.smod),
+								c.dir === 0 ? '0' : '1',
+								String(c.scon),
+								String(c.dmod),
+								'0',
+								String(c.dcon),
+							]),
+						);
 					},
-					redo: async () => { await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area); },
+					redo: async () => {
+						await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
+					},
 				});
 			}
 
@@ -1516,9 +1672,9 @@ export const useSlotsStore = defineStore('slots', {
 						}
 						cableSnaps = (patch.areas[areaIdx].cableList ?? [])
 							.filter((c) => selectedModules.includes(c.smod) || selectedModules.includes(c.dmod))
-							.map((c) => ({ ...c } as Cable));
+							.map((c) => ({ ...c }) as Cable);
 					} else if (selectedCables.length > 0) {
-						cableSnaps = selectedCables.map((c) => ({ ...c } as Cable));
+						cableSnaps = selectedCables.map((c) => ({ ...c }) as Cable);
 					}
 				}
 
@@ -1583,10 +1739,21 @@ export const useSlotsStore = defineStore('slots', {
 							const allCmds: string[][] = [];
 							for (const mod of modSnaps) {
 								const paramVals0 = mod.lv.slice(0, mod.pcnt);
-								allCmds.push(['add-module', slot, location,
-									String(mod.type), String(mod.index), String(mod.horiz), String(mod.vert),
-									String(mod.colour), String(mod.modes.length), ...mod.modes.map(String),
-									String(mod.pcnt), ...paramVals0.map(String), mod.uname ?? '']);
+								allCmds.push([
+									'add-module',
+									slot,
+									location,
+									String(mod.type),
+									String(mod.index),
+									String(mod.horiz),
+									String(mod.vert),
+									String(mod.colour),
+									String(mod.modes.length),
+									...mod.modes.map(String),
+									String(mod.pcnt),
+									...paramVals0.map(String),
+									mod.uname ?? '',
+								]);
 								const slotE = this.slots[slot];
 								if (slotE.variations) {
 									for (let v = 1; v < slotE.variations.length; v++) {
@@ -1600,9 +1767,18 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							for (const c of cableSnaps) {
 								const cn = { ...c, dir: c.dir ?? 1 };
-								allCmds.push(['add-cable', slot, location, String(cn.colour),
-									String(cn.smod), cn.dir === 0 ? '0' : '1', String(cn.scon),
-									String(cn.dmod), '0', String(cn.dcon)]);
+								allCmds.push([
+									'add-cable',
+									slot,
+									location,
+									String(cn.colour),
+									String(cn.smod),
+									cn.dir === 0 ? '0' : '1',
+									String(cn.scon),
+									String(cn.dmod),
+									'0',
+									String(cn.dcon),
+								]);
 							}
 							for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
 								await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
@@ -1658,10 +1834,7 @@ export const useSlotsStore = defineStore('slots', {
 		async assignMidiCC(slot: SlotLabel, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number, cc: number): Promise<void> {
 			const locStr = location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
 			const prevControllers = [...this.slots[slot].controllers];
-			this.slots[slot].controllers = [
-				...this.slots[slot].controllers.filter((c) => c.cc !== cc),
-				{ cc, location, moduleIndex, paramIndex },
-			];
+			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => c.cc !== cc), { cc, location, moduleIndex, paramIndex }];
 			this.slots[slot].rawHex = null;
 			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
@@ -1676,13 +1849,22 @@ export const useSlotsStore = defineStore('slots', {
 							const oldAssignment = prevControllers.find((c) => c.cc === cc);
 							if (oldAssignment) {
 								const oldLocStr = oldAssignment.location === 1 ? 'va' : oldAssignment.location === 2 ? 'patch' : 'fx';
-								await window.cli.run(['assign-midicc', slot, oldLocStr, String(oldAssignment.moduleIndex), String(oldAssignment.paramIndex), String(cc)]);
+								await window.cli.run([
+									'assign-midicc',
+									slot,
+									oldLocStr,
+									String(oldAssignment.moduleIndex),
+									String(oldAssignment.paramIndex),
+									String(cc),
+								]);
 							} else {
 								await window.cli.run(['deassign-midicc', slot, String(cc)]);
 							}
 						}
 					},
-					redo: async () => { await this.assignMidiCC(slot, location, moduleIndex, paramIndex, cc); },
+					redo: async () => {
+						await this.assignMidiCC(slot, location, moduleIndex, paramIndex, cc);
+					},
 				});
 			}
 			const deviceStore = useDeviceStore();
@@ -1711,12 +1893,13 @@ export const useSlotsStore = defineStore('slots', {
 							}
 						}
 					},
-					redo: async () => { await this.deassignMidiCC(slot, cc); },
+					redo: async () => {
+						await this.deassignMidiCC(slot, cc);
+					},
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected)
-				await window.cli.run(['deassign-midicc', slot, String(cc)]);
+			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-midicc', slot, String(cc)]);
 		},
 
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {
@@ -1742,12 +1925,13 @@ export const useSlotsStore = defineStore('slots', {
 							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
 						}
 					},
-					redo: async () => { await this.deassignMidiCCs(slot, ccs); },
+					redo: async () => {
+						await this.deassignMidiCCs(slot, ccs);
+					},
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
-				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
+			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0) await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
 		},
 
 		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
@@ -1772,12 +1956,13 @@ export const useSlotsStore = defineStore('slots', {
 							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
 						}
 					},
-					redo: async () => { await this.deassignAllMidiCC(slot); },
+					redo: async () => {
+						await this.deassignAllMidiCC(slot);
+					},
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
-				await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
+			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0) await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
 		},
 
 		async autoAssignMidiCC(slot: SlotLabel, targets: { location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[]): Promise<void> {
@@ -1792,10 +1977,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const newCCSet = new Set(newAssignments.map((a) => a.cc));
 			const prevControllers = [...this.slots[slot].controllers];
-			this.slots[slot].controllers = [
-				...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)),
-				...newAssignments,
-			];
+			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)), ...newAssignments];
 			this.slots[slot].rawHex = null;
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot) && newAssignments.length > 0) {
@@ -1817,7 +1999,9 @@ export const useSlotsStore = defineStore('slots', {
 							await window.cli.runBatch(cmds);
 						}
 					},
-					redo: async () => { await this.autoAssignMidiCC(slot, targets); },
+					redo: async () => {
+						await this.autoAssignMidiCC(slot, targets);
+					},
 				});
 			}
 			const deviceStore = useDeviceStore();

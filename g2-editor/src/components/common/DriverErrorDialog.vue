@@ -13,11 +13,10 @@
 				<div v-else class="text-sm text-content-secondary leading-relaxed">
 					The G2 was found on USB but its interface could not be claimed. Possible solutions:
 					<ul class="list-disc pl-4">
-					<li>G2 is claimed by another application. Quit other app and retry.</li>
-					<li>Try unplugging the G2 and plugging it back in.</li>
-					<li>Restart your Mac to reset the USB subsystem.</li>
+						<li>G2 is claimed by another application. Quit other app and retry.</li>
+						<li>Try unplugging the G2 and plugging it back in.</li>
+						<li>Restart your Mac to reset the USB subsystem.</li>
 					</ul>
-
 				</div>
 				<div class="flex justify-end">
 					<button

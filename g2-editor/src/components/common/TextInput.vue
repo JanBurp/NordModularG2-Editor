@@ -1,12 +1,5 @@
 <template>
-	<input
-		type="text"
-		class="settings-input"
-		v-bind="$attrs"
-		:value="modelValue"
-		:disabled="disabled"
-		@input="handleInput"
-	/>
+	<input type="text" class="settings-input" v-bind="$attrs" :value="modelValue" :disabled="disabled" @input="handleInput" />
 </template>
 
 <script setup lang="ts">

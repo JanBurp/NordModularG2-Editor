@@ -18,7 +18,9 @@
 				<span class="text-content-secondary truncate flex-1 min-w-0 font-medium">
 					{{ diskFolderName || 'No folder selected' }}
 				</span>
-				<button class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">…</button>
+				<button class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">
+					…
+				</button>
 			</div>
 
 			<template v-if="browser.diskFolder">
@@ -29,22 +31,16 @@
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
-					<ListItem
-						v-for="entry in filteredDiskDirs"
-						:key="entry.path"
-						@click="selectDisk(entry)"
-					>
+					<ListItem v-for="entry in filteredDiskDirs" :key="entry.path" @click="selectDisk(entry)">
 						<template #icon><span class="text-content-secondary">▶</span></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
-					<ListItem
-						v-for="entry in filteredDiskFiles"
-						:key="entry.path"
-						@click="selectDisk(entry)"
-					>
+					<ListItem v-for="entry in filteredDiskFiles" :key="entry.path" @click="selectDisk(entry)">
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
-						<template #meta><span class="text-content-secondary">{{ entry.name.split('.').pop() }}</span></template>
+						<template #meta
+							><span class="text-content-secondary">{{ entry.name.split('.').pop() }}</span></template
+						>
 					</ListItem>
 					<StateMessage
 						v-if="filteredDiskDirs.length === 0 && filteredDiskFiles.length === 0"
@@ -87,7 +83,9 @@
 								:key="`${p.bank}-${p.location}`"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
-								<template #icon><span class="text-content-secondary">{{ p.location }}</span></template>
+								<template #icon
+									><span class="text-content-secondary">{{ p.location }}</span></template
+								>
 								<template #label>{{ p.name }}</template>
 							</ListItem>
 						</template>
@@ -118,7 +116,11 @@
 	}>();
 
 	const emit = defineEmits<{
-		select: [item: { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' } | { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' }];
+		select: [
+			item:
+				| { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' }
+				| { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' },
+		];
 	}>();
 
 	const browser = useBrowserStore();

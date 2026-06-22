@@ -173,30 +173,64 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	bw.write(8, 7); // 7 sub-sections
 	bw.write(8, NUM_VAR);
 	// Sub 1: Morphs
-	bw.write(8, 1); bw.write(7, 16);
+	bw.write(8, 1);
+	bw.write(7, 16);
 	for (let v = 0; v < NUM_VAR; v++) {
 		bw.write(8, v);
 		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphDials?.[j] ?? 0);
 		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphModes?.[j] ?? 0);
 	}
 	// Sub 2: Volume
-	bw.write(8, 2); bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.patchVol ?? 0); bw.write(7, params[v]?.activeMuted ?? 0); }
+	bw.write(8, 2);
+	bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.patchVol ?? 0);
+		bw.write(7, params[v]?.activeMuted ?? 0);
+	}
 	// Sub 3: Glide
-	bw.write(8, 3); bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.glide ?? 0); bw.write(7, params[v]?.glideTime ?? 0); }
+	bw.write(8, 3);
+	bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.glide ?? 0);
+		bw.write(7, params[v]?.glideTime ?? 0);
+	}
 	// Sub 4: Bend
-	bw.write(8, 4); bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.bend ?? 0); bw.write(7, params[v]?.semi ?? 0); }
+	bw.write(8, 4);
+	bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.bend ?? 0);
+		bw.write(7, params[v]?.semi ?? 0);
+	}
 	// Sub 5: Vibrato
-	bw.write(8, 5); bw.write(7, 3);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.vibrato ?? 0); bw.write(7, params[v]?.cents ?? 0); bw.write(7, params[v]?.rate ?? 0); }
+	bw.write(8, 5);
+	bw.write(7, 3);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.vibrato ?? 0);
+		bw.write(7, params[v]?.cents ?? 0);
+		bw.write(7, params[v]?.rate ?? 0);
+	}
 	// Sub 6: Arp
-	bw.write(8, 6); bw.write(7, 4);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.arpeggiator ?? 0); bw.write(7, params[v]?.arpTime ?? 0); bw.write(7, params[v]?.arpType ?? 0); bw.write(7, params[v]?.octaves ?? 0); }
+	bw.write(8, 6);
+	bw.write(7, 4);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.arpeggiator ?? 0);
+		bw.write(7, params[v]?.arpTime ?? 0);
+		bw.write(7, params[v]?.arpType ?? 0);
+		bw.write(7, params[v]?.octaves ?? 0);
+	}
 	// Sub 7: OctaveShift + Sustain
-	bw.write(8, 7); bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) { bw.write(8, v); bw.write(7, params[v]?.octaveShift ?? 0); bw.write(7, params[v]?.sustain ?? 0); }
+	bw.write(8, 7);
+	bw.write(7, 2);
+	for (let v = 0; v < NUM_VAR; v++) {
+		bw.write(8, v);
+		bw.write(7, params[v]?.octaveShift ?? 0);
+		bw.write(7, params[v]?.sustain ?? 0);
+	}
 	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
@@ -255,10 +289,14 @@ function buildRawHex(sections: Uint8Array[]): string {
 	const totalLen = sections.reduce((s, b) => s + b.length, 0);
 	const sectionBytes = new Uint8Array(totalLen);
 	let writeOfs = 0;
-	for (const sec of sections) { sectionBytes.set(sec, writeOfs); writeOfs += sec.length; }
+	for (const sec of sections) {
+		sectionBytes.set(sec, writeOfs);
+		writeOfs += sec.length;
+	}
 	// CRC covers [0x17][0x00][sectionBytes] (same range as parser's filedataArray)
 	const forCrc = new Uint8Array(2 + sectionBytes.length);
-	forCrc[0] = 0x17; forCrc[1] = 0x00;
+	forCrc[0] = 0x17;
+	forCrc[1] = 0x00;
 	forCrc.set(sectionBytes, 2);
 	const crc = calcCrc(forCrc);
 	const result = new Uint8Array(sectionBytes.length + 2);
@@ -282,7 +320,11 @@ function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
 
 // Tracks which area sections have already been written (prevents duplicates within one slot).
 interface WrittenSets {
-	m4a: Set<number>; m52: Set<number>; m4d: Set<number>; m5a: Set<number>; m5b: Set<number>;
+	m4a: Set<number>;
+	m52: Set<number>;
+	m4d: Set<number>;
+	m5a: Set<number>;
+	m5b: Set<number>;
 	m60: boolean;
 }
 
@@ -298,8 +340,14 @@ function newWrittenSets(): WrittenSets {
  * from `patch`; all other sections are preserved verbatim from the template.
  */
 function processSection(
-	type: number, siz: number, secData: Uint8Array, verbatim: Uint8Array,
-	patch: Patch, out: Uint8Array[], w: WrittenSets, variations: VariationState[],
+	type: number,
+	siz: number,
+	secData: Uint8Array,
+	verbatim: Uint8Array,
+	patch: Patch,
+	out: Uint8Array[],
+	w: WrittenSets,
+	variations: VariationState[],
 ): void {
 	const areaIdx = siz > 0 ? (secData[0] >> 6) & 0x3 : 0;
 
@@ -400,7 +448,10 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			}
 			out.push(template.slice(ofs, ofs + 3 + siz));
 			// Advance to next slot when more data follows
-			if (ofs + 3 + siz < sectionDataLen) { slotIdx++; w = newWrittenSets(); }
+			if (ofs + 3 + siz < sectionDataLen) {
+				slotIdx++;
+				w = newWrittenSets();
+			}
 		} else {
 			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w, variationsArray[slotIdx] ?? []);
 		}

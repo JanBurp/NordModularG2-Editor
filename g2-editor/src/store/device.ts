@@ -15,14 +15,14 @@ export enum DeviceStatus {
 }
 
 const STATUS_MAP: Record<DeviceStatus, { textClass: string; dotClass: string; label: string }> = {
-	[DeviceStatus.Connected]:    { textClass: 'text-green-400',   dotClass: 'bg-green-500',                label: 'connected' },
-	[DeviceStatus.Connecting]:   { textClass: 'text-orange-300',  dotClass: 'bg-orange-400 animate-pulse', label: 'connecting' },
-	[DeviceStatus.Loading]:      { textClass: 'text-blue-300',    dotClass: 'bg-blue-400 animate-pulse',   label: 'loading' },
-	[DeviceStatus.Disconnected]: { textClass: 'text-content-secondary', dotClass: 'bg-surface-3',          label: 'disconnected' },
-	[DeviceStatus.Lost]:         { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'lost' },
-	[DeviceStatus.Unsupported]:  { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'not available' },
-	[DeviceStatus.Offline]:      { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'offline' },
-	[DeviceStatus.DriverError]:  { textClass: 'text-red-400',     dotClass: 'bg-red-500',                  label: 'driver error' },
+	[DeviceStatus.Connected]: { textClass: 'text-green-400', dotClass: 'bg-green-500', label: 'connected' },
+	[DeviceStatus.Connecting]: { textClass: 'text-orange-300', dotClass: 'bg-orange-400 animate-pulse', label: 'connecting' },
+	[DeviceStatus.Loading]: { textClass: 'text-blue-300', dotClass: 'bg-blue-400 animate-pulse', label: 'loading' },
+	[DeviceStatus.Disconnected]: { textClass: 'text-content-secondary', dotClass: 'bg-surface-3', label: 'disconnected' },
+	[DeviceStatus.Lost]: { textClass: 'text-red-400', dotClass: 'bg-red-500', label: 'lost' },
+	[DeviceStatus.Unsupported]: { textClass: 'text-red-400', dotClass: 'bg-red-500', label: 'not available' },
+	[DeviceStatus.Offline]: { textClass: 'text-red-400', dotClass: 'bg-red-500', label: 'offline' },
+	[DeviceStatus.DriverError]: { textClass: 'text-red-400', dotClass: 'bg-red-500', label: 'driver error' },
 };
 
 export const useDeviceStore = defineStore('device', {
@@ -102,10 +102,25 @@ export const useDeviceStore = defineStore('device', {
 		async setPerformanceMode(name: string) {
 			if (!this.device) {
 				this.device = {
-					synthName: '', mode: 'Performance', perfBank: 0, perfLoc: 0, memProtect: false, globalOctaveShiftActive: false, globalOctaveShift: 0,
+					synthName: '',
+					mode: 'Performance',
+					perfBank: 0,
+					perfLoc: 0,
+					memProtect: false,
+					globalOctaveShiftActive: false,
+					globalOctaveShift: 0,
 					performance: { name, focus: '', rangeEnable: false, bpm: 0, clockRunning: false },
 					slots: [],
-					midi: { slots: { A: 0, B: 0, C: 0, D: 0, global: 0 }, sysex: 0, local: false, prgch: 0, ctrlsRecv: false, ctrlsSend: false, clkse: false, clkre: false },
+					midi: {
+						slots: { A: 0, B: 0, C: 0, D: 0, global: 0 },
+						sysex: 0,
+						local: false,
+						prgch: 0,
+						ctrlsRecv: false,
+						ctrlsSend: false,
+						clkse: false,
+						clkre: false,
+					},
 					tuning: { semi: 0, cent: 0 },
 					pedal: { polarity: false, gain: 0 },
 				};
@@ -122,12 +137,23 @@ export const useDeviceStore = defineStore('device', {
 			}
 		},
 
-		updateSynthSettings(ev: { synthName: string; mode: string; perfBank?: number; perfLoc?: number; memProtect?: boolean; globalOctaveShiftActive?: boolean; globalOctaveShift?: number; midi: Device['midi']; tuning: Device['tuning']; pedal: Device['pedal'] }) {
+		updateSynthSettings(ev: {
+			synthName: string;
+			mode: string;
+			perfBank?: number;
+			perfLoc?: number;
+			memProtect?: boolean;
+			globalOctaveShiftActive?: boolean;
+			globalOctaveShift?: number;
+			midi: Device['midi'];
+			tuning: Device['tuning'];
+			pedal: Device['pedal'];
+		}) {
 			if (!this.device) return;
 			this.device.synthName = ev.synthName;
 			this.device.mode = ev.mode;
 			this.device.perfBank = ev.perfBank ?? 0;
-			this.device.perfLoc  = ev.perfLoc  ?? 0;
+			this.device.perfLoc = ev.perfLoc ?? 0;
 			this.device.memProtect = ev.memProtect ?? false;
 			this.device.globalOctaveShiftActive = ev.globalOctaveShiftActive ?? false;
 			this.device.globalOctaveShift = ev.globalOctaveShift ?? 0;
@@ -146,40 +172,35 @@ export const useDeviceStore = defineStore('device', {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.active = !entry.active;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']);
 		},
 
 		toggleSlotKey(slot: SlotLabel) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.key = !entry.key;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
 		},
 
 		setSlotHold(slot: SlotLabel, value: boolean) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.hold = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-hold', slot, value ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-hold', slot, value ? '1' : '0']);
 		},
 
 		setSlotRangeLower(slot: SlotLabel, lower: number) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.range.lower = lower;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]);
 		},
 
 		setSlotRangeUpper(slot: SlotLabel, upper: number) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.range.upper = upper;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]);
 		},
 
 		buildSynthPayload() {
@@ -188,7 +209,7 @@ export const useDeviceStore = defineStore('device', {
 				synthName: d.synthName,
 				mode: d.mode,
 				perfBank: d.perfBank,
-				perfLoc:  d.perfLoc,
+				perfLoc: d.perfLoc,
 				memProtect: d.memProtect,
 				globalOctaveShiftActive: d.globalOctaveShiftActive,
 				globalOctaveShift: d.globalOctaveShift,
@@ -199,8 +220,7 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		sendSynthSettings() {
-			if (this.device && this.status === DeviceStatus.Connected)
-				window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]);
+			if (this.device && this.status === DeviceStatus.Connected) window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]);
 		},
 
 		setSynthName(name: string) {
@@ -302,9 +322,7 @@ export const useDeviceStore = defineStore('device', {
 		setRangeEnable(value: boolean) {
 			if (!this.device) return;
 			if (this.device.performance) this.device.performance.rangeEnable = value;
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-range-enable', value ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected) window.cli.run(['set-range-enable', value ? '1' : '0']);
 		},
-
 	},
 });

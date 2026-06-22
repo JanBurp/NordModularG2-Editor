@@ -20,7 +20,10 @@ export function useModuleDrop(svgRef: Ref<SVGSVGElement | null>, onDrop: (info: 
 	function handleDragOver(e: DragEvent) {
 		if (!svgRef.value) return;
 		const typeId = ui.draggedModuleId;
-		if (!typeId) { clearDropGhost(); return; }
+		if (!typeId) {
+			clearDropGhost();
+			return;
+		}
 		const mp = toSvgCoords(e as unknown as MouseEvent);
 		if (!mp) return;
 		const col = Math.max(0, Math.floor(mp.x / 256));

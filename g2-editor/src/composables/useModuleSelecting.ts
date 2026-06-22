@@ -27,8 +27,10 @@ export function useModuleSelecting(
 	let rafId: number | null = null;
 	let pendingClientX = 0;
 	let pendingClientY = 0;
-	let startX = 0, startY = 0;
-	let lastX = 0, lastY = 0;
+	let startX = 0,
+		startY = 0;
+	let lastX = 0,
+		lastY = 0;
 	let isDragging = false;
 
 	function captureCtm() {
@@ -50,9 +52,9 @@ export function useModuleSelecting(
 	function updateRect(x1: number, y1: number, x2: number, y2: number) {
 		const el = rectEl.value;
 		if (!el) return;
-		el.style.left   = Math.min(x1, x2) + 'px';
-		el.style.top    = Math.min(y1, y2) + 'px';
-		el.style.width  = Math.abs(x2 - x1) + 'px';
+		el.style.left = Math.min(x1, x2) + 'px';
+		el.style.top = Math.min(y1, y2) + 'px';
+		el.style.width = Math.abs(x2 - x1) + 'px';
 		el.style.height = Math.abs(y2 - y1) + 'px';
 	}
 

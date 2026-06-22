@@ -1,19 +1,31 @@
 <template>
-	<g
-		:transform="`translate(${param.x}, ${param.y})`"
-		class="switch-control"
-		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
-	>
+	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
-			<svg v-if="singleButtonMode && displayNames.length <= 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }">
+			<svg
+				v-if="singleButtonMode && displayNames.length <= 1"
+				:x="0"
+				:y="0"
+				:width="width"
+				height="11"
+				class="switch-bitmap"
+				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
+			>
 				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
 			<!-- Single button mode: show active bitmap without highlight -->
-			<svg v-else-if="singleButtonMode && displayNames.length > 1" :x="0" :y="0" :width="width" height="11" class="switch-bitmap" v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }">
+			<svg
+				v-else-if="singleButtonMode && displayNames.length > 1"
+				:x="0"
+				:y="0"
+				:width="width"
+				height="11"
+				class="switch-bitmap"
+				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
+			>
 				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
@@ -39,7 +51,11 @@
 		<!-- Text-based switch -->
 		<template v-else>
 			<!-- Single button mode, with one displayname: show with highlight -->
-			<g v-if="singleButtonMode && displayNames.length <= 1" class="switch-button" v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }">
+			<g
+				v-if="singleButtonMode && displayNames.length <= 1"
+				class="switch-button"
+				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
+			>
 				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" />
 				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
@@ -47,7 +63,11 @@
 			</g>
 
 			<!-- Single button mode: show only active option without highlight -->
-			<g v-else-if="singleButtonMode && displayNames.length > 1" class="switch-button" v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }">
+			<g
+				v-else-if="singleButtonMode && displayNames.length > 1"
+				class="switch-button"
+				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
+			>
 				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" fill="#EEE" />
 				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
@@ -156,5 +176,4 @@
 		stroke: #333;
 		stroke-width: 1;
 	}
-
 </style>

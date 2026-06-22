@@ -30,9 +30,7 @@ export function useDeviceEvents(log: LogFn) {
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
 				const results = await Promise.allSettled(
-					ev.patches
-						.filter((p: any) => p?.data)
-						.map((p: any) => slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p))),
+					ev.patches.filter((p: any) => p?.data).map((p: any) => slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p))),
 				);
 				results.forEach((r, i) => {
 					if (r.status === 'rejected') console.error(`Watch: patch load failed for index ${i}:`, r.reason);

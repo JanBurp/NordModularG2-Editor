@@ -46,8 +46,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'open-performance':
 				case 'open':
 					await patchFile.openFromElectronDialog();
-					if (currentPatch.value?.description?.variation !== undefined)
-						uiStore.variation = currentPatch.value.description.variation;
+					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
 					break;
 				case 'save':
 					if (slotsStore.isPerformanceMode) {
@@ -81,7 +80,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				}
 				case 'cut': {
-					if (isInputFocused()) { document.execCommand('cut'); break; }
+					if (isInputFocused()) {
+						document.execCommand('cut');
+						break;
+					}
 					await cutSelection();
 					break;
 				}
@@ -91,13 +93,22 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				}
 				case 'delete': {
-					if (isInputFocused()) { document.execCommand('delete'); break; }
+					if (isInputFocused()) {
+						document.execCommand('delete');
+						break;
+					}
 					await deleteSelection();
 					break;
 				}
 				case 'select-all': {
-					if (isInputFocused()) { (document.activeElement as HTMLInputElement).select(); break; }
-					uiStore.selectModules(currentModules.value.map((m: any) => m.index as number), uiStore.activeArea === 1 ? 'va' : 'fx');
+					if (isInputFocused()) {
+						(document.activeElement as HTMLInputElement).select();
+						break;
+					}
+					uiStore.selectModules(
+						currentModules.value.map((m: any) => m.index as number),
+						uiStore.activeArea === 1 ? 'va' : 'fx',
+					);
 					break;
 				}
 				case 'toggle-modules':
@@ -118,10 +129,18 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'area-split':
 					uiStore.toggleSplit();
 					break;
-				case 'slot-A': handleSlotClick(0); break;
-				case 'slot-B': handleSlotClick(1); break;
-				case 'slot-C': handleSlotClick(2); break;
-				case 'slot-D': handleSlotClick(3); break;
+				case 'slot-A':
+					handleSlotClick(0);
+					break;
+				case 'slot-B':
+					handleSlotClick(1);
+					break;
+				case 'slot-C':
+					handleSlotClick(2);
+					break;
+				case 'slot-D':
+					handleSlotClick(3);
+					break;
 				case 'variation-1':
 				case 'variation-2':
 				case 'variation-3':
@@ -137,8 +156,12 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
 					break;
-				case 'undo': await slotsStore.undo(); break;
-				case 'redo': await slotsStore.redo(); break;
+				case 'undo':
+					await slotsStore.undo();
+					break;
+				case 'redo':
+					await slotsStore.redo();
+					break;
 				case 'show-about':
 					options.showAbout?.();
 					break;

@@ -74,9 +74,7 @@ export function useModuleKeyboard() {
 
 		if (uiStore.selectedModules.length === 0) {
 			// First use: pick top-left of active area
-			const topLeft = modules.reduce((best, m) =>
-				m.horiz < best.horiz || (m.horiz === best.horiz && m.vert < best.vert) ? m : best,
-			);
+			const topLeft = modules.reduce((best, m) => (m.horiz < best.horiz || (m.horiz === best.horiz && m.vert < best.vert) ? m : best));
 			selectInArea(topLeft, area);
 			return;
 		}
@@ -101,7 +99,10 @@ export function useModuleKeyboard() {
 				} else if (isSplit && area === 1) {
 					// Voice bottom-right → cross to FX top-left
 					const target = getTopLeftModule(0);
-					if (target) { next = target; nextArea = 0; }
+					if (target) {
+						next = target;
+						nextArea = 0;
+					}
 				} else {
 					// Wrap within same area to first column top
 					next = columns.get(sortedColKeys[0])!.sort((a, b) => a.vert - b.vert)[0];
@@ -118,7 +119,10 @@ export function useModuleKeyboard() {
 				} else if (isSplit && area === 0) {
 					// FX top-left → cross to Voice bottom-right
 					const target = getBottomRightModule(1);
-					if (target) { next = target; nextArea = 1; }
+					if (target) {
+						next = target;
+						nextArea = 1;
+					}
 				} else {
 					// Wrap within same area to last column bottom
 					next = columns.get(sortedColKeys[sortedColKeys.length - 1])!.sort((a, b) => b.vert - a.vert)[0];
@@ -130,7 +134,10 @@ export function useModuleKeyboard() {
 				next = closestByVert(columns.get(nextColKey)!, cur.vert);
 			} else if (isSplit && area === 1) {
 				const target = getTopLeftModule(0);
-				if (target) { next = target; nextArea = 0; }
+				if (target) {
+					next = target;
+					nextArea = 0;
+				}
 			}
 		} else if (key === 'ArrowLeft') {
 			const prevColKey = [...sortedColKeys].reverse().find((c) => c < cur.horiz);
@@ -138,7 +145,10 @@ export function useModuleKeyboard() {
 				next = closestByVert(columns.get(prevColKey)!, cur.vert);
 			} else if (isSplit && area === 0) {
 				const target = getBottomRightModule(1);
-				if (target) { next = target; nextArea = 1; }
+				if (target) {
+					next = target;
+					nextArea = 1;
+				}
 			}
 		}
 

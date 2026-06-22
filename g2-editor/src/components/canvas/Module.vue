@@ -79,7 +79,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					/>
+				/>
 				<ModuleSlider
 					v-else-if="isSlider(param.n)"
 					:param="param"
@@ -88,7 +88,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					/>
+				/>
 				<ModuleSwitch
 					v-else-if="isSwitch(param.n)"
 					:param="param"
@@ -99,7 +99,7 @@
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
 					@param-context-menu="onParamContextMenu"
-					/>
+				/>
 				<ModuleKnobSpin
 					v-else-if="isSpinner(param.n)"
 					:param="param"
@@ -108,7 +108,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					/>
+				/>
 				<ModuleKnobSpinH
 					v-else-if="isSpinnerH(param.n)"
 					:param="param"
@@ -117,7 +117,7 @@
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
-					/>
+				/>
 			</g>
 		</g>
 
@@ -344,7 +344,11 @@
 		const raw = e.dataTransfer?.getData('text/plain');
 		if (!raw) return;
 		let data: any;
-		try { data = JSON.parse(raw); } catch { return; }
+		try {
+			data = JSON.parse(raw);
+		} catch {
+			return;
+		}
 		if (data.type !== 'cc') return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
@@ -378,9 +382,7 @@
 			})),
 		});
 		const existing = slot
-			? slotsStore.slots[slot].controllers.find(
-					(c) => c.location === location && c.moduleIndex === moduleIdx.value && c.paramIndex === paramIndex
-				)
+			? slotsStore.slots[slot].controllers.find((c) => c.location === location && c.moduleIndex === moduleIdx.value && c.paramIndex === paramIndex)
 			: undefined;
 		items.push({
 			label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',
@@ -392,18 +394,21 @@
 		if (param && isSwitch(param.n)) {
 			if (getParam(param.type)?.canLabel) {
 				const label = getParamLabel(paramIndex);
-				items.push({ label: 'Rename label', action: () =>
-					emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' })
+				items.push({
+					label: 'Rename label',
+					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' }),
 				});
 			}
 		} else {
-			items.push({ label: 'Set Value', action: () => {
-				const paramType = param?.type ?? '';
-				const currentValue = getParamValue(paramIndex);
-				handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
-			}});
+			items.push({
+				label: 'Set Value',
+				action: () => {
+					const paramType = param?.type ?? '';
+					const currentValue = getParamValue(paramIndex);
+					handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+				},
+			});
 		}
 		openContextMenu(event, items);
 	}
-
 </script>

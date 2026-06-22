@@ -79,7 +79,9 @@ describe('popUndo / popRedo', () => {
 
 	it('preserves LIFO order across multiple entries', () => {
 		const store = useHistoryStore();
-		const e1 = entry(), e2 = entry(), e3 = entry();
+		const e1 = entry(),
+			e2 = entry(),
+			e3 = entry();
 		store.record('A', e1);
 		store.record('A', e2);
 		store.record('A', e3);

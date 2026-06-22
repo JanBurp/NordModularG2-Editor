@@ -28,7 +28,9 @@ export function useSlotEvents(log: LogFn) {
 			try {
 				for (const sl of previouslyKeyed) await window.cli.run(['set-slot-key', sl, '0']);
 				await window.cli.run(['set-slot-key', slot, '1']);
-			} catch { /* device may have disconnected mid-debounce; state resyncs on next event */ }
+			} catch {
+				/* device may have disconnected mid-debounce; state resyncs on next event */
+			}
 		}, 100);
 	}
 
@@ -81,7 +83,9 @@ export function useSlotEvents(log: LogFn) {
 					const raw = await window.cli.run(['get-perf-settings']);
 					const parsed = JSON.parse(raw);
 					store.updatePerfSettings(parsed.data ?? parsed);
-				} catch { /* state will sync on next perf_settings event */ }
+				} catch {
+					/* state will sync on next perf_settings event */
+				}
 			}
 			return true;
 		}

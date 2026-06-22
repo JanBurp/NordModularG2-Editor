@@ -8,11 +8,13 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const uiStore = useUiStore();
 	const device = useDeviceStore();
 
-	const getArea = areaGetter ?? (() => {
-		if (uiStore.selectedModulesArea === 'va') return 'voice';
-		if (uiStore.selectedModulesArea === 'fx') return 'fx';
-		return uiStore.activeArea === 1 ? 'voice' : 'fx';
-	});
+	const getArea =
+		areaGetter ??
+		(() => {
+			if (uiStore.selectedModulesArea === 'va') return 'voice';
+			if (uiStore.selectedModulesArea === 'fx') return 'fx';
+			return uiStore.activeArea === 1 ? 'voice' : 'fx';
+		});
 
 	const currentModules = computed(() =>
 		getArea() === 'voice' ? slotsStore.getAreaModules(uiStore.slotInFocus, 1) : slotsStore.getAreaModules(uiStore.slotInFocus, 0),
@@ -63,7 +65,10 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 
 	async function handleModuleDelete(moduleIndex: number): Promise<void> {
 		await slotsStore.deleteModule(moduleIndex, getArea());
-		uiStore.selectModules(uiStore.selectedModules.filter((i) => i !== moduleIndex), uiStore.selectedModulesArea ?? (getArea() === 'voice' ? 'va' : 'fx'));
+		uiStore.selectModules(
+			uiStore.selectedModules.filter((i) => i !== moduleIndex),
+			uiStore.selectedModulesArea ?? (getArea() === 'voice' ? 'va' : 'fx'),
+		);
 	}
 
 	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {

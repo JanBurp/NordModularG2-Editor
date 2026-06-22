@@ -5,11 +5,7 @@ import { useDragInteraction } from './useDragInteraction';
 
 const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 
-export function useKnob(
-	value: Ref<number> | ComputedRef<number>,
-	knobType: Ref<string> | ComputedRef<string>,
-	emitChange: (value: number) => void,
-) {
+export function useKnob(value: Ref<number> | ComputedRef<number>, knobType: Ref<string> | ComputedRef<string>, emitChange: (value: number) => void) {
 	const radius = computed(() => RADII[knobType.value] ?? 10);
 	const angle = computed(() => (value.value / 128) * 270 - 135);
 	const isReset = computed(() => knobType.value === 'KnobReset');

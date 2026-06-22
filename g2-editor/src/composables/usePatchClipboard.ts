@@ -8,11 +8,13 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	const uiStore = useUiStore();
 	const { deleteSelection } = usePatchOperations(areaGetter);
 
-	const getSourceArea = areaGetter ?? (() => {
-		if (uiStore.selectedModulesArea === 'va') return 'voice';
-		if (uiStore.selectedModulesArea === 'fx') return 'fx';
-		return uiStore.activeArea === 1 ? 'voice' : 'fx';
-	});
+	const getSourceArea =
+		areaGetter ??
+		(() => {
+			if (uiStore.selectedModulesArea === 'va') return 'voice';
+			if (uiStore.selectedModulesArea === 'fx') return 'fx';
+			return uiStore.activeArea === 1 ? 'voice' : 'fx';
+		});
 
 	const hasClipboard = computed(() => uiStore.clipboard !== null && uiStore.clipboard.modules.length > 0);
 
@@ -24,11 +26,13 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const areaIdx = area === 'voice' ? 1 : 0;
 		const slot = uiStore.slotInFocus;
 
-		const modules = slotsStore.getAreaModules(slot, areaIdx)
+		const modules = slotsStore
+			.getAreaModules(slot, areaIdx)
 			.filter((m: any) => selectedIds.has(m.index as number))
 			.map((m: any) => ({ ...m, lv: [...m.lv], modes: [...m.modes], paramLabels: m.paramLabels ? [...m.paramLabels] : undefined }));
 
-		const cables = slotsStore.getAreaCables(slot, areaIdx)
+		const cables = slotsStore
+			.getAreaCables(slot, areaIdx)
 			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
 			.map((c: any) => ({ ...c }));
 
@@ -47,7 +51,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		// Destination area: use mouse position's area if known, else active area
 		const mousePos = uiStore.lastMousePos;
-		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : (uiStore.activeArea === 1 ? 'va' : 'fx');
+		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : uiStore.activeArea === 1 ? 'va' : 'fx';
 		const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
 		const areaIdx = area === 'voice' ? 1 : 0;
 
@@ -80,7 +84,10 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 			.map((c) => ({ newSmod: idMap.get(c.smod)!, newDmod: idMap.get(c.dmod)!, colour: c.colour, scon: c.scon, dcon: c.dcon, dir: c.dir }));
 		await slotsStore.paste(entries, remappedCables, area);
 
-		uiStore.selectModules(entries.map((e) => e.newId), destAreaKey);
+		uiStore.selectModules(
+			entries.map((e) => e.newId),
+			destAreaKey,
+		);
 	}
 
 	return { copySelection, cutSelection, pasteClipboard, hasClipboard };

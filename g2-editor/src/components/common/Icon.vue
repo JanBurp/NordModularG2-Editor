@@ -5,10 +5,10 @@
 </template>
 
 <script setup lang="ts">
-const icons = {
-	undo: ['M5 1.5 L2 4.5 L5 7.5', 'M2 4.5 H10 Q14 4.5 14 8.5 Q14 13 10 13 H8'],
-	redo: ['M11 1.5 L14 4.5 L11 7.5', 'M14 4.5 H6 Q2 4.5 2 8.5 Q2 13 6 13 H8'],
-} as const;
+	const icons = {
+		undo: ['M5 1.5 L2 4.5 L5 7.5', 'M2 4.5 H10 Q14 4.5 14 8.5 Q14 13 10 13 H8'],
+		redo: ['M11 1.5 L14 4.5 L11 7.5', 'M14 4.5 H6 Q2 4.5 2 8.5 Q2 13 6 13 H8'],
+	} as const;
 
-defineProps<{ name: keyof typeof icons }>();
+	defineProps<{ name: keyof typeof icons }>();
 </script>
