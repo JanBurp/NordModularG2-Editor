@@ -1,5 +1,5 @@
 <template>
-	<div class="h-full overflow-y-auto p-2 bg-surface-0">
+	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
 		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
 		<div class="flex justify-between items-center">
 			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
