@@ -1,7 +1,7 @@
 <template>
 	<Teleport to="body">
 		<div class="fixed inset-0 z-50" @mousedown.self="emit('close')">
-			<div class="absolute w-80 bg-surface-1 rounded shadow-xl p-3" :style="panelStyle">
+			<div class="absolute w-80 bg-surface-1 border border-line-default rounded shadow-xl p-3" :style="panelStyle">
 				<SearchInput
 					ref="searchRef"
 					v-model="query"
@@ -15,7 +15,7 @@
 						v-for="(m, i) in filtered"
 						:key="m.id"
 						:ref="(el) => setItemRef(el, i)"
-						:class="['flex items-baseline gap-2 px-2 py-1 text-xs cursor-pointer rounded', i === navIndex ? 'bg-blue-600 text-white' : 'hover:bg-surface-3']"
+						:class="['flex items-baseline gap-2 px-2 py-1 text-xs cursor-pointer rounded', i === navIndex ? 'bg-blue-500 dark:bg-blue-400 text-white' : 'hover:bg-surface-3']"
 						@mousedown.prevent="addAndClose(m.id)"
 					>
 						<span class="font-medium">{{ m.long || m.short }}</span>
