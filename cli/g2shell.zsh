@@ -8,7 +8,7 @@ _G2_DIR="${${(%):-%x}:A:h}"
 
 _G2_CMDS=(
   connect disconnect list-devices startup device list
-  get-patch get-patch-file select-patch upload-patch upload-perf get-perf-file
+  get-patch get-patch-file select-patch select-perf upload-patch upload-perf get-perf-file
   slot variation set-perf-mode set-perf-name set-patch-name
   set-master-clock-run set-master-clock-bpm
   set-patch-description

@@ -18,6 +18,8 @@
 #include "g2_protocol.h"
 #include "utils.h"
 #include "cJSON.h"
+#include "daemon.h"
+#include "g2_events.h"
 
 static g2_error_cb_t g2_error_cb = NULL;
 static void *g2_error_cb_ctx = NULL;
@@ -112,6 +114,10 @@ cJSON *query_perf_settings(int mode, const char *type) {
     int ret;
     uint16_t size;
 
+    /* The G2 tags this reply baCmd==0x04 in steady state, but baCmd==0x0C while
+     * finalizing a mode/perf switch (see g2_events.c's aCmd==0x0C handling) — both
+     * are genuine, perf_parse_and_add()-compatible payloads; byte[2] (perf_version)
+     * is in the same place either way, so no validation is needed here. */
     if (send_system(0x41, 0x81) == 0) {
         usleep(USB_SEND_DELAY_US);
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
@@ -121,13 +127,26 @@ cJSON *query_perf_settings(int mode, const char *type) {
         }
     }
 
+    /* This reply's payload (name + settings) is only valid when bsubCmd is 0x11
+     * (steady state) or 0x29 (sent while finalizing a mode/perf switch, baCmd may
+     * be 0x04 or 0x0C either way) — both shapes perf_parse_and_add() understands.
+     * Anything else (e.g. the 0x81 selections-shaped reply above, mis-ordered)
+     * is a stray message: relay it via g2_emit_event() so it isn't lost, then
+     * keep waiting instead of treating it as our answer. */
     if (send_system(selsData[2], 0x10) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+            if (ret <= 0 || (perfInterrupt[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
-            perfSize = size;
+            if (size < 4 || size > sizeof(perfData)) break;
             recv_bulk(perfData, size);
+            if (perfData[3] == 0x11 || perfData[3] == 0x29) { perfSize = size; break; }
+            g2_msg_t relay = {0};
+            memcpy(relay.interrupt, perfInterrupt, 16);
+            relay.bulk = perfData;
+            relay.bulk_size = size;
+            g2_emit_event(&relay);
         }
     }
 
@@ -303,6 +322,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
+    debug_timing("get_patch_version_start");
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
         g2_err("Failed to send get patch version command\n");
@@ -312,6 +332,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+    debug_timing("get_patch_version_end");
     if (ret <= 0) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
@@ -322,6 +343,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
+    debug_timing("get_patch_slot_start");
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         g2_err("Failed to send get patch command\n");
         goto cleanup;
@@ -351,6 +373,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     ret = recv_bulk(patchData, patchSize);
+    debug_timing("get_patch_slot_end");
     if (ret <= 0) {
         g2_err("Failed to read patch bulk data\n");
         free(patchData);
@@ -359,6 +382,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     /* Step 3: Get patch name */
+    debug_timing("get_patch_name_start");
     char patchName[32] = {0};
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         g2_err("Failed to send get patch name command\n");
@@ -369,6 +393,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     usleep(100000);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
+    debug_timing("get_patch_name_end");
 
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
@@ -1288,9 +1313,18 @@ int g2_select_perf(int bank, int location) {
     uint8_t cmd[4] = { 0x0a, 4, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
     if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
+    /* In daemon mode the listener queue is the only consumer; the daemon's
+     * select-perf dispatch already drains the whole post-select cascade
+     * (ACK, synth/perf settings, version updates, final BULK_REARM) and emits
+     * each as a watch event. Calling recv_interrupt() here too would race it
+     * for the same messages, silently swallowing whichever one it grabs
+     * first (e.g. perf_settings) without emitting it or freeing its bulk
+     * payload — see select-perf dispatch in daemon.c. */
+    if (!g2_listener_active) {
+        uint8_t response[64] = {0};
+        recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+        g2_drain_pending();
+    }
     return G2_OK;
 }
 

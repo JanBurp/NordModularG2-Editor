@@ -7,6 +7,10 @@ const { PatchParser } = await import('../parser/nmg2PatchParser');
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
 
+/* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
+ * device never sends the matching synth_settings_update (error/disconnect mid-load). */
+export const PERF_SETTLE_TIMEOUT_MS = 5000;
+
 function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;
 	while (ofs < bytes.length && bytes[ofs] !== 0) ofs++;
@@ -104,19 +108,25 @@ export function usePatchFile() {
 
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
+		device.modeChanging = true;
+		device.pendingPerfBank = bank - 1;
+		device.pendingPerfLoc = location - 1;
+		setTimeout(() => {
+			if (device.pendingPerfBank === bank - 1 && device.pendingPerfLoc === location - 1) {
+				console.warn('Performance select did not settle in time');
+				device.clearPendingPerf();
+			}
+		}, PERF_SETTLE_TIMEOUT_MS);
+		// Device is already in Performance mode here (this only fires from the synth-performance
+		// browser list) — skip device.setPerformanceMode()'s redundant 'set-perf-mode' round trip,
+		// which otherwise adds a full serial USB transaction in front of select-perf.
+		if (device.device?.performance) device.device.performance.name = `Bank ${bank} / ${location}`;
 		try {
-			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
-			SLOT_LABELS.forEach((s) => {
-				slotsStore.slots[s].loading = true;
-			});
 			await window.cli.run(['select-perf', String(bank), String(location)]);
-			SLOT_LABELS.forEach((s) => {
-				slotsStore.slots[s].loading = false;
-			});
-			await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
+			device.clearPendingPerf();
 		}
 	}
 

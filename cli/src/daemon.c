@@ -20,6 +20,7 @@
 #include <signal.h>
 #include <unistd.h>
 #include <pthread.h>
+#include <time.h>
 #include "defs.h"
 #include "g2_device.h"
 #include "g2_io.h"
@@ -143,10 +144,25 @@ static void debug_status(const char *msg) {
 	fflush(stdout);
 }
 
+/* Elapsed milliseconds since an arbitrary monotonic epoch (process start). */
+long long now_ms(void) {
+	struct timespec ts;
+	clock_gettime(CLOCK_MONOTONIC, &ts);
+	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+void debug_timing(const char *label) {
+	if (!g2_debug) return;
+	printf("{\"debug\":\"timing\",\"label\":\"%s\",\"ms\":%lld}\n", label, now_ms());
+	fflush(stdout);
+}
+
 static void rearm_with_version_update(void) {
 	printf("{\"type\":\"version_update\",\"scope\":\"all_slots\"}\n");
 	fflush(stdout);
+	debug_timing("rearm_data_start");
 	g2_emit_rearm_data();
+	debug_timing("rearm_data_end");
 	g2_rearm();
 }
 
@@ -486,7 +502,9 @@ static void execute_cmd(const char *line) {
 		if (ret == G2_OK) rearm_after_get_patch = 1;
 
 	} else if (strcmp(cmd, "select-perf") == 0 && n >= 2) {
+		debug_timing("select_perf_start");
 		ret = g2_select_perf(arg_i(args, 0), arg_i(args, 1));
+		debug_timing("select_perf_returned");
 		if (ret == G2_OK) {
 			/* The G2 stops streaming while loading the performance.
 			 * Drain the listener queue until BULK_REARM so the G2 is fully
@@ -500,11 +518,25 @@ static void execute_cmd(const char *line) {
 					g2_emit_event(&msg);
 					g2_msg_free(&msg);
 					if (rearm) {
+						debug_timing("select_perf_bulk_rearm_detected");
 						g2_pending_rearm = 0;
 						rearm_with_version_update();
+						debug_timing("select_perf_rearm_done");
 						break;
 					}
 					if (disc) { ret = G2_ERR_CONNECT; break; }
+					/* Some replies (e.g. a version-bump while G2 is still streaming, see
+					 * g2_events.c's aCmd=0x0C/0x1F case) signal readiness via g2_pending_rearm
+					 * instead of a literal BULK_REARM sentinel in the queue. Without this check
+					 * the loop would otherwise burn its full deadline waiting for a sentinel
+					 * that never arrives. */
+					if (g2_pending_rearm) {
+						debug_timing("select_perf_pending_rearm_detected");
+						g2_pending_rearm = 0;
+						rearm_with_version_update();
+						debug_timing("select_perf_rearm_done");
+						break;
+					}
 				}
 				deadline_ms -= 50;
 			}
@@ -811,6 +843,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 			 * Always rearm — if recv_interrupt() already consumed a sentinel=2
 			 * and set g2_pending_rearm=1, it removes the message from the queue
 			 * so the main loop never sees it here (no double-rearm risk). */
+			debug_timing("main_loop_bulk_rearm_detected");
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
 			g2_pending_rearm = 0;

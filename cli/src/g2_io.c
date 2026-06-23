@@ -17,6 +17,7 @@
 #include "defs.h"
 #include "g2_device.h"
 #include "g2_io.h"
+#include "g2_events.h"
 #include "utils.h"
 
 /* Global device state */
@@ -630,6 +631,18 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
             uint8_t aCmd = msg.interrupt[2];
             uint8_t subCmd = msg.interrupt[4];
             if ((aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
+                g2_msg_free(&msg);
+                continue;
+            }
+            /* Unsolicited push notifications (slot_change, assigned_voices, perf_name,
+             * clock, midi_cc, patch_version_change) can arrive interleaved with a query's
+             * real response — e.g. assigned_voices fires right after a perf load triggers
+             * voice reassignment, racing with query_perf_settings()'s own request/response.
+             * Relay them via the normal event dispatcher so they aren't lost, but never hand
+             * them back here as if they might be the response a caller is waiting for. */
+            if (aCmd == 0x04 && (subCmd == 0x09 || subCmd == 0x05 || subCmd == 0x29 ||
+                                  subCmd == 0x3F || subCmd == 0x5D || subCmd == 0x80 || subCmd == 0x38)) {
+                g2_emit_event(&msg);
                 g2_msg_free(&msg);
                 continue;
             }
