@@ -106,14 +106,7 @@ export function usePatchFile() {
 		if (device.status !== DeviceStatus.Connected) return;
 		try {
 			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
-			SLOT_LABELS.forEach((s) => {
-				slotsStore.slots[s].loading = true;
-			});
 			await window.cli.run(['select-perf', String(bank), String(location)]);
-			SLOT_LABELS.forEach((s) => {
-				slotsStore.slots[s].loading = false;
-			});
-			await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
