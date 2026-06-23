@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "cJSON.h"
 #include "daemon.h"
+#include "g2_events.h"
 
 static g2_error_cb_t g2_error_cb = NULL;
 static void *g2_error_cb_ctx = NULL;
@@ -113,6 +114,10 @@ cJSON *query_perf_settings(int mode, const char *type) {
     int ret;
     uint16_t size;
 
+    /* The G2 tags this reply baCmd==0x04 in steady state, but baCmd==0x0C while
+     * finalizing a mode/perf switch (see g2_events.c's aCmd==0x0C handling) — both
+     * are genuine, perf_parse_and_add()-compatible payloads; byte[2] (perf_version)
+     * is in the same place either way, so no validation is needed here. */
     if (send_system(0x41, 0x81) == 0) {
         usleep(USB_SEND_DELAY_US);
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
@@ -122,13 +127,26 @@ cJSON *query_perf_settings(int mode, const char *type) {
         }
     }
 
+    /* This reply's payload (name + settings) is only valid when bsubCmd is 0x11
+     * (steady state) or 0x29 (sent while finalizing a mode/perf switch, baCmd may
+     * be 0x04 or 0x0C either way) — both shapes perf_parse_and_add() understands.
+     * Anything else (e.g. the 0x81 selections-shaped reply above, mis-ordered)
+     * is a stray message: relay it via g2_emit_event() so it isn't lost, then
+     * keep waiting instead of treating it as our answer. */
     if (send_system(selsData[2], 0x10) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+            if (ret <= 0 || (perfInterrupt[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
-            perfSize = size;
+            if (size < 4 || size > sizeof(perfData)) break;
             recv_bulk(perfData, size);
+            if (perfData[3] == 0x11 || perfData[3] == 0x29) { perfSize = size; break; }
+            g2_msg_t relay = {0};
+            memcpy(relay.interrupt, perfInterrupt, 16);
+            relay.bulk = perfData;
+            relay.bulk_size = size;
+            g2_emit_event(&relay);
         }
     }
 
