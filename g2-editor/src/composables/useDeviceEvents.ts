@@ -38,7 +38,11 @@ export function useDeviceEvents(log: LogFn) {
 			} else if (prevMode && ev.mode !== prevMode) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
-			store.modeChanging = false;
+			if (store.pendingPerfBank !== null || store.pendingPerfLoc !== null) {
+				if (ev.perfBank === store.pendingPerfBank && ev.perfLoc === store.pendingPerfLoc) store.clearPendingPerf();
+			} else {
+				store.modeChanging = false;
+			}
 			return true;
 		}
 		if (ev.type === 'perf_settings') {

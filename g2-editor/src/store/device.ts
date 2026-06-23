@@ -30,6 +30,8 @@ export const useDeviceStore = defineStore('device', {
 		status: DeviceStatus.Disconnected,
 		device: null as Device | null,
 		modeChanging: false,
+		pendingPerfBank: null as number | null,
+		pendingPerfLoc: null as number | null,
 		lastMidiCC: null as number | null,
 	}),
 
@@ -57,6 +59,12 @@ export const useDeviceStore = defineStore('device', {
 	actions: {
 		applyDeviceInfo(data: Device) {
 			this.device = data;
+		},
+
+		clearPendingPerf() {
+			this.pendingPerfBank = null;
+			this.pendingPerfLoc = null;
+			this.modeChanging = false;
 		},
 
 		async disconnect() {

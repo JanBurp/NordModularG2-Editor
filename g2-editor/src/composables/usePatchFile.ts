@@ -7,6 +7,10 @@ const { PatchParser } = await import('../parser/nmg2PatchParser');
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
 
+/* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
+ * device never sends the matching synth_settings_update (error/disconnect mid-load). */
+const PERF_SETTLE_TIMEOUT_MS = 5000;
+
 function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;
 	while (ofs < bytes.length && bytes[ofs] !== 0) ofs++;
@@ -104,12 +108,22 @@ export function usePatchFile() {
 
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
+		device.modeChanging = true;
+		device.pendingPerfBank = bank - 1;
+		device.pendingPerfLoc = location - 1;
+		setTimeout(() => {
+			if (device.pendingPerfBank === bank - 1 && device.pendingPerfLoc === location - 1) {
+				console.warn('Performance select did not settle in time');
+				device.clearPendingPerf();
+			}
+		}, PERF_SETTLE_TIMEOUT_MS);
 		try {
 			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
 			await window.cli.run(['select-perf', String(bank), String(location)]);
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
+			device.clearPendingPerf();
 		}
 	}
 
