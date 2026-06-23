@@ -117,8 +117,11 @@ export function usePatchFile() {
 				device.clearPendingPerf();
 			}
 		}, PERF_SETTLE_TIMEOUT_MS);
+		// Device is already in Performance mode here (this only fires from the synth-performance
+		// browser list) — skip device.setPerformanceMode()'s redundant 'set-perf-mode' round trip,
+		// which otherwise adds a full serial USB transaction in front of select-perf.
+		if (device.device?.performance) device.device.performance.name = `Bank ${bank} / ${location}`;
 		try {
-			await device.setPerformanceMode(`Bank ${bank} / ${location}`);
 			await window.cli.run(['select-perf', String(bank), String(location)]);
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
