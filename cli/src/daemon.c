@@ -525,6 +525,18 @@ static void execute_cmd(const char *line) {
 						break;
 					}
 					if (disc) { ret = G2_ERR_CONNECT; break; }
+					/* Some replies (e.g. a version-bump while G2 is still streaming, see
+					 * g2_events.c's aCmd=0x0C/0x1F case) signal readiness via g2_pending_rearm
+					 * instead of a literal BULK_REARM sentinel in the queue. Without this check
+					 * the loop would otherwise burn its full deadline waiting for a sentinel
+					 * that never arrives. */
+					if (g2_pending_rearm) {
+						debug_timing("select_perf_pending_rearm_detected");
+						g2_pending_rearm = 0;
+						rearm_with_version_update();
+						debug_timing("select_perf_rearm_done");
+						break;
+					}
 				}
 				deadline_ms -= 50;
 			}
