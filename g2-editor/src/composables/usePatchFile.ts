@@ -9,7 +9,7 @@ type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch'
 
 /* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
  * device never sends the matching synth_settings_update (error/disconnect mid-load). */
-const PERF_SETTLE_TIMEOUT_MS = 5000;
+export const PERF_SETTLE_TIMEOUT_MS = 5000;
 
 function stripFileHeader(bytes: number[] | Uint8Array): string {
 	let ofs = 0;

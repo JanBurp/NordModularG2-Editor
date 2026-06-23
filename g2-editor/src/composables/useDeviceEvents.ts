@@ -3,6 +3,7 @@ import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
+import { PERF_SETTLE_TIMEOUT_MS } from './usePatchFile';
 import type { LogFn } from './useG2';
 
 export function useDeviceEvents(log: LogFn) {
@@ -23,10 +24,32 @@ export function useDeviceEvents(log: LogFn) {
 		}
 		if (ev.type === 'synth_settings_update') {
 			const prevMode = store.device?.mode;
+			const prevPerfBank = store.device?.perfBank;
+			const prevPerfLoc = store.device?.perfLoc;
 			store.updateSynthSettings(ev);
 			log('←', 'Watch', `synth mode=${ev.mode} name=${ev.synthName}`);
 			if (slotsStore.uploadingFromFile) return true;
-			if (prevMode && ev.mode !== prevMode) store.modeChanging = true;
+			const modeSwitched = !!prevMode && ev.mode !== prevMode;
+			// A hardware button press can switch to a different performance while
+			// already in Performance mode, so mode itself doesn't change — detect
+			// that case via perfBank/perfLoc instead. Skip it if the app itself is
+			// already tracking a browser-initiated select (handled separately below).
+			const hardwarePerfSwitch =
+				!modeSwitched &&
+				ev.mode === 'Performance' &&
+				prevMode === 'Performance' &&
+				store.pendingPerfBank === null &&
+				store.pendingPerfLoc === null &&
+				(ev.perfBank !== prevPerfBank || ev.perfLoc !== prevPerfLoc);
+			if (modeSwitched || hardwarePerfSwitch) store.modeChanging = true;
+			if (hardwarePerfSwitch) {
+				// Real name/slot state arrives in the paired perf_settings event right
+				// after this one; keep the overlay up until then (with a safety timeout
+				// in case it never arrives, e.g. disconnect mid-switch).
+				setTimeout(() => {
+					if (store.modeChanging && store.pendingPerfBank === null) store.modeChanging = false;
+				}, PERF_SETTLE_TIMEOUT_MS);
+			}
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
 				const results = await Promise.allSettled(
@@ -35,12 +58,12 @@ export function useDeviceEvents(log: LogFn) {
 				results.forEach((r, i) => {
 					if (r.status === 'rejected') console.error(`Watch: patch load failed for index ${i}:`, r.reason);
 				});
-			} else if (prevMode && ev.mode !== prevMode) {
+			} else if (modeSwitched) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
 			if (store.pendingPerfBank !== null || store.pendingPerfLoc !== null) {
 				if (ev.perfBank === store.pendingPerfBank && ev.perfLoc === store.pendingPerfLoc) store.clearPendingPerf();
-			} else {
+			} else if (modeSwitched) {
 				store.modeChanging = false;
 			}
 			return true;
@@ -48,6 +71,10 @@ export function useDeviceEvents(log: LogFn) {
 		if (ev.type === 'perf_settings') {
 			store.updatePerfSettings(ev);
 			log('←', 'Watch', `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`);
+			// Clears the overlay opened for a hardware-initiated performance switch
+			// (see synth_settings_update above) once the real name/slot data lands.
+			// No-op for the browser-select path (already cleared via perfBank/perfLoc match).
+			if (store.modeChanging && store.pendingPerfBank === null && store.pendingPerfLoc === null) store.modeChanging = false;
 			return true;
 		}
 		if (ev.type === 'perf_name') {
