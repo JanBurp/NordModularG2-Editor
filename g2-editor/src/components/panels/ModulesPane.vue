@@ -83,6 +83,7 @@
 		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
 	});
 	const expandedCategories = ref(settings.categoriesExpanded ? getAllCategories() : []);
+	const preSearchExpandedCategories = ref<string[] | null>(null);
 	const searchQuery = ref('');
 	const selectedModuleId = ref<number | null>(null);
 	const selectedNavIndex = ref(-1);
@@ -130,9 +131,26 @@
 
 	const selectedNavModuleId = computed(() => (selectedNavIndex.value >= 0 ? (flatNavModules.value[selectedNavIndex.value]?.id ?? null) : null));
 
-	watch(searchQuery, () => {
+	watch(searchQuery, (newVal) => {
 		selectedModuleId.value = null;
 		selectedNavIndex.value = -1;
+
+		if (newVal) {
+			if (preSearchExpandedCategories.value === null) {
+				preSearchExpandedCategories.value = [...expandedCategories.value];
+			}
+			const matchingCats = categories.value.filter((c) => categoryMatchesSearch(c));
+			for (const cat of matchingCats) {
+				if (!expandedCategories.value.includes(cat)) {
+					expandedCategories.value.push(cat);
+				}
+			}
+		} else {
+			if (preSearchExpandedCategories.value !== null) {
+				expandedCategories.value = preSearchExpandedCategories.value;
+				preSearchExpandedCategories.value = null;
+			}
+		}
 	});
 
 	watch(
