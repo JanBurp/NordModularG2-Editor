@@ -70,6 +70,7 @@
 	import { useSettingsStore } from '@/store/settings';
 	import { useModuleHelp } from '../../composables/useModuleHelp';
 	import { useAddModule } from '../../composables/useAddModule';
+	import { useListNav } from '../../composables/useListNav';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
@@ -87,7 +88,6 @@
 	const preSearchExpandedCategories = ref<string[] | null>(null);
 	const searchQuery = ref('');
 	const selectedModuleId = ref<number | null>(null);
-	const selectedNavIndex = ref(-1);
 
 	defineProps<{
 		isActive: boolean;
@@ -130,11 +130,13 @@
 		return categories.value.filter((c) => categoryMatchesSearch(c)).flatMap((c) => getModulesByCategory(c));
 	});
 
+	const { selectedIndex: selectedNavIndex, navigate: navStep, reset: resetNavIndex } = useListNav(() => flatNavModules.value.length);
+
 	const selectedNavModuleId = computed(() => (selectedNavIndex.value >= 0 ? (flatNavModules.value[selectedNavIndex.value]?.id ?? null) : null));
 
 	watch(searchQuery, (newVal) => {
 		selectedModuleId.value = null;
-		selectedNavIndex.value = -1;
+		resetNavIndex();
 
 		if (newVal) {
 			if (preSearchExpandedCategories.value === null) {
@@ -317,11 +319,7 @@
 	}
 
 	function navigate(direction: 1 | -1) {
-		const count = flatNavModules.value.length;
-		if (!count) return;
-		selectedNavIndex.value =
-			selectedNavIndex.value < 0 ? (direction === 1 ? 0 : count - 1) : Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
-
+		navStep(direction);
 		const mod = flatNavModules.value[selectedNavIndex.value];
 		if (!mod) return;
 
@@ -336,18 +334,11 @@
 		});
 	}
 
-	let isAddingModule = false;
-
 	function handleEnter() {
-		if (isAddingModule || selectedNavIndex.value < 0) return;
+		if (selectedNavIndex.value < 0) return;
 		const mod = flatNavModules.value[selectedNavIndex.value];
 		if (!mod) return;
-		isAddingModule = true;
-		addModuleAtMousePos(mod.id)
-			.catch(console.error)
-			.finally(() => {
-				isAddingModule = false;
-			});
+		addModuleAtMousePos(mod.id).catch(console.error);
 	}
 
 	function handleModuleClick(moduleId: number) {

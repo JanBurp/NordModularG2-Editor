@@ -100,14 +100,9 @@
 		navIndex.value = Math.max(0, Math.min(count - 1, navIndex.value + dir));
 	}
 
-	let isAdding = false;
-
 	async function addAndClose(typeId: number) {
-		if (isAdding) return;
-		isAdding = true;
 		emit('close');
 		await addModuleAtMousePos(typeId).catch(console.error);
-		isAdding = false;
 	}
 
 	function handleEnter() {

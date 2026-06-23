@@ -180,6 +180,21 @@
 		return map;
 	});
 
+	function svgClientToGrid(clientX: number, clientY: number): { col: number; row: number } | null {
+		const svg = svgRef.value;
+		if (!svg?.getScreenCTM) return null;
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return null;
+		const pt = svg.createSVGPoint();
+		pt.x = clientX;
+		pt.y = clientY;
+		const svgPt = pt.matrixTransform(ctm.inverse());
+		return {
+			col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
+			row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),
+		};
+	}
+
 	function onParamChange(moduleIndex: number, paramIndex: number, value: number, immediate?: boolean) {
 		emit('paramChange', moduleIndex, paramIndex, value, immediate);
 	}
@@ -202,16 +217,9 @@
 	const { addModuleAt } = useAddModule();
 
 	function onCanvasContextMenu(e: MouseEvent) {
-		const svg = svgRef.value;
-		if (!svg?.getScreenCTM) return;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		const svgPt = pt.matrixTransform(ctm.inverse());
-		const col = Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH));
-		const row = Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT));
+		const grid = svgClientToGrid(e.clientX, e.clientY);
+		if (!grid) return;
+		const { col, row } = grid;
 		const area = props.area as 'va' | 'fx';
 
 		const cats = settingsStore.hidden_modules ? getAllCategories() : getAllCategories().filter((c) => c !== 'Hidden');
@@ -227,19 +235,9 @@
 	}
 
 	function handleSvgMouseMove(e: MouseEvent) {
-		const svg = svgRef.value;
-		if (!svg?.getScreenCTM) return;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		const svgPt = pt.matrixTransform(ctm.inverse());
-		uiStore.lastMousePos = {
-			col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
-			row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),
-			area: props.area as 'va' | 'fx',
-		};
+		const grid = svgClientToGrid(e.clientX, e.clientY);
+		if (!grid) return;
+		uiStore.lastMousePos = { ...grid, area: props.area as 'va' | 'fx' };
 	}
 
 	onUnmounted(() => {

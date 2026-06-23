@@ -131,6 +131,7 @@
 	import { useDeviceStore } from '../../store/device';
 	import { useSettingsStore } from '@/store/settings';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
+	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
 	import ListItem from '../browser/ListItem.vue';
@@ -153,7 +154,6 @@
 
 	const searchRef = ref();
 	const searchQuery = ref('');
-	const selectedNavIndex = ref(-1);
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
@@ -198,8 +198,10 @@
 		return groups.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
 	});
 
+	const { selectedIndex: selectedNavIndex, navigate: navStep, reset: resetNavIndex } = useListNav(() => flatNavItems.value.length);
+
 	watch(searchQuery, () => {
-		selectedNavIndex.value = -1;
+		resetNavIndex();
 	});
 
 	const filteredDiskDirs = computed(() => browser.diskEntries.filter((e) => e.isDir));
@@ -216,10 +218,7 @@
 	});
 
 	function navigate(direction: 1 | -1) {
-		const count = flatNavItems.value.length;
-		if (!count) return;
-		selectedNavIndex.value =
-			selectedNavIndex.value < 0 ? (direction === 1 ? 0 : count - 1) : Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
+		navStep(direction);
 		requestAnimationFrame(() => {
 			document.querySelector(`[data-nav-idx="${selectedNavIndex.value}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 		});
