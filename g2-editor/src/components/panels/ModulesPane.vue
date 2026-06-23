@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
-		<SearchInput ref="searchRef" v-model="searchQuery" :isActive="isActive" placeholder="Search modules... (/)" />
+		<SearchInput ref="searchRef" v-model="searchQuery" :isActive="isActive" placeholder="Search modules... (/)" @up="navigate(-1)" @down="navigate(1)" @enter="handleEnter" />
 		<div class="flex justify-between items-center">
 			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
 			<Button variant="toggle" size="xs" @click="toggleAllCategories">{{ allExpanded ? 'Collapse All' : 'Expand All' }}</Button>
@@ -19,7 +19,7 @@
 				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 					<template v-for="module in getModulesByCategory(category)" :key="module.id">
 						<div
-							class="w-64 bg-surface-3 rounded overflow-visible shadow"
+							:class="['w-64 bg-surface-3 rounded overflow-visible shadow', module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '']"
 							:style="{
 								height: getModuleHeight(module) + 'px',
 								cursor: 'grab',
@@ -56,10 +56,12 @@
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
 	import { useSettingsStore } from '@/store/settings';
+	import { useSlotsStore } from '@/store/slots';
 	import { useModuleHelp } from '../../composables/useModuleHelp';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
+	const slotsStore = useSlotsStore();
 	const { helpHtml, loadHelp } = useModuleHelp();
 	const searchRef = ref();
 
@@ -72,6 +74,7 @@
 	const expandedCategories = ref(settings.categoriesExpanded ? getAllCategories() : []);
 	const searchQuery = ref('');
 	const selectedModuleId = ref<number | null>(null);
+	const selectedNavIndex = ref(-1);
 
 	defineProps<{
 		isActive: boolean;
@@ -107,8 +110,22 @@
 		else helpHtml.value = '';
 	});
 
+	const flatNavModules = computed(() => {
+		if (!searchQuery.value) {
+			return categories.value
+				.filter((c) => categoryMatchesSearch(c) && isExpanded(c))
+				.flatMap((c) => getModulesByCategory(c));
+		}
+		return categories.value.filter((c) => categoryMatchesSearch(c)).flatMap((c) => getModulesByCategory(c));
+	});
+
+	const selectedNavModuleId = computed(() =>
+		selectedNavIndex.value >= 0 ? (flatNavModules.value[selectedNavIndex.value]?.id ?? null) : null,
+	);
+
 	watch(searchQuery, () => {
 		selectedModuleId.value = null;
+		selectedNavIndex.value = -1;
 	});
 
 	watch(
@@ -271,6 +288,55 @@
 			});
 		}
 		return moduleInstances.get(moduleId);
+	}
+
+	function navigate(direction: 1 | -1) {
+		const count = flatNavModules.value.length;
+		if (!count) return;
+		selectedNavIndex.value =
+			selectedNavIndex.value < 0
+				? direction === 1
+					? 0
+					: count - 1
+				: Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
+
+		const mod = flatNavModules.value[selectedNavIndex.value];
+		if (!mod) return;
+
+		for (const cat of categories.value) {
+			if (getModulesByCategoryRaw(cat).some((m) => m.id === mod.id)) {
+				if (!expandedCategories.value.includes(cat)) expandedCategories.value.push(cat);
+				break;
+			}
+		}
+		requestAnimationFrame(() => {
+			document.querySelector(`[data-testid="module-item-${mod.short}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		});
+	}
+
+	let isAddingModule = false;
+
+	function handleEnter() {
+		if (isAddingModule || selectedNavIndex.value < 0) return;
+		const mod = flatNavModules.value[selectedNavIndex.value];
+		if (!mod) return;
+		isAddingModule = true;
+		addModuleAtMousePos(mod.id)
+			.catch(console.error)
+			.finally(() => {
+				isAddingModule = false;
+			});
+	}
+
+	async function addModuleAtMousePos(typeId: number) {
+		const pos = ui.lastMousePos;
+		const col = pos?.col ?? 0;
+		const row = pos?.row ?? 0;
+		const isVoice = !pos || pos.area === 'va';
+		const area = isVoice ? 'voice' : 'fx';
+		const areaNum: 0 | 1 = isVoice ? 1 : 0;
+		const modules = slotsStore.getAreaModules(ui.slotInFocus, areaNum);
+		await slotsStore.dropModuleWithCollision(typeId, col, row, area, modules);
 	}
 
 	function handleModuleClick(moduleId: number) {

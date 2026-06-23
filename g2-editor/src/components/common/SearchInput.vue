@@ -10,6 +10,8 @@
 			@blur="isFocused = false"
 			@keydown.esc="clearSearch"
 			@keydown.enter="handleEnter"
+			@keydown.up.prevent="emit('up')"
+			@keydown.down.prevent="emit('down')"
 		/>
 		<span v-show="searchValue" class="search-clear" @click="clearSearch">×</span>
 	</div>
@@ -32,7 +34,7 @@
 		},
 	});
 
-	const emit = defineEmits(['update:modelValue', 'enter']);
+	const emit = defineEmits(['update:modelValue', 'enter', 'up', 'down']);
 
 	const searchInputRef = ref<HTMLInputElement | null>(null);
 	const searchValue = ref(props.modelValue);

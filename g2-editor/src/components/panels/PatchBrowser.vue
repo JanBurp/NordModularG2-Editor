@@ -25,7 +25,7 @@
 
 			<template v-if="browser.diskFolder">
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search files... (/)" :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" />
+					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search files... (/)" :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" @up="navigate(-1)" @down="navigate(1)" />
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
@@ -35,7 +35,7 @@
 						<template #icon><span class="text-content-secondary">▶</span></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
-					<ListItem v-for="entry in filteredDiskFiles" :key="entry.path" @click="selectDisk(entry)">
+					<ListItem v-for="(entry, i) in filteredDiskFiles" :key="entry.path" :data-nav-idx="i" :selected="i === selectedNavIndex" @click="selectDisk(entry)">
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
 						<template #meta
@@ -57,7 +57,7 @@
 			<StateMessage v-if="!device.connected" variant="empty" message="Connect G2 to browse synth patches" />
 			<template v-else>
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search... (/)" :isActive="isActive" @enter="handleEnter" />
+					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search... (/)" :isActive="isActive" @enter="handleEnter" @up="navigate(-1)" @down="navigate(1)" />
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
@@ -81,6 +81,8 @@
 							<ListItem
 								v-for="p in group.patches"
 								:key="`${p.bank}-${p.location}`"
+								:data-nav-idx="flatNavItems.indexOf(p)"
+								:selected="flatNavItems.indexOf(p) === selectedNavIndex"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
 								<template #icon
@@ -102,7 +104,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, computed } from 'vue';
+	import { ref, computed, watch } from 'vue';
 	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
 	import { useDeviceStore } from '../../store/device';
 	import { useSettingsStore } from '@/store/settings';
@@ -129,6 +131,7 @@
 
 	const searchRef = ref();
 	const searchQuery = ref('');
+	const selectedNavIndex = ref(-1);
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
@@ -167,6 +170,16 @@
 	const patchGroups = computed(() => groupByBank(filteredPatches.value));
 	const perfGroups = computed(() => groupByBank(filteredPerformances.value));
 
+	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
+		if (browser.view === 'disk') return filteredDiskFiles.value;
+		const groups = browser.view === 'patches' ? patchGroups.value : perfGroups.value;
+		return groups.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
+	});
+
+	watch(searchQuery, () => {
+		selectedNavIndex.value = -1;
+	});
+
 	const filteredDiskDirs = computed(() => browser.diskEntries.filter((e) => e.isDir));
 	const filteredDiskFiles = computed(() => {
 		const q = searchQuery.value.toLowerCase();
@@ -179,6 +192,20 @@
 		const parts = browser.diskFolder.split('/');
 		return parts.length > 1 ? parts[parts.length - 2] || '/' : '';
 	});
+
+	function navigate(direction: 1 | -1) {
+		const count = flatNavItems.value.length;
+		if (!count) return;
+		selectedNavIndex.value =
+			selectedNavIndex.value < 0
+				? direction === 1
+					? 0
+					: count - 1
+				: Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
+		requestAnimationFrame(() => {
+			document.querySelector(`[data-nav-idx="${selectedNavIndex.value}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+		});
+	}
 
 	async function onViewChange(view: string | number | null | (string | number)[]) {
 		const v = view as 'patches' | 'performances' | 'disk';
@@ -206,6 +233,14 @@
 	}
 
 	function handleEnter() {
+		if (selectedNavIndex.value >= 0) {
+			const item = flatNavItems.value[selectedNavIndex.value];
+			if (item) {
+				if (browser.view === 'disk') return selectDisk(item as DiskEntry);
+				selectSynth(item as SynthPatch, browser.view === 'performances' ? 'performance' : 'patch');
+				return;
+			}
+		}
 		if (browser.view === 'disk' && filteredDiskFiles.value.length > 0) {
 			const entry = filteredDiskFiles.value[0];
 			const kind = entry.name.toLowerCase().endsWith('.prf2') ? 'performance' : 'patch';

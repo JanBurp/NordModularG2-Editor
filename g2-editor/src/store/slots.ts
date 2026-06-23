@@ -1269,7 +1269,13 @@ export const useSlotsStore = defineStore('slots', {
 					return { index: d.index, col, fromRow: orig?.vert ?? d.newRow, toRow: d.newRow };
 				});
 
-				for (const d of pushDowns) await this.moveModuleNoReload(d.index, col, d.newRow, area);
+				for (const d of pushDowns) {
+					try {
+						await this.moveModuleNoReload(d.index, col, d.newRow, area);
+					} catch (e) {
+						console.warn('[dropModuleWithCollision] move failed, proceeding with add:', e);
+					}
+				}
 				const result = await this.addModule(typeId, moduleId, col, row, area);
 
 				if (shouldRecord) {
