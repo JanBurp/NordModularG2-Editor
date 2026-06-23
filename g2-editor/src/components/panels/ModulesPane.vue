@@ -1,11 +1,19 @@
 <template>
 	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
-		<SearchInput ref="searchRef" v-model="searchQuery" :isActive="isActive" placeholder="Search modules... (/)" @up="navigate(-1)" @down="navigate(1)" @enter="handleEnter" />
+		<SearchInput
+			ref="searchRef"
+			v-model="searchQuery"
+			:isActive="isActive"
+			placeholder="Search modules... (/)"
+			@up="navigate(-1)"
+			@down="navigate(1)"
+			@enter="handleEnter"
+		/>
 		<div class="flex justify-between items-center">
 			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
 			<Button variant="toggle" size="xs" @click="toggleAllCategories">{{ allExpanded ? 'Collapse All' : 'Expand All' }}</Button>
 		</div>
-		<div v-for="category in categories" :key="category" class="mb-4">
+		<div v-for="category in categories" :key="category" class="mb-2">
 			<div v-if="categoryMatchesSearch(category)">
 				<div
 					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
@@ -19,7 +27,10 @@
 				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 					<template v-for="module in getModulesByCategory(category)" :key="module.id">
 						<div
-							:class="['w-64 bg-surface-3 rounded overflow-visible shadow', module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '']"
+							:class="[
+								'w-64 bg-surface-3 rounded overflow-visible shadow',
+								module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '',
+							]"
 							:style="{
 								height: getModuleHeight(module) + 'px',
 								cursor: 'grab',
@@ -112,16 +123,12 @@
 
 	const flatNavModules = computed(() => {
 		if (!searchQuery.value) {
-			return categories.value
-				.filter((c) => categoryMatchesSearch(c) && isExpanded(c))
-				.flatMap((c) => getModulesByCategory(c));
+			return categories.value.filter((c) => categoryMatchesSearch(c) && isExpanded(c)).flatMap((c) => getModulesByCategory(c));
 		}
 		return categories.value.filter((c) => categoryMatchesSearch(c)).flatMap((c) => getModulesByCategory(c));
 	});
 
-	const selectedNavModuleId = computed(() =>
-		selectedNavIndex.value >= 0 ? (flatNavModules.value[selectedNavIndex.value]?.id ?? null) : null,
-	);
+	const selectedNavModuleId = computed(() => (selectedNavIndex.value >= 0 ? (flatNavModules.value[selectedNavIndex.value]?.id ?? null) : null));
 
 	watch(searchQuery, () => {
 		selectedModuleId.value = null;
@@ -294,11 +301,7 @@
 		const count = flatNavModules.value.length;
 		if (!count) return;
 		selectedNavIndex.value =
-			selectedNavIndex.value < 0
-				? direction === 1
-					? 0
-					: count - 1
-				: Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
+			selectedNavIndex.value < 0 ? (direction === 1 ? 0 : count - 1) : Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
 
 		const mod = flatNavModules.value[selectedNavIndex.value];
 		if (!mod) return;

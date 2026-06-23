@@ -1,7 +1,7 @@
 <template>
 	<div class="h-full flex flex-col overflow-hidden">
 		<!-- Tab switcher -->
-		<BtnGroup :options="viewOptions" :model-value="browser.view" variant="tab" @update:model-value="onViewChange" class="mb-2" />
+		<BtnGroup :options="viewOptions" :model-value="browser.view" variant="tab" stretch @update:model-value="onViewChange" class="mb-2 w-full" />
 
 		<!-- ── DISK VIEW ─────────────────────────────────────── -->
 		<template v-if="browser.view === 'disk'">
@@ -25,7 +25,15 @@
 
 			<template v-if="browser.diskFolder">
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search files... (/)" :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" @up="navigate(-1)" @down="navigate(1)" />
+					<SearchInput
+						ref="searchRef"
+						v-model="searchQuery"
+						placeholder="Search files... (/)"
+						:isActive="isActive && browser.view === 'disk'"
+						@enter="handleEnter"
+						@up="navigate(-1)"
+						@down="navigate(1)"
+					/>
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
@@ -35,7 +43,13 @@
 						<template #icon><span class="text-content-secondary">▶</span></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
-					<ListItem v-for="(entry, i) in filteredDiskFiles" :key="entry.path" :data-nav-idx="i" :selected="i === selectedNavIndex" @click="selectDisk(entry)">
+					<ListItem
+						v-for="(entry, i) in filteredDiskFiles"
+						:key="entry.path"
+						:data-nav-idx="i"
+						:selected="i === selectedNavIndex"
+						@click="selectDisk(entry)"
+					>
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
 						<template #meta
@@ -57,7 +71,15 @@
 			<StateMessage v-if="!device.connected" variant="empty" message="Connect G2 to browse synth patches" />
 			<template v-else>
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search... (/)" :isActive="isActive" @enter="handleEnter" @up="navigate(-1)" @down="navigate(1)" />
+					<SearchInput
+						ref="searchRef"
+						v-model="searchQuery"
+						placeholder="Search... (/)"
+						:isActive="isActive"
+						@enter="handleEnter"
+						@up="navigate(-1)"
+						@down="navigate(1)"
+					/>
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
@@ -136,9 +158,9 @@
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
 	const viewOptions = [
+		{ label: 'Disk', value: 'disk' },
 		{ label: 'Patches', value: 'patches' },
 		{ label: 'Performances', value: 'performances' },
-		{ label: 'Disk', value: 'disk' },
 	];
 
 	/* Group a flat SynthPatch list by bank number */
@@ -197,11 +219,7 @@
 		const count = flatNavItems.value.length;
 		if (!count) return;
 		selectedNavIndex.value =
-			selectedNavIndex.value < 0
-				? direction === 1
-					? 0
-					: count - 1
-				: Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
+			selectedNavIndex.value < 0 ? (direction === 1 ? 0 : count - 1) : Math.max(0, Math.min(count - 1, selectedNavIndex.value + direction));
 		requestAnimationFrame(() => {
 			document.querySelector(`[data-nav-idx="${selectedNavIndex.value}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 		});

@@ -11,7 +11,7 @@
 			:topIndicatorValue="topIndicators ? !!topIndicators[index] : false"
 			:bottomIndicator="bottomIndicators ? bottomIndicators[index] !== undefined : false"
 			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
-			class="btn-group-item"
+			:class="['btn-group-item', { 'flex-1': stretch }]"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
 			:draggable="draggable ? 'true' : undefined"
 			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
@@ -41,6 +41,7 @@
 		bottomIndicators?: boolean[];
 		testIdPrefix?: string;
 		draggable?: boolean;
+		stretch?: boolean;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
