@@ -44,6 +44,7 @@ static void print_usage(const char *prog) {
     printf("  get-patch-file <slot> [file]                                                              Save patch as .pch2 file\n");
     printf("  get-perf-file [file]                                                                      Save current performance as .prf2 file\n");
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                          Load bank patch into slot\n");
+    printf("  select-perf <bank:1-32> <location:1-127>                                                  Load bank performance\n");
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
     printf("  set-synth-settings <json>                                                                 Set all synth settings from JSON object\n");
