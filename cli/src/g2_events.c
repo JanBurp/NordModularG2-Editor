@@ -16,6 +16,7 @@
 #include "g2_events.h"
 #include "g2_protocol.h"
 #include "cJSON.h"
+#include "daemon.h"
 
 int g2_watch_verbose = 1;
 static int g_events_perf_mode = 1; /* 1=Performance, 0=Patch; updated by C_SYNTH_SETTINGS bulk event */
@@ -366,7 +367,12 @@ void g2_emit_rearm_data(void) {
     const char *slot_names[] = {"A", "B", "C", "D"};
     cJSON *patches = cJSON_CreateArray();
     for (int s = 0; s < 4; s++) {
+        char label[32];
+        snprintf(label, sizeof(label), "get_patch_%s_start", slot_names[s]);
+        debug_timing(label);
         cJSON *p = g2_get_patch(slot_names[s]);
+        snprintf(label, sizeof(label), "get_patch_%s_end", slot_names[s]);
+        debug_timing(label);
         cJSON_AddItemToArray(patches, p ? p : cJSON_CreateNull());
     }
     cJSON_AddItemToObject(synth, "patches", patches);

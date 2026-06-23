@@ -18,6 +18,7 @@
 #include "g2_protocol.h"
 #include "utils.h"
 #include "cJSON.h"
+#include "daemon.h"
 
 static g2_error_cb_t g2_error_cb = NULL;
 static void *g2_error_cb_ctx = NULL;
@@ -303,6 +304,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
+    debug_timing("get_patch_version_start");
     uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
     if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
         g2_err("Failed to send get patch version command\n");
@@ -312,6 +314,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     usleep(USB_SEND_DELAY_US);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+    debug_timing("get_patch_version_end");
     if (ret <= 0) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
@@ -322,6 +325,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
+    debug_timing("get_patch_slot_start");
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         g2_err("Failed to send get patch command\n");
         goto cleanup;
@@ -351,6 +355,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     ret = recv_bulk(patchData, patchSize);
+    debug_timing("get_patch_slot_end");
     if (ret <= 0) {
         g2_err("Failed to read patch bulk data\n");
         free(patchData);
@@ -359,6 +364,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
 
     /* Step 3: Get patch name */
+    debug_timing("get_patch_name_start");
     char patchName[32] = {0};
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         g2_err("Failed to send get patch name command\n");
@@ -369,6 +375,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     usleep(100000);
 
     ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
+    debug_timing("get_patch_name_end");
 
     if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
         parse_name(interruptResp + 5, patchName, sizeof(patchName));
