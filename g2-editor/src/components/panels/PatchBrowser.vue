@@ -25,7 +25,7 @@
 
 			<template v-if="browser.diskFolder">
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput v-model="searchQuery" placeholder="Search files..." :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" />
+					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search files... (/)" :isActive="isActive && browser.view === 'disk'" @enter="handleEnter" />
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
@@ -57,7 +57,7 @@
 			<StateMessage v-if="!device.connected" variant="empty" message="Connect G2 to browse synth patches" />
 			<template v-else>
 				<div class="px-2 pt-2 shrink-0">
-					<SearchInput v-model="searchQuery" placeholder="Search..." :isActive="isActive" @enter="handleEnter" />
+					<SearchInput ref="searchRef" v-model="searchQuery" placeholder="Search... (/)" :isActive="isActive" @enter="handleEnter" />
 				</div>
 
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
@@ -127,7 +127,10 @@
 	const device = useDeviceStore();
 	const settings = useSettingsStore();
 
+	const searchRef = ref();
 	const searchQuery = ref('');
+
+	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
 	const viewOptions = [
 		{ label: 'Patches', value: 'patches' },

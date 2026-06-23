@@ -26,6 +26,14 @@
 	}
 }
 
+@layer base {
+	input:focus,
+	textarea:focus,
+	select:focus {
+		@apply outline-none ring-2 ring-blue-500/60 ring-offset-1 ring-offset-surface-0;
+	}
+}
+
 body {
 	@apply font-sans bg-surface-0 text-content-primary overflow-hidden m-0;
 	font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
@@ -89,7 +97,7 @@ body {
 }
 
 .search-input {
-	@apply w-full px-3 py-2 pr-8 bg-surface-2 border border-line-default rounded text-content-primary text-xs focus:outline-none focus:border-blue-700 placeholder:text-content-muted;
+	@apply w-full px-3 py-2 pr-8 bg-surface-2 border border-line-default rounded text-content-primary text-xs focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60 focus:ring-offset-1 focus:ring-offset-surface-0 placeholder:text-content-muted;
 }
 
 .search-clear {

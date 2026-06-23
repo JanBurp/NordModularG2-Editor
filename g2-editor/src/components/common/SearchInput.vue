@@ -5,7 +5,9 @@
 			v-model="searchValue"
 			type="text"
 			class="search-input"
-			:placeholder="placeholder"
+			:placeholder="displayPlaceholder"
+			@focus="isFocused = true"
+			@blur="isFocused = false"
 			@keydown.esc="clearSearch"
 			@keydown.enter="handleEnter"
 		/>
@@ -13,7 +15,7 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import { ref, watch, nextTick } from 'vue';
+	import { ref, computed, watch, nextTick } from 'vue';
 
 	const props = defineProps({
 		modelValue: {
@@ -34,6 +36,8 @@
 
 	const searchInputRef = ref<HTMLInputElement | null>(null);
 	const searchValue = ref(props.modelValue);
+	const isFocused = ref(false);
+	const displayPlaceholder = computed(() => (isFocused.value ? props.placeholder.replace(' (/)', '') : props.placeholder));
 
 	watch(
 		() => props.modelValue,
@@ -64,4 +68,6 @@
 	function handleEnter() {
 		emit('enter');
 	}
+
+	defineExpose({ focus: () => searchInputRef.value?.focus() });
 </script>

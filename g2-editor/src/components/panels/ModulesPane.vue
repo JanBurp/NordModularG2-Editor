@@ -1,6 +1,6 @@
 <template>
 	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
-		<SearchInput v-model="searchQuery" :isActive="isActive" placeholder="Search modules..." />
+		<SearchInput ref="searchRef" v-model="searchQuery" :isActive="isActive" placeholder="Search modules... (/)" />
 		<div class="flex justify-between items-center">
 			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
 			<Button variant="toggle" size="xs" @click="toggleAllCategories">{{ allExpanded ? 'Collapse All' : 'Expand All' }}</Button>
@@ -61,6 +61,9 @@
 	const ui = useUiStore();
 	const settings = useSettingsStore();
 	const { helpHtml, loadHelp } = useModuleHelp();
+	const searchRef = ref();
+
+	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
 	const categories = computed(() => {
 		const all = getAllCategories();
