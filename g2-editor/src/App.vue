@@ -152,10 +152,12 @@
 	<ParamEditDialog />
 
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
+
+	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, ref } from 'vue';
+	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
@@ -189,6 +191,7 @@
 	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import AboutDialog from './components/common/AboutDialog.vue';
 	import DriverErrorDialog from './components/common/DriverErrorDialog.vue';
+	import QuickAddModule from './components/common/QuickAddModule.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -277,6 +280,32 @@
 	);
 
 	const showAboutDialog = ref(false);
+	const showQuickAdd = ref(false);
+	const quickAddPos = ref({ x: 0, y: 0 });
+
+	function onMouseMove(e: MouseEvent) {
+		quickAddPos.value = { x: e.clientX, y: e.clientY };
+	}
+
+	function onGlobalKeydown(e: KeyboardEvent) {
+		if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) {
+			const el = document.activeElement;
+			const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+			if (!isInput) {
+				e.preventDefault();
+				showQuickAdd.value = true;
+			}
+		}
+	}
+
+	onMounted(() => {
+		window.addEventListener('keydown', onGlobalKeydown);
+		window.addEventListener('mousemove', onMouseMove);
+	});
+	onUnmounted(() => {
+		window.removeEventListener('keydown', onGlobalKeydown);
+		window.removeEventListener('mousemove', onMouseMove);
+	});
 
 	useElectronMenuActions({
 		currentModules,

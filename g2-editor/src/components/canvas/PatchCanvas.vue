@@ -14,6 +14,7 @@
 			xmlns="http://www.w3.org/2000/svg"
 			@mousedown="handleCanvasMousedown"
 			@mousemove="handleSvgMouseMove"
+			@contextmenu.prevent="onCanvasContextMenu"
 			@click="
 				emit('canvasClick');
 				handleCanvasClick();
@@ -59,7 +60,8 @@
 	import { ref, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import type { ModuleInstance } from '../../types';
-	import { getModule } from '../../renderer/nmg2mods';
+	import type { ContextMenuItem } from '../../types';
+	import { getModule, getAllCategories, getModulesByCategory } from '../../renderer/nmg2mods';
 	import '../../renderer/svgStyles.css';
 	import Module from './Module.vue';
 	import Cables from './Cables.vue';
@@ -69,6 +71,9 @@
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
 	import { useUiStore } from '../../store/ui';
+	import { useSettingsStore } from '../../store/settings';
+	import { useContextMenu } from '../../composables/useContextMenu';
+	import { useAddModule } from '../../composables/useAddModule';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 
 	const props = defineProps({
@@ -192,6 +197,34 @@
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
 
 	const uiStore = useUiStore();
+	const settingsStore = useSettingsStore();
+	const { open: openContextMenu } = useContextMenu();
+	const { addModuleAt } = useAddModule();
+
+	function onCanvasContextMenu(e: MouseEvent) {
+		const svg = svgRef.value;
+		if (!svg?.getScreenCTM) return;
+		const ctm = svg.getScreenCTM();
+		if (!ctm) return;
+		const pt = svg.createSVGPoint();
+		pt.x = e.clientX;
+		pt.y = e.clientY;
+		const svgPt = pt.matrixTransform(ctm.inverse());
+		const col = Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH));
+		const row = Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT));
+		const area = props.area as 'va' | 'fx';
+
+		const cats = settingsStore.hidden_modules ? getAllCategories() : getAllCategories().filter((c) => c !== 'Hidden');
+		const items: ContextMenuItem[] = cats.map((cat) => ({
+			label: cat,
+			children: getModulesByCategory(cat).map((m) => ({
+				label: m.long || m.short,
+				action: () => addModuleAt(m.id, col, row, area),
+			})),
+		}));
+
+		openContextMenu(e, items);
+	}
 
 	function handleSvgMouseMove(e: MouseEvent) {
 		const svg = svgRef.value;

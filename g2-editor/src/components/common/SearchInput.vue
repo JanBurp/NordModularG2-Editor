@@ -1,5 +1,5 @@
 <template>
-	<div class="relative mb-3">
+	<div class="relative">
 		<input
 			ref="searchInputRef"
 			v-model="searchValue"

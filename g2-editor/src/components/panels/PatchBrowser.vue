@@ -24,7 +24,7 @@
 			</div>
 
 			<template v-if="browser.diskFolder">
-				<div class="px-2 pt-2 shrink-0">
+				<div class="p-2 shrink-0">
 					<SearchInput
 						ref="searchRef"
 						v-model="searchQuery"

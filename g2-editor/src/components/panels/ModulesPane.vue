@@ -1,6 +1,7 @@
 <template>
 	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
 		<SearchInput
+			class="mb-3"
 			ref="searchRef"
 			v-model="searchQuery"
 			:isActive="isActive"
@@ -67,13 +68,13 @@
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
 	import { useSettingsStore } from '@/store/settings';
-	import { useSlotsStore } from '@/store/slots';
 	import { useModuleHelp } from '../../composables/useModuleHelp';
+	import { useAddModule } from '../../composables/useAddModule';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
-	const slotsStore = useSlotsStore();
 	const { helpHtml, loadHelp } = useModuleHelp();
+	const { addModuleAtMousePos } = useAddModule();
 	const searchRef = ref();
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
@@ -347,17 +348,6 @@
 			.finally(() => {
 				isAddingModule = false;
 			});
-	}
-
-	async function addModuleAtMousePos(typeId: number) {
-		const pos = ui.lastMousePos;
-		const col = pos?.col ?? 0;
-		const row = pos?.row ?? 0;
-		const isVoice = !pos || pos.area === 'va';
-		const area = isVoice ? 'voice' : 'fx';
-		const areaNum: 0 | 1 = isVoice ? 1 : 0;
-		const modules = slotsStore.getAreaModules(ui.slotInFocus, areaNum);
-		await slotsStore.dropModuleWithCollision(typeId, col, row, area, modules);
 	}
 
 	function handleModuleClick(moduleId: number) {
