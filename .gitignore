@@ -1,6 +1,7 @@
 # C CLI build artifacts
 cli/build/
 *.o
+cli/daemon.log
 
 # Electron app
 g2-editor/node_modules/
