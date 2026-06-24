@@ -175,6 +175,24 @@ static void emit_embedded_event(const uint8_t *response) {
     if (lastByte > 15) lastByte = 15;
 
     if (aCmd == 0x0C) {
+        /* R_STORE (0x0D): slot/bank/location (bank+location 0-indexed from hardware).
+         * R_CLEAR (0x15): type(0=patch,1=perf)/bank/location (0-indexed). */
+        if (subCmd == 0x0d) {
+            printf("{\"type\":\"patch_stored\",\"slot\":%u,\"bank\":%u,\"location\":%u}\n",
+                   (unsigned)response[5],
+                   (unsigned)(response[6] + 1),
+                   (unsigned)(response[7] + 1));
+            fflush(stdout);
+            return;
+        }
+        if (subCmd == 0x15) {
+            printf("{\"type\":\"patch_cleared\",\"kind\":\"%s\",\"bank\":%u,\"location\":%u}\n",
+                   response[5] == 1 ? "performance" : "patch",
+                   (unsigned)(response[6] + 1),
+                   (unsigned)(response[7] + 1));
+            fflush(stdout);
+            return;
+        }
         if (version == 0x40) {
             switch (subCmd) {
                 case 0x1F:

@@ -22,6 +22,22 @@ export function useDeviceEvents(log: LogFn) {
 			log('←', 'Watch', 'names');
 			return true;
 		}
+		if (ev.type === 'patch_cleared') {
+			browserStore.removePatch(ev.bank, ev.location, ev.kind);
+			log('←', 'Watch', `patch_cleared ${ev.kind} ${ev.bank}-${ev.location}`);
+			return true;
+		}
+		if (ev.type === 'patch_stored') {
+			const slotLabels = ['A', 'B', 'C', 'D'] as const;
+			const kind = ev.slot === 4 ? 'performance' : 'patch';
+			const name =
+				ev.slot === 4
+					? (store.device?.performance?.name ?? '')
+					: (slotsStore.getPatchName(slotLabels[ev.slot as 0 | 1 | 2 | 3]) ?? '');
+			browserStore.upsertPatch(ev.bank, ev.location, kind, name);
+			log('←', 'Watch', `patch_stored slot=${ev.slot} ${ev.bank}-${ev.location}`);
+			return true;
+		}
 		if (ev.type === 'synth_settings_update') {
 			const prevMode = store.device?.mode;
 			const prevPerfBank = store.device?.perfBank;

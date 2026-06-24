@@ -14,6 +14,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableThickness: 1 as number,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
+		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 	}),
 	actions: {
 		toggleSidebar(tab: PaneTab) {

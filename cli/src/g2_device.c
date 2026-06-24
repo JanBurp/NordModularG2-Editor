@@ -1328,6 +1328,57 @@ int g2_select_perf(int bank, int location) {
     return G2_OK;
 }
 
+int g2_store_patch(int slot, int bank, int location) {
+    if (slot < 0 || slot > 4)           return G2_ERR_INVALID_PARAM;
+    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
+    g2_drain_pending();
+    /* S_STORE: [0x0B, slot, bank-1, location-1] */
+    uint8_t cmd[4] = { 0x0b, (uint8_t)slot, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
+    if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_clear_patch(int type, int bank, int location) {
+    if (type < 0 || type > 1)           return G2_ERR_INVALID_PARAM;
+    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
+    g2_drain_pending();
+    /* S_CLEAR: [0x0C, type, bank-1, location-1, 0x00] */
+    uint8_t cmd[5] = { 0x0c, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)(location - 1), 0x00 };
+    if (send_system_data(0x41, cmd, 5) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
+int g2_clear_bank(int type, int bank, int from_loc, int to_loc) {
+    if (type < 0 || type > 1)             return G2_ERR_INVALID_PARAM;
+    if (bank < 1 || bank > 32)            return G2_ERR_INVALID_PARAM;
+    if (from_loc < 1 || from_loc > 127)   return G2_ERR_INVALID_PARAM;
+    if (to_loc < 1 || to_loc > 127)       return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)          return G2_ERR_CONNECT;
+    g2_drain_pending();
+    /* S_CLEAR_BANK: bank written twice — matches Delphi CreateClearBankMessage */
+    uint8_t cmd[7] = { 0x0e, (uint8_t)type,
+                       (uint8_t)(bank - 1), (uint8_t)(from_loc - 1),
+                       (uint8_t)(bank - 1), (uint8_t)(to_loc - 1), 0x00 };
+    if (send_system_data(0x41, cmd, 7) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[64] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_set_synth_settings(cJSON *params) {
     if (!params) { g2_err("set-synth-settings: NULL params\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-synth-settings: failed to connect\n"); return G2_ERR_CONNECT; }

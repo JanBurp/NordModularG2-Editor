@@ -676,6 +676,28 @@ static int cmd_select_perf(int argc, char **argv, int i) {
     return g2_select_perf(bank, location);
 }
 
+static int cmd_store_patch(int argc, char **argv, int i) {
+    if (i + 3 >= argc) {
+        fprintf(stderr, "Usage: store-patch <slot:0-4> <bank:1-32> <location:1-127>\n");
+        return 1;
+    }
+    int slot     = atoi(argv[i + 1]);
+    int bank     = atoi(argv[i + 2]);
+    int location = atoi(argv[i + 3]);
+    return g2_store_patch(slot, bank, location);
+}
+
+static int cmd_clear_patch(int argc, char **argv, int i) {
+    if (i + 3 >= argc) {
+        fprintf(stderr, "Usage: clear-patch <kind:patch|performance> <bank:1-32> <location:1-127>\n");
+        return 1;
+    }
+    int type     = (strcmp(argv[i + 1], "performance") == 0) ? 1 : 0;
+    int bank     = atoi(argv[i + 2]);
+    int location = atoi(argv[i + 3]);
+    return g2_clear_patch(type, bank, location);
+}
+
 static int cmd_upload_patch(int argc, char **argv, int i) {
     if (i + 2 >= argc) {
         fprintf(stderr, "Usage: upload-patch <slot> <filepath>\n");
@@ -804,6 +826,8 @@ static const cmd_entry_t commands[] = {
     { "copy-variation",   cmd_copy_variation   },
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },
+    { "store-patch",      cmd_store_patch      },
+    { "clear-patch",      cmd_clear_patch      },
     { "upload-patch",     cmd_upload_patch     },
     { "upload-perf",      cmd_upload_perf      },
     { "set-synth-settings",    cmd_set_synth_settings    },

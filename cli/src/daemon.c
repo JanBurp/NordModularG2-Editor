@@ -106,6 +106,7 @@ static void emit(cJSON *resp) {
 	if (s) { printf("%s\n", s); fflush(stdout); free(s); }
 }
 
+/* Notify the frontend that patch memory changed so it refreshes the list. */
 /* Emit a typed event: {"type":<type>,"data":<data>}. Takes ownership of data. */
 static void emit_event(const char *type, cJSON *data) {
 	cJSON *ev = cJSON_CreateObject();
@@ -541,6 +542,25 @@ static void execute_cmd(const char *line) {
 				deadline_ms -= 50;
 			}
 		}
+
+	} else if (strcmp(cmd, "store-patch") == 0 && n >= 3) {
+		ret = g2_store_patch(arg_i(args, 0), arg_i(args, 1), arg_i(args, 2));
+
+	} else if (strcmp(cmd, "clear-patch") == 0 && n >= 3) {
+		const char *kind = arg_s(args, 0);
+		int type = (kind && strcmp(kind, "performance") == 0) ? 1 : 0;
+		ret = g2_clear_patch(type, arg_i(args, 1), arg_i(args, 2));
+
+	} else if (strcmp(cmd, "clear-bank") == 0 && n >= 2) {
+		const char *kind = arg_s(args, 0);
+		int type = (kind && strcmp(kind, "performance") == 0) ? 1 : 0;
+		ret = g2_clear_bank(type, arg_i(args, 1), 1, 127);
+
+	} else if (strcmp(cmd, "reload-names") == 0) {
+		g2_listener_stop();
+		emit_event("names", g2_list(LIST_FILTER_ALL, 0));
+		g2_listener_start();
+		ret = G2_OK;
 
 	} else if (strcmp(cmd, "upload-patch") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));

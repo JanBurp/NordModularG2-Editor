@@ -184,6 +184,9 @@ int g2_batch_ops(int slot, const G2Op *ops, int n_ops);
 /* Patch browser commands */
 int g2_select_patch(int slot, int bank, int location);
 int g2_select_perf(int bank, int location);
+int g2_store_patch(int slot, int bank, int location);
+int g2_clear_patch(int type, int bank, int location);
+int g2_clear_bank(int type, int bank, int from_loc, int to_loc);
 int g2_upload_patch(int slot, const char *filepath);
 int g2_upload_perf(const char *filepath);
 

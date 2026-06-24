@@ -53,7 +53,7 @@
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
 						<template #meta
-							><span class="text-content-secondary">{{ entry.name.split('.').pop() }}</span></template
+							><span class="text-content-secondary text-xs">{{ entry.name.split('.').pop() }}</span></template
 						>
 					</ListItem>
 					<StateMessage
@@ -82,15 +82,19 @@
 					/>
 				</div>
 
+				<div class="flex justify-end items-center px-2 py-0.5 shrink-0">
+					<Button variant="toggle" size="xs" @click="toggleAllBanks">{{ allBanksCollapsed ? 'Expand All' : 'Collapse All' }}</Button>
+				</div>
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Patches grouped by bank -->
-					<template v-for="group in browser.view === 'patches' ? patchGroups : perfGroups" :key="group.bank">
+					<template v-for="group in currentGroups" :key="group.bank">
 						<!-- Bank header (collapsible) -->
 						<li
 							class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
 							@click="browser.toggleBank(group.bank)"
+							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
 						>
 							<span class="text-content-muted w-3">
 								{{ browser.isBankCollapsed(group.bank) ? '▶' : '▼' }}
@@ -106,19 +110,19 @@
 								:data-nav-idx="flatNavItems.indexOf(p)"
 								:selected="flatNavItems.indexOf(p) === selectedNavIndex"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
+								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
 								<template #icon
-									><span class="text-content-secondary">{{ p.location }}</span></template
+									><span class="text-content-secondary text-xs">{{ p.bank }}-{{ p.location }}</span></template
 								>
 								<template #label>{{ p.name }}</template>
+								<template v-if="p.category" #meta
+									><span class="text-content-secondary text-xs">{{ p.category }}</span></template
+								>
 							</ListItem>
 						</template>
 					</template>
-					<StateMessage
-						v-if="(browser.view === 'patches' ? patchGroups : perfGroups).length === 0"
-						variant="empty"
-						:message="searchQuery ? 'No patches match' : 'No patches found'"
-					/>
+					<StateMessage v-if="currentGroups.length === 0" variant="empty" :message="searchQuery ? 'No patches match' : 'No patches found'" />
 				</ul>
 			</template>
 		</template>
@@ -128,9 +132,14 @@
 <script setup lang="ts">
 	import { ref, computed, watch } from 'vue';
 	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
+	import type { ContextMenuItem } from '@/types';
 	import { useDeviceStore } from '../../store/device';
 	import { useSettingsStore } from '@/store/settings';
+	import { useSlotsStore } from '@/store/slots';
+	import { useUiStore } from '@/store/ui';
+	import { useContextMenu } from '../../composables/useContextMenu';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
+	import Button from '../toolbar/Button.vue';
 	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
@@ -151,6 +160,9 @@
 	const browser = useBrowserStore();
 	const device = useDeviceStore();
 	const settings = useSettingsStore();
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
+	const { open: openCtx } = useContextMenu();
 
 	const searchRef = ref();
 	const searchQuery = ref('');
@@ -163,34 +175,98 @@
 		{ label: 'Performances', value: 'performances' },
 	];
 
-	/* Group a flat SynthPatch list by bank number */
+	/* Group a flat SynthPatch list by bank number, always including all 32 banks */
 	function groupByBank(list: SynthPatch[]): { bank: number; patches: SynthPatch[] }[] {
 		const map = new Map<number, SynthPatch[]>();
+		for (let i = 1; i <= 32; i++) map.set(i, []);
 		for (const p of list) {
-			let arr = map.get(p.bank);
-			if (!arr) {
-				arr = [];
-				map.set(p.bank, arr);
-			}
-			arr.push(p);
+			const arr = map.get(p.bank);
+			if (arr) arr.push(p);
 		}
-		return Array.from(map.entries())
-			.sort(([a], [b]) => a - b)
-			.map(([bank, patches]) => ({ bank, patches }));
+		return Array.from(map.entries()).map(([bank, patches]) => ({ bank, patches }));
+	}
+
+	function applySort(list: SynthPatch[]): SynthPatch[] {
+		const mode = settings.browserSortMode;
+		if (mode === 'name') return [...list].sort((a, b) => a.name.localeCompare(b.name));
+		if (mode === 'name-desc') return [...list].sort((a, b) => b.name.localeCompare(a.name));
+		if (mode === 'category') return [...list].sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') || a.name.localeCompare(b.name));
+		return [...list].sort((a, b) => a.bank - b.bank || a.location - b.location);
 	}
 
 	const filteredPatches = computed(() => {
 		const q = searchQuery.value.toLowerCase();
-		return q ? browser.synthPatches.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPatches;
+		const sorted = applySort(browser.synthPatches);
+		return q ? sorted.filter((p) => p.name.toLowerCase().includes(q)) : sorted;
 	});
 
 	const filteredPerformances = computed(() => {
 		const q = searchQuery.value.toLowerCase();
-		return q ? browser.synthPerformances.filter((p) => p.name.toLowerCase().includes(q)) : browser.synthPerformances;
+		const sorted = applySort(browser.synthPerformances);
+		return q ? sorted.filter((p) => p.name.toLowerCase().includes(q)) : sorted;
 	});
 
 	const patchGroups = computed(() => groupByBank(filteredPatches.value));
 	const perfGroups = computed(() => groupByBank(filteredPerformances.value));
+
+	const currentGroups = computed(() => (browser.view === 'patches' ? patchGroups.value : perfGroups.value));
+
+	const allBanksCollapsed = computed(() => currentGroups.value.every((g) => browser.isBankCollapsed(g.bank)));
+
+	function toggleAllBanks() {
+		const collapse = !allBanksCollapsed.value;
+		currentGroups.value.forEach((g) => {
+			if (collapse !== browser.isBankCollapsed(g.bank)) browser.toggleBank(g.bank);
+		});
+	}
+
+	function onPatchCtx(e: MouseEvent, p: SynthPatch, kind: 'patch' | 'performance') {
+		const slotIdx = (['A', 'B', 'C', 'D'].indexOf(uiStore.slotInFocus) as 0 | 1 | 2 | 3) ?? 0;
+		const patchName =
+			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
+		openCtx(e, [
+			{ label: `Store "${patchName}" here`, action: () => browser.storePatch(slotIdx, p.bank, p.location, kind, patchName) },
+			{ type: 'separator' },
+			{ label: 'Delete (clear this location)', action: () => browser.clearPatch(p.bank, p.location, kind) },
+		]);
+	}
+
+	function onBankCtx(e: MouseEvent, bank: number) {
+		const kind = browser.view === 'performances' ? 'performance' : 'patch';
+		const slotIdx = (['A', 'B', 'C', 'D'].indexOf(uiStore.slotInFocus) as 0 | 1 | 2 | 3) ?? 0;
+		const patchName =
+			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
+
+		const list = kind === 'performance' ? browser.synthPerformances : browser.synthPatches;
+		const occupied = new Set(list.filter((p) => p.bank === bank).map((p) => p.location));
+		const emptyLocs: number[] = [];
+		for (let loc = 1; loc <= 127 && emptyLocs.length < 20; loc++) {
+			if (!occupied.has(loc)) emptyLocs.push(loc);
+		}
+		const totalEmpty = 127 - occupied.size;
+
+		const storeChildren: ContextMenuItem[] = emptyLocs.map((loc) => ({
+			label: `Location ${loc}`,
+			action: () => browser.storePatch(slotIdx, bank, loc, kind, patchName),
+		}));
+		if (totalEmpty > emptyLocs.length) storeChildren.push({ type: 'item', label: `… ${totalEmpty - emptyLocs.length} more`, disabled: true });
+		if (storeChildren.length === 0) storeChildren.push({ type: 'item', label: 'Bank is full', disabled: true });
+
+		const sortItems: ContextMenuItem[] = [
+			{ label: 'By location', action: () => (settings.browserSortMode = 'location') },
+			{ label: 'By name A–Z', action: () => (settings.browserSortMode = 'name') },
+			{ label: 'By name Z–A', action: () => (settings.browserSortMode = 'name-desc') },
+			{ label: 'By category', disabled: kind !== 'patch', action: () => (settings.browserSortMode = 'category') },
+		];
+
+		openCtx(e, [
+			{ label: `Store "${patchName}" in bank ${bank}`, children: storeChildren },
+			{ type: 'separator' },
+			{ label: 'Clear all in bank', action: () => browser.clearBank(bank, kind) },
+			{ type: 'separator' },
+			{ label: 'Sort', children: sortItems },
+		]);
+	}
 
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
 		if (browser.view === 'disk') return filteredDiskFiles.value;

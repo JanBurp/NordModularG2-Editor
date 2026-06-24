@@ -67,6 +67,20 @@ export const useBrowserStore = defineStore('browser', {
 			}
 		},
 
+		removePatch(bank: number, location: number, kind: 'patch' | 'performance'): void {
+			const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
+			const idx = list.findIndex((p) => p.bank === bank && p.location === location);
+			if (idx >= 0) list.splice(idx, 1);
+		},
+
+		upsertPatch(bank: number, location: number, kind: 'patch' | 'performance', name: string): void {
+			const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
+			const entry: SynthPatch = { bank, location, name };
+			const idx = list.findIndex((p) => p.bank === bank && p.location === location);
+			if (idx >= 0) list.splice(idx, 1, entry);
+			else list.push(entry);
+		},
+
 		toggleBank(bank: number): void {
 			const idx = this.collapsedBanks.indexOf(bank);
 			if (idx >= 0) this.collapsedBanks.splice(idx, 1);
@@ -96,6 +110,58 @@ export const useBrowserStore = defineStore('browser', {
 			if (!this.diskFolder) return;
 			const parent = this.diskFolder.split('/').slice(0, -1).join('/') || '/';
 			await this.loadDiskList(parent);
+		},
+
+		async storePatch(slotIndex: 0 | 1 | 2 | 3, bank: number, location: number, kind: 'patch' | 'performance', name?: string): Promise<void> {
+			const slot = kind === 'performance' ? 4 : slotIndex;
+			this.loading = true;
+			this.error = '';
+			try {
+				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
+				const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
+				const entry: SynthPatch = { bank, location, name: name ?? '' };
+				const idx = list.findIndex((p) => p.bank === bank && p.location === location);
+				if (idx >= 0) list.splice(idx, 1, entry);
+				else list.push(entry);
+			} catch (e: any) {
+				this.error = e.message;
+			} finally {
+				this.loading = false;
+			}
+		},
+
+		async clearBank(bank: number, kind: 'patch' | 'performance'): Promise<void> {
+			this.loading = true;
+			this.error = '';
+			try {
+				await window.cli.run(['clear-bank', kind, String(bank)]);
+				if (kind === 'performance') {
+					this.synthPerformances = this.synthPerformances.filter((p) => p.bank !== bank);
+				} else {
+					this.synthPatches = this.synthPatches.filter((p) => p.bank !== bank);
+				}
+			} catch (e: any) {
+				this.error = e.message;
+			} finally {
+				this.loading = false;
+			}
+		},
+
+		async clearPatch(bank: number, location: number, kind: 'patch' | 'performance'): Promise<void> {
+			this.loading = true;
+			this.error = '';
+			try {
+				await window.cli.run(['clear-patch', kind, String(bank), String(location)]);
+				if (kind === 'performance') {
+					this.synthPerformances = this.synthPerformances.filter((p) => !(p.bank === bank && p.location === location));
+				} else {
+					this.synthPatches = this.synthPatches.filter((p) => !(p.bank === bank && p.location === location));
+				}
+			} catch (e: any) {
+				this.error = e.message;
+			} finally {
+				this.loading = false;
+			}
 		},
 
 		async chooseDiskFolder(): Promise<void> {
