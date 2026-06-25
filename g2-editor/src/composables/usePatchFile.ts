@@ -100,7 +100,7 @@ export function usePatchFile() {
 		const result = await window.electronAPI.openPatchDialog();
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
-		const name = (result.filepath!.split('/').pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
 		const parser = new PatchParser(buffer);
 		const prf2 = parser.parsePrf2();
@@ -156,7 +156,7 @@ export function usePatchFile() {
 				const result = await window.electronAPI.patches.load(item.filepath);
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
-				const name = (item.filepath.split('/').pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				const name = (item.filepath.split(/[/\\]/).pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				const rawHex = stripFileHeader(result.data as number[]);
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
 					const prf2 = new PatchParser(buffer).parsePrf2();

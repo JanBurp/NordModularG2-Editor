@@ -1914,9 +1914,7 @@ CJSON_PUBLIC(int) cJSON_GetArraySize(const cJSON *array)
         child = child->next;
     }
 
-    /* FIXME: Can overflow here. Cannot be fixed without breaking the API */
-
-    return (int)size;
+    return size > (size_t)INT_MAX ? INT_MAX : (int)size;
 }
 
 static cJSON* get_array_item(const cJSON *array, size_t index)

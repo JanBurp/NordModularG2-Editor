@@ -56,7 +56,7 @@ class G2Parser {
 		};
 
 		const hdr = new Uint8Array(data, 0, 320);
-		const str = String.fromCharCode.apply(null, hdr as unknown as number[]);
+		const str = new TextDecoder('latin1').decode(hdr);
 		let ofs = str.indexOf('\0');
 		const textHdrLen = ofs + 3;
 		const filedata = new DataView(data, ofs + 3, data.byteLength - ofs - 5);

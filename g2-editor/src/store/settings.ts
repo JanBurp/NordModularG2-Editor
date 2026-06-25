@@ -47,19 +47,19 @@ export const useSettingsStore = defineStore('settings', {
 			window.electronAPI?.setTheme(value);
 		},
 		setCableGravity(value: number) {
-			this.cableGravity = value;
+			this.cableGravity = Math.max(0, Math.min(100, value));
 		},
 		setCableOpacity(value: number) {
-			this.cableOpacity = value;
+			this.cableOpacity = Math.max(0, Math.min(100, value));
 		},
 		setCableThickness(value: number) {
-			this.cableThickness = value;
+			this.cableThickness = Math.max(0, Math.min(10, value));
 		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;
 		},
 		setKnobSensitivity(value: number) {
-			this.knobSensitivity = value;
+			this.knobSensitivity = Math.max(0.1, Math.min(10, value));
 		},
 	},
 	persist: true,
