@@ -263,10 +263,13 @@ function numberFormat(value: number) {
 
 export function rateLo(i: number, con: unknown, tw: unknown): string | undefined {
 	if (!tw) return;
-	i = (con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[0]].l;
-	const bf = [{ b: 0.09259, f: 1.06733 }, { b: 0.64, f: 1.05946309436 }, { b: 10.3, f: 1.05946309436 }, 0, 1][
-		(con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[1]].l
-	];
+	const ca = (tw as { ca?: number[] }).ca;
+	if (!ca) return;
+	const c0 = (con as Record<string, { l: number }>)[ca[0]];
+	const c1 = (con as Record<string, { l: number }>)[ca[1]];
+	if (!c0 || !c1) return;
+	i = c0.l;
+	const bf = [{ b: 0.09259, f: 1.06733 }, { b: 0.64, f: 1.05946309436 }, { b: 10.3, f: 1.05946309436 }, 0, 1][c1.l];
 	if (bf == 0) return rateBPM(i).slice(0, -3);
 	if (bf == 1) return _clk[i >> 2];
 	const r = (bf as { b: number; f: number }).b / Math.pow((bf as { b: number; f: number }).f, 64 - Math.floor(i));
@@ -277,9 +280,13 @@ export function rateLo(i: number, con: unknown, tw: unknown): string | undefined
 
 export function OscFreq(i: number, con: unknown, tw: unknown): string | undefined {
 	if (!tw) return;
-	const c = Math.floor((con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[0]].l);
-	const f = Math.floor((con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[1]].l);
-	const m = (con as Record<string, { l: number }>)[(tw as { ca: number[] }).ca[2]].l;
+	const ca = (tw as { ca?: number[] }).ca;
+	if (!ca) return;
+	const cc = con as Record<string, { l: number }>;
+	if (!cc[ca[0]] || !cc[ca[1]] || !cc[ca[2]]) return;
+	const c = Math.floor(cc[ca[0]].l);
+	const f = Math.floor(cc[ca[1]].l);
+	const m = cc[ca[2]].l;
 	let r: number;
 	switch (m) {
 		case 0:

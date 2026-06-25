@@ -55,8 +55,7 @@ export const useUiStore = defineStore('ui', {
 		setSlotInFocus(slot: SlotLabel) {
 			this.slotInFocus = slot;
 			this.clearSelection();
-			const device = useDeviceStore().device;
-			if (device?.performance) device.performance.focus = slot;
+			useDeviceStore().setPerformanceFocus(slot);
 		},
 
 		setModuleColor(index: number) {

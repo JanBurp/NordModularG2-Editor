@@ -269,6 +269,10 @@ export const useDeviceStore = defineStore('device', {
 			this.sendSynthSettings();
 		},
 
+		setPerformanceFocus(slot: SlotLabel) {
+			if (this.device?.performance) this.device.performance.focus = slot;
+		},
+
 		setMidiCtrlsRecv(value: boolean) {
 			if (!this.device) return;
 			this.device.midi.ctrlsRecv = value;
