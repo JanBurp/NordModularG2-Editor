@@ -49,8 +49,7 @@
 	);
 
 	const levelShiftY = computed(() => {
-		return ((127 - props.value) / 132) * 42;
-		// return ((127 - props.value) / 127) * 42;
+		return ((127 - props.value) / 127) * 42;
 	});
 </script>
 <style scoped>

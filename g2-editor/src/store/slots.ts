@@ -1,5 +1,5 @@
 import type { MidiCCAssignment, ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
-import { PATCH_PARAM_KEYS } from '@/types/patch';
+import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
@@ -494,8 +494,8 @@ export const useSlotsStore = defineStore('slots', {
 			const paramVals: number[] = (modDef?.params ?? []).map((p) => getParam(p.type)?.def ?? 64);
 			const uname = (modDef?.short ?? 'Module') + moduleId;
 
-			const lv: number[] = Array(numParams * 9);
-			for (let v = 0; v < 9; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
+			const lv: number[] = Array(numParams * NUM_VARIATIONS);
+			for (let v = 0; v < NUM_VARIATIONS; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
 
 			const mod: ModuleInstance = {
 				type: typeId,
@@ -1482,7 +1482,7 @@ export const useSlotsStore = defineStore('slots', {
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
-				const existingLabel = (mod?.paramLabels as any[])?.find((pl: any) => pl.paramIndex === paramIndex);
+				const existingLabel = mod?.paramLabels?.find((pl) => pl.paramIndex === paramIndex);
 				const prevLabel = existingLabel?.labels?.[0] ?? '';
 				hist.record(slot, {
 					undo: async () => {
@@ -1497,10 +1497,10 @@ export const useSlotsStore = defineStore('slots', {
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 			if (!mod) return;
 			if (!mod.paramLabels) mod.paramLabels = [];
-			let entry = (mod.paramLabels as any[]).find((pl: any) => pl.paramIndex === paramIndex);
+			let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
 			if (!entry) {
 				entry = { paramIndex, isString: false, paramLen: 7, labels: [label] };
-				(mod.paramLabels as any[]).push(entry);
+				mod.paramLabels.push(entry);
 			} else {
 				entry.labels[0] = label;
 			}

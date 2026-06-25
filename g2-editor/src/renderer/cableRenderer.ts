@@ -80,7 +80,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 
 		const pc = new Patchcord(sx, sy, dx, dy);
 		const d = pc.getCurvePath(gravity);
-		const color = CABLE_SVG_COLORS[cable.colour] || CABLE_SVG_COLORS[0];
+		const color = CABLE_SVG_COLORS[cable.colour] ?? CABLE_SVG_COLORS[0];
 
 		const isSelected = selectedKeys.has(makeCableKey(cable));
 		const key = makeCableKey(cable);
