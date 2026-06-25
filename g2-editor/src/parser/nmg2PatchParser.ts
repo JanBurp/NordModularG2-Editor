@@ -162,6 +162,8 @@ class G2Parser {
 			this.rawData = initialData;
 			this.bitofs = 0;
 		}
+		if (this.bitofs + numbits > this.rawData.length * 8)
+			throw new RangeError(`getBits: read past end of section (bit ${this.bitofs}, requesting ${numbits}, section is ${this.rawData.length * 8} bits)`);
 		let rv = (this.rawData[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1;
 		this.bitofs++;
 		while (numbits > 1) {
