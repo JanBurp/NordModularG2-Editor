@@ -116,11 +116,7 @@ export const useBrowserStore = defineStore('browser', {
 			const slot = kind === 'performance' ? 4 : slotIndex;
 			try {
 				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
-				const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
-				const entry: SynthPatch = { bank, location, name: name ?? '' };
-				const idx = list.findIndex((p) => p.bank === bank && p.location === location);
-				if (idx >= 0) list.splice(idx, 1, entry);
-				else list.push(entry);
+				this.upsertPatch(bank, location, kind, name ?? '');
 			} catch (e: any) {
 				this.error = e.message;
 			}
