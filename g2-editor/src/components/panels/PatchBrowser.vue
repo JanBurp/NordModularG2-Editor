@@ -284,8 +284,25 @@
 
 	const { selectedIndex: selectedNavIndex, navigate: navStep, reset: resetNavIndex } = useListNav(() => flatNavItems.value.length);
 
-	watch(searchQuery, () => {
+	const preSearchCollapsedBanks = ref<number[] | null>(null);
+
+	watch(searchQuery, (newVal) => {
 		resetNavIndex();
+		if (newVal) {
+			if (preSearchCollapsedBanks.value === null) {
+				preSearchCollapsedBanks.value = [...browser.collapsedBanks];
+			}
+			currentGroups.value.forEach((g) => {
+				if (g.patches.length > 0 && browser.isBankCollapsed(g.bank)) {
+					browser.toggleBank(g.bank);
+				}
+			});
+		} else {
+			if (preSearchCollapsedBanks.value !== null) {
+				browser.collapsedBanks = [...preSearchCollapsedBanks.value];
+				preSearchCollapsedBanks.value = null;
+			}
+		}
 	});
 
 	onMounted(() => {
