@@ -1,3 +1,5 @@
+import { ref } from 'vue';
+import type { Patch } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSlotsStore } from '../store/slots';
@@ -6,6 +8,11 @@ const { PatchParser } = await import('../parser/nmg2PatchParser');
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
+type Prf2Data = {
+	slotNames: string[];
+	patches: Patch[];
+	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
+};
 
 /* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
  * device never sends the matching synth_settings_update (error/disconnect mid-load). */
@@ -23,6 +30,7 @@ export function usePatchFile() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const device = useDeviceStore();
+	const uploadError = ref<string | null>(null);
 
 	function applyVariation(parsedPatch: any): void {
 		if (parsedPatch?.description?.variation !== undefined) {
@@ -34,16 +42,57 @@ export function usePatchFile() {
 		return slotsStore.loadSlot(SLOT_LABELS[index]);
 	}
 
+	async function applyPerformanceFile(prf2: Prf2Data, name: string, rawHex: string, filepath: string): Promise<void> {
+		const connected = device.status === DeviceStatus.Connected;
+		if (connected) {
+			if (slotsStore.uploadingFromFile) return;
+			slotsStore.uploadingFromFile = true;
+		}
+		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath);
+		await device.setPerformanceMode(name);
+		if (connected) {
+			try {
+				await window.cli.run(['upload-perf', filepath]);
+			} catch (err) {
+				console.error('Upload perf to G2 failed:', err);
+				uploadError.value = 'Performance upload to G2 failed — check device connection.';
+			} finally {
+				slotsStore.uploadingFromFile = false;
+			}
+			if (device.device?.performance) device.device.performance.name = name;
+		} else if (prf2.slotMeta.length === 4) {
+			const slots = prf2.slotMeta.map((m, i) => ({
+				slot: SLOT_LABELS[i],
+				name: prf2.slotNames[i],
+				active: m.active,
+				key: m.key,
+				hold: m.hold,
+				bank: m.bank,
+				patch: m.patch,
+				range: { lower: m.rangeLow, upper: m.rangeHigh },
+			}));
+			const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
+			const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
+			device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, slots });
+			uiStore.setSlotInFocus(focusLabel);
+		}
+	}
+
 	async function handleFileLoad(event: Event): Promise<void> {
 		const input = event.target as HTMLInputElement;
 		const file = input.files?.[0];
 		if (!file) return;
-		const buffer = await file.arrayBuffer();
-		const parsedPatch = new PatchParser(buffer).parse() as any;
-		const name = file.name.replace(/\.(pch2|prf2)$/i, '');
-		const rawHex = stripFileHeader(new Uint8Array(buffer));
-		slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
-		applyVariation(parsedPatch);
+		try {
+			const buffer = await file.arrayBuffer();
+			const parsedPatch = new PatchParser(buffer).parse() as any;
+			const name = file.name.replace(/\.(pch2|prf2)$/i, '');
+			const rawHex = stripFileHeader(new Uint8Array(buffer));
+			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
+			applyVariation(parsedPatch);
+		} catch (err) {
+			console.error('Failed to load patch file:', err);
+			uploadError.value = 'Failed to load patch file — the file may be corrupt.';
+		}
 	}
 
 	async function openFromElectronDialog(): Promise<void> {
@@ -56,38 +105,7 @@ export function usePatchFile() {
 		const parser = new PatchParser(buffer);
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
-			const connected = device.status === DeviceStatus.Connected;
-			if (connected) {
-				if (slotsStore.uploadingFromFile) return;
-				slotsStore.uploadingFromFile = true;
-			}
-			slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, result.filepath!);
-			await device.setPerformanceMode(name);
-			if (connected) {
-				try {
-					await window.cli.run(['upload-perf', result.filepath!]);
-				} catch (err) {
-					console.error('Upload perf to G2 failed:', err);
-				} finally {
-					slotsStore.uploadingFromFile = false;
-				}
-				if (device.device?.performance) device.device.performance.name = name;
-			} else if (prf2.slotMeta.length === 4) {
-				const slots = prf2.slotMeta.map((m, i) => ({
-					slot: SLOT_LABELS[i],
-					name: prf2.slotNames[i],
-					active: m.active,
-					key: m.key,
-					hold: m.hold,
-					bank: m.bank,
-					patch: m.patch,
-					range: { lower: m.rangeLow, upper: m.rangeHigh },
-				}));
-				const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
-				const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
-				device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, slots });
-				uiStore.setSlotInFocus(focusLabel);
-			}
+			await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
 			return;
 		}
 		const targetSlot = uiStore.slotInFocus;
@@ -100,6 +118,7 @@ export function usePatchFile() {
 				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
 			} catch (err) {
 				console.error('Upload to G2 failed:', err);
+				uploadError.value = 'Patch upload to G2 failed — check device connection.';
 			} finally {
 				slotsStore.uploadingFromFile = false;
 			}
@@ -142,38 +161,7 @@ export function usePatchFile() {
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
 					const prf2 = new PatchParser(buffer).parsePrf2();
 					if (prf2) {
-						const connected = device.status === DeviceStatus.Connected;
-						if (connected) {
-							if (slotsStore.uploadingFromFile) return;
-							slotsStore.uploadingFromFile = true;
-						}
-						slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, item.filepath);
-						await device.setPerformanceMode(name);
-						if (connected) {
-							try {
-								await window.cli.run(['upload-perf', item.filepath]);
-							} catch (err) {
-								console.error('Upload perf to G2 failed:', err);
-							} finally {
-								slotsStore.uploadingFromFile = false;
-							}
-							if (device.device?.performance) device.device.performance.name = name;
-						} else if (prf2.slotMeta.length === 4) {
-							const slots = prf2.slotMeta.map((m, i) => ({
-								slot: SLOT_LABELS[i],
-								name: prf2.slotNames[i],
-								active: m.active,
-								key: m.key,
-								hold: m.hold,
-								bank: m.bank,
-								patch: m.patch,
-								range: { lower: m.rangeLow, upper: m.rangeHigh },
-							}));
-							const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
-							const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
-							device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, slots });
-							uiStore.setSlotInFocus(focusLabel);
-						}
+						await applyPerformanceFile(prf2, name, rawHex, item.filepath);
 						return;
 					}
 				}
@@ -187,6 +175,7 @@ export function usePatchFile() {
 						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
+						uploadError.value = 'Patch upload to G2 failed — check device connection.';
 					} finally {
 						slotsStore.uploadingFromFile = false;
 					}
@@ -216,5 +205,6 @@ export function usePatchFile() {
 		handlePerformanceSynthSelect,
 		loadSlotPatch,
 		openFromElectronDialog,
+		uploadError,
 	};
 }

@@ -180,35 +180,40 @@ export const useDeviceStore = defineStore('device', {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.active = !entry.active;
-			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']).catch((err: unknown) => console.error('set-slot-enabled failed:', err));
 		},
 
 		toggleSlotKey(slot: SlotLabel) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.key = !entry.key;
-			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-key', slot, entry.key ? '1' : '0']).catch((err: unknown) => console.error('set-slot-key failed:', err));
 		},
 
 		setSlotHold(slot: SlotLabel, value: boolean) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.hold = value;
-			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-hold', slot, value ? '1' : '0']);
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-hold', slot, value ? '1' : '0']).catch((err: unknown) => console.error('set-slot-hold failed:', err));
 		},
 
 		setSlotRangeLower(slot: SlotLabel, lower: number) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.range.lower = lower;
-			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]);
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]).catch((err: unknown) => console.error('set-slot-range failed:', err));
 		},
 
 		setSlotRangeUpper(slot: SlotLabel, upper: number) {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.range.upper = upper;
-			if (this.status === DeviceStatus.Connected) window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]);
+			if (this.status === DeviceStatus.Connected)
+				window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]).catch((err: unknown) => console.error('set-slot-range failed:', err));
 		},
 
 		buildSynthPayload() {
@@ -228,7 +233,8 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		sendSynthSettings() {
-			if (this.device && this.status === DeviceStatus.Connected) window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]);
+			if (this.device && this.status === DeviceStatus.Connected)
+				window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]).catch((err: unknown) => console.error('set-synth-settings failed:', err));
 		},
 
 		setSynthName(name: string) {
