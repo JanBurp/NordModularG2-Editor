@@ -138,14 +138,14 @@ export const useBrowserStore = defineStore('browser', {
 		async clearPatch(bank: number, location: number, kind: 'patch' | 'performance'): Promise<void> {
 			try {
 				await window.cli.run(['clear-patch', kind, String(bank), String(location)]);
-				if (kind === 'performance') {
-					this.synthPerformances = this.synthPerformances.filter((p) => !(p.bank === bank && p.location === location));
-				} else {
-					this.synthPatches = this.synthPatches.filter((p) => !(p.bank === bank && p.location === location));
-				}
+				this.removePatch(bank, location, kind);
 			} catch (e: any) {
 				this.error = e.message;
 			}
+		},
+
+		setCollapsedBanks(banks: number[]): void {
+			this.collapsedBanks = banks;
 		},
 
 		async chooseDiskFolder(): Promise<void> {

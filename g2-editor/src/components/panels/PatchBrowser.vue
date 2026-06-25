@@ -220,16 +220,21 @@
 	const allBanksExpanded = computed(() => currentGroups.value.every((g) => !browser.isBankCollapsed(g.bank)));
 
 	function toggleAllBanks() {
-		const collapse = !allBanksCollapsed.value;
+		const collapse = allBanksExpanded.value;
 		currentGroups.value.forEach((g) => {
 			if (collapse !== browser.isBankCollapsed(g.bank)) browser.toggleBank(g.bank);
 		});
 	}
 
-	function onPatchCtx(e: MouseEvent, p: SynthPatch, kind: 'patch' | 'performance') {
+	function getSlotContext(kind: 'patch' | 'performance') {
 		const slotIdx = (['A', 'B', 'C', 'D'].indexOf(uiStore.slotInFocus) as 0 | 1 | 2 | 3) ?? 0;
 		const patchName =
 			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
+		return { slotIdx, patchName };
+	}
+
+	function onPatchCtx(e: MouseEvent, p: SynthPatch, kind: 'patch' | 'performance') {
+		const { slotIdx, patchName } = getSlotContext(kind);
 		const items: ContextMenuItem[] = [];
 		if (kind !== 'performance' || device.device?.mode === 'Performance') {
 			items.push({ label: `Store "${patchName}" here`, action: () => browser.storePatch(slotIdx, p.bank, p.location, kind, patchName) });
@@ -241,18 +246,16 @@
 
 	function onBankCtx(e: MouseEvent, bank: number) {
 		const kind = browser.view === 'performances' ? 'performance' : 'patch';
-		const slotIdx = (['A', 'B', 'C', 'D'].indexOf(uiStore.slotInFocus) as 0 | 1 | 2 | 3) ?? 0;
-		const patchName =
-			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
+		const { slotIdx, patchName } = getSlotContext(kind);
 
 		const list = kind === 'performance' ? browser.synthPerformances : browser.synthPatches;
 		const byLoc = new Map(list.filter((p) => p.bank === bank).map((p) => [p.location, p]));
+		const maxLoc = kind === 'performance' ? 32 : 128;
 		const storeChildren: ContextMenuItem[] = [];
-		for (let loc = 1; loc <= 128; loc++) {
+		for (let loc = 1; loc <= maxLoc; loc++) {
 			const existing = byLoc.get(loc);
 			storeChildren.push({
 				label: `${bank}-${loc}  ${existing ? existing.name : '(empty)'}`,
-				disabled: existing ? false : undefined,
 				action: () => browser.storePatch(slotIdx, bank, loc, kind, patchName),
 			});
 		}
@@ -278,8 +281,7 @@
 
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
 		if (browser.view === 'disk') return filteredDiskFiles.value;
-		const groups = browser.view === 'patches' ? patchGroups.value : perfGroups.value;
-		return groups.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
+		return currentGroups.value.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
 	});
 
 	const { selectedIndex: selectedNavIndex, navigate: navStep, reset: resetNavIndex } = useListNav(() => flatNavItems.value.length);
@@ -299,14 +301,14 @@
 			});
 		} else {
 			if (preSearchCollapsedBanks.value !== null) {
-				browser.collapsedBanks = [...preSearchCollapsedBanks.value];
+				browser.setCollapsedBanks([...preSearchCollapsedBanks.value]);
 				preSearchCollapsedBanks.value = null;
 			}
 		}
 	});
 
 	onMounted(() => {
-		browser.collapsedBanks = [...settings.browserCollapsedBanks];
+		browser.setCollapsedBanks([...settings.browserCollapsedBanks]);
 		onViewChange(settings.browserView);
 	});
 
