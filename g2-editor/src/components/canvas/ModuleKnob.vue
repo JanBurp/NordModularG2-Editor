@@ -2,6 +2,7 @@
 	<g
 		:transform="`translate(${param.x}, ${param.y})`"
 		class="knob-control"
+		:style="{ cursor }"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
@@ -10,7 +11,7 @@
 		<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" class="hit-area" />
 
 		<!-- Main circle with radial gradient -->
-		<circle :r="radius" :cx="radius + 2" :cy="radius + 2" fill="url(#g120)" stroke="#333" stroke-width="0.5" :class="{ dragging: isDragging }" />
+		<circle ref="knobCircle" :r="radius" :cx="radius + 2" :cy="radius + 2" fill="url(#g120)" stroke="#333" stroke-width="0.5" :class="{ dragging: isDragging }" />
 
 		<!-- Bottom-left tick mark -->
 		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
@@ -37,7 +38,7 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed, toRef } from 'vue';
+	import { computed, ref, toRef } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
 
@@ -53,15 +54,16 @@
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const { radius, angle, isReset, isDragging, onMouseDown } = useKnob(
+	const knobCircle = ref<Element | null>(null);
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),
+		knobCircle,
 	);
 </script>
 <style scoped>
 	.knob-control {
-		cursor: ns-resize;
 		user-select: none;
 	}
 

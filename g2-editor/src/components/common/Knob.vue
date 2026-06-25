@@ -1,5 +1,5 @@
 <template>
-	<div class="knob-wrapper" @dblclick="onDoubleClick()">
+	<div class="knob-wrapper" :style="{ cursor }" @dblclick="onDoubleClick()">
 		<svg :width="radius + 16" :height="radius + 16" class="knob-svg" @mousedown="onMouseDown" @touchstart.passive="onMouseDown">
 			<defs>
 				<!-- Local copy of the g120 radial gradient (avoids dependency on canvas SVG defs) -->
@@ -13,6 +13,7 @@
 			<g>
 				<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" />
 				<circle
+					ref="knobCircle"
 					:r="radius"
 					:cx="radius + 2"
 					:cy="radius + 2"
@@ -38,7 +39,7 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref } from 'vue';
 	import { useKnob } from '../../composables/useKnob';
 
 	const props = defineProps<{
@@ -50,16 +51,17 @@
 		change: [value: number];
 	}>();
 
-	const { radius, angle, isReset, isDragging, onMouseDown, onDoubleClick } = useKnob(
+	const knobCircle = ref<Element | null>(null);
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onDoubleClick } = useKnob(
 		computed(() => props.value),
 		computed(() => props.type ?? 'KnobMedium'),
 		(value) => emit('change', value),
+		knobCircle,
 	);
 </script>
 <style scoped>
 	.knob-wrapper {
 		display: inline-block;
-		cursor: ns-resize;
 		user-select: none;
 	}
 

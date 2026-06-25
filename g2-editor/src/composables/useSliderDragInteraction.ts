@@ -5,7 +5,7 @@ const SENSITIVITY = 0.3;
 
 export function useSliderDragInteraction(paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
 	let startValue = 0;
-	const { isDragging, onMouseDown, onMouseUp } = useDragInteraction((dy) => {
+	const { isDragging, onMouseDown, onMouseUp } = useDragInteraction((_dx, dy) => {
 		const newValue = clamp(Math.round(startValue + dy * SENSITIVITY), 0, 127);
 		if (newValue !== getValue()) onChange(paramIndex, newValue);
 	});

@@ -6,6 +6,20 @@
 					<BtnGroup :model-value="settings.theme" :options="THEME_OPTIONS" @update:model-value="settings.setTheme($event as ThemeMode)" />
 				</SettingsRow>
 
+				<p class="settings-subheader">Knob control:</p>
+				<SettingsRow label="Knob Mode">
+					<BtnGroup :model-value="settings.knobMode" :options="KNOB_MODE_OPTIONS" @update:model-value="settings.setKnobMode($event as KnobMode)" />
+				</SettingsRow>
+				<SettingsRow label="Sensitivity">
+					<RangeInput
+						:model-value="settings.knobSensitivity"
+						:min="0.25"
+						:max="4"
+						:step="0.25"
+						@update:model-value="settings.setKnobSensitivity($event)"
+					/>
+				</SettingsRow>
+
 				<p class="settings-subheader">Cable rendering:</p>
 				<SettingsRow :label="L.cableGravity">
 					<RangeInput :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
@@ -24,16 +38,6 @@
 				</SettingsRow>
 
 				<p class="settings-subheader">Settings:</p>
-				<SettingsRow :label="L.editorPath">
-					<div class="flex gap-1 flex-1 items-center">
-						<div class="w-1/4">
-							<button class="settings-input px-2 cursor-pointer" @click="browser.chooseDiskFolder()">…</button>
-						</div>
-						<div class="w-3/4">
-							<TextInput :model-value="settings.path" @update:model-value="settings.setPath($event)" />
-						</div>
-					</div>
-				</SettingsRow>
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
 				</SettingsRow>
@@ -280,7 +284,7 @@
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
-	import { useSettingsStore, type ThemeMode } from '@/store/settings';
+	import { useSettingsStore, type ThemeMode, type KnobMode } from '@/store/settings';
 	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
@@ -414,6 +418,12 @@
 		{ label: 'System', value: 'system' },
 		{ label: 'Light', value: 'light' },
 		{ label: 'Dark', value: 'dark' },
+	];
+
+	const KNOB_MODE_OPTIONS = [
+		{ label: 'Vert', value: 'vertical' },
+		{ label: 'Horz', value: 'horizontal' },
+		{ label: 'Circular', value: 'circular' },
 	];
 
 	const OFF_SEND_RECV_BOTH = [

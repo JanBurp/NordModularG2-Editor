@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'midicc' | 'settings' | '';
+export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 
 export const useSettingsStore = defineStore('settings', {
 	state: () => ({
@@ -17,6 +18,8 @@ export const useSettingsStore = defineStore('settings', {
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
+		knobMode: 'vertical' as KnobMode,
+		knobSensitivity: 1 as number,
 	}),
 	actions: {
 		toggleSidebar(tab: PaneTab) {
@@ -51,6 +54,12 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setCableThickness(value: number) {
 			this.cableThickness = value;
+		},
+		setKnobMode(value: KnobMode) {
+			this.knobMode = value;
+		},
+		setKnobSensitivity(value: number) {
+			this.knobSensitivity = value;
 		},
 	},
 	persist: true,
