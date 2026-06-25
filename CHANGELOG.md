@@ -12,19 +12,33 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Undo/Redo
 - Copy Variation
 - Midi CC assignments
-- Themes: System, Light, Dark
 - Missing VU meter's on Modules
 - Graphics & Params for several modules improved/finished
+- New Patch / New Performance implemented
+- Patch browser: Load/Store/Delete/Sort actions implemented
+- Context menu and QuickAdd popup (M) for adding modules to patch
+- Module category search improvements and key commands to add module
+- Themes: System, Light, Dark
+- Cable rendering options
+- Knob dial options
+- SidePanel open/closed state persisted as user preference
 
 ### Changed
 - Parameter sending smoother
 - Documentation restructured
+- Patch browser UX fully revised
+- Faster performance loading (`select-perf`)
+- SidePanel default state as setting
 
 ### Fixed
-- Cable editing bug (split area)
 - Swapped Gate LEDs
 - Sequencer and VU LED rendering issues
 - Sequencer Random/Clear buttons not working
+- Performance name bug when switching from patch mode
+- Cable editing bug (split area)
+- Windows scrollbar consuming layout space
+- Error popup when closing editor
+- Patch load from synth
 
 ---
 
