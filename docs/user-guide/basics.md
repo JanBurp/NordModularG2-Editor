@@ -82,17 +82,50 @@ Per-slot configuration is in the **Settings pane → Performance Settings**:
 
 ## Patch Browser (`Cmd+B`)
 
+Three tabs: **Disk**, **Patches**, **Performances**.
+
 ### Disk Tab
+
 - `↑` — navigate to parent folder
 - `…` — open system folder picker
-- **Search** — filter files (Esc to clear)
+- **Search** — filter files; Esc to clear
 - Click folder — navigate into it
-- Click `.pch2` / `.prf2` — load file
+- Click `.pch2` / `.prf2` — load into active slot
 
-### Synth Tab (G2 connected)
-- Browse patches and performances stored in the G2
-- Click bank header to expand/collapse
-- Click entry to load
+### Patches / Performances Tabs (G2 connected)
+
+Patches and performances stored on the G2, grouped by bank.
+
+**Navigation**
+
+| Action | Result |
+|---|---|
+| Click bank header | Collapse / expand bank |
+| ▶ / ▼ button (top-right) | Expand all / collapse all banks |
+| Click entry | Load patch or performance |
+| `/` or focus search | Jump to search |
+| `↑` / `↓` in search | Move selection through visible entries |
+| `Enter` | Load selected (or first) entry |
+| `Esc` | Clear search |
+
+**Search** — auto-expands any bank with a matching result; restores previous collapse state when cleared.
+
+**Right-click a patch entry**
+
+| Item | Action |
+|---|---|
+| Store "*name*" here | Write the current slot's patch to this bank location |
+| Delete (clear this location) | Erase this location from the G2 bank |
+
+**Right-click a bank header**
+
+| Item | Action |
+|---|---|
+| Store "*name*" | Submenu listing all locations — choose where to write |
+| Clear all in bank | Erase every location in this bank |
+| Sort | Submenu: By location · By name A–Z · By name Z–A · By category |
+
+> Store is unavailable for performance banks unless the G2 is in Performance mode.
 
 ---
 

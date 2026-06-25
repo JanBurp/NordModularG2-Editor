@@ -29,6 +29,10 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `upload-perf` | `<filepath>` | Upload .prf2 performance |
 | `select-patch` | `<slot> <bank> <loc>` | Load bank patch into slot (bank 1–32, loc 1–127) |
 | `select-perf` | `<bank> <loc>` | Load bank performance |
+| `store-patch` | `<slot> <bank> <loc>` | Store slot's patch to bank location (slot 0-3, use slot 4 for performances) |
+| `clear-patch` | `<patch\|performance> <bank> <loc>` | Clear a single bank location |
+| `clear-bank` | `<patch\|performance> <bank>` | Clear all entries in a bank (locations 1–128) |
+| `reload-names` | | Re-fetch patch/performance name list from G2 and emit `names` event |
 | `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank) |
 | `get-perf-settings` | | Get current performance settings |
 | `set-perf-mode` | `<patch\|performance>` | Switch between patch and performance mode |
@@ -88,6 +92,16 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 |---|---|---|
 | `set-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <value> <variation>` | Set module parameter value |
 | `set-param-label` | `<slot> <va\|fx> <module-id> <param-idx> <label-idx> <label>` | Set parameter label |
+| `copy-variation` | `<slot> <from> <to>` | Copy all parameter values from one variation to another (0-based indices) |
+
+## MIDI CC Assignments
+
+| Command | Arguments | Description |
+|---|---|---|
+| `assign-midicc` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <cc-num>` | Assign MIDI CC to a module parameter (CC 0–119) |
+| `deassign-midicc` | `<slot> <cc-num>` | Remove a MIDI CC assignment |
+| `assign-midicc-batch` | `<slot> <loc> <mod> <param> <cc> [<loc> <mod> <param> <cc> ...]` | Assign multiple CCs in one USB frame |
+| `deassign-midicc-batch` | `<slot> <cc> [<cc> ...]` | Remove multiple CC assignments in one USB frame |
 
 ## Resources & Daemon
 
@@ -96,6 +110,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `get-resources` | `<slot>` | Get CPU/memory resource usage |
 | `daemon` | | Persistent: watch events + accept JSON commands on stdin |
 | `seq` | `"<cmd1>" "<cmd2>" ...` | Run multiple commands sequentially |
+| `debug` | `<on\|off>` | Enable/disable debug timing output (emits JSON `debug` events to stdout) |
 
 ---
 

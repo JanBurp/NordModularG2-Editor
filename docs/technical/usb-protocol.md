@@ -213,9 +213,9 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10a) | Embedded ACK |
 | `0x04` | GET_ASSIGNED_VOICES *(not implemented yet)* | — | Embedded; 4 voice counts at `[5..8]` |
 | `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0B ss bb ll` | STORE (slot→bank) *(not implemented yet)* | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0C tt bb ll 00` | CLEAR *(not implemented yet)* | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
-| `0x0E tt bb ff tt 00` | CLEAR_BANK *(not implemented yet)* | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
+| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
+| `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
 | `0x17 tt bb ll` | PATCH_BANK_UPLOAD *(not implemented yet)* | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
 | `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not implemented yet)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
