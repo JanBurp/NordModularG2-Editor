@@ -217,7 +217,8 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		buildSynthPayload() {
-			const d = this.device!;
+			if (!this.device) return null;
+			const d = this.device;
 			return {
 				synthName: d.synthName,
 				mode: d.mode,
@@ -233,8 +234,9 @@ export const useDeviceStore = defineStore('device', {
 		},
 
 		sendSynthSettings() {
-			if (this.device && this.status === DeviceStatus.Connected)
-				window.cli.run(['set-synth-settings', JSON.stringify(this.buildSynthPayload())]).catch((err: unknown) => console.error('set-synth-settings failed:', err));
+			const payload = this.buildSynthPayload();
+			if (payload && this.status === DeviceStatus.Connected)
+				window.cli.run(['set-synth-settings', JSON.stringify(payload)]).catch((err: unknown) => console.error('set-synth-settings failed:', err));
 		},
 
 		setSynthName(name: string) {

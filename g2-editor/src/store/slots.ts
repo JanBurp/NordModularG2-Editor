@@ -1421,11 +1421,11 @@ export const useSlotsStore = defineStore('slots', {
 			sendCoalesced(`${slot}:patch:1:${param}:${variation}`, ['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
-		async setPatchParam(variation: number, key: string, value: number): Promise<void> {
+		async setPatchParam(variation: number, key: keyof PatchParamVariation, value: number): Promise<void> {
 			const slot = useUiStore().slotInFocus;
 			const entry = this.slots[slot];
 
-			const prevValue = (entry?.variations?.[variation]?.patch as unknown as Record<string, number>)?.[key] ?? value;
+			const prevValue = (entry?.variations?.[variation]?.patch?.[key] as number | undefined) ?? value;
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -1447,10 +1447,10 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			if (entry?.variations?.[variation]) {
-				(entry.variations[variation].patch as unknown as Record<string, number>)[key] = value;
+				(entry.variations[variation].patch as Record<keyof PatchParamVariation, number | number[]>)[key] = value;
 				entry.rawHex = null;
 			}
-			const paramIdx = PATCH_PARAM_KEYS.indexOf(key as keyof PatchParamVariation);
+			const paramIdx = PATCH_PARAM_KEYS.indexOf(key);
 			if (paramIdx < 0) return;
 			// Convert global index to section + local index (inverse of SECTION_OFFSETS in useSlotEvents.ts)
 			let section = 2,
