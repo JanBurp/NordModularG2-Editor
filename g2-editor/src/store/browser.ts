@@ -114,8 +114,6 @@ export const useBrowserStore = defineStore('browser', {
 
 		async storePatch(slotIndex: 0 | 1 | 2 | 3, bank: number, location: number, kind: 'patch' | 'performance', name?: string): Promise<void> {
 			const slot = kind === 'performance' ? 4 : slotIndex;
-			this.loading = true;
-			this.error = '';
 			try {
 				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
 				const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
@@ -125,14 +123,10 @@ export const useBrowserStore = defineStore('browser', {
 				else list.push(entry);
 			} catch (e: any) {
 				this.error = e.message;
-			} finally {
-				this.loading = false;
 			}
 		},
 
 		async clearBank(bank: number, kind: 'patch' | 'performance'): Promise<void> {
-			this.loading = true;
-			this.error = '';
 			try {
 				await window.cli.run(['clear-bank', kind, String(bank)]);
 				if (kind === 'performance') {
@@ -142,14 +136,10 @@ export const useBrowserStore = defineStore('browser', {
 				}
 			} catch (e: any) {
 				this.error = e.message;
-			} finally {
-				this.loading = false;
 			}
 		},
 
 		async clearPatch(bank: number, location: number, kind: 'patch' | 'performance'): Promise<void> {
-			this.loading = true;
-			this.error = '';
 			try {
 				await window.cli.run(['clear-patch', kind, String(bank), String(location)]);
 				if (kind === 'performance') {
@@ -159,8 +149,6 @@ export const useBrowserStore = defineStore('browser', {
 				}
 			} catch (e: any) {
 				this.error = e.message;
-			} finally {
-				this.loading = false;
 			}
 		},
 

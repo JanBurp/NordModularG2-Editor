@@ -6,13 +6,15 @@
 		]"
 		@click="$emit('click')"
 	>
-		<div class="shrink-0 w-8">
+		<div class="shrink-0 w-8 text-content-secondary text-xs">
 			<slot name="icon"></slot>
 		</div>
-		<div class="truncate flex-1">
+		<div class="truncate flex-1 text-sm">
 			<slot name="label" />
 		</div>
-		<slot name="meta" />
+		<div class="text-content-secondary text-xs">
+			<slot name="meta"></slot>
+		</div>
 	</li>
 </template>
 

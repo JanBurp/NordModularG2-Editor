@@ -554,7 +554,7 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "clear-bank") == 0 && n >= 2) {
 		const char *kind = arg_s(args, 0);
 		int type = (kind && strcmp(kind, "performance") == 0) ? 1 : 0;
-		ret = g2_clear_bank(type, arg_i(args, 1), 1, 127);
+		ret = g2_clear_bank(type, arg_i(args, 1), 1, 128);
 
 	} else if (strcmp(cmd, "reload-names") == 0) {
 		g2_listener_stop();

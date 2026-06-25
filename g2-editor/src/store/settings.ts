@@ -15,6 +15,8 @@ export const useSettingsStore = defineStore('settings', {
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
+		browserView: 'patches' as 'disk' | 'patches' | 'performances',
+		browserCollapsedBanks: [] as number[],
 	}),
 	actions: {
 		toggleSidebar(tab: PaneTab) {

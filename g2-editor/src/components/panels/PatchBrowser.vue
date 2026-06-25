@@ -52,9 +52,7 @@
 					>
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
-						<template #meta
-							><span class="text-content-secondary text-xs">{{ entry.name.split('.').pop() }}</span></template
-						>
+						<template #meta>{{ entry.name.split('.').pop() }}</template>
 					</ListItem>
 					<StateMessage
 						v-if="filteredDiskDirs.length === 0 && filteredDiskFiles.length === 0"
@@ -70,20 +68,24 @@
 		<template v-else>
 			<StateMessage v-if="!device.connected" variant="empty" message="Connect G2 to browse synth patches" />
 			<template v-else>
-				<div class="px-2 pt-2 shrink-0">
+				<div class="flex items-center gap-1 px-2 pt-2 shrink-0">
 					<SearchInput
 						ref="searchRef"
 						v-model="searchQuery"
 						placeholder="Search... (/)"
 						:isActive="isActive"
+						class="flex-1 min-w-0"
 						@enter="handleEnter"
 						@up="navigate(-1)"
 						@down="navigate(1)"
 					/>
-				</div>
-
-				<div class="flex justify-end items-center px-2 py-0.5 shrink-0">
-					<Button variant="toggle" size="xs" @click="toggleAllBanks">{{ allBanksCollapsed ? 'Expand All' : 'Collapse All' }}</Button>
+					<button
+						class="shrink-0 text-content-secondary hover:text-white px-1 cursor-pointer"
+						:title="allBanksExpanded ? 'Collapse All' : 'Expand All'"
+						@click="toggleAllBanks"
+					>
+						{{ allBanksExpanded ? '▼' : '▶' }}
+					</button>
 				</div>
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
@@ -93,6 +95,7 @@
 						<!-- Bank header (collapsible) -->
 						<li
 							class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
+							:class="group.patches.length === 0 ? 'opacity-40' : ''"
 							@click="browser.toggleBank(group.bank)"
 							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
 						>
@@ -112,13 +115,9 @@
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
-								<template #icon
-									><span class="text-content-secondary text-xs">{{ p.bank }}-{{ p.location }}</span></template
-								>
+								<template #icon>{{ p.bank }}-{{ p.location }}</template>
 								<template #label>{{ p.name }}</template>
-								<template v-if="p.category" #meta
-									><span class="text-content-secondary text-xs">{{ p.category }}</span></template
-								>
+								<template v-if="p.category" #meta>{{ formatCategory(p.category) }}</template>
 							</ListItem>
 						</template>
 					</template>
@@ -130,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, computed, watch } from 'vue';
+	import { ref, computed, watch, onMounted } from 'vue';
 	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
 	import type { ContextMenuItem } from '@/types';
 	import { useDeviceStore } from '../../store/device';
@@ -138,12 +137,18 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { SOUND_CATEGORIES } from '@/constants/categories';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
-	import Button from '../toolbar/Button.vue';
 	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
 	import ListItem from '../browser/ListItem.vue';
+
+	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [c.name.toLowerCase().replace(/ /g, '_'), c.name]));
+	function formatCategory(cat?: string): string {
+		if (!cat) return '';
+		return categoryByKey.get(cat) ?? cat;
+	}
 
 	defineProps<{
 		isActive: boolean;
@@ -175,10 +180,10 @@
 		{ label: 'Performances', value: 'performances' },
 	];
 
-	/* Group a flat SynthPatch list by bank number, always including all 32 banks */
-	function groupByBank(list: SynthPatch[]): { bank: number; patches: SynthPatch[] }[] {
+	/* Group a flat SynthPatch list by bank number */
+	function groupByBank(list: SynthPatch[], maxBanks = 32): { bank: number; patches: SynthPatch[] }[] {
 		const map = new Map<number, SynthPatch[]>();
-		for (let i = 1; i <= 32; i++) map.set(i, []);
+		for (let i = 1; i <= maxBanks; i++) map.set(i, []);
 		for (const p of list) {
 			const arr = map.get(p.bank);
 			if (arr) arr.push(p);
@@ -207,11 +212,12 @@
 	});
 
 	const patchGroups = computed(() => groupByBank(filteredPatches.value));
-	const perfGroups = computed(() => groupByBank(filteredPerformances.value));
+	const perfGroups = computed(() => groupByBank(filteredPerformances.value, 8));
 
 	const currentGroups = computed(() => (browser.view === 'patches' ? patchGroups.value : perfGroups.value));
 
 	const allBanksCollapsed = computed(() => currentGroups.value.every((g) => browser.isBankCollapsed(g.bank)));
+	const allBanksExpanded = computed(() => currentGroups.value.every((g) => !browser.isBankCollapsed(g.bank)));
 
 	function toggleAllBanks() {
 		const collapse = !allBanksCollapsed.value;
@@ -224,11 +230,13 @@
 		const slotIdx = (['A', 'B', 'C', 'D'].indexOf(uiStore.slotInFocus) as 0 | 1 | 2 | 3) ?? 0;
 		const patchName =
 			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
-		openCtx(e, [
-			{ label: `Store "${patchName}" here`, action: () => browser.storePatch(slotIdx, p.bank, p.location, kind, patchName) },
-			{ type: 'separator' },
-			{ label: 'Delete (clear this location)', action: () => browser.clearPatch(p.bank, p.location, kind) },
-		]);
+		const items: ContextMenuItem[] = [];
+		if (kind !== 'performance' || device.device?.mode === 'Performance') {
+			items.push({ label: `Store "${patchName}" here`, action: () => browser.storePatch(slotIdx, p.bank, p.location, kind, patchName) });
+			items.push({ type: 'separator' });
+		}
+		items.push({ label: 'Delete (clear this location)', action: () => browser.clearPatch(p.bank, p.location, kind) });
+		openCtx(e, items);
 	}
 
 	function onBankCtx(e: MouseEvent, bank: number) {
@@ -238,34 +246,34 @@
 			kind === 'performance' ? (device.device?.performance?.name ?? '(perf)') : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
 
 		const list = kind === 'performance' ? browser.synthPerformances : browser.synthPatches;
-		const occupied = new Set(list.filter((p) => p.bank === bank).map((p) => p.location));
-		const emptyLocs: number[] = [];
-		for (let loc = 1; loc <= 127 && emptyLocs.length < 20; loc++) {
-			if (!occupied.has(loc)) emptyLocs.push(loc);
+		const byLoc = new Map(list.filter((p) => p.bank === bank).map((p) => [p.location, p]));
+		const storeChildren: ContextMenuItem[] = [];
+		for (let loc = 1; loc <= 128; loc++) {
+			const existing = byLoc.get(loc);
+			storeChildren.push({
+				label: `${bank}-${loc}  ${existing ? existing.name : '(empty)'}`,
+				disabled: existing ? false : undefined,
+				action: () => browser.storePatch(slotIdx, bank, loc, kind, patchName),
+			});
 		}
-		const totalEmpty = 127 - occupied.size;
 
-		const storeChildren: ContextMenuItem[] = emptyLocs.map((loc) => ({
-			label: `Location ${loc}`,
-			action: () => browser.storePatch(slotIdx, bank, loc, kind, patchName),
-		}));
-		if (totalEmpty > emptyLocs.length) storeChildren.push({ type: 'item', label: `… ${totalEmpty - emptyLocs.length} more`, disabled: true });
-		if (storeChildren.length === 0) storeChildren.push({ type: 'item', label: 'Bank is full', disabled: true });
-
+		const chk = (mode: string) => (settings.browserSortMode === mode ? '✓ ' : '  ');
 		const sortItems: ContextMenuItem[] = [
-			{ label: 'By location', action: () => (settings.browserSortMode = 'location') },
-			{ label: 'By name A–Z', action: () => (settings.browserSortMode = 'name') },
-			{ label: 'By name Z–A', action: () => (settings.browserSortMode = 'name-desc') },
-			{ label: 'By category', disabled: kind !== 'patch', action: () => (settings.browserSortMode = 'category') },
+			{ label: `${chk('location')}By location`, action: () => (settings.browserSortMode = 'location') },
+			{ label: `${chk('name')}By name A–Z`, action: () => (settings.browserSortMode = 'name') },
+			{ label: `${chk('name-desc')}By name Z–A`, action: () => (settings.browserSortMode = 'name-desc') },
+			{ label: `${chk('category')}By category`, disabled: kind !== 'patch', action: () => (settings.browserSortMode = 'category') },
 		];
 
-		openCtx(e, [
-			{ label: `Store "${patchName}" in bank ${bank}`, children: storeChildren },
-			{ type: 'separator' },
-			{ label: 'Clear all in bank', action: () => browser.clearBank(bank, kind) },
-			{ type: 'separator' },
-			{ label: 'Sort', children: sortItems },
-		]);
+		const items: ContextMenuItem[] = [];
+		if (kind !== 'performance' || device.device?.mode === 'Performance') {
+			items.push({ label: `Store "${patchName}"`, children: storeChildren });
+			items.push({ type: 'separator' });
+		}
+		items.push({ label: 'Clear all in bank', action: () => browser.clearBank(bank, kind) });
+		items.push({ type: 'separator' });
+		items.push({ label: 'Sort', children: sortItems });
+		openCtx(e, items);
 	}
 
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
@@ -279,6 +287,19 @@
 	watch(searchQuery, () => {
 		resetNavIndex();
 	});
+
+	onMounted(() => {
+		browser.collapsedBanks = [...settings.browserCollapsedBanks];
+		onViewChange(settings.browserView);
+	});
+
+	watch(
+		() => browser.collapsedBanks,
+		(v) => {
+			settings.browserCollapsedBanks = [...v];
+		},
+		{ deep: true },
+	);
 
 	const filteredDiskDirs = computed(() => browser.diskEntries.filter((e) => e.isDir));
 	const filteredDiskFiles = computed(() => {
@@ -303,6 +324,7 @@
 	async function onViewChange(view: string | number | null | (string | number)[]) {
 		const v = view as 'patches' | 'performances' | 'disk';
 		browser.view = v;
+		settings.browserView = v;
 		searchQuery.value = '';
 		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && device.connected) {
 			await browser.loadSynthList();

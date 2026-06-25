@@ -1,57 +1,67 @@
 <template>
-	<div class="h-full overflow-y-auto overflow-x-hidden p-2 bg-surface-0">
-		<SearchInput
-			class="mb-3"
-			ref="searchRef"
-			v-model="searchQuery"
-			:isActive="isActive"
-			placeholder="Search modules... (/)"
-			@up="navigate(-1)"
-			@down="navigate(1)"
-			@enter="handleEnter"
-		/>
-		<div class="flex justify-between items-center">
-			<div data-testid="module-count" class="text-content-muted py-1 px-1">{{ totalModuleCount }} modules</div>
-			<Button variant="toggle" size="xs" @click="toggleAllCategories">{{ allExpanded ? 'Collapse All' : 'Expand All' }}</Button>
-		</div>
-		<div v-for="category in categories" :key="category" class="mb-2">
-			<div v-if="categoryMatchesSearch(category)">
-				<div
-					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
-					@click="toggleCategory(category)"
+	<div class="h-full flex flex-col overflow-hidden bg-surface-0">
+		<div class="px-2 pt-2 pb-1 shrink-0">
+			<div class="flex items-center gap-1 mb-1">
+				<SearchInput
+					ref="searchRef"
+					v-model="searchQuery"
+					:isActive="isActive"
+					placeholder="Search modules... (/)"
+					class="flex-1 min-w-0"
+					@up="navigate(-1)"
+					@down="navigate(1)"
+					@enter="handleEnter"
+				/>
+				<button
+					class="shrink-0 text-content-secondary hover:text-white px-1 cursor-pointer"
+					:title="allExpanded ? 'Collapse All' : 'Expand All'"
+					@click="toggleAllCategories"
 				>
-					<span class="text-xs w-3 text-content-muted">{{ isExpanded(category) ? '▼' : '▶' }}</span>
-					{{ category }}
-					<span class="font-normal text-content-muted text-xs">({{ getModulesByCategory(category).length }})</span>
-				</div>
+					{{ allExpanded ? '▼' : '▶' }}
+				</button>
+			</div>
+			<div data-testid="module-count" class="text-content-muted py-0.5 px-1 text-xs">{{ totalModuleCount }} modules</div>
+		</div>
+		<div class="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
+			<div v-for="category in categories" :key="category" class="mb-2">
+				<div v-if="categoryMatchesSearch(category)">
+					<div
+						class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
+						@click="toggleCategory(category)"
+					>
+						<span class="text-xs w-3 text-content-muted">{{ isExpanded(category) ? '▼' : '▶' }}</span>
+						{{ category }}
+						<span class="font-normal text-content-muted text-xs">({{ getModulesByCategory(category).length }})</span>
+					</div>
 
-				<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
-					<template v-for="module in getModulesByCategory(category)" :key="module.id">
-						<div
-							:class="[
-								'w-64 bg-surface-3 rounded overflow-visible shadow',
-								module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '',
-							]"
-							:style="{
-								height: getModuleHeight(module) + 'px',
-								cursor: 'grab',
-							}"
-							:data-testid="`module-item-${module.short}`"
-							draggable="true"
-							@dragstart="(e) => handleModuleDragStart(e, module.id)"
-							@dragend="handleModuleDragEnd"
-							@click="handleModuleClick(module.id)"
-						>
-							<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
-								<Module :instance="getModuleInstance(module.id)" />
-							</svg>
-						</div>
-						<div
-							v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
-							class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
-							v-html="ui.helpAllModules ? helpCache.get(module.id) || '' : helpHtml"
-						/>
-					</template>
+					<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
+						<template v-for="module in getModulesByCategory(category)" :key="module.id">
+							<div
+								:class="[
+									'w-64 bg-surface-3 rounded overflow-visible shadow',
+									module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '',
+								]"
+								:style="{
+									height: getModuleHeight(module) + 'px',
+									cursor: 'grab',
+								}"
+								:data-testid="`module-item-${module.short}`"
+								draggable="true"
+								@dragstart="(e) => handleModuleDragStart(e, module.id)"
+								@dragend="handleModuleDragEnd"
+								@click="handleModuleClick(module.id)"
+							>
+								<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
+									<Module :instance="getModuleInstance(module.id)" />
+								</svg>
+							</div>
+							<div
+								v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
+								class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
+								v-html="ui.helpAllModules ? helpCache.get(module.id) || '' : helpHtml"
+							/>
+						</template>
+					</div>
 				</div>
 			</div>
 		</div>
@@ -62,7 +72,6 @@
 	import { ref, reactive, computed, watch } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
-	import Button from '../toolbar/Button.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';
