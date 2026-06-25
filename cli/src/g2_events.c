@@ -102,6 +102,52 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             char *s = cJSON_PrintUnformatted(root);
             if (s) { printf("%s\n", s); fflush(stdout); free(s); }
             cJSON_Delete(root);
+        } else if (bsubCmd == 0x13) {
+            /* R_LIST_NAMES embeds R_ADD_NAMES (0x16) with bank/location/name.
+             * bulk offsets: [4]=hdr0, [5]=hdr1, [6]=0x16, [7]=unk, [8]=pft, [9..]=sub-cmds+name */
+            int bank = -1, loc = -1, pft = -1, cat = -1;
+            char name[17] = {0};
+            int ni = 0;
+            if (dataEnd >= 10 && bulk[6] == 0x16) {
+                pft = bulk[8];
+                int i = 9;
+                while (i < dataEnd) {
+                    uint8_t b = bulk[i++];
+                    if (b == 0x03 && i + 1 < dataEnd) {
+                        bank = bulk[i++] + 1; loc = bulk[i++] + 1;
+                    } else if (b == 0x01 && i < dataEnd) {
+                        loc = bulk[i++] + 1;
+                    } else if (b == 0x00) {
+                        if (i < dataEnd) cat = bulk[i++];
+                        break;
+                    } else if (b == 0x02 || b == 0x04 || b == 0x05) {
+                        break;
+                    } else if (b >= 0x20 && ni < 16) {
+                        name[ni++] = (char)b;
+                        if (ni == 16) { if (i < dataEnd) cat = bulk[i++]; break; }
+                    }
+                }
+            }
+            static const char *g2cats[16] = {
+                "no_cat","acoustic","sequencer","bass","classic","drum",
+                "fantasy","fx","lead","organ","pad","piano","synth",
+                "audio_in","user_1","user_2"
+            };
+            if (bank >= 0 && loc >= 0 && pft >= 0) {
+                printf("{\"type\":\"patch_names_updated\",\"kind\":\"%s\",\"bank\":%d,\"location\":%d,\"name\":\"",
+                       pft == 0 ? "patch" : "performance", bank, loc);
+                for (int j = 0; j < ni; j++) {
+                    if (name[j] == '"' || name[j] == '\\') fputc('\\', stdout);
+                    fputc(name[j], stdout);
+                }
+                if (cat >= 0 && cat < 16)
+                    printf("\",\"category\":\"%s\"}\n", g2cats[cat]);
+                else
+                    printf("\"}\n");
+            } else {
+                printf("{\"type\":\"patch_names_updated\"}\n"); /* fallback if parse fails */
+            }
+            fflush(stdout);
         } else {
             printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
             for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }

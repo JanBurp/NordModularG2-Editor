@@ -73,9 +73,9 @@ export const useBrowserStore = defineStore('browser', {
 			if (idx >= 0) list.splice(idx, 1);
 		},
 
-		upsertPatch(bank: number, location: number, kind: 'patch' | 'performance', name: string): void {
+		upsertPatch(bank: number, location: number, kind: 'patch' | 'performance', name: string, category?: string): void {
 			const list = kind === 'performance' ? this.synthPerformances : this.synthPatches;
-			const entry: SynthPatch = { bank, location, name };
+			const entry: SynthPatch = { bank, location, name, ...(category !== undefined && { category }) };
 			const idx = list.findIndex((p) => p.bank === bank && p.location === location);
 			if (idx >= 0) list.splice(idx, 1, entry);
 			else list.push(entry);
