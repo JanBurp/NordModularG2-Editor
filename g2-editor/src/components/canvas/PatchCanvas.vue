@@ -11,6 +11,7 @@
 			font-size="9"
 			:width="canvasWidth"
 			:height="canvasHeight"
+			style="min-width: 100%"
 			xmlns="http://www.w3.org/2000/svg"
 			@mousedown="handleCanvasMousedown"
 			@mousemove="handleSvgMouseMove"
@@ -146,13 +147,12 @@
 	);
 
 	const canvasWidth = computed(() => {
-		if (props.modules.length === 0) return 1280;
 		let maxX = 0;
 		(props.modules as any[]).forEach((m: any) => {
 			const mx = (m.horiz + 1) * MODULE_WIDTH;
 			if (mx > maxX) maxX = mx;
 		});
-		return Math.max(maxX + 100, 1280);
+		return maxX + 100;
 	});
 
 	const canvasHeight = computed(() => {
