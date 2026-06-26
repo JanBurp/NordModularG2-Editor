@@ -20,7 +20,7 @@
 
 	const nameWidth = computed(() => {
 		const rect = text.value?.getBoundingClientRect(); //  .getComputedTextLength();
-		return Number(rect?.width) + 6;
+		return (rect?.width ?? 0) + 6;
 	});
 
 	const nameHeight = computed(() => {

@@ -25,7 +25,7 @@
 
 			<Module
 				v-for="mod in props.modules as any[]"
-				:key="mod.index + '-' + mod.uname"
+				:key="mod.index"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
 				:connected-inputs="connectedJacksMap.get(mod.index)?.inputs"
