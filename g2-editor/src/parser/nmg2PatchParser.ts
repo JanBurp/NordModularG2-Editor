@@ -232,8 +232,8 @@ class G2Parser {
 			while (bytesRemaining > 0) {
 				const isString = this.getBits(8);
 				const paramLen = this.getBits(8);
-				const paramIndex = this.getBits(8);
-				bytesRemaining -= 3;
+				const paramIndex = paramLen > 0 ? this.getBits(8) : 0;
+				bytesRemaining -= paramLen > 0 ? 3 : 2;
 				const entry: ParamLabel = {
 					paramIndex,
 					isString: isString === 1,
@@ -241,7 +241,10 @@ class G2Parser {
 					labels: [],
 				};
 				if (paramLen - 1 > 0) {
-					const labelCount = Math.floor((paramLen - 1) / 7);
+					const labelCount = Math.min(
+						Math.floor((paramLen - 1) / 7),
+						Math.floor(bytesRemaining / 7), // clamp: guards against corrupt paramLen
+					);
 					for (let j = 0; j < labelCount; j++) {
 						let str = '';
 						for (let k = 0; k < 7; k++) {
