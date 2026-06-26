@@ -64,7 +64,10 @@
 	function onKeydown(e: KeyboardEvent) {
 		if (!props.modelValue) return;
 		if (e.key === 'Escape') onCancel();
-		if (e.key === 'Enter') onConfirm();
+		if (e.key === 'Enter') {
+			(document.activeElement as HTMLElement)?.blur();
+			onConfirm();
+		}
 	}
 
 	onMounted(() => window.addEventListener('keydown', onKeydown));
