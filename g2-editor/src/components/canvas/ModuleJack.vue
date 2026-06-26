@@ -42,13 +42,15 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { JACK_COLORS } from '../../constants';
+	import { JACK_COLORS, getEffectiveJackColor } from '../../constants';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCableColorItems } from '../../utils/colorSwatches';
+	import { computed } from 'vue';
 
 	const props = defineProps<{
 		name: string;
 		colour: string;
+		uprated?: boolean;
 		x: number;
 		y: number;
 		type: 'input' | 'output';
@@ -80,7 +82,8 @@
 
 	const { open: openContextMenu } = useContextMenu();
 
-	const jackColor = JACK_COLORS[props.colour] || props.colour;
+	const effectiveColour = computed(() => getEffectiveJackColor(props.colour, props.uprated ?? false));
+	const jackColor = computed(() => JACK_COLORS[effectiveColour.value] || effectiveColour.value);
 
 	function onContextMenu(e: MouseEvent) {
 		if (!props.connected) return;
@@ -105,7 +108,7 @@
 			moduleIndex: props.moduleIndex,
 			connectorIndex: props.connectorIndex,
 			type: props.type,
-			colour: props.colour,
+			colour: effectiveColour.value,
 		});
 	}
 
@@ -115,7 +118,7 @@
 			moduleIndex: props.moduleIndex,
 			connectorIndex: props.connectorIndex,
 			type: props.type,
-			colour: props.colour,
+			colour: effectiveColour.value,
 		});
 	}
 </script>

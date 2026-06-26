@@ -11,6 +11,8 @@ export {
 	CABLE_SVG_COLORS,
 	DEFAULT_CABLE_VISIBILITY,
 	JACK_COLORS,
+	getEffectiveJackColor,
+	jackColorNameToIndex,
 	type CableColor,
 	type CableColorName,
 } from './cableColors';

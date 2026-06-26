@@ -64,6 +64,28 @@ export const DEFAULT_CABLE_VISIBILITY: Record<CableColorName, boolean> = {
 };
 
 /**
+ * Returns the effective jack colour accounting for module uprate.
+ * "purple" in module defs is a mod-rate signal identical to "blue" for signal-rate purposes.
+ * When uprated: blue/purple → red, yellow → orange.
+ */
+export function getEffectiveJackColor(defaultColour: string, uprated: boolean): string {
+	const base = defaultColour === 'purple' ? 'blue' : defaultColour;
+	if (!uprated) return base;
+	if (base === 'blue') return 'red';
+	if (base === 'yellow') return 'orange';
+	return base;
+}
+
+/**
+ * Maps a colour name (e.g. "red", "blue") to its numeric cable index (0-6).
+ * Falls back to 1 (blue) for unknown names.
+ */
+export function jackColorNameToIndex(name: string): number {
+	const entry = Object.entries(CABLE_COLOR_INDEX_MAP).find(([, n]) => n === name);
+	return entry ? Number(entry[0]) : 1;
+}
+
+/**
  * Jack colors for input/output connectors
  */
 export const JACK_COLORS: Record<string, string> = {

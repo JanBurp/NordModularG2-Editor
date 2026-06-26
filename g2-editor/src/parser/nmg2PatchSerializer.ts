@@ -93,7 +93,7 @@ function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
 		bw.write(3, c.colour);
 		bw.write(8, c.smod);
 		bw.write(6, c.scon);
-		bw.write(1, c.dir);
+		bw.write(1, c.dir ?? 1);
 		bw.write(8, c.dmod);
 		bw.write(6, c.dcon);
 	}

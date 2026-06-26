@@ -1,6 +1,8 @@
 import type { MidiCCAssignment, ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
-import { findConnectedInputCables, findGroupOutputColor } from '../parser/cableGraph';
+import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables } from '../parser/cableGraph';
+import { getModule } from '../renderer/nmg2mods';
+import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 
 import type { Cable } from '@/renderer/cableRenderer';
@@ -255,6 +257,7 @@ export const useSlotsStore = defineStore('slots', {
 				area: 1,
 				variation: patch.description?.variation ?? 0,
 			};
+			this._autoRecolorOnLoad(patch);
 			useHistoryStore().clearHistory(slot);
 			return { name, rawHex, patch };
 		},
@@ -797,6 +800,30 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// Recomputes uprate flags on all modules in the area and recolors auto-colored cables.
+		// Called after any cable topology change so the editor stays in sync without hardware confirmation.
+		_syncUprateAndColors(patch: Patch, areaIdx: 0 | 1): void {
+			const area = patch.areas[areaIdx];
+			const areaModDefs = (area.modules ?? [])
+				.map((m) => ({ index: m.index, def: getModule(m.type) as ModuleDefinition | undefined }))
+				.filter((m): m is { index: number; def: ModuleDefinition } => m.def !== undefined);
+			const uprateSet = computeUprateSet(area.cableList ?? [], areaModDefs);
+			for (const m of area.modules ?? []) {
+				m.uprate = uprateSet.has(m.index) ? 1 : 0;
+			}
+			const modDefMap = new Map(areaModDefs.map((m) => [m.index, m.def]));
+			patch.areas[areaIdx].cableList = autoRecolorCables(area.cableList ?? [], uprateSet, modDefMap) as unknown as typeof patch.areas[0]['cableList'];
+		},
+
+		// On load: recolor each area whose cables have no userColour (i.e. pre-feature patches).
+		_autoRecolorOnLoad(patch: Patch): void {
+			for (const areaIdx of [0, 1] as const) {
+				const cables = patch.areas[areaIdx]?.cableList ?? [];
+				if (cables.some((c) => c.userColour !== undefined)) continue;
+				this._syncUprateAndColors(patch, areaIdx);
+			}
+		},
+
 		async addCable(
 			fromMod: number,
 			fromConType: number,
@@ -896,6 +923,9 @@ export const useSlotsStore = defineStore('slots', {
 				await window.cli.run(mainCmd);
 			}
 
+			// Recompute signal-rate uprate and recolor cables that changed rate (local display only).
+			this._syncUprateAndColors(patch, areaIdx);
+
 			if (shouldRecord) {
 				const postCableList = patch.areas[areaIdx].cableList ?? [];
 				// Added cable = in post but not in pre
@@ -958,6 +988,8 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							await window.cli.runBatch(restoreCmds);
 						}
+						// Re-sync uprate after undo so module flags and display are correct.
+						this._syncUprateAndColors(patch, areaIdx);
 					},
 					redo: async () => {
 						await this.addCable(fromMod, fromConType, fromCon, toMod, toConType, toCon, area, color);
@@ -1074,6 +1106,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[slot].templateRawHex = rawHex;
 			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
+			this._autoRecolorOnLoad(patch);
 			useHistoryStore().clearHistory(slot);
 		},
 
@@ -1090,6 +1123,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].rawHex = null;
 				this.slots[labels[i]].templateRawHex = null;
 				this.slotFilePaths[labels[i]] = '';
+				this._autoRecolorOnLoad(patches[i]);
 				hist.clearHistory(labels[i]);
 			}
 			this.performanceName = name;
@@ -1527,7 +1561,8 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
 							const orig = prevColorMap.find((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon);
-							return orig ? { ...c, colour: orig.colour } : c;
+							// Restore both colour and userColour (orig was captured before the user-set)
+							return orig ? { ...c, colour: orig.colour, userColour: orig.userColour } : c;
 						});
 						this.slots[slot].rawHex = null;
 						await window.cli.runBatch(
@@ -1551,7 +1586,8 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 
-			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color } : c));
+			// userColour marks this as an explicit user override so auto-recolor skips it.
+			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color, userColour: color } : c));
 			this.slots[slot].rawHex = null;
 			await window.cli.runBatch(
 				matching.map((c) => [
@@ -1621,6 +1657,7 @@ export const useSlotsStore = defineStore('slots', {
 					String(c.dcon),
 				]),
 			);
+			this._syncUprateAndColors(patch, areaIdx);
 		},
 
 		updateResources(slot: SlotLabel, data: number[]): void {
@@ -1721,6 +1758,8 @@ export const useSlotsStore = defineStore('slots', {
 					this.slots[slot].rawHex = null;
 					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				}
+
+				this._syncUprateAndColors(patch, areaIdx);
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';

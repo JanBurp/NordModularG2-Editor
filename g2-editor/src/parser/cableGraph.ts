@@ -1,4 +1,6 @@
 import type { Cable } from '@/renderer/cableRenderer';
+import type { ModuleDefinition } from '@/types/module';
+import { getEffectiveJackColor, jackColorNameToIndex } from '@/constants/cableColors';
 
 // BFS over dir=0 (input-to-input) cables to find all cables transitively connected to a given input jack
 export function findConnectedInputCables(cableList: Cable[], startMod: number, startCon: number): Cable[] {
@@ -46,6 +48,61 @@ export function isNestDrivenByOutput(cableList: Cable[], startMod: number, start
 		}
 	}
 	return false;
+}
+
+// Computes which modules are uprated (audio-rate promoted) given the current cable topology.
+// A module is uprated when any of its blue/yellow/purple inputs receives a red/orange signal.
+// The red/orange can come from a static-red output OR from a blue/purple output whose module is already uprated.
+// Iterates to fixed-point to handle cascading uprate.
+export function computeUprateSet(cables: Cable[], modules: Array<{ index: number; def: ModuleDefinition }>): Set<number> {
+	const uprated = new Set<number>();
+	const modDefs = new Map(modules.map((m) => [m.index, m.def]));
+	let changed = true;
+	while (changed) {
+		changed = false;
+		for (const cable of cables) {
+			if ((cable.dir ?? 1) !== 1) continue;
+			const srcDef = modDefs.get(cable.smod);
+			const dstDef = modDefs.get(cable.dmod);
+			if (!srcDef || !dstDef) continue;
+			const srcOutput = srcDef.outputs?.[cable.scon];
+			const dstInput = dstDef.inputs?.[cable.dcon];
+			if (!srcOutput || !dstInput) continue;
+			const effectiveSrc = getEffectiveJackColor(srcOutput.colour, uprated.has(cable.smod));
+			// Destination is uprate-eligible if its base colour is blue or yellow (purple normalised to blue)
+			const dstBase = dstInput.colour === 'purple' ? 'blue' : dstInput.colour;
+			if ((effectiveSrc === 'red' || effectiveSrc === 'orange') && (dstBase === 'blue' || dstBase === 'yellow')) {
+				if (!uprated.has(cable.dmod)) {
+					uprated.add(cable.dmod);
+					changed = true;
+				}
+			}
+		}
+	}
+	return uprated;
+}
+
+// Recolors all auto-colored cables (those without userColour) to match the effective signal rate.
+// dir=1 cables get the effective colour of their source output jack.
+// dir=0 cables get the colour of the output driving their input group (or white if none).
+export function autoRecolorCables(cables: Cable[], uprateSet: Set<number>, modDefs: Map<number, ModuleDefinition>): Cable[] {
+	const pass1 = cables.map((cable) => {
+		if (cable.userColour !== undefined) return cable;
+		if ((cable.dir ?? 1) !== 1) return cable;
+		const srcDef = modDefs.get(cable.smod);
+		const srcOutput = srcDef?.outputs?.[cable.scon];
+		if (!srcOutput) return cable;
+		const effectiveColour = getEffectiveJackColor(srcOutput.colour, uprateSet.has(cable.smod));
+		const newIndex = jackColorNameToIndex(effectiveColour);
+		return newIndex !== cable.colour ? { ...cable, colour: newIndex } : cable;
+	});
+
+	return pass1.map((cable) => {
+		if (cable.userColour !== undefined) return cable;
+		if ((cable.dir ?? 1) !== 0) return cable;
+		const groupColor = findGroupOutputColor(pass1, cable.smod ?? 0, cable.scon ?? 0, cable.dmod ?? 0, cable.dcon ?? 0);
+		return groupColor !== cable.colour ? { ...cable, colour: groupColor } : cable;
+	});
 }
 
 // Returns the colour of any output already driving the combined input group of (smod,scon) and (dmod,dcon).

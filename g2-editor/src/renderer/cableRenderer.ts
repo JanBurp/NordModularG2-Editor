@@ -5,6 +5,7 @@ import { svgPath } from './svgUtils';
 
 export interface Cable {
 	colour: number;
+	userColour?: number; // set only when user explicitly overrides via context menu
 	smod: number;
 	scon: number;
 	dmod: number;

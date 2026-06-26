@@ -2,9 +2,10 @@ import type { ModuleInstance } from './module';
 
 export interface Cable {
 	colour: number;
+	userColour?: number; // set only when user explicitly overrides via context menu
 	smod: number;
 	scon: number;
-	dir: number;
+	dir?: number;
 	dmod: number;
 	dcon: number;
 	[key: string]: unknown;
