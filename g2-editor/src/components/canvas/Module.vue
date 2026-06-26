@@ -97,7 +97,7 @@
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
 					@change="onParamChange"
-					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, ...info })"
+					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, labelIndex: 0, ...info })"
 					@param-context-menu="onParamContextMenu"
 				/>
 				<ModuleKnobSpin
@@ -215,7 +215,7 @@
 		moduleColorChange: [moduleIndex: number, colourId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
-		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
+		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string; labelIndex: number }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
@@ -369,7 +369,7 @@
 		slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
 	}
 
-	function onParamContextMenu(paramIndex: number, event: MouseEvent) {
+	function onParamContextMenu(paramIndex: number, event: MouseEvent, labelIndex = 0) {
 		const param = moduleDef.value?.params?.[paramIndex];
 		const slot = uiStore.slotInFocus;
 		const location = props.areaLabel === 'va' ? 1 : 0;
@@ -404,7 +404,7 @@
 				const label = getParamLabel(paramIndex);
 				items.push({
 					label: 'Rename label',
-					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[0] ?? '' }),
+					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[labelIndex] ?? '', labelIndex }),
 				});
 			}
 		} else {

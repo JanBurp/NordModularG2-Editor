@@ -14,6 +14,7 @@ export function useModuleLabelDialog() {
 	const editingParamLabel = ref('');
 	const editingParamLabelModuleId = ref<number | null>(null);
 	const editingParamLabelParamIndex = ref<number | null>(null);
+	const editingParamLabelLabelIndex = ref(0);
 
 	function handleModuleLabelEdit({ moduleIndex, currentLabel }: { moduleIndex: number; currentLabel: string }): void {
 		editingModuleId.value = moduleIndex;
@@ -28,9 +29,10 @@ export function useModuleLabelDialog() {
 		showLabelDialog.value = false;
 	}
 
-	function handleParamLabelEdit({ moduleIndex, paramIndex, currentLabel }: { moduleIndex: number; paramIndex: number; currentLabel: string }): void {
+	function handleParamLabelEdit({ moduleIndex, paramIndex, currentLabel, labelIndex = 0 }: { moduleIndex: number; paramIndex: number; currentLabel: string; labelIndex?: number }): void {
 		editingParamLabelModuleId.value = moduleIndex;
 		editingParamLabelParamIndex.value = paramIndex;
+		editingParamLabelLabelIndex.value = labelIndex;
 		editingParamLabel.value = currentLabel;
 		showParamLabelDialog.value = true;
 	}
@@ -38,7 +40,7 @@ export function useModuleLabelDialog() {
 	async function confirmParamLabel(): Promise<void> {
 		if (editingParamLabelModuleId.value === null || editingParamLabelParamIndex.value === null) return;
 		const area = uiStore.area === 1 ? 'voice' : 'fx';
-		await slotsStore.setParamLabel(editingParamLabelModuleId.value, editingParamLabelParamIndex.value, editingParamLabel.value, area);
+		await slotsStore.setParamLabel(editingParamLabelModuleId.value, editingParamLabelParamIndex.value, editingParamLabel.value, area, editingParamLabelLabelIndex.value);
 		showParamLabelDialog.value = false;
 	}
 

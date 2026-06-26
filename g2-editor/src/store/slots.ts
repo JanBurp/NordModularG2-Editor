@@ -1473,7 +1473,7 @@ export const useSlotsStore = defineStore('slots', {
 			]);
 		},
 
-		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx'): Promise<void> {
+		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx', labelIndex = 0): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
@@ -1483,13 +1483,13 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 				const existingLabel = mod?.paramLabels?.find((pl) => pl.paramIndex === paramIndex);
-				const prevLabel = existingLabel?.labels?.[0] ?? '';
+				const prevLabel = existingLabel?.labels?.[labelIndex] ?? '';
 				hist.record(slot, {
 					undo: async () => {
-						await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area);
+						await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area, labelIndex);
 					},
 					redo: async () => {
-						await this.setParamLabel(moduleIndex, paramIndex, label, area);
+						await this.setParamLabel(moduleIndex, paramIndex, label, area, labelIndex);
 					},
 				});
 			}
@@ -1499,13 +1499,16 @@ export const useSlotsStore = defineStore('slots', {
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
 			if (!entry) {
-				entry = { paramIndex, isString: false, paramLen: 7, labels: [label] };
+				const labels = Array<string>(labelIndex + 1).fill('');
+				labels[labelIndex] = label;
+				entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };
 				mod.paramLabels.push(entry);
 			} else {
-				entry.labels[0] = label;
+				while (entry.labels.length <= labelIndex) entry.labels.push('');
+				entry.labels[labelIndex] = label;
 			}
 			this.slots[slot].rawHex = null;
-			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), '0', label]);
+			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels]);
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

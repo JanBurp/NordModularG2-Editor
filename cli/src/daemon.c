@@ -250,9 +250,12 @@ static int execute_seq(cJSON *args) {
             g2_build_set_module_label_op(op, p, s_loc, arg_i(sub,3), arg_s(sub,4));
             n_ops++;
 
-        } else if (strcmp(scmd, "set-param-label") == 0 && sn >= 7) {
+        } else if (strcmp(scmd, "set-param-label") == 0 && sn >= 6) {
+            int num_labels = sn - 5;
+            const char *labels[128];
+            for (int li = 0; li < num_labels && li < 128; li++) labels[li] = arg_s(sub, 5 + li);
             g2_build_set_param_label_op(op, p, s_loc,
-                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_s(sub,6));
+                arg_i(sub, 3), arg_i(sub, 4), num_labels < 128 ? num_labels : 128, labels);
             n_ops++;
 
         } else if (strcmp(scmd, "set-param") == 0 && sn >= 7) {
@@ -435,11 +438,16 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_module_label(slot, loc, arg_i(args, 2), arg_s(args, 3));
 
-	} else if (strcmp(cmd, "set-param-label") == 0 && n >= 6) {
+	} else if (strcmp(cmd, "set-param-label") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
-		else ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4), arg_s(args, 5));
+		else {
+			int num_labels = n - 4;
+			const char *labels[128];
+			for (int li = 0; li < num_labels && li < 128; li++) labels[li] = arg_s(args, 4 + li);
+			ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), num_labels < 128 ? num_labels : 128, labels);
+		}
 
 	} else if (strcmp(cmd, "set-param") == 0 && n >= 6) {
 		int slot = parse_slot(arg_s(args, 0));

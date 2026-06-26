@@ -1020,20 +1020,19 @@ void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
 
 void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
                                   int loc, int module_id, int param_idx,
-                                  int label_idx, const char *label) {
-    int num_labels=label_idx+1;
-    int payload_len=6+7*num_labels;
-    int idx=0;
-    buf[idx++]=(uint8_t)loc; buf[idx++]=(uint8_t)module_id;
-    buf[idx++]=(uint8_t)(3+7*num_labels); buf[idx++]=1;
-    buf[idx++]=(uint8_t)(1+7*num_labels); buf[idx++]=(uint8_t)param_idx;
-    for (int i=0; i<label_idx; i++) for (int j=0; j<7; j++) buf[idx++]=0;
-    if (label) {
-        size_t llen=strlen(label); if (llen>7) llen=7;
-        for (int j=0; j<7; j++) buf[idx++]=(j<(int)llen)?(uint8_t)label[j]:0;
+                                  int num_labels, const char **labels) {
+    int payload_len = 6 + 7 * num_labels;
+    int idx = 0;
+    buf[idx++] = (uint8_t)loc; buf[idx++] = (uint8_t)module_id;
+    buf[idx++] = (uint8_t)(3 + 7 * num_labels); buf[idx++] = 1;
+    buf[idx++] = (uint8_t)(1 + 7 * num_labels); buf[idx++] = (uint8_t)param_idx;
+    for (int i = 0; i < num_labels; i++) {
+        const char *lbl = (labels && labels[i]) ? labels[i] : "";
+        size_t llen = strlen(lbl); if (llen > 7) llen = 7;
+        for (int j = 0; j < 7; j++) buf[idx++] = (j < (int)llen) ? (uint8_t)lbl[j] : 0;
     }
-    if (idx<payload_len) memset(buf+idx, 0, (size_t)(payload_len-idx));
-    op->cmd=0x42; op->payload=buf; op->len=payload_len;
+    if (idx < payload_len) memset(buf + idx, 0, (size_t)(payload_len - idx));
+    op->cmd = 0x42; op->payload = buf; op->len = payload_len;
 }
 
 /* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
@@ -1232,19 +1231,18 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
     return G2_OK;
 }
 
-int g2_set_param_label(int slot, int location, int module_id, int param_idx, int label_idx, const char *label) {
+int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels) {
 
-    if (slot < 0 || slot > 3)         { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1) { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
-    if (label_idx < 0 || label_idx > 127) { g2_err("set-param-label: label_idx out of range\n"); return G2_ERR_INVALID_PARAM; }
-    if (!label || !*label)             { g2_err("set-param-label: label must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    if (slot < 0 || slot > 3)            { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)    { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (num_labels <= 0 || num_labels > 128) { g2_err("set-param-label: num_labels out of range\n"); return G2_ERR_INVALID_PARAM; }
 
     if (ensure_connected(0) < 0) { g2_err("set-param-label: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
     uint8_t buf[6 + 7 * 128]; G2Op op;
-    g2_build_set_param_label_op(&op, buf, location, module_id, param_idx, label_idx, label);
+    g2_build_set_param_label_op(&op, buf, location, module_id, param_idx, num_labels, labels);
     if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("set-param-label: failed to send\n");
         return G2_ERR_SEND;

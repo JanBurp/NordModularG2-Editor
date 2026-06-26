@@ -1,5 +1,5 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)">
+	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, contextMenuLabelIndex)">
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
@@ -42,6 +42,7 @@
 				class="switch-bitmap"
 				:class="{ active: index === activeIndex }"
 				@click="onButtonClick(index)"
+				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
 				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${param.n}-${index})`" />
@@ -82,6 +83,7 @@
 				class="switch-button"
 				:class="{ active: index === activeIndex }"
 				@click="onButtonClick(index)"
+				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
 				<rect
 					:x="getButtonX(index)"
@@ -117,7 +119,7 @@
 	const emit = defineEmits<{
 		change: [index: number, value: number, immediate?: boolean];
 		paramLabelEdit: [info: { paramIndex: number; currentLabel: string }];
-		paramContextMenu: [paramIndex: number, event: MouseEvent];
+		paramContextMenu: [paramIndex: number, event: MouseEvent, labelIndex: number];
 	}>();
 
 	const {
@@ -144,6 +146,15 @@
 		(index, value) => emit('change', index, value, true),
 		(info) => emit('paramLabelEdit', info),
 	);
+
+	const contextMenuLabelIndex = computed(() => {
+		if (singleButtonMode.value) {
+			const dn = displayNames.value;
+			const len = Array.isArray(dn) ? dn.length : (dn as string).length;
+			if (len <= 1) return 0;
+		}
+		return activeIndex.value;
+	});
 </script>
 <style scoped>
 	.switch-control {

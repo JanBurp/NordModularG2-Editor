@@ -149,8 +149,8 @@ int g2_set_module_color(int slot, int location, int module_id, int color);
 /* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
 int g2_set_module_label(int slot, int location, int module_id, const char *label);
 
-/* Set param label: slot 0-3, location 0=fx/1=va, label_idx 0-127, label max 7 chars */
-int g2_set_param_label(int slot, int location, int module_id, int param_idx, int label_idx, const char *label);
+/* Set param labels: slot 0-3, location 0=fx/1=va, labels[0..num_labels-1] max 7 chars each */
+int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels);
 
 /* Set module mode: slot 0-3, location 0=fx/1=va, param index, value */
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val);
@@ -175,7 +175,7 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, const char *label);
 void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
-    int loc, int module_id, int param_idx, int label_idx, const char *label);
+    int loc, int module_id, int param_idx, int num_labels, const char **labels);
 
 /* Send multiple patch mutations as a single compound USB frame.
  * All ops must target the same slot. Version is fetched once; drain+delay happen once. */

@@ -68,7 +68,7 @@ static void print_usage(const char *prog) {
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
-    printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>                Set a parameter label\n");
+    printf("  set-param-label <slot> <va|fx> <module-id> <param-idx> <label0> [label1 ...]              Set parameter labels (all labels from index 0)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>                      Assign a MIDI CC number to a parameter\n");
@@ -450,8 +450,8 @@ static int cmd_set_module_name(int argc, char **argv, int i) {
 }
 
 static int cmd_set_param_label(int argc, char **argv, int i) {
-    if (i + 6 >= argc) {
-        fprintf(stderr, "Usage: set-param-label <slot> <va|fx> <module-id> <param-idx> <label-idx> <label>\n");
+    if (i + 5 >= argc) {
+        fprintf(stderr, "Usage: set-param-label <slot> <va|fx> <module-id> <param-idx> <label0> [label1 ...]\n");
         return 1;
     }
     int slot      = parse_slot(argv[i + 1]);
@@ -459,8 +459,8 @@ static int cmd_set_param_label(int argc, char **argv, int i) {
     int location  = parse_location_str(argv[i + 2]);
     int module_id = atoi(argv[i + 3]);
     int param_idx = atoi(argv[i + 4]);
-    int label_idx = atoi(argv[i + 5]);
-    return g2_set_param_label(slot, location, module_id, param_idx, label_idx, argv[i + 6]);
+    int num_labels = argc - (i + 5);
+    return g2_set_param_label(slot, location, module_id, param_idx, num_labels, (const char **)(argv + i + 5));
 }
 
 static int cmd_set_module_mode(int argc, char **argv, int i) {
