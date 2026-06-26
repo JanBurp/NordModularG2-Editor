@@ -23,8 +23,8 @@ export interface Area {
 
 export interface PatchDescription {
 	voices: number;
-	height: number;
-	unk2: number;
+	height: number; // FBarPosition: 0=FX mode, 1-3999=split (voice% = height/4000*100), ≥4000=Voice mode
+	octaveShift: number; // raw stored value; actual shift = octaveShift - 2
 	red: number;
 	blue: number;
 	yellow: number;

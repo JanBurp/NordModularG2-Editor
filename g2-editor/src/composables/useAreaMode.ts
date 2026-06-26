@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import type { Ref } from 'vue';
 import { useUiStore } from '@/store/ui';
+import { useSlotsStore } from '@/store/slots';
 import { MODULE_ROW_HEIGHT } from '@/constants/ui';
 
 export function useAreaMode(containerRef?: Ref<HTMLElement | null>) {
@@ -27,6 +28,7 @@ export function useAreaMode(containerRef?: Ref<HTMLElement | null>) {
 		function onUp() {
 			window.removeEventListener('mousemove', onMove);
 			window.removeEventListener('mouseup', onUp);
+			useSlotsStore().setPatchDescription();
 		}
 		window.addEventListener('mousemove', onMove);
 		window.addEventListener('mouseup', onUp);

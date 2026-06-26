@@ -483,7 +483,7 @@ class G2Parser {
 		const description_attrs: Record<string, number> = {
 			voices: 5,
 			height: 14,
-			unk2: 3,
+			octaveShift: 3,
 			red: 1,
 			blue: 1,
 			yellow: 1,

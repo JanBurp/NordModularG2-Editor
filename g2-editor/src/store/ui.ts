@@ -1,25 +1,29 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
-import type { SlotAreaState } from '@/types/ui';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 import { useSettingsStore } from './settings';
+import { useSlotsStore } from './slots';
 
-function defaultSlotAreaState(): SlotAreaState {
-	return { areaMode: 1, dividerPos: 50, lastNonSplitArea: 1 };
+// FBarPosition: pixel height of voice area in original G2 editor (0–16383, 14-bit)
+// Confirmed from test patches: FX=0, split-below-Out=239, Voice=551; G2Demo default=600
+const FBAR_VOICE = 600; // sentinel written for Voice mode
+const FBAR_VOICE_THRESHOLD = 540; // ≥540 treated as Voice (covers original editor's 551 and our 600)
+
+function fbarToArea(h: number): 0 | 1 | 2 {
+	if (h <= 0) return 0;
+	if (h >= FBAR_VOICE_THRESHOLD) return 1;
+	return 2;
+}
+function fbarToDivider(h: number): number {
+	return Math.round((Math.max(1, Math.min(FBAR_VOICE - 1, h)) / FBAR_VOICE) * 100 * 10) / 10;
 }
 
 export const useUiStore = defineStore('ui', {
 	state: () => ({
 		slotInFocus: 'A' as SlotLabel,
-		slotAreaStates: {
-			A: defaultSlotAreaState(),
-			B: defaultSlotAreaState(),
-			C: defaultSlotAreaState(),
-			D: defaultSlotAreaState(),
-		} as Record<SlotLabel, SlotAreaState>,
 		variation: 0 as number,
 		moduleColor: 0 as number,
 		selectedCables: [] as Cable[],
@@ -38,17 +42,23 @@ export const useUiStore = defineStore('ui', {
 	getters: {
 		selectedSlotIndex: (state) => SLOT_LABELS.indexOf(state.slotInFocus),
 
-		// Current slot's area mode (0=FX, 1=Voice, 2=Split)
-		area: (state): number => state.slotAreaStates[state.slotInFocus].areaMode,
-
-		// Active single area for patch/USB operations: never returns 2.
-		// In Split mode returns the last non-split area so the USB layer stays unaware of Split.
-		activeArea: (state): 0 | 1 => {
-			const s = state.slotAreaStates[state.slotInFocus];
-			return s.areaMode === 2 ? s.lastNonSplitArea : (s.areaMode as 0 | 1);
+		// Current slot's area mode (0=FX, 1=Voice, 2=Split), derived from patch.description.height
+		area: (state): 0 | 1 | 2 => {
+			const patch = useSlotsStore().slots[state.slotInFocus].patch;
+			return fbarToArea(patch?.description?.height ?? 4000);
 		},
 
-		dividerPos: (state): number => state.slotAreaStates[state.slotInFocus].dividerPos,
+		// Active single area for patch/USB operations: never returns 2.
+		activeArea: (state): 0 | 1 => {
+			const patch = useSlotsStore().slots[state.slotInFocus].patch;
+			const area = fbarToArea(patch?.description?.height ?? 4000);
+			return area === 2 ? 1 : (area as 0 | 1);
+		},
+
+		dividerPos: (state): number => {
+			const patch = useSlotsStore().slots[state.slotInFocus].patch;
+			return fbarToDivider(patch?.description?.height ?? 2000);
+		},
 	},
 
 	actions: {
@@ -121,26 +131,33 @@ export const useUiStore = defineStore('ui', {
 			this.cableShakeCount++;
 		},
 
-		setAreaMode(mode: 0 | 1 | 2) {
-			const s = this.slotAreaStates[this.slotInFocus];
-			if (mode !== 2) s.lastNonSplitArea = mode;
-			s.areaMode = mode;
-			this.clearSelection();
-		},
-
-		toggleSplit() {
-			const s = this.slotAreaStates[this.slotInFocus];
-			if (s.areaMode === 2) {
-				s.areaMode = s.lastNonSplitArea;
-			} else {
-				s.lastNonSplitArea = s.areaMode as 0 | 1;
-				s.areaMode = 2;
+		setAreaFbar(fbar: number) {
+			const patch = useSlotsStore().slots[this.slotInFocus].patch;
+			if (patch?.description) {
+				patch.description.height = Math.max(0, Math.min(16383, fbar));
 			}
 			this.clearSelection();
 		},
 
+		setAreaMode(mode: 0 | 1 | 2) {
+			if (mode === 0) this.setAreaFbar(0);
+			else if (mode === 1) this.setAreaFbar(FBAR_VOICE);
+			else if (this.area !== 2) this.setAreaFbar(Math.round(FBAR_VOICE / 2));
+			useSlotsStore().setPatchDescription();
+		},
+
+		toggleSplit() {
+			if (this.area === 2) {
+				this.setAreaFbar(this.dividerPos >= 50 ? FBAR_VOICE : 0);
+			} else {
+				this.setAreaFbar(Math.round(FBAR_VOICE / 2));
+			}
+			useSlotsStore().setPatchDescription();
+		},
+
 		setDividerPos(pos: number) {
-			this.slotAreaStates[this.slotInFocus].dividerPos = Math.max(0, Math.min(100, pos));
+			const fbar = Math.max(1, Math.min(FBAR_VOICE - 1, Math.round((pos / 100) * FBAR_VOICE)));
+			this.setAreaFbar(fbar);
 		},
 	},
 });

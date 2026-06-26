@@ -266,7 +266,7 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 	}
 	bw.write(5, desc.voices);
 	bw.write(14, desc.height);
-	bw.write(3, desc.unk2);
+	bw.write(3, desc.octaveShift);
 	bw.write(1, desc.red);
 	bw.write(1, desc.blue);
 	bw.write(1, desc.yellow);
