@@ -56,12 +56,12 @@
 							@module-drop="voiceOps.handleModuleDrop"
 							@mode-change="voiceOps.handleModeChange"
 							@param-change="voiceOps.handleParamChange"
-							@module-label-edit="handleModuleLabelEdit"
+							@module-label-edit="(info) => handleModuleLabelEdit({ ...info, area: 'voice' })"
 							@module-delete="voiceOps.handleModuleDelete"
 							@module-color-change="voiceOps.handleModuleColorChange"
 							@jack-delete-connected="voiceOps.handleJackDeleteConnected"
 							@jack-set-cable-color="voiceOps.handleJackSetCableColor"
-							@param-label-edit="handleParamLabelEdit"
+							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'voice' })"
 						/>
 					</div>
 
@@ -82,12 +82,12 @@
 							@module-drop="fxOps.handleModuleDrop"
 							@mode-change="fxOps.handleModeChange"
 							@param-change="fxOps.handleParamChange"
-							@module-label-edit="handleModuleLabelEdit"
+							@module-label-edit="(info) => handleModuleLabelEdit({ ...info, area: 'fx' })"
 							@module-delete="fxOps.handleModuleDelete"
 							@module-color-change="fxOps.handleModuleColorChange"
 							@jack-delete-connected="fxOps.handleJackDeleteConnected"
 							@jack-set-cable-color="fxOps.handleJackSetCableColor"
-							@param-label-edit="handleParamLabelEdit"
+							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'fx' })"
 						/>
 					</div>
 				</template>
