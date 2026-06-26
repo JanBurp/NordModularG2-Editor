@@ -1,5 +1,5 @@
 <template>
-	<div class="knob-wrapper" :style="{ cursor }" @dblclick="onDoubleClick()">
+	<div class="knob-wrapper" :style="{ cursor }">
 		<svg :width="radius + 16" :height="radius + 16" class="knob-svg" @mousedown="onMouseDown" @touchstart.passive="onMouseDown">
 			<defs>
 				<!-- Local copy of the g120 radial gradient (avoids dependency on canvas SVG defs) -->
@@ -33,7 +33,7 @@
 					stroke-width="2"
 					:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
 				/>
-				<path v-if="isReset" d="M-3,-2 L3,-2 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" />
+				<path v-if="isReset" d="M-3,-3 L3,-3 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" style="cursor: pointer" @mousedown.stop @click.stop="resetToDefault()" />
 			</g>
 		</svg>
 	</div>
@@ -52,7 +52,7 @@
 	}>();
 
 	const knobCircle = ref<Element | null>(null);
-	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onDoubleClick } = useKnob(
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, resetToDefault } = useKnob(
 		computed(() => props.value),
 		computed(() => props.type ?? 'KnobMedium'),
 		(value) => emit('change', value),

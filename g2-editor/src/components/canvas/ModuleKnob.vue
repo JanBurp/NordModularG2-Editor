@@ -31,7 +31,7 @@
 		/>
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
-		<path v-if="isReset" d="M-3,-2 L3,-2 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" />
+		<path v-if="isReset" d="M-3,-3 L3,-3 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" style="cursor: pointer" @mousedown.stop @click.stop="resetToDefault()" />
 
 		<!-- Selected param underline -->
 		<rect v-if="highlight" :x="0" :y="radius * 2 + 3" :width="radius * 2 + 4" height="2" fill="white" pointer-events="none" />
@@ -55,7 +55,7 @@
 	}>();
 
 	const knobCircle = ref<Element | null>(null);
-	const { radius, angle, isReset, isDragging, cursor, onMouseDown } = useKnob(
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, resetToDefault } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),

@@ -82,9 +82,9 @@ export function useKnob(
 		onMouseDown(event);
 	}
 
-	function onDoubleClick(defaultVal = 64) {
+	function resetToDefault(defaultVal = 64) {
 		emitChange(defaultVal);
 	}
 
-	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onDoubleClick };
+	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, resetToDefault };
 }
