@@ -195,8 +195,8 @@
 	function onBrowserKeydown(e: KeyboardEvent) {
 		if (!props.isActive) return;
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-		if (e.key === 'ArrowLeft') { e.stopPropagation(); cycleView(-1); }
-		else if (e.key === 'ArrowRight') { e.stopPropagation(); cycleView(1); }
+		if (e.key === 'ArrowLeft') { e.stopImmediatePropagation(); cycleView(-1); }
+		else if (e.key === 'ArrowRight') { e.stopImmediatePropagation(); cycleView(1); }
 	}
 
 	/* Group a flat SynthPatch list by bank number */
