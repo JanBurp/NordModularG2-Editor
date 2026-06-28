@@ -176,6 +176,7 @@
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
 	import { getModule } from '../../renderer/nmg2mods';
+	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { getParam } from '../../renderer/parammap';
 	import { useModuleParams } from '../../composables/useModuleParams';
@@ -317,8 +318,8 @@
 		return map;
 	});
 
-	const x = computed(() => (instance.value.horiz || 0) * 256);
-	const y = computed(() => (instance.value.vert || 0) * 16);
+	const x = computed(() => (instance.value.horiz || 0) * MODULE_WIDTH);
+	const y = computed(() => (instance.value.vert || 0) * MODULE_ROW_HEIGHT);
 
 	const displayName = computed(() => {
 		if (typeof instance.value.uname !== 'undefined') return instance.value.uname;
@@ -326,7 +327,7 @@
 	});
 
 	const height = computed(() => {
-		return (moduleDef.value?.height || 2) * 16;
+		return (moduleDef.value?.height || 2) * MODULE_ROW_HEIGHT;
 	});
 
 	const { localLv, getParamValue, getParamLabel, onParamChange, getModeValue, onModeChange } = useModuleParams(

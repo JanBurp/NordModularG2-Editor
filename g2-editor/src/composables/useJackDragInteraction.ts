@@ -1,6 +1,7 @@
 import { onUnmounted } from 'vue';
 import type { Ref } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
+import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
 import { svgPath, svgCircle } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { useCableVisibility } from './useCableVisibility';
@@ -92,8 +93,8 @@ export function useJackDragInteraction(
 		for (const mod of getModules()) {
 			const modDef = getModule(mod.type);
 			if (!modDef) continue;
-			const baseX = mod.horiz * 256;
-			const baseY = mod.vert * 16;
+			const baseX = mod.horiz * MODULE_WIDTH;
+			const baseY = mod.vert * MODULE_ROW_HEIGHT;
 			for (const targetType of targetTypes) {
 				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 				jacks.forEach((jack, idx) => {
@@ -144,7 +145,7 @@ export function useJackDragInteraction(
 		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
 		const jack = jacks?.[info.connectorIndex];
 		if (!jack) return null;
-		return { x: jack.x + mod.horiz * 256, y: jack.y + mod.vert * 16 };
+		return { x: jack.x + mod.horiz * MODULE_WIDTH, y: jack.y + mod.vert * MODULE_ROW_HEIGHT };
 	}
 
 	function toSvgCoords(e: MouseEvent) {

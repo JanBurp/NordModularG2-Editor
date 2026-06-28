@@ -2,7 +2,7 @@ import { ref, computed, onUnmounted } from 'vue';
 import type { Ref, ComputedRef } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
-import { MODULE_ROW_HEIGHT } from '@/constants';
+import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
 
 type DragState = {
 	indices: number[];
@@ -49,7 +49,7 @@ export function useModuleDrag(
 				const height = (getModule(mod.type)?.height ?? 2) * MODULE_ROW_HEIGHT;
 				return {
 					idx,
-					x: start.horiz * 256 + drag.dxPx,
+					x: start.horiz * MODULE_WIDTH + drag.dxPx,
 					y: start.vert * MODULE_ROW_HEIGHT + drag.dyPx,
 					height,
 				};

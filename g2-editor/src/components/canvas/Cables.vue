@@ -176,7 +176,8 @@
 				if (!oldKeys.has(key)) svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.add('selected'));
 			}
 		},
-		{ deep: true },
+		// selectedCables is always replaced with a new array (never mutated in place),
+		// so a reference watch suffices — deep traversal would only add spurious re-runs.
 	);
 
 	const { handleJackDragStart, handleJackDragEnd } = useJackDragInteraction(

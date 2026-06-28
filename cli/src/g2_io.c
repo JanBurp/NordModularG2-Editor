@@ -266,6 +266,9 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
 
+    /* pos + extraLen + 2 (header bytes already counted in pos) + 2 (CRC) must fit */
+    if (pos + 3 + extraLen + 2 > sizeof(buff)) return -1;
+
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SYS;
     buff[pos++] = cmd;
@@ -296,6 +299,9 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
               const uint8_t *extra, size_t extraLen) {
     uint8_t buff[2048] = {0};
     int pos = COMMAND_OFFSET;
+
+    /* 4 header bytes written below + extraLen payload + 2 CRC must fit */
+    if (pos + 4 + extraLen + 2 > sizeof(buff)) return -1;
 
     buff[pos++] = 0x01;
     buff[pos++] = COMMAND_REQ | COMMAND_SLOT | slot;

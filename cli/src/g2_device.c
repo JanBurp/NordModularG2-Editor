@@ -429,7 +429,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     char *hexStr = malloc(patchSize * 2 + 1);
     if (hexStr) {
         for (size_t i = 0; i < patchSize; i++) {
-            sprintf(hexStr + i * 2, "%02x", patchData[i]);
+            snprintf(hexStr + i * 2, 3, "%02x", patchData[i]);
         }
         hexStr[patchSize * 2] = '\0';
         cJSON_AddStringToObject(root, "data", hexStr);
