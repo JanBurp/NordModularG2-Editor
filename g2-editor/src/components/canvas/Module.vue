@@ -229,8 +229,6 @@
 
 	function onContextMenu(e: MouseEvent) {
 		openContextMenu(e, [
-			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
-			{ type: 'separator' },
 			{ label: 'Rename…', action: () => onTitleDblClick() },
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
@@ -239,6 +237,8 @@
 				label: 'Set Color',
 				children: [{ type: 'swatches', swatches: buildColorSwatches((id) => emit('moduleColorChange', moduleIdx.value, id)) }],
 			},
+			{ type: 'separator' },
+			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
 		]);
 	}
 
@@ -377,6 +377,28 @@
 		const location = props.areaLabel === 'va' ? 1 : 0;
 		const items: any[] = [];
 
+		if (param && isSwitch(param.n)) {
+			if (getParam(param.type)?.canLabel) {
+				const label = getParamLabel(paramIndex);
+				items.push({
+					label: 'Rename label',
+					action: () =>
+						emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[labelIndex] ?? '', labelIndex }),
+				});
+			}
+		} else {
+			items.push({
+				label: 'Set Value',
+				action: () => {
+					const paramType = param?.type ?? '';
+					const currentValue = getParamValue(paramIndex);
+					handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
+				},
+			});
+		}
+
+		items.push({ type: 'separator' });
+
 		// MIDI CC items
 		const lastCC = deviceStore.lastMidiCC;
 		items.push({
@@ -399,26 +421,7 @@
 			disabled: !existing,
 			action: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 		});
-		items.push({ type: 'separator' });
 
-		if (param && isSwitch(param.n)) {
-			if (getParam(param.type)?.canLabel) {
-				const label = getParamLabel(paramIndex);
-				items.push({
-					label: 'Rename label',
-					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[labelIndex] ?? '', labelIndex }),
-				});
-			}
-		} else {
-			items.push({
-				label: 'Set Value',
-				action: () => {
-					const paramType = param?.type ?? '';
-					const currentValue = getParamValue(paramIndex);
-					handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
-				},
-			});
-		}
 		openContextMenu(event, items);
 	}
 </script>

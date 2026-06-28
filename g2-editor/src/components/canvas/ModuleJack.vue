@@ -89,15 +89,15 @@
 		if (!props.connected) return;
 		openContextMenu(e, [
 			{
+				label: 'Delete connected',
+				action: () => emit('jackDeleteConnected', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
+			},
+			{ type: 'separator' },
+			{
 				label: 'Set Cable Color',
 				children: buildCableColorItems((colorId) =>
 					emit('jackSetCableColor', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type, colorId }),
 				),
-			},
-			{ type: 'separator' },
-			{
-				label: 'Delete connected',
-				action: () => emit('jackDeleteConnected', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
 			},
 		]);
 	}
