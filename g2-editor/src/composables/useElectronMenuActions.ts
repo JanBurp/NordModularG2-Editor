@@ -121,21 +121,27 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().toggleSidebar('settings');
 					break;
 				case 'area-voice':
+					if (isInputFocused()) break;
 					uiStore.setAreaMode(uiStore.area === 1 ? 2 : 1);
 					break;
 				case 'area-fx':
+					if (isInputFocused()) break;
 					uiStore.setAreaMode(uiStore.area === 0 ? 2 : 0);
 					break;
 				case 'slot-A':
+					if (isInputFocused()) break;
 					handleSlotClick(0);
 					break;
 				case 'slot-B':
+					if (isInputFocused()) break;
 					handleSlotClick(1);
 					break;
 				case 'slot-C':
+					if (isInputFocused()) break;
 					handleSlotClick(2);
 					break;
 				case 'slot-D':
+					if (isInputFocused()) break;
 					handleSlotClick(3);
 					break;
 				case 'variation-1':
@@ -146,6 +152,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'variation-6':
 				case 'variation-7':
 				case 'variation-8': {
+					if (isInputFocused()) break;
 					const variation = parseInt(action.substring(10, 11));
 					await handleVariationClick(variation - 1);
 					break;
