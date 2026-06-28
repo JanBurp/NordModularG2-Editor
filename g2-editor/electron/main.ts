@@ -1,6 +1,10 @@
 import { BrowserWindow, app, ipcMain, dialog, Menu, shell, nativeTheme } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
+if (process.env.TEST_USER_DATA) {
+	app.setPath('userData', process.env.TEST_USER_DATA);
+}
+
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";

@@ -60,12 +60,13 @@ test.describe('offline – no patch loaded', () => {
 	});
 
 	test.describe('module search / filter', () => {
-		test.beforeEach(async ({ sendMenuAction }) => {
+		test.beforeEach(async ({ sendMenuAction, page }) => {
 			await sendMenuAction('toggle-modules');
+			await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 		});
 
 		test('typing a module name shows only matching modules', async ({ page }) => {
-			await page.getByPlaceholder('Search modules...').fill('OscA');
+			await page.locator('[data-testid="modules-search"] input').fill('OscA');
 
 			await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 			const countText = await page.locator('[data-testid="module-count"]').innerText();
@@ -73,14 +74,14 @@ test.describe('offline – no patch loaded', () => {
 		});
 
 		test('unmatched search shows 0 modules', async ({ page }) => {
-			await page.getByPlaceholder('Search modules...').fill('zzznomatch');
+			await page.locator('[data-testid="modules-search"] input').fill('zzznomatch');
 
 			await expect(page.locator('[data-testid="module-count"]')).toHaveText('0 modules');
 			await expect(page.locator('[data-testid="module-item-OscA"]')).not.toBeVisible();
 		});
 
 		test('Escape clears search and restores all modules', async ({ page }) => {
-			const search = page.getByPlaceholder('Search modules...');
+			const search = page.locator('[data-testid="modules-search"] input');
 			await search.fill('OscA');
 			await search.press('Escape');
 
@@ -90,7 +91,7 @@ test.describe('offline – no patch loaded', () => {
 		});
 
 		test('category-level search filters by category name', async ({ page }) => {
-			await page.getByPlaceholder('Search modules...').fill('osc');
+			await page.locator('[data-testid="modules-search"] input').fill('osc');
 
 			await expect(page.locator('[data-testid="module-item-OscA"]')).toBeVisible();
 			const countText = await page.locator('[data-testid="module-count"]').innerText();

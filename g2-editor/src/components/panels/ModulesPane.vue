@@ -8,6 +8,7 @@
 					:isActive="isActive"
 					placeholder="Search modules... (/)"
 					class="flex-1 min-w-0"
+					data-testid="modules-search"
 					@up="navigate(-1)"
 					@down="navigate(1)"
 					@enter="handleEnter"

@@ -19,12 +19,15 @@ export type AppFixtures = {
 
 export const test = base.extend<AppFixtures>({
 	app: async ({ }, use) => {
+		const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'g2-test-'));
 		const app = await electron.launch({
 			args: [APP_ROOT],
 			env: {
 				...process.env,
 				VITE_DEV_OFFLINE: 'true',
 				NODE_ENV: 'test',
+				HEADLESS: '1',
+				TEST_USER_DATA: testUserData,
 			},
 		});
 
@@ -44,6 +47,7 @@ export const test = base.extend<AppFixtures>({
 
 		await use(app);
 		await app.close();
+		fs.rmSync(testUserData, { recursive: true, force: true });
 	},
 
 	page: async ({ app }, use) => {
