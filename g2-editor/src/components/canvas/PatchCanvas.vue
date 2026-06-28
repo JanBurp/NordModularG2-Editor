@@ -21,7 +21,7 @@
 				handleCanvasClick();
 			"
 		>
-			<text :font-size="160" x="50%" y="50%" width="100%" height="100%" text-anchor="">{{ getAreaByShort(area) }}</text>
+			<text :font-size="160" x="50%" y="50%" width="100%" height="100%" text-anchor="middle" fill="#666">{{ getAreaByShort(area) }}</text>
 
 			<Module
 				v-for="mod in props.modules as any[]"
