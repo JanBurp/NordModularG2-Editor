@@ -38,10 +38,7 @@
 					<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 						<template v-for="module in getModulesByCategory(category)" :key="module.id">
 							<div
-								:class="[
-									'w-64 bg-surface-3 rounded overflow-visible shadow',
-									module.id === selectedNavModuleId ? 'ring-2 ring-accent-primary' : '',
-								]"
+								:class="['w-64 bg-surface-3 overflow-visible shadow', module.id === selectedNavModuleId ? 'ring-2 ring-amber-300' : '']"
 								:style="{
 									height: getModuleHeight(module) + 'px',
 									cursor: 'grab',
