@@ -14,31 +14,47 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Midi CC assignments
 - Missing VU meter's on Modules
 - Graphics & Params for several modules improved/finished
-- New Patch / New Performance implemented
+- New Patch / New Performance implemented (#14)
 - Patch browser: Load/Store/Delete/Sort actions implemented
 - Context menu and QuickAdd popup (M) for adding modules to patch
-- Module category search improvements and key commands to add module
+- Module category search improvements
 - Themes: System, Light, Dark
 - Cable rendering options
 - Knob dial options
+- Area position stored in patch (voice/fx/split)
 - SidePanel open/closed state persisted as user preference
+- Settings pane auto-opens last section
+- Patch browser: UX improvements
+- Key commands help
+- Parameter values overlay on modules
+- Knob reset (double-click to reset to default)
 
 ### Changed
-- Parameter sending smoother
+- Parameter sending smoother (#8)
 - Documentation restructured
 - Patch browser UX fully revised
 - Faster performance loading (`select-perf`)
 - SidePanel default state as setting
+- Jack and cable coloring improved
+- Key commands revised and documentation updated
 
 ### Fixed
 - Swapped Gate LEDs
-- Sequencer and VU LED rendering issues
-- Sequencer Random/Clear buttons not working
+- Sequencer and VU LED rendering issues (#10)
+- Sequencer Random/Clear buttons not working (#9)
 - Performance name bug when switching from patch mode
+- Switching slots, also changes key (#11)
 - Cable editing bug (split area)
 - Windows scrollbar consuming layout space
-- Error popup when closing editor
-- Patch load from synth
+- Error popup when closing editor (#12)
+- Patch load from synth (#15)
+- Input focus bug
+- Enter key in SetValue dialog
+- VU meters mixed up in renderer
+- Module rename not area-aware
+- Corrupted paramname length in parser
+- Label rename bug (CLI and editor)
+- Performance file upload flow robustness
 
 ---
 
@@ -69,9 +85,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Content-Security-Policy header for Electron renderer
 
 ### Fixed
-- Settings panel now only shows options relevant to the current context
-- Color picker was not area-aware; UX improved
-- Save As dialog did not open for new (unsaved) patches
+- Settings panel now only shows options relevant to the current context (#3)
+- Color picker was not area-aware; UX improved (#1)
+- Save As dialog did not open for new (unsaved) patches (#2)
 
 ---
 
