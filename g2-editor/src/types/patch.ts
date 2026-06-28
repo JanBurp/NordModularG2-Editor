@@ -109,6 +109,7 @@ export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
 	mode?: { area: 0 | 1; variation: number };
+	splitHeight?: number; // remembered voice-area height to restore split position after a Voice/FX toggle (session state; the .pch2 has only the single `height` field)
 	patchParams?: PatchParamVariation[];
 	controllers?: MidiCCAssignment[];
 }

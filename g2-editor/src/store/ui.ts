@@ -141,17 +141,21 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		setAreaMode(mode: 0 | 1 | 2) {
+			const patch = useSlotsStore().slots[this.slotInFocus].patch;
+			if (this.area === 2 && mode !== 2 && patch?.description) patch.splitHeight = patch.description.height;
 			if (mode === 0) this.setAreaFbar(0);
 			else if (mode === 1) this.setAreaFbar(FBAR_VOICE);
-			else if (this.area !== 2) this.setAreaFbar(Math.round(FBAR_VOICE / 2));
+			else if (this.area !== 2) this.setAreaFbar(patch?.splitHeight ?? Math.round(FBAR_VOICE / 2));
 			useSlotsStore().setPatchDescription();
 		},
 
 		toggleSplit() {
+			const patch = useSlotsStore().slots[this.slotInFocus].patch;
 			if (this.area === 2) {
+				if (patch?.description) patch.splitHeight = patch.description.height;
 				this.setAreaFbar(this.dividerPos >= 50 ? FBAR_VOICE : 0);
 			} else {
-				this.setAreaFbar(Math.round(FBAR_VOICE / 2));
+				this.setAreaFbar(patch?.splitHeight ?? Math.round(FBAR_VOICE / 2));
 			}
 			useSlotsStore().setPatchDescription();
 		},
