@@ -129,7 +129,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, computed, watch, onMounted } from 'vue';
+	import { ref, computed, watch, onMounted, onUnmounted } from 'vue';
 	import { useBrowserStore, type SynthPatch, type DiskEntry } from '../../store/browser';
 	import type { ContextMenuItem } from '@/types';
 	import { useDeviceStore } from '../../store/device';
@@ -150,7 +150,7 @@
 		return categoryByKey.get(cat) ?? cat;
 	}
 
-	defineProps<{
+	const props = defineProps<{
 		isActive: boolean;
 	}>();
 
@@ -179,6 +179,19 @@
 		{ label: 'Patches', value: 'patches' },
 		{ label: 'Performances', value: 'performances' },
 	];
+
+	function cycleView(dir: 1 | -1) {
+		const idx = viewOptions.findIndex((o) => o.value === browser.view);
+		const next = (idx + dir + viewOptions.length) % viewOptions.length;
+		onViewChange(viewOptions[next].value);
+	}
+
+	function onBrowserKeydown(e: KeyboardEvent) {
+		if (!props.isActive) return;
+		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
+		if (e.key === 'ArrowLeft') { e.stopPropagation(); cycleView(-1); }
+		else if (e.key === 'ArrowRight') { e.stopPropagation(); cycleView(1); }
+	}
 
 	/* Group a flat SynthPatch list by bank number */
 	function groupByBank(list: SynthPatch[], maxBanks = 32): { bank: number; patches: SynthPatch[] }[] {
@@ -310,6 +323,11 @@
 	onMounted(() => {
 		browser.setCollapsedBanks([...settings.browserCollapsedBanks]);
 		onViewChange(settings.browserView);
+		window.addEventListener('keydown', onBrowserKeydown);
+	});
+
+	onUnmounted(() => {
+		window.removeEventListener('keydown', onBrowserKeydown);
 	});
 
 	watch(
