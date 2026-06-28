@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col gap-1">
-		<Collapsible title="Editor Settings" :default-open="false">
+		<Collapsible title="Editor Settings" :model-value="isOpen('Editor Settings')" @update:model-value="onToggle('Editor Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorTheme">
 					<BtnGroup :model-value="settings.theme" :options="THEME_OPTIONS" @update:model-value="settings.setTheme($event as ThemeMode)" />
@@ -43,7 +43,7 @@
 				</SettingsRow>
 			</div>
 		</Collapsible>
-		<Collapsible v-if="device.connected" title="Synth Settings" :default-open="false">
+		<Collapsible v-if="device.connected" title="Synth Settings" :model-value="isOpen('Synth Settings')" @update:model-value="onToggle('Synth Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
@@ -158,7 +158,7 @@
 			</div>
 		</Collapsible>
 
-		<Collapsible v-if="device.device || anyPatchLoaded" title="Performance Settings" :default-open="false">
+		<Collapsible v-if="device.device || anyPatchLoaded" title="Performance Settings" :model-value="isOpen('Performance Settings')" @update:model-value="onToggle('Performance Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
 					<TextInput
@@ -227,7 +227,7 @@
 			</div>
 		</Collapsible>
 
-		<Collapsible v-if="currentPatch" title="Patch Settings">
+		<Collapsible v-if="currentPatch" title="Patch Settings" :model-value="isOpen('Patch Settings')" @update:model-value="onToggle('Patch Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
 					<TextInput
@@ -272,7 +272,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref, watch } from 'vue';
 	import { makeOffMemory, OFF_SENTINEL } from '@/composables/useOffMemory';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import RangeInput from '@/components/common/RangeInput.vue';
@@ -303,6 +303,25 @@
 	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const anyPatchLoaded = computed(() => SLOT_LABELS.some((slot) => !!slotsStore.getPatchForSlot(slot as SlotLabel)));
+
+	const activeSection = computed(() => {
+		if (currentPatch.value) return 'Patch Settings';
+		if (device.connected) return 'Synth Settings';
+		return 'Editor Settings';
+	});
+
+	const openSections = ref(new Set([activeSection.value]));
+
+	watch([() => settings.rightPaneTab, () => settings.showRightPane], ([tab, show]) => {
+		if (tab === 'settings' && show) openSections.value = new Set([activeSection.value]);
+	});
+
+	function isOpen(section: string) { return openSections.value.has(section); }
+	function onToggle(section: string, v: boolean) {
+		const next = new Set(openSections.value);
+		if (v) next.add(section); else next.delete(section);
+		openSections.value = next;
+	}
 
 	const selectedCategory = computed({
 		get: () => (currentPatch.value as any)?.description?.category ?? 0,
