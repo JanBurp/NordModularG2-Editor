@@ -93,10 +93,10 @@ test.describe('file operations – offline', () => {
 		await expect(page.locator('[data-testid="slot-1"]')).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="slot-0"]')).not.toHaveClass(/btn-active/);
 
-		// On slot B: Voice is active by default
-		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		// On slot B: Split is active (patch data has height in split range)
+		await expect(page.getByRole('button', { name: 'Split' })).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
-		await expect(page.locator('[data-testid="canvas-fx"]')).not.toBeVisible();
+		await expect(page.locator('[data-testid="canvas-fx"]')).toBeVisible();
 
 		// Switch to FX area
 		await page.getByRole('button', { name: 'FX' }).click();
@@ -109,6 +109,7 @@ test.describe('file operations – offline', () => {
 		await page.getByRole('button', { name: 'Voice' }).click();
 		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await expect(page.locator('[data-testid="canvas-fx"]')).not.toBeVisible();
 
 		// Switch to slot C
 		await page.locator('[data-testid="slot-2"]').click();
