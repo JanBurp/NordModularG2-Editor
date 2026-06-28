@@ -39,15 +39,21 @@
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
-					<ListItem v-for="entry in filteredDiskDirs" :key="entry.path" @click="selectDisk(entry)">
+					<ListItem
+						v-for="(entry, i) in filteredDiskDirs"
+						:key="entry.path"
+						:data-nav-idx="i"
+						:selected="i === selectedNavIndex"
+						@click="selectDisk(entry)"
+					>
 						<template #icon><span class="text-content-secondary">▶</span></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
 					<ListItem
 						v-for="(entry, i) in filteredDiskFiles"
 						:key="entry.path"
-						:data-nav-idx="i"
-						:selected="i === selectedNavIndex"
+						:data-nav-idx="filteredDiskDirs.length + i"
+						:selected="filteredDiskDirs.length + i === selectedNavIndex"
 						@click="selectDisk(entry)"
 					>
 						<template #icon><span /></template>
@@ -293,7 +299,7 @@
 	}
 
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
-		if (browser.view === 'disk') return filteredDiskFiles.value;
+		if (browser.view === 'disk') return [...filteredDiskDirs.value, ...filteredDiskFiles.value];
 		return currentGroups.value.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
 	});
 
@@ -393,10 +399,8 @@
 				return;
 			}
 		}
-		if (browser.view === 'disk' && filteredDiskFiles.value.length > 0) {
-			const entry = filteredDiskFiles.value[0];
-			const kind = entry.name.toLowerCase().endsWith('.prf2') ? 'performance' : 'patch';
-			emit('select', { type: 'disk', filepath: entry.path, kind });
+		if (browser.view === 'disk' && flatNavItems.value.length > 0) {
+			selectDisk(flatNavItems.value[0] as DiskEntry);
 		} else if (browser.view === 'patches' && filteredPatches.value.length > 0) {
 			selectSynth(filteredPatches.value[0], 'patch');
 		} else if (browser.view === 'performances' && filteredPerformances.value.length > 0) {
