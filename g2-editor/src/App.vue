@@ -154,6 +154,8 @@
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 
 	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
+
+	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
 </template>
 
 <script setup lang="ts">
@@ -192,7 +194,9 @@
 	import AboutDialog from './components/common/AboutDialog.vue';
 	import DriverErrorDialog from './components/common/DriverErrorDialog.vue';
 	import QuickAddModule from './components/common/QuickAddModule.vue';
+	import KeyCommandsPage from './components/common/KeyCommandsPage.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
+	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
 	import type { SlotLabel } from './store/slots';
@@ -202,6 +206,7 @@
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
+	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -288,13 +293,37 @@
 	}
 
 	function onGlobalKeydown(e: KeyboardEvent) {
-		if (e.key === 'm' && !e.ctrlKey && !e.metaKey && !e.altKey) {
-			const el = document.activeElement;
-			const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
-			if (!isInput) {
-				e.preventDefault();
-				showQuickAdd.value = true;
+		if (uiStore.showKeyCommandsPage) {
+			if (e.key === 'Escape') uiStore.showKeyCommandsPage = false;
+			return;
+		}
+
+		const el = document.activeElement;
+		const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
+		const noMod = !e.ctrlKey && !e.metaKey && !e.altKey;
+
+		if (isInput) return;
+
+		if (noMod) {
+			switch (e.key) {
+				case 'm':
+					e.preventDefault();
+					showQuickAdd.value = true;
+					return;
+				case 'r':
+					e.preventDefault();
+					device.setClockRunning(!device.clockRunning);
+					return;
+				case ' ':
+					e.preventDefault();
+					toggleAllCables();
+					return;
 			}
+		}
+
+		if (e.key === ' ' && e.ctrlKey && !e.metaKey && !e.altKey) {
+			e.preventDefault();
+			uiStore.shakeCables();
 		}
 	}
 

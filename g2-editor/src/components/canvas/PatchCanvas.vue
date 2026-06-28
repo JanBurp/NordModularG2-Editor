@@ -45,6 +45,7 @@
 			/>
 			<DragGhost :ghosts="dragGhosts" />
 			<CCBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<ParamValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 		</svg>
 		<Cables
 			ref="cablesRef"
@@ -68,6 +69,7 @@
 	import Cables from './Cables.vue';
 	import DragGhost from './DragGhost.vue';
 	import CCBadgesOverlay from './CCBadgesOverlay.vue';
+	import ParamValuesOverlay from './ParamValuesOverlay.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';

@@ -31,6 +31,7 @@ export const useUiStore = defineStore('ui', {
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
 		showSvgViewer: false as boolean,
+		showKeyCommandsPage: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
 		helpModuleTypeId: null as number | null,

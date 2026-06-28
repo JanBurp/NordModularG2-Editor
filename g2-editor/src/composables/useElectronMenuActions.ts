@@ -121,13 +121,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().toggleSidebar('settings');
 					break;
 				case 'area-voice':
-					uiStore.setAreaMode(1);
+					uiStore.setAreaMode(uiStore.area === 1 ? 2 : 1);
 					break;
 				case 'area-fx':
-					uiStore.setAreaMode(0);
-					break;
-				case 'area-split':
-					uiStore.toggleSplit();
+					uiStore.setAreaMode(uiStore.area === 0 ? 2 : 0);
 					break;
 				case 'slot-A':
 					handleSlotClick(0);
@@ -155,6 +152,12 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'toggle-svg-viewer':
 					uiStore.toggleSvgViewer();
+					break;
+				case 'toggle-midi-cc-panel':
+					useSettingsStore().toggleSidebar('midicc');
+					break;
+				case 'show-key-commands':
+					uiStore.showKeyCommandsPage = true;
 					break;
 				case 'undo':
 					await slotsStore.undo();

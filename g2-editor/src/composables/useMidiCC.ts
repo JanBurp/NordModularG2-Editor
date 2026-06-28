@@ -1,5 +1,5 @@
-import { ref, onUnmounted } from 'vue';
 import type { MidiCCAssignment } from '@/types';
+import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 
 const RESERVED_CC = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97, 120, 121, 122, 123, 124, 125, 126, 127]);
 
@@ -77,42 +77,7 @@ export function ccLabel(n: number): string {
 	return name ? `CC ${n}: ${name}` : `CC ${n}`;
 }
 
-// Global singleton — registered once on first call
-let listenerCount = 0;
-export const showCCOverlay = ref(false);
-
-function onKeyDown(e: KeyboardEvent) {
-	if (e.key === 'F8') {
-		e.preventDefault(); // stop browser/Electron from intercepting F8 before keyup fires
-		if (!e.repeat) showCCOverlay.value = true;
-	}
-	if (e.key === 'Escape') showCCOverlay.value = false;
-}
-function onKeyUp(e: KeyboardEvent) {
-	if (e.key === 'F8') showCCOverlay.value = false;
-}
-// Safety net: if F8 triggered a system action and the window lost focus,
-// we never get keyup — reset overlay on blur so it doesn't stay on indefinitely.
-function onWindowBlur() {
-	showCCOverlay.value = false;
-}
-
 export function useMidiCCOverlay() {
-	if (listenerCount === 0) {
-		window.addEventListener('keydown', onKeyDown);
-		window.addEventListener('keyup', onKeyUp);
-		window.addEventListener('blur', onWindowBlur);
-	}
-	listenerCount++;
-
-	onUnmounted(() => {
-		listenerCount--;
-		if (listenerCount === 0) {
-			window.removeEventListener('keydown', onKeyDown);
-			window.removeEventListener('keyup', onKeyUp);
-			window.removeEventListener('blur', onWindowBlur);
-		}
-	});
-
-	return { showCCOverlay };
+	const { isVisible } = useKeyHoldOverlay('F8');
+	return { showCCOverlay: isVisible };
 }

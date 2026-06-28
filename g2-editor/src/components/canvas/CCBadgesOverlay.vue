@@ -1,7 +1,5 @@
 <template>
-	<g v-if="showCCOverlay" class="cc-badges-overlay">
-		<ModuleCCBadge v-for="b in badges" :key="`cc-${b.cc}`" :cc="b.cc" :x="b.x" :y="b.y" />
-	</g>
+	<ParamOverlay v-if="showCCOverlay" :items="badges" />
 </template>
 
 <script setup lang="ts">
@@ -11,7 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMidiCCOverlay } from '@/composables/useMidiCC';
-	import ModuleCCBadge from './ModuleCCBadge.vue';
+	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
 		modules: ModuleInstance[];
@@ -22,11 +20,11 @@
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 
-	const badges = computed<{ cc: number; x: number; y: number }[]>(() => {
+	const badges = computed(() => {
 		const slot = uiStore.slotInFocus;
 		if (!slot) return [];
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		const result: { cc: number; x: number; y: number }[] = [];
+		const result: { text: string; x: number; y: number }[] = [];
 		for (const c of slotsStore.slots[slot].controllers) {
 			if (c.location !== location) continue;
 			const mod = props.modules.find((m) => m.index === c.moduleIndex);
@@ -34,7 +32,7 @@
 			const param = getModule(mod.type)?.params?.[c.paramIndex];
 			if (!param) continue;
 			result.push({
-				cc: c.cc,
+				text: `CC# ${c.cc}`,
 				x: (mod.horiz ?? 0) * 256 + param.x,
 				y: (mod.vert ?? 0) * 16 + param.y,
 			});

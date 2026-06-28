@@ -24,21 +24,24 @@ nav_order: 4
 | `Cmd+V` | Paste modules at mouse cursor; layout, parameters and cables preserved |
 | `Cmd+A` | Select all modules |
 | `Delete` / `Backspace` | Delete selection |
+| `Cmd+Z` | Undo |
+| `Cmd+Shift+Z` | Redo |
 
 ## Slots & Variations
 
 | Key | Action |
 |---|---|
-| `Opt+A/B/C/D` | Select slot A / B / C / D |
-| `Opt+1–8` | Select variation 1–8 |
+| `A` / `B` / `C` / `D` | Select slot A / B / C / D |
+| `1–8` | Select variation 1–8 |
 
 ## View & Areas
 
 | Key | Action |
 |---|---|
-| `Opt+V` | Voice area |
-| `Opt+S` | Split view |
-| `Opt+F` | FX area |
+| `V` | Toggle Voice area ↔ Split view |
+| `F` | Toggle FX area ↔ Split view |
+| `Space` | Show / hide all cables |
+| `Ctrl+Space` | Shake cables |
 
 ## Panels
 
@@ -46,14 +49,33 @@ nav_order: 4
 |---|---|
 | `Cmd+M` | Toggle Modules pane |
 | `Cmd+B` | Toggle Browser pane |
+| `Cmd+I` | Toggle Midi CC pane |
 | `Cmd+,` | Toggle Settings pane |
+
+## Overlays
+
+Hold the key to show the overlay; release or press `Escape` to hide.
+
+| Key | Action |
+|---|---|
+| `F5` | Show parameter values on canvas |
+| `F8` | Show Midi CC assignments on canvas |
 
 ## Modules & Parameters
 
 | Key | Action |
 |---|---|
+| `M` | Quick add module at cursor position |
 | `Shift+Arrow` | Navigate between modules |
 | `←` / `→` | Navigate parameters (module selected) |
 | `↑` / `↓` | Adjust parameter ±1 |
 | `Alt+↑` / `Alt+↓` | Adjust parameter ±16 |
 | `F1` | Show module help |
+
+## Other
+
+| Key | Action |
+|---|---|
+| `R` | Toggle clock run / stop |
+| `/` | Focus search / filter |
+| `Escape` | Abort drag / close dialog / clear filter |
