@@ -10,6 +10,12 @@ export function findModuleByIndex(modules: ModuleInstance[], id: number): Module
 	return modules.find((m) => m.index === id);
 }
 
+export type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
+
+export function sameJack(a: JackEnd, b: JackEnd): boolean {
+	return a.moduleIndex === b.moduleIndex && a.connectorIndex === b.connectorIndex && a.type === b.type;
+}
+
 export function matchesCableJack(c: Cable, moduleIndex: number, connectorIndex: number, type: 'input' | 'output'): boolean {
 	if (type === 'output') return (c.dir ?? 1) === 1 && c.smod === moduleIndex && c.scon === connectorIndex;
 	return (
@@ -19,7 +25,7 @@ export function matchesCableJack(c: Cable, moduleIndex: number, connectorIndex: 
 }
 
 // Does `jack` correspond to this cable's smod/scon end (true) or its dmod/dcon end (false)?
-export function isCableSourceEnd(c: Cable, jack: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }): boolean {
+export function isCableSourceEnd(c: Cable, jack: JackEnd): boolean {
 	if (jack.type === 'output') return true;
 	return c.smod === jack.moduleIndex && c.scon === jack.connectorIndex;
 }

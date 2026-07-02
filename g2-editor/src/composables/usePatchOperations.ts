@@ -2,8 +2,7 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-
-type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
+import type { JackEnd } from '../store/slotHelpers';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();

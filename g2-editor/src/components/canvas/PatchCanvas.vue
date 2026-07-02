@@ -66,6 +66,8 @@
 <script setup lang="ts">
 	import { ref, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
+	import { sameJack } from '../../store/slotHelpers';
+	import type { JackEnd } from '../../store/slotHelpers';
 	import type { ModuleInstance } from '../../types';
 	import type { ContextMenuItem } from '../../types';
 	import { getModule, getAllCategories, getModulesByCategory } from '../../renderer/nmg2mods';
@@ -111,8 +113,6 @@
 		},
 	});
 
-	type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
-
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number, immediate?: boolean];
 		modeChange: [moduleIndex: number, index: number, value: number];
@@ -151,7 +151,6 @@
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
 	const hoveredJack = ref<JackEnd | null>(null);
-	const sameJack = (a: JackEnd, b: JackEnd) => a.moduleIndex === b.moduleIndex && a.connectorIndex === b.connectorIndex && a.type === b.type;
 	function onJackHoverEnter(info: JackEnd) {
 		hoveredJack.value = info;
 	}

@@ -12,7 +12,47 @@ import type { JackDragInfo } from '../types';
 
 type SnapJack = JackDragInfo & { x: number; y: number };
 
-export const SNAP_RANGE = 64;
+export const SNAP_RANGE = 96;
+
+// Shared with useCableGrabInteraction.ts: converts a mouse event into SVG user-space coordinates.
+export function toSvgCoords(svgRef: Ref<SVGSVGElement | null> | undefined, e: MouseEvent) {
+	const svg = svgRef?.value as SVGSVGElement | null;
+	if (!svg?.getScreenCTM) return null;
+	const ctm = svg.getScreenCTM();
+	if (!ctm) return null;
+	const pt = svg.createSVGPoint();
+	pt.x = e.clientX;
+	pt.y = e.clientY;
+	return pt.matrixTransform(ctm.inverse());
+}
+
+// Shared with useCableGrabInteraction.ts: looks up a jack's SVG position from module/patch geometry.
+export function getJackSvgPos(getModules: () => any[], info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }) {
+	const mod = getModules().find((m) => m.index === info.moduleIndex);
+	if (!mod) return null;
+	const modDef = getModule(mod.type);
+	if (!modDef) return null;
+	const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
+	const jack = jacks?.[info.connectorIndex];
+	if (!jack) return null;
+	return { x: jack.x + mod.horiz * MODULE_WIDTH, y: jack.y + mod.vert * MODULE_ROW_HEIGHT };
+}
+
+// Shared with useCableGrabInteraction.ts: creates/moves/removes the snap-target highlight circle.
+export function updateSnapHighlight(svg: SVGElement, current: SVGCircleElement | null, snap: { x: number; y: number } | null): SVGCircleElement | null {
+	if (!snap) {
+		current?.remove();
+		return null;
+	}
+	if (!current) {
+		const el = svgCircle(snap.x, snap.y, 8, { fill: 'none', stroke: '#000', 'stroke-width': '3', class: 'nomouse', opacity: '0.8' });
+		svg.appendChild(el);
+		return el;
+	}
+	current.setAttribute('cx', String(snap.x));
+	current.setAttribute('cy', String(snap.y));
+	return current;
+}
 
 export function useJackDragInteraction(
 	svgRef: Ref<SVGSVGElement | null> | undefined,
@@ -90,52 +130,6 @@ export function useJackDragInteraction(
 		return best;
 	}
 
-	function updateSnapHighlight(snap: SnapJack | null) {
-		if (!svgRef?.value) return;
-		const svg = svgRef.value as SVGElement;
-		if (!snap) {
-			snapHighlight?.remove();
-			snapHighlight = null;
-			return;
-		}
-		if (!snapHighlight) {
-			snapHighlight = svgCircle(snap.x, snap.y, 8, {
-				fill: 'none',
-				stroke: '#000',
-				'stroke-width': '3',
-				class: 'nomouse',
-				opacity: '0.8',
-			});
-			svg.appendChild(snapHighlight);
-		} else {
-			snapHighlight.setAttribute('cx', String(snap.x));
-			snapHighlight.setAttribute('cy', String(snap.y));
-			snapHighlight.setAttribute('stroke', '#000');
-		}
-	}
-
-	function getJackSvgPos(info: JackDragInfo) {
-		const mod = getModules().find((m) => m.index === info.moduleIndex);
-		if (!mod) return null;
-		const modDef = getModule(mod.type);
-		if (!modDef) return null;
-		const jacks = info.type === 'input' ? modDef.inputs : modDef.outputs;
-		const jack = jacks?.[info.connectorIndex];
-		if (!jack) return null;
-		return { x: jack.x + mod.horiz * MODULE_WIDTH, y: jack.y + mod.vert * MODULE_ROW_HEIGHT };
-	}
-
-	function toSvgCoords(e: MouseEvent) {
-		const svg = svgRef?.value as SVGSVGElement | null;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform(ctm.inverse());
-	}
-
 	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
 		const dist = Math.hypot(dx - sx, dy - sy);
 		const sag = Math.min(dist * 0.25, 60);
@@ -146,12 +140,12 @@ export function useJackDragInteraction(
 	function onMouseMovePreview(e: MouseEvent) {
 		if (!dragSrcPos || !svgRef?.value) return;
 		hasDragged = true;
-		const mp = toSvgCoords(e);
+		const mp = toSvgCoords(svgRef, e);
 		if (!mp) return;
 		const svg = svgRef.value as SVGElement;
 
 		snapJack = findSnapJack(mp);
-		updateSnapHighlight(snapJack);
+		snapHighlight = updateSnapHighlight(svg, snapHighlight, snapJack);
 
 		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
 		if (!previewCable) {
@@ -189,7 +183,7 @@ export function useJackDragInteraction(
 	}
 
 	function handleJackDragStart(info: JackDragInfo) {
-		const pos = getJackSvgPos(info);
+		const pos = getJackSvgPos(getModules, info);
 		if (pos) {
 			dragSrcPos = pos;
 			dragSrcInfo = info;

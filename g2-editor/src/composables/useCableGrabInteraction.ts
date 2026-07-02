@@ -2,19 +2,19 @@ import { onUnmounted } from 'vue';
 import type { Ref } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
-import { svgCircle } from '../renderer/svgUtils';
 import { makeCableKey, shiftCableEndpoint } from '../renderer/cableRenderer';
 import type { Cable } from '../renderer/cableRenderer';
-import { matchesCableJack, isCableSourceEnd } from '../store/slotHelpers';
+import { matchesCableJack, isCableSourceEnd, sameJack } from '../store/slotHelpers';
+import type { JackEnd } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
 import { useUiStore } from '../store/ui';
-import { SNAP_RANGE } from './useJackDragInteraction';
+import { SNAP_RANGE, toSvgCoords, getJackSvgPos, updateSnapHighlight } from './useJackDragInteraction';
 import { isGrabModifierPressed } from '../utils/platform';
 
-export type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
+export type { JackEnd };
 type SnapEnd = JackEnd & { x: number; y: number };
 
-const sameJack = (a: JackEnd, b: JackEnd) => a.moduleIndex === b.moduleIndex && a.connectorIndex === b.connectorIndex && a.type === b.type;
+type DragCable = { elements: SVGPathElement[]; originalD: string };
 
 export function useCableGrabInteraction(
 	svgRef: Ref<SVGSVGElement | null> | undefined,
@@ -27,40 +27,19 @@ export function useCableGrabInteraction(
 	let grabbedJack: JackEnd | null = null;
 	let group: Cable[] = [];
 	let groupHasIncomingDriver = false;
+	let drivenNestJacks: Set<string> | null = null;
 	let hasDragged = false;
 	let snapTarget: SnapEnd | null = null;
-	let originalPaths = new Map<string, string>();
+	let dragCables = new Map<string, DragCable>();
 	let snapHighlight: SVGCircleElement | null = null;
-
-	function toSvgCoords(e: MouseEvent) {
-		const svg = svgRef?.value as SVGSVGElement | null;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform(ctm.inverse());
-	}
-
-	function jackSvgPos(end: JackEnd): { x: number; y: number } | null {
-		const mod = getModules().find((m) => m.index === end.moduleIndex);
-		if (!mod) return null;
-		const modDef = getModule(mod.type);
-		if (!modDef) return null;
-		const jacks = end.type === 'input' ? modDef.inputs : modDef.outputs;
-		const jack = jacks?.[end.connectorIndex];
-		if (!jack) return null;
-		return { x: jack.x + mod.horiz * MODULE_WIDTH, y: jack.y + mod.vert * MODULE_ROW_HEIGHT };
-	}
 
 	// Grabbing a cable identifies "the jack" you grabbed: whichever endpoint is closer to the click point.
 	function findNearestEndpoint(cable: Cable, mouseSvgPos: { x: number; y: number }): JackEnd {
 		const dir = cable.dir ?? 1;
 		const sourceEnd: JackEnd = { moduleIndex: cable.smod, connectorIndex: cable.scon, type: dir === 1 ? 'output' : 'input' };
 		const destEnd: JackEnd = { moduleIndex: cable.dmod, connectorIndex: cable.dcon, type: 'input' };
-		const sourcePos = jackSvgPos(sourceEnd);
-		const destPos = jackSvgPos(destEnd);
+		const sourcePos = getJackSvgPos(getModules, sourceEnd);
+		const destPos = getJackSvgPos(getModules, destEnd);
 		if (!sourcePos) return destEnd;
 		if (!destPos) return sourceEnd;
 		const sourceDist = Math.hypot(sourcePos.x - mouseSvgPos.x, sourcePos.y - mouseSvgPos.y);
@@ -82,14 +61,11 @@ export function useCableGrabInteraction(
 		if (!grabbedJack) return false;
 		if (sameJack(jack, grabbedJack)) return true;
 		if (jack.type !== grabbedJack.type) return false;
-		if (groupHasIncomingDriver && jack.type === 'input' && computeDrivenInputJacks(getCables()).has(`${jack.moduleIndex}-${jack.connectorIndex}`)) {
-			return false;
-		}
+		if (drivenNestJacks?.has(`${jack.moduleIndex}-${jack.connectorIndex}`)) return false;
 		return true;
 	}
 
-	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd, excludeDrivenInputs: boolean): SnapEnd | null {
-		const drivenNestJacks = excludeDrivenInputs ? computeDrivenInputJacks(getCables()) : null;
+	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd): SnapEnd | null {
 		let bestDist = SNAP_RANGE;
 		let best: SnapEnd | null = null;
 		for (const mod of getModules()) {
@@ -99,10 +75,7 @@ export function useCableGrabInteraction(
 			const baseY = mod.vert * MODULE_ROW_HEIGHT;
 			const jacks = jack.type === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 			jacks.forEach((j, idx) => {
-				// The grabbed jack itself must stay a valid candidate: dropping back on it should be
-				// detected (and treated as a no-op by the caller), not skipped and mistaken for empty space.
-				const isGrabbedJack = mod.index === jack.moduleIndex && idx === jack.connectorIndex;
-				if (!isGrabbedJack && drivenNestJacks?.has(`${mod.index}-${idx}`)) return;
+				if (!isValidDropCandidate({ moduleIndex: mod.index, connectorIndex: idx, type: jack.type })) return;
 				const jx = j.x + baseX;
 				const jy = j.y + baseY;
 				const dist = Math.hypot(jx - mouseSvgPos.x, jy - mouseSvgPos.y);
@@ -115,37 +88,22 @@ export function useCableGrabInteraction(
 		return best;
 	}
 
-	function updateSnapHighlight(snap: SnapEnd | null) {
-		if (!svgRef?.value) return;
-		const svg = svgRef.value as SVGElement;
-		if (!snap) {
-			snapHighlight?.remove();
-			snapHighlight = null;
-			return;
-		}
-		if (!snapHighlight) {
-			snapHighlight = svgCircle(snap.x, snap.y, 8, { fill: 'none', stroke: '#000', 'stroke-width': '3', class: 'nomouse', opacity: '0.8' });
-			svg.appendChild(snapHighlight);
-		} else {
-			snapHighlight.setAttribute('cx', String(snap.x));
-			snapHighlight.setAttribute('cy', String(snap.y));
-		}
-	}
-
-	// Snapshot each grabbed cable's currently-rendered curve so it can be shifted live during the drag
-	// (without re-invoking Patchcord, which re-randomizes the shape) and restored on a no-op/cancel.
-	function captureOriginalPaths(svg: SVGElement, cables: Cable[]) {
-		originalPaths = new Map();
+	// Snapshot each grabbed cable's rendered elements and current curve once, so the drag can shift them
+	// live (without re-invoking Patchcord, which re-randomizes the shape) without re-querying the DOM or
+	// re-reading their 'd' attribute on every mousemove, and can restore them exactly on a no-op/cancel.
+	function captureDragCables(svg: SVGElement, cables: Cable[]) {
+		dragCables = new Map();
 		for (const cable of cables) {
 			const key = makeCableKey(cable);
-			const d = svg.querySelector<SVGPathElement>(`.svgcableborder[data-cable-key="${key}"]`)?.getAttribute('d');
-			if (d) originalPaths.set(key, d);
+			const elements = Array.from(svg.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`));
+			const originalD = elements[0]?.getAttribute('d');
+			if (originalD) dragCables.set(key, { elements, originalD });
 		}
 	}
 
-	function revertPaths(svg: SVGElement) {
-		for (const [key, d] of originalPaths) {
-			svg.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`).forEach((el) => el.setAttribute('d', d));
+	function revertDragCables() {
+		for (const { elements, originalD } of dragCables.values()) {
+			elements.forEach((el) => el.setAttribute('d', originalD));
 		}
 	}
 
@@ -153,9 +111,10 @@ export function useCableGrabInteraction(
 		grabbedJack = null;
 		group = [];
 		groupHasIncomingDriver = false;
+		drivenNestJacks = null;
 		hasDragged = false;
 		snapTarget = null;
-		originalPaths = new Map();
+		dragCables = new Map();
 	}
 
 	function clearGrabPreview() {
@@ -167,23 +126,20 @@ export function useCableGrabInteraction(
 
 	// Moves the real grabbed cable(s) live, in their own colors, instead of drawing a synthetic preview.
 	function onMove(e: MouseEvent) {
-		if (!grabbedJack || !svgRef?.value) return;
+		if (!grabbedJack) return;
 		hasDragged = true;
-		const mp = toSvgCoords(e);
-		if (!mp) return;
-		const svg = svgRef.value as SVGElement;
+		const mp = toSvgCoords(svgRef, e);
+		if (!mp || !svgRef?.value) return;
 
-		snapTarget = findDropTarget(mp, grabbedJack, groupHasIncomingDriver);
-		updateSnapHighlight(snapTarget);
+		snapTarget = findDropTarget(mp, grabbedJack);
+		snapHighlight = updateSnapHighlight(svgRef.value as SVGElement, snapHighlight, snapTarget);
 
 		for (const cable of group) {
-			const key = makeCableKey(cable);
-			const elements = svg.querySelectorAll<SVGPathElement>(`[data-cable-key="${key}"]`);
-			const currentD = elements[0]?.getAttribute('d');
-			if (!currentD) continue;
+			const entry = dragCables.get(makeCableKey(cable));
+			if (!entry) continue;
 			const role: 'src' | 'dst' = isCableSourceEnd(cable, grabbedJack) ? 'src' : 'dst';
-			const newD = shiftCableEndpoint(currentD, role, mp.x, mp.y);
-			elements.forEach((el) => el.setAttribute('d', newD));
+			const newD = shiftCableEndpoint(entry.originalD, role, mp.x, mp.y);
+			entry.elements.forEach((el) => el.setAttribute('d', newD));
 		}
 	}
 
@@ -192,16 +148,12 @@ export function useCableGrabInteraction(
 		const localGroup = group;
 		const localFromJack = grabbedJack;
 		const wasDragged = hasDragged;
-		const svg = svgRef?.value as SVGElement | null;
+		const isNoOpDrop = target && localFromJack && sameJack(target, localFromJack);
 		clearGrabPreview();
+		if (isNoOpDrop) revertDragCables(); // DOM was mutated live during the drag; nothing else will restore it
 		resetState();
 
-		if (!wasDragged || !localFromJack) return; // released above the current jack: no-op, DOM untouched
-
-		if (target && sameJack(target, localFromJack)) {
-			if (svg) revertPaths(svg); // DOM was mutated live during the drag; nothing else will restore it
-			return;
-		}
+		if (!wasDragged || !localFromJack || isNoOpDrop) return;
 
 		onCableGroupDrop(localGroup, localFromJack, target);
 	}
@@ -223,20 +175,20 @@ export function useCableGrabInteraction(
 	function handleCableGrabStart(e: MouseEvent, cable: Cable) {
 		if (!isGrabModifierPressed(e)) return;
 		e.stopPropagation();
-		const mp = toSvgCoords(e);
-		if (!mp) return;
+		const mp = toSvgCoords(svgRef, e);
+		if (!mp || !svgRef?.value) return;
 
 		const jack = findNearestEndpoint(cable, mp);
-		const pos = jackSvgPos(jack);
-		if (!pos) return;
+		if (!getJackSvgPos(getModules, jack)) return;
 
 		grabbedJack = jack;
 		group = computeGroup(jack);
 		groupHasIncomingDriver =
 			jack.type === 'input' && group.some((c) => (c.dir ?? 1) === 1 && c.dmod === jack.moduleIndex && c.dcon === jack.connectorIndex);
+		drivenNestJacks = groupHasIncomingDriver ? computeDrivenInputJacks(getCables()) : null;
 		hasDragged = false;
 		snapTarget = null;
-		if (svgRef?.value) captureOriginalPaths(svgRef.value as SVGElement, group);
+		captureDragCables(svgRef.value as SVGElement, group);
 
 		window.addEventListener('mousemove', onMove);
 		window.addEventListener('mouseup', onUp);

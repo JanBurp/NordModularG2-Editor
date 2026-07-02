@@ -1668,6 +1668,67 @@ export const useSlotsStore = defineStore('slots', {
 			this._syncUprateAndColors(patch, areaIdx);
 		},
 
+		// Shared by breakJackConnection/moveCableGroup: replaces oldCables with newCables as one undoable step.
+		async _swapCables(
+			slot: SlotLabel,
+			patch: Patch,
+			areaIdx: 0 | 1,
+			location: 'va' | 'fx',
+			oldCables: Cable[],
+			newCables: Cable[],
+			redo: () => Promise<void>,
+		): Promise<void> {
+			const buildDelCmds = (cables: Cable[]) =>
+				cables.map((c) => [
+					'del-cable',
+					slot,
+					location,
+					String(c.smod),
+					(c.dir ?? 1) === 0 ? '0' : '1',
+					String(c.scon),
+					String(c.dmod),
+					'0',
+					String(c.dcon),
+				]);
+			const buildAddCmds = (cables: Cable[]) =>
+				cables.map((c) => [
+					'add-cable',
+					slot,
+					location,
+					String(c.colour),
+					String(c.smod),
+					(c.dir ?? 1) === 0 ? '0' : '1',
+					String(c.scon),
+					String(c.dmod),
+					'0',
+					String(c.dcon),
+				]);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const deletedCables = oldCables.map((c) => ({ ...c }));
+				const addedCables = newCables.map((c) => ({ ...c }));
+				hist.record(slot, {
+					undo: async () => {
+						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
+						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
+						this.slots[slot].rawHex = null;
+						await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
+						this._syncUprateAndColors(patch, areaIdx);
+					},
+					redo,
+				});
+			}
+
+			for (const c of oldCables) mutDeleteCable(patch, areaIdx, c);
+			for (const c of newCables) mutAddCable(patch, areaIdx, { ...c });
+			this.slots[slot].rawHex = null;
+
+			await window.cli.runBatch([...buildDelCmds(oldCables), ...buildAddCmds(newCables)]);
+
+			this._syncUprateAndColors(patch, areaIdx);
+		},
+
 		// Removes a jack from a multi-cable connection, splicing its remaining neighbors together
 		// instead of deleting the whole connection (see deleteConnectedCables for that behavior).
 		async breakJackConnection(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', area: 'voice' | 'fx'): Promise<void> {
@@ -1711,57 +1772,9 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 
-			const buildDelCmds = (cables: Cable[]) =>
-				cables.map((c) => [
-					'del-cable',
-					slot,
-					location,
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
-			const buildAddCmds = (cables: Cable[]) =>
-				cables.map((c) => [
-					'add-cable',
-					slot,
-					location,
-					String(c.colour),
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
-
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				const deletedCables = matching.map((c) => ({ ...c }));
-				const addedCables = newCables.map((c) => ({ ...c }));
-				hist.record(slot, {
-					undo: async () => {
-						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
-						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
-						this.slots[slot].rawHex = null;
-						await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
-						this._syncUprateAndColors(patch, areaIdx);
-					},
-					redo: async () => {
-						await this.breakJackConnection(moduleIndex, connectorIndex, type, area);
-					},
-				});
-			}
-
-			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
-			for (const c of newCables) mutAddCable(patch, areaIdx, c);
-			this.slots[slot].rawHex = null;
-
-			await window.cli.runBatch([...buildDelCmds(matching), ...buildAddCmds(newCables)]);
-
-			this._syncUprateAndColors(patch, areaIdx);
+			await this._swapCables(slot, patch, areaIdx, location, matching, newCables, () =>
+				this.breakJackConnection(moduleIndex, connectorIndex, type, area),
+			);
 		},
 
 		// Relocates a group of cables (all sharing the same jack) from one jack to another, as a single undoable step.
@@ -1782,57 +1795,7 @@ export const useSlotsStore = defineStore('slots', {
 				return { ...c, dmod: toJack.moduleIndex, dcon: toJack.connectorIndex };
 			});
 
-			const buildDelCmds = (list: Cable[]) =>
-				list.map((c) => [
-					'del-cable',
-					slot,
-					location,
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
-			const buildAddCmds = (list: Cable[]) =>
-				list.map((c) => [
-					'add-cable',
-					slot,
-					location,
-					String(c.colour),
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
-
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				const deletedCables = cables.map((c) => ({ ...c }));
-				const addedCables = newCables.map((c) => ({ ...c }));
-				hist.record(slot, {
-					undo: async () => {
-						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
-						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
-						this.slots[slot].rawHex = null;
-						await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
-						this._syncUprateAndColors(patch, areaIdx);
-					},
-					redo: async () => {
-						await this.moveCableGroup(cables, fromJack, toJack, area);
-					},
-				});
-			}
-
-			for (const c of cables) mutDeleteCable(patch, areaIdx, c);
-			for (const c of newCables) mutAddCable(patch, areaIdx, c);
-			this.slots[slot].rawHex = null;
-
-			await window.cli.runBatch([...buildDelCmds(cables), ...buildAddCmds(newCables)]);
-
-			this._syncUprateAndColors(patch, areaIdx);
+			await this._swapCables(slot, patch, areaIdx, location, cables, newCables, () => this.moveCableGroup(cables, fromJack, toJack, area));
 		},
 
 		updateResources(slot: SlotLabel, data: number[]): void {

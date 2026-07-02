@@ -20,10 +20,10 @@
 	import { useJackDragInteraction } from '../../composables/useJackDragInteraction';
 	import { useCableGrabInteraction } from '../../composables/useCableGrabInteraction';
 	import { matchesCableJack } from '../../store/slotHelpers';
+	import type { JackEnd } from '../../store/slotHelpers';
 	import { isGrabModifierPressed } from '../../utils/platform';
+	import { CABLE_COLOR_INDEX_MAP } from '../../constants';
 	import type { JackDragInfo } from '../../types';
-
-	type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
 
 	const props = defineProps({
 		modules: {
@@ -170,9 +170,21 @@
 		{ deep: true },
 	);
 
-	// Watch for hovered-jack changes — reveal/hide the hovered jack's cables independent of the color filter.
-	watch(hoverRevealKeys, () => {
-		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>, hoverRevealKeys.value);
+	// Watch for hovered-jack changes: diff old vs new keys, touching only the cables that changed
+	// instead of rescanning every cable in the patch (mirrors the selectedCables watcher below).
+	watch(hoverRevealKeys, (newKeys, oldKeys) => {
+		if (!svgRef?.value) return;
+		const svg = svgRef.value as SVGElement;
+		for (const key of newKeys) {
+			if (!oldKeys?.has(key)) svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('cable-hidden'));
+		}
+		for (const key of oldKeys ?? []) {
+			if (newKeys.has(key)) continue;
+			svg.querySelectorAll<Element>(`[data-cable-key="${key}"]`).forEach((el) => {
+				const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
+				if (colorName) el.classList.toggle('cable-hidden', cableVisibility.value[colorName as keyof typeof cableVisibility.value] === false);
+			});
+		}
 	});
 
 	// Watch for shake trigger to re-render cables with new random curves.
