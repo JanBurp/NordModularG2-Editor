@@ -137,7 +137,10 @@
 			@jackDragStart="onJackDragStart"
 			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
+			@jackBreakConnection="(info) => emit('jackBreakConnection', info)"
 			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
+			@jackHoverEnter="(info) => emit('jackHoverEnter', info)"
+			@jackHoverLeave="(info) => emit('jackHoverLeave', info)"
 		/>
 
 		<!-- Output jacks -->
@@ -156,7 +159,10 @@
 			@jackDragStart="onJackDragStart"
 			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
+			@jackBreakConnection="(info) => emit('jackBreakConnection', info)"
 			@jackSetCableColor="(info) => emit('jackSetCableColor', info)"
+			@jackHoverEnter="(info) => emit('jackHoverEnter', info)"
+			@jackHoverLeave="(info) => emit('jackHoverLeave', info)"
 		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
@@ -217,7 +223,10 @@
 		moduleDelete: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colourId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
+		jackHoverEnter: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackHoverLeave: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string; labelIndex: number }];
 	}>();
 

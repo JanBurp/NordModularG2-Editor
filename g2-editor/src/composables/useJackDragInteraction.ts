@@ -6,11 +6,13 @@ import { svgPath, svgCircle } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { useCableVisibility } from './useCableVisibility';
 import { useUiStore } from '../store/ui';
+import { matchesCableJack } from '../store/slotHelpers';
+import { computeDrivenInputJacks } from '../parser/cableGraph';
 import type { JackDragInfo } from '../types';
 
 type SnapJack = JackDragInfo & { x: number; y: number };
 
-const SNAP_RANGE = 64;
+export const SNAP_RANGE = 64;
 
 export function useJackDragInteraction(
 	svgRef: Ref<SVGSVGElement | null> | undefined,
@@ -42,11 +44,8 @@ export function useJackDragInteraction(
 			const dcon = parseInt(el.getAttribute('data-dcon') || '-1');
 			const dir = parseInt(el.getAttribute('data-dir') || '1');
 			const key = el.getAttribute('data-cable-key')!;
-			const matches =
-				(info.type === 'output' && dir === 1 && smod === info.moduleIndex && scon === info.connectorIndex) ||
-				(info.type === 'input' && dmod === info.moduleIndex && dcon === info.connectorIndex) ||
-				(info.type === 'input' && dir === 0 && smod === info.moduleIndex && scon === info.connectorIndex);
-			if (matches) {
+			const pseudoCable = { smod, scon, dmod, dcon, dir, colour: 0 };
+			if (matchesCableJack(pseudoCable, info.moduleIndex, info.connectorIndex, info.type)) {
 				svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((e) => e.classList.remove('cable-hidden'));
 			}
 		});
@@ -55,10 +54,7 @@ export function useJackDragInteraction(
 	function findAllCablesForJack(info: JackDragInfo): any[] {
 		const result: any[] = [];
 		for (const cable of getCables()) {
-			const dir = cable.dir ?? 1;
-			if (info.type === 'output' && dir === 1 && cable.smod === info.moduleIndex && cable.scon === info.connectorIndex) result.push(cable);
-			if (info.type === 'input' && cable.dmod === info.moduleIndex && cable.dcon === info.connectorIndex) result.push(cable);
-			if (info.type === 'input' && dir === 0 && cable.smod === info.moduleIndex && cable.scon === info.connectorIndex) result.push(cable);
+			if (matchesCableJack(cable, info.moduleIndex, info.connectorIndex, info.type)) result.push(cable);
 		}
 		return result;
 	}
@@ -68,26 +64,7 @@ export function useJackDragInteraction(
 		const src = dragSrcInfo;
 		const targetTypes: ('input' | 'output')[] = src.type === 'output' ? ['input'] : ['output', 'input'];
 		const cables = getCables();
-		const dir0Cables = cables.filter((c: any) => (c.dir ?? 1) === 0);
-		const drivenNestJacks = new Set<string>();
-		for (const c of cables) {
-			if ((c.dir ?? 1) !== 1) continue;
-			const queue: { mod: number; con: number }[] = [{ mod: c.dmod ?? 0, con: c.dcon ?? 0 }];
-			while (queue.length > 0) {
-				const { mod, con } = queue.shift()!;
-				const key = `${mod}-${con}`;
-				if (drivenNestJacks.has(key)) continue;
-				drivenNestJacks.add(key);
-				for (const dc of dir0Cables) {
-					const sm = dc.smod ?? 0,
-						sc = dc.scon ?? 0,
-						dm = dc.dmod ?? 0,
-						dc2 = dc.dcon ?? 0;
-					if (sm === mod && sc === con) queue.push({ mod: dm, con: dc2 });
-					else if (dm === mod && dc2 === con) queue.push({ mod: sm, con: sc });
-				}
-			}
-		}
+		const drivenNestJacks = computeDrivenInputJacks(cables);
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
 		for (const mod of getModules()) {

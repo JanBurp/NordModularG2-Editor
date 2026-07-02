@@ -1,6 +1,9 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import type { Cable } from '../renderer/cableRenderer';
+
+type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -87,6 +90,30 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.deleteConnectedCables(moduleIndex, connectorIndex, type, getArea());
 	}
 
+	async function handleJackBreakConnection({
+		moduleIndex,
+		connectorIndex,
+		type,
+	}: {
+		moduleIndex: number;
+		connectorIndex: number;
+		type: 'input' | 'output';
+	}): Promise<void> {
+		await slotsStore.breakJackConnection(moduleIndex, connectorIndex, type, getArea());
+	}
+
+	async function handleCableGroupDrop(group: Cable[], fromJack: JackEnd, toJack: JackEnd | null): Promise<void> {
+		try {
+			if (toJack) {
+				await slotsStore.moveCableGroup(group, fromJack, toJack, getArea());
+			} else {
+				await slotsStore.deleteSelection([], group, getArea(), currentModules.value, currentCables.value);
+			}
+		} finally {
+			uiStore.selectedCables = [];
+		}
+	}
+
 	async function handleJackSetCableColor({
 		moduleIndex,
 		connectorIndex,
@@ -111,6 +138,8 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		handleModuleDelete,
 		handleModuleColorChange,
 		handleJackDeleteConnected,
+		handleJackBreakConnection,
+		handleCableGroupDrop,
 		handleJackSetCableColor,
 	};
 }

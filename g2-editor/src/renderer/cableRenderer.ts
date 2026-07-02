@@ -29,6 +29,7 @@ export interface Jack {
 
 export interface CableRenderOptions {
 	onCableClick?: (cable: Cable) => void;
+	onCableGrabStart?: (e: MouseEvent, cable: Cable) => void;
 	selectedCables?: Cable[];
 	gravity?: number;
 	opacity?: number;
@@ -117,6 +118,10 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-cable-key': key,
 			'data-cable-color': String(cable.colour),
 		});
+		if (options?.onCableGrabStart) {
+			hitArea.addEventListener('mousedown', (e) => options.onCableGrabStart!(e, cable));
+		}
+
 		svgElement.appendChild(border);
 		svgElement.appendChild(main);
 		svgElement.appendChild(hitArea);
@@ -128,8 +133,13 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
 }
 
 // Applies CSS cable-hidden class based on per-color visibility flags.
-export function applyCableVisibility(svgElement: SVGElement, visibility: Record<string, boolean>): void {
+// forceVisibleKeys overrides the color filter for specific cables (e.g. temporarily revealed on jack hover).
+export function applyCableVisibility(svgElement: SVGElement, visibility: Record<string, boolean>, forceVisibleKeys?: Set<string>): void {
 	svgElement.querySelectorAll<Element>('[data-cable-color]').forEach((el) => {
+		if (forceVisibleKeys?.has(el.getAttribute('data-cable-key') || '')) {
+			el.classList.remove('cable-hidden');
+			return;
+		}
 		const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
 		if (colorName) el.classList.toggle('cable-hidden', visibility[colorName] === false);
 	});

@@ -7,6 +7,8 @@
 		@mousedown.stop="onMousedown"
 		@mouseup.stop="onMouseup"
 		@contextmenu.stop.prevent="onContextMenu"
+		@mouseenter="onMouseenter"
+		@mouseleave="onMouseleave"
 	>
 		<!-- Larger hit area for easier clicking/dragging -->
 		<circle v-if="type === 'input'" :cx="x" :cy="y" r="10" fill="none" style="pointer-events: all" />
@@ -77,7 +79,10 @@
 			},
 		];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
+		jackHoverEnter: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackHoverLeave: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
@@ -91,6 +96,10 @@
 			{
 				label: 'Delete connected',
 				action: () => emit('jackDeleteConnected', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
+			},
+			{
+				label: 'Break',
+				action: () => emit('jackBreakConnection', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type }),
 			},
 			{ type: 'separator' },
 			{
@@ -110,6 +119,14 @@
 			type: props.type,
 			colour: effectiveColour.value,
 		});
+	}
+
+	function onMouseenter() {
+		emit('jackHoverEnter', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type });
+	}
+
+	function onMouseleave() {
+		emit('jackHoverLeave', { moduleIndex: props.moduleIndex, connectorIndex: props.connectorIndex, type: props.type });
 	}
 
 	function onMouseup(e: MouseEvent) {

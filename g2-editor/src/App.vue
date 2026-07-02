@@ -60,7 +60,9 @@
 							@module-delete="voiceOps.handleModuleDelete"
 							@module-color-change="voiceOps.handleModuleColorChange"
 							@jack-delete-connected="voiceOps.handleJackDeleteConnected"
+							@jack-break-connection="voiceOps.handleJackBreakConnection"
 							@jack-set-cable-color="voiceOps.handleJackSetCableColor"
+							@cable-group-drop="(info) => voiceOps.handleCableGroupDrop(info.group, info.fromJack, info.toJack)"
 							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'voice' })"
 						/>
 					</div>
@@ -86,7 +88,9 @@
 							@module-delete="fxOps.handleModuleDelete"
 							@module-color-change="fxOps.handleModuleColorChange"
 							@jack-delete-connected="fxOps.handleJackDeleteConnected"
+							@jack-break-connection="fxOps.handleJackBreakConnection"
 							@jack-set-cable-color="fxOps.handleJackSetCableColor"
+							@cable-group-drop="(info) => fxOps.handleCableGroupDrop(info.group, info.fromJack, info.toJack)"
 							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'fx' })"
 						/>
 					</div>

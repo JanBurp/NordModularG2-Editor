@@ -80,6 +80,55 @@ export async function createCable(
 	await page.waitForTimeout(300);
 }
 
+type JackRef = { moduleShort: string; jackType: 'input' | 'output'; connectorIdx: number; occurrence?: number };
+
+/**
+ * Ctrl/Cmd-drag an existing cable's endpoint to relocate or delete it (the new cable-editing gesture).
+ * `cableIndex` selects which cable to grab, by DOM render order (0-based; cables render in creation order).
+ * `grabNear` is the jack whose end of that cable gets grabbed. `target` is the destination jack,
+ * or `{ empty: true }` to drop in empty canvas space (deletes the cable).
+ */
+export async function grabAndDropCableEnd(page: Page, cableIndex: number, grabNear: JackRef, target: JackRef | { empty: true }): Promise<void> {
+	await page.evaluate(
+		({ cableIndex, grabNear, target }) => {
+			function findJack(moduleShort: string, occurrence: number, jackData: string): Element | null {
+				const modules = Array.from(document.querySelectorAll(`[data-testid^="canvas-"] [data-module-short="${moduleShort}"]`));
+				const mod = modules[occurrence];
+				return mod ? mod.querySelector(`[data-jack="${jackData}"]`) : null;
+			}
+
+			const hitAreas = Array.from(document.querySelectorAll<SVGPathElement>('.cable-hit'));
+			const hitArea = hitAreas[cableIndex];
+			if (!hitArea) throw new Error(`Cable hit-area not found at index ${cableIndex}`);
+
+			const grabJack = findJack(grabNear.moduleShort, grabNear.occurrence ?? 0, `${grabNear.jackType}-${grabNear.connectorIdx}`);
+			if (!grabJack) throw new Error(`Jack not found: ${grabNear.moduleShort} ${grabNear.jackType}-${grabNear.connectorIdx}`);
+			const grabRect = grabJack.getBoundingClientRect();
+			const grabX = grabRect.left + grabRect.width / 2;
+			const grabY = grabRect.top + grabRect.height / 2;
+
+			let toX: number, toY: number;
+			if ('empty' in target) {
+				toX = 40;
+				toY = 500;
+			} else {
+				const targetJack = findJack(target.moduleShort, target.occurrence ?? 0, `${target.jackType}-${target.connectorIdx}`);
+				if (!targetJack) throw new Error(`Target jack not found: ${target.moduleShort} ${target.jackType}-${target.connectorIdx}`);
+				const targetRect = targetJack.getBoundingClientRect();
+				toX = targetRect.left + targetRect.width / 2;
+				toY = targetRect.top + targetRect.height / 2;
+			}
+
+			hitArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: false, cancelable: true, ctrlKey: true, clientX: grabX, clientY: grabY }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, clientX: (grabX + toX) / 2, clientY: (grabY + toY) / 2 }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, clientX: toX, clientY: toY }));
+			window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, ctrlKey: true, clientX: toX, clientY: toY }));
+		},
+		{ cableIndex, grabNear, target },
+	);
+	await page.waitForTimeout(300);
+}
+
 /** Read the module/cable count shown in the status bar for the given area. */
 export async function getStatusCounts(page: Page): Promise<{ voiceModules: number; voiceCables: number; fxModules: number; fxCables: number }> {
 	const text = await page.locator('[data-testid="status-counts"]').innerText();

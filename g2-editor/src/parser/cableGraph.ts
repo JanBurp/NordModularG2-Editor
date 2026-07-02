@@ -42,12 +42,40 @@ export function isNestDrivenByOutput(cableList: Cable[], startMod: number, start
 		if (cableList.some((c) => (c.dir ?? 1) === 1 && (c.dmod ?? 0) === mod && (c.dcon ?? 0) === con)) return true;
 		for (const c of cableList) {
 			if ((c.dir ?? 1) !== 0) continue;
-			const sm = c.smod ?? 0, sc = c.scon ?? 0, dm = c.dmod ?? 0, dc = c.dcon ?? 0;
+			const sm = c.smod ?? 0,
+				sc = c.scon ?? 0,
+				dm = c.dmod ?? 0,
+				dc = c.dcon ?? 0;
 			if (sm === mod && sc === con) queue.push({ mod: dm, con: dc });
 			else if (dm === mod && dc === con) queue.push({ mod: sm, con: sc });
 		}
 	}
 	return false;
+}
+
+// BFS outward from every output cable over dir=0 edges to find all input jacks whose nest is already driven by an output.
+export function computeDrivenInputJacks(cableList: Cable[]): Set<string> {
+	const dir0Cables = cableList.filter((c) => (c.dir ?? 1) === 0);
+	const drivenNestJacks = new Set<string>();
+	for (const c of cableList) {
+		if ((c.dir ?? 1) !== 1) continue;
+		const queue: { mod: number; con: number }[] = [{ mod: c.dmod ?? 0, con: c.dcon ?? 0 }];
+		while (queue.length > 0) {
+			const { mod, con } = queue.shift()!;
+			const key = `${mod}-${con}`;
+			if (drivenNestJacks.has(key)) continue;
+			drivenNestJacks.add(key);
+			for (const dc of dir0Cables) {
+				const sm = dc.smod ?? 0,
+					sc = dc.scon ?? 0,
+					dm = dc.dmod ?? 0,
+					dc2 = dc.dcon ?? 0;
+				if (sm === mod && sc === con) queue.push({ mod: dm, con: dc2 });
+				else if (dm === mod && dc2 === con) queue.push({ mod: sm, con: sc });
+			}
+		}
+	}
+	return drivenNestJacks;
 }
 
 // Computes which modules are uprated (audio-rate promoted) given the current cable topology.

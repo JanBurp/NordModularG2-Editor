@@ -40,7 +40,10 @@
 				@module-delete="(idx) => emit('moduleDelete', idx)"
 				@module-color-change="(idx, colorId) => emit('moduleColorChange', idx, colorId)"
 				@jack-delete-connected="(info) => emit('jackDeleteConnected', info)"
+				@jack-break-connection="(info) => emit('jackBreakConnection', info)"
 				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
+				@jack-hover-enter="onJackHoverEnter"
+				@jack-hover-leave="onJackHoverLeave"
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
@@ -52,8 +55,10 @@
 			:modules="props.modules as any[]"
 			:cables="props.cables as Cable[]"
 			:selected-cables="props.selectedCables"
+			:hovered-jack="hoveredJack"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
+			@cable-group-drop="emit('cableGroupDrop', $event)"
 		/>
 		<div ref="selectionRectEl" class="selection-rect" />
 	</div>
@@ -106,6 +111,8 @@
 		},
 	});
 
+	type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
+
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number, immediate?: boolean];
 		modeChange: [moduleIndex: number, index: number, value: number];
@@ -132,7 +139,9 @@
 		moduleDelete: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colorId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
+		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
+		cableGroupDrop: [info: { group: Cable[]; fromJack: JackEnd; toJack: JackEnd | null }];
 		paramLabelEdit: [info: { moduleIndex: number; paramIndex: number; currentLabel: string }];
 	}>();
 
@@ -140,6 +149,15 @@
 	provide('patchCanvasSvg', svgRef);
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
+
+	const hoveredJack = ref<JackEnd | null>(null);
+	const sameJack = (a: JackEnd, b: JackEnd) => a.moduleIndex === b.moduleIndex && a.connectorIndex === b.connectorIndex && a.type === b.type;
+	function onJackHoverEnter(info: JackEnd) {
+		hoveredJack.value = info;
+	}
+	function onJackHoverLeave(info: JackEnd) {
+		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
+	}
 
 	const { handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
 		svgRef,

@@ -1,7 +1,7 @@
 <template />
 
 <script setup lang="ts">
-	import { inject, watch, onMounted, nextTick } from 'vue';
+	import { inject, watch, onMounted, onUnmounted, nextTick, computed } from 'vue';
 	import type { Ref } from 'vue';
 	import {
 		makePatchCables,
@@ -18,7 +18,11 @@
 	import { useUiStore } from '../../store/ui';
 	import { useSettingsStore } from '../../store/settings';
 	import { useJackDragInteraction } from '../../composables/useJackDragInteraction';
+	import { useCableGrabInteraction } from '../../composables/useCableGrabInteraction';
+	import { matchesCableJack } from '../../store/slotHelpers';
 	import type { JackDragInfo } from '../../types';
+
+	type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
 
 	const props = defineProps({
 		modules: {
@@ -33,11 +37,16 @@
 			type: Array as () => Cable[],
 			default: () => [],
 		},
+		hoveredJack: {
+			type: Object as () => JackEnd | null,
+			default: null,
+		},
 	});
 
 	const emit = defineEmits<{
 		jackDragStart: [info: JackDragInfo];
 		jackDragEnd: [info: JackDragInfo];
+		cableGroupDrop: [info: { group: Cable[]; fromJack: JackEnd; toJack: JackEnd | null }];
 	}>();
 
 	const svgRef = inject<Ref<SVGSVGElement | null>>('patchCanvasSvg');
@@ -45,6 +54,13 @@
 	const { cableVisibility } = useCableVisibility();
 	const uiStore = useUiStore();
 	const settings = useSettingsStore();
+
+	// Cables touching the currently-hovered jack stay visible even if hidden by the color filter.
+	const hoverRevealKeys = computed<Set<string>>(() => {
+		const h = props.hoveredJack as JackEnd | null;
+		if (!h) return new Set();
+		return new Set((props.cables as Cable[]).filter((c) => matchesCableJack(c, h.moduleIndex, h.connectorIndex, h.type)).map(makeCableKey));
+	});
 
 	function renderCables() {
 		if (!svgRef?.value) return;
@@ -57,13 +73,30 @@
 				gravity: settings.cableGravity,
 				opacity: settings.cableOpacity,
 				thickness: settings.cableThickness,
+				onCableGrabStart: handleCableGrabStart,
 			});
 		}
-		applyCableVisibility(svg, cableVisibility.value as unknown as Record<string, boolean>);
+		applyCableVisibility(svg, cableVisibility.value as unknown as Record<string, boolean>, hoverRevealKeys.value);
+	}
+
+	// Cable hit-areas only become interactive while Ctrl/Cmd is held (see .cable-grab-mode in svgStyles.css),
+	// so plain clicks/drags on cables keep falling through to the canvas exactly as before.
+	function updateGrabMode(e: Event) {
+		const isCtrlHeld = 'ctrlKey' in e && ((e as KeyboardEvent).ctrlKey || (e as KeyboardEvent).metaKey);
+		svgRef?.value?.classList.toggle('cable-grab-mode', isCtrlHeld);
 	}
 
 	onMounted(() => {
 		nextTick(() => renderCables());
+		window.addEventListener('keydown', updateGrabMode);
+		window.addEventListener('keyup', updateGrabMode);
+		window.addEventListener('blur', updateGrabMode);
+	});
+
+	onUnmounted(() => {
+		window.removeEventListener('keydown', updateGrabMode);
+		window.removeEventListener('keyup', updateGrabMode);
+		window.removeEventListener('blur', updateGrabMode);
 	});
 
 	// Diff-based cables watch: only add new cables / remove deleted ones.
@@ -90,6 +123,7 @@
 					gravity: settings.cableGravity,
 					opacity: settings.cableOpacity,
 					thickness: settings.cableThickness,
+					onCableGrabStart: handleCableGrabStart,
 				};
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
@@ -104,7 +138,7 @@
 					}
 				}
 
-				applyCableVisibility(svgRef.value!, cableVisibility.value as unknown as Record<string, boolean>);
+				applyCableVisibility(svgRef.value!, cableVisibility.value as unknown as Record<string, boolean>, hoverRevealKeys.value);
 			});
 		},
 	);
@@ -130,10 +164,15 @@
 	watch(
 		cableVisibility,
 		() => {
-			if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
+			if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>, hoverRevealKeys.value);
 		},
 		{ deep: true },
 	);
+
+	// Watch for hovered-jack changes — reveal/hide the hovered jack's cables independent of the color filter.
+	watch(hoverRevealKeys, () => {
+		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>, hoverRevealKeys.value);
+	});
 
 	// Watch for shake trigger to re-render cables with new random curves.
 	watch(
@@ -186,6 +225,13 @@
 		() => props.cables as any[],
 		(info) => emit('jackDragStart', info),
 		(info) => emit('jackDragEnd', info),
+	);
+
+	const { handleCableGrabStart } = useCableGrabInteraction(
+		svgRef,
+		() => props.modules as any[],
+		() => props.cables as Cable[],
+		(group, fromJack, toJack) => emit('cableGroupDrop', { group, fromJack, toJack }),
 	);
 
 	defineExpose({ handleJackDragStart, handleJackDragEnd });
