@@ -8,7 +8,15 @@ import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModu
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
-import { areaConfig, findModuleByIndex, matchesCableJack, resolveColumnCollisions, extractVariations, removeModuleFromVariations } from './slotHelpers';
+import {
+	areaConfig,
+	findModuleByIndex,
+	matchesCableJack,
+	isCableSourceEnd,
+	resolveColumnCollisions,
+	extractVariations,
+	removeModuleFromVariations,
+} from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 import { useHistoryStore } from './history';
@@ -1770,9 +1778,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (cables.length === 0) return;
 
 			const newCables = cables.map((c) => {
-				if (fromJack.type === 'output') return { ...c, smod: toJack.moduleIndex, scon: toJack.connectorIndex };
-				if (c.smod === fromJack.moduleIndex && c.scon === fromJack.connectorIndex)
-					return { ...c, smod: toJack.moduleIndex, scon: toJack.connectorIndex };
+				if (isCableSourceEnd(c, fromJack)) return { ...c, smod: toJack.moduleIndex, scon: toJack.connectorIndex };
 				return { ...c, dmod: toJack.moduleIndex, dcon: toJack.connectorIndex };
 			});
 

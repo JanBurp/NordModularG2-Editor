@@ -8,6 +8,7 @@ function now(): string {
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
+	isMac: process.platform === 'darwin',
 	patches: {
 		list: (folder: string) => ipcRenderer.invoke("patches:list", folder),
 		load: (filepath: string) => ipcRenderer.invoke("patches:load", filepath),

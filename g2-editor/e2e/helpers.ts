@@ -108,21 +108,32 @@ export async function grabAndDropCableEnd(page: Page, cableIndex: number, grabNe
 			const grabY = grabRect.top + grabRect.height / 2;
 
 			let toX: number, toY: number;
+			let targetJackEl: Element | null = null;
 			if ('empty' in target) {
 				toX = 40;
 				toY = 500;
 			} else {
-				const targetJack = findJack(target.moduleShort, target.occurrence ?? 0, `${target.jackType}-${target.connectorIdx}`);
-				if (!targetJack) throw new Error(`Target jack not found: ${target.moduleShort} ${target.jackType}-${target.connectorIdx}`);
-				const targetRect = targetJack.getBoundingClientRect();
+				targetJackEl = findJack(target.moduleShort, target.occurrence ?? 0, `${target.jackType}-${target.connectorIdx}`);
+				if (!targetJackEl) throw new Error(`Target jack not found: ${target.moduleShort} ${target.jackType}-${target.connectorIdx}`);
+				const targetRect = targetJackEl.getBoundingClientRect();
 				toX = targetRect.left + targetRect.width / 2;
 				toY = targetRect.top + targetRect.height / 2;
 			}
 
-			hitArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: false, cancelable: true, ctrlKey: true, clientX: grabX, clientY: grabY }));
-			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, clientX: (grabX + toX) / 2, clientY: (grabY + toY) / 2 }));
-			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, clientX: toX, clientY: toY }));
-			window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, ctrlKey: true, clientX: toX, clientY: toY }));
+			// Both ctrlKey and metaKey are set so this works regardless of the host OS running the test
+			// (the app only requires whichever one is the platform's primary modifier).
+			hitArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: false, cancelable: true, ctrlKey: true, metaKey: true, clientX: grabX, clientY: grabY }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, metaKey: true, clientX: (grabX + toX) / 2, clientY: (grabY + toY) / 2 }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
+
+			// Dispatch the mouseup directly on the target jack element to match real user behavior (releasing
+			// the mouse precisely over the jack, which calls stopPropagation and never reaches a window
+			// listener) rather than via window, which would bypass that code path entirely.
+			if (targetJackEl) {
+				targetJackEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
+			} else {
+				window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
+			}
 		},
 		{ cableIndex, grabNear, target },
 	);

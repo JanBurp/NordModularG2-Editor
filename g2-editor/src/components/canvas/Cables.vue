@@ -20,6 +20,7 @@
 	import { useJackDragInteraction } from '../../composables/useJackDragInteraction';
 	import { useCableGrabInteraction } from '../../composables/useCableGrabInteraction';
 	import { matchesCableJack } from '../../store/slotHelpers';
+	import { isGrabModifierPressed } from '../../utils/platform';
 	import type { JackDragInfo } from '../../types';
 
 	type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
@@ -82,8 +83,8 @@
 	// Cable hit-areas only become interactive while Ctrl/Cmd is held (see .cable-grab-mode in svgStyles.css),
 	// so plain clicks/drags on cables keep falling through to the canvas exactly as before.
 	function updateGrabMode(e: Event) {
-		const isCtrlHeld = 'ctrlKey' in e && ((e as KeyboardEvent).ctrlKey || (e as KeyboardEvent).metaKey);
-		svgRef?.value?.classList.toggle('cable-grab-mode', isCtrlHeld);
+		const isGrabHeld = 'ctrlKey' in e && isGrabModifierPressed(e as KeyboardEvent);
+		svgRef?.value?.classList.toggle('cable-grab-mode', isGrabHeld);
 	}
 
 	onMounted(() => {
@@ -227,12 +228,19 @@
 		(info) => emit('jackDragEnd', info),
 	);
 
-	const { handleCableGrabStart } = useCableGrabInteraction(
+	const { handleCableGrabStart, handleJackMouseUp: handleCableGrabJackMouseUp } = useCableGrabInteraction(
 		svgRef,
 		() => props.modules as any[],
 		() => props.cables as Cable[],
 		(group, fromJack, toJack) => emit('cableGroupDrop', { group, fromJack, toJack }),
 	);
 
-	defineExpose({ handleJackDragStart, handleJackDragEnd });
+	// A jack's own mouseup handler stops native propagation, so a cable-grab in progress must be
+	// offered the event via this same Vue-emit chain before falling through to the normal jack-drag flow.
+	function handleJackDragEndOrGrabDrop(info: JackDragInfo) {
+		if (handleCableGrabJackMouseUp(info)) return;
+		handleJackDragEnd(info);
+	}
+
+	defineExpose({ handleJackDragStart, handleJackDragEnd: handleJackDragEndOrGrabDrop });
 </script>

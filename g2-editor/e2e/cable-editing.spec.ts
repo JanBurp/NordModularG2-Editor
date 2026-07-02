@@ -6,7 +6,9 @@ const MOD = { OscA: 97, FltClassic: 92, Mix21A: 194 } as const;
 
 const CABLE_COLOR_NAMES = ['red', 'blue', 'yellow', 'orange', 'green', 'purple', 'white'];
 
-async function soleCableAttrs(page: import('@playwright/test').Page): Promise<{ smod: string; scon: string; dmod: string; dcon: string; dir: string; colour: string; key: string } | null> {
+async function soleCableAttrs(
+	page: import('@playwright/test').Page,
+): Promise<{ smod: string; scon: string; dmod: string; dcon: string; dir: string; colour: string; key: string; d: string } | null> {
 	return page.evaluate(() => {
 		const el = document.querySelector('.svgcableborder[data-cable-key]');
 		if (!el) return null;
@@ -18,6 +20,7 @@ async function soleCableAttrs(page: import('@playwright/test').Page): Promise<{ 
 			dir: el.getAttribute('data-dir')!,
 			colour: el.getAttribute('data-cable-color')!,
 			key: el.getAttribute('data-cable-key')!,
+			d: el.getAttribute('d')!,
 		};
 	});
 }
@@ -154,5 +157,6 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		expect((await getStatusCounts(page)).voiceCables).toBe(1);
 		const after = await soleCableAttrs(page);
 		expect(after?.key).toBe(before?.key);
+		expect(after?.d).toBe(before?.d); // visually reverted to its pre-drag curve, not left bent toward the mouse
 	});
 });

@@ -18,6 +18,12 @@ export function matchesCableJack(c: Cable, moduleIndex: number, connectorIndex: 
 	);
 }
 
+// Does `jack` correspond to this cable's smod/scon end (true) or its dmod/dcon end (false)?
+export function isCableSourceEnd(c: Cable, jack: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }): boolean {
+	if (jack.type === 'output') return true;
+	return c.smod === jack.moduleIndex && c.scon === jack.connectorIndex;
+}
+
 function defaultPatchParams(): PatchParamVariation {
 	return {
 		patchVol: 100,

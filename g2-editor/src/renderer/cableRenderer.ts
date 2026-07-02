@@ -145,17 +145,26 @@ export function applyCableVisibility(svgElement: SVGElement, visibility: Record<
 	});
 }
 
-// Shifts a bezier cable path to new endpoints while preserving the existing curve shape.
-// cp1 lives near dst so it shifts by the dst delta; cp2 lives near src so it shifts by the src delta.
-function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: number, newDy: number): string {
+// Shifts one endpoint of a bezier cable path to a new position while preserving the curve's shape.
+// end='dst' moves the path's "M" point (cable.dmod/dcon); end='src' moves the path's final point
+// (cable.smod/scon). The adjacent control point (cp1 near dst, cp2 near src) moves with its endpoint.
+export function shiftCableEndpoint(existingD: string, end: 'src' | 'dst', newX: number, newY: number): string {
 	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
 	if (!m) return existingD;
-	const [oldDx, oldDy, cp1x, cp1y, cp2x, cp2y, oldSx, oldSy] = m.slice(1).map(Number);
-	const ddx = newDx - oldDx,
-		ddy = newDy - oldDy;
-	const dsx = newSx - oldSx,
-		dsy = newSy - oldSy;
-	return `M${newDx} ${newDy}C${cp1x + ddx} ${cp1y + ddy},${cp2x + dsx} ${cp2y + dsy},${newSx} ${newSy}`;
+	const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = m.slice(1).map(Number);
+	if (end === 'dst') {
+		const ddx = newX - dx,
+			ddy = newY - dy;
+		return `M${newX} ${newY}C${cp1x + ddx} ${cp1y + ddy},${cp2x} ${cp2y},${sx} ${sy}`;
+	}
+	const dsx = newX - sx,
+		dsy = newY - sy;
+	return `M${dx} ${dy}C${cp1x} ${cp1y},${cp2x + dsx} ${cp2y + dsy},${newX} ${newY}`;
+}
+
+// Shifts a bezier cable path to new endpoints while preserving the existing curve shape.
+function shiftCablePath(existingD: string, newSx: number, newSy: number, newDx: number, newDy: number): string {
+	return shiftCableEndpoint(shiftCableEndpoint(existingD, 'dst', newDx, newDy), 'src', newSx, newSy);
 }
 
 // Re-paths cables whose source or destination module is in movedIds, preserving curve shape.

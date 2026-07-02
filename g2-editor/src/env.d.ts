@@ -12,6 +12,7 @@ declare global {
 	interface Window {
 		electronAPI: {
 			isOffline: boolean;
+			isMac: boolean;
 			patches: {
 				list: (folder: string) => Promise<{
 					success: boolean;
