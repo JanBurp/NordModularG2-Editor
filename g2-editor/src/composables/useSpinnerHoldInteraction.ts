@@ -1,3 +1,5 @@
+import { onUnmounted } from 'vue';
+
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSlider';
 
 export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
@@ -67,6 +69,12 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 		stopRepeat();
 		onChange(paramIndex, 64);
 	}
+
+	onUnmounted(() => {
+		stopRepeat();
+		document.removeEventListener('mouseup', onMouseUp);
+		document.removeEventListener('touchend', onMouseUp);
+	});
 
 	return {
 		onMouseDown,

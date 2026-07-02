@@ -1,4 +1,4 @@
-import { ref } from 'vue';
+import { onUnmounted, ref } from 'vue';
 
 export function useDragInteraction(onDelta: (dx: number, dy: number, event: MouseEvent | TouchEvent) => void) {
 	const isDragging = ref(false);
@@ -30,6 +30,10 @@ export function useDragInteraction(onDelta: (dx: number, dy: number, event: Mous
 		document.removeEventListener('touchmove', onMouseMove);
 		document.removeEventListener('touchend', onMouseUp);
 	}
+
+	onUnmounted(() => {
+		onMouseUp();
+	});
 
 	return { isDragging, onMouseDown, onMouseUp };
 }
