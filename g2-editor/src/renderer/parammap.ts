@@ -140,7 +140,7 @@ const parammap: Record<string, ParamDefinition> = {
 	Pad_1: { width: 26, low: 0, high: 1, def: 0, defin: ['0 ~ 0 dB, 1 ~ +6 dB'], comments: '' },
 	Pad_2: { width: 26, low: 0, high: 1, def: 0, defin: ['0 ~ 0 dB, 1 ~ -6 dB'], comments: '' },
 	Pad_3: { width: 26, low: 0, high: 2, def: 0, defin: ['0 ~ 0 dB, 1 ~ -6 dB, 2 ~ -12 dB'], comments: '' },
-	Pad_4: { width: 26, low: 0, high: 3, def: 1, defin: ['0 ~ -12 dB, 1 ~ -6 dB, 2 ~ 0 dB,3 ~ +6 dB'], comments: '' },
+	Pad_4: { width: 26, low: 0, high: 3, def: 1, defin: ['0 ~ +6 dB, 1 ~ 0 dB, 2 ~ -6 dB, 3 ~ -12 dB'], comments: '' },
 	PartialRange: { low: 0, high: 127, def: 0, defin: ['0 ~ {+-}0, 1 ~ {+-}0, 64 ~ {+-}32, 65 ~ {+-}32*, 126 ~ {+-}63*, 126 ~ {+-}63*'], comments: '* clipped at {+-}32 and the lowest bit is not effective' },
 	Phase: { f: 'lfoP', low: 0, high: 127, def: 0, defin: ['0 ~ 0, 64 ~ 180, 127 ~ 357'], comments: 'In degrees, 360 degrees in a full circle' },
 	PhaserFreq: { low: 0, high: 127, def: 64, defin: ['0 ~ 0.05 Hz, 64 ~ 2.98 Hz, 127 ~ 11.6 Hz'], comments: '' },
