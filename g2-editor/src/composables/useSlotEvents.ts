@@ -4,7 +4,7 @@ import type { LogFn } from './useG2';
 import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { SlotLabel } from '@/types';
 import { ref } from 'vue';
-import { useSlotsStore } from '@/store/slots';
+import { resolveParamEcho, useSlotsStore } from '@/store/slots';
 
 export function useSlotEvents(log: LogFn) {
 	const store = useDeviceStore();
@@ -12,6 +12,7 @@ export function useSlotEvents(log: LogFn) {
 
 	const hardwareVariationChange = ref<{ slot: SlotLabel; variation: number } | null>(null);
 	const hardwareSlotChange = ref<SlotLabel | null>(null);
+	const pendingSlotReload = new Set<SlotLabel>();
 	const pendingResourceFetch = new Set<SlotLabel>();
 	let keyFocusTimer: ReturnType<typeof setTimeout> | null = null;
 
@@ -90,6 +91,7 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'param_change') {
 			log('←', 'Watch', `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`, 'param');
+			resolveParamEcho(`${ev.slot}:${ev.area}:${ev.module}:${ev.param}:${ev.variation}`, ev.value as number);
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
 			const areaKey = ev.area === 'va' ? 'voice' : 'fx';
@@ -128,7 +130,7 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'patch_version_change') {
 			log('←', 'Watch', `patch_version_change slot=${ev.slot} ver=${ev.version}`);
 			const sl = ev.slot as SlotLabel;
-			if (sl) slotsStore.loadSlot(sl);
+			if (sl) pendingSlotReload.add(sl);
 			return true;
 		}
 		if (ev.type === 'patch_update') {
@@ -139,7 +141,13 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 			const sl = ev.slot as SlotLabel;
-			if (sl) slotsStore.updateResources(sl, ev.data);
+			if (sl) {
+				slotsStore.updateResources(sl, ev.data);
+				if (pendingSlotReload.has(sl)) {
+					pendingSlotReload.delete(sl);
+					slotsStore.loadSlot(sl);
+				}
+			}
 			log('←', 'Watch', `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`);
 			return true;
 		}

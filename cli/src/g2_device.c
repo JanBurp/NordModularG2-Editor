@@ -1964,12 +1964,20 @@ int g2_copy_variation(int slot, int from_var, int to_var) {
 
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
-    if (slot < 0 || slot > 3)         return G2_ERR_INVALID_PARAM;
-    if (location < 0 || location > 2) return G2_ERR_INVALID_PARAM;
-    if (ensure_connected(0) < 0)      return G2_ERR_CONNECT;
+    if (slot < 0 || slot > 3)             { g2_err("set-param: invalid slot\n");        return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 2)     { g2_err("set-param: invalid location\n");    return G2_ERR_INVALID_PARAM; }
+    if (module_id < 0 || module_id > 255) { g2_err("set-param: invalid module-id\n");   return G2_ERR_INVALID_PARAM; }
+    if (param_idx < 0 || param_idx > 255) { g2_err("set-param: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
+    if (variation < 0 || variation > 8)   { g2_err("set-param: variation must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0)          { g2_err("set-param: not connected\n");       return G2_ERR_CONNECT; }
 
     uint8_t version = cable_get_version(slot);
 
+    /* Deliberately NOT sent via send_slot()/COMMAND_REQ: the G2 treats a
+     * COMMAND_REQ set-param as a structural patch edit, bumping the patch
+     * version and emitting an error/ack on every single write — turning a
+     * knob then floods patch_version_change + error events and destabilizes
+     * the connection. COMMAND_WRITE_NO_RESP is required for this subcommand. */
     uint8_t buff[2048] = {0};
     int pos = COMMAND_OFFSET;
     buff[pos++] = 0x01;

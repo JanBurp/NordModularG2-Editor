@@ -290,6 +290,14 @@ static int execute_seq(cJSON *args) {
  * recv_interrupt calls. */
 static int rearm_after_get_patch = 0;
 
+/* Also set when a patch_version_change event arrives (see main loop below).
+ * Not every patch_version_change is followed by a get-patch — e.g. a param
+ * changed via a MIDI CC feedback loop doesn't warrant a full patch reload —
+ * so if no get-patch shows up within this window, rearm directly instead of
+ * leaving the flag (and the G2's watch stream) stuck indefinitely. */
+static long long rearm_after_get_patch_deadline_ms = 0;
+#define REARM_FALLBACK_MS 300
+
 static void execute_cmd(const char *line) {
 	cJSON *req = daemon_parse_request(line);
 	if (!req) {
@@ -752,6 +760,46 @@ static void do_reconnect(void) {
 	fflush(stdout);
 }
 
+/* Process one message pulled from the listener queue: dispatch disconnect/
+ * rearm handling and emit it as a watch event. Shared by the main loop's
+ * idle wait and its post-command backlog drain, so a burst of stdin
+ * commands can't starve queue processing (see call sites below). */
+static void process_watch_msg(g2_msg_t *msg) {
+	if (msg->sentinel == 1) {
+		/* Device disconnected. */
+		g2_msg_free(msg);
+		if (daemon_running) do_reconnect();
+	} else if (msg->sentinel == 2) {
+		/* BULK_REARM: G2 stopped streaming (select-patch or select-perf).
+		 * Always rearm — if recv_interrupt() already consumed a sentinel=2
+		 * and set g2_pending_rearm=1, it removes the message from the queue
+		 * so the main loop never sees it here (no double-rearm risk). */
+		debug_timing("main_loop_bulk_rearm_detected");
+		g2_emit_event(msg);
+		g2_msg_free(msg);
+		g2_pending_rearm = 0;
+		rearm_with_version_update();
+	} else {
+		/* patch_version_change arrives while streaming is active.  The following
+		 * get-patch command will issue GET_PATCH_SLOT (0x36), which silently stops
+		 * G2 streaming just like select-patch.  Arm the deferred rearm now so the
+		 * main loop restarts streaming after get-patch returns. */
+		if ((msg->interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED
+			? (msg->interrupt[2] == 0x04 && msg->interrupt[4] == 0x38)
+			: (msg->bulk && msg->bulk_size > 3 && msg->bulk[1] == 0x01 && msg->bulk[3] == 0x21)) {
+			rearm_after_get_patch = 1;
+			rearm_after_get_patch_deadline_ms = now_ms() + REARM_FALLBACK_MS;
+		}
+		g2_emit_event(msg);
+		g2_msg_free(msg);
+		if (g2_pending_rearm) {
+			g2_pending_rearm = 0;
+			rearm_with_version_update();
+			/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
+		}
+	}
+}
+
 /* ── entry point ───────────────────────────────────────────────────────── */
 
 int g2_daemon_run(output_format_t format, int debug) {
@@ -855,44 +903,29 @@ int g2_daemon_run(output_format_t format, int debug) {
 				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
+			/* A rapid burst of stdin commands (e.g. coalesced set-param sends
+			 * during a knob drag) would otherwise starve g2_msg_recv() below for
+			 * the whole burst, leaving patch_version_change events undrained and
+			 * g2_slot_version stale — causing the G2 to silently reject every
+			 * subsequent set-param stamped with that stale version. Drain
+			 * whatever's already queued (non-blocking) after every command. */
+			g2_msg_t qmsg;
+			while (g2_msg_recv(&qmsg, 0) == 0) process_watch_msg(&qmsg);
 			continue;
+		}
+
+		/* No get-patch followed the last patch_version_change within the
+		 * fallback window — rearm directly so the watch stream doesn't stay
+		 * stuck (see rearm_after_get_patch_deadline_ms comment above). */
+		if (rearm_after_get_patch && now_ms() >= rearm_after_get_patch_deadline_ms) {
+			rearm_after_get_patch = 0;
+			rearm_with_version_update();
 		}
 
 		/* Wait for next event from the listener. */
 		g2_msg_t msg;
 		if (g2_msg_recv(&msg, 100) != 0) continue;
-
-		if (msg.sentinel == 1) {
-			/* Device disconnected. */
-			g2_msg_free(&msg);
-			if (daemon_running) do_reconnect();
-		} else if (msg.sentinel == 2) {
-			/* BULK_REARM: G2 stopped streaming (select-patch or select-perf).
-			 * Always rearm — if recv_interrupt() already consumed a sentinel=2
-			 * and set g2_pending_rearm=1, it removes the message from the queue
-			 * so the main loop never sees it here (no double-rearm risk). */
-			debug_timing("main_loop_bulk_rearm_detected");
-			g2_emit_event(&msg);
-			g2_msg_free(&msg);
-			g2_pending_rearm = 0;
-			rearm_with_version_update();
-		} else {
-			/* patch_version_change arrives while streaming is active.  The following
-			 * get-patch command will issue GET_PATCH_SLOT (0x36), which silently stops
-			 * G2 streaming just like select-patch.  Arm the deferred rearm now so the
-			 * main loop restarts streaming after get-patch returns. */
-			if ((msg.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED
-				? (msg.interrupt[2] == 0x04 && msg.interrupt[4] == 0x38)
-				: (msg.bulk && msg.bulk_size > 3 && msg.bulk[1] == 0x01 && msg.bulk[3] == 0x21))
-				rearm_after_get_patch = 1;
-			g2_emit_event(&msg);
-			g2_msg_free(&msg);
-			if (g2_pending_rearm) {
-				g2_pending_rearm = 0;
-				rearm_with_version_update();
-				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
-			}
-		}
+		process_watch_msg(&msg);
 	}
 
 	g2_listener_stop();

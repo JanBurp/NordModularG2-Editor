@@ -652,6 +652,21 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
                 g2_msg_free(&msg);
                 continue;
             }
+            /* Same rationale, for per-slot live watch-stream notifications (aCmd
+             * 0-3: param_change, patch_param, morph_change, patch_version, ...).
+             * These are spontaneous — no blocking command ever expects one of
+             * these as its own reply — but they can arrive interleaved with e.g.
+             * cable_get_version()'s GET_PATCH_VERSION query while a MIDI-CC
+             * feedback loop is actively changing other params. Without this, such
+             * a query can swallow a live param_change and misread an unrelated
+             * data byte (e.g. a module ID) as the version, corrupting
+             * g2_slot_version[] with a bogus value that then gets stamped on
+             * every subsequent set-param — which the G2 silently rejects. */
+            if (aCmd <= 0x03) {
+                g2_emit_event(&msg);
+                g2_msg_free(&msg);
+                continue;
+            }
         }
         /* Return this message. */
         int copy = (size > 16) ? 16 : size;
