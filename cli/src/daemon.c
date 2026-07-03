@@ -32,7 +32,7 @@
 /* ── command queue ─────────────────────────────────────────────────────── */
 
 typedef struct cmd_entry {
-	char line[4096];
+	char *line;
 	struct cmd_entry *next;
 } cmd_entry_t;
 
@@ -43,8 +43,8 @@ static cmd_entry_t *q_tail = NULL;
 int daemon_enqueue(const char *line) {
 	cmd_entry_t *e = malloc(sizeof(*e));
 	if (!e) return -1;
-	strncpy(e->line, line, sizeof(e->line) - 1);
-	e->line[sizeof(e->line) - 1] = '\0';
+	e->line = strdup(line);
+	if (!e->line) { free(e); return -1; }
 	e->next = NULL;
 	pthread_mutex_lock(&q_mutex);
 	if (q_tail) q_tail->next = e;
@@ -64,8 +64,7 @@ char *daemon_dequeue(void) {
 	}
 	pthread_mutex_unlock(&q_mutex);
 	if (!e) return NULL;
-	char *line = malloc(sizeof(e->line));
-	if (line) memcpy(line, e->line, sizeof(e->line));
+	char *line = e->line;  /* transfer ownership to caller */
 	free(e);
 	return line;
 }
@@ -719,9 +718,11 @@ static void daemon_stop(int sig) {
 
 static void *stdin_reader(void *arg) {
 	(void)arg;
-	char line[4096];
-	while (fgets(line, sizeof(line), stdin))
+	char *line = NULL;
+	size_t cap = 0;
+	while (getline(&line, &cap, stdin) != -1)
 		daemon_enqueue(line);
+	free(line);
 	daemon_running = 0;
 	return NULL;
 }

@@ -116,8 +116,8 @@
 							<ListItem
 								v-for="p in group.patches"
 								:key="`${p.bank}-${p.location}`"
-								:data-nav-idx="flatNavItems.indexOf(p)"
-								:selected="flatNavItems.indexOf(p) === selectedNavIndex"
+								:data-nav-idx="flatNavIndex.get(p)"
+								:selected="flatNavIndex.get(p) === selectedNavIndex"
 								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
@@ -301,6 +301,13 @@
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
 		if (browser.view === 'disk') return [...filteredDiskDirs.value, ...filteredDiskFiles.value];
 		return currentGroups.value.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
+	});
+
+	// item → index lookup, so per-row rendering is O(1) instead of indexOf's O(n) (twice per row).
+	const flatNavIndex = computed(() => {
+		const m = new Map<DiskEntry | SynthPatch, number>();
+		flatNavItems.value.forEach((item, i) => m.set(item, i));
+		return m;
 	});
 
 	const { selectedIndex: selectedNavIndex, navigate: navStep, reset: resetNavIndex } = useListNav(() => flatNavItems.value.length);

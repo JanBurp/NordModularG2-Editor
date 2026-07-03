@@ -343,7 +343,10 @@ int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops) {
     buff[pos++] = version;
 
     for (int i = 0; i < n_ops; i++) {
-        if (pos + 1 + ops[i].len > (int)sizeof(buff) - 2) break;
+        if (pos + 1 + ops[i].len > (int)sizeof(buff) - 2) {
+            fprintf(stderr, "send_slot_batch: batch too large for one frame (%d ops)\n", n_ops);
+            return -1;  /* fail atomically rather than silently dropping ops */
+        }
         buff[pos++] = ops[i].cmd;
         memcpy(buff + pos, ops[i].payload, (size_t)ops[i].len);
         pos += ops[i].len;

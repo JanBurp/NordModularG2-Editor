@@ -73,6 +73,8 @@ export function useJackDragInteraction(
 
 	let cycleJack: JackDragInfo | null = null;
 	let cycleIndex = -1;
+	// Cached once at drag start (cables can't change mid-drag) instead of recomputed every mousemove.
+	let drivenNestJacks: Set<string> | null = null;
 
 	function revealConnectedCables(info: JackDragInfo) {
 		if (!svgRef?.value) return;
@@ -103,8 +105,6 @@ export function useJackDragInteraction(
 		if (!dragSrcInfo) return null;
 		const src = dragSrcInfo;
 		const targetTypes: ('input' | 'output')[] = src.type === 'output' ? ['input'] : ['output', 'input'];
-		const cables = getCables();
-		const drivenNestJacks = computeDrivenInputJacks(cables);
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
 		for (const mod of getModules()) {
@@ -116,7 +116,7 @@ export function useJackDragInteraction(
 				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 				jacks.forEach((jack, idx) => {
 					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
-					if (targetType === 'input' && src.type === 'output' && drivenNestJacks.has(`${mod.index}-${idx}`)) return;
+					if (targetType === 'input' && src.type === 'output' && drivenNestJacks?.has(`${mod.index}-${idx}`)) return;
 					const jx = jack.x + baseX;
 					const jy = jack.y + baseY;
 					const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
@@ -170,6 +170,7 @@ export function useJackDragInteraction(
 		snapJack = null;
 		dragSrcPos = null;
 		dragSrcInfo = null;
+		drivenNestJacks = null;
 		hasDragged = false;
 		window.removeEventListener('mousemove', onMouseMovePreview);
 		window.removeEventListener('mouseup', onWindowMouseup);
@@ -188,6 +189,8 @@ export function useJackDragInteraction(
 			dragSrcPos = pos;
 			dragSrcInfo = info;
 			hasDragged = false;
+			// Only output-jack drags consult driven-nest jacks (see findSnapJack); compute once here.
+			drivenNestJacks = info.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
 			window.addEventListener('mousemove', onMouseMovePreview);
 			window.addEventListener('mouseup', onWindowMouseup);
 			revealConnectedCables(info);

@@ -1420,6 +1420,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx || !ctx.patch.description) return;
 			const { slot, patch } = ctx;
 			const description = patch.description!;
+			this.slots[slot].rawHex = null; // description was mutated by caller — invalidate cache so Save re-serializes
 			const templateHex = this.slots[slot].templateRawHex;
 			if (!templateHex || useDeviceStore().status !== DeviceStatus.Connected) return;
 			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');

@@ -53,7 +53,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref, watch } from 'vue';
+	import { computed, ref } from 'vue';
 
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
@@ -89,17 +89,14 @@
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
-	const selectedCategory = ref<number>(0);
-	watch(
-		() => (currentPatch.value as any)?.description?.category,
-		(cat) => {
-			if (cat !== undefined && cat !== null) selectedCategory.value = cat;
+	const selectedCategory = computed({
+		get: () => currentPatch.value?.description?.category ?? 0,
+		set: (val: number) => {
+			if (currentPatch.value?.description) {
+				currentPatch.value.description.category = Number(val);
+				slotsStore.setPatchDescription();
+			}
 		},
-		{ immediate: true },
-	);
-	watch(selectedCategory, (cat) => {
-		const desc = (currentPatch.value as any)?.description;
-		if (desc) desc.category = cat;
 	});
 
 	const selectedVoiceMode = computed({
