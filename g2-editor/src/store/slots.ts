@@ -56,6 +56,31 @@ function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
 const _paramInFlight = new Set<string>();
 const _paramPending = new Map<string, string[]>();
 
+// Best-effort confirmation that a set-param actually reached the device: the G2
+// echoes back a param_change watch event whenever a param really changes. If none
+// arrives, the device likely silently dropped the command (see g2_io.c send_slot
+// doc comment on stale version bytes) — this is an inference from absence, not a
+// confirmed rejection, so it only warns and never blocks/throttles sending.
+const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<typeof setTimeout> }>();
+
+function armParamEcho(key: string, value: number): void {
+	const existing = _paramAwaitingEcho.get(key);
+	if (existing) clearTimeout(existing.timer);
+	const timer = setTimeout(() => {
+		_paramAwaitingEcho.delete(key);
+		console.warn(`[USB] set-param not confirmed by device: ${key} v=${value}`);
+	}, 300);
+	_paramAwaitingEcho.set(key, { value, timer });
+}
+
+export function resolveParamEcho(key: string, value: number): void {
+	const pending = _paramAwaitingEcho.get(key);
+	if (pending && pending.value === value) {
+		clearTimeout(pending.timer);
+		_paramAwaitingEcho.delete(key);
+	}
+}
+
 function sendCoalesced(key: string, cmd: string[]): void {
 	if (_paramInFlight.has(key)) {
 		_paramPending.set(key, cmd);
@@ -71,6 +96,8 @@ function sendCoalesced(key: string, cmd: string[]): void {
 			if (pending) {
 				_paramPending.delete(key);
 				sendCoalesced(key, pending);
+			} else {
+				armParamEcho(key, Number(cmd[5]));
 			}
 		});
 }
@@ -575,7 +602,15 @@ export const useSlotsStore = defineStore('slots', {
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 
-			const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+			const mod: ModuleInstance = {
+				...src,
+				index: newId,
+				horiz: col,
+				vert: row,
+				lv: [...src.lv],
+				modes: [...src.modes],
+				paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+			};
 			mutAddModule(patch, areaIdx, mod);
 
 			const paramVals0 = src.lv.slice(0, src.pcnt);
@@ -624,6 +659,16 @@ export const useSlotsStore = defineStore('slots', {
 					} catch (err) {
 						console.warn('set-param batch CLI failed:', err);
 					}
+				}
+			}
+
+			if (src.paramLabels && src.paramLabels.length > 0) {
+				try {
+					await window.cli.runBatch(
+						src.paramLabels.map((pl) => ['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]),
+					);
+				} catch (err) {
+					console.warn('set-param-label batch CLI failed:', err);
 				}
 			}
 
@@ -698,7 +743,15 @@ export const useSlotsStore = defineStore('slots', {
 				const allCmds: string[][] = [];
 
 				for (const { src, newId, col, row } of entries) {
-					const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+					const mod: ModuleInstance = {
+						...src,
+						index: newId,
+						horiz: col,
+						vert: row,
+						lv: [...src.lv],
+						modes: [...src.modes],
+						paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+					};
 					mutAddModule(patch, areaIdx, mod);
 					if (slotEntry.variations) {
 						for (let v = 0; v < slotEntry.variations.length; v++) {
@@ -730,6 +783,11 @@ export const useSlotsStore = defineStore('slots', {
 									allCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
 								}
 							}
+						}
+					}
+					if (src.paramLabels && src.paramLabels.length > 0) {
+						for (const pl of src.paramLabels) {
+							allCmds.push(['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]);
 						}
 					}
 				}
@@ -1049,11 +1107,15 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			slotEntry.rawHex = null;
 
+			const key = `${slot}:${location}:${moduleId}:${paramIdx}:${variation}`;
 			const cmd = ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)];
 			if (immediate) {
-				window.cli.run(cmd).catch((err: unknown) => console.error('setParam failed:', err));
+				window.cli
+					.run(cmd)
+					.then(() => armParamEcho(key, value))
+					.catch((err: unknown) => console.error('setParam failed:', err));
 			} else {
-				sendCoalesced(`${slot}:${location}:${moduleId}:${paramIdx}:${variation}`, cmd);
+				sendCoalesced(key, cmd);
 			}
 		},
 
