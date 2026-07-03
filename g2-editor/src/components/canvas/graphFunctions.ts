@@ -160,27 +160,7 @@ function lfoShpgraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	let kt: 'C' | 'L' = 'L';
 	if (wave < 2) {
 		kt = 'C';
-		const newk: FastVector[] = [];
-		let lastx = kl[0].x;
-		let lasty = kl[0].y;
-		kl.forEach((x, i) => {
-			if (i === 0) {
-				newk.push(x);
-			} else {
-				let tx = x.x;
-				if (x.x2) {
-					const delta = x.x2 - tx;
-					tx = tx + delta * (shp * (1 / 128));
-				}
-				const tx1 = (tx - lastx) / 2;
-				newk.push(new FastVector(lastx + tx1, lasty));
-				newk.push(new FastVector(tx - tx1, x.y));
-				newk.push(new FastVector(tx, x.y));
-				lasty = x.y;
-				lastx = tx;
-			}
-		});
-		kl = newk;
+		kl = expandWaveCurve(kl, shp);
 	}
 	const k = kl.concat(
 		kl.slice(1).map((x) => {

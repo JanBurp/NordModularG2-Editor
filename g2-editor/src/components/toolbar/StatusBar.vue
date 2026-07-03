@@ -32,6 +32,7 @@
 	import { useSettingsStore } from '../../store/settings';
 	import type { PaneTab } from '../../store/settings';
 	import { useAreaMode } from '../../composables/useAreaMode';
+	import { areaConfig } from '../../store/slotHelpers';
 
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
@@ -41,7 +42,7 @@
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 
 	function areaCount(area: 'voice' | 'fx', type: 'modules' | 'cables'): number {
-		const i = area === 'voice' ? 1 : 0;
+		const i = areaConfig(area).areaIdx;
 		return type === 'modules' ? (currentPatch.value?.areas?.[i]?.modules?.length ?? 0) : (currentPatch.value?.areas?.[i]?.cableList?.length ?? 0);
 	}
 </script>

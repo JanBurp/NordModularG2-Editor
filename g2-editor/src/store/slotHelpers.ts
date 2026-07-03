@@ -6,6 +6,14 @@ export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'v
 	return area === 'voice' ? { areaIdx: 1, location: 'va' } : { areaIdx: 0, location: 'fx' };
 }
 
+// Resolves the working area from the current UI state: an explicit selection area wins,
+// otherwise fall back to the active area.
+export function resolveSelectionArea(ui: { selectedModulesArea: 'va' | 'fx' | null; activeArea: number }): 'voice' | 'fx' {
+	if (ui.selectedModulesArea === 'va') return 'voice';
+	if (ui.selectedModulesArea === 'fx') return 'fx';
+	return ui.activeArea === 1 ? 'voice' : 'fx';
+}
+
 export function findModuleByIndex(modules: ModuleInstance[], id: number): ModuleInstance | undefined {
 	return modules.find((m) => m.index === id);
 }

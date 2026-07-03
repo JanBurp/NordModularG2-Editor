@@ -85,6 +85,7 @@
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAddModule } from '../../composables/useAddModule';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
+	import { clientToSvgPoint } from '../../renderer/svgUtils';
 
 	const props = defineProps({
 		modules: {
@@ -200,14 +201,8 @@
 	});
 
 	function svgClientToGrid(clientX: number, clientY: number): { col: number; row: number } | null {
-		const svg = svgRef.value;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = clientX;
-		pt.y = clientY;
-		const svgPt = pt.matrixTransform(ctm.inverse());
+		const svgPt = clientToSvgPoint(svgRef.value, clientX, clientY);
+		if (!svgPt) return null;
 		return {
 			col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
 			row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),

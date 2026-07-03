@@ -2,26 +2,16 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-import type { JackEnd } from '../store/slotHelpers';
+import { areaConfig, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
-	const getArea =
-		areaGetter ??
-		(() => {
-			if (uiStore.selectedModulesArea === 'va') return 'voice';
-			if (uiStore.selectedModulesArea === 'fx') return 'fx';
-			return uiStore.activeArea === 1 ? 'voice' : 'fx';
-		});
+	const getArea = areaGetter ?? (() => resolveSelectionArea(uiStore));
 
-	const currentModules = computed(() =>
-		getArea() === 'voice' ? slotsStore.getAreaModules(uiStore.slotInFocus, 1) : slotsStore.getAreaModules(uiStore.slotInFocus, 0),
-	);
-	const currentCables = computed(() =>
-		getArea() === 'voice' ? slotsStore.getAreaCables(uiStore.slotInFocus, 1) : slotsStore.getAreaCables(uiStore.slotInFocus, 0),
-	);
+	const currentModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(getArea()).areaIdx));
+	const currentCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(getArea()).areaIdx));
 
 	async function deleteSelection(): Promise<void> {
 		try {

@@ -1,5 +1,6 @@
 import type { Ref } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
+import { clientToSvgPoint } from '../renderer/svgUtils';
 import { useUiStore } from '../store/ui';
 
 export function useModuleDrop(svgRef: Ref<SVGSVGElement | null>, onDrop: (info: { typeId: number; col: number; row: number }) => void) {
@@ -7,14 +8,7 @@ export function useModuleDrop(svgRef: Ref<SVGSVGElement | null>, onDrop: (info: 
 	let dropGhost: SVGRectElement | null = null;
 
 	function toSvgCoords(e: MouseEvent) {
-		const svg = svgRef.value as SVGSVGElement | null;
-		if (!svg?.getScreenCTM) return null;
-		const ctm = svg.getScreenCTM();
-		if (!ctm) return null;
-		const pt = svg.createSVGPoint();
-		pt.x = e.clientX;
-		pt.y = e.clientY;
-		return pt.matrixTransform(ctm.inverse());
+		return clientToSvgPoint(svgRef.value, e.clientX, e.clientY);
 	}
 
 	function handleDragOver(e: DragEvent) {

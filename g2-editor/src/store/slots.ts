@@ -48,6 +48,11 @@ export type { SlotLabel };
 
 const BATCH_CHUNK = 128;
 
+// Maps a controller location code to its CLI location string.
+function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
+	return location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
+}
+
 const _paramInFlight = new Set<string>();
 const _paramPending = new Map<string, string[]>();
 
@@ -433,7 +438,7 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							if (removedCCSnap.length > 0) {
 								const flatArgs = removedCCSnap.flatMap((a) => {
-									const locStr = a.location === 1 ? 'va' : 'fx';
+									const locStr = ccLocationStr(a.location);
 									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
 								});
 								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
@@ -2016,7 +2021,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async assignMidiCC(slot: SlotLabel, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number, cc: number): Promise<void> {
-			const locStr = location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
+			const locStr = ccLocationStr(location);
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => c.cc !== cc), { cc, location, moduleIndex, paramIndex }];
 			this.slots[slot].rawHex = null;
@@ -2032,7 +2037,7 @@ export const useSlotsStore = defineStore('slots', {
 						if (deviceStore.status === DeviceStatus.Connected) {
 							const oldAssignment = prevControllers.find((c) => c.cc === cc);
 							if (oldAssignment) {
-								const oldLocStr = oldAssignment.location === 1 ? 'va' : oldAssignment.location === 2 ? 'patch' : 'fx';
+								const oldLocStr = ccLocationStr(oldAssignment.location);
 								await window.cli.run([
 									'assign-midicc',
 									slot,
@@ -2072,7 +2077,7 @@ export const useSlotsStore = defineStore('slots', {
 						if (restored) {
 							const deviceStore = useDeviceStore();
 							if (deviceStore.status === DeviceStatus.Connected) {
-								const locStr = restored.location === 1 ? 'va' : restored.location === 2 ? 'patch' : 'fx';
+								const locStr = ccLocationStr(restored.location);
 								await window.cli.run(['assign-midicc', slot, locStr, String(restored.moduleIndex), String(restored.paramIndex), String(cc)]);
 							}
 						}
@@ -2103,7 +2108,7 @@ export const useSlotsStore = defineStore('slots', {
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && restored.length > 0) {
 							const flatArgs = restored.flatMap((a) => {
-								const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+								const locStr = ccLocationStr(a.location);
 								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
 							});
 							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
@@ -2134,7 +2139,7 @@ export const useSlotsStore = defineStore('slots', {
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && prevControllers.length > 0) {
 							const flatArgs = prevControllers.flatMap((a) => {
-								const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+								const locStr = ccLocationStr(a.location);
 								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
 							});
 							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
@@ -2175,7 +2180,7 @@ export const useSlotsStore = defineStore('slots', {
 							const restored = prevControllers.filter((c) => newCCSet.has(c.cc));
 							if (restored.length > 0) {
 								const flatArgs = restored.flatMap((a) => {
-									const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+									const locStr = ccLocationStr(a.location);
 									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
 								});
 								cmds.push(['assign-midicc-batch', slot, ...flatArgs]);
@@ -2191,7 +2196,7 @@ export const useSlotsStore = defineStore('slots', {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected && newAssignments.length > 0) {
 				const flatArgs = newAssignments.flatMap((a) => {
-					const locStr = a.location === 1 ? 'va' : a.location === 2 ? 'patch' : 'fx';
+					const locStr = ccLocationStr(a.location);
 					return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
 				});
 				await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);

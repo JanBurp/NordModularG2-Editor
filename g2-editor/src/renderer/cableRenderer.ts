@@ -145,13 +145,21 @@ export function applyCableVisibility(svgElement: SVGElement, visibility: Record<
 	});
 }
 
+// Parses a bezier cable path "M dx dy C cp1x cp1y,cp2x cp2y,sx sy" into its 8 numbers, or null.
+type CablePathPoints = [number, number, number, number, number, number, number, number];
+function parseCablePath(d: string): CablePathPoints | null {
+	const m = d.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
+	if (!m) return null;
+	return m.slice(1).map(Number) as CablePathPoints;
+}
+
 // Shifts one endpoint of a bezier cable path to a new position while preserving the curve's shape.
 // end='dst' moves the path's "M" point (cable.dmod/dcon); end='src' moves the path's final point
 // (cable.smod/scon). The adjacent control point (cp1 near dst, cp2 near src) moves with its endpoint.
 export function shiftCableEndpoint(existingD: string, end: 'src' | 'dst', newX: number, newY: number): string {
-	const m = existingD.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
-	if (!m) return existingD;
-	const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = m.slice(1).map(Number);
+	const p = parseCablePath(existingD);
+	if (!p) return existingD;
+	const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = p;
 	if (end === 'dst') {
 		const ddx = newX - dx,
 			ddy = newY - dy;
@@ -227,9 +235,9 @@ export function updateCableGravity(svgElement: SVGElement, oldGravity: number, n
 	svgElement.querySelectorAll<SVGPathElement>('[data-cable-key]').forEach((el) => {
 		const d = el.getAttribute('d');
 		if (!d) return;
-		const m = d.match(/M([-\d.]+) ([-\d.]+)C([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+),([-\d.]+) ([-\d.]+)/);
-		if (!m) return;
-		const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = m.slice(1).map(Number);
+		const p = parseCablePath(d);
+		if (!p) return;
+		const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = p;
 		const diffX = sx - dx,
 			diffY = sy - dy;
 		const length = Math.sqrt(diffX * diffX + diffY * diffY);

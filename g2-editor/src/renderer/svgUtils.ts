@@ -100,3 +100,17 @@ export function svgText(x: number, y: number, text: string, attrs?: Record<strin
 export function svgNested(attrs?: Record<string, any>): SVGSVGElement {
 	return svgNSGet('svg', attrs) as SVGSVGElement;
 }
+
+/**
+ * Transforms viewport (client) coordinates into the SVG's user-space coordinates.
+ * Returns null if the element is missing or has no current transform matrix.
+ */
+export function clientToSvgPoint(svg: SVGSVGElement | null, clientX: number, clientY: number): { x: number; y: number } | null {
+	if (!svg?.getScreenCTM) return null;
+	const ctm = svg.getScreenCTM();
+	if (!ctm) return null;
+	const pt = svg.createSVGPoint();
+	pt.x = clientX;
+	pt.y = clientY;
+	return pt.matrixTransform(ctm.inverse());
+}

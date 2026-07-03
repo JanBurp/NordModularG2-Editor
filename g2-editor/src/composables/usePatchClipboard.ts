@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { areaConfig, resolveSelectionArea } from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
 
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
@@ -8,13 +9,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	const uiStore = useUiStore();
 	const { deleteSelection } = usePatchOperations(areaGetter);
 
-	const getSourceArea =
-		areaGetter ??
-		(() => {
-			if (uiStore.selectedModulesArea === 'va') return 'voice';
-			if (uiStore.selectedModulesArea === 'fx') return 'fx';
-			return uiStore.activeArea === 1 ? 'voice' : 'fx';
-		});
+	const getSourceArea = areaGetter ?? (() => resolveSelectionArea(uiStore));
 
 	const hasClipboard = computed(() => uiStore.clipboard !== null && uiStore.clipboard.modules.length > 0);
 
@@ -23,7 +18,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		if (selectedIds.size === 0) return;
 
 		const area = getSourceArea();
-		const areaIdx = area === 'voice' ? 1 : 0;
+		const { areaIdx, location: areaKey } = areaConfig(area);
 		const slot = uiStore.slotInFocus;
 
 		const modules = slotsStore
@@ -36,7 +31,6 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
 			.map((c: any) => ({ ...c }));
 
-		const areaKey: 'va' | 'fx' = areaIdx === 1 ? 'va' : 'fx';
 		uiStore.clipboard = { modules, cables, area: areaKey };
 	}
 
@@ -53,7 +47,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const mousePos = uiStore.lastMousePos;
 		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : uiStore.activeArea === 1 ? 'va' : 'fx';
 		const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
-		const areaIdx = area === 'voice' ? 1 : 0;
+		const { areaIdx } = areaConfig(area);
 
 		// Compute target top-left from mouse or fall back to +2 offset from clipboard origin
 		const minCol = Math.min(...clipboard.modules.map((m) => m.horiz));

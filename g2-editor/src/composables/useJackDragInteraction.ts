@@ -2,7 +2,7 @@ import { onUnmounted } from 'vue';
 import type { Ref } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
-import { svgPath, svgCircle } from '../renderer/svgUtils';
+import { svgPath, svgCircle, clientToSvgPoint } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { useCableVisibility } from './useCableVisibility';
 import { useUiStore } from '../store/ui';
@@ -16,14 +16,7 @@ export const SNAP_RANGE = 96;
 
 // Shared with useCableGrabInteraction.ts: converts a mouse event into SVG user-space coordinates.
 export function toSvgCoords(svgRef: Ref<SVGSVGElement | null> | undefined, e: MouseEvent) {
-	const svg = svgRef?.value as SVGSVGElement | null;
-	if (!svg?.getScreenCTM) return null;
-	const ctm = svg.getScreenCTM();
-	if (!ctm) return null;
-	const pt = svg.createSVGPoint();
-	pt.x = e.clientX;
-	pt.y = e.clientY;
-	return pt.matrixTransform(ctm.inverse());
+	return clientToSvgPoint(svgRef?.value ?? null, e.clientX, e.clientY);
 }
 
 // Shared with useCableGrabInteraction.ts: looks up a jack's SVG position from module/patch geometry.
