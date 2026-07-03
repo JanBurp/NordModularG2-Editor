@@ -99,6 +99,8 @@ int parse_location_str(const char *s) {
 /* Decode a hex string into a newly-allocated byte array.
  * Returns the number of bytes, or -1 on allocation failure. Caller must free *out. */
 int hex_to_bytes(const char *hex, uint8_t **out) {
+    *out = NULL;
+    if (!hex) return -1;
     int nbytes = (int)(strlen(hex) / 2);
     *out = malloc(nbytes);
     if (!*out) return -1;

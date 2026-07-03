@@ -133,9 +133,11 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		setAreaFbar(fbar: number) {
-			const patch = useSlotsStore().slots[this.slotInFocus].patch;
-			if (patch?.description) {
-				patch.description.height = Math.max(0, Math.min(16383, fbar));
+			const slotsStore = useSlotsStore();
+			const entry = slotsStore.slots[this.slotInFocus];
+			if (entry.patch?.description) {
+				entry.patch.description.height = Math.max(0, Math.min(16383, fbar));
+				entry.rawHex = null; // invalidate cache so Save re-serializes the new height
 			}
 			this.clearSelection();
 		},

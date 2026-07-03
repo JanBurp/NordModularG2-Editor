@@ -316,8 +316,8 @@ static void execute_cmd(const char *line) {
 
 	if (strcmp(cmd, "verbose") == 0 && n >= 1) {
 		const char *val = arg_s(args, 0);
-		if (strcmp(val, "on") == 0)       g2_watch_verbose = 1;
-		else if (strcmp(val, "off") == 0) g2_watch_verbose = 0;
+		if (val && strcmp(val, "on") == 0)       g2_watch_verbose = 1;
+		else if (val && strcmp(val, "off") == 0) g2_watch_verbose = 0;
 		else {
 			cJSON *r = daemon_make_error(id, G2_ERR_INVALID_PARAM);
 			emit(r); cJSON_Delete(r); cJSON_Delete(req);
@@ -330,8 +330,8 @@ static void execute_cmd(const char *line) {
 
 	if (strcmp(cmd, "debug") == 0 && n >= 1) {
 		const char *val = arg_s(args, 0);
-		if (strcmp(val, "on") == 0)       g2_debug = 1;
-		else if (strcmp(val, "off") == 0) g2_debug = 0;
+		if (val && strcmp(val, "on") == 0)       g2_debug = 1;
+		else if (val && strcmp(val, "off") == 0) g2_debug = 0;
 		else {
 			cJSON *r = daemon_make_error(id, G2_ERR_INVALID_PARAM);
 			emit(r); cJSON_Delete(r); cJSON_Delete(req);
@@ -580,6 +580,7 @@ static void execute_cmd(const char *line) {
 
 	} else if (strcmp(cmd, "get-perf-file") == 0) {
 		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);
+		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-synth-settings") == 0 && n >= 1) {
 		cJSON *params = cJSON_Parse(arg_s(args, 0));

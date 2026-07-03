@@ -123,7 +123,7 @@ cJSON *query_perf_settings(int mode, const char *type) {
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size);
+            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
         }
     }
 
@@ -240,7 +240,7 @@ cJSON *g2_device_info(int debug) {
 
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size);
+            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
         }
     }
 
@@ -257,6 +257,7 @@ cJSON *g2_device_info(int debug) {
 
         if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
+            if (size > 1024) size = 1024;
             perfSize = size;
             recv_bulk(perfData, size);
         }
@@ -387,6 +388,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         g2_err("Failed to send get patch name command\n");
         free(patchData);
+        patchData = NULL;
         goto cleanup;
     }
 
@@ -993,6 +995,8 @@ int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
     buf[pos++]=(uint8_t)module_id; buf[pos++]=(uint8_t)col;
     buf[pos++]=(uint8_t)row; buf[pos++]=(uint8_t)(color&0xff);
     buf[pos++]=0x00; buf[pos++]=0x00; /* upRate, isLed */
+    if (num_modes < 0) num_modes = 0;
+    if (num_modes > 16) num_modes = 16;  /* bound: caller buffers hold at most this many */
     for (int m=0; m<num_modes; m++)
         buf[pos++]=(uint8_t)(mode_vals ? mode_vals[m] : 0);
     if (name && *name) {
@@ -1784,7 +1788,7 @@ cJSON *g2_get_perf_file(const char *filename) {
         int ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size);
+            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
         }
     }
 

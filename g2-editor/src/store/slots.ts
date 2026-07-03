@@ -1149,7 +1149,11 @@ export const useSlotsStore = defineStore('slots', {
 				path = result.filepath;
 			}
 			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
-			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].patch!).filter(Boolean);
+			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => {
+				const e = this.slots[s];
+				if (e.patch) e.patch.controllers = [...e.controllers]; // sync edits (auto-CC, deletes) before serialize
+				return e.patch!;
+			}).filter(Boolean);
 			if (patches.length !== 4) return;
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
 			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray);
@@ -1834,7 +1838,7 @@ export const useSlotsStore = defineStore('slots', {
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
-					if (selectedModules.length > 0) {
+					if (selectedModules.length > 0 && selectedCables.length === 0) {
 						for (const id of selectedModules) {
 							const mod = findModuleByIndex(patch.areas[areaIdx].modules, id);
 							if (!mod) continue;
