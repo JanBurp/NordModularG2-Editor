@@ -29,7 +29,12 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const modules = slotsStore
 			.getAreaModules(slot, areaIdx)
 			.filter((m: any) => selectedIds.has(m.index as number))
-			.map((m: any) => ({ ...m, lv: [...m.lv], modes: [...m.modes], paramLabels: m.paramLabels ? [...m.paramLabels] : undefined }));
+			.map((m: any) => ({
+				...m,
+				lv: [...m.lv],
+				modes: [...m.modes],
+				paramLabels: m.paramLabels ? m.paramLabels.map((pl: any) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+			}));
 
 		const cables = slotsStore
 			.getAreaCables(slot, areaIdx)

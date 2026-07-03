@@ -597,7 +597,15 @@ export const useSlotsStore = defineStore('slots', {
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 
-			const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+			const mod: ModuleInstance = {
+				...src,
+				index: newId,
+				horiz: col,
+				vert: row,
+				lv: [...src.lv],
+				modes: [...src.modes],
+				paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+			};
 			mutAddModule(patch, areaIdx, mod);
 
 			const paramVals0 = src.lv.slice(0, src.pcnt);
@@ -646,6 +654,16 @@ export const useSlotsStore = defineStore('slots', {
 					} catch (err) {
 						console.warn('set-param batch CLI failed:', err);
 					}
+				}
+			}
+
+			if (src.paramLabels && src.paramLabels.length > 0) {
+				try {
+					await window.cli.runBatch(
+						src.paramLabels.map((pl) => ['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]),
+					);
+				} catch (err) {
+					console.warn('set-param-label batch CLI failed:', err);
 				}
 			}
 
@@ -720,7 +738,15 @@ export const useSlotsStore = defineStore('slots', {
 				const allCmds: string[][] = [];
 
 				for (const { src, newId, col, row } of entries) {
-					const mod: ModuleInstance = { ...src, index: newId, horiz: col, vert: row, lv: [...src.lv], modes: [...src.modes] };
+					const mod: ModuleInstance = {
+						...src,
+						index: newId,
+						horiz: col,
+						vert: row,
+						lv: [...src.lv],
+						modes: [...src.modes],
+						paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+					};
 					mutAddModule(patch, areaIdx, mod);
 					if (slotEntry.variations) {
 						for (let v = 0; v < slotEntry.variations.length; v++) {
@@ -752,6 +778,11 @@ export const useSlotsStore = defineStore('slots', {
 									allCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
 								}
 							}
+						}
+					}
+					if (src.paramLabels && src.paramLabels.length > 0) {
+						for (const pl of src.paramLabels) {
+							allCmds.push(['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]);
 						}
 					}
 				}
