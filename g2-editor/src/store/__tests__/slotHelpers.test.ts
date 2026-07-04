@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { resolveColumnCollisions } from '../slotHelpers';
+import { resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
 
 describe('resolveColumnCollisions', () => {
 	it('returns empty when no occupants', () => {
@@ -51,5 +51,30 @@ describe('resolveColumnCollisions', () => {
 		const r2 = result.find((r) => r.index === 2)!;
 		expect(r1.newRow).toBe(2);
 		expect(r2.newRow).toBe(5); // pushed past r1's end (2+3=5)
+	});
+});
+
+describe('resolvePasteRowOffset', () => {
+	it('leaves dRow unchanged when the target column differs from the source', () => {
+		const mods = [{ vert: 0, height: 2 }];
+		expect(resolvePasteRowOffset(mods, 1, 0)).toBe(0);
+	});
+
+	it('leaves dRow unchanged when the target row does not overlap the source', () => {
+		const mods = [{ vert: 0, height: 2 }];
+		expect(resolvePasteRowOffset(mods, 0, 5)).toBe(5);
+	});
+
+	it('places a single module directly below the source when paste lands on it', () => {
+		const mods = [{ vert: 0, height: 2 }];
+		expect(resolvePasteRowOffset(mods, 0, 0)).toBe(2);
+	});
+
+	it('places the whole group below its bounding box when paste lands on any source module', () => {
+		const mods = [
+			{ vert: 0, height: 2 },
+			{ vert: 2, height: 4 },
+		];
+		expect(resolvePasteRowOffset(mods, 0, 0)).toBe(6);
 	});
 });

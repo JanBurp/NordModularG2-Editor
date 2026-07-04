@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { areaConfig, resolveSelectionArea } from '../store/slotHelpers';
+import { areaConfig, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
 
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
@@ -60,7 +60,10 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const targetCol = mousePos ? mousePos.col : minCol + 2;
 		const targetRow = mousePos ? mousePos.row : minRow + 2;
 		const dCol = targetCol - minCol;
-		const dRow = targetRow - minRow;
+
+		const { getModule } = await import('../renderer/nmg2mods');
+		const moduleRects = clipboard.modules.map((m) => ({ vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
+		const dRow = resolvePasteRowOffset(moduleRects, dCol, targetRow - minRow);
 
 		// Generate new IDs against the destination area
 		const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);

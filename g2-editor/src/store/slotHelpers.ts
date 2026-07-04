@@ -107,3 +107,11 @@ export function resolveColumnCollisions(
 			newRow: newRows.get(m.index)!,
 		}));
 }
+
+export function resolvePasteRowOffset(modules: { vert: number; height: number }[], dCol: number, dRow: number): number {
+	if (dCol !== 0) return dRow;
+	if (!modules.some((m) => Math.abs(dRow) < m.height)) return dRow;
+	const minRow = Math.min(...modules.map((m) => m.vert));
+	const maxBottom = Math.max(...modules.map((m) => m.vert + m.height));
+	return maxBottom - minRow;
+}
