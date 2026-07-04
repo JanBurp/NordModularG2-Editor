@@ -1,6 +1,6 @@
-import { ref } from 'vue';
-
 import { DeviceStatus, useDeviceStore } from '@/store/device';
+
+import { ref } from 'vue';
 import { useDeviceEvents } from './useDeviceEvents';
 import { useLedEvents } from './useLedEvents';
 import { useSlotEvents } from './useSlotEvents';
@@ -29,7 +29,7 @@ export function useG2() {
 
 	const log: LogFn = (direction, event, message, category) => {
 		if (category !== 'led' && category !== 'volume') {
-			const fn = event === 'Daemon' || event === 'USB' || event === 'Connect' || event === 'Disconnect' ? console.error : console.log;
+			const fn = event === 'Daemon' || event === 'USB' || event === 'Connect' || event === 'Disconnect' ? console.warn : console.log;
 			fn(`[USB] ${now()} ${direction} ${event} ${message}`);
 		}
 	};

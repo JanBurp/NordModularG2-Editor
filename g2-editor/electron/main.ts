@@ -63,7 +63,7 @@ function startDaemon() {
 		console.error("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
 		return;
 	}
-	console.error('[daemon] Starting daemon process...');
+	console.warn('[daemon] Starting daemon process...');
 	const proc = spawn(cliPath, ["daemon"]);
 	daemonProcess = proc;
 	proc.stdin?.on("error", () => {
