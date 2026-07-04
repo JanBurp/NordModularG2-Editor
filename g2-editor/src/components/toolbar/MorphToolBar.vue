@@ -9,7 +9,13 @@
 					@dragover.prevent
 					@drop="onMorphCCDrop(i, $event)"
 				>
-					<svg v-if="showCCOverlay && getMorphCC(i) !== null" class="absolute -top-1 left-1/2 z-10 hover:z-20" width="1" height="14" overflow="visible">
+					<svg
+						v-if="showCCOverlay && getMorphCC(i) !== null"
+						class="absolute -top-1 left-1/2 z-10 hover:z-20"
+						width="1"
+						height="14"
+						overflow="visible"
+					>
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
 					<Knob

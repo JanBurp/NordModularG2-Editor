@@ -11,7 +11,16 @@
 		<circle :r="radius + 4" :cx="radius + 2" :cy="radius + 2" fill="transparent" class="hit-area" />
 
 		<!-- Main circle with radial gradient -->
-		<circle ref="knobCircle" :r="radius" :cx="radius + 2" :cy="radius + 2" fill="url(#g120)" stroke="#333" stroke-width="0.5" :class="{ dragging: isDragging }" />
+		<circle
+			ref="knobCircle"
+			:r="radius"
+			:cx="radius + 2"
+			:cy="radius + 2"
+			fill="url(#g120)"
+			stroke="#333"
+			stroke-width="0.5"
+			:class="{ dragging: isDragging }"
+		/>
 
 		<!-- Bottom-left tick mark -->
 		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
@@ -31,7 +40,15 @@
 		/>
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
-		<path v-if="isReset" d="M-3,-3 L3,-3 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" style="cursor: pointer" @mousedown.stop @click.stop="resetToDefault()" />
+		<path
+			v-if="isReset"
+			d="M-3,-3 L3,-3 L0,2 Z"
+			fill="green"
+			:transform="`translate(${radius + 2}, 0)`"
+			style="cursor: pointer"
+			@mousedown.stop
+			@click.stop="resetToDefault()"
+		/>
 
 		<!-- Selected param underline -->
 		<rect v-if="highlight" :x="0" :y="radius * 2 + 3" :width="radius * 2 + 4" height="2" fill="white" pointer-events="none" />

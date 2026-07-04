@@ -33,7 +33,15 @@
 					stroke-width="2"
 					:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
 				/>
-				<path v-if="isReset" d="M-3,-3 L3,-3 L0,2 Z" fill="green" :transform="`translate(${radius + 2}, 0)`" style="cursor: pointer" @mousedown.stop @click.stop="resetToDefault()" />
+				<path
+					v-if="isReset"
+					d="M-3,-3 L3,-3 L0,2 Z"
+					fill="green"
+					:transform="`translate(${radius + 2}, 0)`"
+					style="cursor: pointer"
+					@mousedown.stop
+					@click.stop="resetToDefault()"
+				/>
 			</g>
 		</svg>
 	</div>

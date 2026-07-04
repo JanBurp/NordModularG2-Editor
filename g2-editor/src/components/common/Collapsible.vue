@@ -18,7 +18,12 @@
 
 	const open = ref(props.modelValue ?? props.defaultOpen);
 
-	watch(() => props.modelValue, (v) => { if (v !== undefined) open.value = v; });
+	watch(
+		() => props.modelValue,
+		(v) => {
+			if (v !== undefined) open.value = v;
+		},
+	);
 
 	function toggle() {
 		open.value = !open.value;

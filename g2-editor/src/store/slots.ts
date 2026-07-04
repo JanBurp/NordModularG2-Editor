@@ -59,18 +59,7 @@ function delCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[]
 }
 
 function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[] {
-	return [
-		'add-cable',
-		slot,
-		location,
-		String(c.colour),
-		String(c.smod),
-		(c.dir ?? 1) === 0 ? '0' : '1',
-		String(c.scon),
-		String(c.dmod),
-		'0',
-		String(c.dcon),
-	];
+	return ['add-cable', slot, location, String(c.colour), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
 }
 
 const _paramInFlight = new Set<string>();
@@ -1228,11 +1217,13 @@ export const useSlotsStore = defineStore('slots', {
 				path = result.filepath;
 			}
 			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
-			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => {
-				const e = this.slots[s];
-				if (e.patch) e.patch.controllers = [...e.controllers]; // sync edits (auto-CC, deletes) before serialize
-				return e.patch!;
-			}).filter(Boolean);
+			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
+				.map((s) => {
+					const e = this.slots[s];
+					if (e.patch) e.patch.controllers = [...e.controllers]; // sync edits (auto-CC, deletes) before serialize
+					return e.patch!;
+				})
+				.filter(Boolean);
 			if (patches.length !== 4) return;
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
 			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray);

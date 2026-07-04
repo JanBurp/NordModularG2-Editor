@@ -29,7 +29,19 @@ export function useModuleLabelDialog() {
 		showLabelDialog.value = false;
 	}
 
-	function handleParamLabelEdit({ moduleIndex, paramIndex, currentLabel, labelIndex = 0, area }: { moduleIndex: number; paramIndex: number; currentLabel: string; labelIndex?: number; area: 'voice' | 'fx' }): void {
+	function handleParamLabelEdit({
+		moduleIndex,
+		paramIndex,
+		currentLabel,
+		labelIndex = 0,
+		area,
+	}: {
+		moduleIndex: number;
+		paramIndex: number;
+		currentLabel: string;
+		labelIndex?: number;
+		area: 'voice' | 'fx';
+	}): void {
 		editingParamLabelModuleId.value = moduleIndex;
 		editingParamLabelParamIndex.value = paramIndex;
 		editingParamLabelLabelIndex.value = labelIndex;
@@ -40,7 +52,13 @@ export function useModuleLabelDialog() {
 
 	async function confirmParamLabel(): Promise<void> {
 		if (editingParamLabelModuleId.value === null || editingParamLabelParamIndex.value === null) return;
-		await slotsStore.setParamLabel(editingParamLabelModuleId.value, editingParamLabelParamIndex.value, editingParamLabel.value, editingParamArea.value, editingParamLabelLabelIndex.value);
+		await slotsStore.setParamLabel(
+			editingParamLabelModuleId.value,
+			editingParamLabelParamIndex.value,
+			editingParamLabel.value,
+			editingParamArea.value,
+			editingParamLabelLabelIndex.value,
+		);
 		showParamLabelDialog.value = false;
 	}
 

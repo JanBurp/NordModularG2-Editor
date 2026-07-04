@@ -205,7 +205,9 @@ export const useDeviceStore = defineStore('device', {
 			if (!entry) return;
 			entry.range.lower = lower;
 			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-range', slot, String(lower), String(entry.range.upper)]).catch((err: unknown) => console.error('set-slot-range failed:', err));
+				window.cli
+					.run(['set-slot-range', slot, String(lower), String(entry.range.upper)])
+					.catch((err: unknown) => console.error('set-slot-range failed:', err));
 		},
 
 		setSlotRangeUpper(slot: SlotLabel, upper: number) {
@@ -213,7 +215,9 @@ export const useDeviceStore = defineStore('device', {
 			if (!entry) return;
 			entry.range.upper = upper;
 			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['set-slot-range', slot, String(entry.range.lower), String(upper)]).catch((err: unknown) => console.error('set-slot-range failed:', err));
+				window.cli
+					.run(['set-slot-range', slot, String(entry.range.lower), String(upper)])
+					.catch((err: unknown) => console.error('set-slot-range failed:', err));
 		},
 
 		buildSynthPayload() {

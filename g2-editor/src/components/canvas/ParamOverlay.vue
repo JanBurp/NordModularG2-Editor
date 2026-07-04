@@ -1,6 +1,14 @@
 <template>
 	<g class="param-overlay" pointer-events="none">
-		<MidiBadge v-for="badge in orderedBadges" :key="badge.id" :text="badge.text" :x="badge.x" :y="badge.y" @hover="onHover(badge.id)" @unhover="onUnhover(badge.id)" />
+		<MidiBadge
+			v-for="badge in orderedBadges"
+			:key="badge.id"
+			:text="badge.text"
+			:x="badge.x"
+			:y="badge.y"
+			@hover="onHover(badge.id)"
+			@unhover="onUnhover(badge.id)"
+		/>
 	</g>
 </template>
 

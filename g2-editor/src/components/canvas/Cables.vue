@@ -180,9 +180,9 @@
 		}
 		for (const key of oldKeys ?? []) {
 			if (newKeys.has(key)) continue;
-			svg
-				.querySelectorAll<Element>(`[data-cable-key="${key}"]`)
-				.forEach((el) => applyVisibilityToElement(el, cableVisibility.value as unknown as Record<string, boolean>));
+			svg.querySelectorAll<Element>(`[data-cable-key="${key}"]`).forEach((el) =>
+				applyVisibilityToElement(el, cableVisibility.value as unknown as Record<string, boolean>),
+			);
 		}
 	});
 

@@ -43,7 +43,12 @@
 				</SettingsRow>
 			</div>
 		</Collapsible>
-		<Collapsible v-if="device.connected" title="Synth Settings" :model-value="isOpen('Synth Settings')" @update:model-value="onToggle('Synth Settings', $event)">
+		<Collapsible
+			v-if="device.connected"
+			title="Synth Settings"
+			:model-value="isOpen('Synth Settings')"
+			@update:model-value="onToggle('Synth Settings', $event)"
+		>
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.synthName">
 					<TextInput :model-value="device.device?.synthName ?? ''" @update:model-value="device.setSynthName($event)" />
@@ -158,7 +163,12 @@
 			</div>
 		</Collapsible>
 
-		<Collapsible v-if="device.device || anyPatchLoaded" title="Performance Settings" :model-value="isOpen('Performance Settings')" @update:model-value="onToggle('Performance Settings', $event)">
+		<Collapsible
+			v-if="device.device || anyPatchLoaded"
+			title="Performance Settings"
+			:model-value="isOpen('Performance Settings')"
+			@update:model-value="onToggle('Performance Settings', $event)"
+		>
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.perfName">
 					<TextInput
@@ -227,7 +237,12 @@
 			</div>
 		</Collapsible>
 
-		<Collapsible v-if="currentPatch" title="Patch Settings" :model-value="isOpen('Patch Settings')" @update:model-value="onToggle('Patch Settings', $event)">
+		<Collapsible
+			v-if="currentPatch"
+			title="Patch Settings"
+			:model-value="isOpen('Patch Settings')"
+			@update:model-value="onToggle('Patch Settings', $event)"
+		>
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.patchName">
 					<TextInput
@@ -273,7 +288,7 @@
 
 <script setup lang="ts">
 	import { computed, ref, watch } from 'vue';
-	import { makeOffMemory, OFF_SENTINEL } from '@/composables/useOffMemory';
+	import { makeOffMemory } from '@/composables/useOffMemory';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import RangeInput from '@/components/common/RangeInput.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
@@ -285,7 +300,6 @@
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore, type ThemeMode, type KnobMode } from '@/store/settings';
-	import { useBrowserStore } from '@/store/browser';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
@@ -296,7 +310,6 @@
 
 	const device = useDeviceStore();
 	const settings = useSettingsStore();
-	const browser = useBrowserStore();
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
@@ -316,10 +329,13 @@
 		if (tab === 'settings' && show) openSections.value = new Set([activeSection.value]);
 	});
 
-	function isOpen(section: string) { return openSections.value.has(section); }
+	function isOpen(section: string) {
+		return openSections.value.has(section);
+	}
 	function onToggle(section: string, v: boolean) {
 		const next = new Set(openSections.value);
-		if (v) next.add(section); else next.delete(section);
+		if (v) next.add(section);
+		else next.delete(section);
 		openSections.value = next;
 	}
 

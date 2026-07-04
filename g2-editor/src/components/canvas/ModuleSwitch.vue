@@ -1,5 +1,9 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="switch-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, contextMenuLabelIndex)">
+	<g
+		:transform="`translate(${param.x}, ${param.y})`"
+		class="switch-control"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, contextMenuLabelIndex)"
+	>
 		<!-- Bitmap-based switch -->
 		<template v-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
