@@ -14,10 +14,6 @@
  *   Watch events flow to stdout unchanged (no "id" field).
  */
 
-#ifdef __MINGW32__
-#define _POSIX_C_SOURCE 200809L /* getline() is not declared by MinGW-w64 without this */
-#endif
-
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -713,6 +709,38 @@ static void execute_cmd(const char *line) {
 }
 
 /* ── stdin reader thread ───────────────────────────────────────────────── */
+
+#ifdef __MINGW32__
+/* MinGW-w64's <stdio.h> does not declare POSIX getline(); provide a minimal replacement. */
+static long g2_getline(char **lineptr, size_t *n, FILE *stream) {
+	if (*lineptr == NULL || *n == 0) {
+		*n = 128;
+		*lineptr = malloc(*n);
+		if (*lineptr == NULL)
+			return -1;
+	}
+	size_t len = 0;
+	int c;
+	while ((c = fgetc(stream)) != EOF) {
+		if (len + 1 >= *n) {
+			size_t new_cap = *n * 2;
+			char *new_ptr = realloc(*lineptr, new_cap);
+			if (new_ptr == NULL)
+				return -1;
+			*lineptr = new_ptr;
+			*n = new_cap;
+		}
+		(*lineptr)[len++] = (char)c;
+		if (c == '\n')
+			break;
+	}
+	if (len == 0 && c == EOF)
+		return -1;
+	(*lineptr)[len] = '\0';
+	return (long)len;
+}
+#define getline g2_getline
+#endif
 
 static volatile sig_atomic_t daemon_running = 1;
 
