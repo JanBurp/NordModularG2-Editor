@@ -12,16 +12,14 @@
 						<div class="text-base font-bold text-content-primary">G2 Editor</div>
 						<div class="text-xs text-content-secondary mt-0.5">v{{ version }}</div>
 					</div>
-					<div class="text-xs text-content-secondary">Modern Editor for Nord Modular G2</div>
+					<div class="text-xs text-content-secondary">Editor for the Nord Modular G2</div>
 					<div class="text-xs text-content-secondary">by Jan den Besten</div>
 					<button class="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0" @click="openSite">
 						janburp.github.io/NordModularG2-Editor
 					</button>
 
 					<div class="w-full border-t border-line-default pt-3 flex flex-col gap-2 text-left">
-						<p class="text-xs text-content-muted italic text-center">
-							Use this editor at your own risk. No responsibility for damage, data loss, or issues from its use.
-						</p>
+						<p class="text-xs text-content-muted italic text-center">Use this editor at your own risk.</p>
 						<p class="text-xs text-content-muted text-center">
 							Thanks to the Nord G2 community at
 							<button
@@ -29,20 +27,21 @@
 								@click="openLink('https://electro-music.com')"
 							>
 								electro-music.com</button
-							>, especially the
+							>, bverhue for the
 							<button
 								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
 								@click="openLink('https://www.bverhue.nl/g2dev/')"
 							>
-								Delphi Editor by bverhue
+								Delphi Editor
 							</button>
 							and the
 							<button
 								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
 								@click="openLink('https://electro-music.com/patchviewer/')"
 							>
-								patchviewer by ian-s</button
-							>. Also thanks to the people who donated to make this work possible.
+								patchviewer
+							</button>
+							by ian-s. And all others who tested, discussed and donated to make this work possible.
 						</p>
 						<div class="flex justify-center pt-1">
 							<button
