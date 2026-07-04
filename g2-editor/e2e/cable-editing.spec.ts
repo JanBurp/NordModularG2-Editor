@@ -159,4 +159,27 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		expect(after?.key).toBe(before?.key);
 		expect(after?.d).toBe(before?.d); // visually reverted to its pre-drag curve, not left bent toward the mouse
 	});
+
+	test('Ctrl/Cmd-drag released directly on an incompatible jack reverts instead of deleting', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
+		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		const before = await soleCableAttrs(page);
+
+		// Grab the input end and release directly on an output jack — a mismatched type, so the
+		// drop is invalid. Landing on empty canvas would delete the cable; landing on a specific
+		// but incompatible jack should revert it instead.
+		await grabAndDropCableEnd(
+			page,
+			0,
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+		);
+
+		expect((await getStatusCounts(page)).voiceCables).toBe(1);
+		const after = await soleCableAttrs(page);
+		expect(after?.key).toBe(before?.key);
+		expect(after?.d).toBe(before?.d);
+	});
 });

@@ -73,7 +73,8 @@
 	import { useUiStore } from '@/store/ui';
 	import { useDeviceStore } from '@/store/device';
 	import { getModule } from '@/renderer/nmg2mods';
-	import { getAllowedCCs, CC_SHORT } from '@/composables/useMidiCC';
+	import { getAllowedCCs, CC_SHORT, parseCCDragPayload } from '@/composables/useMidiCC';
+	import { estimateBadgeWidth } from '@/utils/badgeLayout';
 	import type { MidiCCAssignment } from '@/types';
 	import Dialog from '@/components/common/Dialog.vue';
 
@@ -198,8 +199,8 @@
 		e.dataTransfer.effectAllowed = 'move';
 		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
 
-		// Custom drag image — mirrors MidiBadge ghost styling
-		const w = cc >= 100 ? 52 : cc >= 10 ? 46 : 40;
+		// Custom drag image — mirrors MidiBadge ghost styling (CCBadgesOverlay uses the same "CC# n" text)
+		const w = estimateBadgeWidth(`CC# ${cc}`);
 		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 		svg.setAttribute('width', String(w));
 		svg.setAttribute('height', '15');
@@ -229,16 +230,10 @@
 	}
 
 	async function onRowDrop(targetCC: number, targetAssignment: MidiCCAssignment | null, e: DragEvent) {
-		const raw = e.dataTransfer?.getData('text/plain');
-		if (!raw || !slot.value) return;
-		let data: any;
-		try {
-			data = JSON.parse(raw);
-		} catch {
-			return;
-		}
+		const data = parseCCDragPayload(e);
+		if (!data || !slot.value) return;
 		const s = slot.value;
-		if (data.type === 'cc' && data.cc !== targetCC) {
+		if (data.cc !== targetCC) {
 			const dragged = controllers.value.find((c) => c.cc === data.cc);
 			if (!dragged) return;
 			if (targetAssignment) {

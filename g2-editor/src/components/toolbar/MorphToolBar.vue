@@ -50,7 +50,7 @@
 	import { useDeviceStore } from '../../store/device';
 	import { MORPH_NAMES } from '../../types/patch';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
 
 	defineProps<{ patchName: string }>();
 
@@ -83,15 +83,8 @@
 	}
 
 	function onMorphCCDrop(morphIdx: number, event: DragEvent) {
-		const raw = event.dataTransfer?.getData('text/plain');
-		if (!raw) return;
-		let data: any;
-		try {
-			data = JSON.parse(raw);
-		} catch {
-			return;
-		}
-		if (data.type !== 'cc') return;
+		const data = parseCCDragPayload(event);
+		if (!data) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
 		slotsStore.assignMidiCC(slot, 2, 1, morphIdx, data.cc);

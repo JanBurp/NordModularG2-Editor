@@ -26,7 +26,6 @@ export function useCableGrabInteraction(
 
 	let grabbedJack: JackEnd | null = null;
 	let group: Cable[] = [];
-	let groupHasIncomingDriver = false;
 	let drivenNestJacks: Set<string> | null = null;
 	let hasDragged = false;
 	let snapTarget: SnapEnd | null = null;
@@ -111,7 +110,6 @@ export function useCableGrabInteraction(
 	function teardown() {
 		grabbedJack = null;
 		group = [];
-		groupHasIncomingDriver = false;
 		drivenNestJacks = null;
 		hasDragged = false;
 		snapTarget = null;
@@ -161,12 +159,20 @@ export function useCableGrabInteraction(
 		finishGrab(target);
 	}
 
+	// Releasing on a jack that can't take the drop reverts the cable rather than deleting it — deletion
+	// is reserved for a genuine drop in empty canvas space (handled by onUp's null-target path above).
+	function cancelGrab() {
+		revertDragCables();
+		teardown();
+	}
+
 	// Called when a mouseup lands directly on a jack (routed via the Vue emit chain, since that jack's
 	// own mouseup handler stops native propagation and would otherwise swallow the window 'mouseup' above).
 	// Returns true if a grab was in progress and this event was consumed.
 	function handleJackMouseUp(jack: JackEnd): boolean {
 		if (!grabbedJack) return false;
-		finishGrab(isValidDropCandidate(jack) ? jack : null);
+		if (isValidDropCandidate(jack)) finishGrab(jack);
+		else cancelGrab();
 		return true;
 	}
 
@@ -181,9 +187,7 @@ export function useCableGrabInteraction(
 
 		grabbedJack = jack;
 		group = computeGroup(jack);
-		groupHasIncomingDriver =
-			jack.type === 'input' && group.some((c) => (c.dir ?? 1) === 1 && c.dmod === jack.moduleIndex && c.dcon === jack.connectorIndex);
-		drivenNestJacks = groupHasIncomingDriver ? computeDrivenInputJacks(getCables()) : null;
+		drivenNestJacks = jack.type === 'input' ? computeDrivenInputJacks(getCables()) : null;
 		hasDragged = false;
 		snapTarget = null;
 		captureDragCables(svgRef.value as SVGElement, group);

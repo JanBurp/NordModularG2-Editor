@@ -15,18 +15,30 @@
 
 	const hoveredId = ref<number | null>(null);
 
-	const laidOutBadges = computed(() =>
-		layoutBadges(
-			props.items.map((item, id) => ({
-				id,
-				text: item.text,
-				x: item.x,
-				y: item.y,
-				width: estimateBadgeWidth(item.text),
-				height: 14,
-			})),
-		),
-	);
+	// layoutBadges is O(n^2); skip re-running it when only badge text changed (e.g. a live param
+	// value), not geometry — reuse each badge's previously resolved y by id instead.
+	type PositionedBadge = { id: number; text: string; x: number; y: number; width: number; height: number };
+	let lastSignature = '';
+	let lastLayout: PositionedBadge[] = [];
+
+	const laidOutBadges = computed(() => {
+		const boxed = props.items.map((item, id) => ({
+			id,
+			text: item.text,
+			x: item.x,
+			y: item.y,
+			width: estimateBadgeWidth(item.text),
+			height: 14,
+		}));
+		const signature = boxed.map((b) => `${b.id}:${b.x},${b.y},${b.width}`).join('|');
+		if (signature === lastSignature) {
+			const resolvedY = new Map(lastLayout.map((b) => [b.id, b.y]));
+			return boxed.map((b) => ({ ...b, y: resolvedY.get(b.id) ?? b.y }));
+		}
+		lastSignature = signature;
+		lastLayout = layoutBadges(boxed);
+		return lastLayout;
+	});
 
 	const orderedBadges = computed(() => {
 		if (hoveredId.value === null) return laidOutBadges.value;

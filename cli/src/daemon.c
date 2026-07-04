@@ -232,6 +232,7 @@ static int execute_seq(cJSON *args) {
 
         } else if (strcmp(scmd, "add-module") == 0 && sn >= 9) {
             int j = 8, num_modes = arg_i(sub, j++);
+            if (num_modes < 0 || num_modes > 16) { ret = G2_ERR_INVALID_PARAM; break; }
             int mode_vals[64] = {0};
             for (int m = 0; m < num_modes && m < 64; m++) mode_vals[m] = arg_i(sub, j++);
             int num_params = arg_i(sub, j++);
@@ -410,7 +411,7 @@ static void execute_cmd(const char *line) {
 		int param_vals[256] = {0};
 		for (int p = 0; p < num_params && p < 256; p++) param_vals[p] = arg_i(args, j++);
 		const char *name = arg_s(args, j);
-		if (name && strlen(name) > 16) {
+		if ((num_modes < 0 || num_modes > 16) || (name && strlen(name) > 16)) {
 			ret = G2_ERR_INVALID_PARAM;
 		} else {
 			ret = g2_add_module(slot, loc, type_id, module_id, col, row, color,

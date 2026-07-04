@@ -123,7 +123,7 @@ cJSON *query_perf_settings(int mode, const char *type) {
         ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
+            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
         }
     }
 
@@ -240,7 +240,7 @@ cJSON *g2_device_info(int debug) {
 
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
+            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
         }
     }
 
@@ -1788,7 +1788,7 @@ cJSON *g2_get_perf_file(const char *filename) {
         int ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t size = ((uint16_t)selsInterrupt[1] << 8) | selsInterrupt[2];
-            if (size > 0 && size <= sizeof(selsData)) recv_bulk(selsData, size);
+            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
         }
     }
 

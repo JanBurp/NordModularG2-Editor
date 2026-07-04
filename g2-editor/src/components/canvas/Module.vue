@@ -203,7 +203,7 @@
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
 	import { useDeviceStore } from '../../store/device';
-	import { buildCCMenuItems } from '../../composables/useMidiCC';
+	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -361,15 +361,8 @@
 	}
 
 	function onParamCCDrop(e: DragEvent) {
-		const raw = e.dataTransfer?.getData('text/plain');
-		if (!raw) return;
-		let data: any;
-		try {
-			data = JSON.parse(raw);
-		} catch {
-			return;
-		}
-		if (data.type !== 'cc') return;
+		const data = parseCCDragPayload(e);
+		if (!data) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
 		let el = e.target as Element | null;

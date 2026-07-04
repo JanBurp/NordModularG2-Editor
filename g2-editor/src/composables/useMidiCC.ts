@@ -109,3 +109,16 @@ export function useMidiCCOverlay() {
 	const { isVisible } = useKeyHoldOverlay('F8');
 	return { showCCOverlay: isVisible };
 }
+
+// Reads the { type: 'cc', cc } payload set by a CC badge drag start. Returns null if the drop
+// didn't carry a CC payload (wrong drag source, or malformed data).
+export function parseCCDragPayload(event: DragEvent): { cc: number } | null {
+	const raw = event.dataTransfer?.getData('text/plain');
+	if (!raw) return null;
+	try {
+		const data = JSON.parse(raw);
+		return data.type === 'cc' ? { cc: data.cc } : null;
+	} catch {
+		return null;
+	}
+}

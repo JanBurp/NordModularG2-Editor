@@ -38,7 +38,11 @@
 	onMounted(measure);
 	watch(
 		() => props.text,
-		() => nextTick(measure),
+		(text, prevText) => {
+			// Monospace font: width only depends on character count, so a same-length text change
+			// (e.g. a live param value) can keep the already-measured width and skip the reflow.
+			if (text.length !== prevText.length) nextTick(measure);
+		},
 	);
 	watch(hovered, (v) => {
 		if (v) emit('hover');
