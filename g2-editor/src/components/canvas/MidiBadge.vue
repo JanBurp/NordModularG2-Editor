@@ -7,6 +7,7 @@
 
 <script setup lang="ts">
 	import { ref, computed, onMounted, watch, nextTick } from 'vue';
+	import { estimateBadgeWidth } from '../../utils/badgeLayout';
 
 	const props = withDefaults(
 		defineProps<{
@@ -24,7 +25,7 @@
 	}>();
 
 	const textRef = ref<SVGTextElement | null>(null);
-	const width = ref(Math.max(20, props.text.length * 7 + 10));
+	const width = ref(estimateBadgeWidth(props.text));
 	const hovered = ref(false);
 
 	const rectX = computed(() => (props.anchor === 'top-center' ? props.x - width.value / 2 : props.x));

@@ -132,6 +132,12 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
 	svgElement.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.remove());
 }
 
+// Applies the color-filter visibility to one cable element (ignoring any hover-reveal override).
+export function applyVisibilityToElement(el: Element, visibility: Record<string, boolean>): void {
+	const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
+	if (colorName) el.classList.toggle('cable-hidden', visibility[colorName] === false);
+}
+
 // Applies CSS cable-hidden class based on per-color visibility flags.
 // forceVisibleKeys overrides the color filter for specific cables (e.g. temporarily revealed on jack hover).
 export function applyCableVisibility(svgElement: SVGElement, visibility: Record<string, boolean>, forceVisibleKeys?: Set<string>): void {
@@ -140,8 +146,7 @@ export function applyCableVisibility(svgElement: SVGElement, visibility: Record<
 			el.classList.remove('cable-hidden');
 			return;
 		}
-		const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
-		if (colorName) el.classList.toggle('cable-hidden', visibility[colorName] === false);
+		applyVisibilityToElement(el, visibility);
 	});
 }
 

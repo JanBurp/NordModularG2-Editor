@@ -7,17 +7,13 @@
 <script setup lang="ts">
 	import { computed, ref } from 'vue';
 	import MidiBadge from './MidiBadge.vue';
-	import { layoutBadges } from '../../utils/badgeLayout';
+	import { layoutBadges, estimateBadgeWidth } from '../../utils/badgeLayout';
 
 	const props = defineProps<{
 		items: Array<{ text: string; x: number; y: number }>;
 	}>();
 
 	const hoveredId = ref<number | null>(null);
-
-	function estimateWidth(text: string): number {
-		return Math.max(20, text.length * 7 + 10);
-	}
 
 	const laidOutBadges = computed(() =>
 		layoutBadges(
@@ -26,7 +22,7 @@
 				text: item.text,
 				x: item.x,
 				y: item.y,
-				width: estimateWidth(item.text),
+				width: estimateBadgeWidth(item.text),
 				height: 14,
 			})),
 		),

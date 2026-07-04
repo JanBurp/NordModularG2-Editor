@@ -12,6 +12,7 @@
 		applyCableVisibility,
 		updateCableStyles,
 		updateCableGravity,
+		applyVisibilityToElement,
 	} from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
@@ -22,7 +23,6 @@
 	import { matchesCableJack } from '../../store/slotHelpers';
 	import type { JackEnd } from '../../store/slotHelpers';
 	import { isGrabModifierPressed } from '../../utils/platform';
-	import { CABLE_COLOR_INDEX_MAP } from '../../constants';
 	import type { JackDragInfo } from '../../types';
 
 	const props = defineProps({
@@ -180,10 +180,9 @@
 		}
 		for (const key of oldKeys ?? []) {
 			if (newKeys.has(key)) continue;
-			svg.querySelectorAll<Element>(`[data-cable-key="${key}"]`).forEach((el) => {
-				const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
-				if (colorName) el.classList.toggle('cable-hidden', cableVisibility.value[colorName as keyof typeof cableVisibility.value] === false);
-			});
+			svg
+				.querySelectorAll<Element>(`[data-cable-key="${key}"]`)
+				.forEach((el) => applyVisibilityToElement(el, cableVisibility.value as unknown as Record<string, boolean>));
 		}
 	});
 

@@ -53,6 +53,26 @@ function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
 	return location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
 }
 
+// Builds the CLI del-cable / add-cable command tuple for a single cable.
+function delCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[] {
+	return ['del-cable', slot, location, String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
+}
+
+function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[] {
+	return [
+		'add-cable',
+		slot,
+		location,
+		String(c.colour),
+		String(c.smod),
+		(c.dir ?? 1) === 0 ? '0' : '1',
+		String(c.scon),
+		String(c.dmod),
+		'0',
+		String(c.dcon),
+	];
+}
+
 const _paramInFlight = new Set<string>();
 const _paramPending = new Map<string, string[]>();
 
@@ -159,6 +179,76 @@ function buildVariationHardwareCmds(slot: SlotLabel, variations: VariationState[
 	}
 
 	return cmds;
+}
+
+// Shared by addModuleWithData/paste: clones `src` into a new module instance at (col, row), seeds its
+// variation param slices, and builds the CLI commands to create it on hardware.
+function buildModuleAddition(
+	src: ModuleInstance,
+	newId: number,
+	col: number,
+	row: number,
+	slot: SlotLabel,
+	location: 'va' | 'fx',
+	areaKey: 'fx' | 'voice',
+	variations: VariationState[] | null | undefined,
+): { mod: ModuleInstance; addModuleCmd: string[]; setParamCmds: string[][]; setParamLabelCmds: string[][] } {
+	const mod: ModuleInstance = {
+		...src,
+		index: newId,
+		horiz: col,
+		vert: row,
+		lv: [...src.lv],
+		modes: [...src.modes],
+		paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+	};
+
+	if (variations) {
+		for (let v = 0; v < variations.length; v++) {
+			const start = v * src.pcnt;
+			variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
+		}
+	}
+
+	const paramVals0 = src.lv.slice(0, src.pcnt);
+	const addModuleCmd = [
+		'add-module',
+		slot,
+		location,
+		String(src.type),
+		String(newId),
+		String(col),
+		String(row),
+		String(src.colour),
+		String(src.modes.length),
+		...src.modes.map(String),
+		String(src.pcnt),
+		...paramVals0.map(String),
+		src.uname ?? '',
+	];
+
+	const setParamCmds: string[][] = [];
+	if (src.pcnt > 0 && variations) {
+		for (let v = 1; v < variations.length; v++) {
+			for (let p = 0; p < src.pcnt; p++) {
+				const val = src.lv[v * src.pcnt + p];
+				if (val !== undefined && val !== paramVals0[p]) {
+					setParamCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
+				}
+			}
+		}
+	}
+
+	const setParamLabelCmds: string[][] = (src.paramLabels ?? []).map((pl) => [
+		'set-param-label',
+		slot,
+		location,
+		String(newId),
+		String(pl.paramIndex),
+		...pl.labels,
+	]);
+
+	return { mod, addModuleCmd, setParamCmds, setParamLabelCmds };
 }
 
 interface SlotEntry {
@@ -601,72 +691,29 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
-
-			const mod: ModuleInstance = {
-				...src,
-				index: newId,
-				horiz: col,
-				vert: row,
-				lv: [...src.lv],
-				modes: [...src.modes],
-				paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
-			};
-			mutAddModule(patch, areaIdx, mod);
-
-			const paramVals0 = src.lv.slice(0, src.pcnt);
 			const entry = this.slots[slot];
-			if (entry.variations) {
-				for (let v = 0; v < entry.variations.length; v++) {
-					const start = v * src.pcnt;
-					entry.variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
-				}
-			}
+
+			const { mod, addModuleCmd, setParamCmds, setParamLabelCmds } = buildModuleAddition(src, newId, col, row, slot, location, areaKey, entry.variations);
+			mutAddModule(patch, areaIdx, mod);
 			entry.rawHex = null;
 
 			try {
-				await window.cli.run([
-					'add-module',
-					slot,
-					location,
-					String(src.type),
-					String(newId),
-					String(col),
-					String(row),
-					String(src.colour),
-					String(src.modes.length),
-					...src.modes.map(String),
-					String(src.pcnt),
-					...paramVals0.map(String),
-					src.uname ?? '',
-				]);
+				await window.cli.run(addModuleCmd);
 			} catch (err) {
 				console.warn('add-module CLI failed:', err);
 			}
 
-			if (src.pcnt > 0 && entry.variations) {
-				const varCmds: string[][] = [];
-				for (let v = 1; v < entry.variations.length; v++) {
-					for (let p = 0; p < src.pcnt; p++) {
-						const val = src.lv[v * src.pcnt + p];
-						if (val !== undefined && val !== paramVals0[p]) {
-							varCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
-						}
-					}
-				}
-				if (varCmds.length > 0) {
-					try {
-						await window.cli.runBatch(varCmds);
-					} catch (err) {
-						console.warn('set-param batch CLI failed:', err);
-					}
+			if (setParamCmds.length > 0) {
+				try {
+					await window.cli.runBatch(setParamCmds);
+				} catch (err) {
+					console.warn('set-param batch CLI failed:', err);
 				}
 			}
 
-			if (src.paramLabels && src.paramLabels.length > 0) {
+			if (setParamLabelCmds.length > 0) {
 				try {
-					await window.cli.runBatch(
-						src.paramLabels.map((pl) => ['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]),
-					);
+					await window.cli.runBatch(setParamLabelCmds);
 				} catch (err) {
 					console.warn('set-param-label batch CLI failed:', err);
 				}
@@ -743,53 +790,18 @@ export const useSlotsStore = defineStore('slots', {
 				const allCmds: string[][] = [];
 
 				for (const { src, newId, col, row } of entries) {
-					const mod: ModuleInstance = {
-						...src,
-						index: newId,
-						horiz: col,
-						vert: row,
-						lv: [...src.lv],
-						modes: [...src.modes],
-						paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
-					};
-					mutAddModule(patch, areaIdx, mod);
-					if (slotEntry.variations) {
-						for (let v = 0; v < slotEntry.variations.length; v++) {
-							const start = v * src.pcnt;
-							slotEntry.variations[v][areaKey][newId] = src.lv.slice(start, start + src.pcnt);
-						}
-					}
-					const paramVals0 = src.lv.slice(0, src.pcnt);
-					allCmds.push([
-						'add-module',
+					const { mod, addModuleCmd, setParamCmds, setParamLabelCmds } = buildModuleAddition(
+						src,
+						newId,
+						col,
+						row,
 						slot,
 						location,
-						String(src.type),
-						String(newId),
-						String(col),
-						String(row),
-						String(src.colour),
-						String(src.modes.length),
-						...src.modes.map(String),
-						String(src.pcnt),
-						...paramVals0.map(String),
-						src.uname ?? '',
-					]);
-					if (src.pcnt > 0 && slotEntry.variations) {
-						for (let v = 1; v < slotEntry.variations.length; v++) {
-							for (let p = 0; p < src.pcnt; p++) {
-								const val = src.lv[v * src.pcnt + p];
-								if (val !== undefined && val !== paramVals0[p]) {
-									allCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
-								}
-							}
-						}
-					}
-					if (src.paramLabels && src.paramLabels.length > 0) {
-						for (const pl of src.paramLabels) {
-							allCmds.push(['set-param-label', slot, location, String(newId), String(pl.paramIndex), ...pl.labels]);
-						}
-					}
+						areaKey,
+						slotEntry.variations,
+					);
+					mutAddModule(patch, areaIdx, mod);
+					allCmds.push(addModuleCmd, ...setParamCmds, ...setParamLabelCmds);
 				}
 
 				const addedCables = cables.map((c) => ({ smod: c.newSmod, scon: c.scon, dmod: c.newDmod, dcon: c.dcon, dir: c.dir, colour: c.colour }));
@@ -1701,20 +1713,7 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this.slots[slot].rawHex = null;
-						await window.cli.runBatch(
-							deletedCables.map((c) => [
-								'add-cable',
-								slot,
-								location,
-								String(c.colour),
-								String(c.smod),
-								c.dir === 0 ? '0' : '1',
-								String(c.scon),
-								String(c.dmod),
-								'0',
-								String(c.dcon),
-							]),
-						);
+						await window.cli.runBatch(deletedCables.map((c) => addCableCmd(slot, location, c)));
 					},
 					redo: async () => {
 						await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
@@ -1724,19 +1723,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
 			this.slots[slot].rawHex = null;
-			await window.cli.runBatch(
-				matching.map((c) => [
-					'del-cable',
-					slot,
-					location,
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]),
-			);
+			await window.cli.runBatch(matching.map((c) => delCableCmd(slot, location, c)));
 			this._syncUprateAndColors(patch, areaIdx);
 		},
 
@@ -1750,31 +1737,8 @@ export const useSlotsStore = defineStore('slots', {
 			newCables: Cable[],
 			redo: () => Promise<void>,
 		): Promise<void> {
-			const buildDelCmds = (cables: Cable[]) =>
-				cables.map((c) => [
-					'del-cable',
-					slot,
-					location,
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
-			const buildAddCmds = (cables: Cable[]) =>
-				cables.map((c) => [
-					'add-cable',
-					slot,
-					location,
-					String(c.colour),
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]);
+			const buildDelCmds = (cables: Cable[]) => cables.map((c) => delCableCmd(slot, location, c));
+			const buildAddCmds = (cables: Cable[]) => cables.map((c) => addCableCmd(slot, location, c));
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {

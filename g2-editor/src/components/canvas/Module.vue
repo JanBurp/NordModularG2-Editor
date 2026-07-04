@@ -203,7 +203,7 @@
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
 	import { useDeviceStore } from '../../store/device';
-	import { ccLabel, getAllowedCCs } from '../../composables/useMidiCC';
+	import { buildCCMenuItems } from '../../composables/useMidiCC';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -411,26 +411,18 @@
 
 		// MIDI CC items
 		const lastCC = deviceStore.lastMidiCC;
-		items.push({
-			label: lastCC !== null ? `Assign CC (${lastCC})` : 'Assign CC (none)',
-			disabled: lastCC === null || !slot,
-			action: () => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, lastCC!),
-		});
-		items.push({
-			label: 'Assign CC…',
-			children: getAllowedCCs().map((cc) => ({
-				label: ccLabel(cc),
-				action: () => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
-			})),
-		});
 		const existing = slot
 			? slotsStore.slots[slot].controllers.find((c) => c.location === location && c.moduleIndex === moduleIdx.value && c.paramIndex === paramIndex)
 			: undefined;
-		items.push({
-			label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',
-			disabled: !existing,
-			action: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
-		});
+		items.push(
+			...buildCCMenuItems({
+				lastCC,
+				existing,
+				enabled: !!slot,
+				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
+				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
+			}),
+		);
 
 		openContextMenu(event, items);
 	}

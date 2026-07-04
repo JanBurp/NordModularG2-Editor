@@ -8,7 +8,7 @@ import { matchesCableJack, isCableSourceEnd, sameJack } from '../store/slotHelpe
 import type { JackEnd } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
 import { useUiStore } from '../store/ui';
-import { SNAP_RANGE, toSvgCoords, getJackSvgPos, updateSnapHighlight } from './useJackDragInteraction';
+import { SNAP_RANGE, toSvgCoords, getJackSvgPos, updateSnapHighlight } from '../renderer/jackGeometry';
 import { isGrabModifierPressed } from '../utils/platform';
 
 export type { JackEnd };
@@ -107,7 +107,8 @@ export function useCableGrabInteraction(
 		}
 	}
 
-	function resetState() {
+	// Always invoked together (grab end, unmount) — one teardown for interaction state and DOM/listener cleanup.
+	function teardown() {
 		grabbedJack = null;
 		group = [];
 		groupHasIncomingDriver = false;
@@ -115,9 +116,7 @@ export function useCableGrabInteraction(
 		hasDragged = false;
 		snapTarget = null;
 		dragCables = new Map();
-	}
 
-	function clearGrabPreview() {
 		snapHighlight?.remove();
 		snapHighlight = null;
 		window.removeEventListener('mousemove', onMove);
@@ -149,9 +148,8 @@ export function useCableGrabInteraction(
 		const localFromJack = grabbedJack;
 		const wasDragged = hasDragged;
 		const isNoOpDrop = target && localFromJack && sameJack(target, localFromJack);
-		clearGrabPreview();
 		if (isNoOpDrop) revertDragCables(); // DOM was mutated live during the drag; nothing else will restore it
-		resetState();
+		teardown();
 
 		if (!wasDragged || !localFromJack || isNoOpDrop) return;
 
@@ -194,10 +192,7 @@ export function useCableGrabInteraction(
 		window.addEventListener('mouseup', onUp);
 	}
 
-	onUnmounted(() => {
-		clearGrabPreview();
-		resetState();
-	});
+	onUnmounted(teardown);
 
 	return { handleCableGrabStart, handleJackMouseUp };
 }

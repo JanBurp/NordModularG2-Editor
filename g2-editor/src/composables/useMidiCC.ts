@@ -1,4 +1,4 @@
-import type { MidiCCAssignment } from '@/types';
+import type { ContextMenuItem, MidiCCAssignment } from '@/types';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 
 const RESERVED_CC = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97, 120, 121, 122, 123, 124, 125, 126, 127]);
@@ -75,6 +75,34 @@ export const CC_SHORT: Record<number, string> = {
 export function ccLabel(n: number): string {
 	const name = CC_NAMES[n];
 	return name ? `CC ${n}: ${name}` : `CC ${n}`;
+}
+
+// Builds the 3-item "Assign CC (last) / Assign CC… / Deassign CC" context-menu block shared by
+// module-param and morph CC assignment.
+export function buildCCMenuItems(opts: {
+	lastCC: number | null;
+	existing: MidiCCAssignment | undefined;
+	enabled: boolean;
+	onAssign: (cc: number) => void;
+	onDeassign: () => void;
+}): ContextMenuItem[] {
+	const { lastCC, existing, enabled, onAssign, onDeassign } = opts;
+	return [
+		{
+			label: lastCC !== null ? `Assign CC (${lastCC})` : 'Assign CC (none)',
+			disabled: lastCC === null || !enabled,
+			action: () => lastCC !== null && onAssign(lastCC),
+		},
+		{
+			label: 'Assign CC…',
+			children: getAllowedCCs().map((cc) => ({ label: ccLabel(cc), action: () => onAssign(cc) })),
+		},
+		{
+			label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',
+			disabled: !existing,
+			action: onDeassign,
+		},
+	];
 }
 
 export function useMidiCCOverlay() {

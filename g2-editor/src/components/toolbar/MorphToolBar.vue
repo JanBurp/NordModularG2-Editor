@@ -50,7 +50,7 @@
 	import { useDeviceStore } from '../../store/device';
 	import { MORPH_NAMES } from '../../types/patch';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { getAllowedCCs, ccLabel, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
 
 	defineProps<{ patchName: string }>();
 
@@ -72,25 +72,13 @@
 		const slot = uiStore.slotInFocus;
 		const lastCC = deviceStore.lastMidiCC;
 		const existing = slot ? slotsStore.slots[slot].controllers.find((c) => c.location === 2 && c.paramIndex === morphIdx) : undefined;
-		const items: any[] = [
-			{
-				label: lastCC !== null ? `Assign CC (${lastCC})` : 'Assign CC (none)',
-				disabled: lastCC === null || !slot,
-				action: () => slot && slotsStore.assignMidiCC(slot, 2, 1, morphIdx, lastCC!),
-			},
-			{
-				label: 'Assign CC…',
-				children: getAllowedCCs().map((cc) => ({
-					label: ccLabel(cc),
-					action: () => slot && slotsStore.assignMidiCC(slot, 2, 1, morphIdx, cc),
-				})),
-			},
-			{
-				label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',
-				disabled: !existing,
-				action: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
-			},
-		];
+		const items = buildCCMenuItems({
+			lastCC,
+			existing,
+			enabled: !!slot,
+			onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, 2, 1, morphIdx, cc),
+			onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
+		});
 		openContextMenu(event, items);
 	}
 

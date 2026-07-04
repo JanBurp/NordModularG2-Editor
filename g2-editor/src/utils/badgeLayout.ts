@@ -7,6 +7,11 @@ export interface BadgeBox {
 
 const GAP = 2;
 
+// Rough width before the actual text can be measured in the DOM (e.g. for initial layout/pre-layout).
+export function estimateBadgeWidth(text: string): number {
+	return Math.max(20, text.length * 7 + 10);
+}
+
 function overlaps(a: BadgeBox, b: BadgeBox): boolean {
 	return a.x < b.x + b.width && a.x + a.width > b.x && a.y < b.y + b.height && a.y + a.height > b.y;
 }
