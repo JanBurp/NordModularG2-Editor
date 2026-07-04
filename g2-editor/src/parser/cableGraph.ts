@@ -133,6 +133,25 @@ export function autoRecolorCables(cables: Cable[], uprateSet: Set<number>, modDe
 	});
 }
 
+// Infers which cables carry an explicit user colour, for cables just parsed from the wire
+// format (hardware or .pch2 file) — that format has no spare bits to persist userColour itself.
+// A cable is inferred user-set when its stored colour differs from what a fresh auto-recolor
+// pass would compute for it right now.
+// Known limitation: if a user's chosen colour happens to equal the current auto default for
+// that jack/uprate state, it's indistinguishable from "never set" and may revert on a later
+// topology change — unavoidable given the wire format has no spare bits.
+export function inferUserColours(cables: Cable[], uprateSet: Set<number>, modDefs: Map<number, ModuleDefinition>): Cable[] {
+	const stripped = cables.map((c) => {
+		const { userColour, ...rest } = c;
+		return rest as Cable;
+	});
+	const natural = autoRecolorCables(stripped, uprateSet, modDefs);
+	return cables.map((c, i) => {
+		if (c.userColour !== undefined) return c;
+		return c.colour !== natural[i].colour ? { ...c, userColour: c.colour } : c;
+	});
+}
+
 // Returns the colour of any output already driving the combined input group of (smod,scon) and (dmod,dcon).
 // Falls back to 6 (white) when no output is connected.
 export function findGroupOutputColor(cableList: Cable[], smod: number, scon: number, dmod: number, dcon: number): number {

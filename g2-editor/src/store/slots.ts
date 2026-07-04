@@ -1,6 +1,6 @@
 import type { MidiCCAssignment, ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
-import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables } from '../parser/cableGraph';
+import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
@@ -724,7 +724,7 @@ export const useSlotsStore = defineStore('slots', {
 
 		async paste(
 			entries: { src: ModuleInstance; newId: number; col: number; row: number }[],
-			cables: { newSmod: number; newDmod: number; colour: number; scon: number; dcon: number; dir: number }[],
+			cables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[],
 			area: 'voice' | 'fx',
 		): Promise<void> {
 			if (entries.length === 0) return;
@@ -794,8 +794,8 @@ export const useSlotsStore = defineStore('slots', {
 				}
 
 				const addedCables = cables.map((c) => ({ smod: c.newSmod, scon: c.scon, dmod: c.newDmod, dcon: c.dcon, dir: c.dir, colour: c.colour }));
-				for (const { newSmod, newDmod, colour, scon, dcon, dir } of cables) {
-					mutAddCable(patch, areaIdx, { colour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
+				for (const { newSmod, newDmod, colour, userColour, scon, dcon, dir } of cables) {
+					mutAddCable(patch, areaIdx, { colour, userColour, smod: newSmod, scon, dir, dmod: newDmod, dcon });
 					const fromConType = dir === 1 ? 1 : 0;
 					allCmds.push([
 						'add-cable',
@@ -872,26 +872,36 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		// Recomputes uprate flags on all modules in the area and recolors auto-colored cables.
-		// Called after any cable topology change so the editor stays in sync without hardware confirmation.
-		_syncUprateAndColors(patch: Patch, areaIdx: 0 | 1): void {
+		// Shared by _syncUprateAndColors/_autoRecolorOnLoad: module defs + current uprate set for an area.
+		_uprateContext(patch: Patch, areaIdx: 0 | 1): { uprateSet: Set<number>; modDefMap: Map<number, ModuleDefinition> } {
 			const area = patch.areas[areaIdx];
 			const areaModDefs = (area.modules ?? [])
 				.map((m) => ({ index: m.index, def: getModule(m.type) as ModuleDefinition | undefined }))
 				.filter((m): m is { index: number; def: ModuleDefinition } => m.def !== undefined);
 			const uprateSet = computeUprateSet(area.cableList ?? [], areaModDefs);
+			return { uprateSet, modDefMap: new Map(areaModDefs.map((m) => [m.index, m.def])) };
+		},
+
+		// Recomputes uprate flags on all modules in the area and recolors auto-colored cables.
+		// Called after any cable topology change so the editor stays in sync without hardware confirmation.
+		_syncUprateAndColors(patch: Patch, areaIdx: 0 | 1): void {
+			const area = patch.areas[areaIdx];
+			const { uprateSet, modDefMap } = this._uprateContext(patch, areaIdx);
 			for (const m of area.modules ?? []) {
 				m.uprate = uprateSet.has(m.index) ? 1 : 0;
 			}
-			const modDefMap = new Map(areaModDefs.map((m) => [m.index, m.def]));
 			patch.areas[areaIdx].cableList = autoRecolorCables(area.cableList ?? [], uprateSet, modDefMap) as unknown as (typeof patch.areas)[0]['cableList'];
 		},
 
-		// On load: recolor each area whose cables have no userColour (i.e. pre-feature patches).
+		// On load: infer user-overridden colours from the freshly-parsed cables (the wire format has
+		// no bit to persist userColour, so it's reconstructed by diffing stored vs computed colour),
+		// then recompute uprate + auto-recolor everything that wasn't inferred as an override.
 		_autoRecolorOnLoad(patch: Patch): void {
 			for (const areaIdx of [0, 1] as const) {
 				const cables = patch.areas[areaIdx]?.cableList ?? [];
-				if (cables.some((c) => c.userColour !== undefined)) continue;
+				if (cables.length === 0) continue;
+				const { uprateSet, modDefMap } = this._uprateContext(patch, areaIdx);
+				patch.areas[areaIdx].cableList = inferUserColours(cables, uprateSet, modDefMap) as unknown as (typeof patch.areas)[0]['cableList'];
 				this._syncUprateAndColors(patch, areaIdx);
 			}
 		},
@@ -1794,8 +1804,9 @@ export const useSlotsStore = defineStore('slots', {
 			} else {
 				// No driving source (e.g. an output fanning directly to several inputs): chain the orphaned neighbors together.
 				const colour = matching[0].colour;
+				const userColour = matching[0].userColour;
 				for (let i = 0; i < others.length - 1; i++) {
-					newCables.push({ colour, dir: 0, smod: others[i].mod, scon: others[i].con, dmod: others[i + 1].mod, dcon: others[i + 1].con });
+					newCables.push({ colour, userColour, dir: 0, smod: others[i].mod, scon: others[i].con, dmod: others[i + 1].mod, dcon: others[i + 1].con });
 				}
 			}
 

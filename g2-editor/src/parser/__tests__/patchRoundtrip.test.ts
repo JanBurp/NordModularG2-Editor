@@ -8,6 +8,8 @@ import fs from 'fs';
 import path from 'path';
 import { serializePatch, serializePerformance } from '../nmg2PatchSerializer';
 import { extractVariations } from '../../store/slotHelpers';
+import { computeUprateSet, inferUserColours } from '../cableGraph';
+import { getModule } from '../../renderer/nmg2mods';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
@@ -285,6 +287,64 @@ describe('addCable', () => {
 		expect(cables).toHaveLength(existingCount + 1);
 		const found = cables.find((c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2);
 		expect(found).toBeDefined();
+	});
+});
+
+describe('cable colour persistence (userColour inference)', () => {
+	// Builds the { uprateSet, modDefMap } context inferUserColours needs, mirroring slots.ts's _uprateContext.
+	function uprateContext(patch: Patch, areaIdx: 0 | 1) {
+		const area = patch.areas[areaIdx];
+		const areaModDefs = area.modules.map((m) => ({ index: m.index, def: getModule(m.type)! })).filter((m) => m.def !== undefined);
+		const uprateSet = computeUprateSet(area.cableList ?? [], areaModDefs);
+		return { uprateSet, modDefMap: new Map(areaModDefs.map((m) => [m.index, m.def])) };
+	}
+
+	it('recovers an explicit colour that differs from the auto default after save/reload', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+
+		// Keyboard (type 1): output 0 "Pitch" is blue (index 1), output 1 "Gate" is yellow (index 2).
+		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		// 2-Out (type 4): destination with plain inputs, no outputs.
+		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		mutAddModule(patch, 1, kbd);
+		mutAddModule(patch, 1, out);
+
+		// Overridden cable: Pitch (blue/1) forced to red (0) — disagrees with the natural default.
+		const overridden: Cable = { colour: 0, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 };
+		// Plain cable: Gate (yellow/2) left at its natural default — never touched by the user.
+		const plain: Cable = { colour: 2, smod: 1, scon: 1, dir: 1, dmod: 2, dcon: 1 };
+		mutAddCable(patch, 1, overridden);
+		mutAddCable(patch, 1, plain);
+
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: reloaded } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		const { uprateSet, modDefMap } = uprateContext(reloaded, 1);
+		const inferred = inferUserColours(reloaded.areas[1].cableList ?? [], uprateSet, modDefMap);
+
+		const overriddenAfter = inferred.find((c) => c.scon === 0)!;
+		const plainAfter = inferred.find((c) => c.scon === 1)!;
+		expect(overriddenAfter.userColour).toBe(0);
+		expect(plainAfter.userColour).toBeUndefined();
+	});
+
+	it('does not pin a colour that happens to equal the natural default (documented limitation)', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		mutAddModule(patch, 1, kbd);
+		mutAddModule(patch, 1, out);
+
+		// "User picks" blue for Pitch — same as the natural default, so it's indistinguishable from unset.
+		const indistinguishable: Cable = { colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 };
+		mutAddCable(patch, 1, indistinguishable);
+
+		const savedRawHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: reloaded } = simulateFileSaveAndLoad(name, savedRawHex);
+
+		const { uprateSet, modDefMap } = uprateContext(reloaded, 1);
+		const inferred = inferUserColours(reloaded.areas[1].cableList ?? [], uprateSet, modDefMap);
+		expect(inferred[0].userColour).toBeUndefined();
 	});
 });
 
