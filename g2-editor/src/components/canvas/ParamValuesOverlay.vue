@@ -9,6 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useKeyHoldOverlay } from '@/composables/useKeyHoldOverlay';
+	import { isKnob, isSlider } from '@/utils/moduleControls';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -25,19 +26,19 @@
 		if (!slot) return [];
 		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
 		const variation = uiStore.variation;
-		const result: { text: string; x: number; y: number; color: string }[] = [];
+		const result: { text: string; x: number; y: number }[] = [];
 		for (const mod of props.modules) {
 			const moduleDef = getModule(mod.type);
 			if (!moduleDef?.params?.length) continue;
 			const values: number[] = slotsStore.slots[slot]?.variations?.[variation]?.[areaKey]?.[mod.index] ?? [];
 			for (let i = 0; i < moduleDef.params.length; i++) {
 				const param = moduleDef.params[i];
+				if (!isKnob(param.n) && !isSlider(param.n)) continue;
 				const value = values[i] ?? 0;
 				result.push({
 					text: String(value),
 					x: (mod.horiz ?? 0) * 256 + param.x,
 					y: (mod.vert ?? 0) * 16 + param.y,
-					color: '#5CF',
 				});
 			}
 		}

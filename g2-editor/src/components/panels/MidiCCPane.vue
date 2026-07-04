@@ -198,7 +198,7 @@
 		e.dataTransfer.effectAllowed = 'move';
 		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
 
-		// Custom drag image — mirrors ModuleCCBadge ghost styling
+		// Custom drag image — mirrors MidiBadge ghost styling
 		const w = cc >= 100 ? 52 : cc >= 10 ? 46 : 40;
 		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 		svg.setAttribute('width', String(w));

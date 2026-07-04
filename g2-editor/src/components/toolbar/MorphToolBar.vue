@@ -9,10 +9,9 @@
 					@dragover.prevent
 					@drop="onMorphCCDrop(i, $event)"
 				>
-					<span
-						v-if="showCCOverlay && getMorphCC(i) !== null"
-						class="absolute -top-1 left-1/2 -translate-x-1/2 text-[9px] font-bold bg-yellow-400 text-black px-1 rounded pointer-events-none z-10"
-					>CC# {{ getMorphCC(i) }}</span>
+					<svg v-if="showCCOverlay && getMorphCC(i) !== null" class="absolute -top-1 left-1/2 z-10 hover:z-20" width="1" height="14" overflow="visible">
+						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
+					</svg>
 					<Knob
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
@@ -42,6 +41,7 @@
 	import { computed } from 'vue';
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
+	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
 	import CheckBox from '../common/CheckBox.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
