@@ -12,22 +12,21 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Undo/Redo
 - Copy Variation
 - Midi CC assignments
-- Missing VU meter's on Modules
-- Graphics & Params for several modules improved/finished
+- Popups for MidiCC and values
 - New Patch / New Performance implemented (#14)
-- Patch browser: Load/Store/Delete/Sort actions implemented
-- Context menu and QuickAdd popup (M) for adding modules to patch
+- Patch browser: Load/Store/Delete/Sort actions implemented and UX improvements
 - Module category search improvements
+- Context menu and QuickAdd popup (M) for adding modules to patch
+- Graphics & Params for several modules improved/finished
+- Knob reset (double-click to reset to default)
 - Themes: System, Light, Dark
+- Cable editing improvements
 - Cable rendering options
 - Knob dial options
 - Area position stored in patch (voice/fx/split)
 - SidePanel open/closed state persisted as user preference
 - Settings pane auto-opens last section
-- Patch browser: UX improvements
 - Key commands help
-- Parameter values overlay on modules
-- Knob reset (double-click to reset to default)
 
 ### Changed
 - Parameter sending smoother (#8)
@@ -55,6 +54,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Corrupted paramname length in parser
 - Label rename bug (CLI and editor)
 - Performance file upload flow robustness
+- Missing VU meter's on Modules
+- Compressor module outputs swapped (R-L)
+- Input pad parameter mapping
 
 ---
 
