@@ -18,15 +18,14 @@ A cross-platform editor for the Nord Modular G2 synthesizer. The original Clavia
 
 See the [Changelog](../CHANGELOG.md) for more details
 
-Core editing is working. Second-goal features (undo/redo, morphs, MIDI CC) are in progress.
-
 | Goal | Status |
 |---|---|
-| Core USB, parsing, basic patch editing | ✅ Done |
-| Undo/Redo, morphs, MIDI CC, parameter pages | 🔄 In progress |
-| Patch Adjuster, Mutator, advanced features | 🗓 Planned |
+| Core USB, Parsing, Basic Editing, etc. | ✅ Done |
+| Undo/Redo, MIDI CC assignment, Browser, Variation copy, Led's in patch, etc. | ✅ Done |
+| Morph Editing, Parameter Pages Assignment | 🔄 In progress |
+| Patch Adjuster, Mutator, Advanced Features | 🗓 Planned |
 
-### First proof of concept (30 April 2026)
+### Video of first proof of concept (30 April 2026)
 
 [![Watch the video](https://img.youtube.com/vi/BuMu8OjTbvk/0.jpg)](https://youtu.be/BuMu8OjTbvk)
 
