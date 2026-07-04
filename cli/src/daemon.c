@@ -14,6 +14,10 @@
  *   Watch events flow to stdout unchanged (no "id" field).
  */
 
+#ifdef __MINGW32__
+#define _POSIX_C_SOURCE 200809L /* getline() is not declared by MinGW-w64 without this */
+#endif
+
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
