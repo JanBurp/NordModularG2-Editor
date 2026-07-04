@@ -41,11 +41,6 @@ export function getAllowedCCs(): number[] {
 	return result;
 }
 
-export function getFreeCCs(controllers: MidiCCAssignment[]): number[] {
-	const used = new Set(controllers.map((c) => c.cc));
-	return getAllowedCCs().filter((cc) => !used.has(cc));
-}
-
 export const CC_SHORT: Record<number, string> = {
 	2: 'Breath',
 	4: 'Foot',

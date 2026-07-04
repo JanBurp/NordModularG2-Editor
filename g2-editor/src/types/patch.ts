@@ -76,7 +76,6 @@ export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [
 ];
 
 export const NUM_VARIATIONS = 9;
-export const NUM_MORPHS = 8;
 export const MORPH_NAMES = ['Wheel', 'Vel', 'Keyb', 'Aft.Tch', 'Sust.Pd', 'Ctrl.Pd', 'P.Stick', 'G.Wh 2'];
 export const MORPH_MODE_OPTIONS: string[][] = [
 	['Knob', 'Wheel'],

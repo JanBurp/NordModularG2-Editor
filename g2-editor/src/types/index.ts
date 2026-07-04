@@ -83,11 +83,6 @@ export interface Device {
 	pedal: { polarity: boolean; gain: number };
 }
 
-export interface DeviceState {
-	connected: boolean;
-	device: Device | null;
-}
-
 export interface ParamDefinition {
 	names?: string[];
 	width?: number;
@@ -108,8 +103,6 @@ export interface ParamDefinition {
 	canLabel?: boolean;
 	trigger?: boolean;
 }
-
-export type ParamMap = Record<string, ParamDefinition>;
 
 export interface ModuleJack {
 	name: string;

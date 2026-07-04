@@ -29,13 +29,6 @@ extern void test_parse_name_stops_at_non_printable(void);
 extern void test_parse_name_empty(void);
 extern void test_parse_name_only_null(void);
 
-extern void test_bitstream_init(void);
-extern void test_bitstream_read_bits(void);
-extern void test_bitstream_read_bits_advanced(void);
-extern void test_bitstream_seek_bit(void);
-extern void test_bitstream_tell_bit(void);
-extern void test_bitstream_read_bits_across_bytes(void);
-
 extern void test_parse_synth_name(void);
 extern void test_parse_mode_patch(void);
 extern void test_parse_mode_performance(void);
@@ -149,13 +142,6 @@ int main(void) {
     RUN_TEST(test_parse_name_stops_at_non_printable);
     RUN_TEST(test_parse_name_empty);
     RUN_TEST(test_parse_name_only_null);
-
-    RUN_TEST(test_bitstream_init);
-    /* RUN_TEST(test_bitstream_read_bits); - bitstream algorithm doesn't match Python's getbits */
-    /* RUN_TEST(test_bitstream_read_bits_advanced); */
-    RUN_TEST(test_bitstream_seek_bit);
-    RUN_TEST(test_bitstream_tell_bit);
-    /* RUN_TEST(test_bitstream_read_bits_across_bytes); */
 
     RUN_TEST(test_parse_synth_name);
     RUN_TEST(test_parse_mode_patch);

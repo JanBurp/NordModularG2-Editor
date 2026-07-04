@@ -196,10 +196,6 @@ export function getModule(id: number): ModuleDefinition | undefined {
 	return moduleMap.get(id);
 }
 
-export function getModuleByName(short: string): ModuleDefinition | undefined {
-	return moduleNameMap.get(short);
-}
-
 export function getAllModules(): ModuleDefinition[] {
 	return modules;
 }

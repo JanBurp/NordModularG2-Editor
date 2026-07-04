@@ -29,15 +29,6 @@
 	const uiStore = useUiStore();
 	const searchQuery = ref('');
 
-	// const gradients = [
-	// 	{ id: 'g116', component: 'linearGradient', props: { gradientUnits: 'objectBoundingBox' } },
-	// 	{ id: 'g117', component: 'linearGradient', props: { gradientUnits: 'objectBoundingBox' } },
-	// 	{ id: 'g118', component: 'linearGradient', props: { gradientUnits: 'objectBoundingBox', x1: '0%', y1: '0%', x2: '0%', y2: '100%' } },
-	// 	{ id: 'g119', component: 'linearGradient', props: { gradientUnits: 'objectBoundingBox', x1: '0%', y1: '0%', x2: '0%', y2: '100%' } },
-	// 	{ id: 'g120', component: 'radialGradient', props: { gradientUnits: 'objectBoundingBox', cx: '50%', cy: '50%', r: '70%' } },
-	// 	{ id: 'g121', component: 'linearGradient', props: { gradientUnits: 'objectBoundingBox', x1: '0%', y1: '0%', x2: '0%', y2: '100%' } },
-	// ];
-
 	const paths = [
 		{ id: 'BitmapHVCA' },
 		{ id: 'BitmapVVCA' },
