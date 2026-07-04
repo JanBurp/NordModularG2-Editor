@@ -29,8 +29,18 @@ nav_order: 1
   - **Right-click** any variation button to copy its parameters to another variation or to Init
   - Non-Init variations also offer **Set to Init** (overwrites this variation with Init parameters)
   - **Drag** a variation button onto another to copy (asks for confirmation)
-- **Level** — master patch volume (knob)
-- **Active/Monitor** — toggle patch monitoring
+
+---
+
+## Morph Toolbar
+
+Shown below the patch toolbar whenever a patch is loaded:
+
+- **4 Morph knobs** — one per morph; each has a source selector below it to pick what drives it
+- **Patch Level** — master patch volume (knob)
+- **Active/Mute** — checkbox next to Patch Level toggles patch monitoring
+
+Right-click a Morph knob to assign a MIDI CC to it (see [MIDI CC Assignment](midi-cc)).
 
 ---
 
@@ -50,7 +60,10 @@ Click **Perf** in the toolbar to switch between patch and performance mode.
 - **BPM** — click to set tempo (30–240)
 - **Run** — toggle master clock
 
-Per-slot configuration is in the **Settings pane → Performance Settings**:
+**Settings pane → Performance Settings** also has:
+- **Range Enable** — turns KB Split on/off for the performance
+
+Per-slot configuration is in the same section:
 
 | Column | Meaning |
 |---|---|
@@ -64,12 +77,21 @@ Per-slot configuration is in the **Settings pane → Performance Settings**:
 ## Settings Pane (`Cmd+,`)
 
 ### Editor Settings
-- **Disk path** — default folder for the patch browser
+- **Theme** — editor color theme
+- **Knob control** — Knob Mode (relative/absolute) and drag Sensitivity
+- **Cable rendering** — Gravity, Opacity, Thickness
 - **Hidden modules** — show/hide hidden (not recognised by Clavia editor) modules in patch browser
+
+> The patch browser's disk folder is set from the **`…`** button in the Disk tab (see Patch Browser below), not from this pane.
 
 ### Synth Settings (requires G2 connected)
 - **Synth name**
-- **MIDI channels** — per slot (A/B/C/D) and global
+- **Memory Protect**
+- **MIDI channels** — per slot (A/B/C/D) and global; each can be set to Off
+- **MIDI settings** — Local, Clock (off/send/recv/both), Program Change, CC (off/send/recv/both), Sysex channel (or All)
+- **Tuning** — Semi, Cents
+- **Pedal** — Polarity, Gain
+- **Global Oct.** — global octave shift (−2 to +2) with an Active toggle
 
 ### Patch Settings
 - **Arpeggiator** — on/off, Time, Mode, Octaves
@@ -82,7 +104,7 @@ Per-slot configuration is in the **Settings pane → Performance Settings**:
 
 ## Patch Browser (`Cmd+B`)
 
-Three tabs: **Disk**, **Patches**, **Performances**.
+Three tabs: **Disk**, **Patches**, **Performances**. With the Browser pane focused (and no text field active), `←` / `→` cycles between them.
 
 ### Disk Tab
 

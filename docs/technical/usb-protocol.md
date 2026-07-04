@@ -229,6 +229,24 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
 | `0x81` | UNKNOWN_1 (init query) | — | Extended bulk |
 
+**Daemon commands:**
+
+```
+set-synth-settings   <...>                    (0x03)
+set-perf-mode        <mode>                   (0x3E)
+select-patch         <slot> <bank> <loc>      (0x0A)
+select-perf          <bank> <loc>             (0x0A, slot byte=4)
+store-patch          <slot> <bank> <loc>      (0x0B)
+clear-patch          <slot> <bank> <loc>      (0x0C)
+clear-bank           <slot> <bank> <from> <to> (0x0E)
+reload-names         <mode> [bank]            (0x14)
+get-perf-settings                              (0x02, then falls through to §6b's 0x10)
+```
+
+Almost every other command in §6b/§7 also sends `0x35` (GET_PATCH_VERSION) or `0x81` (UNKNOWN_1) first, as an internal version-fetch step — this is noted where relevant rather than repeated for each command.
+
+`verbose` and `debug` are local daemon flags with no wire traffic — not every JSON command touches the USB layer.
+
 ### 6b. Performance-Version System Commands (cmd_id = perf_version)
 
 These use the same scope (`0x2C`) but put the **performance version** at the cmd_id position instead of `0x41`. Obtain the perf version from GET_PATCH_VERSION with slot=4 or from the init response.
@@ -247,6 +265,19 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
 | `0x59` | UNKNOWN_2 (perf init query) *(not implemented yet)* | — | Embedded ACK |
 | `0x5E` | GET_GLOBAL_KNOBS *(not implemented yet)* | — | Extended bulk |
+
+**Daemon commands:**
+
+```
+slot                  <slot>                    (0x10 + 0x11 + 0x09, or just 0x09 — see below)
+get-perf-settings                                (0x10)
+get-perf-file                                    (0x10, then per-slot 0x3C — see §7)
+set-perf-name         <name>                     (0x29)
+set-master-clock-run  <0|1>                      (0x3F)
+set-master-clock-bpm  <bpm>                      (0x3F)
+```
+
+`set-slot-enabled`, `set-slot-key`, `set-slot-hold`, `set-slot-range`, and `set-range-enable` also live here (all use `0x10` read + `0x11` write) — see the dedicated subsections below for their exact field offsets.
 
 ### SELECT_SLOT command
 
@@ -314,6 +345,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
+| `0x21` | SET_PATCH_DESCRIPTION (aka C_PATCH_DESCR) | `[size_hi][size_lo][data]` (data max 62 bytes, see §9's PatchDescription body layout) | Embedded ACK |
 | `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
 | `0x2A` | SET_UPRATE_MODE *(not implemented yet)* | `loc mod uprate` | Embedded ACK |
@@ -344,6 +376,37 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x6F` | SET_PATCH_NOTES *(not implemented yet)* | patch notes chunk | Embedded ACK |
 | `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
+
+> **SET_PATCH_DESCRIPTION (`0x21`) gotcha:** the daemon's `voice-mode` and `voice-count` commands wrap this in a read-modify-write via `g2_get_patch()` — do not call them from an editor that already has the patch loaded in memory (it will race with the editor's own copy). Use `set-patch-description` directly with the full 14-byte body instead (`cli/src/g2_device.c:1481-1504`).
+
+> **SET_PATCH (`0x37`) scope caveat:** `upload-perf` reuses this same sub-cmd byte but at **system/performance scope** (`COMMAND_REQ|COMMAND_SYS`, fixed version `0x42`) with a different payload shape — it embeds an inline `0x1A 0x29` performance-name header before the section data. This is distinct from the per-slot `upload-patch` usage documented above.
+
+**Daemon commands:**
+
+```
+set-patch-name          <slot> <name>                              (0x27)
+get-patch               <slot>                                     (0x28 name, 0x35 version, 0x3C binary)
+set-module-mode         <slot> <loc> <mod> <param> <val>            (0x2B)
+add-module               <slot> <loc> ...                          (0x30)
+set-module-color        <slot> <loc> <mod> <color>                 (0x31)
+del-module               <slot> <loc> <mod>                        (0x32)
+set-module-name         <slot> <loc> <mod> <name>                  (0x33)
+move-module              <slot> <loc> <mod> <col> <row>             (0x34)
+upload-patch             <slot> <file>                              (0x37, slot scope)
+upload-perf              <file>                                    (0x37, system scope — see caveat above)
+set-param                <slot> <loc> <mod> <param> <val> <var>    (0x40)
+set-param-label          <slot> <loc> <mod> <param> <label> ...    (0x42)
+copy-variation           <slot> <from> <to>                        (0x44)
+add-cable                <slot> <loc> ...                          (0x50)
+del-cable                <slot> <loc> ...                          (0x51)
+set-cable-color          <slot> <loc> ... <color>                  (0x54)
+variation                <slot> <variation>                        (0x35 then 0x6A)
+set-patch-description    <slot> <14-byte body>                     (0x21)
+voice-mode / voice-count <slot> <value>                            (0x21, via read-modify-write — see caveat above)
+get-resources            <slot>                                    (0x71, queried for loc 0 and 1)
+```
+
+Nearly every command above also sends `0x35` (GET_PATCH_VERSION) first to fetch/cache the patch version — this happens transparently via `cable_get_version()` and isn't repeated in the list above.
 
 ### Knob & MIDI Assignment Sub-Commands
 
@@ -732,6 +795,8 @@ bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
 
 | `version` | `subCmd` | JSON type | Extra fields |
 |-----------|----------|-----------|--------------|
+| any | `0x0D` | `patch_stored` | `slot`=response[5], `bank`=response[6]+1, `location`=response[7]+1 (checked before the `version==0x40` branch) |
+| any | `0x15` | `patch_cleared` | `kind`="performance" if response[5]==1 else "patch"; `bank`=response[6]+1, `location`=response[7]+1 (checked before the `version==0x40` branch) |
 | `0x40` | `0x1F` | `version_update` | `perf_version` = response[5] |
 | `0x40` | `0x36` or `0x38` | `patch_version` | `slot`, `version` = response[5], [6] |
 | other | `0x7F` | `ok` | — |
@@ -780,8 +845,12 @@ When `version != 0x40`:
 
 | `subCmd` | JSON type | Data |
 |----------|-----------|------|
+| `0x21` | `patch_version_change` | `slot`, `version`:0 — bulk-level hardware notification ("patch description changed"); distinct from the embedded `0x21`/`0x3C` `patch_update` above, and always reports `version:0` since none accompanies this variant |
 | `0x39` | `led_data` | `slot`, `data[]` — raw bytes, see §15 |
 | `0x3A` | `volume_data` | `slot`, `data[]` — raw bytes, see §16 |
+| `0x4D` | `param_list` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PARAMS itself remains *(not implemented yet)* as a sender) |
+| `0x5B` | `param_names` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PARAM_NAMES remains *(not implemented yet)* as a sender) |
+| `0x6F` | `patch_notes` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PATCH_NOTES remains *(not implemented yet)* as a sender) |
 | `0x72` | `resources_used` | `slot`, `data[]` — raw bytes |
 
 ### Performance bulk sub-commands (`aCmd 0x04`)
@@ -791,6 +860,7 @@ When `version != 0x40`:
 | `0x40` | `0x1F` | `version_update` | `scope`="all_slots"; triggers re-arm |
 | any | `0x03` | `synth_settings_update` | `mode`="Patch"\|"Performance". Two variants: (1) **hardware** — G2 PERF button or unsolicited mode change: no `patches` field; (2) **daemon rearm** — emitted by `g2_emit_rearm_data()` after BULK_REARM: includes `"patches":[…]` array (4 entries, one per slot) so the frontend can apply all slots without separate `get-patch` commands. |
 | any | `0x11` | `perf_settings` | — |
+| any | `0x13` | `patch_names_updated` | Decodes an embedded R_ADD_NAMES (`0x16`) list-name update emitted after a hardware store/rename: `kind` ("patch"/"performance"), `bank`, `location`, `name`, `category`. Falls back to `{"type":"patch_names_updated"}` with no fields if parsing fails. |
 | any | `0x29` | `perf_name` + `perf_settings` | Compound message: null-terminated name at bulk[4..], followed by a full C_PERF_SETTINGS (0x11) chunk. Emitted by G2 when Hold or KB Split changes on hardware. Also emitted as embedded when only the name changes (no settings chunk). |
 
 **C_PERF_NAME compound bulk layout:**
@@ -840,6 +910,17 @@ Emitted JSON: `{"type":"version_update","perf_version":N,"slot_versions":[{"slot
 |-----------|---------|
 | `device_disconnected` | `LIBUSB_ERROR_NO_DEVICE` during poll |
 | `device_reconnected` | Successful reconnect after disconnect |
+
+### Daemon Lifecycle Events
+
+Emitted once at daemon startup, before any watch events:
+
+| JSON type | Trigger |
+|-----------|---------|
+| `usb_devices` | List of detected USB devices (`daemon.c:772`) |
+| `device_info` | Details of the connected device (`daemon.c:805`) |
+| `usb_driver_error` | Failed to claim the USB interface / driver error (`daemon.c:781`) |
+| `watch_armed` | START_NOTIFICATIONS succeeded; the daemon is now listening for watch events (`daemon.c:844`) |
 
 ### Debug-only events
 
@@ -1072,12 +1153,16 @@ The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_
   ["add-module",       "<slot>", "<loc>", type, id, col, row, colour, n_modes, mode0..., n_params, param0..., "name"],
   ["set-module-color", "<slot>", "<loc>", module_id, color],
   ["set-module-name",  "<slot>", "<loc>", module_id, "name"],
-  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, label_idx, "label"],
+  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, "label0", "label1", ...],
   ["set-param",        "<slot>", "<loc>", module_id, param_idx, value, variation]
 ]}
 ```
 
 Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
+
+> **`set-param-label` in `seq` — no `label_idx` arg:** unlike the doc's general SET_PARAM_LABEL description in §8b, the `seq` form takes a variadic label list with no separate `label_idx` — each label's position in the trailing array *is* its index (`num_labels = sn - 5` in `execute_seq()`, `cli/src/daemon.c:253-259`).
+
+> **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through (`daemon.c:238-239`) — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. Use the standalone `add-module` command if you need non-default parameter values applied immediately (e.g. pasting a module with non-default variation values).
 
 > **`set-param` in `seq` — deferred execution:** `set-param` uses `COMMAND_WRITE_NO_RESP` and cannot be packed into the compound USB frame. The daemon queues all `set-param` entries into a `SetParamEntry[]` array and executes them sequentially via `g2_set_param()` **after** `g2_batch_ops()` returns. This keeps structural mutations (add/del/move module, add/del cable) atomic in one frame while still allowing parameter values in the same `seq` call — essential for copy/paste of modules with non-default variation values.
 

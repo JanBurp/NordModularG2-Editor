@@ -12,15 +12,15 @@ The editor has three main areas:
 
 - **Toolbar** (top) — patch name, slot selector (A–D), variation buttons, cable visibility controls, resource monitor
 - **Canvas** (center) — Voice and FX areas with modules and cables
-- **Side panel** (right) — toggled panels: Modules pane, Patch Browser, Settings
+- **Side panel** (right) — toggled panels: Modules pane, Patch Browser, MIDI CC pane, Settings
 
 The canvas can show:
 
 | View | Key | Description |
 |---|---|---|
-| Voice only | `Opt+V` | Polyphonic signal processing modules |
-| FX only | `Opt+F` | Effects chain modules |
-| Split view | `Opt+S` | Both areas side by side; drag the divider to resize |
+| Voice only | `V` | Polyphonic signal processing modules (Split if already Voice-only) |
+| FX only | `F` | Effects chain modules (Split if already FX-only) |
+| Split view | — | Both areas side by side; drag the divider to resize. Reached from `V`/`F` above, not a dedicated shortcut |
 
 ## Sections
 

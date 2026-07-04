@@ -50,7 +50,7 @@
 				{ keys: ['⌘ X'], action: 'Cut selected modules' },
 				{ keys: ['⌘ V'], action: 'Paste modules' },
 				{ keys: ['⌘ A'], action: 'Select all modules' },
-				{ keys: ['Del', 'Backspace'], action: 'Delete selection' },
+				{ keys: ['Backspace'], action: 'Delete selection' },
 				{ keys: ['⌘ Z'], action: 'Undo' },
 				{ keys: ['⇧ ⌘ Z'], action: 'Redo' },
 			],
@@ -66,8 +66,8 @@
 		{
 			title: 'View & Areas',
 			rows: [
-				{ keys: ['V'], action: 'Toggle Voice area ↔ Split' },
-				{ keys: ['F'], action: 'Toggle FX area ↔ Split' },
+				{ keys: ['V'], action: 'Show Voice area (Split if already Voice-only)' },
+				{ keys: ['F'], action: 'Show FX area (Split if already FX-only)' },
 				{ keys: ['Space'], action: 'Show / hide all cables' },
 				{ keys: ['Ctrl+Space'], action: 'Shake cables' },
 			],
@@ -79,6 +79,8 @@
 				{ keys: ['⌘ B'], action: 'Toggle Browser pane' },
 				{ keys: ['⌘ I'], action: 'Toggle Midi CC pane' },
 				{ keys: ['⌘ ,'], action: 'Toggle Settings pane' },
+				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
+				{ keys: ['←', '→'], action: 'Switch Disk/Patches/Performances tab (Browser pane focused)' },
 			],
 		},
 		{
@@ -101,7 +103,7 @@
 		{
 			title: 'Other',
 			rows: [
-				{ keys: ['ESC'], action: 'Abort / close dialog / clear filter' },
+				{ keys: ['ESC'], action: 'Close dialog / menu / overlay, or clear search filter' },
 				{ keys: ['F1'], action: 'Show module help' },
 			],
 		},

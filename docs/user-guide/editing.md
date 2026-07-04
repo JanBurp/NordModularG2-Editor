@@ -12,6 +12,8 @@ nav_order: 2
 2. Search by name or category, or scroll the list
 3. Drag a module onto the canvas (Voice or FX area)
 
+**Quick add** — press `M`, type to search, then `Enter` or click a result to place it at the cursor position.
+
 ---
 
 ## Selecting & Moving
@@ -23,7 +25,7 @@ nav_order: 2
 | Drag on empty canvas | Rubber-band select |
 | Drag module title bar | Move module(s) |
 | `Cmd+A` | Select all modules in current area |
-| `Delete` / `Backspace` | Delete selected modules and their cables |
+| `Backspace` | Delete selected modules and their cables |
 
 ### Keyboard Navigation Between Modules
 

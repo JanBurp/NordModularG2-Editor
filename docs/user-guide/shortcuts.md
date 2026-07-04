@@ -23,7 +23,7 @@ nav_order: 4
 | `Cmd+X` | Cut selected modules; cut cables (delete only — no paste) |
 | `Cmd+V` | Paste modules at mouse cursor; layout, parameters and cables preserved |
 | `Cmd+A` | Select all modules |
-| `Delete` / `Backspace` | Delete selection |
+| `Backspace` | Delete selection |
 | `Cmd+Z` | Undo |
 | `Cmd+Shift+Z` | Redo |
 
@@ -38,8 +38,8 @@ nav_order: 4
 
 | Key | Action |
 |---|---|
-| `V` | Toggle Voice area ↔ Split view |
-| `F` | Toggle FX area ↔ Split view |
+| `V` | Show Voice area (Split if already Voice-only) |
+| `F` | Show FX area (Split if already FX-only) |
 | `Space` | Show / hide all cables |
 | `Ctrl+Space` | Shake cables |
 
@@ -51,6 +51,7 @@ nav_order: 4
 | `Cmd+B` | Toggle Browser pane |
 | `Cmd+I` | Toggle Midi CC pane |
 | `Cmd+,` | Toggle Settings pane |
+| `←` / `→` | Switch Disk/Patches/Performances tab (Browser pane focused) |
 
 ## Overlays
 
@@ -78,4 +79,4 @@ Hold the key to show the overlay; release or press `Escape` to hide.
 |---|---|
 | `R` | Toggle clock run / stop |
 | `/` | Focus search / filter |
-| `Escape` | Abort drag / close dialog / clear filter |
+| `Escape` | Close dialog / menu / overlay, or clear search filter |
