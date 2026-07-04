@@ -33,7 +33,7 @@ See the [Changelog](../CHANGELOG.md) for more details
 
 ## Acknowledgements
 
-Protocol knowledge from the Nord G2 community at [electro-music.com](https://electro-music.com): the [Delphi Editor by bverhue](https://www.bverhue.nl/g2dev/), [patchviewer by ian-s](https://electro-music.com/patchviewer/), and [g2ools by qfingers](https://electro-music.com/forum/viewtopic.php?t=15405).
+Protocol knowledge from the Nord G2 community at [electro-music.com](https://electro-music.com): the [Delphi Editor by bverhue](https://www.bverhue.nl/g2dev/), [patchviewer by ian-s](https://electro-music.com/patchviewer/), and [g2ools by qfingers](https://electro-music.com/forum/viewtopic.php?t=15405). Also to Chris Purusha for some technical discussions and insights. And everyone who tested and or donated to this project.
 
 ## Donate
 
