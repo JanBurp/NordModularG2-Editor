@@ -25,6 +25,8 @@ The pane lists all allowed CCs (2–119, excluding reserved numbers). Each row s
 
 Unassigned rows appear dimmed. Click a row to select it; **Ctrl/Cmd+click** toggles; **Shift+click** extends the selection.
 
+Rows are drag-and-drop reassignable — drag one CC row onto another to move/swap its assignment.
+
 ### Buttons
 
 | Button | Action |
@@ -37,9 +39,9 @@ Unassigned rows appear dimmed. Click a row to select it; **Ctrl/Cmd+click** togg
 
 ## Assigning via Context Menu
 
-Right-click any parameter (knob, slider, switch, or spinner) on the canvas to open the context menu. Three MIDI CC options are available:
+Right-click any parameter (knob, slider, switch, or spinner) on the canvas — or any of the four Morph knobs in the Morph toolbar — to open the context menu. Three MIDI CC options are available:
 
-- **Assign CC (last received)** — assigns whichever CC the G2 most recently received. Useful when you twiddle a hardware knob first to pick the CC.
+- **Assign CC (N)** / **Assign CC (none)** — assigns whichever CC the G2 most recently received; the label shows that CC number, or "none" if none has been received yet. Useful when you twiddle a hardware knob first to pick the CC.
 - **Assign CC…** — opens a submenu listing all allowed CCs by number and name. Click one to assign it.
 - **Deassign CC** — removes the current assignment. This item is only shown when the parameter already has a CC assigned.
 
