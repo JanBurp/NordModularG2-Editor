@@ -285,13 +285,16 @@ ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {
 	nativeTheme.themeSource = mode;
 });
 
+let quitting = false;
 app.on("before-quit", (e) => {
+	if (quitting) return;
 	e.preventDefault();
+	quitting = true;
 	(async () => {
 		// await stopWatchAndWait();
 		// try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
 		await stopDaemon();
-		app.exit(0);
+		app.quit();
 	})();
 });
 
