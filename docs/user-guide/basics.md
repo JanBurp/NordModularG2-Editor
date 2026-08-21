@@ -25,10 +25,7 @@ nav_order: 1
 - **Category** — dropdown to set sound category
 - **Voice mode** — mono / legato / poly
 - **Voice count** — number of voices
-- **Variations 1–8 / Init** — click to switch variation
-  - **Right-click** any variation button to copy its parameters to another variation or to Init
-  - Non-Init variations also offer **Set to Init** (overwrites this variation with Init parameters)
-  - **Drag** a variation button onto another to copy (asks for confirmation)
+- **Variations 1–8 / Init** — click to switch. Right-click for **Set to Init** / copy to another variation or Init; drag one variation onto another to copy (confirms first)
 
 ---
 
@@ -36,19 +33,15 @@ nav_order: 1
 
 Shown below the patch toolbar whenever a patch is loaded:
 
-- **4 Morph knobs** — one per morph; each has a source selector below it to pick what drives it
-- **Patch Level** — master patch volume (knob)
-- **Active/Mute** — checkbox next to Patch Level toggles patch monitoring
-
-Right-click a Morph knob to assign a MIDI CC to it (see [MIDI CC Assignment](midi-cc)).
+- **8 Morph knobs** — one per morph, each with a source selector below it; right-click a knob to assign a MIDI CC (see [MIDI CC Assignment](midi-cc))
+- **Patch Level** — master patch volume, with an Active/Mute checkbox next to it
 
 ---
 
-## Slots (A / B / C / D)
+## Slots (A–D)
 
-- Click a slot button to make it active
-- Top indicator: keyboard status; bottom indicator: active status
-- `Shift+click` — toggle slot active; `Ctrl+click` — toggle slot keyboard
+Click to activate. Top/bottom indicators show keyboard/active status.
+`Shift+click` toggles active, `Ctrl+click` toggles keyboard.
 
 ---
 
@@ -59,9 +52,7 @@ Click **Perf** in the toolbar to switch between patch and performance mode.
 - **Performance name** — click to rename (max 16 chars)
 - **BPM** — click to set tempo (30–240)
 - **Run** — toggle master clock
-
-**Settings pane → Performance Settings** also has:
-- **Range Enable** — turns KB Split on/off for the performance
+- **Settings pane → Performance Settings → Range Enable** — turns KB Split on/off for the performance
 
 Per-slot configuration is in the same section:
 
@@ -108,44 +99,25 @@ Three tabs: **Disk**, **Patches**, **Performances**. With the Browser pane focus
 
 ### Disk Tab
 
-- `↑` — navigate to parent folder
-- `…` — open system folder picker
-- **Search** — filter files; Esc to clear
-- Click folder — navigate into it
-- Click `.pch2` / `.prf2` — load into active slot
+- `↑` — parent folder; `…` — system folder picker; **Search** filters files (Esc clears)
+- Click folder to navigate in; click `.pch2` / `.prf2` to load into the active slot
 
 ### Patches / Performances Tabs (G2 connected)
 
 Patches and performances stored on the G2, grouped by bank.
-
-**Navigation**
 
 | Action | Result |
 |---|---|
 | Click bank header | Collapse / expand bank |
 | ▶ / ▼ button (top-right) | Expand all / collapse all banks |
 | Click entry | Load patch or performance |
-| `/` or focus search | Jump to search |
-| `↑` / `↓` in search | Move selection through visible entries |
-| `Enter` | Load selected (or first) entry |
-| `Esc` | Clear search |
+| `/` or focus search | Jump to search; `↑`/`↓` moves selection, `Enter` loads, `Esc` clears |
 
-**Search** — auto-expands any bank with a matching result; restores previous collapse state when cleared.
+Search auto-expands any bank with a match and restores collapse state when cleared.
 
-**Right-click a patch entry**
+**Right-click a patch entry** — *Store "name" here* (write current slot's patch here) or *Delete* (clear this location).
 
-| Item | Action |
-|---|---|
-| Store "*name*" here | Write the current slot's patch to this bank location |
-| Delete (clear this location) | Erase this location from the G2 bank |
-
-**Right-click a bank header**
-
-| Item | Action |
-|---|---|
-| Store "*name*" | Submenu listing all locations — choose where to write |
-| Clear all in bank | Erase every location in this bank |
-| Sort | Submenu: By location · By name A–Z · By name Z–A · By category |
+**Right-click a bank header** — *Store "name"* (submenu of locations), *Clear all in bank*, or *Sort* (By location · By name A–Z · By name Z–A · By category).
 
 > Store is unavailable for performance banks unless the G2 is in Performance mode.
 
