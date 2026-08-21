@@ -12,6 +12,8 @@ files:
 extraResources:
   - from: ../doc/help
     to: doc/help
+  - from: ../designs/mini-modules
+    to: designs/mini-modules
   - from: resources/patches
     to: patches
 

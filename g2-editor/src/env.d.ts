@@ -24,6 +24,7 @@ declare global {
 				builtinPath: (name: string) => Promise<string>;
 			};
 			loadHelp: (shortName: string) => Promise<string | null>;
+			loadModuleGraphics: () => Promise<Record<number, string>>;
 			onMenuAction: (cb: (action: MenuAction) => void) => void;
 			offMenuAction: () => void;
 			savePatch: (filepath: string, data: number[]) => Promise<void>;

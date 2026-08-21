@@ -17,6 +17,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	},
 
 	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),
+	loadModuleGraphics: () => ipcRenderer.invoke("modules:load-graphics"),
 
 	onMenuAction: (cb: (action: MenuAction) => void) =>
 		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),

@@ -9,11 +9,12 @@
 						:key="m.id"
 						:ref="(el) => setItemRef(el, i)"
 						:class="[
-							'flex items-baseline gap-2 px-2 py-1 text-xs cursor-pointer rounded',
+							'flex items-center gap-2 px-2 py-1 text-xs cursor-pointer rounded',
 							i === navIndex ? 'bg-blue-500 dark:bg-blue-400 text-white' : 'hover:bg-surface-3',
 						]"
 						@mousedown.prevent="addAndClose(m.id)"
 					>
+						<img v-if="graphics[m.id]" :src="graphics[m.id]" class="w-5 h-5 shrink-0 bg-white" />
 						<span class="font-medium">{{ m.long || m.short }}</span>
 						<span :class="['text-xs', i === navIndex ? 'text-white/70' : 'text-content-muted']">{{ m.page?.name }}</span>
 					</div>
@@ -30,6 +31,7 @@
 	import { getAllCategories, getModulesByCategory } from '../../renderer/nmg2mods';
 	import { useSettingsStore } from '../../store/settings';
 	import { useAddModule } from '../../composables/useAddModule';
+	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 
 	const props = defineProps<{ x: number; y: number }>();
 	const emit = defineEmits<{ close: [] }>();
@@ -45,6 +47,7 @@
 		return { left: `${x}px`, top: `${y}px` };
 	});
 	const { addModuleAtMousePos } = useAddModule();
+	const { graphics } = useModuleGraphics();
 
 	const searchRef = ref();
 	const query = ref('');
