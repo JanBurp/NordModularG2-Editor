@@ -41,7 +41,7 @@
 							>
 								patchviewer
 							</button>
-							by ian-s. Chris Purusha and all others who i discussed with. And all who tested or donated to make this work possible.
+							by ian-s. Chris Purusha, Åka Danielson and BlueHell and all others who tested or donated to make this work possible.
 						</p>
 						<div class="flex justify-center pt-1">
 							<button
