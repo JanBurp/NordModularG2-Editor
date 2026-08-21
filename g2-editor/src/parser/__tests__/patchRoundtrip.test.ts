@@ -85,6 +85,7 @@ function expectPatchEqual(a: Patch, b: Patch) {
 	expect(b.description).toEqual(a.description);
 	expect(b.patchParams).toEqual(a.patchParams);
 	expect(b.controllers ?? []).toEqual(a.controllers ?? []);
+	expect(b.text ?? '').toEqual(a.text ?? '');
 }
 
 /**
@@ -866,5 +867,53 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
 		const patchWithout = parsePatchFromRawHex(name, hexWithout);
 		expect(patchWithout.controllers ?? []).toHaveLength(0);
+	});
+});
+
+describe('patch text round-trip: parse → serialize → parse', () => {
+	it('text survives serialize → parse, including an embedded newline and Latin-1 chars', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.text = 'Line one\nLine two - special chars: äöü';
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.text).toBe(patch.text);
+	});
+
+	it('text survives file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.text = 'Some patch notes';
+
+		const savedHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedHex);
+
+		expect(patchB.text).toBe(patch.text);
+	});
+
+	it('empty text still produces a zero-length 0x6f section (not omitted)', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.text = '';
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+
+		expect(extractSection(newHex, 0x6f)).toBe('6f0000');
+	});
+});
+
+describe('prf2 patch text per-slot mutation round-trip', () => {
+	it('mutating slot 0 text does not affect slots 1–3', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const before = [1, 2, 3].map((s) => patches[s].text ?? '');
+
+		patches[0].text = 'slot0 notes';
+
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+		const { patches: reparsed } = parsePerfFromRawHex(name, newHex);
+
+		expect(reparsed[0].text).toBe('slot0 notes');
+		for (let s = 1; s <= 3; s++) {
+			expect(reparsed[s].text ?? '').toBe(before[s - 1]);
+		}
 	});
 });

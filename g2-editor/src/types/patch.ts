@@ -111,6 +111,7 @@ export interface Patch {
 	splitHeight?: number; // remembered voice-area height to restore split position after a Voice/FX toggle (session state; the .pch2 has only the single `height` field)
 	patchParams?: PatchParamVariation[];
 	controllers?: MidiCCAssignment[];
+	text?: string; // free-text patch notes ("Text Pad" / C_PATCH_NOTES section)
 }
 
 export interface ClipboardEntry {

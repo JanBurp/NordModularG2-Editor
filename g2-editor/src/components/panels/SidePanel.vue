@@ -9,6 +9,7 @@
 			/>
 			<ModulesPane ref="modulesPaneRef" v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
 			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
+			<TextPane v-show="settingsStore.rightPaneTab === 'text'" />
 			<SettingsPane v-show="settingsStore.rightPaneTab === 'settings'" :isActive="settingsStore.rightPaneTab === 'settings'" />
 		</div>
 	</div>
@@ -20,6 +21,7 @@
 	import ModulesPane from './ModulesPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
+	import TextPane from './TextPane.vue';
 	import { useSettingsStore } from '@/store/settings';
 	import { usePatchFile } from '@/composables/usePatchFile';
 

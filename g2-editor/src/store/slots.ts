@@ -1512,6 +1512,17 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-patch-description', slot, hex]);
 		},
 
+		async setPatchText(text: string): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			patch.text = text;
+			this.slots[slot].rawHex = null; // invalidate cache so Save re-serializes
+			if (useDeviceStore().status === DeviceStatus.Connected) {
+				await window.cli.run(['set-patch-notes', slot, text]);
+			}
+		},
+
 		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {
 			const slot = useUiStore().slotInFocus;
 			const entry = this.slots[slot];

@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 
 export const useSettingsStore = defineStore('settings', {

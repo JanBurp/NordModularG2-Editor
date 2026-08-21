@@ -204,6 +204,9 @@ int g2_set_patch_name(int slot, const char *name);
 /* Patch description: slot 0-3, pre-encoded bitstream bytes */
 int g2_set_patch_description(int slot, const uint8_t *data, int len);
 
+/* Patch notes ("Text Pad"): slot 0-3, raw text bytes (len may be 0 to clear) */
+int g2_set_patch_notes(int slot, const uint8_t *data, int len);
+
 /* Voice mode/count: slot 0-3. These call g2_get_patch internally (read-modify-write);
  * use set-patch-description directly when an editor has the patch loaded. */
 int g2_set_voice_mode(int slot, int mode);    /* monopoly: 0=poly 1=mono 2=legato 3=slgt */

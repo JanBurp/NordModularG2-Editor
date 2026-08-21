@@ -306,6 +306,12 @@ function buildRawHex(sections: Uint8Array[]): string {
 	return bytesToHex(result);
 }
 
+function writeTextPad(text: string): Uint8Array {
+	const data = new Uint8Array(text.length);
+	for (let i = 0; i < text.length; i++) data[i] = text.charCodeAt(i) & 0xff;
+	return makeSection(SectionType.SEPARATOR, data);
+}
+
 function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
 	const bw = new BitWriter();
 	bw.write(7, controllers.length);
@@ -390,17 +396,19 @@ function processSection(
 		const controllers = patch.controllers ?? [];
 		if (controllers.length > 0) out.push(writeControllers(controllers));
 		w.m60 = true;
+	} else if (type === SectionType.SEPARATOR) {
+		out.push(writeTextPad(patch.text ?? ''));
 	} else {
-		// Preserve verbatim: text pad (SEPARATOR), perf data (PERF_DATA), unknown sections
+		// Preserve verbatim: perf data (PERF_DATA), unknown sections
 		out.push(verbatim);
 	}
 }
 
 /**
  * Re-serializes a Patch to rawHex using section-replacement:
- * mutable sections (module list, cable list, parameters, names) are regenerated
- * from the patch object; all other sections (description, text pad) are preserved
- * verbatim from the template.
+ * mutable sections (module list, cable list, parameters, names, text pad) are regenerated
+ * from the patch object; all other sections (description) are preserved verbatim from the
+ * template.
  *
  * templateRawHex must be the last valid rawHex from the hardware or file load —
  * it is used to copy preserved sections (especially the patch description whose
@@ -446,7 +454,7 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 				out.push(writeControllers(patch.controllers));
 			}
-			out.push(template.slice(ofs, ofs + 3 + siz));
+			out.push(writeTextPad(patch.text ?? ''));
 			// Advance to next slot when more data follows
 			if (ofs + 3 + siz < sectionDataLen) {
 				slotIdx++;
