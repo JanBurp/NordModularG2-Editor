@@ -29,8 +29,7 @@ class G2Parser {
 	private slots: string[] = [];
 	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
 	private aof = 0;
-	private textpadofs = 0;
-	private textpadlen = 0;
+	private textpad: string[] = [];
 	private rawData: Uint8Array = new Uint8Array(0);
 	private bitofs = 0;
 	private patchParamsData: PatchParamVariation[][] = [];
@@ -87,18 +86,8 @@ class G2Parser {
 		return this.areas[areaIdx].cableList;
 	}
 
-	getTextPad(): string | null {
-		if (this.textpadlen == 0) return null;
-		let rv = '';
-		const dv = new DataView(this.data);
-		for (let i = 0; i < this.textpadlen; i++) rv += String.fromCharCode(dv.getUint8(this.textpadofs + i));
-		return rv;
-	}
-
-	setTextPad(str: string): void {
-		if (this.textpadlen == 0) return;
-		const dv = new DataView(this.data);
-		for (let i = 0; i < Math.min(str.length, this.textpadlen); i++) dv.setUint8(this.textpadofs + i, str.charCodeAt(i));
+	getTextPad(slot: number): string | null {
+		return this.textpad[slot] ?? null;
 	}
 
 	getArea(areaIndex: number): G2Area {
@@ -257,8 +246,9 @@ class G2Parser {
 	}
 
 	private parseTextPad(data: Uint8Array): void {
-		this.textpadlen = data.length;
-		this.textpadofs = data.byteOffset;
+		let str = '';
+		for (let i = 0; i < data.length; i++) str += String.fromCharCode(data[i]);
+		this.textpad[this.aof >> 1] = str;
 	}
 
 	private parseModuleParameters(data: Uint8Array): string {
@@ -485,6 +475,7 @@ export class PatchParser {
 			description: this.patcher.getpd(0) ?? undefined,
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 			controllers: controllers.length > 0 ? controllers : undefined,
+			text: this.patcher.getTextPad(0) ?? undefined,
 		};
 	}
 
@@ -499,6 +490,7 @@ export class PatchParser {
 				description: this.patcher.getpd(slot) ?? undefined,
 				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
 				controllers: controllers.length > 0 ? controllers : undefined,
+				text: this.patcher.getTextPad(slot) ?? undefined,
 			})),
 			slotMeta: this.patcher.getSlotMeta(),
 		};

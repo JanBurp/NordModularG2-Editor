@@ -628,6 +628,14 @@ static void execute_cmd(const char *line) {
 			}
 		}
 
+	} else if (strcmp(cmd, "set-patch-notes") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else {
+			const char *text = arg_s(args, 1);
+			ret = g2_set_patch_notes(slot, (const uint8_t *)text, (int)strlen(text));
+		}
+
 	} else if (strcmp(cmd, "get-patch") == 0 && n >= 1) {
 		data = g2_get_patch(arg_s(args, 0));
 		ret = data ? G2_OK : G2_ERR;
