@@ -366,6 +366,8 @@ app.whenReady().then(async () => {
 				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
 				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
+				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+T" },
+				{ label: "Text Panel (legacy shortcut)", visible: false, click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
 				{ label: "Settings", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "V" },

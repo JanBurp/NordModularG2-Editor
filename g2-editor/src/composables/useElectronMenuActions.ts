@@ -163,6 +163,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-midi-cc-panel':
 					useSettingsStore().toggleSidebar('midicc');
 					break;
+				case 'toggle-text-panel':
+					useSettingsStore().toggleSidebar('text');
+					break;
 				case 'show-key-commands':
 					uiStore.showKeyCommandsPage = true;
 					break;
