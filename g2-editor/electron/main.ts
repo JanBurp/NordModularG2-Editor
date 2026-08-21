@@ -261,6 +261,30 @@ ipcMain.handle("help:load", (_, shortName: string) => {
 	}
 });
 
+ipcMain.handle("modules:load-graphics", () => {
+	const graphicsDir = app.isPackaged
+		? path.join(process.resourcesPath, "designs", "mini-modules")
+		: path.join(process.env.APP_ROOT!, "..", "designs", "mini-modules");
+	const graphics: Record<number, string> = {};
+	try {
+		for (const category of fs.readdirSync(graphicsDir)) {
+			const categoryDir = path.join(graphicsDir, category);
+			if (!fs.statSync(categoryDir).isDirectory()) continue;
+			for (const file of fs.readdirSync(categoryDir)) {
+				if (!file.endsWith(".svg")) continue;
+				const idToken = file.split("_")[0];
+				const id = idToken.toLowerCase().startsWith("0x") ? parseInt(idToken, 16) : parseInt(idToken, 10);
+				if (Number.isNaN(id)) continue;
+				const svg = fs.readFileSync(path.join(categoryDir, file));
+				graphics[id] = `data:image/svg+xml;base64,${svg.toString("base64")}`;
+			}
+		}
+	} catch {
+		// designs folder missing — return whatever was collected (likely empty)
+	}
+	return graphics;
+});
+
 ipcMain.handle("patch:open-dialog", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
