@@ -411,6 +411,70 @@ cJSON *g2_get_patch(const char *slot_str) {
         }
     }
 
+    /* Step 4: Get patch notes ("Text Pad"). Read-only — the real G2 protocol has no live
+     * SET for this (confirmed against the official editor's decompiled message set: only a
+     * GET_PATCH_TEXT request exists; notes only travel to the device embedded in a full
+     * patch write, same as set-patch-description/upload-patch already handle). Non-fatal
+     * on failure; an empty text field just means notes didn't come back this time. */
+    debug_timing("get_patch_text_start");
+    char *patchText = NULL;
+    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_TEXT, NULL, 0) == 0) {
+        usleep(100000);
+        /* A straggler notification from a preceding operation (e.g. an upload) can still be
+         * in flight when our request's answer arrives. Rather than trust whatever packet
+         * shows up first, loop discarding anything that isn't tagged as a notes response
+         * (0x6f) — mirrors the reference editor's single-outstanding-command lockstep
+         * (FWaitForCmd in BVE.NMG2USB.pas), bounded here since this fetch is best-effort. */
+        for (int attempt = 0; attempt < 5; attempt++) {
+            ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
+            if (ret <= 0) break;
+            if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+                if (interruptResp[4] != SUB_RESPONSE_PATCH_NOTES) continue;
+                /* Self-contained: [0]type [1..2]slot echo [3]0 [4]0x6f(tag) [5..6]size
+                 * (big-endian) [7..7+size)]text [after that]CRC. CRC follows the data, it
+                 * doesn't precede it — confirmed via the extended branch below, whose bulk
+                 * payload has the identical tag+2-byte-length shape one byte earlier. Only
+                 * covers very short text (~7 bytes fit before the CRC); anything longer
+                 * arrives via the extended-bulk branch below instead. */
+                uint16_t size = (interruptResp[5] << 8) | interruptResp[6];
+                if (size > 0 && size <= 16 - 7 - 2) {
+                    patchText = malloc((size_t)size + 1);
+                    if (patchText) {
+                        memcpy(patchText, interruptResp + 7, size);
+                        patchText[size] = '\0';
+                    }
+                }
+                break;
+            } else if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
+                uint8_t *textData = malloc(size);
+                if (!textData) break;
+                int bulkLen = recv_bulk(textData, size);
+                /* Bulk payload: [0..2] header, [3]=response tag (0x6f for notes; confirmed
+                 * name responses carry 0x27 there — this is what filters out a stale
+                 * straggler bulk transfer left over from the preceding name-fetch step, same
+                 * shape otherwise), [4..5]=text length (big-endian), then the text itself.
+                 * Confirmed against real hardware: a 97-byte capture had tag=0x6f, length=89
+                 * at [4..5], and the text starting exactly at offset 6. */
+                if (bulkLen > 6 && textData[3] == SUB_RESPONSE_PATCH_NOTES) {
+                    uint16_t textLen = ((uint16_t)textData[4] << 8) | textData[5];
+                    if (textLen > (uint16_t)(bulkLen - 6)) textLen = (uint16_t)(bulkLen - 6);
+                    patchText = malloc((size_t)textLen + 1);
+                    if (patchText) {
+                        memcpy(patchText, textData + 6, textLen);
+                        patchText[textLen] = '\0';
+                    }
+                    free(textData);
+                    break;
+                }
+                free(textData);
+                continue;
+            }
+            /* Unrecognized packet type — keep waiting for the real answer. */
+        }
+        debug_timing("get_patch_text_end");
+    }
+
     /* Convert USB bulk format to pch2 format before returning */
     uint8_t *pch2Data = malloc(patchSize);
     size_t pch2Size = patchSize;
@@ -426,7 +490,9 @@ cJSON *g2_get_patch(const char *slot_str) {
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "slot", (char*[]){ "A", "B", "C", "D" }[slot]);
     cJSON_AddStringToObject(root, "name", patchName);
+    cJSON_AddStringToObject(root, "text", patchText ? patchText : "");
     cJSON_AddNumberToObject(root, "size", patchSize);
+    free(patchText);
 
     char *hexStr = malloc(patchSize * 2 + 1);
     if (hexStr) {
@@ -1492,27 +1558,6 @@ int g2_set_patch_description(int slot, const uint8_t *data, int len) {
     memcpy(payload + 2, data, len);
     if (send_slot(slot, version, 0x21, payload, 2 + len) < 0) {
         g2_err("set-patch-description: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
-}
-
-int g2_set_patch_notes(int slot, const uint8_t *data, int len) {
-    if (slot < 0 || slot > 3) { g2_err("set-patch-notes: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (len < 0 || (len > 0 && !data)) { g2_err("set-patch-notes: invalid data\n"); return G2_ERR_INVALID_PARAM; }
-    if (len > 2000) { g2_err("set-patch-notes: text too long\n"); return G2_ERR_INVALID_PARAM; }
-    if (ensure_connected(0) < 0) { g2_err("set-patch-notes: failed to connect\n"); return G2_ERR_CONNECT; }
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
-    /* G2 uses chunk format for C_PATCH_NOTES: [0x6f][size_hi][size_lo][data] */
-    uint8_t payload[2 + 2000];
-    payload[0] = (len >> 8) & 0xFF;
-    payload[1] = len & 0xFF;
-    if (len > 0) memcpy(payload + 2, data, len);
-    if (send_slot(slot, version, 0x6f, payload, 2 + len) < 0) {
-        g2_err("set-patch-notes: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);

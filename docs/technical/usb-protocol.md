@@ -372,10 +372,20 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
 | `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
-| `0x6E` | GET_PATCH_NOTES *(not implemented yet)* | — | Extended bulk (patch notes text) |
-| `0x6F` | SET_PATCH_NOTES *(not implemented yet)* | patch notes chunk | Embedded ACK |
+| `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text); sent as step 4 of `g2_get_patch()`, result reported as `text` alongside `name` |
+| `0x6F` | *(no live SET exists — see note below)* | — | — |
 | `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
+
+> **Patch notes (`0x6E`/`0x6F`) — there is no live SET.** `0x6F` is the chunk ID for the text-pad
+> section *inside the full patch file/bulk format* (used by `set-patch-description`-style whole-
+> patch writes, `.pch2` save/load, and `upload-patch`) — it is not a standalone live USB command.
+> Confirmed against the official Nord editor's decompiled message set: only a `CMTextpadRequest`
+> (GET, `0x6E`) exists; there is no write/dump class for notes at all, unlike patch name which has
+> a real `CMPatchNameDump` (`0x27`) write path. An earlier implementation here speculatively sent
+> `0x6F` standalone as if it were SET_PATCH_NOTES — confirmed on real hardware to hang the G2's USB
+> comms (required a power cycle to recover). Don't reintroduce it; notes only reach the device
+> embedded in a full patch write.
 
 > **SET_PATCH_DESCRIPTION (`0x21`) gotcha:** the daemon's `voice-mode` and `voice-count` commands wrap this in a read-modify-write via `g2_get_patch()` — do not call them from an editor that already has the patch loaded in memory (it will race with the editor's own copy). Use `set-patch-description` directly with the full 14-byte body instead (`cli/src/g2_device.c:1481-1504`).
 
@@ -385,7 +395,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 
 ```
 set-patch-name          <slot> <name>                              (0x27)
-get-patch               <slot>                                     (0x28 name, 0x35 version, 0x3C binary)
+get-patch               <slot>                                     (0x28 name, 0x35 version, 0x3C binary, 0x6E notes)
 set-module-mode         <slot> <loc> <mod> <param> <val>            (0x2B)
 add-module               <slot> <loc> ...                          (0x30)
 set-module-color        <slot> <loc> <mod> <color>                 (0x31)
@@ -850,7 +860,7 @@ When `version != 0x40`:
 | `0x3A` | `volume_data` | `slot`, `data[]` — raw bytes, see §16 |
 | `0x4D` | `param_list` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PARAMS itself remains *(not implemented yet)* as a sender) |
 | `0x5B` | `param_names` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PARAM_NAMES remains *(not implemented yet)* as a sender) |
-| `0x6F` | `patch_notes` | `slot`, `data[]` — raw bytes (response-side decode only; GET_PATCH_NOTES remains *(not implemented yet)* as a sender) |
+| `0x6F` | `patch_notes` | `slot`, `data[]` — raw bytes; spontaneous broadcast decode only, unrelated to `g2_get_patch()`'s direct `0x6E` request/response round-trip (see §7 note on patch notes) |
 | `0x72` | `resources_used` | `slot`, `data[]` — raw bytes |
 
 ### Performance bulk sub-commands (`aCmd 0x04`)
@@ -1005,7 +1015,7 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `0x39` | R_LED_DATA | — | LED states (bulk, watch only) |
 | `0x3A` | R_VOLUME_DATA | — | Volume/level data (bulk, watch only) |
 | `0x5F` | C_KNOBS_GLOBAL | GET_GLOBAL_KNOBS | Global knob assignments |
-| `0x6F` | C_PATCH_NOTES | — | Patch text notes |
+| `0x6F` | C_PATCH_NOTES | — | Patch text notes chunk ID (full patch file/bulk format only — see §7 note, no standalone live SET) |
 | `0x72` | R_RESOURCES_USED | GET_RESOURCES_USED | DSP resource usage |
 | `0x7E` | R_ERROR | any | Error response; code at `[5]` |
 | `0x7F` | R_OK | any | Generic ACK |

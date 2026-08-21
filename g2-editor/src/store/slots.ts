@@ -365,6 +365,9 @@ export const useSlotsStore = defineStore('slots', {
 			pch2.set(sectionBytes, header.length);
 			const { PatchParser } = await import('../parser/nmg2PatchParser');
 			const patch = new PatchParser(pch2.buffer).parse() as Patch;
+			// Patch notes ("Text Pad") aren't part of the bulk patch dump — the daemon fetches
+			// them separately (GET_PATCH_TEXT) and reports them as `text` alongside `name`.
+			if (result.text) patch.text = result.text;
 
 			this.slots[slot].name = name;
 			this.slots[slot].rawHex = rawHex;
@@ -1512,15 +1515,15 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-patch-description', slot, hex]);
 		},
 
-		async setPatchText(text: string): Promise<void> {
+		// Local edit only — the G2 protocol has no live "set patch notes" command (confirmed
+		// against the official editor: only a read exists). Notes reach the device embedded
+		// in a full patch write (upload-patch / Save), same as patch description already does.
+		setPatchText(text: string): void {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 			patch.text = text;
 			this.slots[slot].rawHex = null; // invalidate cache so Save re-serializes
-			if (useDeviceStore().status === DeviceStatus.Connected) {
-				await window.cli.run(['set-patch-notes', slot, text]);
-			}
 		},
 
 		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {
