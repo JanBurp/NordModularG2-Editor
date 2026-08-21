@@ -78,6 +78,7 @@
 				{ keys: ['⌘ M'], action: 'Toggle Modules pane' },
 				{ keys: ['⌘ B'], action: 'Toggle Browser pane' },
 				{ keys: ['⌘ I'], action: 'Toggle Midi CC pane' },
+				{ keys: ['⌘ T', '⌘ J'], action: 'Toggle Text pane' },
 				{ keys: ['⌘ ,'], action: 'Toggle Settings pane' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
 				{ keys: ['←', '→'], action: 'Switch Disk/Patches/Performances tab (Browser pane focused)' },
