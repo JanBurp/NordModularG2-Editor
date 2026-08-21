@@ -99,6 +99,21 @@ path.svgcableborder.selected {
 	opacity: 1;
 }
 
+/* Hover emphasis: the hovered jack's whole cable nest gets a bigger, darker outline and is
+   brought to the front (see emphasizeCableByKey/applyCableVisibility in cableRenderer.ts).
+   Scales off --cable-border-width (set per cable from settings.cableThickness) rather than a
+   fixed size, so the emphasis stays proportional at any thickness setting. */
+path.svgcableborder.cable-emphasized {
+	stroke: rgba(0, 0, 0, 0.7);
+	stroke-width: calc(var(--cable-border-width, 5px) + 2px) !important;
+}
+
+/* Full opacity for the emphasized main cable stroke, overriding the settings.cableOpacity value
+   set inline per cable. */
+path.svgcable.cable-emphasized {
+	opacity: 1 !important;
+}
+
 input#shifter,
 input#scaler {
 	display: none;

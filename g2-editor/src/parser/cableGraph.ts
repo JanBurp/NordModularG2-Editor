@@ -54,6 +54,47 @@ export function findDrivingOutputCable(cableList: Cable[], startMod: number, sta
 	return null;
 }
 
+type NestJack = { mod: number; con: number; type: 'input' | 'output' };
+
+function nestJackKey(j: NestJack): string {
+	return `${j.mod}-${j.con}-${j.type}`;
+}
+
+// A cable's two endpoints as (mod, con, type) jacks: a dir=1 cable runs output->input, a dir=0
+// cable straps two inputs together.
+function cableEndpoints(c: Cable): [NestJack, NestJack] {
+	const isOutputSource = (c.dir ?? 1) === 1;
+	return [
+		{ mod: c.smod ?? 0, con: c.scon ?? 0, type: isOutputSource ? 'output' : 'input' },
+		{ mod: c.dmod ?? 0, con: c.dcon ?? 0, type: 'input' },
+	];
+}
+
+// BFS over the whole cable graph (jacks as nodes, cables as edges) to find every cable reachable
+// from a jack, however many hops away — the entire nest: stacked inputs, their driving output,
+// and every other destination that output fans out to — regardless of which jack in the chain
+// (start, middle, or end) you start from.
+export function findJackNestCables(cableList: Cable[], startMod: number, startCon: number, startType: 'input' | 'output'): Cable[] {
+	const visited = new Set<string>();
+	const result: Cable[] = [];
+	const queue: NestJack[] = [{ mod: startMod, con: startCon, type: startType }];
+	while (queue.length > 0) {
+		const jack = queue.shift()!;
+		const key = nestJackKey(jack);
+		if (visited.has(key)) continue;
+		visited.add(key);
+		for (const c of cableList) {
+			const [a, b] = cableEndpoints(c);
+			const touchesA = a.mod === jack.mod && a.con === jack.con && a.type === jack.type;
+			const touchesB = b.mod === jack.mod && b.con === jack.con && b.type === jack.type;
+			if (!touchesA && !touchesB) continue;
+			if (!result.includes(c)) result.push(c);
+			queue.push(touchesA ? b : a);
+		}
+	}
+	return result;
+}
+
 // Whether any output cable already drives the nest connected to this input jack.
 export function isNestDrivenByOutput(cableList: Cable[], startMod: number, startCon: number): boolean {
 	return findDrivingOutputCable(cableList, startMod, startCon) !== null;

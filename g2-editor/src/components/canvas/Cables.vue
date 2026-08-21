@@ -13,6 +13,7 @@
 		updateCableStyles,
 		updateCableGravity,
 		applyVisibilityToElement,
+		emphasizeCableByKey,
 	} from '../../renderer/cableRenderer';
 	import type { Cable, Module as CableModule } from '../../renderer/cableRenderer';
 	import { useCableVisibility } from '../../composables/useCableVisibility';
@@ -20,7 +21,7 @@
 	import { useSettingsStore } from '../../store/settings';
 	import { useJackDragInteraction } from '../../composables/useJackDragInteraction';
 	import { useCableGrabInteraction } from '../../composables/useCableGrabInteraction';
-	import { matchesCableJack } from '../../store/slotHelpers';
+	import { findJackNestCables } from '../../parser/cableGraph';
 	import type { JackEnd } from '../../store/slotHelpers';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import type { JackDragInfo } from '../../types';
@@ -56,11 +57,12 @@
 	const uiStore = useUiStore();
 	const settings = useSettingsStore();
 
-	// Cables touching the currently-hovered jack stay visible even if hidden by the color filter.
+	// Cables in the whole nest reachable from the currently-hovered jack stay visible even if hidden
+	// by the color filter (not just the one cable touching the hovered jack).
 	const hoverRevealKeys = computed<Set<string>>(() => {
 		const h = props.hoveredJack as JackEnd | null;
 		if (!h) return new Set();
-		return new Set((props.cables as Cable[]).filter((c) => matchesCableJack(c, h.moduleIndex, h.connectorIndex, h.type)).map(makeCableKey));
+		return new Set(findJackNestCables(props.cables as Cable[], h.moduleIndex, h.connectorIndex, h.type).map(makeCableKey));
 	});
 
 	function renderCables() {
@@ -176,7 +178,7 @@
 		if (!svgRef?.value) return;
 		const svg = svgRef.value as SVGElement;
 		for (const key of newKeys) {
-			if (!oldKeys?.has(key)) svg.querySelectorAll(`[data-cable-key="${key}"]`).forEach((el) => el.classList.remove('cable-hidden'));
+			if (!oldKeys?.has(key)) emphasizeCableByKey(svg, key);
 		}
 		for (const key of oldKeys ?? []) {
 			if (newKeys.has(key)) continue;

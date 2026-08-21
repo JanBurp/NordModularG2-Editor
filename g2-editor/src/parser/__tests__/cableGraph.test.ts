@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findConnectedInputCables, findDrivingOutputCable, findGroupOutputColor, inferUserColours } from '../cableGraph';
+import { findConnectedInputCables, findDrivingOutputCable, findGroupOutputColor, findJackNestCables, inferUserColours } from '../cableGraph';
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ModuleDefinition } from '@/types/module';
 
@@ -93,6 +93,66 @@ describe('findGroupOutputColor', () => {
 		const inp = cable(1, 0, 2, 0, 0, 1);
 		const out = cable(0, 0, 2, 0, 1, 7);
 		expect(findGroupOutputColor([inp, out], 1, 0, 3, 0)).toBe(7);
+	});
+});
+
+describe('findJackNestCables', () => {
+	it('hovering an unstacked input with a direct driver returns just that driver cable', () => {
+		const out = cable(0, 0, 1, 0, 1, 4);
+		expect(findJackNestCables([out], 1, 0, 'input')).toEqual([out]);
+	});
+
+	it('hovering an input in a stack driven by one output returns all stack cables plus the driver', () => {
+		const c1 = cable(1, 0, 2, 0, 0);
+		const c2 = cable(2, 0, 3, 0, 0);
+		const out = cable(0, 0, 3, 0, 1, 7);
+		const result = findJackNestCables([c1, c2, out], 1, 0, 'input');
+		expect(result).toContain(c1);
+		expect(result).toContain(c2);
+		expect(result).toContain(out);
+		expect(result).toHaveLength(3);
+	});
+
+	it('hovering an input in a stack with no driver returns only the stack cables', () => {
+		const c1 = cable(1, 0, 2, 0, 0);
+		expect(findJackNestCables([c1], 1, 0, 'input')).toEqual([c1]);
+	});
+
+	it('hovering a jack in the middle of a stack returns the same whole nest as hovering its start', () => {
+		const c1 = cable(1, 0, 2, 0, 0);
+		const c2 = cable(2, 0, 3, 0, 0);
+		const out = cable(0, 0, 3, 0, 1, 7);
+		const result = findJackNestCables([c1, c2, out], 2, 0, 'input');
+		expect(result).toContain(c1);
+		expect(result).toContain(c2);
+		expect(result).toContain(out);
+		expect(result).toHaveLength(3);
+	});
+
+	it('hovering an output that fans out to two destinations reveals both, plus a stacked destination\'s stack-mates', () => {
+		const toStacked = cable(0, 0, 1, 0, 1, 4); // fans out to module 1, which is stacked with module 2
+		const toPlain = cable(0, 0, 3, 0, 1, 4); // second fan-out destination, unstacked
+		const stackMate = cable(1, 0, 2, 0, 0);
+		const result = findJackNestCables([toStacked, toPlain, stackMate], 0, 0, 'output');
+		expect(result).toContain(toStacked);
+		expect(result).toContain(toPlain);
+		expect(result).toContain(stackMate);
+		expect(result).toHaveLength(3);
+	});
+
+	it('hovering one fanned-out destination input reveals its sibling destinations too, not just its own cable', () => {
+		const toStacked = cable(0, 0, 1, 0, 1, 4);
+		const toPlain = cable(0, 0, 3, 0, 1, 4);
+		const stackMate = cable(1, 0, 2, 0, 0);
+		const result = findJackNestCables([toStacked, toPlain, stackMate], 3, 0, 'input');
+		expect(result).toContain(toStacked);
+		expect(result).toContain(toPlain);
+		expect(result).toContain(stackMate);
+		expect(result).toHaveLength(3);
+	});
+
+	it('hovering an output with no connections returns an empty array', () => {
+		expect(findJackNestCables([], 0, 0, 'output')).toEqual([]);
 	});
 });
 

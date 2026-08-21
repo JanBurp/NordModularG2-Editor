@@ -99,7 +99,9 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 			'data-dmod': String(dmod.index),
 			'data-dcon': String(cable.dcon),
 			'data-dir': String(dir),
-			style: `stroke-width: ${borderStroke};`,
+			// --cable-border-width lets the .cable-emphasized hover style (svgStyles.css) scale its
+			// bigger outline off the current border width instead of using a fixed value.
+			style: `stroke-width: ${borderStroke}; --cable-border-width: ${borderStroke}px;`,
 		});
 
 		const main = svgPath(d, {
@@ -135,15 +137,31 @@ export function removeCableByKey(svgElement: SVGElement, key: string): void {
 // Applies the color-filter visibility to one cable element (ignoring any hover-reveal override).
 export function applyVisibilityToElement(el: Element, visibility: Record<string, boolean>): void {
 	const colorName = CABLE_COLOR_INDEX_MAP[parseInt(el.getAttribute('data-cable-color') || '0')];
+	el.classList.remove('cable-emphasized');
 	if (colorName) el.classList.toggle('cable-hidden', visibility[colorName] === false);
 }
 
+// Reveals and emphasizes one cable element (border/main/hit) and moves it to the front, above all
+// other cables, so the hovered jack's whole nest reads clearly on top of the rest of the patch.
+function emphasizeElement(el: Element): void {
+	el.classList.remove('cable-hidden');
+	el.classList.add('cable-emphasized');
+	el.parentNode?.appendChild(el);
+}
+
+// Emphasizes one cable (by key) and brings it to the front — used to reveal cables newly entering
+// the hovered jack's nest without rescanning the whole svg (see applyCableVisibility).
+export function emphasizeCableByKey(svgElement: SVGElement, key: string): void {
+	svgElement.querySelectorAll<Element>(`[data-cable-key="${key}"]`).forEach(emphasizeElement);
+}
+
 // Applies CSS cable-hidden class based on per-color visibility flags.
-// forceVisibleKeys overrides the color filter for specific cables (e.g. temporarily revealed on jack hover).
+// forceVisibleKeys overrides the color filter for specific cables (e.g. temporarily revealed and
+// emphasized on jack hover).
 export function applyCableVisibility(svgElement: SVGElement, visibility: Record<string, boolean>, forceVisibleKeys?: Set<string>): void {
 	svgElement.querySelectorAll<Element>('[data-cable-color]').forEach((el) => {
 		if (forceVisibleKeys?.has(el.getAttribute('data-cable-key') || '')) {
-			el.classList.remove('cable-hidden');
+			emphasizeElement(el);
 			return;
 		}
 		applyVisibilityToElement(el, visibility);
@@ -230,7 +248,7 @@ export function updateCableStyles(svgElement: SVGElement, opacity: number, thick
 		el.setAttribute('style', `stroke-width: ${mainStroke}; opacity: ${o};`);
 	});
 	svgElement.querySelectorAll<SVGPathElement>('.svgcableborder').forEach((el) => {
-		el.setAttribute('style', `stroke-width: ${borderStroke};`);
+		el.setAttribute('style', `stroke-width: ${borderStroke}; --cable-border-width: ${borderStroke}px;`);
 	});
 }
 

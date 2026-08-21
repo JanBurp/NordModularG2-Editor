@@ -1,6 +1,6 @@
 // @vitest-environment happy-dom
 import { describe, expect, it } from 'vitest';
-import { makeCableKey, removeCableByKey } from '@/renderer/cableRenderer';
+import { makeCableKey, removeCableByKey, applyCableVisibility, emphasizeCableByKey } from '@/renderer/cableRenderer';
 import type { Cable } from '@/renderer/cableRenderer';
 
 function makeCable(overrides: Partial<Cable> = {}): Cable {
@@ -75,5 +75,77 @@ describe('removeCableByKey', () => {
 		expect(() => removeCableByKey(svg, '1[0]2-1')).not.toThrow();
 		// The safe-key element was not accidentally removed
 		expect(svg.querySelectorAll(`[data-cable-key]`).length).toBe(1);
+	});
+});
+
+// Appends a border/main/hit triple for one cable, as makePatchCables would.
+function appendCableTriple(svg: SVGSVGElement, key: string, colorIndex: number): SVGPathElement[] {
+	return ['svgcableborder', 'svgcable', 'cable-hit'].map((cls) => {
+		const el = document.createElementNS('http://www.w3.org/2000/svg', 'path') as SVGPathElement;
+		el.setAttribute('class', cls);
+		el.setAttribute('data-cable-key', key);
+		el.setAttribute('data-cable-color', String(colorIndex));
+		svg.appendChild(el);
+		return el;
+	});
+}
+
+describe('applyCableVisibility', () => {
+	it('hides a cable whose color is toggled off', () => {
+		const svg = makeSvg();
+		const [border] = appendCableTriple(svg, '1-0-2-0', 0); // colour 0 = red
+		applyCableVisibility(svg, { red: false });
+		expect(border.classList.contains('cable-hidden')).toBe(true);
+	});
+
+	it('leaves a visible-color cable alone', () => {
+		const svg = makeSvg();
+		const [border] = appendCableTriple(svg, '1-0-2-0', 0);
+		applyCableVisibility(svg, { red: true });
+		expect(border.classList.contains('cable-hidden')).toBe(false);
+		expect(border.classList.contains('cable-emphasized')).toBe(false);
+	});
+
+	it('reveals and emphasizes a hidden cable that is force-visible', () => {
+		const svg = makeSvg();
+		const [border, main] = appendCableTriple(svg, '1-0-2-0', 0);
+		applyCableVisibility(svg, { red: false }, new Set(['1-0-2-0']));
+		expect(border.classList.contains('cable-hidden')).toBe(false);
+		expect(border.classList.contains('cable-emphasized')).toBe(true);
+		expect(main.classList.contains('cable-emphasized')).toBe(true);
+	});
+
+	it('brings a force-visible cable in the middle of the stack to the very front', () => {
+		const svg = makeSvg();
+		appendCableTriple(svg, 'A', 0);
+		appendCableTriple(svg, 'B', 0); // this is the one that gets emphasized
+		appendCableTriple(svg, 'C', 0);
+		applyCableVisibility(svg, { red: true }, new Set(['B']));
+		const keysInOrder = [...svg.querySelectorAll('path')].map((el) => el.getAttribute('data-cable-key'));
+		// B's triple ends up last, after C, even though it started in the middle.
+		expect(keysInOrder).toEqual(['A', 'A', 'A', 'C', 'C', 'C', 'B', 'B', 'B']);
+	});
+
+	it('un-emphasizes a cable that is no longer force-visible', () => {
+		const svg = makeSvg();
+		const [border] = appendCableTriple(svg, '1-0-2-0', 0);
+		applyCableVisibility(svg, { red: true }, new Set(['1-0-2-0']));
+		expect(border.classList.contains('cable-emphasized')).toBe(true);
+		applyCableVisibility(svg, { red: true }, new Set());
+		expect(border.classList.contains('cable-emphasized')).toBe(false);
+	});
+});
+
+describe('emphasizeCableByKey', () => {
+	it('reveals, emphasizes, and moves the matching cable to the end of the svg', () => {
+		const svg = makeSvg();
+		appendCableTriple(svg, '1-0-2-0', 0);
+		const [border] = appendCableTriple(svg, '3-0-4-0', 0);
+		border.classList.add('cable-hidden');
+		emphasizeCableByKey(svg, '3-0-4-0');
+		expect(border.classList.contains('cable-hidden')).toBe(false);
+		expect(border.classList.contains('cable-emphasized')).toBe(true);
+		const allPaths = [...svg.querySelectorAll('path')];
+		expect(allPaths[allPaths.length - 1].getAttribute('data-cable-key')).toBe('3-0-4-0');
 	});
 });
