@@ -78,11 +78,13 @@
 	import { useModuleHelp } from '../../composables/useModuleHelp';
 	import { useAddModule } from '../../composables/useAddModule';
 	import { useListNav } from '../../composables/useListNav';
+	import { useModuleDragSource } from '../../composables/useModuleDragSource';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
 	const { helpHtml, loadHelp } = useModuleHelp();
 	const { addModuleAtMousePos } = useAddModule();
+	const { handleDragStart: handleModuleDragStart, handleDragEnd: handleModuleDragEnd } = useModuleDragSource();
 	const searchRef = ref();
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
@@ -350,15 +352,6 @@
 
 	function handleModuleClick(moduleId: number) {
 		selectedModuleId.value = selectedModuleId.value === moduleId ? null : moduleId;
-	}
-
-	function handleModuleDragStart(e: DragEvent, moduleId: number) {
-		if (e.dataTransfer) e.dataTransfer.setData('text/plain', String(moduleId));
-		ui.draggedModuleId = moduleId;
-	}
-
-	function handleModuleDragEnd() {
-		ui.draggedModuleId = null;
 	}
 </script>
 

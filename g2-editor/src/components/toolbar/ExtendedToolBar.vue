@@ -1,6 +1,7 @@
 <template>
 	<ToolBar v-if="patchName">
-		<ToolBarLabel class="w-10">Morphs:</ToolBarLabel>
+		<ModulePicker class="ml-13" />
+		<ToolBarLabel class="ml-22 w-10">Morphs:</ToolBarLabel>
 		<div class="flex items-center gap-2">
 			<template v-for="(name, i) in MORPH_NAMES" :key="i">
 				<div
@@ -47,6 +48,7 @@
 	import { computed } from 'vue';
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
+	import ModulePicker from './ModulePicker.vue';
 	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
 	import CheckBox from '../common/CheckBox.vue';
