@@ -32,4 +32,5 @@ export const getAreaByShort = (short: string): string => AREA_OPTIONS.find((o) =
 export const VARIATION_OPTIONS = Array.from({ length: 9 }, (_, i) => ({
 	label: i < 8 ? String(i + 1) : 'INIT ',
 	value: i,
+	draggable: i < 8,
 }));

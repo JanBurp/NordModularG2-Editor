@@ -1,5 +1,10 @@
 <template>
-	<g :transform="`translate(${param.x}, ${param.y})`" class="slider-control" @contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)">
+	<g
+		:transform="`translate(${param.x}, ${param.y})`"
+		class="slider-control"
+		@wheel="onWheel"
+		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
+	>
 		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
 		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" />
 
@@ -22,6 +27,7 @@
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
+	import { useWheelInteraction } from '../../composables/useWheelInteraction';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -46,6 +52,11 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
+	);
+
+	const { onWheel } = useWheelInteraction(
+		() => props.value,
+		(value) => emit('change', props.paramIndex, value),
 	);
 
 	const levelShiftY = computed(() => {

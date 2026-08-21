@@ -13,7 +13,7 @@
 			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
 			:class="['btn-group-item', { 'flex-1': stretch }]"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
-			:draggable="draggable ? 'true' : undefined"
+			:draggable="draggable && option.draggable !== false ? 'true' : undefined"
 			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
 			@keydown="(e: KeyboardEvent) => handleKeydown(e, index)"
 			@dragstart.stop="draggable && emit('btn-dragstart', option.value)"

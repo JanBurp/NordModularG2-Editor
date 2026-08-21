@@ -5,6 +5,7 @@
 		:style="{ cursor }"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
+		@wheel="onWheel"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 	>
 		<!-- Invisible hit area for easier grabbing -->
@@ -72,7 +73,7 @@
 	}>();
 
 	const knobCircle = ref<Element | null>(null);
-	const { radius, angle, isReset, isDragging, cursor, onMouseDown, resetToDefault } = useKnob(
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToDefault } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),

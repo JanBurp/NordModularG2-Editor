@@ -20,12 +20,12 @@
 
 		<div class="flex items-center gap-2">
 			<BtnGroup
-				v-model="uiStore.variation"
+				:model-value="uiStore.variation"
 				:options="VARIATION_OPTIONS"
 				variant="variation"
 				testIdPrefix="variation"
 				draggable
-				@update:model-value="(v) => emit('variationClick', v)"
+				@update:model-value="onVariationSelect"
 				@btn-dragstart="onVariationDragStart"
 				@btn-drop="onVariationDrop"
 				@btn-contextmenu="onVariationContextMenu"
@@ -124,6 +124,15 @@
 	const confirmDialog = ref(false);
 	const confirmMessage = ref('');
 	const pendingCopy = ref<{ from: number; to: number } | null>(null);
+
+	function onVariationSelect(v: string | number | (string | number)[]) {
+		const idx = v as number;
+		if (idx === 8) {
+			slotsStore.copyVariation(8, uiStore.variation);
+			return;
+		}
+		emit('variationClick', idx);
+	}
 
 	function onVariationDragStart(v: string | number) {
 		dragFrom.value = v as number;

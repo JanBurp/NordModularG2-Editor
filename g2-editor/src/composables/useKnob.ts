@@ -3,6 +3,7 @@ import type { ComputedRef, Ref } from 'vue';
 import { clamp } from '@/utils/math';
 import { computed } from 'vue';
 import { useDragInteraction } from './useDragInteraction';
+import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 
 const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
@@ -86,5 +87,7 @@ export function useKnob(
 		emitChange(defaultVal);
 	}
 
-	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, resetToDefault };
+	const { onWheel } = useWheelInteraction(() => value.value, emitChange);
+
+	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToDefault };
 }

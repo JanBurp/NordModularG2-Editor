@@ -4,6 +4,7 @@
 		class="knob-spin-h"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
+		@wheel="onWheel"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 	>
 		<use href="#KnobSpinH" width="20" height="10" />
@@ -13,6 +14,7 @@
 <script setup lang="ts">
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
+	import { useWheelInteraction } from '../../composables/useWheelInteraction';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -31,6 +33,11 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
+	);
+
+	const { onWheel } = useWheelInteraction(
+		() => props.value,
+		(value) => emit('change', props.paramIndex, value),
 	);
 </script>
 <style scoped>
