@@ -64,9 +64,13 @@ export function useCableGrabInteraction(
 		return true;
 	}
 
-	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd): SnapEnd | null {
+	// Reports the nearest valid drop target within range, plus whether a same-type jack that FAILED
+	// validity (wrong nest state) sits nearer than any valid one — drives the "not-allowed" cursor.
+	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd): { jack: SnapEnd | null; invalidNearby: boolean } {
 		let bestDist = SNAP_RANGE;
 		let best: SnapEnd | null = null;
+		let bestInvalidDist = SNAP_RANGE;
+		let invalidNearby = false;
 		for (const mod of getModules()) {
 			const modDef = getModule(mod.type);
 			if (!modDef) continue;
@@ -74,17 +78,25 @@ export function useCableGrabInteraction(
 			const baseY = mod.vert * MODULE_ROW_HEIGHT;
 			const jacks = jack.type === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 			jacks.forEach((j, idx) => {
-				if (!isValidDropCandidate({ moduleIndex: mod.index, connectorIndex: idx, type: jack.type })) return;
 				const jx = j.x + baseX;
 				const jy = j.y + baseY;
 				const dist = Math.hypot(jx - mouseSvgPos.x, jy - mouseSvgPos.y);
+				if (dist >= SNAP_RANGE) return;
+				const candidate: JackEnd = { moduleIndex: mod.index, connectorIndex: idx, type: jack.type };
+				if (!isValidDropCandidate(candidate)) {
+					if (dist < bestInvalidDist) {
+						bestInvalidDist = dist;
+						invalidNearby = true;
+					}
+					return;
+				}
 				if (dist < bestDist) {
 					bestDist = dist;
-					best = { moduleIndex: mod.index, connectorIndex: idx, type: jack.type, x: jx, y: jy };
+					best = { ...candidate, x: jx, y: jy };
 				}
 			});
 		}
-		return best;
+		return { jack: best, invalidNearby: invalidNearby && bestInvalidDist < bestDist };
 	}
 
 	// Snapshot each grabbed cable's rendered elements and current curve once, so the drag can shift them
@@ -117,6 +129,7 @@ export function useCableGrabInteraction(
 
 		snapHighlight?.remove();
 		snapHighlight = null;
+		svgRef?.value?.classList.remove('cable-dragging', 'cable-invalid-target');
 		window.removeEventListener('mousemove', onMove);
 		window.removeEventListener('mouseup', onUp);
 	}
@@ -128,8 +141,10 @@ export function useCableGrabInteraction(
 		const mp = toSvgCoords(svgRef, e);
 		if (!mp || !svgRef?.value) return;
 
-		snapTarget = findDropTarget(mp, grabbedJack);
+		const dropTarget = findDropTarget(mp, grabbedJack);
+		snapTarget = dropTarget.jack;
 		snapHighlight = updateSnapHighlight(svgRef.value as SVGElement, snapHighlight, snapTarget);
+		svgRef.value.classList.toggle('cable-invalid-target', dropTarget.invalidNearby);
 
 		for (const cable of group) {
 			const entry = dragCables.get(makeCableKey(cable));
@@ -176,6 +191,21 @@ export function useCableGrabInteraction(
 		return true;
 	}
 
+	// Shared setup for both grab entry points: click-on-cable-body and Cmd/Ctrl-click-on-jack.
+	function beginGrab(jack: JackEnd, jackGroup: Cable[]) {
+		if (!svgRef?.value) return;
+		grabbedJack = jack;
+		group = jackGroup;
+		drivenNestJacks = jack.type === 'input' ? computeDrivenInputJacks(getCables()) : null;
+		hasDragged = false;
+		snapTarget = null;
+		captureDragCables(svgRef.value as SVGElement, group);
+		svgRef.value.classList.add('cable-dragging');
+
+		window.addEventListener('mousemove', onMove);
+		window.addEventListener('mouseup', onUp);
+	}
+
 	function handleCableGrabStart(e: MouseEvent, cable: Cable) {
 		if (!isGrabModifierPressed(e)) return;
 		e.stopPropagation();
@@ -185,18 +215,21 @@ export function useCableGrabInteraction(
 		const jack = findNearestEndpoint(cable, mp);
 		if (!getJackSvgPos(getModules, jack)) return;
 
-		grabbedJack = jack;
-		group = computeGroup(jack);
-		drivenNestJacks = jack.type === 'input' ? computeDrivenInputJacks(getCables()) : null;
-		hasDragged = false;
-		snapTarget = null;
-		captureDragCables(svgRef.value as SVGElement, group);
+		beginGrab(jack, computeGroup(jack));
+	}
 
-		window.addEventListener('mousemove', onMove);
-		window.addEventListener('mouseup', onUp);
+	// Cmd/Ctrl-mousedown directly on a jack that already has cable(s) — mirrors the original editor's
+	// jack-based re-route gesture. Returns false (not consumed) when the jack has no cable, so the
+	// caller falls through to starting a brand-new cable drag instead.
+	function handleJackGrabStart(e: MouseEvent, jack: JackEnd): boolean {
+		const jackGroup = computeGroup(jack);
+		if (jackGroup.length === 0) return false;
+		e.stopPropagation();
+		beginGrab(jack, jackGroup);
+		return true;
 	}
 
 	onUnmounted(teardown);
 
-	return { handleCableGrabStart, handleJackMouseUp };
+	return { handleCableGrabStart, handleJackGrabStart, handleJackMouseUp };
 }

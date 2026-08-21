@@ -2,7 +2,7 @@ import { ref } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { CABLE_COLOR_INDEX_MAP } from '../constants';
-import { isNestDrivenByOutput } from '../parser/cableGraph';
+import { isNestDrivenByOutput, findDrivingOutputCable } from '../parser/cableGraph';
 
 type JackInfo = {
 	moduleIndex: number;
@@ -36,7 +36,16 @@ export function useJackPatching() {
 
 		const srcArea = src.area ?? 0;
 		if (src.type === info.type) {
-			// input-to-input: white cable, dir=0
+			// input-to-input: extends a "nest". Refuse if both jacks already belong to nests driven
+			// by two different outputs — that would silently merge two independently-driven signal
+			// groups (matches the original editor's refusal of a plain drag-connect when both ends
+			// already carry a signal on different chains).
+			const cableList = slotsStore.getAreaCables(uiStore.slotInFocus, srcArea);
+			const srcDriver = findDrivingOutputCable(cableList, src.moduleIndex, src.connectorIndex);
+			const dstDriver = findDrivingOutputCable(cableList, info.moduleIndex, info.connectorIndex);
+			if (srcDriver && dstDriver && (srcDriver.smod !== dstDriver.smod || srcDriver.scon !== dstDriver.scon)) return;
+
+			// white cable, dir=0
 			await slotsStore.addCable(
 				src.moduleIndex,
 				0,

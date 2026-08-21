@@ -216,7 +216,7 @@
 	const emit = defineEmits<{
 		paramChange: [moduleIndex: number, paramIndex: number, value: number, immediate?: boolean];
 		modeChange: [moduleIndex: number, index: number, value: number];
-		jackDragStart: [info: JackDragInfo];
+		jackDragStart: [info: JackDragInfo, e: MouseEvent];
 		jackDragEnd: [info: JackDragInfo];
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
@@ -252,8 +252,8 @@
 		]);
 	}
 
-	function onJackDragStart(info: JackDragInfo) {
-		emit('jackDragStart', info);
+	function onJackDragStart(info: JackDragInfo, e: MouseEvent) {
+		emit('jackDragStart', info, e);
 	}
 
 	function onJackDragEnd(info: JackDragInfo) {

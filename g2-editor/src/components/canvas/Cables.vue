@@ -239,7 +239,11 @@
 		(info) => emit('jackDragEnd', info),
 	);
 
-	const { handleCableGrabStart, handleJackMouseUp: handleCableGrabJackMouseUp } = useCableGrabInteraction(
+	const {
+		handleCableGrabStart,
+		handleJackGrabStart,
+		handleJackMouseUp: handleCableGrabJackMouseUp,
+	} = useCableGrabInteraction(
 		svgRef,
 		() => props.modules as any[],
 		() => props.cables as Cable[],
@@ -253,5 +257,12 @@
 		handleJackDragEnd(info);
 	}
 
-	defineExpose({ handleJackDragStart, handleJackDragEnd: handleJackDragEndOrGrabDrop });
+	// Cmd/Ctrl-mousedown on a jack that already has a cable grabs it for re-routing (mirrors the
+	// original editor's jack-based gesture) instead of starting a brand-new cable drag.
+	function handleJackDragStartOrGrab(info: JackDragInfo, e: MouseEvent) {
+		if (isGrabModifierPressed(e) && handleJackGrabStart(e, info)) return;
+		handleJackDragStart(info);
+	}
+
+	defineExpose({ handleJackDragStart: handleJackDragStartOrGrab, handleJackDragEnd: handleJackDragEndOrGrabDrop });
 </script>

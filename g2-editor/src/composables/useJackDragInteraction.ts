@@ -60,12 +60,17 @@ export function useJackDragInteraction(
 		return result;
 	}
 
-	function findSnapJack(mousePos: { x: number; y: number }): SnapJack | null {
-		if (!dragSrcInfo) return null;
+	// Reports the nearest valid snap target within range, plus whether a same-type jack that FAILED
+	// validity (self, or an already-driven nest) sits nearer than any valid one — drives the
+	// "not-allowed" cursor.
+	function findSnapJack(mousePos: { x: number; y: number }): { jack: SnapJack | null; invalidNearby: boolean } {
+		if (!dragSrcInfo) return { jack: null, invalidNearby: false };
 		const src = dragSrcInfo;
 		const targetTypes: ('input' | 'output')[] = src.type === 'output' ? ['input'] : ['output', 'input'];
 		let bestDist = SNAP_RANGE;
 		let best: SnapJack | null = null;
+		let bestInvalidDist = SNAP_RANGE;
+		let invalidNearby = false;
 		for (const mod of getModules()) {
 			const modDef = getModule(mod.type);
 			if (!modDef) continue;
@@ -74,11 +79,19 @@ export function useJackDragInteraction(
 			for (const targetType of targetTypes) {
 				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
 				jacks.forEach((jack, idx) => {
-					if (mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type) return;
-					if (targetType === 'input' && src.type === 'output' && drivenNestJacks?.has(`${mod.index}-${idx}`)) return;
 					const jx = jack.x + baseX;
 					const jy = jack.y + baseY;
 					const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
+					if (dist >= SNAP_RANGE) return;
+					const isSelf = mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type;
+					const isDrivenConflict = targetType === 'input' && src.type === 'output' && drivenNestJacks?.has(`${mod.index}-${idx}`);
+					if (isSelf || isDrivenConflict) {
+						if (dist < bestInvalidDist) {
+							bestInvalidDist = dist;
+							invalidNearby = true;
+						}
+						return;
+					}
 					if (dist < bestDist) {
 						bestDist = dist;
 						best = { moduleIndex: mod.index, connectorIndex: idx, type: targetType, colour: jack.colour, x: jx, y: jy };
@@ -86,7 +99,7 @@ export function useJackDragInteraction(
 				});
 			}
 		}
-		return best;
+		return { jack: best, invalidNearby: invalidNearby && bestInvalidDist < bestDist };
 	}
 
 	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
@@ -103,8 +116,10 @@ export function useJackDragInteraction(
 		if (!mp) return;
 		const svg = svgRef.value as SVGElement;
 
-		snapJack = findSnapJack(mp);
+		const snapResult = findSnapJack(mp);
+		snapJack = snapResult.jack;
 		snapHighlight = updateSnapHighlight(svg, snapHighlight, snapJack);
+		svg.classList.toggle('cable-invalid-target', snapResult.invalidNearby);
 
 		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
 		if (!previewCable) {
@@ -131,6 +146,7 @@ export function useJackDragInteraction(
 		dragSrcInfo = null;
 		drivenNestJacks = null;
 		hasDragged = false;
+		svgRef?.value?.classList.remove('cable-invalid-target');
 		window.removeEventListener('mousemove', onMouseMovePreview);
 		window.removeEventListener('mouseup', onWindowMouseup);
 		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);

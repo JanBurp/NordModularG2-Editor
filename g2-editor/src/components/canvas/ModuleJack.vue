@@ -69,6 +69,7 @@
 				type: 'input' | 'output';
 				colour: string;
 			},
+			e: MouseEvent,
 		];
 		jackDragEnd: [
 			info: {
@@ -113,12 +114,16 @@
 
 	function onMousedown(e: MouseEvent) {
 		e.stopPropagation();
-		emit('jackDragStart', {
-			moduleIndex: props.moduleIndex,
-			connectorIndex: props.connectorIndex,
-			type: props.type,
-			colour: effectiveColour.value,
-		});
+		emit(
+			'jackDragStart',
+			{
+				moduleIndex: props.moduleIndex,
+				connectorIndex: props.connectorIndex,
+				type: props.type,
+				colour: effectiveColour.value,
+			},
+			e,
+		);
 	}
 
 	function onMouseenter() {

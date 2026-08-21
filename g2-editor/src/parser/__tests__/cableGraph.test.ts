@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { findConnectedInputCables, findGroupOutputColor, inferUserColours } from '../cableGraph';
+import { findConnectedInputCables, findDrivingOutputCable, findGroupOutputColor, inferUserColours } from '../cableGraph';
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ModuleDefinition } from '@/types/module';
 
@@ -45,6 +45,30 @@ describe('findConnectedInputCables', () => {
 	it('handles connection from destination side', () => {
 		const c = cable(2, 0, 1, 0, 0);
 		expect(findConnectedInputCables([c], 1, 0)).toEqual([c]);
+	});
+});
+
+describe('findDrivingOutputCable', () => {
+	it('returns null when no output drives the jack', () => {
+		expect(findDrivingOutputCable([], 1, 0)).toBeNull();
+	});
+
+	it('returns the output cable driving the jack directly', () => {
+		const out = cable(0, 0, 1, 0, 1, 4);
+		expect(findDrivingOutputCable([out], 1, 0)).toBe(out);
+	});
+
+	it('returns the output cable driving a transitively connected jack', () => {
+		const inp = cable(1, 0, 2, 0, 0);
+		const out = cable(0, 0, 2, 0, 1, 7);
+		expect(findDrivingOutputCable([inp, out], 1, 0)).toBe(out);
+	});
+
+	it('distinguishes two nests driven by two different outputs', () => {
+		const outA = cable(0, 0, 1, 0, 1, 1);
+		const outB = cable(0, 1, 2, 0, 1, 2);
+		expect(findDrivingOutputCable([outA, outB], 1, 0)).toBe(outA);
+		expect(findDrivingOutputCable([outA, outB], 2, 0)).toBe(outB);
 	});
 });
 

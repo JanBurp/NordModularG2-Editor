@@ -33,7 +33,7 @@
 				:area-label="props.area as 'fx' | 'va'"
 				@param-change="onParamChange"
 				@mode-change="onModeChange"
-				@jack-drag-start="(info) => cablesRef?.handleJackDragStart(info)"
+				@jack-drag-start="(info, e) => cablesRef?.handleJackDragStart(info, e)"
 				@jack-drag-end="(info) => cablesRef?.handleJackDragEnd(info)"
 				@module-drag-start="handleModuleDragStart"
 				@module-label-edit="(info) => emit('moduleLabelEdit', info)"

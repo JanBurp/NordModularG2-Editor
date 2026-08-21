@@ -30,8 +30,8 @@ export function findConnectedInputCables(cableList: Cable[], startMod: number, s
 	return result;
 }
 
-// BFS from an input jack to determine whether any output cable already drives the connected nest.
-export function isNestDrivenByOutput(cableList: Cable[], startMod: number, startCon: number): boolean {
+// BFS from an input jack over its dir=0 "nest" to find the output cable already driving it, if any.
+export function findDrivingOutputCable(cableList: Cable[], startMod: number, startCon: number): Cable | null {
 	const visited = new Set<string>();
 	const queue: { mod: number; con: number }[] = [{ mod: startMod, con: startCon }];
 	while (queue.length > 0) {
@@ -39,7 +39,8 @@ export function isNestDrivenByOutput(cableList: Cable[], startMod: number, start
 		const key = `${mod}-${con}`;
 		if (visited.has(key)) continue;
 		visited.add(key);
-		if (cableList.some((c) => (c.dir ?? 1) === 1 && (c.dmod ?? 0) === mod && (c.dcon ?? 0) === con)) return true;
+		const driver = cableList.find((c) => (c.dir ?? 1) === 1 && (c.dmod ?? 0) === mod && (c.dcon ?? 0) === con);
+		if (driver) return driver;
 		for (const c of cableList) {
 			if ((c.dir ?? 1) !== 0) continue;
 			const sm = c.smod ?? 0,
@@ -50,7 +51,12 @@ export function isNestDrivenByOutput(cableList: Cable[], startMod: number, start
 			else if (dm === mod && dc === con) queue.push({ mod: sm, con: sc });
 		}
 	}
-	return false;
+	return null;
+}
+
+// Whether any output cable already drives the nest connected to this input jack.
+export function isNestDrivenByOutput(cableList: Cable[], startMod: number, startCon: number): boolean {
+	return findDrivingOutputCable(cableList, startMod, startCon) !== null;
 }
 
 // BFS outward from every output cable over dir=0 edges to find all input jacks whose nest is already driven by an output.

@@ -162,3 +162,13 @@ svg.cable-grab-mode .cable-hit {
 	pointer-events: stroke;
 	cursor: grab;
 }
+
+/* Active cable-grab drag (mousedown through mouseup) — overrides the ambient 'grab' cursor above. */
+svg.cable-dragging {
+	cursor: grabbing;
+}
+
+/* Hovering an incompatible drop target during a new-cable drag or a cable-grab drag. */
+svg.cable-invalid-target {
+	cursor: not-allowed;
+}
