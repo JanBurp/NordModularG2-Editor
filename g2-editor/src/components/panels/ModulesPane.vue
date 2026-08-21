@@ -366,13 +366,13 @@
 	.module-help :deep(h1) {
 		font-size: 0.85rem;
 		font-weight: 600;
-		color: #e5e5e5;
+		color: var(--color-content-primary);
 		margin-bottom: 0.5rem;
 	}
 	.module-help :deep(h2) {
 		font-size: 0.75rem;
 		font-weight: 600;
-		color: #d4d4d4;
+		color: var(--color-content-secondary);
 		margin-top: 0.75rem;
 		margin-bottom: 0.25rem;
 	}
@@ -381,7 +381,7 @@
 		line-height: 1.5;
 	}
 	.module-help :deep(strong) {
-		color: #e5e5e5;
+		color: var(--color-content-primary);
 		font-weight: 600;
 	}
 	.module-help :deep(ul) {

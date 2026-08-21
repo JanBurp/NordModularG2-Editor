@@ -17,7 +17,7 @@
 						Cancel
 					</button>
 					<button
-						class="px-3 py-1 text-xs border border-line-default rounded bg-gray-300 text-gray-800 hover:bg-gray-200 cursor-pointer"
+						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer"
 						@click="onConfirm"
 					>
 						OK

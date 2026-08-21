@@ -6,19 +6,19 @@
 			ref="menuEl"
 			role="menu"
 			data-testid="context-menu"
-			class="fixed z-50 min-w-40 max-h-[90vh] overflow-y-auto bg-neutral-800 border border-neutral-700 rounded shadow-xl py-1 text-sm text-neutral-200 list-none m-0 p-0"
+			class="fixed z-50 min-w-40 max-h-[90vh] overflow-y-auto bg-surface-2 border border-line-default rounded shadow-xl py-1 text-sm text-content-primary list-none m-0 p-0"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px' }"
 			@mouseenter="cancelClose"
 			@mouseleave="scheduleClose(300)"
 		>
 			<template v-for="(item, idx) in items" :key="idx">
-				<li v-if="item.type === 'separator'" class="border-t border-neutral-700 my-1 mx-2" />
+				<li v-if="item.type === 'separator'" class="border-t border-line-default my-1 mx-2" />
 
 				<li v-else-if="item.type === 'swatches'" class="grid grid-cols-4">
 					<button
 						v-for="(sw, si) in item.swatches"
 						:key="si"
-						class="h-8 border border-neutral-600 hover:border-2 hover:border-neutral-200 cursor-pointer"
+						class="h-8 border border-line-default hover:border-2 hover:border-content-primary cursor-pointer"
 						:class="sw.fullWidth ? 'col-span-4 w-full' : 'w-10'"
 						:style="{ backgroundColor: sw.color }"
 						@click.stop="onSwatchClick(sw)"
@@ -31,8 +31,8 @@
 					:ref="(el) => setItemRef(idx, el as HTMLElement | null)"
 					class="flex items-center justify-between px-3 py-1.5 select-none"
 					:class="[
-						item.disabled ? 'text-neutral-500 cursor-not-allowed' : 'hover:bg-neutral-700 cursor-pointer',
-						activeSubmenu === idx ? 'bg-neutral-700' : '',
+						item.disabled ? 'text-content-muted cursor-not-allowed' : 'hover:bg-surface-3 cursor-pointer',
+						activeSubmenu === idx ? 'bg-surface-3' : '',
 						item.bgColor ? 'text-neutral-900' : '',
 					]"
 					:style="item.bgColor ? { backgroundColor: item.bgColor } : {}"
@@ -40,7 +40,7 @@
 					@click.stop="onItemClick(item)"
 				>
 					<span>{{ item.label }}</span>
-					<span v-if="item.children" class="text-neutral-500 ml-6 text-xs">▶</span>
+					<span v-if="item.children" class="text-content-muted ml-6 text-xs">▶</span>
 				</li>
 			</template>
 		</ul>

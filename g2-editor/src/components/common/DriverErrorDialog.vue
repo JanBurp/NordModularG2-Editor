@@ -5,9 +5,9 @@
 				<div class="text-sm font-semibold text-red-400">USB Driver Problem</div>
 				<p v-if="isWindows" class="text-sm text-content-secondary leading-relaxed">
 					The G2 was found on USB but its interface could not be claimed.<br /><br />
-					Install <strong class="text-white">WinUSB</strong> using
+					Install <strong class="text-content-primary">WinUSB</strong> using
 					<a href="#" class="underline text-blue-400 hover:text-blue-300" @click.prevent="openZadig">Zadig</a>: select the Nord G2, choose
-					<strong class="text-white">WinUSB</strong>, and click <strong class="text-white">Replace Driver</strong>. Then click Retry. NOTE: This will
+					<strong class="text-content-primary">WinUSB</strong>, and click <strong class="text-content-primary">Replace Driver</strong>. Then click Retry. NOTE: This will
 					replace Clavia's USB Driver.
 				</p>
 				<div v-else class="text-sm text-content-secondary leading-relaxed">
@@ -20,7 +20,7 @@
 				</div>
 				<div class="flex justify-end">
 					<button
-						class="px-3 py-1 text-xs border border-line-default rounded bg-gray-300 text-gray-800 hover:bg-gray-200 cursor-pointer"
+						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer"
 						@click="emit('retry')"
 					>
 						Retry

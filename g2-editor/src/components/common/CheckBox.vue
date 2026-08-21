@@ -4,7 +4,7 @@
 		:aria-checked="modelValue"
 		tabindex="0"
 		class="w-4 h-4 rounded-xs cursor-pointer flex items-center justify-center shrink-0"
-		:class="modelValue ? 'bg-green-600' : 'bg-neutral-300'"
+		:class="modelValue ? 'bg-green-600' : 'bg-surface-3'"
 		v-bind="$attrs"
 		@click="toggle"
 		@keydown.space.prevent="toggle"

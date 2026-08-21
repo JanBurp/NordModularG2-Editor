@@ -1,23 +1,23 @@
 <template>
-	<div class="flex flex-col h-full overflow-hidden text-xs text-neutral-200 bg-neutral-900">
+	<div class="flex flex-col h-full overflow-hidden text-xs text-content-primary bg-surface-0">
 		<!-- Button row -->
-		<div class="flex flex-wrap gap-1 p-2 border-b border-neutral-700 shrink-0">
+		<div class="flex flex-wrap gap-1 p-2 border-b border-line-default shrink-0">
 			<button
-				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
+				class="px-2 py-0.5 rounded bg-surface-2 hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="selectedRows.size === 0"
 				@click="removeSelected"
 			>
 				Remove
 			</button>
 			<button
-				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
+				class="px-2 py-0.5 rounded bg-surface-2 hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="controllers.length === 0"
 				@click="removeAll"
 			>
 				Remove All
 			</button>
 			<button
-				class="px-2 py-0.5 rounded bg-neutral-700 hover:bg-neutral-600 disabled:opacity-40 disabled:cursor-not-allowed"
+				class="px-2 py-0.5 rounded bg-surface-2 hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="autoAssignDisabled"
 				@click="autoAssign"
 			>
@@ -28,7 +28,7 @@
 		<!-- List -->
 		<div class="flex-1 overflow-y-auto select-none">
 			<!-- Header -->
-			<div class="grid grid-cols-[2.5rem_4rem_5rem_1fr] sticky top-0 bg-neutral-800 text-neutral-400 border-b border-neutral-700 py-1">
+			<div class="grid grid-cols-[2.5rem_4rem_5rem_1fr] sticky top-0 bg-surface-1 text-content-secondary border-b border-line-default py-1">
 				<span class="px-2">CC</span>
 				<span class="px-2">Name</span>
 				<span class="px-2">Module</span>
@@ -38,8 +38,8 @@
 			<div
 				v-for="row in allCCRows"
 				:key="row.cc"
-				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-neutral-800 cursor-grab"
-				:class="row.assignment ? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-neutral-800') : 'opacity-40'"
+				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-line-subtle cursor-grab"
+				:class="row.assignment ? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-surface-1') : 'opacity-40'"
 				draggable="true"
 				@click.exact="row.assignment && selectRow(row.cc)"
 				@click.ctrl.exact="row.assignment && toggleRow(row.cc)"
@@ -50,19 +50,19 @@
 				@drop="onRowDrop(row.cc, row.assignment, $event)"
 			>
 				<span class="px-2 py-0.5">{{ row.cc }}</span>
-				<span class="px-2 py-0.5 text-neutral-400">{{ ccShortName(row.cc) }}</span>
+				<span class="px-2 py-0.5 text-content-secondary">{{ ccShortName(row.cc) }}</span>
 				<span class="px-2 py-0.5">{{ row.assignment ? getModuleName(row.assignment) : '' }}</span>
 				<span class="px-2 py-0.5">{{ row.assignment ? getParamName(row.assignment) : '' }}</span>
 			</div>
 		</div>
 
 		<!-- Drop zone hint -->
-		<div class="shrink-0 py-1 px-2 text-center text-neutral-500 border-t border-neutral-700 text-[10px]">
+		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">
 			F8 - show CC's on params<span v-if="deviceStore.lastMidiCC"> | Last CC: #{{ deviceStore.lastMidiCC }} </span>
 		</div>
 
 		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
-			<p class="text-sm text-neutral-200">Remove all {{ controllers.length }} CC assignments?</p>
+			<p class="text-sm text-content-primary">Remove all {{ controllers.length }} CC assignments?</p>
 		</Dialog>
 	</div>
 </template>
