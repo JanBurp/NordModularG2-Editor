@@ -1,6 +1,6 @@
 <template>
-	<div class="morph-groups-panel flex flex-col items-center border border-line-default rounded px-2 py-0.5">
-		<div class="text-[10px] font-semibold text-center leading-none mb-0.5">Morph Groups</div>
+	<ToolBarBigLabel>Morph Groups</ToolBarBigLabel>
+	<div class="morph-groups-panel flex flex-col items-center px-2 py-0.5">
 		<div class="flex items-center gap-2">
 			<template v-for="(name, i) in MORPH_NAMES" :key="i">
 				<div
@@ -18,7 +18,7 @@
 					>
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
-					<span class="text-[9px] leading-none mb-0.5">{{ name }}</span>
+					<span class="text-xs mb-1">{{ name }}</span>
 					<div class="knob-frame" :class="{ selected: uiStore.selectedMorphGroup === i }" @click="uiStore.setSelectedMorphGroup(i)">
 						<Knob
 							:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
@@ -29,7 +29,6 @@
 					<MorphSourceSelect
 						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
 						:morph-idx="i"
-						:selected="uiStore.selectedMorphGroup === i"
 						@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
 					/>
 				</div>
@@ -50,6 +49,8 @@
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import ToolBarLabel from './ToolBarLabel.vue';
+	import ToolBarBigLabel from './ToolBarBigLabel.vue';
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -107,12 +108,11 @@
 
 <style scoped>
 	.knob-frame {
-		padding: 1px;
-		border-radius: 4px;
+		padding: 2px 4px;
+		border-radius: 2px;
 		cursor: pointer;
 	}
 	.knob-frame.selected {
-		box-shadow: 0 0 0 2px #fff;
-		border-radius: 50%;
+		background-color: #fff;
 	}
 </style>

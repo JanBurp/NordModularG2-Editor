@@ -80,7 +80,7 @@
 </script>
 <style scoped>
 	.knob-wrapper {
-		display: inline-block;
+		display: block;
 		user-select: none;
 	}
 
