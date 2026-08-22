@@ -6,6 +6,7 @@ import { getParam } from '../renderer/parammap';
 import { useParamEditDialog } from './useParamEditDialog';
 import type { ModuleInstance } from '../types';
 import { clamp } from '@/utils/math';
+import { isGrabModifierPressed } from '@/utils/platform';
 
 function isInputFocused(): boolean {
 	const el = document.activeElement;
@@ -194,6 +195,24 @@ export function useModuleKeyboard() {
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 
+	// Ctrl/Cmd+Up/Down nudges the selected param's morph range for the currently selected group
+	// (only when it's already assigned to that group).
+	function nudgeMorphRange(delta: number) {
+		const sel = uiStore.selectedParam;
+		if (!sel) return;
+		const found = findModuleAnywhere(sel.moduleId);
+		if (!found) return;
+		const slot = uiStore.slotInFocus;
+		if (!slot) return;
+		const groupIndex = uiStore.selectedMorphGroup;
+		const variation = uiStore.variation;
+		const existing = slotsStore
+			.getMorphAssignments(slot, variation)
+			.find((a) => a.groupIndex === groupIndex && a.location === found.area && a.moduleIndex === sel.moduleId && a.paramIndex === sel.paramIndex);
+		if (!existing) return;
+		slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, clamp(existing.range + delta, -127, 127));
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (isInputFocused()) return;
@@ -202,6 +221,12 @@ export function useModuleKeyboard() {
 
 		const isArrow = key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight';
 		if (!isArrow) return;
+
+		if ((key === 'ArrowUp' || key === 'ArrowDown') && isGrabModifierPressed(e) && uiStore.selectedParam) {
+			nudgeMorphRange(key === 'ArrowUp' ? 1 : -1);
+			e.preventDefault();
+			return;
+		}
 
 		if (shiftKey && !altKey) {
 			navigateModule(key);

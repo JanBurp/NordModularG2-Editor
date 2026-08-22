@@ -1,5 +1,5 @@
 <template>
-	<div class="morph-source-btn" @click="emit('update:modelValue', (modelValue + 1) % MORPH_MODE_OPTIONS[morphIdx].length)">
+	<div class="morph-source-btn" :class="{ selected }" @click="emit('update:modelValue', (modelValue + 1) % MORPH_MODE_OPTIONS[morphIdx].length)">
 		{{ MORPH_MODE_OPTIONS[morphIdx][modelValue] }}
 	</div>
 </template>
@@ -7,7 +7,7 @@
 <script setup lang="ts">
 	import { MORPH_MODE_OPTIONS } from '../../types/patch';
 
-	defineProps<{ modelValue: number; morphIdx: number }>();
+	defineProps<{ modelValue: number; morphIdx: number; selected?: boolean }>();
 	const emit = defineEmits<{ 'update:modelValue': [value: number] }>();
 </script>
 
@@ -29,5 +29,10 @@
 
 	.morph-source-btn:hover {
 		background: #bbb;
+	}
+
+	.morph-source-btn.selected {
+		background: #333;
+		color: #fff;
 	}
 </style>

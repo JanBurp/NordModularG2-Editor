@@ -657,6 +657,65 @@ describe('patchParams round-trip', () => {
 	});
 });
 
+describe('morph assignment round-trip', () => {
+	it('assignments (incl. a negative range) survive serialize → parse', () => {
+		const { name, rawHex, patch } = loadFixture('Analogue NL2.pch2');
+		const assignments = [
+			{ groupIndex: 0, location: 0 as const, moduleIndex: 2, paramIndex: 0, range: 40 },
+			{ groupIndex: 3, location: 1 as const, moduleIndex: 5, paramIndex: 1, range: -25 },
+		];
+		patch.patchParams![0].morphAssignments = assignments;
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.patchParams![0].morphAssignments).toEqual(assignments);
+	});
+
+	it('assignments survive file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.patchParams![2].morphAssignments = [{ groupIndex: 7, location: 0 as const, moduleIndex: 1, paramIndex: 3, range: 1 }];
+
+		const savedHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedHex);
+
+		expect(patchB.patchParams![2].morphAssignments).toEqual(patch.patchParams![2].morphAssignments);
+	});
+
+	it('no morph assignments produces no 0x65 section', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		for (const p of patch.patchParams ?? []) p.morphAssignments = [];
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+
+		expect(extractSection(newHex, 0x65)).toBeNull();
+	});
+
+	it('a real fixture with an existing 0x65 section (Analogue NL2.pch2) parses it and round-trips byte-identically', () => {
+		const { name, rawHex, patch } = loadFixture('Analogue NL2.pch2');
+		expect(extractSection(rawHex, 0x65)).not.toBeNull();
+		expect(patch.patchParams!.some((p) => p.morphAssignments.length > 0)).toBe(true);
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+
+		expect(extractSection(newHex, 0x65)).toBe(extractSection(rawHex, 0x65));
+	});
+
+	it('assignment removed when deassigned', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.patchParams![0].morphAssignments = [{ groupIndex: 1, location: 1 as const, moduleIndex: 3, paramIndex: 0, range: 10 }];
+
+		const hexWith = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchWith = parsePatchFromRawHex(name, hexWith);
+		expect(patchWith.patchParams![0].morphAssignments).toHaveLength(1);
+
+		patchWith.patchParams![0].morphAssignments = [];
+		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
+		const patchWithout = parsePatchFromRawHex(name, hexWithout);
+		expect(patchWithout.patchParams![0].morphAssignments ?? []).toHaveLength(0);
+	});
+});
+
 // ── prf2 helpers ──────────────────────────────────────────────────────────────
 
 function loadFixturePrf2(filename: string): { name: string; rawHex: string; slotNames: string[]; patches: Patch[] } {

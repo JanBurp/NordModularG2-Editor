@@ -23,6 +23,28 @@
 			:class="{ dragging: isDragging }"
 		/>
 
+		<!-- Morph Group assignment tint: red = assigned to the selected group, blue = another group -->
+		<circle
+			v-if="morphColor"
+			:r="radius"
+			:cx="radius + 2"
+			:cy="radius + 2"
+			:fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'"
+			opacity="0.55"
+			style="mix-blend-mode: multiply"
+			pointer-events="none"
+		/>
+
+		<!-- Morph range sector, only for the currently selected group's assignment -->
+		<path
+			v-if="morphRange !== undefined"
+			:d="describeMorphArc(radius + 2, radius + 2, radius + 3, value, clampedRangeTarget)"
+			fill="none"
+			:stroke="morphColor === 'red' ? '#e0303c' : '#4a63c8'"
+			stroke-width="2.5"
+			pointer-events="none"
+		/>
+
 		<!-- Bottom-left tick mark -->
 		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
 
@@ -59,13 +81,19 @@
 	import { computed, ref, toRef } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
+	import { describeMorphArc } from '../../utils/knobArc';
+	import { clamp } from '../../utils/math';
 
 	const props = defineProps<{
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
 		highlight?: boolean;
+		morphColor?: 'red' | 'blue' | null;
+		morphRange?: number;
 	}>();
+
+	const clampedRangeTarget = computed(() => clamp(props.value + (props.morphRange ?? 0), 0, 127));
 
 	const emit = defineEmits<{
 		change: [index: number, value: number];

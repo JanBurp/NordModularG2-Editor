@@ -22,6 +22,16 @@
 					stroke-width="0.5"
 					:class="{ dragging: isDragging }"
 				/>
+				<circle
+					v-if="colorVariant"
+					:r="radius"
+					:cx="radius + 2"
+					:cy="radius + 2"
+					:fill="colorVariant === 'red' ? '#e0303c' : '#4a63c8'"
+					opacity="0.55"
+					style="mix-blend-mode: multiply"
+					pointer-events="none"
+				/>
 				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
 				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
 				<line
@@ -53,6 +63,7 @@
 	const props = defineProps<{
 		value: number;
 		type?: string; // 'KnobBig' | 'KnobMedium' | 'KnobSmall' | 'KnobReset'
+		colorVariant?: 'red' | 'blue' | null; // Morph Groups: red = selected group, blue = a different group
 	}>();
 
 	const emit = defineEmits<{

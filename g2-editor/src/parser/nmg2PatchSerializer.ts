@@ -234,6 +234,41 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
+// Per-parameter Morph Group assignment ($65, "C_MORPH_PARAM" in the reference Delphi editor).
+// A separate top-level chunk, sibling to PARAMETERS/$4d (which only holds the morph dial/mode
+// values, patch volume, glide, etc.) — mirrors nmg2PatchParser.ts's parseMorphParameters exactly.
+// Never writes a record with range === 0 (the real format deletes such records; presence of a
+// record is what marks the assignment, there's no separate bitmask).
+function writeMorphParamSection(params: PatchParamVariation[]): Uint8Array {
+	const NUM_VAR = 9;
+	const bw = new BitWriter();
+	bw.write(8, NUM_VAR);
+	bw.write(4, 8); // MorphCount, constant 8 (NMORPHS)
+	bw.write(20, 0); // Reserved1
+	for (let v = 0; v < NUM_VAR; v++) {
+		const assignments = (params[v]?.morphAssignments ?? []).filter((a) => a.range !== 0);
+		bw.write(4, v); // VariationIndex
+		bw.write(4, 0); // Unknown1
+		bw.write(8, 0); // Unknown2
+		bw.write(8, 0); // Unknown3
+		bw.write(8, 0); // Unknown4
+		bw.write(8, 0); // Unknown5
+		bw.write(8, 0); // Unknown6
+		bw.write(8, 0); // Unknown7
+		bw.write(4, 0); // Unknown8
+		bw.write(8, assignments.length);
+		for (const a of assignments) {
+			bw.write(2, a.location);
+			bw.write(8, a.moduleIndex);
+			bw.write(7, a.paramIndex);
+			bw.write(4, a.groupIndex);
+			bw.write(8, a.range); // JS bitwise ops on negative numbers naturally yield two's complement
+		}
+		bw.write(4, 0); // Reserved2
+	}
+	return makeSection(SectionType.MORPH_PARAMS, bw.flush());
+}
+
 export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDescription): Uint8Array | null {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
@@ -332,10 +367,16 @@ interface WrittenSets {
 	m5a: Set<number>;
 	m5b: Set<number>;
 	m60: boolean;
+	m65: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false };
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, m65: false };
+}
+
+// True when any variation actually has morph-group assignment data worth writing.
+function hasMorphAssignments(variations: VariationState[]): boolean {
+	return variations.some((v) => v.patch.morphAssignments.some((a) => a.range !== 0));
 }
 
 /**
@@ -396,6 +437,9 @@ function processSection(
 		const controllers = patch.controllers ?? [];
 		if (controllers.length > 0) out.push(writeControllers(controllers));
 		w.m60 = true;
+	} else if (type === SectionType.MORPH_PARAMS && !w.m65) {
+		if (hasMorphAssignments(variations)) out.push(writeMorphParamSection(variations.map((v) => v.patch)));
+		w.m65 = true;
 	} else if (type === SectionType.SEPARATOR) {
 		out.push(writeTextPad(patch.text ?? ''));
 	} else {
@@ -430,6 +474,9 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 		out.push(writeControllers(patch.controllers));
 	}
+	if (!w.m65 && hasMorphAssignments(variations)) {
+		out.push(writeMorphParamSection(variations.map((v) => v.patch)));
+	}
 	return buildRawHex(out);
 }
 
@@ -454,6 +501,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 				out.push(writeControllers(patch.controllers));
 			}
+			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
+				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
+			}
 			out.push(writeTextPad(patch.text ?? ''));
 			// Advance to next slot when more data follows
 			if (ofs + 3 + siz < sectionDataLen) {
@@ -468,6 +518,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 	const lastPatch = patches[slotIdx] ?? patches[0];
 	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
 		out.push(writeControllers(lastPatch.controllers));
+	}
+	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
+		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 	}
 	return buildRawHex(out);
 }

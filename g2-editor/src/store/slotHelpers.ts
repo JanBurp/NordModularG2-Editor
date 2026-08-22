@@ -57,6 +57,7 @@ function defaultPatchParams(): PatchParamVariation {
 		octaves: 0,
 		morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
 		morphModes: [0, 0, 0, 0, 0, 0, 0, 0],
+		morphAssignments: [],
 	};
 }
 

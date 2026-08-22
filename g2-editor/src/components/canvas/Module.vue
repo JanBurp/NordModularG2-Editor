@@ -70,13 +70,15 @@
 
 		<!-- Parameters -->
 		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
-			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index">
+			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index" @mousedown.capture="onParamMorphMouseDown(index, $event)">
 				<ModuleKnob
 					v-if="isKnob(param.n)"
 					:param="param"
 					:value="getParamValue(index)"
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
+					:morph-range="morphRangeFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 				/>
@@ -86,6 +88,8 @@
 					:value="getParamValue(index)"
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
+					:morph-range="morphRangeFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 				/>
@@ -96,6 +100,7 @@
 					:label="getParamLabel(index)"
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, labelIndex: 0, ...info })"
 					@param-context-menu="onParamContextMenu"
@@ -106,6 +111,7 @@
 					:value="getParamValue(index)"
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 				/>
@@ -115,10 +121,12 @@
 					:value="getParamValue(index)"
 					:param-index="index"
 					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 				/>
 			</g>
+			<MidiBadge v-if="dragHintPos" :text="dragHint!.text" :x="dragHintPos.x" :y="dragHintPos.y" anchor="top-center" />
 		</g>
 
 		<!-- Input jacks -->
@@ -204,6 +212,10 @@
 	import { useSlotsStore } from '../../store/slots';
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
+	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
+	import { isGrabModifierPressed } from '../../utils/platform';
+	import MidiBadge from './MidiBadge.vue';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -356,6 +368,60 @@
 		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
 	});
 
+	// Morph Group assignment: coloring, ctrl-click assign/deassign, ctrl-drag range editing.
+	const morphLocation = computed<0 | 1>(() => (props.areaLabel === 'va' ? 1 : 0));
+
+	const moduleMorphAssignments = computed(() => {
+		const slot = uiStore.slotInFocus;
+		if (!slot) return [];
+		return slotsStore.getMorphAssignments(slot, uiStore.variation).filter((a) => a.location === morphLocation.value && a.moduleIndex === moduleIdx.value);
+	});
+
+	function morphAssignmentsForParam(paramIndex: number) {
+		return moduleMorphAssignments.value.filter((a) => a.paramIndex === paramIndex);
+	}
+
+	function morphColorFor(paramIndex: number): 'red' | 'blue' | null {
+		const list = morphAssignmentsForParam(paramIndex);
+		if (list.length === 0) return null;
+		return list.some((a) => a.groupIndex === uiStore.selectedMorphGroup) ? 'red' : 'blue';
+	}
+
+	function morphRangeFor(paramIndex: number): number | undefined {
+		return morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === uiStore.selectedMorphGroup)?.range;
+	}
+
+	const { dragHint, startDrag } = useMorphRangeDrag();
+
+	const dragHintPos = computed(() => {
+		if (!dragHint.value) return null;
+		const param = moduleDef.value?.params?.[dragHint.value.paramIndex];
+		if (!param) return null;
+		return { x: param.x + 5, y: param.y - 4 };
+	});
+
+	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+		if (!isGrabModifierPressed(e)) return;
+		const slot = uiStore.slotInFocus;
+		if (!slot) return;
+		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
+		const param = moduleDef.value?.params?.[paramIndex];
+		// Buttons/switches/spinners always get the fixed max range (no drag needed for those).
+		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;
+		const groupIndex = uiStore.selectedMorphGroup;
+		const location = morphLocation.value;
+		const variation = uiStore.variation;
+		startDrag(paramIndex, e, {
+			isAssigned: () => morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === groupIndex),
+			getRange: () => morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === groupIndex)?.range ?? 0,
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, isFixedRange ? 127 : 1),
+			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex),
+			onRangeChange: isFixedRange
+				? undefined
+				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, range),
+		});
+	}
+
 	function onParamCCDragOver(e: DragEvent) {
 		e.preventDefault();
 	}
@@ -400,6 +466,22 @@
 			});
 		}
 
+		items.push({ type: 'separator' });
+
+		// Morph Group assign/deassign (toggles assignment to the currently selected toolbar group)
+		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;
+		items.push(
+			...buildMorphMenuItems({
+				slot,
+				variation: uiStore.variation,
+				groupIndex: uiStore.selectedMorphGroup,
+				location: location as 0 | 1,
+				moduleIndex: moduleIdx.value,
+				paramIndex,
+				isAssigned: morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === uiStore.selectedMorphGroup),
+				defaultRange: isFixedRange ? 127 : 1,
+			}),
+		);
 		items.push({ type: 'separator' });
 
 		// MIDI CC items

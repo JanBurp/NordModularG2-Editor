@@ -51,6 +51,7 @@ class G2Parser {
 			[SectionType.PARAMETERS]: ['Parameters', (d) => this.parseModuleParameters(d)],
 			[SectionType.PARAM_NAMES]: ['Param Names', (d) => this.parseParamNames(d)],
 			[SectionType.CONTROLLERS]: ['Controllers', (d) => this.parseControllers(d)],
+			[SectionType.MORPH_PARAMS]: ['Morph Parameters', (d) => this.parseMorphParameters(d)],
 		};
 
 		const hdr = new Uint8Array(data, 0, 320);
@@ -279,6 +280,7 @@ class G2Parser {
 						octaves: 0,
 						morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
 						morphModes: [0, 0, 0, 0, 0, 0, 0, 0],
+						morphAssignments: [],
 					};
 				return params[v];
 			};
@@ -361,6 +363,49 @@ class G2Parser {
 			}
 		}
 		return 'Area=' + areaIdx + ':ModuleCount=' + nummod + ':VariationCount=' + numvar;
+	}
+
+	// Per-parameter Morph Group assignment ($65, "C_MORPH_PARAM" in the reference Delphi editor).
+	// A separate top-level chunk from the PARAMETERS/$4d section above (which only holds the morph
+	// dial/mode values, patch volume, glide, etc.) — reverse-engineered from BVE.NMG2File.pas
+	// (TMorphParameters.Read/Write). Presence of a record is the assignment; a record's Range is
+	// never 0 (Delphi deletes the record when Range hits 0).
+	private parseMorphParameters(data: Uint8Array): string {
+		const slotIdx = this.aof >> 1;
+		const params = this.patchParamsData[slotIdx];
+		if (!params) return 'Morph Parameters: no matching PARAMETERS section';
+		const variationCount = this.getBits(8, data);
+		this.getBits(4); // MorphCount, constant 8 (NMORPHS) — informational, not used
+		this.getBits(20); // Reserved1 — unknown header padding, always 0 on write
+		let total = 0;
+		for (let i = 0; i < variationCount; i++) {
+			const variationIndex = this.getBits(4);
+			this.getBits(4); // Unknown1
+			this.getBits(8); // Unknown2
+			this.getBits(8); // Unknown3
+			this.getBits(8); // Unknown4
+			this.getBits(8); // Unknown5
+			this.getBits(8); // Unknown6
+			this.getBits(8); // Unknown7
+			this.getBits(4); // Unknown8
+			const morphParamCount = this.getBits(8);
+			const target = params[variationIndex];
+			for (let j = 0; j < morphParamCount; j++) {
+				const location = this.getBits(2) as 0 | 1;
+				const moduleIndex = this.getBits(8);
+				const paramIndex = this.getBits(7);
+				const groupIndex = this.getBits(4);
+				const raw = this.getBits(8);
+				const range = raw > 127 ? raw - 256 : raw;
+				target?.morphAssignments.push({ groupIndex, location, moduleIndex, paramIndex, range });
+			}
+			total += morphParamCount;
+			// Reserved2: 4 bits between variations, except the real writer trims this to whatever
+			// bits remain at the very end of the chunk — guard against reading past the section.
+			const bitsLeft = this.rawData.length * 8 - this.bitofs;
+			if (bitsLeft > 0) this.getBits(Math.min(4, bitsLeft));
+		}
+		return 'Morph Parameters: count=' + total;
 	}
 
 	private parseCableList(data: Uint8Array): string {
