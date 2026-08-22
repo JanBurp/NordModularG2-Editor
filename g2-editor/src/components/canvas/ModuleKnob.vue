@@ -23,7 +23,7 @@
 			:class="{ dragging: isDragging }"
 		/>
 
-		<!-- Morph Group assignment tint: red = assigned to the selected group, blue = another group -->
+		<!-- Assigned to a morph group: whole knob tinted red (selected group) or blue (another group) -->
 		<circle
 			v-if="morphColor"
 			:r="radius"
@@ -35,13 +35,13 @@
 			pointer-events="none"
 		/>
 
-		<!-- Morph range sector, only for the currently selected group's assignment -->
+		<!-- Assigned to the selected group: a darker "piece of the cake" sector shows the morph range -->
 		<path
-			v-if="morphRange !== undefined"
-			:d="describeMorphArc(radius + 2, radius + 2, radius + 3, value, clampedRangeTarget)"
-			fill="none"
-			:stroke="morphColor === 'red' ? '#e0303c' : '#4a63c8'"
-			stroke-width="2.5"
+			v-if="morphColor === 'red' && morphRange !== undefined"
+			:d="describeMorphSector(radius + 2, radius + 2, radius, value, clampedRangeTarget)"
+			fill="#Ba4058"
+			opacity="0.7"
+			style="mix-blend-mode: multiply"
 			pointer-events="none"
 		/>
 
@@ -81,7 +81,7 @@
 	import { computed, ref, toRef } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
-	import { describeMorphArc } from '../../utils/knobArc';
+	import { describeMorphSector } from '../../utils/knobArc';
 	import { clamp } from '../../utils/math';
 
 	const props = defineProps<{

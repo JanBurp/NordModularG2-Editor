@@ -126,7 +126,7 @@
 					@param-context-menu="onParamContextMenu"
 				/>
 			</g>
-			<MidiBadge v-if="dragHintPos" :text="dragHint!.text" :x="dragHintPos.x" :y="dragHintPos.y" anchor="top-center" />
+			<ParamOverlay :items="dragHintItems" />
 		</g>
 
 		<!-- Input jacks -->
@@ -215,7 +215,7 @@
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
-	import MidiBadge from './MidiBadge.vue';
+	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -393,11 +393,13 @@
 
 	const { dragHint, startDrag } = useMorphRangeDrag();
 
-	const dragHintPos = computed(() => {
-		if (!dragHint.value) return null;
+	// Same overlay component (ParamOverlay + its collision-avoiding layout) used by the MIDI CC and
+	// parameter-value hold-overlays, so the live range hint never sits on top of the parameter.
+	const dragHintItems = computed(() => {
+		if (!dragHint.value) return [];
 		const param = moduleDef.value?.params?.[dragHint.value.paramIndex];
-		if (!param) return null;
-		return { x: param.x + 5, y: param.y - 4 };
+		if (!param) return [];
+		return [{ text: dragHint.value.text, x: param.x, y: param.y }];
 	});
 
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
@@ -414,7 +416,9 @@
 		startDrag(paramIndex, e, {
 			isAssigned: () => morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === groupIndex),
 			getRange: () => morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === groupIndex)?.range ?? 0,
-			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, isFixedRange ? 127 : 1),
+			// Freshly assigned params start at the full parameter range (matches the real editor);
+			// the user then Ctrl-drags to narrow it.
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, 127),
 			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex),
 			onRangeChange: isFixedRange
 				? undefined
@@ -469,7 +473,6 @@
 		items.push({ type: 'separator' });
 
 		// Morph Group assign/deassign (toggles assignment to the currently selected toolbar group)
-		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;
 		items.push(
 			...buildMorphMenuItems({
 				slot,
@@ -479,7 +482,7 @@
 				moduleIndex: moduleIdx.value,
 				paramIndex,
 				isAssigned: morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === uiStore.selectedMorphGroup),
-				defaultRange: isFixedRange ? 127 : 1,
+				defaultRange: 127, // full parameter range, matching the real editor's initial morph range
 			}),
 		);
 		items.push({ type: 'separator' });

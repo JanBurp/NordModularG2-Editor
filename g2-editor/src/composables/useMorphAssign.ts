@@ -12,8 +12,8 @@ export function buildMorphMenuItems(opts: {
 	moduleIndex: number;
 	paramIndex: number;
 	isAssigned: boolean;
-	// Range used when this action *assigns* (ignored when it deassigns) — buttons/switches get a
-	// fixed max range, knobs/sliders default to a small non-zero range the user then Ctrl-drags.
+	// Range used when this action *assigns* (ignored when it deassigns) — starts at the full
+	// parameter range, matching the real editor; the user then Ctrl-drags a knob/slider to narrow it.
 	defaultRange: number;
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
