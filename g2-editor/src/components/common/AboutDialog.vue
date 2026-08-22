@@ -3,13 +3,13 @@
 		<div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="close">
 			<div class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
-					<span class="text-sm font-semibold text-content-primary">About G2 Editor</span>
+					<span class="text-sm font-semibold text-content-primary">About {{ APP_NAME }}</span>
 					<button class="text-content-secondary hover:text-content-primary text-lg leading-none cursor-pointer" @click="close">×</button>
 				</div>
 				<div class="px-4 py-4 flex flex-col items-center gap-3 text-center">
 					<img v-if="iconDataUrl" :src="iconDataUrl" class="w-16 h-16" alt="G2 Editor icon" />
 					<div>
-						<div class="text-base font-bold text-content-primary">G2 Editor</div>
+						<div class="text-base font-bold text-content-primary">{{ APP_NAME }}</div>
 						<div class="text-xs text-content-secondary mt-0.5">v{{ version }}</div>
 					</div>
 					<div class="text-xs text-content-secondary">Editor for the Nord Modular G2</div>
@@ -64,6 +64,7 @@
 <script setup lang="ts">
 	import { ref, watch, onMounted, onUnmounted } from 'vue';
 	import Button from '@/components/toolbar/Button.vue';
+	import { APP_NAME } from '@/constants';
 
 	const props = defineProps<{ modelValue: boolean }>();
 	const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();

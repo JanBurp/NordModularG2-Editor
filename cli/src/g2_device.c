@@ -1565,6 +1565,33 @@ int g2_set_patch_description(int slot, const uint8_t *data, int len) {
     return G2_OK;
 }
 
+/* EXPERIMENTAL — see g2_device.h. A prior standalone 0x6f send (identical below except for
+ * the trailing byte) hung the G2's USB comms. The one structural difference found between
+ * that send and the confirmed-working 0x21 (description) send: the description's payload
+ * writer ends with an extra terminator byte (0x00) that the notes payload didn't have.
+ * This retries with that terminator appended — untested against real hardware. */
+int g2_set_patch_notes(int slot, const uint8_t *data, int len) {
+    if (slot < 0 || slot > 3) { g2_err("set-patch-notes: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (len < 0 || (len > 0 && !data)) { g2_err("set-patch-notes: invalid data\n"); return G2_ERR_INVALID_PARAM; }
+    if (len > 2000) { g2_err("set-patch-notes: text too long\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("set-patch-notes: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+    /* G2 uses chunk format for C_PATCH_NOTES: [0x6f][size_hi][size_lo][data][0x00 terminator] */
+    uint8_t payload[2 + 2000 + 1];
+    payload[0] = (len >> 8) & 0xFF;
+    payload[1] = len & 0xFF;
+    if (len > 0) memcpy(payload + 2, data, len);
+    payload[2 + len] = 0x00;
+    if (send_slot(slot, version, 0x6f, payload, 2 + len + 1) < 0) {
+        g2_err("set-patch-notes: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 /* NOTE: g2_set_voice_mode / g2_set_voice_count call g2_get_patch internally
  * (read-modify-write). Do NOT call these from an editor that has a patch
  * loaded in memory — use set-patch-description directly instead. */

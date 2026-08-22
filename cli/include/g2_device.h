@@ -204,6 +204,14 @@ int g2_set_patch_name(int slot, const char *name);
 /* Patch description: slot 0-3, pre-encoded bitstream bytes */
 int g2_set_patch_description(int slot, const uint8_t *data, int len);
 
+/* EXPERIMENTAL — patch notes ("Text Pad") live SET, slot 0-3, raw text bytes.
+ * A prior standalone 0x6f send hung the G2 (see project memory); this retries
+ * with a trailing terminator byte, the one structural lead found comparing
+ * against the confirmed-working 0x21 (description) send. CLI-only on purpose
+ * (not wired into daemon.c/the Electron app) — test manually, one call at a
+ * time, ready to power-cycle the G2 if it hangs again. */
+int g2_set_patch_notes(int slot, const uint8_t *data, int len);
+
 /* Voice mode/count: slot 0-3. These call g2_get_patch internally (read-modify-write);
  * use set-patch-description directly when an editor has the patch loaded. */
 int g2_set_voice_mode(int slot, int mode);    /* monopoly: 0=poly 1=mono 2=legato 3=slgt */

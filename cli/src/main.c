@@ -53,6 +53,7 @@ static void print_usage(const char *prog) {
     printf("  get-perf-settings                                                                         Get current performance settings\n");
     printf("  set-patch-name <slot> <name>                                                              Set patch name for a slot\n");
     printf("  set-patch-description <slot> <hexdata>                                                    Set patch description (hex-encoded binary)\n");
+    printf("  set-patch-notes <slot> <text>                                                             EXPERIMENTAL — see g2_device.h; may hang the G2\n");
     printf("  set-master-clock-run <0|1>                                                                Start (1) or stop (0) the master clock\n");
     printf("  set-master-clock-bpm <30-240>                                                             Set master clock BPM\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
@@ -654,6 +655,14 @@ static int cmd_set_patch_description(int argc, char **argv, int i) {
     return ret;
 }
 
+static int cmd_set_patch_notes(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: set-patch-notes <slot> <text>\n"); return 1; }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-patch-notes: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    const char *text = argv[i + 2];
+    return g2_set_patch_notes(slot, (const uint8_t *)text, (int)strlen(text));
+}
+
 static int cmd_select_patch(int argc, char **argv, int i) {
     if (i + 3 >= argc) {
         fprintf(stderr, "Usage: select-patch <slot> <bank:1-32> <location:1-127>\n");
@@ -836,6 +845,7 @@ static const cmd_entry_t commands[] = {
     { "get-perf-settings",     cmd_get_perf_settings     },
     { "set-patch-name",        cmd_set_patch_name        },
     { "set-patch-description", cmd_set_patch_description },
+    { "set-patch-notes",       cmd_set_patch_notes       },
     { "set-master-clock-run",  cmd_set_master_clock_run  },
     { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
     { "set-slot-enabled",      cmd_set_slot_enabled      },

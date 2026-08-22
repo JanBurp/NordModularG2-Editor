@@ -104,6 +104,82 @@ describe('paste', () => {
 	});
 });
 
+describe('edited flag', () => {
+	it('a mutating action marks the slot edited', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+		expect(store.isSlotEdited('A')).toBe(false);
+
+		await store.setModuleLabel(1, 'Foo', 'voice');
+
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(store.slots['A'].rawHex).toBeNull();
+	});
+
+	it('_applyPatchOutput clears the edited flag once a fresh parse completes', async () => {
+		const fs = await import('fs');
+		const path = await import('path');
+		const { fileURLToPath } = await import('url');
+		const dirname = fileURLToPath(new URL('.', import.meta.url));
+		const buf = fs.readFileSync(path.join(dirname, '../../../../test-patches/EmptyPatch.pch2'));
+		const fileBytes = new Uint8Array(buf);
+		let ofs = 0;
+		while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
+		const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
+		const rawHex = Array.from(fileBytes.slice(ofs + 3))
+			.map((b) => b.toString(16).padStart(2, '0'))
+			.join('');
+
+		const store = useSlotsStore();
+		store.slots['A'].edited = true;
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+
+		expect(store.isSlotEdited('A')).toBe(false);
+	});
+
+	it('loadPatchFile resets the edited flag', () => {
+		const store = useSlotsStore();
+		store.slots['A'].edited = true;
+		store.loadPatchFile('A', makePatch(), 'test');
+		expect(store.isSlotEdited('A')).toBe(false);
+	});
+
+	it('loadPerformanceFile resets the edited flag for all 4 slots', () => {
+		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].edited = true;
+		store.loadPerformanceFile([makePatch(), makePatch(), makePatch(), makePatch()], ['a', 'b', 'c', 'd'], 'perf', 'cafe');
+		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
+	});
+
+	it('saveSlot resets the edited flag after a successful save', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].rawHex = '00'.repeat(20); // non-null: skips re-serialization, isolating the save-reset behavior
+		store.slots['A'].edited = true;
+		(globalThis as any).window.electronAPI = { savePatch: vi.fn().mockResolvedValue(undefined) };
+
+		await store.saveSlot('A', '/tmp/test.pch2');
+
+		expect(store.isSlotEdited('A')).toBe(false);
+	});
+
+	it('savePerformance resets the edited flag for all 4 slots after a successful save', async () => {
+		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) {
+			store.slots[s].patch = makePatch();
+			store.slots[s].edited = true;
+		}
+		store.performanceRawHex = '00'.repeat(20);
+		(globalThis as any).window.electronAPI = { savePatch: vi.fn().mockResolvedValue(undefined) };
+		vi.spyOn(await import('@/parser/nmg2PatchSerializer'), 'serializePerformance').mockReturnValue('00'.repeat(20));
+
+		await store.savePerformance('/tmp/test.prf2');
+
+		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
+	});
+});
+
 describe('assignedVoicesForSlot', () => {
 	it('returns the correct count for each slot label', () => {
 		const store = useSlotsStore();

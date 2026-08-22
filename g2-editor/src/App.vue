@@ -194,6 +194,8 @@
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
+	import { useWindowTitle } from './composables/useWindowTitle';
+	import { APP_NAME } from '@/constants';
 	import ParamEditDialog from './components/common/ParamEditDialog.vue';
 	import AboutDialog from './components/common/AboutDialog.vue';
 	import DriverErrorDialog from './components/common/DriverErrorDialog.vue';
@@ -350,6 +352,7 @@
 		},
 	});
 	useModuleKeyboard();
+	useWindowTitle();
 
 	async function handlePerfModeToggle(): Promise<void> {
 		try {
@@ -361,7 +364,7 @@
 
 	onMounted(async () => {
 		const { version, platform } = await window.electronAPI.getAppInfo();
-		console.log(`[startup] G2 Editor v${version} — ${platform}`);
+		console.log(`[startup] ${APP_NAME} v${version} — ${platform}`);
 
 		const isOffline = window.electronAPI.isOffline;
 		if (isOffline) {

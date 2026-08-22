@@ -251,6 +251,7 @@ interface SlotEntry {
 	resources: SlotResources;
 	assignedVoices: number;
 	controllers: MidiCCAssignment[];
+	edited: boolean; // true when the slot has unsaved edits since last load/save
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -273,6 +274,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				edited: false,
 			},
 			B: {
 				name: '',
@@ -285,6 +287,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				edited: false,
 			},
 			C: {
 				name: '',
@@ -297,6 +300,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				edited: false,
 			},
 			D: {
 				name: '',
@@ -309,6 +313,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				edited: false,
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
@@ -324,6 +329,8 @@ export const useSlotsStore = defineStore('slots', {
 		getPatchForSlot: (state) => (slot: SlotLabel) => state.slots[slot]?.patch ?? null,
 
 		getPatchName: (state) => (slot: SlotLabel) => state.slots[slot]?.name ?? '',
+
+		isSlotEdited: (state) => (slot: SlotLabel) => state.slots[slot]?.edited ?? false,
 
 		getAreaModules: (state) => (slot: SlotLabel, area: 0 | 1) => state.slots[slot]?.patch?.areas?.[area]?.modules ?? [],
 
@@ -380,6 +387,7 @@ export const useSlotsStore = defineStore('slots', {
 				variation: patch.description?.variation ?? 0,
 			};
 			this._autoRecolorOnLoad(patch);
+			this.slots[slot].edited = false;
 			useHistoryStore().clearHistory(slot);
 			return { name, rawHex, patch };
 		},
@@ -389,6 +397,13 @@ export const useSlotsStore = defineStore('slots', {
 			if (!slot) return null;
 			const patch = this.slots[slot].patch;
 			return patch ? { slot, patch } : null;
+		},
+
+		// Central "this slot changed" signal: invalidates the serialization cache (forcing
+		// Save to re-serialize) and marks the slot as having unsaved edits.
+		_markSlotDirty(slot: SlotLabel): void {
+			this.slots[slot].rawHex = null;
+			this.slots[slot].edited = true;
 		},
 
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
@@ -434,13 +449,13 @@ export const useSlotsStore = defineStore('slots', {
 				hist.record(slot, {
 					undo: async () => {
 						slotEntry.variations![toVar] = deepCloneVariationState(prevState);
-						slotEntry.rawHex = null;
+						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
 						if (cmds.length > 0) await window.cli.runBatch(cmds);
 					},
 					redo: async () => {
 						slotEntry.variations![toVar] = deepCloneVariationState(newState);
-						slotEntry.rawHex = null;
+						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
 						if (cmds.length > 0) await window.cli.runBatch(cmds);
 					},
@@ -450,7 +465,7 @@ export const useSlotsStore = defineStore('slots', {
 			const key = `${slot}:${fromVar}:${toVar}`;
 			this.pendingCopyVariation[key] = (this.pendingCopyVariation[key] ?? 0) + 1;
 			slotEntry.variations[toVar] = newState;
-			slotEntry.rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.run(['copy-variation', slot, String(fromVar), String(toVar)]);
 		},
 
@@ -464,7 +479,7 @@ export const useSlotsStore = defineStore('slots', {
 			const slotEntry = this.slots[slot];
 			if (!slotEntry.variations) return;
 			slotEntry.variations[toVar] = deepCloneVariationState(slotEntry.variations[fromVar]);
-			slotEntry.rawHex = null;
+			this._markSlotDirty(slot);
 		},
 
 		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
@@ -503,7 +518,7 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
 							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
-							slotE.rawHex = null;
+							this._markSlotDirty(slot);
 							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
 							const allCmds: string[][] = [
 								[
@@ -565,7 +580,7 @@ export const useSlotsStore = defineStore('slots', {
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
-			slotEntry.rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.run(['del-module', slot, location, String(moduleId)]);
 
@@ -579,7 +594,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { areaIdx, location } = areaConfig(area);
 			mutMoveModule(patch, areaIdx, moduleId, col, row);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
 		},
@@ -591,7 +606,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { areaIdx, location } = areaConfig(area);
 			mutMoveModule(patch, areaIdx, moduleId, col, row);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
 
@@ -643,7 +658,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (entry.variations) {
 				for (const vState of entry.variations) vState[areaKey][moduleId] = [...paramVals];
 			}
-			entry.rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.run([
 				'add-module',
@@ -687,7 +702,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const { mod, addModuleCmd, setParamCmds, setParamLabelCmds } = buildModuleAddition(src, newId, col, row, slot, location, areaKey, entry.variations);
 			mutAddModule(patch, areaIdx, mod);
-			entry.rawHex = null;
+			this._markSlotDirty(slot);
 
 			try {
 				await window.cli.run(addModuleCmd);
@@ -769,7 +784,7 @@ export const useSlotsStore = defineStore('slots', {
 
 				if (pushDowns.length > 0) {
 					for (const p of pushDowns) mutMoveModule(patch, areaIdx, p.index, p.col, p.newRow);
-					this.slots[slot].rawHex = null;
+					this._markSlotDirty(slot);
 					try {
 						await window.cli.runBatch(pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]));
 					} catch (err) {
@@ -814,7 +829,7 @@ export const useSlotsStore = defineStore('slots', {
 					]);
 				}
 
-				slotEntry.rawHex = null;
+				this._markSlotDirty(slot);
 				try {
 					// Send module commands first (add-module + set-param), then cable commands.
 					// The G2 firmware cannot reference a newly-added module in the same compound
@@ -853,7 +868,7 @@ export const useSlotsStore = defineStore('slots', {
 							// Restore pushed-down modules
 							const moveCmds = movedBack.map((m) => ['move-module', slot, location, String(m.index), String(m.col), String(m.fromRow)]);
 							for (const m of movedBack) mutMoveModule(patch, areaIdx, m.index, m.col, m.fromRow);
-							this.slots[slot].rawHex = null;
+							this._markSlotDirty(slot);
 							const allUndoCmds = [...delCableCmds, ...delModCmds, ...moveCmds];
 							if (allUndoCmds.length > 0) {
 								await window.cli.runBatch(allUndoCmds);
@@ -950,7 +965,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const cable = { colour: effectiveColor, smod, scon, dir, dmod, dcon };
 			mutAddCable(patch, areaIdx, cable);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			const mainCmd = [
 				'add-cable',
@@ -1026,7 +1041,7 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						await window.cli.run([
 							'del-cable',
 							slot,
@@ -1044,7 +1059,7 @@ export const useSlotsStore = defineStore('slots', {
 								const orig = recoloredOrig.find((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon);
 								return orig ? { ...c, colour: orig.colour } : c;
 							});
-							this.slots[slot].rawHex = null;
+							this._markSlotDirty(slot);
 							const restoreCmds: string[][] = [];
 							for (const b of recoloredOrig) {
 								restoreCmds.push([
@@ -1119,7 +1134,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (slotEntry.variations?.[variation]?.[areaKey]?.[moduleId]) {
 				slotEntry.variations[variation][areaKey][moduleId][paramIdx] = value;
 			}
-			slotEntry.rawHex = null;
+			this._markSlotDirty(slot);
 
 			const key = `${slot}:${location}:${moduleId}:${paramIdx}:${variation}`;
 			const cmd = ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)];
@@ -1162,7 +1177,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			if (mod?.modes) mod.modes[modeIdx] = value;
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
 		},
@@ -1196,6 +1211,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
 			this._autoRecolorOnLoad(patch);
+			this.slots[slot].edited = false;
 			useHistoryStore().clearHistory(slot);
 		},
 
@@ -1211,6 +1227,7 @@ export const useSlotsStore = defineStore('slots', {
 				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
 				this.slots[labels[i]].rawHex = null;
 				this.slots[labels[i]].templateRawHex = null;
+				this.slots[labels[i]].edited = false;
 				this.slotFilePaths[labels[i]] = '';
 				this._autoRecolorOnLoad(patches[i]);
 				hist.clearHistory(labels[i]);
@@ -1246,6 +1263,7 @@ export const useSlotsStore = defineStore('slots', {
 			await window.electronAPI.savePatch(path, data);
 			this.performanceFilePath = path;
 			this.performanceRawHex = newRawHex;
+			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
@@ -1269,6 +1287,7 @@ export const useSlotsStore = defineStore('slots', {
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
 			await window.electronAPI.savePatch(path, data);
 			this.slotFilePaths[slot] = path;
+			entry.edited = false;
 		},
 
 		async moveModulesWithCollision(
@@ -1330,7 +1349,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const p of pushDowns) mutMoveModule(patch, areaIdx, p.index, p.col, p.newRow);
 			for (const t of targets) mutMoveModule(patch, areaIdx, t.index, t.toCol, t.toRow);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			const cliCmds: string[][] = [
 				...pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]),
@@ -1351,7 +1370,7 @@ export const useSlotsStore = defineStore('slots', {
 							mutMoveModule(patch, areaIdx, t.index, t.fromCol, t.fromRow);
 							undoCmds.push(['move-module', slot, location, String(t.index), String(t.fromCol), String(t.fromRow)]);
 						}
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						if (undoCmds.length > 0) await window.cli.runBatch(undoCmds);
 					},
 					redo: async () => {
@@ -1458,7 +1477,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			for (const id of moduleIds) mutSetModuleColor(patch, areaIdx, id, color);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.runBatch(moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]));
 		},
 
@@ -1483,7 +1502,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			mutSetModuleLabel(patch, areaIdx, moduleId, label);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
 		},
 
@@ -1503,7 +1522,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx || !ctx.patch.description) return;
 			const { slot, patch } = ctx;
 			const description = patch.description!;
-			this.slots[slot].rawHex = null; // description was mutated by caller — invalidate cache so Save re-serializes
+			this._markSlotDirty(slot);
 			const templateHex = this.slots[slot].templateRawHex;
 			if (!templateHex || useDeviceStore().status !== DeviceStatus.Connected) return;
 			const { buildPatchDescriptionBytes } = await import('../parser/nmg2PatchSerializer');
@@ -1523,7 +1542,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 			patch.text = text;
-			this.slots[slot].rawHex = null; // invalidate cache so Save re-serializes
+			this._markSlotDirty(slot);
 		},
 
 		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {
@@ -1557,7 +1576,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (field === 'dial') patch.morphDials[morphIdx] = value;
 			else patch.morphModes[morphIdx] = value;
-			entry.rawHex = null;
+			this._markSlotDirty(slot);
 			const param = field === 'dial' ? morphIdx : 8 + morphIdx;
 			sendCoalesced(`${slot}:patch:1:${param}:${variation}`, ['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
@@ -1589,7 +1608,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			if (entry?.variations?.[variation]) {
 				(entry.variations[variation].patch as Record<keyof PatchParamVariation, number | number[]>)[key] = value;
-				entry.rawHex = null;
+				this._markSlotDirty(slot);
 			}
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key);
 			if (paramIdx < 0) return;
@@ -1648,7 +1667,7 @@ export const useSlotsStore = defineStore('slots', {
 				while (entry.labels.length <= labelIndex) entry.labels.push('');
 				entry.labels[labelIndex] = label;
 			}
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels]);
 		},
 
@@ -1671,7 +1690,7 @@ export const useSlotsStore = defineStore('slots', {
 							// Restore both colour and userColour (orig was captured before the user-set)
 							return orig ? { ...c, colour: orig.colour, userColour: orig.userColour } : c;
 						});
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						await window.cli.runBatch(
 							prevColorMap.map((b) => [
 								'set-cable-color',
@@ -1695,7 +1714,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			// userColour marks this as an explicit user override so auto-recolor skips it.
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color, userColour: color } : c));
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.runBatch(
 				matching.map((c) => [
 					'set-cable-color',
@@ -1727,7 +1746,7 @@ export const useSlotsStore = defineStore('slots', {
 				hist.record(slot, {
 					undo: async () => {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						await window.cli.runBatch(deletedCables.map((c) => addCableCmd(slot, location, c)));
 					},
 					redo: async () => {
@@ -1737,7 +1756,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			await window.cli.runBatch(matching.map((c) => delCableCmd(slot, location, c)));
 			this._syncUprateAndColors(patch, areaIdx);
 		},
@@ -1763,7 +1782,7 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
 						this._syncUprateAndColors(patch, areaIdx);
 					},
@@ -1773,7 +1792,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const c of oldCables) mutDeleteCable(patch, areaIdx, c);
 			for (const c of newCables) mutAddCable(patch, areaIdx, { ...c });
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 
 			await window.cli.runBatch([...buildDelCmds(oldCables), ...buildAddCmds(newCables)]);
 
@@ -1933,7 +1952,7 @@ export const useSlotsStore = defineStore('slots', {
 						removeModuleFromVariations(this.slots[slot].variations, id, areaIdx === 0 ? 'fx' : 'voice');
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
-					this.slots[slot].rawHex = null;
+					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				} else if (selectedCables.length > 0) {
 					const cliCmds: string[][] = [];
@@ -1945,7 +1964,7 @@ export const useSlotsStore = defineStore('slots', {
 						mutDeleteCable(patch, areaIdx, { smod, scon, dmod, dcon });
 						cliCmds.push(['del-cable', slot, location, String(smod), cable.dir === 0 ? '0' : '1', String(scon), String(dmod), '0', String(dcon)]);
 					}
-					this.slots[slot].rawHex = null;
+					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
 				}
 
@@ -1966,7 +1985,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
-							this.slots[slot].rawHex = null;
+							this._markSlotDirty(slot);
 							const allCmds: string[][] = [];
 							for (const mod of modSnaps) {
 								const paramVals0 = mod.lv.slice(0, mod.pcnt);
@@ -2066,14 +2085,14 @@ export const useSlotsStore = defineStore('slots', {
 			const locStr = ccLocationStr(location);
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => c.cc !== cc), { cc, location, moduleIndex, paramIndex }];
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
@@ -2106,14 +2125,14 @@ export const useSlotsStore = defineStore('slots', {
 		async deassignMidiCC(slot: SlotLabel, cc: number): Promise<void> {
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => c.cc !== cc);
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const restored = prevControllers.find((c) => c.cc === cc);
 						if (restored) {
@@ -2137,14 +2156,14 @@ export const useSlotsStore = defineStore('slots', {
 			const ccSet = new Set(ccs);
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSet.has(c.cc));
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const restored = prevControllers.filter((c) => ccSet.has(c.cc));
 						const deviceStore = useDeviceStore();
@@ -2169,14 +2188,14 @@ export const useSlotsStore = defineStore('slots', {
 			const prevControllers = [...this.slots[slot].controllers];
 			const ccs = prevControllers.map((c) => c.cc);
 			this.slots[slot].controllers = [];
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && prevControllers.length > 0) {
@@ -2209,13 +2228,13 @@ export const useSlotsStore = defineStore('slots', {
 			const newCCSet = new Set(newAssignments.map((a) => a.cc));
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)), ...newAssignments];
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot) && newAssignments.length > 0) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
-						this.slots[slot].rawHex = null;
+						this._markSlotDirty(slot);
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
 							const cmds: string[][] = [['deassign-midicc-batch', slot, ...newAssignments.map((a) => String(a.cc))]];

@@ -1,5 +1,7 @@
 import type { SlotLabel } from '@/types';
 
+export const APP_NAME = 'G2 Editor';
+
 /** SVG pixel width of one module column. */
 export const MODULE_WIDTH = 256;
 /** SVG pixel height of one module row unit. */

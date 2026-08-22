@@ -96,7 +96,10 @@ export function useSlotEvents(log: LogFn) {
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
 			const areaKey = ev.area === 'va' ? 'voice' : 'fx';
 			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
-			if (vState?.[areaKey]?.[ev.module as number]) vState[areaKey][ev.module as number][ev.param as number] = ev.value;
+			if (vState?.[areaKey]?.[ev.module as number]) {
+				vState[areaKey][ev.module as number][ev.param as number] = ev.value;
+				slotsStore._markSlotDirty(slotLabel);
+			}
 			return true;
 		}
 		if (ev.type === 'patch_param') {
@@ -109,6 +112,7 @@ export function useSlotEvents(log: LogFn) {
 				if (vState) {
 					if ((ev.param as number) < 8) vState.patch.morphDials[ev.param as number] = ev.value as number;
 					else vState.patch.morphModes[(ev.param as number) - 8] = ev.value as number;
+					slotsStore._markSlotDirty(slotLabel);
 				}
 				return true;
 			}
@@ -118,12 +122,18 @@ export function useSlotEvents(log: LogFn) {
 			const globalIdx = (SECTION_OFFSETS[ev.module as number] ?? 0) + (ev.param as number);
 			const key = PATCH_PARAM_KEYS[globalIdx];
 			const vState = slotsStore.slots[slotLabel]?.variations?.[ev.variation as number];
-			if (vState && key) (vState.patch as unknown as Record<string, number>)[key] = ev.value;
+			if (vState && key) {
+				(vState.patch as unknown as Record<string, number>)[key] = ev.value;
+				slotsStore._markSlotDirty(slotLabel);
+			}
 			return true;
 		}
 		if (ev.type === 'patch_name') {
 			const sl = ev.slot as SlotLabel;
-			if (sl && slotsStore.slots[sl]) slotsStore.slots[sl].name = ev.name;
+			if (sl && slotsStore.slots[sl]) {
+				slotsStore.slots[sl].name = ev.name;
+				slotsStore._markSlotDirty(sl);
+			}
 			log('←', 'Watch', `patch_name slot=${ev.slot} name=${ev.name}`);
 			return true;
 		}
