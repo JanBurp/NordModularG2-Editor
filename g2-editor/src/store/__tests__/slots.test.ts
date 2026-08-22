@@ -180,6 +180,87 @@ describe('edited flag', () => {
 	});
 });
 
+describe('undo/redo coverage for text, name, and description fields', () => {
+	it('setPatchText participates in undo/redo', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.text = 'hello';
+		store.slots['A'].patch = patch;
+
+		store.setPatchText('hello world');
+		expect(patch.text).toBe('hello world');
+
+		await store.undo();
+		expect(patch.text).toBe('hello');
+
+		await store.redo();
+		expect(patch.text).toBe('hello world');
+	});
+
+	it('setPatchName participates in undo/redo and marks the slot edited', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].name = 'Old Name';
+
+		await store.setPatchName('New Name');
+		expect(store.slots['A'].name).toBe('New Name');
+		expect(store.isSlotEdited('A')).toBe(true);
+
+		await store.undo();
+		expect(store.slots['A'].name).toBe('Old Name');
+
+		await store.redo();
+		expect(store.slots['A'].name).toBe('New Name');
+	});
+
+	for (const field of ['category', 'monopoly', 'voices', 'height'] as const) {
+		it(`setPatchDescriptionField('${field}') participates in undo/redo and marks the slot edited`, async () => {
+			const store = useSlotsStore();
+			const patch = makePatch();
+			patch.description[field] = 1;
+			store.slots['A'].patch = patch;
+
+			store.setPatchDescriptionField(field, 42);
+			expect(patch.description[field]).toBe(42);
+			expect(store.isSlotEdited('A')).toBe(true);
+
+			await store.undo();
+			expect(patch.description[field]).toBe(1);
+
+			await store.redo();
+			expect(patch.description[field]).toBe(42);
+		});
+	}
+});
+
+describe('undo() clears the dirty flag once the stack is empty', () => {
+	it('clears edited after undoing the only edit', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].name = 'Old';
+
+		await store.setPatchName('New');
+		expect(store.isSlotEdited('A')).toBe(true);
+
+		await store.undo();
+		expect(store.isSlotEdited('A')).toBe(false);
+	});
+
+	it('leaves edited set while earlier entries remain', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].name = 'Old';
+
+		await store.setPatchName('Mid');
+		await store.setPatchName('New');
+		expect(store.isSlotEdited('A')).toBe(true);
+
+		await store.undo(); // back to 'Mid' — one earlier entry (Old → Mid) still in the stack
+		expect(store.slots['A'].name).toBe('Mid');
+		expect(store.isSlotEdited('A')).toBe(true);
+	});
+});
+
 describe('assignedVoicesForSlot', () => {
 	it('returns the correct count for each slot label', () => {
 		const store = useSlotsStore();

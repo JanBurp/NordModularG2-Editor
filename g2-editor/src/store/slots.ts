@@ -1511,7 +1511,17 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot } = ctx;
+			const prevName = this.slots[slot].name;
+			if (prevName === name) return;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => this.setPatchName(prevName),
+					redo: async () => this.setPatchName(name),
+				});
+			}
 			this.slots[slot].name = name;
+			this._markSlotDirty(slot);
 			if (useDeviceStore().status === DeviceStatus.Connected) {
 				await window.cli.run(['set-patch-name', slot, name]);
 			}
@@ -1534,6 +1544,41 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-patch-description', slot, hex]);
 		},
 
+		// Shared by PatchToolBar/SettingsPane (category, voice mode, voice count) and ui.ts's
+		// setAreaFbar (area/split height): mutates one patch-description field and records undo,
+		// coalesced per field+slot so a drag (height) collapses to one undo entry. Callers remain
+		// responsible for pushing to hardware via setPatchDescription() — this only mutates + marks dirty.
+		setPatchDescriptionField(field: 'category' | 'monopoly' | 'voices' | 'height', value: number): void {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const description = patch.description;
+			if (!description) return;
+			const prevValue = description[field];
+			if (prevValue === value) return;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const box = { initial: prevValue, latest: value };
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							this.setPatchDescriptionField(field, box.initial);
+							await this.setPatchDescription();
+						},
+						redo: async () => {
+							this.setPatchDescriptionField(field, box.latest);
+							await this.setPatchDescription();
+						},
+					},
+					`patchdesc:${field}:${slot}`,
+					box,
+				);
+			}
+			description[field] = value;
+			this._markSlotDirty(slot);
+		},
+
 		// Local edit only — the G2 protocol has no live "set patch notes" command (confirmed
 		// against the official editor: only a read exists). Notes reach the device embedded
 		// in a full patch write (upload-patch / Save), same as patch description already does.
@@ -1541,6 +1586,21 @@ export const useSlotsStore = defineStore('slots', {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
+			const prevText = patch.text ?? '';
+			if (prevText === text) return;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const box = { initial: prevText, latest: text };
+				hist.record(
+					slot,
+					{
+						undo: async () => this.setPatchText(box.initial as string),
+						redo: async () => this.setPatchText(box.latest as string),
+					},
+					`text:${slot}`,
+					box,
+				);
+			}
 			patch.text = text;
 			this._markSlotDirty(slot);
 		},
@@ -2057,6 +2117,10 @@ export const useSlotsStore = defineStore('slots', {
 			hist.lock(slot);
 			try {
 				await entry.undo();
+				// Back to the load/save baseline once the undo stack is empty — clear the
+				// dirty flag. Known limitation: a save partway through history isn't tracked,
+				// so this only fires on a fully empty stack (see plan/memory for details).
+				if (!hist.canUndo(slot)) this.slots[slot].edited = false;
 			} catch (err) {
 				console.warn('[undo] CLI failed (offline?):', err);
 				hist.restoreUndo(slot, entry);

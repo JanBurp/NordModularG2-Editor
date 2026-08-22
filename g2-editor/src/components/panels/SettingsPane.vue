@@ -344,7 +344,7 @@
 		set: (cat: number) => {
 			const desc = (currentPatch.value as any)?.description;
 			if (desc) {
-				desc.category = cat;
+				slotsStore.setPatchDescriptionField('category', cat);
 				slotsStore.setPatchDescription();
 			}
 		},

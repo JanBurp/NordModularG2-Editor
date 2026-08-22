@@ -93,7 +93,7 @@
 		get: () => currentPatch.value?.description?.category ?? 0,
 		set: (val: number) => {
 			if (currentPatch.value?.description) {
-				currentPatch.value.description.category = Number(val);
+				slotsStore.setPatchDescriptionField('category', Number(val));
 				slotsStore.setPatchDescription();
 			}
 		},
@@ -103,7 +103,7 @@
 		get: () => currentPatch.value?.description?.monopoly ?? 1,
 		set: (val: number) => {
 			if (currentPatch.value?.description) {
-				currentPatch.value.description.monopoly = Number(val);
+				slotsStore.setPatchDescriptionField('monopoly', Number(val));
 				slotsStore.setPatchDescription();
 			}
 		},
@@ -112,7 +112,7 @@
 		get: () => currentPatch.value?.description?.voices ?? 0,
 		set: (val: number) => {
 			if (currentPatch.value?.description) {
-				currentPatch.value.description.voices = Number(val);
+				slotsStore.setPatchDescriptionField('voices', Number(val));
 				slotsStore.setPatchDescription();
 			}
 		},
