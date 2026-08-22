@@ -349,7 +349,13 @@ export const useSlotsStore = defineStore('slots', {
 	},
 
 	actions: {
-		async _applyPatchOutput(slot: SlotLabel, output: string): Promise<{ name: string; rawHex: string; patch: Patch }> {
+		// preserveHistory: true for the hardware-echo auto-resync after our own edit (a structural
+		// edit — add/move/delete module, cable changes, etc. — bumps the G2's patch version, which
+		// triggers a background reload of this same patch; that reload must not wipe the undo stack
+		// or the dirty flag for the edit it's merely confirming). False (default) for a genuine fresh
+		// load — explicit slot activation, bank-patch selection, startup, reconnect — where resetting
+		// both is correct.
+		async _applyPatchOutput(slot: SlotLabel, output: string, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch }> {
 			const result = JSON.parse(output);
 			const name: string = result.name;
 			const rawHex: string = result.data;
@@ -387,8 +393,10 @@ export const useSlotsStore = defineStore('slots', {
 				variation: patch.description?.variation ?? 0,
 			};
 			this._autoRecolorOnLoad(patch);
-			this.slots[slot].edited = false;
-			useHistoryStore().clearHistory(slot);
+			if (!preserveHistory) {
+				this.slots[slot].edited = false;
+				useHistoryStore().clearHistory(slot);
+			}
 			return { name, rawHex, patch };
 		},
 
@@ -567,7 +575,13 @@ export const useSlotsStore = defineStore('slots', {
 								});
 								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
 							}
-							if (allCmds.length > 0) await window.cli.runBatch(allCmds);
+							if (allCmds.length > 0) {
+								try {
+									await window.cli.runBatch(allCmds);
+								} catch (err) {
+									console.warn('deleteModule undo: CLI failed (offline?):', err);
+								}
+							}
 						},
 						redo: async () => {
 							await this.deleteModule(moduleId, area);
@@ -582,7 +596,11 @@ export const useSlotsStore = defineStore('slots', {
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
-			await window.cli.run(['del-module', slot, location, String(moduleId)]);
+			try {
+				await window.cli.run(['del-module', slot, location, String(moduleId)]);
+			} catch (err) {
+				console.warn('deleteModule: CLI failed (offline?):', err);
+			}
 
 			return { name: slotEntry.name, rawHex: '', patch };
 		},
@@ -596,21 +614,11 @@ export const useSlotsStore = defineStore('slots', {
 			mutMoveModule(patch, areaIdx, moduleId, col, row);
 			this._markSlotDirty(slot);
 
-			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
-		},
-
-		async moveModule(moduleId: number, col: number, row: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
-			const ctx = this._getActivePatch();
-			if (!ctx) return null;
-			const { slot, patch } = ctx;
-
-			const { areaIdx, location } = areaConfig(area);
-			mutMoveModule(patch, areaIdx, moduleId, col, row);
-			this._markSlotDirty(slot);
-
-			await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
-
-			return { name: this.slots[slot].name, rawHex: '', patch };
+			try {
+				await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
+			} catch (err) {
+				console.warn('moveModuleNoReload: CLI failed (offline?):', err);
+			}
 		},
 
 		async addModule(
@@ -660,21 +668,25 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			this._markSlotDirty(slot);
 
-			await window.cli.run([
-				'add-module',
-				slot,
-				location,
-				String(typeId),
-				String(moduleId),
-				String(col),
-				String(row),
-				String(mod.colour),
-				String(numModes),
-				...modeVals.map(String),
-				String(numParams),
-				...paramVals.map(String),
-				uname,
-			]);
+			try {
+				await window.cli.run([
+					'add-module',
+					slot,
+					location,
+					String(typeId),
+					String(moduleId),
+					String(col),
+					String(row),
+					String(mod.colour),
+					String(numModes),
+					...modeVals.map(String),
+					String(numParams),
+					...paramVals.map(String),
+					uname,
+				]);
+			} catch (err) {
+				console.warn('addModule: CLI failed (offline?):', err);
+			}
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -1017,10 +1029,14 @@ export const useSlotsStore = defineStore('slots', {
 				recolorGroup(smod, scon, effectiveColor);
 			}
 
-			if (recolorCmds.length > 0) {
-				await window.cli.runBatch([mainCmd, ...recolorCmds]);
-			} else {
-				await window.cli.run(mainCmd);
+			try {
+				if (recolorCmds.length > 0) {
+					await window.cli.runBatch([mainCmd, ...recolorCmds]);
+				} else {
+					await window.cli.run(mainCmd);
+				}
+			} catch (err) {
+				console.warn('addCable: CLI failed (offline?):', err);
 			}
 
 			// Recompute signal-rate uprate and recolor cables that changed rate (local display only).
@@ -1042,17 +1058,21 @@ export const useSlotsStore = defineStore('slots', {
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
 						this._markSlotDirty(slot);
-						await window.cli.run([
-							'del-cable',
-							slot,
-							location,
-							String(addedCable.smod),
-							addedCable.dir === 0 ? '0' : '1',
-							String(addedCable.scon),
-							String(addedCable.dmod),
-							'0',
-							String(addedCable.dcon),
-						]);
+						try {
+							await window.cli.run([
+								'del-cable',
+								slot,
+								location,
+								String(addedCable.smod),
+								addedCable.dir === 0 ? '0' : '1',
+								String(addedCable.scon),
+								String(addedCable.dmod),
+								'0',
+								String(addedCable.dcon),
+							]);
+						} catch (err) {
+							console.warn('addCable undo: CLI failed (offline?):', err);
+						}
 						// Restore recolored cables
 						if (recoloredOrig.length > 0) {
 							patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
@@ -1086,7 +1106,11 @@ export const useSlotsStore = defineStore('slots', {
 									String(b.dcon),
 								]);
 							}
-							await window.cli.runBatch(restoreCmds);
+							try {
+								await window.cli.runBatch(restoreCmds);
+							} catch (err) {
+								console.warn('addCable undo (recolor restore): CLI failed (offline?):', err);
+							}
 						}
 						// Re-sync uprate after undo so module flags and display are correct.
 						this._syncUprateAndColors(patch, areaIdx);
@@ -1182,12 +1206,12 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
 		},
 
-		async loadSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		async loadSlot(slot: SlotLabel, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
 			try {
 				const output = await window.cli.run(['get-patch', slot]);
-				return await this._applyPatchOutput(slot, output);
+				return await this._applyPatchOutput(slot, output, preserveHistory);
 			} catch (e: any) {
 				if (!this.slots[slot].patch) {
 					this.slots[slot].error = e.message;
@@ -1355,7 +1379,13 @@ export const useSlotsStore = defineStore('slots', {
 				...pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]),
 				...targets.map((t) => ['move-module', slot, location, String(t.index), String(t.toCol), String(t.toRow)]),
 			];
-			if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+			if (cliCmds.length > 0) {
+				try {
+					await window.cli.runBatch(cliCmds);
+				} catch (err) {
+					console.warn('moveModulesWithCollision: CLI failed (offline?):', err);
+				}
+			}
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -1371,7 +1401,13 @@ export const useSlotsStore = defineStore('slots', {
 							undoCmds.push(['move-module', slot, location, String(t.index), String(t.fromCol), String(t.fromRow)]);
 						}
 						this._markSlotDirty(slot);
-						if (undoCmds.length > 0) await window.cli.runBatch(undoCmds);
+						if (undoCmds.length > 0) {
+							try {
+								await window.cli.runBatch(undoCmds);
+							} catch (err) {
+								console.warn('moveModulesWithCollision undo: CLI failed (offline?):', err);
+							}
+						}
 					},
 					redo: async () => {
 						const currentCtx = this._getActivePatch();
@@ -1751,20 +1787,24 @@ export const useSlotsStore = defineStore('slots', {
 							return orig ? { ...c, colour: orig.colour, userColour: orig.userColour } : c;
 						});
 						this._markSlotDirty(slot);
-						await window.cli.runBatch(
-							prevColorMap.map((b) => [
-								'set-cable-color',
-								slot,
-								location,
-								String(b.colour),
-								String(b.smod),
-								(b.dir ?? 1) === 0 ? '0' : '1',
-								String(b.scon),
-								String(b.dmod),
-								'0',
-								String(b.dcon),
-							]),
-						);
+						try {
+							await window.cli.runBatch(
+								prevColorMap.map((b) => [
+									'set-cable-color',
+									slot,
+									location,
+									String(b.colour),
+									String(b.smod),
+									(b.dir ?? 1) === 0 ? '0' : '1',
+									String(b.scon),
+									String(b.dmod),
+									'0',
+									String(b.dcon),
+								]),
+							);
+						} catch (err) {
+							console.warn('setCableColor undo: CLI failed (offline?):', err);
+						}
 					},
 					redo: async () => {
 						await this.setCableColor(moduleIndex, connectorIndex, type, color, area);
@@ -1775,20 +1815,24 @@ export const useSlotsStore = defineStore('slots', {
 			// userColour marks this as an explicit user override so auto-recolor skips it.
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color, userColour: color } : c));
 			this._markSlotDirty(slot);
-			await window.cli.runBatch(
-				matching.map((c) => [
-					'set-cable-color',
-					slot,
-					location,
-					String(color),
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]),
-			);
+			try {
+				await window.cli.runBatch(
+					matching.map((c) => [
+						'set-cable-color',
+						slot,
+						location,
+						String(color),
+						String(c.smod),
+						(c.dir ?? 1) === 0 ? '0' : '1',
+						String(c.scon),
+						String(c.dmod),
+						'0',
+						String(c.dcon),
+					]),
+				);
+			} catch (err) {
+				console.warn('setCableColor: CLI failed (offline?):', err);
+			}
 		},
 
 		async deleteConnectedCables(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', area: 'voice' | 'fx'): Promise<void> {
@@ -1807,7 +1851,11 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
-						await window.cli.runBatch(deletedCables.map((c) => addCableCmd(slot, location, c)));
+						try {
+							await window.cli.runBatch(deletedCables.map((c) => addCableCmd(slot, location, c)));
+						} catch (err) {
+							console.warn('deleteConnectedCables undo: CLI failed (offline?):', err);
+						}
 					},
 					redo: async () => {
 						await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
@@ -1817,7 +1865,11 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
 			this._markSlotDirty(slot);
-			await window.cli.runBatch(matching.map((c) => delCableCmd(slot, location, c)));
+			try {
+				await window.cli.runBatch(matching.map((c) => delCableCmd(slot, location, c)));
+			} catch (err) {
+				console.warn('deleteConnectedCables: CLI failed (offline?):', err);
+			}
 			this._syncUprateAndColors(patch, areaIdx);
 		},
 
@@ -1843,7 +1895,11 @@ export const useSlotsStore = defineStore('slots', {
 						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
-						await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
+						try {
+							await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
+						} catch (err) {
+							console.warn('_swapCables undo: CLI failed (offline?):', err);
+						}
 						this._syncUprateAndColors(patch, areaIdx);
 					},
 					redo,
@@ -1854,7 +1910,11 @@ export const useSlotsStore = defineStore('slots', {
 			for (const c of newCables) mutAddCable(patch, areaIdx, { ...c });
 			this._markSlotDirty(slot);
 
-			await window.cli.runBatch([...buildDelCmds(oldCables), ...buildAddCmds(newCables)]);
+			try {
+				await window.cli.runBatch([...buildDelCmds(oldCables), ...buildAddCmds(newCables)]);
+			} catch (err) {
+				console.warn('_swapCables: CLI failed (offline?):', err);
+			}
 
 			this._syncUprateAndColors(patch, areaIdx);
 		},
@@ -2013,7 +2073,13 @@ export const useSlotsStore = defineStore('slots', {
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
 					this._markSlotDirty(slot);
-					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+					if (cliCmds.length > 0) {
+						try {
+							await window.cli.runBatch(cliCmds);
+						} catch (err) {
+							console.warn('deleteSelection: CLI failed (offline?):', err);
+						}
+					}
 				} else if (selectedCables.length > 0) {
 					const cliCmds: string[][] = [];
 					for (const cable of selectedCables) {
@@ -2025,7 +2091,13 @@ export const useSlotsStore = defineStore('slots', {
 						cliCmds.push(['del-cable', slot, location, String(smod), cable.dir === 0 ? '0' : '1', String(scon), String(dmod), '0', String(dcon)]);
 					}
 					this._markSlotDirty(slot);
-					if (cliCmds.length > 0) await window.cli.runBatch(cliCmds);
+					if (cliCmds.length > 0) {
+						try {
+							await window.cli.runBatch(cliCmds);
+						} catch (err) {
+							console.warn('deleteSelection: CLI failed (offline?):', err);
+						}
+					}
 				}
 
 				this._syncUprateAndColors(patch, areaIdx);
@@ -2090,8 +2162,12 @@ export const useSlotsStore = defineStore('slots', {
 									String(cn.dcon),
 								]);
 							}
-							for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
-								await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
+							try {
+								for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
+									await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
+								}
+							} catch (err) {
+								console.warn('deleteSelection undo: CLI failed (offline?):', err);
 							}
 						},
 						redo: async () => {

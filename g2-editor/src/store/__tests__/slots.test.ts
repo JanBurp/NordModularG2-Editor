@@ -1,6 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
+import { useHistoryStore } from '@/store/history';
 
 beforeEach(() => {
 	setActivePinia(createPinia());
@@ -15,6 +16,24 @@ function makePatch(): any {
 			{ modules: [], cableList: [] },
 		],
 	};
+}
+
+// Loads a real, parseable fixture as {name, rawHex} — needed wherever a test must reach
+// _applyPatchOutput's full-reparse branch (a synthetic hex blob would throw as malformed).
+async function loadFixture(): Promise<{ name: string; rawHex: string }> {
+	const fs = await import('fs');
+	const path = await import('path');
+	const { fileURLToPath } = await import('url');
+	const dirname = fileURLToPath(new URL('.', import.meta.url));
+	const buf = fs.readFileSync(path.join(dirname, '../../../../test-patches/EmptyPatch.pch2'));
+	const fileBytes = new Uint8Array(buf);
+	let ofs = 0;
+	while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
+	const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
+	const rawHex = Array.from(fileBytes.slice(ofs + 3))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+	return { name, rawHex };
 }
 
 describe('_applyPatchOutput — malformed binary', () => {
@@ -118,18 +137,7 @@ describe('edited flag', () => {
 	});
 
 	it('_applyPatchOutput clears the edited flag once a fresh parse completes', async () => {
-		const fs = await import('fs');
-		const path = await import('path');
-		const { fileURLToPath } = await import('url');
-		const dirname = fileURLToPath(new URL('.', import.meta.url));
-		const buf = fs.readFileSync(path.join(dirname, '../../../../test-patches/EmptyPatch.pch2'));
-		const fileBytes = new Uint8Array(buf);
-		let ofs = 0;
-		while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
-		const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
-		const rawHex = Array.from(fileBytes.slice(ofs + 3))
-			.map((b) => b.toString(16).padStart(2, '0'))
-			.join('');
+		const { name, rawHex } = await loadFixture();
 
 		const store = useSlotsStore();
 		store.slots['A'].edited = true;
@@ -258,6 +266,176 @@ describe('undo() clears the dirty flag once the stack is empty', () => {
 		await store.undo(); // back to 'Mid' — one earlier entry (Old → Mid) still in the stack
 		expect(store.slots['A'].name).toBe('Mid');
 		expect(store.isSlotEdited('A')).toBe(true);
+	});
+});
+
+describe('_applyPatchOutput / loadSlot — preserveHistory', () => {
+	it('preserveHistory=true keeps undo history and the dirty flag (hardware-echo resync after our own edit)', async () => {
+		const { name, rawHex } = await loadFixture();
+		const store = useSlotsStore();
+		const hist = useHistoryStore();
+
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		// Simulate having just made a structural edit: dirty, one undo entry recorded, and the
+		// edit's own _markSlotDirty already nulled rawHex — exactly the state a real add/move/
+		// delete-module action leaves behind right before the hardware's version-change echo arrives.
+		store.slots['A'].edited = true;
+		hist.record('A', { undo: async () => {}, redo: async () => {} });
+		store.slots['A'].rawHex = null;
+
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }), true);
+
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(hist.canUndo('A')).toBe(true);
+	});
+
+	it('preserveHistory=false (default) clears undo history and the dirty flag (genuine fresh load)', async () => {
+		const { name, rawHex } = await loadFixture();
+		const store = useSlotsStore();
+		const hist = useHistoryStore();
+
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		store.slots['A'].edited = true;
+		hist.record('A', { undo: async () => {}, redo: async () => {} });
+		store.slots['A'].rawHex = null;
+
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+
+		expect(store.isSlotEdited('A')).toBe(false);
+		expect(hist.canUndo('A')).toBe(false);
+	});
+
+	it('loadSlot forwards preserveHistory to _applyPatchOutput', async () => {
+		const { name, rawHex } = await loadFixture();
+		const store = useSlotsStore();
+		const hist = useHistoryStore();
+		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(JSON.stringify({ slot: 'A', name, data: rawHex }));
+
+		await store.loadSlot('A');
+		store.slots['A'].edited = true;
+		hist.record('A', { undo: async () => {}, redo: async () => {} });
+		store.slots['A'].rawHex = null;
+
+		await store.loadSlot('A', true);
+
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(hist.canUndo('A')).toBe(true);
+	});
+});
+
+// Offline mode (no daemon/device): window.cli.run/runBatch reject immediately. Before the fix,
+// these actions pushed to hardware BEFORE calling hist.record — an unguarded rejection aborted
+// the function early, so the edit never made it into the undo stack even though the local patch
+// mutation had already happened.
+describe('module add/move/delete record undo even when the CLI/hardware call fails (offline)', () => {
+	function moduleStub(index: number) {
+		return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	}
+
+	beforeEach(() => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+	});
+
+	it('addModule records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.addModule(5, 1, 0, 0, 'voice');
+
+		expect(patch.areas[1].modules.some((m: any) => m.index === 1)).toBe(true);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('dropModuleWithCollision (drag-from-palette / QuickAddModule add) records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.dropModuleWithCollision(5, 0, 0, 'voice', patch.areas[1].modules);
+
+		expect(patch.areas[1].modules).toHaveLength(1);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('moveModulesWithCollision records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleStub(1)];
+		store.slots['A'].patch = patch;
+
+		await store.moveModulesWithCollision([1], 1, 0, 'voice', patch.areas[1].modules);
+
+		expect(patch.areas[1].modules[0].horiz).toBe(1);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('deleteSelection records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleStub(1)];
+		store.slots['A'].patch = patch;
+
+		await store.deleteSelection([1], [], 'voice', patch.areas[1].modules, patch.areas[1].cableList);
+
+		expect(patch.areas[1].modules).toHaveLength(0);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('deleteModule records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleStub(1)];
+		store.slots['A'].patch = patch;
+
+		await store.deleteModule(1, 'voice');
+
+		expect(patch.areas[1].modules).toHaveLength(0);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+});
+
+describe('cable add/color/delete record undo even when the CLI/hardware call fails (offline)', () => {
+	beforeEach(() => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+	});
+
+	it('addCable records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', 1);
+
+		expect(patch.areas[1].cableList).toHaveLength(1);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('setCableColor records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].cableList = [{ colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 }];
+		store.slots['A'].patch = patch;
+
+		await store.setCableColor(2, 0, 'input', 5, 'voice');
+
+		expect(patch.areas[1].cableList[0].colour).toBe(5);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it('deleteConnectedCables records undo despite a rejected CLI call', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].cableList = [{ colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 }];
+		store.slots['A'].patch = patch;
+
+		await store.deleteConnectedCables(2, 0, 'input', 'voice');
+
+		expect(patch.areas[1].cableList).toHaveLength(0);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
 	});
 });
 

@@ -1,11 +1,30 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
+import { useHistoryStore } from '@/store/history';
 import { useSlotEvents } from '../useSlotEvents';
 
 beforeEach(() => {
 	setActivePinia(createPinia());
 });
+
+// Loads a real, parseable fixture as {name, rawHex} for tests that need loadSlot()'s
+// 'get-patch' response to survive a full reparse.
+async function loadFixture(): Promise<{ name: string; rawHex: string }> {
+	const fs = await import('fs');
+	const path = await import('path');
+	const { fileURLToPath } = await import('url');
+	const dirname = fileURLToPath(new URL('.', import.meta.url));
+	const buf = fs.readFileSync(path.join(dirname, '../../../../test-patches/EmptyPatch.pch2'));
+	const fileBytes = new Uint8Array(buf);
+	let ofs = 0;
+	while (ofs < fileBytes.length && fileBytes[ofs] !== 0) ofs++;
+	const name = new TextDecoder().decode(fileBytes.slice(0, ofs));
+	const rawHex = Array.from(fileBytes.slice(ofs + 3))
+		.map((b) => b.toString(16).padStart(2, '0'))
+		.join('');
+	return { name, rawHex };
+}
 
 function seedVariation() {
 	const store = useSlotsStore();
@@ -49,5 +68,28 @@ describe('useSlotEvents — hardware-driven dirty marking', () => {
 
 		expect(store.slots['A'].name).toBe('Renamed');
 		expect(store.isSlotEdited('A')).toBe(true);
+	});
+});
+
+describe('useSlotEvents — hardware-echo resync preserves undo/dirty state', () => {
+	it('patch_version_change followed by resources_used reloads with preserveHistory (undo/dirty survive)', async () => {
+		const { name, rawHex } = await loadFixture();
+		const store = useSlotsStore();
+		const hist = useHistoryStore();
+		const { handleEvent } = useSlotEvents(() => {});
+
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		// Simulate the state left behind right after a real add/move/delete-module action:
+		// dirty, one undo entry recorded, rawHex nulled by that action's own _markSlotDirty.
+		store.slots['A'].edited = true;
+		hist.record('A', { undo: async () => {}, redo: async () => {} });
+		store.slots['A'].rawHex = null;
+		(globalThis as any).window = { cli: { run: vi.fn().mockResolvedValue(JSON.stringify({ slot: 'A', name, data: rawHex })) } };
+
+		await handleEvent({ type: 'patch_version_change', slot: 'A', version: 5 });
+		await handleEvent({ type: 'resources_used', slot: 'A', data: Array(29).fill(0) });
+
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(hist.canUndo('A')).toBe(true);
 	});
 });

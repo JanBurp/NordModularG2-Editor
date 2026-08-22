@@ -155,7 +155,10 @@ export function useSlotEvents(log: LogFn) {
 				slotsStore.updateResources(sl, ev.data);
 				if (pendingSlotReload.has(sl)) {
 					pendingSlotReload.delete(sl);
-					slotsStore.loadSlot(sl);
+					// This reload is triggered by our own structural edit bumping the G2's patch
+					// version (add/move/delete module, cable changes, etc.) — preserve undo history
+					// and the dirty flag, which the edit that caused this already set correctly.
+					slotsStore.loadSlot(sl, true);
 				}
 			}
 			log('←', 'Watch', `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`);
