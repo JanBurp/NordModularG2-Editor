@@ -8,11 +8,22 @@
 		<!-- Track (KnobSlider) - click and hold to repeat inc/dec -->
 		<use href="#KnobSlider" width="10" height="62" @mousedown="onTrackMouseDown" @touchstart.passive="onTrackMouseDown" />
 
+		<!-- Morph range span, only for the currently selected group's assignment -->
+		<rect
+			v-if="morphRange !== undefined"
+			width="10"
+			:y="Math.min(levelShiftY, rangeTargetShiftY)"
+			:height="Math.abs(rangeTargetShiftY - levelShiftY) + 6"
+			:fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'"
+			opacity="0.5"
+			pointer-events="none"
+		/>
+
 		<!-- Handle -->
 		<rect
 			width="10"
 			height="6"
-			fill="#666"
+			:fill="morphColor === 'red' ? '#e0303c' : morphColor === 'blue' ? '#4a63c8' : '#666'"
 			:transform="`translate(0, ${levelShiftY})`"
 			@mousedown="onDragMouseDown"
 			@touchstart.passive="onDragMouseDown"
@@ -28,12 +39,15 @@
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
+	import { clamp } from '../../utils/math';
 
 	const props = defineProps<{
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
 		highlight?: boolean;
+		morphColor?: 'red' | 'blue' | null;
+		morphRange?: number;
 	}>();
 
 	const emit = defineEmits<{
@@ -61,6 +75,11 @@
 
 	const levelShiftY = computed(() => {
 		return ((127 - props.value) / 127) * 42;
+	});
+
+	const rangeTargetShiftY = computed(() => {
+		const target = clamp(props.value + (props.morphRange ?? 0), 0, 127);
+		return ((127 - target) / 127) * 42;
 	});
 </script>
 <style scoped>

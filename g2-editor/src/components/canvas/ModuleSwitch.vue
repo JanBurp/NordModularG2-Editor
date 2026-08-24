@@ -103,6 +103,9 @@
 			</g>
 		</template>
 
+		<!-- Morph Group assignment indicator: red = assigned to the selected group, blue = another group -->
+		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'" pointer-events="none" />
+
 		<!-- Selected param underline -->
 		<rect v-if="highlight" x="0" y="12" :width="width" height="2" fill="white" pointer-events="none" />
 	</g>
@@ -118,6 +121,7 @@
 		paramIndex: number;
 		label?: ParamLabel;
 		highlight?: boolean;
+		morphColor?: 'red' | 'blue' | null;
 	}>();
 
 	const emit = defineEmits<{

@@ -55,6 +55,19 @@ export interface PatchParamVariation {
 	octaves: number;
 	morphDials: number[];
 	morphModes: number[];
+	morphAssignments: MorphAssignment[];
+}
+
+// Assigns a module parameter to one of the 8 Morph Groups with a signed range. A param may be
+// assigned to several groups at once (several entries, same location/moduleIndex/paramIndex,
+// different groupIndex). Range is never 0 once assigned — see nmg2PatchParser.ts's MORPH_PARAMS
+// section for why (the real G2 binary format deletes a record when its range hits 0).
+export interface MorphAssignment {
+	groupIndex: number; // 0-7
+	location: 0 | 1; // 0=FX, 1=Voice
+	moduleIndex: number;
+	paramIndex: number;
+	range: number; // signed, -127..127
 }
 
 export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [

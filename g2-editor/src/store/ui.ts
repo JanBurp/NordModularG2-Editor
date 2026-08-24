@@ -30,6 +30,7 @@ export const useUiStore = defineStore('ui', {
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
+		selectedMorphGroup: 0 as number, // 0-7, which Morph Group toolbar knob is currently selected
 		showSvgViewer: false as boolean,
 		showKeyCommandsPage: false as boolean,
 		cableShakeCount: 0 as number,
@@ -98,6 +99,10 @@ export const useUiStore = defineStore('ui', {
 
 		clearSelectedParam() {
 			this.selectedParam = null;
+		},
+
+		setSelectedMorphGroup(i: number) {
+			this.selectedMorphGroup = Math.max(0, Math.min(7, i));
 		},
 
 		toggleSvgViewer() {

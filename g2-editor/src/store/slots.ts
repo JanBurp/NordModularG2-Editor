@@ -1,4 +1,4 @@
-import type { MidiCCAssignment, ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
+import type { MidiCCAssignment, ModuleInstance, MorphAssignment, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
@@ -125,8 +125,13 @@ function deepCloneVariationState(v: VariationState): VariationState {
 	return {
 		fx: Object.fromEntries(Object.entries(v.fx).map(([k, arr]) => [k, [...arr]])),
 		voice: Object.fromEntries(Object.entries(v.voice).map(([k, arr]) => [k, [...arr]])),
-		// PatchParamVariation has only two array fields; shallow spread handles the rest
-		patch: { ...v.patch, morphDials: [...v.patch.morphDials], morphModes: [...v.patch.morphModes] },
+		// PatchParamVariation has three array fields; shallow spread handles the rest
+		patch: {
+			...v.patch,
+			morphDials: [...v.patch.morphDials],
+			morphModes: [...v.patch.morphModes],
+			morphAssignments: v.patch.morphAssignments.map((a) => ({ ...a })),
+		},
 	};
 }
 
@@ -1725,6 +1730,179 @@ export const useSlotsStore = defineStore('slots', {
 			sendCoalesced(`${slot}:patch:1:${param}:${variation}`, ['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
+		getMorphAssignments(slot: SlotLabel, variation: number): MorphAssignment[] {
+			return this.slots[slot]?.variations?.[variation]?.patch.morphAssignments ?? [];
+		},
+
+		// A param may be assigned to several morph groups at once, so this only dedupes on the exact
+		// (groupIndex, location, moduleIndex, paramIndex) tuple, unlike assignMidiCC's dedupe-by-cc.
+		async assignParamToMorphGroup(
+			slot: SlotLabel,
+			variation: number,
+			groupIndex: number,
+			location: 0 | 1,
+			moduleIndex: number,
+			paramIndex: number,
+			range: number,
+		): Promise<void> {
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const isSame = (a: MorphAssignment) =>
+				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
+			const prevAssignments = patch.morphAssignments;
+			patch.morphAssignments = [...prevAssignments.filter((a) => !isSame(a)), { groupIndex, location, moduleIndex, paramIndex, range }];
+			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						const v2 = this.slots[slot]?.variations?.[variation];
+						if (v2) v2.patch.morphAssignments = prevAssignments;
+						this.slots[slot].rawHex = null;
+						// TODO(morph-cli, deferred): resync hardware once an `assign-morph`/`deassign-morph`
+						// CLI command exists, mirroring assignMidiCC's undo (above).
+					},
+					redo: async () => {
+						await this.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex, range);
+					},
+				});
+			}
+			// TODO(morph-cli, deferred): no `assign-morph` CLI command exists yet. When added, mirror
+			// assignMidiCC:
+			//   const deviceStore = useDeviceStore();
+			//   if (deviceStore.status === DeviceStatus.Connected)
+			//     await window.cli.run(['assign-morph', slot, String(groupIndex), location === 0 ? 'fx' : 'va', String(moduleIndex), String(paramIndex), String(range), String(variation)]);
+		},
+
+		async deassignParamFromMorphGroup(
+			slot: SlotLabel,
+			variation: number,
+			groupIndex: number,
+			location: 0 | 1,
+			moduleIndex: number,
+			paramIndex: number,
+		): Promise<void> {
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const prevAssignments = patch.morphAssignments;
+			patch.morphAssignments = prevAssignments.filter(
+				(a) => !(a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex),
+			);
+			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						const v2 = this.slots[slot]?.variations?.[variation];
+						if (v2) v2.patch.morphAssignments = prevAssignments;
+						this.slots[slot].rawHex = null;
+						// TODO(morph-cli, deferred): resync hardware, mirrors deassignMidiCC's undo.
+					},
+					redo: async () => {
+						await this.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex);
+					},
+				});
+			}
+			// TODO(morph-cli, deferred): mirror deassignMidiCC once a `deassign-morph` CLI command exists.
+		},
+
+		async setMorphAssignmentRange(
+			slot: SlotLabel,
+			variation: number,
+			groupIndex: number,
+			location: 0 | 1,
+			moduleIndex: number,
+			paramIndex: number,
+			range: number,
+		): Promise<void> {
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const idx = patch.morphAssignments.findIndex(
+				(a) => a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex,
+			);
+			if (idx === -1) return; // not assigned — caller must assign first
+			const prevRange = patch.morphAssignments[idx].range;
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const cKey = `morphrange:${variation}:${groupIndex}:${location}:${moduleIndex}:${paramIndex}`;
+				const box = { initial: prevRange, latest: range };
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							await this.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIndex, paramIndex, box.initial);
+						},
+						redo: async () => {
+							await this.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIndex, paramIndex, box.latest);
+						},
+					},
+					cKey,
+					box,
+				);
+			}
+
+			const list = patch.morphAssignments;
+			patch.morphAssignments = [...list.slice(0, idx), { ...list[idx], range }, ...list.slice(idx + 1)];
+			this.slots[slot].rawHex = null;
+			// TODO(morph-cli, deferred): a real-time drag should use sendCoalesced(...) (see setMorphParam),
+			// once a `set-morph-range` CLI command exists.
+		},
+
+		// Deassigns everything from one morph group (toolbar right-click "Clear").
+		async clearMorphGroup(slot: SlotLabel, variation: number, groupIndex: number): Promise<void> {
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const prevAssignments = patch.morphAssignments;
+			patch.morphAssignments = prevAssignments.filter((a) => a.groupIndex !== groupIndex);
+			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						const v2 = this.slots[slot]?.variations?.[variation];
+						if (v2) v2.patch.morphAssignments = prevAssignments;
+						this.slots[slot].rawHex = null;
+					},
+					redo: async () => {
+						await this.clearMorphGroup(slot, variation, groupIndex);
+					},
+				});
+			}
+			// TODO(morph-cli, deferred): batch `deassign-morph` calls once implemented.
+		},
+
+		// Copies all assignments+ranges from one morph group to another, replacing the destination
+		// group's existing assignments (toolbar right-click "Copy To | Group X").
+		async copyMorphGroup(slot: SlotLabel, variation: number, fromGroupIndex: number, toGroupIndex: number): Promise<void> {
+			if (fromGroupIndex === toGroupIndex) return;
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const prevAssignments = patch.morphAssignments;
+			const copied = prevAssignments.filter((a) => a.groupIndex === fromGroupIndex).map((a) => ({ ...a, groupIndex: toGroupIndex }));
+			patch.morphAssignments = [...prevAssignments.filter((a) => a.groupIndex !== toGroupIndex), ...copied];
+			this.slots[slot].rawHex = null;
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						const v2 = this.slots[slot]?.variations?.[variation];
+						if (v2) v2.patch.morphAssignments = prevAssignments;
+						this.slots[slot].rawHex = null;
+					},
+					redo: async () => {
+						await this.copyMorphGroup(slot, variation, fromGroupIndex, toGroupIndex);
+					},
+				});
+			}
+			// TODO(morph-cli, deferred): batch `assign-morph` calls for `copied`.
+		},
+
 		async setPatchParam(variation: number, key: keyof PatchParamVariation, value: number): Promise<void> {
 			const slot = useUiStore().slotInFocus;
 			const entry = this.slots[slot];
@@ -1751,7 +1929,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 
 			if (entry?.variations?.[variation]) {
-				(entry.variations[variation].patch as Record<keyof PatchParamVariation, number | number[]>)[key] = value;
+				(entry.variations[variation].patch as Record<keyof PatchParamVariation, number | number[] | MorphAssignment[]>)[key] = value;
 				this._markSlotDirty(slot);
 			}
 			const paramIdx = PATCH_PARAM_KEYS.indexOf(key);

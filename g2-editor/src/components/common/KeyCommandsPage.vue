@@ -85,9 +85,19 @@
 			],
 		},
 		{
+			title: 'Morph Groups',
+			rows: [
+				{ keys: ['⌃ Click'], action: 'Assign / deassign parameter to selected Morph Group' },
+				{ keys: ['⌃ Drag'], action: 'Set morph range (assigned knob/slider)' },
+				{ keys: ['⌃ ↑', '⌃ ↓'], action: 'Nudge morph range of selected parameter' },
+			],
+		},
+		{
 			title: 'Overlays',
 			rows: [
 				{ keys: ['F5'], action: 'Show parameter values (hold)' },
+				{ keys: ['F6'], action: 'Show morph ranges (hold)' },
+				{ keys: ['F7'], action: 'Show morph group assignments (hold)' },
 				{ keys: ['F8'], action: 'Show Midi CC assignments (hold)' },
 			],
 		},

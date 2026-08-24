@@ -10,6 +10,7 @@ import path from "node:path";
 import fs from "node:fs";
 import os from "node:os";
 import { spawn, type ChildProcess } from "child_process";
+import { loadWindowState, trackWindowState } from "./windowState";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -34,9 +35,12 @@ const cliPath = app.isPackaged
 
 function createWindow() {
 	const headless = process.env.HEADLESS === '1';
+	const state = loadWindowState();
 	win = new BrowserWindow({
-		width: 800,
-		height: 600,
+		width: state?.width ?? 800,
+		height: state?.height ?? 600,
+		x: state?.x,
+		y: state?.y,
 		show: !headless,
 		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
@@ -47,9 +51,11 @@ function createWindow() {
 	});
 
 	if (!headless) {
-		win.maximize();
+		if (state?.isMaximized ?? true) win.maximize();
 		win.show();
 	}
+
+	trackWindowState(win);
 
 	if (VITE_DEV_SERVER_URL) {
 		win.loadURL(VITE_DEV_SERVER_URL);
