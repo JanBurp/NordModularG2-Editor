@@ -332,10 +332,11 @@ interface WrittenSets {
 	m5a: Set<number>;
 	m5b: Set<number>;
 	m60: boolean;
+	wroteText: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false };
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false };
 }
 
 /**
@@ -398,6 +399,7 @@ function processSection(
 		w.m60 = true;
 	} else if (type === SectionType.SEPARATOR) {
 		out.push(writeTextPad(patch.text ?? ''));
+		w.wroteText = true;
 	} else {
 		// Preserve verbatim: perf data (PERF_DATA), unknown sections
 		out.push(verbatim);
@@ -429,6 +431,13 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	}
 	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 		out.push(writeControllers(patch.controllers));
+	}
+	// The main hardware get-patch response never includes a text-pad section (notes are
+	// fetched separately via GET_PATCH_TEXT and merged only into patch.text) — so for any
+	// patch loaded from hardware, the template never has one to replace. Append it, same
+	// fallback pattern as controllers above.
+	if (!w.wroteText && patch.text) {
+		out.push(writeTextPad(patch.text));
 	}
 	return buildRawHex(out);
 }

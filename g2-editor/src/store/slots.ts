@@ -252,6 +252,7 @@ interface SlotEntry {
 	assignedVoices: number;
 	controllers: MidiCCAssignment[];
 	edited: boolean; // true when the slot has unsaved edits since last load/save
+	textDirty: boolean; // true when patch notes have been edited but not yet pushed to the device
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -275,6 +276,7 @@ export const useSlotsStore = defineStore('slots', {
 				assignedVoices: 0,
 				controllers: [],
 				edited: false,
+				textDirty: false,
 			},
 			B: {
 				name: '',
@@ -288,6 +290,7 @@ export const useSlotsStore = defineStore('slots', {
 				assignedVoices: 0,
 				controllers: [],
 				edited: false,
+				textDirty: false,
 			},
 			C: {
 				name: '',
@@ -301,6 +304,7 @@ export const useSlotsStore = defineStore('slots', {
 				assignedVoices: 0,
 				controllers: [],
 				edited: false,
+				textDirty: false,
 			},
 			D: {
 				name: '',
@@ -314,6 +318,7 @@ export const useSlotsStore = defineStore('slots', {
 				assignedVoices: 0,
 				controllers: [],
 				edited: false,
+				textDirty: false,
 			},
 		} as Record<SlotLabel, SlotEntry>,
 		performanceName: '',
@@ -1290,6 +1295,27 @@ export const useSlotsStore = defineStore('slots', {
 			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
 		},
 
+		// Shared by saveSlot/pushPatchToDevice: builds the .pch2 byte layout
+		// ([nameBytes][0x00][0x17][0x00][sectionBytes]), re-serializing from templateRawHex only
+		// if the cache was invalidated by an edit since the last serialize (or if forceReserialize
+		// is set — see pushPatchToDevice: rawHex fetched straight from hardware via get-patch/
+		// slot_data has NO trailing CRC (g2_get_patch's patch_usb_to_pch2 strips it on read), while
+		// rawHex produced by serializePatch/buildRawHex DOES append one. g2_upload_patch always
+		// strips the file's last 2 bytes assuming they're that CRC — uploading a cached,
+		// never-locally-reserialized rawHex silently truncates 2 real bytes of patch data on the
+		// device. forceReserialize bypasses the cache so the CRC-appending path always runs.
+		async _buildPchBytes(entry: SlotEntry, forceReserialize = false): Promise<number[]> {
+			if (!entry.rawHex || forceReserialize) {
+				if (!entry.templateRawHex) throw new Error('No template rawHex to serialize from');
+				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
+				entry.patch!.controllers = [...entry.controllers];
+				entry.rawHex = serializePatch(entry.name, entry.patch!, entry.templateRawHex, entry.variations ?? []);
+			}
+			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
+			return [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+		},
+
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
 			const entry = this.slots[slot];
 			if (!entry?.patch) return;
@@ -1300,18 +1326,36 @@ export const useSlotsStore = defineStore('slots', {
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			if (!entry.rawHex) {
-				if (!entry.templateRawHex) return;
-				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
-				entry.patch.controllers = [...entry.controllers];
-				entry.rawHex = serializePatch(entry.name, entry.patch, entry.templateRawHex, entry.variations ?? []);
-			}
-			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
-			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			if (!entry.rawHex && !entry.templateRawHex) return;
+			const data = await this._buildPchBytes(entry);
 			await window.electronAPI.savePatch(path, data);
 			this.slotFilePaths[slot] = path;
 			entry.edited = false;
+		},
+
+		// Pushes the slot's current in-memory patch to the connected device via a full re-upload —
+		// the only way patch notes reach hardware live (see setPatchText's comment). Writes a temp
+		// file named after the patch (g2_upload_patch derives the on-device name from the filename)
+		// and reuses uploadingFromFile so this never races usePatchFile.ts's own upload-patch calls.
+		async pushPatchToDevice(slot: SlotLabel): Promise<boolean> {
+			const entry = this.slots[slot];
+			if (!entry?.patch) return false;
+			if (!entry.textDirty) return false; // nothing to push — never re-upload an untouched slot
+			if (useDeviceStore().status !== DeviceStatus.Connected) return false;
+			if (this.uploadingFromFile) return false;
+			this.uploadingFromFile = true;
+			try {
+				const bytes = await this._buildPchBytes(entry, true);
+				const tempPath = await window.electronAPI.writeTempPatch(entry.name, bytes);
+				await window.cli.run(['upload-patch', slot, tempPath]);
+				entry.textDirty = false;
+				return true;
+			} catch (err) {
+				console.error(`Push notes to G2 failed for slot ${slot}:`, err);
+				return false;
+			} finally {
+				this.uploadingFromFile = false;
+			}
 		},
 
 		async moveModulesWithCollision(
@@ -1616,12 +1660,15 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Local edit only — the G2 protocol has no live "set patch notes" command (confirmed
-		// against the official editor: only a read exists). Notes reach the device embedded
-		// in a full patch write (upload-patch / Save), same as patch description already does.
-		setPatchText(text: string): void {
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot, patch } = ctx;
+		// against three independent sources, including a real hang on actual hardware). Notes
+		// reach the device via a full patch re-upload — see `pushPatchToDevice`, triggered by
+		// TextPane.vue when the notes pane loses visibility or via its explicit "Save now" button,
+		// same approach chrispurusha/G2-Edit uses. Takes an explicit slot (not the currently-focused
+		// one) so a slot switch right after a keystroke can't write a stale edit into the wrong slot.
+		setPatchText(slot: SlotLabel, text: string): void {
+			const entry = this.slots[slot];
+			const patch = entry?.patch;
+			if (!patch) return;
 			const prevText = patch.text ?? '';
 			if (prevText === text) return;
 			const hist = useHistoryStore();
@@ -1630,8 +1677,8 @@ export const useSlotsStore = defineStore('slots', {
 				hist.record(
 					slot,
 					{
-						undo: async () => this.setPatchText(box.initial as string),
-						redo: async () => this.setPatchText(box.latest as string),
+						undo: async () => this.setPatchText(slot, box.initial as string),
+						redo: async () => this.setPatchText(slot, box.latest as string),
 					},
 					`text:${slot}`,
 					box,
@@ -1639,6 +1686,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			patch.text = text;
 			this._markSlotDirty(slot);
+			entry.textDirty = true;
 		},
 
 		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {

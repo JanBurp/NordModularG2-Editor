@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
+import { useDeviceStore, DeviceStatus } from '@/store/device';
 
 beforeEach(() => {
 	setActivePinia(createPinia());
@@ -195,7 +196,7 @@ describe('undo/redo coverage for text, name, and description fields', () => {
 		patch.text = 'hello';
 		store.slots['A'].patch = patch;
 
-		store.setPatchText('hello world');
+		store.setPatchText('A', 'hello world');
 		expect(patch.text).toBe('hello world');
 
 		await store.undo();
@@ -203,6 +204,24 @@ describe('undo/redo coverage for text, name, and description fields', () => {
 
 		await store.redo();
 		expect(patch.text).toBe('hello world');
+	});
+
+	it('setPatchText targets the given slot regardless of which slot is focused (slot-switch race fix)', () => {
+		const store = useSlotsStore();
+		const patchA = makePatch();
+		patchA.text = 'A original';
+		const patchB = makePatch();
+		patchB.text = 'B original';
+		store.slots['A'].patch = patchA;
+		store.slots['B'].patch = patchB;
+		// uiStore.slotInFocus defaults to 'A', but we're explicitly targeting 'B' —
+		// simulates a debounced commit firing after the user already switched away from B.
+		store.setPatchText('B', 'B edited');
+
+		expect(patchB.text).toBe('B edited');
+		expect(patchA.text).toBe('A original');
+		expect(store.slots['B'].textDirty).toBe(true);
+		expect(store.slots['A'].textDirty).toBe(false);
 	});
 
 	it('setPatchName participates in undo/redo and marks the slot edited', async () => {
@@ -436,6 +455,75 @@ describe('cable add/color/delete record undo even when the CLI/hardware call fai
 
 		expect(patch.areas[1].cableList).toHaveLength(0);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+});
+
+describe('pushPatchToDevice', () => {
+	function seedDirtyPatch() {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+		// Simulates rawHex cached straight from hardware (get-patch/slot_data) — NO trailing CRC,
+		// since g2_get_patch's patch_usb_to_pch2 strips it on read. templateRawHex is what a real
+		// hardware load always sets alongside it.
+		store.slots['A'].rawHex = '00'.repeat(20);
+		store.slots['A'].templateRawHex = '00'.repeat(20);
+		store.slots['A'].textDirty = true;
+		return store;
+	}
+
+	it('pushes via upload-patch, always force-reserializing rather than trusting a cached rawHex that may lack the CRC upload-patch expects', async () => {
+		const store = seedDirtyPatch();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/Test.pch2') };
+		const runSpy = (globalThis as any).window.cli.run;
+		const serializeSpy = vi.spyOn(await import('@/parser/nmg2PatchSerializer'), 'serializePatch').mockReturnValue('ab'.repeat(20) + 'cdef');
+
+		const result = await store.pushPatchToDevice('A');
+
+		expect(result).toBe(true);
+		expect(serializeSpy).toHaveBeenCalled(); // re-serialized despite rawHex already being cached/non-null
+		expect(store.slots['A'].rawHex).toBe('ab'.repeat(20) + 'cdef'); // cache updated with the CRC-safe result
+		expect(store.slots['A'].textDirty).toBe(false);
+		expect(runSpy).toHaveBeenCalledWith(['upload-patch', 'A', '/tmp/g2-notes-x/Test.pch2']);
+	});
+
+	it('no-ops when the slot is not dirty — never re-upload an untouched slot', async () => {
+		const store = seedDirtyPatch();
+		store.slots['A'].textDirty = false;
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.pushPatchToDevice('A');
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-patch']));
+	});
+
+	it('no-ops (stays dirty) when not connected', async () => {
+		const store = seedDirtyPatch();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.pushPatchToDevice('A');
+
+		expect(result).toBe(false);
+		expect(store.slots['A'].textDirty).toBe(true);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+
+	it('no-ops (stays dirty) when an upload is already in flight', async () => {
+		const store = seedDirtyPatch();
+		useDeviceStore().status = DeviceStatus.Connected;
+		store.uploadingFromFile = true;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.pushPatchToDevice('A');
+
+		expect(result).toBe(false);
+		expect(store.slots['A'].textDirty).toBe(true);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 });
 

@@ -204,13 +204,12 @@ int g2_set_patch_name(int slot, const char *name);
 /* Patch description: slot 0-3, pre-encoded bitstream bytes */
 int g2_set_patch_description(int slot, const uint8_t *data, int len);
 
-/* EXPERIMENTAL — patch notes ("Text Pad") live SET, slot 0-3, raw text bytes.
- * A prior standalone 0x6f send hung the G2 (see project memory); this retries
- * with a trailing terminator byte, the one structural lead found comparing
- * against the confirmed-working 0x21 (description) send. CLI-only on purpose
- * (not wired into daemon.c/the Electron app) — test manually, one call at a
- * time, ready to power-cycle the G2 if it hangs again. */
-int g2_set_patch_notes(int slot, const uint8_t *data, int len);
+/* No g2_set_patch_notes(): confirmed (twice, both hanging the G2) there is no standalone live
+ * SET for patch notes in the real protocol — notes only ever reach hardware embedded in a full
+ * patch write (see g2_upload_patch / set-patch-description's own comment). Three independent
+ * sources agree: the decompiled official editor, the Delphi reference, and chrispurusha/G2-Edit
+ * (a real, hardware-tested community editor) all only ever send 0x6f as part of a full patch
+ * dump/upload, never standalone. Do not reintroduce a standalone attempt. */
 
 /* Voice mode/count: slot 0-3. These call g2_get_patch internally (read-modify-write);
  * use set-patch-description directly when an editor has the patch loaded. */

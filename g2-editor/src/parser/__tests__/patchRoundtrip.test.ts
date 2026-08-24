@@ -718,6 +718,22 @@ function extractSection(rawHex: string, targetType: number): string | null {
 	return null;
 }
 
+// Removes every section of a given type from rawHex, keeping the trailing CRC bytes as-is
+// (their validity doesn't matter — serializePatch never checks the template's own CRC).
+function removeSection(rawHex: string, targetType: number): string {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const out: number[] = [];
+	let ofs = 0;
+	while (ofs < bytes.length - 2) {
+		const type = bytes[ofs];
+		const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+		if (type !== targetType) out.push(...bytes.slice(ofs, ofs + 3 + siz));
+		ofs += 3 + siz;
+	}
+	out.push(...bytes.slice(bytes.length - 2));
+	return out.map((b) => b.toString(16).padStart(2, '0')).join('');
+}
+
 // ── prf2 tests ────────────────────────────────────────────────────────────────
 
 describe('prf2 round-trip: parse → serializePerformance → parse', () => {
@@ -898,6 +914,29 @@ describe('patch text round-trip: parse → serialize → parse', () => {
 		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 
 		expect(extractSection(newHex, 0x6f)).toBe('6f0000');
+	});
+
+	it('adds a text-pad section when the template has none (hardware get-patch case)', () => {
+		// The main hardware get-patch response never includes a 0x6f section — notes are
+		// fetched separately and merged only into patch.text. Simulate that template shape.
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const templateNoText = removeSection(rawHex, 0x6f);
+		expect(extractSection(templateNoText, 0x6f)).toBeNull();
+
+		patch.text = 'Notes added after loading from hardware';
+		const newHex = serializePatch(name, patch, templateNoText, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.text).toBe(patch.text);
+	});
+
+	it('adds no text-pad section when the template has none and text is empty', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const templateNoText = removeSection(rawHex, 0x6f);
+		patch.text = '';
+
+		const newHex = serializePatch(name, patch, templateNoText, extractVariations(patch));
+		expect(extractSection(newHex, 0x6f)).toBeNull();
 	});
 });
 
