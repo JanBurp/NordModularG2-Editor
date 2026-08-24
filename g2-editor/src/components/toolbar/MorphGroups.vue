@@ -19,13 +19,12 @@
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
 					<span class="text-xs mb-1">{{ name }}</span>
-					<div class="knob-frame" :class="{ selected: uiStore.selectedMorphGroup === i }" @click="uiStore.setSelectedMorphGroup(i)">
-						<Knob
-							:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
-							:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
-							@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
-						/>
-					</div>
+					<Knob
+						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
+						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
+						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
+						@click="uiStore.setSelectedMorphGroup(i)"
+					/>
 					<MorphSourceSelect
 						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
 						:morph-idx="i"
@@ -49,7 +48,6 @@
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
-	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarBigLabel from './ToolBarBigLabel.vue';
 
 	const slotsStore = useSlotsStore();
@@ -105,14 +103,3 @@
 		slotsStore.assignMidiCC(slot, 2, 1, morphIdx, data.cc);
 	}
 </script>
-
-<style scoped>
-	.knob-frame {
-		padding: 2px 4px;
-		border-radius: 2px;
-		cursor: pointer;
-	}
-	.knob-frame.selected {
-		background-color: #fff;
-	}
-</style>
