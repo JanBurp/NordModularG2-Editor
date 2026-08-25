@@ -1,5 +1,5 @@
 <template>
-	<div class="flex flex-col gap-0.5" :style="{ width: pickerWidthPx + 'px' }">
+	<ToolBarGroup class="flex flex-col gap-0.5" :style="{ width: pickerWidthPx + 'px' }">
 		<div class="grid grid-cols-8 gap-px">
 			<button
 				v-for="cat in categories"
@@ -15,7 +15,7 @@
 				{{ cat }}
 			</button>
 		</div>
-		<div class="flex items-center gap-1 h-7 overflow-x-auto">
+		<div class="flex items-center gap-1 h-7 overflow-x-auto bg-surface-0">
 			<template v-for="m in modules" :key="m.id">
 				<img
 					v-if="graphics[m.id]"
@@ -38,7 +38,7 @@
 				</div>
 			</template>
 		</div>
-	</div>
+	</ToolBarGroup>
 </template>
 
 <script setup lang="ts">
@@ -48,6 +48,7 @@
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { useModuleDragSource } from '../../composables/useModuleDragSource';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
+	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const settings = useSettingsStore();
 	const { graphics } = useModuleGraphics();

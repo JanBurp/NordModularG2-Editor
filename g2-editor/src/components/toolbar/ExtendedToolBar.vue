@@ -1,7 +1,7 @@
 <template>
 	<ToolBar v-if="patchName">
 		<ModulePicker class="ml-13" />
-		<MorphGroups class="ml-4" />
+		<MorphGroups />
 
 		<span class="ml-auto"></span>
 		<ToolBarLabel>Patch Level:</ToolBarLabel>

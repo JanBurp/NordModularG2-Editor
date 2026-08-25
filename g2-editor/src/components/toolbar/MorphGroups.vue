@@ -1,6 +1,5 @@
 <template>
-	<ToolBarBigLabel>Morph Groups</ToolBarBigLabel>
-	<div class="morph-groups-panel flex flex-col items-center px-2 py-0.5">
+	<ToolBarGroup class="flex flex-col items-center">
 		<div class="flex items-center gap-2">
 			<template v-for="(name, i) in MORPH_NAMES" :key="i">
 				<div
@@ -33,7 +32,7 @@
 				</div>
 			</template>
 		</div>
-	</div>
+	</ToolBarGroup>
 </template>
 
 <script setup lang="ts">
@@ -48,7 +47,8 @@
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
-	import ToolBarBigLabel from './ToolBarBigLabel.vue';
+	import ToolBarLabel from './ToolBarLabel.vue';
+	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
