@@ -5,7 +5,7 @@
 				v-for="cat in categories"
 				:key="cat"
 				type="button"
-				class="text-[10px] leading-none px-1 h-5 truncate cursor-pointer border-b-2"
+				class="text-xs leading-none px-1 h-5 truncate cursor-pointer border-b-2"
 				:class="cat === selectedCategory ? 'bg-surface-1' : 'bg-surface-3 text-content-primary hover:bg-surface-3'"
 				:style="{
 					borderBottomColor: getCategoryColor(cat),

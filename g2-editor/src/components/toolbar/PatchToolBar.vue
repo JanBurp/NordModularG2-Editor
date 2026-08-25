@@ -36,19 +36,13 @@
 			{{ confirmMessage }}
 		</Dialog>
 
-		<ColorPicker />
+		<ToolBarDivider />
+
+		<PatchLevel />
 
 		<ToolBarDivider />
 
 		<CableVisibilitySelector />
-
-		<ToolBarDivider />
-		<Button variant="default" size="small" :disabled="!canUndo" @click="slotsStore.undo()" title="Undo (⌘Z)">
-			<Icon name="undo" class="w-3.5 h-3.5" />
-		</Button>
-		<Button variant="default" size="small" :disabled="!canRedo" @click="slotsStore.redo()" title="Redo (⇧⌘Z)">
-			<Icon name="redo" class="w-3.5 h-3.5" />
-		</Button>
 	</ToolBar>
 </template>
 
@@ -62,13 +56,10 @@
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
 	import Select from '../common/Select.vue';
-	import ColorPicker from '../common/ColorPicker.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
-	import Button from './Button.vue';
-	import Icon from '../common/Icon.vue';
+	import PatchLevel from './PatchLevel.vue';
 	import Dialog from '../common/Dialog.vue';
 	import { useSlotsStore } from '../../store/slots';
-	import { useHistoryStore } from '../../store/history';
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
@@ -81,11 +72,7 @@
 	}>();
 
 	const slotsStore = useSlotsStore();
-	const historyStore = useHistoryStore();
 	const uiStore = useUiStore();
-
-	const canUndo = computed(() => historyStore.canUndo(uiStore.slotInFocus));
-	const canRedo = computed(() => historyStore.canRedo(uiStore.slotInFocus));
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 

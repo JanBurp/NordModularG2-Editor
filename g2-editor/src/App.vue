@@ -25,8 +25,6 @@
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
-				<ToolBarDivider />
-				<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 			</template>
 
 			<button class="status-badge ml-auto" :class="device.statusClass" data-testid="connection-status" @click="toggleConnection">
@@ -181,7 +179,6 @@
 	import { useContextMenu } from './composables/useContextMenu';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
-	import CPU from './components/toolbar/CPU.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
