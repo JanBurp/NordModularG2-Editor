@@ -104,6 +104,10 @@ body {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
 }
 
+.btn-group-item-vertical {
+	@apply rounded-none m-0 first:rounded-t last:rounded-b not-first:border-t-0;
+}
+
 .btn-cable-select {
 	@apply border-line-subtle!;
 }

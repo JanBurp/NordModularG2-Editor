@@ -1,47 +1,55 @@
 <template>
 	<ToolBar>
 		<ToolBarLabel>Param<br />Pages:</ToolBarLabel>
-		<BtnGroup
-			:model-value="uiStore.displayedParamPage"
-			:options="pageOptions"
-			variant="toggle"
-			testIdPrefix="param-page"
-			@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
-		/>
-		<BtnGroup
-			:model-value="uiStore.selectedParamBank + 1"
-			:options="bankOptions"
-			variant="variation"
-			testIdPrefix="param-bank"
-			@update:model-value="(v) => uiStore.setSelectedParamBank((v as number) - 1)"
-		/>
-
-		<ToolBarDivider />
-
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-4">
 			<div
 				v-for="cell in cells"
 				:key="cell.slotIndex"
-				class="flex flex-col items-center w-14"
+				class="flex flex-col items-center w-16 gap-1"
 				:draggable="altHeld"
 				@dragstart="onCellDragStart(cell, $event)"
 				@dragover.prevent
 				@drop="onDrop(cell.slotIndex, $event)"
 				@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			>
-				<span class="text-[10px] w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
+				<span class="text-xs w-full truncate text-center font-bold" :class="{ 'opacity-40': !cell.assignment }">
 					{{ cell.assignment ? cell.moduleLabel : '—' }}
 				</span>
+
 				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
 				<div v-else class="w-8 h-8 rounded-full border border-line-default opacity-40 my-1" />
-				<span class="text-[10px] w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
+
+				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
 					{{ cell.assignment ? cell.paramLabel : '—' }}
 				</span>
-				<span class="text-[10px] text-content-secondary w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
+
+				<span class="text-xs text-content-secondary w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
 					{{ cell.assignment ? cell.valueLabel : '' }}
 				</span>
 			</div>
 		</div>
+
+		<ToolBarDivider></ToolBarDivider>
+
+		<div class="flex flex-col h-full">
+			<div class="grow">&nbsp;</div>
+			<BtnGroup
+				:model-value="uiStore.selectedParamBank + 1"
+				:options="bankOptions"
+				variant="variation"
+				testIdPrefix="param-bank"
+				@update:model-value="(v) => uiStore.setSelectedParamBank((v as number) - 1)"
+			/>
+		</div>
+
+		<BtnGroup
+			:model-value="uiStore.displayedParamPage"
+			:options="pageOptions"
+			variant="toggle"
+			vertical
+			testIdPrefix="param-page"
+			@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
+		/>
 	</ToolBar>
 </template>
 
