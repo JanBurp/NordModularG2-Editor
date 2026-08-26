@@ -1,5 +1,5 @@
 <template>
-	<span class="label text text-nowrap overflow-hidden text-ellipsis h-6" :class="bgColor">
+	<span class="text text-nowrap overflow-hidden text-ellipsis h-6 bg-input" :class="bgColor">
 		<slot></slot>
 	</span>
 </template>
@@ -26,8 +26,8 @@
 
 	const bgColor = computed(() => {
 		if (hasDefaultSlot.value) {
-			return 'bg-neutral-900';
+			return 'bg-input';
 		}
-		return 'bg-neutral-300';
+		return 'bg-input';
 	});
 </script>

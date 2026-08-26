@@ -4,12 +4,12 @@
 		:aria-checked="modelValue"
 		tabindex="0"
 		class="w-4 h-4 rounded-xs cursor-pointer flex items-center justify-center shrink-0"
-		:class="modelValue ? 'bg-green-600' : 'bg-surface-3'"
+		:class="modelValue ? 'bg-input' : 'bg-surface-3'"
 		v-bind="$attrs"
 		@click="toggle"
 		@keydown.space.prevent="toggle"
 	>
-		<svg v-if="modelValue" viewBox="0 0 10 8" class="w-2.5 h-2 fill-none stroke-white" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+		<svg v-if="modelValue" viewBox="0 0 10 8" class="w-2.5 h-2 fill-none stroke-black" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
 			<polyline points="1,4 4,7 9,1" />
 		</svg>
 	</div>

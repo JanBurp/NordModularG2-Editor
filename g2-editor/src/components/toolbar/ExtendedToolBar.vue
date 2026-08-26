@@ -2,20 +2,16 @@
 	<ToolBar v-if="patchName">
 		<ModulePicker class="ml-13" />
 
-		<ToolBarDivider></ToolBarDivider>
-
-		<div class="flex items-center flex-col gap-4">
+		<div class="flex items-center flex-col gap-4 ml-4">
 			<UndoRedo />
 			<ColorPicker />
 		</div>
 
-		<div class="flex flex-col gap-4 items-center">
+		<div class="flex flex-col gap-4 items-center ml-4">
 			<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 		</div>
 
-		<ToolBarDivider></ToolBarDivider>
-
-		<MorphGroups />
+		<MorphGroups class="ml-4" />
 
 		<span class="ml-auto"></span>
 	</ToolBar>

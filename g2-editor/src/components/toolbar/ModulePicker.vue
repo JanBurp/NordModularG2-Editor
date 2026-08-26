@@ -6,7 +6,7 @@
 				:key="cat"
 				type="button"
 				class="text-xs leading-none px-1 h-5 truncate cursor-pointer border-b-2"
-				:class="cat === selectedCategory ? 'bg-surface-1' : 'bg-surface-3 text-content-primary hover:bg-surface-3'"
+				:class="cat === selectedCategory ? 'bg-input text-black' : 'bg-surface-3 text-content-primary hover:bg-surface-3'"
 				:style="{
 					borderBottomColor: getCategoryColor(cat),
 				}"
@@ -15,7 +15,7 @@
 				{{ cat }}
 			</button>
 		</div>
-		<div class="flex items-center gap-1 h-7 overflow-x-auto bg-surface-0">
+		<div class="flex items-center gap-1 h-7 overflow-x-auto">
 			<template v-for="m in modules" :key="m.id">
 				<img
 					v-if="graphics[m.id]"

@@ -1,7 +1,7 @@
 // Per-category accent colors for the module picker, approximating the category-tab
 // underline colors used in the original Clavia G2 editor. Keys match ModuleDefinition.page.name.
 export const MODULE_CATEGORY_COLORS: Record<string, string> = {
-	'In/Out': '#4dd0c4',
+	'In/Out': '#535156',
 	Osc: '#d32f2f',
 	Rnd: '#2979ff',
 	Filter: '#00695c',

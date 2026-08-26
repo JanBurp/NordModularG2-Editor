@@ -6,7 +6,7 @@
 		<ToolBar>
 			<template v-if="device">
 				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
-				<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
+				<ToolBarText class="w-36 cursor-pointer" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
 				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
