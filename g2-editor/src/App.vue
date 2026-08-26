@@ -33,9 +33,14 @@
 			</button>
 		</ToolBar>
 
-		<ExtendedToolBar />
-		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
-		<ParameterPages />
+		<ExtendedToolBar v-if="settingsStore.showExtendedToolBar" />
+		<PatchToolBar
+			v-if="currentPatch"
+			:patch-name="patchName"
+			@variation-click="handleVariationClick"
+			@patch-name-click="() => openPatchNameDialog(patchName)"
+		/>
+		<ParameterPages v-if="currentPatch && settingsStore.showParamPages" />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden">

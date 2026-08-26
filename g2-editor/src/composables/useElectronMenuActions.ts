@@ -171,6 +171,12 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-text-panel':
 					useSettingsStore().toggleSidebar('text');
 					break;
+				case 'toggle-extended-toolbar':
+					useSettingsStore().toggleExtendedToolBar();
+					break;
+				case 'toggle-parameter-pages':
+					useSettingsStore().toggleParamPages();
+					break;
 				case 'show-key-commands':
 					uiStore.showKeyCommandsPage = true;
 					break;

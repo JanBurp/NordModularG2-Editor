@@ -15,6 +15,8 @@ export const useSettingsStore = defineStore('settings', {
 		cableThickness: 1 as number,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
+		showExtendedToolBar: true as boolean,
+		showParamPages: false as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
@@ -22,6 +24,12 @@ export const useSettingsStore = defineStore('settings', {
 		knobSensitivity: 1 as number,
 	}),
 	actions: {
+		toggleExtendedToolBar() {
+			this.showExtendedToolBar = !this.showExtendedToolBar;
+		},
+		toggleParamPages() {
+			this.showParamPages = !this.showParamPages;
+		},
 		toggleSidebar(tab: PaneTab) {
 			if (this.rightPaneTab === tab) {
 				this.showRightPane = !this.showRightPane;

@@ -1,6 +1,6 @@
 <template>
 	<ToolBar>
-		<ToolBarLabel>Param Pages:</ToolBarLabel>
+		<ToolBarLabel>Param<br />Pages:</ToolBarLabel>
 		<BtnGroup
 			:model-value="uiStore.displayedParamPage"
 			:options="pageOptions"
