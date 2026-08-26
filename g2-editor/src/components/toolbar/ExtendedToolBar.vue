@@ -1,5 +1,5 @@
 <template>
-	<ToolBar v-if="patchName">
+	<ToolBar>
 		<ModulePicker class="ml-13" />
 
 		<div class="flex items-center flex-col gap-4 ml-4">
