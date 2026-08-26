@@ -1,9 +1,9 @@
 <template>
 	<ToolBarGroup class="flex flex-col items-center">
-		<div class="flex items-center gap-2">
+		<div class="flex items-center gap-0">
 			<template v-for="(name, i) in MORPH_NAMES" :key="i">
 				<div
-					class="relative flex flex-col items-center"
+					class="relative flex flex-col items-center min-w-14"
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
 					@dragover.prevent
 					@drop="onMorphCCDrop(i, $event)"
@@ -23,6 +23,7 @@
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
 						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
+						class="mb-2"
 					/>
 					<MorphSourceSelect
 						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"

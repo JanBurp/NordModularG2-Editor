@@ -1,3 +1,3 @@
 <template>
-	<div class="w-px h-6 bg-surface-2"></div>
+	<div class="w-px h-6 transparent"></div>
 </template>
