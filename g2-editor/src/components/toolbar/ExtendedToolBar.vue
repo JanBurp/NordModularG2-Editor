@@ -33,9 +33,6 @@
 	import MorphGroups from './MorphGroups.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { usePatchFile } from '../../composables/usePatchFile';
-	import ToolBarDivider from './ToolBarDivider.vue';
-
-	defineProps<{ patchName: string }>();
 
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();

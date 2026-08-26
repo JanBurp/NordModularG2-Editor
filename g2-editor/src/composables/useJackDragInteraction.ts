@@ -1,10 +1,8 @@
 import { onUnmounted } from 'vue';
 import type { Ref } from 'vue';
-import { getModule } from '../renderer/nmg2mods';
-import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
 import { svgPath } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
-import { SNAP_RANGE, toSvgCoords, getJackSvgPos, updateSnapHighlight } from '../renderer/jackGeometry';
+import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
 import { useCableVisibility } from './useCableVisibility';
 import { useUiStore } from '../store/ui';
 import { matchesCableJack } from '../store/slotHelpers';
@@ -67,39 +65,18 @@ export function useJackDragInteraction(
 		if (!dragSrcInfo) return { jack: null, invalidNearby: false };
 		const src = dragSrcInfo;
 		const targetTypes: ('input' | 'output')[] = src.type === 'output' ? ['input'] : ['output', 'input'];
-		let bestDist = SNAP_RANGE;
-		let best: SnapJack | null = null;
-		let bestInvalidDist = SNAP_RANGE;
-		let invalidNearby = false;
-		for (const mod of getModules()) {
-			const modDef = getModule(mod.type);
-			if (!modDef) continue;
-			const baseX = mod.horiz * MODULE_WIDTH;
-			const baseY = mod.vert * MODULE_ROW_HEIGHT;
-			for (const targetType of targetTypes) {
-				const jacks = targetType === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
-				jacks.forEach((jack, idx) => {
-					const jx = jack.x + baseX;
-					const jy = jack.y + baseY;
-					const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
-					if (dist >= SNAP_RANGE) return;
-					const isSelf = mod.index === src.moduleIndex && idx === src.connectorIndex && targetType === src.type;
-					const isDrivenConflict = targetType === 'input' && src.type === 'output' && drivenNestJacks?.has(`${mod.index}-${idx}`);
-					if (isSelf || isDrivenConflict) {
-						if (dist < bestInvalidDist) {
-							bestInvalidDist = dist;
-							invalidNearby = true;
-						}
-						return;
-					}
-					if (dist < bestDist) {
-						bestDist = dist;
-						best = { moduleIndex: mod.index, connectorIndex: idx, type: targetType, colour: jack.colour, x: jx, y: jy };
-					}
-				});
-			}
-		}
-		return { jack: best, invalidNearby: invalidNearby && bestInvalidDist < bestDist };
+		return findNearestJack(
+			getModules,
+			mousePos,
+			targetTypes,
+			(candidate) => {
+				const isSelf = candidate.moduleIndex === src.moduleIndex && candidate.connectorIndex === src.connectorIndex && candidate.type === src.type;
+				const isDrivenConflict =
+					candidate.type === 'input' && src.type === 'output' && drivenNestJacks?.has(`${candidate.moduleIndex}-${candidate.connectorIndex}`);
+				return !isSelf && !isDrivenConflict;
+			},
+			(candidate, jackDef, x, y) => ({ ...candidate, colour: jackDef.colour, x, y }),
+		);
 	}
 
 	function previewPath(sx: number, sy: number, dx: number, dy: number): string {

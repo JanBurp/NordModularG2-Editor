@@ -6,7 +6,7 @@
 				:key="cat"
 				type="button"
 				class="text-xs leading-none px-1 h-5 truncate cursor-pointer border-b-2"
-				:class="cat === selectedCategory ? 'bg-input text-black' : 'bg-surface-3 text-content-primary hover:bg-surface-3'"
+				:class="cat === selectedCategory ? 'bg-input text-black' : 'bg-surface-3 text-content-primary hover:bg-surface-2'"
 				:style="{
 					borderBottomColor: getCategoryColor(cat),
 				}"
@@ -43,21 +43,16 @@
 
 <script setup lang="ts">
 	import { ref, computed } from 'vue';
-	import { getAllCategories, getModulesByCategory } from '../../renderer/nmg2mods';
-	import { useSettingsStore } from '../../store/settings';
+	import { getModulesByCategory } from '../../renderer/nmg2mods';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { useModuleDragSource } from '../../composables/useModuleDragSource';
+	import { useVisibleCategories } from '../../composables/useVisibleCategories';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
-	const settings = useSettingsStore();
 	const { graphics } = useModuleGraphics();
 	const { handleDragStart, handleDragEnd } = useModuleDragSource();
-
-	const categories = computed(() => {
-		const all = getAllCategories();
-		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
-	});
+	const { categories } = useVisibleCategories();
 
 	const selectedCategory = ref(categories.value[0]);
 

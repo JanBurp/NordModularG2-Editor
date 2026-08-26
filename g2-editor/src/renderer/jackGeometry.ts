@@ -24,6 +24,55 @@ export function getJackSvgPos(getModules: () => any[], info: { moduleIndex: numb
 	return { x: jack.x + mod.horiz * MODULE_WIDTH, y: jack.y + mod.vert * MODULE_ROW_HEIGHT };
 }
 
+type JackType = 'input' | 'output';
+type JackCandidate = { moduleIndex: number; connectorIndex: number; type: JackType };
+
+// Scans every jack of the given type(s) across all modules and reports the nearest one within
+// SNAP_RANGE that passes `isValid`, plus whether a same-scan candidate that FAILED validity sits
+// nearer than any valid one — drives the "not-allowed" cursor. Shared by useJackDragInteraction.ts
+// and useCableGrabInteraction.ts, whose snap-target searches differ only in which jack type(s) to
+// scan, what counts as a valid candidate, and what extra fields to attach to the result.
+export function findNearestJack<T extends { x: number; y: number }>(
+	getModules: () => any[],
+	mousePos: { x: number; y: number },
+	types: JackType[],
+	isValid: (candidate: JackCandidate) => boolean,
+	build: (candidate: JackCandidate, jackDef: any, x: number, y: number) => T,
+): { jack: T | null; invalidNearby: boolean } {
+	let bestDist = SNAP_RANGE;
+	let best: T | null = null;
+	let bestInvalidDist = SNAP_RANGE;
+	let invalidNearby = false;
+	for (const mod of getModules()) {
+		const modDef = getModule(mod.type);
+		if (!modDef) continue;
+		const baseX = mod.horiz * MODULE_WIDTH;
+		const baseY = mod.vert * MODULE_ROW_HEIGHT;
+		for (const type of types) {
+			const jacks = type === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
+			jacks.forEach((jackDef: any, idx: number) => {
+				const jx = jackDef.x + baseX;
+				const jy = jackDef.y + baseY;
+				const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
+				if (dist >= SNAP_RANGE) return;
+				const candidate: JackCandidate = { moduleIndex: mod.index, connectorIndex: idx, type };
+				if (!isValid(candidate)) {
+					if (dist < bestInvalidDist) {
+						bestInvalidDist = dist;
+						invalidNearby = true;
+					}
+					return;
+				}
+				if (dist < bestDist) {
+					bestDist = dist;
+					best = build(candidate, jackDef, jx, jy);
+				}
+			});
+		}
+	}
+	return { jack: best, invalidNearby: invalidNearby && bestInvalidDist < bestDist };
+}
+
 // Creates/moves/removes the snap-target highlight circle.
 export function updateSnapHighlight(svg: SVGElement, current: SVGCircleElement | null, snap: { x: number; y: number } | null): SVGCircleElement | null {
 	if (!snap) {

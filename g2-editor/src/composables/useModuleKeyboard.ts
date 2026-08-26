@@ -17,20 +17,27 @@ function closestByVert(modules: ModuleInstance[], targetVert: number): ModuleIns
 	return modules.reduce((best, m) => (Math.abs(m.vert - targetVert) < Math.abs(best.vert - targetVert) ? m : best));
 }
 
-function buildColumnMap(modules: ModuleInstance[]): { columns: Map<number, ModuleInstance[]>; sortedKeys: number[] } {
-	const columns = new Map<number, ModuleInstance[]>();
-	for (const m of modules) {
-		if (!columns.has(m.horiz)) columns.set(m.horiz, []);
-		columns.get(m.horiz)!.push(m);
-	}
-	const sortedKeys = Array.from(columns.keys()).sort((a, b) => a - b);
-	return { columns, sortedKeys };
-}
-
 export function useModuleKeyboard() {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 	const { showDialog } = useParamEditDialog();
+
+	// Module mutations always replace the area's `modules` array (see patchMutations.ts), so caching
+	// by reference is safe: it hits across repeated arrow-key navigation and invalidates automatically
+	// the moment the patch changes.
+	let columnMapCache: { modules: ModuleInstance[]; result: { columns: Map<number, ModuleInstance[]>; sortedKeys: number[] } } | null = null;
+	function buildColumnMap(modules: ModuleInstance[]): { columns: Map<number, ModuleInstance[]>; sortedKeys: number[] } {
+		if (columnMapCache?.modules === modules) return columnMapCache.result;
+		const columns = new Map<number, ModuleInstance[]>();
+		for (const m of modules) {
+			if (!columns.has(m.horiz)) columns.set(m.horiz, []);
+			columns.get(m.horiz)!.push(m);
+		}
+		const sortedKeys = Array.from(columns.keys()).sort((a, b) => a - b);
+		const result = { columns, sortedKeys };
+		columnMapCache = { modules, result };
+		return result;
+	}
 
 	function getModulesInArea(area: 0 | 1): ModuleInstance[] {
 		return slotsStore.getAreaModules(uiStore.slotInFocus, area) as ModuleInstance[];

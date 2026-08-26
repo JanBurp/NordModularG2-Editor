@@ -10,15 +10,15 @@
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import Knob from '../common/Knob.vue';
 	import CheckBox from '../common/CheckBox.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
+	import { usePatchParams } from '../../composables/usePatchParams';
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
-	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.slotInFocus));
+	const { patchParams } = usePatchParams();
 </script>

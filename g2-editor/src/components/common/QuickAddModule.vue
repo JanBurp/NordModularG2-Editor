@@ -28,15 +28,15 @@
 <script setup lang="ts">
 	import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 	import SearchInput from './SearchInput.vue';
-	import { getAllCategories, getModulesByCategory } from '../../renderer/nmg2mods';
-	import { useSettingsStore } from '../../store/settings';
+	import { getModulesByCategory } from '../../renderer/nmg2mods';
 	import { useAddModule } from '../../composables/useAddModule';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
+	import { useVisibleCategories } from '../../composables/useVisibleCategories';
 
 	const props = defineProps<{ x: number; y: number }>();
 	const emit = defineEmits<{ close: [] }>();
 
-	const settings = useSettingsStore();
+	const { categories } = useVisibleCategories();
 
 	const PANEL_W = 320; // w-80
 	const PANEL_H = 360; // search + list estimate
@@ -73,10 +73,7 @@
 		itemRefs.value[i] = el instanceof Element ? el : null;
 	}
 
-	const allModules = computed(() => {
-		const cats = settings.hidden_modules ? getAllCategories() : getAllCategories().filter((c) => c !== 'Hidden');
-		return cats.flatMap((cat) => getModulesByCategory(cat));
-	});
+	const allModules = computed(() => categories.value.flatMap((cat) => getModulesByCategory(cat)));
 
 	const filtered = computed(() => {
 		const q = query.value.toLowerCase().trim();

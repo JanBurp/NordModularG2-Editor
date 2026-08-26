@@ -36,7 +36,6 @@
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
 	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
@@ -47,7 +46,7 @@
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
-	import ToolBarLabel from './ToolBarLabel.vue';
+	import { usePatchParams } from '../../composables/usePatchParams';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const slotsStore = useSlotsStore();
@@ -56,7 +55,7 @@
 	const { open: openContextMenu } = useContextMenu();
 	const { showCCOverlay } = useMidiCCOverlay();
 
-	const patchParams = computed(() => slotsStore.getPatchParams(uiStore.slotInFocus));
+	const { patchParams } = usePatchParams();
 
 	function getMorphCC(morphIdx: number): number | null {
 		const slot = uiStore.slotInFocus;

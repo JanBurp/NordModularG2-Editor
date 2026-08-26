@@ -79,20 +79,18 @@
 	import { useAddModule } from '../../composables/useAddModule';
 	import { useListNav } from '../../composables/useListNav';
 	import { useModuleDragSource } from '../../composables/useModuleDragSource';
+	import { useVisibleCategories } from '../../composables/useVisibleCategories';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
 	const { helpHtml, loadHelp } = useModuleHelp();
 	const { addModuleAtMousePos } = useAddModule();
 	const { handleDragStart: handleModuleDragStart, handleDragEnd: handleModuleDragEnd } = useModuleDragSource();
+	const { categories } = useVisibleCategories();
 	const searchRef = ref();
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
-	const categories = computed(() => {
-		const all = getAllCategories();
-		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
-	});
 	const expandedCategories = ref(settings.categoriesExpanded ? getAllCategories() : []);
 	const preSearchExpandedCategories = ref<string[] | null>(null);
 	const searchQuery = ref('');

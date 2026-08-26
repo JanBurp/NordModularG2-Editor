@@ -16,6 +16,8 @@ import {
 	resolveColumnCollisions,
 	extractVariations,
 	removeModuleFromVariations,
+	runCliSafe,
+	runCliBatchSafe,
 } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
@@ -586,11 +588,7 @@ export const useSlotsStore = defineStore('slots', {
 								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
 							}
 							if (allCmds.length > 0) {
-								try {
-									await window.cli.runBatch(allCmds);
-								} catch (err) {
-									console.warn('deleteModule undo: CLI failed (offline?):', err);
-								}
+								await runCliBatchSafe(allCmds, 'deleteModule undo');
 							}
 						},
 						redo: async () => {
@@ -606,11 +604,7 @@ export const useSlotsStore = defineStore('slots', {
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
-			try {
-				await window.cli.run(['del-module', slot, location, String(moduleId)]);
-			} catch (err) {
-				console.warn('deleteModule: CLI failed (offline?):', err);
-			}
+			await runCliSafe(['del-module', slot, location, String(moduleId)], 'deleteModule');
 
 			return { name: slotEntry.name, rawHex: '', patch };
 		},
@@ -624,11 +618,7 @@ export const useSlotsStore = defineStore('slots', {
 			mutMoveModule(patch, areaIdx, moduleId, col, row);
 			this._markSlotDirty(slot);
 
-			try {
-				await window.cli.run(['move-module', slot, location, String(moduleId), String(col), String(row)]);
-			} catch (err) {
-				console.warn('moveModuleNoReload: CLI failed (offline?):', err);
-			}
+			await runCliSafe(['move-module', slot, location, String(moduleId), String(col), String(row)], 'moveModuleNoReload');
 		},
 
 		async addModule(
@@ -678,8 +668,8 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			this._markSlotDirty(slot);
 
-			try {
-				await window.cli.run([
+			await runCliSafe(
+				[
 					'add-module',
 					slot,
 					location,
@@ -693,10 +683,9 @@ export const useSlotsStore = defineStore('slots', {
 					String(numParams),
 					...paramVals.map(String),
 					uname,
-				]);
-			} catch (err) {
-				console.warn('addModule: CLI failed (offline?):', err);
-			}
+				],
+				'addModule',
+			);
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -1039,14 +1028,10 @@ export const useSlotsStore = defineStore('slots', {
 				recolorGroup(smod, scon, effectiveColor);
 			}
 
-			try {
-				if (recolorCmds.length > 0) {
-					await window.cli.runBatch([mainCmd, ...recolorCmds]);
-				} else {
-					await window.cli.run(mainCmd);
-				}
-			} catch (err) {
-				console.warn('addCable: CLI failed (offline?):', err);
+			if (recolorCmds.length > 0) {
+				await runCliBatchSafe([mainCmd, ...recolorCmds], 'addCable');
+			} else {
+				await runCliSafe(mainCmd, 'addCable');
 			}
 
 			// Recompute signal-rate uprate and recolor cables that changed rate (local display only).
@@ -1068,8 +1053,8 @@ export const useSlotsStore = defineStore('slots', {
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
 						this._markSlotDirty(slot);
-						try {
-							await window.cli.run([
+						await runCliSafe(
+							[
 								'del-cable',
 								slot,
 								location,
@@ -1079,10 +1064,9 @@ export const useSlotsStore = defineStore('slots', {
 								String(addedCable.dmod),
 								'0',
 								String(addedCable.dcon),
-							]);
-						} catch (err) {
-							console.warn('addCable undo: CLI failed (offline?):', err);
-						}
+							],
+							'addCable undo',
+						);
 						// Restore recolored cables
 						if (recoloredOrig.length > 0) {
 							patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
@@ -1116,11 +1100,7 @@ export const useSlotsStore = defineStore('slots', {
 									String(b.dcon),
 								]);
 							}
-							try {
-								await window.cli.runBatch(restoreCmds);
-							} catch (err) {
-								console.warn('addCable undo (recolor restore): CLI failed (offline?):', err);
-							}
+							await runCliBatchSafe(restoreCmds, 'addCable undo (recolor restore)');
 						}
 						// Re-sync uprate after undo so module flags and display are correct.
 						this._syncUprateAndColors(patch, areaIdx);
@@ -1438,11 +1418,7 @@ export const useSlotsStore = defineStore('slots', {
 				...targets.map((t) => ['move-module', slot, location, String(t.index), String(t.toCol), String(t.toRow)]),
 			];
 			if (cliCmds.length > 0) {
-				try {
-					await window.cli.runBatch(cliCmds);
-				} catch (err) {
-					console.warn('moveModulesWithCollision: CLI failed (offline?):', err);
-				}
+				await runCliBatchSafe(cliCmds, 'moveModulesWithCollision');
 			}
 
 			const hist = useHistoryStore();
@@ -1460,11 +1436,7 @@ export const useSlotsStore = defineStore('slots', {
 						}
 						this._markSlotDirty(slot);
 						if (undoCmds.length > 0) {
-							try {
-								await window.cli.runBatch(undoCmds);
-							} catch (err) {
-								console.warn('moveModulesWithCollision undo: CLI failed (offline?):', err);
-							}
+							await runCliBatchSafe(undoCmds, 'moveModulesWithCollision undo');
 						}
 					},
 					redo: async () => {
@@ -1743,6 +1715,31 @@ export const useSlotsStore = defineStore('slots', {
 			return this.slots[slot]?.variations?.[variation]?.patch.morphAssignments ?? [];
 		},
 
+		// Shared plumbing for assign/deassign/clear/copy below, which all replace the whole
+		// `morphAssignments` array in one step: mutates via `mutate`, marks the slot dirty, and (unless
+		// history is locked) records an undo that restores the previous array — CLI hardware resync is
+		// deferred until an assign-morph/deassign-morph/set-morph-range CLI command exists (see the
+		// per-action TODOs below) — plus a `redo` that replays the call.
+		_mutateMorphAssignments(slot: SlotLabel, variation: number, mutate: (prev: MorphAssignment[]) => MorphAssignment[], redo: () => Promise<void>): void {
+			const vState = this.slots[slot]?.variations?.[variation];
+			if (!vState) return;
+			const patch = vState.patch;
+			const prevAssignments = patch.morphAssignments;
+			patch.morphAssignments = mutate(prevAssignments);
+			this._markSlotDirty(slot);
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						const v2 = this.slots[slot]?.variations?.[variation];
+						if (v2) v2.patch.morphAssignments = prevAssignments;
+						this._markSlotDirty(slot);
+					},
+					redo,
+				});
+			}
+		},
+
 		// A param may be assigned to several morph groups at once, so this only dedupes on the exact
 		// (groupIndex, location, moduleIndex, paramIndex) tuple, unlike assignMidiCC's dedupe-by-cc.
 		async assignParamToMorphGroup(
@@ -1754,29 +1751,14 @@ export const useSlotsStore = defineStore('slots', {
 			paramIndex: number,
 			range: number,
 		): Promise<void> {
-			const vState = this.slots[slot]?.variations?.[variation];
-			if (!vState) return;
-			const patch = vState.patch;
 			const isSame = (a: MorphAssignment) =>
 				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
-			const prevAssignments = patch.morphAssignments;
-			patch.morphAssignments = [...prevAssignments.filter((a) => !isSame(a)), { groupIndex, location, moduleIndex, paramIndex, range }];
-			this.slots[slot].rawHex = null;
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				hist.record(slot, {
-					undo: async () => {
-						const v2 = this.slots[slot]?.variations?.[variation];
-						if (v2) v2.patch.morphAssignments = prevAssignments;
-						this.slots[slot].rawHex = null;
-						// TODO(morph-cli, deferred): resync hardware once an `assign-morph`/`deassign-morph`
-						// CLI command exists, mirroring assignMidiCC's undo (above).
-					},
-					redo: async () => {
-						await this.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex, range);
-					},
-				});
-			}
+			this._mutateMorphAssignments(
+				slot,
+				variation,
+				(prev) => [...prev.filter((a) => !isSame(a)), { groupIndex, location, moduleIndex, paramIndex, range }],
+				() => this.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex, range),
+			);
 			// TODO(morph-cli, deferred): no `assign-morph` CLI command exists yet. When added, mirror
 			// assignMidiCC:
 			//   const deviceStore = useDeviceStore();
@@ -1792,28 +1774,15 @@ export const useSlotsStore = defineStore('slots', {
 			moduleIndex: number,
 			paramIndex: number,
 		): Promise<void> {
-			const vState = this.slots[slot]?.variations?.[variation];
-			if (!vState) return;
-			const patch = vState.patch;
-			const prevAssignments = patch.morphAssignments;
-			patch.morphAssignments = prevAssignments.filter(
-				(a) => !(a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex),
+			this._mutateMorphAssignments(
+				slot,
+				variation,
+				(prev) =>
+					prev.filter(
+						(a) => !(a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex),
+					),
+				() => this.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex),
 			);
-			this.slots[slot].rawHex = null;
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				hist.record(slot, {
-					undo: async () => {
-						const v2 = this.slots[slot]?.variations?.[variation];
-						if (v2) v2.patch.morphAssignments = prevAssignments;
-						this.slots[slot].rawHex = null;
-						// TODO(morph-cli, deferred): resync hardware, mirrors deassignMidiCC's undo.
-					},
-					redo: async () => {
-						await this.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex);
-					},
-				});
-			}
 			// TODO(morph-cli, deferred): mirror deassignMidiCC once a `deassign-morph` CLI command exists.
 		},
 
@@ -1856,32 +1825,19 @@ export const useSlotsStore = defineStore('slots', {
 
 			const list = patch.morphAssignments;
 			patch.morphAssignments = [...list.slice(0, idx), { ...list[idx], range }, ...list.slice(idx + 1)];
-			this.slots[slot].rawHex = null;
+			this._markSlotDirty(slot);
 			// TODO(morph-cli, deferred): a real-time drag should use sendCoalesced(...) (see setMorphParam),
 			// once a `set-morph-range` CLI command exists.
 		},
 
 		// Deassigns everything from one morph group (toolbar right-click "Clear").
 		async clearMorphGroup(slot: SlotLabel, variation: number, groupIndex: number): Promise<void> {
-			const vState = this.slots[slot]?.variations?.[variation];
-			if (!vState) return;
-			const patch = vState.patch;
-			const prevAssignments = patch.morphAssignments;
-			patch.morphAssignments = prevAssignments.filter((a) => a.groupIndex !== groupIndex);
-			this.slots[slot].rawHex = null;
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				hist.record(slot, {
-					undo: async () => {
-						const v2 = this.slots[slot]?.variations?.[variation];
-						if (v2) v2.patch.morphAssignments = prevAssignments;
-						this.slots[slot].rawHex = null;
-					},
-					redo: async () => {
-						await this.clearMorphGroup(slot, variation, groupIndex);
-					},
-				});
-			}
+			this._mutateMorphAssignments(
+				slot,
+				variation,
+				(prev) => prev.filter((a) => a.groupIndex !== groupIndex),
+				() => this.clearMorphGroup(slot, variation, groupIndex),
+			);
 			// TODO(morph-cli, deferred): batch `deassign-morph` calls once implemented.
 		},
 
@@ -1889,26 +1845,15 @@ export const useSlotsStore = defineStore('slots', {
 		// group's existing assignments (toolbar right-click "Copy To | Group X").
 		async copyMorphGroup(slot: SlotLabel, variation: number, fromGroupIndex: number, toGroupIndex: number): Promise<void> {
 			if (fromGroupIndex === toGroupIndex) return;
-			const vState = this.slots[slot]?.variations?.[variation];
-			if (!vState) return;
-			const patch = vState.patch;
-			const prevAssignments = patch.morphAssignments;
-			const copied = prevAssignments.filter((a) => a.groupIndex === fromGroupIndex).map((a) => ({ ...a, groupIndex: toGroupIndex }));
-			patch.morphAssignments = [...prevAssignments.filter((a) => a.groupIndex !== toGroupIndex), ...copied];
-			this.slots[slot].rawHex = null;
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				hist.record(slot, {
-					undo: async () => {
-						const v2 = this.slots[slot]?.variations?.[variation];
-						if (v2) v2.patch.morphAssignments = prevAssignments;
-						this.slots[slot].rawHex = null;
-					},
-					redo: async () => {
-						await this.copyMorphGroup(slot, variation, fromGroupIndex, toGroupIndex);
-					},
-				});
-			}
+			this._mutateMorphAssignments(
+				slot,
+				variation,
+				(prev) => {
+					const copied = prev.filter((a) => a.groupIndex === fromGroupIndex).map((a) => ({ ...a, groupIndex: toGroupIndex }));
+					return [...prev.filter((a) => a.groupIndex !== toGroupIndex), ...copied];
+				},
+				() => this.copyMorphGroup(slot, variation, fromGroupIndex, toGroupIndex),
+			);
 			// TODO(morph-cli, deferred): batch `assign-morph` calls for `copied`.
 		},
 
@@ -2022,24 +1967,21 @@ export const useSlotsStore = defineStore('slots', {
 							return orig ? { ...c, colour: orig.colour, userColour: orig.userColour } : c;
 						});
 						this._markSlotDirty(slot);
-						try {
-							await window.cli.runBatch(
-								prevColorMap.map((b) => [
-									'set-cable-color',
-									slot,
-									location,
-									String(b.colour),
-									String(b.smod),
-									(b.dir ?? 1) === 0 ? '0' : '1',
-									String(b.scon),
-									String(b.dmod),
-									'0',
-									String(b.dcon),
-								]),
-							);
-						} catch (err) {
-							console.warn('setCableColor undo: CLI failed (offline?):', err);
-						}
+						await runCliBatchSafe(
+							prevColorMap.map((b) => [
+								'set-cable-color',
+								slot,
+								location,
+								String(b.colour),
+								String(b.smod),
+								(b.dir ?? 1) === 0 ? '0' : '1',
+								String(b.scon),
+								String(b.dmod),
+								'0',
+								String(b.dcon),
+							]),
+							'setCableColor undo',
+						);
 					},
 					redo: async () => {
 						await this.setCableColor(moduleIndex, connectorIndex, type, color, area);
@@ -2050,24 +1992,21 @@ export const useSlotsStore = defineStore('slots', {
 			// userColour marks this as an explicit user override so auto-recolor skips it.
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color, userColour: color } : c));
 			this._markSlotDirty(slot);
-			try {
-				await window.cli.runBatch(
-					matching.map((c) => [
-						'set-cable-color',
-						slot,
-						location,
-						String(color),
-						String(c.smod),
-						(c.dir ?? 1) === 0 ? '0' : '1',
-						String(c.scon),
-						String(c.dmod),
-						'0',
-						String(c.dcon),
-					]),
-				);
-			} catch (err) {
-				console.warn('setCableColor: CLI failed (offline?):', err);
-			}
+			await runCliBatchSafe(
+				matching.map((c) => [
+					'set-cable-color',
+					slot,
+					location,
+					String(color),
+					String(c.smod),
+					(c.dir ?? 1) === 0 ? '0' : '1',
+					String(c.scon),
+					String(c.dmod),
+					'0',
+					String(c.dcon),
+				]),
+				'setCableColor',
+			);
 		},
 
 		async deleteConnectedCables(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', area: 'voice' | 'fx'): Promise<void> {
@@ -2086,11 +2025,10 @@ export const useSlotsStore = defineStore('slots', {
 					undo: async () => {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
-						try {
-							await window.cli.runBatch(deletedCables.map((c) => addCableCmd(slot, location, c)));
-						} catch (err) {
-							console.warn('deleteConnectedCables undo: CLI failed (offline?):', err);
-						}
+						await runCliBatchSafe(
+							deletedCables.map((c) => addCableCmd(slot, location, c)),
+							'deleteConnectedCables undo',
+						);
 					},
 					redo: async () => {
 						await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
@@ -2100,11 +2038,10 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const c of matching) mutDeleteCable(patch, areaIdx, c);
 			this._markSlotDirty(slot);
-			try {
-				await window.cli.runBatch(matching.map((c) => delCableCmd(slot, location, c)));
-			} catch (err) {
-				console.warn('deleteConnectedCables: CLI failed (offline?):', err);
-			}
+			await runCliBatchSafe(
+				matching.map((c) => delCableCmd(slot, location, c)),
+				'deleteConnectedCables',
+			);
 			this._syncUprateAndColors(patch, areaIdx);
 		},
 
@@ -2130,11 +2067,7 @@ export const useSlotsStore = defineStore('slots', {
 						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
-						try {
-							await window.cli.runBatch([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)]);
-						} catch (err) {
-							console.warn('_swapCables undo: CLI failed (offline?):', err);
-						}
+						await runCliBatchSafe([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)], '_swapCables undo');
 						this._syncUprateAndColors(patch, areaIdx);
 					},
 					redo,
@@ -2145,11 +2078,7 @@ export const useSlotsStore = defineStore('slots', {
 			for (const c of newCables) mutAddCable(patch, areaIdx, { ...c });
 			this._markSlotDirty(slot);
 
-			try {
-				await window.cli.runBatch([...buildDelCmds(oldCables), ...buildAddCmds(newCables)]);
-			} catch (err) {
-				console.warn('_swapCables: CLI failed (offline?):', err);
-			}
+			await runCliBatchSafe([...buildDelCmds(oldCables), ...buildAddCmds(newCables)], '_swapCables');
 
 			this._syncUprateAndColors(patch, areaIdx);
 		},
@@ -2309,11 +2238,7 @@ export const useSlotsStore = defineStore('slots', {
 					}
 					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) {
-						try {
-							await window.cli.runBatch(cliCmds);
-						} catch (err) {
-							console.warn('deleteSelection: CLI failed (offline?):', err);
-						}
+						await runCliBatchSafe(cliCmds, 'deleteSelection');
 					}
 				} else if (selectedCables.length > 0) {
 					const cliCmds: string[][] = [];
@@ -2327,11 +2252,7 @@ export const useSlotsStore = defineStore('slots', {
 					}
 					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) {
-						try {
-							await window.cli.runBatch(cliCmds);
-						} catch (err) {
-							console.warn('deleteSelection: CLI failed (offline?):', err);
-						}
+						await runCliBatchSafe(cliCmds, 'deleteSelection');
 					}
 				}
 

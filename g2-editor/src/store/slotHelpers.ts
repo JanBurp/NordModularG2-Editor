@@ -116,3 +116,21 @@ export function resolvePasteRowOffset(modules: { vert: number; height: number }[
 	const maxBottom = Math.max(...modules.map((m) => m.vert + m.height));
 	return maxBottom - minRow;
 }
+
+// Pushing a mutation to hardware is always best-effort: the offline case (or a mid-command
+// disconnect) must not surface as an error, since the local edit already succeeded.
+export async function runCliSafe(cmd: string[], label: string): Promise<void> {
+	try {
+		await window.cli.run(cmd);
+	} catch (err) {
+		console.warn(`${label}: CLI failed (offline?):`, err);
+	}
+}
+
+export async function runCliBatchSafe(cmds: string[][], label: string): Promise<void> {
+	try {
+		await window.cli.runBatch(cmds);
+	} catch (err) {
+		console.warn(`${label}: CLI failed (offline?):`, err);
+	}
+}

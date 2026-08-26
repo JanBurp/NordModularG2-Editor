@@ -1,14 +1,12 @@
 import { onUnmounted } from 'vue';
 import type { Ref } from 'vue';
-import { getModule } from '../renderer/nmg2mods';
-import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
 import { makeCableKey, shiftCableEndpoint } from '../renderer/cableRenderer';
 import type { Cable } from '../renderer/cableRenderer';
 import { matchesCableJack, isCableSourceEnd, sameJack } from '../store/slotHelpers';
 import type { JackEnd } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
 import { useUiStore } from '../store/ui';
-import { SNAP_RANGE, toSvgCoords, getJackSvgPos, updateSnapHighlight } from '../renderer/jackGeometry';
+import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
 import { isGrabModifierPressed } from '../utils/platform';
 
 export type { JackEnd };
@@ -67,36 +65,7 @@ export function useCableGrabInteraction(
 	// Reports the nearest valid drop target within range, plus whether a same-type jack that FAILED
 	// validity (wrong nest state) sits nearer than any valid one — drives the "not-allowed" cursor.
 	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd): { jack: SnapEnd | null; invalidNearby: boolean } {
-		let bestDist = SNAP_RANGE;
-		let best: SnapEnd | null = null;
-		let bestInvalidDist = SNAP_RANGE;
-		let invalidNearby = false;
-		for (const mod of getModules()) {
-			const modDef = getModule(mod.type);
-			if (!modDef) continue;
-			const baseX = mod.horiz * MODULE_WIDTH;
-			const baseY = mod.vert * MODULE_ROW_HEIGHT;
-			const jacks = jack.type === 'input' ? (modDef.inputs ?? []) : (modDef.outputs ?? []);
-			jacks.forEach((j, idx) => {
-				const jx = j.x + baseX;
-				const jy = j.y + baseY;
-				const dist = Math.hypot(jx - mouseSvgPos.x, jy - mouseSvgPos.y);
-				if (dist >= SNAP_RANGE) return;
-				const candidate: JackEnd = { moduleIndex: mod.index, connectorIndex: idx, type: jack.type };
-				if (!isValidDropCandidate(candidate)) {
-					if (dist < bestInvalidDist) {
-						bestInvalidDist = dist;
-						invalidNearby = true;
-					}
-					return;
-				}
-				if (dist < bestDist) {
-					bestDist = dist;
-					best = { ...candidate, x: jx, y: jy };
-				}
-			});
-		}
-		return { jack: best, invalidNearby: invalidNearby && bestInvalidDist < bestDist };
+		return findNearestJack(getModules, mouseSvgPos, [jack.type], isValidDropCandidate, (candidate, _jackDef, x, y) => ({ ...candidate, x, y }));
 	}
 
 	// Snapshot each grabbed cable's rendered elements and current curve once, so the drag can shift them

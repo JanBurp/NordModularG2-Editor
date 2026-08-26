@@ -33,7 +33,7 @@
 			</button>
 		</ToolBar>
 
-		<ExtendedToolBar :patch-name="patchName" />
+		<ExtendedToolBar />
 		<PatchToolBar :patch-name="patchName" @variation-click="handleVariationClick" @patch-name-click="() => openPatchNameDialog(patchName)" />
 
 		<div class="flex-1 flex overflow-hidden">

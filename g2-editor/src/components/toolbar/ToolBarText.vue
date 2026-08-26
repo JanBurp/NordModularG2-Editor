@@ -1,33 +1,5 @@
 <template>
-	<span class="text text-nowrap overflow-hidden text-ellipsis h-6 bg-input" :class="bgColor">
+	<span class="text text-nowrap overflow-hidden text-ellipsis h-6 bg-input">
 		<slot></slot>
 	</span>
 </template>
-
-<script setup lang="ts">
-	import { computed, useSlots } from 'vue';
-
-	const slots = useSlots();
-
-	const hasDefaultSlot = computed(() => {
-		if (!slots.default) return true; // no slot provided -> treat as empty
-		const vnodes = slots.default() || [];
-		// consider empty if every vnode is a text node that's only whitespace
-		return (
-			vnodes.length === 0 ||
-			vnodes.every((vn) => {
-				// text nodes have type === Symbol(Text) or vnode.children is a string
-				const children = vn?.children;
-				if (typeof children === 'string') return children.trim() === '';
-				return false;
-			})
-		);
-	});
-
-	const bgColor = computed(() => {
-		if (hasDefaultSlot.value) {
-			return 'bg-input';
-		}
-		return 'bg-input';
-	});
-</script>
