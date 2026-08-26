@@ -65,7 +65,7 @@ body {
 }
 
 .btn {
-	@apply inline-flex items-center justify-center bg-surface-2 border border-line-default rounded text-content-primary font-normal focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-0 focus-visible:outline-none cursor-pointer;
+	@apply inline-flex items-center justify-center bg-surface-2 border border-line-subtle rounded text-content-primary font-normal focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-0 focus-visible:outline-none cursor-pointer hover:bg-surface-3;
 }
 
 .btn-default {
@@ -129,7 +129,7 @@ body {
 }
 
 .text {
-	@apply border border-black text-black inline-block px-1 py-1 text-center rounded-xs text-xs;
+	@apply border border-black text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
 }
 
 .selection-rect {
@@ -152,7 +152,7 @@ body {
 }
 
 .settings-input {
-	@apply w-full px-1 text-xs bg-input! border border-line-subtle text-black rounded-xs h-6 overflow-hidden text-ellipsis text-nowrap focus:outline-none focus:bg-surface-3 disabled:bg-surface-1 disabled:text-content-muted disabled:border-line-subtle disabled:cursor-not-allowed;
+	@apply w-full px-1 text-xs bg-surface-2! border border-line-subtle text-content-primary rounded-xs h-6 overflow-hidden text-ellipsis text-nowrap focus:outline-none focus:bg-surface-3 disabled:bg-surface-1 disabled:text-content-muted disabled:border-line-subtle disabled:cursor-not-allowed;
 }
 
 .settings-row {
