@@ -75,6 +75,8 @@ static void print_usage(const char *prog) {
     printf("  deassign-midicc <slot> <cc-num>                                                          Remove a MIDI CC assignment\n");
     printf("  assign-midicc-batch <slot> [<va|fx|patch> <mod> <par> <cc>]...                          Assign multiple MIDI CCs in one USB frame\n");
     printf("  deassign-midicc-batch <slot> <cc-num>...                                                Remove multiple MIDI CC assignments in one USB frame\n");
+    printf("  assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>                         Assign a parameter to a Parameter Page knob (0-119)\n");
+    printf("  deassign-knob <slot> <slot-index>                                                       Remove a Parameter Page knob assignment\n");
     printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
@@ -570,6 +572,31 @@ static int cmd_deassign_midicc_batch(int argc, char **argv, int i) {
     return ret;
 }
 
+static int cmd_assign_knob(int argc, char **argv, int i) {
+    if (i + 5 >= argc) {
+        fprintf(stderr, "Usage: assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>\n");
+        return 1;
+    }
+    int slot       = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "assign-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location   = parse_location_str(argv[i + 2]);
+    int mod_id     = atoi(argv[i + 3]);
+    int param      = atoi(argv[i + 4]);
+    int slot_index = atoi(argv[i + 5]);
+    return g2_assign_knob(slot, location, mod_id, param, slot_index);
+}
+
+static int cmd_deassign_knob(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: deassign-knob <slot> <slot-index>\n");
+        return 1;
+    }
+    int slot       = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "deassign-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int slot_index = atoi(argv[i + 2]);
+    return g2_deassign_knob(slot, slot_index);
+}
+
 static int cmd_set_morph_range(int argc, char **argv, int i) {
     if (i + 7 >= argc) {
         fprintf(stderr, "Usage: set-morph-range <slot> <fx|va> <module-id> <param-idx> <range> <group> <variation>\n");
@@ -861,6 +888,8 @@ static const cmd_entry_t commands[] = {
     { "deassign-midicc",       cmd_deassign_midicc       },
     { "assign-midicc-batch",   cmd_assign_midicc_batch   },
     { "deassign-midicc-batch", cmd_deassign_midicc_batch },
+    { "assign-knob",           cmd_assign_knob           },
+    { "deassign-knob",         cmd_deassign_knob         },
     { "set-morph-range",       cmd_set_morph_range       },
     { "set-morph-range-batch", cmd_set_morph_range_batch },
     { "set-param-label",  cmd_set_param_label  },

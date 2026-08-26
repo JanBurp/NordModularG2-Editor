@@ -1,4 +1,4 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment } from '@/types';
+import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment, ParamPageAssignment } from '@/types';
 import { SectionType } from './constants';
 
 // CRC-16 lookup table (same polynomial as parser)
@@ -359,6 +359,24 @@ function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
 	return makeSection(SectionType.CONTROLLERS, bw.flush());
 }
 
+// Mirrors parseKnobs (nmg2PatchParser.ts) exactly: fixed 120-slot array, presence bit per slot.
+function writeKnobs(knobs: ParamPageAssignment[]): Uint8Array {
+	const bySlot = new Map(knobs.map((k) => [k.slotIndex, k]));
+	const bw = new BitWriter();
+	bw.write(16, 120);
+	for (let slotIndex = 0; slotIndex < 120; slotIndex++) {
+		const k = bySlot.get(slotIndex);
+		bw.write(1, k ? 1 : 0);
+		if (k) {
+			bw.write(2, k.location);
+			bw.write(8, k.moduleIndex);
+			bw.write(2, k.isLed);
+			bw.write(7, k.paramIndex);
+		}
+	}
+	return makeSection(SectionType.KNOBS, bw.flush());
+}
+
 // Tracks which area sections have already been written (prevents duplicates within one slot).
 interface WrittenSets {
 	m4a: Set<number>;
@@ -368,11 +386,12 @@ interface WrittenSets {
 	m5b: Set<number>;
 	m60: boolean;
 	wroteText: boolean;
+	m62: boolean;
 	m65: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false, m65: false };
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false, m62: false, m65: false };
 }
 
 // True when any variation actually has morph-group assignment data worth writing.
@@ -438,6 +457,10 @@ function processSection(
 		const controllers = patch.controllers ?? [];
 		if (controllers.length > 0) out.push(writeControllers(controllers));
 		w.m60 = true;
+	} else if (type === SectionType.KNOBS && !w.m62) {
+		const knobs = patch.paramPages ?? [];
+		if (knobs.length > 0) out.push(writeKnobs(knobs));
+		w.m62 = true;
 	} else if (type === SectionType.MORPH_PARAMS && !w.m65) {
 		if (hasMorphAssignments(variations)) out.push(writeMorphParamSection(variations.map((v) => v.patch)));
 		w.m65 = true;
@@ -476,6 +499,9 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 		out.push(writeControllers(patch.controllers));
 	}
+	if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
+		out.push(writeKnobs(patch.paramPages));
+	}
 	// The main hardware get-patch response never includes a text-pad section (notes are
 	// fetched separately via GET_PATCH_TEXT and merged only into patch.text) — so for any
 	// patch loaded from hardware, the template never has one to replace. Append it, same
@@ -510,6 +536,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 				out.push(writeControllers(patch.controllers));
 			}
+			if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
+				out.push(writeKnobs(patch.paramPages));
+			}
 			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 			}
@@ -527,6 +556,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 	const lastPatch = patches[slotIdx] ?? patches[0];
 	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
 		out.push(writeControllers(lastPatch.controllers));
+	}
+	if (!w.m62 && lastPatch?.paramPages && lastPatch.paramPages.length > 0) {
+		out.push(writeKnobs(lastPatch.paramPages));
 	}
 	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));

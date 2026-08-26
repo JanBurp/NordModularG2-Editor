@@ -545,3 +545,79 @@ describe('assignedVoicesForSlot', () => {
 		expect(store.assignedVoicesForSlot('A')).toBe(0);
 	});
 });
+
+describe('assignParamToPage / deassignParamPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	it('assignParamToPage writes the record, marks the slot dirty, and records undo', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.assignParamToPage('A', 5, 1, 2, 0);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 }]);
+		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '0', '5']);
+	});
+
+	it('assigning into an occupied slot evicts the old occupant', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.assignParamToPage('A', 5, 0, 2, 3);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 2, paramIndex: 3, isLed: 0 }]);
+	});
+
+	it('assigning an already-assigned param moves it (old slotIndex cleared)', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.assignParamToPage('A', 9, 0, 1, 0);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 9, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('deassignParamPage removes the record and undo restores it', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.deassignParamPage('A', 5);
+		expect(store.slots['A'].paramPages).toEqual([]);
+
+		await store.undo();
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('undo/redo round-trip for assignParamToPage', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.undo();
+		expect(store.slots['A'].paramPages).toEqual([]);
+
+		await store.redo();
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('records undo despite a rejected CLI call (offline)', async () => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await expect(store.assignParamToPage('A', 5, 0, 1, 0)).rejects.toThrow();
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+});

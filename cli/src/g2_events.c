@@ -350,6 +350,14 @@ static void emit_embedded_event(const uint8_t *response) {
         return;
     }
 
+    /* S_ASSIGN_KNOB (0x25) / S_DEASSIGN_KNOB (0x26) echoes — sent when a Parameter Page knob is
+     * assigned/deassigned from the physical front panel — are not decoded yet: unlike morph_change
+     * (0x43) below, there's no confirmed response byte layout for these to copy (see
+     * g2-editor's Parameter Pages plan doc). They currently fall through to the "unknown" case at
+     * the bottom of this switch, which is deliberate — it dumps the raw response hex, useful for a
+     * hardware capture to determine the real layout. Add dedicated cases here (mirroring the
+     * "knob_assign_change" JSON shape useSlotEvents.ts expects) only once that capture confirms
+     * the byte offsets — do not guess them. */
     switch (subCmd) {
         case 0x40:
             if (response[5] == 2) {

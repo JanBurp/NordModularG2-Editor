@@ -85,6 +85,7 @@ function expectPatchEqual(a: Patch, b: Patch) {
 	expect(b.description).toEqual(a.description);
 	expect(b.patchParams).toEqual(a.patchParams);
 	expect(b.controllers ?? []).toEqual(a.controllers ?? []);
+	expect(b.paramPages ?? []).toEqual(a.paramPages ?? []);
 	expect(b.text ?? '').toEqual(a.text ?? '');
 }
 
@@ -942,6 +943,73 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
 		const patchWithout = parsePatchFromRawHex(name, hexWithout);
 		expect(patchWithout.controllers ?? []).toHaveLength(0);
+	});
+});
+
+describe('Parameter Pages round-trip: assign → serialize → parse', () => {
+	it('paramPages survive serialize → parse', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const assignments = [
+			{ slotIndex: 0, location: 1 as const, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 42, location: 0 as const, moduleIndex: 5, paramIndex: 1, isLed: 0 },
+			{ slotIndex: 119, location: 1 as const, moduleIndex: 1, paramIndex: 3, isLed: 0 },
+		];
+		patch.paramPages = assignments;
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.paramPages).toEqual(assignments);
+	});
+
+	it('paramPages survive file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [{ slotIndex: 8, location: 1 as const, moduleIndex: 1, paramIndex: 2, isLed: 0 }];
+
+		const savedHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedHex);
+
+		expect(patchB.paramPages).toEqual(patch.paramPages);
+	});
+
+	it('empty paramPages produces no 0x62 section', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [];
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+
+		expect(extractSection(newHex, 0x62)).toBeNull();
+	});
+
+	it('paramPages removed when deassigned', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [{ slotIndex: 16, location: 1 as const, moduleIndex: 3, paramIndex: 0, isLed: 0 }];
+
+		const hexWith = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchWith = parsePatchFromRawHex(name, hexWith);
+		expect(patchWith.paramPages).toHaveLength(1);
+
+		patchWith.paramPages = [];
+		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
+		const patchWithout = parsePatchFromRawHex(name, hexWithout);
+		expect(patchWithout.paramPages ?? []).toHaveLength(0);
+	});
+});
+
+describe('paramPages slot addressing helpers', () => {
+	it('slotIndexFor / slotIndexToBankPageKnob round-trip for all 120 slots', async () => {
+		const { slotIndexFor, slotIndexToBankPageKnob, BANK_COUNT, PAGE_COUNT, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } = await import('../../renderer/paramPages');
+		expect(BANK_COUNT * PAGE_COUNT * KNOBS_PER_PAGE).toBe(TOTAL_KNOB_SLOTS);
+		for (let bank = 0; bank < BANK_COUNT; bank++) {
+			for (let page = 0; page < PAGE_COUNT; page++) {
+				for (let knob = 0; knob < KNOBS_PER_PAGE; knob++) {
+					const slotIndex = slotIndexFor(bank, page, knob);
+					expect(slotIndex).toBeGreaterThanOrEqual(0);
+					expect(slotIndex).toBeLessThan(TOTAL_KNOB_SLOTS);
+					expect(slotIndexToBankPageKnob(slotIndex)).toEqual({ bank, page, knob });
+				}
+			}
+		}
 	});
 });
 

@@ -234,6 +234,12 @@ typedef struct { int location, module_id, param_idx, cc_num; } G2MidiCCEntry;
 int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count);
 int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
 
+/* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
+ * knob's address 0-119. Payload layout is inferred from the Delphi reference source, NOT bit-
+ * confirmed against a real USB capture — verify before relying on it for real hardware use. */
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index);
+int g2_deassign_knob(int slot, int slot_index);
+
 /* Morph group assignment (S_SET_MORPH_RANGE, 0x43). A param counts as assigned to
  * morph_group purely because range != 0 — setting range to 0 deassigns it. */
 int g2_set_morph_range(int slot, int location, int module_id, int param_idx,

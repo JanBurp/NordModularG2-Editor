@@ -1,4 +1,4 @@
-import type { MidiCCAssignment, ModuleInstance, MorphAssignment, Patch, PatchParamVariation, VariationState } from '@/types';
+import type { MidiCCAssignment, ModuleInstance, MorphAssignment, ParamPageAssignment, Patch, PatchParamVariation, VariationState } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
@@ -277,6 +277,7 @@ interface SlotEntry {
 	resources: SlotResources;
 	assignedVoices: number;
 	controllers: MidiCCAssignment[];
+	paramPages: ParamPageAssignment[];
 	edited: boolean; // true when the slot has unsaved edits since last load/save
 	textDirty: boolean; // true when patch notes have been edited but not yet pushed to the device
 }
@@ -301,6 +302,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				paramPages: [],
 				edited: false,
 				textDirty: false,
 			},
@@ -315,6 +317,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				paramPages: [],
 				edited: false,
 				textDirty: false,
 			},
@@ -329,6 +332,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				paramPages: [],
 				edited: false,
 				textDirty: false,
 			},
@@ -343,6 +347,7 @@ export const useSlotsStore = defineStore('slots', {
 				resources: emptySlotResources(),
 				assignedVoices: 0,
 				controllers: [],
+				paramPages: [],
 				edited: false,
 				textDirty: false,
 			},
@@ -418,6 +423,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].templateRawHex = rawHex;
 			this.slots[slot].patch = patch;
 			this.slots[slot].controllers = patch.controllers ? [...patch.controllers] : [];
+			this.slots[slot].paramPages = patch.paramPages ? [...patch.paramPages] : [];
 			this.slots[slot].variations = extractVariations(patch);
 			patch.mode = {
 				area: 1,
@@ -1238,6 +1244,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].variations = extractVariations(patch);
 			this.slots[slot].name = name;
 			this.slots[slot].controllers = patch.controllers ? [...patch.controllers] : [];
+			this.slots[slot].paramPages = patch.paramPages ? [...patch.paramPages] : [];
 			if (rawHex) {
 				this.slots[slot].rawHex = rawHex;
 				this.slots[slot].templateRawHex = rawHex;
@@ -1257,6 +1264,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].variations = extractVariations(patches[i]);
 				this.slots[labels[i]].name = slotName;
 				this.slots[labels[i]].controllers = patches[i].controllers ? [...patches[i].controllers!] : [];
+				this.slots[labels[i]].paramPages = patches[i].paramPages ? [...patches[i].paramPages!] : [];
 				// Per-slot rawHex is NOT set — prf2 serialization uses the full performance template
 				this.slots[labels[i]].rawHex = null;
 				this.slots[labels[i]].templateRawHex = null;
@@ -1283,7 +1291,10 @@ export const useSlotsStore = defineStore('slots', {
 			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
 				.map((s) => {
 					const e = this.slots[s];
-					if (e.patch) e.patch.controllers = [...e.controllers]; // sync edits (auto-CC, deletes) before serialize
+					if (e.patch) {
+						e.patch.controllers = [...e.controllers]; // sync edits (auto-CC, deletes) before serialize
+						e.patch.paramPages = [...e.paramPages];
+					}
 					return e.patch!;
 				})
 				.filter(Boolean);
@@ -1313,6 +1324,7 @@ export const useSlotsStore = defineStore('slots', {
 				if (!entry.templateRawHex) throw new Error('No template rawHex to serialize from');
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
 				entry.patch!.controllers = [...entry.controllers];
+				entry.patch!.paramPages = [...entry.paramPages];
 				entry.rawHex = serializePatch(entry.name, entry.patch!, entry.templateRawHex, entry.variations ?? []);
 			}
 			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
@@ -2483,6 +2495,105 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-midicc', slot, String(cc)]);
+		},
+
+		// Assigns a module parameter to a Parameter Page knob slot (0-119). Enforces two-way
+		// uniqueness like the real hardware/reference editor (BVE.NMG2Mess.pas's
+		// CreateAssignKnobMessage): if slotIndex already holds a different param, that old
+		// occupant is evicted; if this param already occupies a different slot, that old slot is
+		// cleared too. Both changes land in one undo entry.
+		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
+			const prev = [...this.slots[slot].paramPages];
+			const oldAtSlot = prev.find((k) => k.slotIndex === slotIndex);
+			const oldParamSlot = prev.find((k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex);
+			const next = prev.filter(
+				(k) => k.slotIndex !== slotIndex && !(k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex),
+			);
+			next.push({ slotIndex, location, moduleIndex, paramIndex, isLed: 0 });
+			this.slots[slot].paramPages = next;
+			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...next];
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].paramPages = prev;
+						this._markSlotDirty(slot);
+						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
+						const deviceStore = useDeviceStore();
+						if (deviceStore.status === DeviceStatus.Connected) {
+							await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
+							if (oldAtSlot) {
+								const locStr = morphLocationStr(oldAtSlot.location);
+								await window.cli.run([
+									'assign-knob',
+									slot,
+									locStr,
+									String(oldAtSlot.moduleIndex),
+									String(oldAtSlot.paramIndex),
+									String(slotIndex),
+								]);
+							}
+							if (oldParamSlot && oldParamSlot.slotIndex !== slotIndex) {
+								const locStr = morphLocationStr(oldParamSlot.location);
+								await window.cli.run([
+									'assign-knob',
+									slot,
+									locStr,
+									String(oldParamSlot.moduleIndex),
+									String(oldParamSlot.paramIndex),
+									String(oldParamSlot.slotIndex),
+								]);
+							}
+						}
+					},
+					redo: async () => {
+						await this.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex);
+					},
+				});
+			}
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected) {
+				const locStr = morphLocationStr(location);
+				await window.cli.run(['assign-knob', slot, locStr, String(moduleIndex), String(paramIndex), String(slotIndex)]);
+			}
+		},
+
+		async deassignParamPage(slot: SlotLabel, slotIndex: number): Promise<void> {
+			const prev = [...this.slots[slot].paramPages];
+			this.slots[slot].paramPages = prev.filter((k) => k.slotIndex !== slotIndex);
+			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...this.slots[slot].paramPages];
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						this.slots[slot].paramPages = prev;
+						this._markSlotDirty(slot);
+						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
+						const restored = prev.find((k) => k.slotIndex === slotIndex);
+						if (restored) {
+							const deviceStore = useDeviceStore();
+							if (deviceStore.status === DeviceStatus.Connected) {
+								const locStr = morphLocationStr(restored.location);
+								await window.cli.run([
+									'assign-knob',
+									slot,
+									locStr,
+									String(restored.moduleIndex),
+									String(restored.paramIndex),
+									String(slotIndex),
+								]);
+							}
+						}
+					},
+					redo: async () => {
+						await this.deassignParamPage(slot, slotIndex);
+					},
+				});
+			}
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
 		},
 
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {

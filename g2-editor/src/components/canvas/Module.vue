@@ -70,7 +70,14 @@
 
 		<!-- Parameters -->
 		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
-			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index" @mousedown.capture="onParamMorphMouseDown(index, $event)">
+			<g
+				v-for="(param, index) in moduleDef.params"
+				:key="param.name"
+				:data-param-index="index"
+				:draggable="altHeld"
+				@mousedown.capture="onParamMorphMouseDown(index, $event)"
+				@dragstart="onParamPageDragStart(index, $event)"
+			>
 				<ModuleKnob
 					v-if="isKnob(param.n)"
 					:param="param"
@@ -213,6 +220,7 @@
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { buildParamPageMenuItems, useAltHeld } from '../../composables/useParamPageAssign';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import ParamOverlay from './ParamOverlay.vue';
@@ -392,6 +400,7 @@
 	}
 
 	const { dragHint, startDrag } = useMorphRangeDrag();
+	const { altHeld } = useAltHeld();
 
 	// Same overlay component (ParamOverlay + its collision-avoiding layout) used by the MIDI CC and
 	// parameter-value hold-overlays, so the live range hint never sits on top of the parameter.
@@ -424,6 +433,15 @@
 				? undefined
 				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, range),
 		});
+	}
+
+	// Alt+drag a param onto a Parameter Pages toolbar knob slot to assign it (ParameterPages.vue's
+	// drop handler). Only reachable while altHeld is true (see :draggable on the param <g>).
+	function onParamPageDragStart(paramIndex: number, e: DragEvent) {
+		if (!e.dataTransfer) return;
+		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
+		e.dataTransfer.effectAllowed = 'copy';
+		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'param', location, moduleIndex: moduleIdx.value, paramIndex }));
 	}
 
 	function onParamCCDragOver(e: DragEvent) {
@@ -499,6 +517,22 @@
 				enabled: !!slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
+			}),
+		);
+		items.push({ type: 'separator' });
+
+		// Parameter Pages knob assign/deassign
+		const existingPage = slot
+			? slotsStore.slots[slot].paramPages.find((k) => k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex)
+			: undefined;
+		items.push(
+			...buildParamPageMenuItems({
+				slot,
+				bank: uiStore.selectedParamBank,
+				location: location as 0 | 1,
+				moduleIndex: moduleIdx.value,
+				paramIndex,
+				existing: existingPage,
 			}),
 		);
 

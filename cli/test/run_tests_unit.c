@@ -90,6 +90,20 @@ extern void test_set_morph_range_invalid_range_low(void);
 extern void test_set_morph_range_invalid_range_high(void);
 extern void test_set_morph_range_invalid_variation(void);
 
+extern void test_assign_knob_invalid_slot_low(void);
+extern void test_assign_knob_invalid_slot_high(void);
+extern void test_assign_knob_invalid_location(void);
+extern void test_assign_knob_invalid_module_id_low(void);
+extern void test_assign_knob_invalid_module_id_high(void);
+extern void test_assign_knob_invalid_param_idx_low(void);
+extern void test_assign_knob_invalid_param_idx_high(void);
+extern void test_assign_knob_invalid_slot_index_low(void);
+extern void test_assign_knob_invalid_slot_index_high(void);
+extern void test_deassign_knob_invalid_slot_low(void);
+extern void test_deassign_knob_invalid_slot_high(void);
+extern void test_deassign_knob_invalid_slot_index_low(void);
+extern void test_deassign_knob_invalid_slot_index_high(void);
+
 extern void test_set_param_label_invalid_slot_low(void);
 extern void test_set_param_label_invalid_slot_high(void);
 extern void test_set_param_label_invalid_location(void);
@@ -216,6 +230,20 @@ int main(void) {
     RUN_TEST(test_set_morph_range_invalid_range_low);
     RUN_TEST(test_set_morph_range_invalid_range_high);
     RUN_TEST(test_set_morph_range_invalid_variation);
+
+    RUN_TEST(test_assign_knob_invalid_slot_low);
+    RUN_TEST(test_assign_knob_invalid_slot_high);
+    RUN_TEST(test_assign_knob_invalid_location);
+    RUN_TEST(test_assign_knob_invalid_module_id_low);
+    RUN_TEST(test_assign_knob_invalid_module_id_high);
+    RUN_TEST(test_assign_knob_invalid_param_idx_low);
+    RUN_TEST(test_assign_knob_invalid_param_idx_high);
+    RUN_TEST(test_assign_knob_invalid_slot_index_low);
+    RUN_TEST(test_assign_knob_invalid_slot_index_high);
+    RUN_TEST(test_deassign_knob_invalid_slot_low);
+    RUN_TEST(test_deassign_knob_invalid_slot_high);
+    RUN_TEST(test_deassign_knob_invalid_slot_index_low);
+    RUN_TEST(test_deassign_knob_invalid_slot_index_high);
 
     /* set-param-label validation tests */
     RUN_TEST(test_set_param_label_invalid_slot_low);

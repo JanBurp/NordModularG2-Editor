@@ -6,6 +6,7 @@ export const SectionType = {
 	PARAM_NAMES: 0x5b,
 	MODULE_NAMES: 0x5a,
 	CONTROLLERS: 0x60,
+	KNOBS: 0x62,
 	MORPH_PARAMS: 0x65,
 	SEPARATOR: 0x6f,
 	PERF_DATA: 0x11,

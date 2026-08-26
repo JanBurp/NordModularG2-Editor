@@ -161,6 +161,30 @@ export function useSlotEvents(log: LogFn) {
 			}
 			return true;
 		}
+		if (ev.type === 'knob_assign_change') {
+			// Parameter Pages knob assign/deassign echoed from the front panel. NOTE: cli/src/g2_events.c
+			// does not emit this event yet (S_ASSIGN_KNOB/S_DEASSIGN_KNOB response byte offsets are
+			// unconfirmed — see the comment there) — this handler is ready-but-inert until that lands.
+			// Expected shape: { slot, slotIndex, assigned: true, area: 'fx'|'va', module, param } for an
+			// assign, or { slot, slotIndex, assigned: false } for a deassign.
+			log('←', 'Watch', `knob_assign_change s=${ev.slot} slotIndex=${ev.slotIndex} assigned=${ev.assigned}`, 'param');
+			const slotLabel = ev.slot as SlotLabel;
+			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
+			const slotIndex = ev.slotIndex as number;
+			resolveParamEcho(`${slotLabel}:knob:${slotIndex}`, ev.assigned ? 1 : 0);
+			const list = slotsStore.slots[slotLabel].paramPages;
+			const idx = list.findIndex((k) => k.slotIndex === slotIndex);
+			if (!ev.assigned) {
+				if (idx !== -1) slotsStore.slots[slotLabel].paramPages = [...list.slice(0, idx), ...list.slice(idx + 1)];
+			} else {
+				const location: 0 | 1 = ev.area === 'va' ? 1 : 0;
+				const entry = { slotIndex, location, moduleIndex: ev.module as number, paramIndex: ev.param as number, isLed: 0 };
+				slotsStore.slots[slotLabel].paramPages = idx !== -1 ? [...list.slice(0, idx), entry, ...list.slice(idx + 1)] : [...list, entry];
+			}
+			if (slotsStore.slots[slotLabel].patch) slotsStore.slots[slotLabel].patch!.paramPages = [...slotsStore.slots[slotLabel].paramPages];
+			slotsStore._markSlotDirty(slotLabel);
+			return true;
+		}
 		if (ev.type === 'patch_name') {
 			const sl = ev.slot as SlotLabel;
 			if (sl && slotsStore.slots[sl]) {

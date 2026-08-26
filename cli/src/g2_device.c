@@ -2196,6 +2196,36 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
     return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
+/* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
+ * knob's address 0-119 (3 Banks x 5 Pages x 8 Knobs — see g2-editor/src/renderer/paramPages.ts).
+ * Same acked COMMAND_REQ envelope as MIDI CC assign (send_slot), NOT the raw WRITE_NO_RESP
+ * envelope used by g2_set_morph_range. Payload layout is a best-effort inference from the Delphi
+ * reference editor (BVE.NMG2Mess.pas AddAssignKnobMessage/AddDeAssignKnobMessage) cross-checked
+ * against decompiled G2Editor.c opcodes — NOT bit-confirmed against a real USB capture. Verify
+ * before trusting on real hardware. */
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
+    if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
+    if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[5] = { (uint8_t)module_id, (uint8_t)param_idx, (uint8_t)location, 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, 0x25, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+int g2_deassign_knob(int slot, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, 0x26, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
  * plain JSON array matching the "data" field of the resources_used watch event:
  * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).

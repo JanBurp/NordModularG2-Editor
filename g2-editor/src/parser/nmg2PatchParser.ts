@@ -2,13 +2,13 @@
  * prf2 file is very similar but contains extra section type 0x11 at beginning which contains slot names and slot data
  */
 
-import type { Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment } from '../types/patch';
+import type { Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment, ParamPageAssignment } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
 import { SectionType } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 
-export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment };
+export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment, ParamPageAssignment };
 
 class G2Area implements Area {
 	name: string;
@@ -35,6 +35,10 @@ class G2Parser {
 	private patchParamsData: PatchParamVariation[][] = [];
 	private pd: (PatchDescription | null)[] = [];
 	private controllersData: MidiCCAssignment[] = [];
+	// Per-slot, unlike controllersData — C_KNOBS ($62) is per-patch like CONTROLLERS, but stored
+	// per-slot-index here (mirroring patchParamsData) so a .prf2's 4 slots don't collide the way
+	// controllersData does (see PatchParser.parsePrf2 — a pre-existing, unrelated bug left as-is).
+	private knobsData: ParamPageAssignment[][] = [];
 	readonly data: ArrayBuffer;
 	ofs = 0;
 
@@ -51,6 +55,7 @@ class G2Parser {
 			[SectionType.PARAMETERS]: ['Parameters', (d) => this.parseModuleParameters(d)],
 			[SectionType.PARAM_NAMES]: ['Param Names', (d) => this.parseParamNames(d)],
 			[SectionType.CONTROLLERS]: ['Controllers', (d) => this.parseControllers(d)],
+			[SectionType.KNOBS]: ['Knobs', (d) => this.parseKnobs(d)],
 			[SectionType.MORPH_PARAMS]: ['Morph Parameters', (d) => this.parseMorphParameters(d)],
 		};
 
@@ -479,6 +484,32 @@ class G2Parser {
 		this.controllersData = list;
 	}
 
+	getKnobs(slot: number): ParamPageAssignment[] | null {
+		return this.knobsData[slot] ?? null;
+	}
+
+	// Parameter Pages knob assignments ($62, "C_KNOBS" in the reference Delphi editor). Fixed-size
+	// array of 120 slots (3 Banks x 5 Pages x 8 Knobs, see renderer/paramPages.ts) — the 16-bit count
+	// is always 120, and slot position (not a stored field) is the slot's address. Each slot is a
+	// single presence bit, followed by 20 bits of assignment data when present. Reverse-engineered
+	// from BVE.NMG2File.pas's TKnob.Read/TKnobList.Read, cross-validated against decompiled
+	// G2Editor.c's NSFile_V11::CKnobMapData_11::WriteStream. Per-patch, like CONTROLLERS ($60), not
+	// per-variation like MORPH_PARAMS ($65).
+	private parseKnobs(data: Uint8Array): void {
+		const count = this.getBits(16, data);
+		const list: ParamPageAssignment[] = [];
+		for (let slotIndex = 0; slotIndex < count; slotIndex++) {
+			const assigned = this.getBits(1);
+			if (!assigned) continue;
+			const location = this.getBits(2) as 0 | 1;
+			const moduleIndex = this.getBits(8);
+			const isLed = this.getBits(2);
+			const paramIndex = this.getBits(7);
+			list.push({ slotIndex, location, moduleIndex, isLed, paramIndex });
+		}
+		this.knobsData[this.aof >> 1] = list;
+	}
+
 	private parsePatchDesc(data: Uint8Array): void {
 		const description_attrs: Record<string, number> = {
 			voices: 5,
@@ -515,11 +546,13 @@ export class PatchParser {
 
 	parse(): Patch {
 		const controllers = this.patcher.getControllers();
+		const paramPages = this.patcher.getKnobs(0);
 		return {
 			areas: [this.patcher.getArea(0), this.patcher.getArea(1)],
 			description: this.patcher.getpd(0) ?? undefined,
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 			controllers: controllers.length > 0 ? controllers : undefined,
+			paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
 			text: this.patcher.getTextPad(0) ?? undefined,
 		};
 	}
@@ -530,13 +563,17 @@ export class PatchParser {
 		const controllers = this.patcher.getControllers();
 		return {
 			slotNames,
-			patches: [0, 1, 2, 3].map((slot) => ({
-				areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
-				description: this.patcher.getpd(slot) ?? undefined,
-				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
-				controllers: controllers.length > 0 ? controllers : undefined,
-				text: this.patcher.getTextPad(slot) ?? undefined,
-			})),
+			patches: [0, 1, 2, 3].map((slot) => {
+				const paramPages = this.patcher.getKnobs(slot);
+				return {
+					areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
+					description: this.patcher.getpd(slot) ?? undefined,
+					patchParams: this.patcher.getPatchParams(slot) ?? undefined,
+					controllers: controllers.length > 0 ? controllers : undefined,
+					paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
+					text: this.patcher.getTextPad(slot) ?? undefined,
+				};
+			}),
 			slotMeta: this.patcher.getSlotMeta(),
 		};
 	}
