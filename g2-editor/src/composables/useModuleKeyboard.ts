@@ -220,11 +220,42 @@ export function useModuleKeyboard() {
 		slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, clamp(existing.range + delta, -127, 127));
 	}
 
+	// Ctrl/Cmd+Enter toggles the selected param's assignment to the currently selected morph
+	// group — the keyboard equivalent of a Ctrl/Cmd-click on a param (see useMorphRangeDrag.ts).
+	// Assigns at the same default full range (127) the mouse paths use.
+	function toggleMorphAssign() {
+		const sel = uiStore.selectedParam;
+		if (!sel) return;
+		const found = findModuleAnywhere(sel.moduleId);
+		if (!found) return;
+		const slot = uiStore.slotInFocus;
+		if (!slot) return;
+		const groupIndex = uiStore.selectedMorphGroup;
+		const variation = uiStore.variation;
+		const existing = slotsStore
+			.getMorphAssignments(slot, variation)
+			.find((a) => a.groupIndex === groupIndex && a.location === found.area && a.moduleIndex === sel.moduleId && a.paramIndex === sel.paramIndex);
+		if (existing) slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex);
+		else slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, 127);
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (isInputFocused()) return;
 
 		const { key, shiftKey, altKey } = e;
+
+		if (isGrabModifierPressed(e) && key >= '1' && key <= '8') {
+			uiStore.setSelectedMorphGroup(Number(key) - 1);
+			e.preventDefault();
+			return;
+		}
+
+		if (isGrabModifierPressed(e) && key === 'Enter') {
+			toggleMorphAssign();
+			e.preventDefault();
+			return;
+		}
 
 		const isArrow = key === 'ArrowUp' || key === 'ArrowDown' || key === 'ArrowLeft' || key === 'ArrowRight';
 		if (!isArrow) return;
@@ -252,4 +283,6 @@ export function useModuleKeyboard() {
 
 	onMounted(() => window.addEventListener('keydown', handleKeydown));
 	onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+
+	return { handleKeydown };
 }

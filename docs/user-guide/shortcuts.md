@@ -53,6 +53,14 @@ nav_order: 4
 | `Cmd+,` | Toggle Settings pane |
 | `←` / `→` | Switch Disk/Patches/Performances tab (Browser pane focused) |
 
+## Morph Groups
+
+| Key | Action |
+|---|---|
+| `Cmd+1–8` | Select active Morph Group |
+| `Cmd+Enter` | Assign / deassign selected parameter to active Morph Group |
+| `Cmd+↑` / `Cmd+↓` | Nudge morph range of selected parameter |
+
 ## Overlays
 
 Hold the key to show the overlay; release or press `Escape` to hide.
@@ -60,6 +68,8 @@ Hold the key to show the overlay; release or press `Escape` to hide.
 | Key | Action |
 |---|---|
 | `F5` | Show parameter values on canvas |
+| `F6` | Show morph ranges on canvas |
+| `F7` | Show morph group assignments on canvas |
 | `F8` | Show Midi CC assignments on canvas |
 
 ## Modules & Parameters

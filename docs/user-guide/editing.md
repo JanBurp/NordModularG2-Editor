@@ -70,6 +70,24 @@ Open the **Modules pane** (`Cmd+M`), search or scroll, then drag a module onto t
 
 ---
 
+## Morph Assignment
+
+Pick the active Morph Group first — click one of the **8 toolbar knobs**, or `Cmd+1–8`.
+
+| Action | Result |
+|---|---|
+| `Cmd+Click` parameter | Assign / deassign to active Morph Group |
+| `Cmd+Drag` parameter (vertical) | Set morph range (knobs/sliders only — buttons, switches and spinners are fixed-range) |
+| Right-click parameter → **Morph assign** | Assign / deassign to active Morph Group |
+| `Cmd+Enter` (parameter selected) | Assign / deassign to active Morph Group |
+| `Cmd+↑` / `Cmd+↓` (parameter selected) | Nudge morph range |
+
+Assigned parameters are tinted on the canvas — red for the active group, blue for others. Hold `F6` to show each assigned parameter's range, `F7` to show which group(s) it belongs to.
+
+Right-click a toolbar Morph knob for **Clear** (remove all assignments in that group) or **Copy To →** another group.
+
+---
+
 ## Module Help
 
 - `F1` — show help for the selected module (or all visible modules)

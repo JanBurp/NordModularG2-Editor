@@ -90,6 +90,8 @@
 				{ keys: ['⌃ Click'], action: 'Assign / deassign parameter to selected Morph Group' },
 				{ keys: ['⌃ Drag'], action: 'Set morph range (assigned knob/slider)' },
 				{ keys: ['⌃ ↑', '⌃ ↓'], action: 'Nudge morph range of selected parameter' },
+				{ keys: ['⌃ 1–8'], action: 'Select active Morph Group' },
+				{ keys: ['⌃ ↵'], action: 'Assign / deassign selected parameter to active Morph Group' },
 			],
 		},
 		{
