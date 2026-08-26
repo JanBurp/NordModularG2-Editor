@@ -199,11 +199,25 @@ export function usePatchFile() {
 		}
 	}
 
+	async function newPatch(): Promise<void> {
+		if (!window.electronAPI) return;
+		const filepath = await window.electronAPI.patches.builtinPath('EmptyPatch.pch2');
+		await handlePatchSelect({ type: 'disk', filepath });
+	}
+
+	async function loadInitPatch(slot: 1 | 2): Promise<void> {
+		if (!window.electronAPI) return;
+		const filepath = await window.electronAPI.patches.initLoadPath(slot);
+		await handlePatchSelect({ type: 'disk', filepath });
+	}
+
 	return {
 		handleFileLoad,
 		handlePatchSelect,
 		handlePerformanceSynthSelect,
 		loadSlotPatch,
+		loadInitPatch,
+		newPatch,
 		openFromElectronDialog,
 		uploadError,
 	};

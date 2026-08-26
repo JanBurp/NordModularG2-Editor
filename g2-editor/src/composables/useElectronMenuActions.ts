@@ -33,11 +33,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	onMounted(() => {
 		window.electronAPI?.onMenuAction(async (action: string) => {
 			switch (action) {
-				case 'new-patch': {
-					const filepath = await window.electronAPI.patches.builtinPath('EmptyPatch.pch2');
-					await patchFile.handlePatchSelect({ type: 'disk', filepath });
+				case 'new-patch':
+					await patchFile.newPatch();
 					break;
-				}
 				case 'new-performance': {
 					const filepath = await window.electronAPI.patches.builtinPath('EmptyPerf.prf2');
 					await patchFile.handlePatchSelect({ type: 'disk', filepath });
@@ -74,6 +72,13 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					}
 					if (slotsStore.isPerformanceMode && slotsStore.performanceRawHex) await slotsStore.savePerformance();
 					break;
+				case 'save-init-1':
+				case 'save-init-2': {
+					const slotNum = action === 'save-init-1' ? 1 : 2;
+					const filepath = await window.electronAPI.patches.initSavePath(slotNum);
+					await slotsStore.exportSlotToFile(uiStore.slotInFocus, filepath);
+					break;
+				}
 				case 'copy': {
 					if (isInputFocused()) break;
 					copySelection();

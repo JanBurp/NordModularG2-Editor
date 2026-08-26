@@ -22,6 +22,8 @@ declare global {
 				load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
 				setFolder: () => Promise<{ success: boolean; folder?: string }>;
 				builtinPath: (name: string) => Promise<string>;
+				initLoadPath: (slot: number) => Promise<string>;
+				initSavePath: (slot: number) => Promise<string>;
 			};
 			loadHelp: (shortName: string) => Promise<string | null>;
 			loadModuleGraphics: () => Promise<Record<number, string>>;

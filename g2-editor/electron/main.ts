@@ -214,11 +214,29 @@ ipcMain.handle("patches:load", async (_, filepath: string) => {
 	}
 });
 
-ipcMain.handle("patches:builtin-path", (_, name: string) => {
-	const patchesDir = app.isPackaged
+function builtinPatchesDir(): string {
+	return app.isPackaged
 		? path.join(process.resourcesPath, "patches")
 		: path.join(process.env.APP_ROOT!, "resources", "patches");
-	return path.join(patchesDir, name);
+}
+
+ipcMain.handle("patches:builtin-path", (_, name: string) => {
+	return path.join(builtinPatchesDir(), name);
+});
+
+// Resolves the path to load for "Init N": a user-saved snapshot in userData if one
+// exists, else the bundled EmptyPatch.pch2 (same fallback "New Patch" always uses).
+ipcMain.handle("patches:init-load-path", (_, slot: number) => {
+	const initPath = path.join(app.getPath("userData"), "patches", `init-${slot}.pch2`);
+	if (fs.existsSync(initPath)) return initPath;
+	return path.join(builtinPatchesDir(), "EmptyPatch.pch2");
+});
+
+// Resolves the write target for "Save Init Patch N", ensuring its directory exists.
+ipcMain.handle("patches:init-save-path", (_, slot: number) => {
+	const dir = path.join(app.getPath("userData"), "patches");
+	fs.mkdirSync(dir, { recursive: true });
+	return path.join(dir, `init-${slot}.pch2`);
 });
 
 ipcMain.handle("patches:set-folder", async (event) => {
@@ -391,6 +409,9 @@ app.whenReady().then(async () => {
 				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
 				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
 				{ label: "Save All", click: () => win!.webContents.send("menu:action", "save-all") },
+				{ type: "separator" as const },
+				{ label: "Save Init Patch 1", click: () => win!.webContents.send("menu:action", "save-init-1") },
+				{ label: "Save Init Patch 2", click: () => win!.webContents.send("menu:action", "save-init-2") },
 			],
 		},
 		{

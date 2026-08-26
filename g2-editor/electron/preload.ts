@@ -14,6 +14,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		load: (filepath: string) => ipcRenderer.invoke("patches:load", filepath),
 		setFolder: () => ipcRenderer.invoke("patches:set-folder"),
 		builtinPath: (name: string) => ipcRenderer.invoke("patches:builtin-path", name),
+		initLoadPath: (slot: number) => ipcRenderer.invoke("patches:init-load-path", slot),
+		initSavePath: (slot: number) => ipcRenderer.invoke("patches:init-save-path", slot),
 	},
 
 	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),

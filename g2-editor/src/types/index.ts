@@ -8,6 +8,8 @@ export type MenuAction =
 	| 'save'
 	| 'save-as'
 	| 'save-all'
+	| 'save-init-1'
+	| 'save-init-2'
 	| 'delete'
 	| 'select-all'
 	| 'toggle-modules'

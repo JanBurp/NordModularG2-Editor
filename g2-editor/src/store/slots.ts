@@ -1331,11 +1331,20 @@ export const useSlotsStore = defineStore('slots', {
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			if (!entry.rawHex && !entry.templateRawHex) return;
-			const data = await this._buildPchBytes(entry);
-			await window.electronAPI.savePatch(path, data);
+			await this.exportSlotToFile(slot, path);
 			this.slotFilePaths[slot] = path;
 			entry.edited = false;
+		},
+
+		// Serializes and writes a slot's current patch to an arbitrary file path, without
+		// touching slotFilePaths/edited — used for one-off snapshots (e.g. Save Init Patch)
+		// that must not hijack what the next regular Save writes to.
+		async exportSlotToFile(slot: SlotLabel, filepath: string): Promise<void> {
+			const entry = this.slots[slot];
+			if (!entry?.patch) return;
+			if (!entry.rawHex && !entry.templateRawHex) return;
+			const data = await this._buildPchBytes(entry);
+			await window.electronAPI.savePatch(filepath, data);
 		},
 
 		// Pushes the slot's current in-memory patch to the connected device via a full re-upload —
