@@ -128,6 +128,39 @@ export function useSlotEvents(log: LogFn) {
 			}
 			return true;
 		}
+		if (ev.type === 'morph_change') {
+			log(
+				'←',
+				'Watch',
+				`morph_change s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} morph=${ev.morph} v=${ev.value} neg=${ev.negative} var=${ev.variation}`,
+				'param',
+			);
+			const slotLabel = ev.slot as SlotLabel;
+			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
+			const location: 0 | 1 = ev.area === 'va' ? 1 : 0;
+			const groupIndex = ev.morph as number;
+			const moduleIndex = ev.module as number;
+			const paramIndex = ev.param as number;
+			const variation = ev.variation as number;
+			const range = ev.negative ? -(ev.value as number) : (ev.value as number);
+			resolveParamEcho(`${slotLabel}:morph:${variation}:${groupIndex}:${location}:${moduleIndex}:${paramIndex}`, range);
+			const vState = slotsStore.slots[slotLabel]?.variations?.[variation];
+			if (vState) {
+				const list = vState.patch.morphAssignments;
+				const idx = list.findIndex(
+					(a) => a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex,
+				);
+				if (range === 0) {
+					if (idx !== -1) vState.patch.morphAssignments = [...list.slice(0, idx), ...list.slice(idx + 1)];
+				} else if (idx !== -1) {
+					vState.patch.morphAssignments = [...list.slice(0, idx), { ...list[idx], range }, ...list.slice(idx + 1)];
+				} else {
+					vState.patch.morphAssignments = [...list, { groupIndex, location, moduleIndex, paramIndex, range }];
+				}
+				slotsStore._markSlotDirty(slotLabel);
+			}
+			return true;
+		}
 		if (ev.type === 'patch_name') {
 			const sl = ev.slot as SlotLabel;
 			if (sl && slotsStore.slots[sl]) {

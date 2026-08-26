@@ -55,6 +55,25 @@ function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
 	return location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
 }
 
+// Maps a morph assignment's location (0=fx/1=va) to its CLI location string.
+function morphLocationStr(location: 0 | 1): 'fx' | 'va' {
+	return location === 0 ? 'fx' : 'va';
+}
+
+// Builds the CLI set-morph-range command tuple. Arg order (range before group) matches
+// sendCoalesced/armParamEcho's assumption (see below) that cmd[5] is the value being echoed.
+function setMorphRangeCmd(
+	slot: SlotLabel,
+	location: 0 | 1,
+	moduleIndex: number,
+	paramIndex: number,
+	range: number,
+	groupIndex: number,
+	variation: number,
+): string[] {
+	return ['set-morph-range', slot, morphLocationStr(location), String(moduleIndex), String(paramIndex), String(range), String(groupIndex), String(variation)];
+}
+
 // Builds the CLI del-cable / add-cable command tuple for a single cable.
 function delCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[] {
 	return ['del-cable', slot, location, String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
@@ -1715,25 +1734,51 @@ export const useSlotsStore = defineStore('slots', {
 			return this.slots[slot]?.variations?.[variation]?.patch.morphAssignments ?? [];
 		},
 
+		// Diffs two morphAssignments arrays (by groupIndex+location+moduleIndex+paramIndex) and pushes
+		// the deltas to hardware in one set-morph-range-batch call: entries present in `from` but not
+		// `to` are deassigned (range forced to 0), entries present in `to` are (re-)assigned at their
+		// stored range. No-op while offline.
+		async _resyncMorphAssignments(slot: SlotLabel, variation: number, from: MorphAssignment[], to: MorphAssignment[]): Promise<void> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			const tupleKey = (a: MorphAssignment) => `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
+			const toKeys = new Set(to.map(tupleKey));
+			const removed = from.filter((a) => !toKeys.has(tupleKey(a))).map((a) => ({ ...a, range: 0 }));
+			const ops = [...removed, ...to];
+			if (ops.length === 0) return;
+			const flatArgs = ops.flatMap((a) => [
+				morphLocationStr(a.location),
+				String(a.moduleIndex),
+				String(a.paramIndex),
+				String(a.range),
+				String(a.groupIndex),
+				String(variation),
+			]);
+			await window.cli.run(['set-morph-range-batch', slot, ...flatArgs]);
+		},
+
 		// Shared plumbing for assign/deassign/clear/copy below, which all replace the whole
-		// `morphAssignments` array in one step: mutates via `mutate`, marks the slot dirty, and (unless
-		// history is locked) records an undo that restores the previous array — CLI hardware resync is
-		// deferred until an assign-morph/deassign-morph/set-morph-range CLI command exists (see the
-		// per-action TODOs below) — plus a `redo` that replays the call.
+		// `morphAssignments` array in one step: mutates via `mutate`, marks the slot dirty, pushes the
+		// diff to hardware (see _resyncMorphAssignments), and (unless history is locked) records an
+		// undo that restores the previous array and resyncs hardware back to it too.
 		_mutateMorphAssignments(slot: SlotLabel, variation: number, mutate: (prev: MorphAssignment[]) => MorphAssignment[], redo: () => Promise<void>): void {
 			const vState = this.slots[slot]?.variations?.[variation];
 			if (!vState) return;
 			const patch = vState.patch;
 			const prevAssignments = patch.morphAssignments;
-			patch.morphAssignments = mutate(prevAssignments);
+			const nextAssignments = mutate(prevAssignments);
+			patch.morphAssignments = nextAssignments;
 			this._markSlotDirty(slot);
+			void this._resyncMorphAssignments(slot, variation, prevAssignments, nextAssignments);
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
 						const v2 = this.slots[slot]?.variations?.[variation];
+						const current = v2?.patch.morphAssignments ?? [];
 						if (v2) v2.patch.morphAssignments = prevAssignments;
 						this._markSlotDirty(slot);
+						await this._resyncMorphAssignments(slot, variation, current, prevAssignments);
 					},
 					redo,
 				});
@@ -1759,11 +1804,6 @@ export const useSlotsStore = defineStore('slots', {
 				(prev) => [...prev.filter((a) => !isSame(a)), { groupIndex, location, moduleIndex, paramIndex, range }],
 				() => this.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex, range),
 			);
-			// TODO(morph-cli, deferred): no `assign-morph` CLI command exists yet. When added, mirror
-			// assignMidiCC:
-			//   const deviceStore = useDeviceStore();
-			//   if (deviceStore.status === DeviceStatus.Connected)
-			//     await window.cli.run(['assign-morph', slot, String(groupIndex), location === 0 ? 'fx' : 'va', String(moduleIndex), String(paramIndex), String(range), String(variation)]);
 		},
 
 		async deassignParamFromMorphGroup(
@@ -1783,7 +1823,6 @@ export const useSlotsStore = defineStore('slots', {
 					),
 				() => this.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex),
 			);
-			// TODO(morph-cli, deferred): mirror deassignMidiCC once a `deassign-morph` CLI command exists.
 		},
 
 		async setMorphAssignmentRange(
@@ -1826,8 +1865,8 @@ export const useSlotsStore = defineStore('slots', {
 			const list = patch.morphAssignments;
 			patch.morphAssignments = [...list.slice(0, idx), { ...list[idx], range }, ...list.slice(idx + 1)];
 			this._markSlotDirty(slot);
-			// TODO(morph-cli, deferred): a real-time drag should use sendCoalesced(...) (see setMorphParam),
-			// once a `set-morph-range` CLI command exists.
+			const key = `${slot}:morph:${variation}:${groupIndex}:${location}:${moduleIndex}:${paramIndex}`;
+			sendCoalesced(key, setMorphRangeCmd(slot, location, moduleIndex, paramIndex, range, groupIndex, variation));
 		},
 
 		// Deassigns everything from one morph group (toolbar right-click "Clear").
@@ -1838,7 +1877,6 @@ export const useSlotsStore = defineStore('slots', {
 				(prev) => prev.filter((a) => a.groupIndex !== groupIndex),
 				() => this.clearMorphGroup(slot, variation, groupIndex),
 			);
-			// TODO(morph-cli, deferred): batch `deassign-morph` calls once implemented.
 		},
 
 		// Copies all assignments+ranges from one morph group to another, replacing the destination
@@ -1854,7 +1892,6 @@ export const useSlotsStore = defineStore('slots', {
 				},
 				() => this.copyMorphGroup(slot, variation, fromGroupIndex, toGroupIndex),
 			);
-			// TODO(morph-cli, deferred): batch `assign-morph` calls for `copied`.
 		},
 
 		async setPatchParam(variation: number, key: keyof PatchParamVariation, value: number): Promise<void> {

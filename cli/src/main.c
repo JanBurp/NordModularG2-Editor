@@ -570,6 +570,47 @@ static int cmd_deassign_midicc_batch(int argc, char **argv, int i) {
     return ret;
 }
 
+static int cmd_set_morph_range(int argc, char **argv, int i) {
+    if (i + 7 >= argc) {
+        fprintf(stderr, "Usage: set-morph-range <slot> <fx|va> <module-id> <param-idx> <range> <group> <variation>\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-morph-range: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location = parse_location_str(argv[i + 2]);
+    int mod_id   = atoi(argv[i + 3]);
+    int param    = atoi(argv[i + 4]);
+    int range    = atoi(argv[i + 5]);
+    int group    = atoi(argv[i + 6]);
+    int var      = atoi(argv[i + 7]);
+    return g2_set_morph_range(slot, location, mod_id, param, group, range, var);
+}
+
+static int cmd_set_morph_range_batch(int argc, char **argv, int i) {
+    int remaining = argc - i - 2;
+    if (remaining < 6 || remaining % 6 != 0) {
+        fprintf(stderr, "Usage: set-morph-range-batch <slot> <fx|va> <module-id> <param-idx> <range> <group> <variation> [...]\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-morph-range-batch: invalid slot '%s'\n", argv[i + 1]); return 1; }
+    int count = remaining / 6;
+    G2MorphEntry *entries = malloc((size_t)count * sizeof(G2MorphEntry));
+    if (!entries) return G2_ERR_NO_MEMORY;
+    for (int j = 0; j < count; j++) {
+        int base = i + 2 + j * 6;
+        entries[j].location    = parse_location_str(argv[base]);
+        entries[j].module_id   = atoi(argv[base + 1]);
+        entries[j].param_idx   = atoi(argv[base + 2]);
+        entries[j].range       = atoi(argv[base + 3]);
+        entries[j].morph_group = atoi(argv[base + 4]);
+        entries[j].variation   = atoi(argv[base + 5]);
+    }
+    int ret = g2_set_morph_range_batch(slot, entries, count);
+    free(entries);
+    return ret;
+}
+
 static int cmd_get_perf_settings(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
     cJSON *synth = query_synth_settings(NULL);
@@ -820,6 +861,8 @@ static const cmd_entry_t commands[] = {
     { "deassign-midicc",       cmd_deassign_midicc       },
     { "assign-midicc-batch",   cmd_assign_midicc_batch   },
     { "deassign-midicc-batch", cmd_deassign_midicc_batch },
+    { "set-morph-range",       cmd_set_morph_range       },
+    { "set-morph-range-batch", cmd_set_morph_range_batch },
     { "set-param-label",  cmd_set_param_label  },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },

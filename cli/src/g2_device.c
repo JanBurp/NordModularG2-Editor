@@ -2080,6 +2080,64 @@ int g2_set_param(int slot, int location, int module_id,
     /* No recv_interrupt — WRITE_NO_RESP */
 }
 
+int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
+                        int morph_group, int range, int variation) {
+    if (slot < 0 || slot > 3)             { g2_err("set-morph-range: invalid slot\n");        return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)     { g2_err("set-morph-range: invalid location\n");    return G2_ERR_INVALID_PARAM; }
+    if (module_id < 0 || module_id > 255) { g2_err("set-morph-range: invalid module-id\n");   return G2_ERR_INVALID_PARAM; }
+    if (param_idx < 0 || param_idx > 255) { g2_err("set-morph-range: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
+    if (morph_group < 0 || morph_group > 7) { g2_err("set-morph-range: invalid morph-group\n"); return G2_ERR_INVALID_PARAM; }
+    if (range < -100 || range > 100)      { g2_err("set-morph-range: range must be -100..100\n"); return G2_ERR_INVALID_PARAM; }
+    if (variation < 0 || variation > 8)   { g2_err("set-morph-range: variation must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0)          { g2_err("set-morph-range: not connected\n");       return G2_ERR_CONNECT; }
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t magnitude = (uint8_t)(range < 0 ? -range : range);
+    uint8_t negative = (uint8_t)(range < 0 ? 1 : 0);
+
+    /* Same category as g2_set_param: the Delphi reference sends S_SET_MORPH_RANGE via its
+     * "responseless" table, not the acked/COMMAND_REQ path — so this must NOT go through
+     * send_slot() (which always sets COMMAND_REQ). */
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = 0x43; /* S_SET_MORPH_RANGE */
+    buff[pos++] = (uint8_t)location;
+    buff[pos++] = (uint8_t)module_id;
+    buff[pos++] = (uint8_t)param_idx;
+    buff[pos++] = (uint8_t)morph_group;
+    buff[pos++] = magnitude;
+    buff[pos++] = negative;
+    buff[pos++] = (uint8_t)variation;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+    /* No recv_interrupt — WRITE_NO_RESP */
+}
+
+int g2_set_morph_range_batch(int slot, const G2MorphEntry *entries, int count) {
+    if (count <= 0) return G2_OK;
+    for (int i = 0; i < count; i++) {
+        int ret = g2_set_morph_range(slot, entries[i].location, entries[i].module_id,
+                                      entries[i].param_idx, entries[i].morph_group,
+                                      entries[i].range, entries[i].variation);
+        if (ret != G2_OK) return ret;
+    }
+    return G2_OK;
+}
+
 int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int cc_num) {
     if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
     if (location < 0 || location > 2)   return G2_ERR_INVALID_PARAM;

@@ -234,6 +234,16 @@ typedef struct { int location, module_id, param_idx, cc_num; } G2MidiCCEntry;
 int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count);
 int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
 
+/* Morph group assignment (S_SET_MORPH_RANGE, 0x43). A param counts as assigned to
+ * morph_group purely because range != 0 — setting range to 0 deassigns it. */
+int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
+                        int morph_group, int range, int variation);
+
+/* Batch morph-range commands — one daemon call sends N individual WRITE_NO_RESP
+ * messages (not a COMMAND_REQ compound frame; see g2_set_morph_range). */
+typedef struct { int location, module_id, param_idx, morph_group, range, variation; } G2MorphEntry;
+int g2_set_morph_range_batch(int slot, const G2MorphEntry *entries, int count);
+
 /* Version cache: patch version per slot (0-3 = A-D), 0 = unknown.
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
  * Invalidated on version_update all-slots event. */

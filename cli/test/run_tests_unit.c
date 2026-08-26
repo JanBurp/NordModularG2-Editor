@@ -81,6 +81,15 @@ extern void test_set_cable_color_invalid_color_high(void);
 extern void test_set_cable_color_invalid_from_con_type(void);
 extern void test_set_cable_color_invalid_to_con_type(void);
 
+extern void test_set_morph_range_invalid_slot_low(void);
+extern void test_set_morph_range_invalid_slot_high(void);
+extern void test_set_morph_range_invalid_location(void);
+extern void test_set_morph_range_invalid_morph_group_low(void);
+extern void test_set_morph_range_invalid_morph_group_high(void);
+extern void test_set_morph_range_invalid_range_low(void);
+extern void test_set_morph_range_invalid_range_high(void);
+extern void test_set_morph_range_invalid_variation(void);
+
 extern void test_set_param_label_invalid_slot_low(void);
 extern void test_set_param_label_invalid_slot_high(void);
 extern void test_set_param_label_invalid_location(void);
@@ -198,6 +207,15 @@ int main(void) {
     RUN_TEST(test_set_cable_color_invalid_color_high);
     RUN_TEST(test_set_cable_color_invalid_from_con_type);
     RUN_TEST(test_set_cable_color_invalid_to_con_type);
+
+    RUN_TEST(test_set_morph_range_invalid_slot_low);
+    RUN_TEST(test_set_morph_range_invalid_slot_high);
+    RUN_TEST(test_set_morph_range_invalid_location);
+    RUN_TEST(test_set_morph_range_invalid_morph_group_low);
+    RUN_TEST(test_set_morph_range_invalid_morph_group_high);
+    RUN_TEST(test_set_morph_range_invalid_range_low);
+    RUN_TEST(test_set_morph_range_invalid_range_high);
+    RUN_TEST(test_set_morph_range_invalid_variation);
 
     /* set-param-label validation tests */
     RUN_TEST(test_set_param_label_invalid_slot_low);
