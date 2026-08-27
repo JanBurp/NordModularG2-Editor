@@ -16,13 +16,18 @@
 					{{ cell.moduleHeader }}
 				</span>
 
-				<div class="w-full rounded px-1 py-0.5 text-center" :class="cell.assignment ? 'bg-surface-3' : 'opacity-40'">
+				<!-- Unassigned state mirrors the assigned box's exact shape (border instead of fill, same
+				     padding, two dash lines instead of one-plus-blank) so the row never shifts height,
+				     matching the knob/button placeholder convention below. -->
+				<div class="w-full rounded px-1 py-0.5 text-center" :class="cell.assignment ? 'bg-surface-3' : 'border border-line-default opacity-40'">
 					<div class="text-xs truncate">{{ cell.assignment ? cell.paramLabel : '—' }}</div>
-					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '' }}</div>
+					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '—' }}</div>
 				</div>
 
 				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
-				<div v-else class="w-8 h-8 rounded-full border border-line-default opacity-40 my-1" />
+				<!-- Matches Knob.vue's own rendered size exactly (SVG is radius+16 = 26px for the
+				     default KnobMedium type) so the row height doesn't shift between assigned/empty cells. -->
+				<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
 
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
 					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
@@ -36,7 +41,9 @@
 				>
 					{{ cell.buttonValueLabel }}
 				</div>
-				<div v-else class="w-full h-5 rounded border border-line-default opacity-40" />
+				<!-- Matches .btn-xs's own height exactly (h-4, see style.css) so this row doesn't shift
+				     between cells with/without a button. -->
+				<div v-else class="w-full h-4 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
 
