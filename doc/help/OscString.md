@@ -50,7 +50,7 @@ Frequency mode selector (Semitone/Frequency/Partial/Factor).
 **Decay** (Level_100)
 Decay time of internal feedback signal.
 
-**Moisture** (Level_100)
+**Damp** (Level_100)
 High frequency damping (Damp).
 
 **Active** (ActiveMonitor)
