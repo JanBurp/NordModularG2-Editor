@@ -24,13 +24,13 @@
 				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
 				<div v-else class="w-8 h-8 rounded-full border border-line-default opacity-40 my-1" />
 
-				<!-- Physical pushbutton below the knob. Defaults to the knob's own param (matching the
-				     manual's "a single assignment assigns both the knob... and its associated pushbutton")
-				     — see the buttonParamIndex comment below for the not-yet-ported per-module override. -->
-				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
-					{{ cell.assignment ? cell.buttonLabel : '—' }}
+				<!-- Physical pushbutton below the knob. Targets whatever ParameterPages.vue's buttonParams
+				     lookup resolves (mirrors the knob's own param, a different param, or none at all) —
+				     see the buttonParamIndex comment below. -->
+				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
+					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
 				</span>
-				<Button v-if="cell.assignment" variant="default" size="xs" class="w-full truncate">{{ cell.buttonValueLabel }}</Button>
+				<Button v-if="cell.assignment && cell.hasButton" variant="default" size="xs" class="w-full truncate">{{ cell.buttonValueLabel }}</Button>
 				<div v-else class="w-full h-5 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
@@ -73,6 +73,7 @@
 	import { useAltHeld, parseParamDragPayload } from '../../composables/useParamPageAssign';
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor } from '../../renderer/paramPages';
 	import { getModule } from '../../renderer/nmg2mods';
+	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { formatValue } from '../../utils/moduleControls';
 	import type { ContextMenuItem, ParamPageAssignment } from '../../types';
 
@@ -92,6 +93,7 @@
 		paramLabel: string;
 		value: number;
 		valueLabel: string;
+		hasButton: boolean;
 		buttonLabel: string;
 		buttonValueLabel: string;
 	}
@@ -127,7 +129,7 @@
 		};
 	}
 
-	const emptyCell = { moduleLabel: '', paramLabel: '', value: 0, valueLabel: '', buttonLabel: '', buttonValueLabel: '' };
+	const emptyCell = { moduleLabel: '', paramLabel: '', value: 0, valueLabel: '', hasButton: false, buttonLabel: '', buttonValueLabel: '' };
 
 	const cells = computed<Cell[]>(() => {
 		const slot = uiStore.slotInFocus;
@@ -142,13 +144,15 @@
 				: String(assignment.moduleIndex);
 			const knobDisplay = resolveParamDisplay(assignment, assignment.paramIndex, moduleInfo);
 			// The physical button below the knob often targets a DIFFERENT module parameter (e.g.
-			// Sequencer step-value knobs pair with a step-on/off button) via a per-parameter
-			// "ButtonParamIndex" lookup (BVE.NMG2Data.pas in the reference Delphi editor). That
-			// per-module override table isn't ported into nmg2mods.ts yet, so this defaults to
-			// mirroring the knob's own param — the documented fallback when "nothing specific exists
-			// for the module/param".
-			const buttonParamIndex = assignment.paramIndex;
-			const buttonDisplay = resolveParamDisplay(assignment, buttonParamIndex, moduleInfo);
+			// Sequencer step-value knobs pair with a step-on/off button), or has no button function
+			// at all — resolved via buttonParams.ts, ported from BVE.NMG2Data.pas's ButtonParamIndex
+			// table in the reference Delphi editor. undefined = not in the table = falls back to
+			// mirroring the knob's own param (the documented default).
+			const moduleTypeId = moduleInfo?.mod.type;
+			const lookedUp = moduleTypeId !== undefined ? getButtonParamIndex(moduleTypeId, assignment.paramIndex) : undefined;
+			const buttonParamIndex = lookedUp ?? assignment.paramIndex;
+			const hasButton = buttonParamIndex !== -1;
+			const buttonDisplay = hasButton ? resolveParamDisplay(assignment, buttonParamIndex, moduleInfo) : null;
 			return {
 				slotIndex,
 				assignment,
@@ -156,8 +160,9 @@
 				paramLabel: knobDisplay.label,
 				value: knobDisplay.value,
 				valueLabel: knobDisplay.valueLabel,
-				buttonLabel: buttonDisplay.label,
-				buttonValueLabel: buttonDisplay.valueLabel,
+				hasButton,
+				buttonLabel: buttonDisplay?.label ?? '',
+				buttonValueLabel: buttonDisplay?.valueLabel ?? '',
 			};
 		});
 		return base.map((cell, i) => {
