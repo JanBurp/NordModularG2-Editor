@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
+import { useUiStore } from '@/store/ui';
 import { useSlotEvents } from '../useSlotEvents';
 
 beforeEach(() => {
@@ -68,6 +69,67 @@ describe('useSlotEvents — hardware-driven dirty marking', () => {
 
 		expect(store.slots['A'].name).toBe('Renamed');
 		expect(store.isSlotEdited('A')).toBe(true);
+	});
+});
+
+function seedModule() {
+	const store = useSlotsStore();
+	store.slots['A'].patch = {
+		areas: [
+			{ modules: [], cableList: [] },
+			{ modules: [{ index: 7, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }], cableList: [] },
+		],
+	} as any;
+	return store;
+}
+
+describe('useSlotEvents — selected_param (hardware panel cursor) sync', () => {
+	it('applies the hardware cursor to the focused slot when the module exists', async () => {
+		seedModule();
+		const uiStore = useUiStore();
+		uiStore.slotInFocus = 'A';
+		const { handleEvent } = useSlotEvents(() => {});
+
+		await handleEvent({ type: 'selected_param', slot: 'A', area: 'va', module: 7, param: 3 });
+
+		expect(uiStore.selectedModules).toEqual([7]);
+		expect(uiStore.selectedParam).toEqual({ moduleId: 7, paramIndex: 3 });
+	});
+
+	it('ignores events for a slot that is not currently in focus', async () => {
+		seedModule();
+		const uiStore = useUiStore();
+		uiStore.slotInFocus = 'A';
+		const { handleEvent } = useSlotEvents(() => {});
+
+		await handleEvent({ type: 'selected_param', slot: 'B', area: 'va', module: 7, param: 3 });
+
+		expect(uiStore.selectedModules).toEqual([]);
+		expect(uiStore.selectedParam).toBeNull();
+	});
+
+	it("ignores the 'patch' (Master Clock) context — no on-canvas equivalent", async () => {
+		seedModule();
+		const uiStore = useUiStore();
+		uiStore.slotInFocus = 'A';
+		const { handleEvent } = useSlotEvents(() => {});
+
+		await handleEvent({ type: 'selected_param', slot: 'A', area: 'patch', module: 1, param: 0 });
+
+		expect(uiStore.selectedModules).toEqual([]);
+		expect(uiStore.selectedParam).toBeNull();
+	});
+
+	it('ignores a stale event referencing a module that no longer exists', async () => {
+		seedModule();
+		const uiStore = useUiStore();
+		uiStore.slotInFocus = 'A';
+		const { handleEvent } = useSlotEvents(() => {});
+
+		await handleEvent({ type: 'selected_param', slot: 'A', area: 'va', module: 99, param: 0 });
+
+		expect(uiStore.selectedModules).toEqual([]);
+		expect(uiStore.selectedParam).toBeNull();
 	});
 });
 

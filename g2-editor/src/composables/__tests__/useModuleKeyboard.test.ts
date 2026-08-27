@@ -13,9 +13,16 @@ vi.hoisted(() => {
 	(globalThis as any).window = { electronAPI: { isMac: false }, cli: { run: () => Promise.resolve(undefined) } };
 });
 
+// Real module type 5 (used by moduleStub) has no params — stub a 2-param module def so
+// navigateParam's Left/Right cycling has something to cycle through.
+vi.mock('@/renderer/nmg2mods', () => ({
+	getModule: () => ({ params: [{ type: 0 }, { type: 0 }] }),
+}));
+
 import { createPinia, setActivePinia } from 'pinia';
 import { useUiStore } from '@/store/ui';
 import { useSlotsStore } from '@/store/slots';
+import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useParamEditDialog } from '../useParamEditDialog';
 import { useModuleKeyboard } from '../useModuleKeyboard';
 
@@ -30,8 +37,12 @@ function grabKey(key: string): KeyboardEvent {
 	return { key, ctrlKey: true, metaKey: true, shiftKey: false, altKey: false, preventDefault: vi.fn() } as unknown as KeyboardEvent;
 }
 
-function moduleStub(index: number) {
-	return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+function arrowKey(key: string, shiftKey = false): KeyboardEvent {
+	return { key, ctrlKey: false, metaKey: false, shiftKey, altKey: false, preventDefault: vi.fn() } as unknown as KeyboardEvent;
+}
+
+function moduleStub(index: number, horiz = 0, vert = 0) {
+	return { index, type: 5, horiz, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
 }
 
 // Seeds a slot with one module in the Voice area, a selected param on it, and an empty
@@ -139,5 +150,139 @@ describe('useModuleKeyboard — keyboard Morph Group select/assign', () => {
 		handleKeydown(grabKey('Enter'));
 
 		expect(slotsStore.getMorphAssignments('A', 0)).toHaveLength(0);
+	});
+});
+
+// Column 0 (horiz=0) has two modules stacked; column 1 (horiz=1) has one module —
+// confirms Up/Down sweeps into the next/previous column at a column boundary, matching
+// real G2 panel cursor nav (verified on hardware: Down at the bottom of a column moves
+// to the top of the next column, and vice versa for Up, until the grid's own corners).
+function seedColumn() {
+	const uiStore = useUiStore();
+	const slotsStore = useSlotsStore();
+	slotsStore.slots['A'].patch = {
+		areas: [
+			{ modules: [], cableList: [] },
+			{ modules: [moduleStub(1, 0, 0), moduleStub(2, 0, 10), moduleStub(3, 1, 0)], cableList: [] },
+		],
+	} as any;
+	slotsStore.slots['A'].variations = [
+		{ fx: {}, voice: {}, patch: { morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: [] } },
+	] as any;
+	return { uiStore, slotsStore };
+}
+
+// Two modules per column, each column's top module sitting far from the other column's —
+// distinguishes "always land on the target column's top module" from the old
+// closest-by-vert heuristic (verified on hardware: Left/Right always lands on top).
+function seedTwoColumns() {
+	const uiStore = useUiStore();
+	const slotsStore = useSlotsStore();
+	slotsStore.slots['A'].patch = {
+		areas: [
+			{ modules: [], cableList: [] },
+			{
+				modules: [moduleStub(1, 0, 0), moduleStub(2, 0, 20), moduleStub(3, 1, 5), moduleStub(4, 1, 25)],
+				cableList: [],
+			},
+		],
+	} as any;
+	slotsStore.slots['A'].variations = [
+		{ fx: {}, voice: {}, patch: { morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: [] } },
+	] as any;
+	return { uiStore, slotsStore };
+}
+
+describe('useModuleKeyboard — Shift+Arrow module navigation wrap', () => {
+	it('ArrowDown at the bottom of a column moves to the top of the next column', () => {
+		const { uiStore } = seedColumn();
+		uiStore.selectModules([2], 'va'); // bottom of column 0
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowDown', true));
+
+		expect(uiStore.selectedModules).toEqual([3]); // top of column 1
+	});
+
+	it('ArrowUp at the top of a column moves to the bottom of the previous column', () => {
+		const { uiStore } = seedColumn();
+		uiStore.selectModules([3], 'va'); // column 1's only module
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowUp', true));
+
+		expect(uiStore.selectedModules).toEqual([2]); // bottom of column 0
+	});
+
+	it('ArrowUp at the top-left module wraps to the bottom of the last column', () => {
+		const { uiStore } = seedColumn();
+		uiStore.selectModules([1], 'va'); // top-left of the whole grid
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowUp', true));
+
+		expect(uiStore.selectedModules).toEqual([3]); // bottom of the last column
+	});
+
+	it('ArrowRight always lands on the top of the next column, not the closest-by-vert module', () => {
+		const { uiStore } = seedTwoColumns();
+		uiStore.selectModules([2], 'va'); // column 0, vert 20 — closest-by-vert would pick module 4 (vert 25)
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowRight', true));
+
+		expect(uiStore.selectedModules).toEqual([3]); // top of column 1 (vert 5)
+	});
+
+	it('ArrowLeft always lands on the top of the previous column, not the closest-by-vert module', () => {
+		const { uiStore } = seedTwoColumns();
+		uiStore.selectModules([4], 'va'); // column 1, vert 25 — closest-by-vert would pick module 2 (vert 20)
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowLeft', true));
+
+		expect(uiStore.selectedModules).toEqual([1]); // top of column 0 (vert 0)
+	});
+});
+
+describe('useModuleKeyboard — hardware cursor sync (select-param)', () => {
+	it('Shift+Arrow module nav sends select-param when connected', () => {
+		const { uiStore } = seedColumn();
+		useDeviceStore().status = DeviceStatus.Connected;
+		const run = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = run;
+		uiStore.selectModules([1], 'va');
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowDown', true));
+
+		expect(run).toHaveBeenCalledWith(['select-param', 'A', 'va', '2', '0']);
+	});
+
+	it('plain Left/Right param nav sends select-param when connected', () => {
+		const { uiStore } = seedColumn();
+		useDeviceStore().status = DeviceStatus.Connected;
+		const run = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = run;
+		uiStore.selectModules([1], 'va');
+		uiStore.setSelectedParam(1, 0);
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowRight', false));
+
+		expect(run).toHaveBeenCalledWith(['select-param', 'A', 'va', '1', '1']);
+	});
+
+	it('does not send select-param when the device is disconnected', () => {
+		const { uiStore } = seedColumn();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		const run = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = run;
+		uiStore.selectModules([1], 'va');
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('ArrowDown', true));
+
+		expect(run).not.toHaveBeenCalled();
 	});
 });

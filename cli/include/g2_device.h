@@ -225,6 +225,11 @@ int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
 int g2_copy_variation(int slot, int from_var, int to_var);
 
+/* Moves the hardware panel's cursor to a param (SUB_COMMAND_SEL_PARAM, 0x2F) — the
+ * outgoing half of the same message the G2 sends back when its own panel buttons move
+ * the cursor (decoded as the "selected_param" watch event, see g2_events.c). */
+int g2_select_param(int slot, int location, int module_id, int param_idx);
+
 /* MIDI CC assignment commands */
 int g2_assign_midicc(int slot, int location, int module_id, int param_idx, int cc_num);
 int g2_deassign_midicc(int slot, int cc_num);

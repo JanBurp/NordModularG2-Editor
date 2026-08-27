@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
+import { DeviceStatus, useDeviceStore } from '../store/device';
 import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { useParamEditDialog } from './useParamEditDialog';
@@ -13,14 +14,19 @@ function isInputFocused(): boolean {
 	return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
-function closestByVert(modules: ModuleInstance[], targetVert: number): ModuleInstance {
-	return modules.reduce((best, m) => (Math.abs(m.vert - targetVert) < Math.abs(best.vert - targetVert) ? m : best));
-}
-
 export function useModuleKeyboard() {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
+	const deviceStore = useDeviceStore();
 	const { showDialog } = useParamEditDialog();
+
+	// Mirrors the cursor move to the hardware panel (SUB_COMMAND_SEL_PARAM, 0x2F) so the
+	// G2's own Select LED tracks keyboard navigation. Fire-and-forget: a dropped/failed send
+	// just means the hardware cursor briefly lags, not a state-correctness issue.
+	function syncCursorToHardware(moduleId: number, paramIndex: number, area: 0 | 1) {
+		if (deviceStore.status !== DeviceStatus.Connected) return;
+		window.cli.run(['select-param', uiStore.slotInFocus, area === 1 ? 'va' : 'fx', String(moduleId), String(paramIndex)]).catch(() => {});
+	}
 
 	// Module mutations always replace the area's `modules` array (see patchMutations.ts), so caching
 	// by reference is safe: it hits across repeated arrow-key navigation and invalidates automatically
@@ -68,6 +74,7 @@ export function useModuleKeyboard() {
 	function selectInArea(module: ModuleInstance, area: 0 | 1) {
 		uiStore.selectModules([module.index], area === 1 ? 'va' : 'fx');
 		uiStore.setSelectedParam(module.index, 0);
+		syncCursorToHardware(module.index, 0, area);
 	}
 
 	function navigateModule(key: string) {
@@ -135,7 +142,8 @@ export function useModuleKeyboard() {
 		} else if (key === 'ArrowRight') {
 			const nextColKey = sortedColKeys.find((c) => c > cur.horiz);
 			if (nextColKey !== undefined) {
-				next = closestByVert(columns.get(nextColKey)!, cur.vert);
+				// Always lands on the target column's top module (matches G2 panel cursor nav)
+				next = columns.get(nextColKey)!.sort((a, b) => a.vert - b.vert)[0];
 			} else if (isSplit && area === 1) {
 				const target = getTopLeftModule(0);
 				if (target) {
@@ -146,7 +154,8 @@ export function useModuleKeyboard() {
 		} else if (key === 'ArrowLeft') {
 			const prevColKey = [...sortedColKeys].reverse().find((c) => c < cur.horiz);
 			if (prevColKey !== undefined) {
-				next = closestByVert(columns.get(prevColKey)!, cur.vert);
+				// Always lands on the target column's top module (matches G2 panel cursor nav)
+				next = columns.get(prevColKey)!.sort((a, b) => a.vert - b.vert)[0];
 			} else if (isSplit && area === 0) {
 				const target = getBottomRightModule(1);
 				if (target) {
@@ -182,6 +191,7 @@ export function useModuleKeyboard() {
 		const currentParamIndex = uiStore.selectedParam?.moduleId === moduleId ? uiStore.selectedParam.paramIndex : -1;
 		const newIndex = currentParamIndex < 0 ? 0 : (currentParamIndex + dir + params.length) % params.length;
 		uiStore.setSelectedParam(moduleId, newIndex);
+		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 
 	async function changeParamValue(delta: number) {
