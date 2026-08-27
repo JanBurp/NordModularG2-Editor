@@ -24,6 +24,7 @@ export function useModuleDrag(
 	getModules: () => any[],
 	onMove: (info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }) => void,
 	onModuleClick: (index: number, shiftKey: boolean) => void,
+	getZoom: () => number,
 ): {
 	dragState: Ref<DragState | null>;
 	dragGhosts: ComputedRef<DragGhost[]>;
@@ -68,8 +69,8 @@ export function useModuleDrag(
 
 	function onModuleDragMove(e: MouseEvent) {
 		if (dragModuleIndex === null) return;
-		const dxPx = e.clientX - dragStartClientX;
-		const dyPx = e.clientY - dragStartClientY;
+		const dxPx = (e.clientX - dragStartClientX) / getZoom();
+		const dyPx = (e.clientY - dragStartClientY) / getZoom();
 		if (!dragMoved) {
 			if (Math.hypot(dxPx, dyPx) < 5) return;
 			const sel = ui.selectedModules;
@@ -95,7 +96,7 @@ export function useModuleDrag(
 		dragState.value = null;
 		if (drag && moduleIndex !== null) {
 			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
-			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / 256));
+			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / MODULE_WIDTH));
 			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / MODULE_ROW_HEIGHT));
 			const dCol = anchorTargetCol - anchorStart.horiz;
 			const dRow = anchorTargetRow - anchorStart.vert;

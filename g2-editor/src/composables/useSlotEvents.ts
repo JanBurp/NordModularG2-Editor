@@ -5,10 +5,12 @@ import { PATCH_PARAM_KEYS } from '@/types/patch';
 import type { SlotLabel } from '@/types';
 import { ref } from 'vue';
 import { resolveParamEcho, useSlotsStore } from '@/store/slots';
+import { useUiStore } from '@/store/ui';
 
 export function useSlotEvents(log: LogFn) {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
 
 	const hardwareVariationChange = ref<{ slot: SlotLabel; variation: number } | null>(null);
 	const hardwareSlotChange = ref<SlotLabel | null>(null);
@@ -99,6 +101,21 @@ export function useSlotEvents(log: LogFn) {
 			if (vState?.[areaKey]?.[ev.module as number]) {
 				vState[areaKey][ev.module as number][ev.param as number] = ev.value;
 				slotsStore._markSlotDirty(slotLabel);
+			}
+			return true;
+		}
+		if (ev.type === 'selected_param') {
+			log('←', 'Watch', `selected_param slot=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param}`);
+			const sl = ev.slot as SlotLabel;
+			// Selection is a single global (not per-slot), and only meaningful for the slot
+			// currently in view; the 'patch' context (Master Clock section) has no on-canvas
+			// module grid to select in this editor.
+			if (sl !== uiStore.slotInFocus || ev.area === 'patch') return true;
+			const area: 0 | 1 = ev.area === 'va' ? 1 : 0;
+			const moduleId = ev.module as number;
+			if (slotsStore.getAreaModules(sl, area).some((m: any) => m.index === moduleId)) {
+				uiStore.selectModules([moduleId], area === 1 ? 'va' : 'fx');
+				uiStore.setSelectedParam(moduleId, ev.param as number);
 			}
 			return true;
 		}

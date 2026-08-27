@@ -17,7 +17,7 @@
 			<CPU :va="slotsStore.activeSlotResources.va" :fx="slotsStore.activeSlotResources.fx" />
 		</div>
 
-		<MorphGroups class="ml-4" />
+		<MorphGroups class="ml-4" @morph-group-label-edit="(info) => emit('morphGroupLabelEdit', info)" />
 
 		<span class="ml-auto"></span>
 	</ToolBar>
@@ -33,6 +33,8 @@
 	import MorphGroups from './MorphGroups.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { usePatchFile } from '../../composables/usePatchFile';
+
+	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
 
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();

@@ -1304,7 +1304,7 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
 int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels) {
 
     if (slot < 0 || slot > 3)            { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)    { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 2)    { g2_err("set-param-label: location must be 0(fx), 1(va) or 2(patch)\n"); return G2_ERR_INVALID_PARAM; }
     if (num_labels <= 0 || num_labels > 128) { g2_err("set-param-label: num_labels out of range\n"); return G2_ERR_INVALID_PARAM; }
 
     if (ensure_connected(0) < 0) { g2_err("set-param-label: failed to connect\n"); return G2_ERR_CONNECT; }
@@ -2064,6 +2064,44 @@ int g2_set_param(int slot, int location, int module_id,
     buff[pos++] = (uint8_t)param_idx;
     buff[pos++] = (uint8_t)value;
     buff[pos++] = (uint8_t)variation;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+    /* No recv_interrupt — WRITE_NO_RESP */
+}
+
+int g2_select_param(int slot, int location, int module_id, int param_idx) {
+    if (slot < 0 || slot > 3)             { g2_err("select-param: invalid slot\n");        return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 2)     { g2_err("select-param: invalid location\n");    return G2_ERR_INVALID_PARAM; }
+    if (module_id < 0 || module_id > 255) { g2_err("select-param: invalid module-id\n");   return G2_ERR_INVALID_PARAM; }
+    if (param_idx < 0 || param_idx > 255) { g2_err("select-param: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0)          { g2_err("select-param: not connected\n");       return G2_ERR_CONNECT; }
+
+    uint8_t version = cable_get_version(slot);
+
+    /* Same category as g2_set_param: this moves the hardware panel's cursor on every
+     * keyboard nav, so it must NOT go through send_slot()/COMMAND_REQ (which acks and
+     * would churn the connection on rapid arrow-key repeats) — COMMAND_WRITE_NO_RESP. */
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = SUB_COMMAND_SEL_PARAM;
+    buff[pos++] = 0x00;
+    buff[pos++] = (uint8_t)location;
+    buff[pos++] = (uint8_t)module_id;
+    buff[pos++] = (uint8_t)param_idx;
 
     int msgLength = pos - COMMAND_OFFSET;
     uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);

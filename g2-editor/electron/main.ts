@@ -460,9 +460,9 @@ app.whenReady().then(async () => {
 				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
 				{ label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
-				{ role: "zoomIn" as const },
-				{ role: "zoomOut" as const },
-				{ role: "resetZoom" as const },
+				{ label: "Zoom In", click: () => win!.webContents.send("menu:action", "zoom-in"), accelerator: "CommandOrControl+=" },
+				{ label: "Zoom Out", click: () => win!.webContents.send("menu:action", "zoom-out"), accelerator: "CommandOrControl+-" },
+				{ label: "Actual Size", click: () => win!.webContents.send("menu:action", "zoom-reset"), accelerator: "CommandOrControl+0" },
 			],
 		},
 		{

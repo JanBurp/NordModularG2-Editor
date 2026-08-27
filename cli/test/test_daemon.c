@@ -224,6 +224,19 @@ void test_daemon_variation_cmd(void) {
     TEST_ASSERT_EQUAL_INT(0, r);
 }
 
+/* Test: select-param (hardware cursor sync) reaches g2_select_param via the daemon's
+ * JSON dispatch — regression test for an arg-count guard mismatch (n >= 5 required but
+ * only 4 args are ever sent) that silently dropped every keyboard-nav cursor sync. Uses
+ * a high module/param id (250/250) unlikely to collide with a real module. */
+void test_daemon_select_param_cmd(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    char cmd[80];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"select-param\",\"args\":[\"A\",\"va\",\"250\",\"250\"]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
+    TEST_ASSERT_EQUAL_INT(0, r);
+}
+
 /* Test 5: A fast burst of set-param commands must not starve listener-forwarded watch
  * events until the whole burst drains — regression test for the daemon main loop's
  * stdin-drain-before-listener-check ordering (see STDIN_DRAIN_BATCH in daemon.c). Uses

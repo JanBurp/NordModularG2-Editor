@@ -1,4 +1,4 @@
-import type { ModuleInstance } from './module';
+import type { ModuleInstance, ParamLabel } from './module';
 
 export interface Cable {
 	colour: number;
@@ -140,6 +140,7 @@ export interface Patch {
 	controllers?: MidiCCAssignment[];
 	paramPages?: ParamPageAssignment[];
 	text?: string; // free-text patch notes ("Text Pad" / C_PATCH_NOTES section)
+	morphParamLabels?: ParamLabel[]; // custom Morph Group names; paramIndex 8-15 = group (paramIndex-8)
 }
 
 export interface ClipboardEntry {

@@ -17,7 +17,9 @@ void test_set_param_label_invalid_slot_high(void) {
 }
 
 void test_set_param_label_invalid_location(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_param_label(0, 2, 1, 0, 1, one_label));
+    /* location=2 ("patch") is now valid — used for morph group labels — so
+     * the invalid case moves to 3. */
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_param_label(0, 3, 1, 0, 1, one_label));
 }
 
 void test_set_param_label_invalid_label_idx(void) {

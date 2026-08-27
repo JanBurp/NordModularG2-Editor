@@ -9,8 +9,10 @@
 		<svg
 			ref="svgRef"
 			font-size="9"
-			:width="canvasWidth"
-			:height="canvasHeight"
+			:width="canvasWidth * zoom"
+			:height="canvasHeight * zoom"
+			:viewBox="`0 0 ${canvasWidth} ${canvasHeight}`"
+			preserveAspectRatio="xMinYMin meet"
 			style="min-width: 100%"
 			xmlns="http://www.w3.org/2000/svg"
 			@mousedown="handleCanvasMousedown"
@@ -157,6 +159,9 @@
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
+	const settingsStore = useSettingsStore();
+	const zoom = computed(() => settingsStore.canvasZoom);
+
 	const hoveredJack = ref<JackEnd | null>(null);
 	function onJackHoverEnter(info: JackEnd) {
 		hoveredJack.value = info;
@@ -170,6 +175,7 @@
 		computed(() => props.modules as any[]),
 		selectionRectEl,
 		props.area,
+		() => zoom.value,
 	);
 
 	const canvasWidth = computed(() => {
@@ -223,18 +229,18 @@
 		emit('modeChange', moduleIndex, index, value);
 	}
 
+	const uiStore = useUiStore();
+	const { open: openContextMenu } = useContextMenu();
+	const { addModuleAt } = useAddModule();
+
 	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
+		() => zoom.value,
 	);
 
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
-
-	const uiStore = useUiStore();
-	const settingsStore = useSettingsStore();
-	const { open: openContextMenu } = useContextMenu();
-	const { addModuleAt } = useAddModule();
 
 	function onCanvasContextMenu(e: MouseEvent) {
 		const grid = svgClientToGrid(e.clientX, e.clientY);

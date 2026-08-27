@@ -4,6 +4,7 @@ import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoR
 import { getModule } from '../renderer/nmg2mods';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
+import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
 
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
@@ -1998,6 +1999,42 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			this._markSlotDirty(slot);
 			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels]);
+		},
+
+		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
+		// fixed PATCH_MORPH pseudo-module (location=2/"patch") — same $PARAM_NAMES/set-param-label
+		// mechanism as setParamLabel above, decoupled from morph modulation assignments.
+		async setMorphGroupLabel(groupIndex: number, label: string): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const paramIndex = 8 + groupIndex;
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const prevLabel = patch.morphParamLabels?.find((pl) => pl.paramIndex === paramIndex)?.labels?.[0] ?? '';
+				hist.record(slot, {
+					undo: async () => {
+						await this.setMorphGroupLabel(groupIndex, prevLabel);
+					},
+					redo: async () => {
+						await this.setMorphGroupLabel(groupIndex, label);
+					},
+				});
+			}
+
+			if (!patch.morphParamLabels) patch.morphParamLabels = [];
+			let entry = patch.morphParamLabels.find((pl) => pl.paramIndex === paramIndex);
+			if (!entry) {
+				// isString: true matches how the real hardware encodes morph group labels
+				// (confirmed from a shipped .pch2's own $PARAM_NAMES(areaIdx=2) section).
+				entry = { paramIndex, isString: true, paramLen: 8, labels: [label] };
+				patch.morphParamLabels.push(entry);
+			} else {
+				entry.labels[0] = label;
+			}
+			this._markSlotDirty(slot);
+			await window.cli.run(['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label]);
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

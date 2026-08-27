@@ -476,6 +476,44 @@ describe('paramLabels round-trip', () => {
 	});
 });
 
+describe('morphParamLabels round-trip', () => {
+	// EmptyPatch.pch2 ships with a real $PARAM_NAMES(areaIdx=2) section holding the hardware's
+	// own default Morph Group labels — confirms the parser reads real morph-label data, not
+	// just synthetic test data.
+	const DEFAULT_MORPH_LABELS: ParamLabel[] = ['Wheel', 'Vel', 'Keyb', 'Aft.Tch', 'Sust.Pd', 'Ctrl.Pd', 'P.Stick', 'G.Wh 2'].map((label, i) => ({
+		paramIndex: 8 + i,
+		isString: true,
+		paramLen: 8,
+		labels: [label],
+	}));
+
+	it('parses the default morph labels already present in a real fixture', () => {
+		const { patch } = loadFixture('EmptyPatch.pch2');
+		expect(patch.morphParamLabels).toEqual(DEFAULT_MORPH_LABELS);
+	});
+
+	it('preserves a renamed morph group label through round-trip', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+
+		patch.morphParamLabels = DEFAULT_MORPH_LABELS.map((e) => (e.paramIndex === 8 ? { ...e, labels: ['Foo'] } : e));
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.morphParamLabels).toEqual(patch.morphParamLabels);
+	});
+
+	it('omits the areaIdx=2 $5b chunk once morphParamLabels is cleared', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+		patch.morphParamLabels = undefined;
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.morphParamLabels).toBeUndefined();
+	});
+});
+
 describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLoad)', () => {
 	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
 		it(`unmodified patch — ${file}`, () => {
