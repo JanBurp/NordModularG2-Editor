@@ -24,9 +24,6 @@
 				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
 				<div v-else class="w-8 h-8 rounded-full border border-line-default opacity-40 my-1" />
 
-				<!-- Physical pushbutton below the knob. Targets whatever ParameterPages.vue's buttonParams
-				     lookup resolves (mirrors the knob's own param, a different param, or none at all) —
-				     see the buttonParamIndex comment below. -->
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
 					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
 				</span>
@@ -45,8 +42,25 @@
 
 		<ToolBarDivider></ToolBarDivider>
 
-		<div class="flex flex-col h-full">
-			<div class="grow">&nbsp;</div>
+		<div class="flex flex-col gap-1">
+			<div class="flex gap-2">
+				<BtnGroup
+					:model-value="uiStore.displayedParamPage"
+					:options="pageOptions"
+					variant="toggle"
+					vertical
+					testIdPrefix="param-page"
+					@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
+					class="w-8"
+				/>
+				<div class="flex flex-col text-content-muted">
+					<div>Osc</div>
+					<div>LFO</div>
+					<div>Env</div>
+					<div>Filter</div>
+					<div>Effect</div>
+				</div>
+			</div>
 			<BtnGroup
 				:model-value="uiStore.selectedParamBank + 1"
 				:options="bankOptions"
@@ -55,15 +69,6 @@
 				@update:model-value="(v) => uiStore.setSelectedParamBank((v as number) - 1)"
 			/>
 		</div>
-
-		<BtnGroup
-			:model-value="uiStore.displayedParamPage"
-			:options="pageOptions"
-			variant="toggle"
-			vertical
-			testIdPrefix="param-page"
-			@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
-		/>
 	</ToolBar>
 </template>
 
@@ -207,7 +212,7 @@
 			const isContinuation = sameModule(cell.assignment, base[i - 1]?.assignment ?? null);
 			if (!isContinuation) return { ...cell, moduleHeader: cell.moduleLabel };
 			const isLastOfRun = !sameModule(cell.assignment, base[i + 1]?.assignment ?? null);
-			return { ...cell, moduleHeader: isLastOfRun ? '———]' : '———' };
+			return { ...cell, moduleHeader: isLastOfRun ? '—————]' : '—————' };
 		});
 	});
 
