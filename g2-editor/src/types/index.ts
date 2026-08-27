@@ -33,7 +33,10 @@ export type MenuAction =
 	| 'variation-8'
 	| 'show-module-help'
 	| 'undo'
-	| 'redo';
+	| 'redo'
+	| 'zoom-in'
+	| 'zoom-out'
+	| 'zoom-reset';
 
 export interface SlotInfo {
 	slot: SlotLabel;

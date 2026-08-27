@@ -177,6 +177,15 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'show-key-commands':
 					uiStore.showKeyCommandsPage = true;
 					break;
+				case 'zoom-in':
+					useSettingsStore().zoomIn();
+					break;
+				case 'zoom-out':
+					useSettingsStore().zoomOut();
+					break;
+				case 'zoom-reset':
+					useSettingsStore().resetCanvasZoom();
+					break;
 				case 'undo':
 					await slotsStore.undo();
 					break;

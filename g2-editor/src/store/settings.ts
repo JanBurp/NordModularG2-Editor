@@ -21,6 +21,7 @@ export const useSettingsStore = defineStore('settings', {
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,
 		knobSensitivity: 1 as number,
+		canvasZoom: 1 as number,
 	}),
 	actions: {
 		toggleExtendedToolBar() {
@@ -64,6 +65,18 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setKnobSensitivity(value: number) {
 			this.knobSensitivity = Math.max(0.1, Math.min(10, value));
+		},
+		setCanvasZoom(value: number) {
+			this.canvasZoom = Math.max(0.25, Math.min(3, value));
+		},
+		zoomIn() {
+			this.setCanvasZoom(this.canvasZoom + 0.1);
+		},
+		zoomOut() {
+			this.setCanvasZoom(this.canvasZoom - 0.1);
+		},
+		resetCanvasZoom() {
+			this.canvasZoom = 1;
 		},
 	},
 	persist: true,

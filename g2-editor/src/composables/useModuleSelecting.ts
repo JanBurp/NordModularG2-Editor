@@ -17,6 +17,7 @@ export function useModuleSelecting(
 	modules: Ref<ModuleInstance[]> | ComputedRef<ModuleInstance[]>,
 	rectEl: Ref<HTMLDivElement | null>,
 	area: string,
+	getZoom: () => number,
 ) {
 	const uiStore = useUiStore();
 	const shiftHeld = ref(false);
@@ -52,10 +53,13 @@ export function useModuleSelecting(
 	function updateRect(x1: number, y1: number, x2: number, y2: number) {
 		const el = rectEl.value;
 		if (!el) return;
-		el.style.left = Math.min(x1, x2) + 'px';
-		el.style.top = Math.min(y1, y2) + 'px';
-		el.style.width = Math.abs(x2 - x1) + 'px';
-		el.style.height = Math.abs(y2 - y1) + 'px';
+		// x1/y1/x2/y2 are SVG user-space coords; rectEl is a plain HTML overlay positioned in
+		// screen pixels, so scale by zoom to match the SVG's viewBox-scaled on-screen size.
+		const zoom = getZoom();
+		el.style.left = Math.min(x1, x2) * zoom + 'px';
+		el.style.top = Math.min(y1, y2) * zoom + 'px';
+		el.style.width = Math.abs(x2 - x1) * zoom + 'px';
+		el.style.height = Math.abs(y2 - y1) * zoom + 'px';
 	}
 
 	function getModulesInRect(x1: number, y1: number, x2: number, y2: number): number[] {
