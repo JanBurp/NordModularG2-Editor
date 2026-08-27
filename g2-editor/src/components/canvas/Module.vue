@@ -69,14 +69,15 @@
 		</g>
 
 		<!-- Parameters -->
-		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
+		<g class="params" @dragover="onParamDragOver" @drop="onParamDrop">
 			<g
 				v-for="(param, index) in moduleDef.params"
 				:key="param.name"
 				:data-param-index="index"
-				:draggable="altHeld"
+				:data-param-location="morphLocation"
+				:data-module-index="moduleIdx"
+				class="cursor-pointer"
 				@mousedown.capture="onParamMorphMouseDown(index, $event)"
-				@dragstart="onParamPageDragStart(index, $event)"
 			>
 				<ModuleKnob
 					v-if="isKnob(param.n)"
@@ -219,7 +220,8 @@
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
-	import { buildParamPageMenuItems, useAltHeld } from '../../composables/useParamPageAssign';
+	import { buildParamPageMenuItems } from '../../composables/useParamPageAssign';
+	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
 
@@ -400,9 +402,17 @@
 	// Renders its live range badge via MorphDragHintOverlay (canvas-level, painted after every
 	// module) instead of locally, so the badge always stays above other modules on the canvas.
 	const { startDrag } = useMorphRangeDrag();
-	const { altHeld } = useAltHeld();
 
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+		if (e.altKey) {
+			// Alt+drag this param onto a Parameter Pages toolbar knob to assign it. Uses a custom
+			// pointer-tracked drag (useParamPageDrag.ts) instead of native HTML5 DnD — see that file's
+			// header comment for why. stopPropagation() (inside startParamPageDrag) also blocks the
+			// knob/slider/etc. widget's own mousedown-drag from engaging underneath this gesture.
+			const label = moduleDef.value?.params?.[paramIndex]?.name ?? 'Param';
+			startParamPageDrag(e, { kind: 'param', location: morphLocation.value, moduleIndex: moduleIdx.value, paramIndex, label });
+			return;
+		}
 		if (!isGrabModifierPressed(e)) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
@@ -426,22 +436,14 @@
 		});
 	}
 
-	// Alt+drag a param onto a Parameter Pages toolbar knob slot to assign it (ParameterPages.vue's
-	// drop handler). Only reachable while altHeld is true (see :draggable on the param <g>).
-	function onParamPageDragStart(paramIndex: number, e: DragEvent) {
-		if (!e.dataTransfer) return;
-		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		e.dataTransfer.effectAllowed = 'copy';
-		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'param', location, moduleIndex: moduleIdx.value, paramIndex }));
-	}
-
-	function onParamCCDragOver(e: DragEvent) {
+	function onParamDragOver(e: DragEvent) {
 		e.preventDefault();
 	}
 
-	function onParamCCDrop(e: DragEvent) {
-		const data = parseCCDragPayload(e);
-		if (!data) return;
+	// Drop target for a dragged MIDI CC badge (assign). A dragged Parameter Pages toolbar knob is
+	// handled separately by useParamPageDrag.ts's own elementFromPoint-based drop detection, not via
+	// native DnD.
+	function onParamDrop(e: DragEvent) {
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
 		let el = e.target as Element | null;
@@ -450,7 +452,12 @@
 		const paramIndex = parseInt(el.getAttribute('data-param-index') ?? '');
 		if (isNaN(paramIndex)) return;
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+
+		const ccData = parseCCDragPayload(e);
+		if (ccData) {
+			slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, ccData.cc);
+			e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
+		}
 	}
 
 	function onParamContextMenu(paramIndex: number, event: MouseEvent, labelIndex = 0) {
@@ -519,7 +526,6 @@
 		items.push(
 			...buildParamPageMenuItems({
 				slot,
-				bank: uiStore.selectedParamBank,
 				location: location as 0 | 1,
 				moduleIndex: moduleIdx.value,
 				paramIndex,

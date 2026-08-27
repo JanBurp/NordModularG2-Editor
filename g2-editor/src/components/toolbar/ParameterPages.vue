@@ -5,11 +5,9 @@
 			<div
 				v-for="cell in cells"
 				:key="cell.slotIndex"
-				class="flex flex-col items-center w-16 gap-1"
-				:draggable="altHeld"
-				@dragstart="onCellDragStart(cell, $event)"
-				@dragover.prevent
-				@drop="onDrop(cell.slotIndex, $event)"
+				class="flex flex-col items-center w-16 gap-1 select-none cursor-pointer"
+				:data-knob-slot="cell.slotIndex"
+				@mousedown.capture="onCellMouseDownCapture(cell, $event)"
 				@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			>
 				<span class="text-xs w-full truncate text-center font-bold" :class="{ 'opacity-40': !cell.assignment }">
@@ -24,7 +22,12 @@
 					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '—' }}</div>
 				</div>
 
-				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
+				<Knob
+					v-if="cell.assignment"
+					:value="cell.value"
+					:class="{ 'pointer-events-none': altHeld }"
+					@change="(v) => onKnobChange(cell.assignment!, v)"
+				/>
 				<!-- Matches Knob.vue's own rendered size exactly (SVG is radius+16 = 26px for the
 				     default KnobMedium type) so the row height doesn't shift between assigned/empty cells. -->
 				<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
@@ -35,6 +38,7 @@
 				<div
 					v-if="cell.assignment && cell.hasButton"
 					class="btn btn-xs w-full truncate text-center"
+					:class="{ 'pointer-events-none': altHeld }"
 					@mousedown="onButtonMouseDown(cell)"
 					@mouseup="onButtonMouseUp(cell)"
 					@click="onButtonClick(cell)"
@@ -89,7 +93,8 @@
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { useAltHeld, parseParamDragPayload } from '../../composables/useParamPageAssign';
+	import { useAltHeld } from '../../composables/useParamPageAssign';
+	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor } from '../../renderer/paramPages';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
@@ -267,39 +272,15 @@
 		openContextMenu(event, items);
 	}
 
-	// Drag source for knob-to-knob move/swap within the toolbar (gated on Alt, like canvas param
-	// drag, so it doesn't compete with the Knob's own mousedown-based value-drag gesture).
-	function onCellDragStart(cell: Cell, e: DragEvent) {
-		if (!cell.assignment || !e.dataTransfer) return;
-		e.dataTransfer.effectAllowed = 'move';
-		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'knob-slot', slotIndex: cell.slotIndex }));
-	}
-
-	// Drop target for both: an Alt-dragged canvas param (assign) and another toolbar knob (move/swap).
-	function onDrop(targetSlotIndex: number, e: DragEvent) {
-		const slot = uiStore.slotInFocus;
-		if (!slot) return;
-
-		const paramPayload = parseParamDragPayload(e);
-		if (paramPayload) {
-			slotsStore.assignParamToPage(slot, targetSlotIndex, paramPayload.location, paramPayload.moduleIndex, paramPayload.paramIndex);
-			return;
-		}
-
-		const raw = e.dataTransfer?.getData('text/plain');
-		if (!raw) return;
-		let data: any;
-		try {
-			data = JSON.parse(raw);
-		} catch {
-			return;
-		}
-		if (data.type !== 'knob-slot' || data.slotIndex === targetSlotIndex) return;
-		const sourceSlotIndex = data.slotIndex as number;
-		const source = slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === sourceSlotIndex);
-		if (!source) return;
-		const target = slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === targetSlotIndex);
-		slotsStore.assignParamToPage(slot, targetSlotIndex, source.location, source.moduleIndex, source.paramIndex);
-		if (target) slotsStore.assignParamToPage(slot, sourceSlotIndex, target.location, target.moduleIndex, target.paramIndex);
+	// Alt+mousedown on an assigned cell starts a custom pointer-tracked drag (useParamPageDrag.ts) —
+	// onto another toolbar knob (move/swap) or onto a canvas param (assign) — instead of native HTML5
+	// DnD; see that file's header comment for why. The Knob/button children get pointer-events-none
+	// while Alt is held (template) so this mousedown always lands on the cell itself rather than
+	// racing their own mousedown-based gestures (useKnob.ts/useDragInteraction.ts value-drag, trigger
+	// press/release) — .capture here is just defense-in-depth.
+	function onCellMouseDownCapture(cell: Cell, e: MouseEvent) {
+		if (!e.altKey) return;
+		e.stopPropagation();
+		if (cell.assignment) startParamPageDrag(e, { kind: 'knob-slot', slotIndex: cell.slotIndex, label: cell.paramLabel });
 	}
 </script>
