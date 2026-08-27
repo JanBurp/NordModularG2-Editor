@@ -218,7 +218,8 @@
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
 	import { useDeviceStore } from '../../store/device';
-	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
+	import { buildCCMenuItems } from '../../composables/useMidiCC';
+	import { parseDragPayload } from '../../utils/dragPayload';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
 	import { buildParamPageMenuItems } from '../../composables/useParamPageAssign';
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
@@ -410,7 +411,7 @@
 			// header comment for why. stopPropagation() (inside startParamPageDrag) also blocks the
 			// knob/slider/etc. widget's own mousedown-drag from engaging underneath this gesture.
 			const label = moduleDef.value?.params?.[paramIndex]?.name ?? 'Param';
-			startParamPageDrag(e, { kind: 'param', location: morphLocation.value, moduleIndex: moduleIdx.value, paramIndex, label });
+			startParamPageDrag(e, { location: morphLocation.value, moduleIndex: moduleIdx.value, paramIndex, label });
 			return;
 		}
 		if (!isGrabModifierPressed(e)) return;
@@ -440,12 +441,14 @@
 		e.preventDefault();
 	}
 
-	// Drop target for a dragged MIDI CC badge (assign). A dragged Parameter Pages toolbar knob is
-	// handled separately by useParamPageDrag.ts's own elementFromPoint-based drop detection, not via
-	// native DnD.
+	// Drop target for a dragged MIDI CC row (assign a CC) and for a dragged Parameter Pages knob
+	// (assign this param to that knob slot). Both arrive as native DnD from an HTML source; the
+	// reverse direction — this param dragged onto a toolbar knob — is useParamPageDrag.ts instead.
 	function onParamDrop(e: DragEvent) {
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
+		const data = parseDragPayload(e);
+		if (!data) return;
 		let el = e.target as Element | null;
 		while (el && !el.hasAttribute('data-param-index')) el = el.parentElement;
 		if (!el) return;
@@ -453,11 +456,9 @@
 		if (isNaN(paramIndex)) return;
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
 
-		const ccData = parseCCDragPayload(e);
-		if (ccData) {
-			slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, ccData.cc);
-			e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
-		}
+		if (data.type === 'cc') slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+		else slotsStore.assignParamToPage(slot, data.slotIndex, location, moduleIdx.value, paramIndex);
+		e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
 	}
 
 	function onParamContextMenu(paramIndex: number, event: MouseEvent, labelIndex = 0) {

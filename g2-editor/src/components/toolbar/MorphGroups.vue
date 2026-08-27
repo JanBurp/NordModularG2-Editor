@@ -47,7 +47,8 @@
 	import { MORPH_NAMES } from '../../types/patch';
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { buildCCMenuItems, parseCCDragPayload, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import { parseDragPayload } from '../../utils/dragPayload';
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
@@ -109,8 +110,8 @@
 	}
 
 	function onMorphCCDrop(morphIdx: number, event: DragEvent) {
-		const data = parseCCDragPayload(event);
-		if (!data) return;
+		const data = parseDragPayload(event);
+		if (data?.type !== 'cc') return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
 		slotsStore.assignMidiCC(slot, 2, 1, morphIdx, data.cc);

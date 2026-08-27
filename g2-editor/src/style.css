@@ -136,6 +136,23 @@ body {
 	@apply border border-black text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
 }
 
+/* Parameter Pages assign-drag cursors (root classes toggled by ParamDragGhost.vue). Scoped to the
+   drag source / drop target elements so the rest of the canvas and toolbar keep their own cursors,
+   and `!important` in a stylesheet — unlike an inherited cursor — outranks the inline `cursor` that
+   ModuleKnob.vue/Knob.vue put on the widget under the pointer. */
+.alt-assign [data-param-index],
+.alt-assign [data-param-index] *,
+.alt-assign [data-knob-slot],
+.alt-assign [data-knob-slot] * {
+	cursor: grab !important;
+}
+
+/* Canvas -> toolbar drag in progress: one cursor everywhere, including outside the canvas SVG. */
+.param-dragging,
+.param-dragging * {
+	cursor: grabbing !important;
+}
+
 .selection-rect {
 	display: none;
 	position: absolute;

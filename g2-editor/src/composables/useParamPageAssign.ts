@@ -44,10 +44,10 @@ export function buildParamPageMenuItems(opts: {
 	return [assignItem, deassignItem];
 }
 
-// Alt-held state, refcounted via useKeyHoldOverlay's shared registry — gates :draggable on canvas
-// params so native HTML5 drag-start (Alt+drag a param onto a Parameter Pages toolbar knob) only
-// activates while Alt is physically held, never competing with the existing mousedown-based
-// knob-value-drag / Ctrl+drag-morph gestures on the same element.
+// Alt-held state, refcounted via useKeyHoldOverlay's shared registry. Gates the Parameter Pages
+// assign-drag affordances so they only arm while Alt is physically held and never compete with the
+// mousedown-based knob-value-drag / Ctrl+drag-morph gestures on the same elements: :draggable and
+// pointer-events on the toolbar knobs (ParameterPages.vue), and the drag cursors (ParamDragGhost.vue).
 export function useAltHeld() {
 	const { isVisible } = useKeyHoldOverlay('Alt');
 	return { altHeld: isVisible };

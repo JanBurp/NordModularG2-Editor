@@ -661,3 +661,70 @@ describe('assignParamToPage / deassignParamPage', () => {
 		expect(useHistoryStore().canUndo('A')).toBe(true);
 	});
 });
+
+describe('swapParamPageSlots', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	function at(slotIndex: number) {
+		return useSlotsStore().slots['A'].paramPages.find((k) => k.slotIndex === slotIndex);
+	}
+
+	it('moves the assignment when the target slot is empty', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+
+		await store.swapParamPageSlots('A', 3, 9);
+
+		expect(at(3)).toBeUndefined();
+		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['deassign-knob', 'A', '3']);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '5', '9']);
+	});
+
+	it('exchanges both assignments when the target slot is occupied', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+
+		await store.swapParamPageSlots('A', 3, 9);
+
+		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
+		expect(at(3)).toMatchObject({ location: 0, moduleIndex: 4, paramIndex: 1 });
+	});
+
+	// The reason this action exists: two assignParamToPage calls recorded two entries, so one Ctrl+Z
+	// left the swap half-applied.
+	it('records the swap as a single undo entry that restores both slots at once', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+		const before = [...store.slots['A'].paramPages];
+
+		await store.swapParamPageSlots('A', 3, 9);
+		await store.undo();
+
+		expect(store.slots['A'].paramPages).toEqual(before);
+		expect(store.slots['A'].patch!.paramPages).toEqual(before);
+
+		await store.redo();
+		expect(at(9)).toMatchObject({ moduleIndex: 2, paramIndex: 5 });
+		expect(at(3)).toMatchObject({ moduleIndex: 4, paramIndex: 1 });
+	});
+
+	it('does nothing when the source slot is empty or is the target', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+		const before = [...store.slots['A'].paramPages];
+
+		await store.swapParamPageSlots('A', 3, 9);
+		await store.swapParamPageSlots('A', 9, 9);
+
+		expect(store.slots['A'].paramPages).toEqual(before);
+	});
+});

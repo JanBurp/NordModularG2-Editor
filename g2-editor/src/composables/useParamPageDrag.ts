@@ -2,9 +2,12 @@ import { reactive, readonly } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 
-export type ParamDragPayload =
-	| { kind: 'param'; location: 0 | 1; moduleIndex: number; paramIndex: number; label: string }
-	| { kind: 'knob-slot'; slotIndex: number; label: string };
+export interface ParamDragPayload {
+	location: 0 | 1;
+	moduleIndex: number;
+	paramIndex: number;
+	label: string;
+}
 
 interface DragState {
 	active: boolean;
@@ -20,13 +23,14 @@ export function useParamPageDragState() {
 	return readonly(state);
 }
 
-// Custom pointer-tracked drag for assigning a canvas param <-> a Parameter Pages toolbar knob slot,
-// in either direction. Native HTML5 drag-and-drop was tried first but proved unreliable: dragging
-// FROM the canvas's SVG <g> param elements never reliably started a native drag session (Chromium's
-// drag-source recognition is flaky for SVG), and dragging FROM the toolbar's HTML cells raced with
-// native text-selection dragging. This sidesteps the browser's drag-and-drop recognition entirely —
-// just mouse tracking + elementFromPoint on release — matching how the rest of the canvas's own drag
-// gestures (module move, cable drag, knob value-drag) already work in this codebase.
+// Canvas param -> Parameter Pages toolbar knob, as a custom pointer-tracked drag: native HTML5
+// drag-and-drop never reliably starts a drag session FROM the canvas's SVG <g> param elements
+// (Chromium's drag-source recognition is flaky for SVG), so this sidesteps the browser's
+// recognition entirely — mouse tracking plus elementFromPoint on release.
+//
+// The opposite direction (toolbar knob -> canvas param) does use native DnD, in ParameterPages.vue:
+// there the drag source is plain HTML, which Chromium handles fine, and the SVG side only has to be
+// a drop target — the same HTML-source/SVG-target path MidiCCPane.vue has always used successfully.
 export function startParamPageDrag(e: MouseEvent, payload: ParamDragPayload) {
 	e.preventDefault();
 	e.stopPropagation();
@@ -52,43 +56,14 @@ export function startParamPageDrag(e: MouseEvent, payload: ParamDragPayload) {
 }
 
 function handleDrop(target: Element, payload: ParamDragPayload) {
-	const slotsStore = useSlotsStore();
-	const uiStore = useUiStore();
-	const slot = uiStore.slotInFocus;
+	const slot = useUiStore().slotInFocus;
 	if (!slot) return;
 
-	// Dropped onto a canvas param (Module.vue's param <g>, tagged with data-param-index/
-	// data-param-location/data-module-index)?
-	let paramEl: Element | null = target;
-	while (paramEl && !paramEl.hasAttribute('data-param-index')) paramEl = paramEl.parentElement;
-	if (paramEl) {
-		const paramIndex = parseInt(paramEl.getAttribute('data-param-index') ?? '');
-		const location = parseInt(paramEl.getAttribute('data-param-location') ?? '');
-		const moduleIndex = parseInt(paramEl.getAttribute('data-module-index') ?? '');
-		if (!isNaN(paramIndex) && !isNaN(location) && !isNaN(moduleIndex) && payload.kind === 'knob-slot') {
-			slotsStore.assignParamToPage(slot, payload.slotIndex, location as 0 | 1, moduleIndex, paramIndex);
-		}
-		return;
-	}
-
-	// Dropped onto a Parameter Pages toolbar cell (tagged with data-knob-slot)?
+	// Dropped onto a Parameter Pages knob (ParameterPages.vue's knob wrapper, tagged data-knob-slot)?
 	let cellEl: Element | null = target;
 	while (cellEl && !cellEl.hasAttribute('data-knob-slot')) cellEl = cellEl.parentElement;
-	if (cellEl) {
-		const targetSlotIndex = parseInt(cellEl.getAttribute('data-knob-slot') ?? '');
-		if (isNaN(targetSlotIndex)) return;
-		if (payload.kind === 'param') {
-			slotsStore.assignParamToPage(slot, targetSlotIndex, payload.location, payload.moduleIndex, payload.paramIndex);
-			return;
-		}
-		if (payload.slotIndex === targetSlotIndex) return;
-		// Knob-to-knob move/swap.
-		const source = slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === payload.slotIndex);
-		if (!source) return;
-		const previousOccupant = slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === targetSlotIndex);
-		slotsStore.assignParamToPage(slot, targetSlotIndex, source.location, source.moduleIndex, source.paramIndex);
-		if (previousOccupant) {
-			slotsStore.assignParamToPage(slot, payload.slotIndex, previousOccupant.location, previousOccupant.moduleIndex, previousOccupant.paramIndex);
-		}
-	}
+	if (!cellEl) return;
+	const slotIndex = parseInt(cellEl.getAttribute('data-knob-slot') ?? '');
+	if (isNaN(slotIndex)) return;
+	useSlotsStore().assignParamToPage(slot, slotIndex, payload.location, payload.moduleIndex, payload.paramIndex);
 }

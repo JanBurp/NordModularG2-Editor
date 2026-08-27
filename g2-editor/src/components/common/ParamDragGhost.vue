@@ -19,16 +19,17 @@
 	const { altHeld } = useAltHeld();
 
 	// Global cursor feedback for the Alt-drag gesture, centralized here (this component is mounted
-	// once, app-wide) rather than as a per-element CSS class: a plain class-based cursor on the
-	// draggable param/knob loses to child widgets' own inline `cursor` style (e.g. Knob.vue's
-	// ns-resize/ew-resize), so `!important` is needed to reliably win over those while Alt is held or
-	// a drag is in progress.
+	// once, app-wide). These flags only switch the two root classes on; the cursors themselves live in
+	// style.css, scoped to the drag source / drop target elements. Setting the cursor on <body>
+	// instead does NOT work: `!important` raises the priority of the body's own declaration, it does
+	// not beat a cursor declared on the element actually under the pointer (ModuleKnob.vue's inline
+	// ns-resize, the param <g>'s cursor-pointer), while it *does* leak onto every element that has no
+	// cursor of its own — the exact inverse of what this gesture needs.
 	watch(
 		[() => drag.active, altHeld],
 		([active, alt]) => {
-			if (active) document.body.style.setProperty('cursor', 'grabbing', 'important');
-			else if (alt) document.body.style.setProperty('cursor', 'grab', 'important');
-			else document.body.style.removeProperty('cursor');
+			document.documentElement.classList.toggle('param-dragging', active);
+			document.documentElement.classList.toggle('alt-assign', alt && !active);
 		},
 		{ immediate: true },
 	);

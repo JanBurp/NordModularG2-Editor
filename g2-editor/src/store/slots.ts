@@ -2600,6 +2600,57 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`
+		// (one assign-knob or deassign-knob each, matching what the hardware expects per slot).
+		// Undo/redo of a multi-slot edit is just this applied to the before/after list.
+		async _applyParamPages(slot: SlotLabel, list: ParamPageAssignment[], touched: number[]): Promise<void> {
+			this.slots[slot].paramPages = [...list];
+			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...list];
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			for (const slotIndex of touched) {
+				const entry = list.find((k) => k.slotIndex === slotIndex);
+				if (entry) {
+					const locStr = morphLocationStr(entry.location);
+					await window.cli.run(['assign-knob', slot, locStr, String(entry.moduleIndex), String(entry.paramIndex), String(slotIndex)]);
+				} else {
+					await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
+				}
+			}
+		},
+
+		// Moves a knob slot's assignment onto another slot, exchanging with that slot's occupant when
+		// it has one. Both writes are computed as a single new list rather than as two
+		// assignParamToPage calls, so the pair lands as ONE undo entry — otherwise a single Ctrl+Z
+		// leaves the swap half-applied.
+		async swapParamPageSlots(slot: SlotLabel, sourceSlotIndex: number, targetSlotIndex: number): Promise<void> {
+			if (sourceSlotIndex === targetSlotIndex) return;
+			const prev = [...this.slots[slot].paramPages];
+			const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
+			if (!source) return;
+			const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
+
+			const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
+			next.push({ ...source, slotIndex: targetSlotIndex });
+			if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex });
+
+			const touched = [sourceSlotIndex, targetSlotIndex];
+			await this._applyParamPages(slot, next, touched);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						await this._applyParamPages(slot, prev, touched);
+					},
+					redo: async () => {
+						await this._applyParamPages(slot, next, touched);
+					},
+				});
+			}
+		},
+
 		async deassignParamPage(slot: SlotLabel, slotIndex: number): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
 			this.slots[slot].paramPages = prev.filter((k) => k.slotIndex !== slotIndex);

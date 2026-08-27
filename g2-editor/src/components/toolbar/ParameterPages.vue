@@ -6,26 +6,44 @@
 				v-for="cell in cells"
 				:key="cell.slotIndex"
 				class="flex flex-col items-center w-16 gap-1 select-none cursor-pointer"
-				:data-knob-slot="cell.slotIndex"
-				@mousedown.capture="onCellMouseDownCapture(cell, $event)"
 				@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			>
 				<span class="text-xs w-full truncate text-center font-bold" :class="{ 'opacity-40': !cell.assignment }">
 					{{ cell.moduleHeader }}
 				</span>
 
-				<div class="w-full rounded-xs px-1 text-center" :class="cell.assignment ? 'bg-surface-3' : 'border border-line-default opacity-40'">
+				<!-- Both states carry the border and differ only in its colour: this box is the one cell child
+				     with auto height, so a border only on the empty variant would add 2px there and make the
+				     whole toolbar change height as pages fill up. (The knob and button placeholders below
+				     have explicit heights, where border-box already absorbs their border.) -->
+				<div
+					class="w-full rounded-xs px-1 text-center border"
+					:class="cell.assignment ? 'bg-surface-3 border-transparent' : 'border-line-default opacity-40'"
+				>
 					<div class="text-xs truncate">{{ cell.assignment ? cell.paramLabel : '—' }}</div>
 					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '—' }}</div>
 				</div>
 
-				<Knob
-					v-if="cell.assignment"
-					:value="cell.value"
-					:class="{ 'pointer-events-none': altHeld }"
-					@change="(v) => onKnobChange(cell.assignment!, v)"
-				/>
-				<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
+				<!-- The knob alone — not the whole cell — is the Alt+drag source and drop target for page
+				     assignment, so data-knob-slot lives here and the grab cursor (style.css's .alt-assign
+				     rules) covers only the knob. The wrapper stays hit-testable while the Knob inside goes
+				     pointer-events-none under Alt, so the gesture never races useKnob.ts's value-drag.
+				     Empty slots drag too: dropping one on a canvas param assigns that param here. -->
+				<div
+					:data-knob-slot="cell.slotIndex"
+					:draggable="altHeld"
+					@dragstart="onKnobDragStart(cell, $event)"
+					@dragover.prevent
+					@drop.prevent="onKnobDrop(cell, $event)"
+				>
+					<Knob
+						v-if="cell.assignment"
+						:value="cell.value"
+						:class="{ 'pointer-events-none': altHeld }"
+						@change="(v) => onKnobChange(cell.assignment!, v)"
+					/>
+					<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
+				</div>
 
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
 					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
@@ -88,8 +106,9 @@
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAltHeld } from '../../composables/useParamPageAssign';
-	import { startParamPageDrag } from '../../composables/useParamPageDrag';
-	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor } from '../../renderer/paramPages';
+	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../../renderer/paramPages';
+	import { serializeDragPayload, parseDragPayload } from '../../utils/dragPayload';
+	import { setBadgeDragImage } from '../../utils/badgeLayout';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { getParam } from '../../renderer/parammap';
@@ -266,15 +285,23 @@
 		openContextMenu(event, items);
 	}
 
-	// Alt+mousedown on an assigned cell starts a custom pointer-tracked drag (useParamPageDrag.ts) —
-	// onto another toolbar knob (move/swap) or onto a canvas param (assign) — instead of native HTML5
-	// DnD; see that file's header comment for why. The Knob/button children get pointer-events-none
-	// while Alt is held (template) so this mousedown always lands on the cell itself rather than
-	// racing their own mousedown-based gestures (useKnob.ts/useDragInteraction.ts value-drag, trigger
-	// press/release) — .capture here is just defense-in-depth.
-	function onCellMouseDownCapture(cell: Cell, e: MouseEvent) {
-		if (!e.altKey) return;
-		e.stopPropagation();
-		if (cell.assignment) startParamPageDrag(e, { kind: 'knob-slot', slotIndex: cell.slotIndex, label: cell.paramLabel });
+	// Alt+drag a knob onto a canvas param (assign) or onto another knob (move/swap). This direction is
+	// plain HTML5 DnD — an HTML drag source, which Chromium handles reliably, exactly like
+	// MidiCCPane.vue's CC rows. Only the reverse direction needs useParamPageDrag.ts's custom
+	// pointer-tracked drag, because an SVG drag source is the case Chromium doesn't handle.
+	// `draggable` is gated on altHeld so a plain drag still turns the knob.
+	function onKnobDragStart(cell: Cell, e: DragEvent) {
+		if (!e.dataTransfer) return;
+		e.dataTransfer.effectAllowed = 'move';
+		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'knob-slot', slotIndex: cell.slotIndex }));
+		const label = cell.assignment ? cell.paramLabel : `Knob ${slotIndexToBankPageKnob(cell.slotIndex).knob + 1}`;
+		setBadgeDragImage(e, label, '#8bd3ff');
+	}
+
+	async function onKnobDrop(cell: Cell, e: DragEvent) {
+		const data = parseDragPayload(e);
+		const slot = uiStore.slotInFocus;
+		if (!slot || data?.type !== 'knob-slot') return;
+		await slotsStore.swapParamPageSlots(slot, data.slotIndex, cell.slotIndex);
 	}
 </script>
