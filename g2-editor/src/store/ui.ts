@@ -41,6 +41,10 @@ export const useUiStore = defineStore('ui', {
 		helpAllModules: false as boolean,
 		clipboard: null as ClipboardEntry | null,
 		lastMousePos: null as { col: number; row: number; area: 'va' | 'fx' } | null,
+		// Live morph-range Ctrl/Cmd-drag hint, read by MorphDragHintOverlay (canvas-level, rendered
+		// after every module) so the badge always paints above other modules instead of being hidden
+		// behind whichever one happens to sit below it in the DOM.
+		morphDragHint: null as { moduleIndex: number; paramIndex: number; text: string; area: 'va' | 'fx' } | null,
 	}),
 
 	getters: {

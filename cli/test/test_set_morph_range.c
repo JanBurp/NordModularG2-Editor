@@ -27,11 +27,11 @@ void test_set_morph_range_invalid_morph_group_high(void) {
 }
 
 void test_set_morph_range_invalid_range_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, -101, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, -128, 0));
 }
 
 void test_set_morph_range_invalid_range_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, 101, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, 128, 0));
 }
 
 void test_set_morph_range_invalid_variation(void) {

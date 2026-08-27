@@ -92,6 +92,10 @@ const _paramPending = new Map<string, string[]>();
 // doc comment on stale version bytes) — this is an inference from absence, not a
 // confirmed rejection, so it only warns and never blocks/throttles sending.
 const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<typeof setTimeout> }>();
+// The daemon drains all queued stdin commands before forwarding watch events (see cli/src/daemon.c),
+// so a burst of sends (e.g. a fast knob/morph-range drag) can delay a legitimate echo past a short
+// timeout. 500ms gives real confirmations more room while still catching a truly dropped command.
+const PARAM_ECHO_TIMEOUT_MS = 500;
 
 function armParamEcho(key: string, value: number): void {
 	const existing = _paramAwaitingEcho.get(key);
@@ -99,7 +103,7 @@ function armParamEcho(key: string, value: number): void {
 	const timer = setTimeout(() => {
 		_paramAwaitingEcho.delete(key);
 		console.warn(`[USB] set-param not confirmed by device: ${key} v=${value}`);
-	}, 300);
+	}, PARAM_ECHO_TIMEOUT_MS);
 	_paramAwaitingEcho.set(key, { value, timer });
 }
 

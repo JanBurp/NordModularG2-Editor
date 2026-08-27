@@ -827,6 +827,12 @@ static void do_reconnect(void) {
 
 /* ── entry point ───────────────────────────────────────────────────────── */
 
+/* Max consecutive stdin commands drained before the main loop is forced to give the
+ * listener queue a (non-blocking) check. Without this cap, a fast command burst (e.g. a
+ * knob/morph-range drag) can starve param_change/morph_change forwarding for the whole
+ * burst, since daemon_dequeue() keeps returning non-NULL. */
+#define STDIN_DRAIN_BATCH 8
+
 int g2_daemon_run(output_format_t format, int debug) {
 	(void)format;
 	g2_debug = debug;
@@ -914,10 +920,14 @@ int g2_daemon_run(output_format_t format, int debug) {
 	printf("{\"type\":\"watch_armed\"}\n");
 	fflush(stdout);
 
+	int cmds_since_listener_check = 0;
+
 	while (daemon_running) {
-		/* Drain stdin commands first. */
+		/* Drain stdin commands, but yield to the listener queue every STDIN_DRAIN_BATCH
+		 * commands even if more are still queued (see STDIN_DRAIN_BATCH doc comment). */
 		char *line = daemon_dequeue();
-		if (line) {
+		int had_line = (line != NULL);
+		if (had_line) {
 			execute_cmd(line);
 			free(line);
 			/* If a command handler's recv_interrupt() saw a BULK_REARM (sentinel=2)
@@ -928,12 +938,15 @@ int g2_daemon_run(output_format_t format, int debug) {
 				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
-			continue;
+			if (++cmds_since_listener_check < STDIN_DRAIN_BATCH) continue;
 		}
+		cmds_since_listener_check = 0;
 
-		/* Wait for next event from the listener. */
+		/* Wait for next event from the listener. A batch of stdin commands likely means
+		 * more are still queued, so peek non-blockingly rather than stalling on them;
+		 * an empty stdin queue keeps the original 100ms idle wait. */
 		g2_msg_t msg;
-		if (g2_msg_recv(&msg, 100) != 0) continue;
+		if (g2_msg_recv(&msg, had_line ? 0 : 100) != 0) continue;
 
 		if (msg.sentinel == 1) {
 			/* Device disconnected. */
