@@ -14,10 +14,7 @@
 					{{ cell.moduleHeader }}
 				</span>
 
-				<!-- Unassigned state mirrors the assigned box's exact shape (border instead of fill, same
-				     padding, two dash lines instead of one-plus-blank) so the row never shifts height,
-				     matching the knob/button placeholder convention below. -->
-				<div class="w-full rounded px-1 py-0.5 text-center" :class="cell.assignment ? 'bg-surface-3' : 'border border-line-default opacity-40'">
+				<div class="w-full rounded-xs px-1 text-center" :class="cell.assignment ? 'bg-surface-3' : 'border border-line-default opacity-40'">
 					<div class="text-xs truncate">{{ cell.assignment ? cell.paramLabel : '—' }}</div>
 					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '—' }}</div>
 				</div>
@@ -28,8 +25,6 @@
 					:class="{ 'pointer-events-none': altHeld }"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
 				/>
-				<!-- Matches Knob.vue's own rendered size exactly (SVG is radius+16 = 26px for the
-				     default KnobMedium type) so the row height doesn't shift between assigned/empty cells. -->
 				<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
 
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
@@ -45,33 +40,14 @@
 				>
 					{{ cell.buttonValueLabel }}
 				</div>
-				<!-- Matches .btn-xs's own height exactly (h-4, see style.css) so this row doesn't shift
-				     between cells with/without a button. -->
 				<div v-else class="w-full h-4 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
 
 		<ToolBarDivider></ToolBarDivider>
 
-		<div class="flex flex-col gap-1">
-			<div class="flex gap-2">
-				<BtnGroup
-					:model-value="uiStore.displayedParamPage"
-					:options="pageOptions"
-					variant="toggle"
-					vertical
-					testIdPrefix="param-page"
-					@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
-					class="w-8"
-				/>
-				<div class="flex flex-col text-content-muted">
-					<div>Osc</div>
-					<div>LFO</div>
-					<div>Env</div>
-					<div>Filter</div>
-					<div>Effect</div>
-				</div>
-			</div>
+		<div class="flex flex-col h-full mb-1">
+			<div class="grow">&nbsp;</div>
 			<BtnGroup
 				:model-value="uiStore.selectedParamBank + 1"
 				:options="bankOptions"
@@ -79,6 +55,24 @@
 				testIdPrefix="param-bank"
 				@update:model-value="(v) => uiStore.setSelectedParamBank((v as number) - 1)"
 			/>
+		</div>
+		<div class="flex gap-2">
+			<BtnGroup
+				:model-value="uiStore.displayedParamPage"
+				:options="pageOptions"
+				variant="toggle"
+				vertical
+				testIdPrefix="param-page"
+				@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
+				class="w-8"
+			/>
+			<div class="flex flex-col text-content-muted">
+				<div>Osc</div>
+				<div>LFO</div>
+				<div>Env</div>
+				<div>Filter</div>
+				<div>Effect</div>
+			</div>
 		</div>
 	</ToolBar>
 </template>
