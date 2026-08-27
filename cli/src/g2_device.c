@@ -2087,7 +2087,7 @@ int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
     if (module_id < 0 || module_id > 255) { g2_err("set-morph-range: invalid module-id\n");   return G2_ERR_INVALID_PARAM; }
     if (param_idx < 0 || param_idx > 255) { g2_err("set-morph-range: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
     if (morph_group < 0 || morph_group > 7) { g2_err("set-morph-range: invalid morph-group\n"); return G2_ERR_INVALID_PARAM; }
-    if (range < -100 || range > 100)      { g2_err("set-morph-range: range must be -100..100\n"); return G2_ERR_INVALID_PARAM; }
+    if (range < -127 || range > 127)      { g2_err("set-morph-range: range must be -127..127\n"); return G2_ERR_INVALID_PARAM; }
     if (variation < 0 || variation > 8)   { g2_err("set-morph-range: variation must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0)          { g2_err("set-morph-range: not connected\n");       return G2_ERR_CONNECT; }
 

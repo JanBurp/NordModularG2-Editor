@@ -126,7 +126,6 @@
 					@param-context-menu="onParamContextMenu"
 				/>
 			</g>
-			<ParamOverlay :items="dragHintItems" />
 		</g>
 
 		<!-- Input jacks -->
@@ -215,7 +214,6 @@
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
-	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -391,16 +389,9 @@
 		return morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === uiStore.selectedMorphGroup)?.range;
 	}
 
-	const { dragHint, startDrag } = useMorphRangeDrag();
-
-	// Same overlay component (ParamOverlay + its collision-avoiding layout) used by the MIDI CC and
-	// parameter-value hold-overlays, so the live range hint never sits on top of the parameter.
-	const dragHintItems = computed(() => {
-		if (!dragHint.value) return [];
-		const param = moduleDef.value?.params?.[dragHint.value.paramIndex];
-		if (!param) return [];
-		return [{ text: dragHint.value.text, x: param.x, y: param.y }];
-	});
+	// Renders its live range badge via MorphDragHintOverlay (canvas-level, painted after every
+	// module) instead of locally, so the badge always stays above other modules on the canvas.
+	const { startDrag } = useMorphRangeDrag();
 
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
 		if (!isGrabModifierPressed(e)) return;
@@ -413,7 +404,7 @@
 		const groupIndex = uiStore.selectedMorphGroup;
 		const location = morphLocation.value;
 		const variation = uiStore.variation;
-		startDrag(paramIndex, e, {
+		startDrag(moduleIdx.value, paramIndex, props.areaLabel ?? 'fx', e, {
 			isAssigned: () => morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === groupIndex),
 			getRange: () => morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === groupIndex)?.range ?? 0,
 			// Freshly assigned params start at the full parameter range (matches the real editor);

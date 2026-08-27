@@ -1,5 +1,6 @@
-import { onUnmounted, ref } from 'vue';
+import { onUnmounted } from 'vue';
 import { isGrabModifierPressed } from '@/utils/platform';
+import { useUiStore } from '@/store/ui';
 
 const DRAG_THRESHOLD_PX = 3;
 
@@ -18,13 +19,12 @@ export interface MorphDragHandlers {
 // the plan). Both start on the same mousedown and are disambiguated by whether the mouse moved
 // past a small threshold before release.
 export function useMorphRangeDrag() {
-	// Which param is currently being drag-adjusted, and the live hint text to show near it.
-	const dragHint = ref<{ paramIndex: number; text: string } | null>(null);
+	const uiStore = useUiStore();
 	// Removes the active window listeners without firing the assign/deassign click fallback —
 	// used both to guard against a stray previous drag and on component unmount.
 	let stopActiveDrag: (() => void) | null = null;
 
-	function startDrag(paramIndex: number, e: MouseEvent, handlers: MorphDragHandlers): void {
+	function startDrag(moduleIndex: number, paramIndex: number, area: 'va' | 'fx', e: MouseEvent, handlers: MorphDragHandlers): void {
 		if (!isGrabModifierPressed(e)) return;
 		e.preventDefault();
 		e.stopPropagation();
@@ -33,14 +33,19 @@ export function useMorphRangeDrag() {
 		const startY = e.clientY;
 		const startRange = handlers.getRange();
 		let moved = false;
+		let lastSentRange = startRange;
 
 		function onMove(ev: MouseEvent) {
 			const dy = startY - ev.clientY; // dragging up increases the range
 			if (!moved && Math.abs(dy) > DRAG_THRESHOLD_PX) moved = true;
 			if (moved && handlers.onRangeChange && handlers.isAssigned()) {
 				const newRange = Math.max(-127, Math.min(127, Math.round(startRange + dy)));
+				// Always keep the on-screen hint live, even when the (clamped) value hasn't
+				// changed since the last send — only the device command itself is deduped.
+				uiStore.morphDragHint = { moduleIndex, paramIndex, area, text: newRange >= 0 ? `+${newRange}` : `${newRange}` };
+				if (newRange === lastSentRange) return;
+				lastSentRange = newRange;
 				handlers.onRangeChange(newRange);
-				dragHint.value = { paramIndex, text: newRange >= 0 ? `+${newRange}` : `${newRange}` };
 			}
 		}
 
@@ -48,7 +53,7 @@ export function useMorphRangeDrag() {
 			stopActiveDrag = null;
 			window.removeEventListener('mousemove', onMove);
 			window.removeEventListener('mouseup', onUp);
-			dragHint.value = null;
+			uiStore.morphDragHint = null;
 		}
 
 		function onUp() {
@@ -69,5 +74,5 @@ export function useMorphRangeDrag() {
 	// Ctrl-dragging), drop the listeners without firing the assign/deassign click fallback.
 	onUnmounted(() => stopActiveDrag?.());
 
-	return { dragHint, startDrag };
+	return { startDrag };
 }

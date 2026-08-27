@@ -51,6 +51,7 @@
 			<ParamValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphRangeBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<MorphDragHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 		</svg>
 		<Cables
 			ref="cablesRef"
@@ -81,6 +82,7 @@
 	import ParamValuesOverlay from './ParamValuesOverlay.vue';
 	import MorphAssignBadgesOverlay from './MorphAssignBadgesOverlay.vue';
 	import MorphRangeBadgesOverlay from './MorphRangeBadgesOverlay.vue';
+	import MorphDragHintOverlay from './MorphDragHintOverlay.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
