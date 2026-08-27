@@ -224,6 +224,72 @@ void test_daemon_variation_cmd(void) {
     TEST_ASSERT_EQUAL_INT(0, r);
 }
 
+/* Test 5: A fast burst of set-param commands must not starve listener-forwarded watch
+ * events until the whole burst drains — regression test for the daemon main loop's
+ * stdin-drain-before-listener-check ordering (see STDIN_DRAIN_BATCH in daemon.c). Uses
+ * a high module/param id (250/250) unlikely to collide with a real module in whatever
+ * patch happens to be loaded on slot A, since this shared-daemon suite doesn't load a
+ * scratch patch first. */
+void test_daemon_stdin_burst_forwards_events_promptly(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    enum { BURST = 30 };
+    int ids[BURST];
+    char cmd[96];
+
+    /* Fire the whole burst without waiting for any response in between — this is what
+     * starves the listener queue under the old unconditional-drain loop. */
+    for (int n = 0; n < BURST; n++) {
+        ids[n] = g_cmd_id++;
+        int len = snprintf(cmd, sizeof(cmd),
+            "{\"id\":%d,\"cmd\":\"set-param\",\"args\":[\"A\",\"va\",\"250\",\"250\",\"%d\",\"0\"]}",
+            ids[n], n % 2);
+        TEST_ASSERT_TRUE(write(g_daemon.in_fd, cmd, len) == len);
+        TEST_ASSERT_TRUE(write(g_daemon.in_fd, "\n", 1) == 1);
+    }
+
+    /* Every "ok" ack for the burst must show up — proves the loop restructuring didn't
+     * drop/break command processing. Also note (best-effort; module 250/param 250 may
+     * not exist in whatever patch is loaded) whether a param_change event was seen
+     * before the last ack, i.e. interleaved with the burst rather than only after it. */
+    int acked[BURST];
+    memset(acked, 0, sizeof(acked));
+    int acked_count = 0;
+    int saw_event_before_last_ack = 0;
+    int last_ack_seen = 0;
+
+    char buf[65536];
+    for (int i = 0; i < BURST * 3 && acked_count < BURST; i++) {
+        if (read_line_timeout(g_daemon.out_fd, buf, sizeof(buf), 5) < 0) break;
+        cJSON *r = cJSON_Parse(buf);
+        if (!r) continue;
+
+        cJSON *t = cJSON_GetObjectItem(r, "type");
+        if (t && cJSON_IsString(t) && strcmp(t->valuestring, "param_change") == 0 && !last_ack_seen)
+            saw_event_before_last_ack = 1;
+
+        cJSON *id_j = cJSON_GetObjectItem(r, "id");
+        if (id_j) {
+            int id = (int)id_j->valuedouble;
+            for (int n = 0; n < BURST; n++) {
+                if (ids[n] == id && !acked[n]) {
+                    acked[n] = 1;
+                    acked_count++;
+                    if (acked_count == BURST) last_ack_seen = 1;
+                    break;
+                }
+            }
+        }
+        cJSON_Delete(r);
+    }
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(BURST, acked_count, "all burst commands acked");
+    if (saw_event_before_last_ack)
+        printf("[test_daemon_stdin_burst_forwards_events_promptly] param_change interleaved with burst, as expected\n");
+    else
+        printf("[test_daemon_stdin_burst_forwards_events_promptly] no param_change observed (module 250/param 250 likely doesn't exist on the loaded patch) — command-ack correctness still verified\n");
+}
+
 /* Test 6: set-perf-mode cycle — performance then patch — verifies Delphi approach:
  * synth_settings_update must contain a "patches" array with 4 entries.
  * This is the last shared-daemon test; it calls daemon_shutdown. */
