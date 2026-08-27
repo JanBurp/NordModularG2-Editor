@@ -13,19 +13,25 @@
 				@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			>
 				<span class="text-xs w-full truncate text-center font-bold" :class="{ 'opacity-40': !cell.assignment }">
-					{{ cell.assignment ? cell.moduleLabel : '—' }}
+					{{ cell.moduleHeader }}
 				</span>
+
+				<div class="w-full rounded px-1 py-0.5 text-center" :class="cell.assignment ? 'bg-surface-3' : 'opacity-40'">
+					<div class="text-xs truncate">{{ cell.assignment ? cell.paramLabel : '—' }}</div>
+					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '' }}</div>
+				</div>
 
 				<Knob v-if="cell.assignment" :value="cell.value" @change="(v) => onKnobChange(cell.assignment!, v)" />
 				<div v-else class="w-8 h-8 rounded-full border border-line-default opacity-40 my-1" />
 
+				<!-- Physical pushbutton below the knob. Defaults to the knob's own param (matching the
+				     manual's "a single assignment assigns both the knob... and its associated pushbutton")
+				     — see the buttonParamIndex comment below for the not-yet-ported per-module override. -->
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
-					{{ cell.assignment ? cell.paramLabel : '—' }}
+					{{ cell.assignment ? cell.buttonLabel : '—' }}
 				</span>
-
-				<span class="text-xs text-content-secondary w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment }">
-					{{ cell.assignment ? cell.valueLabel : '' }}
-				</span>
+				<Button v-if="cell.assignment" variant="default" size="xs" class="w-full truncate">{{ cell.buttonValueLabel }}</Button>
+				<div v-else class="w-full h-5 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
 
@@ -59,6 +65,7 @@
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
+	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
@@ -81,49 +88,84 @@
 		slotIndex: number;
 		assignment: ParamPageAssignment | null;
 		moduleLabel: string;
+		moduleHeader: string; // moduleLabel, or a continuation dash-run when the previous cell is the same module (mirrors the G2's own display)
 		paramLabel: string;
 		value: number;
 		valueLabel: string;
+		buttonLabel: string;
+		buttonValueLabel: string;
 	}
 
-	function moduleAndParamLabel(a: ParamPageAssignment): { moduleLabel: string; paramLabel: string; paramType: string } | null {
+	function sameModule(a: ParamPageAssignment | null, b: ParamPageAssignment | null): boolean {
+		return !!a && !!b && a.location === b.location && a.moduleIndex === b.moduleIndex;
+	}
+
+	function resolveModule(a: ParamPageAssignment) {
 		const slot = uiStore.slotInFocus;
 		const patch = slot ? slotsStore.slots[slot].patch : null;
 		const mod = patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
 		if (!mod) return null;
-		const moduleDef = getModule(mod.type);
-		const paramDef = moduleDef?.params?.[a.paramIndex];
+		return { mod, moduleDef: getModule(mod.type) };
+	}
+
+	// Reads a module parameter's display label + live formatted value. Used for both the knob
+	// (paramIndex = the assignment's own param) and the button below it (see buttonParamIndex note
+	// at the call site).
+	function resolveParamDisplay(
+		a: ParamPageAssignment,
+		paramIndex: number,
+		moduleInfo: ReturnType<typeof resolveModule>,
+	): { label: string; value: number; valueLabel: string } {
+		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
+		const slot = uiStore.slotInFocus;
+		const areaKey = a.location === 1 ? 'voice' : 'fx';
+		const value = slot ? (slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[paramIndex] ?? 64) : 0;
 		return {
-			moduleLabel: mod.uname || moduleDef?.short || String(a.moduleIndex),
-			paramLabel: paramDef?.name ?? String(a.paramIndex),
-			paramType: paramDef?.type ?? '',
+			label: paramDef?.name ?? String(paramIndex),
+			value,
+			valueLabel: paramDef ? formatValue(value, paramDef.type) : String(value),
 		};
 	}
 
-	function paramValue(a: ParamPageAssignment): number {
-		const slot = uiStore.slotInFocus;
-		if (!slot) return 0;
-		const areaKey = a.location === 1 ? 'voice' : 'fx';
-		return slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[a.paramIndex] ?? 64;
-	}
+	const emptyCell = { moduleLabel: '', paramLabel: '', value: 0, valueLabel: '', buttonLabel: '', buttonValueLabel: '' };
 
 	const cells = computed<Cell[]>(() => {
 		const slot = uiStore.slotInFocus;
 		const list = slot ? slotsStore.slots[slot].paramPages : [];
-		return Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => {
+		const base: Omit<Cell, 'moduleHeader'>[] = Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => {
 			const slotIndex = slotIndexFor(uiStore.selectedParamBank, uiStore.displayedParamPage, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
-			if (!assignment) return { slotIndex, assignment: null, moduleLabel: '', paramLabel: '', value: 0, valueLabel: '' };
-			const info = moduleAndParamLabel(assignment);
-			const value = paramValue(assignment);
+			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
+			const moduleInfo = resolveModule(assignment);
+			const moduleLabel = moduleInfo
+				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
+				: String(assignment.moduleIndex);
+			const knobDisplay = resolveParamDisplay(assignment, assignment.paramIndex, moduleInfo);
+			// The physical button below the knob often targets a DIFFERENT module parameter (e.g.
+			// Sequencer step-value knobs pair with a step-on/off button) via a per-parameter
+			// "ButtonParamIndex" lookup (BVE.NMG2Data.pas in the reference Delphi editor). That
+			// per-module override table isn't ported into nmg2mods.ts yet, so this defaults to
+			// mirroring the knob's own param — the documented fallback when "nothing specific exists
+			// for the module/param".
+			const buttonParamIndex = assignment.paramIndex;
+			const buttonDisplay = resolveParamDisplay(assignment, buttonParamIndex, moduleInfo);
 			return {
 				slotIndex,
 				assignment,
-				moduleLabel: info?.moduleLabel ?? String(assignment.moduleIndex),
-				paramLabel: info?.paramLabel ?? String(assignment.paramIndex),
-				value,
-				valueLabel: info ? formatValue(value, info.paramType) : String(value),
+				moduleLabel,
+				paramLabel: knobDisplay.label,
+				value: knobDisplay.value,
+				valueLabel: knobDisplay.valueLabel,
+				buttonLabel: buttonDisplay.label,
+				buttonValueLabel: buttonDisplay.valueLabel,
 			};
+		});
+		return base.map((cell, i) => {
+			if (!cell.assignment) return { ...cell, moduleHeader: '—' };
+			const isContinuation = sameModule(cell.assignment, base[i - 1]?.assignment ?? null);
+			if (!isContinuation) return { ...cell, moduleHeader: cell.moduleLabel };
+			const isLastOfRun = !sameModule(cell.assignment, base[i + 1]?.assignment ?? null);
+			return { ...cell, moduleHeader: isLastOfRun ? '———]' : '———' };
 		});
 	});
 
