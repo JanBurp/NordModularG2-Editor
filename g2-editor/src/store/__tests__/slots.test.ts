@@ -189,6 +189,46 @@ describe('edited flag', () => {
 	});
 });
 
+describe('setMorphGroupLabel', () => {
+	it('mutates patch.morphParamLabels, marks the slot dirty, and pushes the right CLI command', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.setMorphGroupLabel(0, 'Foo');
+
+		expect(patch.morphParamLabels).toEqual([{ paramIndex: 8, isString: true, paramLen: 8, labels: ['Foo'] }]);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['set-param-label', 'A', 'patch', '1', '8', 'Foo']);
+	});
+
+	it('updates the existing entry in place when the group is renamed again', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.setMorphGroupLabel(2, 'First');
+		await store.setMorphGroupLabel(2, 'Second');
+
+		expect(patch.morphParamLabels).toEqual([{ paramIndex: 10, isString: true, paramLen: 8, labels: ['Second'] }]);
+	});
+
+	it('participates in undo/redo', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.setMorphGroupLabel(0, 'Foo');
+		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
+
+		await store.undo();
+		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('');
+
+		await store.redo();
+		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
+	});
+});
+
 describe('undo/redo coverage for text, name, and description fields', () => {
 	it('setPatchText participates in undo/redo', async () => {
 		const store = useSlotsStore();

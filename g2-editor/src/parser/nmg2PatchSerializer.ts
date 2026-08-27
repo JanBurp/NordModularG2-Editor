@@ -1,5 +1,5 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment } from '@/types';
-import { SectionType } from './constants';
+import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment, ParamLabel } from '@/types';
+import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -118,18 +118,18 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: 
 	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
-function writeParamNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
-	const labeled = modules.filter((m) => m.paramLabels && m.paramLabels.length > 0);
+function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array | null {
+	const labeled = entries.filter((e) => e.paramLabels.length > 0);
 	if (labeled.length === 0) return null;
 
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
 	bw.write(8, labeled.length);
-	for (const m of labeled) {
-		bw.write(8, m.index);
-		const moduleLen = m.paramLabels!.reduce((sum, e) => sum + 3 + e.labels.length * 7, 0);
+	for (const e of labeled) {
+		bw.write(8, e.index);
+		const moduleLen = e.paramLabels.reduce((sum, e) => sum + 3 + e.labels.length * 7, 0);
 		bw.write(8, moduleLen);
-		for (const entry of m.paramLabels!) {
+		for (const entry of e.paramLabels) {
 			bw.write(8, entry.isString ? 1 : 0);
 			bw.write(8, 1 + entry.labels.length * 7);
 			bw.write(8, entry.paramIndex);
@@ -369,15 +369,22 @@ interface WrittenSets {
 	m60: boolean;
 	wroteText: boolean;
 	m65: boolean;
+	m5bMorph: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false, m65: false };
+	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false, m65: false, m5bMorph: false };
 }
 
 // True when any variation actually has morph-group assignment data worth writing.
 function hasMorphAssignments(variations: VariationState[]): boolean {
 	return variations.some((v) => v.patch.morphAssignments.some((a) => a.range !== 0));
+}
+
+// Wraps the patch's custom Morph Group labels (if any) as the single synthetic PATCH_MORPH
+// "module" entry writeParamNames expects, for the areaIdx=2 ($PARAM_NAMES/"patch" scope) section.
+function morphParamNamesEntries(patch: Patch): Array<{ index: number; paramLabels: ParamLabel[] }> {
+	return patch.morphParamLabels && patch.morphParamLabels.length > 0 ? [{ index: PATCH_MORPH_MODULE_ID, paramLabels: patch.morphParamLabels }] : [];
 }
 
 /**
@@ -417,16 +424,26 @@ function processSection(
 		w.m4d.add(areaIdx);
 		// Param names follow params in Delphi write order; emit here so
 		// labels survive even if the template predates them.
-		const paramNamesSection = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+		const paramNamesSection = writeParamNames(
+			areaIdx as 0 | 1,
+			patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+		);
 		if (paramNamesSection) out.push(paramNamesSection);
 		w.m5b.add(areaIdx);
 	} else if (type === SectionType.PARAM_NAMES && areaIdx <= 1) {
 		if (!w.m5b.has(areaIdx)) {
-			const sec = writeParamNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
+			const sec = writeParamNames(
+				areaIdx as 0 | 1,
+				patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+			);
 			if (sec) out.push(sec);
 			w.m5b.add(areaIdx);
 		}
 		// If already written via PARAMETERS trigger, skip (don't preserve verbatim)
+	} else if (type === SectionType.PARAM_NAMES && areaIdx === 2 && !w.m5bMorph) {
+		const sec = writeParamNames(2, morphParamNamesEntries(patch));
+		if (sec) out.push(sec);
+		w.m5bMorph = true;
 	} else if (type === SectionType.MODULE_NAMES && areaIdx <= 1 && !w.m5a.has(areaIdx)) {
 		const namesSection = writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
 		if (namesSection) out.push(namesSection);
@@ -486,6 +503,11 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	if (!w.m65 && hasMorphAssignments(variations)) {
 		out.push(writeMorphParamSection(variations.map((v) => v.patch)));
 	}
+	// Same fallback: the hardware get-patch response never includes a $PARAM_NAMES(areaIdx=2)
+	// section, so any custom Morph Group labels need appending when the template predates them.
+	if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
+		out.push(writeParamNames(2, morphParamNamesEntries(patch))!);
+	}
 	return buildRawHex(out);
 }
 
@@ -513,6 +535,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 			}
+			if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
+				out.push(writeParamNames(2, morphParamNamesEntries(patch))!);
+			}
 			out.push(writeTextPad(patch.text ?? ''));
 			// Advance to next slot when more data follows
 			if (ofs + 3 + siz < sectionDataLen) {
@@ -530,6 +555,9 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 	}
 	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
+	}
+	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
+		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch))!);
 	}
 	return buildRawHex(out);
 }

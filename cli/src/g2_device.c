@@ -1304,7 +1304,7 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
 int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels) {
 
     if (slot < 0 || slot > 3)            { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 1)    { g2_err("set-param-label: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 2)    { g2_err("set-param-label: location must be 0(fx), 1(va) or 2(patch)\n"); return G2_ERR_INVALID_PARAM; }
     if (num_labels <= 0 || num_labels > 128) { g2_err("set-param-label: num_labels out of range\n"); return G2_ERR_INVALID_PARAM; }
 
     if (ensure_connected(0) < 0) { g2_err("set-param-label: failed to connect\n"); return G2_ERR_CONNECT; }

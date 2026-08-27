@@ -5,7 +5,7 @@
 import type { Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 
-import { SectionType } from './constants';
+import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 
 export type { ModuleInstance, ParamLabel, Area, Cable, Patch, PatchDescription, PatchParamVariation, MidiCCAssignment };
@@ -33,6 +33,7 @@ class G2Parser {
 	private rawData: Uint8Array = new Uint8Array(0);
 	private bitofs = 0;
 	private patchParamsData: PatchParamVariation[][] = [];
+	private morphParamLabelsData: ParamLabel[][] = [];
 	private pd: (PatchDescription | null)[] = [];
 	private controllersData: MidiCCAssignment[] = [];
 	readonly data: ArrayBuffer;
@@ -112,6 +113,10 @@ class G2Parser {
 		return this.patchParamsData[slot] ?? null;
 	}
 
+	getMorphParamLabels(slot: number): ParamLabel[] | null {
+		return this.morphParamLabelsData[slot] ?? null;
+	}
+
 	getModuleArray(areaIdx: number, basename: string): ModuleInstance[] {
 		const array: ModuleInstance[] = [];
 		let i = 0;
@@ -175,7 +180,7 @@ class G2Parser {
 	private parseParamNames(data: Uint8Array): string {
 		const areaIdx = this.getBits(2, data);
 		const nummod = this.getBits(8);
-		if (areaIdx > 1) return 'Area=' + areaIdx;
+		if (areaIdx > 2) return 'Area=' + areaIdx;
 		for (let i = 0; i < nummod; i++) {
 			const modIdx = this.getBits(8);
 			const moduleLen = this.getBits(8);
@@ -210,8 +215,12 @@ class G2Parser {
 				entries.push(entry);
 			}
 			if (entries.length > 0) {
-				const m = this.findModule(this.aof + areaIdx, modIdx);
-				if (m) m.paramLabels = entries;
+				if (areaIdx === 2) {
+					if (modIdx === PATCH_MORPH_MODULE_ID) this.morphParamLabelsData[this.aof >> 1] = entries;
+				} else {
+					const m = this.findModule(this.aof + areaIdx, modIdx);
+					if (m) m.paramLabels = entries;
+				}
 			}
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
@@ -521,6 +530,7 @@ export class PatchParser {
 			patchParams: this.patcher.getPatchParams(0) ?? undefined,
 			controllers: controllers.length > 0 ? controllers : undefined,
 			text: this.patcher.getTextPad(0) ?? undefined,
+			morphParamLabels: this.patcher.getMorphParamLabels(0) ?? undefined,
 		};
 	}
 
@@ -536,6 +546,7 @@ export class PatchParser {
 				patchParams: this.patcher.getPatchParams(slot) ?? undefined,
 				controllers: controllers.length > 0 ? controllers : undefined,
 				text: this.patcher.getTextPad(slot) ?? undefined,
+				morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
 			})),
 			slotMeta: this.patcher.getSlotMeta(),
 		};

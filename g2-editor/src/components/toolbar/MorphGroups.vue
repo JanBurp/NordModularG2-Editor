@@ -1,7 +1,7 @@
 <template>
 	<ToolBarGroup class="flex flex-col items-center">
 		<div class="flex items-center gap-0">
-			<template v-for="(name, i) in MORPH_NAMES" :key="i">
+			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
 					class="relative flex flex-col items-center min-w-14"
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
@@ -17,7 +17,7 @@
 					>
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
-					<span class="text-xs mb-1">{{ name }}</span>
+					<span class="text-xs mb-1">{{ displayName(i) }}</span>
 					<Knob
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
@@ -37,6 +37,7 @@
 </template>
 
 <script setup lang="ts">
+	import { computed } from 'vue';
 	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
@@ -50,6 +51,8 @@
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
+	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
+
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const deviceStore = useDeviceStore();
@@ -57,6 +60,15 @@
 	const { showCCOverlay } = useMidiCCOverlay();
 
 	const { patchParams } = usePatchParams();
+
+	const activePatch = computed(() => {
+		const slot = uiStore.slotInFocus;
+		return slot ? slotsStore.getPatchForSlot(slot) : null;
+	});
+
+	function displayName(i: number): string {
+		return activePatch.value?.morphParamLabels?.find((pl) => pl.paramIndex === 8 + i)?.labels?.[0] || MORPH_NAMES[i];
+	}
 
 	function getMorphCC(morphIdx: number): number | null {
 		const slot = uiStore.slotInFocus;
@@ -68,6 +80,7 @@
 		const slot = uiStore.slotInFocus;
 		const variation = uiStore.variation;
 		const items: ContextMenuItem[] = [
+			{ label: 'Rename…', disabled: !slot, action: () => emit('morphGroupLabelEdit', { groupIndex, currentLabel: displayName(groupIndex) }) },
 			{ label: 'Clear', disabled: !slot, action: () => slot && slotsStore.clearMorphGroup(slot, variation, groupIndex) },
 			{
 				label: 'Copy To',

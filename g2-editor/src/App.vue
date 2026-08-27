@@ -33,7 +33,10 @@
 			</button>
 		</ToolBar>
 
-		<ExtendedToolBar v-if="settingsStore.showExtendedToolBar" />
+		<ExtendedToolBar
+			v-if="settingsStore.showExtendedToolBar"
+			@morph-group-label-edit="(info) => openMorphLabelDialog(info.groupIndex, info.currentLabel)"
+		/>
 		<PatchToolBar
 			v-if="currentPatch"
 			:patch-name="patchName"
@@ -140,6 +143,14 @@
 		/>
 	</Dialog>
 
+	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
+		<input
+			v-model="editingMorphLabel"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+			maxlength="7"
+		/>
+	</Dialog>
+
 	<Dialog v-model="showBpmDialog" title="Set BPM" @confirm="confirmBpm" @cancel="cancelBpmDialog">
 		<input
 			v-model.number="editingBpm"
@@ -189,6 +200,7 @@
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
+	import { useMorphLabelDialog } from './composables/useMorphLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
@@ -281,6 +293,8 @@
 		confirm: confirmPerfName,
 		cancel: cancelPerfNameDialog,
 	} = usePerfNameDialog();
+
+	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 
