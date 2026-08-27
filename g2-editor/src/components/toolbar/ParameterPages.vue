@@ -30,7 +30,15 @@
 				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
 					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
 				</span>
-				<Button v-if="cell.assignment && cell.hasButton" variant="default" size="xs" class="w-full truncate">{{ cell.buttonValueLabel }}</Button>
+				<div
+					v-if="cell.assignment && cell.hasButton"
+					class="btn btn-xs w-full truncate text-center"
+					@mousedown="onButtonMouseDown(cell)"
+					@mouseup="onButtonMouseUp(cell)"
+					@click="onButtonClick(cell)"
+				>
+					{{ cell.buttonValueLabel }}
+				</div>
 				<div v-else class="w-full h-5 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
@@ -65,7 +73,6 @@
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
-	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
@@ -74,7 +81,9 @@
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor } from '../../renderer/paramPages';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
+	import { getParam } from '../../renderer/parammap';
 	import { formatValue } from '../../utils/moduleControls';
+	import { clamp } from '../../utils/math';
 	import type { ContextMenuItem, ParamPageAssignment } from '../../types';
 
 	const slotsStore = useSlotsStore();
@@ -94,6 +103,11 @@
 		value: number;
 		valueLabel: string;
 		hasButton: boolean;
+		buttonParamIndex: number;
+		buttonValue: number;
+		buttonLow: number;
+		buttonHigh: number;
+		buttonIsTrigger: boolean;
 		buttonLabel: string;
 		buttonValueLabel: string;
 	}
@@ -110,26 +124,44 @@
 		return { mod, moduleDef: getModule(mod.type) };
 	}
 
-	// Reads a module parameter's display label + live formatted value. Used for both the knob
-	// (paramIndex = the assignment's own param) and the button below it (see buttonParamIndex note
-	// at the call site).
+	// Reads a module parameter's display label + live formatted value, plus its parammap.ts range/
+	// trigger metadata (needed to drive the button below the knob the same way useSwitch.ts does on
+	// canvas). Used for both the knob (paramIndex = the assignment's own param) and the button (see
+	// buttonParamIndex note at the call site).
 	function resolveParamDisplay(
 		a: ParamPageAssignment,
 		paramIndex: number,
 		moduleInfo: ReturnType<typeof resolveModule>,
-	): { label: string; value: number; valueLabel: string } {
+	): { label: string; value: number; valueLabel: string; low: number; high: number; isTrigger: boolean } {
 		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
 		const slot = uiStore.slotInFocus;
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
 		const value = slot ? (slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[paramIndex] ?? 64) : 0;
+		const paramMeta = paramDef ? getParam(paramDef.type) : undefined;
 		return {
 			label: paramDef?.name ?? String(paramIndex),
 			value,
 			valueLabel: paramDef ? formatValue(value, paramDef.type) : String(value),
+			low: paramMeta?.low ?? 0,
+			high: paramMeta?.high ?? 127,
+			isTrigger: paramMeta?.trigger === true,
 		};
 	}
 
-	const emptyCell = { moduleLabel: '', paramLabel: '', value: 0, valueLabel: '', hasButton: false, buttonLabel: '', buttonValueLabel: '' };
+	const emptyCell = {
+		moduleLabel: '',
+		paramLabel: '',
+		value: 0,
+		valueLabel: '',
+		hasButton: false,
+		buttonParamIndex: 0,
+		buttonValue: 0,
+		buttonLow: 0,
+		buttonHigh: 0,
+		buttonIsTrigger: false,
+		buttonLabel: '',
+		buttonValueLabel: '',
+	};
 
 	const cells = computed<Cell[]>(() => {
 		const slot = uiStore.slotInFocus;
@@ -161,6 +193,11 @@
 				value: knobDisplay.value,
 				valueLabel: knobDisplay.valueLabel,
 				hasButton,
+				buttonParamIndex,
+				buttonValue: buttonDisplay?.value ?? 0,
+				buttonLow: buttonDisplay?.low ?? 0,
+				buttonHigh: buttonDisplay?.high ?? 0,
+				buttonIsTrigger: buttonDisplay?.isTrigger ?? false,
 				buttonLabel: buttonDisplay?.label ?? '',
 				buttonValueLabel: buttonDisplay?.valueLabel ?? '',
 			};
@@ -177,6 +214,38 @@
 	function onKnobChange(a: ParamPageAssignment, value: number) {
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
 		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey);
+	}
+
+	// buttonParamIndex may differ from a.paramIndex (see the buttonParams.ts lookup above) — write
+	// to whichever param the button actually targets, not necessarily the knob's own.
+	function onButtonChange(a: ParamPageAssignment, buttonParamIndex: number, value: number) {
+		const areaKey = a.location === 1 ? 'voice' : 'fx';
+		slotsStore.setParam(a.moduleIndex, buttonParamIndex, value, uiStore.variation, areaKey);
+	}
+
+	// Mirrors useSwitch.ts's isTrigger handling exactly (same composable ModuleSwitch.vue uses on
+	// canvas): a momentary trigger param (parammap.ts's `trigger: true`, e.g. TrigBtn) is pressed
+	// (1) on mousedown and released (0) on mouseup — sending a single "cycled" value on click, as
+	// non-trigger params do below, doesn't match how the device actually treats it and the optimistic
+	// echo-confirmation never matches what the device reports back.
+	function onButtonMouseDown(cell: Cell) {
+		if (!cell.assignment || !cell.buttonIsTrigger) return;
+		onButtonChange(cell.assignment, cell.buttonParamIndex, 1);
+	}
+
+	function onButtonMouseUp(cell: Cell) {
+		if (!cell.assignment || !cell.buttonIsTrigger) return;
+		onButtonChange(cell.assignment, cell.buttonParamIndex, 0);
+	}
+
+	// Non-trigger params (e.g. OffOnBlank) cycle through their [low, high] range on click, mirroring
+	// useSwitch.ts's onCycleValue.
+	function onButtonClick(cell: Cell) {
+		if (!cell.assignment || cell.buttonIsTrigger) return;
+		const { buttonLow: low, buttonHigh: high } = cell;
+		const range = high - low + 1;
+		const current = clamp(cell.buttonValue, low, high);
+		onButtonChange(cell.assignment, cell.buttonParamIndex, low + ((current - low + 1) % range));
 	}
 
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
