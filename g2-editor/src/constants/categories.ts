@@ -51,6 +51,20 @@ export function getCategoryName(categoryId: number): string {
 }
 
 /**
+ * Convert a display name (e.g. "Audio In") to its device slug (e.g. "audio_in")
+ */
+export function categorySlugFromName(name: string): string {
+	return name.toLowerCase().replace(/ /g, '_');
+}
+
+/**
+ * Get the device slug for a category ID (used to populate SynthPatch.category)
+ */
+export function getCategorySlug(categoryId: number): string {
+	return categorySlugFromName(SOUND_CATEGORIES[categoryId]?.name ?? SOUND_CATEGORIES[0].name);
+}
+
+/**
  * Validate category ID
  * Returns true if the ID is valid (0-15)
  */
