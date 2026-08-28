@@ -47,6 +47,14 @@ Right-click any parameter (knob, slider, switch, or spinner) on the canvas — o
 
 ---
 
+## Assigning via the "L" Shortcut
+
+Select a parameter (click it, or navigate to it with the arrow keys) and press **L** to instantly assign the most recently received MIDI CC to it. This is faster than the context menu, but offers no chance to check which CC will be used first — if you're not sure which CC was received last, use **Assign CC (N)** from the context menu instead, which shows the number before you commit.
+
+As with the context menu, a CC can only be assigned to one parameter at a time — if `L` assigns a CC that was already assigned elsewhere, the previous assignment is dropped.
+
+---
+
 ## CC Overlay
 
 Press **F8** to toggle a yellow overlay on the canvas that shows CC number badges on every assigned parameter. Press **F8** again to hide the overlay.

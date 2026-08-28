@@ -112,6 +112,7 @@
 				{ keys: ['←', '→'], action: 'Navigate parameters' },
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
+				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 			],
 		},
 		{

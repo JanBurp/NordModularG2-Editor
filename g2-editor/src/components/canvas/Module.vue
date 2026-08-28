@@ -70,7 +70,7 @@
 
 		<!-- Parameters -->
 		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
-			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index" @mousedown.capture="onParamMorphMouseDown(index, $event)">
+			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index" @mousedown.capture="onParamMouseDown(index, $event)">
 				<ModuleKnob
 					v-if="isKnob(param.n)"
 					:param="param"
@@ -393,11 +393,17 @@
 	// module) instead of locally, so the badge always stays above other modules on the canvas.
 	const { startDrag } = useMorphRangeDrag();
 
-	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
+	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
+	// active one for keyboard shortcuts (arrow-key nav, L) right away.
+	function onParamMouseDown(paramIndex: number, e: MouseEvent) {
+		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
+		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
+		uiStore.selectedCables = [];
+
 		if (!isGrabModifierPressed(e)) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
-		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		const param = moduleDef.value?.params?.[paramIndex];
 		// Buttons/switches/spinners always get the fixed max range (no drag needed for those).
 		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;
