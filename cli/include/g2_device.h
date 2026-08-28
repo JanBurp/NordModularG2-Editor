@@ -245,6 +245,12 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
 int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index);
 int g2_deassign_knob(int slot, int slot_index);
 
+/* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d, CMParameterPageFocus). page_id
+ * packs both selectors into one byte: page_id = page*3 + bank, i.e. page_id/3 = Page A-E (0-4)
+ * and page_id%3 = Bank 1-3 (0-2). Valid range 0-14. Confirmed against the decompiled Clavia
+ * editor (G2Editor.c CMParameterPageFocus::WriteStream / G2Demo.c GetPageId). */
+int g2_select_param_page(int slot, int page_id);
+
 /* Morph group assignment (S_SET_MORPH_RANGE, 0x43). A param counts as assigned to
  * morph_group purely because range != 0 — setting range to 0 deassigns it. */
 int g2_set_morph_range(int slot, int location, int module_id, int param_idx,

@@ -77,6 +77,7 @@ static void print_usage(const char *prog) {
     printf("  deassign-midicc-batch <slot> <cc-num>...                                                Remove multiple MIDI CC assignments in one USB frame\n");
     printf("  assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>                         Assign a parameter to a Parameter Page knob (0-119)\n");
     printf("  deassign-knob <slot> <slot-index>                                                       Remove a Parameter Page knob assignment\n");
+    printf("  select-param-page <slot> <page-id>                                                      Select the front-panel Parameter Page (page-id = page*3 + bank, 0-14)\n");
     printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
@@ -521,6 +522,16 @@ static int cmd_select_param(int argc, char **argv, int i) {
     return g2_select_param(slot, location, mod_id, param);
 }
 
+static int cmd_select_param_page(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: select-param-page <slot> <page-id>   (page-id = page*3 + bank, 0-14)\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "select-param-page: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_select_param_page(slot, atoi(argv[i + 2]));
+}
+
 static int cmd_assign_midicc(int argc, char **argv, int i) {
     if (i + 5 >= argc) {
         fprintf(stderr, "Usage: assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>\n");
@@ -909,6 +920,7 @@ static const cmd_entry_t commands[] = {
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },
     { "select-param",     cmd_select_param     },
+    { "select-param-page", cmd_select_param_page },
     { "copy-variation",   cmd_copy_variation   },
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },

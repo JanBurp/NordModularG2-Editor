@@ -103,6 +103,10 @@ extern void test_deassign_knob_invalid_slot_low(void);
 extern void test_deassign_knob_invalid_slot_high(void);
 extern void test_deassign_knob_invalid_slot_index_low(void);
 extern void test_deassign_knob_invalid_slot_index_high(void);
+extern void test_select_param_page_invalid_slot_low(void);
+extern void test_select_param_page_invalid_slot_high(void);
+extern void test_select_param_page_invalid_page_low(void);
+extern void test_select_param_page_invalid_page_high(void);
 
 extern void test_select_param_invalid_slot_low(void);
 extern void test_select_param_invalid_slot_high(void);
@@ -253,6 +257,10 @@ int main(void) {
     RUN_TEST(test_deassign_knob_invalid_slot_high);
     RUN_TEST(test_deassign_knob_invalid_slot_index_low);
     RUN_TEST(test_deassign_knob_invalid_slot_index_high);
+    RUN_TEST(test_select_param_page_invalid_slot_low);
+    RUN_TEST(test_select_param_page_invalid_slot_high);
+    RUN_TEST(test_select_param_page_invalid_page_low);
+    RUN_TEST(test_select_param_page_invalid_page_high);
 
     RUN_TEST(test_select_param_invalid_slot_low);
     RUN_TEST(test_select_param_invalid_slot_high);

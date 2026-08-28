@@ -2264,6 +2264,24 @@ int g2_deassign_knob(int slot, int slot_index) {
     return send_slot((uint8_t)slot, version, 0x26, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
+/* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d). CONFIRMED on real hardware
+ * (2026-08-28, both directions round-tripping with the editor). Unlike the knob assign/deassign
+ * pair above, the layout was solid before that too: the decompiled Clavia editor writes exactly [0x2d][page_id]
+ * (G2Editor.c CMParameterPageFocus::WriteStream) and packs the two selectors with
+ * page_id = page*3 + bank (G2Demo.c GetPageId; decoder G2Editor.c SetFocusedParameterPage, which
+ * silently ignores anything >= 15 — so reject that here rather than sending a no-op). There is no
+ * separate Bank opcode: changing only the Bank means re-sending the whole page_id. The G2 echoes
+ * this same sub-command back when the page is changed from the front panel (see g2_events.c). */
+int g2_select_param_page(int slot, int page_id) {
+    if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
+    if (page_id < 0 || page_id > 14)   return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)       return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload = (uint8_t)page_id;
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_SEL_PARAM_PAGE, &payload, 1) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
  * plain JSON array matching the "data" field of the resources_used watch event:
  * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).

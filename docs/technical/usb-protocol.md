@@ -411,6 +411,7 @@ add-cable                <slot> <loc> ...                          (0x50)
 del-cable                <slot> <loc> ...                          (0x51)
 set-cable-color          <slot> <loc> ... <color>                  (0x54)
 variation                <slot> <variation>                        (0x35 then 0x6A)
+select-param-page        <slot> <page-id>                          (0x2D, page-id = page*3 + bank)
 set-patch-description    <slot> <14-byte body>                     (0x21)
 voice-mode / voice-count <slot> <value>                            (0x21, via read-modify-write — see caveat above)
 get-resources            <slot>                                    (0x71, queried for loc 0 and 1)
@@ -429,9 +430,32 @@ These are combined into slot-command messages. Each message can contain multiple
 | `0x1E` | SEL_GLOBAL_PAGE *(not implemented yet)* | `page` | via parent message |
 | `0x22` | ASSIGN_MIDICC | `loc mod param cc` | Embedded ACK |
 | `0x23` | DEASSIGN_MIDICC | `cc` | Embedded ACK |
-| `0x25` | ASSIGN_KNOB *(not implemented yet)* | `mod param loc 00 knob_index` | via parent message |
-| `0x26` | DEASSIGN_KNOB *(not implemented yet)* | `00 knob_index` | via parent message |
-| `0x2D` | SEL_PARAM_PAGE *(not implemented yet)* | `page` | via parent message |
+| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | Embedded ACK |
+| `0x26` | DEASSIGN_KNOB | `00 knob_index` | Embedded ACK |
+| `0x2D` | SEL_PARAM_PAGE | `page_id` | Embedded ACK |
+
+### SEL_PARAM_PAGE (`0x2D`) — front-panel Parameter Page
+
+One payload byte packs **both** front-panel selectors:
+
+```
+[0] page_id   0-14
+      page_id / 3  ->  Parameter Page  A=0 B=1 C=2 D=3 E=4
+      page_id % 3  ->  Bank            1=0 2=1 3=2
+```
+
+There is no separate Bank sub-command — changing only the Bank means re-sending the whole
+`page_id` with the current Page. Values >= 15 are silently ignored by the device, so
+`g2_select_param_page()` rejects them locally instead of sending a no-op.
+
+The same sub-command travels **both ways**: the G2 emits it unsolicited when the page is changed
+from the front panel, decoded as the `param_page_change` watch event (§14). Sending it from the
+editor also produces an echo carrying the value we just set, which is idempotent for the UI.
+
+This packing is the same one the knob address uses: knob slot index `= page_id * 8 + knob`, i.e.
+`page*24 + bank*8 + knob` (see `g2-editor/src/renderer/paramPages.ts`). Confirmed against the
+decompiled Clavia editor (`CMParameterPageFocus::WriteStream`, `GetPageId`,
+`CParameterPages::SetFocusedParameterPage`).
 
 ### MIDI CC Commands
 
@@ -840,6 +864,7 @@ When `version != 0x40`:
 |----------|-----------|--------------|
 | `0x21` or `0x3C` | `patch_update` | `slot` |
 | `0x27` | `patch_name` | `slot`, `name` |
+| `0x2D` | `param_page_change` | `slot`, `page`=r[5] (packed: `page/3` = Page A-E, `page%3` = Bank 1-3) |
 | `0x2F` | `selected_param` | `slot`, `area` ("fx"/"va"/"patch"), `module`=r[7], `param`=r[8] |
 | `0x40` (location==2) | `patch_param` | `slot`, `module`=r[6], `param`=r[7], `value`=r[8], `variation`=r[9] |
 | `0x40` (location 0/1) | `param_change` | `slot`, `area` ("fx"/"va"), `module`=r[6], `param`=r[7], `value`=r[8], `variation`=r[9] |
@@ -1010,6 +1035,7 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `0x21` | C_PATCH_DESCR | SET_PATCH | Patch description received |
 | `0x27` | S_PATCH_NAME | — | Patch name notification |
 | `0x29` | C_PERF_NAME | — | Performance name notification |
+| `0x2D` | S_SEL_PARAM_PAGE | SEL_PARAM_PAGE | Front-panel Parameter Page changed (watch + echo); byte packs `page*3 + bank` |
 | `0x36` | R_PATCH_VERSION | GET_PATCH_VERSION | Patch version value |
 | `0x38` | R_PATCH_VERSION_CHANGE | — | Patch version changed (watch) |
 | `0x39` | R_LED_DATA | — | LED states (bulk, watch only) |

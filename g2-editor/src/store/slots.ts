@@ -5,6 +5,7 @@ import { getModule } from '../renderer/nmg2mods';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
+import { slotIndexFor, KNOBS_PER_PAGE } from '../renderer/paramPages';
 
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
@@ -482,6 +483,20 @@ export const useSlotsStore = defineStore('slots', {
 			const active = useUiStore().slotInFocus;
 			if (!active) return;
 			await window.cli.run(['variation', String(variation + 1), active]);
+		},
+
+		// Moves the G2's front-panel Parameter Page selection (S_SEL_PARAM_PAGE, 0x2d). The device
+		// packs Page and Bank into one byte — page*3 + bank — which is exactly the first knob of
+		// that page divided by KNOBS_PER_PAGE, so derive it from slotIndexFor rather than
+		// re-spelling the arithmetic and letting the two drift apart. There is no separate Bank
+		// opcode: changing either selector re-sends the whole byte.
+		async selectParamPage(bank: number, page: number): Promise<void> {
+			const active = useUiStore().slotInFocus;
+			if (!active) return;
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			const pageId = slotIndexFor(bank, page, 0) / KNOBS_PER_PAGE;
+			await runCliSafe(['select-param-page', active, String(pageId)], 'selectParamPage');
 		},
 
 		async copyVariation(fromVar: number, toVar: number): Promise<void> {

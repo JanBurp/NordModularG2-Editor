@@ -1,5 +1,6 @@
 /*
- * Unit tests for g2_assign_knob / g2_deassign_knob parameter validation (no USB required)
+ * Unit tests for g2_assign_knob / g2_deassign_knob / g2_select_param_page parameter validation
+ * (no USB required)
  */
 
 #include "unity.h"
@@ -56,4 +57,21 @@ void test_deassign_knob_invalid_slot_index_low(void) {
 
 void test_deassign_knob_invalid_slot_index_high(void) {
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_deassign_knob(0, 120));
+}
+
+void test_select_param_page_invalid_slot_low(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_select_param_page(-1, 0));
+}
+
+void test_select_param_page_invalid_slot_high(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_select_param_page(4, 0));
+}
+
+void test_select_param_page_invalid_page_low(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_select_param_page(0, -1));
+}
+
+/* 15 = page 5 / bank 0, one past page E — the device's own decoder drops it silently */
+void test_select_param_page_invalid_page_high(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_select_param_page(0, 15));
 }

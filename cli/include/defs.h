@@ -48,6 +48,7 @@ typedef enum {
 /* Sub Commands - Actions */
 #define SUB_COMMAND_SET_PARAM                (0x40)
 #define SUB_COMMAND_SEL_PARAM                (0x2f)  /* Move hardware panel cursor to a param (CMParamFocusDump) */
+#define SUB_COMMAND_SEL_PARAM_PAGE           (0x2d)  /* Select front-panel Parameter Page (CMParameterPageFocus); payload = page*3 + bank, 0-14 */
 #define SUB_COMMAND_SET                      (0x37)  /* Upload patch to slot */
 #define SUB_COMMAND_START_STOP               (0x7d)  /* Start/stop notifications */
 #define START_COMM                           (0x00)  /* Arm G2 for unsolicited notifications */

@@ -64,7 +64,7 @@
 				:options="bankOptions"
 				variant="variation"
 				testIdPrefix="param-bank"
-				@update:model-value="(v) => uiStore.setSelectedParamBank((v as number) - 1)"
+				@update:model-value="(v) => onBankSelect((v as number) - 1)"
 			/>
 		</div>
 		<div class="flex gap-2">
@@ -74,7 +74,7 @@
 				variant="toggle"
 				vertical
 				testIdPrefix="param-page"
-				@update:model-value="(v) => uiStore.setDisplayedParamPage(v as number)"
+				@update:model-value="(v) => onPageSelect(v as number)"
 				class="w-8"
 			/>
 			<div class="flex flex-col text-content-muted">
@@ -237,6 +237,25 @@
 			return { ...cell, moduleHeader: isLastOfRun ? '—————]' : '—————' };
 		});
 	});
+
+	// The G2's own A-E / 1-3 buttons are the same selection: push it to the hardware so the front
+	// panel follows the toolbar. Optimistic — the ui-store value is set first, exactly like
+	// handleVariationClick in useSlotManagement.ts. selectParamPage is a no-op when offline, and the
+	// device's echo (param_page_change, handled in useSlotEvents.ts) writes the identical value back,
+	// so there's nothing to suppress. Both selectors send the whole page byte, hence one shared push.
+	function pushParamPage() {
+		slotsStore.selectParamPage(uiStore.selectedParamBank, uiStore.displayedParamPage);
+	}
+
+	function onBankSelect(bank: number) {
+		uiStore.setSelectedParamBank(bank);
+		pushParamPage();
+	}
+
+	function onPageSelect(page: number) {
+		uiStore.setDisplayedParamPage(page);
+		pushParamPage();
+	}
 
 	function onKnobChange(a: ParamPageAssignment, value: number) {
 		const areaKey = a.location === 1 ? 'voice' : 'fx';

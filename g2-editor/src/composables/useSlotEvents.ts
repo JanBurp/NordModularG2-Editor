@@ -119,6 +119,18 @@ export function useSlotEvents(log: LogFn) {
 			}
 			return true;
 		}
+		if (ev.type === 'param_page_change') {
+			log('←', 'Watch', `param_page_change slot=${ev.slot} page=${ev.page}`);
+			// One byte packs both selectors: page = byte/3 (A-E), bank = byte%3 (1-3). Like
+			// selected_param above, the toolbar's page/bank is a single global (not per-slot), so
+			// only the slot currently in view may move it. Values >= 15 are out of range — the
+			// device's own decoder ignores them, so we do too.
+			const page = ev.page as number;
+			if (ev.slot !== uiStore.slotInFocus || page > 14) return true;
+			uiStore.setDisplayedParamPage(Math.floor(page / 3));
+			uiStore.setSelectedParamBank(page % 3);
+			return true;
+		}
 		if (ev.type === 'patch_param') {
 			log('←', 'Watch', `patch_param s=${ev.slot} m=${ev.module} p=${ev.param} v=${ev.value} var=${ev.variation}`, 'param');
 			const slotLabel = ev.slot as SlotLabel;
