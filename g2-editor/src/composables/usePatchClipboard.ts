@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { areaConfig, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
+import { areaConfig, buildCloneEntries, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
 
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
@@ -67,31 +67,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		// Generate new IDs against the destination area
 		const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);
-		let nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
-
-		const idMap = new Map<number, number>();
-		for (const mod of clipboard.modules) {
-			idMap.set(mod.index, nextId++);
-		}
-
-		const entries = clipboard.modules.map((mod) => ({
-			src: mod,
-			newId: idMap.get(mod.index)!,
-			col: Math.max(0, mod.horiz + dCol),
-			row: Math.max(0, mod.vert + dRow),
-		}));
-
-		const remappedCables = clipboard.cables
-			.filter((c) => idMap.has(c.smod) && idMap.has(c.dmod))
-			.map((c) => ({
-				newSmod: idMap.get(c.smod)!,
-				newDmod: idMap.get(c.dmod)!,
-				colour: c.colour,
-				userColour: c.userColour,
-				scon: c.scon,
-				dcon: c.dcon,
-				dir: c.dir ?? 1,
-			}));
+		const { entries, remappedCables } = buildCloneEntries(clipboard.modules, clipboard.cables, existingIds, dCol, dRow);
 		await slotsStore.paste(entries, remappedCables, area);
 
 		uiStore.selectModules(

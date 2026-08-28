@@ -109,6 +109,45 @@ export function resolveColumnCollisions(
 		}));
 }
 
+export function buildCloneEntries(
+	modules: ModuleInstance[],
+	cables: Cable[],
+	existingIds: number[],
+	dCol: number,
+	dRow: number,
+): {
+	entries: { src: ModuleInstance; newId: number; col: number; row: number }[];
+	remappedCables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[];
+} {
+	let nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+
+	const idMap = new Map<number, number>();
+	for (const mod of modules) {
+		idMap.set(mod.index, nextId++);
+	}
+
+	const entries = modules.map((mod) => ({
+		src: mod,
+		newId: idMap.get(mod.index)!,
+		col: Math.max(0, mod.horiz + dCol),
+		row: Math.max(0, mod.vert + dRow),
+	}));
+
+	const remappedCables = cables
+		.filter((c) => idMap.has(c.smod) && idMap.has(c.dmod))
+		.map((c) => ({
+			newSmod: idMap.get(c.smod)!,
+			newDmod: idMap.get(c.dmod)!,
+			colour: c.colour,
+			userColour: c.userColour,
+			scon: c.scon,
+			dcon: c.dcon,
+			dir: c.dir ?? 1,
+		}));
+
+	return { entries, remappedCables };
+}
+
 export function resolvePasteRowOffset(modules: { vert: number; height: number }[], dCol: number, dRow: number): number {
 	if (dCol !== 0) return dRow;
 	if (!modules.some((m) => Math.abs(dRow) < m.height)) return dRow;

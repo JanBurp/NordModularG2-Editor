@@ -142,7 +142,7 @@
 				colour: string;
 			},
 		];
-		moduleMove: [info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }];
+		moduleMove: [info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number; isCopy: boolean }];
 		moduleDrop: [info: { typeId: number; col: number; row: number }];
 		canvasClick: [];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
