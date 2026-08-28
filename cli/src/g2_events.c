@@ -350,14 +350,6 @@ static void emit_embedded_event(const uint8_t *response) {
         return;
     }
 
-    /* S_ASSIGN_KNOB (0x25) / S_DEASSIGN_KNOB (0x26) echoes — sent when a Parameter Page knob is
-     * assigned/deassigned from the physical front panel — are not decoded yet: unlike morph_change
-     * (0x43) below, there's no confirmed response byte layout for these to copy (see
-     * g2-editor's Parameter Pages plan doc). They currently fall through to the "unknown" case at
-     * the bottom of this switch, which is deliberate — it dumps the raw response hex, useful for a
-     * hardware capture to determine the real layout. Add dedicated cases here (mirroring the
-     * "knob_assign_change" JSON shape useSlotEvents.ts expects) only once that capture confirms
-     * the byte offsets — do not guess them. */
     switch (subCmd) {
         case 0x40:
             if (response[5] == 2) {
@@ -402,6 +394,26 @@ static void emit_embedded_event(const uint8_t *response) {
         case 0x2D:
             printf("{\"type\":\"param_page_change\",\"slot\":\"%s\",\"page\":%u}\n",
                    SLOT_LETTER(slot), response[5]);
+            break;
+        /* CMBarbMapChangeNotify (0x74) — a one-off real-hardware capture (2026-08-28) showed the
+         * G2 sending this, with zero payload bytes, instead of echoing S_ASSIGN_KNOB (0x25) for a
+         * front-panel knob assign. Per the decompiled reference editor, CMBarbMapChangeNotify::
+         * ReadStream only consumes the header and UseOnPatch just clears the cached knob map and
+         * marks it dirty ("Barb" is that source's internal name for a knob/controller assignment,
+         * shared with CBarbTargetSpec inside CMKnobAssign itself) — no module/param/slot-index
+         * fields, i.e. a stateless "the knob map changed, go re-fetch" ping (see knob_map_changed
+         * in useSlotEvents.ts, which reloads the slot). NOT reproducible on a follow-up pass: an
+         * unconditional raw-USB debug capture showed nothing at all sent for several repeated
+         * front-panel assigns, while ordinary param changes kept notifying normally — and Clavia's
+         * own official editor exhibits the identical gap on the same hardware. Kept as
+         * correct-if-it-ever-fires, but front-panel knob assign is a confirmed, accepted sync gap,
+         * not a bug — see the usb-protocol.md §7 follow-up note. There's no front-panel deassign
+         * gesture either (deassign is editor-only). The performance-wide sibling (0x75,
+         * CMPerfBarbMapChangeNotify, for a "Global Knob Assign" feature this editor doesn't have)
+         * is deliberately not handled here — same choice as the 0x1E CMGlobalParameterPageFocus
+         * twin. */
+        case 0x74:
+            printf("{\"type\":\"knob_map_changed\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
             break;
         case 0x21:
         case 0x3C:
@@ -478,5 +490,15 @@ void g2_emit_event(const g2_msg_t *msg) {
             emit_bulk_event(msg->bulk, msg->bulk_size);
     } else if (msgType == RESPONSE_TYPE_EMBEDDED) {
         emit_embedded_event(msg->interrupt);
+    } else {
+        /* Every other dispatch path in this file falls back to an "unknown" print that at
+         * least surfaces the raw bytes — this one didn't, so any response whose type nibble
+         * isn't EXTENDED/EMBEDDED was silently dropped with zero trace. Found 2026-08-28
+         * while debugging a front-panel Parameter Page knob assign that produced no watch
+         * output at all despite the assignment landing on the device — print it instead. */
+        char hex[48] = "";
+        for (int i = 0; i < 16; i++) snprintf(hex + i * 2, 3, "%02x", msg->interrupt[i]);
+        printf("{\"type\":\"unknown\",\"subtype\":\"response_type\",\"msgType\":%u,\"data\":\"%s\"}\n", msgType, hex);
+        fflush(stdout);
     }
 }

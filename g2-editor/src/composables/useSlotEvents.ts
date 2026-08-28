@@ -190,27 +190,20 @@ export function useSlotEvents(log: LogFn) {
 			}
 			return true;
 		}
-		if (ev.type === 'knob_assign_change') {
-			// Parameter Pages knob assign/deassign echoed from the front panel. NOTE: cli/src/g2_events.c
-			// does not emit this event yet (S_ASSIGN_KNOB/S_DEASSIGN_KNOB response byte offsets are
-			// unconfirmed — see the comment there) — this handler is ready-but-inert until that lands.
-			// Expected shape: { slot, slotIndex, assigned: true, area: 'fx'|'va', module, param } for an
-			// assign, or { slot, slotIndex, assigned: false } for a deassign.
-			log('←', 'Watch', `knob_assign_change s=${ev.slot} slotIndex=${ev.slotIndex} assigned=${ev.assigned}`, 'param');
+		if (ev.type === 'knob_map_changed') {
+			// Front-panel Parameter Page knob assign, decoded from CMBarbMapChangeNotify (0x74) —
+			// see cli/src/g2_events.c. NOTE (2026-08-28): a one-off capture showed this instead of
+			// an S_ASSIGN_KNOB (0x25) echo, but it wasn't reproducible on a follow-up pass — an
+			// unconditional raw-USB debug capture showed nothing sent at all for several repeated
+			// front-panel assigns, and Clavia's own official editor doesn't reflect front-panel
+			// knob assigns live either. So this handler is effectively unreachable in practice —
+			// kept as correct-if-it-ever-fires (full reload, since the notification carries no
+			// module/param/slot-index fields), not as a working live-sync feature. Front-panel
+			// knob assignment not syncing live is an accepted gap (manual reload picks it up).
+			log('←', 'Watch', `knob_map_changed slot=${ev.slot}`, 'param');
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
-			const slotIndex = ev.slotIndex as number;
-			resolveParamEcho(`${slotLabel}:knob:${slotIndex}`, ev.assigned ? 1 : 0);
-			const list = slotsStore.slots[slotLabel].paramPages;
-			const idx = list.findIndex((k) => k.slotIndex === slotIndex);
-			if (!ev.assigned) {
-				if (idx !== -1) slotsStore.slots[slotLabel].paramPages = [...list.slice(0, idx), ...list.slice(idx + 1)];
-			} else {
-				const location: 0 | 1 = ev.area === 'va' ? 1 : 0;
-				const entry = { slotIndex, location, moduleIndex: ev.module as number, paramIndex: ev.param as number, isLed: 0 };
-				slotsStore.slots[slotLabel].paramPages = idx !== -1 ? [...list.slice(0, idx), entry, ...list.slice(idx + 1)] : [...list, entry];
-			}
-			if (slotsStore.slots[slotLabel].patch) slotsStore.slots[slotLabel].patch!.paramPages = [...slotsStore.slots[slotLabel].paramPages];
+			await slotsStore.loadSlot(slotLabel, true);
 			slotsStore._markSlotDirty(slotLabel);
 			return true;
 		}

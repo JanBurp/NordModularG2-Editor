@@ -240,8 +240,11 @@ int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count);
 int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
 
 /* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
- * knob's address 0-119. Payload layout is inferred from the Delphi reference source, NOT bit-
- * confirmed against a real USB capture — verify before relying on it for real hardware use. */
+ * knob's address 0-119. Payload layout is inferred from the Delphi reference source; both calls
+ * were confirmed on real hardware (2026-08-28) to be accepted (generic embedded ACK, no error),
+ * but the front panel never echoes 0x25/0x26 itself (see g2_events.c's 0x74 case), so the exact
+ * field-level semantics (which byte lands on which knob) haven't been independently re-verified
+ * against the decompiled CMKnobAssign::WriteStream bit layout — worth a visual spot-check. */
 int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index);
 int g2_deassign_knob(int slot, int slot_index);
 

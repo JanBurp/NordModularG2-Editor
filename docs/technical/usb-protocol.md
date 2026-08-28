@@ -430,8 +430,8 @@ These are combined into slot-command messages. Each message can contain multiple
 | `0x1E` | SEL_GLOBAL_PAGE *(not implemented yet)* | `page` | via parent message |
 | `0x22` | ASSIGN_MIDICC | `loc mod param cc` | Embedded ACK |
 | `0x23` | DEASSIGN_MIDICC | `cc` | Embedded ACK |
-| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | Embedded ACK |
-| `0x26` | DEASSIGN_KNOB | `00 knob_index` | Embedded ACK |
+| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | Embedded ACK — real hardware accepts it without error (2026-08-28), but the front panel never echoes 0x25 itself for its own knob assigns (see `0x74` below), so the field offsets aren't independently confirmed |
+| `0x26` | DEASSIGN_KNOB | `00 knob_index` | Embedded ACK — same caveat; also, deassign has no front-panel gesture at all (editor-only) |
 | `0x2D` | SEL_PARAM_PAGE | `page_id` | Embedded ACK |
 
 ### SEL_PARAM_PAGE (`0x2D`) — front-panel Parameter Page
@@ -456,6 +456,38 @@ This packing is the same one the knob address uses: knob slot index `= page_id *
 `page*24 + bank*8 + knob` (see `g2-editor/src/renderer/paramPages.ts`). Confirmed against the
 decompiled Clavia editor (`CMParameterPageFocus::WriteStream`, `GetPageId`,
 `CParameterPages::SetFocusedParameterPage`).
+
+### Knob map change notification (`0x74`) — front-panel Parameter Page knob assign
+
+Confirmed by a real hardware capture (2026-08-28): assigning a knob to a Parameter Page slot from
+the physical front panel does **not** echo `ASSIGN_KNOB` (`0x25`). It instead sends this unrelated
+sub-command, with **zero payload bytes** — nothing beyond the standard 5-byte response header.
+
+In the decompiled reference editor this is `CMBarbMapChangeNotify` ("Barb" is that source's
+internal name for a knob/controller assignment, shared with `CBarbTargetSpec` inside `CMKnobAssign`
+itself). Its `ReadStream` only consumes the header, and `UseOnPatch` just clears the editor's
+cached knob map and marks it dirty — a stateless "the knob map changed, go re-fetch" ping, carrying
+no `module`/`param`/`location`/`slot_index` fields at all. Decoded as `knob_map_changed` (§14); the
+frontend responds with a full slot reload (`loadSlot(slot, true)`), the only way to recover the new
+assignment since the notification itself carries none of the details.
+
+**Follow-up (2026-08-28): not reproducible, and not a decode gap.** After the initial capture, a
+raw-USB-level debug pass (unconditional logging of every interrupt read, no filtering at all)
+showed the G2 sends *nothing* on the wire for a front-panel knob assign — repeated several times in
+a row, with the assignment reliably taking effect on the device each time — while ordinary
+parameter changes kept notifying normally in the same session. Clavia's own official editor was
+then checked directly against the same hardware and shows the identical gap: it does not reflect a
+front-panel knob assignment live either. So `0x74` firing at all appears to be rare/inconsistent
+rather than a normal per-assign echo, and no editor — official or otherwise — achieves live sync
+for this specific action. The decode above is kept as correct-if-it-ever-fires, but front-panel
+knob assignment should be treated as a confirmed, accepted gap (workaround: manual slot reload),
+not a bug to keep chasing.
+
+There is no front-panel gesture to deassign a knob (confirmed on real hardware) — deassign is
+editor-only, so no companion "deassign" notify exists. A performance-wide sibling, `0x75`
+(`CMPerfBarbMapChangeNotify`, backing a "Global Knob Assign" feature this editor doesn't implement),
+exists in the reference source but is deliberately not decoded here — same choice as the `0x1E`
+`CMGlobalParameterPageFocus` twin above.
 
 ### MIDI CC Commands
 
@@ -874,6 +906,7 @@ When `version != 0x40`:
 | `0x69` | `current_note` | `slot`, `note`=r[5], `velocity`=r[6] |
 | `0x6A` | `variation_change` | `slot`, `variation`=r[5] |
 | `0x72` | `resources_used` | `slot`, `location`=r[5] |
+| `0x74` | `knob_map_changed` | `slot` — no other fields (CMBarbMapChangeNotify, zero payload bytes; not reproducible on demand, see §7 note above) |
 | `0x7E` | `error` | `slot`, `code`=r[5] |
 
 ### Bulk notification sub-commands (`aCmd 0x00-0x03`)

@@ -2239,8 +2239,10 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
  * Same acked COMMAND_REQ envelope as MIDI CC assign (send_slot), NOT the raw WRITE_NO_RESP
  * envelope used by g2_set_morph_range. Payload layout is a best-effort inference from the Delphi
  * reference editor (BVE.NMG2Mess.pas AddAssignKnobMessage/AddDeAssignKnobMessage) cross-checked
- * against decompiled G2Editor.c opcodes — NOT bit-confirmed against a real USB capture. Verify
- * before trusting on real hardware. */
+ * against decompiled G2Editor.c opcodes. Confirmed on real hardware (2026-08-28) to be accepted
+ * without error, but the front panel never echoes 0x25/0x26 back (see g2_events.c's 0x74 case),
+ * so there's no independent confirmation the individual fields (module/param/location/slot_index)
+ * land on the intended byte offsets — worth a visual spot-check before fully trusting this. */
 int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
