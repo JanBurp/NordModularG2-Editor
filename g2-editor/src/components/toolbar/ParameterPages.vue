@@ -6,22 +6,14 @@
 				v-for="cell in cells"
 				:key="cell.slotIndex"
 				class="flex flex-col items-center w-16 gap-1 select-none cursor-pointer"
+				:class="{ 'opacity-40': !cell.assignment }"
 				@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			>
-				<span class="text-xs w-full truncate text-center font-bold" :class="{ 'opacity-40': !cell.assignment }">
-					{{ cell.moduleHeader }}
-				</span>
+				<span class="text-xs w-full truncate text-center font-bold">{{ cell.moduleHeader }}</span>
 
-				<!-- Both states carry the border and differ only in its colour: this box is the one cell child
-				     with auto height, so a border only on the empty variant would add 2px there and make the
-				     whole toolbar change height as pages fill up. (The knob and button placeholders below
-				     have explicit heights, where border-box already absorbs their border.) -->
-				<div
-					class="w-full rounded-xs px-1 text-center border"
-					:class="cell.assignment ? 'bg-surface-3 border-transparent' : 'border-line-default opacity-40'"
-				>
-					<div class="text-xs truncate">{{ cell.assignment ? cell.paramLabel : '—' }}</div>
-					<div class="text-xs text-content-secondary truncate">{{ cell.assignment ? cell.valueLabel : '—' }}</div>
+				<div class="w-full rounded-xs px-1 text-center bg-surface-3">
+					<div class="text-xs truncate">{{ cell.paramLabel }}</div>
+					<div class="text-xs text-content-secondary truncate">{{ cell.valueLabel }}</div>
 				</div>
 
 				<!-- The knob alone — not the whole cell — is the Alt+drag source and drop target for page
@@ -36,36 +28,37 @@
 					@dragover.prevent
 					@drop.prevent="onKnobDrop(cell, $event)"
 				>
+					<!-- Unassigned slots render the same Knob, just at value 0 and inert (the cell-level
+					     opacity above dims it). The wrapper keeps its own pointer events, so the assign
+					     drag/drop still works on empty cells. -->
 					<Knob
-						v-if="cell.assignment"
 						:value="cell.value"
-						:class="{ 'pointer-events-none': altHeld }"
+						:class="{ 'pointer-events-none': altHeld || !cell.assignment }"
 						@change="(v) => onKnobChange(cell.assignment!, v)"
 					/>
-					<div v-else class="w-[26px] h-[26px] rounded-full border border-line-default opacity-40" />
 				</div>
 
-				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': !cell.assignment || !cell.hasButton }">
-					{{ cell.assignment && cell.hasButton ? cell.buttonLabel : '—' }}
-				</span>
+				<!-- hasButton is false for unassigned cells too, so it alone gates the button's liveness.
+				     The extra opacity only applies to assigned-but-buttonless params, which the cell-level
+				     opacity doesn't already cover. -->
+				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': cell.assignment && !cell.hasButton }">{{ cell.buttonLabel }}</span>
 				<div
-					v-if="cell.assignment && cell.hasButton"
 					class="btn btn-xs w-full truncate text-center"
-					:class="{ 'pointer-events-none': altHeld }"
+					:class="{ 'opacity-40': cell.assignment && !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
 					@mousedown="onButtonMouseDown(cell)"
 					@mouseup="onButtonMouseUp(cell)"
 					@click="onButtonClick(cell)"
 				>
 					{{ cell.buttonValueLabel }}
 				</div>
-				<div v-else class="w-full h-4 rounded border border-line-default opacity-40" />
 			</div>
 		</div>
 
 		<ToolBarDivider></ToolBarDivider>
 
-		<div class="flex flex-col h-full mb-1">
-			<div class="grow">&nbsp;</div>
+		<!-- self-stretch overrides ToolBar's items-center so this column spans the row height set by the
+		     cells, letting justify-end bottom-align the bank buttons with them. -->
+		<div class="self-stretch flex flex-col justify-end mb-1">
 			<BtnGroup
 				:model-value="uiStore.selectedParamBank + 1"
 				:options="bankOptions"
@@ -178,19 +171,23 @@
 		};
 	}
 
+	// Unassigned cells render the same components as assigned ones, so their labels must still
+	// occupy a text line — an empty string would collapse the row and make cell heights diverge.
+	const BLANK = '\u00A0';
+
 	const emptyCell = {
-		moduleLabel: '',
-		paramLabel: '',
+		moduleLabel: BLANK,
+		paramLabel: BLANK,
 		value: 0,
-		valueLabel: '',
+		valueLabel: BLANK,
 		hasButton: false,
 		buttonParamIndex: 0,
 		buttonValue: 0,
 		buttonLow: 0,
 		buttonHigh: 0,
 		buttonIsTrigger: false,
-		buttonLabel: '',
-		buttonValueLabel: '',
+		buttonLabel: BLANK,
+		buttonValueLabel: BLANK,
 	};
 
 	const cells = computed<Cell[]>(() => {
@@ -228,12 +225,12 @@
 				buttonLow: buttonDisplay?.low ?? 0,
 				buttonHigh: buttonDisplay?.high ?? 0,
 				buttonIsTrigger: buttonDisplay?.isTrigger ?? false,
-				buttonLabel: buttonDisplay?.label ?? '',
-				buttonValueLabel: buttonDisplay?.valueLabel ?? '',
+				buttonLabel: buttonDisplay?.label ?? BLANK,
+				buttonValueLabel: buttonDisplay?.valueLabel ?? BLANK,
 			};
 		});
 		return base.map((cell, i) => {
-			if (!cell.assignment) return { ...cell, moduleHeader: '—' };
+			if (!cell.assignment) return { ...cell, moduleHeader: BLANK };
 			const isContinuation = sameModule(cell.assignment, base[i - 1]?.assignment ?? null);
 			if (!isContinuation) return { ...cell, moduleHeader: cell.moduleLabel };
 			const isLastOfRun = !sameModule(cell.assignment, base[i + 1]?.assignment ?? null);
