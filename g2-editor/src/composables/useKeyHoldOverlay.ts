@@ -39,6 +39,9 @@ export function useKeyHoldOverlay(key: string): { isVisible: Ref<boolean> } {
 		window.addEventListener('keydown', entry.down);
 		window.addEventListener('keyup', entry.up);
 		window.addEventListener('blur', entry.blur);
+		// Chromium delivers no key events during a native HTML5 drag, so a keyup that happens
+		// mid-drag is swallowed and the hold would stay stuck on after the drop.
+		window.addEventListener('dragend', entry.blur);
 	}
 	entry.count++;
 
@@ -48,6 +51,7 @@ export function useKeyHoldOverlay(key: string): { isVisible: Ref<boolean> } {
 			window.removeEventListener('keydown', entry.down);
 			window.removeEventListener('keyup', entry.up);
 			window.removeEventListener('blur', entry.blur);
+			window.removeEventListener('dragend', entry.blur);
 			registry.delete(key);
 		}
 	});

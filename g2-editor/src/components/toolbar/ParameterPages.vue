@@ -289,7 +289,12 @@
 	// `draggable` is gated on altHeld so a plain drag still turns the knob.
 	function onKnobDragStart(cell: Cell, e: DragEvent) {
 		if (!e.dataTransfer) return;
-		e.dataTransfer.effectAllowed = 'move';
+		// 'all', not 'move': the gesture holds Alt/Option throughout, and macOS folds that modifier
+		// into the drag's operation mask (Option = copy) before Blink sees it. A 'move'-only mask
+		// then reduces to no allowed operation while Option is down, and the drop event is never
+		// dispatched — the user has to let go of Alt before the mouse. dropEffect is deliberately
+		// left alone at the drop targets for the same reason; the handlers don't read it.
+		e.dataTransfer.effectAllowed = 'all';
 		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'knob-slot', slotIndex: cell.slotIndex }));
 		const label = cell.assignment ? cell.paramLabel : `Knob ${slotIndexToBankPageKnob(cell.slotIndex).knob + 1}`;
 		setBadgeDragImage(e, label, '#8bd3ff');
