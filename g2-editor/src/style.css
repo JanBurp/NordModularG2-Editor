@@ -1,5 +1,13 @@
 @import 'tailwindcss';
 
+@font-face {
+	font-family: 'Saira Condensed';
+	font-weight: 700;
+	font-style: normal;
+	font-display: swap;
+	src: url('/fonts/SairaCondensed-Bold.ttf') format('truetype');
+}
+
 @theme {
 	--color-surface-0: #ececec;
 	--color-surface-1: #f5f5f5;
