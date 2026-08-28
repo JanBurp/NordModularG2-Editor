@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Patch } from '@/types';
+import type { Patch, GlobalParamPageAssignment } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSlotsStore } from '../store/slots';
@@ -12,6 +12,7 @@ type Prf2Data = {
 	slotNames: string[];
 	patches: Patch[];
 	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
+	globalParamPages: GlobalParamPageAssignment[];
 };
 
 /* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
@@ -48,7 +49,7 @@ export function usePatchFile() {
 			if (slotsStore.uploadingFromFile) return;
 			slotsStore.uploadingFromFile = true;
 		}
-		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath);
+		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
 		await device.setPerformanceMode(name);
 		if (connected) {
 			try {

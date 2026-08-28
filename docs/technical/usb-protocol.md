@@ -263,8 +263,9 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
+| `0x3F FF 02 global` | SET_KNOB_SOURCE (`g2_set_knob_source`) | `FF` unknown, `02`=knob-source mode, `global`=1(Global)/0(Patch) | None (confirmed 2026-08-28 via 4 consecutive real SHIFT+GLOBAL front-panel presses, echoing `ff0201`/`ff0200` in lockstep on the same channel as the two rows above — this is the actual Patch/Global Parameter Pages source toggle, not the page-select opcodes `0x2D`/`0x1E`, which only choose a page *within* whichever source this sets) |
 | `0x59` | UNKNOWN_2 (perf init query) *(not implemented yet)* | — | Embedded ACK |
-| `0x5E` | GET_GLOBAL_KNOBS *(not implemented yet)* | — | Extended bulk |
+| `0x5E` | GET_GLOBAL_KNOBS (`g2_get_global_knobs`) | — | Extended bulk; response chunk `C_KNOBS_GLOBAL` (`0x5F`, see §17) |
 
 **Daemon commands:**
 
@@ -425,9 +426,9 @@ These are combined into slot-command messages. Each message can contain multiple
 
 | Sub-cmd | Name | Payload bytes | Response |
 |---------|------|---------------|----------|
-| `0x1C` | ASSIGN_GLOBAL_KNOB *(not implemented yet)* | `mod param loc 00 knob_index` | via parent message |
-| `0x1D` | DEASSIGN_GLOBAL_KNOB *(not implemented yet)* | `00 knob_index` | via parent message |
-| `0x1E` | SEL_GLOBAL_PAGE *(not implemented yet)* | `page` | via parent message |
+| `0x1C` | ASSIGN_GLOBAL_KNOB (`g2_assign_global_knob`, UNVERIFIED against real hardware) | `(target_slot<<4 \| location<<2) mod param 00 knob_index` — target_slot (0-3=A-D) folds into the first byte's high nibble alongside location, per BVE.NMG2Mess.pas | via parent message |
+| `0x1D` | DEASSIGN_GLOBAL_KNOB (`g2_deassign_global_knob`, UNVERIFIED against real hardware) | `00 knob_index` | via parent message |
+| `0x1E` | SEL_GLOBAL_PAGE (`g2_select_global_page`, confirmed 2026-08-28: editor→hardware page-select works) | `page` | via parent message; the hardware's own echo of this arrives system-wide as `global_page_change` (see the Performance messages / `aCmd==0x04` table below), not slot-scoped like this send side |
 | `0x22` | ASSIGN_MIDICC | `loc mod param cc` | Embedded ACK |
 | `0x23` | DEASSIGN_MIDICC | `cc` | Embedded ACK |
 | `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | Embedded ACK — real hardware accepts it without error (2026-08-28), but the front panel never echoes 0x25 itself for its own knob assigns (see `0x74` below), so the field offsets aren't independently confirmed |
@@ -485,9 +486,11 @@ not a bug to keep chasing.
 
 There is no front-panel gesture to deassign a knob (confirmed on real hardware) — deassign is
 editor-only, so no companion "deassign" notify exists. A performance-wide sibling, `0x75`
-(`CMPerfBarbMapChangeNotify`, backing a "Global Knob Assign" feature this editor doesn't implement),
-exists in the reference source but is deliberately not decoded here — same choice as the `0x1E`
-`CMGlobalParameterPageFocus` twin above.
+(`CMPerfBarbMapChangeNotify`, the Global Parameter Pages front-panel-assign echo), is now decoded
+as `global_knob_map_changed` (same stateless "go re-fetch" shape and the same UNVERIFIED-whether-
+it-ever-fires caveat as `0x74` above) — see `g2_events.c`. `0x1E`'s echo (`CMGlobalParameterPageFocus`,
+decoded as `global_page_change`) is likewise decoded defensively; the Delphi reference source never
+implements either opcode's receive side, so whether the G2 actually sends them is unconfirmed.
 
 ### MIDI CC Commands
 
@@ -875,8 +878,9 @@ bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
 | `0x05` | `assigned_voices` | `voices`: [r[5], r[6], r[7], r[8]] — **1-based** counts; 0 = non-poly slot |
 | `0x09` | `slot_change` | `slot` = response[5] |
 | `0x10` or `0x11` | `perf_settings_update` | — |
+| `0x1E` | `global_page_change` | `page`=r[5] (packed: `page/3` = Page A-E, `page%3` = Bank 1-3) — Global Parameter Pages sibling of the slot-scoped `0x2D` below; confirmed 2026-08-28 to arrive here (system-wide, no slot tag) rather than per-slot, since Global page state isn't slot-scoped, same as `0x3F` below |
 | `0x29` | `perf_name` | `name` (null-terminated from response[5]) |
-| `0x3F` | `master_clock_run` or `master_clock_bpm` | `run`/`bpm` = response[7]; type determined by response[6] (`0x00`=run, else bpm) |
+| `0x3F` | `master_clock_run` / `master_clock_bpm` / `knob_source_change` | response[6] selects the sub-type: `0x00`=run (`run`=r[7]), `0x01`=bpm (`bpm`=r[7]), `0x02`=knob-assign source toggle confirmed 2026-08-28 via the SHIFT+GLOBAL front-panel combo (`global`=r[7], 1=Global/0=Patch) |
 | `0x5D` | `ext_master_clock` | `value` = (response[6]<<8)\|response[7] |
 | `0x7E` | `error` | `code` = response[5] |
 | `0x7F` | `ok` | — |
@@ -907,6 +911,7 @@ When `version != 0x40`:
 | `0x6A` | `variation_change` | `slot`, `variation`=r[5] |
 | `0x72` | `resources_used` | `slot`, `location`=r[5] |
 | `0x74` | `knob_map_changed` | `slot` — no other fields (CMBarbMapChangeNotify, zero payload bytes; not reproducible on demand, see §7 note above) |
+| `0x75` | `global_knob_map_changed` | no fields — Global Parameter Pages sibling of `0x74` (CMPerfBarbMapChangeNotify); same reproducibility caveat |
 | `0x7E` | `error` | `slot`, `code`=r[5] |
 
 ### Bulk notification sub-commands (`aCmd 0x00-0x03`)

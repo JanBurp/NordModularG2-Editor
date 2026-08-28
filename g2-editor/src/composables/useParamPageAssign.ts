@@ -1,4 +1,4 @@
-import type { ContextMenuItem, ParamPageAssignment, SlotLabel } from '@/types';
+import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '@/types';
 import { useSlotsStore } from '@/store/slots';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 import { PAGE_LETTERS, BANK_COUNT, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '@/renderer/paramPages';
@@ -39,6 +39,49 @@ export function buildParamPageMenuItems(opts: {
 		label: deassignLabel,
 		disabled: !existing || !slot,
 		action: () => slot && existing && slotsStore.deassignParamPage(slot, existing.slotIndex),
+	};
+
+	return [assignItem, deassignItem];
+}
+
+// Global Parameter Pages sibling of buildParamPageMenuItems above — "Assign to Global Page"
+// submenu on a module parameter. Available regardless of ParameterPages.vue's toggle state
+// (assigning from canvas doesn't require Global Pages to be the currently *displayed* toolbar
+// page). `slot` here is which patch's module is being assigned — becomes the assignment's
+// `slot` field, since a Global Page slot can target any of the 4 patches.
+export function buildGlobalParamPageMenuItems(opts: {
+	slot: SlotLabel | null;
+	location: 0 | 1;
+	moduleIndex: number;
+	paramIndex: number;
+	existing: GlobalParamPageAssignment | undefined;
+}): ContextMenuItem[] {
+	const slotsStore = useSlotsStore();
+	const { slot, location, moduleIndex, paramIndex, existing } = opts;
+
+	const assignItem: ContextMenuItem = {
+		label: 'Assign to Global Page',
+		disabled: !slot,
+		children: PAGE_LETTERS.flatMap((letter, page) =>
+			Array.from({ length: BANK_COUNT }, (_, bank) => ({
+				label: `Page ${letter}${bank + 1}`,
+				children: Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => ({
+					label: `Knob ${knob + 1}`,
+					action: () => slot && slotsStore.assignParamToGlobalPage(slot, slotIndexFor(bank, page, knob), location, moduleIndex, paramIndex),
+				})),
+			})),
+		),
+	};
+
+	let deassignLabel = 'Deassign Global';
+	if (existing) {
+		const { page, knob } = slotIndexToBankPageKnob(existing.slotIndex);
+		deassignLabel = `Deassign Global (Page ${PAGE_LETTERS[page]}, Knob ${knob + 1})`;
+	}
+	const deassignItem: ContextMenuItem = {
+		label: deassignLabel,
+		disabled: !existing,
+		action: () => existing && slotsStore.deassignGlobalParamPage(existing.slotIndex),
 	};
 
 	return [assignItem, deassignItem];

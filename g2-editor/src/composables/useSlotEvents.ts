@@ -121,14 +121,51 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'param_page_change') {
 			log('←', 'Watch', `param_page_change slot=${ev.slot} page=${ev.page}`);
-			// One byte packs both selectors: page = byte/3 (A-E), bank = byte%3 (1-3). Like
-			// selected_param above, the toolbar's page/bank is a single global (not per-slot), so
-			// only the slot currently in view may move it. Values >= 15 are out of range — the
-			// device's own decoder ignores them, so we do too.
+			// One byte packs both selectors: page = byte/3 (A-E), bank = byte%3 (1-3). This opcode
+			// (0x2D) turns out to be SHARED between Patch and Global page display — like 0x3F's
+			// run/bpm/source sub-modes, the hardware reports "the displayed page changed" once and
+			// relies on the already-known current source (uiStore.globalPagesActive, tracked via
+			// knob_source_change) to disambiguate, rather than always sending the separate
+			// global_page_change (0x1E) echo. Confirmed 2026-08-28: front-panel page buttons
+			// pressed while in Global mode landed here, not in global_page_change — this handler
+			// previously force-set Patch mode on every receipt, silently reverting the toggle the
+			// instant a page changed while actually in Global mode. Values >= 15 are out of range —
+			// the device's own decoder ignores them, so we do too.
 			const page = ev.page as number;
-			if (ev.slot !== uiStore.slotInFocus || page > 14) return true;
+			if (page > 14) return true;
+			if (uiStore.globalPagesActive) {
+				// Global page/bank isn't slot-scoped — accept regardless of which slot is in view.
+				uiStore.setDisplayedGlobalParamPage(Math.floor(page / 3));
+				uiStore.setSelectedGlobalParamBank(page % 3);
+				return true;
+			}
+			// Patch page/bank is a single global (not per-slot) view, so only the slot currently in
+			// view may move it — same reasoning as selected_param above.
+			if (ev.slot !== uiStore.slotInFocus) return true;
 			uiStore.setDisplayedParamPage(Math.floor(page / 3));
 			uiStore.setSelectedParamBank(page % 3);
+			return true;
+		}
+		if (ev.type === 'global_page_change') {
+			log('←', 'Watch', `global_page_change slot=${ev.slot} page=${ev.page}`);
+			// Global Parameter Pages sibling of param_page_change above. Not slot-gated the way that
+			// one is — the toolbar's Global Pages bank/page is a single global view regardless of
+			// which slot's canvas is in focus, since a Global Pages entry can target any of the 4
+			// slots.
+			const page = ev.page as number;
+			if (page > 14) return true;
+			// Receiving 0x1E is itself the signal the front panel is now showing Global pages (see
+			// param_page_change above for the symmetric case).
+			uiStore.setGlobalPagesActive(true);
+			uiStore.setDisplayedGlobalParamPage(Math.floor(page / 3));
+			uiStore.setSelectedGlobalParamBank(page % 3);
+			return true;
+		}
+		if (ev.type === 'global_knob_map_changed') {
+			// Global Parameter Pages sibling of knob_map_changed above — same "stateless ping, full
+			// reload, likely near-dead in practice" caveat (see g2_events.c's 0x75 case).
+			log('←', 'Watch', 'global_knob_map_changed', 'param');
+			await slotsStore.loadGlobalKnobs();
 			return true;
 		}
 		if (ev.type === 'patch_param') {

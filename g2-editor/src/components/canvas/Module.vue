@@ -221,7 +221,7 @@
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
-	import { buildParamPageMenuItems } from '../../composables/useParamPageAssign';
+	import { buildParamPageMenuItems, buildGlobalParamPageMenuItems } from '../../composables/useParamPageAssign';
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
@@ -457,6 +457,7 @@
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
 
 		if (data.type === 'cc') slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+		else if (data.global) slotsStore.assignParamToGlobalPage(slot, data.slotIndex, location, moduleIdx.value, paramIndex);
 		else slotsStore.assignParamToPage(slot, data.slotIndex, location, moduleIdx.value, paramIndex);
 		e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
 	}
@@ -531,6 +532,22 @@
 				moduleIndex: moduleIdx.value,
 				paramIndex,
 				existing: existingPage,
+			}),
+		);
+
+		// Global Parameter Pages knob assign/deassign
+		const existingGlobalPage = slot
+			? slotsStore.globalParamPages.find(
+					(k) => k.slot === slot && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex,
+				)
+			: undefined;
+		items.push(
+			...buildGlobalParamPageMenuItems({
+				slot,
+				location: location as 0 | 1,
+				moduleIndex: moduleIdx.value,
+				paramIndex,
+				existing: existingGlobalPage,
 			}),
 		);
 

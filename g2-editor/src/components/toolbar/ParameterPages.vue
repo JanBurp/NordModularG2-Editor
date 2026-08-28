@@ -23,6 +23,7 @@
 				     Empty slots drag too: dropping one on a canvas param assigns that param here. -->
 				<div
 					:data-knob-slot="cell.slotIndex"
+					:data-knob-global="uiStore.globalPagesActive ? '' : undefined"
 					:draggable="altHeld"
 					@dragstart="onKnobDragStart(cell, $event)"
 					@dragover.prevent
@@ -56,11 +57,13 @@
 
 		<ToolBarDivider></ToolBarDivider>
 
-		<!-- self-stretch overrides ToolBar's items-center so this column spans the row height set by the
-		     cells, letting justify-end bottom-align the bank buttons with them. -->
-		<div class="self-stretch flex flex-col justify-end mb-1">
+		<ToolBarDivider></ToolBarDivider>
+
+		<div class="self-stretch flex flex-col justify-between py-0.5">
+			<Button variant="toggle" :active="uiStore.globalPagesActive" @click="onToggleGlobalPages()" data-testid="global-pages-toggle"> Global </Button>
+
 			<BtnGroup
-				:model-value="uiStore.selectedParamBank + 1"
+				:model-value="(uiStore.globalPagesActive ? uiStore.selectedGlobalParamBank : uiStore.selectedParamBank) + 1"
 				:options="bankOptions"
 				variant="variation"
 				testIdPrefix="param-bank"
@@ -69,7 +72,7 @@
 		</div>
 		<div class="flex gap-2">
 			<BtnGroup
-				:model-value="uiStore.displayedParamPage"
+				:model-value="uiStore.globalPagesActive ? uiStore.displayedGlobalParamPage : uiStore.displayedParamPage"
 				:options="pageOptions"
 				variant="toggle"
 				vertical
@@ -94,6 +97,7 @@
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
+	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
@@ -107,7 +111,7 @@
 	import { getParam } from '../../renderer/parammap';
 	import { formatValue } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
-	import type { ContextMenuItem, ParamPageAssignment } from '../../types';
+	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -119,7 +123,7 @@
 
 	interface Cell {
 		slotIndex: number;
-		assignment: ParamPageAssignment | null;
+		assignment: ParamPageAssignment | GlobalParamPageAssignment | null;
 		moduleLabel: string;
 		moduleHeader: string; // moduleLabel, or a continuation dash-run when the previous cell is the same module (mirrors the G2's own display)
 		paramLabel: string;
@@ -135,13 +139,19 @@
 		buttonValueLabel: string;
 	}
 
-	function sameModule(a: ParamPageAssignment | null, b: ParamPageAssignment | null): boolean {
-		return !!a && !!b && a.location === b.location && a.moduleIndex === b.moduleIndex;
+	// A Global Parameter Page assignment carries its own target `slot` (it can address any of the
+	// 4 patches); a per-Patch one is implicitly scoped to whichever slot's canvas is showing it.
+	function assignmentSlot(a: ParamPageAssignment | GlobalParamPageAssignment): SlotLabel {
+		return 'slot' in a ? a.slot : uiStore.slotInFocus;
 	}
 
-	function resolveModule(a: ParamPageAssignment) {
-		const slot = uiStore.slotInFocus;
-		const patch = slot ? slotsStore.slots[slot].patch : null;
+	function sameModule(a: ParamPageAssignment | GlobalParamPageAssignment | null, b: ParamPageAssignment | GlobalParamPageAssignment | null): boolean {
+		return !!a && !!b && a.location === b.location && a.moduleIndex === b.moduleIndex && assignmentSlot(a) === assignmentSlot(b);
+	}
+
+	function resolveModule(a: ParamPageAssignment | GlobalParamPageAssignment) {
+		const slot = assignmentSlot(a);
+		const patch = slotsStore.slots[slot].patch;
 		const mod = patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
 		if (!mod) return null;
 		return { mod, moduleDef: getModule(mod.type) };
@@ -152,14 +162,14 @@
 	// canvas). Used for both the knob (paramIndex = the assignment's own param) and the button (see
 	// buttonParamIndex note at the call site).
 	function resolveParamDisplay(
-		a: ParamPageAssignment,
+		a: ParamPageAssignment | GlobalParamPageAssignment,
 		paramIndex: number,
 		moduleInfo: ReturnType<typeof resolveModule>,
 	): { label: string; value: number; valueLabel: string; low: number; high: number; isTrigger: boolean } {
 		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
-		const slot = uiStore.slotInFocus;
+		const slot = assignmentSlot(a);
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
-		const value = slot ? (slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[paramIndex] ?? 64) : 0;
+		const value = slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[paramIndex] ?? 64;
 		const paramMeta = paramDef ? getParam(paramDef.type) : undefined;
 		return {
 			label: paramDef?.name ?? String(paramIndex),
@@ -191,10 +201,13 @@
 	};
 
 	const cells = computed<Cell[]>(() => {
+		const global = uiStore.globalPagesActive;
 		const slot = uiStore.slotInFocus;
-		const list = slot ? slotsStore.slots[slot].paramPages : [];
+		const list: (ParamPageAssignment | GlobalParamPageAssignment)[] = global ? slotsStore.globalParamPages : slot ? slotsStore.slots[slot].paramPages : [];
+		const bank = global ? uiStore.selectedGlobalParamBank : uiStore.selectedParamBank;
+		const page = global ? uiStore.displayedGlobalParamPage : uiStore.displayedParamPage;
 		const base: Omit<Cell, 'moduleHeader'>[] = Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => {
-			const slotIndex = slotIndexFor(uiStore.selectedParamBank, uiStore.displayedParamPage, knob);
+			const slotIndex = slotIndexFor(bank, page, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
 			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
 			const moduleInfo = resolveModule(assignment);
@@ -232,7 +245,13 @@
 		return base.map((cell, i) => {
 			if (!cell.assignment) return { ...cell, moduleHeader: BLANK };
 			const isContinuation = sameModule(cell.assignment, base[i - 1]?.assignment ?? null);
-			if (!isContinuation) return { ...cell, moduleHeader: cell.moduleLabel };
+			if (!isContinuation) {
+				// A Global cell's module can belong to a DIFFERENT patch than any other cell on the
+				// page, so prefix the target slot letter to disambiguate (patch mode never needs
+				// this — every cell is implicitly the same, currently-focused slot).
+				const label = global ? `${assignmentSlot(cell.assignment)}: ${cell.moduleLabel}` : cell.moduleLabel;
+				return { ...cell, moduleHeader: label };
+			}
 			const isLastOfRun = !sameModule(cell.assignment, base[i + 1]?.assignment ?? null);
 			return { ...cell, moduleHeader: isLastOfRun ? '—————]' : '—————' };
 		});
@@ -244,29 +263,46 @@
 	// device's echo (param_page_change, handled in useSlotEvents.ts) writes the identical value back,
 	// so there's nothing to suppress. Both selectors send the whole page byte, hence one shared push.
 	function pushParamPage() {
-		slotsStore.selectParamPage(uiStore.selectedParamBank, uiStore.displayedParamPage);
+		if (uiStore.globalPagesActive) {
+			slotsStore.selectGlobalParamPage(uiStore.selectedGlobalParamBank, uiStore.displayedGlobalParamPage);
+		} else {
+			slotsStore.selectParamPage(uiStore.selectedParamBank, uiStore.displayedParamPage);
+		}
+	}
+
+	// The real mode-switch is the SHIFT+GLOBAL front-panel combo (set-knob-source, opcode 0x3F
+	// sub-mode 0x02 — confirmed against real hardware 2026-08-28), NOT the page-select opcodes.
+	// Push that first so the front panel actually switches source, then re-push the (new mode's)
+	// currently-displayed page/bank so it also shows the right page within that source.
+	function onToggleGlobalPages() {
+		const next = !uiStore.globalPagesActive;
+		uiStore.setGlobalPagesActive(next);
+		slotsStore.setKnobSource(next);
+		pushParamPage();
 	}
 
 	function onBankSelect(bank: number) {
-		uiStore.setSelectedParamBank(bank);
+		if (uiStore.globalPagesActive) uiStore.setSelectedGlobalParamBank(bank);
+		else uiStore.setSelectedParamBank(bank);
 		pushParamPage();
 	}
 
 	function onPageSelect(page: number) {
-		uiStore.setDisplayedParamPage(page);
+		if (uiStore.globalPagesActive) uiStore.setDisplayedGlobalParamPage(page);
+		else uiStore.setDisplayedParamPage(page);
 		pushParamPage();
 	}
 
-	function onKnobChange(a: ParamPageAssignment, value: number) {
+	function onKnobChange(a: ParamPageAssignment | GlobalParamPageAssignment, value: number) {
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
-		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey);
+		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey, false, assignmentSlot(a));
 	}
 
 	// buttonParamIndex may differ from a.paramIndex (see the buttonParams.ts lookup above) — write
 	// to whichever param the button actually targets, not necessarily the knob's own.
-	function onButtonChange(a: ParamPageAssignment, buttonParamIndex: number, value: number) {
+	function onButtonChange(a: ParamPageAssignment | GlobalParamPageAssignment, buttonParamIndex: number, value: number) {
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
-		slotsStore.setParam(a.moduleIndex, buttonParamIndex, value, uiStore.variation, areaKey);
+		slotsStore.setParam(a.moduleIndex, buttonParamIndex, value, uiStore.variation, areaKey, false, assignmentSlot(a));
 	}
 
 	// Mirrors useSwitch.ts's isTrigger handling exactly (same composable ModuleSwitch.vue uses on
@@ -296,8 +332,13 @@
 
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
 		if (!cell.assignment) return;
-		const slot = uiStore.slotInFocus;
-		const items: ContextMenuItem[] = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
+		let items: ContextMenuItem[];
+		if (uiStore.globalPagesActive) {
+			items = [{ label: 'Deassign', action: () => slotsStore.deassignGlobalParamPage(cell.slotIndex) }];
+		} else {
+			const slot = uiStore.slotInFocus;
+			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
+		}
 		openContextMenu(event, items);
 	}
 
@@ -314,15 +355,20 @@
 		// dispatched — the user has to let go of Alt before the mouse. dropEffect is deliberately
 		// left alone at the drop targets for the same reason; the handlers don't read it.
 		e.dataTransfer.effectAllowed = 'all';
-		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'knob-slot', slotIndex: cell.slotIndex }));
+		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'knob-slot', slotIndex: cell.slotIndex, global: uiStore.globalPagesActive }));
 		const label = cell.assignment ? cell.paramLabel : `Knob ${slotIndexToBankPageKnob(cell.slotIndex).knob + 1}`;
 		setBadgeDragImage(e, label, '#8bd3ff');
 	}
 
 	async function onKnobDrop(cell: Cell, e: DragEvent) {
 		const data = parseDragPayload(e);
+		if (data?.type !== 'knob-slot') return;
+		if (uiStore.globalPagesActive) {
+			await slotsStore.swapGlobalParamPageSlots(data.slotIndex, cell.slotIndex);
+			return;
+		}
 		const slot = uiStore.slotInFocus;
-		if (!slot || data?.type !== 'knob-slot') return;
+		if (!slot) return;
 		await slotsStore.swapParamPageSlots(slot, data.slotIndex, cell.slotIndex);
 	}
 </script>

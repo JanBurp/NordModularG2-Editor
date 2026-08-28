@@ -131,6 +131,20 @@ export interface ParamPageAssignment {
 	isLed: number; // 0-3, semantics unconfirmed (TKnob.FIsLed) — preserved verbatim, not exposed in UI
 }
 
+// The Global Parameter Pages sibling of ParamPageAssignment (same 120-slot 3 Banks x 5 Pages x 8
+// Knobs geometry) — but Performance-scoped, not Patch-scoped: each slot can target a module
+// parameter in ANY of the 4 patch slots (A-D), addressed by the extra `slot` field. Stored in the
+// .prf2's C_KNOBS_GLOBAL ($5f) section, not inside any one Patch. Reverse-engineered from
+// BVE.NMG2File.pas's TGlobalKnob (a TKnob subclass adding a trailing 2-bit FSlotIndex).
+export interface GlobalParamPageAssignment {
+	slotIndex: number; // 0-119
+	slot: 'A' | 'B' | 'C' | 'D'; // which patch slot's module this targets (SlotLabel, inlined — types/index.ts's SlotLabel re-exports from this file, so importing it here would be circular)
+	location: 0 | 1; // 0=FX, 1=Voice
+	moduleIndex: number;
+	paramIndex: number;
+	isLed: number; // 0-3, semantics unconfirmed — preserved verbatim, not exposed in UI
+}
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;

@@ -1,4 +1,4 @@
-import type { Cable, ModuleInstance, ParamLabel, Patch } from '@/types';
+import type { Cable, GlobalParamPageAssignment, ModuleInstance, ParamLabel, Patch } from '@/types';
 import { describe, expect, it } from 'vitest';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
 
@@ -757,7 +757,13 @@ describe('morph assignment round-trip', () => {
 
 // ── prf2 helpers ──────────────────────────────────────────────────────────────
 
-function loadFixturePrf2(filename: string): { name: string; rawHex: string; slotNames: string[]; patches: Patch[] } {
+function loadFixturePrf2(filename: string): {
+	name: string;
+	rawHex: string;
+	slotNames: string[];
+	patches: Patch[];
+	globalParamPages: GlobalParamPageAssignment[];
+} {
 	const buf = fs.readFileSync(path.join(FIXTURES, filename));
 	const fileBytes = new Uint8Array(buf);
 	let ofs = 0;
@@ -767,10 +773,10 @@ function loadFixturePrf2(filename: string): { name: string; rawHex: string; slot
 		.map((b) => b.toString(16).padStart(2, '0'))
 		.join('');
 	const parsed = new PatchParser(fileBytes.buffer).parsePrf2()!;
-	return { name, rawHex, slotNames: parsed.slotNames, patches: parsed.patches };
+	return { name, rawHex, slotNames: parsed.slotNames, patches: parsed.patches, globalParamPages: parsed.globalParamPages };
 }
 
-function parsePerfFromRawHex(name: string, rawHex: string): { slotNames: string[]; patches: Patch[] } {
+function parsePerfFromRawHex(name: string, rawHex: string): { slotNames: string[]; patches: Patch[]; globalParamPages: GlobalParamPageAssignment[] } {
 	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 	const nameBytes = new TextEncoder().encode(name);
 	const prf2 = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
@@ -1031,6 +1037,55 @@ describe('Parameter Pages round-trip: assign → serialize → parse', () => {
 		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
 		const patchWithout = parsePatchFromRawHex(name, hexWithout);
 		expect(patchWithout.paramPages ?? []).toHaveLength(0);
+	});
+});
+
+describe('Global Parameter Pages round-trip: assign → serializePerformance → parse', () => {
+	it('globalParamPages survive serialize → parse', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [
+			{ slotIndex: 0, slot: 'A', location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 42, slot: 'C', location: 0, moduleIndex: 5, paramIndex: 1, isLed: 0 },
+			{ slotIndex: 119, slot: 'D', location: 1, moduleIndex: 1, paramIndex: 3, isLed: 0 },
+		];
+
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { globalParamPages: reparsed } = parsePerfFromRawHex(name, newHex);
+
+		expect(reparsed).toEqual(assignments);
+	});
+
+	it('globalParamPages survive file save/load cycle', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [{ slotIndex: 8, slot: 'B', location: 1, moduleIndex: 1, paramIndex: 2, isLed: 0 }];
+
+		const savedHex = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { patches: patchesB } = simulatePerfFileSaveAndLoad(name, savedHex);
+		// simulatePerfFileSaveAndLoad discards globalParamPages (returns only {rawHex, patches}) —
+		// reparse the saved bytes directly instead, same round-trip the store's save/load actually
+		// performs (loadPerformanceFile/savePerformance in slots.ts).
+		expect(patchesB).toHaveLength(4);
+		const { globalParamPages: reparsed } = parsePerfFromRawHex(name, savedHex);
+		expect(reparsed).toEqual(assignments);
+	});
+
+	it('empty globalParamPages produces no 0x5f section', () => {
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations), []);
+		expect(extractSection(newHex, 0x5f)).toBeNull();
+	});
+
+	it('globalParamPages removed when deassigned', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [{ slotIndex: 16, slot: 'D', location: 1, moduleIndex: 3, paramIndex: 0, isLed: 0 }];
+
+		const hexWith = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { globalParamPages: withKnobs } = parsePerfFromRawHex(name, hexWith);
+		expect(withKnobs).toHaveLength(1);
+
+		const hexWithout = serializePerformance(patches, hexWith, patches.map(extractVariations), []);
+		const { globalParamPages: withoutKnobs } = parsePerfFromRawHex(name, hexWithout);
+		expect(withoutKnobs).toHaveLength(0);
 	});
 });
 

@@ -1,4 +1,13 @@
-import type { MidiCCAssignment, ModuleInstance, MorphAssignment, ParamPageAssignment, Patch, PatchParamVariation, VariationState } from '@/types';
+import type {
+	GlobalParamPageAssignment,
+	MidiCCAssignment,
+	ModuleInstance,
+	MorphAssignment,
+	ParamPageAssignment,
+	Patch,
+	PatchParamVariation,
+	VariationState,
+} from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
@@ -361,6 +370,9 @@ export const useSlotsStore = defineStore('slots', {
 		performanceName: '',
 		performanceFilePath: '',
 		performanceRawHex: null as string | null,
+		// Global Parameter Pages: Performance-scoped (not per-slot, unlike SlotEntry.paramPages) —
+		// see GlobalParamPageAssignment in types/patch.ts.
+		globalParamPages: [] as GlobalParamPageAssignment[],
 		uploadingFromFile: false,
 		pendingCopyVariation: {} as Record<string, number>,
 	}),
@@ -497,6 +509,60 @@ export const useSlotsStore = defineStore('slots', {
 			if (deviceStore.status !== DeviceStatus.Connected) return;
 			const pageId = slotIndexFor(bank, page, 0) / KNOBS_PER_PAGE;
 			await runCliSafe(['select-param-page', active, String(pageId)], 'selectParamPage');
+		},
+
+		// Global Parameter Pages sibling of selectParamPage (S_SEL_GLOBAL_PAGE, 0x1e). `active` here
+		// is only the transport slot the command rides on — any of the 4 works interchangeably, per
+		// the reference editor (global pages aren't addressed by slot).
+		async selectGlobalParamPage(bank: number, page: number): Promise<void> {
+			const active = useUiStore().slotInFocus;
+			if (!active) return;
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			const pageId = slotIndexFor(bank, page, 0) / KNOBS_PER_PAGE;
+			await runCliSafe(['select-global-page', active, String(pageId)], 'selectGlobalParamPage');
+		},
+
+		// Toggles the front panel's Parameter Pages knob-assign source between Patch and Global —
+		// the SHIFT+GLOBAL combo (opcode 0x3F sub-mode 0x02, system-wide not per-slot). Confirmed
+		// against real hardware 2026-08-28: 4 consecutive SHIFT+GLOBAL presses echoed
+		// ff0201/ff0200/ff0201/ff0200 in lockstep (01=Global, 00=Patch). This is the actual
+		// mode-switch — selectGlobalParamPage/selectParamPage only choose a page *within* whichever
+		// source this sets.
+		async setKnobSource(isGlobal: boolean): Promise<void> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			await runCliSafe(['set-knob-source', isGlobal ? '1' : '0'], 'setKnobSource');
+		},
+
+		// Fetches the Global Parameter Pages assignment list from the device (Q_GLOBAL_KNOBS/
+		// C_KNOBS_GLOBAL, 0x5e/0x5f) and replaces the local list wholesale. Called once during
+		// startup sync (after all 4 slots are loaded) and after a mode-switch rearm — mirrors
+		// _applyPatchOutput's role for per-slot patch data, but there's no per-slot template to
+		// preserve since this list isn't serialized until a .prf2 save. System-wide, not per-slot
+		// (like g2_set_knob_source) — no slot argument needed.
+		async loadGlobalKnobs(): Promise<void> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return;
+			try {
+				const output = await window.cli.run(['get-global-knobs']);
+				await this._applyGlobalKnobsOutput(output);
+			} catch (e) {
+				console.error('Failed to load Global Parameter Pages:', e);
+			}
+		},
+
+		// Shared by loadGlobalKnobs and the synth_settings_update rearm path (useDeviceEvents.ts),
+		// which hands back the same {"data": "<hex>"} shape get-global-knobs itself returns.
+		async _applyGlobalKnobsOutput(output: string): Promise<void> {
+			const result = JSON.parse(output);
+			const hex: string | undefined = result.data;
+			if (!hex) return;
+			const hexPairs = hex.match(/.{2}/g);
+			if (!hexPairs) return;
+			const bytes = new Uint8Array(hexPairs.map((b) => parseInt(b, 16)));
+			const { parseGlobalKnobsChunk } = await import('../parser/nmg2PatchParser');
+			this.globalParamPages = parseGlobalKnobsChunk(bytes);
 		},
 
 		async copyVariation(fromVar: number, toVar: number): Promise<void> {
@@ -1159,10 +1225,20 @@ export const useSlotsStore = defineStore('slots', {
 			return { name: this.slots[slot].name, rawHex: '', patch };
 		},
 
-		async setParam(moduleId: number, paramIdx: number, value: number, variation: number, area: 'voice' | 'fx', immediate = false): Promise<void> {
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot } = ctx;
+		// targetSlot overrides the default (uiStore.slotInFocus, via _getActivePatch) — needed by
+		// Global Parameter Pages knobs, which can target a module in a DIFFERENT slot than the one
+		// currently shown on canvas (ParameterPages.vue's Global Pages mode).
+		async setParam(
+			moduleId: number,
+			paramIdx: number,
+			value: number,
+			variation: number,
+			area: 'voice' | 'fx',
+			immediate = false,
+			targetSlot?: SlotLabel,
+		): Promise<void> {
+			const slot = targetSlot ?? this._getActivePatch()?.slot;
+			if (!slot) return;
 
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -1179,10 +1255,10 @@ export const useSlotsStore = defineStore('slots', {
 					slot,
 					{
 						undo: async () => {
-							await this.setParam(moduleId, paramIdx, box.initial, variation, area);
+							await this.setParam(moduleId, paramIdx, box.initial, variation, area, false, slot);
 						},
 						redo: async () => {
-							await this.setParam(moduleId, paramIdx, box.latest, variation, area);
+							await this.setParam(moduleId, paramIdx, box.latest, variation, area, false, slot);
 						},
 					},
 					cKey,
@@ -1275,7 +1351,14 @@ export const useSlotsStore = defineStore('slots', {
 			useHistoryStore().clearHistory(slot);
 		},
 
-		loadPerformanceFile(patches: Patch[], slotNames: string[], name: string, rawHex: string, filepath?: string): void {
+		loadPerformanceFile(
+			patches: Patch[],
+			slotNames: string[],
+			name: string,
+			rawHex: string,
+			filepath?: string,
+			globalParamPages?: GlobalParamPageAssignment[],
+		): void {
 			const labels: SlotLabel[] = ['A', 'B', 'C', 'D'];
 			const hist = useHistoryStore();
 			for (let i = 0; i < 4; i++) {
@@ -1296,6 +1379,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.performanceName = name;
 			this.performanceRawHex = rawHex;
 			this.performanceFilePath = filepath ?? '';
+			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
 		},
 
 		async savePerformance(filepath?: string): Promise<void> {
@@ -1320,7 +1404,7 @@ export const useSlotsStore = defineStore('slots', {
 				.filter(Boolean);
 			if (patches.length !== 4) return;
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
-			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray);
+			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
 			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
@@ -2701,6 +2785,76 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
+		},
+
+		// Global Parameter Pages siblings of assignParamToPage/_applyParamPages/swapParamPageSlots/
+		// deassignParamPage above. Performance-scoped (this.globalParamPages, not any one slot's
+		// paramPages) and — per design decision — no undo/redo in this first pass, unlike the
+		// per-patch versions. `targetSlot` is which patch's module the knob controls; the CLI's
+		// transport slot (which USB session the command rides on) is always uiStore.slotInFocus,
+		// matching selectGlobalParamPage.
+		async assignParamToGlobalPage(targetSlot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
+			const prev = this.globalParamPages;
+			const next = prev.filter(
+				(k) =>
+					k.slotIndex !== slotIndex &&
+					!(k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex),
+			);
+			next.push({ slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 });
+			this.globalParamPages = next;
+			const active = useUiStore().slotInFocus;
+			const deviceStore = useDeviceStore();
+			if (active && deviceStore.status === DeviceStatus.Connected) {
+				const locStr = morphLocationStr(location);
+				await window.cli.run(['assign-global-knob', active, targetSlot, locStr, String(moduleIndex), String(paramIndex), String(slotIndex)]);
+			}
+		},
+
+		// Replaces the whole Global Parameter Pages list and re-syncs only the knob slots named in
+		// `touched` — mirrors _applyParamPages.
+		async _applyGlobalParamPages(list: GlobalParamPageAssignment[], touched: number[]): Promise<void> {
+			this.globalParamPages = [...list];
+			const active = useUiStore().slotInFocus;
+			const deviceStore = useDeviceStore();
+			if (!active || deviceStore.status !== DeviceStatus.Connected) return;
+			for (const slotIndex of touched) {
+				const entry = list.find((k) => k.slotIndex === slotIndex);
+				if (entry) {
+					const locStr = morphLocationStr(entry.location);
+					await window.cli.run([
+						'assign-global-knob',
+						active,
+						entry.slot,
+						locStr,
+						String(entry.moduleIndex),
+						String(entry.paramIndex),
+						String(slotIndex),
+					]);
+				} else {
+					await window.cli.run(['deassign-global-knob', active, String(slotIndex)]);
+				}
+			}
+		},
+
+		async swapGlobalParamPageSlots(sourceSlotIndex: number, targetSlotIndex: number): Promise<void> {
+			if (sourceSlotIndex === targetSlotIndex) return;
+			const prev = this.globalParamPages;
+			const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
+			if (!source) return;
+			const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
+
+			const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
+			next.push({ ...source, slotIndex: targetSlotIndex });
+			if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex });
+
+			await this._applyGlobalParamPages(next, [sourceSlotIndex, targetSlotIndex]);
+		},
+
+		async deassignGlobalParamPage(slotIndex: number): Promise<void> {
+			this.globalParamPages = this.globalParamPages.filter((k) => k.slotIndex !== slotIndex);
+			const active = useUiStore().slotInFocus;
+			const deviceStore = useDeviceStore();
+			if (active && deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-global-knob', active, String(slotIndex)]);
 		},
 
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {

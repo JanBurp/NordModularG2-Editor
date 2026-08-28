@@ -138,6 +138,7 @@ export type {
 	MidiCCAssignment,
 	MorphAssignment,
 	ParamPageAssignment,
+	GlobalParamPageAssignment,
 } from './patch';
 export { NUM_VARIATIONS } from './patch';
 export type { CliService } from './cli';

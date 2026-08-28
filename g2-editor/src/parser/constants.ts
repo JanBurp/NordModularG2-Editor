@@ -10,6 +10,7 @@ export const SectionType = {
 	MORPH_PARAMS: 0x65,
 	SEPARATOR: 0x6f,
 	PERF_DATA: 0x11,
+	KNOBS_GLOBAL: 0x5f,
 } as const;
 
 // Fixed pseudo-module holding the 8 Morph Groups (location=2/"patch"). Params 0-7 are the

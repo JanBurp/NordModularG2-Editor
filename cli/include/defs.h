@@ -49,6 +49,11 @@ typedef enum {
 #define SUB_COMMAND_SET_PARAM                (0x40)
 #define SUB_COMMAND_SEL_PARAM                (0x2f)  /* Move hardware panel cursor to a param (CMParamFocusDump) */
 #define SUB_COMMAND_SEL_PARAM_PAGE           (0x2d)  /* Select front-panel Parameter Page (CMParameterPageFocus); payload = page*3 + bank, 0-14 */
+#define SUB_COMMAND_ASSIGN_GLOBAL_KNOB       (0x1c)  /* Global Parameter Pages sibling of 0x25 (S_ASS_GLOBAL_KNOB) */
+#define SUB_COMMAND_DEASSIGN_GLOBAL_KNOB     (0x1d)  /* Global Parameter Pages sibling of 0x26 (S_DEASS_GLOB_KNOB) */
+#define SUB_COMMAND_SEL_GLOBAL_PAGE          (0x1e)  /* Global Parameter Pages sibling of SUB_COMMAND_SEL_PARAM_PAGE (S_SEL_GLOBAL_PAGE) */
+#define SUB_COMMAND_GET_GLOBAL_KNOBS         (0x5e)  /* Bulk fetch request (Q_GLOBAL_KNOBS); response chunk id is C_KNOBS_GLOBAL, 0x5f */
+#define RESP_CHUNK_KNOBS_GLOBAL              (0x5f)  /* Response tag byte for the above (C_KNOBS_GLOBAL) */
 #define SUB_COMMAND_SET                      (0x37)  /* Upload patch to slot */
 #define SUB_COMMAND_START_STOP               (0x7d)  /* Start/stop notifications */
 #define START_COMM                           (0x00)  /* Arm G2 for unsolicited notifications */
