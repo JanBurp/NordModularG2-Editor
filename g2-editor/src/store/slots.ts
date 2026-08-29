@@ -14,7 +14,7 @@ import { getModule } from '../renderer/nmg2mods';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
-import { slotIndexFor, KNOBS_PER_PAGE } from '../renderer/paramPages';
+import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/paramPages';
 
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
@@ -2699,6 +2699,41 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// Bulk module-level assign — the manual's "Assign|Page X|Multi Column" / "...|Column N" popup,
+		// right-clicked on a module's background instead of one parameter. Assigns
+		// moduleDef.params[0..count-1] to `count` consecutive knob slots starting at startSlotIndex
+		// (page/bank/knob order — see paramPages.ts), landing as one undo entry via _applyParamPages,
+		// same as swapParamPageSlots. Evicts whatever occupied those slots AND any of this module's
+		// OTHER existing page assignments among the first `count` params (the same two-way uniqueness
+		// assignParamToPage enforces for one param, generalized to N so re-running this always leaves
+		// the module cleanly assigned rather than stragglers elsewhere). Truncates rather than erroring
+		// if there isn't enough room left before slot 119 — mirrors autoAssignMidiCC's cc>119 cutoff.
+		async assignModuleToPage(slot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
+			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
+			if (n <= 0) return;
+			const prev = [...this.slots[slot].paramPages];
+			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
+			const targetSet = new Set(targetSlots);
+			const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !(k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n));
+			for (let i = 0; i < n; i++) next.push({ slotIndex: targetSlots[i], location, moduleIndex, paramIndex: i, isLed: 0 });
+			const evictedElsewhere = prev
+				.filter((k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n && !targetSet.has(k.slotIndex))
+				.map((k) => k.slotIndex);
+			const touched = [...targetSlots, ...evictedElsewhere];
+			await this._applyParamPages(slot, next, touched);
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						await this._applyParamPages(slot, prev, touched);
+					},
+					redo: async () => {
+						await this.assignModuleToPage(slot, startSlotIndex, location, moduleIndex, count);
+					},
+				});
+			}
+		},
+
 		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`
 		// (one assign-knob or deassign-knob each, matching what the hardware expects per slot).
 		// Undo/redo of a multi-slot edit is just this applied to the before/after list.
@@ -2808,6 +2843,26 @@ export const useSlotsStore = defineStore('slots', {
 				const locStr = morphLocationStr(location);
 				await window.cli.run(['assign-global-knob', active, targetSlot, locStr, String(moduleIndex), String(paramIndex), String(slotIndex)]);
 			}
+		},
+
+		// Global Parameter Pages sibling of assignModuleToPage above — no undo/redo, matching the rest
+		// of this Global section's "no undo in this first pass" design decision.
+		async assignModuleToGlobalPage(targetSlot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
+			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
+			if (n <= 0) return;
+			const prev = this.globalParamPages;
+			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
+			const targetSet = new Set(targetSlots);
+			const next = prev.filter(
+				(k) => !targetSet.has(k.slotIndex) && !(k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n),
+			);
+			for (let i = 0; i < n; i++) next.push({ slotIndex: targetSlots[i], slot: targetSlot, location, moduleIndex, paramIndex: i, isLed: 0 });
+			const evictedElsewhere = prev
+				.filter(
+					(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n && !targetSet.has(k.slotIndex),
+				)
+				.map((k) => k.slotIndex);
+			await this._applyGlobalParamPages(next, [...targetSlots, ...evictedElsewhere]);
 		},
 
 		// Replaces the whole Global Parameter Pages list and re-syncs only the knob slots named in

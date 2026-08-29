@@ -221,7 +221,12 @@
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
-	import { buildParamPageMenuItems, buildGlobalParamPageMenuItems } from '../../composables/useParamPageAssign';
+	import {
+		buildParamPageMenuItems,
+		buildGlobalParamPageMenuItems,
+		buildModuleAssignMenuItems,
+		buildGlobalModuleAssignMenuItems,
+	} from '../../composables/useParamPageAssign';
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
@@ -259,8 +264,14 @@
 	}
 
 	function onContextMenu(e: MouseEvent) {
+		const slot = uiStore.slotInFocus;
+		const location = props.areaLabel === 'va' ? 1 : 0;
+		const paramCount = moduleDef.value?.params?.length ?? 0;
 		openContextMenu(e, [
 			{ label: 'Rename…', action: () => onTitleDblClick() },
+			{ type: 'separator' },
+			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
+			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
 			{ type: 'separator' },

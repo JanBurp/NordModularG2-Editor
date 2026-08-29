@@ -87,6 +87,69 @@ export function buildGlobalParamPageMenuItems(opts: {
 	return [assignItem, deassignItem];
 }
 
+// Module-background right-click "Assign" submenu — bulk-assigns ALL of a module's parameters
+// (moduleDef.params, in order) to consecutive Parameter Page knob slots. Matches the manual's
+// "Assign|Page X|Multi Column" / "Assign|Page X|Column N" popup menu: Multi Column spreads the
+// module across as many pages as it needs starting at that page's first column; Column N confines
+// it to that single 8-knob column (both truncate rather than erroring — see assignModuleToPage).
+export function buildModuleAssignMenuItems(opts: { slot: SlotLabel | null; location: 0 | 1; moduleIndex: number; paramCount: number }): ContextMenuItem[] {
+	const slotsStore = useSlotsStore();
+	const { slot, location, moduleIndex, paramCount } = opts;
+	if (paramCount === 0) return [];
+
+	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
+		const children: ContextMenuItem[] = [
+			{
+				label: `Multi Column (${paramCount})`,
+				action: () => slot && slotsStore.assignModuleToPage(slot, slotIndexFor(0, page, 0), location, moduleIndex, paramCount),
+			},
+		];
+		for (let bank = 0; bank < BANK_COUNT; bank++) {
+			children.push({
+				label: `Column ${bank + 1}`,
+				action: () =>
+					slot && slotsStore.assignModuleToPage(slot, slotIndexFor(bank, page, 0), location, moduleIndex, Math.min(paramCount, KNOBS_PER_PAGE)),
+			});
+		}
+		return { label: `Page ${letter}`, children };
+	});
+
+	return [{ label: 'Assign', disabled: !slot, children: pageItems }];
+}
+
+// Global Parameter Pages sibling of buildModuleAssignMenuItems above — "Global Assign" submenu on a
+// module's background. `slot` is which patch's module is being assigned, same as
+// buildGlobalParamPageMenuItems.
+export function buildGlobalModuleAssignMenuItems(opts: {
+	slot: SlotLabel | null;
+	location: 0 | 1;
+	moduleIndex: number;
+	paramCount: number;
+}): ContextMenuItem[] {
+	const slotsStore = useSlotsStore();
+	const { slot, location, moduleIndex, paramCount } = opts;
+	if (paramCount === 0) return [];
+
+	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
+		const children: ContextMenuItem[] = [
+			{
+				label: `Multi Column (${paramCount})`,
+				action: () => slot && slotsStore.assignModuleToGlobalPage(slot, slotIndexFor(0, page, 0), location, moduleIndex, paramCount),
+			},
+		];
+		for (let bank = 0; bank < BANK_COUNT; bank++) {
+			children.push({
+				label: `Column ${bank + 1}`,
+				action: () =>
+					slot && slotsStore.assignModuleToGlobalPage(slot, slotIndexFor(bank, page, 0), location, moduleIndex, Math.min(paramCount, KNOBS_PER_PAGE)),
+			});
+		}
+		return { label: `Page ${letter}`, children };
+	});
+
+	return [{ label: 'Global Assign', disabled: !slot, children: pageItems }];
+}
+
 // Alt-held state, refcounted via useKeyHoldOverlay's shared registry. Gates the Parameter Pages
 // assign-drag affordances so they only arm while Alt is physically held and never compete with the
 // mousedown-based knob-value-drag / Ctrl+drag-morph gestures on the same elements: :draggable and
