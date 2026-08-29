@@ -2362,10 +2362,13 @@ int g2_select_global_page(int slot, int page_id) {
  * and reliably produced garbage). Flushes stale EP 0x81 data before sending (like g2_get_patch)
  * and validates the response's tag byte with a bounded discard-and-retry loop (like
  * get_patch_text's SUB_RESPONSE_PATCH_NOTES check) — a stray leftover bulk transfer from a
- * preceding operation would otherwise be silently misread as this chunk. Returns the chunk's raw
- * bytes hex-encoded under "data", same convention g2_get_patch uses, so the TS side can feed it
- * straight into parseGlobalKnobsChunk. Not run through patch_usb_to_pch2 — that conversion strips
- * a whole-patch header/CRC wrapper a single section-chunk reply doesn't carry. */
+ * preceding operation would otherwise be silently misread as this chunk. Same envelope shape as
+ * that SUB_RESPONSE_PATCH_NOTES bulk branch too: [0..2] header, [3]=response tag (checked below),
+ * [4..5]=payload length (big-endian), [6..]=the actual C_KNOBS_GLOBAL bytes — so those 6 bytes are
+ * stripped before hex-encoding under "data", letting the TS side feed it straight into
+ * parseGlobalKnobsChunk. Not run through patch_usb_to_pch2 — that conversion strips a whole-patch
+ * header/CRC wrapper this single section-chunk reply doesn't carry; it needs its own, smaller
+ * envelope strip instead (above). */
 cJSON *g2_get_global_knobs(void) {
     uint8_t interruptResp[16] = {0};
     int ret;
@@ -2413,18 +2416,23 @@ cJSON *g2_get_global_knobs(void) {
             return NULL;
         }
         ret = recv_bulk(chunkData, chunkSize);
-        if (ret <= 0 || chunkSize < 4 || chunkData[3] != RESP_CHUNK_KNOBS_GLOBAL) {
+        if (ret <= 0 || chunkSize < 6 || chunkData[3] != RESP_CHUNK_KNOBS_GLOBAL) {
             free(chunkData);
             continue;
         }
 
+        /* Strip the envelope: [4..5] is the payload's own big-endian length, clamped to what we
+         * actually received, same as get_patch_text's textLen handling. */
+        uint16_t payloadLen = ((uint16_t)chunkData[4] << 8) | chunkData[5];
+        if (payloadLen > (uint16_t)(chunkSize - 6)) payloadLen = (uint16_t)(chunkSize - 6);
+
         cJSON *root = cJSON_CreateObject();
-        char *hexStr = malloc((size_t)chunkSize * 2 + 1);
+        char *hexStr = malloc((size_t)payloadLen * 2 + 1);
         if (hexStr) {
-            for (size_t i = 0; i < chunkSize; i++) {
-                snprintf(hexStr + i * 2, 3, "%02x", chunkData[i]);
+            for (size_t i = 0; i < payloadLen; i++) {
+                snprintf(hexStr + i * 2, 3, "%02x", chunkData[6 + i]);
             }
-            hexStr[(size_t)chunkSize * 2] = '\0';
+            hexStr[(size_t)payloadLen * 2] = '\0';
             cJSON_AddStringToObject(root, "data", hexStr);
             free(hexStr);
         }
