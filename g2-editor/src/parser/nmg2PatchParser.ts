@@ -40,6 +40,8 @@ export type {
 export function parseGlobalKnobsChunk(data: Uint8Array): GlobalParamPageAssignment[] {
 	let bitofs = 0;
 	const getBits = (numbits: number): number => {
+		if (bitofs + numbits > data.length * 8)
+			throw new RangeError(`parseGlobalKnobsChunk: read past end of section (bit ${bitofs}, requesting ${numbits}, section is ${data.length * 8} bits)`);
 		let rv = (data[bitofs >> 3] >> (7 - (bitofs & 7))) & 1;
 		bitofs++;
 		while (numbits > 1) {

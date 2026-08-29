@@ -680,8 +680,10 @@ describe('swapParamPageSlots', () => {
 
 		expect(at(3)).toBeUndefined();
 		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['deassign-knob', 'A', '3']);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '5', '9']);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['deassign-knob', 'A', '3'],
+			['assign-knob', 'A', 'va', '2', '5', '9'],
+		]);
 	});
 
 	it('exchanges both assignments when the target slot is occupied', async () => {
@@ -753,8 +755,11 @@ describe('assignModuleToPage', () => {
 		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '0', '8']);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '2', '10']);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['assign-knob', 'A', 'va', '2', '0', '8'],
+			['assign-knob', 'A', 'va', '2', '1', '9'],
+			['assign-knob', 'A', 'va', '2', '2', '10'],
+		]);
 	});
 
 	it("evicts occupants of the target slots and any of this module's other assignments among the reassigned params", async () => {
@@ -821,7 +826,10 @@ describe('assignModuleToGlobalPage', () => {
 			{ slotIndex: 17, slot: 'B', location: 0, moduleIndex: 7, paramIndex: 1, isLed: 0 },
 		]);
 		expect(useHistoryStore().canUndo('A')).toBe(false);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16']);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16'],
+			['assign-global-knob', 'A', 'B', 'fx', '7', '1', '17'],
+		]);
 	});
 
 	it("evicts occupants and this module's other assignments for the target patch slot", async () => {

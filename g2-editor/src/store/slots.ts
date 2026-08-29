@@ -94,6 +94,83 @@ function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[]
 	return ['add-cable', slot, location, String(c.colour), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
 }
 
+// Builds the CLI assign-knob command tuple for a single Parameter Page slot.
+function assignKnobCmd(slot: SlotLabel, entry: ParamPageAssignment): string[] {
+	return ['assign-knob', slot, morphLocationStr(entry.location), String(entry.moduleIndex), String(entry.paramIndex), String(entry.slotIndex)];
+}
+
+// Builds the CLI assign-global-knob command tuple. `active` is the transport slot (uiStore.slotInFocus).
+function assignGlobalKnobCmd(active: SlotLabel, entry: GlobalParamPageAssignment): string[] {
+	return [
+		'assign-global-knob',
+		active,
+		entry.slot,
+		morphLocationStr(entry.location),
+		String(entry.moduleIndex),
+		String(entry.paramIndex),
+		String(entry.slotIndex),
+	];
+}
+
+// Two-way-uniqueness single-slot assign (assignParamToPage/assignParamToGlobalPage): evicts
+// whatever currently occupies `slotIndex` and whatever `sameKey` currently occupies (its old slot),
+// then inserts `entry`. Shared by both Patch and Global variants — GlobalParamPageAssignment is a
+// structural superset of ParamPageAssignment (adds `slot`).
+function computeAssignOne<T extends ParamPageAssignment>(
+	prev: T[],
+	slotIndex: number,
+	sameKey: (k: T) => boolean,
+	entry: T,
+): { next: T[]; oldAtSlot?: T; oldKeySlot?: T } {
+	const oldAtSlot = prev.find((k) => k.slotIndex === slotIndex);
+	const oldKeySlot = prev.find(sameKey);
+	const next = prev.filter((k) => k.slotIndex !== slotIndex && !sameKey(k));
+	next.push(entry);
+	return { next, oldAtSlot, oldKeySlot };
+}
+
+// Bulk "assign whole module" (assignModuleToPage/assignModuleToGlobalPage). Evicts ALL of this
+// module's existing assignments (`sameModule`), not just ones with paramIndex < n — fixes a
+// stragglers bug where a prior larger assign left paramIndex >= n behind after a shrink.
+function computeAssignModule<T extends ParamPageAssignment>(
+	prev: T[],
+	targetSlots: number[],
+	sameModule: (k: T) => boolean,
+	makeEntry: (paramIndex: number, slotIndex: number) => T,
+): { next: T[]; touched: number[] } {
+	const targetSet = new Set(targetSlots);
+	const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !sameModule(k));
+	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(i, slotIndex)));
+	const evictedElsewhere = prev.filter((k) => sameModule(k) && !targetSet.has(k.slotIndex)).map((k) => k.slotIndex);
+	return { next, touched: [...targetSlots, ...evictedElsewhere] };
+}
+
+// Swaps (or moves, if the target is empty) two knob slots' occupants — one computed list so the
+// pair lands as a single undo entry (Patch variant) or a single CLI apply (both variants).
+function computeSwap<T extends ParamPageAssignment>(prev: T[], sourceSlotIndex: number, targetSlotIndex: number): T[] | null {
+	const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
+	if (!source) return null;
+	const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
+	const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
+	next.push({ ...source, slotIndex: targetSlotIndex } as T);
+	if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex } as T);
+	return next;
+}
+
+// Builds one assign/deassign CLI command per touched slot from the final list — shared by
+// _applyParamPages/_applyGlobalParamPages, replacing their former sequential-await loops.
+function buildTouchedCmds<T extends ParamPageAssignment>(
+	list: T[],
+	touched: number[],
+	assignCmd: (entry: T) => string[],
+	deassignCmd: (slotIndex: number) => string[],
+): string[][] {
+	return touched.map((slotIndex) => {
+		const entry = list.find((k) => k.slotIndex === slotIndex);
+		return entry ? assignCmd(entry) : deassignCmd(slotIndex);
+	});
+}
+
 const _paramInFlight = new Set<string>();
 const _paramPending = new Map<string, string[]>();
 
@@ -624,6 +701,7 @@ export const useSlotsStore = defineStore('slots', {
 			const hist = useHistoryStore();
 			const ccLocation = areaIdx === 0 ? 0 : 1;
 			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
+			const removedPagesSnap = slotEntry.paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -649,6 +727,7 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
 							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
+							if (removedPagesSnap.length > 0) slotE.paramPages = [...slotE.paramPages, ...removedPagesSnap];
 							this._markSlotDirty(slot);
 							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
 							const allCmds: string[][] = [
@@ -698,6 +777,7 @@ export const useSlotsStore = defineStore('slots', {
 								});
 								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
 							}
+							for (const p of removedPagesSnap) allCmds.push(assignKnobCmd(slot, p));
 							if (allCmds.length > 0) {
 								await runCliBatchSafe(allCmds, 'deleteModule undo');
 							}
@@ -713,9 +793,13 @@ export const useSlotsStore = defineStore('slots', {
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
+			if (removedPagesSnap.length > 0)
+				slotEntry.paramPages = slotEntry.paramPages.filter((k) => !(k.location === ccLocation && k.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
-			await runCliSafe(['del-module', slot, location, String(moduleId)], 'deleteModule');
+			const deleteCmds: string[][] = [['del-module', slot, location, String(moduleId)]];
+			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
+			await runCliBatchSafe(deleteCmds, 'deleteModule');
 
 			return { name: slotEntry.name, rawHex: '', patch };
 		},
@@ -1238,7 +1322,7 @@ export const useSlotsStore = defineStore('slots', {
 			targetSlot?: SlotLabel,
 		): Promise<void> {
 			const slot = targetSlot ?? this._getActivePatch()?.slot;
-			if (!slot) return;
+			if (!slot || !this.slots[slot]?.patch) return;
 
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -2375,6 +2459,7 @@ export const useSlotsStore = defineStore('slots', {
 				// Capture pre-state for history
 				let modSnaps: ModuleInstance[] = [];
 				let cableSnaps: Cable[] = [];
+				let pagesSnaps: ParamPageAssignment[] = [];
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -2425,6 +2510,14 @@ export const useSlotsStore = defineStore('slots', {
 						removeModuleFromVariations(this.slots[slot].variations, id, areaIdx === 0 ? 'fx' : 'voice');
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
+					const pageLocation = areaIdx === 0 ? 0 : 1;
+					pagesSnaps = this.slots[slot].paramPages.filter((k) => k.location === pageLocation && selectedModules.includes(k.moduleIndex));
+					if (pagesSnaps.length > 0) {
+						this.slots[slot].paramPages = this.slots[slot].paramPages.filter(
+							(k) => !(k.location === pageLocation && selectedModules.includes(k.moduleIndex)),
+						);
+						for (const p of pagesSnaps) cliCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
+					}
 					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) {
 						await runCliBatchSafe(cliCmds, 'deleteSelection');
@@ -2462,6 +2555,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
+							if (pagesSnaps.length > 0) this.slots[slot].paramPages = [...this.slots[slot].paramPages, ...pagesSnaps];
 							this._markSlotDirty(slot);
 							const allCmds: string[][] = [];
 							for (const mod of modSnaps) {
@@ -2507,6 +2601,7 @@ export const useSlotsStore = defineStore('slots', {
 									String(cn.dcon),
 								]);
 							}
+							for (const p of pagesSnaps) allCmds.push(assignKnobCmd(slot, p));
 							try {
 								for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
 									await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
@@ -2644,12 +2739,13 @@ export const useSlotsStore = defineStore('slots', {
 		// cleared too. Both changes land in one undo entry.
 		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
-			const oldAtSlot = prev.find((k) => k.slotIndex === slotIndex);
-			const oldParamSlot = prev.find((k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex);
-			const next = prev.filter(
-				(k) => k.slotIndex !== slotIndex && !(k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex),
+			const entry: ParamPageAssignment = { slotIndex, location, moduleIndex, paramIndex, isLed: 0 };
+			const { next, oldAtSlot, oldKeySlot } = computeAssignOne(
+				prev,
+				slotIndex,
+				(k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
+				entry,
 			);
-			next.push({ slotIndex, location, moduleIndex, paramIndex, isLed: 0 });
 			this.slots[slot].paramPages = next;
 			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...next];
@@ -2663,28 +2759,8 @@ export const useSlotsStore = defineStore('slots', {
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
 							await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
-							if (oldAtSlot) {
-								const locStr = morphLocationStr(oldAtSlot.location);
-								await window.cli.run([
-									'assign-knob',
-									slot,
-									locStr,
-									String(oldAtSlot.moduleIndex),
-									String(oldAtSlot.paramIndex),
-									String(slotIndex),
-								]);
-							}
-							if (oldParamSlot && oldParamSlot.slotIndex !== slotIndex) {
-								const locStr = morphLocationStr(oldParamSlot.location);
-								await window.cli.run([
-									'assign-knob',
-									slot,
-									locStr,
-									String(oldParamSlot.moduleIndex),
-									String(oldParamSlot.paramIndex),
-									String(oldParamSlot.slotIndex),
-								]);
-							}
+							if (oldAtSlot) await window.cli.run(assignKnobCmd(slot, oldAtSlot));
+							if (oldKeySlot && oldKeySlot.slotIndex !== slotIndex) await window.cli.run(assignKnobCmd(slot, oldKeySlot));
 						}
 					},
 					redo: async () => {
@@ -2693,10 +2769,7 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected) {
-				const locStr = morphLocationStr(location);
-				await window.cli.run(['assign-knob', slot, locStr, String(moduleIndex), String(paramIndex), String(slotIndex)]);
-			}
+			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignKnobCmd(slot, entry));
 		},
 
 		// Bulk module-level assign — the manual's "Assign|Page X|Multi Column" / "...|Column N" popup,
@@ -2704,22 +2777,21 @@ export const useSlotsStore = defineStore('slots', {
 		// moduleDef.params[0..count-1] to `count` consecutive knob slots starting at startSlotIndex
 		// (page/bank/knob order — see paramPages.ts), landing as one undo entry via _applyParamPages,
 		// same as swapParamPageSlots. Evicts whatever occupied those slots AND any of this module's
-		// OTHER existing page assignments among the first `count` params (the same two-way uniqueness
-		// assignParamToPage enforces for one param, generalized to N so re-running this always leaves
-		// the module cleanly assigned rather than stragglers elsewhere). Truncates rather than erroring
-		// if there isn't enough room left before slot 119 — mirrors autoAssignMidiCC's cc>119 cutoff.
+		// OTHER existing page assignments (the same two-way uniqueness assignParamToPage enforces for
+		// one param, generalized to N so re-running this always leaves the module cleanly assigned
+		// rather than stragglers elsewhere). Truncates rather than erroring if there isn't enough room
+		// left before slot 119 — mirrors autoAssignMidiCC's cc>119 cutoff.
 		async assignModuleToPage(slot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
 			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
 			if (n <= 0) return;
 			const prev = [...this.slots[slot].paramPages];
 			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
-			const targetSet = new Set(targetSlots);
-			const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !(k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n));
-			for (let i = 0; i < n; i++) next.push({ slotIndex: targetSlots[i], location, moduleIndex, paramIndex: i, isLed: 0 });
-			const evictedElsewhere = prev
-				.filter((k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n && !targetSet.has(k.slotIndex))
-				.map((k) => k.slotIndex);
-			const touched = [...targetSlots, ...evictedElsewhere];
+			const { next, touched } = computeAssignModule<ParamPageAssignment>(
+				prev,
+				targetSlots,
+				(k) => k.location === location && k.moduleIndex === moduleIndex,
+				(paramIndex, slotIndex) => ({ slotIndex, location, moduleIndex, paramIndex, isLed: 0 }),
+			);
 			await this._applyParamPages(slot, next, touched);
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -2735,23 +2807,22 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`
-		// (one assign-knob or deassign-knob each, matching what the hardware expects per slot).
-		// Undo/redo of a multi-slot edit is just this applied to the before/after list.
+		// (one assign-knob or deassign-knob each, matching what the hardware expects per slot), as a
+		// single batched CLI call. Undo/redo of a multi-slot edit is just this applied to the
+		// before/after list.
 		async _applyParamPages(slot: SlotLabel, list: ParamPageAssignment[], touched: number[]): Promise<void> {
 			this.slots[slot].paramPages = [...list];
 			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...list];
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return;
-			for (const slotIndex of touched) {
-				const entry = list.find((k) => k.slotIndex === slotIndex);
-				if (entry) {
-					const locStr = morphLocationStr(entry.location);
-					await window.cli.run(['assign-knob', slot, locStr, String(entry.moduleIndex), String(entry.paramIndex), String(slotIndex)]);
-				} else {
-					await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
-				}
-			}
+			const cmds = buildTouchedCmds(
+				list,
+				touched,
+				(entry) => assignKnobCmd(slot, entry),
+				(slotIndex) => ['deassign-knob', slot, String(slotIndex)],
+			);
+			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyParamPages');
 		},
 
 		// Moves a knob slot's assignment onto another slot, exchanging with that slot's occupant when
@@ -2761,13 +2832,8 @@ export const useSlotsStore = defineStore('slots', {
 		async swapParamPageSlots(slot: SlotLabel, sourceSlotIndex: number, targetSlotIndex: number): Promise<void> {
 			if (sourceSlotIndex === targetSlotIndex) return;
 			const prev = [...this.slots[slot].paramPages];
-			const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
-			if (!source) return;
-			const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
-
-			const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
-			next.push({ ...source, slotIndex: targetSlotIndex });
-			if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex });
+			const next = computeSwap(prev, sourceSlotIndex, targetSlotIndex);
+			if (!next) return;
 
 			const touched = [sourceSlotIndex, targetSlotIndex];
 			await this._applyParamPages(slot, next, touched);
@@ -2787,6 +2853,7 @@ export const useSlotsStore = defineStore('slots', {
 
 		async deassignParamPage(slot: SlotLabel, slotIndex: number): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
+			const removed = prev.find((k) => k.slotIndex === slotIndex);
 			this.slots[slot].paramPages = prev.filter((k) => k.slotIndex !== slotIndex);
 			this._markSlotDirty(slot);
 			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...this.slots[slot].paramPages];
@@ -2797,20 +2864,9 @@ export const useSlotsStore = defineStore('slots', {
 						this.slots[slot].paramPages = prev;
 						this._markSlotDirty(slot);
 						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
-						const restored = prev.find((k) => k.slotIndex === slotIndex);
-						if (restored) {
+						if (removed) {
 							const deviceStore = useDeviceStore();
-							if (deviceStore.status === DeviceStatus.Connected) {
-								const locStr = morphLocationStr(restored.location);
-								await window.cli.run([
-									'assign-knob',
-									slot,
-									locStr,
-									String(restored.moduleIndex),
-									String(restored.paramIndex),
-									String(slotIndex),
-								]);
-							}
+							if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignKnobCmd(slot, removed));
 						}
 					},
 					redo: async () => {
@@ -2827,22 +2883,25 @@ export const useSlotsStore = defineStore('slots', {
 		// paramPages) and — per design decision — no undo/redo in this first pass, unlike the
 		// per-patch versions. `targetSlot` is which patch's module the knob controls; the CLI's
 		// transport slot (which USB session the command rides on) is always uiStore.slotInFocus,
-		// matching selectGlobalParamPage.
+		// matching selectGlobalParamPage. Each mutation still marks the affected patch slot(s) dirty
+		// via the existing per-slot _markSlotDirty, even though globalParamPages itself lives outside
+		// any one slot's patch — that's the only "unsaved edits" signal the app has.
 		async assignParamToGlobalPage(targetSlot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
 			const prev = this.globalParamPages;
-			const next = prev.filter(
-				(k) =>
-					k.slotIndex !== slotIndex &&
-					!(k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex),
+			const entry: GlobalParamPageAssignment = { slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 };
+			const { next, oldAtSlot, oldKeySlot } = computeAssignOne(
+				prev,
+				slotIndex,
+				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
+				entry,
 			);
-			next.push({ slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 });
 			this.globalParamPages = next;
+			this._markSlotDirty(targetSlot);
+			if (oldAtSlot) this._markSlotDirty(oldAtSlot.slot);
+			if (oldKeySlot) this._markSlotDirty(oldKeySlot.slot);
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
-			if (active && deviceStore.status === DeviceStatus.Connected) {
-				const locStr = morphLocationStr(location);
-				await window.cli.run(['assign-global-knob', active, targetSlot, locStr, String(moduleIndex), String(paramIndex), String(slotIndex)]);
-			}
+			if (active && deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignGlobalKnobCmd(active, entry));
 		},
 
 		// Global Parameter Pages sibling of assignModuleToPage above — no undo/redo, matching the rest
@@ -2850,63 +2909,54 @@ export const useSlotsStore = defineStore('slots', {
 		async assignModuleToGlobalPage(targetSlot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
 			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
 			if (n <= 0) return;
-			const prev = this.globalParamPages;
 			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
-			const targetSet = new Set(targetSlots);
-			const next = prev.filter(
-				(k) => !targetSet.has(k.slotIndex) && !(k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n),
+			const { next, touched } = computeAssignModule<GlobalParamPageAssignment>(
+				this.globalParamPages,
+				targetSlots,
+				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex,
+				(paramIndex, slotIndex) => ({ slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 }),
 			);
-			for (let i = 0; i < n; i++) next.push({ slotIndex: targetSlots[i], slot: targetSlot, location, moduleIndex, paramIndex: i, isLed: 0 });
-			const evictedElsewhere = prev
-				.filter(
-					(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex < n && !targetSet.has(k.slotIndex),
-				)
-				.map((k) => k.slotIndex);
-			await this._applyGlobalParamPages(next, [...targetSlots, ...evictedElsewhere]);
+			await this._applyGlobalParamPages(next, touched);
 		},
 
 		// Replaces the whole Global Parameter Pages list and re-syncs only the knob slots named in
-		// `touched` — mirrors _applyParamPages.
+		// `touched` — mirrors _applyParamPages, plus marks every distinct patch slot touched (by
+		// either the old or new occupant of each touched knob slot) dirty, since this list isn't
+		// nested inside any one slot's patch for that to happen automatically.
 		async _applyGlobalParamPages(list: GlobalParamPageAssignment[], touched: number[]): Promise<void> {
+			const prevList = this.globalParamPages;
+			const dirtySlots = new Set<SlotLabel>();
+			for (const slotIndex of touched) {
+				const oldEntry = prevList.find((k) => k.slotIndex === slotIndex);
+				const newEntry = list.find((k) => k.slotIndex === slotIndex);
+				if (oldEntry) dirtySlots.add(oldEntry.slot);
+				if (newEntry) dirtySlots.add(newEntry.slot);
+			}
+			dirtySlots.forEach((s) => this._markSlotDirty(s));
 			this.globalParamPages = [...list];
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
 			if (!active || deviceStore.status !== DeviceStatus.Connected) return;
-			for (const slotIndex of touched) {
-				const entry = list.find((k) => k.slotIndex === slotIndex);
-				if (entry) {
-					const locStr = morphLocationStr(entry.location);
-					await window.cli.run([
-						'assign-global-knob',
-						active,
-						entry.slot,
-						locStr,
-						String(entry.moduleIndex),
-						String(entry.paramIndex),
-						String(slotIndex),
-					]);
-				} else {
-					await window.cli.run(['deassign-global-knob', active, String(slotIndex)]);
-				}
-			}
+			const cmds = buildTouchedCmds(
+				list,
+				touched,
+				(entry) => assignGlobalKnobCmd(active, entry),
+				(slotIndex) => ['deassign-global-knob', active, String(slotIndex)],
+			);
+			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyGlobalParamPages');
 		},
 
 		async swapGlobalParamPageSlots(sourceSlotIndex: number, targetSlotIndex: number): Promise<void> {
 			if (sourceSlotIndex === targetSlotIndex) return;
-			const prev = this.globalParamPages;
-			const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
-			if (!source) return;
-			const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
-
-			const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
-			next.push({ ...source, slotIndex: targetSlotIndex });
-			if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex });
-
+			const next = computeSwap(this.globalParamPages, sourceSlotIndex, targetSlotIndex);
+			if (!next) return;
 			await this._applyGlobalParamPages(next, [sourceSlotIndex, targetSlotIndex]);
 		},
 
 		async deassignGlobalParamPage(slotIndex: number): Promise<void> {
+			const removed = this.globalParamPages.find((k) => k.slotIndex === slotIndex);
 			this.globalParamPages = this.globalParamPages.filter((k) => k.slotIndex !== slotIndex);
+			if (removed) this._markSlotDirty(removed.slot);
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
 			if (active && deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-global-knob', active, String(slotIndex)]);

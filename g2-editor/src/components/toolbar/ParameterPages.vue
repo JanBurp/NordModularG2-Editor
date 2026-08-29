@@ -363,7 +363,7 @@
 	async function onKnobDrop(cell: Cell, e: DragEvent) {
 		const data = parseDragPayload(e);
 		if (data?.type !== 'knob-slot') return;
-		if (uiStore.globalPagesActive) {
+		if (data.global) {
 			await slotsStore.swapGlobalParamPageSlots(data.slotIndex, cell.slotIndex);
 			return;
 		}
