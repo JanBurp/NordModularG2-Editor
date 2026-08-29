@@ -187,6 +187,34 @@ describe('edited flag', () => {
 
 		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
 	});
+
+	it('savePerformance falls back to a live hardware fetch when no .prf2 was ever loaded (hardware-native perf mode)', async () => {
+		const store = useSlotsStore();
+		store.performanceRawHex = null; // nothing loaded from disk/browser this session
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Connected;
+		device.device = { mode: 'Performance' } as any;
+		const cliRun = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = cliRun;
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(cliRun).toHaveBeenCalledWith(['get-perf-file', '/tmp/live.prf2']);
+		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
+	});
+
+	it('savePerformance does nothing when performanceRawHex is null and the device is not live in Performance mode', async () => {
+		const store = useSlotsStore();
+		store.performanceRawHex = null;
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Disconnected;
+		const cliRun = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = cliRun;
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(cliRun).not.toHaveBeenCalled();
+	});
 });
 
 describe('setMorphGroupLabel', () => {

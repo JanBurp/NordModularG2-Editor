@@ -1276,7 +1276,24 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async savePerformance(filepath?: string): Promise<void> {
-			if (!this.performanceRawHex) return;
+			if (!this.performanceRawHex) {
+				// Hardware-native performance mode (no .prf2 opened from disk/browser this
+				// session, so there's no template to reserialize from) — pull the current
+				// performance straight from the device instead. g2_get_perf_file does the
+				// entire job itself (queries all 4 slots + perf settings, writes the .prf2).
+				const device = useDeviceStore();
+				if (!device.isPerformanceMode || device.status !== DeviceStatus.Connected) return;
+				let hwPath = filepath || this.performanceFilePath;
+				if (!hwPath) {
+					//@ts-ignore
+					const result = await window.electronAPI.showSavePerfDialog(this.performanceName || device.device?.performance?.name);
+					if (!result.success || !result.filepath) return;
+					hwPath = result.filepath;
+				}
+				await window.cli.run(['get-perf-file', hwPath]);
+				this.performanceFilePath = hwPath;
+				return;
+			}
 			let path = filepath || this.performanceFilePath;
 			if (!path) {
 				//@ts-ignore

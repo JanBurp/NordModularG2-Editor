@@ -3,6 +3,9 @@ import { defineStore } from 'pinia';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
+export type RecentFile = { path: string; kind: 'patch' | 'performance' };
+
+const MAX_RECENT_FILES = 20;
 
 export const useSettingsStore = defineStore('settings', {
 	state: () => ({
@@ -22,8 +25,14 @@ export const useSettingsStore = defineStore('settings', {
 		knobMode: 'vertical' as KnobMode,
 		knobSensitivity: 1 as number,
 		canvasZoom: 1 as number,
+		recentFiles: [] as RecentFile[],
 	}),
 	actions: {
+		addRecentFile(path: string, kind: RecentFile['kind']) {
+			this.recentFiles = [{ path, kind }, ...this.recentFiles.filter((f) => f.path !== path)].slice(0, MAX_RECENT_FILES);
+			// IPC uses structured clone, which chokes on Pinia's reactive Proxy — send plain objects.
+			window.electronAPI?.updateRecentFiles(this.recentFiles.map((f) => ({ ...f })));
+		},
 		toggleExtendedToolBar() {
 			this.showExtendedToolBar = !this.showExtendedToolBar;
 		},

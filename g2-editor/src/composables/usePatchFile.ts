@@ -1,7 +1,8 @@
 import { ref } from 'vue';
-import type { Patch } from '@/types';
+import type { Patch, SlotLabel } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
+import { useSettingsStore } from '../store/settings';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 const { PatchParser } = await import('../parser/nmg2PatchParser');
@@ -95,9 +96,10 @@ export function usePatchFile() {
 		}
 	}
 
-	async function openFromElectronDialog(): Promise<void> {
+	async function openFromElectronDialog(slot?: SlotLabel, kind?: 'patch' | 'performance'): Promise<void> {
+		if (slot) uiStore.setSlotInFocus(slot);
 		if (!window.electronAPI) return;
-		const result = await window.electronAPI.openPatchDialog();
+		const result = await window.electronAPI.openPatchDialog(kind);
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
 		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
@@ -106,8 +108,10 @@ export function usePatchFile() {
 		const prf2 = parser.parsePrf2();
 		if (prf2) {
 			await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
+			useSettingsStore().addRecentFile(result.filepath!, 'performance');
 			return;
 		}
+		useSettingsStore().addRecentFile(result.filepath!, 'patch');
 		const targetSlot = uiStore.slotInFocus;
 		const parsedPatch = parser.parse() as any;
 		slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
@@ -199,7 +203,8 @@ export function usePatchFile() {
 		}
 	}
 
-	async function newPatch(): Promise<void> {
+	async function newPatch(slot?: SlotLabel): Promise<void> {
+		if (slot) uiStore.setSlotInFocus(slot);
 		if (!window.electronAPI) return;
 		const filepath = await window.electronAPI.patches.builtinPath('EmptyPatch.pch2');
 		await handlePatchSelect({ type: 'disk', filepath });
