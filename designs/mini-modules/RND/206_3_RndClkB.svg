@@ -1,0 +1,84 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="206_3_RndClkB.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="9.5763754"
+     inkscape:cx="97.270623"
+     inkscape:cy="97.322835"
+     inkscape:window-width="3840"
+     inkscape:window-height="2131"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="6.5771799"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="6.5771799"
+       y="17.927124">CLK B</tspan></text>
+  <g
+     id="g1"
+     transform="matrix(1,0,0,1.338911,0,-7.8351562)"
+     style="fill:#00ccff;fill-opacity:1;stroke-width:0.86422">
+    <rect
+       style="fill:#00ccff;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.86422;stroke-dasharray:none;stroke-opacity:1"
+       id="rect2"
+       width="40.484291"
+       height="11.877891"
+       x="5.5078545"
+       y="23.118622" />
+    <path
+       style="fill:#00ccff;fill-opacity:1;stroke:#ffffff;stroke-width:0.86422;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 26.685867,32.081965 V 28.484314 H 28.7812 v 1.462781 h 1.897663 v -4.467411 h 2.016265 v 1.897661 h 1.897661 v 5.258105 h 1.541851 v -2.332543 h 1.858127 v -3.597651 h 1.897663 v 4.506947 h 1.541848 V 25.44015"
+       id="path1" />
+  </g>
+  <circle
+     style="font-variation-settings:'wdth' 75;fill:#ffff00;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:10.0157"
+     id="path2"
+     cx="9.1804647"
+     cy="35.41254"
+     r="1.3040433" />
+  <path
+     style="fill:#00cbff;fill-opacity:1;stroke:none;stroke-width:0.264583px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+     d="m 36.398902,39.890908 h 9.260416 l -4.552399,7.884985 z"
+     id="path2-6" />
+  <path
+     style="font-variation-settings:'wdth' 75;fill:none;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:1;stroke-linecap:round;stroke-linejoin:round;stroke-dashoffset:10.0157"
+     d="m 39.879616,39.886387 c -1.146675,0.03282 -2.320584,-0.02919 -3.448754,0.08365 0.573927,1.258544 1.43941,2.458096 2.12394,3.694237 0.826061,1.318792 1.54667,2.725415 2.436032,3.99366 0.482386,0.01955 0.582848,-0.723807 0.861806,-1.012282 1.252903,-2.222254 2.613441,-4.413118 3.796885,-6.655959 -1.448805,-0.16532 -2.994395,-0.06665 -4.480473,-0.106355 -0.42981,3.2e-5 -0.859626,0.0021 -1.289436,0.003 z"
+     id="path3" />
+</svg>

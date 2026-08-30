@@ -1,0 +1,96 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="63_6_Scratch.svg"
+   inkscape:version="1.3.2 (091e20e, 2023-11-25, custom)"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     inkscape:zoom="9.6688511"
+     inkscape:cx="97.271122"
+     inkscape:cy="97.322835"
+     inkscape:window-width="3840"
+     inkscape:window-height="2131"
+     inkscape:window-x="-9"
+     inkscape:window-y="-9"
+     inkscape:window-maximized="1"
+     inkscape:current-layer="svg1" />
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="3.6237285"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="3.6237285"
+       y="17.927124">SCRAT</tspan></text>
+  <g
+     id="g10">
+    <rect
+       style="fill:#c5c5c5;fill-opacity:1;fill-rule:evenodd;stroke:#800066;stroke-width:2;stroke-dasharray:none;stroke-opacity:1"
+       id="rect6"
+       width="34.036041"
+       height="25.7854"
+       x="8.7319794"
+       y="20.891006" />
+    <g
+       id="g9"
+       transform="translate(0.39402159)">
+      <circle
+         style="font-variation-settings:'wdth' 75, 'wght' 700;fill:#3e3e3e;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:10.0157;stroke-opacity:1"
+         id="path6"
+         cx="27.287212"
+         cy="33.783707"
+         r="11.046662" />
+      <circle
+         style="font-variation-settings:'wdth' 75, 'wght' 700;fill:#ff80e6;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:10.0157;stroke-opacity:1"
+         id="path6-2"
+         cx="27.287212"
+         cy="33.783707"
+         r="3.4718742" />
+      <g
+         id="g7"
+         transform="matrix(0.86808706,-0.69522027,0.66448404,0.90824109,-52.084596,45.064349)"
+         style="stroke-width:0.894286">
+        <path
+           style="fill:none;stroke:#000000;stroke-width:0.894286;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+           d="m 59.037087,20.469274 v 9.656409"
+           id="path7" />
+        <rect
+           style="fill:#000000;fill-opacity:1;fill-rule:evenodd;stroke-width:0.236613"
+           id="rect7"
+           width="2.5442038"
+           height="3.353723"
+           x="57.764984"
+           y="29.805031" />
+      </g>
+    </g>
+  </g>
+</svg>
