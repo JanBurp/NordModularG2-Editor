@@ -2776,9 +2776,10 @@ export const useSlotsStore = defineStore('slots', {
 						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
-							await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
-							if (oldAtSlot) await window.cli.run(assignKnobCmd(slot, oldAtSlot));
-							if (oldKeySlot && oldKeySlot.slotIndex !== slotIndex) await window.cli.run(assignKnobCmd(slot, oldKeySlot));
+							const cmds: string[][] = [['deassign-knob', slot, String(slotIndex)]];
+							if (oldAtSlot) cmds.push(assignKnobCmd(slot, oldAtSlot));
+							if (oldKeySlot && oldKeySlot.slotIndex !== slotIndex) cmds.push(assignKnobCmd(slot, oldKeySlot));
+							await runCliBatchSafe(cmds, 'assignParamToPage undo');
 						}
 					},
 					redo: async () => {
