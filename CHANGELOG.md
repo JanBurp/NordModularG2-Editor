@@ -8,6 +8,37 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Added
+- Assigning Morph Groups
+- Assigning Parameter Pages
+- Patch text notes
+- Mini-modules picker, also wired into Quick Add Module popup
+- Cable hovering emphasizes the whole connected nest
+- Mouse-wheel interaction
+- Zoom for patch area only
+- New / Init 1 / Init 2 patch buttons
+- Recent files in File menu
+- Improved MIDI Learn
+- Window size/position persisted across sessions
+- Toasts, error popups, and contextual hints (UX review pass)
+
+### Changed
+- Toolbar layout reorganized
+- Styling/UX polish across canvas, Morph Groups, Parameter Pages
+- Undo/redo history improvements
+
+### Fixed
+- Patch category not saving correctly
+- Editing actions not registering in undo history (offline mode)
+- Light theme issues
+
+---
+
+## [0.6.1] - 2026-07-04
+
+### Fixed
+- Windows CI build
+
 ---
 
 ## [0.6.0] - 2026-07-04
