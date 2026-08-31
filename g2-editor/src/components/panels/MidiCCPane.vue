@@ -54,6 +54,8 @@
 				@dragstart="onRowDragStart(row.cc, $event)"
 				@dragover.prevent
 				@drop="onRowDrop(row.cc, row.assignment, $event)"
+				@mouseenter="row.assignment && showHint('ccRow')"
+				@mouseleave="clearHint"
 			>
 				<span class="px-2 py-0.5">{{ row.cc }}</span>
 				<span class="px-2 py-0.5 text-content-secondary">{{ ccShortName(row.cc) }}</span>
@@ -64,10 +66,6 @@
 
 		<!-- Drop zone hint -->
 		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">F8 - show CC's on params</div>
-
-		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
-			<p class="text-sm text-content-primary">Remove all {{ controllers.length }} CC assignments?</p>
-		</Dialog>
 	</div>
 </template>
 
@@ -75,23 +73,23 @@
 	import { ref, computed } from 'vue';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
+	import { useStatusHint } from '@/composables/useStatusHint';
 	import { useDeviceStore } from '@/store/device';
 	import { getModule } from '@/renderer/nmg2mods';
 	import { getAllowedCCs, CC_SHORT } from '@/composables/useMidiCC';
 	import { setBadgeDragImage } from '@/utils/badgeLayout';
 	import { serializeDragPayload, parseDragPayload } from '@/utils/dragPayload';
 	import type { MidiCCAssignment } from '@/types';
-	import Dialog from '@/components/common/Dialog.vue';
 
 	type CCRow = { cc: number; assignment: MidiCCAssignment | null };
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const { showHint, clearHint } = useStatusHint();
 	const deviceStore = useDeviceStore();
 
 	const selectedRows = ref<Set<number>>(new Set());
 	let lastSelectedCC: number | null = null;
-	const showRemoveAllDialog = ref(false);
 
 	const slot = computed(() => uiStore.slotInFocus);
 
@@ -165,14 +163,9 @@
 		await slotsStore.deassignMidiCCs(s, ccs);
 	}
 
-	function removeAll() {
-		if (!slot.value || controllers.value.length === 0) return;
-		showRemoveAllDialog.value = true;
-	}
-
-	async function confirmRemoveAll() {
+	async function removeAll() {
 		const s = slot.value;
-		if (!s) return;
+		if (!s || controllers.value.length === 0) return;
 		selectedRows.value = new Set();
 		await slotsStore.deassignAllMidiCC(s);
 	}

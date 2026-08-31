@@ -48,6 +48,9 @@ export const useUiStore = defineStore('ui', {
 		// after every module) so the badge always paints above other modules instead of being hidden
 		// behind whichever one happens to sit below it in the DOM.
 		morphDragHint: null as { moduleIndex: number; paramIndex: number; text: string; area: 'va' | 'fx' } | null,
+		// Contextual one-line gesture hint shown in StatusBar while hovering a jack/title/param/CC
+		// row that has a hidden modifier-key gesture; null when nothing relevant is hovered.
+		statusHint: null as string | null,
 	}),
 
 	getters: {

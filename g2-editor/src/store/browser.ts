@@ -2,6 +2,7 @@ import { defineStore } from 'pinia';
 import { SLOT_LABELS } from '@/constants';
 import { getCategorySlug } from '@/constants/categories';
 import { useSlotsStore } from './slots';
+import { showToast } from '@/composables/useToast';
 
 export interface SynthPatch {
 	bank: number;
@@ -123,7 +124,7 @@ export const useBrowserStore = defineStore('browser', {
 					kind === 'patch' ? getCategorySlug(useSlotsStore().getPatchForSlot(SLOT_LABELS[slotIndex])?.description?.category ?? 0) : undefined;
 				this.upsertPatch(bank, location, kind, name ?? '', category);
 			} catch (e: any) {
-				this.error = e.message;
+				showToast(e.message);
 			}
 		},
 
@@ -136,7 +137,7 @@ export const useBrowserStore = defineStore('browser', {
 					this.synthPatches = this.synthPatches.filter((p) => p.bank !== bank);
 				}
 			} catch (e: any) {
-				this.error = e.message;
+				showToast(e.message);
 			}
 		},
 
@@ -145,7 +146,7 @@ export const useBrowserStore = defineStore('browser', {
 				await window.cli.run(['clear-patch', kind, String(bank), String(location)]);
 				this.removePatch(bank, location, kind);
 			} catch (e: any) {
-				this.error = e.message;
+				showToast(e.message);
 			}
 		},
 

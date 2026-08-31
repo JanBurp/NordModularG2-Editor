@@ -1,10 +1,10 @@
-import { ref } from 'vue';
 import type { Patch, GlobalParamPageAssignment, SlotLabel } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSettingsStore } from '../store/settings';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { showToast } from './useToast';
 const { PatchParser } = await import('../parser/nmg2PatchParser');
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
@@ -32,7 +32,6 @@ export function usePatchFile() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const device = useDeviceStore();
-	const uploadError = ref<string | null>(null);
 
 	function applyVariation(parsedPatch: any): void {
 		if (parsedPatch?.description?.variation !== undefined) {
@@ -57,7 +56,7 @@ export function usePatchFile() {
 				await window.cli.run(['upload-perf', filepath]);
 			} catch (err) {
 				console.error('Upload perf to G2 failed:', err);
-				uploadError.value = 'Performance upload to G2 failed — check device connection.';
+				showToast('Performance upload to G2 failed — check device connection.');
 			} finally {
 				slotsStore.uploadingFromFile = false;
 			}
@@ -93,7 +92,7 @@ export function usePatchFile() {
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
-			uploadError.value = 'Failed to load patch file — the file may be corrupt.';
+			showToast('Failed to load patch file — the file may be corrupt.');
 		}
 	}
 
@@ -121,7 +120,7 @@ export function usePatchFile() {
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
-			uploadError.value = 'Failed to load patch file — the file may be corrupt.';
+			showToast('Failed to load patch file — the file may be corrupt.');
 			return;
 		}
 		if (device.status === DeviceStatus.Connected) {
@@ -130,7 +129,7 @@ export function usePatchFile() {
 				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
 			} catch (err) {
 				console.error('Upload to G2 failed:', err);
-				uploadError.value = 'Patch upload to G2 failed — check device connection.';
+				showToast('Patch upload to G2 failed — check device connection.');
 			} finally {
 				slotsStore.uploadingFromFile = false;
 			}
@@ -145,6 +144,7 @@ export function usePatchFile() {
 		setTimeout(() => {
 			if (device.pendingPerfBank === bank - 1 && device.pendingPerfLoc === location - 1) {
 				console.warn('Performance select did not settle in time');
+				showToast('Performance switch did not complete — check device connection.');
 				device.clearPendingPerf();
 			}
 		}, PERF_SETTLE_TIMEOUT_MS);
@@ -157,6 +157,7 @@ export function usePatchFile() {
 			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
+			showToast('Failed to select synth performance — check device connection.');
 			device.clearPendingPerf();
 		}
 	}
@@ -187,13 +188,14 @@ export function usePatchFile() {
 						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
 					} catch (err) {
 						console.error('Upload to G2 failed:', err);
-						uploadError.value = 'Patch upload to G2 failed — check device connection.';
+						showToast('Patch upload to G2 failed — check device connection.');
 					} finally {
 						slotsStore.uploadingFromFile = false;
 					}
 				}
 			} catch (err) {
 				console.error('Failed to load patch:', err);
+				showToast('Failed to load patch file — the file may be corrupt.');
 			}
 		} else {
 			if (device.status !== DeviceStatus.Connected) return;
@@ -207,6 +209,7 @@ export function usePatchFile() {
 				await slotsStore.loadSlot(targetSlot);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
+				showToast('Failed to select synth patch — check device connection.');
 			}
 		}
 	}
@@ -232,6 +235,5 @@ export function usePatchFile() {
 		loadInitPatch,
 		newPatch,
 		openFromElectronDialog,
-		uploadError,
 	};
 }

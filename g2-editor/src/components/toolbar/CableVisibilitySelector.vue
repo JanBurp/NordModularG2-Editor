@@ -24,17 +24,27 @@
 		>
 			H
 		</button>
-		<button class="btn btn-toggle btn-small btn-group-item w-6 h-6 btn-cable-select" title="Re-render cables" @click="uiStore.shakeCables()">S</button>
+		<button
+			class="btn btn-toggle btn-small btn-group-item w-6 h-6 btn-cable-select"
+			title="Re-render cables"
+			@click="uiStore.shakeCables()"
+			@mouseenter="showHint('cableShake')"
+			@mouseleave="clearHint"
+		>
+			S
+		</button>
 	</div>
 </template>
 
 <script setup lang="ts">
 	import { useCableVisibility } from '../../composables/useCableVisibility';
 	import { useUiStore } from '../../store/ui';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import type { CableVisibility } from '../../composables/useCableVisibility';
 
 	const { cableColors, cableVisibility, allCablesVisible, toggleCableVisibility, toggleShowHideAll } = useCableVisibility();
 	const uiStore = useUiStore();
+	const { showHint, clearHint } = useStatusHint();
 
 	function getVisibility(colorName: string): boolean {
 		return cableVisibility.value[colorName as keyof CableVisibility];

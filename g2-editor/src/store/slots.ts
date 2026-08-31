@@ -19,6 +19,7 @@ import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/para
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
+import { showToast } from '../composables/useToast';
 import {
 	areaConfig,
 	findModuleByIndex,
@@ -1538,7 +1539,13 @@ export const useSlotsStore = defineStore('slots', {
 					if (!result.success || !result.filepath) return;
 					hwPath = result.filepath;
 				}
-				await window.cli.run(['get-perf-file', hwPath]);
+				try {
+					await window.cli.run(['get-perf-file', hwPath]);
+				} catch (err) {
+					console.error('Failed to save performance:', err);
+					showToast('Failed to save performance.');
+					return;
+				}
 				this.performanceFilePath = hwPath;
 				return;
 			}
@@ -1566,7 +1573,13 @@ export const useSlotsStore = defineStore('slots', {
 			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
 			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
-			await window.electronAPI.savePatch(path, data);
+			try {
+				await window.electronAPI.savePatch(path, data);
+			} catch (err) {
+				console.error('Failed to save performance:', err);
+				showToast('Failed to save performance.');
+				return;
+			}
 			this.performanceFilePath = path;
 			this.performanceRawHex = newRawHex;
 			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
@@ -1604,20 +1617,28 @@ export const useSlotsStore = defineStore('slots', {
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			await this.exportSlotToFile(slot, path);
+			const ok = await this.exportSlotToFile(slot, path);
+			if (!ok) return;
 			this.slotFilePaths[slot] = path;
 			entry.edited = false;
 		},
 
 		// Serializes and writes a slot's current patch to an arbitrary file path, without
 		// touching slotFilePaths/edited — used for one-off snapshots (e.g. Save Init Patch)
-		// that must not hijack what the next regular Save writes to.
-		async exportSlotToFile(slot: SlotLabel, filepath: string): Promise<void> {
+		// that must not hijack what the next regular Save writes to. Returns whether the write succeeded.
+		async exportSlotToFile(slot: SlotLabel, filepath: string): Promise<boolean> {
 			const entry = this.slots[slot];
-			if (!entry?.patch) return;
-			if (!entry.rawHex && !entry.templateRawHex) return;
-			const data = await this._buildPchBytes(entry);
-			await window.electronAPI.savePatch(filepath, data);
+			if (!entry?.patch) return false;
+			if (!entry.rawHex && !entry.templateRawHex) return false;
+			try {
+				const data = await this._buildPchBytes(entry);
+				await window.electronAPI.savePatch(filepath, data);
+				return true;
+			} catch (err) {
+				console.error(`Failed to save slot ${slot}:`, err);
+				showToast('Failed to save patch.');
+				return false;
+			}
 		},
 
 		// Pushes the slot's current in-memory patch to the connected device via a full re-upload —
@@ -1639,6 +1660,7 @@ export const useSlotsStore = defineStore('slots', {
 				return true;
 			} catch (err) {
 				console.error(`Push notes to G2 failed for slot ${slot}:`, err);
+				showToast('Failed to push patch notes to device — check connection.');
 				return false;
 			} finally {
 				this.uploadingFromFile = false;

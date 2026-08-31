@@ -135,6 +135,10 @@
 				</ul>
 			</template>
 		</template>
+
+		<Dialog v-model="showClearBankDialog" title="Clear Bank" confirm-label="Clear" @confirm="confirmClearBank">
+			<p class="text-sm text-content-primary">Clear all patches in Bank {{ pendingClearBank?.bank }}?</p>
+		</Dialog>
 	</div>
 </template>
 
@@ -154,6 +158,7 @@
 	import StateMessage from '../browser/StateMessage.vue';
 	import ListItem from '../browser/ListItem.vue';
 	import Icon from '../common/Icon.vue';
+	import Dialog from '../common/Dialog.vue';
 
 	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {
@@ -182,6 +187,8 @@
 
 	const searchRef = ref();
 	const searchQuery = ref('');
+	const showClearBankDialog = ref(false);
+	const pendingClearBank = ref<{ bank: number; kind: 'patch' | 'performance' } | null>(null);
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
@@ -301,10 +308,22 @@
 			items.push({ label: `Store "${patchName}"`, children: storeChildren });
 			items.push({ type: 'separator' });
 		}
-		items.push({ label: 'Clear all in bank', action: () => browser.clearBank(bank, kind) });
+		items.push({
+			label: 'Clear all in bank',
+			action: () => {
+				pendingClearBank.value = { bank, kind };
+				showClearBankDialog.value = true;
+			},
+		});
 		items.push({ type: 'separator' });
 		items.push({ label: 'Sort', children: sortItems });
 		openCtx(e, items);
+	}
+
+	function confirmClearBank() {
+		if (!pendingClearBank.value) return;
+		browser.clearBank(pendingClearBank.value.bank, pendingClearBank.value.kind);
+		pendingClearBank.value = null;
 	}
 
 	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {

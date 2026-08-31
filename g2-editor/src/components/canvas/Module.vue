@@ -22,6 +22,8 @@
 			data-drag-handle="true"
 			@mousedown.stop.prevent="onDragHandleMousedown"
 			@dblclick.stop.prevent="onTitleDblClick"
+			@mouseenter="onTitleHoverEnter"
+			@mouseleave="onTitleHoverLeave"
 		/>
 
 		<!-- Visual elements from ve array -->
@@ -78,6 +80,8 @@
 				:data-module-index="moduleIdx"
 				class="cursor-pointer"
 				@mousedown.capture="onParamMorphMouseDown(index, $event)"
+				@mouseenter="onParamHoverEnter"
+				@mouseleave="onParamHoverLeave"
 			>
 				<ModuleKnob
 					v-if="isKnob(param.n)"
@@ -188,6 +192,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { useUiStore } from '../../store/ui';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import ModuleBackground from './ModuleBackground.vue';
 	import ModuleKnob from './ModuleKnob.vue';
 	import ModuleTitle from './ModuleTitle.vue';
@@ -314,6 +319,13 @@
 		});
 	}
 
+	function onTitleHoverEnter() {
+		showHint('moduleTitle');
+	}
+	function onTitleHoverLeave() {
+		clearHint();
+	}
+
 	const instance = computed(() => props.instance as ModuleInstance);
 	const moduleIdx = computed(() => instance.value.index || 0);
 
@@ -387,6 +399,7 @@
 	);
 
 	const uiStore = useUiStore();
+	const { showHint, clearHint } = useStatusHint();
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
 
@@ -459,6 +472,13 @@
 				? undefined
 				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, range),
 		});
+	}
+
+	function onParamHoverEnter() {
+		showHint('paramMorph');
+	}
+	function onParamHoverLeave() {
+		clearHint();
 	}
 
 	function onParamDragOver(e: DragEvent) {

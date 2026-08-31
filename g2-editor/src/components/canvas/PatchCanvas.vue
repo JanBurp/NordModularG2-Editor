@@ -73,7 +73,8 @@
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
-	import { sameJack } from '../../store/slotHelpers';
+	import { sameJack, matchesCableJack } from '../../store/slotHelpers';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import type { JackEnd } from '../../store/slotHelpers';
 	import type { ModuleInstance } from '../../types';
 	import type { ContextMenuItem } from '../../types';
@@ -183,9 +184,12 @@
 	const hoveredJack = ref<JackEnd | null>(null);
 	function onJackHoverEnter(info: JackEnd) {
 		hoveredJack.value = info;
+		const connected = (props.cables as Cable[]).some((c) => matchesCableJack(c, info.moduleIndex, info.connectorIndex, info.type));
+		if (connected) showHint('jackConnected');
 	}
 	function onJackHoverLeave(info: JackEnd) {
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
+		clearHint();
 	}
 
 	const { handleCanvasMousedown, handleModuleClick, handleCanvasClick } = useModuleSelecting(
@@ -248,6 +252,7 @@
 	}
 
 	const uiStore = useUiStore();
+	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
 	const { addModuleAt } = useAddModule();
 

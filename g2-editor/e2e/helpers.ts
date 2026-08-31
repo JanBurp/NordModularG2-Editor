@@ -140,17 +140,15 @@ export async function grabAndDropCableEnd(page: Page, cableIndex: number, grabNe
 	await page.waitForTimeout(300);
 }
 
-/** Read the module/cable count shown in the status bar for the given area. */
+/** Read the module/cable count shown in the CPU widget's per-area rows (Extended Toolbar). */
 export async function getStatusCounts(page: Page): Promise<{ voiceModules: number; voiceCables: number; fxModules: number; fxCables: number }> {
-	const text = await page.locator('[data-testid="status-counts"]').innerText();
-	const vm = text.match(/Voice:\s*(\d+)\s*modules\s*\/\s*(\d+)\s*cables/);
-	const fx = text.match(/FX:\s*(\d+)\s*modules\s*\/\s*(\d+)\s*cables/);
-	return {
-		voiceModules: vm ? parseInt(vm[1]) : 0,
-		voiceCables: vm ? parseInt(vm[2]) : 0,
-		fxModules: fx ? parseInt(fx[1]) : 0,
-		fxCables: fx ? parseInt(fx[2]) : 0,
+	const parse = (text: string) => {
+		const m = text.match(/(\d+)m\/(\d+)c/);
+		return { modules: m ? parseInt(m[1]) : 0, cables: m ? parseInt(m[2]) : 0 };
 	};
+	const va = parse(await page.locator('[data-testid="area-counts-va"]').innerText());
+	const fx = parse(await page.locator('[data-testid="area-counts-fx"]').innerText());
+	return { voiceModules: va.modules, voiceCables: va.cables, fxModules: fx.modules, fxCables: fx.cables };
 }
 
 /** Right-click a locator and wait for the context menu to appear. */

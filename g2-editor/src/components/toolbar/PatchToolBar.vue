@@ -1,7 +1,7 @@
 <template>
 	<ToolBar>
 		<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
-		<ToolBarText class="w-36 cursor-pointer hover:text-input" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
+		<ToolBarText class="w-36 cursor-pointer hover:text-input" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 
 		<div class="flex items-center gap-1.5">
 			<ToolBarLabel>Cat:</ToolBarLabel>
@@ -32,10 +32,6 @@
 			/>
 		</div>
 
-		<Dialog v-model="confirmDialog" title="Copy Variation" confirm-label="Copy" @confirm="onConfirmCopy">
-			{{ confirmMessage }}
-		</Dialog>
-
 		<ToolBarDivider />
 
 		<PatchLevel />
@@ -58,7 +54,6 @@
 	import Select from '../common/Select.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
 	import PatchLevel from './PatchLevel.vue';
-	import Dialog from '../common/Dialog.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
@@ -108,9 +103,6 @@
 
 	const { open: openContextMenu } = useContextMenu();
 	const dragFrom = ref<number | null>(null);
-	const confirmDialog = ref(false);
-	const confirmMessage = ref('');
-	const pendingCopy = ref<{ from: number; to: number } | null>(null);
 
 	function onVariationSelect(v: string | number | (string | number)[]) {
 		const idx = v as number;
@@ -125,20 +117,12 @@
 		dragFrom.value = v as number;
 	}
 
-	function onVariationDrop(v: string | number) {
+	async function onVariationDrop(v: string | number) {
 		const target = v as number;
 		if (dragFrom.value === null || dragFrom.value === target) return;
 		const from = dragFrom.value;
 		dragFrom.value = null;
-		confirmMessage.value = `Copy variation ${VARIATION_OPTIONS[from].label.trim()} to ${VARIATION_OPTIONS[target].label.trim()}?`;
-		pendingCopy.value = { from, to: target };
-		confirmDialog.value = true;
-	}
-
-	async function onConfirmCopy() {
-		if (!pendingCopy.value) return;
-		await slotsStore.copyVariation(pendingCopy.value.from, pendingCopy.value.to);
-		pendingCopy.value = null;
+		await slotsStore.copyVariation(from, target);
 	}
 
 	function onVariationContextMenu(v: string | number, event: MouseEvent) {

@@ -6,9 +6,9 @@
 		<ToolBar>
 			<template v-if="device">
 				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
-				<ToolBarText class="w-36 cursor-pointer" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
+				<ToolBarText class="w-36 cursor-pointer" hint="renamePerf" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-13 cursor-pointer hover:text-input" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
+				<ToolBarText class="w-13 cursor-pointer hover:text-input" hint="setBpm" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
 				<ToolBarDivider />
 				<BtnGroup
@@ -27,7 +27,14 @@
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
 			</template>
 
-			<button class="status-badge ml-auto" :class="device.statusClass" data-testid="connection-status" @click="toggleConnection">
+			<button
+				class="status-badge ml-auto"
+				:class="device.statusClass"
+				data-testid="connection-status"
+				@click="toggleConnection"
+				@mouseenter="showHint('connectionToggle')"
+				@mouseleave="clearHint"
+			>
 				<span class="status-dot" :class="device.dotClass" />
 				<span>{{ device.statusLabel }}</span>
 			</button>
@@ -180,6 +187,8 @@
 	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
 
 	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
+
+	<Toast />
 </template>
 
 <script setup lang="ts">
@@ -224,6 +233,7 @@
 	import DriverErrorDialog from './components/common/DriverErrorDialog.vue';
 	import QuickAddModule from './components/common/QuickAddModule.vue';
 	import KeyCommandsPage from './components/common/KeyCommandsPage.vue';
+	import Toast from './components/common/Toast.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
@@ -231,11 +241,13 @@
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
+	import { useStatusHint } from './composables/useStatusHint';
 
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
+	const { showHint, clearHint } = useStatusHint();
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();

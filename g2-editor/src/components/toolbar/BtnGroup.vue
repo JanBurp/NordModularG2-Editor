@@ -20,6 +20,8 @@
 			@dragover.prevent
 			@drop.prevent.stop="draggable && emit('btn-drop', option.value)"
 			@contextmenu.prevent.stop="emit('btn-contextmenu', option.value, $event)"
+			@mouseenter="option.hint && showHint(option.hint)"
+			@mouseleave="clearHint"
 		>
 			{{ option.label }}
 		</Button>
@@ -30,6 +32,9 @@
 	import { computed } from 'vue';
 	import Button from './Button.vue';
 	import type { Option } from '@/types/ui';
+	import { useStatusHint } from '@/composables/useStatusHint';
+
+	const { showHint, clearHint } = useStatusHint();
 
 	interface Props {
 		modelValue: string | number | null | (string | number)[];

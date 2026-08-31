@@ -4,6 +4,7 @@ import { ref } from 'vue';
 import { useDeviceEvents } from './useDeviceEvents';
 import { useLedEvents } from './useLedEvents';
 import { useSlotEvents } from './useSlotEvents';
+import { showToast } from './useToast';
 
 export type { DeviceStatus };
 
@@ -111,6 +112,7 @@ export function useG2() {
 				if (ev.type === 'device_disconnected') {
 					store.status = DeviceStatus.Lost;
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
+					showToast('G2 disconnected — check the USB cable.');
 					return;
 				}
 				if (ev.type === 'device_reconnected') {
@@ -172,6 +174,7 @@ export function useG2() {
 			if (e.message !== 'usb_driver_error') {
 				store.status = DeviceStatus.Disconnected;
 				log('←', 'Connect', `G2 not found: ${e.message}`);
+				showToast(`G2 not found: ${e.message}`);
 			}
 			stopWatch();
 		}
