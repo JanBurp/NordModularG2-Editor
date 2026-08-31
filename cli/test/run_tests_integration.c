@@ -79,6 +79,8 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     fflush(stderr);
 }
 
+/* run_test_with_output — unused while all its call sites below are disabled;
+ * preserved for when upload/roundtrip or watch-based tests are re-enabled.
 static void run_test_with_output(const char *name, void (*test_func)(void)) {
     fprintf(stderr, "%s\n", name);
     fflush(stderr);
@@ -87,6 +89,7 @@ static void run_test_with_output(const char *name, void (*test_func)(void)) {
     fprintf(stderr, "-------------------\n");
     fflush(stderr);
 }
+*/
 
 int main(void) {
     fprintf(stderr, "Running integration tests...\n");
