@@ -29,7 +29,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();
-	const { deleteSelection } = usePatchOperations();
+	const { deleteSelection, deleteUnusedModules } = usePatchOperations();
 	const { copySelection, cutSelection, pasteClipboard, pasteParams } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
 
@@ -143,6 +143,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						break;
 					}
 					await deleteSelection();
+					break;
+				}
+				case 'delete-unused-modules': {
+					await deleteUnusedModules();
 					break;
 				}
 				case 'select-all': {

@@ -443,6 +443,8 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ type: "separator" as const },
 				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
 				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
+				{ type: "separator" as const },
+				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
 			],
 		},
 		{

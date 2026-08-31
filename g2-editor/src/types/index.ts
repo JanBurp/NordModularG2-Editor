@@ -23,6 +23,7 @@ export type MenuAction =
 	| 'save-init-1'
 	| 'save-init-2'
 	| 'delete'
+	| 'delete-unused-modules'
 	| 'select-all'
 	| 'paste-params'
 	| 'toggle-modules'

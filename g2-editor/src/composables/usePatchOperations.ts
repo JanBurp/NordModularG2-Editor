@@ -22,6 +22,26 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
+	async function deleteUnusedModules(): Promise<void> {
+		const { getModule } = await import('../renderer/nmg2mods');
+		const NAME_MODULE_TYPE = 126;
+		// A Name bar has no jacks (always "unused"); only sweep it away if the user never customized it.
+		const isUntouchedNameModule = (m: any) =>
+			m.type === NAME_MODULE_TYPE && (m.colour || 0) === 0 && (m.uname ?? '') === (getModule(m.type)?.short ?? 'Module') + m.index;
+
+		for (const area of ['voice', 'fx'] as const) {
+			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const unusedIds = modules
+				.filter((m: any) => !cables.some((c: any) => c.smod === m.index || c.dmod === m.index))
+				.filter((m: any) => m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m))
+				.map((m: any) => m.index as number);
+			if (unusedIds.length > 0) {
+				await slotsStore.deleteSelection(unusedIds, [], area, modules, cables);
+			}
+		}
+	}
+
 	async function handleModuleMove({
 		indices,
 		dCol,
@@ -153,6 +173,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	return {
 		currentModules,
 		deleteSelection,
+		deleteUnusedModules,
 		handleModuleMove,
 		handleModuleDrop,
 		handleParamChange,
