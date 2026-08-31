@@ -81,6 +81,7 @@
 				{ keys: ['⌘ J'], action: 'Toggle Text pane' },
 				{ keys: ['⌘ ,'], action: 'Toggle Settings pane' },
 				{ keys: ['⌘ T'], action: 'Toggle Extended Toolbar' },
+				{ keys: ['⌘ F'], action: 'Toggle Parameter Pages' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
 				{ keys: ['←', '→'], action: 'Switch Disk/Patches/Performances tab (Browser pane focused)' },
 			],

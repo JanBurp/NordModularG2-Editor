@@ -1,5 +1,5 @@
 import { ref } from 'vue';
-import type { Patch, SlotLabel } from '@/types';
+import type { Patch, GlobalParamPageAssignment, SlotLabel } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSettingsStore } from '../store/settings';
@@ -13,6 +13,7 @@ type Prf2Data = {
 	slotNames: string[];
 	patches: Patch[];
 	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
+	globalParamPages: GlobalParamPageAssignment[];
 };
 
 /* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
@@ -49,7 +50,7 @@ export function usePatchFile() {
 			if (slotsStore.uploadingFromFile) return;
 			slotsStore.uploadingFromFile = true;
 		}
-		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath);
+		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
 		await device.setPerformanceMode(name);
 		if (connected) {
 			try {
@@ -104,18 +105,25 @@ export function usePatchFile() {
 		const buffer = new Uint8Array(result.data).buffer;
 		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
-		const parser = new PatchParser(buffer);
-		const prf2 = parser.parsePrf2();
-		if (prf2) {
-			await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
-			useSettingsStore().addRecentFile(result.filepath!, 'performance');
+		let targetSlot: SlotLabel | undefined;
+		try {
+			const parser = new PatchParser(buffer);
+			const prf2 = parser.parsePrf2();
+			if (prf2) {
+				await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
+				useSettingsStore().addRecentFile(result.filepath!, 'performance');
+				return;
+			}
+			useSettingsStore().addRecentFile(result.filepath!, 'patch');
+			targetSlot = uiStore.slotInFocus;
+			const parsedPatch = parser.parse() as any;
+			slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
+			applyVariation(parsedPatch);
+		} catch (err) {
+			console.error('Failed to load patch file:', err);
+			uploadError.value = 'Failed to load patch file — the file may be corrupt.';
 			return;
 		}
-		useSettingsStore().addRecentFile(result.filepath!, 'patch');
-		const targetSlot = uiStore.slotInFocus;
-		const parsedPatch = parser.parse() as any;
-		slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
-		applyVariation(parsedPatch);
 		if (device.status === DeviceStatus.Connected) {
 			slotsStore.uploadingFromFile = true;
 			try {

@@ -462,6 +462,11 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_select_param(slot, loc, arg_i(args, 2), arg_i(args, 3));
 
+	} else if (strcmp(cmd, "select-param-page") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_select_param_page(slot, arg_i(args, 1));
+
 	} else if (strcmp(cmd, "assign-midicc") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
@@ -472,6 +477,38 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_deassign_midicc(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "assign-knob") == 0 && n >= 5) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_assign_knob(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+
+	} else if (strcmp(cmd, "deassign-knob") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_deassign_knob(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "select-global-page") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_select_global_page(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "assign-global-knob") == 0 && n >= 6) {
+		int slot = parse_slot(arg_s(args, 0));
+		int targetSlot = parse_slot(arg_s(args, 1));
+		int loc = parse_location(args, 2);
+		if (slot == SLOT_INVALID || targetSlot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_assign_global_knob(slot, targetSlot, loc, arg_i(args, 3), arg_i(args, 4), arg_i(args, 5));
+
+	} else if (strcmp(cmd, "deassign-global-knob") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_deassign_global_knob(slot, arg_i(args, 1));
+
+	} else if (strcmp(cmd, "get-global-knobs") == 0) {
+		data = g2_get_global_knobs();
+		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "assign-midicc-batch") == 0 && n >= 5 && (n - 1) % 4 == 0) {
 		int slot = parse_slot(arg_s(args, 0));
@@ -646,6 +683,9 @@ static void execute_cmd(const char *line) {
 
 	} else if (strcmp(cmd, "set-master-clock-bpm") == 0 && n >= 1) {
 		ret = g2_set_master_clock_bpm(arg_i(args, 0));
+
+	} else if (strcmp(cmd, "set-knob-source") == 0 && n >= 1) {
+		ret = g2_set_knob_source(arg_i(args, 0));
 
 	} else if (strcmp(cmd, "set-patch-description") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));
@@ -887,6 +927,20 @@ int g2_daemon_run(output_format_t format, int debug) {
 		cJSON_AddItemToObject(ev, "data", patch ? patch : cJSON_CreateNull());
 		emit(ev);
 		cJSON_Delete(ev);
+	}
+
+	/* Global Parameter Pages: fetched once, after all 4 slots are loaded (an entry's
+	 * module/param indices are only meaningful once those are known) — mirrors the Delphi
+	 * reference's USBInitSeq ordering (patches, then global knobs, then MIDI-CC). Transport
+	 * slot A; failure is non-fatal (omit the field, editor falls back to an empty list). */
+	debug_status("startup_global_knobs");
+	{
+		cJSON *gk = g2_get_global_knobs();
+		if (gk) {
+			cJSON_AddStringToObject(gk, "type", "global_knobs_data");
+			emit(gk);
+			cJSON_Delete(gk);
+		}
 	}
 
 	debug_status("startup_list");

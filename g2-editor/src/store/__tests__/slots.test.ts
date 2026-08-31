@@ -673,3 +673,269 @@ describe('assignedVoicesForSlot', () => {
 		expect(store.assignedVoicesForSlot('A')).toBe(0);
 	});
 });
+
+describe('assignParamToPage / deassignParamPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	it('assignParamToPage writes the record, marks the slot dirty, and records undo', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.assignParamToPage('A', 5, 1, 2, 0);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 }]);
+		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '0', '5']);
+	});
+
+	it('assigning into an occupied slot evicts the old occupant', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.assignParamToPage('A', 5, 0, 2, 3);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 2, paramIndex: 3, isLed: 0 }]);
+	});
+
+	it('assigning an already-assigned param moves it (old slotIndex cleared)', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.assignParamToPage('A', 9, 0, 1, 0);
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 9, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('deassignParamPage removes the record and undo restores it', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.deassignParamPage('A', 5);
+		expect(store.slots['A'].paramPages).toEqual([]);
+
+		await store.undo();
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('undo/redo round-trip for assignParamToPage', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
+
+		await store.undo();
+		expect(store.slots['A'].paramPages).toEqual([]);
+
+		await store.redo();
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+	});
+
+	it('records undo despite a rejected CLI call (offline)', async () => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await expect(store.assignParamToPage('A', 5, 0, 1, 0)).rejects.toThrow();
+
+		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+});
+
+describe('swapParamPageSlots', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	function at(slotIndex: number) {
+		return useSlotsStore().slots['A'].paramPages.find((k) => k.slotIndex === slotIndex);
+	}
+
+	it('moves the assignment when the target slot is empty', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+
+		await store.swapParamPageSlots('A', 3, 9);
+
+		expect(at(3)).toBeUndefined();
+		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['deassign-knob', 'A', '3'],
+			['assign-knob', 'A', 'va', '2', '5', '9'],
+		]);
+	});
+
+	it('exchanges both assignments when the target slot is occupied', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+
+		await store.swapParamPageSlots('A', 3, 9);
+
+		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
+		expect(at(3)).toMatchObject({ location: 0, moduleIndex: 4, paramIndex: 1 });
+	});
+
+	// The reason this action exists: two assignParamToPage calls recorded two entries, so one Ctrl+Z
+	// left the swap half-applied.
+	it('records the swap as a single undo entry that restores both slots at once', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 1, 2, 5);
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+		const before = [...store.slots['A'].paramPages];
+
+		await store.swapParamPageSlots('A', 3, 9);
+		await store.undo();
+
+		expect(store.slots['A'].paramPages).toEqual(before);
+		expect(store.slots['A'].patch!.paramPages).toEqual(before);
+
+		await store.redo();
+		expect(at(9)).toMatchObject({ moduleIndex: 2, paramIndex: 5 });
+		expect(at(3)).toMatchObject({ moduleIndex: 4, paramIndex: 1 });
+	});
+
+	it('does nothing when the source slot is empty or is the target', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 9, 0, 4, 1);
+		const before = [...store.slots['A'].paramPages];
+
+		await store.swapParamPageSlots('A', 3, 9);
+		await store.swapParamPageSlots('A', 9, 9);
+
+		expect(store.slots['A'].paramPages).toEqual(before);
+	});
+});
+
+describe('assignModuleToPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	function at(slotIndex: number) {
+		return useSlotsStore().slots['A'].paramPages.find((k) => k.slotIndex === slotIndex);
+	}
+
+	it('assigns count consecutive slots (one per param, in order), marks dirty, and records one undo entry', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.assignModuleToPage('A', 8, 1, 2, 3);
+
+		expect(store.slots['A'].paramPages).toEqual([
+			{ slotIndex: 8, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 9, location: 1, moduleIndex: 2, paramIndex: 1, isLed: 0 },
+			{ slotIndex: 10, location: 1, moduleIndex: 2, paramIndex: 2, isLed: 0 },
+		]);
+		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['assign-knob', 'A', 'va', '2', '0', '8'],
+			['assign-knob', 'A', 'va', '2', '1', '9'],
+			['assign-knob', 'A', 'va', '2', '2', '10'],
+		]);
+	});
+
+	it("evicts occupants of the target slots and any of this module's other assignments among the reassigned params", async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 9, 0, 9, 9); // occupant of a target slot
+		await store.assignParamToPage('A', 40, 1, 2, 1); // module 2's param 1, previously parked elsewhere
+
+		await store.assignModuleToPage('A', 8, 1, 2, 3);
+
+		expect(at(9)).toMatchObject({ moduleIndex: 2, paramIndex: 1 }); // evicted occupant's slot now holds module 2 param 1
+		expect(at(40)).toBeUndefined(); // stray moved into the contiguous run
+		expect(store.slots['A'].paramPages.filter((k) => k.moduleIndex === 2)).toHaveLength(3);
+	});
+
+	it('undo/redo round-trips the whole run as one entry', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignModuleToPage('A', 8, 1, 2, 3);
+		const assigned = [...store.slots['A'].paramPages];
+
+		await store.undo();
+		expect(store.slots['A'].paramPages).toEqual([]);
+
+		await store.redo();
+		expect(store.slots['A'].paramPages).toEqual(assigned);
+	});
+
+	it('truncates instead of overrunning slot 119', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.assignModuleToPage('A', 118, 0, 5, 5);
+
+		expect(store.slots['A'].paramPages.map((k) => k.slotIndex).sort((a, b) => a - b)).toEqual([118, 119]);
+	});
+
+	it('does nothing when the starting slot is already past the last slot', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.assignModuleToPage('A', 120, 0, 5, 5);
+
+		expect(store.slots['A'].paramPages).toEqual([]);
+	});
+});
+
+describe('assignModuleToGlobalPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	function at(slotIndex: number) {
+		return useSlotsStore().globalParamPages.find((k) => k.slotIndex === slotIndex);
+	}
+
+	it('assigns count consecutive global slots targeting the given patch slot, with no undo entry', async () => {
+		const store = useSlotsStore();
+
+		await store.assignModuleToGlobalPage('B', 16, 0, 7, 2);
+
+		expect(store.globalParamPages).toEqual([
+			{ slotIndex: 16, slot: 'B', location: 0, moduleIndex: 7, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 17, slot: 'B', location: 0, moduleIndex: 7, paramIndex: 1, isLed: 0 },
+		]);
+		expect(useHistoryStore().canUndo('A')).toBe(false);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16'],
+			['assign-global-knob', 'A', 'B', 'fx', '7', '1', '17'],
+		]);
+	});
+
+	it("evicts occupants and this module's other assignments for the target patch slot", async () => {
+		const store = useSlotsStore();
+		await store.assignParamToGlobalPage('B', 17, 1, 9, 9);
+		await store.assignParamToGlobalPage('B', 50, 0, 7, 1);
+
+		await store.assignModuleToGlobalPage('B', 16, 0, 7, 2);
+
+		expect(at(17)).toMatchObject({ moduleIndex: 7, paramIndex: 1 });
+		expect(at(50)).toBeUndefined();
+	});
+
+	it('truncates instead of overrunning slot 119', async () => {
+		const store = useSlotsStore();
+
+		await store.assignModuleToGlobalPage('B', 118, 0, 5, 5);
+
+		expect(store.globalParamPages.map((k) => k.slotIndex).sort((a, b) => a - b)).toEqual([118, 119]);
+	});
+});

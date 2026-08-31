@@ -69,8 +69,16 @@
 		</g>
 
 		<!-- Parameters -->
-		<g class="params" @dragover="onParamCCDragOver" @drop="onParamCCDrop">
-			<g v-for="(param, index) in moduleDef.params" :key="param.name" :data-param-index="index" @mousedown.capture="onParamMouseDown(index, $event)">
+		<g class="params" @dragover="onParamDragOver" @drop="onParamDrop">
+			<g
+				v-for="(param, index) in moduleDef.params"
+				:key="param.name"
+				:data-param-index="index"
+				:data-param-location="morphLocation"
+				:data-module-index="moduleIdx"
+				class="cursor-pointer"
+				@mousedown.capture="onParamMorphMouseDown(index, $event)"
+			>
 				<ModuleKnob
 					v-if="isKnob(param.n)"
 					:param="param"
@@ -210,8 +218,16 @@
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
 	import { useDeviceStore } from '../../store/device';
-	import { buildCCMenuItems, parseCCDragPayload } from '../../composables/useMidiCC';
+	import { buildCCMenuItems } from '../../composables/useMidiCC';
+	import { parseDragPayload } from '../../utils/dragPayload';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import {
+		buildParamPageMenuItems,
+		buildGlobalParamPageMenuItems,
+		buildModuleAssignMenuItems,
+		buildGlobalModuleAssignMenuItems,
+	} from '../../composables/useParamPageAssign';
+	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
 
@@ -249,8 +265,14 @@
 	}
 
 	function onContextMenu(e: MouseEvent) {
+		const slot = uiStore.slotInFocus;
+		const location = props.areaLabel === 'va' ? 1 : 0;
+		const paramCount = moduleDef.value?.params?.length ?? 0;
 		openContextMenu(e, [
 			{ label: 'Rename…', action: () => onTitleDblClick() },
+			{ type: 'separator' },
+			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
+			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
 			{ type: 'separator' },
@@ -403,11 +425,20 @@
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
 	// active one for keyboard shortcuts (arrow-key nav, L) right away.
-	function onParamMouseDown(paramIndex: number, e: MouseEvent) {
+	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
 		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
 		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		uiStore.selectedCables = [];
 
+		if (e.altKey) {
+			// Alt+drag this param onto a Parameter Pages toolbar knob to assign it. Uses a custom
+			// pointer-tracked drag (useParamPageDrag.ts) instead of native HTML5 DnD — see that file's
+			// header comment for why. stopPropagation() (inside startParamPageDrag) also blocks the
+			// knob/slider/etc. widget's own mousedown-drag from engaging underneath this gesture.
+			const label = moduleDef.value?.params?.[paramIndex]?.name ?? 'Param';
+			startParamPageDrag(e, { location: morphLocation.value, moduleIndex: moduleIdx.value, paramIndex, label });
+			return;
+		}
 		if (!isGrabModifierPressed(e)) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
@@ -430,22 +461,29 @@
 		});
 	}
 
-	function onParamCCDragOver(e: DragEvent) {
+	function onParamDragOver(e: DragEvent) {
 		e.preventDefault();
 	}
 
-	function onParamCCDrop(e: DragEvent) {
-		const data = parseCCDragPayload(e);
-		if (!data) return;
+	// Drop target for a dragged MIDI CC row (assign a CC) and for a dragged Parameter Pages knob
+	// (assign this param to that knob slot). Both arrive as native DnD from an HTML source; the
+	// reverse direction — this param dragged onto a toolbar knob — is useParamPageDrag.ts instead.
+	function onParamDrop(e: DragEvent) {
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
+		const data = parseDragPayload(e);
+		if (!data) return;
 		let el = e.target as Element | null;
 		while (el && !el.hasAttribute('data-param-index')) el = el.parentElement;
 		if (!el) return;
 		const paramIndex = parseInt(el.getAttribute('data-param-index') ?? '');
 		if (isNaN(paramIndex)) return;
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+
+		if (data.type === 'cc') slotsStore.assignMidiCC(slot, location, moduleIdx.value, paramIndex, data.cc);
+		else if (data.global) slotsStore.assignParamToGlobalPage(slot, data.slotIndex, location, moduleIdx.value, paramIndex);
+		else slotsStore.assignParamToPage(slot, data.slotIndex, location, moduleIdx.value, paramIndex);
+		e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
 	}
 
 	function onParamContextMenu(paramIndex: number, event: MouseEvent, labelIndex = 0) {
@@ -503,6 +541,37 @@
 				enabled: !!slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
+			}),
+		);
+		items.push({ type: 'separator' });
+
+		// Parameter Pages knob assign/deassign
+		const existingPage = slot
+			? slotsStore.slots[slot].paramPages.find((k) => k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex)
+			: undefined;
+		items.push(
+			...buildParamPageMenuItems({
+				slot,
+				location: location as 0 | 1,
+				moduleIndex: moduleIdx.value,
+				paramIndex,
+				existing: existingPage,
+			}),
+		);
+
+		// Global Parameter Pages knob assign/deassign
+		const existingGlobalPage = slot
+			? slotsStore.globalParamPages.find(
+					(k) => k.slot === slot && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex,
+				)
+			: undefined;
+		items.push(
+			...buildGlobalParamPageMenuItems({
+				slot,
+				location: location as 0 | 1,
+				moduleIndex: moduleIdx.value,
+				paramIndex,
+				existing: existingGlobalPage,
 			}),
 		);
 

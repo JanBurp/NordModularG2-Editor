@@ -32,6 +32,16 @@
 					style="mix-blend-mode: multiply"
 					pointer-events="none"
 				/>
+				<!-- Assigned to the selected group: a darker "piece of the cake" sector shows the morph range
+				     (mirrors ModuleKnob.vue's canvas equivalent). -->
+				<path
+					v-if="colorVariant === 'red' && morphRange !== undefined"
+					:d="describeMorphSector(radius + 2, radius + 2, radius, value, clampedRangeTarget)"
+					fill="#Ba4058"
+					opacity="0.7"
+					style="mix-blend-mode: multiply"
+					pointer-events="none"
+				/>
 				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
 				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
 				<line
@@ -59,12 +69,17 @@
 <script setup lang="ts">
 	import { computed, ref } from 'vue';
 	import { useKnob } from '../../composables/useKnob';
+	import { describeMorphSector } from '../../utils/knobArc';
+	import { clamp } from '../../utils/math';
 
 	const props = defineProps<{
 		value: number;
 		type?: string; // 'KnobBig' | 'KnobMedium' | 'KnobSmall' | 'KnobReset'
 		colorVariant?: 'red' | 'blue' | null; // Morph Groups: red = selected group, blue = a different group
+		morphRange?: number; // selected group's morph range, when colorVariant === 'red' (see ModuleKnob.vue)
 	}>();
+
+	const clampedRangeTarget = computed(() => clamp(props.value + (props.morphRange ?? 0), 0, 127));
 
 	const emit = defineEmits<{
 		change: [value: number];

@@ -298,14 +298,39 @@ static void emit_embedded_event(const uint8_t *response) {
                 printf("{\"type\":\"perf_settings_update\"}\n");
                 break;
             case 0x3F:
+                /* response[6] is a shared sub-mode selector for opcode 0x3F: 0x00=SET_MASTER_CLOCK_RUN,
+                 * 0x01=SET_MASTER_CLOCK_BPM (usb-protocol.md's `0x3F FF 00 run` / `0x3F FF 01 bpm`),
+                 * 0x02=knob-assign SOURCE toggle (Patch vs Global) — confirmed 2026-08-28 via the
+                 * G2's SHIFT+GLOBAL front-panel combo, which echoes back `ff02<01|00>` on this exact
+                 * channel, alternating in lockstep across 4 consecutive presses (01=Global, 00=Patch).
+                 * This is genuinely a system-wide/performance-level setting, not per-slot (see
+                 * g2_set_knob_source's send_system_data transport, mirroring g2_set_master_clock_run/
+                 * bpm). Anything else falls through to a raw dump instead of guessing. */
                 if (response[6] == 0x00)
                     printf("{\"type\":\"master_clock_run\",\"run\":%u}\n", response[7]);
-                else
+                else if (response[6] == 0x01)
                     printf("{\"type\":\"master_clock_bpm\",\"bpm\":%u}\n", response[7]);
+                else if (response[6] == 0x02)
+                    printf("{\"type\":\"knob_source_change\",\"global\":%u}\n", response[7]);
+                else {
+                    char hex[32] = "";
+                    for (int i = 5; i <= lastByte && i - 5 < 15; i++)
+                        snprintf(hex + (i-5)*2, 3, "%02x", response[i]);
+                    printf("{\"type\":\"unknown\",\"subtype\":\"master_clock_family\",\"sub\":63,\"data\":\"%s\"}\n", hex);
+                }
                 break;
             case 0x5D:
                 printf("{\"type\":\"ext_master_clock\",\"value\":%u}\n",
                        (response[6] << 8) | response[7]);
+                break;
+            case 0x1E:
+                /* Global Parameter Pages page-change echo (CMGlobalParameterPageFocus) — confirmed
+                 * 2026-08-28 (was previously wrongly assumed to be slot-scoped like the per-patch
+                 * 0x2D sibling below, so it fell through to this switch's "perf"/unknown default
+                 * unhandled). Global page state isn't slot-scoped — like knob_source_change (0x3F),
+                 * the hardware reports it system-wide (aCmd=0x04), no slot tag. Same page*3+bank
+                 * packing as 0x2D. */
+                printf("{\"type\":\"global_page_change\",\"page\":%u}\n", response[5]);
                 break;
             case 0x80:
                 printf("{\"type\":\"midi_cc\",\"cc\":%u}\n", response[6]);
@@ -388,6 +413,42 @@ static void emit_embedded_event(const uint8_t *response) {
                    SLOT_LETTER(slot), response[6] == 0 ? "fx" : (response[6] == 1 ? "va" : "patch"),
                    response[7], response[8]);
             break;
+        /* Front-panel Parameter Page change (CMParameterPageFocus). Same sub-command the editor
+         * sends via g2_select_param_page, echoed back on every page/bank button press. The single
+         * payload byte packs both selectors: page = byte/3 (A-E), bank = byte%3 (1-3). */
+        case 0x2D:
+            printf("{\"type\":\"param_page_change\",\"slot\":\"%s\",\"page\":%u}\n",
+                   SLOT_LETTER(slot), response[5]);
+            break;
+        /* CMBarbMapChangeNotify (0x74) — a one-off real-hardware capture (2026-08-28) showed the
+         * G2 sending this, with zero payload bytes, instead of echoing S_ASSIGN_KNOB (0x25) for a
+         * front-panel knob assign. Per the decompiled reference editor, CMBarbMapChangeNotify::
+         * ReadStream only consumes the header and UseOnPatch just clears the cached knob map and
+         * marks it dirty ("Barb" is that source's internal name for a knob/controller assignment,
+         * shared with CBarbTargetSpec inside CMKnobAssign itself) — no module/param/slot-index
+         * fields, i.e. a stateless "the knob map changed, go re-fetch" ping (see knob_map_changed
+         * in useSlotEvents.ts, which reloads the slot). NOT reproducible on a follow-up pass: an
+         * unconditional raw-USB debug capture showed nothing at all sent for several repeated
+         * front-panel assigns, while ordinary param changes kept notifying normally — and Clavia's
+         * own official editor exhibits the identical gap on the same hardware. Kept as
+         * correct-if-it-ever-fires, but front-panel knob assign is a confirmed, accepted sync gap,
+         * not a bug — see the usb-protocol.md §7 follow-up note. There's no front-panel deassign
+         * gesture either (deassign is editor-only). The performance-wide sibling (0x75,
+         * CMPerfBarbMapChangeNotify, for a "Global Knob Assign" feature this editor doesn't have)
+         * is deliberately not handled here — same choice as the 0x1E CMGlobalParameterPageFocus
+         * twin. */
+        case 0x74:
+            printf("{\"type\":\"knob_map_changed\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
+            break;
+        /* CMPerfBarbMapChangeNotify (0x75) — the performance-wide sibling of 0x74 above, for
+         * front-panel Global Parameter Page knob assigns. Previously deliberately unhandled (see
+         * the note above); now decoded the same stateless way — no module/param/slot-index
+         * fields expected, so the handler (useSlotEvents.ts) just re-fetches the whole Global
+         * Pages list via loadGlobalKnobs(). Unverified: whether this ever actually fires is the
+         * same open question 0x74 has (see the note above and usb-protocol.md §7). */
+        case 0x75:
+            printf("{\"type\":\"global_knob_map_changed\"}\n");
+            break;
         case 0x21:
         case 0x3C:
             printf("{\"type\":\"patch_update\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
@@ -441,6 +502,18 @@ void g2_emit_rearm_data(void) {
     }
     cJSON_AddItemToObject(synth, "patches", patches);
 
+    /* Global Parameter Pages: fetched once per rearm, after all 4 slots (their module/param
+     * indices are what a Global Pages entry addresses), mirroring the Delphi reference's
+     * USBInitSeq (patches, then global knobs). Transport slot A — any of the 4 works
+     * interchangeably (see g2_device.h). Failure is non-fatal: omit the field, same as any
+     * other best-effort rearm data. */
+    cJSON *gk = g2_get_global_knobs();
+    if (gk) {
+        cJSON *gkData = cJSON_GetObjectItem(gk, "data");
+        if (gkData && cJSON_IsString(gkData)) cJSON_AddStringToObject(synth, "globalKnobs", gkData->valuestring);
+        cJSON_Delete(gk);
+    }
+
     char *ss = cJSON_PrintUnformatted(synth);
     if (ss) { printf("%s\n", ss); fflush(stdout); free(ss); }
     cJSON_Delete(synth);
@@ -463,5 +536,15 @@ void g2_emit_event(const g2_msg_t *msg) {
             emit_bulk_event(msg->bulk, msg->bulk_size);
     } else if (msgType == RESPONSE_TYPE_EMBEDDED) {
         emit_embedded_event(msg->interrupt);
+    } else {
+        /* Every other dispatch path in this file falls back to an "unknown" print that at
+         * least surfaces the raw bytes — this one didn't, so any response whose type nibble
+         * isn't EXTENDED/EMBEDDED was silently dropped with zero trace. Found 2026-08-28
+         * while debugging a front-panel Parameter Page knob assign that produced no watch
+         * output at all despite the assignment landing on the device — print it instead. */
+        char hex[48] = "";
+        for (int i = 0; i < 16; i++) snprintf(hex + i * 2, 3, "%02x", msg->interrupt[i]);
+        printf("{\"type\":\"unknown\",\"subtype\":\"response_type\",\"msgType\":%u,\"data\":\"%s\"}\n", msgType, hex);
+        fflush(stdout);
     }
 }

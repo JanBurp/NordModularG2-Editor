@@ -1,5 +1,5 @@
 <template>
-	<div class="flex gap-0" role="group">
+	<div :class="['flex gap-0', { 'flex-col': vertical }]" role="group">
 		<Button
 			v-for="(option, index) in normalizedOptions"
 			:key="option.value"
@@ -11,7 +11,7 @@
 			:topIndicatorValue="topIndicators ? !!topIndicators[index] : false"
 			:bottomIndicator="bottomIndicators ? bottomIndicators[index] !== undefined : false"
 			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
-			:class="['btn-group-item', { 'flex-1': stretch }]"
+			:class="[vertical ? 'btn-group-item-vertical' : 'btn-group-item', { 'flex-1': stretch }]"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
 			:draggable="draggable && option.draggable !== false ? 'true' : undefined"
 			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
@@ -42,6 +42,7 @@
 		testIdPrefix?: string;
 		draggable?: boolean;
 		stretch?: boolean;
+		vertical?: boolean;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {

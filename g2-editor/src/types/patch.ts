@@ -117,6 +117,34 @@ export interface MidiCCAssignment {
 	paramIndex: number;
 }
 
+// Assigns a module parameter to one of the 120 front-panel "Parameter Pages" assignable knob/button
+// slots (3 Banks x 5 Pages A-E x 8 knobs). slotIndex is the array position in the patch-file's
+// C_KNOBS ($62) section and is the sole address of a slot — bank/page/knob are derived from it via
+// slotIndexToBankPageKnob() (renderer/paramPages.ts), not stored separately. Reverse-engineered from
+// BVE.NMG2File.pas's TKnob/TKnobList, cross-validated against decompiled G2Editor.c. Stored per-patch
+// (like MidiCCAssignment/controllers), NOT per-variation (unlike MorphAssignment).
+export interface ParamPageAssignment {
+	slotIndex: number; // 0-119
+	location: 0 | 1; // 0=FX, 1=Voice
+	moduleIndex: number;
+	paramIndex: number;
+	isLed: number; // 0-3, semantics unconfirmed (TKnob.FIsLed) — preserved verbatim, not exposed in UI
+}
+
+// The Global Parameter Pages sibling of ParamPageAssignment (same 120-slot 3 Banks x 5 Pages x 8
+// Knobs geometry) — but Performance-scoped, not Patch-scoped: each slot can target a module
+// parameter in ANY of the 4 patch slots (A-D), addressed by the extra `slot` field. Stored in the
+// .prf2's C_KNOBS_GLOBAL ($5f) section, not inside any one Patch. Reverse-engineered from
+// BVE.NMG2File.pas's TGlobalKnob (a TKnob subclass adding a trailing 2-bit FSlotIndex).
+export interface GlobalParamPageAssignment {
+	slotIndex: number; // 0-119
+	slot: 'A' | 'B' | 'C' | 'D'; // which patch slot's module this targets (SlotLabel, inlined — types/index.ts's SlotLabel re-exports from this file, so importing it here would be circular)
+	location: 0 | 1; // 0=FX, 1=Voice
+	moduleIndex: number;
+	paramIndex: number;
+	isLed: number; // 0-3, semantics unconfirmed — preserved verbatim, not exposed in UI
+}
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;
@@ -124,6 +152,7 @@ export interface Patch {
 	splitHeight?: number; // remembered voice-area height to restore split position after a Voice/FX toggle (session state; the .pch2 has only the single `height` field)
 	patchParams?: PatchParamVariation[];
 	controllers?: MidiCCAssignment[];
+	paramPages?: ParamPageAssignment[];
 	text?: string; // free-text patch notes ("Text Pad" / C_PATCH_NOTES section)
 	morphParamLabels?: ParamLabel[]; // custom Morph Group names; paramIndex 8-15 = group (paramIndex-8)
 }

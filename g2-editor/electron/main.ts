@@ -457,6 +457,7 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ label: "Settings", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
+				{ label: "Parameter Pages", click: () => win!.webContents.send("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
 				{ type: "separator" as const },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "V" },
 				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "F" },

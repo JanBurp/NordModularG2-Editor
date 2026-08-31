@@ -4,6 +4,7 @@
 			:model-value="uiStore.area"
 			:options="AREA_OPTIONS"
 			variant="toggle"
+			size="small"
 			@update:model-value="handleAreaChange"
 			@toggle-off="handleAreaToggleOff"
 		/>
@@ -17,6 +18,7 @@
 			:model-value="settingsStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="tab"
+			size="small"
 			@update:model-value="(tab) => settingsStore.toggleSidebar(tab as PaneTab)"
 			@toggle-off="(tab) => settingsStore.toggleSidebar(tab as PaneTab)"
 		/>

@@ -1,5 +1,17 @@
-import type { Patch, ModuleInstance, Cable, PatchDescription, PatchParamVariation, VariationState, MidiCCAssignment, ParamLabel } from '@/types';
+import type {
+	Patch,
+	ModuleInstance,
+	Cable,
+	PatchDescription,
+	PatchParamVariation,
+	VariationState,
+	MidiCCAssignment,
+	ParamPageAssignment,
+	ParamLabel,
+	GlobalParamPageAssignment,
+} from '@/types';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
+import { SLOT_LABELS } from '@/constants';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -359,6 +371,44 @@ function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
 	return makeSection(SectionType.CONTROLLERS, bw.flush());
 }
 
+// Mirrors parseKnobs (nmg2PatchParser.ts) exactly: fixed 120-slot array, presence bit per slot.
+function writeKnobs(knobs: ParamPageAssignment[]): Uint8Array {
+	const bySlot = new Map(knobs.map((k) => [k.slotIndex, k]));
+	const bw = new BitWriter();
+	bw.write(16, 120);
+	for (let slotIndex = 0; slotIndex < 120; slotIndex++) {
+		const k = bySlot.get(slotIndex);
+		bw.write(1, k ? 1 : 0);
+		if (k) {
+			bw.write(2, k.location);
+			bw.write(8, k.moduleIndex);
+			bw.write(2, k.isLed);
+			bw.write(7, k.paramIndex);
+		}
+	}
+	return makeSection(SectionType.KNOBS, bw.flush());
+}
+
+// Mirrors writeKnobs, plus a trailing 2-bit slot field per entry (0-3 = A-D) — see
+// parseGlobalKnobsChunk (nmg2PatchParser.ts) and GlobalParamPageAssignment (types/patch.ts).
+function writeGlobalKnobs(knobs: GlobalParamPageAssignment[]): Uint8Array {
+	const bySlot = new Map(knobs.map((k) => [k.slotIndex, k]));
+	const bw = new BitWriter();
+	bw.write(16, 120);
+	for (let slotIndex = 0; slotIndex < 120; slotIndex++) {
+		const k = bySlot.get(slotIndex);
+		bw.write(1, k ? 1 : 0);
+		if (k) {
+			bw.write(2, k.location);
+			bw.write(8, k.moduleIndex);
+			bw.write(2, k.isLed);
+			bw.write(7, k.paramIndex);
+			bw.write(2, SLOT_LABELS.indexOf(k.slot));
+		}
+	}
+	return makeSection(SectionType.KNOBS_GLOBAL, bw.flush());
+}
+
 // Tracks which area sections have already been written (prevents duplicates within one slot).
 interface WrittenSets {
 	m4a: Set<number>;
@@ -368,12 +418,24 @@ interface WrittenSets {
 	m5b: Set<number>;
 	m60: boolean;
 	wroteText: boolean;
+	m62: boolean;
 	m65: boolean;
 	m5bMorph: boolean;
 }
 
 function newWrittenSets(): WrittenSets {
-	return { m4a: new Set(), m52: new Set(), m4d: new Set(), m5a: new Set(), m5b: new Set(), m60: false, wroteText: false, m65: false, m5bMorph: false };
+	return {
+		m4a: new Set(),
+		m52: new Set(),
+		m4d: new Set(),
+		m5a: new Set(),
+		m5b: new Set(),
+		m60: false,
+		wroteText: false,
+		m62: false,
+		m65: false,
+		m5bMorph: false,
+	};
 }
 
 // True when any variation actually has morph-group assignment data worth writing.
@@ -455,6 +517,10 @@ function processSection(
 		const controllers = patch.controllers ?? [];
 		if (controllers.length > 0) out.push(writeControllers(controllers));
 		w.m60 = true;
+	} else if (type === SectionType.KNOBS && !w.m62) {
+		const knobs = patch.paramPages ?? [];
+		if (knobs.length > 0) out.push(writeKnobs(knobs));
+		w.m62 = true;
 	} else if (type === SectionType.MORPH_PARAMS && !w.m65) {
 		if (hasMorphAssignments(variations)) out.push(writeMorphParamSection(variations.map((v) => v.patch)));
 		w.m65 = true;
@@ -493,6 +559,9 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 		out.push(writeControllers(patch.controllers));
 	}
+	if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
+		out.push(writeKnobs(patch.paramPages));
+	}
 	// The main hardware get-patch response never includes a text-pad section (notes are
 	// fetched separately via GET_PATCH_TEXT and merged only into patch.text) — so for any
 	// patch loaded from hardware, the template never has one to replace. Append it, same
@@ -516,21 +585,35 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
  * as serializePatch, but slot-aware: written sets reset at each SEPARATOR boundary so all 4
  * slots' sections are updated, not just slot 0's.
  */
-export function serializePerformance(patches: Patch[], templateRawHex: string, variationsArray: VariationState[][]): string {
+export function serializePerformance(
+	patches: Patch[],
+	templateRawHex: string,
+	variationsArray: VariationState[][],
+	globalParamPages: GlobalParamPageAssignment[] = [],
+): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
 	const out: Uint8Array[] = [];
 	let slotIdx = 0;
 	let w = newWrittenSets();
+	// File-scope (not per-slot, unlike WrittenSets — never reset at a SEPARATOR): C_KNOBS_GLOBAL
+	// appears once for the whole performance, not once per slot.
+	let wroteGlobalKnobs = false;
 	let ofs = 0;
 	while (ofs < sectionDataLen) {
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		if (type === SectionType.SEPARATOR) {
+		if (type === SectionType.KNOBS_GLOBAL) {
+			if (!wroteGlobalKnobs && globalParamPages.length > 0) out.push(writeGlobalKnobs(globalParamPages));
+			wroteGlobalKnobs = true;
+		} else if (type === SectionType.SEPARATOR) {
 			const patch = patches[slotIdx] ?? patches[0];
 			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
 				out.push(writeControllers(patch.controllers));
+			}
+			if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
+				out.push(writeKnobs(patch.paramPages));
 			}
 			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
@@ -553,11 +636,20 @@ export function serializePerformance(patches: Patch[], templateRawHex: string, v
 	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
 		out.push(writeControllers(lastPatch.controllers));
 	}
+	if (!w.m62 && lastPatch?.paramPages && lastPatch.paramPages.length > 0) {
+		out.push(writeKnobs(lastPatch.paramPages));
+	}
 	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 	}
 	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
 		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch))!);
+	}
+	// Append-if-missing fallback (same pattern as patch.text in serializePatch): a template that
+	// never carried a C_KNOBS_GLOBAL section (e.g. one built before this feature existed) still
+	// needs its Global Page assignments persisted.
+	if (!wroteGlobalKnobs && globalParamPages.length > 0) {
+		out.push(writeGlobalKnobs(globalParamPages));
 	}
 	return buildRawHex(out);
 }

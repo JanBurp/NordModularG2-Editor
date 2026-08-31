@@ -220,6 +220,11 @@ int g2_set_voice_count(int slot, int count);  /* voices: 1-32 */
 int g2_set_master_clock_run(int run);
 int g2_set_master_clock_bpm(int bpm);
 
+/* Parameter Pages knob-assign source toggle (Patch vs Global) — the SHIFT+GLOBAL front-panel
+ * combo, sub-mode 0x02 of the same 0x3F opcode as the master clock commands above; system-wide,
+ * not per-slot. Confirmed against real hardware 2026-08-28 (see g2_events.c's 0x3F case). */
+int g2_set_knob_source(int is_global);
+
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);
@@ -238,6 +243,35 @@ int g2_deassign_midicc(int slot, int cc_num);
 typedef struct { int location, module_id, param_idx, cc_num; } G2MidiCCEntry;
 int g2_assign_midicc_batch(int slot, const G2MidiCCEntry *entries, int count);
 int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
+
+/* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
+ * knob's address 0-119. Payload layout is inferred from the Delphi reference source; both calls
+ * were confirmed on real hardware (2026-08-28) to be accepted (generic embedded ACK, no error),
+ * but the front panel never echoes 0x25/0x26 itself (see g2_events.c's 0x74 case), so the exact
+ * field-level semantics (which byte lands on which knob) haven't been independently re-verified
+ * against the decompiled CMKnobAssign::WriteStream bit layout — worth a visual spot-check. */
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index);
+int g2_deassign_knob(int slot, int slot_index);
+
+/* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d, CMParameterPageFocus). page_id
+ * packs both selectors into one byte: page_id = page*3 + bank, i.e. page_id/3 = Page A-E (0-4)
+ * and page_id%3 = Bank 1-3 (0-2). Valid range 0-14. Confirmed against the decompiled Clavia
+ * editor (G2Editor.c CMParameterPageFocus::WriteStream / G2Demo.c GetPageId). */
+int g2_select_param_page(int slot, int page_id);
+
+/* Global Parameter Pages siblings of the three functions above (S_ASS_GLOBAL_KNOB=0x1c /
+ * S_DEASS_GLOB_KNOB=0x1d / S_SEL_GLOBAL_PAGE=0x1e), plus a bulk fetch (Q_GLOBAL_KNOBS=0x5e).
+ * Reverse-engineered from the Delphi reference source (BVE.NMG2Mess.pas
+ * AddAssignGlobalKnobMessage/AddDeassignGlobalKnobMessage/AddSelectGlobalParamPageMessage),
+ * UNVERIFIED against real hardware — worth a spot-check before trusting field-level semantics.
+ * `slot` is only the transport/routing slot the command rides on (any of the 4 works
+ * interchangeably per the reference editor); `target_slot` (0-3, A-D) is which patch's module
+ * the knob controls, encoded in the payload itself. */
+int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index);
+int g2_deassign_global_knob(int slot, int slot_index);
+int g2_select_global_page(int slot, int page_id);
+/* System-wide, unlike the three above — no transport slot needed (see g2_device.c). */
+cJSON *g2_get_global_knobs(void);
 
 /* Morph group assignment (S_SET_MORPH_RANGE, 0x43). A param counts as assigned to
  * morph_group purely because range != 0 — setting range to 0 deassigns it. */

@@ -41,6 +41,18 @@ static void debug_send(const char *fn, const uint8_t *buf, int len) {
     fflush(stdout);
 }
 
+/* Mirrors debug_send but for the listener thread's raw interrupt reads — every 16-byte header
+ * it sees, unconditionally, before any msgType classification. g2_emit_event() only knows how
+ * to route RESPONSE_TYPE_EXTENDED/EMBEDDED; this catches anything upstream of that, including a
+ * message the listener itself drops without ever queuing it. */
+static void debug_recv(const uint8_t *hdr) {
+    if (!g2_debug) return;
+    printf("{\"debug\":\"recv\",\"fn\":\"listener\",\"hex\":\"");
+    for (int i = 0; i < 16; i++) printf("%02x", hdr[i]);
+    printf("\"}\n");
+    fflush(stdout);
+}
+
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
@@ -490,6 +502,8 @@ static void *listener_thread(void *arg) {
             break;
         }
         if (ret <= 0) continue;
+
+        debug_recv(hdr);
 
         g2_msg_t msg = {0};
         memcpy(msg.interrupt, hdr, sizeof(hdr));

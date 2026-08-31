@@ -79,8 +79,9 @@
 	import { useUiStore } from '@/store/ui';
 	import { useDeviceStore } from '@/store/device';
 	import { getModule } from '@/renderer/nmg2mods';
-	import { getAllowedCCs, CC_SHORT, parseCCDragPayload } from '@/composables/useMidiCC';
-	import { estimateBadgeWidth } from '@/utils/badgeLayout';
+	import { getAllowedCCs, CC_SHORT } from '@/composables/useMidiCC';
+	import { setBadgeDragImage } from '@/utils/badgeLayout';
+	import { serializeDragPayload, parseDragPayload } from '@/utils/dragPayload';
 	import type { MidiCCAssignment } from '@/types';
 	import Dialog from '@/components/common/Dialog.vue';
 
@@ -203,41 +204,14 @@
 	function onRowDragStart(cc: number, e: DragEvent) {
 		if (!e.dataTransfer) return;
 		e.dataTransfer.effectAllowed = 'move';
-		e.dataTransfer.setData('text/plain', JSON.stringify({ type: 'cc', cc }));
-
-		// Custom drag image — mirrors MidiBadge ghost styling (CCBadgesOverlay uses the same "CC# n" text)
-		const w = estimateBadgeWidth(`CC# ${cc}`);
-		const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
-		svg.setAttribute('width', String(w));
-		svg.setAttribute('height', '15');
-		svg.style.cssText = 'position:fixed;top:-200px;left:-200px;pointer-events:none;';
-		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-		rect.setAttribute('width', String(w));
-		rect.setAttribute('height', '15');
-		rect.setAttribute('fill', '#FFE55C');
-		rect.setAttribute('stroke', '#000');
-		rect.setAttribute('stroke-width', '0.8');
-		rect.setAttribute('rx', '2');
-		rect.setAttribute('opacity', '0.8');
-		const text = document.createElementNS('http://www.w3.org/2000/svg', 'text');
-		text.setAttribute('x', String(w / 2));
-		text.setAttribute('y', '11');
-		text.setAttribute('fill', '#000');
-		text.setAttribute('font-size', '11');
-		text.setAttribute('font-weight', 'bold');
-		text.setAttribute('font-family', 'monospace');
-		text.setAttribute('text-anchor', 'middle');
-		text.textContent = `CC# ${cc}`;
-		svg.appendChild(rect);
-		svg.appendChild(text);
-		document.body.appendChild(svg);
-		e.dataTransfer.setDragImage(svg, w / 2, 7);
-		requestAnimationFrame(() => document.body.removeChild(svg));
+		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'cc', cc }));
+		// Mirrors MidiBadge ghost styling (CCBadgesOverlay uses the same "CC# n" text)
+		setBadgeDragImage(e, `CC# ${cc}`);
 	}
 
 	async function onRowDrop(targetCC: number, targetAssignment: MidiCCAssignment | null, e: DragEvent) {
-		const data = parseCCDragPayload(e);
-		if (!data || !slot.value) return;
+		const data = parseDragPayload(e);
+		if (data?.type !== 'cc' || !slot.value) return;
 		const s = slot.value;
 		if (data.cc !== targetCC) {
 			const dragged = controllers.value.find((c) => c.cc === data.cc);

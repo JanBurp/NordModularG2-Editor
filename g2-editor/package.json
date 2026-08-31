@@ -20,6 +20,7 @@
     "preview": "electron-vite preview",
     "postinstall": "node scripts/copy-cli.js",
     "create-icons": "node scripts/create-icons.js",
+    "generate:button-params": "node scripts/generate-button-params.js",
     "test": "vitest run",
     "test:e2e": "electron-vite build && playwright test",
     "test:e2e:headless": "electron-vite build && HEADLESS=1 playwright test",

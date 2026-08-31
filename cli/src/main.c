@@ -55,6 +55,7 @@ static void print_usage(const char *prog) {
     printf("  set-patch-description <slot> <hexdata>                                                    Set patch description (hex-encoded binary)\n");
     printf("  set-master-clock-run <0|1>                                                                Start (1) or stop (0) the master clock\n");
     printf("  set-master-clock-bpm <30-240>                                                             Set master clock BPM\n");
+    printf("  set-knob-source <0|1>                                                                     Toggle Parameter Pages knob-assign source (1=Global, 0=Patch) — SHIFT+GLOBAL\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
     printf("  slot <A|B|C|D>                                                                            Change active slot (activates if inactive)\n");
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
@@ -75,6 +76,13 @@ static void print_usage(const char *prog) {
     printf("  deassign-midicc <slot> <cc-num>                                                          Remove a MIDI CC assignment\n");
     printf("  assign-midicc-batch <slot> [<va|fx|patch> <mod> <par> <cc>]...                          Assign multiple MIDI CCs in one USB frame\n");
     printf("  deassign-midicc-batch <slot> <cc-num>...                                                Remove multiple MIDI CC assignments in one USB frame\n");
+    printf("  assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>                         Assign a parameter to a Parameter Page knob (0-119)\n");
+    printf("  deassign-knob <slot> <slot-index>                                                       Remove a Parameter Page knob assignment\n");
+    printf("  select-param-page <slot> <page-id>                                                      Select the front-panel Parameter Page (page-id = page*3 + bank, 0-14)\n");
+    printf("  assign-global-knob <slot> <target-slot> <va|fx> <module-id> <param-idx> <slot-index>    Assign a parameter to a Global Parameter Page knob (0-119)\n");
+    printf("  deassign-global-knob <slot> <slot-index>                                                Remove a Global Parameter Page knob assignment\n");
+    printf("  select-global-page <slot> <page-id>                                                     Select the active Global Parameter Page (page-id = page*3 + bank, 0-14)\n");
+    printf("  get-global-knobs                                                                        Fetch the Global Parameter Pages assignment list (system-wide, no slot)\n");
     printf("  copy-variation <slot> <from:0-8> <to:0-8>                                                 Copy one variation to another\n");
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
@@ -519,6 +527,16 @@ static int cmd_select_param(int argc, char **argv, int i) {
     return g2_select_param(slot, location, mod_id, param);
 }
 
+static int cmd_select_param_page(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: select-param-page <slot> <page-id>   (page-id = page*3 + bank, 0-14)\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "select-param-page: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_select_param_page(slot, atoi(argv[i + 2]));
+}
+
 static int cmd_assign_midicc(int argc, char **argv, int i) {
     if (i + 5 >= argc) {
         fprintf(stderr, "Usage: assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>\n");
@@ -581,6 +599,83 @@ static int cmd_deassign_midicc_batch(int argc, char **argv, int i) {
     int ret = g2_deassign_midicc_batch(slot, cc_nums, count);
     free(cc_nums);
     return ret;
+}
+
+static int cmd_assign_knob(int argc, char **argv, int i) {
+    if (i + 5 >= argc) {
+        fprintf(stderr, "Usage: assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>\n");
+        return 1;
+    }
+    int slot       = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "assign-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location   = parse_location_str(argv[i + 2]);
+    int mod_id     = atoi(argv[i + 3]);
+    int param      = atoi(argv[i + 4]);
+    int slot_index = atoi(argv[i + 5]);
+    return g2_assign_knob(slot, location, mod_id, param, slot_index);
+}
+
+static int cmd_deassign_knob(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: deassign-knob <slot> <slot-index>\n");
+        return 1;
+    }
+    int slot       = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "deassign-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int slot_index = atoi(argv[i + 2]);
+    return g2_deassign_knob(slot, slot_index);
+}
+
+static int cmd_select_global_page(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: select-global-page <slot> <page-id>   (page-id = page*3 + bank, 0-14)\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "select-global-page: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_select_global_page(slot, atoi(argv[i + 2]));
+}
+
+static int cmd_assign_global_knob(int argc, char **argv, int i) {
+    if (i + 6 >= argc) {
+        fprintf(stderr, "Usage: assign-global-knob <slot> <target-slot> <va|fx> <module-id> <param-idx> <slot-index>\n");
+        return 1;
+    }
+    int slot        = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "assign-global-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int target_slot = parse_slot(argv[i + 2]);
+    if (target_slot == SLOT_INVALID) { fprintf(stderr, "assign-global-knob: invalid target-slot '%s', expected A-D\n", argv[i + 2]); return 1; }
+    int location   = parse_location_str(argv[i + 3]);
+    int mod_id     = atoi(argv[i + 4]);
+    int param      = atoi(argv[i + 5]);
+    int slot_index = atoi(argv[i + 6]);
+    return g2_assign_global_knob(slot, target_slot, location, mod_id, param, slot_index);
+}
+
+static int cmd_deassign_global_knob(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: deassign-global-knob <slot> <slot-index>\n");
+        return 1;
+    }
+    int slot       = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "deassign-global-knob: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int slot_index = atoi(argv[i + 2]);
+    return g2_deassign_global_knob(slot, slot_index);
+}
+
+static int cmd_get_global_knobs(int argc, char **argv, int i) {
+    (void)argc; (void)argv; (void)i;
+    cJSON *result = g2_get_global_knobs();
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get global knobs", output_format);
+        else
+            fprintf(stderr, "Failed to get global knobs\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
 }
 
 static int cmd_set_morph_range(int argc, char **argv, int i) {
@@ -661,6 +756,11 @@ static int cmd_set_master_clock_run(int argc, char **argv, int i) {
 static int cmd_set_master_clock_bpm(int argc, char **argv, int i) {
     if (i + 1 >= argc) { fprintf(stderr, "Usage: set-master-clock-bpm <30-240>\n"); return 1; }
     return g2_set_master_clock_bpm(atoi(argv[i + 1]));
+}
+
+static int cmd_set_knob_source(int argc, char **argv, int i) {
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-knob-source <0|1>   (1 = Global, 0 = Patch)\n"); return 1; }
+    return g2_set_knob_source(atoi(argv[i + 1]));
 }
 
 static int cmd_set_slot_enabled(int argc, char **argv, int i) {
@@ -874,12 +974,19 @@ static const cmd_entry_t commands[] = {
     { "deassign-midicc",       cmd_deassign_midicc       },
     { "assign-midicc-batch",   cmd_assign_midicc_batch   },
     { "deassign-midicc-batch", cmd_deassign_midicc_batch },
+    { "assign-knob",           cmd_assign_knob           },
+    { "deassign-knob",         cmd_deassign_knob         },
+    { "assign-global-knob",    cmd_assign_global_knob    },
+    { "deassign-global-knob",  cmd_deassign_global_knob  },
+    { "select-global-page",    cmd_select_global_page    },
+    { "get-global-knobs",      cmd_get_global_knobs      },
     { "set-morph-range",       cmd_set_morph_range       },
     { "set-morph-range-batch", cmd_set_morph_range_batch },
     { "set-param-label",  cmd_set_param_label  },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },
     { "select-param",     cmd_select_param     },
+    { "select-param-page", cmd_select_param_page },
     { "copy-variation",   cmd_copy_variation   },
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },
@@ -895,6 +1002,7 @@ static const cmd_entry_t commands[] = {
     { "set-patch-description", cmd_set_patch_description },
     { "set-master-clock-run",  cmd_set_master_clock_run  },
     { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
+    { "set-knob-source",       cmd_set_knob_source       },
     { "set-slot-enabled",      cmd_set_slot_enabled      },
     { "set-slot-key",          cmd_set_slot_key          },
     { "set-slot-hold",         cmd_set_slot_hold         },

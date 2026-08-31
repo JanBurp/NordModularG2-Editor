@@ -218,6 +218,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-extended-toolbar':
 					useSettingsStore().toggleExtendedToolBar();
 					break;
+				case 'toggle-parameter-pages':
+					useSettingsStore().toggleParamPages();
+					break;
 				case 'show-key-commands':
 					uiStore.showKeyCommandsPage = true;
 					break;

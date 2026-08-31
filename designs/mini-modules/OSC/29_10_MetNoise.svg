@@ -43,14 +43,15 @@
      y="0.75" />
   <text
      xml:space="preserve"
-     style="font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';letter-spacing:0px;word-spacing:0px;stroke-width:0.264583;font-weight:normal;font-style:normal;font-stretch:normal;font-variant:normal;font-variation-settings:'wdth' 75, 'wght' 700;font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal"
-     x="4.9333072"
-     y="17.927124"
-     id="text1"><tspan
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.2313px;line-height:1.25;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="3.1148958"
+     y="17.451324"
+     id="text1"
+     transform="scale(0.97345923,1.0272644)"><tspan
        id="tspan1"
-       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.75559929px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wght' 700, 'wdth' 75.0;stroke-width:0.264583"
-       x="4.9333072"
-       y="17.927124">METAL</tspan></text>
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.2313px;font-family:'Saira Condensed';-inkscape-font-specification:'Saira Condensed, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="3.1148958"
+       y="17.451324">METAL</tspan></text>
   <path
      style="fill:none;stroke:#800000;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;stroke-dasharray:none;stroke-opacity:1"
      d="M 4.6599306,42.333333 V 23.812499 L 9.5942234,42.227531 V 29.104166 l 2.4871466,9.28216 V 23.806561 l 4.934766,18.416798 V 29.078412 l 2.488223,9.286171 V 23.812499 l 4.966352,18.534677 V 29.022918 l 2.50309,9.341665 V 23.812499 l 4.962644,18.520834 V 29.104166 l 2.497018,9.319004 V 23.812499 l 4.962642,18.520834 V 29.104166 l 2.481323,9.260417 V 23.812499 l 4.962641,18.520834"

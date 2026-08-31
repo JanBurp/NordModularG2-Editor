@@ -1678,6 +1678,25 @@ int g2_set_master_clock_bpm(int bpm) {
     return G2_OK;
 }
 
+/* Toggles the front panel's Parameter Pages knob-assign SOURCE between Patch and Global — the
+ * SHIFT+GLOBAL combo's own command, sub-mode 0x02 of the shared 0x3F opcode (see g2_events.c's
+ * 0x3F case for how the confirming capture was made: 2026-08-28, 4 consecutive real SHIFT+GLOBAL
+ * presses echoed ff0201/ff0200/ff0201/ff0200 in lockstep). System-wide, not per-slot — mirrors
+ * g2_set_master_clock_run/bpm's transport exactly, not the per-slot g2_select_global_page. */
+int g2_set_knob_source(int is_global) {
+    if (ensure_connected(0) < 0) { g2_err("set-knob-source: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version;
+    if (get_perf_version(&version) < 0) return G2_ERR;
+    uint8_t cmd[4] = { 0x3F, 0xFF, 0x02, is_global ? 1 : 0 };
+    if (send_system_data(version, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_upload_patch(int slot, const char *filepath) {
     if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
@@ -2232,6 +2251,197 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
         ops[i].len     = 1;
     }
     return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+/* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
+ * knob's address 0-119 (3 Banks x 5 Pages x 8 Knobs — see g2-editor/src/renderer/paramPages.ts).
+ * Same acked COMMAND_REQ envelope as MIDI CC assign (send_slot), NOT the raw WRITE_NO_RESP
+ * envelope used by g2_set_morph_range. Payload layout is a best-effort inference from the Delphi
+ * reference editor (BVE.NMG2Mess.pas AddAssignKnobMessage/AddDeAssignKnobMessage) cross-checked
+ * against decompiled G2Editor.c opcodes. Confirmed on real hardware (2026-08-28) to be accepted
+ * without error, but the front panel never echoes 0x25/0x26 back (see g2_events.c's 0x74 case),
+ * so there's no independent confirmation the individual fields (module/param/location/slot_index)
+ * land on the intended byte offsets — worth a visual spot-check before fully trusting this. */
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
+    if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
+    if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[5] = { (uint8_t)module_id, (uint8_t)param_idx, (uint8_t)location, 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, 0x25, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+int g2_deassign_knob(int slot, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, 0x26, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+/* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d). CONFIRMED on real hardware
+ * (2026-08-28, both directions round-tripping with the editor). Unlike the knob assign/deassign
+ * pair above, the layout was solid before that too: the decompiled Clavia editor writes exactly [0x2d][page_id]
+ * (G2Editor.c CMParameterPageFocus::WriteStream) and packs the two selectors with
+ * page_id = page*3 + bank (G2Demo.c GetPageId; decoder G2Editor.c SetFocusedParameterPage, which
+ * silently ignores anything >= 15 — so reject that here rather than sending a no-op). There is no
+ * separate Bank opcode: changing only the Bank means re-sending the whole page_id. The G2 echoes
+ * this same sub-command back when the page is changed from the front panel (see g2_events.c). */
+int g2_select_param_page(int slot, int page_id) {
+    if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
+    if (page_id < 0 || page_id > 14)   return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)       return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload = (uint8_t)page_id;
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_SEL_PARAM_PAGE, &payload, 1) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+/* Global Parameter Pages knob assignment (S_ASS_GLOBAL_KNOB=0x1c / S_DEASS_GLOB_KNOB=0x1d).
+ * Mirrors g2_assign_knob/g2_deassign_knob above, with one difference: the payload's first byte
+ * folds in a 4-bit target-slot nibble (which patch's module the knob controls) alongside the
+ * 2-bit location, per the Delphi reference (BVE.NMG2Mess.pas AddAssignGlobalKnobMessage:
+ * slotIndex(4) location(2) unused(2), module(8), param(8), unused(8), knobIndex(8)). `slot` is
+ * only the transport/routing slot the command rides on — any of the 4 works interchangeably.
+ * UNVERIFIED against real hardware (see g2_device.h). */
+int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (target_slot < 0 || target_slot > 3) return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
+    if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
+    if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t first = (uint8_t)((target_slot << 4) | (location << 2));
+    uint8_t payload[5] = { first, (uint8_t)module_id, (uint8_t)param_idx, 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_ASSIGN_GLOBAL_KNOB, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+int g2_deassign_global_knob(int slot, int slot_index) {
+    if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
+    if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_DEASSIGN_GLOBAL_KNOB, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+/* Select the active Global Parameter Page (S_SEL_GLOBAL_PAGE=0x1e) — Global Pages sibling of
+ * g2_select_param_page. Same page_id packing (page*3 + bank, 0-14). UNVERIFIED against real
+ * hardware; the Delphi reference itself never implements the receive/echo side of this opcode. */
+int g2_select_global_page(int slot, int page_id) {
+    if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
+    if (page_id < 0 || page_id > 14)   return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)       return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    uint8_t payload = (uint8_t)page_id;
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_SEL_GLOBAL_PAGE, &payload, 1) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+/* Bulk fetch of the Global Parameter Pages assignment list (Q_GLOBAL_KNOBS=0x5e request,
+ * C_KNOBS_GLOBAL=0x5f response chunk). Opcodes confirmed against the decompiled Clavia editor
+ * (CMPerfKnobMapRequest sends 0x5e; CMPerformanceKnobMapDump, molecule id 0x5f, is the response
+ * — its ReadStream delegates to the SAME NSFile_V11::CKnobMapData_11 class the per-patch $62
+ * section uses, just constructed with an internal "isGlobal" flag, confirming
+ * parseGlobalKnobsChunk's extra-slot-field design). System-wide, NOT per-slot: unlike
+ * g2_get_patch's SUB_COMMAND_GET_PATCH_SLOT, CMPerfKnobMapRequest::WriteStream initializes with
+ * scope=2 (system) — the same scope byte as query_synth_settings's SUB_COMMAND_GET_SYNTH_SETTINGS
+ * and CMGlobalParameterPageFocusRequest (0x59) — not scope=0 (slot), so this mirrors
+ * query_synth_settings's send_system()+extended-response transport, not g2_get_patch's
+ * send_slot()+per-patch-version one (which a previous version of this function used, incorrectly,
+ * and reliably produced garbage). Flushes stale EP 0x81 data before sending (like g2_get_patch)
+ * and validates the response's tag byte with a bounded discard-and-retry loop (like
+ * get_patch_text's SUB_RESPONSE_PATCH_NOTES check) — a stray leftover bulk transfer from a
+ * preceding operation would otherwise be silently misread as this chunk. Same envelope shape as
+ * that SUB_RESPONSE_PATCH_NOTES bulk branch too: [0..2] header, [3]=response tag (checked below),
+ * [4..5]=payload length (big-endian), [6..]=the actual C_KNOBS_GLOBAL bytes — so those 6 bytes are
+ * stripped before hex-encoding under "data", letting the TS side feed it straight into
+ * parseGlobalKnobsChunk. Not run through patch_usb_to_pch2 — that conversion strips a whole-patch
+ * header/CRC wrapper this single section-chunk reply doesn't carry; it needs its own, smaller
+ * envelope strip instead (above). */
+cJSON *g2_get_global_knobs(void) {
+    uint8_t interruptResp[16] = {0};
+    int ret;
+
+    if (ensure_connected(1) < 0) {
+        g2_err("Failed to connect to G2\n");
+        return NULL;
+    }
+
+    /* Flush stale G2 data left over from a previous command (direct mode only — the listener
+     * thread drains EP 0x81 continuously, so no flush needed then). Mirrors g2_get_patch. */
+    if (!g2_listener_active) {
+        uint8_t stale[16]; int n;
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
+    }
+
+    if (send_system(0x41, SUB_COMMAND_GET_GLOBAL_KNOBS) < 0) {
+        g2_err("Failed to send get-global-knobs command\n");
+        return NULL;
+    }
+
+    usleep(USB_SEND_DELAY_US);
+
+    /* Discard-and-retry until a response tagged C_KNOBS_GLOBAL (0x5f) at byte[3] arrives, or we
+     * give up — same lockstep-ish pattern as get_patch_text, since a straggler from a preceding
+     * operation can still be in flight when our request's answer arrives. */
+    for (int attempt = 0; attempt < 5; attempt++) {
+        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) {
+            g2_err("No interrupt response for global knobs\n");
+            return NULL;
+        }
+        if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
+
+        uint16_t chunkSize = (interruptResp[1] << 8) | interruptResp[2];
+        if (chunkSize == 0) continue;
+        uint8_t *chunkData = malloc(chunkSize);
+        if (!chunkData) {
+            g2_err("Memory allocation failed\n");
+            return NULL;
+        }
+        ret = recv_bulk(chunkData, chunkSize);
+        if (ret <= 0 || chunkSize < 6 || chunkData[3] != RESP_CHUNK_KNOBS_GLOBAL) {
+            free(chunkData);
+            continue;
+        }
+
+        /* Strip the envelope: [4..5] is the payload's own big-endian length, clamped to what we
+         * actually received, same as get_patch_text's textLen handling. */
+        uint16_t payloadLen = ((uint16_t)chunkData[4] << 8) | chunkData[5];
+        if (payloadLen > (uint16_t)(chunkSize - 6)) payloadLen = (uint16_t)(chunkSize - 6);
+
+        cJSON *root = cJSON_CreateObject();
+        char *hexStr = malloc((size_t)payloadLen * 2 + 1);
+        if (hexStr) {
+            for (size_t i = 0; i < payloadLen; i++) {
+                snprintf(hexStr + i * 2, 3, "%02x", chunkData[6 + i]);
+            }
+            hexStr[(size_t)payloadLen * 2] = '\0';
+            cJSON_AddStringToObject(root, "data", hexStr);
+            free(hexStr);
+        }
+        free(chunkData);
+        return root;
+    }
+
+    g2_err("No matching response for global knobs after retries\n");
+    return NULL;
 }
 
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a

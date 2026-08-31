@@ -31,6 +31,11 @@ export const useUiStore = defineStore('ui', {
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
 		selectedMorphGroup: 0 as number, // 0-7, which Morph Group toolbar knob is currently selected
+		selectedParamBank: 0 as number, // 0-2, ambient Bank for right-click "Assign to Page" + which bank's row the toolbar shows
+		displayedParamPage: 0 as number, // 0-4 (A-E), which Parameter Page the toolbar currently displays
+		globalPagesActive: false as boolean, // ParameterPages.vue toggle: off = Patch pages, on = Global (Performance) pages
+		selectedGlobalParamBank: 0 as number, // 0-2, independent of selectedParamBank so each view keeps its own position
+		displayedGlobalParamPage: 0 as number, // 0-4 (A-E), independent of displayedParamPage
 		showSvgViewer: false as boolean,
 		showKeyCommandsPage: false as boolean,
 		cableShakeCount: 0 as number,
@@ -107,6 +112,30 @@ export const useUiStore = defineStore('ui', {
 
 		setSelectedMorphGroup(i: number) {
 			this.selectedMorphGroup = Math.max(0, Math.min(7, i));
+		},
+
+		setSelectedParamBank(i: number) {
+			this.selectedParamBank = Math.max(0, Math.min(2, i));
+		},
+
+		setDisplayedParamPage(i: number) {
+			this.displayedParamPage = Math.max(0, Math.min(4, i));
+		},
+
+		// Explicit set (not a blind toggle) so both the toolbar click and an incoming hardware echo
+		// (param_page_change/global_page_change in useSlotEvents.ts — receiving one IS the signal
+		// for which mode the front panel is now showing, since there's no separate "enter Global
+		// mode" opcode) can drive it without racing each other.
+		setGlobalPagesActive(active: boolean) {
+			this.globalPagesActive = active;
+		},
+
+		setSelectedGlobalParamBank(i: number) {
+			this.selectedGlobalParamBank = Math.max(0, Math.min(2, i));
+		},
+
+		setDisplayedGlobalParamPage(i: number) {
+			this.displayedGlobalParamPage = Math.max(0, Math.min(4, i));
 		},
 
 		toggleSvgViewer() {

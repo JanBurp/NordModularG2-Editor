@@ -3,6 +3,7 @@ import { SLOT_LABELS } from '@/constants';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
+import { useUiStore } from '@/store/ui';
 import { getCategorySlug } from '@/constants/categories';
 import { PERF_SETTLE_TIMEOUT_MS } from './usePatchFile';
 import type { LogFn } from './useG2';
@@ -11,6 +12,7 @@ export function useDeviceEvents(log: LogFn) {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
 	const browserStore = useBrowserStore();
+	const uiStore = useUiStore();
 
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
@@ -84,6 +86,10 @@ export function useDeviceEvents(log: LogFn) {
 				results.forEach((r, i) => {
 					if (r.status === 'rejected') console.error(`Watch: patch load failed for index ${i}:`, r.reason);
 				});
+				// Global Parameter Pages, embedded the same way (see g2_emit_rearm_data in g2_events.c).
+				if (typeof ev.globalKnobs === 'string') {
+					await slotsStore._applyGlobalKnobsOutput(JSON.stringify({ data: ev.globalKnobs }));
+				}
 			} else if (modeSwitched) {
 				await Promise.all(SLOT_LABELS.map((s) => slotsStore.loadSlot(s)));
 			}
@@ -118,6 +124,15 @@ export function useDeviceEvents(log: LogFn) {
 			log('←', 'Watch', `clock_bpm=${ev.bpm}`);
 			return true;
 		}
+		if (ev.type === 'knob_source_change') {
+			// SHIFT+GLOBAL front-panel combo (opcode 0x3F sub-mode 0x02, see g2_events.c) — the
+			// actual Patch/Global mode-switch (selectGlobalParamPage/selectParamPage only choose a
+			// page within whichever source this sets). Receiving it is the signal for which source
+			// the front panel now shows, so mirror it into the toolbar toggle.
+			uiStore.setGlobalPagesActive(ev.global === 1);
+			log('←', 'Watch', `knob_source_change global=${ev.global}`);
+			return true;
+		}
 		if (ev.type === 'assigned_voices') {
 			if (Array.isArray(ev.voices)) {
 				const slotLabels = ['A', 'B', 'C', 'D'] as const;
@@ -139,6 +154,14 @@ export function useDeviceEvents(log: LogFn) {
 			const raw = await window.cli.run(['get-perf-settings']);
 			const parsed = JSON.parse(raw);
 			store.updatePerfSettings(parsed.data ?? parsed);
+			return true;
+		}
+		if (ev.type === 'global_knobs_data') {
+			// Startup-only sync (daemon.c's connect sequence, after all 4 slots load) — the rearm
+			// path gets its Global Parameter Pages data via synth_settings_update's `globalKnobs`
+			// field instead (see above).
+			log('←', 'Watch', 'global_knobs_data');
+			await slotsStore._applyGlobalKnobsOutput(JSON.stringify(ev));
 			return true;
 		}
 		if (ev.type === 'midi_cc') {

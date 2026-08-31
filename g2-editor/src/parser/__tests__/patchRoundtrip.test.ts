@@ -1,4 +1,4 @@
-import type { Cable, ModuleInstance, ParamLabel, Patch } from '@/types';
+import type { Cable, GlobalParamPageAssignment, ModuleInstance, ParamLabel, Patch } from '@/types';
 import { describe, expect, it } from 'vitest';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
 
@@ -85,6 +85,7 @@ function expectPatchEqual(a: Patch, b: Patch) {
 	expect(b.description).toEqual(a.description);
 	expect(b.patchParams).toEqual(a.patchParams);
 	expect(b.controllers ?? []).toEqual(a.controllers ?? []);
+	expect(b.paramPages ?? []).toEqual(a.paramPages ?? []);
 	expect(b.text ?? '').toEqual(a.text ?? '');
 }
 
@@ -756,7 +757,13 @@ describe('morph assignment round-trip', () => {
 
 // ── prf2 helpers ──────────────────────────────────────────────────────────────
 
-function loadFixturePrf2(filename: string): { name: string; rawHex: string; slotNames: string[]; patches: Patch[] } {
+function loadFixturePrf2(filename: string): {
+	name: string;
+	rawHex: string;
+	slotNames: string[];
+	patches: Patch[];
+	globalParamPages: GlobalParamPageAssignment[];
+} {
 	const buf = fs.readFileSync(path.join(FIXTURES, filename));
 	const fileBytes = new Uint8Array(buf);
 	let ofs = 0;
@@ -766,10 +773,10 @@ function loadFixturePrf2(filename: string): { name: string; rawHex: string; slot
 		.map((b) => b.toString(16).padStart(2, '0'))
 		.join('');
 	const parsed = new PatchParser(fileBytes.buffer).parsePrf2()!;
-	return { name, rawHex, slotNames: parsed.slotNames, patches: parsed.patches };
+	return { name, rawHex, slotNames: parsed.slotNames, patches: parsed.patches, globalParamPages: parsed.globalParamPages };
 }
 
-function parsePerfFromRawHex(name: string, rawHex: string): { slotNames: string[]; patches: Patch[] } {
+function parsePerfFromRawHex(name: string, rawHex: string): { slotNames: string[]; patches: Patch[]; globalParamPages: GlobalParamPageAssignment[] } {
 	const sectionBytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 	const nameBytes = new TextEncoder().encode(name);
 	const prf2 = new Uint8Array(nameBytes.length + 3 + sectionBytes.length);
@@ -980,6 +987,122 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
 		const patchWithout = parsePatchFromRawHex(name, hexWithout);
 		expect(patchWithout.controllers ?? []).toHaveLength(0);
+	});
+});
+
+describe('Parameter Pages round-trip: assign → serialize → parse', () => {
+	it('paramPages survive serialize → parse', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		const assignments = [
+			{ slotIndex: 0, location: 1 as const, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 42, location: 0 as const, moduleIndex: 5, paramIndex: 1, isLed: 0 },
+			{ slotIndex: 119, location: 1 as const, moduleIndex: 1, paramIndex: 3, isLed: 0 },
+		];
+		patch.paramPages = assignments;
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		expect(patchB.paramPages).toEqual(assignments);
+	});
+
+	it('paramPages survive file save/load cycle', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [{ slotIndex: 8, location: 1 as const, moduleIndex: 1, paramIndex: 2, isLed: 0 }];
+
+		const savedHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const { patch: patchB } = simulateFileSaveAndLoad(name, savedHex);
+
+		expect(patchB.paramPages).toEqual(patch.paramPages);
+	});
+
+	it('empty paramPages produces no 0x62 section', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [];
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+
+		expect(extractSection(newHex, 0x62)).toBeNull();
+	});
+
+	it('paramPages removed when deassigned', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.paramPages = [{ slotIndex: 16, location: 1 as const, moduleIndex: 3, paramIndex: 0, isLed: 0 }];
+
+		const hexWith = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchWith = parsePatchFromRawHex(name, hexWith);
+		expect(patchWith.paramPages).toHaveLength(1);
+
+		patchWith.paramPages = [];
+		const hexWithout = serializePatch(name, patchWith, hexWith, extractVariations(patchWith));
+		const patchWithout = parsePatchFromRawHex(name, hexWithout);
+		expect(patchWithout.paramPages ?? []).toHaveLength(0);
+	});
+});
+
+describe('Global Parameter Pages round-trip: assign → serializePerformance → parse', () => {
+	it('globalParamPages survive serialize → parse', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [
+			{ slotIndex: 0, slot: 'A', location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 42, slot: 'C', location: 0, moduleIndex: 5, paramIndex: 1, isLed: 0 },
+			{ slotIndex: 119, slot: 'D', location: 1, moduleIndex: 1, paramIndex: 3, isLed: 0 },
+		];
+
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { globalParamPages: reparsed } = parsePerfFromRawHex(name, newHex);
+
+		expect(reparsed).toEqual(assignments);
+	});
+
+	it('globalParamPages survive file save/load cycle', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [{ slotIndex: 8, slot: 'B', location: 1, moduleIndex: 1, paramIndex: 2, isLed: 0 }];
+
+		const savedHex = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { patches: patchesB } = simulatePerfFileSaveAndLoad(name, savedHex);
+		// simulatePerfFileSaveAndLoad discards globalParamPages (returns only {rawHex, patches}) —
+		// reparse the saved bytes directly instead, same round-trip the store's save/load actually
+		// performs (loadPerformanceFile/savePerformance in slots.ts).
+		expect(patchesB).toHaveLength(4);
+		const { globalParamPages: reparsed } = parsePerfFromRawHex(name, savedHex);
+		expect(reparsed).toEqual(assignments);
+	});
+
+	it('empty globalParamPages produces no 0x5f section', () => {
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations), []);
+		expect(extractSection(newHex, 0x5f)).toBeNull();
+	});
+
+	it('globalParamPages removed when deassigned', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const assignments: GlobalParamPageAssignment[] = [{ slotIndex: 16, slot: 'D', location: 1, moduleIndex: 3, paramIndex: 0, isLed: 0 }];
+
+		const hexWith = serializePerformance(patches, rawHex, patches.map(extractVariations), assignments);
+		const { globalParamPages: withKnobs } = parsePerfFromRawHex(name, hexWith);
+		expect(withKnobs).toHaveLength(1);
+
+		const hexWithout = serializePerformance(patches, hexWith, patches.map(extractVariations), []);
+		const { globalParamPages: withoutKnobs } = parsePerfFromRawHex(name, hexWithout);
+		expect(withoutKnobs).toHaveLength(0);
+	});
+});
+
+describe('paramPages slot addressing helpers', () => {
+	it('slotIndexFor / slotIndexToBankPageKnob round-trip for all 120 slots', async () => {
+		const { slotIndexFor, slotIndexToBankPageKnob, BANK_COUNT, PAGE_COUNT, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } = await import('../../renderer/paramPages');
+		expect(BANK_COUNT * PAGE_COUNT * KNOBS_PER_PAGE).toBe(TOTAL_KNOB_SLOTS);
+		for (let bank = 0; bank < BANK_COUNT; bank++) {
+			for (let page = 0; page < PAGE_COUNT; page++) {
+				for (let knob = 0; knob < KNOBS_PER_PAGE; knob++) {
+					const slotIndex = slotIndexFor(bank, page, knob);
+					expect(slotIndex).toBeGreaterThanOrEqual(0);
+					expect(slotIndex).toBeLessThan(TOTAL_KNOB_SLOTS);
+					expect(slotIndexToBankPageKnob(slotIndex)).toEqual({ bank, page, knob });
+				}
+			}
+		}
 	});
 });
 

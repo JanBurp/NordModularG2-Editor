@@ -53,6 +53,7 @@ nav_order: 4
 | `Cmd+J` | Toggle Text pane |
 | `Cmd+,` | Toggle Settings pane |
 | `Cmd+T` | Toggle Extended Toolbar |
+| `Cmd+F` | Toggle Parameter Pages |
 | `←` / `→` | Switch Disk/Patches/Performances tab (Browser pane focused) |
 
 ## Morph Groups
