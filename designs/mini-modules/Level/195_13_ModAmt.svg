@@ -1,0 +1,57 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="3.9879718"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="3.9879718"
+       y="17.927124">MO AM</tspan></text>
+  <g
+     id="g6"
+     transform="translate(0.09475565,1.5875)">
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="M 7.4363432,36.179715 H 44.063657"
+       id="path2" />
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:#009908;fill-opacity:1;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="M 24.947882,30.333492 V 42.014093 L 35.074761,36.120467 Z"
+       id="path3" />
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="M 30.174516,33.079766 V 24.045847"
+       id="path4" />
+    <path
+       style="font-variation-settings:normal;opacity:1;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000;stop-opacity:1"
+       d="M 30.921212,24.045847 H 7.2468317"
+       id="path6" />
+    <circle
+       style="font-variation-settings:'wdth' 75, 'wght' 700;fill:#009908;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:10.0157;stroke-opacity:1"
+       id="path5"
+       cx="17.527212"
+       cy="24.045847"
+       r="2.5811195" />
+  </g>
+</svg>

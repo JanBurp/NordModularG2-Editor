@@ -1,0 +1,92 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="44_6_LevMult.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="true">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="0.26458332"
+       spacingy="0.26458332"
+       empcolor="#3f3fff"
+       empopacity="0.25098039"
+       color="#3f3fff"
+       opacity="0.1254902"
+       empspacing="5"
+       dotted="false"
+       gridanglex="30"
+       gridanglez="30"
+       visible="true" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="9.9300861"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="9.9300861"
+       y="17.927124">GATE</tspan></text>
+  <g
+     id="g1"
+     transform="matrix(1.2277662,0,0,1.2277662,-1.9967146,-10.235117)"
+     style="stroke-width:0.814487"
+     inkscape:export-filename="..\x Logic\Gate.svg"
+     inkscape:export-xdpi="96"
+     inkscape:export-ydpi="96">
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.22173;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="m 28.247294,36.179715 h 9.064141"
+       id="path2"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.22173;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="M 7.9027316,30.10686 H 23.719094"
+       id="path2-3"
+       sodipodi:nodetypes="cc"
+       inkscape:transform-center-x="-14.310679"
+       inkscape:transform-center-y="8.9693692" />
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:none;fill-opacity:1;stroke:#000000;stroke-width:1.22173;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="M 7.8872593,42.818002 H 23.703621"
+       id="path2-32"
+       sodipodi:nodetypes="cc" />
+    <path
+       style="font-variation-settings:normal;vector-effect:none;fill:#fffe33;fill-opacity:1;stroke:#000000;stroke-width:1.22173;stroke-linecap:butt;stroke-linejoin:miter;stroke-miterlimit:4;stroke-dasharray:none;stroke-dashoffset:0;stroke-opacity:1;-inkscape-stroke:none;stop-color:#000000"
+       d="m 16.357686,28.313445 v 15.855448 c 0,0 12.143346,0.767701 12.244125,-8.000109 0,-8.364693 -12.244125,-7.855339 -12.244125,-7.855339 z"
+       id="path3"
+       sodipodi:nodetypes="cccc" />
+  </g>
+</svg>

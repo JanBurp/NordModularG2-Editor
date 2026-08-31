@@ -439,6 +439,7 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
 				{ label: "Copy", click: () => win!.webContents.send("menu:action", "copy"), accelerator: "CommandOrControl+C" },
 				{ label: "Paste", click: () => win!.webContents.send("menu:action", "paste"), accelerator: "CommandOrControl+V" },
+				{ label: "Paste Params", click: () => win!.webContents.send("menu:action", "paste-params"), accelerator: "CommandOrControl+E" },
 				{ type: "separator" as const },
 				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
 				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },

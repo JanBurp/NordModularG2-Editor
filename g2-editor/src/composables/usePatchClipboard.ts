@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { areaConfig, buildCloneEntries, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
+import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
 
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
@@ -36,7 +36,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
 			.map((c: any) => ({ ...c }));
 
-		uiStore.clipboard = { modules, cables, area: areaKey };
+		uiStore.clipboard = { modules, cables, area: areaKey, copiedVariation: uiStore.variation };
 	}
 
 	async function cutSelection(): Promise<void> {
@@ -76,5 +76,19 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		);
 	}
 
-	return { copySelection, cutSelection, pasteClipboard, hasClipboard };
+	// Targets: the current live selection if one exists (explicit "paste onto a different module"),
+	// else fall back to pasting each copied module back onto a module with the same id (covers
+	// "copy in one Variation/slot, Paste Params in another" without needing to reselect).
+	function pasteParams(): void {
+		const clipboard = uiStore.clipboard;
+		if (!clipboard || clipboard.modules.length === 0) return;
+		const area = getSourceArea();
+		const currentModules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
+		const targetIds = uiStore.selectedModules.length > 0 ? uiStore.selectedModules : clipboard.modules.map((m) => m.index);
+		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targetIds, currentModules);
+		if (pairs.length === 0) return;
+		slotsStore.pasteParams(pairs, uiStore.variation, area);
+	}
+
+	return { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard };
 }

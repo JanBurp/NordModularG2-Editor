@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="9.7757454"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="9.7757454"
+       y="17.927124">VOCO</tspan></text>
+  <g
+     id="g7"
+     transform="translate(0.53783544)">
+    <g
+       id="g6"
+       transform="matrix(0.83046932,-0.47021839,0.47126446,0.8286259,-11.425245,24.43669)"
+       style="stroke-width:1.04843">
+      <ellipse
+         style="font-variation-settings:'wdth' 75, 'wght' 700;fill:#8e8e8e;fill-opacity:1;fill-rule:evenodd;stroke:#656565;stroke-width:0.524215;stroke-linecap:butt;stroke-linejoin:round;stroke-dasharray:none;stroke-dashoffset:10.0157;stroke-opacity:1"
+         id="path1"
+         cx="39.456303"
+         cy="25.6117"
+         rx="4.8897877"
+         ry="5.0824142" />
+      <path
+         id="rect2"
+         style="fill:#cccccc;fill-rule:evenodd;stroke-width:0.277397"
+         d="m 34.341396,24.927999 h 10.229819 c 0.03643,0.109701 0.04554,0.633383 0,0.882704 H 34.341396 c -0.01822,-0.169538 -0.04554,-0.733111 0,-0.882704 z" />
+      <path
+         style="fill:#178237;fill-opacity:1;stroke:#000000;stroke-width:0.277397px;stroke-linecap:butt;stroke-linejoin:miter;stroke-opacity:1"
+         d="M 38.322126,47.457499 36.265164,29.614865 42.65051,29.536022 40.967959,47.457498 H 38.322126"
+         id="path3" />
+      <path
+         id="rect2-2"
+         style="fill:#cccccc;fill-rule:evenodd;stroke-width:0.277397"
+         d="m 43.408336,29.09209 c -0.273254,0.354672 -0.601159,0.692784 -0.601159,0.692784 l -6.689575,-0.01939 c 0,0 -0.510075,-0.419712 -0.655811,-0.707883 z" />
+    </g>
+    <rect
+       style="fill:#3d3d3d;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+       id="rect5"
+       width="2.6471326"
+       height="18.485622"
+       x="23.756838"
+       y="-23.794895"
+       transform="rotate(90)" />
+    <rect
+       style="fill:#3d3d3d;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+       id="rect5-2"
+       width="2.6471326"
+       height="18.485622"
+       x="27.760378"
+       y="-23.77729"
+       transform="rotate(90)" />
+    <rect
+       style="fill:#3d3d3d;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+       id="rect5-1"
+       width="2.6471326"
+       height="18.485622"
+       x="34.395832"
+       y="-23.77729"
+       transform="rotate(90)" />
+    <rect
+       style="fill:#3d3d3d;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+       id="rect5-3"
+       width="2.6471326"
+       height="18.485622"
+       x="38.37154"
+       y="-23.77729"
+       transform="rotate(90)" />
+    <rect
+       style="fill:#3d3d3d;fill-opacity:1;fill-rule:evenodd;stroke-width:0.264583"
+       id="rect5-19"
+       width="2.6471326"
+       height="18.485622"
+       x="42.347244"
+       y="-23.77729"
+       transform="rotate(90)" />
+  </g>
+</svg>

@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="7.2966485"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="7.2966485"
+       y="17.927124">EQ 3B</tspan></text>
+  <g
+     id="g7"
+     transform="translate(-0.0139905)">
+    <path
+       id="rect7"
+       style="fill:#52e07c;fill-opacity:1;fill-rule:evenodd;stroke:none;stroke-width:0.264583;stroke-opacity:1"
+       d="m 6.5488154,26.193749 h 4.8037936 c 3.09152,0 1.86685,10.847917 4.803794,10.847917 6.28609,0 4.815732,-9.208892 9.607588,-9.260417 4.585755,0.05153 3.476073,9.260417 9.607587,9.260417 4.431179,-0.05152 1.86685,-9.157366 4.803794,-9.260417 h 4.803794 L 44.913397,47.625 H 6.5488154 Z" />
+    <path
+       id="rect7-8"
+       style="fill:none;fill-opacity:1;fill-rule:evenodd;stroke:#178237;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+       d="m 6.548815,26.193749 h 4.803794 c 3.09152,0 1.86685,10.847917 4.803794,10.847917 6.28609,0 4.815732,-9.208892 9.607588,-9.260417 4.585755,0.05153 3.476073,9.260417 9.607587,9.260417 4.431179,-0.05152 1.86685,-9.157366 4.803794,-9.260417 h 4.803794" />
+  </g>
+</svg>

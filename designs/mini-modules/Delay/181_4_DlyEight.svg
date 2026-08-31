@@ -1,0 +1,157 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   sodipodi:docname="89_2_Flanger.svg"
+   xmlns:inkscape="http://www.inkscape.org/namespaces/inkscape"
+   xmlns:sodipodi="http://sodipodi.sourceforge.net/DTD/sodipodi-0.dtd"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <sodipodi:namedview
+     id="namedview1"
+     pagecolor="#ffffff"
+     bordercolor="#666666"
+     borderopacity="1.0"
+     inkscape:showpageshadow="2"
+     inkscape:pageopacity="0.0"
+     inkscape:pagecheckerboard="0"
+     inkscape:deskcolor="#d1d1d1"
+     inkscape:document-units="mm"
+     showgrid="false">
+    <inkscape:grid
+       id="grid1"
+       units="px"
+       originx="0"
+       originy="0"
+       spacingx="0.26458332"
+       spacingy="0.26458332"
+       empcolor="#3f3fff"
+       empopacity="0.25098039"
+       color="#3f3fff"
+       opacity="0.1254902"
+       empspacing="5"
+       dotted="false"
+       gridanglex="30"
+       gridanglez="30"
+       visible="false" />
+  </sodipodi:namedview>
+  <defs
+     id="defs1" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 4.2046741,31.223273 c 11.9879609,0 40.5446509,0 40.5446509,0"
+     id="path6" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75"
+     inkscape:export-filename="..\Delay\8 Tap.svg"
+     inkscape:export-xdpi="96"
+     inkscape:export-ydpi="96" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="7.8513107"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="7.8513107"
+       y="17.927124">8 TAP</tspan></text>
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5"
+     width="3.8937259"
+     height="13.223974"
+     x="8.801136"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-4"
+     width="3.8937259"
+     height="13.223974"
+     x="13.782128"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-1"
+     width="3.8937259"
+     height="13.223974"
+     x="18.763123"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-3"
+     width="3.8937259"
+     height="13.223974"
+     x="23.744116"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-5"
+     width="3.8937259"
+     height="13.223974"
+     x="28.725109"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-39"
+     width="3.8937259"
+     height="13.223974"
+     x="33.7061"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-15"
+     width="3.8937259"
+     height="13.223974"
+     x="38.687096"
+     y="24.611286" />
+  <rect
+     style="fill:#8800cc;fill-opacity:1;fill-rule:evenodd;stroke:#000000;stroke-width:0.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect5-2"
+     width="3.8937259"
+     height="13.223974"
+     x="43.668087"
+     y="24.611286" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 10.858198,37.967449 v 5.43652"
+     id="path5" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 15.822549,37.967449 v 5.43652"
+     id="path5-1" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 20.786901,37.967449 v 5.43652"
+     id="path5-8" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 25.751252,37.967449 v 5.43652"
+     id="path5-5" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 30.715603,37.967449 v 5.43652"
+     id="path5-6" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 35.679954,37.967449 v 5.43652"
+     id="path5-17" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 40.644306,37.967449 v 5.43652"
+     id="path5-3" />
+  <path
+     style="fill:none;stroke:#000000;stroke-width:1;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+     d="m 45.608657,37.967449 v 5.43652"
+     id="path5-7" />
+</svg>

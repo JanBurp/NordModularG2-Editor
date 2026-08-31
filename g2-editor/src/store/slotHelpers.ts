@@ -18,6 +18,32 @@ export function findModuleByIndex(modules: ModuleInstance[], id: number): Module
 	return modules.find((m) => m.index === id);
 }
 
+export interface PasteParamsPair {
+	targetId: number;
+	paramValues: number[];
+	modeValues: number[];
+}
+
+// Pairs copied modules with target ids by order, keeping only same-type pairs, and slices each
+// source module's `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt).
+export function buildPasteParamsPairs(
+	sourceModules: ModuleInstance[],
+	copiedVariation: number,
+	targetIds: number[],
+	currentModules: ModuleInstance[],
+): PasteParamsPair[] {
+	const pairs: PasteParamsPair[] = [];
+	const count = Math.min(sourceModules.length, targetIds.length);
+	for (let i = 0; i < count; i++) {
+		const src = sourceModules[i];
+		const target = findModuleByIndex(currentModules, targetIds[i]);
+		if (!target || target.type !== src.type) continue;
+		const offset = copiedVariation * src.pcnt;
+		pairs.push({ targetId: target.index, paramValues: src.lv.slice(offset, offset + src.pcnt), modeValues: [...src.modes] });
+	}
+	return pairs;
+}
+
 export type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
 
 export function sameJack(a: JackEnd, b: JackEnd): boolean {

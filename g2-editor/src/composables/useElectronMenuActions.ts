@@ -30,7 +30,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();
 	const { deleteSelection } = usePatchOperations();
-	const { copySelection, cutSelection, pasteClipboard } = usePatchClipboard();
+	const { copySelection, cutSelection, pasteClipboard, pasteParams } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
 
 	onMounted(() => {
@@ -130,6 +130,11 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'paste': {
 					if (isInputFocused()) break;
 					await pasteClipboard();
+					break;
+				}
+				case 'paste-params': {
+					if (isInputFocused()) break;
+					pasteParams();
 					break;
 				}
 				case 'delete': {

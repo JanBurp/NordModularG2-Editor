@@ -132,6 +132,7 @@ export interface ClipboardEntry {
 	modules: ModuleInstance[];
 	cables: Cable[];
 	area: 'va' | 'fx';
+	copiedVariation: number; // uiStore.variation at copy time — which slice of `lv` Paste Params should use
 }
 
 export const VOICEMODE_OPTIONS = [

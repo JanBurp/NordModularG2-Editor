@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-import { areaConfig, buildCloneEntries, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -90,6 +90,16 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
 
+	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
+	async function handlePasteParams(moduleIndex: number): Promise<void> {
+		const clipboard = uiStore.clipboard;
+		if (!clipboard || clipboard.modules.length === 0) return;
+		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
+		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targets, currentModules.value);
+		if (pairs.length === 0) return;
+		await slotsStore.pasteParams(pairs, uiStore.variation, getArea());
+	}
+
 	async function handleJackDeleteConnected({
 		moduleIndex,
 		connectorIndex,
@@ -149,6 +159,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		handleModeChange,
 		handleModuleDelete,
 		handleModuleColorChange,
+		handlePasteParams,
 		handleJackDeleteConnected,
 		handleJackBreakConnection,
 		handleCableGroupDrop,

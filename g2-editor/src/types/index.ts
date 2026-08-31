@@ -24,6 +24,7 @@ export type MenuAction =
 	| 'save-init-2'
 	| 'delete'
 	| 'select-all'
+	| 'paste-params'
 	| 'toggle-modules'
 	| 'toggle-browser'
 	| 'toggle-settings'

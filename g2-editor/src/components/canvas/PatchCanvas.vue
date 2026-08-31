@@ -41,6 +41,7 @@
 				@module-drag-start="handleModuleDragStart"
 				@module-label-edit="(info) => emit('moduleLabelEdit', info)"
 				@module-delete="(idx) => emit('moduleDelete', idx)"
+				@module-paste-params="(idx) => emit('modulePasteParams', idx)"
 				@module-color-change="(idx, colorId) => emit('moduleColorChange', idx, colorId)"
 				@jack-delete-connected="(info) => emit('jackDeleteConnected', info)"
 				@jack-break-connection="(info) => emit('jackBreakConnection', info)"
@@ -147,6 +148,7 @@
 		canvasClick: [];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 		moduleDelete: [moduleIndex: number];
+		modulePasteParams: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colorId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];

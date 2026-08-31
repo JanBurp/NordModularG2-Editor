@@ -1,0 +1,43 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<!-- Created with Inkscape (http://www.inkscape.org/) -->
+
+<svg
+   width="51.5mm"
+   height="51.5mm"
+   viewBox="0 0 51.5 51.5"
+   version="1.1"
+   id="svg1"
+   xmlns="http://www.w3.org/2000/svg"
+   xmlns:svg="http://www.w3.org/2000/svg">
+  <defs
+     id="defs1" />
+  <rect
+     style="fill:none;fill-rule:evenodd;stroke:#000000;stroke-width:1.5;stroke-dasharray:none;stroke-opacity:1"
+     id="rect1"
+     width="50"
+     height="50"
+     x="0.75"
+     y="0.75" />
+  <text
+     xml:space="preserve"
+     style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;line-height:1.25;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;letter-spacing:0px;word-spacing:0px;stroke-width:0.264583"
+     x="5.3095136"
+     y="17.927124"
+     id="text1"><tspan
+       id="tspan1"
+       style="font-style:normal;font-variant:normal;font-weight:normal;font-stretch:normal;font-size:19.7556px;font-family:Bahnschrift;-inkscape-font-specification:'Bahnschrift, @wght=700,wdth=75.0';font-variant-ligatures:normal;font-variant-caps:normal;font-variant-numeric:normal;font-variant-east-asian:normal;font-variation-settings:'wdth' 75, 'wght' 700;stroke-width:0.264583"
+       x="5.3095136"
+       y="17.927124">PHASE</tspan></text>
+  <g
+     id="g8"
+     transform="translate(0.61680258)">
+    <path
+       style="fill:#52e07c;fill-opacity:1;stroke:none;stroke-width:0.265;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 5.2916666,46.302083 V 26.458332 c 10.4345024,0 11.9062494,17.197917 11.9062494,17.197917 0,0 2.540344,-18.436155 7.9375,-18.436155 5.397156,0 7.9375,18.436155 7.9375,18.436155 0,0 1.231874,-17.137949 11.90625,-17.197917 V 46.302083 H 5.2916666"
+       id="path7" />
+    <path
+       style="fill:none;stroke:#178237;stroke-width:1.5;stroke-linecap:butt;stroke-linejoin:miter;stroke-dasharray:none;stroke-opacity:1"
+       d="M 5.2916666,26.458332 C 15.426327,26.5183 17.197916,43.656249 17.197916,43.656249 c 0,0 2.66028,-18.460865 7.9375,-18.520833 5.27722,0 7.9375,18.520833 7.9375,18.520833 0,0 1.231874,-17.197917 11.90625,-17.197917"
+       id="path8" />
+  </g>
+</svg>

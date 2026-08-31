@@ -231,6 +231,7 @@
 		moduleDragStart: [info: { moduleIndex: number; clientX: number; clientY: number }];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
 		moduleDelete: [moduleIndex: number];
+		modulePasteParams: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colourId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
@@ -252,6 +253,12 @@
 			{ label: 'Rename…', action: () => onTitleDblClick() },
 			{ type: 'separator' },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
+			{ type: 'separator' },
+			{
+				label: 'Paste Params',
+				disabled: !uiStore.clipboard?.modules.length || uiStore.clipboard.modules[0].type !== instance.value.type,
+				action: () => emit('modulePasteParams', moduleIdx.value),
+			},
 			{ type: 'separator' },
 			{
 				label: 'Set Color',
