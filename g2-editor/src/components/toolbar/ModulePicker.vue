@@ -1,11 +1,11 @@
 <template>
-	<ToolBarGroup class="flex flex-col gap-0.5" :style="{ width: pickerWidthPx + 'px' }">
+	<ToolBarGroup class="flex flex-col gap-1" :style="{ width: pickerWidthPx + 'px' }">
 		<div class="grid grid-cols-8 gap-px">
 			<button
 				v-for="cat in categories"
 				:key="cat"
 				type="button"
-				class="text-xs leading-none px-1 h-5 truncate cursor-pointer border-b-2"
+				class="text-xs leading-none px-1 h-6 truncate cursor-pointer border-b-2"
 				:class="cat === selectedCategory ? 'bg-input text-black' : 'bg-surface-3 text-content-primary hover:bg-surface-2'"
 				:style="{
 					borderBottomColor: getCategoryColor(cat),
@@ -15,21 +15,22 @@
 				{{ cat }}
 			</button>
 		</div>
-		<div class="flex items-center gap-1 h-7 overflow-x-auto">
+		<div class="flex items-center gap-1 h-8 overflow-hidden">
 			<template v-for="m in modules" :key="m.id">
 				<img
 					v-if="graphics[m.id]"
 					:src="graphics[m.id]"
 					:title="m.long || m.short"
-					class="w-6 h-6 shrink-0 bg-white cursor-grab"
+					class="w-8 h-8 shrink-0 bg-white cursor-grab"
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
+					alt="graphics[m.id]"
 				/>
 				<div
 					v-else
 					:title="m.long || m.short"
-					class="w-6 h-6 shrink-0 flex items-center justify-center text-center text-[8px] leading-none bg-surface-2 border border-line-default rounded-sm cursor-grab overflow-hidden px-0.5"
+					class="w-8 h-8 shrink-0 flex items-center justify-center text-center text-[8px] leading-none bg-surface-2 border border-line-default rounded-sm cursor-grab overflow-hidden px-0.5"
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"

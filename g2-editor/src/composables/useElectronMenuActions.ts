@@ -2,9 +2,11 @@ import type { ComputedRef } from 'vue';
 import { onMounted, onUnmounted } from 'vue';
 
 import { SLOT_LABELS } from '@/constants';
+import type { SlotLabel } from '@/types';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
+import { useDeviceStore } from '@/store/device';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
@@ -27,14 +29,31 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();
-	const { deleteSelection } = usePatchOperations();
-	const { copySelection, cutSelection, pasteClipboard } = usePatchClipboard();
+	const { deleteSelection, deleteUnusedModules } = usePatchOperations();
+	const { copySelection, cutSelection, pasteClipboard, pasteParams } = usePatchClipboard();
+	const deviceStore = useDeviceStore();
 
 	onMounted(() => {
+		// Cold-start hydration: the persisted recent-files list lives in the renderer
+		// (pinia-plugin-persistedstate), so the native menu (built empty at startup) needs it once.
+		// IPC uses structured clone, which chokes on Pinia's reactive Proxy — send plain objects.
+		window.electronAPI?.updateRecentFiles(useSettingsStore().recentFiles.map((f) => ({ ...f })));
+
 		window.electronAPI?.onMenuAction(async (action: string) => {
+			if (action.startsWith('open-recent:')) {
+				const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
+				if (entry) await patchFile.handlePatchSelect({ type: 'disk', filepath: entry.path, kind: entry.kind });
+				return;
+			}
 			switch (action) {
 				case 'new-patch':
 					await patchFile.newPatch();
+					break;
+				case 'new-to-A':
+				case 'new-to-B':
+				case 'new-to-C':
+				case 'new-to-D':
+					await patchFile.newPatch(action.slice(-1) as SlotLabel);
 					break;
 				case 'new-performance': {
 					const filepath = await window.electronAPI.patches.builtinPath('EmptyPerf.prf2');
@@ -42,12 +61,28 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				}
 				case 'open-performance':
-				case 'open':
-					await patchFile.openFromElectronDialog();
+					await patchFile.openFromElectronDialog(undefined, 'performance');
 					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
 					break;
+				case 'open':
+					await patchFile.openFromElectronDialog(undefined, 'patch');
+					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					break;
+				case 'open-to-A':
+				case 'open-to-B':
+				case 'open-to-C':
+				case 'open-to-D':
+					await patchFile.openFromElectronDialog(action.slice(-1) as SlotLabel, 'patch');
+					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					break;
+				case 'save-from-A':
+				case 'save-from-B':
+				case 'save-from-C':
+				case 'save-from-D':
+					await slotsStore.saveSlot(action.slice(-1) as SlotLabel);
+					break;
 				case 'save':
-					if (slotsStore.isPerformanceMode) {
+					if (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode) {
 						await slotsStore.savePerformance();
 					} else if (slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) {
 						await slotsStore.saveSlot(uiStore.slotInFocus);
@@ -55,7 +90,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'save-as': {
 					const folder = useSettingsStore().path || undefined;
-					if (slotsStore.isPerformanceMode) {
+					if (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode) {
 						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName, folder);
 						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
 					} else {
@@ -97,12 +132,21 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					await pasteClipboard();
 					break;
 				}
+				case 'paste-params': {
+					if (isInputFocused()) break;
+					pasteParams();
+					break;
+				}
 				case 'delete': {
 					if (isInputFocused()) {
 						document.execCommand('delete');
 						break;
 					}
 					await deleteSelection();
+					break;
+				}
+				case 'delete-unused-modules': {
+					await deleteUnusedModules();
 					break;
 				}
 				case 'select-all': {

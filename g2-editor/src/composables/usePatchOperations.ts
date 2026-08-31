@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-import { areaConfig, buildCloneEntries, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -19,6 +19,26 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		} finally {
 			uiStore.clearSelection();
 			uiStore.selectedCables = [];
+		}
+	}
+
+	async function deleteUnusedModules(): Promise<void> {
+		const { getModule } = await import('../renderer/nmg2mods');
+		const NAME_MODULE_TYPE = 126;
+		// A Name bar has no jacks (always "unused"); only sweep it away if the user never customized it.
+		const isUntouchedNameModule = (m: any) =>
+			m.type === NAME_MODULE_TYPE && (m.colour || 0) === 0 && (m.uname ?? '') === (getModule(m.type)?.short ?? 'Module') + m.index;
+
+		for (const area of ['voice', 'fx'] as const) {
+			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const unusedIds = modules
+				.filter((m: any) => !cables.some((c: any) => c.smod === m.index || c.dmod === m.index))
+				.filter((m: any) => m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m))
+				.map((m: any) => m.index as number);
+			if (unusedIds.length > 0) {
+				await slotsStore.deleteSelection(unusedIds, [], area, modules, cables);
+			}
 		}
 	}
 
@@ -90,6 +110,16 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
 
+	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
+	async function handlePasteParams(moduleIndex: number): Promise<void> {
+		const clipboard = uiStore.clipboard;
+		if (!clipboard || clipboard.modules.length === 0) return;
+		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
+		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targets, currentModules.value);
+		if (pairs.length === 0) return;
+		await slotsStore.pasteParams(pairs, uiStore.variation, getArea());
+	}
+
 	async function handleJackDeleteConnected({
 		moduleIndex,
 		connectorIndex,
@@ -143,12 +173,14 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	return {
 		currentModules,
 		deleteSelection,
+		deleteUnusedModules,
 		handleModuleMove,
 		handleModuleDrop,
 		handleParamChange,
 		handleModeChange,
 		handleModuleDelete,
 		handleModuleColorChange,
+		handlePasteParams,
 		handleJackDeleteConnected,
 		handleJackBreakConnection,
 		handleCableGroupDrop,

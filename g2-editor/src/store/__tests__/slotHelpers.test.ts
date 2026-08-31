@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
-import { resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
+import { buildPasteParamsPairs, resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
+
+function mod(index: number, type: number, pcnt: number, lv: number[], modes: number[]): any {
+	return { index, type, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv, modes };
+}
 
 describe('resolveColumnCollisions', () => {
 	it('returns empty when no occupants', () => {
@@ -76,5 +80,30 @@ describe('resolvePasteRowOffset', () => {
 			{ vert: 2, height: 4 },
 		];
 		expect(resolvePasteRowOffset(mods, 0, 0)).toBe(6);
+	});
+});
+
+describe('buildPasteParamsPairs', () => {
+	it('pairs by order and slices lv at the copied variation', () => {
+		const source = [mod(1, 5, 2, [1, 2, 3, 4], [9])];
+		const current = [mod(10, 5, 2, [], [])];
+		expect(buildPasteParamsPairs(source, 1, [10], current)).toEqual([{ targetId: 10, paramValues: [3, 4], modeValues: [9] }]);
+	});
+
+	it('skips a pair when the target module type differs', () => {
+		const source = [mod(1, 5, 1, [7], [0])];
+		const current = [mod(10, 6, 1, [], [])];
+		expect(buildPasteParamsPairs(source, 0, [10], current)).toEqual([]);
+	});
+
+	it('skips a pair when the target id does not exist', () => {
+		const source = [mod(1, 5, 1, [7], [0])];
+		expect(buildPasteParamsPairs(source, 0, [999], [])).toEqual([]);
+	});
+
+	it('only pairs the overlapping prefix when source and target counts differ', () => {
+		const source = [mod(1, 5, 1, [7], []), mod(2, 6, 1, [8], [])];
+		const current = [mod(10, 5, 1, [], [])];
+		expect(buildPasteParamsPairs(source, 0, [10], current)).toEqual([{ targetId: 10, paramValues: [7], modeValues: [] }]);
 	});
 });

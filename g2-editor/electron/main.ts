@@ -351,10 +351,16 @@ ipcMain.handle("modules:load-graphics", () => {
 	return graphics;
 });
 
-ipcMain.handle("patch:open-dialog", async (event) => {
+ipcMain.handle("patch:open-dialog", async (event, kind?: "patch" | "performance") => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const filters =
+		kind === "patch"
+			? [{ name: "Patch Files", extensions: ["pch2"] }]
+			: kind === "performance"
+				? [{ name: "Performance Files", extensions: ["prf2"] }]
+				: [{ name: "Patch Files", extensions: ["pch2", "prf2"] }];
 	const result = await dialog.showOpenDialog(browserWin!, {
-		filters: [{ name: "Patch Files", extensions: ["pch2", "prf2"] }],
+		filters,
 		properties: ["openFile"],
 	});
 	if (result.canceled || !result.filePaths[0]) return { success: false };
@@ -375,38 +381,14 @@ ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {
 	nativeTheme.themeSource = mode;
 });
 
-let quitting = false;
-app.on("before-quit", (e) => {
-	if (quitting) return;
-	e.preventDefault();
-	quitting = true;
-	(async () => {
-		// await stopWatchAndWait();
-		// try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
-		await stopDaemon();
-		app.quit();
-	})();
-});
+const SLOT_LABELS = ["A", "B", "C", "D"] as const;
+type RecentFileEntry = { path: string; kind: "patch" | "performance" };
 
-app.whenReady().then(async () => {
-	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
+function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructorOptions[] {
+	const slotSubmenu = (actionPrefix: string): Electron.MenuItemConstructorOptions[] =>
+		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => win!.webContents.send("menu:action", `${actionPrefix}-${s}`) }));
 
-	if (isMac) {
-		app.dock.setIcon(path.join(process.env.APP_ROOT!, "resources", "icon.png"));
-	}
-
-	if (VITE_DEV_SERVER_URL) {
-		try {
-			const name = await installExtension(VUEJS_DEVTOOLS);
-			console.log(`Added Extension: ${name}`);
-		} catch (err) {
-			console.log("An error occurred while installing Vue DevTools:", err);
-		}
-	}
-
-	createWindow();
-
-	const template: Electron.MenuItemConstructorOptions[] = [
+	return [
 		...(isMac ? [{
 			label: "G2 Editor",
 			submenu: [
@@ -427,13 +409,22 @@ app.whenReady().then(async () => {
 			submenu: [
 				{ label: "New Patch", click: () => win!.webContents.send("menu:action", "new-patch"), accelerator: "CommandOrControl+N" },
 				{ label: "New Performance", click: () => win!.webContents.send("menu:action", "new-performance") },
+				{ label: "New To", submenu: slotSubmenu("new-to") },
 				{ type: "separator" as const },
 				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
 				{ label: "Open Performance", click: () => win!.webContents.send("menu:action", "open-performance") },
+				{ label: "Open To", submenu: slotSubmenu("open-to") },
+				{
+					label: "Recent Files",
+					submenu: recentFiles.length
+						? recentFiles.map((f, i) => ({ label: path.basename(f.path), click: () => win!.webContents.send("menu:action", `open-recent:${i}`) }))
+						: [{ label: "(Empty)", enabled: false }],
+				},
 				{ type: "separator" as const },
 				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
 				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
 				{ label: "Save All", click: () => win!.webContents.send("menu:action", "save-all") },
+				{ label: "Save From", submenu: slotSubmenu("save-from") },
 				{ type: "separator" as const },
 				{ label: "Save Init Patch 1", click: () => win!.webContents.send("menu:action", "save-init-1") },
 				{ label: "Save Init Patch 2", click: () => win!.webContents.send("menu:action", "save-init-2") },
@@ -448,9 +439,12 @@ app.whenReady().then(async () => {
 				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
 				{ label: "Copy", click: () => win!.webContents.send("menu:action", "copy"), accelerator: "CommandOrControl+C" },
 				{ label: "Paste", click: () => win!.webContents.send("menu:action", "paste"), accelerator: "CommandOrControl+V" },
+				{ label: "Paste Params", click: () => win!.webContents.send("menu:action", "paste-params"), accelerator: "CommandOrControl+E" },
 				{ type: "separator" as const },
 				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
 				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
+				{ type: "separator" as const },
+				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
 			],
 		},
 		{
@@ -506,5 +500,42 @@ app.whenReady().then(async () => {
 			],
 		},
 	];
-	Menu.setApplicationMenu(Menu.buildFromTemplate(template));
+}
+
+ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(files)));
+});
+
+let quitting = false;
+app.on("before-quit", (e) => {
+	if (quitting) return;
+	e.preventDefault();
+	quitting = true;
+	(async () => {
+		// await stopWatchAndWait();
+		// try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
+		await stopDaemon();
+		app.quit();
+	})();
+});
+
+app.whenReady().then(async () => {
+	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
+
+	if (isMac) {
+		app.dock.setIcon(path.join(process.env.APP_ROOT!, "resources", "icon.png"));
+	}
+
+	if (VITE_DEV_SERVER_URL) {
+		try {
+			const name = await installExtension(VUEJS_DEVTOOLS);
+			console.log(`Added Extension: ${name}`);
+		} catch (err) {
+			console.log("An error occurred while installing Vue DevTools:", err);
+		}
+	}
+
+	createWindow();
+
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu([])));
 });

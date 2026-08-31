@@ -29,6 +29,7 @@ import {
 	removeModuleFromVariations,
 	runCliSafe,
 	runCliBatchSafe,
+	type PasteParamsPair,
 } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
@@ -1407,6 +1408,56 @@ export const useSlotsStore = defineStore('slots', {
 			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
 		},
 
+		async pasteParams(pairs: PasteParamsPair[], variation: number, area: 'voice' | 'fx'): Promise<void> {
+			if (pairs.length === 0) return;
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const slotEntry = this.slots[slot];
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const prevPairs: PasteParamsPair[] = pairs.map(({ targetId }) => {
+					const mod = findModuleByIndex(patch.areas[areaIdx].modules, targetId);
+					return {
+						targetId,
+						paramValues: slotEntry.variations?.[variation]?.[areaKey]?.[targetId]?.slice() ?? [],
+						modeValues: mod ? [...mod.modes] : [],
+					};
+				});
+				hist.record(slot, {
+					undo: async () => {
+						await this.pasteParams(prevPairs, variation, area);
+					},
+					redo: async () => {
+						await this.pasteParams(pairs, variation, area);
+					},
+				});
+			}
+
+			const cmds: string[][] = [];
+			for (const { targetId, paramValues, modeValues } of pairs) {
+				const paramSlot = slotEntry.variations?.[variation]?.[areaKey]?.[targetId];
+				if (paramSlot) {
+					paramValues.forEach((value, paramIdx) => {
+						paramSlot[paramIdx] = value;
+						cmds.push(['set-param', slot, location, String(targetId), String(paramIdx), String(value), String(variation)]);
+					});
+				}
+				const mod = findModuleByIndex(patch.areas[areaIdx].modules, targetId);
+				if (mod?.modes) {
+					modeValues.forEach((value, modeIdx) => {
+						mod.modes[modeIdx] = value;
+						cmds.push(['set-module-mode', slot, location, String(targetId), String(modeIdx), String(value)]);
+					});
+				}
+			}
+			this._markSlotDirty(slot);
+			if (cmds.length > 0) await window.cli.runBatch(cmds);
+		},
+
 		async loadSlot(slot: SlotLabel, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
@@ -1473,7 +1524,24 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async savePerformance(filepath?: string): Promise<void> {
-			if (!this.performanceRawHex) return;
+			if (!this.performanceRawHex) {
+				// Hardware-native performance mode (no .prf2 opened from disk/browser this
+				// session, so there's no template to reserialize from) — pull the current
+				// performance straight from the device instead. g2_get_perf_file does the
+				// entire job itself (queries all 4 slots + perf settings, writes the .prf2).
+				const device = useDeviceStore();
+				if (!device.isPerformanceMode || device.status !== DeviceStatus.Connected) return;
+				let hwPath = filepath || this.performanceFilePath;
+				if (!hwPath) {
+					//@ts-ignore
+					const result = await window.electronAPI.showSavePerfDialog(this.performanceName || device.device?.performance?.name);
+					if (!result.success || !result.filepath) return;
+					hwPath = result.filepath;
+				}
+				await window.cli.run(['get-perf-file', hwPath]);
+				this.performanceFilePath = hwPath;
+				return;
+			}
 			let path = filepath || this.performanceFilePath;
 			if (!path) {
 				//@ts-ignore

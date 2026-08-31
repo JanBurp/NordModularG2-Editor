@@ -14,7 +14,7 @@
 						]"
 						@mousedown.prevent="addAndClose(m.id)"
 					>
-						<img v-if="graphics[m.id]" :src="graphics[m.id]" class="w-5 h-5 shrink-0 bg-white" />
+						<img v-if="graphics[m.id]" :src="graphics[m.id]" class="w-8 h-8 shrink-0 bg-white" alt="graphics[m.id]" />
 						<span class="font-medium">{{ m.long || m.short }}</span>
 						<span :class="['text-xs', i === navIndex ? 'text-white/70' : 'text-content-muted']">{{ m.page?.name }}</span>
 					</div>

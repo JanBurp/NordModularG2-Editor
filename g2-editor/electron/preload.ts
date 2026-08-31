@@ -24,6 +24,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	onMenuAction: (cb: (action: MenuAction) => void) =>
 		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),
 	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
+	updateRecentFiles: (files: { path: string; kind: "patch" | "performance" }[]) =>
+		ipcRenderer.send("recent-files:update", files),
 
 	savePatch: (filepath: string, data: number[]) =>
 		ipcRenderer.invoke("patch:save", filepath, data),
@@ -31,7 +33,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		ipcRenderer.invoke("patch:write-temp", name, data),
 	showSaveDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName, folder),
 	showSavePerfDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("perf:save-dialog", defaultName, folder),
-	openPatchDialog: () => ipcRenderer.invoke("patch:open-dialog"),
+	openPatchDialog: (kind?: "patch" | "performance") => ipcRenderer.invoke("patch:open-dialog", kind),
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
 	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),

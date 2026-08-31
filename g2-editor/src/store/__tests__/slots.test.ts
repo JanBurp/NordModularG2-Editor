@@ -187,6 +187,34 @@ describe('edited flag', () => {
 
 		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
 	});
+
+	it('savePerformance falls back to a live hardware fetch when no .prf2 was ever loaded (hardware-native perf mode)', async () => {
+		const store = useSlotsStore();
+		store.performanceRawHex = null; // nothing loaded from disk/browser this session
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Connected;
+		device.device = { mode: 'Performance' } as any;
+		const cliRun = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = cliRun;
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(cliRun).toHaveBeenCalledWith(['get-perf-file', '/tmp/live.prf2']);
+		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
+	});
+
+	it('savePerformance does nothing when performanceRawHex is null and the device is not live in Performance mode', async () => {
+		const store = useSlotsStore();
+		store.performanceRawHex = null;
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Disconnected;
+		const cliRun = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = cliRun;
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(cliRun).not.toHaveBeenCalled();
+	});
 });
 
 describe('setMorphGroupLabel', () => {
@@ -226,6 +254,66 @@ describe('setMorphGroupLabel', () => {
 
 		await store.redo();
 		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
+	});
+});
+
+describe('pasteParams', () => {
+	function moduleInstance(index: number, type: number, pcnt: number, modes: number[]): any {
+		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv: [], modes };
+	}
+
+	function withVariations(voiceValues: number[]): any[] {
+		return Array.from({ length: 9 }, () => ({ fx: {}, voice: { 2: [...voiceValues] }, patch: {} }));
+	}
+
+	it('applies param and mode values to the target module, marks dirty, and pushes the matching CLI commands', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		const target = moduleInstance(2, 5, 2, [9]);
+		patch.areas[1].modules = [target];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations([0, 0]);
+
+		await store.pasteParams([{ targetId: 2, paramValues: [10, 20], modeValues: [3] }], 0, 'voice');
+
+		expect(store.slots['A'].variations![0].voice[2]).toEqual([10, 20]);
+		expect(target.modes).toEqual([3]);
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['set-param', 'A', 'va', '2', '0', '10', '0'],
+			['set-param', 'A', 'va', '2', '1', '20', '0'],
+			['set-module-mode', 'A', 'va', '2', '0', '3'],
+		]);
+	});
+
+	it('participates in undo/redo as a single combined step', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		const target = moduleInstance(2, 5, 1, [0]);
+		patch.areas[1].modules = [target];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations([64]);
+
+		await store.pasteParams([{ targetId: 2, paramValues: [100], modeValues: [1] }], 0, 'voice');
+		expect(store.slots['A'].variations![0].voice[2]).toEqual([100]);
+		expect(target.modes).toEqual([1]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![0].voice[2]).toEqual([64]);
+		expect(target.modes).toEqual([0]);
+
+		await store.redo();
+		expect(store.slots['A'].variations![0].voice[2]).toEqual([100]);
+		expect(target.modes).toEqual([1]);
+	});
+
+	it('does nothing when given an empty pairs list', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.pasteParams([], 0, 'voice');
+
+		expect((globalThis as any).window.cli.runBatch).not.toHaveBeenCalled();
 	});
 });
 
