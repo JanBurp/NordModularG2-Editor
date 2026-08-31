@@ -1,9 +1,9 @@
 <template>
 	<rect v-if="selected" :x="nameX" :width="nameWidth" :height="nameHeight" fill="#FFF" pointer-events="none" />
-	<text ref="text" v-if="isName" x="128" y="11" fill="#000" font-size="10" font-weight="900" text-anchor="middle">
+	<text ref="text" v-if="isName" x="128" y="12" fill="#000" font-size="11" font-weight="800" font-family="'Inter'" text-anchor="middle">
 		{{ displayName }}
 	</text>
-	<text ref="text" v-else x="4" y="9" fill="#000" font-size="9" font-weight="900">
+	<text ref="text" v-else x="4" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
 		{{ displayName }}
 	</text>
 </template>
