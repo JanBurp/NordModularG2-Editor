@@ -13,11 +13,12 @@
 			@keydown.up.prevent="emit('up')"
 			@keydown.down.prevent="emit('down')"
 		/>
-		<span v-show="searchValue" class="search-clear" @click="clearSearch">×</span>
+		<Icon v-show="searchValue" name="close" class="search-clear w-2.5 h-2.5" @click="clearSearch" />
 	</div>
 </template>
 <script setup lang="ts">
 	import { ref, computed, watch, nextTick } from 'vue';
+	import Icon from './Icon.vue';
 
 	const props = defineProps({
 		modelValue: {

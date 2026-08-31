@@ -9,17 +9,21 @@
 			<div class="flex items-center gap-1 px-2 py-1.5 border-b border-line-subtle shrink-0 min-w-0">
 				<button
 					v-if="diskParentName"
-					class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer"
+					class="text-content-secondary hover:text-content-primary px-1 shrink-0 cursor-pointer"
 					:title="`Up to ${diskParentName}`"
 					@click="browser.navigateUp()"
 				>
-					↑
+					<Icon name="arrowUp" class="w-2.5 h-2.5" />
 				</button>
 				<span class="text-content-secondary truncate flex-1 min-w-0 font-medium">
 					{{ diskFolderName || 'No folder selected' }}
 				</span>
-				<button class="text-content-secondary hover:text-white px-1 shrink-0 cursor-pointer" title="Choose folder" @click="browser.chooseDiskFolder()">
-					…
+				<button
+					class="text-content-secondary hover:text-content-primary px-1 shrink-0 cursor-pointer"
+					title="Choose folder"
+					@click="browser.chooseDiskFolder()"
+				>
+					<Icon name="folder" class="w-3 h-3" />
 				</button>
 			</div>
 
@@ -46,7 +50,7 @@
 						:selected="i === selectedNavIndex"
 						@click="selectDisk(entry)"
 					>
-						<template #icon><span class="text-content-secondary">▶</span></template>
+						<template #icon><Icon name="folder" class="w-3 h-3 text-content-secondary" /></template>
 						<template #label>{{ entry.name }}</template>
 					</ListItem>
 					<ListItem
@@ -67,7 +71,7 @@
 					/>
 				</ul>
 			</template>
-			<StateMessage v-else variant="empty" message="Click … to choose a folder" />
+			<StateMessage v-else variant="empty" message="Click the folder icon to choose a folder" />
 		</template>
 
 		<!-- ── SYNTH PATCHES / PERFORMANCES ──────────────────── -->
@@ -86,11 +90,11 @@
 						@down="navigate(1)"
 					/>
 					<button
-						class="shrink-0 text-content-secondary hover:text-white px-1 cursor-pointer"
+						class="shrink-0 text-content-secondary hover:text-content-primary px-1 cursor-pointer"
 						:title="allBanksExpanded ? 'Collapse All' : 'Expand All'"
 						@click="toggleAllBanks"
 					>
-						{{ allBanksExpanded ? '▼' : '▶' }}
+						<Icon :name="allBanksExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 					</button>
 				</div>
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
@@ -106,7 +110,7 @@
 							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
 						>
 							<span class="text-content-muted w-3">
-								{{ browser.isBankCollapsed(group.bank) ? '▶' : '▼' }}
+								<Icon :name="browser.isBankCollapsed(group.bank) ? 'chevronRight' : 'chevronDown'" class="w-2.5 h-2.5" />
 							</span>
 							<span class="text-content-secondary font-medium">Bank {{ group.bank }}</span>
 							<span class="text-content-secondary ml-auto">{{ group.patches.length }}</span>
@@ -149,6 +153,7 @@
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
 	import ListItem from '../browser/ListItem.vue';
+	import Icon from '../common/Icon.vue';
 
 	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {

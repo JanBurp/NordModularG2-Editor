@@ -8,7 +8,7 @@
 				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
 				<ToolBarText class="w-36 cursor-pointer" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-13 cursor-pointer hover:text-white" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
+				<ToolBarText class="w-13 cursor-pointer hover:text-input" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
 				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
 				<ToolBarDivider />
 				<BtnGroup
@@ -117,7 +117,7 @@
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
 
-	<Dialog v-model="showParamLabelDialog" title="Rename Label" @confirm="confirmParamLabel" @cancel="showParamLabelDialog = false">
+	<Dialog v-model="showParamLabelDialog" title="Rename Label" confirm-label="Rename" @confirm="confirmParamLabel" @cancel="showParamLabelDialog = false">
 		<input
 			v-model="editingParamLabel"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
@@ -125,7 +125,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showLabelDialog" title="Rename Module" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
+	<Dialog v-model="showLabelDialog" title="Rename Module" confirm-label="Rename" @confirm="confirmModuleLabel" @cancel="showLabelDialog = false">
 		<input
 			v-model="editingLabel"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
@@ -133,7 +133,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showPatchNameDialog" title="Rename Patch" @confirm="confirmPatchName" @cancel="cancelPatchNameDialog">
+	<Dialog v-model="showPatchNameDialog" title="Rename Patch" confirm-label="Rename" @confirm="confirmPatchName" @cancel="cancelPatchNameDialog">
 		<input
 			v-model="editingPatchName"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
@@ -141,7 +141,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showPerfNameDialog" title="Rename Performance" @confirm="confirmPerfName" @cancel="cancelPerfNameDialog">
+	<Dialog v-model="showPerfNameDialog" title="Rename Performance" confirm-label="Rename" @confirm="confirmPerfName" @cancel="cancelPerfNameDialog">
 		<input
 			v-model="editingPerfName"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
@@ -149,7 +149,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
+	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" confirm-label="Rename" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
 		<input
 			v-model="editingMorphLabel"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
@@ -157,7 +157,7 @@
 		/>
 	</Dialog>
 
-	<Dialog v-model="showBpmDialog" title="Set BPM" @confirm="confirmBpm" @cancel="cancelBpmDialog">
+	<Dialog v-model="showBpmDialog" title="Set BPM" confirm-label="Set" @confirm="confirmBpm" @cancel="cancelBpmDialog">
 		<input
 			v-model.number="editingBpm"
 			type="number"

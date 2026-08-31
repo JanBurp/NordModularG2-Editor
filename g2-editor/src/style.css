@@ -116,6 +116,20 @@ body {
 	@apply rounded-none m-0 first:rounded-t last:rounded-b not-first:border-t-0;
 }
 
+/* Segmented control (BtnGroup variant="toggle"/"tab"): a sunken track holding borderless
+   pills, with the active pill raised instead of solid-filled — the native macOS shape. */
+.btn-group-track {
+	@apply bg-surface-0 rounded p-0.5 gap-0.5;
+}
+
+.btn-group-pill {
+	@apply rounded-xs border-transparent bg-transparent m-0;
+}
+
+.btn-group-pill.btn-active {
+	@apply bg-surface-2 text-content-primary! shadow-sm;
+}
+
 .btn-cable-select {
 	@apply border-line-subtle!;
 }
@@ -125,7 +139,7 @@ body {
 }
 
 .search-clear {
-	@apply absolute right-2 top-1/2 -translate-y-1/2 text-content-muted text-base cursor-pointer leading-1 hover:text-content-primary;
+	@apply absolute right-2 top-1/2 -translate-y-1/2 text-content-muted cursor-pointer hover:text-content-primary;
 }
 
 .status-bar .btn {
@@ -141,7 +155,7 @@ body {
 }
 
 .text {
-	@apply border border-black text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
+	@apply border border-line-default text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
 }
 
 /* Parameter Pages assign-drag cursors (root classes toggled by ParamDragGhost.vue). Scoped to the

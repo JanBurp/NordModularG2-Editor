@@ -2,7 +2,7 @@
 	<select
 		:value="modelValue"
 		@change="$emit('update:modelValue', ($event.target as HTMLSelectElement).value)"
-		class="h-6 px-1 border border-line-subtle rounded-xs bg-surface-2 text-content-primary cursor-pointer min-w-12 focus:outline-none focus:border-line-default focus:shadow text-xs"
+		class="h-6 px-1 border border-line-subtle rounded-xs bg-surface-2 text-content-primary cursor-pointer min-w-12 focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/60 focus:ring-offset-1 focus:ring-offset-surface-0 text-xs"
 		:class="{ 'opacity-25': disabled }"
 		:title="title"
 		:disabled="disabled"

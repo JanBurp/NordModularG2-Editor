@@ -14,11 +14,11 @@
 					@enter="handleEnter"
 				/>
 				<button
-					class="shrink-0 text-content-secondary hover:text-white px-1 cursor-pointer"
+					class="shrink-0 text-content-secondary hover:text-content-primary px-1 cursor-pointer"
 					:title="allExpanded ? 'Collapse All' : 'Expand All'"
 					@click="toggleAllCategories"
 				>
-					{{ allExpanded ? '▼' : '▶' }}
+					<Icon :name="allExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 				</button>
 			</div>
 			<div data-testid="module-count" class="text-content-muted py-0.5 px-1 text-xs">{{ totalModuleCount }} modules</div>
@@ -30,7 +30,7 @@
 						class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
 						@click="toggleCategory(category)"
 					>
-						<span class="text-xs w-3 text-content-muted">{{ isExpanded(category) ? '▼' : '▶' }}</span>
+						<span class="w-3 text-content-muted"><Icon :name="isExpanded(category) ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" /></span>
 						{{ category }}
 						<span class="font-normal text-content-muted text-xs">({{ getModulesByCategory(category).length }})</span>
 					</div>
@@ -70,6 +70,7 @@
 	import { ref, reactive, computed, watch } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
+	import Icon from '../common/Icon.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';

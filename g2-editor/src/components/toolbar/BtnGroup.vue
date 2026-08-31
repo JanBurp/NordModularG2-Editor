@@ -1,5 +1,5 @@
 <template>
-	<div :class="['flex gap-0', { 'flex-col': vertical }]" role="group">
+	<div :class="[isTrack ? 'flex btn-group-track' : 'flex gap-0', { 'flex-col': vertical }]" role="group">
 		<Button
 			v-for="(option, index) in normalizedOptions"
 			:key="option.value"
@@ -11,7 +11,7 @@
 			:topIndicatorValue="topIndicators ? !!topIndicators[index] : false"
 			:bottomIndicator="bottomIndicators ? bottomIndicators[index] !== undefined : false"
 			:bottomIndicatorValue="bottomIndicators ? !!bottomIndicators[index] : false"
-			:class="[vertical ? 'btn-group-item-vertical' : 'btn-group-item', { 'flex-1': stretch }]"
+			:class="[isTrack ? 'btn-group-pill' : vertical ? 'btn-group-item-vertical' : 'btn-group-item', { 'flex-1': stretch }]"
 			:data-testid="testIdPrefix ? `${testIdPrefix}-${option.value}` : undefined"
 			:draggable="draggable && option.draggable !== false ? 'true' : undefined"
 			@click="(event: MouseEvent) => handleSelect(option.value, option.disabled, event)"
@@ -64,6 +64,8 @@
 		'btn-drop': [value: string | number];
 		'btn-contextmenu': [value: string | number, event: MouseEvent];
 	}>();
+
+	const isTrack = computed(() => props.variant === 'toggle' || props.variant === 'tab');
 
 	const normalizedOptions = computed(() => {
 		return props.options.map((opt) => {

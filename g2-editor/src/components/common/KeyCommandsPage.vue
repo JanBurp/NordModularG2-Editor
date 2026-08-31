@@ -1,7 +1,7 @@
 <template>
 	<Teleport to="body">
 		<div class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="emit('close')">
-			<div class="bg-surface-1 border border-line-default rounded-lg shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+			<div class="bg-surface-1 border border-line-default rounded shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
 				<div class="flex items-center justify-between mb-5">
 					<h2 class="text-content-primary text-lg font-semibold">Keyboard Shortcuts</h2>
 					<button class="text-content-secondary hover:text-content-primary text-xl leading-none px-2" @click="emit('close')">&times;</button>

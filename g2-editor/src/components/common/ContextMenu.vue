@@ -40,7 +40,7 @@
 					@click.stop="onItemClick(item)"
 				>
 					<span>{{ item.label }}</span>
-					<span v-if="item.children" class="text-content-muted ml-6 text-xs">▶</span>
+					<Icon v-if="item.children" name="chevronRight" class="w-2.5 h-2.5 text-content-muted ml-6" />
 				</li>
 			</template>
 		</ul>
@@ -59,6 +59,7 @@
 	import { nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import type { ContextMenuItem, ContextMenuSwatch } from '../../types';
+	import Icon from './Icon.vue';
 
 	defineOptions({ name: 'ContextMenu' });
 

@@ -1,7 +1,7 @@
 <template>
 	<ToolBar>
 		<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
-		<ToolBarText class="w-36 cursor-pointer hover:text-white" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
+		<ToolBarText class="w-36 cursor-pointer hover:text-input" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 
 		<div class="flex items-center gap-1.5">
 			<ToolBarLabel>Cat:</ToolBarLabel>
@@ -32,7 +32,7 @@
 			/>
 		</div>
 
-		<Dialog v-model="confirmDialog" title="Copy Variation" @confirm="onConfirmCopy">
+		<Dialog v-model="confirmDialog" title="Copy Variation" confirm-label="Copy" @confirm="onConfirmCopy">
 			{{ confirmMessage }}
 		</Dialog>
 

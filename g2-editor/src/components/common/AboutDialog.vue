@@ -4,7 +4,9 @@
 			<div class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
 					<span class="text-sm font-semibold text-content-primary">About {{ APP_NAME }}</span>
-					<button class="text-content-secondary hover:text-content-primary text-lg leading-none cursor-pointer" @click="close">×</button>
+					<button class="text-content-secondary hover:text-content-primary cursor-pointer" @click="close">
+						<Icon name="close" class="w-3 h-3" />
+					</button>
 				</div>
 				<div class="px-4 py-4 flex flex-col items-center gap-3 text-center">
 					<img v-if="iconDataUrl" :src="iconDataUrl" class="w-16 h-16" alt="G2 Editor icon" />
@@ -64,6 +66,7 @@
 <script setup lang="ts">
 	import { ref, watch, onMounted, onUnmounted } from 'vue';
 	import Button from '@/components/toolbar/Button.vue';
+	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
 
 	const props = defineProps<{ modelValue: boolean }>();
