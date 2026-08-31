@@ -129,7 +129,7 @@ describe('findJackNestCables', () => {
 		expect(result).toHaveLength(3);
 	});
 
-	it('hovering an output that fans out to two destinations reveals both, plus a stacked destination\'s stack-mates', () => {
+	it("hovering an output that fans out to two destinations reveals both, plus a stacked destination's stack-mates", () => {
 		const toStacked = cable(0, 0, 1, 0, 1, 4); // fans out to module 1, which is stacked with module 2
 		const toPlain = cable(0, 0, 3, 0, 1, 4); // second fan-out destination, unstacked
 		const stackMate = cable(1, 0, 2, 0, 0);

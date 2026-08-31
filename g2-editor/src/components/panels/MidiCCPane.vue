@@ -63,9 +63,7 @@
 		</div>
 
 		<!-- Drop zone hint -->
-		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">
-			F8 - show CC's on params
-		</div>
+		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">F8 - show CC's on params</div>
 
 		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
 			<p class="text-sm text-content-primary">Remove all {{ controllers.length }} CC assignments?</p>

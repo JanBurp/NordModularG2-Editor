@@ -7,8 +7,8 @@
 					The G2 was found on USB but its interface could not be claimed.<br /><br />
 					Install <strong class="text-content-primary">WinUSB</strong> using
 					<a href="#" class="underline text-blue-400 hover:text-blue-300" @click.prevent="openZadig">Zadig</a>: select the Nord G2, choose
-					<strong class="text-content-primary">WinUSB</strong>, and click <strong class="text-content-primary">Replace Driver</strong>. Then click Retry. NOTE: This will
-					replace Clavia's USB Driver.
+					<strong class="text-content-primary">WinUSB</strong>, and click <strong class="text-content-primary">Replace Driver</strong>. Then click
+					Retry. NOTE: This will replace Clavia's USB Driver.
 				</p>
 				<div v-else class="text-sm text-content-secondary leading-relaxed">
 					The G2 was found on USB but its interface could not be claimed. Possible solutions:

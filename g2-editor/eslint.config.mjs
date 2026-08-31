@@ -47,6 +47,8 @@ const allGlobals = {
   HTMLSelectElement: 'readonly',
   DOMMatrix: 'readonly',
   SVGPoint: 'readonly',
+  ResizeObserver: 'readonly',
+  WheelEvent: 'readonly',
 };
 
 export default [
@@ -70,7 +72,7 @@ export default [
       'prettier/prettier': 'error',
       'no-undef': 'error',
       'no-unused-vars': 'off',
-      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_' }],
+      '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
       'no-useless-assignment': 'off',
       'preserve-caught-error': 'off',
     },
