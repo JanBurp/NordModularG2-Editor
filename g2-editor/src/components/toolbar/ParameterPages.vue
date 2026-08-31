@@ -25,6 +25,7 @@
 					:data-knob-slot="cell.slotIndex"
 					:data-knob-global="uiStore.globalPagesActive ? '' : undefined"
 					:draggable="altHeld"
+					@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
 					@dragstart="onKnobDragStart(cell, $event)"
 					@dragover.prevent
 					@drop.prevent="onKnobDrop(cell, $event)"
@@ -35,6 +36,8 @@
 					<Knob
 						:value="cell.value"
 						:class="{ 'pointer-events-none': altHeld || !cell.assignment }"
+						:colorVariant="cell.morphColor"
+						:morphRange="cell.morphRange"
 						@change="(v) => onKnobChange(cell.assignment!, v)"
 					/>
 				</div>
@@ -103,13 +106,16 @@
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAltHeld } from '../../composables/useParamPageAssign';
+	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
+	import { isGrabModifierPressed } from '../../utils/platform';
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../../renderer/paramPages';
 	import { serializeDragPayload, parseDragPayload } from '../../utils/dragPayload';
 	import { setBadgeDragImage } from '../../utils/badgeLayout';
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { getParam } from '../../renderer/parammap';
-	import { formatValue } from '../../utils/moduleControls';
+	import { formatValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
 	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
 
@@ -117,6 +123,7 @@
 	const uiStore = useUiStore();
 	const { open: openContextMenu } = useContextMenu();
 	const { altHeld } = useAltHeld();
+	const { startDrag: startMorphRangeDrag } = useMorphRangeDrag();
 
 	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value }));
 	const bankOptions = [1, 2, 3];
@@ -137,6 +144,11 @@
 		buttonIsTrigger: boolean;
 		buttonLabel: string;
 		buttonValueLabel: string;
+		// Morph Group state for the currently-selected toolbar group, mirroring Module.vue's
+		// morphColorFor/morphRangeFor exactly: red = assigned to the selected group, blue = assigned to
+		// a different group, null = not assigned at all.
+		morphColor: 'red' | 'blue' | null;
+		morphRange: number | undefined;
 	}
 
 	// A Global Parameter Page assignment carries its own target `slot` (it can address any of the
@@ -198,6 +210,8 @@
 		buttonIsTrigger: false,
 		buttonLabel: BLANK,
 		buttonValueLabel: BLANK,
+		morphColor: null as 'red' | 'blue' | null,
+		morphRange: undefined as number | undefined,
 	};
 
 	const cells = computed<Cell[]>(() => {
@@ -225,6 +239,15 @@
 			const buttonParamIndex = lookedUp ?? assignment.paramIndex;
 			const hasButton = buttonParamIndex !== -1;
 			const buttonDisplay = hasButton ? resolveParamDisplay(assignment, buttonParamIndex, moduleInfo) : null;
+			// Morph Group state, mirroring Module.vue's morphColorFor/morphRangeFor exactly: looked up by
+			// the same (location, moduleIndex, paramIndex) tuple, against the assignment's own target
+			// slot (not uiStore.slotInFocus) so a Global Page cell reflects the right patch.
+			const paramMorphAssignments = slotsStore
+				.getMorphAssignments(assignmentSlot(assignment), uiStore.variation)
+				.filter((m) => m.location === assignment.location && m.moduleIndex === assignment.moduleIndex && m.paramIndex === assignment.paramIndex);
+			const morphColor: 'red' | 'blue' | null =
+				paramMorphAssignments.length === 0 ? null : paramMorphAssignments.some((m) => m.groupIndex === uiStore.selectedMorphGroup) ? 'red' : 'blue';
+			const morphRange = paramMorphAssignments.find((m) => m.groupIndex === uiStore.selectedMorphGroup)?.range;
 			return {
 				slotIndex,
 				assignment,
@@ -240,6 +263,8 @@
 				buttonIsTrigger: buttonDisplay?.isTrigger ?? false,
 				buttonLabel: buttonDisplay?.label ?? BLANK,
 				buttonValueLabel: buttonDisplay?.valueLabel ?? BLANK,
+				morphColor,
+				morphRange,
 			};
 		});
 		return base.map((cell, i) => {
@@ -298,6 +323,34 @@
 		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey, false, assignmentSlot(a));
 	}
 
+	// Cmd(mac)/Ctrl-drag a knob to set its morph range for the currently-selected toolbar group,
+	// mirroring Module.vue's onParamMorphMouseDown exactly (same useMorphRangeDrag.ts gesture: a plain
+	// Cmd/Ctrl+click toggles assign/deassign, dragging past the threshold sets the range instead).
+	// Captured on the wrapper (not the Knob itself) so it fires before useKnob.ts's own value-drag —
+	// startMorphRangeDrag no-ops (and doesn't stopPropagation) unless the grab modifier is actually held.
+	function onKnobMorphMouseDown(cell: Cell, e: MouseEvent) {
+		if (!cell.assignment || !isGrabModifierPressed(e)) return;
+		const a = cell.assignment;
+		const slot = assignmentSlot(a);
+		const groupIndex = uiStore.selectedMorphGroup;
+		const variation = uiStore.variation;
+		// Buttons/switches/spinners always get the fixed max range (no drag needed for those) — same
+		// rule Module.vue applies, based on the knob's own param (not buttonParamIndex).
+		const param = resolveModule(a)?.moduleDef?.params?.[a.paramIndex];
+		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;
+		startMorphRangeDrag(a.moduleIndex, a.paramIndex, a.location === 1 ? 'va' : 'fx', e, {
+			isAssigned: () => cell.morphColor === 'red',
+			getRange: () => cell.morphRange ?? 0,
+			// Freshly assigned params start at the full parameter range (matches the real editor); the
+			// user then Cmd/Ctrl-drags to narrow it.
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, 127),
+			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex),
+			onRangeChange: isFixedRange
+				? undefined
+				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, range),
+		});
+	}
+
 	// buttonParamIndex may differ from a.paramIndex (see the buttonParams.ts lookup above) — write
 	// to whichever param the button actually targets, not necessarily the knob's own.
 	function onButtonChange(a: ParamPageAssignment | GlobalParamPageAssignment, buttonParamIndex: number, value: number) {
@@ -332,6 +385,7 @@
 
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
 		if (!cell.assignment) return;
+		const a = cell.assignment;
 		let items: ContextMenuItem[];
 		if (uiStore.globalPagesActive) {
 			items = [{ label: 'Deassign', action: () => slotsStore.deassignGlobalParamPage(cell.slotIndex) }];
@@ -339,6 +393,23 @@
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
+		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
+		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against
+		// the assignment's own target slot (assignmentSlot), not uiStore.slotInFocus, since a Global
+		// Page cell can target a different patch than the one currently focused.
+		items.push({ type: 'separator' });
+		items.push(
+			...buildMorphMenuItems({
+				slot: assignmentSlot(a),
+				variation: uiStore.variation,
+				groupIndex: uiStore.selectedMorphGroup,
+				location: a.location,
+				moduleIndex: a.moduleIndex,
+				paramIndex: a.paramIndex,
+				isAssigned: cell.morphColor === 'red',
+				defaultRange: 127, // full range — same literal Module.vue's canvas call site uses
+			}),
+		);
 		openContextMenu(event, items);
 	}
 
