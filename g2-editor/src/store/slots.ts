@@ -702,6 +702,7 @@ export const useSlotsStore = defineStore('slots', {
 			const ccLocation = areaIdx === 0 ? 0 : 1;
 			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
 			const removedPagesSnap = slotEntry.paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId);
+			const removedGlobalPagesSnap = this.globalParamPages.filter((k) => k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -728,6 +729,7 @@ export const useSlotsStore = defineStore('slots', {
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
 							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
 							if (removedPagesSnap.length > 0) slotE.paramPages = [...slotE.paramPages, ...removedPagesSnap];
+							if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
 							this._markSlotDirty(slot);
 							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
 							const allCmds: string[][] = [
@@ -778,6 +780,7 @@ export const useSlotsStore = defineStore('slots', {
 								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
 							}
 							for (const p of removedPagesSnap) allCmds.push(assignKnobCmd(slot, p));
+							for (const p of removedGlobalPagesSnap) allCmds.push(assignGlobalKnobCmd(slot, p));
 							if (allCmds.length > 0) {
 								await runCliBatchSafe(allCmds, 'deleteModule undo');
 							}
@@ -795,10 +798,13 @@ export const useSlotsStore = defineStore('slots', {
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
 			if (removedPagesSnap.length > 0)
 				slotEntry.paramPages = slotEntry.paramPages.filter((k) => !(k.location === ccLocation && k.moduleIndex === moduleId));
+			if (removedGlobalPagesSnap.length > 0)
+				this.globalParamPages = this.globalParamPages.filter((k) => !(k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
 			const deleteCmds: string[][] = [['del-module', slot, location, String(moduleId)]];
 			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
+			for (const p of removedGlobalPagesSnap) deleteCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 			await runCliBatchSafe(deleteCmds, 'deleteModule');
 
 			return { name: slotEntry.name, rawHex: '', patch };
@@ -2460,6 +2466,7 @@ export const useSlotsStore = defineStore('slots', {
 				let modSnaps: ModuleInstance[] = [];
 				let cableSnaps: Cable[] = [];
 				let pagesSnaps: ParamPageAssignment[] = [];
+				let globalPagesSnaps: GlobalParamPageAssignment[] = [];
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -2518,6 +2525,15 @@ export const useSlotsStore = defineStore('slots', {
 						);
 						for (const p of pagesSnaps) cliCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 					}
+					globalPagesSnaps = this.globalParamPages.filter(
+						(k) => k.slot === slot && k.location === pageLocation && selectedModules.includes(k.moduleIndex),
+					);
+					if (globalPagesSnaps.length > 0) {
+						this.globalParamPages = this.globalParamPages.filter(
+							(k) => !(k.slot === slot && k.location === pageLocation && selectedModules.includes(k.moduleIndex)),
+						);
+						for (const p of globalPagesSnaps) cliCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
+					}
 					this._markSlotDirty(slot);
 					if (cliCmds.length > 0) {
 						await runCliBatchSafe(cliCmds, 'deleteSelection');
@@ -2556,6 +2572,7 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
 							if (pagesSnaps.length > 0) this.slots[slot].paramPages = [...this.slots[slot].paramPages, ...pagesSnaps];
+							if (globalPagesSnaps.length > 0) this.globalParamPages = [...this.globalParamPages, ...globalPagesSnaps];
 							this._markSlotDirty(slot);
 							const allCmds: string[][] = [];
 							for (const mod of modSnaps) {
@@ -2602,6 +2619,7 @@ export const useSlotsStore = defineStore('slots', {
 								]);
 							}
 							for (const p of pagesSnaps) allCmds.push(assignKnobCmd(slot, p));
+							for (const p of globalPagesSnaps) allCmds.push(assignGlobalKnobCmd(slot, p));
 							try {
 								for (let i = 0; i < allCmds.length; i += BATCH_CHUNK) {
 									await window.cli.runBatch(allCmds.slice(i, i + BATCH_CHUNK));
