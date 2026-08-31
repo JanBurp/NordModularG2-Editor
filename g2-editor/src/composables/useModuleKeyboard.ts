@@ -249,6 +249,21 @@ export function useModuleKeyboard() {
 		else slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, 127);
 	}
 
+	// L assigns the last-received MIDI CC to the selected parameter — matches the original
+	// G2 editor's "MIDI Learn" shortcut. Reuses assignMidiCC's existing dedupe-by-cc behavior,
+	// so stealing a CC already assigned to another knob just works.
+	function assignLastCC() {
+		const sel = uiStore.selectedParam;
+		if (!sel) return;
+		const cc = deviceStore.lastMidiCC;
+		if (cc === null) return;
+		const found = findModuleAnywhere(sel.moduleId);
+		if (!found) return;
+		const slot = uiStore.slotInFocus;
+		if (!slot) return;
+		slotsStore.assignMidiCC(slot, found.area, sel.moduleId, sel.paramIndex, cc);
+	}
+
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (isInputFocused()) return;
@@ -263,6 +278,12 @@ export function useModuleKeyboard() {
 
 		if (isGrabModifierPressed(e) && key === 'Enter') {
 			toggleMorphAssign();
+			e.preventDefault();
+			return;
+		}
+
+		if (key === 'l' && !shiftKey && !altKey && !isGrabModifierPressed(e)) {
+			assignLastCC();
 			e.preventDefault();
 			return;
 		}

@@ -3,6 +3,7 @@ import type { Ref, ComputedRef } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
 import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
+import { isGrabModifierPressed } from '../utils/platform';
 
 type DragState = {
 	indices: number[];
@@ -22,7 +23,7 @@ type DragGhost = { idx: number; x: number; y: number; height: number };
 
 export function useModuleDrag(
 	getModules: () => any[],
-	onMove: (info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }) => void,
+	onMove: (info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number; isCopy: boolean }) => void,
 	onModuleClick: (index: number, shiftKey: boolean) => void,
 	getZoom: () => number,
 ): {
@@ -85,11 +86,13 @@ export function useModuleDrag(
 			dragMoved = true;
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
+		document.body.style.cursor = isGrabModifierPressed(e) ? 'copy' : '';
 	}
 
 	function onModuleDragEnd(e: MouseEvent) {
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
+		document.body.style.cursor = '';
 		const moduleIndex = dragModuleIndex;
 		dragModuleIndex = null;
 		const drag = dragState.value;
@@ -101,7 +104,7 @@ export function useModuleDrag(
 			const dCol = anchorTargetCol - anchorStart.horiz;
 			const dRow = anchorTargetRow - anchorStart.vert;
 			if (dCol !== 0 || dRow !== 0) {
-				onMove({ indices: drag.indices, dCol, dRow, anchorIndex: drag.anchorIndex });
+				onMove({ indices: drag.indices, dCol, dRow, anchorIndex: drag.anchorIndex, isCopy: isGrabModifierPressed(e) });
 			}
 		} else if (moduleIndex !== null) {
 			onModuleClick(moduleIndex, e.shiftKey);
@@ -113,6 +116,7 @@ export function useModuleDrag(
 		dragState.value = null;
 		dragModuleIndex = null;
 		dragMoved = false;
+		document.body.style.cursor = '';
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
 	}

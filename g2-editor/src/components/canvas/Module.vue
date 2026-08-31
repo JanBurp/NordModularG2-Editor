@@ -415,7 +415,14 @@
 	// module) instead of locally, so the badge always stays above other modules on the canvas.
 	const { startDrag } = useMorphRangeDrag();
 
+	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
+	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
+	// active one for keyboard shortcuts (arrow-key nav, L) right away.
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
+		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
+		uiStore.selectedCables = [];
+
 		if (e.altKey) {
 			// Alt+drag this param onto a Parameter Pages toolbar knob to assign it. Uses a custom
 			// pointer-tracked drag (useParamPageDrag.ts) instead of native HTML5 DnD — see that file's
@@ -428,7 +435,6 @@
 		if (!isGrabModifierPressed(e)) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
-		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		const param = moduleDef.value?.params?.[paramIndex];
 		// Buttons/switches/spinners always get the fixed max range (no drag needed for those).
 		const isFixedRange = param ? isSwitch(param.n) || isSpinner(param.n) || isSpinnerH(param.n) : false;

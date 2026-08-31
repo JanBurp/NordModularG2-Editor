@@ -4,6 +4,7 @@ import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
 import { useUiStore } from '@/store/ui';
+import { getCategorySlug } from '@/constants/categories';
 import { PERF_SETTLE_TIMEOUT_MS } from './usePatchFile';
 import type { LogFn } from './useG2';
 
@@ -43,7 +44,9 @@ export function useDeviceEvents(log: LogFn) {
 			const slotLabels = ['A', 'B', 'C', 'D'] as const;
 			const kind = ev.slot === 4 ? 'performance' : 'patch';
 			const name = ev.slot === 4 ? (store.device?.performance?.name ?? '') : (slotsStore.getPatchName(slotLabels[ev.slot as 0 | 1 | 2 | 3]) ?? '');
-			browserStore.upsertPatch(ev.bank, ev.location, kind, name);
+			const category =
+				kind === 'patch' ? getCategorySlug(slotsStore.getPatchForSlot(slotLabels[ev.slot as 0 | 1 | 2 | 3])?.description?.category ?? 0) : undefined;
+			browserStore.upsertPatch(ev.bank, ev.location, kind, name, category);
 			log('←', 'Watch', `patch_stored slot=${ev.slot} ${ev.bank}-${ev.location}`);
 			return true;
 		}

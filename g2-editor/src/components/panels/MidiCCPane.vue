@@ -1,5 +1,11 @@
 <template>
 	<div class="flex flex-col h-full overflow-hidden text-xs text-content-primary bg-surface-0">
+		<!-- MIDI Learn indicator -->
+		<div class="shrink-0 px-2 py-1 border-b border-line-default text-center font-medium">
+			<span v-if="deviceStore.lastMidiCC !== null" class="text-input">MIDI Learn: last CC received #{{ deviceStore.lastMidiCC }}</span>
+			<span v-else class="text-content-muted">MIDI Learn: waiting for CC…</span>
+		</div>
+
 		<!-- Button row -->
 		<div class="flex flex-wrap gap-1 p-2 border-b border-line-default shrink-0">
 			<button
@@ -58,7 +64,7 @@
 
 		<!-- Drop zone hint -->
 		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">
-			F8 - show CC's on params<span v-if="deviceStore.lastMidiCC"> | Last CC: #{{ deviceStore.lastMidiCC }} </span>
+			F8 - show CC's on params
 		</div>
 
 		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">

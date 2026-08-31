@@ -302,10 +302,34 @@ ipcMain.handle("help:load", (_, shortName: string) => {
 	}
 });
 
+let cachedGraphicsFontFace: string | null | undefined;
+
+function loadGraphicsFontFace(): string | null {
+	if (cachedGraphicsFontFace !== undefined) return cachedGraphicsFontFace;
+	try {
+		const fontPath = path.join(process.env.APP_ROOT!, "public", "fonts", "SairaCondensed-Bold.ttf");
+		const b64 = fs.readFileSync(fontPath).toString("base64");
+		cachedGraphicsFontFace = `@font-face{font-family:'Saira Condensed';font-weight:700;font-style:normal;src:url(data:font/ttf;base64,${b64}) format('truetype');}`;
+	} catch (e) {
+		console.warn("Failed to load Saira Condensed font; module graphics will fall back to system fonts:", e);
+		cachedGraphicsFontFace = null;
+	}
+	return cachedGraphicsFontFace;
+}
+
+function injectGraphicsFont(svg: string, fontFace: string): string {
+	const swapped = svg
+		.replace(/font-family:Bahnschrift/g, "font-family:'Saira Condensed'")
+		.replace(/font-family:["']Bahnschrift["']/g, "font-family:'Saira Condensed'");
+	const defs = `<defs><style>${fontFace}</style></defs>`;
+	return swapped.replace(/(<svg\b[^>]*>)/, `$1${defs}`);
+}
+
 ipcMain.handle("modules:load-graphics", () => {
 	const graphicsDir = app.isPackaged
 		? path.join(process.resourcesPath, "designs", "mini-modules")
 		: path.join(process.env.APP_ROOT!, "..", "designs", "mini-modules");
+	const fontFace = loadGraphicsFontFace();
 	const graphics: Record<number, string> = {};
 	try {
 		for (const category of fs.readdirSync(graphicsDir)) {
@@ -316,8 +340,9 @@ ipcMain.handle("modules:load-graphics", () => {
 				const idToken = file.split("_")[0];
 				const id = idToken.toLowerCase().startsWith("0x") ? parseInt(idToken, 16) : parseInt(idToken, 10);
 				if (Number.isNaN(id)) continue;
-				const svg = fs.readFileSync(path.join(categoryDir, file));
-				graphics[id] = `data:image/svg+xml;base64,${svg.toString("base64")}`;
+				let svg = fs.readFileSync(path.join(categoryDir, file), "utf-8");
+				if (fontFace) svg = injectGraphicsFont(svg, fontFace);
+				graphics[id] = `data:image/svg+xml;base64,${Buffer.from(svg, "utf-8").toString("base64")}`;
 			}
 		}
 	} catch {

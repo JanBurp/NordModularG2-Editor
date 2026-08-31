@@ -1,4 +1,7 @@
 import { defineStore } from 'pinia';
+import { SLOT_LABELS } from '@/constants';
+import { getCategorySlug } from '@/constants/categories';
+import { useSlotsStore } from './slots';
 
 export interface SynthPatch {
 	bank: number;
@@ -116,7 +119,9 @@ export const useBrowserStore = defineStore('browser', {
 			const slot = kind === 'performance' ? 4 : slotIndex;
 			try {
 				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
-				this.upsertPatch(bank, location, kind, name ?? '');
+				const category =
+					kind === 'patch' ? getCategorySlug(useSlotsStore().getPatchForSlot(SLOT_LABELS[slotIndex])?.description?.category ?? 0) : undefined;
+				this.upsertPatch(bank, location, kind, name ?? '', category);
 			} catch (e: any) {
 				this.error = e.message;
 			}

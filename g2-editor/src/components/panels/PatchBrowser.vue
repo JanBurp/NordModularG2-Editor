@@ -143,14 +143,14 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { SOUND_CATEGORIES } from '@/constants/categories';
+	import { SOUND_CATEGORIES, categorySlugFromName } from '@/constants/categories';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
 	import ListItem from '../browser/ListItem.vue';
 
-	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [c.name.toLowerCase().replace(/ /g, '_'), c.name]));
+	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {
 		if (!cat) return '';
 		return categoryByKey.get(cat) ?? cat;

@@ -1,5 +1,6 @@
 <template>
 	<div
+		ref="wrapperEl"
 		class="overflow-auto bg-surface-2 relative h-full w-full"
 		:data-testid="`canvas-${area}`"
 		@dragover.prevent="handleDragOver"
@@ -69,7 +70,7 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import { ref, onUnmounted, computed, provide } from 'vue';
+	import { ref, onMounted, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { sameJack } from '../../store/slotHelpers';
 	import type { JackEnd } from '../../store/slotHelpers';
@@ -141,7 +142,7 @@
 				colour: string;
 			},
 		];
-		moduleMove: [info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }];
+		moduleMove: [info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number; isCopy: boolean }];
 		moduleDrop: [info: { typeId: number; col: number; row: number }];
 		canvasClick: [];
 		moduleLabelEdit: [info: { moduleIndex: number; currentLabel: string }];
@@ -161,6 +162,21 @@
 
 	const settingsStore = useSettingsStore();
 	const zoom = computed(() => settingsStore.canvasZoom);
+
+	const wrapperEl = ref<HTMLDivElement | null>(null);
+	const containerWidth = ref(0);
+	let resizeObserver: ResizeObserver | null = null;
+	onMounted(() => {
+		if (wrapperEl.value) {
+			resizeObserver = new ResizeObserver((entries) => {
+				containerWidth.value = entries[0].contentRect.width;
+			});
+			resizeObserver.observe(wrapperEl.value);
+		}
+	});
+	onUnmounted(() => {
+		resizeObserver?.disconnect();
+	});
 
 	const hoveredJack = ref<JackEnd | null>(null);
 	function onJackHoverEnter(info: JackEnd) {
@@ -184,7 +200,7 @@
 			const mx = (m.horiz + 1) * MODULE_WIDTH;
 			if (mx > maxX) maxX = mx;
 		});
-		return maxX + 100;
+		return Math.max(maxX + 100, containerWidth.value / zoom.value);
 	});
 
 	const canvasHeight = computed(() => {

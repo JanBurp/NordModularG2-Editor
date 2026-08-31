@@ -2,7 +2,7 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-import { areaConfig, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { areaConfig, buildCloneEntries, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -22,8 +22,31 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
-	async function handleModuleMove({ indices, dCol, dRow }: { indices: number[]; dCol: number; dRow: number; anchorIndex: number }): Promise<void> {
-		const result = await slotsStore.moveModulesWithCollision(indices, dCol, dRow, getArea(), currentModules.value);
+	async function handleModuleMove({
+		indices,
+		dCol,
+		dRow,
+		isCopy,
+	}: {
+		indices: number[];
+		dCol: number;
+		dRow: number;
+		anchorIndex: number;
+		isCopy: boolean;
+	}): Promise<void> {
+		const area = getArea();
+		if (isCopy) {
+			const selected = currentModules.value.filter((m: any) => indices.includes(m.index));
+			const existingIds = currentModules.value.map((m: any) => m.index as number);
+			const { entries, remappedCables } = buildCloneEntries(selected, currentCables.value, existingIds, dCol, dRow);
+			await slotsStore.paste(entries, remappedCables, area);
+			uiStore.selectModules(
+				entries.map((e) => e.newId),
+				area === 'voice' ? 'va' : 'fx',
+			);
+			return;
+		}
+		const result = await slotsStore.moveModulesWithCollision(indices, dCol, dRow, area, currentModules.value);
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
 	}
 

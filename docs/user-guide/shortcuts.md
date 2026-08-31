@@ -84,6 +84,7 @@ Hold the key to show the overlay; release or press `Escape` to hide.
 | `←` / `→` | Navigate parameters (module selected) |
 | `↑` / `↓` | Adjust parameter ±1 |
 | `Alt+↑` / `Alt+↓` | Adjust parameter ±16 |
+| `L` | Assign last received MIDI CC to selected parameter |
 | `F1` | Show module help |
 
 ## Other
