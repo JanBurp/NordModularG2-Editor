@@ -687,6 +687,9 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "set-knob-source") == 0 && n >= 1) {
 		ret = g2_set_knob_source(arg_i(args, 0));
 
+	} else if (strcmp(cmd, "play-note") == 0 && n >= 2) {
+		ret = g2_play_note(arg_i(args, 0), arg_i(args, 1));
+
 	} else if (strcmp(cmd, "set-patch-description") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) { ret = G2_ERR_INVALID_PARAM; }

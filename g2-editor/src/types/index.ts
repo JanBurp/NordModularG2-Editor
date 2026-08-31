@@ -16,6 +16,7 @@ export type MenuAction =
 	| 'toggle-browser'
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'
+	| 'toggle-keyboard'
 	| 'area-voice'
 	| 'area-fx'
 	| 'area-split'

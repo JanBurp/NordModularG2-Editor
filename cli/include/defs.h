@@ -55,6 +55,11 @@ typedef enum {
 #define SUB_COMMAND_GET_GLOBAL_KNOBS         (0x5e)  /* Bulk fetch request (Q_GLOBAL_KNOBS); response chunk id is C_KNOBS_GLOBAL, 0x5f */
 #define RESP_CHUNK_KNOBS_GLOBAL              (0x5f)  /* Response tag byte for the above (C_KNOBS_GLOBAL) */
 #define SUB_COMMAND_SET                      (0x37)  /* Upload patch to slot */
+#define SUB_COMMAND_PLAY_NOTE                (0x56)  /* Virtual Keyboard note on/off, system-scope, no slot field.
+                                                         Hardware-confirmed via other-approaches/G2-Edit (chrispurusha/G2-Edit)
+                                                         and independently corroborated by a Ghidra decompile of Clavia's own
+                                                         editor (CMPlayNote::WriteStream); see g2_play_note() for the payload
+                                                         shape and the inverted on/off flag. */
 #define SUB_COMMAND_START_STOP               (0x7d)  /* Start/stop notifications */
 #define START_COMM                           (0x00)  /* Arm G2 for unsolicited notifications */
 #define STOP_COMM                            (0x01)  /* Disarm G2 */

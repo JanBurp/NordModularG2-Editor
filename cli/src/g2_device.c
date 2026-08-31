@@ -1697,6 +1697,25 @@ int g2_set_knob_source(int is_global) {
     return G2_OK;
 }
 
+/* Virtual Keyboard note on/off. Payload is just {flag, note} — no slot, no velocity (the protocol
+ * doesn't carry one). THE FLAG IS INVERTED FROM THE OBVIOUS READING: 0 sounds the note, 1 releases
+ * it. Confirmed against real hardware by ear (other-approaches/G2-Edit's dev log, 2026-08-02) —
+ * sending 1-for-on gave a keyboard silent on press, sounding on release. */
+int g2_play_note(int note, int on) {
+    if (note < 0 || note > 127) { g2_err("play-note: note out of range\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("play-note: failed to connect\n"); return G2_ERR_CONNECT; }
+    g2_drain_pending();
+    uint8_t version;
+    if (get_perf_version(&version) < 0) return G2_ERR;
+    uint8_t cmd[3] = { SUB_COMMAND_PLAY_NOTE, on ? 0 : 1, (uint8_t)note };
+    if (send_system_data(version, cmd, 3) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    uint8_t response[16] = {0};
+    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
+    g2_drain_pending();
+    return G2_OK;
+}
+
 int g2_upload_patch(int slot, const char *filepath) {
     if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;

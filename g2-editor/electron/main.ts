@@ -491,6 +491,12 @@ app.whenReady().then(async () => {
 			],
 		},
 		{
+			label: "Tools",
+			submenu: [
+				{ label: "Keyboard", click: () => win!.webContents.send("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
+			],
+		},
+		{
 			label: "Help",
 			submenu: [
 				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },

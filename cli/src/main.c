@@ -56,6 +56,7 @@ static void print_usage(const char *prog) {
     printf("  set-master-clock-run <0|1>                                                                Start (1) or stop (0) the master clock\n");
     printf("  set-master-clock-bpm <30-240>                                                             Set master clock BPM\n");
     printf("  set-knob-source <0|1>                                                                     Toggle Parameter Pages knob-assign source (1=Global, 0=Patch) — SHIFT+GLOBAL\n");
+    printf("  play-note <note 0-127> <0|1>                                                              Virtual Keyboard: sound (1) or release (0) a note\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
     printf("  slot <A|B|C|D>                                                                            Change active slot (activates if inactive)\n");
     printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
@@ -763,6 +764,11 @@ static int cmd_set_knob_source(int argc, char **argv, int i) {
     return g2_set_knob_source(atoi(argv[i + 1]));
 }
 
+static int cmd_play_note(int argc, char **argv, int i) {
+    if (i + 2 >= argc) { fprintf(stderr, "Usage: play-note <note 0-127> <0|1>\n"); return 1; }
+    return g2_play_note(atoi(argv[i + 1]), atoi(argv[i + 2]));
+}
+
 static int cmd_set_slot_enabled(int argc, char **argv, int i) {
     if (i + 2 >= argc) { fprintf(stderr, "Usage: set-slot-enabled <slot> <0|1>\n"); return 1; }
     int slot = parse_slot(argv[i + 1]);
@@ -1003,6 +1009,7 @@ static const cmd_entry_t commands[] = {
     { "set-master-clock-run",  cmd_set_master_clock_run  },
     { "set-master-clock-bpm",  cmd_set_master_clock_bpm  },
     { "set-knob-source",       cmd_set_knob_source       },
+    { "play-note",             cmd_play_note             },
     { "set-slot-enabled",      cmd_set_slot_enabled      },
     { "set-slot-key",          cmd_set_slot_key          },
     { "set-slot-hold",         cmd_set_slot_hold         },

@@ -16,6 +16,7 @@ export const useSettingsStore = defineStore('settings', {
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		showExtendedToolBar: true as boolean,
+		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
@@ -27,6 +28,9 @@ export const useSettingsStore = defineStore('settings', {
 	actions: {
 		toggleExtendedToolBar() {
 			this.showExtendedToolBar = !this.showExtendedToolBar;
+		},
+		toggleVirtualKeyboard() {
+			this.showVirtualKeyboard = !this.showVirtualKeyboard;
 		},
 		toggleParamPages() {
 			this.showParamPages = !this.showParamPages;

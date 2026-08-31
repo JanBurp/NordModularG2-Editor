@@ -225,6 +225,10 @@ int g2_set_master_clock_bpm(int bpm);
  * not per-slot. Confirmed against real hardware 2026-08-28 (see g2_events.c's 0x3F case). */
 int g2_set_knob_source(int is_global);
 
+/* Virtual Keyboard note on/off: note=0-127, on=0/1. System-wide, no slot — the synth routes the
+ * note via its own current keyboard assignment. No velocity: the protocol doesn't carry one. */
+int g2_play_note(int note, int on);
+
 /* Param commands */
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation);

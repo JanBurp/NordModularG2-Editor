@@ -174,6 +174,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-extended-toolbar':
 					useSettingsStore().toggleExtendedToolBar();
 					break;
+				case 'toggle-keyboard':
+					useSettingsStore().toggleVirtualKeyboard();
+					break;
 				case 'toggle-parameter-pages':
 					useSettingsStore().toggleParamPages();
 					break;
