@@ -1,6 +1,6 @@
 <template>
 	<div class="flex flex-col gap-1">
-		<Collapsible title="Editor Settings" :model-value="isOpen('Editor Settings')" @update:model-value="onToggle('Editor Settings', $event)">
+		<Collapsible title="Editor Options" :model-value="isOpen('Editor Settings')" @update:model-value="onToggle('Editor Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorTheme">
 					<BtnGroup :model-value="settings.theme" :options="THEME_OPTIONS" @update:model-value="settings.setTheme($event as ThemeMode)" />

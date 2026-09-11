@@ -439,12 +439,10 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
 				{ label: "Copy", click: () => win!.webContents.send("menu:action", "copy"), accelerator: "CommandOrControl+C" },
 				{ label: "Paste", click: () => win!.webContents.send("menu:action", "paste"), accelerator: "CommandOrControl+V" },
+				{ label: "Clear", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
 				{ label: "Paste Params", click: () => win!.webContents.send("menu:action", "paste-params"), accelerator: "CommandOrControl+E" },
-				{ type: "separator" as const },
-				{ label: "Delete", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
 				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
 				{ type: "separator" as const },
-				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
 			],
 		},
 		{
@@ -473,6 +471,40 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 			],
 		},
 		{
+			label: "Patch",
+			submenu: [
+				{ label: "Patch Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+P" },
+				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
+				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
+				{ label: "Download to Slot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+D" },
+			],
+		},
+		{
+			label: "Performance",
+			submenu: [
+				{ label: "Performance Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+R" },
+				{ label: "Download", click: () => win!.webContents.send("menu:action", "TODO") },
+				{ label: "Save in Synth", click: () => win!.webContents.send("menu:action", "TODO") },
+				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "TODO") },
+				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "TODO") },
+				{ label: "Send Controller Snapshot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+M" },
+				{ label: "Dump One", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+1" },
+			],
+		},
+		{
+			label: "Synth",
+			submenu: [
+				{ label: "Synth Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+G" },
+				{ label: "Upload Active Slot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+U" },
+			],
+		},
+		{
+			label: "Setup",
+			submenu: [
+				{ label: "Editor Options", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
+			],
+		},
+		{
 			label: "Tools",
 			submenu: [
 				{ label: "Parameter Pages", click: () => win!.webContents.send("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
@@ -481,15 +513,8 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
 				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
-				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
-			],
-		},
-		{
-			label: "Settings",
-			submenu: [
-				{ label: "Editor", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 			],
 		},
 		{
