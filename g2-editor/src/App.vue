@@ -174,6 +174,47 @@
 		/>
 	</Dialog>
 
+	<Dialog
+		v-model="downloadToSlot.showDialog.value"
+		title="Download to Slot"
+		confirm-label="Download"
+		@confirm="downloadToSlot.confirm"
+		@cancel="downloadToSlot.cancel"
+	>
+		<div class="text-sm text-content-primary mb-2">Download the current patch to a slot in the connected synth.</div>
+		<label class="text-content-secondary text-xs">Target Slot</label>
+		<select
+			v-model="downloadToSlot.targetSlot.value"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+		>
+			<option v-for="s in downloadToSlot.slotOptions" :key="s" :value="s">Slot {{ s }}</option>
+		</select>
+	</Dialog>
+
+	<Dialog v-model="storeInSynth.showDialog.value" title="Save in Synth" confirm-label="Save" @confirm="storeInSynth.confirm" @cancel="storeInSynth.cancel">
+		<div class="text-sm text-content-primary mb-2">Save the {{ storeInSynth.kind.value }} at a synthesizer memory location.</div>
+		<div class="flex gap-2">
+			<div class="flex-1">
+				<label class="text-content-secondary text-xs">Bank</label>
+				<select
+					v-model.number="storeInSynth.bank.value"
+					class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+				>
+					<option v-for="b in storeInSynth.maxBank.value" :key="b" :value="b">{{ b }}</option>
+				</select>
+			</div>
+			<div class="flex-1">
+				<label class="text-content-secondary text-xs">Location</label>
+				<select
+					v-model.number="storeInSynth.location.value"
+					class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+				>
+					<option v-for="l in storeInSynth.maxLocation.value" :key="l" :value="l">{{ l }}</option>
+				</select>
+			</div>
+		</div>
+	</Dialog>
+
 	<AboutDialog v-model="showAboutDialog" />
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
@@ -223,6 +264,8 @@
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
 	import { useBpmDialog } from './composables/useBpmDialog';
+	import { useDownloadToSlotDialog } from './composables/useDownloadToSlotDialog';
+	import { useStoreInSynthDialog } from './composables/useStoreInSynthDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
@@ -318,6 +361,9 @@
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
+
+	const downloadToSlot = useDownloadToSlotDialog();
+	const storeInSynth = useStoreInSynthDialog();
 
 	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange, requestKeyFocus } = useG2();
 

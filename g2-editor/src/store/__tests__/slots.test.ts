@@ -655,6 +655,109 @@ describe('pushPatchToDevice', () => {
 	});
 });
 
+describe('downloadToSynthSlot — Download to Slot', () => {
+	function seedPatch() {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+		store.slots['A'].templateRawHex = '00'.repeat(20);
+		store.slots['A'].name = 'My Patch';
+		return store;
+	}
+
+	it('uploads the source slot patch into the target slot when connected', async () => {
+		const store = seedPatch();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/My_Patch.pch2') };
+		const runSpy = (globalThis as any).window.cli.run;
+
+		const result = await store.downloadToSynthSlot('A', 'C');
+
+		expect(result).toBe(true);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).toHaveBeenCalledWith('My Patch', expect.any(Array));
+		expect(runSpy).toHaveBeenCalledWith(['upload-patch', 'C', '/tmp/g2-notes-x/My_Patch.pch2']);
+	});
+
+	it('no-ops when not connected', async () => {
+		const store = seedPatch();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.downloadToSynthSlot('A', 'B');
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+
+	it('no-ops when the source slot has no patch', async () => {
+		const store = seedPatch();
+		store.slots['A'].patch = null as any;
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.downloadToSynthSlot('A', 'B');
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+});
+
+describe('downloadPerformanceToSynth — Performance Download', () => {
+	it('uploads the local performance via upload-perf when connected', async () => {
+		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) {
+			store.slots[s].patch = makePatch();
+			store.slots[s].variations = [];
+		}
+		store.performanceName = 'My Perf';
+		store.performanceRawHex = '00'.repeat(80);
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/My_Perf.pch2') };
+
+		const result = await store.downloadPerformanceToSynth();
+
+		expect(result).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['upload-perf', '/tmp/g2-notes-x/My_Perf.pch2']);
+	});
+
+	it('refuses without a local performance template (performanceRawHex)', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.downloadPerformanceToSynth();
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-perf']));
+	});
+
+	it('refuses when not all slots contain a patch', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.performanceRawHex = '00'.repeat(80);
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.downloadPerformanceToSynth();
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+
+	it('no-ops when disconnected', async () => {
+		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].patch = makePatch();
+		store.performanceRawHex = '00'.repeat(80);
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
+
+		const result = await store.downloadPerformanceToSynth();
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+});
+
 describe('assignedVoicesForSlot', () => {
 	it('returns the correct count for each slot label', () => {
 		const store = useSlotsStore();

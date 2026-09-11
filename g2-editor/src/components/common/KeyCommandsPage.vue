@@ -44,6 +44,13 @@
 			],
 		},
 		{
+			title: 'Synth',
+			rows: [
+				{ keys: ['⌘ D'], action: 'Download to Slot' },
+				{ keys: ['⌘ U'], action: 'Upload Active Slot' },
+			],
+		},
+		{
 			title: 'Edit',
 			rows: [
 				{ keys: ['⌘ C'], action: 'Copy selected modules' },

@@ -1649,18 +1649,78 @@ export const useSlotsStore = defineStore('slots', {
 			const entry = this.slots[slot];
 			if (!entry?.patch) return false;
 			if (!entry.textDirty) return false; // nothing to push — never re-upload an untouched slot
+			const ok = await this._uploadSlotToDevice(slot, slot);
+			if (ok) entry.textDirty = false;
+			return ok;
+		},
+
+		// Shared by pushPatchToDevice and "Download to Slot": serializes the source slot's current
+		// patch, writes it to a temp file (g2_upload_patch derives the on-device name from that
+		// filename) and uploads it into the target slot of the connected synth. forceReserialize is
+		// deliberate — see _buildPchBytes' CRC comment: never trust a cached hardware-fetched rawHex.
+		async _uploadSlotToDevice(source: SlotLabel, target: SlotLabel): Promise<boolean> {
+			const entry = this.slots[source];
+			if (!entry?.patch) return false;
 			if (useDeviceStore().status !== DeviceStatus.Connected) return false;
 			if (this.uploadingFromFile) return false;
 			this.uploadingFromFile = true;
 			try {
 				const bytes = await this._buildPchBytes(entry, true);
 				const tempPath = await window.electronAPI.writeTempPatch(entry.name, bytes);
-				await window.cli.run(['upload-patch', slot, tempPath]);
-				entry.textDirty = false;
+				await window.cli.run(['upload-patch', target, tempPath]);
 				return true;
 			} catch (err) {
-				console.error(`Push notes to G2 failed for slot ${slot}:`, err);
-				showToast('Failed to push patch notes to device — check connection.');
+				console.error(`Push slot ${source} to G2 slot ${target} failed:`, err);
+				showToast('Failed to push patch to device — check connection.');
+				return false;
+			} finally {
+				this.uploadingFromFile = false;
+			}
+		},
+
+		// Patch → "Download to Slot": push the current patch of `source` into `target` in the synth.
+		async downloadToSynthSlot(source: SlotLabel, target: SlotLabel): Promise<boolean> {
+			return this._uploadSlotToDevice(source, target);
+		},
+
+		// Performance → "Download": push the locally-authored performance (a .prf2 loaded while
+		// working in local mode) to the connected synth via upload-perf. Requires a performance
+		// template to reserialize from — re-uploads the in-memory edits, not the stale disk file.
+		async downloadPerformanceToSynth(): Promise<boolean> {
+			if (!this.performanceRawHex) {
+				showToast('No local performance to download — load a .prf2 into the editor first.');
+				return false;
+			}
+			if (useDeviceStore().status !== DeviceStatus.Connected) return false;
+			if (this.uploadingFromFile) return false;
+			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
+				.map((s) => {
+					const e = this.slots[s];
+					if (e.patch) {
+						e.patch.controllers = [...e.controllers];
+						e.patch.paramPages = [...e.paramPages];
+					}
+					return e.patch!;
+				})
+				.filter(Boolean);
+			if (patches.length !== 4) {
+				showToast('Cannot download performance — not all slots contain a patch.');
+				return false;
+			}
+			this.uploadingFromFile = true;
+			try {
+				const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+				const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
+				const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
+				const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+				const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
+				const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+				const tempPath = await window.electronAPI.writeTempPatch(this.performanceName, data);
+				await window.cli.run(['upload-perf', tempPath]);
+				return true;
+			} catch (err) {
+				console.error('Failed to download performance to G2:', err);
+				showToast('Failed to download performance — check device connection.');
 				return false;
 			} finally {
 				this.uploadingFromFile = false;

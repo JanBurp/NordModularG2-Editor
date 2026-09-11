@@ -54,7 +54,11 @@ export type MenuAction =
 	| 'zoom-reset'
 	| 'open-patch-settings'
 	| 'open-performance-settings'
-	| 'open-synth-settings';
+	| 'open-synth-settings'
+	| 'download-to-slot'
+	| 'download-performance'
+	| 'upload-active-slot'
+	| 'store-in-synth';
 
 export interface MenuState {
 	connected: boolean;

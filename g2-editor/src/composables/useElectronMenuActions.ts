@@ -11,6 +11,9 @@ import { useHistoryStore } from '@/store/history';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
+import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
+import { useStoreInSynthDialog } from '@/composables/useStoreInSynthDialog';
+import { showToast } from '@/composables/useToast';
 
 interface MenuActionOptions {
 	currentModules: ComputedRef<any[]>;
@@ -190,6 +193,23 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'open-synth-settings':
 					useSettingsStore().openSettingsSection('Synth Settings');
+					break;
+				case 'download-to-slot':
+					useDownloadToSlotDialog().open();
+					break;
+				case 'download-performance':
+					showToast('Downloading performance to G2...');
+					await slotsStore.downloadPerformanceToSynth();
+					break;
+				case 'upload-active-slot': {
+					const hardwareActive = deviceStore.device?.slots?.find((s) => s.key)?.slot;
+					const slot = hardwareActive ?? uiStore.slotInFocus;
+					await slotsStore.loadSlot(slot);
+					showToast(`Loaded slot ${slot} from G2`);
+					break;
+				}
+				case 'store-in-synth':
+					useStoreInSynthDialog().open();
 					break;
 				case 'area-voice':
 					if (isInputFocused()) break;

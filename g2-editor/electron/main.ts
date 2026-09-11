@@ -518,9 +518,9 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
 				{
 					label: "Download to Slot",
-					click: () => win!.webContents.send("menu:action", "TODO"),
+					click: () => win!.webContents.send("menu:action", "download-to-slot"),
 					accelerator: "CommandOrControl+D",
-					enabled: menuState.connected,
+					enabled: menuState.connected && menuState.hasCurrentPatch,
 				},
 			],
 		},
@@ -533,8 +533,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: "CommandOrControl+R",
 					enabled: menuState.hasPerformanceContext,
 				},
-				{ label: "Download", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
-				{ label: "Save in Synth", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{ label: "Download", click: () => win!.webContents.send("menu:action", "download-performance"), enabled: menuState.connected && menuState.hasPerformanceContext },
 				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
 				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
 				{
@@ -562,9 +561,14 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				},
 				{
 					label: "Upload Active Slot",
-					click: () => win!.webContents.send("menu:action", "TODO"),
+					click: () => win!.webContents.send("menu:action", "upload-active-slot"),
 					accelerator: "CommandOrControl+U",
 					enabled: menuState.connected,
+				},
+				{
+					label: "Save in Synth",
+					click: () => win!.webContents.send("menu:action", "store-in-synth"),
+					enabled: menuState.connected && menuState.hasCurrentPatch,
 				},
 			],
 		},
