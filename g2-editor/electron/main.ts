@@ -450,15 +450,6 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 		{
 			label: "View",
 			submenu: [
-				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
-				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
-				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
-				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
-				{ label: "Settings", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
-				{ type: "separator" as const },
-				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
-				{ label: "Parameter Pages", click: () => win!.webContents.send("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
-				{ type: "separator" as const },
 				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "V" },
 				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "F" },
 				{ type: "separator" as const },
@@ -476,9 +467,6 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 				{ label: "Variation 7", click: () => win!.webContents.send("menu:action", "variation-7"), accelerator: "7" },
 				{ label: "Variation 8", click: () => win!.webContents.send("menu:action", "variation-8"), accelerator: "8" },
 				{ type: "separator" as const },
-				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
-				{ label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
-				{ type: "separator" as const },
 				{ label: "Zoom In", click: () => win!.webContents.send("menu:action", "zoom-in"), accelerator: "CommandOrControl+=" },
 				{ label: "Zoom Out", click: () => win!.webContents.send("menu:action", "zoom-out"), accelerator: "CommandOrControl+-" },
 				{ label: "Actual Size", click: () => win!.webContents.send("menu:action", "zoom-reset"), accelerator: "CommandOrControl+0" },
@@ -487,7 +475,21 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 		{
 			label: "Tools",
 			submenu: [
+				{ label: "Parameter Pages", click: () => win!.webContents.send("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
 				{ label: "Keyboard", click: () => win!.webContents.send("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
+				{ type: "separator" as const },
+				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
+				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
+				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
+				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
+				{ type: "separator" as const },
+				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
+			],
+		},
+		{
+			label: "Settings",
+			submenu: [
+				{ label: "Editor", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 			],
 		},
 		{
@@ -495,6 +497,9 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 			submenu: [
 				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },
 				{ label: "Key Commands", click: () => win!.webContents.send("menu:action", "show-key-commands") },
+				{ type: "separator" as const },
+				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
+				// { label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
 				{ label: "About G2 Editor...", click: () => win!.webContents.send("menu:action", "show-about") },
 			],
