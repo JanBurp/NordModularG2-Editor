@@ -77,7 +77,7 @@
 			<BtnGroup
 				:model-value="uiStore.globalPagesActive ? uiStore.displayedGlobalParamPage : uiStore.displayedParamPage"
 				:options="pageOptions"
-				variant="toggle"
+				variant="variation"
 				vertical
 				testIdPrefix="param-page"
 				@update:model-value="(v) => onPageSelect(v as number)"
