@@ -55,6 +55,10 @@ typedef enum {
 #define SUB_COMMAND_GET_GLOBAL_KNOBS         (0x5e)  /* Bulk fetch request (Q_GLOBAL_KNOBS); response chunk id is C_KNOBS_GLOBAL, 0x5f */
 #define RESP_CHUNK_KNOBS_GLOBAL              (0x5f)  /* Response tag byte for the above (C_KNOBS_GLOBAL) */
 #define SUB_COMMAND_SET                      (0x37)  /* Upload patch to slot */
+#define SUB_COMMAND_CTRL_SNAPSHOT           (0x55)  /* Send controller snapshot (S_CTRL_SNAPSHOT) */
+#define SUB_COMMAND_MIDI_DUMP                (0x3d)  /* MIDI SYSEX dump (S_MIDI_DUMP) */
+#define SUB_COMMAND_PATCH_BANK_UPLOAD        (0x17)  /* Request bank upload from device (S_PATCH_BANK_UPLOAD) */
+#define SUB_COMMAND_PATCH_BANK_DATA          (0x19)  /* Send bank data to device (S_PATCH_BANK_DATA) */
 #define SUB_COMMAND_PLAY_NOTE                (0x56)  /* Virtual Keyboard note on/off, system-scope, no slot field.
                                                          Hardware-confirmed via other-approaches/G2-Edit (chrispurusha/G2-Edit)
                                                          and independently corroborated by a Ghidra decompile of Clavia's own

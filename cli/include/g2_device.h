@@ -32,6 +32,7 @@ typedef enum {
     G2_ERR_FILE_OPEN     = -11,
     G2_ERR_FILE_WRITE    = -12,
     G2_ERR_NO_MEMORY     = -13,
+    G2_ERR_NOT_IMPLEMENTED = -14,
 } g2_error_t;
 
 /* Output format types */
@@ -299,5 +300,25 @@ int g2_set_slot_key(int slot_idx, int value);
 int g2_set_slot_hold(int slot_idx, int value);
 int g2_set_slot_range(int slot_idx, int lower, int upper);
 int g2_set_rangeEnable(int value);
+
+/* Controller and Bank operations */
+/* Send all MIDI Controller values to MIDI OUT for all slots */
+int g2_send_controller_snapshot(void);
+
+/* Dump patch as MIDI SYSEX - transmits complete patch in slot as SYSEX dump */
+int g2_dump_patch(int slot);
+
+/* Get bank from device - requests bank data from G2
+ * type: 0 = patch (banks 1-32), 1 = performance (banks 1-8)
+ * folder: destination folder for saved files
+ * name: optional base name for the bank (default: PatchBankN or PerfBankN) */
+int g2_get_bank(int type, int bank, const char *folder, const char *name);
+
+/* Send bank to device - uploads bank data to G2
+ * WARNING: This OVERWRITES the entire target bank!
+ * type_str: "patch" or "performance"
+ * source_type: "pchList" or "folder" - the source of the bank data
+ * bank: target bank number (1-32 for patches, 1-8 for performances) */
+int g2_send_bank(const char *type_str, const char *source_type, int bank);
 
 #endif /* __G2_DEVICE_H__ */

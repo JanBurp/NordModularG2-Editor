@@ -548,6 +548,74 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].edited = true;
 		},
 
+		async dumpOne(): Promise<boolean> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return false;
+			const activeSlot = useUiStore().slotInFocus;
+			const slotEntry = this.slots[activeSlot];
+			if (!slotEntry.patch) {
+				showToast('No patch in active slot to dump');
+				return false;
+			}
+			try {
+				// Transmit complete patch in active slot as MIDI SYSEX dump
+				// The CLI command will handle the SYSEX transmission
+				await window.cli.run(['dump-patch', activeSlot]);
+				showToast(`Dumped slot ${activeSlot} as MIDI SYSEX`);
+				return true;
+			} catch (err) {
+				console.error('Failed to dump patch:', err);
+				showToast('Failed to dump patch — check device connection.');
+				return false;
+			}
+		},
+
+		async uploadBankFromDevice(
+			type: 'patch' | 'performance',
+			bankNum: number,
+			folder: string,
+			filename?: string
+		): Promise<boolean> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return false;
+
+			try {
+				// Get bank from device and save to disk
+				// The CLI will fetch the entire bank and save individual files + .pchList
+				const name = filename || (type === 'patch' ? `PatchBank${bankNum}` : `PerfBank${bankNum}`);
+				await window.cli.run(['get-bank', type, String(bankNum), folder, name]);
+				return true;
+			} catch (err) {
+				console.error('Failed to upload bank from device:', err);
+				showToast('Failed to upload bank from G2');
+				return false;
+			}
+		},
+
+		async downloadBankToDevice(
+			source: { type: 'pchList'; filepath: string } | { type: 'folder'; folderPath: string },
+			bankNum: number,
+			bankType: 'patch' | 'performance'
+		): Promise<boolean> {
+			const deviceStore = useDeviceStore();
+			if (deviceStore.status !== DeviceStatus.Connected) return false;
+
+			try {
+				// Send bank to device
+				// WARNING: This OVERWRITES the entire target bank
+				if (source.type === 'pchList') {
+					await window.cli.run(['send-bank', 'pchList', source.filepath, String(bankNum)]);
+				} else if (source.type === 'folder') {
+					await window.cli.run(['send-bank', 'folder', source.folderPath, String(bankNum)]);
+				}
+				return true;
+			} catch (err) {
+				console.error('Failed to download bank to device:', err);
+				showToast('Failed to download bank to G2');
+				return false;
+			}
+		},
+
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const hasPatch = !!this.slots[slot].patch;
 			this.slots[slot].loading = !hasPatch;

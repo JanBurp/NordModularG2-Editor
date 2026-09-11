@@ -356,5 +356,18 @@ export const useDeviceStore = defineStore('device', {
 			if (this.device.performance) this.device.performance.rangeEnable = value;
 			if (this.status === DeviceStatus.Connected) window.cli.run(['set-range-enable', value ? '1' : '0']);
 		},
+
+		async sendControllerSnapshot(): Promise<boolean> {
+			if (this.status !== DeviceStatus.Connected) return false;
+			try {
+				// Send all assigned MIDI Controller values to MIDI OUT
+				// This will send current CC values for all assigned controllers
+				await window.cli.run(['send-controller-snapshot']);
+				return true;
+			} catch (err) {
+				console.error('Failed to send controller snapshot:', err);
+				return false;
+			}
+		},
 	},
 });

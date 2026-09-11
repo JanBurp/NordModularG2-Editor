@@ -58,7 +58,11 @@ export type MenuAction =
 	| 'download-to-slot'
 	| 'download-performance'
 	| 'upload-active-slot'
-	| 'store-in-synth';
+	| 'store-in-synth'
+	| 'bank-upload'
+	| 'bank-download'
+	| 'send-controller-snapshot'
+	| 'dump-one';
 
 export interface MenuState {
 	connected: boolean;

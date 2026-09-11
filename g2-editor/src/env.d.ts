@@ -44,6 +44,8 @@ declare global {
 			getAppInfo: () => Promise<{ version: string; platform: string; iconDataUrl: string }>;
 			openExternal: (url: string) => void;
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
+			selectBankFolder: () => Promise<{ success: boolean; folder?: string }>;
+			selectPchListFile: () => Promise<{ success: boolean; filepath?: string }>;
 		};
 		cli: CliService;
 	}

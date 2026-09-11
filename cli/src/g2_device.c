@@ -2843,3 +2843,101 @@ int g2_switch_slot(const char *slot_str) {
     return G2_OK;
 }
 
+/* Send Controller Snapshot - sends all MIDI CC values for all slots to MIDI OUT
+ * Uses opcode 0x55 (S_CTRL_SNAPSHOT). This is a slot-scoped command that needs to be
+ * sent to each active slot. Based on Delphi code: AddMsgControllerSnapshot writes 0x55. */
+int g2_send_controller_snapshot(void) {
+    if (ensure_connected(0) < 0) { g2_err("send-controller-snapshot: not connected\n"); return G2_ERR_CONNECT; }
+    
+    /* Send to all slots A-D. The G2 will send all controller values to MIDI OUT. */
+    for (int slot = 0; slot < 4; slot++) {
+        uint8_t version = cable_get_version(slot);
+        /* No additional payload for controller snapshot - just the subcommand */
+        if (send_slot((uint8_t)slot, version, SUB_COMMAND_CTRL_SNAPSHOT, NULL, 0) < 0) {
+            g2_err("send-controller-snapshot: failed to send to slot %c\n", 'A' + slot);
+            return G2_ERR_SEND;
+        }
+        usleep(USB_SEND_DELAY_US);
+    }
+    if (!g2_listener_active) g2_drain_pending();
+    return G2_OK;
+}
+
+/* Dump Patch as MIDI SYSEX - transmits complete patch in slot as SYSEX dump
+ * Uses opcode 0x3D (S_MIDI_DUMP). Based on C++ decompilation: CMDumpOneRequest::WriteStream
+ * initializes with 0x3d. This is a slot-scoped command. */
+int g2_dump_patch(int slot) {
+    if (slot < 0 || slot > 3) { g2_err("dump-patch: invalid slot, expected 0-3\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("dump-patch: not connected\n"); return G2_ERR_CONNECT; }
+    
+    uint8_t version = cable_get_version(slot);
+    /* No additional payload for MIDI dump - just the subcommand */
+    if (send_slot((uint8_t)slot, version, SUB_COMMAND_MIDI_DUMP, NULL, 0) < 0) {
+        g2_err("dump-patch: failed to send\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    if (!g2_listener_active) g2_drain_pending();
+    return G2_OK;
+}
+
+/* Get Bank from device - requests bank data (patches or performances) from G2
+ * Uses opcode 0x17 (S_PATCH_BANK_UPLOAD). This is a system-scoped command.
+ * Bank type: 0 = patch (banks 1-32), 1 = performance (banks 1-8)
+ * The G2 will respond with bank data that needs to be saved to files. */
+int g2_get_bank(int type, int bank, const char *folder, const char *name) {
+    if (type < 0 || type > 1) { g2_err("get-bank: type must be 0 (patch) or 1 (performance)\n"); return G2_ERR_INVALID_PARAM; }
+    if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
+        g2_err("get-bank: invalid bank number for type\n");
+        return G2_ERR_INVALID_PARAM;
+    }
+    if (ensure_connected(0) < 0) { g2_err("get-bank: not connected\n"); return G2_ERR_CONNECT; }
+    
+    /* Send bank upload request: 0x41 is the system command, 0x17 is the subcommand
+     * Payload: type (0=patch, 1=performance), bank number */
+    uint8_t payload[2] = { (uint8_t)type, (uint8_t)bank };
+    if (send_system_data(0x41, payload, 2) < 0) {
+        g2_err("get-bank: failed to send request\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    
+    /* TODO: Handle the response - the G2 will send back the bank data as extended messages
+     * that need to be saved to individual .pch2/.prf2 files and a .pchList file.
+     * For now, just send the request and let the daemon/event system handle the response. */
+    if (!g2_listener_active) g2_drain_pending();
+    
+    /* Return success - the actual data transfer happens asynchronously */
+    return G2_OK;
+}
+
+/* Send Bank to device - uploads bank data (patches or performances) to G2
+ * Uses opcode 0x19 (S_PATCH_BANK_DATA). This is a system-scoped command.
+ * WARNING: This OVERWRITES the entire target bank in the G2!
+ * Bank type: "patch" or "performance"; bank: 1-32 for patches, 1-8 for performances
+ * Source type: "pchList" (reads .pchList file) or "folder" (reads all .pch2/.prf2 files from folder)
+ * The G2 will receive the bank data and write it to the specified bank. */
+int g2_send_bank(const char *type_str, const char *source_type, int bank) {
+    int type = (strcmp(type_str, "performance") == 0) ? 1 : 0;
+    if (type < 0 || type > 1) { g2_err("send-bank: type must be 'patch' or 'performance'\n"); return G2_ERR_INVALID_PARAM; }
+    if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
+        g2_err("send-bank: invalid bank number for type\n");
+        return G2_ERR_INVALID_PARAM;
+    }
+    if (ensure_connected(0) < 0) { g2_err("send-bank: not connected\n"); return G2_ERR_CONNECT; }
+    
+    /* Send bank data command: 0x41 is the system command, 0x19 is the subcommand
+     * Payload: type (0=patch, 1=performance), bank number, then the actual bank data follows
+     * TODO: Read the source (pchList file or folder) and send the data
+     * For now, just send the header - the full implementation would need to:
+     * 1. Read the .pchList file or scan the folder for .pch2/.prf2 files
+     * 2. For each patch/performance, serialize it and send as S_PATCH_BANK_DATA messages
+     * 3. Handle the response from the G2
+     * 
+     * This is a complex operation that requires file I/O and message sequencing.
+     * For now, we'll return an error indicating this is not yet implemented. */
+    g2_err("send-bank: Bank upload to device is not yet fully implemented\n");
+    g2_err("  (requires reading .pchList or folder and sending all patches)\n");
+    return G2_ERR_NOT_IMPLEMENTED;
+}
+

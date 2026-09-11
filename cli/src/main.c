@@ -88,6 +88,10 @@ static void print_usage(const char *prog) {
     printf("  get-resources <slot>                                                                      Get CPU/memory resource usage for slot (A-D)\n");
     printf("  voice-mode <slot> <0-3>                                                                   Set voice mode (0=poly 1=mono 2=legato 3=slgt) [calls get-patch, use in tmux only]\n");
     printf("  voice-count <slot> <1-32>                                                                 Set voice count [calls get-patch, use in tmux only]\n");
+    printf("  send-controller-snapshot                                                               Send all MIDI Controller values to MIDI OUT\n");
+    printf("  dump-patch <slot>                                                                        Dump patch as MIDI SYSEX (slot A-D)\n");
+    printf("  get-bank <type> <bank> <folder> [<name>]                                                  Get bank from device (type: patch|performance, bank: 1-32 or 1-8)\n");
+    printf("  send-bank <type> <source> <bank>                                                         Send bank to device (type: pchList|folder, bank: 1-32 or 1-8)\n");
     printf("  daemon                                                                                    Persistent connection: watch + accept JSON commands on stdin\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
@@ -937,6 +941,45 @@ static int cmd_daemon(int argc, char **argv, int i) {
     _exit(ret);
 }
 
+static int cmd_send_controller_snapshot(int argc, char **argv, int i) {
+    (void)argc; (void)argv; (void)i;
+    return g2_send_controller_snapshot();
+}
+
+static int cmd_dump_patch(int argc, char **argv, int i) {
+    if (i + 1 >= argc) {
+        fprintf(stderr, "Usage: dump-patch <slot>\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "dump-patch: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_dump_patch(slot);
+}
+
+static int cmd_get_bank(int argc, char **argv, int i) {
+    if (i + 3 >= argc) {
+        fprintf(stderr, "Usage: get-bank <type> <bank> <folder> [<name>]\n");
+        return 1;
+    }
+    const char *type_str = argv[i + 1];
+    int type = (strcmp(type_str, "performance") == 0) ? 1 : 0;
+    int bank = atoi(argv[i + 2]);
+    const char *folder = argv[i + 3];
+    const char *name = (i + 4 < argc) ? argv[i + 4] : NULL;
+    return g2_get_bank(type, bank, folder, name);
+}
+
+static int cmd_send_bank(int argc, char **argv, int i) {
+    if (i + 3 >= argc) {
+        fprintf(stderr, "Usage: send-bank <type> <source> <bank>\n");
+        return 1;
+    }
+    const char *type_str = argv[i + 1];
+    const char *source_type = argv[i + 2];
+    int bank = atoi(argv[i + 3]);
+    return g2_send_bank(type_str, source_type, bank);
+}
+
 static int cmd_seq(int argc, char **argv, int i) {
     for (int j = i + 1; j < argc; j++) {
         char buf[1024];
@@ -1016,6 +1059,10 @@ static const cmd_entry_t commands[] = {
     { "set-slot-range",        cmd_set_slot_range        },
     { "set-range-enable",      cmd_set_range_enable      },
     { "daemon",                cmd_daemon                },
+    { "send-controller-snapshot", cmd_send_controller_snapshot },
+    { "dump-patch",        cmd_dump_patch        },
+    { "get-bank",          cmd_get_bank          },
+    { "send-bank",        cmd_send_bank        },
     { "seq",              cmd_seq              },
     { NULL, NULL }
 };

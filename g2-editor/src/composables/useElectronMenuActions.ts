@@ -11,6 +11,8 @@ import { useHistoryStore } from '@/store/history';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
+import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
+import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
 import { useStoreInSynthDialog } from '@/composables/useStoreInSynthDialog';
 import { showToast } from '@/composables/useToast';
@@ -37,6 +39,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
 	const historyStore = useHistoryStore();
+	const bankUploadDialog = useBankUploadDialog();
+	const bankDownloadDialog = useBankDownloadDialog();
 
 	const menuState = computed(() => ({
 		connected: deviceStore.connected,
@@ -298,6 +302,24 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					uiStore.showModuleHelp(mod.type as number);
 					break;
 				}
+				case 'send-controller-snapshot':
+					if (isInputFocused()) break;
+					const snapshotOk = await deviceStore.sendControllerSnapshot();
+					if (snapshotOk) showToast('Controller snapshot sent to MIDI OUT');
+					break;
+				case 'dump-one':
+					if (isInputFocused()) break;
+					const dumpOk = await slotsStore.dumpOne();
+					if (dumpOk) showToast('Patch dumped as MIDI SYSEX');
+					break;
+				case 'bank-upload':
+					if (isInputFocused()) break;
+					bankUploadDialog.open();
+					break;
+				case 'bank-download':
+					if (isInputFocused()) break;
+					bankDownloadDialog.open();
+					break;
 			}
 		});
 	});

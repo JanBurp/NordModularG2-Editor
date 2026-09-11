@@ -60,6 +60,15 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `voice-mode` | `<slot> <0–3>` | Set voice mode (0=poly 1=mono 2=legato 3=slgt) |
 | `voice-count` | `<slot> <1–32>` | Set voice count |
 
+## Controller & Bank
+
+| Command | Arguments | Description |
+|---|---|---|
+| `send-controller-snapshot` | | Send all assigned MIDI Controller values to MIDI OUT |
+| `dump-patch` | `<slot>` | Dump patch from slot as MIDI SYSEX (A-D) |
+| `get-bank` | `<type> <bank> <folder> [<name>]` | Get bank from device (type: patch|performance, bank: 1-32 or 1-8) |
+| `send-bank` | `<type> <source> <bank>` | Send bank to device (type: patch|performance, source: pchList|folder, bank: 1-32 or 1-8) |
+
 ## Clock
 
 | Command | Arguments | Description |

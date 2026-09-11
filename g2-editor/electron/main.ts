@@ -291,6 +291,25 @@ ipcMain.handle("perf:save-dialog", async (event, defaultName?: string, folder?: 
 	return { success: true, filepath: result.filePath };
 });
 
+ipcMain.handle("bank:select-folder", async (event) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showOpenDialog(browserWin!, {
+		properties: ["openDirectory"],
+	});
+	if (result.canceled || !result.filePaths[0]) return { success: false };
+	return { success: true, folder: result.filePaths[0] };
+});
+
+ipcMain.handle("bank:select-pchlist", async (event) => {
+	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const result = await dialog.showOpenDialog(browserWin!, {
+		filters: [{ name: "Patch List Files", extensions: ["pchList"] }],
+		properties: ["openFile"],
+	});
+	if (result.canceled || !result.filePaths[0]) return { success: false };
+	return { success: true, filepath: result.filePaths[0] };
+});
+
 ipcMain.handle("help:load", (_, shortName: string) => {
 	const helpDir = app.isPackaged
 		? path.join(process.resourcesPath, "doc", "help")
@@ -534,17 +553,17 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					enabled: menuState.hasPerformanceContext,
 				},
 				{ label: "Download", click: () => win!.webContents.send("menu:action", "download-performance"), enabled: menuState.connected && menuState.hasPerformanceContext },
-				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
-				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "bank-upload"), enabled: menuState.connected },
+				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "bank-download"), enabled: menuState.connected },
 				{
 					label: "Send Controller Snapshot",
-					click: () => win!.webContents.send("menu:action", "TODO"),
+					click: () => win!.webContents.send("menu:action", "send-controller-snapshot"),
 					accelerator: "CommandOrControl+M",
 					enabled: menuState.connected,
 				},
 				{
 					label: "Dump One",
-					click: () => win!.webContents.send("menu:action", "TODO"),
+					click: () => win!.webContents.send("menu:action", "dump-one"),
 					accelerator: "CommandOrControl+1",
 					enabled: menuState.connected,
 				},

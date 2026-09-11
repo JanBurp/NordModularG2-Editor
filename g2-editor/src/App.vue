@@ -215,6 +215,141 @@
 		</div>
 	</Dialog>
 
+	<Dialog
+		v-model="bankUpload.showDialog.value"
+		title="Bank Upload (from G2)"
+		confirm-label="Upload"
+		@confirm="bankUpload.confirm"
+		@cancel="bankUpload.cancel"
+	>
+		<div class="space-y-4">
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Type:</span>
+				<select
+					v-model="bankUpload.type.value"
+					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+				>
+					<option v-for="t in bankUpload.bankTypes" :key="t" :value="t">
+						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
+					</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Bank:</span>
+				<select
+					v-model="bankUpload.bankNum.value"
+					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+				>
+					<option v-for="n in bankUpload.bankOptions" :key="n" :value="n">{{ n }}</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Folder:</span>
+				<div class="flex-1 flex items-center gap-1">
+					<input
+						v-model="bankUpload.folder.value"
+						class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+						readonly
+						placeholder="Select folder..."
+					/>
+					<button
+						class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4"
+						@click="bankUpload.selectFolder"
+					>
+						Browse...
+					</button>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Name:</span>
+				<input
+					v-model="bankUpload.filename.value"
+					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+					placeholder="(optional)"
+				/>
+			</div>
+			<div v-if="bankUpload.inProgress.value" class="text-orange-400 text-sm">
+				Uploading bank from G2...
+			</div>
+			<div class="text-xs text-content-secondary">
+				Save complete {{ bankUpload.type.value }} bank from synth memory to disk. Creates individual sound files + .pchList file.
+			</div>
+		</div>
+	</Dialog>
+
+	<Dialog
+		v-model="bankDownload.showDialog.value"
+		title="Bank Download (to G2)"
+		confirm-label="Download"
+		@confirm="bankDownload.confirm"
+		@cancel="bankDownload.cancel"
+	>
+		<div class="space-y-4">
+			<div v-if="bankDownload.showWarning.value" class="p-3 bg-red-500/20 border border-red-400 rounded text-red-400 text-sm">
+				<div class="flex items-start gap-2">
+					<span>⚠️</span>
+					<div>
+						<strong>WARNING:</strong> This will OVERWRITE the entire bank in your G2.
+						All existing patches/performances in this bank will be ERASED.
+					</div>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Type:</span>
+				<select
+					v-model="bankDownload.type.value"
+					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+				>
+					<option v-for="t in bankDownload.bankTypes" :key="t" :value="t">
+						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
+					</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Bank:</span>
+				<select
+					v-model="bankDownload.bankNum.value"
+					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+				>
+					<option v-for="n in bankDownload.bankOptions" :key="n" :value="n">{{ n }}</option>
+				</select>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Source:</span>
+				<div class="flex-1 flex items-center gap-2">
+					<select
+						v-model="bankDownload.sourceType.value"
+						class="px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+					>
+						<option v-for="s in bankDownload.sourceTypes" :key="s" :value="s">
+							{{ s === 'pchList' ? '.pchList file' : 'Folder' }}
+						</option>
+					</select>
+					<div class="flex-1 flex items-center gap-1">
+						<input
+							v-model="bankDownload.sourcePath.value"
+							class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+							readonly
+							:placeholder="bankDownload.sourceType.value === 'pchList' ? 'Select .pchList file...' : 'Select folder...'"
+						/>
+						<button
+							class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4"
+							@click="bankDownload.selectSource"
+						>
+							Browse...
+						</button>
+					</div>
+				</div>
+			</div>
+			<div v-if="bankDownload.inProgress.value" class="text-orange-400 text-sm">
+				Downloading bank to G2...
+			</div>
+			<div class="text-xs text-content-secondary">
+				Download bank to synth memory. Source can be a .pchList file or a folder with patch files (alphabetical order, max 128).
+			</div>
+		</div>
+	</Dialog>
+
 	<AboutDialog v-model="showAboutDialog" />
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
@@ -264,6 +399,8 @@
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
 	import { useBpmDialog } from './composables/useBpmDialog';
+	import { useBankDownloadDialog } from './composables/useBankDownloadDialog';
+	import { useBankUploadDialog } from './composables/useBankUploadDialog';
 	import { useDownloadToSlotDialog } from './composables/useDownloadToSlotDialog';
 	import { useStoreInSynthDialog } from './composables/useStoreInSynthDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
@@ -362,6 +499,8 @@
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 
+	const bankUpload = useBankUploadDialog();
+	const bankDownload = useBankDownloadDialog();
 	const downloadToSlot = useDownloadToSlotDialog();
 	const storeInSynth = useStoreInSynthDialog();
 
