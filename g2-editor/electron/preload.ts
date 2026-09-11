@@ -1,5 +1,5 @@
 import { contextBridge, ipcRenderer } from "electron";
-import type { MenuAction } from "../src/types/index";
+import type { MenuAction, MenuState } from "../src/types/index";
 
 function now(): string {
 	const d = new Date();
@@ -26,6 +26,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
 	updateRecentFiles: (files: { path: string; kind: "patch" | "performance" }[]) =>
 		ipcRenderer.send("recent-files:update", files),
+	updateMenuState: (state: MenuState) => ipcRenderer.send("menu-state:update", state),
 
 	savePatch: (filepath: string, data: number[]) =>
 		ipcRenderer.invoke("patch:save", filepath, data),

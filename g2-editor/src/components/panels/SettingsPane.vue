@@ -299,7 +299,7 @@
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
-	import { useSettingsStore, type ThemeMode, type KnobMode } from '@/store/settings';
+	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
@@ -318,6 +318,7 @@
 	const anyPatchLoaded = computed(() => SLOT_LABELS.some((slot) => !!slotsStore.getPatchForSlot(slot as SlotLabel)));
 
 	const activeSection = computed(() => {
+		if (settings.settingsSection) return settings.settingsSection;
 		if (currentPatch.value) return 'Patch Settings';
 		if (device.connected) return 'Synth Settings';
 		return 'Editor Settings';
@@ -325,14 +326,14 @@
 
 	const openSections = ref(new Set([activeSection.value]));
 
-	watch([() => settings.rightPaneTab, () => settings.showRightPane], ([tab, show]) => {
+	watch([() => settings.rightPaneTab, () => settings.showRightPane, () => settings.settingsSection], ([tab, show]) => {
 		if (tab === 'settings' && show) openSections.value = new Set([activeSection.value]);
 	});
 
-	function isOpen(section: string) {
+	function isOpen(section: SettingsSection) {
 		return openSections.value.has(section);
 	}
-	function onToggle(section: string, v: boolean) {
+	function onToggle(section: SettingsSection, v: boolean) {
 		const next = new Set(openSections.value);
 		if (v) next.add(section);
 		else next.delete(section);

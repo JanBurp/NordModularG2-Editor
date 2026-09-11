@@ -1,5 +1,5 @@
 /// <reference types="vite/client" />
-import type { MenuAction } from './types/index';
+import type { MenuAction, MenuState } from './types/index';
 import type { CliService } from './types/cli';
 
 declare module '*.vue' {
@@ -30,6 +30,7 @@ declare global {
 			onMenuAction: (cb: (action: MenuAction) => void) => void;
 			offMenuAction: () => void;
 			updateRecentFiles: (files: { path: string; kind: 'patch' | 'performance' }[]) => void;
+			updateMenuState: (state: MenuState) => void;
 			savePatch: (filepath: string, data: number[]) => Promise<void>;
 			writeTempPatch: (name: string, data: number[]) => Promise<string>;
 			showSaveDialog: (defaultName?: string, folder?: string) => Promise<{ success: boolean; filepath?: string }>;

@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
+export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
 export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
@@ -18,6 +19,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableThickness: 1 as number,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
+		settingsSection: null as SettingsSection | null,
 		showExtendedToolBar: true as boolean,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
@@ -45,6 +47,7 @@ export const useSettingsStore = defineStore('settings', {
 			this.showParamPages = !this.showParamPages;
 		},
 		toggleSidebar(tab: PaneTab) {
+			this.settingsSection = null;
 			if (this.rightPaneTab === tab) {
 				this.showRightPane = !this.showRightPane;
 				if (this.showRightPane === false) {
@@ -54,6 +57,17 @@ export const useSettingsStore = defineStore('settings', {
 				this.rightPaneTab = tab;
 				this.showRightPane = true;
 			}
+		},
+		openSettingsSection(section: SettingsSection) {
+			if (this.showRightPane && this.rightPaneTab === 'settings' && this.settingsSection === section) {
+				this.showRightPane = false;
+				this.rightPaneTab = '';
+				this.settingsSection = null;
+				return;
+			}
+			this.rightPaneTab = 'settings';
+			this.showRightPane = true;
+			this.settingsSection = section;
 		},
 		setPath(value: string) {
 			this.path = value;

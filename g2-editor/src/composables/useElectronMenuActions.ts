@@ -1,5 +1,5 @@
 import type { ComputedRef } from 'vue';
-import { onMounted, onUnmounted } from 'vue';
+import { computed, onMounted, onUnmounted, watch } from 'vue';
 
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
@@ -7,6 +7,7 @@ import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
+import { useHistoryStore } from '@/store/history';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
@@ -30,8 +31,20 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const slotsStore = useSlotsStore();
 	const patchFile = usePatchFile();
 	const { deleteSelection, deleteUnusedModules } = usePatchOperations();
-	const { copySelection, cutSelection, pasteClipboard, pasteParams } = usePatchClipboard();
+	const { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
+	const historyStore = useHistoryStore();
+
+	const menuState = computed(() => ({
+		connected: deviceStore.connected,
+		canUndo: historyStore.canUndo(uiStore.slotInFocus),
+		canRedo: historyStore.canRedo(uiStore.slotInFocus),
+		hasSelection: uiStore.selectedModules.length > 0,
+		hasClipboard: hasClipboard.value,
+		hasCurrentPatch: !!currentPatch.value,
+		hasPerformanceContext: !!deviceStore.device || SLOT_LABELS.some((s) => !!slotsStore.getPatchForSlot(s)),
+	}));
+	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
 
 	onMounted(() => {
 		// Cold-start hydration: the persisted recent-files list lives in the renderer
@@ -167,7 +180,16 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().toggleSidebar('browser');
 					break;
 				case 'toggle-settings':
-					useSettingsStore().toggleSidebar('settings');
+					useSettingsStore().openSettingsSection('Editor Settings');
+					break;
+				case 'open-patch-settings':
+					useSettingsStore().openSettingsSection('Patch Settings');
+					break;
+				case 'open-performance-settings':
+					useSettingsStore().openSettingsSection('Performance Settings');
+					break;
+				case 'open-synth-settings':
+					useSettingsStore().openSettingsSection('Synth Settings');
 					break;
 				case 'area-voice':
 					if (isInputFocused()) break;

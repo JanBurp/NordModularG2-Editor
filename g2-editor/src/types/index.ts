@@ -51,7 +51,20 @@ export type MenuAction =
 	| 'redo'
 	| 'zoom-in'
 	| 'zoom-out'
-	| 'zoom-reset';
+	| 'zoom-reset'
+	| 'open-patch-settings'
+	| 'open-performance-settings'
+	| 'open-synth-settings';
+
+export interface MenuState {
+	connected: boolean;
+	canUndo: boolean;
+	canRedo: boolean;
+	hasSelection: boolean;
+	hasClipboard: boolean;
+	hasCurrentPatch: boolean;
+	hasPerformanceContext: boolean;
+}
 
 export interface SlotInfo {
 	slot: SlotLabel;

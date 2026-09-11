@@ -11,6 +11,7 @@ import fs from "node:fs";
 import os from "node:os";
 import { spawn, type ChildProcess } from "child_process";
 import { loadWindowState, trackWindowState } from "./windowState";
+import type { MenuState } from "../src/types/index";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -383,8 +384,17 @@ ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {
 
 const SLOT_LABELS = ["A", "B", "C", "D"] as const;
 type RecentFileEntry = { path: string; kind: "patch" | "performance" };
+const defaultMenuState: MenuState = {
+	connected: false,
+	canUndo: false,
+	canRedo: false,
+	hasSelection: false,
+	hasClipboard: false,
+	hasCurrentPatch: false,
+	hasPerformanceContext: false,
+};
 
-function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructorOptions[] {
+function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electron.MenuItemConstructorOptions[] {
 	const slotSubmenu = (actionPrefix: string): Electron.MenuItemConstructorOptions[] =>
 		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => win!.webContents.send("menu:action", `${actionPrefix}-${s}`) }));
 
@@ -433,14 +443,39 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 		{
 			label: "Edit",
 			submenu: [
-				{ label: "Undo", click: () => win!.webContents.send("menu:action", "undo"), accelerator: "CommandOrControl+Z" },
-				{ label: "Redo", click: () => win!.webContents.send("menu:action", "redo"), accelerator: "Shift+CommandOrControl+Z" },
+				{ label: "Undo", click: () => win!.webContents.send("menu:action", "undo"), accelerator: "CommandOrControl+Z", enabled: menuState.canUndo },
+				{
+					label: "Redo",
+					click: () => win!.webContents.send("menu:action", "redo"),
+					accelerator: "Shift+CommandOrControl+Z",
+					enabled: menuState.canRedo,
+				},
 				{ type: "separator" as const },
-				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
-				{ label: "Copy", click: () => win!.webContents.send("menu:action", "copy"), accelerator: "CommandOrControl+C" },
-				{ label: "Paste", click: () => win!.webContents.send("menu:action", "paste"), accelerator: "CommandOrControl+V" },
-				{ label: "Clear", click: () => win!.webContents.send("menu:action", "delete"), accelerator: "Backspace" },
-				{ label: "Paste Params", click: () => win!.webContents.send("menu:action", "paste-params"), accelerator: "CommandOrControl+E" },
+				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X", enabled: menuState.hasSelection },
+				{
+					label: "Copy",
+					click: () => win!.webContents.send("menu:action", "copy"),
+					accelerator: "CommandOrControl+C",
+					enabled: menuState.hasSelection,
+				},
+				{
+					label: "Paste",
+					click: () => win!.webContents.send("menu:action", "paste"),
+					accelerator: "CommandOrControl+V",
+					enabled: menuState.hasClipboard,
+				},
+				{
+					label: "Clear",
+					click: () => win!.webContents.send("menu:action", "delete"),
+					accelerator: "Backspace",
+					enabled: menuState.hasSelection,
+				},
+				{
+					label: "Paste Params",
+					click: () => win!.webContents.send("menu:action", "paste-params"),
+					accelerator: "CommandOrControl+E",
+					enabled: menuState.hasClipboard,
+				},
 				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
 				{ type: "separator" as const },
 			],
@@ -473,29 +508,64 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 		{
 			label: "Patch",
 			submenu: [
-				{ label: "Patch Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+P" },
+				{
+					label: "Patch Settings",
+					click: () => win!.webContents.send("menu:action", "open-patch-settings"),
+					accelerator: "CommandOrControl+P",
+					enabled: menuState.hasCurrentPatch,
+				},
 				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
 				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
-				{ label: "Download to Slot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+D" },
+				{
+					label: "Download to Slot",
+					click: () => win!.webContents.send("menu:action", "TODO"),
+					accelerator: "CommandOrControl+D",
+					enabled: menuState.connected,
+				},
 			],
 		},
 		{
 			label: "Performance",
 			submenu: [
-				{ label: "Performance Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+R" },
-				{ label: "Download", click: () => win!.webContents.send("menu:action", "TODO") },
-				{ label: "Save in Synth", click: () => win!.webContents.send("menu:action", "TODO") },
-				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "TODO") },
-				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "TODO") },
-				{ label: "Send Controller Snapshot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+M" },
-				{ label: "Dump One", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+1" },
+				{
+					label: "Performance Settings",
+					click: () => win!.webContents.send("menu:action", "open-performance-settings"),
+					accelerator: "CommandOrControl+R",
+					enabled: menuState.hasPerformanceContext,
+				},
+				{ label: "Download", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{ label: "Save in Synth", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "TODO"), enabled: menuState.connected },
+				{
+					label: "Send Controller Snapshot",
+					click: () => win!.webContents.send("menu:action", "TODO"),
+					accelerator: "CommandOrControl+M",
+					enabled: menuState.connected,
+				},
+				{
+					label: "Dump One",
+					click: () => win!.webContents.send("menu:action", "TODO"),
+					accelerator: "CommandOrControl+1",
+					enabled: menuState.connected,
+				},
 			],
 		},
 		{
 			label: "Synth",
 			submenu: [
-				{ label: "Synth Settings", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+G" },
-				{ label: "Upload Active Slot", click: () => win!.webContents.send("menu:action", "TODO"), accelerator: "CommandOrControl+U" },
+				{
+					label: "Synth Settings",
+					click: () => win!.webContents.send("menu:action", "open-synth-settings"),
+					accelerator: "CommandOrControl+G",
+					enabled: menuState.connected,
+				},
+				{
+					label: "Upload Active Slot",
+					click: () => win!.webContents.send("menu:action", "TODO"),
+					accelerator: "CommandOrControl+U",
+					enabled: menuState.connected,
+				},
 			],
 		},
 		{
@@ -532,8 +602,21 @@ function buildMenu(recentFiles: RecentFileEntry[]): Electron.MenuItemConstructor
 	];
 }
 
+let lastRecentFiles: RecentFileEntry[] = [];
+let lastMenuState: MenuState = defaultMenuState;
+
+function refreshMenu(): void {
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, lastMenuState)));
+}
+
 ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(files)));
+	lastRecentFiles = files;
+	refreshMenu();
+});
+
+ipcMain.on("menu-state:update", (_, state: MenuState) => {
+	lastMenuState = state;
+	refreshMenu();
 });
 
 let quitting = false;
@@ -567,5 +650,5 @@ app.whenReady().then(async () => {
 
 	createWindow();
 
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu([])));
+	refreshMenu();
 });
