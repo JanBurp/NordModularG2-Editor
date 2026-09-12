@@ -173,21 +173,20 @@
 		/>
 	</Dialog>
 
-	<Dialog
-		v-model="downloadToSlot.showDialog.value"
-		title="Download to Slot"
-		confirm-label="Download"
-		@confirm="downloadToSlot.confirm"
-		@cancel="downloadToSlot.cancel"
-	>
+	<Dialog v-model="downloadToSlot.showDialog.value" title="Download to Slot" :show-confirm="false" @cancel="downloadToSlot.cancel">
 		<div class="text-sm text-content-primary mb-2">Download the current patch to a slot in the connected synth.</div>
-		<label class="text-content-secondary text-xs">Target Slot</label>
-		<select
-			v-model="downloadToSlot.targetSlot.value"
-			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
-		>
-			<option v-for="s in downloadToSlot.slotOptions" :key="s" :value="s">Slot {{ s }}</option>
-		</select>
+		<div class="flex gap-2">
+			<Button
+				v-for="s in downloadToSlot.slotOptions"
+				:key="s"
+				variant="default"
+				:disabled="s === downloadToSlot.currentSlot.value"
+				class="flex-1"
+				@click="downloadToSlot.selectSlot(s)"
+			>
+				Slot {{ s }}
+			</Button>
+		</div>
 	</Dialog>
 
 	<Dialog v-model="storeInSynth.showDialog.value" title="Save in Synth" confirm-label="Save" @confirm="storeInSynth.confirm" @cancel="storeInSynth.cancel">

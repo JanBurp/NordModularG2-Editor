@@ -32,7 +32,6 @@ declare global {
 			updateRecentFiles: (files: { path: string; kind: 'patch' | 'performance' }[]) => void;
 			updateMenuState: (state: MenuState) => void;
 			savePatch: (filepath: string, data: number[]) => Promise<void>;
-			writeTempPatch: (name: string, data: number[]) => Promise<string>;
 			showSaveDialog: (defaultName?: string, folder?: string) => Promise<{ success: boolean; filepath?: string }>;
 			showSavePerfDialog: (defaultName?: string, folder?: string) => Promise<{ success: boolean; filepath?: string }>;
 			openPatchDialog: (kind?: 'patch' | 'performance') => Promise<{

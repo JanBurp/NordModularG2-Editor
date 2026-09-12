@@ -132,6 +132,20 @@ static int arg_count(cJSON *args) {
 	return args ? cJSON_GetArraySize(args) : 0;
 }
 
+/* Reads a JSON array of numbers (0-255) at `idx` into a malloc'd byte buffer.
+ * Returns NULL (with *out_len untouched) if the arg isn't an array. Caller frees. */
+static uint8_t *arg_bytes(cJSON *args, int idx, size_t *out_len) {
+	if (!args) return NULL;
+	cJSON *arr = cJSON_GetArrayItem(args, idx);
+	if (!arr || !cJSON_IsArray(arr)) return NULL;
+	int count = cJSON_GetArraySize(arr);
+	uint8_t *buf = (uint8_t *)malloc((size_t)count > 0 ? (size_t)count : 1);
+	if (!buf) return NULL;
+	for (int i = 0; i < count; i++) buf[i] = (uint8_t)cJSON_GetArrayItem(arr, i)->valueint;
+	*out_len = (size_t)count;
+	return buf;
+}
+
 static int parse_location(cJSON *args, int idx) {
 	return parse_location_str(arg_s(args, idx));
 }
@@ -645,8 +659,23 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_upload_patch(slot, arg_s(args, 1));
 
+	} else if (strcmp(cmd, "upload-patch-data") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		size_t buf_len = 0;
+		uint8_t *buf = arg_bytes(args, 1, &buf_len);
+		if (slot == SLOT_INVALID || !buf) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_upload_patch_buf(slot, buf, buf_len);
+		free(buf);
+
 	} else if (strcmp(cmd, "upload-perf") == 0 && n >= 1) {
 		ret = g2_upload_perf(arg_s(args, 0));
+
+	} else if (strcmp(cmd, "upload-perf-data") == 0 && n >= 1) {
+		size_t buf_len = 0;
+		uint8_t *buf = arg_bytes(args, 0, &buf_len);
+		if (!buf) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_upload_perf_buf(buf, buf_len);
+		free(buf);
 
 	} else if (strcmp(cmd, "get-perf-file") == 0) {
 		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);

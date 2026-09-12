@@ -190,6 +190,8 @@ int g2_clear_patch(int type, int bank, int location);
 int g2_clear_bank(int type, int bank, int from_loc, int to_loc);
 int g2_upload_patch(int slot, const char *filepath);
 int g2_upload_perf(const char *filepath);
+int g2_upload_patch_buf(int slot, const uint8_t *data, size_t len);
+int g2_upload_perf_buf(const uint8_t *data, size_t len);
 
 /* Synth settings: takes a cJSON params object matching the JSON emitted by
  * build_synth_bulk_json (synthName, midi, tuning, pedal, memProtect, etc.) */

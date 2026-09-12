@@ -1724,43 +1724,39 @@ int g2_play_note(int note, int on) {
     return G2_OK;
 }
 
-int g2_upload_patch(int slot, const char *filepath) {
-    if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
-    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+/* Locates the section-data region within a raw .pch2/.prf2 buffer:
+ * [name][0x00][0x17][0x00][section bytes][2 byte CRC]. Returns 0 on success, -1 if
+ * the buffer is too short to contain a valid section (data_len <= 0). */
+static int locate_section_data(const uint8_t *data, long fsize, int *name_end, int *data_offset, int *data_len) {
+    int ne = 0;
+    while (ne < fsize && data[ne]) ne++;
+    *name_end = ne;
+    *data_offset = ne + 3;   /* skip NUL + 0x17 + 0x00 */
+    *data_len = (int)fsize - *data_offset - 2;  /* exclude trailing 2-byte CRC */
+    return (*data_len > 0) ? 0 : -1;
+}
 
-    FILE *f = fopen(filepath, "rb");
-    if (!f) return G2_ERR_FILE_OPEN;
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    rewind(f);
-    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
-    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
-    fread(file_data, 1, (size_t)fsize, f);
-    fclose(f);
-
-    /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
-     * Use filename (without extension) as the patch name. */
+/* Derives a wire name (<=15 chars) from a filename's basename, up to the first '.'.
+ * `name` must point at a zeroed 16-byte buffer. Returns the name length. */
+static int name_from_filepath(const char *filepath, char *name) {
     const char *base = strrchr(filepath, '/');
     base = base ? base + 1 : filepath;
-    char name[16] = {0};
     int ni = 0;
     while (ni < 15 && base[ni] && base[ni] != '.') { name[ni] = base[ni]; ni++; }
+    return ni;
+}
 
-    int name_end = 0;
-    while (name_end < fsize && file_data[name_end]) name_end++;
-    int data_offset = name_end + 3;   /* skip NUL + 0x17 + 0x00 */
-    int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
-    if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
-
-    /* Build USB packet with dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer.
-     * Packet: [len_hi][len_lo][0x01][cmd][0x53][0x37][0x00 x3][name+\0][section_data][crc_hi][crc_lo]
-     * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by the Delphi editor).
-     * Name field is variable length: name characters followed by a null byte. */
-    int name_write_len = ni + 1;  /* name chars + terminating null */
+/* Builds and sends the S_SET_PATCH USB packet for a single slot.
+ * Packet: [len_hi][len_lo][0x01][cmd][0x53][0x37][0x00 x3][name+\0][section_data][crc_hi][crc_lo]
+ * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by the Delphi editor).
+ * Name field is variable length: name characters followed by a null byte. */
+static int send_patch_upload(int slot, const char *name, int name_len, const uint8_t *section_data, int data_len) {
+    /* Dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer. */
+    int name_write_len = name_len + 1;  /* name chars + terminating null */
     size_t extraLen = 3 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
-    if (!buff) { free(file_data); return G2_ERR_NO_MEMORY; }
+    if (!buff) return G2_ERR_NO_MEMORY;
 
     int pos = COMMAND_OFFSET;
     buff[pos++] = 0x01;
@@ -1770,9 +1766,8 @@ int g2_upload_patch(int slot, const char *filepath) {
     pos += 3;  /* three zero bytes (calloc) */
     memcpy(buff + pos, name, (size_t)name_write_len);
     pos += name_write_len;
-    memcpy(buff + pos, file_data + data_offset, (size_t)data_len);
+    memcpy(buff + pos, section_data, (size_t)data_len);
     pos += data_len;
-    free(file_data);
 
     int msgLength = pos - COMMAND_OFFSET;
     uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
@@ -1796,7 +1791,8 @@ int g2_upload_patch(int slot, const char *filepath) {
     return G2_OK;
 }
 
-int g2_upload_perf(const char *filepath) {
+int g2_upload_patch(int slot, const char *filepath) {
+    if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
 
     FILE *f = fopen(filepath, "rb");
@@ -1809,29 +1805,53 @@ int g2_upload_perf(const char *filepath) {
     fread(file_data, 1, (size_t)fsize, f);
     fclose(f);
 
-    /* prf2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
-     * Use filename (without extension) as the performance name. */
-    const char *base = strrchr(filepath, '/');
-    base = base ? base + 1 : filepath;
+    /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
+     * Use filename (without extension) as the patch name. */
     char name[16] = {0};
-    int ni = 0;
-    while (ni < 15 && base[ni] && base[ni] != '.') { name[ni] = base[ni]; ni++; }
+    int ni = name_from_filepath(filepath, name);
 
-    int name_end = 0;
-    while (name_end < fsize && file_data[name_end]) name_end++;
-    int data_offset = name_end + 3;   /* skip NUL + 0x17 + 0x00 */
-    int data_len = (int)fsize - data_offset - 2;  /* exclude trailing 2-byte CRC */
-    if (data_len <= 0) { free(file_data); return G2_ERR_PARSE; }
+    int name_end, data_offset, data_len;
+    if (locate_section_data(file_data, fsize, &name_end, &data_offset, &data_len) < 0) {
+        free(file_data);
+        return G2_ERR_PARSE;
+    }
 
-    /* Performance upload: CMD_SYS (0x2C), version 0x42, subcommand 0x37 (S_SET_PATCH).
-     * After the name, the G2 parser expects [$1A][$29][name\0] before the section data
-     * (confirmed by Delphi AddMsgSetPerformance in BVE.NMG2Synth.pas). Without it
-     * the parser finds 0x11 (C_PERF_SETTINGS) where it expects 0x1A, hanging the G2. */
-    int name_write_len = ni + 1;
+    int ret = send_patch_upload(slot, name, ni, file_data + data_offset, data_len);
+    free(file_data);
+    return ret;
+}
+
+/* Same as g2_upload_patch, but takes an already-in-memory pch2 buffer instead of a
+ * filepath — used by the daemon's "upload-patch-data" command so the caller (the
+ * Electron app) doesn't need to round-trip the patch through a temp file. The wire
+ * name is read from the buffer's own leading NUL-terminated bytes (truncated to 15
+ * chars), matching the name already embedded there by the caller. */
+int g2_upload_patch_buf(int slot, const uint8_t *data, size_t len) {
+    if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+
+    int name_end, data_offset, data_len;
+    if (locate_section_data(data, (long)len, &name_end, &data_offset, &data_len) < 0)
+        return G2_ERR_PARSE;
+
+    int ni = name_end < 15 ? name_end : 15;
+    char name[16] = {0};
+    memcpy(name, data, (size_t)ni);
+
+    return send_patch_upload(slot, name, ni, data + data_offset, data_len);
+}
+
+/* Builds and sends the S_SET_PATCH performance-upload USB packet (CMD_SYS scope).
+ * Performance upload: CMD_SYS (0x2C), version 0x42, subcommand 0x37 (S_SET_PATCH).
+ * After the name, the G2 parser expects [$1A][$29][name\0] before the section data
+ * (confirmed by Delphi AddMsgSetPerformance in BVE.NMG2Synth.pas). Without it
+ * the parser finds 0x11 (C_PERF_SETTINGS) where it expects 0x1A, hanging the G2. */
+static int send_perf_upload(const char *name, int name_len, const uint8_t *section_data, int data_len) {
+    int name_write_len = name_len + 1;
     size_t extraLen = 3 + (size_t)name_write_len + 2 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
-    if (!buff) { free(file_data); return G2_ERR_NO_MEMORY; }
+    if (!buff) return G2_ERR_NO_MEMORY;
 
     int pos = COMMAND_OFFSET;
     buff[pos++] = 0x01;
@@ -1845,9 +1865,8 @@ int g2_upload_perf(const char *filepath) {
     buff[pos++] = 0x29;  /* C_PERF_NAME inline header required by G2 parser */
     memcpy(buff + pos, name, (size_t)name_write_len);
     pos += name_write_len;
-    memcpy(buff + pos, file_data + data_offset, (size_t)data_len);
+    memcpy(buff + pos, section_data, (size_t)data_len);
     pos += data_len;
-    free(file_data);
 
     int msgLength = pos - COMMAND_OFFSET;
     uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
@@ -1869,6 +1888,51 @@ int g2_upload_perf(const char *filepath) {
         g2_stop_comm();
     }
     return G2_OK;
+}
+
+int g2_upload_perf(const char *filepath) {
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+
+    FILE *f = fopen(filepath, "rb");
+    if (!f) return G2_ERR_FILE_OPEN;
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
+    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
+    fread(file_data, 1, (size_t)fsize, f);
+    fclose(f);
+
+    /* prf2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
+     * Use filename (without extension) as the performance name. */
+    char name[16] = {0};
+    int ni = name_from_filepath(filepath, name);
+
+    int name_end, data_offset, data_len;
+    if (locate_section_data(file_data, fsize, &name_end, &data_offset, &data_len) < 0) {
+        free(file_data);
+        return G2_ERR_PARSE;
+    }
+
+    int ret = send_perf_upload(name, ni, file_data + data_offset, data_len);
+    free(file_data);
+    return ret;
+}
+
+/* Same as g2_upload_perf, but takes an already-in-memory prf2 buffer instead of a
+ * filepath — see g2_upload_patch_buf for why. */
+int g2_upload_perf_buf(const uint8_t *data, size_t len) {
+    if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
+
+    int name_end, data_offset, data_len;
+    if (locate_section_data(data, (long)len, &name_end, &data_offset, &data_len) < 0)
+        return G2_ERR_PARSE;
+
+    int ni = name_end < 15 ? name_end : 15;
+    char name[16] = {0};
+    memcpy(name, data, (size_t)ni);
+
+    return send_perf_upload(name, ni, data + data_offset, data_len);
 }
 
 cJSON *g2_get_perf_file(const char *filename) {

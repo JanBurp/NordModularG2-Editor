@@ -8,7 +8,6 @@ if (process.env.TEST_USER_DATA) {
 import { fileURLToPath } from "node:url";
 import path from "node:path";
 import fs from "node:fs";
-import os from "node:os";
 import { spawn, type ChildProcess } from "child_process";
 import { loadWindowState, trackWindowState } from "./windowState";
 import type { MenuState } from "../src/types/index";
@@ -138,7 +137,7 @@ async function stopDaemon(): Promise<void> {
 	});
 }
 
-function sendCmd(cmd: string, args: string[]): Promise<string> {
+function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
 	return new Promise((resolve, reject) => {
 		if (!daemonProcess) {
 			reject(new Error("Daemon not running"));
@@ -151,13 +150,15 @@ function sendCmd(cmd: string, args: string[]): Promise<string> {
 		}, 30_000);
 		pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd, args });
-		console.log('[daemon-cmd]->', json);
+		// Elide inline byte-array payloads (e.g. upload-patch-data) from the log line.
+		const logArgs = args.map((a) => (Array.isArray(a) ? `<${a.length} bytes>` : a));
+		console.log('[daemon-cmd]->', JSON.stringify({ id, cmd, args: logArgs }));
 		daemonProcess.stdin?.write(json + "\n");
 	});
 }
 
-ipcMain.handle("cli:run", async (_, args: string[]) => {
-	const [cmd, ...rest] = args;
+ipcMain.handle("cli:run", async (_, args: (string | number[])[]) => {
+	const [cmd, ...rest] = args as [string, ...(string | number[])[]];
 	if (cmd === "disconnect") { await stopDaemon(); return ""; }
 	return await sendCmd(cmd, rest);
 });
@@ -251,22 +252,6 @@ ipcMain.handle("patches:set-folder", async (event) => {
 
 ipcMain.handle("patch:save", async (_, filepath: string, data: number[]) => {
 	fs.writeFileSync(filepath, Buffer.from(data));
-});
-
-// Writes a patch to a fresh temp dir for a silent (no-dialog) upload-patch push. g2_upload_patch
-// derives the on-device patch name from this file's basename (up to the first '.', truncated to
-// 15 chars) — sanitize so the temp path's basename matches the patch's actual name.
-ipcMain.handle("patch:write-temp", async (_, name: string, data: number[]) => {
-	const safe =
-		(name || "patch")
-			.replace(/[\\/:*?"<>|]/g, "_")
-			.replace(/\./g, "_")
-			.trim()
-			.slice(0, 15) || "patch";
-	const dir = fs.mkdtempSync(path.join(os.tmpdir(), "g2-notes-"));
-	const filepath = path.join(dir, `${safe}.pch2`);
-	fs.writeFileSync(filepath, Buffer.from(data));
-	return filepath;
 });
 
 ipcMain.handle("patch:save-dialog", async (event, defaultName?: string, folder?: string) => {

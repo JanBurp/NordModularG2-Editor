@@ -30,8 +30,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 	savePatch: (filepath: string, data: number[]) =>
 		ipcRenderer.invoke("patch:save", filepath, data),
-	writeTempPatch: (name: string, data: number[]) =>
-		ipcRenderer.invoke("patch:write-temp", name, data),
 	showSaveDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName, folder),
 	showSavePerfDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("perf:save-dialog", defaultName, folder),
 	openPatchDialog: (kind?: "patch" | "performance") => ipcRenderer.invoke("patch:open-dialog", kind),
@@ -42,9 +40,15 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),
 });
 
+/* Formats a command's args for the USB log, replacing any inline byte-array payload
+ * (e.g. upload-patch-data) with its length so a patch's raw bytes never flood the log. */
+function fmtArgs(args: (string | number[])[]): string {
+	return args.map((a) => (Array.isArray(a) ? `<${a.length} bytes>` : a)).join(' ');
+}
+
 contextBridge.exposeInMainWorld("cli", {
-	run: (args: string[]) => {
-		console.log(`[USB] ${now()} → Cmd ${args.join(' ')}`);
+	run: (args: (string | number[])[]) => {
+		console.log(`[USB] ${now()} → Cmd ${fmtArgs(args)}`);
 		return ipcRenderer.invoke("cli:run", args);
 	},
 	runBatch: (argsList: string[][]) => {

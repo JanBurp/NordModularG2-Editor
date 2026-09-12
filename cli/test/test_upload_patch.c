@@ -179,6 +179,71 @@ static void do_upload_roundtrip(const char *label, const char *filepath) {
     usleep(300000);
 }
 
+/* Same as do_upload_roundtrip, but exercises g2_upload_patch_buf (the in-memory
+ * path used by the daemon's "upload-patch-data" command) instead of g2_upload_patch. */
+static void do_upload_buf_roundtrip(const char *label, const char *filepath) {
+    ensure_g2();
+    usleep(300000);
+
+    FILE *f = fopen(filepath, "rb");
+    TEST_ASSERT_NOT_NULL_MESSAGE(f, "could not open fixture file");
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+    uint8_t *file_data = malloc((size_t)fsize);
+    TEST_ASSERT_NOT_NULL(file_data);
+    fread(file_data, 1, (size_t)fsize, f);
+    fclose(f);
+
+    fprintf(stderr, "  upload (buf): %s\n", filepath);
+    int ret = g2_upload_patch_buf(SLOT_A, file_data, (size_t)fsize);
+    free(file_data);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(G2_OK, ret, "g2_upload_patch_buf failed");
+
+    usleep(600000);
+    g2_stop_comm();
+
+    cJSON *patch = g2_get_patch("A");
+    TEST_ASSERT_NOT_NULL_MESSAGE(patch, "g2_get_patch returned NULL after buf upload");
+
+    cJSON *name_item = cJSON_GetObjectItem(patch, "name");
+    TEST_ASSERT_NOT_NULL_MESSAGE(name_item, "no 'name' field in get-patch result");
+    const char *got_name = cJSON_GetStringValue(name_item);
+    fprintf(stderr, "  G2 patch name after buf upload: '%s'\n", got_name ? got_name : "(null)");
+    cJSON_Delete(patch);
+
+    mkdir(TMP_OUT_DIR, 0755);
+    char out_path[256];
+    snprintf(out_path, sizeof(out_path), "%s/%s_buf_roundtrip.pch2", TMP_OUT_DIR, label);
+    cJSON *file_result = g2_get_patch_file("A", out_path);
+    TEST_ASSERT_NOT_NULL_MESSAGE(file_result, "g2_get_patch_file returned NULL");
+    cJSON_Delete(file_result);
+
+    uint8_t orig_sections[32768], rt_sections[32768];
+    int orig_len = read_pch2_sections(filepath, orig_sections, sizeof(orig_sections));
+    int rt_len   = read_raw_sections(out_path,  rt_sections,  sizeof(rt_sections));
+
+    TEST_ASSERT_TRUE_MESSAGE(orig_len > 0, "could not read original pch2 sections");
+    TEST_ASSERT_TRUE_MESSAGE(rt_len   > 0, "could not read roundtrip pch2 sections");
+
+    uint8_t orig_ids[32], rt_ids[32];
+    int orig_count = collect_section_ids(orig_sections, orig_len, orig_ids, 32);
+    int rt_count   = collect_section_ids(rt_sections,   rt_len,   rt_ids,   32);
+
+    uint8_t orig_filt[32], rt_filt[32];
+    int orig_filt_count = filter_and_sort(orig_ids, orig_count, orig_filt);
+    int rt_filt_count   = filter_and_sort(rt_ids,   rt_count,   rt_filt);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(orig_filt_count, rt_filt_count, "section count differs after filtering");
+    TEST_ASSERT_EQUAL_UINT8_ARRAY_MESSAGE(orig_filt, rt_filt, orig_filt_count, "section IDs differ");
+
+    usleep(300000);
+}
+
+void test_upload_dxbass_buf(void) {
+    do_upload_buf_roundtrip("DXBassBuf", TEST_PATCHES_DIR "/DXBass FM4.pch2");
+}
+
 /* ------------------------------------------------------------------ */
 
 void test_upload_empty_patch(void) {

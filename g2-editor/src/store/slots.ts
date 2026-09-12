@@ -1710,9 +1710,8 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Pushes the slot's current in-memory patch to the connected device via a full re-upload —
-		// the only way patch notes reach hardware live (see setPatchText's comment). Writes a temp
-		// file named after the patch (g2_upload_patch derives the on-device name from the filename)
-		// and reuses uploadingFromFile so this never races usePatchFile.ts's own upload-patch calls.
+		// the only way patch notes reach hardware live (see setPatchText's comment). Reuses
+		// uploadingFromFile so this never races usePatchFile.ts's own upload-patch calls.
 		async pushPatchToDevice(slot: SlotLabel): Promise<boolean> {
 			const entry = this.slots[slot];
 			if (!entry?.patch) return false;
@@ -1723,9 +1722,9 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Shared by pushPatchToDevice and "Download to Slot": serializes the source slot's current
-		// patch, writes it to a temp file (g2_upload_patch derives the on-device name from that
-		// filename) and uploads it into the target slot of the connected synth. forceReserialize is
-		// deliberate — see _buildPchBytes' CRC comment: never trust a cached hardware-fetched rawHex.
+		// patch and uploads the bytes directly into the target slot of the connected synth.
+		// forceReserialize is deliberate — see _buildPchBytes' CRC comment: never trust a cached
+		// hardware-fetched rawHex.
 		async _uploadSlotToDevice(source: SlotLabel, target: SlotLabel): Promise<boolean> {
 			const entry = this.slots[source];
 			if (!entry?.patch) return false;
@@ -1734,8 +1733,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.uploadingFromFile = true;
 			try {
 				const bytes = await this._buildPchBytes(entry, true);
-				const tempPath = await window.electronAPI.writeTempPatch(entry.name, bytes);
-				await window.cli.run(['upload-patch', target, tempPath]);
+				await window.cli.run(['upload-patch-data', target, bytes]);
 				return true;
 			} catch (err) {
 				console.error(`Push slot ${source} to G2 slot ${target} failed:`, err);
@@ -1746,13 +1744,29 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// get-patch immediately after a patch upload can race the G2 still applying it internally,
+		// returning a malformed response — g2_upload_perf's own post-upload settle delay and the
+		// CLI's upload integration tests (which pause before querying a just-uploaded slot) hit the
+		// same issue. Retry with backoff rather than guessing a single fixed delay.
+		async _reloadSlotAfterUpload(slot: SlotLabel): Promise<void> {
+			for (let attempt = 1; attempt <= 3; attempt++) {
+				await new Promise((resolve) => setTimeout(resolve, 500 * attempt));
+				if (await this.loadSlot(slot, true)) return;
+			}
+		},
+
 		// Patch → "Download to Slot": push the current patch of `source` into `target` in the synth.
+		// Reloads `target` from hardware afterward rather than relying on the patch_version_change/
+		// resources_used watch-event pair — that reload trigger is only confirmed for in-app
+		// structural edits (add/move/delete module or cable), not a wholesale slot upload like this.
 		async downloadToSynthSlot(source: SlotLabel, target: SlotLabel): Promise<boolean> {
-			return this._uploadSlotToDevice(source, target);
+			const ok = await this._uploadSlotToDevice(source, target);
+			if (ok) await this._reloadSlotAfterUpload(target);
+			return ok;
 		},
 
 		// Performance → "Download": push the locally-authored performance (a .prf2 loaded while
-		// working in local mode) to the connected synth via upload-perf. Requires a performance
+		// working in local mode) to the connected synth via upload-perf-data. Requires a performance
 		// template to reserialize from — re-uploads the in-memory edits, not the stale disk file.
 		async downloadPerformanceToSynth(): Promise<boolean> {
 			if (!this.performanceRawHex) {
@@ -1783,8 +1797,11 @@ export const useSlotsStore = defineStore('slots', {
 				const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 				const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
 				const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
-				const tempPath = await window.electronAPI.writeTempPatch(this.performanceName, data);
-				await window.cli.run(['upload-perf', tempPath]);
+				await window.cli.run(['upload-perf-data', data]);
+				// Same reasoning as downloadToSynthSlot: reload all 4 slots explicitly (with retry —
+				// see _reloadSlotAfterUpload) rather than relying on the watch-event reload chain,
+				// which isn't confirmed for a full upload.
+				await Promise.all((['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this._reloadSlotAfterUpload(s)));
 				return true;
 			} catch (err) {
 				console.error('Failed to download performance to G2:', err);

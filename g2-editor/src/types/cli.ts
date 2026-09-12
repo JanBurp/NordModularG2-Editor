@@ -1,5 +1,5 @@
 export interface CliService {
-	run(args: string[]): Promise<string>;
+	run(args: (string | number[])[]): Promise<string>;
 	runBatch(argsList: string[][]): Promise<string[]>;
 	watchStart(): Promise<void>;
 	watchStop(): void;

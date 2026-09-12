@@ -38,6 +38,7 @@ extern void test_stress_editor_mimic(void);
 extern void test_upload_empty_patch(void);
 extern void test_upload_nl2(void);
 extern void test_upload_dxbass(void);
+extern void test_upload_dxbass_buf(void);
 extern void test_upload_mixt(void);
 extern void test_upload_empty_perf(void);
 extern void test_upload_morphing_drum(void);
@@ -106,6 +107,7 @@ int main(void) {
     // run_test_with_output("test_upload_empty_patch", test_upload_empty_patch);
     // run_test_with_output("test_upload_nl2",        test_upload_nl2);
     // run_test_with_output("test_upload_dxbass",       test_upload_dxbass);
+    // run_test_with_output("test_upload_dxbass_buf",   test_upload_dxbass_buf);
     // run_test_with_output("test_upload_mixt",      test_upload_mixt);
     // run_test_with_output("test_upload_empty_perf",    test_upload_empty_perf);
     // run_test_with_output("test_upload_morphing_drum", test_upload_morphing_drum);

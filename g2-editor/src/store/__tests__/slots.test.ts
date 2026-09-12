@@ -600,10 +600,9 @@ describe('pushPatchToDevice', () => {
 		return store;
 	}
 
-	it('pushes via upload-patch, always force-reserializing rather than trusting a cached rawHex that may lack the CRC upload-patch expects', async () => {
+	it('pushes via upload-patch-data, always force-reserializing rather than trusting a cached rawHex that may lack the CRC upload-patch expects', async () => {
 		const store = seedDirtyPatch();
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/Test.pch2') };
 		const runSpy = (globalThis as any).window.cli.run;
 		const serializeSpy = vi.spyOn(await import('@/parser/nmg2PatchSerializer'), 'serializePatch').mockReturnValue('ab'.repeat(20) + 'cdef');
 
@@ -613,45 +612,39 @@ describe('pushPatchToDevice', () => {
 		expect(serializeSpy).toHaveBeenCalled(); // re-serialized despite rawHex already being cached/non-null
 		expect(store.slots['A'].rawHex).toBe('ab'.repeat(20) + 'cdef'); // cache updated with the CRC-safe result
 		expect(store.slots['A'].textDirty).toBe(false);
-		expect(runSpy).toHaveBeenCalledWith(['upload-patch', 'A', '/tmp/g2-notes-x/Test.pch2']);
+		expect(runSpy).toHaveBeenCalledWith(['upload-patch-data', 'A', expect.any(Array)]);
 	});
 
 	it('no-ops when the slot is not dirty — never re-upload an untouched slot', async () => {
 		const store = seedDirtyPatch();
 		store.slots['A'].textDirty = false;
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.pushPatchToDevice('A');
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
-		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-patch']));
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-patch-data']));
 	});
 
 	it('no-ops (stays dirty) when not connected', async () => {
 		const store = seedDirtyPatch();
 		useDeviceStore().status = DeviceStatus.Disconnected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.pushPatchToDevice('A');
 
 		expect(result).toBe(false);
 		expect(store.slots['A'].textDirty).toBe(true);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 
 	it('no-ops (stays dirty) when an upload is already in flight', async () => {
 		const store = seedDirtyPatch();
 		useDeviceStore().status = DeviceStatus.Connected;
 		store.uploadingFromFile = true;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.pushPatchToDevice('A');
 
 		expect(result).toBe(false);
 		expect(store.slots['A'].textDirty).toBe(true);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 });
 
@@ -665,70 +658,132 @@ describe('downloadToSynthSlot — Download to Slot', () => {
 		return store;
 	}
 
-	it('uploads the source slot patch into the target slot when connected', async () => {
+	it('uploads the source slot patch into the target slot when connected, then reloads the target from hardware', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = seedPatch();
+			useDeviceStore().status = DeviceStatus.Connected;
+			const runSpy = (globalThis as any).window.cli.run;
+			const loadSlotSpy = vi.spyOn(store, 'loadSlot');
+
+			const resultPromise = store.downloadToSynthSlot('A', 'C');
+			await vi.runAllTimersAsync();
+			const result = await resultPromise;
+
+			expect(result).toBe(true);
+			expect(runSpy).toHaveBeenCalledWith(['upload-patch-data', 'C', expect.any(Array)]);
+			expect(loadSlotSpy).toHaveBeenCalledWith('C', true);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('does not reload the target slot when the upload fails', async () => {
 		const store = seedPatch();
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/My_Patch.pch2') };
-		const runSpy = (globalThis as any).window.cli.run;
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('USB error'));
+		const loadSlotSpy = vi.spyOn(store, 'loadSlot');
 
 		const result = await store.downloadToSynthSlot('A', 'C');
 
-		expect(result).toBe(true);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).toHaveBeenCalledWith('My Patch', expect.any(Array));
-		expect(runSpy).toHaveBeenCalledWith(['upload-patch', 'C', '/tmp/g2-notes-x/My_Patch.pch2']);
+		expect(result).toBe(false);
+		expect(loadSlotSpy).not.toHaveBeenCalled();
 	});
 
 	it('no-ops when not connected', async () => {
 		const store = seedPatch();
 		useDeviceStore().status = DeviceStatus.Disconnected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.downloadToSynthSlot('A', 'B');
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 
 	it('no-ops when the source slot has no patch', async () => {
 		const store = seedPatch();
 		store.slots['A'].patch = null as any;
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.downloadToSynthSlot('A', 'B');
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
+	});
+});
+
+describe('_reloadSlotAfterUpload — retry with backoff', () => {
+	it('stops retrying as soon as loadSlot succeeds', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			const loadSlotSpy = vi
+				.spyOn(store, 'loadSlot')
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce(null)
+				.mockResolvedValueOnce({ name: 'x', rawHex: '', patch: makePatch() });
+
+			const reloadPromise = store._reloadSlotAfterUpload('A');
+			await vi.runAllTimersAsync();
+			await reloadPromise;
+
+			expect(loadSlotSpy).toHaveBeenCalledTimes(3);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('gives up after 3 failed attempts', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			const loadSlotSpy = vi.spyOn(store, 'loadSlot').mockResolvedValue(null);
+
+			const reloadPromise = store._reloadSlotAfterUpload('A');
+			await vi.runAllTimersAsync();
+			await reloadPromise;
+
+			expect(loadSlotSpy).toHaveBeenCalledTimes(3);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 });
 
 describe('downloadPerformanceToSynth — Performance Download', () => {
-	it('uploads the local performance via upload-perf when connected', async () => {
-		const store = useSlotsStore();
-		for (const s of ['A', 'B', 'C', 'D'] as const) {
-			store.slots[s].patch = makePatch();
-			store.slots[s].variations = [];
+	it('uploads the local performance via upload-perf-data when connected, then reloads all 4 slots from hardware', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			for (const s of ['A', 'B', 'C', 'D'] as const) {
+				store.slots[s].patch = makePatch();
+				store.slots[s].variations = [];
+			}
+			store.performanceName = 'My Perf';
+			store.performanceRawHex = '00'.repeat(80);
+			useDeviceStore().status = DeviceStatus.Connected;
+			const loadSlotSpy = vi.spyOn(store, 'loadSlot');
+
+			const resultPromise = store.downloadPerformanceToSynth();
+			await vi.runAllTimersAsync();
+			const result = await resultPromise;
+
+			expect(result).toBe(true);
+			expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['upload-perf-data', expect.any(Array)]);
+			for (const s of ['A', 'B', 'C', 'D'] as const) {
+				expect(loadSlotSpy).toHaveBeenCalledWith(s, true);
+			}
+		} finally {
+			vi.useRealTimers();
 		}
-		store.performanceName = 'My Perf';
-		store.performanceRawHex = '00'.repeat(80);
-		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn().mockResolvedValue('/tmp/g2-notes-x/My_Perf.pch2') };
-
-		const result = await store.downloadPerformanceToSynth();
-
-		expect(result).toBe(true);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['upload-perf', '/tmp/g2-notes-x/My_Perf.pch2']);
 	});
 
 	it('refuses without a local performance template (performanceRawHex)', async () => {
 		const store = useSlotsStore();
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.downloadPerformanceToSynth();
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-perf']));
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-perf-data']));
 	});
 
 	it('refuses when not all slots contain a patch', async () => {
@@ -736,12 +791,10 @@ describe('downloadPerformanceToSynth — Performance Download', () => {
 		store.slots['A'].patch = makePatch();
 		store.performanceRawHex = '00'.repeat(80);
 		useDeviceStore().status = DeviceStatus.Connected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.downloadPerformanceToSynth();
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 
 	it('no-ops when disconnected', async () => {
@@ -749,12 +802,10 @@ describe('downloadPerformanceToSynth — Performance Download', () => {
 		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].patch = makePatch();
 		store.performanceRawHex = '00'.repeat(80);
 		useDeviceStore().status = DeviceStatus.Disconnected;
-		(globalThis as any).window.electronAPI = { writeTempPatch: vi.fn() };
 
 		const result = await store.downloadPerformanceToSynth();
 
 		expect(result).toBe(false);
-		expect((globalThis as any).window.electronAPI.writeTempPatch).not.toHaveBeenCalled();
 	});
 });
 

@@ -10,7 +10,11 @@
 				</div>
 				<div class="flex justify-end gap-2 px-4 py-3 border-t border-line-default">
 					<button class="px-3 py-1 text-xs rounded text-content-secondary hover:text-content-primary cursor-pointer" @click="onCancel">Cancel</button>
-					<button class="px-3 py-1 text-xs rounded bg-input text-black font-medium hover:opacity-90 cursor-pointer" @click="onConfirm">
+					<button
+						v-if="showConfirm"
+						class="px-3 py-1 text-xs rounded bg-input text-black font-medium hover:opacity-90 cursor-pointer"
+						@click="onConfirm"
+					>
 						{{ confirmLabel }}
 					</button>
 				</div>
@@ -27,8 +31,9 @@
 			modelValue: boolean;
 			title: string;
 			confirmLabel?: string;
+			showConfirm?: boolean;
 		}>(),
-		{ confirmLabel: 'OK' },
+		{ confirmLabel: 'OK', showConfirm: true },
 	);
 
 	const emit = defineEmits<{
@@ -59,7 +64,7 @@
 	function onKeydown(e: KeyboardEvent) {
 		if (!props.modelValue) return;
 		if (e.key === 'Escape') onCancel();
-		if (e.key === 'Enter') {
+		if (e.key === 'Enter' && props.showConfirm) {
 			(document.activeElement as HTMLElement)?.blur();
 			onConfirm();
 		}
