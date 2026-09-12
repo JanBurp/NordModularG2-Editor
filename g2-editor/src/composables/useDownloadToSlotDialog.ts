@@ -28,6 +28,7 @@ export function useDownloadToSlotDialog() {
 	}
 
 	const currentSlot = computed(() => uiStore.slotInFocus);
+	const slotNames = computed(() => Object.fromEntries(SLOT_LABELS.map((s) => [s, slotsStore.getPatchName(s)])) as Record<SlotLabel, string>);
 
-	return { showDialog, slotOptions: SLOT_LABELS, currentSlot, open, selectSlot, cancel };
+	return { showDialog, slotOptions: SLOT_LABELS, currentSlot, slotNames, open, selectSlot, cancel };
 }

@@ -175,17 +175,13 @@
 
 	<Dialog v-model="downloadToSlot.showDialog.value" title="Download to Slot" :show-confirm="false" @cancel="downloadToSlot.cancel">
 		<div class="text-sm text-content-primary mb-2">Download the current patch to a slot in the connected synth.</div>
-		<div class="flex gap-2">
-			<Button
-				v-for="s in downloadToSlot.slotOptions"
-				:key="s"
-				variant="default"
-				:disabled="s === downloadToSlot.currentSlot.value"
-				class="flex-1"
-				@click="downloadToSlot.selectSlot(s)"
-			>
-				Slot {{ s }}
-			</Button>
+		<div class="flex flex-col gap-2">
+			<div v-for="s in downloadToSlot.slotOptions" :key="s" class="flex items-center gap-2">
+				<Button variant="default" :disabled="s === downloadToSlot.currentSlot.value" class="w-20" @click="downloadToSlot.selectSlot(s)">
+					Slot {{ s }}
+				</Button>
+				<span class="text-sm text-content-secondary truncate">{{ downloadToSlot.slotNames.value[s] }}</span>
+			</div>
 		</div>
 	</Dialog>
 
