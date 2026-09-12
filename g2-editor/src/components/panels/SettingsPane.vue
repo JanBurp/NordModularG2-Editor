@@ -3,12 +3,22 @@
 		<Collapsible title="Editor Settings" :model-value="isOpen('Editor Settings')" @update:model-value="onToggle('Editor Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorTheme">
-					<BtnGroup :model-value="settings.theme" :options="THEME_OPTIONS" @update:model-value="settings.setTheme($event as ThemeMode)" />
+					<BtnGroup
+						:model-value="settings.theme"
+						variant="variation"
+						:options="THEME_OPTIONS"
+						@update:model-value="settings.setTheme($event as ThemeMode)"
+					/>
 				</SettingsRow>
 
 				<p class="settings-subheader">Knob control:</p>
 				<SettingsRow label="Knob Mode">
-					<BtnGroup :model-value="settings.knobMode" :options="KNOB_MODE_OPTIONS" @update:model-value="settings.setKnobMode($event as KnobMode)" />
+					<BtnGroup
+						:model-value="settings.knobMode"
+						variant="variation"
+						:options="KNOB_MODE_OPTIONS"
+						@update:model-value="settings.setKnobMode($event as KnobMode)"
+					/>
 				</SettingsRow>
 				<SettingsRow label="Sensitivity">
 					<Slider
@@ -73,17 +83,18 @@
 					<CheckBox :model-value="device.device?.midi.local ?? false" @update:model-value="device.setMidiLocal($event)" />
 				</SettingsRow>
 				<SettingsRow label="Clock">
-					<BtnGroup :model-value="clockValue" :options="OFF_SEND_RECV_BOTH" @update:model-value="setClock(Number($event))" />
+					<BtnGroup :model-value="clockValue" variant="variation" :options="OFF_SEND_RECV_BOTH" @update:model-value="setClock(Number($event))" />
 				</SettingsRow>
 				<SettingsRow :label="L.midiPrgCh">
 					<BtnGroup
+						variant="variation"
 						:model-value="device.device?.midi.prgch ?? 0"
 						:options="OFF_SEND_RECV_BOTH"
 						@update:model-value="device.setMidiPrgCh(Number($event))"
 					/>
 				</SettingsRow>
 				<SettingsRow label="CC">
-					<BtnGroup :model-value="ccValue" :options="OFF_SEND_RECV_BOTH" @update:model-value="setCC(Number($event))" />
+					<BtnGroup :model-value="ccValue" variant="variation" :options="OFF_SEND_RECV_BOTH" @update:model-value="setCC(Number($event))" />
 				</SettingsRow>
 				<SettingsRow :label="L.midiSysex">
 					<div class="flex items-center gap-2">
@@ -135,24 +146,21 @@
 					</template>
 				</SettingsRowDuo>
 				<SettingsRow label="Global Oct.">
-					<div class="flex items-center gap-2">
-						<BtnGroup
-							:model-value="device.device?.globalOctaveShift ?? 0"
-							:options="[
-								{ label: '-2', value: -2 },
-								{ label: '-1', value: -1 },
-								{ label: '0', value: 0 },
-								{ label: '+1', value: 1 },
-								{ label: '+2', value: 2 },
-							]"
-							@update:model-value="device.setGlobalOctaveShift(Number($event))"
-						/>
-						<CheckBox
-							:model-value="device.device?.globalOctaveShiftActive ?? false"
-							@update:model-value="device.setGlobalOctaveShiftActive($event)"
-						/>
-						<span class="text-xs text-content-secondary">Active</span>
-					</div>
+					<BtnGroup
+						:model-value="device.device?.globalOctaveShift ?? 0"
+						variant="variation"
+						:options="[
+							{ label: '-2', value: -2 },
+							{ label: '-1', value: -1 },
+							{ label: '0', value: 0 },
+							{ label: '+1', value: 1 },
+							{ label: '+2', value: 2 },
+						]"
+						@update:model-value="device.setGlobalOctaveShift(Number($event))"
+					/>
+				</SettingsRow>
+				<SettingsRow label="Active">
+					<CheckBox :model-value="device.device?.globalOctaveShiftActive ?? false" @update:model-value="device.setGlobalOctaveShiftActive($event)" />
 				</SettingsRow>
 			</div>
 		</Collapsible>
@@ -264,6 +272,7 @@
 						<BtnGroup
 							v-if="param.btnOptions"
 							:model-value="patchParam(param.key)"
+							variant="variation"
 							:options="param.btnOptions"
 							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, Number($event))"
 						/>

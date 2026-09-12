@@ -81,11 +81,11 @@ body {
 }
 
 .btn-toggle {
-	@apply h-6 px-2 text-sm bg-surface-1 border-line-subtle;
+	@apply h-6 px-2 text-sm;
 }
 
 .btn-variation {
-	@apply min-w-7 h-6 px-1.5 text-sm bg-surface-1;
+	@apply min-w-7 h-6 px-1.5 text-sm;
 }
 
 .btn-active {
@@ -123,7 +123,7 @@ body {
 }
 
 .btn-group-pill {
-	@apply rounded-xs border-transparent bg-transparent m-0;
+	@apply rounded-xs m-0;
 }
 
 .btn-group-pill.btn-active {
@@ -155,7 +155,7 @@ body {
 }
 
 .text {
-	@apply border border-line-default text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
+	@apply text-content-primary inline-block px-1 py-1 text-center rounded-xs text-xs;
 }
 
 /* Parameter Pages assign-drag cursors (root classes toggled by ParamDragGhost.vue). Scoped to the
