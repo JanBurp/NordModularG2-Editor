@@ -127,7 +127,7 @@ body {
 }
 
 .btn-group-pill.btn-active {
-	@apply bg-surface-2 text-content-primary! shadow-sm;
+	@apply bg-input text-black!;
 }
 
 .btn-cable-select {

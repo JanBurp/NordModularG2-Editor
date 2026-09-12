@@ -16,7 +16,6 @@
 					:options="SLOT_OPTIONS"
 					:top-indicators="device.getSlotsKeyStatus"
 					:bottom-indicators="device.getSlotsActiveStatus"
-					variant="toggle"
 					testIdPrefix="slot"
 					@update:model-value="handleSlotClick"
 					@shift-click="handleSlotShiftClick"
