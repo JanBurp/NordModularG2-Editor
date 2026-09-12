@@ -721,13 +721,15 @@ describe('morph assignment round-trip', () => {
 		expect(patchB.patchParams![2].morphAssignments).toEqual(patch.patchParams![2].morphAssignments);
 	});
 
-	it('no morph assignments produces no 0x65 section', () => {
+	it('no morph assignments still produces a (all-default) 0x65 section, not a dropped one', () => {
+		// MORPH_PARAMS is a fixed 9-variation structure that's always present on the wire,
+		// even with no assignments — dropping it corrupted the section sequence.
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		for (const p of patch.patchParams ?? []) p.morphAssignments = [];
 
 		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 
-		expect(extractSection(newHex, 0x65)).toBeNull();
+		expect(extractSection(newHex, 0x65)).not.toBeNull();
 	});
 
 	it('a real fixture with an existing 0x65 section (Analogue NL2.pch2) parses it and round-trips byte-identically', () => {
@@ -854,6 +856,33 @@ describe('prf2 round-trip: parse → serializePerformance → parse', () => {
 	}
 });
 
+describe('prf2 whole-message structure preservation (regression: wire-upload hang)', () => {
+	// A real G2 hung when downloading a performance re-serialized from an unedited .prf2 —
+	// serializePerformance treated the trailing C_KNOBS_GLOBAL section as a 5th slot, resetting
+	// its "already written" tracking and causing the post-loop catch-up to re-emit a slot's
+	// CONTROLLERS/morph-PARAM_NAMES a second time *instead of* the required C_KNOBS_GLOBAL
+	// terminator. Section-by-section patch equality (the describe block above) doesn't catch
+	// this since it never looks past the last parsed patch, so assert on the raw structure too.
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(`${file}: unmodified round-trip ends in a single, correctly-aligned C_KNOBS_GLOBAL section`, () => {
+			const { rawHex, patches } = loadFixturePrf2(file);
+			const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+
+			const bytes = new Uint8Array(newHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+			const dataLen = bytes.length - 2;
+			let ofs = 0;
+			let lastType = -1;
+			while (ofs < dataLen) {
+				lastType = bytes[ofs];
+				const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+				ofs += 3 + siz;
+			}
+			expect(ofs).toBe(dataLen); // no partial/misaligned trailing bytes
+			expect(lastType).toBe(0x5f); // C_KNOBS_GLOBAL
+		});
+	}
+});
+
 describe('prf2 0x11 section preservation', () => {
 	it('perf data header (0x11) is byte-identical after round-trip', () => {
 		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
@@ -966,13 +995,16 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 		expect(patchB.controllers).toEqual(patch.controllers);
 	});
 
-	it('empty controllers produces no 0x60 section', () => {
+	it('empty controllers still produces a (zero-count) 0x60 section, not a dropped one', () => {
+		// The wire format always carries a CONTROLLERS section — dropping it entirely when
+		// empty (rather than writing a valid zero-count one) previously corrupted the
+		// section sequence for any patch/performance with no MIDI-CC assignments.
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		patch.controllers = [];
 
 		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 
-		expect(extractSection(newHex, 0x60)).toBeNull();
+		expect(extractSection(newHex, 0x60)).not.toBeNull();
 	});
 
 	it('controllers removed when deassigned', () => {
@@ -1016,13 +1048,15 @@ describe('Parameter Pages round-trip: assign → serialize → parse', () => {
 		expect(patchB.paramPages).toEqual(patch.paramPages);
 	});
 
-	it('empty paramPages produces no 0x62 section', () => {
+	it('empty paramPages still produces a (all-empty) 0x62 section, not a dropped one', () => {
+		// Same reasoning as the CONTROLLERS case above: KNOBS is a fixed-size 120-slot bitmap
+		// that's always present on the wire, even when nothing is assigned.
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		patch.paramPages = [];
 
 		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
 
-		expect(extractSection(newHex, 0x62)).toBeNull();
+		expect(extractSection(newHex, 0x62)).not.toBeNull();
 	});
 
 	it('paramPages removed when deassigned', () => {
@@ -1069,10 +1103,12 @@ describe('Global Parameter Pages round-trip: assign → serializePerformance →
 		expect(reparsed).toEqual(assignments);
 	});
 
-	it('empty globalParamPages produces no 0x5f section', () => {
+	it('empty globalParamPages still produces a (all-empty) 0x5f section, not a dropped one', () => {
+		// C_KNOBS_GLOBAL is the wire format's final, terminating section for a whole-performance
+		// upload — dropping it when empty left the message without its required terminator.
 		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
 		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations), []);
-		expect(extractSection(newHex, 0x5f)).toBeNull();
+		expect(extractSection(newHex, 0x5f)).not.toBeNull();
 	});
 
 	it('globalParamPages removed when deassigned', () => {

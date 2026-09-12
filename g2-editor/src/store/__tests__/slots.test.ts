@@ -748,64 +748,22 @@ describe('_reloadSlotAfterUpload — retry with backoff', () => {
 	});
 });
 
-describe('downloadPerformanceToSynth — Performance Download', () => {
-	it('uploads the local performance via upload-perf-data when connected, then reloads all 4 slots from hardware', async () => {
-		vi.useFakeTimers();
-		try {
-			const store = useSlotsStore();
-			for (const s of ['A', 'B', 'C', 'D'] as const) {
-				store.slots[s].patch = makePatch();
-				store.slots[s].variations = [];
-			}
-			store.performanceName = 'My Perf';
-			store.performanceRawHex = '00'.repeat(80);
-			useDeviceStore().status = DeviceStatus.Connected;
-			const loadSlotSpy = vi.spyOn(store, 'loadSlot');
-
-			const resultPromise = store.downloadPerformanceToSynth();
-			await vi.runAllTimersAsync();
-			const result = await resultPromise;
-
-			expect(result).toBe(true);
-			expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['upload-perf-data', expect.any(Array)]);
-			for (const s of ['A', 'B', 'C', 'D'] as const) {
-				expect(loadSlotSpy).toHaveBeenCalledWith(s, true);
-			}
-		} finally {
-			vi.useRealTimers();
-		}
-	});
-
-	it('refuses without a local performance template (performanceRawHex)', async () => {
+describe('downloadPerformanceToSynth — Performance Download (temporarily disabled)', () => {
+	// The whole-performance upload-perf-data wire message repeatedly hung real G2 hardware
+	// across several independent fix attempts (content, framing, handshake sequencing) — see
+	// project notes. Disabled until the protocol issue is root-caused or the feature is rebuilt
+	// on the proven single-patch upload path. The prior working implementation and its tests
+	// are preserved in git history rather than left in place as unreachable/dead code.
+	it('always refuses and never touches the wire, regardless of state', async () => {
 		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].patch = makePatch();
+		store.performanceRawHex = '00'.repeat(80);
 		useDeviceStore().status = DeviceStatus.Connected;
 
 		const result = await store.downloadPerformanceToSynth();
 
 		expect(result).toBe(false);
 		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-perf-data']));
-	});
-
-	it('refuses when not all slots contain a patch', async () => {
-		const store = useSlotsStore();
-		store.slots['A'].patch = makePatch();
-		store.performanceRawHex = '00'.repeat(80);
-		useDeviceStore().status = DeviceStatus.Connected;
-
-		const result = await store.downloadPerformanceToSynth();
-
-		expect(result).toBe(false);
-	});
-
-	it('no-ops when disconnected', async () => {
-		const store = useSlotsStore();
-		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].patch = makePatch();
-		store.performanceRawHex = '00'.repeat(80);
-		useDeviceStore().status = DeviceStatus.Disconnected;
-
-		const result = await store.downloadPerformanceToSynth();
-
-		expect(result).toBe(false);
 	});
 });
 

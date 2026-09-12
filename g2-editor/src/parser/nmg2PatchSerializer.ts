@@ -514,15 +514,17 @@ function processSection(
 		const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
 		out.push(makeSection(SectionType.PATCH_DESC, newData));
 	} else if (type === SectionType.CONTROLLERS && !w.m60) {
-		const controllers = patch.controllers ?? [];
-		if (controllers.length > 0) out.push(writeControllers(controllers));
+		// writeControllers([]) already produces a valid, correctly-sized "zero assignments"
+		// section — call it unconditionally instead of dropping the section when empty.
+		out.push(writeControllers(patch.controllers ?? []));
 		w.m60 = true;
 	} else if (type === SectionType.KNOBS && !w.m62) {
-		const knobs = patch.paramPages ?? [];
-		if (knobs.length > 0) out.push(writeKnobs(knobs));
+		// Same reasoning as CONTROLLERS: writeKnobs([]) is a valid fixed-size empty bitmap.
+		out.push(writeKnobs(patch.paramPages ?? []));
 		w.m62 = true;
 	} else if (type === SectionType.MORPH_PARAMS && !w.m65) {
-		if (hasMorphAssignments(variations)) out.push(writeMorphParamSection(variations.map((v) => v.patch)));
+		// Same reasoning: writeMorphParamSection always emits its fixed 9-variation structure.
+		out.push(writeMorphParamSection(variations.map((v) => v.patch)));
 		w.m65 = true;
 	} else if (type === SectionType.SEPARATOR) {
 		out.push(writeTextPad(patch.text ?? ''));
@@ -605,7 +607,10 @@ export function serializePerformance(
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
 		if (type === SectionType.KNOBS_GLOBAL) {
-			if (!wroteGlobalKnobs && globalParamPages.length > 0) out.push(writeGlobalKnobs(globalParamPages));
+			// writeGlobalKnobs([]) already produces a valid fixed-size empty bitmap — call it
+			// unconditionally (like CONTROLLERS/KNOBS/MORPH_PARAMS above) instead of dropping
+			// the section when there are no global page assignments to write.
+			if (!wroteGlobalKnobs) out.push(writeGlobalKnobs(globalParamPages));
 			wroteGlobalKnobs = true;
 		} else if (type === SectionType.SEPARATOR) {
 			const patch = patches[slotIdx] ?? patches[0];
@@ -622,8 +627,12 @@ export function serializePerformance(
 				out.push(writeParamNames(2, morphParamNamesEntries(patch))!);
 			}
 			out.push(writeTextPad(patch.text ?? ''));
-			// Advance to next slot when more data follows
-			if (ofs + 3 + siz < sectionDataLen) {
+			// Advance to the next slot — but only while there still is one. A performance always
+			// has exactly 4 slots; the trailing C_KNOBS_GLOBAL section after the 4th slot's own
+			// separator is NOT a 5th slot. Advancing/resetting `w` for it was wrong: it made the
+			// post-loop catch-up below treat slot 4's own sections as "never written" and
+			// re-emit them a second time (e.g. a duplicate CONTROLLERS/morph-PARAM_NAMES section).
+			if (slotIdx < SLOT_LABELS.length - 1) {
 				slotIdx++;
 				w = newWrittenSets();
 			}

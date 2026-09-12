@@ -202,7 +202,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useDownloadToSlotDialog().open();
 					break;
 				case 'download-performance':
-					showToast('Downloading performance to G2...');
+					// downloadPerformanceToSynth reports its own outcome via toast (including
+					// the "temporarily disabled" case — see its own doc comment).
 					await slotsStore.downloadPerformanceToSynth();
 					break;
 				case 'upload-active-slot': {
