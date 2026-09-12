@@ -231,7 +231,7 @@
 					v-model="bankUpload.bankNum.value"
 					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 				>
-					<option v-for="n in bankUpload.bankOptions" :key="n" :value="n">{{ n }}</option>
+					<option v-for="n in bankUpload.bankOptions.value" :key="n" :value="n">{{ n }}</option>
 				</select>
 			</div>
 			<div class="flex items-center gap-2">
@@ -291,7 +291,7 @@
 					v-model="bankDownload.bankNum.value"
 					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 				>
-					<option v-for="n in bankDownload.bankOptions" :key="n" :value="n">{{ n }}</option>
+					<option v-for="n in bankDownload.bankOptions.value" :key="n" :value="n">{{ n }}</option>
 				</select>
 			</div>
 			<div class="flex items-center gap-2">

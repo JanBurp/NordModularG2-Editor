@@ -570,12 +570,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		async uploadBankFromDevice(
-			type: 'patch' | 'performance',
-			bankNum: number,
-			folder: string,
-			filename?: string
-		): Promise<boolean> {
+		async uploadBankFromDevice(type: 'patch' | 'performance', bankNum: number, folder: string, filename?: string): Promise<boolean> {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return false;
 
@@ -595,7 +590,7 @@ export const useSlotsStore = defineStore('slots', {
 		async downloadBankToDevice(
 			source: { type: 'pchList'; filepath: string } | { type: 'folder'; folderPath: string },
 			bankNum: number,
-			bankType: 'patch' | 'performance'
+			_bankType: 'patch' | 'performance',
 		): Promise<boolean> {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return false;

@@ -303,16 +303,18 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					uiStore.showModuleHelp(mod.type as number);
 					break;
 				}
-				case 'send-controller-snapshot':
+				case 'send-controller-snapshot': {
 					if (isInputFocused()) break;
 					const snapshotOk = await deviceStore.sendControllerSnapshot();
 					if (snapshotOk) showToast('Controller snapshot sent to MIDI OUT');
 					break;
-				case 'dump-one':
+				}
+				case 'dump-one': {
 					if (isInputFocused()) break;
 					const dumpOk = await slotsStore.dumpOne();
 					if (dumpOk) showToast('Patch dumped as MIDI SYSEX');
 					break;
+				}
 				case 'bank-upload':
 					if (isInputFocused()) break;
 					bankUploadDialog.open();
