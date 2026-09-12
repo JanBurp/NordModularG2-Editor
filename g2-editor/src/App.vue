@@ -224,10 +224,7 @@
 		<div class="space-y-4">
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
-				<select
-					v-model="bankUpload.type.value"
-					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
-				>
+				<select v-model="bankUpload.type.value" class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary">
 					<option v-for="t in bankUpload.bankTypes" :key="t" :value="t">
 						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
 					</option>
@@ -251,12 +248,7 @@
 						readonly
 						placeholder="Select folder..."
 					/>
-					<button
-						class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4"
-						@click="bankUpload.selectFolder"
-					>
-						Browse...
-					</button>
+					<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankUpload.selectFolder">Browse...</button>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
@@ -267,9 +259,7 @@
 					placeholder="(optional)"
 				/>
 			</div>
-			<div v-if="bankUpload.inProgress.value" class="text-orange-400 text-sm">
-				Uploading bank from G2...
-			</div>
+			<div v-if="bankUpload.inProgress.value" class="text-orange-400 text-sm">Uploading bank from G2...</div>
 			<div class="text-xs text-content-secondary">
 				Save complete {{ bankUpload.type.value }} bank from synth memory to disk. Creates individual sound files + .pchList file.
 			</div>
@@ -288,17 +278,13 @@
 				<div class="flex items-start gap-2">
 					<span>⚠️</span>
 					<div>
-						<strong>WARNING:</strong> This will OVERWRITE the entire bank in your G2.
-						All existing patches/performances in this bank will be ERASED.
+						<strong>WARNING:</strong> This will OVERWRITE the entire bank in your G2. All existing patches/performances in this bank will be ERASED.
 					</div>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
-				<select
-					v-model="bankDownload.type.value"
-					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
-				>
+				<select v-model="bankDownload.type.value" class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary">
 					<option v-for="t in bankDownload.bankTypes" :key="t" :value="t">
 						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
 					</option>
@@ -331,18 +317,11 @@
 							readonly
 							:placeholder="bankDownload.sourceType.value === 'pchList' ? 'Select .pchList file...' : 'Select folder...'"
 						/>
-						<button
-							class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4"
-							@click="bankDownload.selectSource"
-						>
-							Browse...
-						</button>
+						<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankDownload.selectSource">Browse...</button>
 					</div>
 				</div>
 			</div>
-			<div v-if="bankDownload.inProgress.value" class="text-orange-400 text-sm">
-				Downloading bank to G2...
-			</div>
+			<div v-if="bankDownload.inProgress.value" class="text-orange-400 text-sm">Downloading bank to G2...</div>
 			<div class="text-xs text-content-secondary">
 				Download bank to synth memory. Source can be a .pchList file or a folder with patch files (alphabetical order, max 128).
 			</div>

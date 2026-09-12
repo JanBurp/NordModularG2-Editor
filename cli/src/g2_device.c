@@ -339,9 +339,14 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
     /* Embedded response format: [length][data...][CRC]
-     * The version byte sits at index 6 of the raw 16-byte interrupt response. */
+     * The version byte sits at index 6 of the raw 16-byte interrupt response.
+     * Need at least 7 bytes to access index 6 safely. */
+    if (ret < 7) {
+        g2_err("Short response from G2 for patch version (%d bytes)\n", ret);
+        goto cleanup;
+    }
     version = interruptResp[6];
-    if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
+    if (actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
     debug_timing("get_patch_slot_start");
@@ -552,7 +557,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
     version = interruptResp[6];
-    if (version && actual_slot < 4) g2_slot_version[actual_slot] = version;
+    if (actual_slot < 4) g2_slot_version[actual_slot] = version;
 
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         g2_err("Failed to send get patch command\n");
@@ -1108,12 +1113,15 @@ void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
 /* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
 static uint8_t cable_get_version(int slot) {
     if (g2_slot_version[slot]) return g2_slot_version[slot];
-    /* cache miss — ask G2 (fallback for first use before get-patch) */
+    /* cache miss — ask G2 (fallback for first use before get-patch).
+     * recv_interrupt() is listener-safe (pulls from the shared message queue
+     * when g2_listener_active), same as every other call site in this file. */
     uint8_t slota[16] = {0};
     uint8_t cmdData[2] = {0x35, (uint8_t)slot};
     if (send_system_data(0x41, cmdData, 2) < 0) return 0;
     usleep(USB_SEND_DELAY_US);
-    recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
+    int ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
+    if (ret <= 0) return 0; /* timeout or error */
     if (slota[6]) g2_slot_version[slot] = slota[6];
     return slota[6];
 }
@@ -2852,6 +2860,11 @@ int g2_send_controller_snapshot(void) {
     /* Send to all slots A-D. The G2 will send all controller values to MIDI OUT. */
     for (int slot = 0; slot < 4; slot++) {
         uint8_t version = cable_get_version(slot);
+        /* Skip slots with version 0 (empty/uninitialized) - the G2 rejects commands with version 0 */
+        if (version == 0) {
+            g2_err("send-controller-snapshot: skipping slot %c (version not initialized)\n", 'A' + slot);
+            continue;
+        }
         /* No additional payload for controller snapshot - just the subcommand */
         if (send_slot((uint8_t)slot, version, SUB_COMMAND_CTRL_SNAPSHOT, NULL, 0) < 0) {
             g2_err("send-controller-snapshot: failed to send to slot %c\n", 'A' + slot);
@@ -2871,6 +2884,11 @@ int g2_dump_patch(int slot) {
     if (ensure_connected(0) < 0) { g2_err("dump-patch: not connected\n"); return G2_ERR_CONNECT; }
     
     uint8_t version = cable_get_version(slot);
+    /* Skip if version is 0 (empty/uninitialized slot) - the G2 rejects commands with version 0 */
+    if (version == 0) {
+        g2_err("dump-patch: slot %c is empty or not initialized\n", 'A' + slot);
+        return G2_ERR_INVALID_PARAM;
+    }
     /* No additional payload for MIDI dump - just the subcommand */
     if (send_slot((uint8_t)slot, version, SUB_COMMAND_MIDI_DUMP, NULL, 0) < 0) {
         g2_err("dump-patch: failed to send\n");

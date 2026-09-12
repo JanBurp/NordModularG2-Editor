@@ -763,6 +763,28 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "seq") == 0) {
 		ret = execute_seq(args);
 
+	} else if (strcmp(cmd, "send-controller-snapshot") == 0) {
+		ret = g2_send_controller_snapshot();
+
+	} else if (strcmp(cmd, "dump-patch") == 0 && n >= 1) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_dump_patch(slot);
+
+	} else if (strcmp(cmd, "get-bank") == 0 && n >= 3) {
+		const char *type_str = arg_s(args, 0);
+		int type = (type_str && strcmp(type_str, "performance") == 0) ? 1 : 0;
+		int bank = arg_i(args, 1);
+		const char *folder = arg_s(args, 2);
+		const char *name = (n >= 4) ? arg_s(args, 3) : NULL;
+		ret = g2_get_bank(type, bank, folder, name);
+
+	} else if (strcmp(cmd, "send-bank") == 0 && n >= 3) {
+		const char *type_str = arg_s(args, 0);
+		const char *source_type = arg_s(args, 1);
+		int bank = arg_i(args, 2);
+		ret = g2_send_bank(type_str, source_type, bank);
+
 	}
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
