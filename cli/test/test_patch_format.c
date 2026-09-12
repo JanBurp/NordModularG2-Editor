@@ -334,3 +334,100 @@ void test_patch_usb_to_pch2_exact_size(void) {
     TEST_ASSERT_EQUAL_UINT8(0x50, pch2_data[0]);
     TEST_ASSERT_EQUAL_UINT8(0xa5, pch2_data[18]);
 }
+/* ---- patch_slot_sections_canonical ---------------------------------------
+ * GET_PATCH answers with 0x5a before 0x5b and no 0x69 at all, but a .prf2/.pch2
+ * must carry the canonical order or the G2 rejects the performance on upload. */
+
+/* Builds a [id][hi][lo][payload...] section into buf, returns bytes written. */
+static size_t put_section(uint8_t *buf, uint8_t id, uint8_t fill, size_t payload_len) {
+    buf[0] = id;
+    buf[1] = (uint8_t)((payload_len >> 8) & 0xff);
+    buf[2] = (uint8_t)(payload_len & 0xff);
+    memset(buf + 3, fill, payload_len);
+    return 3 + payload_len;
+}
+
+/* Collects the section ids of a train into ids[], returns the count. */
+static int section_ids(const uint8_t *b, size_t len, uint8_t *ids, int max) {
+    int n = 0;
+    size_t ofs = 0;
+    while (ofs + 3 <= len && n < max) {
+        size_t siz = ((size_t)b[ofs + 1] << 8) | b[ofs + 2];
+        if (ofs + 3 + siz > len) break;
+        ids[n++] = b[ofs];
+        ofs += 3 + siz;
+    }
+    return n;
+}
+
+void test_slot_sections_canonical_reorders_hardware_train(void) {
+    /* Exactly what GET_PATCH returns: 0x5a pair before the 0x5b trio, no 0x69. */
+    uint8_t in[256];
+    size_t n = 0;
+    const uint8_t hw[] = {0x21, 0x4a, 0x4a, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                          0x65, 0x62, 0x60, 0x5a, 0x5a, 0x5b, 0x5b, 0x5b};
+    for (size_t i = 0; i < sizeof(hw); i++) n += put_section(in + n, hw[i], (uint8_t)i, 2);
+
+    uint8_t out[256 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+    patch_slot_sections_canonical(in, n, out, &out_len);
+
+    /* A 0x69 is inserted, so the train grows by exactly one chunk. */
+    TEST_ASSERT_EQUAL_INT(n + PCH2_CANONICAL_GROWTH, out_len);
+
+    uint8_t ids[64];
+    int count = section_ids(out, out_len, ids, 64);
+    const uint8_t want[] = {0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                            0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a};
+    TEST_ASSERT_EQUAL_INT((int)sizeof(want), count);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(want, ids, (int)sizeof(want));
+}
+
+void test_slot_sections_canonical_preserves_repeated_id_order(void) {
+    /* The three 0x5b must keep their relative order (morph-first), not be shuffled. */
+    uint8_t in[256];
+    size_t n = 0;
+    n += put_section(in + n, 0x21, 0x11, 2);
+    n += put_section(in + n, 0x5b, 0xAA, 2);   /* first 0x5b  */
+    n += put_section(in + n, 0x5b, 0xBB, 2);   /* second 0x5b */
+    n += put_section(in + n, 0x5b, 0xCC, 2);   /* third 0x5b  */
+
+    uint8_t out[256 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+    patch_slot_sections_canonical(in, n, out, &out_len);
+
+    /* 0x21, then the inserted 0x69, then the three 0x5b in their original order. */
+    TEST_ASSERT_EQUAL_UINT8(0x21, out[0]);
+    TEST_ASSERT_EQUAL_UINT8(0x69, out[5]);
+    TEST_ASSERT_EQUAL_UINT8(0xAA, out[5 + PCH2_CANONICAL_GROWTH + 3]);
+    TEST_ASSERT_EQUAL_UINT8(0xBB, out[5 + PCH2_CANONICAL_GROWTH + 8]);
+    TEST_ASSERT_EQUAL_UINT8(0xCC, out[5 + PCH2_CANONICAL_GROWTH + 13]);
+}
+
+void test_slot_sections_canonical_keeps_existing_current_note(void) {
+    /* An input that already has a 0x69 must not gain a second one. */
+    uint8_t in[256];
+    size_t n = 0;
+    n += put_section(in + n, 0x21, 0x11, 2);
+    n += put_section(in + n, 0x69, 0x77, 4);
+
+    uint8_t out[256 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+    patch_slot_sections_canonical(in, n, out, &out_len);
+
+    TEST_ASSERT_EQUAL_INT(n, out_len);            /* nothing inserted */
+    TEST_ASSERT_EQUAL_UINT8(0x69, out[5]);
+    TEST_ASSERT_EQUAL_UINT8(0x77, out[8]);        /* the original payload survived */
+}
+
+void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
+    /* A section whose length runs past the buffer must not be reshuffled. */
+    uint8_t in[8] = {0x21, 0xff, 0xff, 0x01, 0x02, 0x03, 0x04, 0x05};
+    uint8_t out[8 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+
+    patch_slot_sections_canonical(in, sizeof(in), out, &out_len);
+
+    TEST_ASSERT_EQUAL_INT(sizeof(in), out_len);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(in, out, sizeof(in));
+}

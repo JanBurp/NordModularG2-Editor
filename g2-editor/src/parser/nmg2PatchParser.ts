@@ -91,10 +91,12 @@ class G2Parser {
 	private patchParamsData: PatchParamVariation[][] = [];
 	private morphParamLabelsData: ParamLabel[][] = [];
 	private pd: (PatchDescription | null)[] = [];
-	private controllersData: MidiCCAssignment[] = [];
-	// Per-slot, unlike controllersData — C_KNOBS ($62) is per-patch like CONTROLLERS, but stored
-	// per-slot-index here (mirroring patchParamsData) so a .prf2's 4 slots don't collide the way
-	// controllersData does (see PatchParser.parsePrf2 — a pre-existing, unrelated bug left as-is).
+	// CONTROLLERS ($60) and C_KNOBS ($62) are both per-patch, so both are stored per-slot-index
+	// here (mirroring patchParamsData) — a .prf2's 4 slots would otherwise collide. controllersData
+	// used to be a single shared list: the last slot parsed won, and every slot was then
+	// re-serialized with that one's MIDI-CC assignments, corrupting three of four slots on
+	// Performance → Download.
+	private controllersData: MidiCCAssignment[][] = [];
 	private knobsData: ParamPageAssignment[][] = [];
 	// Performance-scoped (not per-slot, unlike knobsData) — see GlobalParamPageAssignment.
 	private globalKnobsData: GlobalParamPageAssignment[] = [];
@@ -540,8 +542,8 @@ class G2Parser {
 		return this.slotMeta;
 	}
 
-	getControllers(): MidiCCAssignment[] {
-		return this.controllersData;
+	getControllers(slot = 0): MidiCCAssignment[] {
+		return this.controllersData[slot] ?? [];
 	}
 
 	private parseControllers(data: Uint8Array): void {
@@ -554,7 +556,7 @@ class G2Parser {
 			const paramIndex = this.getBits(7);
 			list.push({ cc, location, moduleIndex, paramIndex });
 		}
-		this.controllersData = list;
+		this.controllersData[this.aof >> 1] = list;
 	}
 
 	getKnobs(slot: number): ParamPageAssignment[] | null {
@@ -643,11 +645,11 @@ export class PatchParser {
 	} | null {
 		const slotNames = this.patcher.isPrf2();
 		if (slotNames.length === 0) return null;
-		const controllers = this.patcher.getControllers();
 		return {
 			slotNames,
 			patches: [0, 1, 2, 3].map((slot) => {
 				const paramPages = this.patcher.getKnobs(slot);
+				const controllers = this.patcher.getControllers(slot);
 				return {
 					areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
 					description: this.patcher.getpd(slot) ?? undefined,

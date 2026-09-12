@@ -1724,6 +1724,9 @@ int g2_play_note(int note, int on) {
     return G2_OK;
 }
 
+/* Defined further down, next to g2_get_global_knobs; used by g2_get_perf_file below. */
+static int get_global_knobs_payload(uint8_t **out, uint16_t *out_len);
+
 /* Locates the section-data region within a raw .pch2/.prf2 buffer:
  * [name][0x00][0x17][0x00][section bytes][2 byte CRC]. Returns 0 on success, -1 if
  * the buffer is too short to contain a valid section (data_len <= 0). */
@@ -1883,6 +1886,13 @@ static int send_perf_upload(const char *name, int name_len, const uint8_t *secti
     free(buff);
     if (ret < 0) return G2_ERR_SEND;
 
+    /* Deliberately does NOT read an ACK, unlike send_patch_upload. Adding a
+     * recv_interrupt()+g2_drain_pending() here was tested against real hardware and killed the
+     * G2's USB comms every time (dead until a power cycle), where the same upload without it
+     * succeeds: in listener mode it steals a packet from the listener thread, and in direct mode
+     * it starts reading ~50ms in, while the G2 is still applying all four slots. The caller-side
+     * race this was meant to solve is handled in the editor instead — see
+     * slots.ts _reloadSlotAfterUpload's retry-with-backoff and its sequential reload loop. */
     if (!g2_listener_active) {
         usleep(600000);  /* let G2 finish applying all 4 slots */
         g2_stop_comm();
@@ -1944,6 +1954,8 @@ cJSON *g2_get_perf_file(const char *filename) {
     size_t perfSize = 0;
     uint8_t *pch2Data[4] = {NULL, NULL, NULL, NULL};
     size_t pch2Size[4] = {0, 0, 0, 0};
+    uint8_t *knobsData = NULL;
+    uint16_t knobsLen = 0;
     uint8_t *outBuf = NULL;
     cJSON *result = NULL;
 
@@ -2054,31 +2066,45 @@ cJSON *g2_get_perf_file(const char *filename) {
         filename = defaultFilename;
     }
 
-    /* Step 4: Assemble .prf2 file in memory.
+    /* Step 4: Global knob assignments — the .prf2's terminating C_KNOBS_GLOBAL section.
+     * On a failed query fall back to the valid "120 slots, none assigned" payload rather
+     * than failing the save: a structurally complete file matters more than these 17 bytes
+     * (same encoding as the TS side's writeGlobalKnobs([])). */
+    static const uint8_t emptyKnobs[17] = {0x00, 0x78};
+    if (get_global_knobs_payload(&knobsData, &knobsLen) < 0) {
+        knobsData = NULL;
+        knobsLen = (uint16_t)sizeof(emptyKnobs);
+    }
+    const uint8_t *knobs = knobsData ? knobsData : emptyKnobs;
+
+    /* Step 5: Assemble .prf2 file in memory. Layout (matching a real .prf2 and what the G2
+     * itself expects back on upload): [0x11 perf settings], then 4 × (that slot's patch
+     * section train, each terminated by its own 0x6f), then one 0x5f C_KNOBS_GLOBAL.
      * 0x11 section content = perfData[4 + nameLen + 3 .. perfSize-1].
      * Offset +3 skips 3 unknown header bytes after the name; byte at +3 maps to unknown2
      * and bytes at +4..+10 map to the 8-byte performance settings header fields. */
     size_t perf_sect_offset = (size_t)(4 + nameLen + 3);
     size_t perf_sect_len = (perf_sect_offset < perfSize) ? (perfSize - perf_sect_offset) : 0;
 
-    size_t header_len = strlen(perfName) + 3;  /* name + null + 0x17 + 0x00 */
+    size_t header_len = strlen(perfName) + 3;  /* name + null + 0x17 + file type */
     size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */
     size_t slots_sect_len = 0;
     for (int s = 0; s < 4; s++)
-        slots_sect_len += (pch2Size[s] > 18) ? (pch2Size[s] - 18) : 0;
-    slots_sect_len += 3 * 3;  /* three 0x6f separator sections between the 4 slots */
+        slots_sect_len += pch2Size[s] + PCH2_CANONICAL_GROWTH;  /* 0x69 may be inserted */
+    slots_sect_len += 4 * 3;  /* one 0x6f separator terminating each of the 4 slots */
 
-    outBuf = malloc(header_len + sect11_total + slots_sect_len + 2);
+    outBuf = malloc(header_len + sect11_total + slots_sect_len + 3 + knobsLen + 2);
     if (!outBuf) { g2_err("Memory allocation failed\n"); goto cleanup; }
 
     size_t pos = 0;
 
-    /* File header: [perfName\0][0x17][0x00] */
+    /* File header: [perfName\0][0x17][0x01].
+     * 0x17 = format version, 0x01 = file type "performance" (0x00 is a patch). */
     size_t pnlen = strlen(perfName);
     memcpy(outBuf + pos, perfName, pnlen); pos += pnlen;
     outBuf[pos++] = 0x00;
     outBuf[pos++] = 0x17;
-    outBuf[pos++] = 0x00;
+    outBuf[pos++] = 0x01;
 
     size_t crc_start = pos;  /* CRC covers from here to end-2 */
 
@@ -2091,18 +2117,27 @@ cJSON *g2_get_perf_file(const char *filename) {
         pos += perf_sect_len;
     }
 
-    /* Slot sections with 0x6f separators between slots */
+    /* Slot sections, each rewritten into canonical chunk order and terminated by its own 0x6f
+     * (C_PATCH_NOTES). The whole pch2 payload is used — its leading 18 bytes are that patch's
+     * C_PATCH_DESCR chunk (0x21, see patch_usb_to_pch2), which a performance carries once per
+     * slot. patch_slot_sections_canonical may insert a 0x69; the sizing above allows for it. */
     static const uint8_t sep6f[3] = {0x6f, 0x00, 0x00};
     for (int s = 0; s < 4; s++) {
-        if (pch2Size[s] > 18) {
-            memcpy(outBuf + pos, pch2Data[s] + 18, pch2Size[s] - 18);
-            pos += pch2Size[s] - 18;
+        if (pch2Size[s] > 0) {
+            size_t reordered = 0;
+            patch_slot_sections_canonical(pch2Data[s], pch2Size[s], outBuf + pos, &reordered);
+            pos += reordered;
         }
-        if (s < 3) {
-            memcpy(outBuf + pos, sep6f, 3);
-            pos += 3;
-        }
+        memcpy(outBuf + pos, sep6f, 3);
+        pos += 3;
     }
+
+    /* 0x5f C_KNOBS_GLOBAL terminator */
+    outBuf[pos++] = 0x5f;
+    outBuf[pos++] = (uint8_t)((knobsLen >> 8) & 0xff);
+    outBuf[pos++] = (uint8_t)(knobsLen & 0xff);
+    memcpy(outBuf + pos, knobs, knobsLen);
+    pos += knobsLen;
 
     /* CRC over all section bytes */
     uint16_t crc = calc_crc16(outBuf + crc_start, pos - crc_start);
@@ -2125,6 +2160,7 @@ cJSON *g2_get_perf_file(const char *filename) {
 cleanup:
     free(perfData);
     for (int s = 0; s < 4; s++) free(pch2Data[s]);
+    free(knobsData);
     free(outBuf);
     return result;
 }
@@ -2459,14 +2495,19 @@ int g2_select_global_page(int slot, int page_id) {
  * stripped before hex-encoding under "data", letting the TS side feed it straight into
  * parseGlobalKnobsChunk. Not run through patch_usb_to_pch2 — that conversion strips a whole-patch
  * header/CRC wrapper this single section-chunk reply doesn't carry; it needs its own, smaller
- * envelope strip instead (above). */
-cJSON *g2_get_global_knobs(void) {
+ * envelope strip instead (above). The stripped payload goes into a malloc'd buffer the caller
+ * frees — shared by g2_get_global_knobs, which hex-encodes it for the editor, and
+ * g2_get_perf_file, which embeds it as the .prf2's terminating 0x5f section. */
+static int get_global_knobs_payload(uint8_t **out, uint16_t *out_len) {
     uint8_t interruptResp[16] = {0};
     int ret;
 
+    *out = NULL;
+    *out_len = 0;
+
     if (ensure_connected(1) < 0) {
         g2_err("Failed to connect to G2\n");
-        return NULL;
+        return -1;
     }
 
     /* Flush stale G2 data left over from a previous command (direct mode only — the listener
@@ -2483,7 +2524,7 @@ cJSON *g2_get_global_knobs(void) {
 
     if (send_system(0x41, SUB_COMMAND_GET_GLOBAL_KNOBS) < 0) {
         g2_err("Failed to send get-global-knobs command\n");
-        return NULL;
+        return -1;
     }
 
     usleep(USB_SEND_DELAY_US);
@@ -2495,7 +2536,7 @@ cJSON *g2_get_global_knobs(void) {
         ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
         if (ret <= 0) {
             g2_err("No interrupt response for global knobs\n");
-            return NULL;
+            return -1;
         }
         if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
 
@@ -2504,7 +2545,7 @@ cJSON *g2_get_global_knobs(void) {
         uint8_t *chunkData = malloc(chunkSize);
         if (!chunkData) {
             g2_err("Memory allocation failed\n");
-            return NULL;
+            return -1;
         }
         ret = recv_bulk(chunkData, chunkSize);
         if (ret <= 0 || chunkSize < 6 || chunkData[3] != RESP_CHUNK_KNOBS_GLOBAL) {
@@ -2517,22 +2558,40 @@ cJSON *g2_get_global_knobs(void) {
         uint16_t payloadLen = ((uint16_t)chunkData[4] << 8) | chunkData[5];
         if (payloadLen > (uint16_t)(chunkSize - 6)) payloadLen = (uint16_t)(chunkSize - 6);
 
-        cJSON *root = cJSON_CreateObject();
-        char *hexStr = malloc((size_t)payloadLen * 2 + 1);
-        if (hexStr) {
-            for (size_t i = 0; i < payloadLen; i++) {
-                snprintf(hexStr + i * 2, 3, "%02x", chunkData[6 + i]);
-            }
-            hexStr[(size_t)payloadLen * 2] = '\0';
-            cJSON_AddStringToObject(root, "data", hexStr);
-            free(hexStr);
+        uint8_t *payload = malloc(payloadLen ? payloadLen : 1);
+        if (!payload) {
+            free(chunkData);
+            g2_err("Memory allocation failed\n");
+            return -1;
         }
+        memcpy(payload, chunkData + 6, payloadLen);
         free(chunkData);
-        return root;
+        *out = payload;
+        *out_len = payloadLen;
+        return 0;
     }
 
     g2_err("No matching response for global knobs after retries\n");
-    return NULL;
+    return -1;
+}
+
+cJSON *g2_get_global_knobs(void) {
+    uint8_t *payload;
+    uint16_t payloadLen;
+    if (get_global_knobs_payload(&payload, &payloadLen) < 0) return NULL;
+
+    cJSON *root = cJSON_CreateObject();
+    char *hexStr = malloc((size_t)payloadLen * 2 + 1);
+    if (hexStr) {
+        for (size_t i = 0; i < payloadLen; i++) {
+            snprintf(hexStr + i * 2, 3, "%02x", payload[i]);
+        }
+        hexStr[(size_t)payloadLen * 2] = '\0';
+        cJSON_AddStringToObject(root, "data", hexStr);
+        free(hexStr);
+    }
+    free(payload);
+    return root;
 }
 
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a

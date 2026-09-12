@@ -304,22 +304,24 @@ static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
     for (int i = 0; i < rt_count; i++) fprintf(stderr, " %02x", rt_ids[i]);
     fprintf(stderr, "\n");
 
-    /* Drop file-only / structural sections before comparing:
-     *   0x21 = C_PATCH_DESCR: file wrapper around each slot's patch — absent in USB roundtrip
-     *   0x69 = file metadata: not sent over USB
-     *   0x5f = C_KNOBS_GLOBAL: not included in g2_get_perf_file output
-     *   0x6f = slot separator: g2_get_perf_file omits it after the last slot */
+    /* 0x21 (C_PATCH_DESCR), 0x6f (per-slot terminator) and 0x5f (C_KNOBS_GLOBAL) used to be
+     * filtered out here because g2_get_perf_file dropped them — which is exactly what made its
+     * output unloadable — so they are now compared like every other section.
+     *
+     * Still compared sorted, not in order: the G2's GET_PATCH reply orders C_MODULE_NAMES before
+     * C_PARAM_NAMES (`5a 5a 5b 5b 5b`) where the file format has them the other way round
+     * (`5b 5b 5b 5a 5a`), confirmed against a real device. A sorted compare still catches a
+     * dropped or duplicated section, which is what this test is for.
+     *
+     * 0x69 stays filtered: it is file metadata the G2 does not return from GET_PATCH, so it is
+     * genuinely absent from the roundtrip. */
     uint8_t orig_filt[128], rt_filt[128];
     int orig_filt_count = 0, rt_filt_count = 0;
     for (int i = 0; i < orig_count; i++) {
-        uint8_t id = orig_ids[i];
-        if (id != 0x21 && id != 0x69 && id != 0x5f && id != 0x6f)
-            orig_filt[orig_filt_count++] = id;
+        if (orig_ids[i] != 0x69) orig_filt[orig_filt_count++] = orig_ids[i];
     }
     for (int i = 0; i < rt_count; i++) {
-        uint8_t id = rt_ids[i];
-        if (id != 0x21 && id != 0x69 && id != 0x5f && id != 0x6f)
-            rt_filt[rt_filt_count++] = id;
+        if (rt_ids[i] != 0x69) rt_filt[rt_filt_count++] = rt_ids[i];
     }
     qsort(orig_filt, (size_t)orig_filt_count, 1, cmp_u8);
     qsort(rt_filt,   (size_t)rt_filt_count,   1, cmp_u8);

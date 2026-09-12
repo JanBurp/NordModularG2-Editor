@@ -130,9 +130,12 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: 
 	return makeSection(SectionType.PARAMETERS, bw.flush());
 }
 
-function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array | null {
+// Always emits a section: with no labelled modules the result is a valid 2-byte
+// "zero entries" header. The G2 expects the full fixed chunk train per patch
+// (C_PARAM_NAMES ×3, C_MODULE_NAMES ×2) — dropping an empty one desyncs its parser
+// across the 4 concatenated patches of a performance upload.
+function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array {
 	const labeled = entries.filter((e) => e.paramLabels.length > 0);
-	if (labeled.length === 0) return null;
 
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
@@ -153,9 +156,9 @@ function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; par
 	return makeSection(SectionType.PARAM_NAMES, bw.flush());
 }
 
-function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array | null {
+// Always emits a section — see writeParamNames.
+function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array {
 	const named = modules.filter((m) => m.uname && m.uname.length > 0);
-	if (named.length === 0) return null;
 
 	let size = 2; // 1 byte header (areaIdx), 1 byte count
 	for (const m of named) {
@@ -449,6 +452,25 @@ function morphParamNamesEntries(patch: Patch): Array<{ index: number; paramLabel
 	return patch.morphParamLabels && patch.morphParamLabels.length > 0 ? [{ index: PATCH_MORPH_MODULE_ID, paramLabels: patch.morphParamLabels }] : [];
 }
 
+// Append-if-missing fallback for the per-area C_PARAM_NAMES sections: normally each one is written
+// at its own position as the template's 0x5b sections are walked, but a template that carries none
+// would otherwise drop the labels entirely. Only appends when there is something to lose, so a
+// template without 0x5b and without labels keeps its exact section train.
+function appendMissingAreaParamNames(patch: Patch, out: Uint8Array[], w: WrittenSets): void {
+	for (const areaIdx of [0, 1] as const) {
+		if (w.m5b.has(areaIdx)) continue;
+		const modules = patch.areas[areaIdx]?.modules ?? [];
+		if (!modules.some((m) => m.paramLabels && m.paramLabels.length > 0)) continue;
+		out.push(
+			writeParamNames(
+				areaIdx,
+				modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+			),
+		);
+		w.m5b.add(areaIdx);
+	}
+}
+
 /**
  * Processes one section from the template, appending the regenerated (or verbatim)
  * output to `out`. Mutates `w` to track what has been written.
@@ -484,31 +506,29 @@ function processSection(
 	} else if (type === SectionType.PARAMETERS && areaIdx <= 1 && !w.m4d.has(areaIdx)) {
 		out.push(writeParameters(areaIdx as 0 | 1, patch.areas[areaIdx].modules, variations));
 		w.m4d.add(areaIdx);
-		// Param names follow params in Delphi write order; emit here so
-		// labels survive even if the template predates them.
-		const paramNamesSection = writeParamNames(
-			areaIdx as 0 | 1,
-			patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
-		);
-		if (paramNamesSection) out.push(paramNamesSection);
-		w.m5b.add(areaIdx);
+		// C_PARAM_NAMES is deliberately NOT emitted here. It used to be, "so labels survive even
+		// if the template predates them", but that interleaved a 0x5b between the three
+		// consecutive C_PARAM_LIST sections and the G2 rejects the resulting performance upload
+		// (error code 3, performance renamed "Error" — reproduced on real hardware). The chunk
+		// order is fixed: 4a 4a 69 52 52 4d 4d 4d 65 62 60 5b 5b 5b 5a 5a 6f. Each 0x5b is now
+		// written at its own template position below, with an append-if-missing fallback in
+		// serializePatch/serializePerformance for a template that carries none.
 	} else if (type === SectionType.PARAM_NAMES && areaIdx <= 1) {
 		if (!w.m5b.has(areaIdx)) {
-			const sec = writeParamNames(
-				areaIdx as 0 | 1,
-				patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+			out.push(
+				writeParamNames(
+					areaIdx as 0 | 1,
+					patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+				),
 			);
-			if (sec) out.push(sec);
 			w.m5b.add(areaIdx);
 		}
 		// If already written via PARAMETERS trigger, skip (don't preserve verbatim)
 	} else if (type === SectionType.PARAM_NAMES && areaIdx === 2 && !w.m5bMorph) {
-		const sec = writeParamNames(2, morphParamNamesEntries(patch));
-		if (sec) out.push(sec);
+		out.push(writeParamNames(2, morphParamNamesEntries(patch)));
 		w.m5bMorph = true;
 	} else if (type === SectionType.MODULE_NAMES && areaIdx <= 1 && !w.m5a.has(areaIdx)) {
-		const namesSection = writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules);
-		if (namesSection) out.push(namesSection);
+		out.push(writeModuleNames(areaIdx as 0 | 1, patch.areas[areaIdx].modules));
 		w.m5a.add(areaIdx);
 	} else if (type === SectionType.PATCH_DESC) {
 		const newData = patch.description ? writePatchDescription(secData, patch.description) : secData;
@@ -577,8 +597,9 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	// Same fallback: the hardware get-patch response never includes a $PARAM_NAMES(areaIdx=2)
 	// section, so any custom Morph Group labels need appending when the template predates them.
 	if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
-		out.push(writeParamNames(2, morphParamNamesEntries(patch))!);
+		out.push(writeParamNames(2, morphParamNamesEntries(patch)));
 	}
+	appendMissingAreaParamNames(patch, out, w);
 	return buildRawHex(out);
 }
 
@@ -624,8 +645,12 @@ export function serializePerformance(
 				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 			}
 			if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
-				out.push(writeParamNames(2, morphParamNamesEntries(patch))!);
+				out.push(writeParamNames(2, morphParamNamesEntries(patch)));
 			}
+			// Before the 0x6f that closes this slot — every slot of a valid performance reaches
+			// this branch, so the post-loop catch-up below deliberately doesn't repeat it (it runs
+			// after the final separator, where an appended 0x5b would land out of order).
+			appendMissingAreaParamNames(patch, out, w);
 			out.push(writeTextPad(patch.text ?? ''));
 			// Advance to the next slot — but only while there still is one. A performance always
 			// has exactly 4 slots; the trailing C_KNOBS_GLOBAL section after the 4th slot's own
@@ -652,7 +677,7 @@ export function serializePerformance(
 		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
 	}
 	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
-		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch))!);
+		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch)));
 	}
 	// Append-if-missing fallback (same pattern as patch.text in serializePatch): a template that
 	// never carried a C_KNOBS_GLOBAL section (e.g. one built before this feature existed) still

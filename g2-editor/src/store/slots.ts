@@ -1635,7 +1635,10 @@ export const useSlotsStore = defineStore('slots', {
 			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
 			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
-			const data = [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			// 0x17 = format version, 0x01 = file type "performance" (0x00 is a patch) — real .prf2
+			// files carry 0x01 here. Our own loader detects a performance by its 0x11 section, but
+			// other editors read this byte.
+			const data = [...nameBytes, 0x00, 0x17, 0x01, ...sectionBytes];
 			try {
 				await window.electronAPI.savePatch(path, data);
 			} catch (err) {
@@ -1760,21 +1763,58 @@ export const useSlotsStore = defineStore('slots', {
 			return ok;
 		},
 
-		// Performance → "Download": push the locally-authored performance to the connected synth.
-		//
-		// TEMPORARILY DISABLED (see project notes): the whole-performance upload-perf-data wire
-		// message repeatedly hung real G2 hardware (device stops responding to any further
-		// command afterward) across several independent fix attempts this session — message
-		// content, framing, and handshake sequencing were each individually verified/corrected
-		// without resolving it. The prior working implementation (serialize via
-		// nmg2PatchSerializer.serializePerformance, send via upload-perf-data, reload all 4
-		// slots via _reloadSlotAfterUpload) is preserved in git history — see commits around
-		// "Fixed -> Dowload to slot" — rather than left in place as unreachable code. Re-enable
-		// only after the protocol issue is actually root-caused (e.g. via a USB capture) or the
-		// feature is rebuilt on the proven single-patch upload path instead.
+		// Performance → "Download": push the locally-authored performance (a .prf2 loaded while
+		// working in local mode) to the connected synth via upload-perf-data. Requires a performance
+		// template to reserialize from — re-uploads the in-memory edits, not the stale disk file.
 		async downloadPerformanceToSynth(): Promise<boolean> {
-			showToast('Performance download is temporarily disabled — known issue with the G2 upload protocol.');
-			return false;
+			if (!this.performanceRawHex) {
+				showToast('No local performance to download — load a .prf2 into the editor first.');
+				return false;
+			}
+			const device = useDeviceStore();
+			if (device.status !== DeviceStatus.Connected) return false;
+			if (this.uploadingFromFile) return false;
+			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
+				.map((s) => {
+					const e = this.slots[s];
+					if (e.patch) {
+						e.patch.controllers = [...e.controllers];
+						e.patch.paramPages = [...e.paramPages];
+					}
+					return e.patch!;
+				})
+				.filter(Boolean);
+			if (patches.length !== 4) {
+				showToast('Cannot download performance — not all slots contain a patch.');
+				return false;
+			}
+			this.uploadingFromFile = true;
+			try {
+				// A performance upload only makes sense with the synth in Performance mode —
+				// same precondition usePatchFile's applyPerformanceFile establishes before its
+				// own upload-perf.
+				await device.setPerformanceMode(this.performanceName);
+				const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+				const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
+				const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
+				const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+				const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
+				const data = [...nameBytes, 0x00, 0x17, 0x01, ...sectionBytes];
+				await window.cli.run(['upload-perf-data', data]);
+				// Same reasoning as downloadToSynthSlot: reload all 4 slots explicitly (with retry —
+				// see _reloadSlotAfterUpload) rather than relying on the watch-event reload chain,
+				// which isn't confirmed for a full upload. Sequentially, not in parallel — four
+				// concurrent retry chains mean up to 12 get-patch calls racing a G2 that is still
+				// applying the performance internally.
+				for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) await this._reloadSlotAfterUpload(s);
+				return true;
+			} catch (err) {
+				console.error('Failed to download performance to G2:', err);
+				showToast('Failed to download performance — check device connection.');
+				return false;
+			} finally {
+				this.uploadingFromFile = false;
+			}
 		},
 
 		async moveModulesWithCollision(

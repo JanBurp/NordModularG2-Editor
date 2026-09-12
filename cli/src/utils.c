@@ -90,6 +90,79 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
     return 0;
 }
 
+/* Canonical per-slot chunk order inside a .prf2/.pch2, as written by both reference editors
+ * (Delphi TG2FilePatch.Write, G2Editor.c CPatchFile_13::WriteMolecules) and as both .prf2
+ * fixtures carry it. The G2 rejects a performance upload whose slots deviate from it —
+ * confirmed on hardware, where an out-of-order slot comes back as an error event with every
+ * patch renamed "Error". GET_PATCH answers in a *different* order (0x5a before 0x5b) and omits
+ * 0x69 entirely, so a slot captured from the wire has to be rewritten into this order before it
+ * can go into a file that is meant to be uploadable again. */
+static const uint8_t kSlotChunkOrder[] = {
+    0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+    0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a
+};
+
+/* A neutral C_CURRENT_NOTE_2 (0x69) chunk: the "nothing playing" value Clavia's own files use
+ * for an idle patch — byte-for-byte what both EmptyPerf.prf2 slots and three of the four
+ * MorphingDrumDemo.prf2 slots contain. GET_PATCH never returns this chunk, but the G2 requires
+ * it on upload (a slot train without it is rejected exactly like an out-of-order one, verified
+ * on hardware), and its contents are live voice state that is not worth round-tripping anyway. */
+static const uint8_t kCurrentNoteDefault[] = {
+    0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00
+};
+
+/* Rewrites one slot's section train into kSlotChunkOrder, preserving each section's bytes and
+ * the relative order of repeated ids (the three 0x5b keep their morph-first ordering). A missing
+ * 0x69 is filled in from kCurrentNoteDefault; every other absent section is simply skipped, and
+ * anything unrecognised is kept at the end rather than dropped. `out` must have room for
+ * in_len + sizeof(kCurrentNoteDefault). On a malformed train the input is copied verbatim. */
+#define SLOT_MAX_SECTIONS 64
+void patch_slot_sections_canonical(const uint8_t *in, size_t in_len, uint8_t *out, size_t *out_len) {
+    struct { uint8_t id; size_t ofs, len; int used; } sec[SLOT_MAX_SECTIONS];
+    int n = 0;
+    size_t ofs = 0;
+    while (ofs + 3 <= in_len && n < SLOT_MAX_SECTIONS) {
+        size_t siz = ((size_t)in[ofs + 1] << 8) | in[ofs + 2];
+        if (ofs + 3 + siz > in_len) break;
+        sec[n].id = in[ofs];
+        sec[n].ofs = ofs;
+        sec[n].len = 3 + siz;
+        sec[n].used = 0;
+        n++;
+        ofs += 3 + siz;
+    }
+    if (ofs != in_len) {  /* didn't parse cleanly — don't risk reshuffling it */
+        memcpy(out, in, in_len);
+        *out_len = in_len;
+        return;
+    }
+
+    size_t pos = 0;
+    for (size_t k = 0; k < sizeof(kSlotChunkOrder); k++) {
+        int found = 0;
+        for (int i = 0; i < n; i++) {
+            if (!sec[i].used && sec[i].id == kSlotChunkOrder[k]) {
+                memcpy(out + pos, in + sec[i].ofs, sec[i].len);
+                pos += sec[i].len;
+                sec[i].used = 1;
+                found = 1;
+                break;
+            }
+        }
+        if (!found && kSlotChunkOrder[k] == 0x69) {
+            memcpy(out + pos, kCurrentNoteDefault, sizeof(kCurrentNoteDefault));
+            pos += sizeof(kCurrentNoteDefault);
+        }
+    }
+    for (int i = 0; i < n; i++) {
+        if (!sec[i].used) {
+            memcpy(out + pos, in + sec[i].ofs, sec[i].len);
+            pos += sec[i].len;
+        }
+    }
+    *out_len = pos;
+}
+
 int parse_location_str(const char *s) {
     if (s && strcmp(s, "va") == 0)    return 1;
     if (s && strcmp(s, "patch") == 0) return 2;

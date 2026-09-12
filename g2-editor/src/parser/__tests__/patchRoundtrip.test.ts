@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
 
 import { PatchParser } from '../nmg2PatchParser';
+import { SectionType } from '../constants';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
@@ -464,7 +465,7 @@ describe('paramLabels round-trip', () => {
 		expect(added!.paramLabels).toEqual(labels);
 	});
 
-	it('omits 0x5b chunk when no module has labels', () => {
+	it('writes an empty 0x5b chunk when no module has labels', () => {
 		// EmptyPatch starts with no labels; round-trip should not introduce any
 		const { name, rawHex, patch: patchA } = loadFixture('EmptyPatch.pch2');
 		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
@@ -503,7 +504,7 @@ describe('morphParamLabels round-trip', () => {
 		expect(patchB.morphParamLabels).toEqual(patch.morphParamLabels);
 	});
 
-	it('omits the areaIdx=2 $5b chunk once morphParamLabels is cleared', () => {
+	it('empties the areaIdx=2 $5b chunk once morphParamLabels is cleared', () => {
 		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 		patch.morphParamLabels = undefined;
 
@@ -808,6 +809,24 @@ function simulatePerfFileSaveAndLoad(name: string, rawHex: string): { rawHex: st
 	return { rawHex: loadedRawHex, patches: parsed.patches };
 }
 
+// Splits a prf2 section stream (trailing CRC excluded) into blocks at each slot separator,
+// so slot N's sections can be compared independently: [0x11 settings], slot 0..3 (each
+// ending in its own 0x6f), then the trailing 0x5f. Section types only — sizes are compared
+// elsewhere; here we only care that nothing is dropped or duplicated.
+function sectionBlocks(rawHex: string): number[][] {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const dataLen = bytes.length - 2;
+	const blocks: number[][] = [[]];
+	let ofs = 0;
+	while (ofs < dataLen) {
+		const type = bytes[ofs];
+		blocks[blocks.length - 1].push(type);
+		if (type === SectionType.SEPARATOR) blocks.push([]);
+		ofs += 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+	}
+	return blocks;
+}
+
 function extractSection(rawHex: string, targetType: number): string | null {
 	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
 	let ofs = 0;
@@ -881,6 +900,76 @@ describe('prf2 whole-message structure preservation (regression: wire-upload han
 			expect(lastType).toBe(0x5f); // C_KNOBS_GLOBAL
 		});
 	}
+
+	// The check above passes even when whole sections go missing, which is what actually
+	// broke Performance → Download: writeParamNames/writeModuleNames returned null for an
+	// area with no labels/names and the caller dropped the section, leaving the 4-patch
+	// stream 20 bytes short per slot. The G2 reads the four patch chunk trains back to
+	// back, so a missing chunk desyncs it for everything that follows.
+	//
+	// Section ORDER matters, not just presence — confirmed on real hardware. An earlier version
+	// emitted C_PARAM_NAMES eagerly right after its C_PARAM_LIST trigger, interleaving a 0x5b
+	// between the three consecutive 0x4d sections; the G2 rejected that performance with
+	// {"type":"error","slot":"A","code":3} and renamed the performance "Error". With the order
+	// restored it loads correctly. So compare the ordered section-id train per slot.
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(`${file}: unmodified round-trip preserves the ordered section train of every slot`, () => {
+			const { rawHex, patches } = loadFixturePrf2(file);
+			const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+
+			const origBlocks = sectionBlocks(rawHex);
+			const newBlocks = sectionBlocks(newHex);
+
+			// 0x11 perf settings + 4 slots (each terminated by 0x6f) + the trailing 0x5f block
+			expect(origBlocks).toHaveLength(5);
+			expect(newBlocks).toHaveLength(5);
+
+			for (let i = 0; i < origBlocks.length; i++) {
+				expect(newBlocks[i]).toEqual(origBlocks[i]);
+			}
+
+			// The fixed per-slot chunk train all three reference implementations agree on.
+			// Block 0 is preceded by the performance's own 0x11 settings section.
+			for (let slot = 0; slot < 4; slot++) {
+				const block = slot === 0 ? newBlocks[0].slice(1) : newBlocks[slot];
+				if (slot === 0) expect(newBlocks[0][0]).toBe(SectionType.PERF_DATA);
+				expect(block.map((t) => t.toString(16)).join(' ')).toBe('21 4a 4a 69 52 52 4d 4d 4d 65 62 60 5b 5b 5b 5a 5a 6f');
+			}
+		});
+	}
+});
+
+describe('prf2 per-slot CONTROLLERS ($60) are not shared between slots', () => {
+	// The parser kept a single controllersData list, so parsing a .prf2 left every slot holding
+	// whichever slot was parsed last, and re-serializing then wrote that one into all four —
+	// silently replacing three slots' MIDI-CC assignments on Performance → Download. A
+	// round-trip test can't see this (both sides share the same collapsed list), so assert
+	// against the fixture's own ground truth instead.
+	it('MorphingDrumDemo.prf2: slot A has its own 13 assignments, slots B–D have 14', () => {
+		const { patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		expect(patches.map((p) => p.controllers?.length ?? 0)).toEqual([13, 14, 14, 14]);
+		// Slot B carries a CC 4 assignment (location 0, module 8) that slot A does not.
+		expect(patches[1].controllers).toEqual(expect.arrayContaining([{ cc: 4, location: 0, moduleIndex: 8, paramIndex: 0 }]));
+		expect(patches[0].controllers).not.toEqual(expect.arrayContaining([{ cc: 4, location: 0, moduleIndex: 8, paramIndex: 0 }]));
+	});
+
+	it('MorphingDrumDemo.prf2: each slot re-serializes with its own $60 section', () => {
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+		const sizes = (hex: string) => {
+			const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+			const out: number[] = [];
+			let ofs = 0;
+			while (ofs < bytes.length - 2) {
+				const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+				if (bytes[ofs] === SectionType.CONTROLLERS) out.push(siz);
+				ofs += 3 + siz;
+			}
+			return out;
+		};
+		// Slot A's shorter section survives instead of being overwritten by another slot's.
+		expect(sizes(newHex)).toEqual(sizes(rawHex));
+	});
 });
 
 describe('prf2 0x11 section preservation', () => {

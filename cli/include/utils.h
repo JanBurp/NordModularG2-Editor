@@ -16,6 +16,16 @@ slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);
 int hex_to_bytes(const char *hex, uint8_t **out);
 
+/* Extra bytes patch_slot_sections_canonical may add (an inserted C_CURRENT_NOTE_2 chunk) —
+ * size the output buffer as in_len + this. */
+#define PCH2_CANONICAL_GROWTH 12
+
+/* Rewrites one slot's section train into the canonical chunk order a .prf2/.pch2 uses, which is
+ * NOT the order GET_PATCH answers in. Required before a captured slot can go into a file that is
+ * meant to be uploadable again — the G2 rejects a performance whose slots deviate. */
+void patch_slot_sections_canonical(const uint8_t *in, size_t in_len,
+                                   uint8_t *out, size_t *out_len);
+
 /* Patch format conversion (USB <-> PCH2) */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
                       uint8_t *pch2_data, size_t *pch2_len);
