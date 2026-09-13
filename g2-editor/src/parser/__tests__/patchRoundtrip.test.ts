@@ -1045,6 +1045,45 @@ describe('prf2 per-slot mutation round-trip', () => {
 	});
 });
 
+describe('trailing CRC matches the file-type byte actually written', () => {
+	// The CRC covers [0x17][fileType][sectionBytes]. buildRawHex used to hardcode fileType 0x00,
+	// so every .prf2 we wrote (header byte 0x01) carried a CRC that didn't validate against its
+	// own header. Verified against genuine Clavia files, whose CRCs do validate over this range.
+	function crc16(bytes: Uint8Array): number {
+		let r = 0;
+		for (const x of bytes) {
+			r ^= x << 8;
+			for (let i = 0; i < 8; i++) r = r & 0x8000 ? ((r << 1) ^ 0x1021) & 0xffff : (r << 1) & 0xffff;
+		}
+		return r;
+	}
+	// Rebuilds the on-disk image the way saveSlot/savePerformance do, then validates the CRC.
+	function expectCrcValid(rawHex: string, fileType: number) {
+		const sections = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		const body = sections.slice(0, sections.length - 2);
+		const stored = (sections[sections.length - 2] << 8) | sections[sections.length - 1];
+		const forCrc = new Uint8Array(2 + body.length);
+		forCrc[0] = 0x17;
+		forCrc[1] = fileType;
+		forCrc.set(body, 2);
+		expect(crc16(forCrc)).toBe(stored);
+	}
+
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(`${file}: performance CRC covers file type 0x01`, () => {
+			const { rawHex, patches } = loadFixturePrf2(file);
+			expectCrcValid(serializePerformance(patches, rawHex, patches.map(extractVariations)), 0x01);
+		});
+	}
+
+	for (const file of ['EmptyPatch.pch2', 'Clavia demo.pch2']) {
+		it(`${file}: patch CRC covers file type 0x00`, () => {
+			const { name, rawHex, patch } = loadFixture(file);
+			expectCrcValid(serializePatch(name, patch, rawHex, extractVariations(patch)), 0x00);
+		});
+	}
+});
+
 describe('prf2 file save/load round-trip', () => {
 	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
 		it(`unmodified — ${file}`, () => {

@@ -2106,7 +2106,10 @@ cJSON *g2_get_perf_file(const char *filename) {
     outBuf[pos++] = 0x17;
     outBuf[pos++] = 0x01;
 
-    size_t crc_start = pos;  /* CRC covers from here to end-2 */
+    /* CRC covers [version][file type][section bytes] — i.e. it starts two bytes back, at the
+     * 0x17, not at the first section. Starting it at the sections left every .prf2 we wrote with
+     * a CRC that didn't validate (the TS side computes the same range in buildRawHex). */
+    size_t crc_start = pos - 2;
 
     /* 0x11 performance settings section */
     outBuf[pos++] = 0x11;

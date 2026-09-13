@@ -13,6 +13,10 @@ import type {
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { SLOT_LABELS } from '@/constants';
 
+// Third header byte of a .pch2/.prf2: file type. Also feeds the CRC (see buildRawHex).
+const FILE_TYPE_PATCH = 0x00;
+const FILE_TYPE_PERFORMANCE = 0x01;
+
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef, 0x1231, 0x0210, 0x3273,
@@ -335,7 +339,7 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 }
 
 // Concatenates sections, computes CRC, returns rawHex string.
-function buildRawHex(sections: Uint8Array[]): string {
+function buildRawHex(sections: Uint8Array[], fileType: number = FILE_TYPE_PATCH): string {
 	const totalLen = sections.reduce((s, b) => s + b.length, 0);
 	const sectionBytes = new Uint8Array(totalLen);
 	let writeOfs = 0;
@@ -343,10 +347,13 @@ function buildRawHex(sections: Uint8Array[]): string {
 		sectionBytes.set(sec, writeOfs);
 		writeOfs += sec.length;
 	}
-	// CRC covers [0x17][0x00][sectionBytes] (same range as parser's filedataArray)
+	// CRC covers [0x17][fileType][sectionBytes] (same range as parser's filedataArray), so it has
+	// to agree with the file-type byte the caller actually writes — 0x01 for a performance, 0x00
+	// for a patch. Hardcoding 0x00 here left every .prf2 we wrote with a CRC that didn't match
+	// its own header.
 	const forCrc = new Uint8Array(2 + sectionBytes.length);
 	forCrc[0] = 0x17;
-	forCrc[1] = 0x00;
+	forCrc[1] = fileType;
 	forCrc.set(sectionBytes, 2);
 	const crc = calcCrc(forCrc);
 	const result = new Uint8Array(sectionBytes.length + 2);
@@ -685,5 +692,5 @@ export function serializePerformance(
 	if (!wroteGlobalKnobs && globalParamPages.length > 0) {
 		out.push(writeGlobalKnobs(globalParamPages));
 	}
-	return buildRawHex(out);
+	return buildRawHex(out, FILE_TYPE_PERFORMANCE);
 }

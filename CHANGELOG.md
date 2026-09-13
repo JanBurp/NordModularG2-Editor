@@ -31,6 +31,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch category not saving correctly
 - Editing actions not registering in undo history (offline mode)
 - Light theme issues
+- File saving (pch2 & prf2)
+
+### Breaking
+- Files saved before this version of this editor could be badly formatted
 
 ---
 
