@@ -1893,10 +1893,15 @@ static int send_perf_upload(const char *name, int name_len, const uint8_t *secti
      * it starts reading ~50ms in, while the G2 is still applying all four slots. The caller-side
      * race this was meant to solve is handled in the editor instead — see
      * slots.ts _reloadSlotAfterUpload's retry-with-backoff and its sequential reload loop. */
-    if (!g2_listener_active) {
-        usleep(600000);  /* let G2 finish applying all 4 slots */
-        g2_stop_comm();
-    }
+    /* Let the G2 finish applying all 4 slots before returning. Without an ACK read there is no
+     * other completion signal, and the command otherwise reports success while the device is
+     * still busy — the next get-patch then fails ("No response from G2 for patch version", then
+     * "Failed to send get patch version command"), which is what left slot A stale after
+     * Performance → Download. This settle used to run in direct mode only; the editor always
+     * uses the daemon, so that is precisely the path that had none. A plain sleep is safe here,
+     * unlike the recv_interrupt above: it takes nothing from the listener queue. */
+    usleep(PERF_UPLOAD_SETTLE_US);
+    if (!g2_listener_active) g2_stop_comm();
     return G2_OK;
 }
 

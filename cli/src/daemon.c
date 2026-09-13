@@ -669,6 +669,7 @@ static void execute_cmd(const char *line) {
 
 	} else if (strcmp(cmd, "upload-perf") == 0 && n >= 1) {
 		ret = g2_upload_perf(arg_s(args, 0));
+		if (ret == G2_OK) rearm_after_get_patch = 1;
 
 	} else if (strcmp(cmd, "upload-perf-data") == 0 && n >= 1) {
 		size_t buf_len = 0;
@@ -676,6 +677,12 @@ static void execute_cmd(const char *line) {
 		if (!buf) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_upload_perf_buf(buf, buf_len);
 		free(buf);
+		/* A performance upload stops G2 streaming the same way select-patch does, and emits no
+		 * BULK_REARM either — without this the watch stays dead after Performance → Download
+		 * until the user happens to edit something. Deferred to the following get-patch for the
+		 * same reason as select-patch: an immediate g2_rearm() would leave a START_COMM ack in
+		 * the listener queue for g2_get_patch's recv_interrupt to trip over. */
+		if (ret == G2_OK) rearm_after_get_patch = 1;
 
 	} else if (strcmp(cmd, "get-perf-file") == 0) {
 		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);

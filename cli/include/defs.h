@@ -102,6 +102,10 @@ typedef enum {
 #define USB_TIMEOUT_STANDARD_MS             (100)   /* normal command/response */
 #define USB_TIMEOUT_LONG_MS                 (2000)  /* patch name fetch, slow ops */
 
+/* A performance upload is answered by no ACK we can safely read (see send_perf_upload), so the
+ * only way to avoid returning while the G2 is still applying its four slots is to wait. */
+#define PERF_UPLOAD_SETTLE_US               (600000)
+
 /* Patch format byte layout (USB bulk ↔ pch2 conversion) */
 #define PCH2_USB_DATA_OFFSET                (0x03)  /* pch2 payload start in USB frame */
 #define PCH2_USB_CHUNK1_END                 (0x15)  /* exclusive end of first pch2 chunk */
