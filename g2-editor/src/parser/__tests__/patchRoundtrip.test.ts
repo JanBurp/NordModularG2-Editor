@@ -916,6 +916,45 @@ describe('C_MORPH_PARAM ($65) chunk length (regression: G2 rejects the patch wit
 			expect(found).toBe(Math.ceil(MORPH_BITS(perVariation * 9) / 8));
 		});
 	}
+
+	it('writes assignments whose range is 0 instead of dropping them', () => {
+		// Genuine files carry these: every one of computer blibs.pch2's 27 morph assignments has
+		// range 0, and a `filter(a => a.range !== 0)` in the writer collapsed its $65 from 183
+		// bytes to the 85-byte empty form — the whole morph configuration lost on save. The
+		// reference reader AddMorph()s every entry without inspecting the range.
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		const patch = patches[0];
+		for (const v of patch.patchParams ?? []) {
+			v.morphAssignments = [
+				{ groupIndex: 1, location: 1 as const, moduleIndex: 7, paramIndex: 4, range: 0 },
+				{ groupIndex: 2, location: 1 as const, moduleIndex: 8, paramIndex: 5, range: 0 },
+			];
+		}
+		const hex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+		const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		let ofs = 0;
+		let found = -1;
+		while (ofs < bytes.length - 2) {
+			const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+			if (bytes[ofs] === 0x65) {
+				found = siz;
+				break;
+			}
+			ofs += 3 + siz;
+		}
+		expect(found).toBe(Math.ceil(MORPH_BITS(2 * 9) / 8));
+	});
+
+	it('preserves the per-morph keyboard-assign values through a round-trip', () => {
+		// 2 bits per morph group in the $65 header. Always zero in all 4055 reference patches and
+		// in a live device capture, so nothing reads it yet — but the writer used to hardcode
+		// zeros, which would silently destroy it the moment a patch did use it.
+		const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		patches[0].morphKeyboardAssign = [0, 1, 2, 0, 2, 1, 0, 1];
+		const hex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+		const reparsed = parsePerfFromRawHex('x', hex);
+		expect(reparsed.patches[0].morphKeyboardAssign).toEqual([0, 1, 2, 0, 2, 1, 0, 1]);
+	});
 });
 
 describe('prf2 whole-message structure preservation (regression: wire-upload hang)', () => {

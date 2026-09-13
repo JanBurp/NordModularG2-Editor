@@ -101,6 +101,7 @@ class G2Parser {
 	private bitofs = 0;
 	private patchParamsData: PatchParamVariation[][] = [];
 	private morphParamLabelsData: ParamLabel[][] = [];
+	private morphKeyboardAssignData: number[][] = [];
 	private pd: (PatchDescription | null)[] = [];
 	// CONTROLLERS ($60) and C_KNOBS ($62) are both per-patch, so both are stored per-slot-index
 	// here (mirroring patchParamsData) — a .prf2's 4 slots would otherwise collide. controllersData
@@ -197,6 +198,10 @@ class G2Parser {
 
 	getMorphParamLabels(slot: number): ParamLabel[] | null {
 		return this.morphParamLabelsData[slot] ?? null;
+	}
+
+	getMorphKeyboardAssign(slot = 0): number[] | null {
+		return this.morphKeyboardAssignData[slot] ?? null;
 	}
 
 	getModuleArray(areaIdx: number, basename: string): ModuleInstance[] {
@@ -466,17 +471,19 @@ class G2Parser {
 		const params = this.patchParamsData[slotIdx];
 		if (!params) return 'Morph Parameters: no matching PARAMETERS section';
 		const variationCount = this.getBits(8, data);
-		this.getBits(4); // MorphCount, constant 8 (NMORPHS) — informational, not used
-		// 8 morph modes, 2 bits each. The reference writer (G2Editor.c
-		// CMorphMapData_11::WriteStream) emits exactly 16 bits here — an earlier reading of 20
-		// stole 4 bits from the first variation's index and had to be paid back with a 4-bit
-		// filler between variations, which left the whole chunk 4 bits too long. Read and
-		// discarded, as before: nothing in the editor exposes these yet.
-		this.getBits(16);
+		const morphCount = this.getBits(4); // NMORPHS, always 8
+		// One 2-bit keyboard-morph-assign value per morph group — morphCount of them, so 16 bits
+		// in practice. The reference writer (G2Editor.c CMorphMapData_11::WriteStream) emits
+		// exactly this; an earlier reading of a flat 20 stole 4 bits from the first variation's
+		// index and paid them back with a filler between variations, leaving the chunk 4 bits
+		// too long (which the G2 rejects — see the serializer).
+		const keyboardAssign: number[] = [];
+		for (let i = 0; i < morphCount; i++) keyboardAssign.push(this.getBits(2));
+		this.morphKeyboardAssignData[slotIdx] = keyboardAssign;
 		let total = 0;
 		for (let i = 0; i < variationCount; i++) {
 			const variationIndex = this.getBits(8);
-			for (let j = 0; j < 8; j++) this.getBits(7); // per-morph reserved, always 0
+			for (let j = 0; j < morphCount; j++) this.getBits(7); // per-morph reserved, always 0
 			const morphParamCount = this.getBits(8);
 			const target = params[variationIndex];
 			for (let j = 0; j < morphParamCount; j++) {
@@ -639,6 +646,7 @@ export class PatchParser {
 			paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
 			text: this.patcher.getTextPad(0) ?? undefined,
 			morphParamLabels: this.patcher.getMorphParamLabels(0) ?? undefined,
+			morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(0) ?? undefined,
 		};
 	}
 
@@ -663,6 +671,7 @@ export class PatchParser {
 					paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
 					text: this.patcher.getTextPad(slot) ?? undefined,
 					morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
+					morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(slot) ?? undefined,
 				};
 			}),
 			slotMeta: this.patcher.getSlotMeta(),

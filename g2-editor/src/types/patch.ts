@@ -155,6 +155,10 @@ export interface Patch {
 	paramPages?: ParamPageAssignment[];
 	text?: string; // free-text patch notes ("Text Pad" / C_PATCH_NOTES section)
 	morphParamLabels?: ParamLabel[]; // custom Morph Group names; paramIndex 8-15 = group (paramIndex-8)
+	// One 0-2 value per morph group, from the C_MORPH_PARAM ($65) header (G2Editor.c calls it
+	// SetKeyboardMorphAssign). Carried through so a save cannot silently zero it — every genuine
+	// file scanned and the live device capture have it all-zero, so nothing reads it yet.
+	morphKeyboardAssign?: number[];
 }
 
 export interface ClipboardEntry {

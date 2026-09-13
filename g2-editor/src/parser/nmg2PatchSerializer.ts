@@ -263,8 +263,9 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 // values, patch volume, glide, etc.) — mirrors nmg2PatchParser.ts's parseMorphParameters exactly.
 // Never writes a record with range === 0 (the real format deletes such records; presence of a
 // record is what marks the assignment, there's no separate bitmask).
-function writeMorphParamSection(params: PatchParamVariation[]): Uint8Array {
+function writeMorphParamSection(params: PatchParamVariation[], keyboardAssign?: number[]): Uint8Array {
 	const NUM_VAR = 9;
+	const NMORPHS = 8;
 	const bw = new BitWriter();
 	bw.write(8, NUM_VAR);
 	bw.write(4, 8); // MorphCount, constant 8 (NMORPHS)
@@ -275,11 +276,17 @@ function writeMorphParamSection(params: PatchParamVariation[]): Uint8Array {
 	// made the chunk one byte longer than the G2 computes from the counts. It rejects the whole
 	// patch then: {"type":"error","code":3}, name replaced by "Error" (reproduced on hardware, and
 	// this is what made Save Performance's output un-uploadable).
-	bw.write(16, 0);
+	// One 2-bit keyboard-morph-assign value per morph group, preserved from the source rather
+	// than zeroed — see Patch.morphKeyboardAssign.
+	for (let j = 0; j < NMORPHS; j++) bw.write(2, keyboardAssign?.[j] ?? 0);
 	for (let v = 0; v < NUM_VAR; v++) {
-		const assignments = (params[v]?.morphAssignments ?? []).filter((a) => a.range !== 0);
+		// Every assignment is written, including range 0. Filtering those out dropped real data:
+		// 27 of 361,430 morph assignments across the 4,055-patch reference library have range 0,
+		// and the reference reader (G2Editor.c CMorphMapData_11::ReadStream) AddMorph()s every
+		// entry it reads without inspecting the range. Same mistake as writeModuleNames'.
+		const assignments = params[v]?.morphAssignments ?? [];
 		bw.write(8, v); // VariationIndex
-		for (let j = 0; j < 8; j++) bw.write(7, 0); // per-morph reserved, always 0
+		for (let j = 0; j < NMORPHS; j++) bw.write(7, 0); // per-morph reserved, always 0
 		bw.write(8, assignments.length);
 		for (const a of assignments) {
 			bw.write(2, a.location);
@@ -452,9 +459,11 @@ function newWrittenSets(): WrittenSets {
 	};
 }
 
-// True when any variation actually has morph-group assignment data worth writing.
+// True when any variation actually has morph-group assignment data worth writing. Counts
+// range-0 assignments too, matching writeMorphParamSection — gating on a non-zero range would
+// drop the whole section for a patch whose only assignments happen to sit at zero.
 function hasMorphAssignments(variations: VariationState[]): boolean {
-	return variations.some((v) => v.patch.morphAssignments.some((a) => a.range !== 0));
+	return variations.some((v) => v.patch.morphAssignments.length > 0);
 }
 
 // Wraps the patch's custom Morph Group labels (if any) as the single synthetic PATCH_MORPH
@@ -555,7 +564,12 @@ function processSection(
 		w.m62 = true;
 	} else if (type === SectionType.MORPH_PARAMS && !w.m65) {
 		// Same reasoning: writeMorphParamSection always emits its fixed 9-variation structure.
-		out.push(writeMorphParamSection(variations.map((v) => v.patch)));
+		out.push(
+			writeMorphParamSection(
+				variations.map((v) => v.patch),
+				patch.morphKeyboardAssign,
+			),
+		);
 		w.m65 = true;
 	} else if (type === SectionType.SEPARATOR) {
 		out.push(writeTextPad(patch.text ?? ''));
@@ -603,7 +617,12 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		out.push(writeTextPad(patch.text));
 	}
 	if (!w.m65 && hasMorphAssignments(variations)) {
-		out.push(writeMorphParamSection(variations.map((v) => v.patch)));
+		out.push(
+			writeMorphParamSection(
+				variations.map((v) => v.patch),
+				patch.morphKeyboardAssign,
+			),
+		);
 	}
 	// Same fallback: the hardware get-patch response never includes a $PARAM_NAMES(areaIdx=2)
 	// section, so any custom Morph Group labels need appending when the template predates them.
@@ -653,7 +672,12 @@ export function serializePerformance(
 				out.push(writeKnobs(patch.paramPages));
 			}
 			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
-				out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
+				out.push(
+					writeMorphParamSection(
+						(variationsArray[slotIdx] ?? []).map((v) => v.patch),
+						patch.morphKeyboardAssign,
+					),
+				);
 			}
 			if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
 				out.push(writeParamNames(2, morphParamNamesEntries(patch)));
@@ -685,7 +709,12 @@ export function serializePerformance(
 		out.push(writeKnobs(lastPatch.paramPages));
 	}
 	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
-		out.push(writeMorphParamSection((variationsArray[slotIdx] ?? []).map((v) => v.patch)));
+		out.push(
+			writeMorphParamSection(
+				(variationsArray[slotIdx] ?? []).map((v) => v.patch),
+				lastPatch?.morphKeyboardAssign,
+			),
+		);
 	}
 	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
 		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch)));
