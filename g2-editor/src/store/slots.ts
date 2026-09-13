@@ -1587,6 +1587,37 @@ export const useSlotsStore = defineStore('slots', {
 			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
 		},
 
+		// g2_get_perf_file captures the G2's *live USB* form and writes it out as a .prf2. That form
+		// is not a valid file: each patch carries 10 parameter variations where a file has 9
+		// (N_USB_VARIATIONS vs N_VARIATIONS), and the G2 rejects such a file if it is ever uploaded
+		// back. Reading the capture straight back out through the parser and serializer converts it —
+		// serializePerformance emits 9 unconditionally — and costs one extra file round-trip.
+		// Best-effort: on any failure the captured file stays as written, still openable here, just
+		// not guaranteed re-uploadable.
+		async _convertCapturedPerfToFileForm(path: string): Promise<void> {
+			try {
+				const file = await window.electronAPI.patches.load(path);
+				if (!file.success || !file.data) return;
+				const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
+				const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+				const prf2 = new PatchParser(new Uint8Array(file.data).buffer).parsePrf2();
+				if (!prf2) return;
+				const rawHex = serializePerformance(
+					prf2.patches,
+					stripFileHeader(file.data),
+					prf2.patches.map((p) => extractVariations(p)),
+					prf2.globalParamPages,
+				);
+				// Only the section bytes change: the file keeps its own header ([name][0x00][version]
+				// [file type]) verbatim, so a long Clavia-style header survives the round-trip intact.
+				const header = file.data.slice(0, file.data.indexOf(0) + 3);
+				const sections = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+				await window.electronAPI.savePatch(path, [...header, ...sections]);
+			} catch (err) {
+				console.error('Failed to convert the captured performance to file form:', err);
+			}
+		},
+
 		async savePerformance(filepath?: string): Promise<void> {
 			if (!this.performanceRawHex) {
 				// Hardware-native performance mode (no .prf2 opened from disk/browser this
@@ -1609,6 +1640,7 @@ export const useSlotsStore = defineStore('slots', {
 					showToast('Failed to save performance.');
 					return;
 				}
+				await this._convertCapturedPerfToFileForm(hwPath);
 				this.performanceFilePath = hwPath;
 				return;
 			}

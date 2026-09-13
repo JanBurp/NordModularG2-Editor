@@ -2082,9 +2082,13 @@ cJSON *g2_get_perf_file(const char *filename) {
      * section train, each terminated by its own 0x6f), then one 0x5f C_KNOBS_GLOBAL.
      * 0x11 section content = perfData[4 + nameLen + 3 .. perfSize-1].
      * Offset +3 skips 3 unknown header bytes after the name; byte at +3 maps to unknown2
-     * and bytes at +4..+10 map to the 8-byte performance settings header fields. */
+     * and bytes at +4..+10 map to the 8-byte performance settings header fields.
+     * The USB response ends with its own 2-byte CRC, which belongs to the transport and not to
+     * the section — taking the payload all the way to perfSize left those two bytes inside the
+     * 0x11 chunk (verified against a genuine .prf2 of the same performance: 85 bytes vs 83). */
     size_t perf_sect_offset = (size_t)(4 + nameLen + 3);
-    size_t perf_sect_len = (perf_sect_offset < perfSize) ? (perfSize - perf_sect_offset) : 0;
+    size_t perf_sect_len = (perf_sect_offset + 2 < perfSize) ? (perfSize - perf_sect_offset - 2) : 0;
+    perf_settings_normalize_slots(perfData + perf_sect_offset, perf_sect_len);
 
     size_t header_len = strlen(perfName) + 3;  /* name + null + 0x17 + file type */
     size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */

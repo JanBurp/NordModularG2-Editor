@@ -31,6 +31,17 @@ export type {
 	GlobalParamPageAssignment,
 };
 
+// Strips a .pch2/.prf2's file header ([name][0x00][version][file type]) and returns the section
+// bytes — including the trailing 2-byte CRC — as a hex string, the `rawHex` form the serializer
+// takes as its template.
+export function stripFileHeader(bytes: number[] | Uint8Array): string {
+	let ofs = 0;
+	while (ofs < bytes.length && bytes[ofs] !== 0) ofs++;
+	return Array.from((bytes as any).slice(ofs + 3))
+		.map((b: unknown) => (b as number).toString(16).padStart(2, '0'))
+		.join('');
+}
+
 // Parses a raw C_KNOBS_GLOBAL ($5f) chunk payload — same 16-bit-count + per-slot-entry layout as
 // parseKnobs (see G2Parser.parseKnobs below), plus a trailing 2-bit slot field (0-3 = A-D) per
 // entry, since a Global Page slot can target a module in any of the 4 patches (see
@@ -456,18 +467,16 @@ class G2Parser {
 		if (!params) return 'Morph Parameters: no matching PARAMETERS section';
 		const variationCount = this.getBits(8, data);
 		this.getBits(4); // MorphCount, constant 8 (NMORPHS) — informational, not used
-		this.getBits(20); // Reserved1 — unknown header padding, always 0 on write
+		// 8 morph modes, 2 bits each. The reference writer (G2Editor.c
+		// CMorphMapData_11::WriteStream) emits exactly 16 bits here — an earlier reading of 20
+		// stole 4 bits from the first variation's index and had to be paid back with a 4-bit
+		// filler between variations, which left the whole chunk 4 bits too long. Read and
+		// discarded, as before: nothing in the editor exposes these yet.
+		this.getBits(16);
 		let total = 0;
 		for (let i = 0; i < variationCount; i++) {
-			const variationIndex = this.getBits(4);
-			this.getBits(4); // Unknown1
-			this.getBits(8); // Unknown2
-			this.getBits(8); // Unknown3
-			this.getBits(8); // Unknown4
-			this.getBits(8); // Unknown5
-			this.getBits(8); // Unknown6
-			this.getBits(8); // Unknown7
-			this.getBits(4); // Unknown8
+			const variationIndex = this.getBits(8);
+			for (let j = 0; j < 8; j++) this.getBits(7); // per-morph reserved, always 0
 			const morphParamCount = this.getBits(8);
 			const target = params[variationIndex];
 			for (let j = 0; j < morphParamCount; j++) {
@@ -480,10 +489,6 @@ class G2Parser {
 				target?.morphAssignments.push({ groupIndex, location, moduleIndex, paramIndex, range });
 			}
 			total += morphParamCount;
-			// Reserved2: 4 bits between variations, except the real writer trims this to whatever
-			// bits remain at the very end of the chunk — guard against reading past the section.
-			const bitsLeft = this.rawData.length * 8 - this.bitofs;
-			if (bitsLeft > 0) this.getBits(Math.min(4, bitsLeft));
 		}
 		return 'Morph Parameters: count=' + total;
 	}

@@ -5,7 +5,7 @@ import { useSettingsStore } from '../store/settings';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { showToast } from './useToast';
-const { PatchParser } = await import('../parser/nmg2PatchParser');
+const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
@@ -19,14 +19,6 @@ type Prf2Data = {
 /* Safety net for handlePerformanceSynthSelect: clears the loading overlay if the
  * device never sends the matching synth_settings_update (error/disconnect mid-load). */
 export const PERF_SETTLE_TIMEOUT_MS = 5000;
-
-function stripFileHeader(bytes: number[] | Uint8Array): string {
-	let ofs = 0;
-	while (ofs < bytes.length && bytes[ofs] !== 0) ofs++;
-	return Array.from((bytes as any).slice(ofs + 3))
-		.map((b: unknown) => (b as number).toString(16).padStart(2, '0'))
-		.join('');
-}
 
 export function usePatchFile() {
 	const slotsStore = useSlotsStore();

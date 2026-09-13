@@ -420,6 +420,90 @@ void test_slot_sections_canonical_keeps_existing_current_note(void) {
     TEST_ASSERT_EQUAL_UINT8(0x77, out[8]);        /* the original payload survived */
 }
 
+/* ---- perf_settings_normalize_slots ---------------------------------------
+ * The 0x11 payload the G2 answers with is byte-identical to a genuine .prf2's except for the
+ * per-slot index, which the device numbers its own way. */
+
+/* The first 0x11 payload bytes captured from hardware for MorphingDrumDemo: the 8-byte header
+ * plus the four [name][NUL][10] blocks, slot indexes 0a 0b 0c 0d. */
+static const uint8_t kCapturedPerfSettings[] = {
+    0x00, 0x00, 0x00, 0x78, 0x00, 0x01, 0x00, 0x00,
+    'E','x','t','A','u','d','i','o','F','M', 0x00,
+    0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x0a, 0x00, 0x00,
+    'R','o','c','k','1','9','0', 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x0b, 0x00, 0x00,
+    'H','o','p','1','0','7', 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x7f, 0x0c, 0x00, 0x00,
+    'H','o','u','s','e','1','4','4', 0x00,
+    0x01, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x7f, 0x0d, 0x00, 0x00
+};
+
+void test_perf_settings_normalize_slots_rewrites_device_numbering(void) {
+    uint8_t data[sizeof(kCapturedPerfSettings)];
+    memcpy(data, kCapturedPerfSettings, sizeof(data));
+
+    perf_settings_normalize_slots(data, sizeof(data));
+
+    /* The slot byte is the 8th of each block's 10 trailing bytes. */
+    TEST_ASSERT_EQUAL_UINT8(0x00, data[8 + 11 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x01, data[8 + 11 + 10 + 8 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x02, data[8 + 11 + 10 + 8 + 10 + 7 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x03, data[8 + 11 + 10 + 8 + 10 + 7 + 10 + 9 + 7]);
+
+    /* Nothing else may move: only those four bytes differ from the capture. */
+    int diffs = 0;
+    for (size_t i = 0; i < sizeof(data); i++)
+        if (data[i] != kCapturedPerfSettings[i]) diffs++;
+    TEST_ASSERT_EQUAL_INT(4, diffs);
+}
+
+/* Captured from hardware: slot C's name is exactly 16 characters, so it carries NO terminator
+ * and the 10 trailing bytes start immediately after it. Slot indexes here are 00 01 0c 03 — the
+ * first two already normalised by an earlier run, the third still the device's own value. */
+static const uint8_t kPerfSettings16CharName[] = {
+    0x00, 0x05, 0x00, 0x95, 0x00, 0x01, 0x00, 0x00,
+    'E','t','h','n','i','c','D','r','u','m','s','1',' ','D','X', 0x00,
+    0x00, 0x00, 0x00, 0x06, 0x0e, 0x00, 0x7f, 0x0a, 0x00, 0x00,
+    'R','n','d','K','i','t',' ','1','b', 0x00,
+    0x01, 0x01, 0x00, 0x09, 0x15, 0x00, 0x7f, 0x0b, 0x00, 0x00,
+    '1','8','5','s','t','e','p','s','e','q','u','e','n','c','e','r',   /* 16 chars, no NUL */
+    0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x7f, 0x0c, 0x00, 0x00,
+    'B','u','r','p',' ',' ','N','L','-','X',' ','v','7','.','0', 0x00,
+    0x01, 0x00, 0x01, 0x09, 0x14, 0x00, 0x7f, 0x0d, 0x00, 0x00
+};
+
+void test_perf_settings_normalize_slots_handles_unterminated_16_char_name(void) {
+    uint8_t data[sizeof(kPerfSettings16CharName)];
+    memcpy(data, kPerfSettings16CharName, sizeof(data));
+
+    perf_settings_normalize_slots(data, sizeof(data));
+
+    /* Slot byte offsets, counting the 16-char name as unterminated. */
+    TEST_ASSERT_EQUAL_UINT8(0x00, data[8 + 16 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x01, data[8 + 16 + 10 + 10 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x02, data[8 + 16 + 10 + 10 + 10 + 16 + 7]);
+    TEST_ASSERT_EQUAL_UINT8(0x03, data[8 + 16 + 10 + 10 + 10 + 16 + 10 + 16 + 7]);
+
+    /* The name that follows the unterminated one must not have been walked into: only the four
+     * slot bytes may differ from the capture. */
+    int diffs = 0;
+    for (size_t i = 0; i < sizeof(data); i++)
+        if (data[i] != kPerfSettings16CharName[i]) diffs++;
+    TEST_ASSERT_EQUAL_INT(4, diffs);
+}
+
+void test_perf_settings_normalize_slots_ignores_truncated_payload(void) {
+    /* A payload that ends mid-block must be left exactly as it was. */
+    uint8_t data[20];
+    memcpy(data, kCapturedPerfSettings, sizeof(data));
+    uint8_t before[20];
+    memcpy(before, data, sizeof(before));
+
+    perf_settings_normalize_slots(data, sizeof(data));
+
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(before, data, sizeof(before));
+}
+
 void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
     /* A section whose length runs past the buffer must not be reshuffled. */
     uint8_t in[8] = {0x21, 0xff, 0xff, 0x01, 0x02, 0x03, 0x04, 0x05};

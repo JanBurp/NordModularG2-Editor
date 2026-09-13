@@ -26,6 +26,11 @@ int hex_to_bytes(const char *hex, uint8_t **out);
 void patch_slot_sections_canonical(const uint8_t *in, size_t in_len,
                                    uint8_t *out, size_t *out_len);
 
+/* Rewrites the slot index inside a captured C_PERF_SETTINGS (0x11) payload to the 0-3 a file
+ * uses. The device reports its own unit-specific numbering instead, which a .prf2 must not
+ * carry. Edits in place. */
+void perf_settings_normalize_slots(uint8_t *data, size_t len);
+
 /* Patch format conversion (USB <-> PCH2) */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
                       uint8_t *pch2_data, size_t *pch2_len);

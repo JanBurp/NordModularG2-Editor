@@ -875,6 +875,49 @@ describe('prf2 round-trip: parse → serializePerformance → parse', () => {
 	}
 });
 
+// The C_MORPH_PARAM ($65) chunk is bit-packed and the G2 checks its byte length against what the
+// declared counts imply. Layout, per G2Editor.c CMorphMapData_11::WriteStream:
+//   header      = 8 (variationCount) + 4 (morphCount) + 8x2 (morph modes)          = 28 bits
+//   variation   = 8 (index) + 8x7 (reserved) + 8 (assignment count)                = 72 bits
+//   assignment  = 2 (location) + 8 (module) + 7 (param) + 4 (group) + 8 (range)    = 29 bits
+// An earlier writer used a 20-bit header reserve plus a 4-bit filler after each variation. Those
+// cancel at every field the parser reads, so round-trips stayed self-consistent — but the chunk
+// ended 4 bits long, and whenever that crossed a byte boundary the G2 rejected the entire patch
+// with {"type":"error","code":3} and renamed it "Error". Confirmed on hardware: 36 assignments
+// over 9 variations is exactly such a case (1720 bits = 215 B; the old writer emitted 216 B).
+describe('C_MORPH_PARAM ($65) chunk length (regression: G2 rejects the patch with code 3)', () => {
+	const MORPH_BITS = (assignments: number) => 28 + 9 * 72 + 29 * assignments;
+
+	for (const perVariation of [0, 1, 4, 7]) {
+		it(`${perVariation} morph assignments per variation packs to the exact byte length`, () => {
+			const { rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+			const patch = patches[0];
+			for (const v of patch.patchParams ?? []) {
+				v.morphAssignments = Array.from({ length: perVariation }, (_, i) => ({
+					groupIndex: 1,
+					location: 1 as const,
+					moduleIndex: 7 + i,
+					paramIndex: 4,
+					range: 127,
+				}));
+			}
+			const hex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+			const bytes = new Uint8Array(hex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+			let ofs = 0;
+			let found = -1;
+			while (ofs < bytes.length - 2) {
+				const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+				if (bytes[ofs] === 0x65) {
+					found = siz;
+					break;
+				}
+				ofs += 3 + siz;
+			}
+			expect(found).toBe(Math.ceil(MORPH_BITS(perVariation * 9) / 8));
+		});
+	}
+});
+
 describe('prf2 whole-message structure preservation (regression: wire-upload hang)', () => {
 	// A real G2 hung when downloading a performance re-serialized from an unedited .prf2 —
 	// serializePerformance treated the trailing C_KNOBS_GLOBAL section as a 5th slot, resetting
@@ -912,6 +955,35 @@ describe('prf2 whole-message structure preservation (regression: wire-upload han
 	// between the three consecutive 0x4d sections; the G2 rejected that performance with
 	// {"type":"error","slot":"A","code":3} and renamed the performance "Error". With the order
 	// restored it loads correctly. So compare the ordered section-id train per slot.
+	// Sizes matter too, not just the id train. writeModuleNames used to filter its entries to
+	// `uname && uname.length > 0`, but a .prf2 carries an entry for every module that HAS a label
+	// record — including one whose label is the empty string (29 of 80 entries in one slot of a
+	// genuine Clavia performance). Dropping those shrank every 0x5a and cost a real file 214
+	// bytes on an unmodified round-trip. Delphi's TModuleLabelList.Write emits its whole list
+	// unfiltered for the same reason. An unmodified round-trip must therefore preserve each
+	// section's payload length exactly.
+	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+		it(`${file}: unmodified round-trip preserves every name/morph section's payload length`, () => {
+			const { rawHex, patches } = loadFixturePrf2(file);
+			const newHex = serializePerformance(patches, rawHex, patches.map(extractVariations));
+
+			// Scoped to the name sections (0x5a/0x5b). Two of MorphingDrumDemo's 0x4d sections
+			// re-serialize 8 bytes larger — a separate, pre-existing encoding difference that the
+			// semantic round-trip tests above pass over, not part of this regression.
+			const sizes = (hex: string): string[] => {
+				const b = new Uint8Array(hex.match(/.{2}/g)!.map((x) => parseInt(x, 16)));
+				const out: string[] = [];
+				for (let ofs = 0; ofs < b.length - 2; ) {
+					const siz = (b[ofs + 1] << 8) | b[ofs + 2];
+					if (b[ofs] === 0x5a || b[ofs] === 0x5b || b[ofs] === 0x65) out.push(`${b[ofs].toString(16)}:${siz}`);
+					ofs += 3 + siz;
+				}
+				return out;
+			};
+			expect(sizes(newHex)).toEqual(sizes(rawHex));
+		});
+	}
+
 	for (const file of ['EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
 		it(`${file}: unmodified round-trip preserves the ordered section train of every slot`, () => {
 			const { rawHex, patches } = loadFixturePrf2(file);

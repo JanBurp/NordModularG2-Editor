@@ -162,7 +162,12 @@ function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; par
 
 // Always emits a section — see writeParamNames.
 function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array {
-	const named = modules.filter((m) => m.uname && m.uname.length > 0);
+	// Every module that HAS a label entry is written, including one whose label is the empty
+	// string — `uname === ''` means the file carried an entry for it, `undefined` means it
+	// carried none. Genuine files are full of the former (29 of 80 entries in one slot of
+	// Sample&Loop v61.prf2), and Delphi's TModuleLabelList.Write emits its whole list unfiltered
+	// too. Filtering on a non-empty name dropped those entries and shrank the section.
+	const named = modules.filter((m) => m.uname !== undefined);
 
 	let size = 2; // 1 byte header (areaIdx), 1 byte count
 	for (const m of named) {
@@ -263,18 +268,18 @@ function writeMorphParamSection(params: PatchParamVariation[]): Uint8Array {
 	const bw = new BitWriter();
 	bw.write(8, NUM_VAR);
 	bw.write(4, 8); // MorphCount, constant 8 (NMORPHS)
-	bw.write(20, 0); // Reserved1
+	// 8 morph modes, 2 bits each — 16 bits, per G2Editor.c CMorphMapData_11::WriteStream. This
+	// used to be 20 bits of "Reserved1", paid back with a 4-bit filler after every variation. The
+	// two cancel out at every field the parser reads, so round-trips stayed self-consistent and
+	// the section merely ended 4 bits long — which, whenever those 4 bits crossed a byte boundary,
+	// made the chunk one byte longer than the G2 computes from the counts. It rejects the whole
+	// patch then: {"type":"error","code":3}, name replaced by "Error" (reproduced on hardware, and
+	// this is what made Save Performance's output un-uploadable).
+	bw.write(16, 0);
 	for (let v = 0; v < NUM_VAR; v++) {
 		const assignments = (params[v]?.morphAssignments ?? []).filter((a) => a.range !== 0);
-		bw.write(4, v); // VariationIndex
-		bw.write(4, 0); // Unknown1
-		bw.write(8, 0); // Unknown2
-		bw.write(8, 0); // Unknown3
-		bw.write(8, 0); // Unknown4
-		bw.write(8, 0); // Unknown5
-		bw.write(8, 0); // Unknown6
-		bw.write(8, 0); // Unknown7
-		bw.write(4, 0); // Unknown8
+		bw.write(8, v); // VariationIndex
+		for (let j = 0; j < 8; j++) bw.write(7, 0); // per-morph reserved, always 0
 		bw.write(8, assignments.length);
 		for (const a of assignments) {
 			bw.write(2, a.location);
@@ -283,7 +288,6 @@ function writeMorphParamSection(params: PatchParamVariation[]): Uint8Array {
 			bw.write(4, a.groupIndex);
 			bw.write(8, a.range); // JS bitwise ops on negative numbers naturally yield two's complement
 		}
-		bw.write(4, 0); // Reserved2
 	}
 	return makeSection(SectionType.MORPH_PARAMS, bw.flush());
 }

@@ -203,6 +203,60 @@ describe('edited flag', () => {
 		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
 	});
 
+	it('savePerformance rewrites the captured .prf2 in file form (g2_get_perf_file writes USB form)', async () => {
+		vi.restoreAllMocks(); // an earlier test in this block spies on serializePerformance
+		const fs = await import('fs');
+		const path = await import('path');
+		const { fileURLToPath } = await import('url');
+		const fixtures = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../test-patches');
+		const captured = Array.from(fs.readFileSync(path.join(fixtures, 'MorphingDrumDemo.prf2')));
+
+		const store = useSlotsStore();
+		store.performanceRawHex = null;
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Connected;
+		device.device = { mode: 'Performance' } as any;
+		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(undefined);
+		const savePatch = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.electronAPI = {
+			patches: { load: vi.fn().mockResolvedValue({ success: true, data: captured }) },
+			savePatch,
+		};
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(savePatch).toHaveBeenCalledTimes(1);
+		const [writtenPath, bytes] = savePatch.mock.calls[0];
+		expect(writtenPath).toBe('/tmp/live.prf2');
+		// The capture's own header survives byte for byte — only the sections are rewritten.
+		const headerEnd = captured.indexOf(0) + 3;
+		expect(bytes.slice(0, headerEnd)).toEqual(captured.slice(0, headerEnd));
+		// Still a performance: first section 0x11, file-type byte 0x01.
+		expect(bytes[headerEnd - 1]).toBe(0x01);
+		expect(bytes[headerEnd]).toBe(0x11);
+		// And it is genuinely re-encoded, not a copy of the bytes that were read back.
+		expect(bytes.length).not.toBe(captured.length);
+	});
+
+	it('savePerformance keeps the captured file when it cannot be converted', async () => {
+		const store = useSlotsStore();
+		store.performanceRawHex = null;
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Connected;
+		device.device = { mode: 'Performance' } as any;
+		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(undefined);
+		const savePatch = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.electronAPI = {
+			patches: { load: vi.fn().mockResolvedValue({ success: false }) },
+			savePatch,
+		};
+
+		await store.savePerformance('/tmp/live.prf2');
+
+		expect(savePatch).not.toHaveBeenCalled();
+		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
+	});
+
 	it('savePerformance does nothing when performanceRawHex is null and the device is not live in Performance mode', async () => {
 		const store = useSlotsStore();
 		store.performanceRawHex = null;
