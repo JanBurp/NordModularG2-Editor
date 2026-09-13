@@ -21,7 +21,7 @@
 					/>
 				</SettingsRow>
 				<SettingsRow label="Sensitivity">
-					<RangeInput
+					<Slider
 						:model-value="settings.knobSensitivity"
 						:min="0.25"
 						:max="4"
@@ -32,19 +32,13 @@
 
 				<p class="settings-subheader">Cable rendering:</p>
 				<SettingsRow :label="L.cableGravity">
-					<RangeInput :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
+					<Slider :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.cableOpacity">
-					<RangeInput :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
+					<Slider :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.cableThickness">
-					<RangeInput
-						:model-value="settings.cableThickness"
-						:min="0"
-						:max="6.5"
-						:step="0.5"
-						@update:model-value="settings.setCableThickness($event)"
-					/>
+					<Slider :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
 				</SettingsRow>
 
 				<p class="settings-subheader">Settings:</p>
@@ -299,7 +293,7 @@
 	import { computed, ref, watch } from 'vue';
 	import { makeOffMemory } from '@/composables/useOffMemory';
 	import Collapsible from '@/components/common/Collapsible.vue';
-	import RangeInput from '@/components/common/RangeInput.vue';
+	import Slider from '@/components/common/Slider.vue';
 	import SettingsRow from '@/components/common/SettingsRow.vue';
 	import SettingsRowDuo from '@/components/common/SettingsRowDuo.vue';
 	import TextInput from '@/components/common/TextInput.vue';
