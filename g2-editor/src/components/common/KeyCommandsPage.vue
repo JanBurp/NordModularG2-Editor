@@ -114,6 +114,9 @@
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
+				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
+				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },
+				{ keys: ['Enter'], action: 'Add selected module (Module Picker toolbar)' },
 			],
 		},
 		{

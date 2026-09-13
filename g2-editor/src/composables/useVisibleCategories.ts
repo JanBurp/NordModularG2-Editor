@@ -6,8 +6,8 @@ import { useSettingsStore } from '../store/settings';
 export function useVisibleCategories() {
 	const settings = useSettingsStore();
 	const categories = computed(() => {
-		const all = getAllCategories();
-		return settings.hidden_modules ? all : all.filter((c) => c !== 'Hidden');
+		const others = getAllCategories().filter((c) => c !== 'Hidden');
+		return settings.hidden_modules ? [...others, 'Hidden'] : others;
 	});
 	return { categories };
 }
