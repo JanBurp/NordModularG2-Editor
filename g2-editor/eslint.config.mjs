@@ -20,6 +20,7 @@ const allGlobals = {
   Event: 'readonly',
   HTMLInputElement: 'readonly',
   MouseEvent: 'readonly',
+  PointerEvent: 'readonly',
   KeyboardEvent: 'readonly',
   HTMLElement: 'readonly',
   Element: 'readonly',
