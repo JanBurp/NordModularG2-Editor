@@ -1,5 +1,5 @@
 <template>
-	<ToolBar>
+	<ToolBar class="py-4">
 		<ToolBarLabel>Param<br />Pages:</ToolBarLabel>
 		<div class="flex items-center gap-4">
 			<div
@@ -11,9 +11,9 @@
 			>
 				<span class="text-xs w-full truncate text-center font-bold">{{ cell.moduleHeader }}</span>
 
-				<div class="w-full rounded-xs px-1 text-center bg-surface-3">
-					<div class="text-xs truncate">{{ cell.paramLabel }}</div>
-					<div class="text-xs text-content-secondary truncate">{{ cell.valueLabel }}</div>
+				<div class="w-full rounded-xs px-1 text-center bg-input-dimmed">
+					<div class="text-xs text-black truncate">{{ cell.paramLabel }}</div>
+					<div class="text-xs text-black truncate">{{ cell.valueLabel }}</div>
 				</div>
 
 				<!-- The knob alone — not the whole cell — is the Alt+drag source and drop target for page
@@ -29,6 +29,7 @@
 					@dragstart="onKnobDragStart(cell, $event)"
 					@dragover.prevent
 					@drop.prevent="onKnobDrop(cell, $event)"
+					class="-mb-1"
 				>
 					<!-- Unassigned slots render the same Knob, just at value 0 and inert (the cell-level
 					     opacity above dims it). The wrapper keeps its own pointer events, so the assign
@@ -278,7 +279,7 @@
 				return { ...cell, moduleHeader: label };
 			}
 			const isLastOfRun = !sameModule(cell.assignment, base[i + 1]?.assignment ?? null);
-			return { ...cell, moduleHeader: isLastOfRun ? '—————]' : '—————' };
+			return { ...cell, moduleHeader: isLastOfRun ? '————]' : '————' };
 		});
 	});
 

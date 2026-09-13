@@ -1,9 +1,9 @@
 <template>
-	<ToolBarGroup class="flex flex-col items-center">
-		<div class="flex items-center gap-0">
+	<ToolBarGroup class="flex flex-col items-center pt-1">
+		<div class="flex items-center gap-2">
 			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
-					class="relative flex flex-col items-center min-w-14"
+					class="relative flex flex-col items-center min-w-14 gap-1"
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
 					@dragover.prevent
 					@drop="onMorphCCDrop(i, $event)"
@@ -17,13 +17,14 @@
 					>
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
-					<span class="text-xs mb-1">{{ displayName(i) }}</span>
+					<div class="w-full rounded-xs px-1 text-center bg-input-dimmed">
+						<span class="text-xs text-black truncate">{{ displayName(i) }}</span>
+					</div>
 					<Knob
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
 						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
-						class="mb-2"
 					/>
 					<MorphSourceSelect
 						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
