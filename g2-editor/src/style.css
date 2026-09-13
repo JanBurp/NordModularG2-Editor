@@ -20,6 +20,7 @@
 	--color-content-secondary: #6e6e6e;
 	--color-content-muted: #9b9b9b;
 	--color-input: #8dd0e4;
+	--color-input-dimmed: #91b6b4;
 }
 
 @media (prefers-color-scheme: dark) {
@@ -33,7 +34,8 @@
 		--color-content-primary: var(--color-neutral-100);
 		--color-content-secondary: var(--color-neutral-400);
 		--color-content-muted: var(--color-neutral-500);
-		--color-input: #37b0b2;
+		--color-input: #37c0c2;
+		--color-input-dimmed: #0f7675;
 	}
 }
 
