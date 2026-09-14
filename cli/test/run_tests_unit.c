@@ -176,6 +176,7 @@ extern void test_scan_bank_folder_ignores_other_type_extension(void);
 extern void test_scan_bank_folder_rejects_duplicate_location(void);
 extern void test_scan_bank_folder_missing_folder_returns_negative_one(void);
 extern void test_build_flash_dump_raw_frame_byte_layout(void);
+extern void test_build_flash_dump_raw_frame_16_char_name_has_no_terminator(void);
 extern void test_build_flash_dump_raw_frame_long_name_is_nul_terminated(void);
 extern void test_build_flash_dump_raw_frame_buffer_too_small(void);
 
@@ -378,6 +379,7 @@ int main(void) {
     RUN_TEST(test_scan_bank_folder_rejects_duplicate_location);
     RUN_TEST(test_scan_bank_folder_missing_folder_returns_negative_one);
     RUN_TEST(test_build_flash_dump_raw_frame_byte_layout);
+    RUN_TEST(test_build_flash_dump_raw_frame_16_char_name_has_no_terminator);
     RUN_TEST(test_build_flash_dump_raw_frame_long_name_is_nul_terminated);
     RUN_TEST(test_build_flash_dump_raw_frame_buffer_too_small);
 

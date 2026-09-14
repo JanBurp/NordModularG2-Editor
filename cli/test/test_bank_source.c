@@ -200,7 +200,25 @@ void test_build_flash_dump_raw_frame_byte_layout(void) {
     TEST_ASSERT_EQUAL_UINT8(expected_crc & 0xff, out[23]);
 }
 
-/* A 15-char name (name_from_filepath's cap) still gets its NUL terminator, so
+/* A 16-char name fills the whole field with NO terminator - captured from real
+ * hardware (bank 2 location 12, "MonsterLeads NL2"), and the same convention
+ * parse_name/perf_settings_normalize_slots already read. Getting this wrong
+ * shifts every field after the name by one byte. */
+void test_build_flash_dump_raw_frame_16_char_name_has_no_terminator(void) {
+    uint8_t file_data[4] = { 0x00, 0x13, 0x00, 0xAA };
+    uint8_t out[64] = {0};
+
+    int len = build_flash_dump_raw_frame(0, 1, 11, "MonsterLeads NL2", file_data, sizeof(file_data), out, sizeof(out));
+
+    TEST_ASSERT_EQUAL_INT(2 + 4 + 3 + 16 + 2 + 1 + 4 + 2, len);
+    TEST_ASSERT_EQUAL_UINT8('2', out[24]);             /* last name char, no NUL after it */
+    TEST_ASSERT_EQUAL_UINT8(0x00, out[25]);            /* size hi */
+    TEST_ASSERT_EQUAL_UINT8(0x04, out[26]);            /* size lo */
+    TEST_ASSERT_EQUAL_UINT8(0x13, out[27]);            /* version, from file_data[1] */
+    TEST_ASSERT_EQUAL_UINT8(0x00, out[28]);            /* body starts here */
+}
+
+/* A 15-char name (one short of the field) still gets its NUL terminator, so
  * the size/version/data fields stay where the device expects them. */
 void test_build_flash_dump_raw_frame_long_name_is_nul_terminated(void) {
     uint8_t file_data[4] = { 0x00, 0x17, 0x00, 0xAA };
