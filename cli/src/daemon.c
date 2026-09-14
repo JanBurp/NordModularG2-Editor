@@ -813,7 +813,8 @@ static void execute_cmd(const char *line) {
 		int bank = arg_i(args, 1);
 		const char *folder = arg_s(args, 2);
 		const char *name = (n >= 4) ? arg_s(args, 3) : NULL;
-		ret = g2_get_bank(type, bank, folder, name);
+		data = g2_get_bank(type, bank, folder, name);
+		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "send-bank") == 0 && n >= 3) {
 		const char *type_str = arg_s(args, 0);

@@ -310,11 +310,13 @@ int g2_send_controller_snapshot(void);
 /* Dump patch as MIDI SYSEX - transmits complete patch in slot as SYSEX dump */
 int g2_dump_patch(int slot);
 
-/* Get bank from device - requests bank data from G2
- * type: 0 = patch (banks 1-32), 1 = performance (banks 1-8)
+/* Get bank from device - reads every location of a bank from flash and saves
+ * each occupied one to disk as a .pch2 file, plus a .pchList index.
+ * type: 0 = patch (banks 1-32); performance banks not yet implemented
  * folder: destination folder for saved files
- * name: optional base name for the bank (default: PatchBankN or PerfBankN) */
-int g2_get_bank(int type, int bank, const char *folder, const char *name);
+ * name: optional base name for the .pchList file (default: PatchBank)
+ * Returns a summary object (written/empty/corrupt counts) on success, NULL on failure. */
+cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name);
 
 /* Send bank to device - uploads bank data to G2
  * WARNING: This OVERWRITES the entire target bank!

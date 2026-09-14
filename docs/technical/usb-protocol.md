@@ -217,8 +217,8 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
 | `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
-| `0x17 tt bb ll` | PATCH_BANK_UPLOAD *(not implemented yet)* | file_type, bank, location | Extended bulk (`R_PATCH_BANK_UPLOAD`) |
-| `0x19 tt bb ll` | PATCH_BANK_DATA (download) *(not implemented yet)* | file_type, bank, location, name\0, size_hi, size_lo, 0x17, patch_data | Embedded ACK |
+| `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type (0=patch,1=perf), bank (0-based), location (0-based) | Embedded `0x18` marker (empty/corrupt/protected/full) or extended bulk `0x19` (patch present) |
+| `0x19` | PATCH_BANK_DATA (download) *(not implemented yet — this is only implemented as a response to `0x17` above)* | file_type, bank, location, name\[16\], size (big-endian u16), version, patch_data | Embedded `0x18` marker ack |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK *(not implemented yet)* | — | Embedded (`R_EXT_MASTER_CLOCK`) |
@@ -240,8 +240,21 @@ store-patch          <slot> <bank> <loc>      (0x0B)
 clear-patch          <slot> <bank> <loc>      (0x0C)
 clear-bank           <slot> <bank> <from> <to> (0x0E)
 reload-names         <mode> [bank]            (0x14)
+get-bank             <type> <bank> <folder> [name] (0x17, looped over all 128 locations)
 get-perf-settings                              (0x02, then falls through to §6b's 0x10)
 ```
+
+**`get-bank`** reads flash storage directly (type+bank+location addressed) and
+never touches slots A-D, unlike `select-patch`/`select-perf` (RETRIEVE,
+`0x0A`) which load a bank entry into a live edit slot. The daemon sends one
+`0x17` request per location (1-128 for a patch bank) and waits for either the
+`0x18` marker (entry empty/corrupt, or memory protected/full — abort) or the
+`0x19` extended-bulk patch data before moving to the next location; there is
+no "bank complete" sentinel from the hardware, the host just stops after
+location 128. Confirmed against the official editor's decompiled source
+(`other-approaches/G2-ReverseEngineered/G2Editor.c`, `CFlashDumper` /
+`CMFlashDumpRequest` / `CMFlashDumpMarker` / `CMFlashDumpRawData`) — see
+`g2_get_bank()` in `cli/src/g2_device.c` for the implementation.
 
 Almost every other command in §6b/§7 also sends `0x35` (GET_PATCH_VERSION) or `0x81` (UNKNOWN_1) first, as an internal version-fetch step — this is noted where relevant rather than repeated for each command.
 
@@ -1069,7 +1082,8 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `0x13` | R_LIST_NAMES | LIST_PATCHES | Patch/perf name list entry |
 | `0x15` | R_CLEAR | CLEAR | Single entry cleared |
 | `0x16` | R_ADD_NAMES | LIST_PATCHES | Additional name list data |
-| `0x18` | R_PATCH_BANK_UPLOAD | PATCH_BANK_UPLOAD | Bank upload data |
+| `0x18` | R_FLASH_DUMP_MARKER | PATCH_BANK_UPLOAD (`0x17`) | Per-location status: `[5]`=status (0=ok/ack, 4=entry empty, 5=entry corrupt, other=memory protected/full); `[6]`=bank, `[7]`=location |
+| `0x19` | R_FLASH_DUMP_RAW_DATA | PATCH_BANK_UPLOAD (`0x17`) | Extended bulk; occupied-location patch data (see §6a) |
 | `0x21` | C_PATCH_DESCR | SET_PATCH | Patch description received |
 | `0x27` | S_PATCH_NAME | — | Patch name notification |
 | `0x29` | C_PERF_NAME | — | Performance name notification |

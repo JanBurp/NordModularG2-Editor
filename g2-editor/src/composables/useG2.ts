@@ -1,6 +1,7 @@
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 
 import { ref } from 'vue';
+import { bankUploadProgress } from './useBankUploadDialog';
 import { useDeviceEvents } from './useDeviceEvents';
 import { useLedEvents } from './useLedEvents';
 import { useSlotEvents } from './useSlotEvents';
@@ -127,6 +128,10 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'device_info' && store.status === DeviceStatus.Connecting) store.status = DeviceStatus.Loading;
+				if (ev.type === 'bank_upload_progress') {
+					bankUploadProgress.value = { location: ev.location, total: ev.total, written: ev.written, empty: ev.empty, corrupt: ev.corrupt };
+					return;
+				}
 				if (ledEvents.handleEvent(ev)) return;
 				if (await deviceEvents.handleEvent(ev)) return;
 				if (await slotEvents.handleEvent(ev)) return;

@@ -66,8 +66,8 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 |---|---|---|
 | `send-controller-snapshot` | | Send all assigned MIDI Controller values to MIDI OUT |
 | `dump-patch` | `<slot>` | Dump patch from slot as MIDI SYSEX (A-D) |
-| `get-bank` | `<type> <bank> <folder> [<name>]` | Get bank from device (type: patch|performance, bank: 1-32 or 1-8) |
-| `send-bank` | `<type> <source> <bank>` | Send bank to device (type: patch|performance, source: pchList|folder, bank: 1-32 or 1-8) |
+| `get-bank` | `<type> <bank> <folder> [<name>]` | Get bank from device: saves each occupied location as a `.pch2` plus a `.pchList` index (type: patch only so far, bank: 1-32) |
+| `send-bank` | `<type> <source> <bank>` | *(not yet implemented)* Send bank to device (type: patch|performance, source: pchList|folder, bank: 1-32 or 1-8) |
 
 ## Clock
 

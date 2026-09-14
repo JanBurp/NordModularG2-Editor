@@ -966,7 +966,17 @@ static int cmd_get_bank(int argc, char **argv, int i) {
     int bank = atoi(argv[i + 2]);
     const char *folder = argv[i + 3];
     const char *name = (i + 4 < argc) ? argv[i + 4] : NULL;
-    return g2_get_bank(type, bank, folder, name);
+    cJSON *result = g2_get_bank(type, bank, folder, name);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to get bank", output_format);
+        else
+            fprintf(stderr, "Failed to get bank\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
 }
 
 static int cmd_send_bank(int argc, char **argv, int i) {

@@ -3034,34 +3034,192 @@ int g2_dump_patch(int slot) {
     return G2_OK;
 }
 
-/* Get Bank from device - requests bank data (patches or performances) from G2
- * Uses opcode 0x17 (S_PATCH_BANK_UPLOAD). This is a system-scoped command.
- * Bank type: 0 = patch (banks 1-32), 1 = performance (banks 1-8)
- * The G2 will respond with bank data that needs to be saved to files. */
-int g2_get_bank(int type, int bank, const char *folder, const char *name) {
-    if (type < 0 || type > 1) { g2_err("get-bank: type must be 0 (patch) or 1 (performance)\n"); return G2_ERR_INVALID_PARAM; }
-    if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
-        g2_err("get-bank: invalid bank number for type\n");
-        return G2_ERR_INVALID_PARAM;
+/* Get Bank from device - reads every location (1-128) of a bank directly out of
+ * the G2's flash memory and saves each occupied one to disk as a .pch2 file, plus
+ * a .pchList index. This is the G2's dedicated "flash dump" protocol - request
+ * opcode 0x17, status marker 0x18, raw data 0x19 - confirmed from the official
+ * editor's decompiled source (other-approaches/G2-ReverseEngineered/G2Editor.c:
+ * CFlashDumper / CMFlashDumpRequest / CMFlashDumpMarker / CMFlashDumpRawData).
+ * Unlike select-patch/select-perf (RETRIEVE, opcode 0x0A) this never loads
+ * anything into a live edit slot (A-D) - flash locations are addressed purely
+ * by (type, bank, location), so it cannot disturb whatever is currently loaded.
+ * There is no "bank complete" sentinel from the hardware: the host just walks
+ * all 128 locations in order and stops - same as the reference implementation. */
+static void emit_bank_upload_progress(int location, int total, int written, int empty, int corrupt) {
+    printf("{\"type\":\"bank_upload_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"empty\":%d,\"corrupt\":%d}\n",
+           location, total, written, empty, corrupt);
+    fflush(stdout);
+}
+
+cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
+    if (type != 0) {
+        g2_err("get-bank: only patch banks are implemented so far (performance banks need .prf2 packaging)\n");
+        return NULL;
     }
-    if (ensure_connected(0) < 0) { g2_err("get-bank: not connected\n"); return G2_ERR_CONNECT; }
-    
-    /* Send bank upload request: 0x41 is the system command, 0x17 is the subcommand
-     * Payload: type (0=patch, 1=performance), bank number */
-    uint8_t payload[2] = { (uint8_t)type, (uint8_t)bank };
-    if (send_system_data(0x41, payload, 2) < 0) {
-        g2_err("get-bank: failed to send request\n");
-        return G2_ERR_SEND;
+    if (bank < 1 || bank > 32) { g2_err("get-bank: invalid bank number\n"); return NULL; }
+    if (folder == NULL) { g2_err("get-bank: folder required\n"); return NULL; }
+    if (ensure_connected(1) < 0) { g2_err("get-bank: not connected\n"); return NULL; }
+
+    /* Drain stale data (same pattern as g2_get_patch_file/g2_get_perf_file). */
+    if (!g2_listener_active) {
+        uint8_t stale[16]; int n;
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
     }
-    usleep(USB_SEND_DELAY_US);
-    
-    /* TODO: Handle the response - the G2 will send back the bank data as extended messages
-     * that need to be saved to individual .pch2/.prf2 files and a .pchList file.
-     * For now, just send the request and let the daemon/event system handle the response. */
-    if (!g2_listener_active) g2_drain_pending();
-    
-    /* Return success - the actual data transfer happens asynchronously */
-    return G2_OK;
+
+    /* .pchList index: header line + one "<bank>:<location>: <name>" line per
+     * written patch (format matches the reference CFlashDumper::WriteDumpList). */
+    size_t listCap = 4096, listLen = 0;
+    char *list = malloc(listCap);
+    if (!list) { g2_err("get-bank: out of memory\n"); return NULL; }
+    listLen += (size_t)snprintf(list, listCap, "Version=Nord Modular G2 Bank Dump\n");
+
+    int writtenCount = 0, emptyCount = 0, corruptCount = 0;
+    int aborted = 0;
+    char abortReason[128] = {0};
+
+    for (int location = 0; location < 128; location++) {
+        uint8_t req[4] = { 0x17, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)location };
+        if (send_system_data(0x41, req, sizeof(req)) < 0) {
+            snprintf(abortReason, sizeof(abortReason), "failed to send request for location %d", location + 1);
+            aborted = 1;
+            break;
+        }
+        usleep(USB_SEND_DELAY_US);
+
+        uint8_t interruptResp[16] = {0};
+        int ret = recv_interrupt(interruptResp, sizeof(interruptResp), USB_TIMEOUT_LONG_MS);
+        if (ret <= 0) {
+            snprintf(abortReason, sizeof(abortReason), "no response for location %d", location + 1);
+            aborted = 1;
+            break;
+        }
+
+        uint8_t msgType = interruptResp[0] & 0x0f;
+        if (msgType == RESPONSE_TYPE_EMBEDDED) {
+            /* subCmd 0x18 = CMFlashDumpMarker: [aCmd=0x0C][version][subCmd][status][...] */
+            uint8_t subCmd = interruptResp[4];
+            uint8_t status = interruptResp[5];
+            if (subCmd != 0x18) {
+                snprintf(abortReason, sizeof(abortReason), "unexpected response (subCmd=0x%02x) at location %d", subCmd, location + 1);
+                aborted = 1;
+                break;
+            }
+            /* Wire status codes per CMFlashDumpMarker::UseOnSynth: 4 = entry empty,
+             * 5 = entry corrupt (skip both, keep going), anything else here is an
+             * abort condition (memory protected / memory full). */
+            if (status == 4) { emptyCount++; emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount); continue; }
+            if (status == 5) {
+                corruptCount++;
+                g2_err("get-bank: location %d is corrupt, skipping\n", location + 1);
+                emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
+                continue;
+            }
+            snprintf(abortReason, sizeof(abortReason), "device reported status 0x%02x at location %d (memory protected/full?)", status, location + 1);
+            aborted = 1;
+            break;
+        } else if (msgType == RESPONSE_TYPE_EXTENDED) {
+            uint16_t size = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+            uint8_t *bulk = malloc(size);
+            if (!bulk) { snprintf(abortReason, sizeof(abortReason), "out of memory at location %d", location + 1); aborted = 1; break; }
+            if (recv_bulk(bulk, size) <= 0) {
+                snprintf(abortReason, sizeof(abortReason), "failed to read bulk data at location %d", location + 1);
+                free(bulk);
+                aborted = 1;
+                break;
+            }
+            /* System bulk header: [0x01][aCmd=0x0C][version][subCmd=0x19], then the
+             * CMFlashDumpRawData payload: fileType, bank, location, name[16], and
+             * then the patch content itself - which turns out to carry its OWN
+             * 3-byte USB-frame header (same as a plain get-patch response), so
+             * there is no separate length field to parse here: everything from
+             * byte 19 onward is exactly what patch_usb_to_pch2 already expects
+             * (confirmed against a real hardware capture - the first real chunk
+             * marker 0x21 lands 3 bytes after this 19-byte prefix, i.e. exactly
+             * where patch_usb_to_pch2's own PCH2_USB_DATA_OFFSET puts it). */
+            if (size < 4 + 19 + 25 || bulk[1] != 0x0C || bulk[3] != 0x19) {
+                /* Too short to hold a real patch after this prefix - treat as
+                 * an empty/unusable entry rather than aborting the whole bank. */
+                free(bulk);
+                emptyCount++;
+                emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
+                continue;
+            }
+            uint8_t *payload = bulk + 4;
+            size_t payloadSize = size - 4;
+            char patchName[32] = {0};
+            parse_name(payload + 3, patchName, sizeof(patchName));
+
+            uint8_t *fileData = payload + 19;
+            size_t dataLen = payloadSize - 19;
+
+            uint8_t *pch2Data = malloc(dataLen);
+            size_t pch2Size = dataLen;
+            if (!pch2Data || patch_usb_to_pch2(fileData, dataLen, pch2Data, &pch2Size) < 0) {
+                /* Diagnostic dump - if this fires again, the hex below tells us
+                 * exactly what the device sent so the framing assumptions above
+                 * can be corrected against real data instead of guessed at. */
+                printf("{\"debug\":\"get_bank_raw\",\"location\":%d,\"size\":%u,\"dataLen\":%u,\"name\":\"%s\",\"hex\":\"",
+                       location + 1, (unsigned)size, (unsigned)dataLen, patchName);
+                for (size_t k = 0; k < size; k++) printf("%02x", bulk[k]);
+                printf("\"}\n");
+                fflush(stdout);
+                snprintf(abortReason, sizeof(abortReason), "failed to convert patch at location %d", location + 1);
+                free(pch2Data);
+                free(bulk);
+                aborted = 1;
+                break;
+            }
+
+            const char *baseName = strlen(patchName) ? patchName : "Untitled";
+            char filename[1024];
+            snprintf(filename, sizeof(filename), "%s/%03d_%s.pch2", folder, location + 1, baseName);
+            FILE *f = fopen(filename, "wb");
+            if (!f || fwrite(pch2Data, 1, pch2Size, f) != pch2Size) {
+                if (f) fclose(f);
+                snprintf(abortReason, sizeof(abortReason), "failed to write file for location %d", location + 1);
+                free(pch2Data);
+                free(bulk);
+                aborted = 1;
+                break;
+            }
+            fclose(f);
+            free(pch2Data);
+            free(bulk);
+
+            if (listLen + 64 > listCap) { listCap *= 2; char *grown = realloc(list, listCap); if (!grown) { free(list); return NULL; } list = grown; }
+            listLen += (size_t)snprintf(list + listLen, listCap - listLen, "%d:%d: %s\n", bank, location + 1, baseName);
+            writtenCount++;
+            emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
+        } else {
+            snprintf(abortReason, sizeof(abortReason), "unexpected response type at location %d", location + 1);
+            aborted = 1;
+            break;
+        }
+    }
+
+    cJSON *result = NULL;
+    if (!aborted) {
+        char listPath[1024];
+        snprintf(listPath, sizeof(listPath), "%s/%s.pchList", folder, name ? name : "PatchBank");
+        FILE *lf = fopen(listPath, "wb");
+        if (lf) { fwrite(list, 1, listLen, lf); fclose(lf); }
+
+        result = cJSON_CreateObject();
+        cJSON_AddNumberToObject(result, "written", writtenCount);
+        cJSON_AddNumberToObject(result, "empty", emptyCount);
+        cJSON_AddNumberToObject(result, "corrupt", corruptCount);
+        cJSON_AddStringToObject(result, "folder", folder);
+    } else {
+        g2_err("get-bank: aborted - %s\n", abortReason);
+    }
+
+    free(list);
+    return result;
 }
 
 /* Send Bank to device - uploads bank data (patches or performances) to G2

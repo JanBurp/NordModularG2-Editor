@@ -213,6 +213,7 @@
 		v-model="bankUpload.showDialog.value"
 		title="Bank Upload (from G2)"
 		confirm-label="Upload"
+		:close-on-confirm="false"
 		@confirm="bankUpload.confirm"
 		@cancel="bankUpload.cancel"
 	>
@@ -254,7 +255,21 @@
 					placeholder="(optional)"
 				/>
 			</div>
-			<div v-if="bankUpload.inProgress.value" class="text-orange-400 text-sm">Uploading bank from G2...</div>
+			<div v-if="bankUpload.inProgress.value" class="space-y-1">
+				<div class="text-orange-400 text-sm">
+					{{
+						bankUpload.progress.value
+							? `Uploading… location ${bankUpload.progress.value.location}/${bankUpload.progress.value.total} (${bankUpload.progress.value.written} written, ${bankUpload.progress.value.empty} empty)`
+							: 'Uploading bank from G2...'
+					}}
+				</div>
+				<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
+					<div
+						class="h-full bg-orange-400 transition-all"
+						:style="{ width: bankUpload.progress.value ? `${(bankUpload.progress.value.location / bankUpload.progress.value.total) * 100}%` : '0%' }"
+					></div>
+				</div>
+			</div>
 			<div class="text-xs text-content-secondary">
 				Save complete {{ bankUpload.type.value }} bank from synth memory to disk. Creates individual sound files + .pchList file.
 			</div>

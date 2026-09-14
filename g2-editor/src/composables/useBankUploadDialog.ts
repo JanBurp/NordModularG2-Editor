@@ -13,6 +13,14 @@ export const bankUploadBankNum = ref<number>(1);
 export const bankUploadFolder = ref<string>('');
 export const bankUploadFilename = ref<string>('');
 export const bankUploadInProgress = ref<boolean>(false);
+export interface BankUploadProgress {
+	location: number;
+	total: number;
+	written: number;
+	empty: number;
+	corrupt: number;
+}
+export const bankUploadProgress = ref<BankUploadProgress | null>(null);
 
 export function useBankUploadDialog() {
 	const slotsStore = useSlotsStore();
@@ -29,6 +37,7 @@ export function useBankUploadDialog() {
 		bankUploadBankNum.value = 1;
 		bankUploadFolder.value = '';
 		bankUploadFilename.value = '';
+		bankUploadProgress.value = null;
 		showBankUploadDialog.value = true;
 	}
 
@@ -50,6 +59,7 @@ export function useBankUploadDialog() {
 		}
 
 		bankUploadInProgress.value = true;
+		bankUploadProgress.value = null;
 		try {
 			const success = await slotsStore.uploadBankFromDevice(
 				bankUploadType.value,
@@ -76,6 +86,7 @@ export function useBankUploadDialog() {
 		folder: bankUploadFolder,
 		filename: bankUploadFilename,
 		inProgress: bankUploadInProgress,
+		progress: bankUploadProgress,
 		bankOptions,
 		bankTypes: BANK_TYPES,
 		open,

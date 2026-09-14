@@ -32,8 +32,9 @@
 			title: string;
 			confirmLabel?: string;
 			showConfirm?: boolean;
+			closeOnConfirm?: boolean;
 		}>(),
-		{ confirmLabel: 'OK', showConfirm: true },
+		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true },
 	);
 
 	const emit = defineEmits<{
@@ -44,7 +45,7 @@
 
 	function onConfirm() {
 		emit('confirm');
-		emit('update:modelValue', false);
+		if (props.closeOnConfirm) emit('update:modelValue', false);
 	}
 
 	function onCancel() {
