@@ -19,6 +19,14 @@ export const bankDownloadSourceType = ref<SourceType>('pchList');
 export const bankDownloadSourcePath = ref<string>('');
 export const bankDownloadInProgress = ref<boolean>(false);
 export const bankDownloadShowWarning = ref<boolean>(true);
+export interface BankDownloadProgress {
+	location: number;
+	total: number;
+	written: number;
+	cleared: number;
+	failed: number;
+}
+export const bankDownloadProgress = ref<BankDownloadProgress | null>(null);
 
 export function useBankDownloadDialog() {
 	const slotsStore = useSlotsStore();
@@ -36,6 +44,7 @@ export function useBankDownloadDialog() {
 		bankDownloadSourceType.value = 'pchList';
 		bankDownloadSourcePath.value = '';
 		bankDownloadShowWarning.value = true;
+		bankDownloadProgress.value = null;
 		showBankDownloadDialog.value = true;
 	}
 
@@ -63,17 +72,8 @@ export function useBankDownloadDialog() {
 			return;
 		}
 
-		// Show warning for destructive operation
-		if (bankDownloadShowWarning.value) {
-			const confirmed = window.confirm(
-				`WARNING: This will OVERWRITE bank ${bankDownloadBankNum.value} in your G2. ` +
-					`All existing patches/performances in this bank will be ERASED.\n\n` +
-					`Are you sure you want to continue?`,
-			);
-			if (!confirmed) return;
-		}
-
 		bankDownloadInProgress.value = true;
+		bankDownloadProgress.value = null;
 		try {
 			const source: { type: 'pchList'; filepath: string } | { type: 'folder'; folderPath: string } =
 				bankDownloadSourceType.value === 'pchList'
@@ -104,6 +104,7 @@ export function useBankDownloadDialog() {
 		sourceType: bankDownloadSourceType,
 		sourcePath: bankDownloadSourcePath,
 		inProgress: bankDownloadInProgress,
+		progress: bankDownloadProgress,
 		showWarning: bankDownloadShowWarning,
 		bankOptions,
 		bankTypes: BANK_TYPES,

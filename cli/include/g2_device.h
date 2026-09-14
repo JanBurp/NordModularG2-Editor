@@ -311,18 +311,35 @@ int g2_send_controller_snapshot(void);
 int g2_dump_patch(int slot);
 
 /* Get bank from device - reads every location of a bank from flash and saves
- * each occupied one to disk as a .pch2 file, plus a .pchList index.
- * type: 0 = patch (banks 1-32); performance banks not yet implemented
+ * each occupied one to disk as a .pch2 (patch) or .prf2 (performance) file,
+ * plus a .pchList index.
+ * type: 0 = patch (banks 1-32), 1 = performance (banks 1-8)
  * folder: destination folder for saved files
  * name: optional base name for the .pchList file (default: PatchBank)
  * Returns a summary object (written/empty/corrupt counts) on success, NULL on failure. */
 cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name);
 
 /* Send bank to device - uploads bank data to G2
- * WARNING: This OVERWRITES the entire target bank!
+ * WARNING: This OVERWRITES the entire target bank! Locations with no matching
+ * source entry are cleared, not left untouched.
  * type_str: "patch" or "performance"
  * source_type: "pchList" or "folder" - the source of the bank data
- * bank: target bank number (1-32 for patches, 1-8 for performances) */
-int g2_send_bank(const char *type_str, const char *source_type, int bank);
+ * source_path: path to the .pchList file or folder
+ * bank: target bank number (1-32 for patches, 1-8 for performances)
+ * Returns a summary object (written/cleared/failed counts) on success, NULL on failure. */
+cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *source_path, int bank);
+
+/* send-bank internals, exposed only so unit tests can exercise them directly
+ * (see test_bank_source.c) - not part of the day-to-day CLI surface. */
+typedef struct {
+    int location;            /* 1-128 */
+    char filepath[1024];
+} bank_entry_t;
+
+int parse_pchlist(const char *pchListPath, int type, bank_entry_t *entries, int maxEntries);
+int scan_bank_folder(const char *folderPath, int type, bank_entry_t *entries, int maxEntries);
+int build_flash_dump_raw_frame(int type, int bank0, int location0, const char *name,
+                                const uint8_t *frame_data, size_t frame_len,
+                                uint8_t *out, size_t out_cap);
 
 #endif /* __G2_DEVICE_H__ */

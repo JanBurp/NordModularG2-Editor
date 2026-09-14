@@ -11,6 +11,8 @@
 #include <string.h>
 #include <stdarg.h>
 #include <unistd.h>
+#include <ctype.h>
+#include <dirent.h>
 #include <libusb.h>
 #include "defs.h"
 #include "g2_device.h"
@@ -573,7 +575,11 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     }
 
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        g2_err("Unexpected response type for patch data\n");
+        /* Temporary diagnostic - see the matching one in g2_get_patch above. */
+        char rhex[35] = "";
+        for (int k = 0; k < ret && k < 16; k++) snprintf(rhex + k * 2, 3, "%02x", interruptResp[k]);
+        g2_err("Unexpected response type for patch data (slot=%d, version=%d, ret=%d, raw_hex=%s)",
+               actual_slot, version, ret, rhex);
         goto cleanup;
     }
 
@@ -3052,11 +3058,11 @@ static void emit_bank_upload_progress(int location, int total, int written, int 
 }
 
 cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
-    if (type != 0) {
-        g2_err("get-bank: only patch banks are implemented so far (performance banks need .prf2 packaging)\n");
+    if (type < 0 || type > 1) { g2_err("get-bank: invalid type\n"); return NULL; }
+    if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
+        g2_err("get-bank: invalid bank number for type\n");
         return NULL;
     }
-    if (bank < 1 || bank > 32) { g2_err("get-bank: invalid bank number\n"); return NULL; }
     if (folder == NULL) { g2_err("get-bank: folder required\n"); return NULL; }
     if (ensure_connected(1) < 0) { g2_err("get-bank: not connected\n"); return NULL; }
 
@@ -3157,38 +3163,51 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
             uint8_t *fileData = payload + 19;
             size_t dataLen = payloadSize - 19;
 
-            uint8_t *pch2Data = malloc(dataLen);
-            size_t pch2Size = dataLen;
-            if (!pch2Data || patch_usb_to_pch2(fileData, dataLen, pch2Data, &pch2Size) < 0) {
-                /* Diagnostic dump - if this fires again, the hex below tells us
+            uint8_t *outData = malloc(dataLen + 256);
+            size_t outSize = dataLen + 256;
+            uint8_t *sections = NULL;
+            int convertFailed;
+            if (type == 0) {
+                convertFailed = (outData == NULL) || patch_usb_to_pch2(fileData, dataLen, outData, &outSize) < 0;
+            } else {
+                sections = malloc(dataLen);
+                size_t sectionsLen = dataLen;
+                convertFailed = (outData == NULL || sections == NULL)
+                    || patch_usb_to_pch2(fileData, dataLen, sections, &sectionsLen) < 0
+                    || perf_sections_to_prf2(strlen(patchName) ? patchName : "Untitled", sections, sectionsLen, outData, &outSize) < 0;
+            }
+            if (convertFailed) {
+                /* Diagnostic dump - if this fires, the hex below tells us
                  * exactly what the device sent so the framing assumptions above
                  * can be corrected against real data instead of guessed at. */
-                printf("{\"debug\":\"get_bank_raw\",\"location\":%d,\"size\":%u,\"dataLen\":%u,\"name\":\"%s\",\"hex\":\"",
-                       location + 1, (unsigned)size, (unsigned)dataLen, patchName);
+                printf("{\"debug\":\"get_bank_raw\",\"location\":%d,\"type\":\"%s\",\"size\":%u,\"dataLen\":%u,\"name\":\"%s\",\"hex\":\"",
+                       location + 1, type == 0 ? "patch" : "performance", (unsigned)size, (unsigned)dataLen, patchName);
                 for (size_t k = 0; k < size; k++) printf("%02x", bulk[k]);
                 printf("\"}\n");
                 fflush(stdout);
-                snprintf(abortReason, sizeof(abortReason), "failed to convert patch at location %d", location + 1);
-                free(pch2Data);
+                snprintf(abortReason, sizeof(abortReason), "failed to convert %s at location %d", type == 0 ? "patch" : "performance", location + 1);
+                free(sections);
+                free(outData);
                 free(bulk);
                 aborted = 1;
                 break;
             }
+            free(sections);
 
             const char *baseName = strlen(patchName) ? patchName : "Untitled";
             char filename[1024];
-            snprintf(filename, sizeof(filename), "%s/%03d_%s.pch2", folder, location + 1, baseName);
+            snprintf(filename, sizeof(filename), "%s/%03d_%s.%s", folder, location + 1, baseName, type == 0 ? "pch2" : "prf2");
             FILE *f = fopen(filename, "wb");
-            if (!f || fwrite(pch2Data, 1, pch2Size, f) != pch2Size) {
+            if (!f || fwrite(outData, 1, outSize, f) != outSize) {
                 if (f) fclose(f);
                 snprintf(abortReason, sizeof(abortReason), "failed to write file for location %d", location + 1);
-                free(pch2Data);
+                free(outData);
                 free(bulk);
                 aborted = 1;
                 break;
             }
             fclose(f);
-            free(pch2Data);
+            free(outData);
             free(bulk);
 
             if (listLen + 64 > listCap) { listCap *= 2; char *grown = realloc(list, listCap); if (!grown) { free(list); return NULL; } list = grown; }
@@ -3222,33 +3241,435 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     return result;
 }
 
-/* Send Bank to device - uploads bank data (patches or performances) to G2
- * Uses opcode 0x19 (S_PATCH_BANK_DATA). This is a system-scoped command.
- * WARNING: This OVERWRITES the entire target bank in the G2!
- * Bank type: "patch" or "performance"; bank: 1-32 for patches, 1-8 for performances
- * Source type: "pchList" (reads .pchList file) or "folder" (reads all .pch2/.prf2 files from folder)
- * The G2 will receive the bank data and write it to the specified bank. */
-int g2_send_bank(const char *type_str, const char *source_type, int bank) {
-    int type = (strcmp(type_str, "performance") == 0) ? 1 : 0;
-    if (type < 0 || type > 1) { g2_err("send-bank: type must be 'patch' or 'performance'\n"); return G2_ERR_INVALID_PARAM; }
+/* Parses a .pchList index (as written by g2_get_bank) into per-location file
+ * paths. Sibling file convention: <dirname(pchListPath)>/%03d_<name>.<ext>,
+ * matching what get-bank itself writes. A line with an out-of-range location
+ * or a missing sibling file is skipped (warned), not fatal - only a missing
+ * or unreadable .pchList itself is. Returns the entry count, or -1.
+ * Not static: exercised directly by unit tests (see test_bank_source.c). */
+int parse_pchlist(const char *pchListPath, int type, bank_entry_t *entries, int maxEntries) {
+    FILE *f = fopen(pchListPath, "r");
+    if (!f) { g2_err("send-bank: cannot open %s\n", pchListPath); return -1; }
+
+    char dir[900] = ".";
+    const char *slash = strrchr(pchListPath, '/');
+    if (slash) {
+        size_t n = (size_t)(slash - pchListPath);
+        if (n >= sizeof(dir)) n = sizeof(dir) - 1;
+        memcpy(dir, pchListPath, n);
+        dir[n] = '\0';
+    }
+
+    const char *ext = (type == 0) ? "pch2" : "prf2";
+    char line[512];
+    int count = 0;
+    while (fgets(line, sizeof(line), f)) {
+        int loc;
+        char name[256];
+        if (sscanf(line, "%*d:%d: %255[^\r\n]", &loc, name) != 2) continue; /* header line or blank */
+        if (loc < 1 || loc > 128) { g2_err("send-bank: skipping out-of-range location %d in %s\n", loc, pchListPath); continue; }
+        if (count >= maxEntries) { g2_err("send-bank: too many entries in %s\n", pchListPath); break; }
+
+        /* The "name" field's own convention varies by producer: get-bank writes
+         * a bare name (no extension, no location prefix on the name itself -
+         * the sibling file separately gets both a %03d_ prefix and extension
+         * appended); other tools (e.g. a real Nord Modular G2 bank dump,
+         * confirmed against a real fixture 2026-09-14) write the name WITH
+         * its extension already and no prefix at all. Try every combination
+         * rather than assume one. */
+        char filepath[1024] = {0};
+        const char *candidates[4];
+        char c0[1024], c1[1024], c2[1024], c3[1024];
+        snprintf(c0, sizeof(c0), "%s/%s", dir, name);
+        snprintf(c1, sizeof(c1), "%s/%s.%s", dir, name, ext);
+        snprintf(c2, sizeof(c2), "%s/%03d_%s", dir, loc, name);
+        snprintf(c3, sizeof(c3), "%s/%03d_%s.%s", dir, loc, name, ext);
+        candidates[0] = c0; candidates[1] = c1; candidates[2] = c2; candidates[3] = c3;
+        int found = 0;
+        for (int i = 0; i < 4 && !found; i++) {
+            FILE *check = fopen(candidates[i], "rb");
+            if (check) { fclose(check); snprintf(filepath, sizeof(filepath), "%s", candidates[i]); found = 1; }
+        }
+        if (!found) { g2_err("send-bank: missing sibling file for location %d: %s\n", loc, name); continue; }
+
+        entries[count].location = loc;
+        snprintf(entries[count].filepath, sizeof(entries[count].filepath), "%s", filepath);
+        count++;
+    }
+    fclose(f);
+    return count;
+}
+
+/* Scans a folder for NNN_*.pch2 (type 0) or NNN_*.prf2 (type 1) files, NNN
+ * being a zero-padded 3-digit location - the same convention get-bank itself
+ * writes. A file without a valid prefix, or with the wrong extension for
+ * `type`, is skipped with a warning; a duplicate location is a fatal error
+ * (silently picking one would erase the other without telling the user).
+ * Returns the entry count, or -1.
+ * Not static: exercised directly by unit tests (see test_bank_source.c). */
+int scan_bank_folder(const char *folderPath, int type, bank_entry_t *entries, int maxEntries) {
+    DIR *d = opendir(folderPath);
+    if (!d) { g2_err("send-bank: cannot open folder %s\n", folderPath); return -1; }
+
+    const char *ext = (type == 0) ? ".pch2" : ".prf2";
+    size_t extLen = strlen(ext);
+    int seen[129] = {0};
+    int count = 0;
+    struct dirent *ent;
+    while ((ent = readdir(d)) != NULL) {
+        const char *fn = ent->d_name;
+        size_t len = strlen(fn);
+        if (len < extLen || strcmp(fn + len - extLen, ext) != 0) continue; /* not this type - not an error */
+        if (len < 4 || !isdigit((unsigned char)fn[0]) || !isdigit((unsigned char)fn[1]) ||
+            !isdigit((unsigned char)fn[2]) || fn[3] != '_') {
+            g2_err("send-bank: skipping '%s' (missing NNN_ location prefix)\n", fn);
+            continue;
+        }
+        int loc = (fn[0] - '0') * 100 + (fn[1] - '0') * 10 + (fn[2] - '0');
+        if (loc < 1 || loc > 128) { g2_err("send-bank: skipping '%s' (location %d out of range)\n", fn, loc); continue; }
+        if (seen[loc]) { g2_err("send-bank: duplicate location %d ('%s')\n", loc, fn); closedir(d); return -1; }
+        seen[loc] = 1;
+        if (count >= maxEntries) { g2_err("send-bank: too many files in %s\n", folderPath); break; }
+
+        entries[count].location = loc;
+        snprintf(entries[count].filepath, sizeof(entries[count].filepath), "%s/%s", folderPath, fn);
+        count++;
+    }
+    closedir(d);
+    return count;
+}
+
+/* Builds one CMFlashDumpRawData (opcode 0x19) write message - a system-scoped
+ * command writing a whole patch/performance file at a specific flash
+ * (type, bank0, location0). Pure function, no I/O, so it is unit-testable
+ * without hardware.
+ * Byte layout captured from real hardware (2026-09-14) by dumping what the G2
+ * itself sends for the same message in the opposite direction (get-bank's
+ * CMFlashDumpRawData response), and matching the decompiled official editor's
+ * CMFlashDumpRawData::WriteStream (other-approaches/G2-ReverseEngineered/
+ * G2Editor.c:20945-20973):
+ *   [len_hi][len_lo][0x01][COMMAND_REQ|COMMAND_SYS][0x41][0x19]
+ *   [type][bank0][location0]
+ *   [name bytes][0x00]   - NUL-terminated, NOT a fixed 16-byte field
+ *   [size_hi][size_lo]   - file_len as a UWord
+ *   [version]            - WriteStream's PutUByte(version); the file's own
+ *                          version byte, i.e. file_data[1] (0x17 = 23)
+ *   [file_data: file_len bytes]
+ *   [crc_hi][crc_lo]     - CRC-16 over the whole message
+ * file_data is the .pch2/.prf2 file content from its name-terminating NUL to
+ * EOF - i.e. [0x00][version][type][sections][file CRC]. That is NOT the same
+ * as locate_section_data's output: the leading 3 bytes and the file's own
+ * trailing CRC are part of what the G2 stores and verifies. Sending only the
+ * section bytes (as this did before) left the device parsing the message's
+ * trailing bytes as further molecules, which it answered with one 0x7E code 3
+ * NACK per write and which renamed the four live slots to "Error".
+ * bank0/location0 are already 0-indexed (caller passes bank-1, location).
+ * Returns the total message length, or -1 if out_cap is too small.
+ * Not static: exercised directly by unit tests (see test_bank_source.c). */
+int build_flash_dump_raw_frame(int type, int bank0, int location0, const char *name,
+                                const uint8_t *file_data, size_t file_len,
+                                uint8_t *out, size_t out_cap) {
+    size_t nameLen = strlen(name);
+    if (nameLen > 15) nameLen = 15;
+    size_t needed = (size_t)COMMAND_OFFSET + 4 + 3 + nameLen + 1 + 2 + 1 + file_len + 2;
+    if (out_cap < needed || file_len < 2) return -1;
+
+    int pos = COMMAND_OFFSET;
+    out[pos++] = 0x01;
+    out[pos++] = COMMAND_REQ | COMMAND_SYS;
+    out[pos++] = 0x41;
+    out[pos++] = 0x19;
+    out[pos++] = (uint8_t)type;
+    out[pos++] = (uint8_t)bank0;
+    out[pos++] = (uint8_t)location0;
+    memcpy(out + pos, name, nameLen);
+    pos += (int)nameLen;
+    out[pos++] = 0x00;
+    out[pos++] = (uint8_t)((file_len >> 8) & 0xff);
+    out[pos++] = (uint8_t)(file_len & 0xff);
+    out[pos++] = file_data[1];
+    memcpy(out + pos, file_data, file_len);
+    pos += (int)file_len;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&out[COMMAND_OFFSET], msgLength);
+    out[pos++] = (crc >> 8) & 0xff;
+    out[pos++] = crc & 0xff;
+    msgLength += 4;
+
+    out[0] = (msgLength >> 8) & 0xff;
+    out[1] = msgLength & 0xff;
+    return pos;
+}
+
+/* Sends one flash-dump raw-data write and waits for the G2's own answer: a
+ * CMFlashDumpMarker (0x18) carrying the same status codes g2_get_bank already
+ * decodes on the read side. Uses the bounded discard-until-tag-match lockstep
+ * the rest of this file uses for request/response pairs (g2_get_patch's notes
+ * step, g2_get_global_knobs, query_perf_settings): the listener thread keeps
+ * running, so an unrelated notification can still land between the write and
+ * its marker; those are relayed on as events instead of being mistaken for the
+ * answer. g2_send_bank stops the live stream around the whole loop, which keeps
+ * that traffic down to a trickle.
+ * Note that recv_interrupt() (g2_io.c) never hands back an aCmd <= 0x03 frame
+ * while the listener is active - it emits it as an event and keeps waiting - so
+ * a 0x7E NACK cannot be observed here directly; no marker at all is what a
+ * rejected write looks like from here.
+ * Returns the marker's status byte (0 = written) via *status when one arrives,
+ * or leaves it at -1; the return value is G2_OK only for status 0. */
+static int send_flash_dump_raw(int type, int bank0, int location0, const char *name,
+                                const uint8_t *file_data, size_t file_len, int *status) {
+    *status = -1;
+    size_t cap = (size_t)COMMAND_OFFSET + 4 + 3 + 16 + 2 + 1 + file_len + 2;
+    uint8_t *buff = calloc(1, cap);
+    if (!buff) return G2_ERR_NO_MEMORY;
+
+    int msgLength = build_flash_dump_raw_frame(type, bank0, location0, name, file_data, file_len, buff, cap);
+    if (msgLength < 0) { free(buff); return G2_ERR_NO_MEMORY; }
+
+    g2_drain_pending();
+    int transferred;
+    int ret = -1;
+    /* A single outbound transfer occasionally fails transiently over a long
+     * bank operation (confirmed on real hardware, 2026-09-14) - retry a couple
+     * of times with a brief pause rather than aborting the whole bank over one
+     * blip. */
+    for (int attempt = 0; attempt < 3 && ret < 0; attempt++) {
+        if (attempt > 0) usleep(USB_SEND_DELAY_US * 10);
+        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    }
+    free(buff);
+    if (ret < 0) return G2_ERR_SEND;
+
+    usleep(USB_SEND_DELAY_US);
+    /* Wait on the device, don't outrun it: a flash write takes far longer than
+     * USB_TIMEOUT_STANDARD_MS, and the marker is what paces the whole bank loop
+     * (the official editor chains the next file off HandleDumpDownOK the same
+     * way). A long timeout is free on the happy path - this returns the moment
+     * the marker arrives. The attempt budget is generous because unrelated
+     * system/perf notifications also land here and each consumes one. */
+    for (int attempt = 0; attempt < 20; attempt++) {
+        uint8_t response[64] = {0};
+        int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+        if (rret <= 0) break;
+        if ((response[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+            if (response[4] != 0x18 || response[7] != (uint8_t)bank0
+                || response[8] != (uint8_t)location0) continue;  /* not our marker */
+            /* Wire status codes, from CMFlashDumpMarker::ReadStream's switch:
+             * 0 = DumpDownOK (written), 1 = MemoryProtected, 3 = MemoryFull,
+             * 4 = EntryEmpty, 5 = EntryCorrupt. Only 0 means this entry landed. */
+            *status = response[5];
+            return *status == 0 ? G2_OK : G2_ERR;
+        }
+        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
+            if (bulkSize == 0) continue;
+            uint8_t *bulk = malloc(bulkSize);
+            if (!bulk) return G2_ERR_NO_MEMORY;
+            int bret = recv_bulk(bulk, bulkSize);
+            /* Marker layout: [0x01][0x0C][ver][0x18][status][fileType][bank][location].
+             * Match bank/location too, so a marker left over from an earlier
+             * location can never be mistaken for this write's answer. */
+            int isMarker = (bret > 7 && bulk[1] == 0x0C && bulk[3] == 0x18
+                            && bulk[6] == (uint8_t)bank0 && bulk[7] == (uint8_t)location0);
+            if (isMarker) {
+                *status = bulk[4];
+                free(bulk);
+                return *status == 0 ? G2_OK : G2_ERR;
+            }
+            /* Somebody else's bulk - relay it so the watch stream keeps it,
+             * same as query_perf_settings does while waiting for its own reply. */
+            g2_msg_t relay = {0};
+            memcpy(relay.interrupt, response, 16);
+            relay.bulk = bulk;
+            relay.bulk_size = (uint16_t)bret;
+            g2_emit_event(&relay);
+            free(bulk);
+        }
+    }
+    return G2_ERR;
+}
+
+static void emit_bank_download_progress(int location, int total, int written, int cleared, int failed) {
+    printf("{\"type\":\"bank_download_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"cleared\":%d,\"failed\":%d}\n",
+           location, total, written, cleared, failed);
+    fflush(stdout);
+}
+
+/* Send Bank to device - writes bank data (patches or performances) to G2 flash
+ * using the same flash-dump protocol get_bank reads with (request 0x17,
+ * marker 0x18, raw data 0x19 - confirmed against the decompiled official
+ * editor, other-approaches/G2-ReverseEngineered/G2Editor.c: CFlashDumper).
+ * WARNING: this OVERWRITES the entire target bank - any location with no
+ * matching source entry is cleared via g2_clear_patch, not left untouched.
+ * Like the reference implementation, this is a per-location loop (0-127) with
+ * a settle delay between writes instead of a synchronous ack wait - see
+ * send_flash_dump_raw's comment for why the ack can't be read here. There is
+ * no single bulk message for a whole bank. */
+cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *source_path, int bank) {
+    int type = (type_str && strcmp(type_str, "performance") == 0) ? 1 : 0;
     if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
         g2_err("send-bank: invalid bank number for type\n");
-        return G2_ERR_INVALID_PARAM;
+        return NULL;
     }
-    if (ensure_connected(0) < 0) { g2_err("send-bank: not connected\n"); return G2_ERR_CONNECT; }
-    
-    /* Send bank data command: 0x41 is the system command, 0x19 is the subcommand
-     * Payload: type (0=patch, 1=performance), bank number, then the actual bank data follows
-     * TODO: Read the source (pchList file or folder) and send the data
-     * For now, just send the header - the full implementation would need to:
-     * 1. Read the .pchList file or scan the folder for .pch2/.prf2 files
-     * 2. For each patch/performance, serialize it and send as S_PATCH_BANK_DATA messages
-     * 3. Handle the response from the G2
-     * 
-     * This is a complex operation that requires file I/O and message sequencing.
-     * For now, we'll return an error indicating this is not yet implemented. */
-    g2_err("send-bank: Bank upload to device is not yet fully implemented\n");
-    g2_err("  (requires reading .pchList or folder and sending all patches)\n");
-    return G2_ERR_NOT_IMPLEMENTED;
+    if (source_path == NULL) { g2_err("send-bank: source path required\n"); return NULL; }
+    if (ensure_connected(1) < 0) { g2_err("send-bank: not connected\n"); return NULL; }
+
+    /* Stop the G2's live stream for the whole loop. Each write is answered by a
+     * CMFlashDumpMarker that send_flash_dump_raw has to actually receive, but
+     * the listener queue holds only MSG_QUEUE_MAX (64) messages and drops the
+     * OLDEST on overflow (g2_io.c) - over 128 locations the continuous LED/VU/
+     * param stream overruns it and takes the markers with it. Confirmed on
+     * hardware (2026-09-14): with streaming on, markers start going missing
+     * part-way through a 23-patch bank and the device eventually stops
+     * accepting writes altogether. Same precaution every other direct-USB query
+     * in this file takes; g2_rearm() below restarts the stream. */
+    g2_stop_comm();
+
+    bank_entry_t *entries = calloc(128, sizeof(bank_entry_t));
+    if (!entries) { g2_err("send-bank: out of memory\n"); return NULL; }
+
+    int nEntries;
+    if (source_type && strcmp(source_type, "pchList") == 0) {
+        nEntries = parse_pchlist(source_path, type, entries, 128);
+    } else if (source_type && strcmp(source_type, "folder") == 0) {
+        nEntries = scan_bank_folder(source_path, type, entries, 128);
+    } else {
+        g2_err("send-bank: source type must be 'pchList' or 'folder'\n");
+        free(entries);
+        return NULL;
+    }
+    if (nEntries < 0) { free(entries); return NULL; }
+
+    bank_entry_t *byLocation[128] = {0};
+    for (int i = 0; i < nEntries; i++) byLocation[entries[i].location - 1] = &entries[i];
+
+    int writtenCount = 0, clearedCount = 0, failedCount = 0;
+    int aborted = 0;
+    char abortReason[128] = {0};
+
+    for (int location = 0; location < 128; location++) {
+        bank_entry_t *e = byLocation[location];
+        if (!e) {
+            if (g2_clear_patch(type, bank, location + 1) != G2_OK) {
+                snprintf(abortReason, sizeof(abortReason), "failed to clear location %d", location + 1);
+                aborted = 1;
+                break;
+            }
+            clearedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
+
+        FILE *f = fopen(e->filepath, "rb");
+        if (!f) {
+            g2_err("send-bank: cannot open %s, skipping location %d\n", e->filepath, location + 1);
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
+        fseek(f, 0, SEEK_END);
+        long fsize = ftell(f);
+        rewind(f);
+        uint8_t *fileData = malloc((size_t)fsize);
+        if (!fileData) {
+            fclose(f);
+            g2_err("send-bank: out of memory reading %s\n", e->filepath);
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
+        fread(fileData, 1, (size_t)fsize, f);
+        fclose(f);
+
+        /* Wire name: basename with the NNN_ location prefix skipped (both
+         * source types share this file-naming convention). name_from_filepath
+         * re-derives its own basename, so passing it an already-prefix-
+         * stripped pointer with no further '/' in it works unchanged. */
+        const char *base = strrchr(e->filepath, '/');
+        base = base ? base + 1 : e->filepath;
+        if (strlen(base) > 4 && isdigit((unsigned char)base[0]) && isdigit((unsigned char)base[1]) &&
+            isdigit((unsigned char)base[2]) && base[3] == '_') {
+            base += 4;
+        }
+        char name[16] = {0};
+        name_from_filepath(base, name);
+
+        /* The G2 stores the file body verbatim: everything from the name-
+         * terminating NUL to EOF, i.e. [0x00][version][type][sections][file
+         * CRC] - confirmed byte-for-byte against what the device sends back
+         * for the same location (see build_flash_dump_raw_frame). Identical
+         * for patches and performances, so neither locate_section_data nor
+         * perf_prf2_to_sections is involved here; locate_section_data is only
+         * used to find the name terminator and reject a truncated file. */
+        int name_end, data_offset, data_len;
+        if (locate_section_data(fileData, fsize, &name_end, &data_offset, &data_len) < 0) {
+            g2_err("send-bank: failed to parse %s\n", e->filepath);
+            free(fileData);
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
+
+        int status = -1;
+        int ret = send_flash_dump_raw(type, bank - 1, location, name,
+                                      fileData + name_end, (size_t)fsize - (size_t)name_end, &status);
+        free(fileData);
+
+        if (ret == G2_ERR_SEND || ret == G2_ERR_NO_MEMORY) {
+            snprintf(abortReason, sizeof(abortReason), "failed to send location %d", location + 1);
+            aborted = 1;
+            break;
+        }
+        if (ret != G2_OK && status < 0) {
+            /* No marker came back at all: the request/response lockstep is broken,
+             * so every later write would be sent blind. Stop rather than keep
+             * hammering a device that has stopped answering. */
+            snprintf(abortReason, sizeof(abortReason), "no reply from device for location %d", location + 1);
+            aborted = 1;
+            break;
+        }
+        if (ret != G2_OK) {
+            /* Device answered but refused this entry (memory protected/full).
+             * Non-fatal, same as an unreadable source file. */
+            g2_err("send-bank: device refused location %d, status %d (%s)\n",
+                   location + 1, status, e->filepath);
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
+        writtenCount++;
+        emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+    }
+
+    free(entries);
+
+    /* The G2 sends a BULK_REARM after a bank write, which the daemon defers via
+     * g2_pending_rearm and - once this command returns - answers with
+     * rearm_with_version_update(): a full re-fetch of all 4 live slots
+     * (g2_emit_rearm_data -> g2_get_patch x4). send-bank never touches the live
+     * slots, so that re-fetch has nothing to learn and every chance to misread a
+     * leftover packet ("Unexpected response type for patch data", confirmed on
+     * hardware 2026-09-14, surfacing as "Error" patches in all 4 slots). Drain
+     * what is left (bounded, so a stuck queue can't hang this command), then do
+     * the one thing the rearm is actually needed for - restart the stream this
+     * command stopped - and clear the flag so the daemon skips the re-fetch. */
+    for (int i = 0; i < 50; i++) {
+        uint8_t drain[64] = {0};
+        if (recv_interrupt(drain, sizeof(drain), USB_TIMEOUT_STANDARD_MS) <= 0) break;
+    }
+    g2_pending_rearm = 0;
+    g2_rearm();
+
+    if (aborted) {
+        g2_err("send-bank: aborted - %s\n", abortReason);
+        return NULL;
+    }
+
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddNumberToObject(result, "written", writtenCount);
+    cJSON_AddNumberToObject(result, "cleared", clearedCount);
+    cJSON_AddNumberToObject(result, "failed", failedCount);
+    return result;
 }
 

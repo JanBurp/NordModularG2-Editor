@@ -165,6 +165,20 @@ extern void test_set_perf_mode_invalid_mode_high(void);
 extern void test_set_perf_name_null_name(void);
 extern void test_set_perf_name_empty_name(void);
 
+extern void test_parse_pchlist_well_formed_returns_entries(void);
+extern void test_parse_pchlist_skips_out_of_range_location(void);
+extern void test_parse_pchlist_skips_missing_sibling_file(void);
+extern void test_parse_pchlist_missing_file_returns_negative_one(void);
+extern void test_parse_pchlist_resolves_name_with_extension_and_no_prefix(void);
+extern void test_scan_bank_folder_accepts_nnn_prefix(void);
+extern void test_scan_bank_folder_rejects_missing_prefix(void);
+extern void test_scan_bank_folder_ignores_other_type_extension(void);
+extern void test_scan_bank_folder_rejects_duplicate_location(void);
+extern void test_scan_bank_folder_missing_folder_returns_negative_one(void);
+extern void test_build_flash_dump_raw_frame_byte_layout(void);
+extern void test_build_flash_dump_raw_frame_long_name_is_nul_terminated(void);
+extern void test_build_flash_dump_raw_frame_buffer_too_small(void);
+
 extern void test_tokenize_del_cable(void);
 extern void test_tokenize_del_module(void);
 extern void test_tokenize_empty_string(void);
@@ -351,6 +365,21 @@ int main(void) {
     RUN_TEST(test_set_perf_mode_invalid_mode_high);
     RUN_TEST(test_set_perf_name_null_name);
     RUN_TEST(test_set_perf_name_empty_name);
+
+    /* send-bank source parsing + write-frame layout tests */
+    RUN_TEST(test_parse_pchlist_well_formed_returns_entries);
+    RUN_TEST(test_parse_pchlist_skips_out_of_range_location);
+    RUN_TEST(test_parse_pchlist_skips_missing_sibling_file);
+    RUN_TEST(test_parse_pchlist_missing_file_returns_negative_one);
+    RUN_TEST(test_parse_pchlist_resolves_name_with_extension_and_no_prefix);
+    RUN_TEST(test_scan_bank_folder_accepts_nnn_prefix);
+    RUN_TEST(test_scan_bank_folder_rejects_missing_prefix);
+    RUN_TEST(test_scan_bank_folder_ignores_other_type_extension);
+    RUN_TEST(test_scan_bank_folder_rejects_duplicate_location);
+    RUN_TEST(test_scan_bank_folder_missing_folder_returns_negative_one);
+    RUN_TEST(test_build_flash_dump_raw_frame_byte_layout);
+    RUN_TEST(test_build_flash_dump_raw_frame_long_name_is_nul_terminated);
+    RUN_TEST(test_build_flash_dump_raw_frame_buffer_too_small);
 
     /* seq tokenize tests */
     RUN_TEST(test_tokenize_del_cable);

@@ -280,6 +280,7 @@
 		v-model="bankDownload.showDialog.value"
 		title="Bank Download (to G2)"
 		confirm-label="Download"
+		:close-on-confirm="false"
 		@confirm="bankDownload.confirm"
 		@cancel="bankDownload.cancel"
 	>
@@ -331,9 +332,25 @@
 					</div>
 				</div>
 			</div>
-			<div v-if="bankDownload.inProgress.value" class="text-orange-400 text-sm">Downloading bank to G2...</div>
+			<div v-if="bankDownload.inProgress.value" class="space-y-1">
+				<div class="text-orange-400 text-sm">
+					{{
+						bankDownload.progress.value
+							? `Downloading… location ${bankDownload.progress.value.location}/${bankDownload.progress.value.total} (${bankDownload.progress.value.written} written, ${bankDownload.progress.value.cleared} cleared)`
+							: 'Downloading bank to G2...'
+					}}
+				</div>
+				<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
+					<div
+						class="h-full bg-orange-400 transition-all"
+						:style="{
+							width: bankDownload.progress.value ? `${(bankDownload.progress.value.location / bankDownload.progress.value.total) * 100}%` : '0%',
+						}"
+					></div>
+				</div>
+			</div>
 			<div class="text-xs text-content-secondary">
-				Download bank to synth memory. Source can be a .pchList file or a folder with patch files (alphabetical order, max 128).
+				Download bank to synth memory. Source can be a .pchList file or a folder of NNN_-prefixed patch files (e.g. 001_MyPatch.pch2, max 128).
 			</div>
 		</div>
 	</Dialog>

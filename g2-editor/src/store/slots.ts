@@ -590,7 +590,7 @@ export const useSlotsStore = defineStore('slots', {
 		async downloadBankToDevice(
 			source: { type: 'pchList'; filepath: string } | { type: 'folder'; folderPath: string },
 			bankNum: number,
-			_bankType: 'patch' | 'performance',
+			bankType: 'patch' | 'performance',
 		): Promise<boolean> {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return false;
@@ -598,11 +598,19 @@ export const useSlotsStore = defineStore('slots', {
 			try {
 				// Send bank to device
 				// WARNING: This OVERWRITES the entire target bank
-				if (source.type === 'pchList') {
-					await window.cli.run(['send-bank', 'pchList', source.filepath, String(bankNum)]);
-				} else if (source.type === 'folder') {
-					await window.cli.run(['send-bank', 'folder', source.folderPath, String(bankNum)]);
-				}
+				const path = source.type === 'pchList' ? source.filepath : source.folderPath;
+				await window.cli.run(['send-bank', bankType, source.type, path, String(bankNum)]);
+				// A bank download can add/remove/rename many patches at once - too broad for
+				// the single-entry upsertPatch/removePatch bookkeeping storePatch/clearPatch use.
+				// 'list' has no daemon-mode handler (daemon.c has none - only the standalone CLI
+				// does), so - like the existing patch_names_updated fallback in useDeviceEvents.ts -
+				// use 'reload-names' instead: it emits a "names" watch event that
+				// useDeviceEvents.ts already listens for and applies via applyNamesData.
+				window.cli.run(['reload-names']).catch(() => {});
+				// No slot reload here: send-bank writes flash only, it never touches the four
+				// live slots. The daemon used to answer the G2's post-write BULK_REARM with a
+				// full 4-slot re-fetch, which is what returned garbled "Error" patches; it now
+				// just restarts streaming (g2_send_bank in g2_device.c).
 				return true;
 			} catch (err) {
 				console.error('Failed to download bank to device:', err);

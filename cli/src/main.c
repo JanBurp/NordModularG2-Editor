@@ -91,7 +91,7 @@ static void print_usage(const char *prog) {
     printf("  send-controller-snapshot                                                               Send all MIDI Controller values to MIDI OUT\n");
     printf("  dump-patch <slot>                                                                        Dump patch as MIDI SYSEX (slot A-D)\n");
     printf("  get-bank <type> <bank> <folder> [<name>]                                                  Get bank from device (type: patch|performance, bank: 1-32 or 1-8)\n");
-    printf("  send-bank <type> <source> <bank>                                                         Send bank to device (type: pchList|folder, bank: 1-32 or 1-8)\n");
+    printf("  send-bank <type> <source-type> <source-path> <bank>                                       Send bank to device (type: patch|performance, source-type: pchList|folder, bank: 1-32 or 1-8)\n");
     printf("  daemon                                                                                    Persistent connection: watch + accept JSON commands on stdin\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
@@ -980,14 +980,25 @@ static int cmd_get_bank(int argc, char **argv, int i) {
 }
 
 static int cmd_send_bank(int argc, char **argv, int i) {
-    if (i + 3 >= argc) {
-        fprintf(stderr, "Usage: send-bank <type> <source> <bank>\n");
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: send-bank <type> <source-type> <source-path> <bank>\n");
         return 1;
     }
     const char *type_str = argv[i + 1];
     const char *source_type = argv[i + 2];
-    int bank = atoi(argv[i + 3]);
-    return g2_send_bank(type_str, source_type, bank);
+    const char *source_path = argv[i + 3];
+    int bank = atoi(argv[i + 4]);
+    cJSON *result = g2_send_bank(type_str, source_type, source_path, bank);
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json("Failed to send bank", output_format);
+        else
+            fprintf(stderr, "Failed to send bank\n");
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
 }
 
 static int cmd_seq(int argc, char **argv, int i) {

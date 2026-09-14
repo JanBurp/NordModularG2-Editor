@@ -816,11 +816,13 @@ static void execute_cmd(const char *line) {
 		data = g2_get_bank(type, bank, folder, name);
 		ret = data ? G2_OK : G2_ERR;
 
-	} else if (strcmp(cmd, "send-bank") == 0 && n >= 3) {
+	} else if (strcmp(cmd, "send-bank") == 0 && n >= 4) {
 		const char *type_str = arg_s(args, 0);
 		const char *source_type = arg_s(args, 1);
-		int bank = arg_i(args, 2);
-		ret = g2_send_bank(type_str, source_type, bank);
+		const char *source_path = arg_s(args, 2);
+		int bank = arg_i(args, 3);
+		data = g2_send_bank(type_str, source_type, source_path, bank);
+		ret = data ? G2_OK : G2_ERR;
 
 	}
 
