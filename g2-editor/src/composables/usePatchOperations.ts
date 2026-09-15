@@ -110,6 +110,10 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
 
+	async function handleModuleReplace(moduleIndex: number, newTypeId: number): Promise<void> {
+		await slotsStore.replaceModule(moduleIndex, newTypeId, getArea());
+	}
+
 	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
 	async function handlePasteParams(moduleIndex: number): Promise<void> {
 		const clipboard = uiStore.clipboard;
@@ -180,6 +184,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		handleModeChange,
 		handleModuleDelete,
 		handleModuleColorChange,
+		handleModuleReplace,
 		handlePasteParams,
 		handleJackDeleteConnected,
 		handleJackBreakConnection,

@@ -13,6 +13,7 @@ import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoR
 import { getModule } from '../renderer/nmg2mods';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
+import { remapParamValues, remapModeValues, remapCablesForModule } from '../parser/moduleReplace';
 import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
 import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/paramPages';
 
@@ -808,6 +809,181 @@ export const useSlotsStore = defineStore('slots', {
 			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 			for (const p of removedGlobalPagesSnap) deleteCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 			await runCliBatchSafe(deleteCmds, 'deleteModule');
+
+			return { name: slotEntry.name, rawHex: '', patch };
+		},
+
+		// Replace = delete the old module + create a new one of `newTypeId` reusing the same module
+		// `index`/position/colour, remapping cables (name+colour match) and params/modes (name+type
+		// match) from old to new; unmatched cables/params/modes are dropped. See moduleReplace.ts for
+		// the remap algorithm and nmg2mods.ts's getReplaceCandidates for how "same group" is decided.
+		async replaceModule(moduleId: number, newTypeId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return null;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const slotEntry = this.slots[slot];
+
+			const oldMod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
+			if (!oldMod) return null;
+			const oldDef = getModule(oldMod.type);
+			const newDef = getModule(newTypeId);
+			if (!oldDef || !newDef) return null;
+
+			const hist = useHistoryStore();
+			const numVar = slotEntry.variations?.length ?? 1;
+			const oldPcnt = oldMod.pcnt;
+			const oldLvSnap = Array(oldPcnt * numVar).fill(0);
+			for (let v = 0; v < numVar; v++) {
+				const varParams = slotEntry.variations?.[v]?.[areaKey]?.[moduleId] ?? [];
+				for (let p = 0; p < oldPcnt; p++) oldLvSnap[v * oldPcnt + p] = varParams[p] ?? 0;
+			}
+			const oldModSnap: ModuleInstance = { ...oldMod, lv: oldLvSnap, modes: [...oldMod.modes] };
+			const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
+
+			const ccLocation = areaIdx === 0 ? 0 : 1;
+			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
+			const removedPagesSnap = slotEntry.paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId);
+			const removedGlobalPagesSnap = this.globalParamPages.filter((k) => k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId);
+
+			const morphLocation: 0 | 1 = areaIdx === 0 ? 0 : 1;
+			const morphSnapPerVar: MorphAssignment[][] = Array.from({ length: numVar }, (_, v) =>
+				(slotEntry.variations?.[v]?.patch.morphAssignments ?? []).filter((a) => a.location === morphLocation && a.moduleIndex === moduleId),
+			);
+
+			const shouldRecord = !hist.isLocked(slot);
+			if (shouldRecord) hist.lock(slot);
+
+			try {
+				await this.deleteModule(moduleId, area);
+
+				// deleteModule doesn't know about morph assignments; drop the replaced module's own
+				// (mirrors the "drop always" fallback the CC/paramPage cleanup above already applies).
+				for (let v = 0; v < numVar; v++) {
+					if (morphSnapPerVar[v].length === 0) continue;
+					this._mutateMorphAssignments(
+						slot,
+						v,
+						(prev) => prev.filter((a) => !(a.location === morphLocation && a.moduleIndex === moduleId)),
+						async () => {},
+					);
+				}
+
+				const newPcnt = newDef.params?.length ?? 0;
+				const newLv = Array(newPcnt * numVar);
+				for (let v = 0; v < numVar; v++) {
+					const oldSlice = oldLvSnap.slice(v * oldPcnt, v * oldPcnt + oldPcnt);
+					const remapped = remapParamValues(oldDef, newDef, oldSlice);
+					for (let p = 0; p < newPcnt; p++) newLv[v * newPcnt + p] = remapped[p];
+				}
+				const newModes = remapModeValues(oldDef, newDef, oldModSnap.modes);
+				const newModuleSrc: ModuleInstance = {
+					type: newTypeId,
+					index: moduleId,
+					horiz: oldModSnap.horiz,
+					vert: oldModSnap.vert,
+					colour: oldModSnap.colour,
+					uprate: 0,
+					leds: 0,
+					pcnt: newPcnt,
+					lv: newLv,
+					modes: newModes,
+					uname: oldModSnap.uname,
+				};
+
+				const { mod, addModuleCmd, setParamCmds, setParamLabelCmds } = buildModuleAddition(
+					newModuleSrc,
+					moduleId,
+					oldModSnap.horiz,
+					oldModSnap.vert,
+					slot,
+					location,
+					areaKey,
+					slotEntry.variations,
+				);
+				mutAddModule(patch, areaIdx, mod);
+
+				const remappedCables = remapCablesForModule(cableSnap, moduleId, oldDef, newDef);
+				for (const c of remappedCables) mutAddCable(patch, areaIdx, c);
+
+				this._markSlotDirty(slot);
+				this._syncUprateAndColors(patch, areaIdx);
+
+				const cliCmds: string[][] = [addModuleCmd, ...setParamCmds, ...setParamLabelCmds];
+				for (const c of remappedCables) {
+					cliCmds.push([
+						'add-cable',
+						slot,
+						location,
+						String(c.colour),
+						String(c.smod),
+						c.dir === 0 ? '0' : '1',
+						String(c.scon),
+						String(c.dmod),
+						'0',
+						String(c.dcon),
+					]);
+				}
+				await runCliBatchSafe(cliCmds, 'replaceModule');
+			} finally {
+				if (shouldRecord) hist.unlock(slot);
+			}
+
+			if (shouldRecord) {
+				hist.record(slot, {
+					undo: async () => {
+						mutDeleteModule(patch, areaIdx, moduleId); // remove the post-replace module (+ its remapped cables) before restoring the original
+						await this.addModuleWithData(oldModSnap, moduleId, oldModSnap.horiz, oldModSnap.vert, area);
+						for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
+						if (removedCCSnap.length > 0) slotEntry.controllers = [...slotEntry.controllers, ...removedCCSnap];
+						if (removedPagesSnap.length > 0) slotEntry.paramPages = [...slotEntry.paramPages, ...removedPagesSnap];
+						if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
+						this._markSlotDirty(slot);
+						this._syncUprateAndColors(patch, areaIdx);
+
+						const undoCmds: string[][] = [];
+						for (const c of cableSnap) {
+							undoCmds.push([
+								'add-cable',
+								slot,
+								location,
+								String(c.colour),
+								String(c.smod),
+								c.dir === 0 ? '0' : '1',
+								String(c.scon),
+								String(c.dmod),
+								'0',
+								String(c.dcon),
+							]);
+						}
+						if (removedCCSnap.length > 0) {
+							const flatArgs = removedCCSnap.flatMap((a) => [
+								ccLocationStr(a.location),
+								String(a.moduleIndex),
+								String(a.paramIndex),
+								String(a.cc),
+							]);
+							undoCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
+						}
+						for (const p of removedPagesSnap) undoCmds.push(assignKnobCmd(slot, p));
+						for (const p of removedGlobalPagesSnap) undoCmds.push(assignGlobalKnobCmd(slot, p));
+						if (undoCmds.length > 0) await runCliBatchSafe(undoCmds, 'replaceModule undo');
+
+						for (let v = 0; v < numVar; v++) {
+							if (morphSnapPerVar[v].length === 0) continue;
+							const vState = this.slots[slot].variations?.[v];
+							if (!vState) continue;
+							const current = vState.patch.morphAssignments;
+							vState.patch.morphAssignments = [...current, ...morphSnapPerVar[v]];
+							await this._resyncMorphAssignments(slot, v, current, vState.patch.morphAssignments);
+						}
+					},
+					redo: async () => {
+						await this.replaceModule(moduleId, newTypeId, area);
+					},
+				});
+			}
 
 			return { name: slotEntry.name, rawHex: '', patch };
 		},

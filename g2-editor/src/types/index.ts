@@ -167,6 +167,7 @@ export interface ContextMenuSwatch {
 export interface ContextMenuItem {
 	type?: 'item' | 'separator' | 'swatches';
 	label?: string;
+	icon?: string;
 	disabled?: boolean;
 	action?: () => void;
 	children?: ContextMenuItem[];

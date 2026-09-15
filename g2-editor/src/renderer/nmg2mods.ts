@@ -207,3 +207,42 @@ export function getAllCategories(): string[] {
 export function getModulesByCategory(categoryName: string): ModuleDefinition[] {
 	return categoryModulesMap.get(categoryName) ?? [];
 }
+
+type ColourMultiset = Record<string, number>;
+
+function jackColourMultiset(jacks?: { colour: string }[]): ColourMultiset {
+	const m: ColourMultiset = {};
+	for (const j of jacks ?? []) m[j.colour] = (m[j.colour] ?? 0) + 1;
+	return m;
+}
+
+function isSubMultiset(small: ColourMultiset, big: ColourMultiset): boolean {
+	return Object.entries(small).every(([colour, n]) => (big[colour] ?? 0) >= n);
+}
+
+function multisetsEqual(a: ColourMultiset, b: ColourMultiset): boolean {
+	return isSubMultiset(a, b) && isSubMultiset(b, a);
+}
+
+// Heuristic approximation of Clavia's "replace module" group table: their real table isn't
+// recoverable (the data-loading routine failed to decompile from the original binary), so we
+// approximate a group as "same toolbar category + matching jack-colour signature." Output jack
+// colours must match exactly; input jack colours only need a subset relationship, so a "bigger"
+// sibling (e.g. FltClassic vs FltLP) can have extra inputs without being excluded. Not perfect
+// (e.g. NoteDet/MonoKey can false-match: both zero-input, blue+yellow output) — good enough as a
+// starting point, tune here if specific pairs turn out wrong.
+export function areModulesReplaceCompatible(a: ModuleDefinition, b: ModuleDefinition): boolean {
+	if (a.id === b.id) return false;
+	if (!a.page?.name || a.page.name !== b.page?.name) return false;
+	if (!multisetsEqual(jackColourMultiset(a.outputs), jackColourMultiset(b.outputs))) return false;
+	const inA = jackColourMultiset(a.inputs);
+	const inB = jackColourMultiset(b.inputs);
+	const [small, big] = (a.inputs?.length ?? 0) <= (b.inputs?.length ?? 0) ? [inA, inB] : [inB, inA];
+	return isSubMultiset(small, big);
+}
+
+export function getReplaceCandidates(moduleTypeId: number): ModuleDefinition[] {
+	const def = getModule(moduleTypeId);
+	if (!def?.page?.name) return [];
+	return getModulesByCategory(def.page.name).filter((m) => areModulesReplaceCompatible(def, m));
+}

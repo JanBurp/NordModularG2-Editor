@@ -26,6 +26,17 @@
 			@mouseleave="onTitleHoverLeave"
 		/>
 
+		<!-- Replace-module triangle: shown only when other modules in this module's group exist -->
+		<path
+			v-if="replaceCandidates.length > 0"
+			data-testid="module-replace-trigger"
+			d="M0,0 L11,0 L0,11 Z"
+			:fill="getCategoryColor(moduleDef.page?.name ?? '')"
+			style="cursor: pointer"
+			@mousedown.stop
+			@click.stop="onReplaceTriangleClick"
+		/>
+
 		<!-- Visual elements from ve array -->
 		<template v-for="entry in visualElementsGroupedLeds" :key="entry.key">
 			<ModuleVeText v-if="entry.ve.type === 'text'" :ve="entry.ve"></ModuleVeText>
@@ -201,7 +212,9 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
-	import { getModule } from '../../renderer/nmg2mods';
+	import { getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
+	import { getCategoryColor } from '../../constants/moduleCategoryColors';
+	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { getParam } from '../../renderer/parammap';
@@ -216,7 +229,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
@@ -254,6 +267,7 @@
 		moduleDelete: [moduleIndex: number];
 		modulePasteParams: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colourId: number];
+		moduleReplace: [moduleIndex: number, newTypeId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
@@ -264,6 +278,7 @@
 
 	const { open: openContextMenu } = useContextMenu();
 	const { handleParamDblClick } = useParamEditDialog();
+	const { graphics } = useModuleGraphics();
 
 	function onModuleClick(e: MouseEvent) {
 		if (e.altKey) onContextMenu(e);
@@ -279,6 +294,7 @@
 			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			{ type: 'separator' },
+			{ label: 'Replace Module', disabled: replaceCandidates.value.length === 0, children: buildReplaceMenuItems() },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
 			{ type: 'separator' },
 			{
@@ -332,6 +348,20 @@
 	const moduleDef = computed<ModuleDefinition | null>(() => {
 		return getModule(instance.value.type) || null;
 	});
+
+	const replaceCandidates = computed<ModuleDefinition[]>(() => getReplaceCandidates(instance.value.type));
+
+	function buildReplaceMenuItems(): ContextMenuItem[] {
+		return replaceCandidates.value.map((def) => ({
+			label: def.long,
+			icon: graphics.value[def.id],
+			action: () => emit('moduleReplace', moduleIdx.value, def.id),
+		}));
+	}
+
+	function onReplaceTriangleClick(e: MouseEvent) {
+		openContextMenu(e, buildReplaceMenuItems());
+	}
 
 	const visualElementsGroupedLeds = computed(() => {
 		if (!moduleDef.value?.ve) return [];

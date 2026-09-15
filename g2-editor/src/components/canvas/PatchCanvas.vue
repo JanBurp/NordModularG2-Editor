@@ -43,6 +43,7 @@
 				@module-delete="(idx) => emit('moduleDelete', idx)"
 				@module-paste-params="(idx) => emit('modulePasteParams', idx)"
 				@module-color-change="(idx, colorId) => emit('moduleColorChange', idx, colorId)"
+				@module-replace="(idx, newTypeId) => emit('moduleReplace', idx, newTypeId)"
 				@jack-delete-connected="(info) => emit('jackDeleteConnected', info)"
 				@jack-break-connection="(info) => emit('jackBreakConnection', info)"
 				@jack-set-cable-color="(info) => emit('jackSetCableColor', info)"
@@ -151,6 +152,7 @@
 		moduleDelete: [moduleIndex: number];
 		modulePasteParams: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colorId: number];
+		moduleReplace: [moduleIndex: number, newTypeId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];

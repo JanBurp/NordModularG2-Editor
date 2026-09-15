@@ -39,7 +39,10 @@
 					@mouseenter="onItemEnter(idx)"
 					@click.stop="onItemClick(item)"
 				>
-					<span>{{ item.label }}</span>
+					<span class="flex items-center gap-2 min-w-0">
+						<img v-if="item.icon" :src="item.icon" class="w-8 h-8 shrink-0 bg-white" alt="" />
+						<span class="truncate">{{ item.label }}</span>
+					</span>
 					<Icon v-if="item.children" name="chevronRight" class="w-2.5 h-2.5 text-content-muted ml-6" />
 				</li>
 			</template>
