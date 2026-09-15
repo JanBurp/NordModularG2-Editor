@@ -263,7 +263,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().toggleSidebar('text');
 					break;
 				case 'toggle-extended-toolbar':
-					useSettingsStore().toggleExtendedToolBar();
+					useSettingsStore().cycleToolbarMode();
 					break;
 				case 'toggle-keyboard':
 					useSettingsStore().toggleVirtualKeyboard();

@@ -103,7 +103,7 @@ body {
 }
 
 .btn-xs {
-	@apply h-4! px-1! text-xs! rounded-none! transition-none!;
+	@apply h-4! px-1! text-xs! rounded-none transition-none!;
 }
 
 .btn-small {

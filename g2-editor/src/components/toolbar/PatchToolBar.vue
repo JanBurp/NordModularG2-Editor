@@ -34,6 +34,11 @@
 
 		<ToolBarDivider />
 
+		<template v-if="mode === 'compact'">
+			<ColorPicker />
+			<ToolBarDivider />
+		</template>
+
 		<PatchLevel />
 
 		<ToolBarDivider />
@@ -59,8 +64,9 @@
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
+	import ColorPicker from '../common/ColorPicker.vue';
 
-	defineProps<{ patchName: string }>();
+	withDefaults(defineProps<{ patchName: string; mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
 	const emit = defineEmits<{
 		variationClick: [value: string | number | (string | number)[]];
 		patchNameClick: [];
