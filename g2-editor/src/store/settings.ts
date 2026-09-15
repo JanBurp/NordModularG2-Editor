@@ -3,6 +3,7 @@ import { defineStore } from 'pinia';
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
+export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
@@ -18,7 +19,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableThickness: 1 as number,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
-		showExtendedToolBar: true as boolean,
+		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
@@ -35,8 +36,9 @@ export const useSettingsStore = defineStore('settings', {
 			// IPC uses structured clone, which chokes on Pinia's reactive Proxy — send plain objects.
 			window.electronAPI?.updateRecentFiles(this.recentFiles.map((f) => ({ ...f })));
 		},
-		toggleExtendedToolBar() {
-			this.showExtendedToolBar = !this.showExtendedToolBar;
+		cycleToolbarMode() {
+			const order: ToolbarMode[] = ['hidden', 'classic', 'compact'];
+			this.toolbarMode = order[(order.indexOf(this.toolbarMode) + 1) % order.length];
 		},
 		toggleVirtualKeyboard() {
 			this.showVirtualKeyboard = !this.showVirtualKeyboard;

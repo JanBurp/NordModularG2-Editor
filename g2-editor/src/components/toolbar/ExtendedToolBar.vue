@@ -6,18 +6,22 @@
 			<Button variant="default" size="xs" @click="patchFile.loadInitPatch(2)">Init 2</Button>
 		</div>
 
-		<ModulePicker class="ml-1" />
+		<template v-if="mode === 'classic'">
+			<ModulePicker class="ml-1" />
 
-		<div class="flex items-center flex-col gap-4 ml-4">
-			<UndoRedo />
-			<ColorPicker />
-		</div>
+			<div class="flex items-center flex-col gap-4 ml-4">
+				<UndoRedo />
+				<ColorPicker />
+			</div>
+		</template>
 
 		<div class="flex flex-col gap-4 items-center ml-4">
-			<CPU :va="vaResources" :fx="fxResources" />
+			<CPU :va="vaResources" :fx="fxResources" :compact="mode === 'compact'" />
 		</div>
 
 		<MorphGroups class="ml-4" @morph-group-label-edit="(info) => emit('morphGroupLabelEdit', info)" />
+
+		<ParameterPagesGroup v-if="mode === 'compact'" class="ml-4" />
 
 		<span class="ml-auto"></span>
 	</ToolBar>
@@ -32,11 +36,13 @@
 	import ColorPicker from '../common/ColorPicker.vue';
 	import CPU from './CPU.vue';
 	import MorphGroups from './MorphGroups.vue';
+	import ParameterPagesGroup from './ParameterPagesGroup.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { usePatchFile } from '../../composables/usePatchFile';
 	import { areaConfig } from '../../store/slotHelpers';
 
+	withDefaults(defineProps<{ mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
 	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
 
 	const slotsStore = useSlotsStore();

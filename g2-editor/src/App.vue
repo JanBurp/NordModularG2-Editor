@@ -40,7 +40,8 @@
 		</ToolBar>
 
 		<ExtendedToolBar
-			v-if="settingsStore.showExtendedToolBar"
+			v-if="settingsStore.toolbarMode !== 'hidden'"
+			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@morph-group-label-edit="(info) => openMorphLabelDialog(info.groupIndex, info.currentLabel)"
 		/>
 		<PatchToolBar
