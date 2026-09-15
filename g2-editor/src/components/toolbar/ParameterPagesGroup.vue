@@ -1,11 +1,11 @@
 <template>
-	<ToolBarLabel>Param<br />Pages:</ToolBarLabel>
-	<div class="flex items-center gap-4">
+	<ToolBarLabel v-if="!compact">Param<br />Pages:</ToolBarLabel>
+	<div class="flex items-center gap-4" :class="{ 'ml-2 gap-2!': compact }">
 		<div
 			v-for="cell in cells"
 			:key="cell.slotIndex"
 			class="flex flex-col items-center w-16 gap-1 select-none cursor-pointer"
-			:class="{ 'opacity-40': !cell.assignment }"
+			:class="{ 'opacity-40': !cell.assignment, 'w-14!': compact }"
 			@contextmenu.prevent="onCellContextMenu(cell, $event)"
 		>
 			<span class="text-xs w-full truncate text-center font-bold">{{ cell.moduleHeader }}</span>
@@ -45,22 +45,20 @@
 			<!-- hasButton is false for unassigned cells too, so it alone gates the button's liveness.
 			     The extra opacity only applies to assigned-but-buttonless params, which the cell-level
 			     opacity doesn't already cover. -->
-			<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': cell.assignment && !cell.hasButton }">{{ cell.buttonLabel }}</span>
-			<div
-				class="btn btn-xs w-full truncate text-center"
-				:class="{ 'opacity-40': cell.assignment && !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
-				@mousedown="onButtonMouseDown(cell)"
-				@mouseup="onButtonMouseUp(cell)"
-				@click="onButtonClick(cell)"
-			>
-				{{ cell.buttonValueLabel }}
-			</div>
+			<template v-if="!compact">
+				<span class="text-xs w-full truncate text-center" :class="{ 'opacity-40': cell.assignment && !cell.hasButton }">{{ cell.buttonLabel }}</span>
+				<div
+					class="btn btn-xs w-full truncate text-center"
+					:class="{ 'opacity-40': cell.assignment && !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
+					@mousedown="onButtonMouseDown(cell)"
+					@mouseup="onButtonMouseUp(cell)"
+					@click="onButtonClick(cell)"
+				>
+					{{ cell.buttonValueLabel }}
+				</div>
+			</template>
 		</div>
 	</div>
-
-	<ToolBarDivider></ToolBarDivider>
-
-	<ToolBarDivider></ToolBarDivider>
 
 	<div class="self-stretch flex flex-col justify-between py-0.5">
 		<Button variant="toggle" :active="uiStore.globalPagesActive" @click="onToggleGlobalPages()" data-testid="global-pages-toggle"> Global </Button>
@@ -78,12 +76,13 @@
 			:model-value="uiStore.globalPagesActive ? uiStore.displayedGlobalParamPage : uiStore.displayedParamPage"
 			:options="pageOptions"
 			variant="variation"
+			:size="compact ? 'xs' : 'normal'"
 			vertical
 			testIdPrefix="param-page"
 			@update:model-value="(v) => onPageSelect(v as number)"
 			class="w-8"
 		/>
-		<div class="flex flex-col text-content-muted">
+		<div v-if="!compact" class="flex flex-col text-content-muted">
 			<div>Osc</div>
 			<div>LFO</div>
 			<div>Env</div>
@@ -100,6 +99,8 @@
 	import BtnGroup from './BtnGroup.vue';
 	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';
+
+	const { compact = false } = defineProps<{ compact?: boolean }>();
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';

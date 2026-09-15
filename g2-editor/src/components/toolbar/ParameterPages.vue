@@ -1,5 +1,5 @@
 <template>
-	<ToolBar class="py-4">
+	<ToolBar class="py-2">
 		<ParameterPagesGroup />
 	</ToolBar>
 </template>

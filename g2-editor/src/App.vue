@@ -47,10 +47,11 @@
 		<PatchToolBar
 			v-if="currentPatch"
 			:patch-name="patchName"
+			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@variation-click="handleVariationClick"
 			@patch-name-click="() => openPatchNameDialog(patchName)"
 		/>
-		<ParameterPages v-if="currentPatch && settingsStore.showParamPages" />
+		<ParameterPages v-if="currentPatch && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<ParamDragGhost />
 
 		<div class="flex-1 flex overflow-hidden">

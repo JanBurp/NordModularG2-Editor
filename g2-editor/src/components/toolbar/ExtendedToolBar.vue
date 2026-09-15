@@ -8,20 +8,19 @@
 
 		<template v-if="mode === 'classic'">
 			<ModulePicker class="ml-1" />
-
 			<div class="flex items-center flex-col gap-4 ml-4">
 				<UndoRedo />
 				<ColorPicker />
 			</div>
 		</template>
 
+		<ParameterPagesGroup v-if="mode === 'compact'" compact />
+
 		<div class="flex flex-col gap-4 items-center ml-4">
 			<CPU :va="vaResources" :fx="fxResources" :compact="mode === 'compact'" />
 		</div>
 
 		<MorphGroups class="ml-4" @morph-group-label-edit="(info) => emit('morphGroupLabelEdit', info)" />
-
-		<ParameterPagesGroup v-if="mode === 'compact'" class="ml-4" />
 
 		<span class="ml-auto"></span>
 	</ToolBar>
