@@ -6,7 +6,7 @@ import { areModulesReplaceCompatible, getModule, getReplaceCandidates } from '..
 // comment on areModulesReplaceCompatible) and needs a regression guard.
 
 describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
-	it('matches Mix4-1B and Mix4-1C (identical jack sets, different height/modes)', () => {
+	it('matches Mix4-1B and Mix4-1C (same category, identical jack sets)', () => {
 		const a = getModule(19); // Mix4-1B
 		const b = getModule(123); // Mix4-1C
 		expect(a).toBeDefined();
@@ -15,18 +15,25 @@ describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
 		expect(getReplaceCandidates(19).map((m) => m.id)).toContain(123);
 	});
 
-	it('matches FltLP and FltClassic (FltClassic has an extra input beyond FltLP)', () => {
-		const a = getModule(87); // FltLP
-		const b = getModule(92); // FltClassic
-		expect(a).toBeDefined();
-		expect(b).toBeDefined();
-		expect(areModulesReplaceCompatible(a!, b!)).toBe(true);
+	it('matches modules in the same category even with very different jack sets (LFOs)', () => {
+		const lfoA = getModule(26); // LfoA: 2 inputs, 1 blue output
+		const clkGen = getModule(68); // ClkGen: 1 input, 4 yellow outputs
+		expect(lfoA).toBeDefined();
+		expect(clkGen).toBeDefined();
+		expect(areModulesReplaceCompatible(lfoA!, clkGen!)).toBe(true);
+		expect(getReplaceCandidates(26).map((m) => m.id)).toContain(68);
 	});
 
-	it('does not match Keyboard against other In/Out modules with different jack signatures', () => {
+	it('matches Keyboard against other In/Out modules despite very different jack signatures', () => {
 		const keyboard = getModule(1); // Keyboard
 		expect(keyboard).toBeDefined();
-		expect(getReplaceCandidates(1)).toEqual([]);
+		expect(getReplaceCandidates(1).length).toBeGreaterThan(0);
+	});
+
+	it('does not match modules across different categories', () => {
+		const oscA = getModule(97); // Osc category
+		const fltLP = getModule(87); // Filter category
+		expect(areModulesReplaceCompatible(oscA!, fltLP!)).toBe(false);
 	});
 
 	it('never includes the module itself in its own candidate list', () => {
@@ -36,5 +43,13 @@ describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
 
 	it('returns no candidates for an unknown module id', () => {
 		expect(getReplaceCandidates(999999)).toEqual([]);
+	});
+
+	it('excludes the Name bar module entirely: it has no candidates, and never appears as one', () => {
+		const name = getModule(126); // Name bar
+		expect(name).toBeDefined();
+		expect(getReplaceCandidates(126)).toEqual([]);
+		// Name bar shares the "In/Out" category with Keyboard, but must never be offered as a target.
+		expect(getReplaceCandidates(1).some((m) => m.id === 126)).toBe(false);
 	});
 });

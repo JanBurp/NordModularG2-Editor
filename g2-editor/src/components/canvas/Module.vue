@@ -11,7 +11,13 @@
 		@contextmenu.stop.prevent="onContextMenu"
 	>
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
-		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected ?? false"></ModuleTitle>
+
+		<ModuleTitle
+			:displayName="displayName"
+			:is-name="instance.type == 126"
+			:selected="isSelected ?? false"
+			:has-replace-trigger="replaceCandidates.length > 0"
+		></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
@@ -26,16 +32,21 @@
 			@mouseleave="onTitleHoverLeave"
 		/>
 
-		<!-- Replace-module triangle: shown only when other modules in this module's group exist -->
-		<path
-			v-if="replaceCandidates.length > 0"
-			data-testid="module-replace-trigger"
-			d="M0,0 L11,0 L0,11 Z"
-			:fill="getCategoryColor(moduleDef.page?.name ?? '')"
-			style="cursor: pointer"
-			@mousedown.stop
-			@click.stop="onReplaceTriangleClick"
-		/>
+		<!-- Replace-module trigger: shown only when other modules in this module's group exist. Hit area (17x17) is ~1.5x the visual chevron so it's easy to click. -->
+		<template v-if="replaceCandidates.length > 0">
+			<rect
+				data-testid="module-replace-trigger"
+				width="17"
+				height="17"
+				fill="transparent"
+				style="cursor: pointer"
+				@mousedown.stop
+				@click.stop="onReplaceTriangleClick"
+				@mouseenter="onReplaceTriangleHoverEnter"
+				@mouseleave="onReplaceTriangleHoverLeave"
+			/>
+			<path d="M3.5,2 L13.5,2 L8.5,7 Z" :fill="getCategoryColor(moduleDef.page?.name ?? '')" pointer-events="none" />
+		</template>
 
 		<!-- Visual elements from ve array -->
 		<template v-for="entry in visualElementsGroupedLeds" :key="entry.key">
@@ -361,6 +372,13 @@
 
 	function onReplaceTriangleClick(e: MouseEvent) {
 		openContextMenu(e, buildReplaceMenuItems());
+	}
+
+	function onReplaceTriangleHoverEnter() {
+		showHint('moduleReplace');
+	}
+	function onReplaceTriangleHoverLeave() {
+		clearHint();
 	}
 
 	const visualElementsGroupedLeds = computed(() => {

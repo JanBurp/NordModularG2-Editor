@@ -208,41 +208,43 @@ export function getModulesByCategory(categoryName: string): ModuleDefinition[] {
 	return categoryModulesMap.get(categoryName) ?? [];
 }
 
-type ColourMultiset = Record<string, number>;
+// Manual overrides for module-replace grouping: each inner array lists the exact module ids that
+// can replace each other, taking full precedence over the automatic same-category matching below
+// for every id it contains. A module alone in a single-id array (e.g. the Name bar) can't be
+// replaced by anything, and nothing can be replaced by it. A module absent from every array here
+// falls back to the default "same category" matching. Add more override groups as needed.
+const REPLACE_GROUP_OVERRIDES: number[][] = [
+	[126], // Name bar — no inputs/outputs, doesn't make sense to swap
+	[1, 199], // Keyboard, MonoKey
+];
 
-function jackColourMultiset(jacks?: { colour: string }[]): ColourMultiset {
-	const m: ColourMultiset = {};
-	for (const j of jacks ?? []) m[j.colour] = (m[j.colour] ?? 0) + 1;
-	return m;
+function findOverrideGroup(id: number): number[] | undefined {
+	return REPLACE_GROUP_OVERRIDES.find((group) => group.includes(id));
 }
 
-function isSubMultiset(small: ColourMultiset, big: ColourMultiset): boolean {
-	return Object.entries(small).every(([colour, n]) => (big[colour] ?? 0) >= n);
-}
-
-function multisetsEqual(a: ColourMultiset, b: ColourMultiset): boolean {
-	return isSubMultiset(a, b) && isSubMultiset(b, a);
-}
-
-// Heuristic approximation of Clavia's "replace module" group table: their real table isn't
-// recoverable (the data-loading routine failed to decompile from the original binary), so we
-// approximate a group as "same toolbar category + matching jack-colour signature." Output jack
-// colours must match exactly; input jack colours only need a subset relationship, so a "bigger"
-// sibling (e.g. FltClassic vs FltLP) can have extra inputs without being excluded. Not perfect
-// (e.g. NoteDet/MonoKey can false-match: both zero-input, blue+yellow output) — good enough as a
-// starting point, tune here if specific pairs turn out wrong.
+// Clavia's real "replace module" group table isn't recoverable (the data-loading routine failed
+// to decompile from the original binary), so a group is approximated as "same toolbar category" —
+// any two modules sharing a page.name can replace each other, even if that drops some cables or
+// params that don't carry over (remapCablesForModule/remapParamValues already drop what doesn't
+// match, mirroring the real editor's "cable connections preserved if possible") — unless overridden
+// above.
 export function areModulesReplaceCompatible(a: ModuleDefinition, b: ModuleDefinition): boolean {
 	if (a.id === b.id) return false;
-	if (!a.page?.name || a.page.name !== b.page?.name) return false;
-	if (!multisetsEqual(jackColourMultiset(a.outputs), jackColourMultiset(b.outputs))) return false;
-	const inA = jackColourMultiset(a.inputs);
-	const inB = jackColourMultiset(b.inputs);
-	const [small, big] = (a.inputs?.length ?? 0) <= (b.inputs?.length ?? 0) ? [inA, inB] : [inB, inA];
-	return isSubMultiset(small, big);
+	const overrideGroup = findOverrideGroup(a.id) ?? findOverrideGroup(b.id);
+	if (overrideGroup) return overrideGroup.includes(a.id) && overrideGroup.includes(b.id);
+	return !!a.page?.name && a.page.name === b.page?.name;
 }
 
 export function getReplaceCandidates(moduleTypeId: number): ModuleDefinition[] {
 	const def = getModule(moduleTypeId);
-	if (!def?.page?.name) return [];
+	if (!def) return [];
+	const overrideGroup = findOverrideGroup(def.id);
+	if (overrideGroup) {
+		return overrideGroup
+			.filter((id) => id !== def.id)
+			.map((id) => getModule(id))
+			.filter((m): m is ModuleDefinition => !!m);
+	}
+	if (!def.page?.name) return [];
 	return getModulesByCategory(def.page.name).filter((m) => areModulesReplaceCompatible(def, m));
 }

@@ -32,6 +32,16 @@ test.describe('replace module', () => {
 		expect((await getStatusCounts(page)).voiceCables).toBe(1);
 	});
 
+	test('hovering the trigger shows a status-bar hint', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.FltLP, 0, 0);
+
+		const trigger = page.locator('[data-testid="canvas-va"] [data-module-short="FltLP"] [data-testid="module-replace-trigger"]');
+		await trigger.hover();
+
+		await expect(page.getByText('Click: replace with another module in this group')).toBeVisible();
+	});
+
 	test('Replace Module appears in the right-click context menu with a submenu of candidates', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.FltLP, 0, 0);

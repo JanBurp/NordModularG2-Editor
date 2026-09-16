@@ -10,6 +10,7 @@ export const STATUS_HINTS = {
 	// Canvas — hidden gestures
 	jackConnected: `${MOD}-drag: move this cable · Click: cycle through connections`,
 	moduleTitle: 'Double-click: rename · Right-click: more options',
+	moduleReplace: 'Click: replace with another module in this group',
 	paramMorph: `${CTRL}-click: assign to Morph Group · ${CTRL}-drag: set range · ${ALT}-drag: assign to Parameter Page`,
 	ccRow: 'Drag to move this CC to another number',
 
