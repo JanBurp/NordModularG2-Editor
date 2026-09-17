@@ -11,7 +11,13 @@
 		@contextmenu.stop.prevent="onContextMenu"
 	>
 		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
-		<ModuleTitle :displayName="displayName" :is-name="instance.type == 126" :selected="isSelected ?? false"></ModuleTitle>
+
+		<ModuleTitle
+			:displayName="displayName"
+			:is-name="instance.type == 126"
+			:selected="isSelected ?? false"
+			:has-replace-trigger="replaceCandidates.length > 0"
+		></ModuleTitle>
 
 		<!-- Drag handle: title row only, transparent, cursor grab -->
 		<rect
@@ -25,6 +31,22 @@
 			@mouseenter="onTitleHoverEnter"
 			@mouseleave="onTitleHoverLeave"
 		/>
+
+		<!-- Replace-module trigger: shown only when other modules in this module's group exist. Hit area (17x17) is ~1.5x the visual chevron so it's easy to click. -->
+		<template v-if="replaceCandidates.length > 0">
+			<rect
+				data-testid="module-replace-trigger"
+				width="17"
+				height="17"
+				fill="transparent"
+				style="cursor: pointer"
+				@mousedown.stop
+				@click.stop="onReplaceTriangleClick"
+				@mouseenter="onReplaceTriangleHoverEnter"
+				@mouseleave="onReplaceTriangleHoverLeave"
+			/>
+			<path d="M3.5,2 L13.5,2 L8.5,7 Z" :fill="getCategoryColor(moduleDef.page?.name ?? '')" pointer-events="none" />
+		</template>
 
 		<!-- Visual elements from ve array -->
 		<template v-for="entry in visualElementsGroupedLeds" :key="entry.key">
@@ -201,7 +223,9 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
-	import { getModule } from '../../renderer/nmg2mods';
+	import { getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
+	import { getCategoryColor } from '../../constants/moduleCategoryColors';
+	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { getParam } from '../../renderer/parammap';
@@ -216,7 +240,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
@@ -254,6 +278,7 @@
 		moduleDelete: [moduleIndex: number];
 		modulePasteParams: [moduleIndex: number];
 		moduleColorChange: [moduleIndex: number, colourId: number];
+		moduleReplace: [moduleIndex: number, newTypeId: number];
 		jackDeleteConnected: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackBreakConnection: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' }];
 		jackSetCableColor: [info: { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colorId: number }];
@@ -264,6 +289,7 @@
 
 	const { open: openContextMenu } = useContextMenu();
 	const { handleParamDblClick } = useParamEditDialog();
+	const { graphics } = useModuleGraphics();
 
 	function onModuleClick(e: MouseEvent) {
 		if (e.altKey) onContextMenu(e);
@@ -279,6 +305,7 @@
 			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
 			{ type: 'separator' },
+			{ label: 'Replace Module', disabled: replaceCandidates.value.length === 0, children: buildReplaceMenuItems() },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
 			{ type: 'separator' },
 			{
@@ -332,6 +359,27 @@
 	const moduleDef = computed<ModuleDefinition | null>(() => {
 		return getModule(instance.value.type) || null;
 	});
+
+	const replaceCandidates = computed<ModuleDefinition[]>(() => getReplaceCandidates(instance.value.type));
+
+	function buildReplaceMenuItems(): ContextMenuItem[] {
+		return replaceCandidates.value.map((def) => ({
+			label: def.long,
+			icon: graphics.value[def.id],
+			action: () => emit('moduleReplace', moduleIdx.value, def.id),
+		}));
+	}
+
+	function onReplaceTriangleClick(e: MouseEvent) {
+		openContextMenu(e, buildReplaceMenuItems());
+	}
+
+	function onReplaceTriangleHoverEnter() {
+		showHint('moduleReplace');
+	}
+	function onReplaceTriangleHoverLeave() {
+		clearHint();
+	}
 
 	const visualElementsGroupedLeds = computed(() => {
 		if (!moduleDef.value?.ve) return [];

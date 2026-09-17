@@ -3,7 +3,7 @@
 	<text ref="text" v-if="isName" x="128" y="12" fill="#000" font-size="11" font-weight="800" font-family="'Inter'" text-anchor="middle">
 		{{ displayName }}
 	</text>
-	<text ref="text" v-else x="4" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
+	<text ref="text" v-else :x="nameX + 2" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
 		{{ displayName }}
 	</text>
 </template>
@@ -16,7 +16,12 @@
 		isName: boolean;
 		displayName: string;
 		selected: boolean;
+		hasReplaceTrigger?: boolean;
 	}>();
+
+	// Reserve room for the replace-module trigger (a 17-wide hit area, see Module.vue) plus a
+	// small gap, so its chevron doesn't overlap the module name.
+	const REPLACE_TRIGGER_RESERVED_WIDTH = 16;
 
 	const nameWidth = computed(() => {
 		const rect = text.value?.getBoundingClientRect(); //  .getComputedTextLength();
@@ -34,6 +39,6 @@
 		if (props.isName) {
 			return 128 - nameWidth.value / 2;
 		}
-		return 2;
+		return props.hasReplaceTrigger ? REPLACE_TRIGGER_RESERVED_WIDTH : 2;
 	});
 </script>

@@ -598,6 +598,94 @@ describe('module add/move/delete record undo even when the CLI/hardware call fai
 	});
 });
 
+describe('replaceModule', () => {
+	beforeEach(() => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+	});
+
+	// FltClassic (92) -> FltLP (87): both are real nmg2mods.ts entries. FltClassic's In (red, jack
+	// 0) has an equivalent on FltLP so its cable should survive; FltClassic's PitchVar (purple,
+	// jack 1) has no equivalent on FltLP (which only has Pitch, not PitchVar) so its cable should
+	// be dropped, mirroring the real editor's silent-drop-if-unmapped behaviour.
+	const FLT_CLASSIC = 92;
+	const FLT_LP = 87;
+
+	function fltClassicStub(index: number) {
+		return { index, type: FLT_CLASSIC, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	}
+
+	it('changes the module type while keeping the same index, and records one undo entry', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [fltClassicStub(1)];
+		store.slots['A'].patch = patch;
+		const pastDepth = () => (useHistoryStore() as any).slots.A.past.length;
+
+		await store.replaceModule(1, FLT_LP, 'voice');
+
+		expect(patch.areas[1].modules).toHaveLength(1);
+		expect(patch.areas[1].modules[0].index).toBe(1);
+		expect(patch.areas[1].modules[0].type).toBe(FLT_LP);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+		expect(pastDepth()).toBe(1); // one consolidated entry, not one per internal deleteModule/addModule step
+	});
+
+	it('keeps a cable on a jack that exists on the new module, drops one that does not', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [fltClassicStub(1)];
+		patch.areas[1].cableList = [
+			{ colour: 0, smod: 1, scon: 0, dir: 1, dmod: 9, dcon: 0 }, // FltClassic In (red) -> some other module
+			{ colour: 0, smod: 1, scon: 1, dir: 1, dmod: 9, dcon: 1 }, // FltClassic PitchVar (purple) -> some other module
+		];
+		store.slots['A'].patch = patch;
+
+		await store.replaceModule(1, FLT_LP, 'voice');
+
+		const remainingCables = patch.areas[1].cableList.filter((c: any) => c.smod === 1 || c.dmod === 1);
+		expect(remainingCables).toHaveLength(1);
+		expect(remainingCables[0].scon).toBe(0); // FltLP's In is jack 0 too
+	});
+
+	it('undo restores the original module type and cables', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [fltClassicStub(1)];
+		patch.areas[1].cableList = [{ colour: 0, smod: 1, scon: 0, dir: 1, dmod: 9, dcon: 0 }];
+		store.slots['A'].patch = patch;
+
+		await store.replaceModule(1, FLT_LP, 'voice');
+		expect(patch.areas[1].modules[0].type).toBe(FLT_LP);
+
+		await store.undo();
+
+		expect(patch.areas[1].modules[0].type).toBe(FLT_CLASSIC);
+		expect(patch.areas[1].cableList.filter((c: any) => c.smod === 1 || c.dmod === 1)).toHaveLength(1);
+	});
+
+	it('pushes a module below down when the replacement is taller, and undo restores its position', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [
+			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+		];
+		store.slots['A'].patch = patch;
+
+		// FltLP (height 2) -> FltClassic (height 4): the module directly below must move out of the way.
+		await store.replaceModule(1, FLT_CLASSIC, 'voice');
+
+		const below = patch.areas[1].modules.find((m: any) => m.index === 2);
+		expect(below.vert).toBe(4);
+
+		await store.undo();
+
+		const belowAfterUndo = patch.areas[1].modules.find((m: any) => m.index === 2);
+		expect(belowAfterUndo.vert).toBe(2);
+	});
+});
+
 describe('cable add/color/delete record undo even when the CLI/hardware call fails (offline)', () => {
 	beforeEach(() => {
 		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
