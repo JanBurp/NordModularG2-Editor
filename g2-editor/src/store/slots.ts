@@ -855,8 +855,23 @@ export const useSlotsStore = defineStore('slots', {
 			const shouldRecord = !hist.isLocked(slot);
 			if (shouldRecord) hist.lock(slot);
 
+			// If the new module is taller, push modules below it in the same column further down
+			// (same collision resolver used by drag-move/palette-drop/paste); computed after
+			// deleteModule so the old module is already excluded from its own column.
+			let pushDowns: { index: number; fromRow: number; newRow: number }[] = [];
+
 			try {
 				await this.deleteModule(moduleId, area);
+
+				const newHeight = newDef.height ?? 2;
+				const colMods = patch.areas[areaIdx].modules
+					.filter((m) => m.horiz === oldModSnap.horiz)
+					.map((m) => ({ index: m.index, vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
+				pushDowns = resolveColumnCollisions(colMods, [{ row: oldModSnap.vert, height: newHeight }]).map((d) => ({
+					...d,
+					fromRow: colMods.find((m) => m.index === d.index)!.vert,
+				}));
+				for (const d of pushDowns) mutMoveModule(patch, areaIdx, d.index, oldModSnap.horiz, d.newRow);
 
 				// deleteModule doesn't know about morph assignments; drop the replaced module's own
 				// (mirrors the "drop always" fallback the CC/paramPage cleanup above already applies).
@@ -910,7 +925,12 @@ export const useSlotsStore = defineStore('slots', {
 				this._markSlotDirty(slot);
 				this._syncUprateAndColors(patch, areaIdx);
 
-				const cliCmds: string[][] = [addModuleCmd, ...setParamCmds, ...setParamLabelCmds];
+				const cliCmds: string[][] = [
+					...pushDowns.map((d) => ['move-module', slot, location, String(d.index), String(oldModSnap.horiz), String(d.newRow)]),
+					addModuleCmd,
+					...setParamCmds,
+					...setParamLabelCmds,
+				];
 				for (const c of remappedCables) {
 					cliCmds.push([
 						'add-cable',
@@ -934,6 +954,7 @@ export const useSlotsStore = defineStore('slots', {
 				hist.record(slot, {
 					undo: async () => {
 						mutDeleteModule(patch, areaIdx, moduleId); // remove the post-replace module (+ its remapped cables) before restoring the original
+						for (const d of pushDowns) mutMoveModule(patch, areaIdx, d.index, oldModSnap.horiz, d.fromRow);
 						await this.addModuleWithData(oldModSnap, moduleId, oldModSnap.horiz, oldModSnap.vert, area);
 						for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
 						if (removedCCSnap.length > 0) slotEntry.controllers = [...slotEntry.controllers, ...removedCCSnap];
@@ -942,7 +963,7 @@ export const useSlotsStore = defineStore('slots', {
 						this._markSlotDirty(slot);
 						this._syncUprateAndColors(patch, areaIdx);
 
-						const undoCmds: string[][] = [];
+						const undoCmds: string[][] = pushDowns.map((d) => ['move-module', slot, location, String(d.index), String(oldModSnap.horiz), String(d.fromRow)]);
 						for (const c of cableSnap) {
 							undoCmds.push([
 								'add-cable',

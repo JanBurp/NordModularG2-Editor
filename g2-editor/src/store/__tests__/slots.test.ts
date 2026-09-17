@@ -609,6 +609,27 @@ describe('replaceModule', () => {
 		expect(patch.areas[1].modules[0].type).toBe(FLT_CLASSIC);
 		expect(patch.areas[1].cableList.filter((c: any) => c.smod === 1 || c.dmod === 1)).toHaveLength(1);
 	});
+
+	it('pushes a module below down when the replacement is taller, and undo restores its position', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [
+			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+		];
+		store.slots['A'].patch = patch;
+
+		// FltLP (height 2) -> FltClassic (height 4): the module directly below must move out of the way.
+		await store.replaceModule(1, FLT_CLASSIC, 'voice');
+
+		const below = patch.areas[1].modules.find((m: any) => m.index === 2);
+		expect(below.vert).toBe(4);
+
+		await store.undo();
+
+		const belowAfterUndo = patch.areas[1].modules.find((m: any) => m.index === 2);
+		expect(belowAfterUndo.vert).toBe(2);
+	});
 });
 
 describe('cable add/color/delete record undo even when the CLI/hardware call fails (offline)', () => {
