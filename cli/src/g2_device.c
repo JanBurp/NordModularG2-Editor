@@ -3122,6 +3122,12 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     int aborted = 0;
     char abortReason[128] = {0};
 
+    /* Tracks the disambiguated name already written for each prior location,
+     * so two patches sharing a name in the same bank don't overwrite each
+     * other's file - the 2nd, 3rd, ... occurrence gets a "2", "3", ... suffix
+     * appended directly (no separator). */
+    char writtenNames[128][40] = {{0}};
+
     for (int location = 0; location < 128; location++) {
         uint8_t req[4] = { 0x17, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)location };
         if (send_system_data(0x41, req, sizeof(req)) < 0) {
@@ -3236,8 +3242,16 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         uint8_t *body = payload + bodyOfs;
 
         const char *baseName = strlen(patchName) ? patchName : "Untitled";
+
+        int occurrence = 0;
+        for (int i = 0; i < writtenCount; i++) if (strcmp(writtenNames[i], baseName) == 0) occurrence++;
+        char dispName[40];
+        if (occurrence == 0) snprintf(dispName, sizeof(dispName), "%s", baseName);
+        else snprintf(dispName, sizeof(dispName), "%s%d", baseName, occurrence + 1);
+        snprintf(writtenNames[writtenCount], sizeof(writtenNames[0]), "%s", baseName);
+
         char filename[1024];
-        snprintf(filename, sizeof(filename), "%s/%03d_%s.%s", folder, location + 1, baseName, type == 0 ? "pch2" : "prf2");
+        snprintf(filename, sizeof(filename), "%s/%s.%s", folder, dispName, type == 0 ? "pch2" : "prf2");
         FILE *f = fopen(filename, "wb");
         if (!f || fwrite(baseName, 1, strlen(baseName), f) != strlen(baseName)
                || fwrite(body, 1, bodyLen, f) != bodyLen) {
@@ -3251,7 +3265,7 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         free(bulk);
 
         if (listLen + 64 > listCap) { listCap *= 2; char *grown = realloc(list, listCap); if (!grown) { free(list); return NULL; } list = grown; }
-        listLen += (size_t)snprintf(list + listLen, listCap - listLen, "%d:%d: %s\n", bank, location + 1, baseName);
+        listLen += (size_t)snprintf(list + listLen, listCap - listLen, "%d:%d: %s\n", bank, location + 1, dispName);
         writtenCount++;
         emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
     }
@@ -3280,10 +3294,12 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
 }
 
 /* Parses a .pchList index (as written by g2_get_bank) into per-location file
- * paths. Sibling file convention: <dirname(pchListPath)>/%03d_<name>.<ext>,
- * matching what get-bank itself writes. A line with an out-of-range location
- * or a missing sibling file is skipped (warned), not fatal - only a missing
- * or unreadable .pchList itself is. Returns the entry count, or -1.
+ * paths. Sibling file convention: <dirname(pchListPath)>/<name>.<ext>,
+ * matching what get-bank itself writes (a numbered suffix like "Name2" only
+ * appears in <name> when get-bank had to disambiguate a duplicate). A line
+ * with an out-of-range location or a missing sibling file is skipped
+ * (warned), not fatal - only a missing or unreadable .pchList itself is.
+ * Returns the entry count, or -1.
  * Not static: exercised directly by unit tests (see test_bank_source.c). */
 int parse_pchlist(const char *pchListPath, int type, bank_entry_t *entries, int maxEntries) {
     FILE *f = fopen(pchListPath, "r");
@@ -3338,42 +3354,43 @@ int parse_pchlist(const char *pchListPath, int type, bank_entry_t *entries, int 
     return count;
 }
 
-/* Scans a folder for NNN_*.pch2 (type 0) or NNN_*.prf2 (type 1) files, NNN
- * being a zero-padded 3-digit location - the same convention get-bank itself
- * writes. A file without a valid prefix, or with the wrong extension for
- * `type`, is skipped with a warning; a duplicate location is a fatal error
- * (silently picking one would erase the other without telling the user).
+/* Scans a folder for *.pch2 (type 0) or *.prf2 (type 1) files (used when
+ * sending a bank from a plain folder with no .pchList sidecar to derive
+ * locations from). There is no location encoded in the filename, so entries
+ * are assigned locations 1, 2, 3, ... in alphabetical filename order.
  * Returns the entry count, or -1.
  * Not static: exercised directly by unit tests (see test_bank_source.c). */
+static int scan_bank_folder_name_cmp(const void *a, const void *b) {
+    return strcmp(*(const char * const *)a, *(const char * const *)b);
+}
+
 int scan_bank_folder(const char *folderPath, int type, bank_entry_t *entries, int maxEntries) {
     DIR *d = opendir(folderPath);
     if (!d) { g2_err("send-bank: cannot open folder %s\n", folderPath); return -1; }
 
     const char *ext = (type == 0) ? ".pch2" : ".prf2";
     size_t extLen = strlen(ext);
-    int seen[129] = {0};
+    char names[128][256];
     int count = 0;
     struct dirent *ent;
     while ((ent = readdir(d)) != NULL) {
         const char *fn = ent->d_name;
         size_t len = strlen(fn);
         if (len < extLen || strcmp(fn + len - extLen, ext) != 0) continue; /* not this type - not an error */
-        if (len < 4 || !isdigit((unsigned char)fn[0]) || !isdigit((unsigned char)fn[1]) ||
-            !isdigit((unsigned char)fn[2]) || fn[3] != '_') {
-            g2_err("send-bank: skipping '%s' (missing NNN_ location prefix)\n", fn);
-            continue;
-        }
-        int loc = (fn[0] - '0') * 100 + (fn[1] - '0') * 10 + (fn[2] - '0');
-        if (loc < 1 || loc > 128) { g2_err("send-bank: skipping '%s' (location %d out of range)\n", fn, loc); continue; }
-        if (seen[loc]) { g2_err("send-bank: duplicate location %d ('%s')\n", loc, fn); closedir(d); return -1; }
-        seen[loc] = 1;
-        if (count >= maxEntries) { g2_err("send-bank: too many files in %s\n", folderPath); break; }
-
-        entries[count].location = loc;
-        snprintf(entries[count].filepath, sizeof(entries[count].filepath), "%s/%s", folderPath, fn);
+        if (count >= maxEntries || count >= 128) { g2_err("send-bank: too many files in %s\n", folderPath); break; }
+        snprintf(names[count], sizeof(names[0]), "%s", fn);
         count++;
     }
     closedir(d);
+
+    const char *sortedNames[128];
+    for (int i = 0; i < count; i++) sortedNames[i] = names[i];
+    qsort(sortedNames, count, sizeof(sortedNames[0]), scan_bank_folder_name_cmp);
+
+    for (int i = 0; i < count; i++) {
+        entries[i].location = i + 1;
+        snprintf(entries[i].filepath, sizeof(entries[i].filepath), "%s/%s", folderPath, sortedNames[i]);
+    }
     return count;
 }
 

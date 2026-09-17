@@ -102,53 +102,32 @@ void test_parse_pchlist_resolves_name_with_extension_and_no_prefix(void) {
 
 /* ---- scan_bank_folder --------------------------------------------------- */
 
-void test_scan_bank_folder_accepts_nnn_prefix(void) {
+void test_scan_bank_folder_assigns_sequential_locations_alphabetically(void) {
     make_dir(TMP_DIR);
     make_dir(TMP_DIR "/folder1");
-    write_file(TMP_DIR "/folder1/001_Alpha.pch2", "x");
-    write_file(TMP_DIR "/folder1/042_Beta.pch2", "x");
+    write_file(TMP_DIR "/folder1/Beta.pch2", "x");
+    write_file(TMP_DIR "/folder1/Alpha.pch2", "x");
 
     bank_entry_t entries[128];
     int n = scan_bank_folder(TMP_DIR "/folder1", 0, entries, 128);
 
     TEST_ASSERT_EQUAL_INT(2, n);
-}
-
-void test_scan_bank_folder_rejects_missing_prefix(void) {
-    make_dir(TMP_DIR);
-    make_dir(TMP_DIR "/folder2");
-    write_file(TMP_DIR "/folder2/001_Alpha.pch2", "x");
-    write_file(TMP_DIR "/folder2/NoPrefix.pch2", "x");
-
-    bank_entry_t entries[128];
-    int n = scan_bank_folder(TMP_DIR "/folder2", 0, entries, 128);
-
-    TEST_ASSERT_EQUAL_INT(1, n);
-    TEST_ASSERT_EQUAL_STRING(TMP_DIR "/folder2/001_Alpha.pch2", entries[0].filepath);
+    TEST_ASSERT_EQUAL_INT(1, entries[0].location);
+    TEST_ASSERT_EQUAL_STRING(TMP_DIR "/folder1/Alpha.pch2", entries[0].filepath);
+    TEST_ASSERT_EQUAL_INT(2, entries[1].location);
+    TEST_ASSERT_EQUAL_STRING(TMP_DIR "/folder1/Beta.pch2", entries[1].filepath);
 }
 
 void test_scan_bank_folder_ignores_other_type_extension(void) {
     make_dir(TMP_DIR);
     make_dir(TMP_DIR "/folder3");
-    write_file(TMP_DIR "/folder3/001_Alpha.pch2", "x");
-    write_file(TMP_DIR "/folder3/002_Beta.prf2", "x");
+    write_file(TMP_DIR "/folder3/Alpha.pch2", "x");
+    write_file(TMP_DIR "/folder3/Beta.prf2", "x");
 
     bank_entry_t entries[128];
     int n = scan_bank_folder(TMP_DIR "/folder3", 0, entries, 128);
 
     TEST_ASSERT_EQUAL_INT(1, n);
-}
-
-void test_scan_bank_folder_rejects_duplicate_location(void) {
-    make_dir(TMP_DIR);
-    make_dir(TMP_DIR "/folder4");
-    write_file(TMP_DIR "/folder4/001_Alpha.pch2", "x");
-    write_file(TMP_DIR "/folder4/001_AlphaAgain.pch2", "x");
-
-    bank_entry_t entries[128];
-    int n = scan_bank_folder(TMP_DIR "/folder4", 0, entries, 128);
-
-    TEST_ASSERT_EQUAL_INT(-1, n);
 }
 
 void test_scan_bank_folder_missing_folder_returns_negative_one(void) {
