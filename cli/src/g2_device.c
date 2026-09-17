@@ -787,6 +787,24 @@ cJSON *g2_list(int filter, int bank_filter) {
             return NULL;
         }
 
+    /* reload-names (daemon.c) calls this with the listener stopped, same direct-
+     * mode window get_patch/get_synth_settings already flush before querying (see
+     * their identical stale-drain loops) - a bank upload's R_LIST_NAMES push can
+     * still be in flight, and with nothing dispatching it via g2_events.c the raw
+     * read below would otherwise absorb it as this command's own 0x14 LIST reply,
+     * misaligning the state machine's byte offsets. Confirmed on hardware
+     * (2026-09-17): a maximal 16-char name has no NUL to resync on, so it's the
+     * one most likely to show a corrupted trailing character. */
+    if (!g2_listener_active) {
+        uint8_t stale[1024]; int n;
+        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+            }
+        }
+    }
+
     if (filter == LIST_FILTER_ALL) {
         root = cJSON_CreateObject();
         cJSON *patches = cJSON_CreateObject();
@@ -3533,6 +3551,19 @@ static void emit_bank_download_progress(int location, int total, int written, in
     fflush(stdout);
 }
 
+/* Records one non-fatal per-location send-bank skip so g2_send_bank's result
+ * JSON can tell the caller which locations were dropped and why, instead of
+ * just a bare count. */
+static void add_bank_failure(cJSON *failures, int location, const char *filepath, const char *reason) {
+    const char *base = strrchr(filepath, '/');
+    base = base ? base + 1 : filepath;
+    cJSON *f = cJSON_CreateObject();
+    cJSON_AddNumberToObject(f, "location", location);
+    cJSON_AddStringToObject(f, "name", base);
+    cJSON_AddStringToObject(f, "reason", reason);
+    cJSON_AddItemToArray(failures, f);
+}
+
 /* Send Bank to device - writes bank data (patches or performances) to G2 flash
  * using the same flash-dump protocol get_bank reads with (request 0x17,
  * marker 0x18, raw data 0x19 - confirmed against the decompiled official
@@ -3587,6 +3618,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     int writtenCount = 0, clearedCount = 0, failedCount = 0;
     int aborted = 0;
     char abortReason[128] = {0};
+    cJSON *failures = cJSON_CreateArray();
 
     for (int location = 0; location < 128; location++) {
         bank_entry_t *e = byLocation[location];
@@ -3604,6 +3636,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         FILE *f = fopen(e->filepath, "rb");
         if (!f) {
             g2_err("send-bank: cannot open %s, skipping location %d\n", e->filepath, location + 1);
+            add_bank_failure(failures, location + 1, e->filepath, "cannot open source file");
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
             continue;
@@ -3615,6 +3648,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         if (!fileData) {
             fclose(f);
             g2_err("send-bank: out of memory reading %s\n", e->filepath);
+            add_bank_failure(failures, location + 1, e->filepath, "out of memory reading file");
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
             continue;
@@ -3645,6 +3679,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         int name_end, data_offset, data_len;
         if (locate_section_data(fileData, fsize, &name_end, &data_offset, &data_len) < 0) {
             g2_err("send-bank: failed to parse %s\n", e->filepath);
+            add_bank_failure(failures, location + 1, e->filepath, "failed to parse patch file");
             free(fileData);
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
@@ -3674,6 +3709,9 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
              * Non-fatal, same as an unreadable source file. */
             g2_err("send-bank: device refused location %d, status %d (%s)\n",
                    location + 1, status, e->filepath);
+            char reason[64];
+            snprintf(reason, sizeof(reason), "device refused write (status %d)", status);
+            add_bank_failure(failures, location + 1, e->filepath, reason);
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
             continue;
@@ -3701,15 +3739,15 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     g2_pending_rearm = 0;
     if (g2_listener_active) g2_rearm();
 
-    if (aborted) {
-        g2_err("send-bank: aborted - %s\n", abortReason);
-        return NULL;
-    }
+    if (aborted) g2_err("send-bank: aborted - %s\n", abortReason);
 
     cJSON *result = cJSON_CreateObject();
     cJSON_AddNumberToObject(result, "written", writtenCount);
     cJSON_AddNumberToObject(result, "cleared", clearedCount);
     cJSON_AddNumberToObject(result, "failed", failedCount);
+    cJSON_AddItemToObject(result, "failures", failures);
+    cJSON_AddBoolToObject(result, "aborted", aborted);
+    if (aborted) cJSON_AddStringToObject(result, "abortReason", abortReason);
     return result;
 }
 

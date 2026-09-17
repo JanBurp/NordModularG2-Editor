@@ -18,6 +18,7 @@ export const bankDownloadBankNum = ref<number>(1);
 export const bankDownloadSourceType = ref<SourceType>('pchList');
 export const bankDownloadSourcePath = ref<string>('');
 export const bankDownloadInProgress = ref<boolean>(false);
+export const bankDownloadReloadingNames = ref<boolean>(false);
 export const bankDownloadShowWarning = ref<boolean>(true);
 export interface BankDownloadProgress {
 	location: number;
@@ -27,6 +28,23 @@ export interface BankDownloadProgress {
 	failed: number;
 }
 export const bankDownloadProgress = ref<BankDownloadProgress | null>(null);
+
+// One-shot wait/notify pair so downloadBankToDevice() can await the "names"
+// watch event actually landing, instead of firing reload-names and returning early.
+let namesReloadedResolvers: Array<() => void> = [];
+export function notifyNamesReloaded(): void {
+	namesReloadedResolvers.forEach((r) => r());
+	namesReloadedResolvers = [];
+}
+export function waitForNamesReload(timeoutMs = 5000): Promise<void> {
+	return new Promise((resolve) => {
+		const timer = setTimeout(resolve, timeoutMs); // safety net if device disconnects mid-reload
+		namesReloadedResolvers.push(() => {
+			clearTimeout(timer);
+			resolve();
+		});
+	});
+}
 
 export function useBankDownloadDialog() {
 	const slotsStore = useSlotsStore();
@@ -45,6 +63,7 @@ export function useBankDownloadDialog() {
 		bankDownloadSourcePath.value = '';
 		bankDownloadShowWarning.value = true;
 		bankDownloadProgress.value = null;
+		bankDownloadReloadingNames.value = false;
 		showBankDownloadDialog.value = true;
 	}
 
@@ -79,9 +98,22 @@ export function useBankDownloadDialog() {
 				bankDownloadSourceType.value === 'pchList'
 					? { type: 'pchList', filepath: bankDownloadSourcePath.value }
 					: { type: 'folder', folderPath: bankDownloadSourcePath.value };
-			const success = await slotsStore.downloadBankToDevice(source, bankDownloadBankNum.value, bankDownloadType.value);
-			if (success) {
-				showToast(`Bank downloaded to G2 bank ${bankDownloadBankNum.value} successfully`);
+			const result = await slotsStore.downloadBankToDevice(source, bankDownloadBankNum.value, bankDownloadType.value);
+			if (result) {
+				if (result.aborted) {
+					console.error('send-bank aborted:', result.abortReason, result.failures);
+					showToast(`Bank upload stopped early: ${result.abortReason} (${result.written} written, ${result.cleared} cleared before stopping)`);
+				} else if (result.failed > 0) {
+					console.warn('send-bank: patches skipped:', result.failures);
+					const shown = result.failures
+						.slice(0, 3)
+						.map((f) => `loc ${f.location} (${f.name}): ${f.reason}`)
+						.join('; ');
+					const more = result.failures.length > 3 ? `; +${result.failures.length - 3} more` : '';
+					showToast(`Bank ${bankDownloadBankNum.value}: ${result.failed} patch(es) skipped - ${shown}${more}`);
+				} else {
+					showToast(`Bank downloaded to G2 bank ${bankDownloadBankNum.value} successfully`);
+				}
 				cancel();
 			}
 		} catch (err) {
@@ -104,6 +136,7 @@ export function useBankDownloadDialog() {
 		sourceType: bankDownloadSourceType,
 		sourcePath: bankDownloadSourcePath,
 		inProgress: bankDownloadInProgress,
+		reloadingNames: bankDownloadReloadingNames,
 		progress: bankDownloadProgress,
 		showWarning: bankDownloadShowWarning,
 		bankOptions,

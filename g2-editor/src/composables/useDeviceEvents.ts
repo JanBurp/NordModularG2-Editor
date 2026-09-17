@@ -6,6 +6,7 @@ import { useBrowserStore } from '@/store/browser';
 import { useUiStore } from '@/store/ui';
 import { getCategorySlug } from '@/constants/categories';
 import { PERF_SETTLE_TIMEOUT_MS } from './usePatchFile';
+import { notifyNamesReloaded } from './useBankDownloadDialog';
 import type { LogFn } from './useG2';
 
 export function useDeviceEvents(log: LogFn) {
@@ -22,6 +23,7 @@ export function useDeviceEvents(log: LogFn) {
 		}
 		if (ev.type === 'names') {
 			if (ev.data) browserStore.applyNamesData(ev.data);
+			notifyNamesReloaded();
 			log('←', 'Watch', 'names');
 			return true;
 		}

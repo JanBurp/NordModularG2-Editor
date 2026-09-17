@@ -37,9 +37,24 @@ import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
 import { useHistoryStore } from './history';
 import { isAllowedCC } from '@/composables/useMidiCC';
+import { bankDownloadReloadingNames, waitForNamesReload } from '@/composables/useBankDownloadDialog';
 
 type ResourceMetrics = { cycles: number; memory: number };
 export type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
+
+export interface BankDownloadFailure {
+	location: number;
+	name: string;
+	reason: string;
+}
+export interface BankDownloadResult {
+	written: number;
+	cleared: number;
+	failed: number;
+	failures: BankDownloadFailure[];
+	aborted: boolean;
+	abortReason?: string;
+}
 
 function emptySlotResources(): SlotResources {
 	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
@@ -592,31 +607,39 @@ export const useSlotsStore = defineStore('slots', {
 			source: { type: 'pchList'; filepath: string } | { type: 'folder'; folderPath: string },
 			bankNum: number,
 			bankType: 'patch' | 'performance',
-		): Promise<boolean> {
+		): Promise<BankDownloadResult | null> {
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status !== DeviceStatus.Connected) return false;
+			if (deviceStore.status !== DeviceStatus.Connected) return null;
 
 			try {
 				// Send bank to device
 				// WARNING: This OVERWRITES the entire target bank
 				const path = source.type === 'pchList' ? source.filepath : source.folderPath;
-				await window.cli.run(['send-bank', bankType, source.type, path, String(bankNum)]);
+				const output = await window.cli.run(['send-bank', bankType, source.type, path, String(bankNum)]);
+				const result: BankDownloadResult = JSON.parse(output);
 				// A bank download can add/remove/rename many patches at once - too broad for
 				// the single-entry upsertPatch/removePatch bookkeeping storePatch/clearPatch use.
 				// 'list' has no daemon-mode handler (daemon.c has none - only the standalone CLI
 				// does), so - like the existing patch_names_updated fallback in useDeviceEvents.ts -
 				// use 'reload-names' instead: it emits a "names" watch event that
 				// useDeviceEvents.ts already listens for and applies via applyNamesData.
+				// Await it (via the dialog's wait/notify pair) so callers only see this resolve
+				// once the browser panel's names have actually been refreshed.
+				bankDownloadReloadingNames.value = true;
+				const namesReloaded = waitForNamesReload();
 				window.cli.run(['reload-names']).catch(() => {});
+				await namesReloaded;
 				// No slot reload here: send-bank writes flash only, it never touches the four
 				// live slots. The daemon used to answer the G2's post-write BULK_REARM with a
 				// full 4-slot re-fetch, which is what returned garbled "Error" patches; it now
 				// just restarts streaming (g2_send_bank in g2_device.c).
-				return true;
+				return result;
 			} catch (err) {
 				console.error('Failed to download bank to device:', err);
 				showToast('Failed to download bank to G2');
-				return false;
+				return null;
+			} finally {
+				bankDownloadReloadingNames.value = false;
 			}
 		},
 
