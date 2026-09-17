@@ -40,3 +40,13 @@ export const VARIATION_OPTIONS = Array.from({ length: 9 }, (_, i) => ({
 	draggable: i < 8,
 	hint: (i < 8 ? 'variationCopy' : 'variationInit') as StatusHintKey,
 }));
+
+export const BANK_TYPE_OPTIONS = [
+	{ label: 'Patch', value: 'patch' },
+	{ label: 'Performance', value: 'performance' },
+];
+
+export const SOURCE_TYPE_OPTIONS = [
+	{ label: '.pchList file', value: 'pchList' },
+	{ label: 'Folder', value: 'folder' },
+];

@@ -224,11 +224,13 @@
 		<div class="space-y-4">
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
-				<select v-model="bankUpload.type.value" class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary">
-					<option v-for="t in bankUpload.bankTypes" :key="t" :value="t">
-						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
-					</option>
-				</select>
+				<BtnGroup
+					:model-value="bankUpload.type.value"
+					:options="BANK_TYPE_OPTIONS"
+					stretch
+					class="flex-1"
+					@update:model-value="bankUpload.type.value = $event as 'patch' | 'performance'"
+				/>
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
@@ -270,12 +272,14 @@
 				<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
 					<div
 						class="h-full bg-orange-400 transition-all"
-						:style="{ width: bankUpload.progress.value ? `${(bankUpload.progress.value.location / bankUpload.progress.value.total) * 100}%` : '0%' }"
+						:style="{
+							width: bankUpload.progress.value ? `${(bankUpload.progress.value.location / bankUpload.progress.value.total) * 100}%` : '0%',
+						}"
 					></div>
 				</div>
 			</div>
 			<div class="text-xs text-content-secondary">
-				Save complete {{ bankUpload.type.value }} bank from synth memory to disk. Creates individual sound files + .pchList file.
+				Save complete {{ bankUpload.type.value }} bank from synth memory to disk.<br />Creates individual sound files + .pchList file.
 			</div>
 		</div>
 	</Dialog>
@@ -289,21 +293,18 @@
 		@cancel="bankDownload.cancel"
 	>
 		<div class="space-y-4">
-			<div v-if="bankDownload.showWarning.value" class="p-3 bg-red-500/20 border border-red-400 rounded text-red-400 text-sm">
-				<div class="flex items-start gap-2">
-					<span>⚠️</span>
-					<div>
-						<strong>WARNING:</strong> This will OVERWRITE the entire bank in your G2. All existing patches/performances in this bank will be ERASED.
-					</div>
-				</div>
+			<div v-if="bankDownload.showWarning.value" class="p-3 bg-red-500/20 border border-red-400 rounded text-red-400 text-sm text-center">
+				<div><strong>WARNING:</strong> This will OVERWRITE the entire bank.</div>
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
-				<select v-model="bankDownload.type.value" class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary">
-					<option v-for="t in bankDownload.bankTypes" :key="t" :value="t">
-						{{ t.charAt(0).toUpperCase() + t.slice(1) }}
-					</option>
-				</select>
+				<BtnGroup
+					:model-value="bankDownload.type.value"
+					:options="BANK_TYPE_OPTIONS"
+					stretch
+					class="flex-1"
+					@update:model-value="bankDownload.type.value = $event as 'patch' | 'performance'"
+				/>
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
@@ -315,25 +316,26 @@
 				</select>
 			</div>
 			<div class="flex items-center gap-2">
-				<span class="text-sm text-content-secondary w-20">Source:</span>
+				<span class="text-sm text-content-secondary w-20">Type:</span>
 				<div class="flex-1 flex items-center gap-2">
-					<select
-						v-model="bankDownload.sourceType.value"
-						class="px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
-					>
-						<option v-for="s in bankDownload.sourceTypes" :key="s" :value="s">
-							{{ s === 'pchList' ? '.pchList file' : 'Folder' }}
-						</option>
-					</select>
-					<div class="flex-1 flex items-center gap-1">
-						<input
-							v-model="bankDownload.sourcePath.value"
-							class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
-							readonly
-							:placeholder="bankDownload.sourceType.value === 'pchList' ? 'Select .pchList file...' : 'Select folder...'"
-						/>
-						<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankDownload.selectSource">Browse...</button>
-					</div>
+					<BtnGroup
+						:model-value="bankDownload.sourceType.value"
+						:options="SOURCE_TYPE_OPTIONS"
+						class="whitespace-nowrap"
+						@update:model-value="bankDownload.sourceType.value = $event as 'pchList' | 'folder'"
+					/>
+				</div>
+			</div>
+			<div class="flex items-center gap-2">
+				<span class="text-sm text-content-secondary w-20">Source:</span>
+				<div class="flex gap-2">
+					<input
+						v-model="bankDownload.sourcePath.value"
+						class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
+						readonly
+						:placeholder="bankDownload.sourceType.value === 'pchList' ? 'Select .pchList file...' : 'Select folder...'"
+					/>
+					<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankDownload.selectSource">Browse...</button>
 				</div>
 			</div>
 			<div v-if="bankDownload.inProgress.value" class="space-y-1">
@@ -350,14 +352,16 @@
 						<div
 							class="h-full bg-orange-400 transition-all"
 							:style="{
-								width: bankDownload.progress.value ? `${(bankDownload.progress.value.location / bankDownload.progress.value.total) * 100}%` : '0%',
+								width: bankDownload.progress.value
+									? `${(bankDownload.progress.value.location / bankDownload.progress.value.total) * 100}%`
+									: '0%',
 							}"
 						></div>
 					</div>
 				</template>
 			</div>
 			<div class="text-xs text-content-secondary">
-				Download bank to synth memory. Source can be a .pchList file or a folder of NNN_-prefixed patch files (e.g. 001_MyPatch.pch2, max 128).
+				Download bank to synth memory.<br />Source can be a .pchList file or a folder patch files (max 128).
 			</div>
 		</div>
 	</Dialog>
@@ -435,7 +439,7 @@
 	import { useSettingsStore } from './store/settings';
 	import { useStatusHint } from './composables/useStatusHint';
 
-	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
+	import { SLOT_LABELS, SLOT_OPTIONS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
