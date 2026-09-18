@@ -187,6 +187,18 @@
 
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
 
+	<ModuleModeDropdown
+		v-if="modeDropdownState.visible && modeDropdownState.paramDef"
+		:param-def="modeDropdownState.paramDef"
+		:value="modeDropdownState.value"
+		:x="modeDropdownState.x"
+		:y="modeDropdownState.y"
+		:module-id="modeDropdownState.moduleId"
+		:lv="modeDropdownState.lv"
+		@select="selectMode"
+		@close="closeModeDropdown"
+	/>
+
 	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
 
 	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
@@ -214,6 +226,8 @@
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
+	import ModuleModeDropdown from './components/canvas/ModuleModeDropdown.vue';
+	import { useModeDropdown } from './composables/useModeDropdown';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
@@ -249,6 +263,7 @@
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
+	const { state: modeDropdownState, close: closeModeDropdown, select: selectMode } = useModeDropdown();
 	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
 	const { showHint, clearHint } = useStatusHint();
 

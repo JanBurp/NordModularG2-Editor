@@ -122,6 +122,7 @@ export interface ParamDefinition {
 	h?: number;
 	canLabel?: boolean;
 	trigger?: boolean;
+	graph?: boolean | string;
 }
 
 export interface ModuleJack {

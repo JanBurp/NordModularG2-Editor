@@ -88,6 +88,8 @@
 				:mode="mode"
 				:value="getModeValue(index)"
 				:param-index="index"
+				:module-id="instance.type"
+				:lv="localLv"
 				@change="onModeChange"
 			/>
 		</g>
