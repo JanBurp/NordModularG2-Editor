@@ -33,9 +33,9 @@ export function useBankUploadDialog() {
 		return Array.from({ length: max }, (_, i) => i + 1);
 	});
 
-	function open(): void {
-		bankUploadType.value = slotsStore.isPerformanceMode || deviceStore.isPerformanceMode ? 'performance' : 'patch';
-		bankUploadBankNum.value = 1;
+	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
+		bankUploadType.value = opts?.type ?? (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode ? 'performance' : 'patch');
+		bankUploadBankNum.value = opts?.bankNum ?? 1;
 		bankUploadFolder.value = '';
 		bankUploadFilename.value = '';
 		bankUploadProgress.value = null;

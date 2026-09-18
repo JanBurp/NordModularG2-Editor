@@ -151,6 +151,8 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
+	import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 	import { SOUND_CATEGORIES, categorySlugFromName } from '@/constants/categories';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import { useListNav } from '../../composables/useListNav';
@@ -184,6 +186,8 @@
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const { open: openCtx } = useContextMenu();
+	const bankDownloadDialog = useBankDownloadDialog();
+	const bankUploadDialog = useBankUploadDialog();
 
 	const searchRef = ref();
 	const searchQuery = ref('');
@@ -308,6 +312,9 @@
 			items.push({ label: `Store "${patchName}"`, children: storeChildren });
 			items.push({ type: 'separator' });
 		}
+		items.push({ label: 'Bank Upload (from G2)', action: () => bankUploadDialog.open({ type: kind, bankNum: bank }) });
+		items.push({ label: 'Bank Download (to G2)', action: () => bankDownloadDialog.open({ type: kind, bankNum: bank }) });
+		items.push({ type: 'separator' });
 		items.push({
 			label: 'Clear all in bank',
 			action: () => {
