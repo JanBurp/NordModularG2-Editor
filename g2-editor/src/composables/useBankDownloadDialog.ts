@@ -26,6 +26,7 @@ export interface BankDownloadProgress {
 	written: number;
 	cleared: number;
 	failed: number;
+	name: string;
 }
 export const bankDownloadProgress = ref<BankDownloadProgress | null>(null);
 

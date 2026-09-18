@@ -130,11 +130,25 @@ export function useG2() {
 				}
 				if (ev.type === 'device_info' && store.status === DeviceStatus.Connecting) store.status = DeviceStatus.Loading;
 				if (ev.type === 'bank_upload_progress') {
-					bankUploadProgress.value = { location: ev.location, total: ev.total, written: ev.written, empty: ev.empty, corrupt: ev.corrupt };
+					bankUploadProgress.value = {
+						location: ev.location,
+						total: ev.total,
+						written: ev.written,
+						empty: ev.empty,
+						corrupt: ev.corrupt,
+						name: ev.name ?? '',
+					};
 					return;
 				}
 				if (ev.type === 'bank_download_progress') {
-					bankDownloadProgress.value = { location: ev.location, total: ev.total, written: ev.written, cleared: ev.cleared, failed: ev.failed };
+					bankDownloadProgress.value = {
+						location: ev.location,
+						total: ev.total,
+						written: ev.written,
+						cleared: ev.cleared,
+						failed: ev.failed,
+						name: ev.name ?? '',
+					};
 					return;
 				}
 				if (ledEvents.handleEvent(ev)) return;

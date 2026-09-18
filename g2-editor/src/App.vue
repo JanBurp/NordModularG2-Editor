@@ -277,6 +277,9 @@
 						}"
 					></div>
 				</div>
+				<div v-if="bankUpload.progress.value" class="text-xs text-content-secondary truncate">
+					{{ `${bankUpload.progress.value.location}: ${bankUpload.progress.value.name || '(empty)'}` }}
+				</div>
 			</div>
 			<div class="text-xs text-content-secondary">
 				Save complete {{ bankUpload.type.value }} bank from synth memory to disk.<br />Creates individual sound files + .pchList file.
@@ -357,6 +360,9 @@
 									: '0%',
 							}"
 						></div>
+					</div>
+					<div v-if="bankDownload.progress.value" class="text-xs text-content-secondary truncate">
+						{{ `${bankDownload.progress.value.location}: ${bankDownload.progress.value.name || '(empty)'}` }}
 					</div>
 				</template>
 			</div>

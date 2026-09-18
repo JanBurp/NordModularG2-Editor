@@ -3098,9 +3098,20 @@ int g2_dump_patch(int slot) {
  * by (type, bank, location), so it cannot disturb whatever is currently loaded.
  * There is no "bank complete" sentinel from the hardware: the host just walks
  * all 128 locations in order and stops - same as the reference implementation. */
-static void emit_bank_upload_progress(int location, int total, int written, int empty, int corrupt) {
-    printf("{\"type\":\"bank_upload_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"empty\":%d,\"corrupt\":%d}\n",
+/* Same "escape only what JSON string syntax requires" as the event emitters in
+ * g2_events.c - patch names are free text from the device/filesystem. */
+static void print_json_escaped(const char *s) {
+    for (const char *p = s ? s : ""; *p; p++) {
+        if (*p == '"' || *p == '\\') fputc('\\', stdout);
+        fputc(*p, stdout);
+    }
+}
+
+static void emit_bank_upload_progress(int location, int total, int written, int empty, int corrupt, const char *name) {
+    printf("{\"type\":\"bank_upload_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"empty\":%d,\"corrupt\":%d,\"name\":\"",
            location, total, written, empty, corrupt);
+    print_json_escaped(name);
+    printf("\"}\n");
     fflush(stdout);
 }
 
@@ -3217,11 +3228,11 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
             /* Wire status codes per CMFlashDumpMarker::ReadStream: 4 = entry empty,
              * 5 = entry corrupt (skip both, keep going), anything else here is an
              * abort condition (1 = memory protected, 3 = memory full). */
-            if (status == 4) { emptyCount++; emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount); continue; }
+            if (status == 4) { emptyCount++; emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, ""); continue; }
             if (status == 5) {
                 corruptCount++;
                 g2_err("get-bank: location %d is corrupt, skipping\n", location + 1);
-                emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
+                emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, "");
                 continue;
             }
             snprintf(abortReason, sizeof(abortReason), "device reported status %u at location %d (memory protected/full?)", status, location + 1);
@@ -3287,7 +3298,7 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         if (listLen + 64 > listCap) { listCap *= 2; char *grown = realloc(list, listCap); if (!grown) { free(list); return NULL; } list = grown; }
         listLen += (size_t)snprintf(list + listLen, listCap - listLen, "%d:%d: %s\n", bank, location + 1, dispName);
         writtenCount++;
-        emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount);
+        emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, dispName);
     }
 
     g2_pending_rearm = 0;
@@ -3594,9 +3605,11 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
     return G2_ERR;
 }
 
-static void emit_bank_download_progress(int location, int total, int written, int cleared, int failed) {
-    printf("{\"type\":\"bank_download_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"cleared\":%d,\"failed\":%d}\n",
+static void emit_bank_download_progress(int location, int total, int written, int cleared, int failed, const char *name) {
+    printf("{\"type\":\"bank_download_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"cleared\":%d,\"failed\":%d,\"name\":\"",
            location, total, written, cleared, failed);
+    print_json_escaped(name);
+    printf("\"}\n");
     fflush(stdout);
 }
 
@@ -3683,32 +3696,9 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
                 break;
             }
             clearedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, "");
             continue;
         }
-
-        FILE *f = fopen(e->filepath, "rb");
-        if (!f) {
-            g2_err("send-bank: cannot open %s, skipping location %d\n", e->filepath, location + 1);
-            add_bank_failure(failures, location + 1, e->filepath, "cannot open source file");
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
-            continue;
-        }
-        fseek(f, 0, SEEK_END);
-        long fsize = ftell(f);
-        rewind(f);
-        uint8_t *fileData = malloc((size_t)fsize);
-        if (!fileData) {
-            fclose(f);
-            g2_err("send-bank: out of memory reading %s\n", e->filepath);
-            add_bank_failure(failures, location + 1, e->filepath, "out of memory reading file");
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
-            continue;
-        }
-        fread(fileData, 1, (size_t)fsize, f);
-        fclose(f);
 
         /* Wire name: basename with the NNN_ location prefix skipped (both
          * source types share this file-naming convention). name_from_filepath
@@ -3720,6 +3710,30 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             isdigit((unsigned char)base[2]) && base[3] == '_') {
             base += 4;
         }
+
+        FILE *f = fopen(e->filepath, "rb");
+        if (!f) {
+            g2_err("send-bank: cannot open %s, skipping location %d\n", e->filepath, location + 1);
+            add_bank_failure(failures, location + 1, e->filepath, "cannot open source file");
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
+            continue;
+        }
+        fseek(f, 0, SEEK_END);
+        long fsize = ftell(f);
+        rewind(f);
+        uint8_t *fileData = malloc((size_t)fsize);
+        if (!fileData) {
+            fclose(f);
+            g2_err("send-bank: out of memory reading %s\n", e->filepath);
+            add_bank_failure(failures, location + 1, e->filepath, "out of memory reading file");
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
+            continue;
+        }
+        fread(fileData, 1, (size_t)fsize, f);
+        fclose(f);
+
         char name[17] = {0};
         name_from_filepath(base, name, 16);
 
@@ -3736,7 +3750,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             add_bank_failure(failures, location + 1, e->filepath, "failed to parse patch file");
             free(fileData);
             failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
             continue;
         }
 
@@ -3762,7 +3776,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             snprintf(reason, sizeof(reason), "too large for device (%ld bytes)", fsize);
             add_bank_failure(failures, location + 1, e->filepath, reason);
             failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
             continue;
         }
         if (ret == G2_ERR_SEND || ret == G2_ERR_NO_MEMORY) {
@@ -3787,11 +3801,11 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             snprintf(reason, sizeof(reason), "device refused write (status %d)", status);
             add_bank_failure(failures, location + 1, e->filepath, reason);
             failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
             continue;
         }
         writtenCount++;
-        emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+        emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
     }
 
     free(entries);

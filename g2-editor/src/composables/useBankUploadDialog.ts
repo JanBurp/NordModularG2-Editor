@@ -19,6 +19,7 @@ export interface BankUploadProgress {
 	written: number;
 	empty: number;
 	corrupt: number;
+	name: string;
 }
 export const bankUploadProgress = ref<BankUploadProgress | null>(null);
 
