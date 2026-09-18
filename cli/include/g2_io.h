@@ -38,6 +38,17 @@ extern volatile int g2_listener_active;
  * the BULK_REARM message from the queue. */
 extern volatile int g2_pending_rearm;
 
+/* Set by recv_interrupt() when it sees a sentinel=1 (device disconnected) while
+ * serving a command handler instead of the main loop's own queue poll.  The daemon
+ * main loop checks this after execute_cmd() and calls do_reconnect() so a disconnect
+ * consumed mid-command is still noticed and recovered from. */
+extern volatile int g2_pending_disconnect;
+
+/* Count of messages the listener queue evicted because it was full
+ * (MSG_QUEUE_MAX). Nonzero during a request/response command means a reply may
+ * have been thrown away - the cause of an unexplained "no reply" abort. */
+extern volatile unsigned long g2_msg_drops;
+
 /* Set to 1 by daemon --debug; causes send_* functions to log hex to stdout */
 extern int g2_debug;
 
@@ -60,6 +71,10 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen);
 int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
               const uint8_t *extra, size_t extraLen);
 int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops);
+
+/* Send one complete bulk-OUT message, resuming after a short write.
+ * Returns bytes sent, or -1 if the write makes no progress. */
+int send_bulk_msg(const uint8_t *buff, int len);
 
 /* Low-level USB receive helpers.
  * When g2_listener_active == 1 these route through the listener queue so that

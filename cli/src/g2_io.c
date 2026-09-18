@@ -29,6 +29,8 @@ g2_device_t g2 = {
 
 int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
+volatile int g2_pending_disconnect = 0;
+volatile unsigned long g2_msg_drops = 0;
 
 static int g2_last_claim_error = 0;
 int g2_get_last_claim_error(void) { return g2_last_claim_error; }
@@ -417,7 +419,12 @@ static struct {
 
 static void mq_push_locked(g2_msg_t msg) {
     if (mq.count >= MSG_QUEUE_MAX) {
-        /* Drop oldest message — LED/vol dominates, losing one state update is fine. */
+        /* Drop oldest message — LED/vol dominates, losing one state update is fine.
+         * Counted, because when it is NOT an LED update that gets evicted the
+         * result is a command waiting forever for a reply that was silently
+         * thrown away - the "no reply from device for location N" a bank write
+         * aborts with. g2_send_bank reports any drops over its run. */
+        g2_msg_drops++;
         msg_node_t *old = mq.head;
         mq.head = old->next;
         if (!mq.head) mq.tail = NULL;
@@ -624,6 +631,7 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
 
         if (msg.sentinel == 1) {
             g2_msg_free(&msg);
+            g2_pending_disconnect = 1;
             return LIBUSB_ERROR_NO_DEVICE;
         }
         if (msg.sentinel == 2) {
@@ -726,6 +734,59 @@ int recv_bulk(uint8_t *data, uint16_t size) {
         }
     }
     return received;
+}
+
+/* Send one bulk-OUT message, resuming after a short write - the write-side
+ * mirror of recv_bulk's loop above.
+ * The G2 reads a message as a single byte stream prefixed with its own length,
+ * so a partial write has to be completed from where it stopped: re-sending the
+ * whole frame (as the callers used to do on a failed transfer) leaves the device
+ * mid-message and it parses the leftover bytes as further molecules, answering
+ * with a 0x7E code-3 NACK and never sending the marker the caller waits for.
+ * Confirmed on hardware: performance bank location 16, a 34 KB .prf2.
+ * A whole .prf2 goes out in one frame, which at the G2's real full-speed
+ * throughput needs far more than USB_TIMEOUT_STANDARD_MS - the reference editor
+ * uses 5000 ms (CUSBManager::TxData -> WritePipeTO).
+ * Retrying is only safe while nothing has gone out yet, which is exactly what
+ * the stall counter allows.
+ * Returns bytes sent, or -1 if the write makes no progress. */
+int send_bulk_msg(const uint8_t *buff, int len) {
+    /* Refuse before anything reaches the wire: a message the G2 cannot buffer
+     * leaves it parsing the overflow as further molecules, which renames the
+     * live slots to "Error" and wedges it until a power cycle. Callers turn
+     * this into a skipped entry rather than a corrupted device. */
+    if (len > G2_MAX_MESSAGE_LEN) return G2_ERR_TOO_LARGE;
+
+    int sent = 0, stalls = 0;
+    while (sent < len) {
+        int transferred = 0;
+        int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT,
+                                       (uint8_t *)buff + sent, len - sent,
+                                       &transferred, USB_TIMEOUT_SEND_MS);
+        if (ret == LIBUSB_ERROR_PIPE) {
+            /* Endpoint halted - clear it and retry this chunk, the same
+             * recovery g2_send_command and the send_slot* helpers do. Leaving
+             * a halt in place fails every later transfer on the endpoint, which
+             * looks like "no USB connection" in the editor while the G2 itself
+             * is perfectly fine. */
+            libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
+            ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT,
+                                       (uint8_t *)buff + sent, len - sent,
+                                       &transferred, USB_TIMEOUT_SEND_MS);
+        }
+        sent += transferred;
+        if (ret < 0 && ret != LIBUSB_ERROR_TIMEOUT) {
+            fprintf(stderr, "send_bulk_msg: write failed at %d/%d: %s\n",
+                    sent, len, libusb_error_name(ret));
+            return -1;
+        }
+        if (transferred > 0) stalls = 0;
+        else if (++stalls >= 3) {
+            fprintf(stderr, "send_bulk_msg: no progress at %d/%d\n", sent, len);
+            return -1;
+        }
+    }
+    return sent;
 }
 
 int send_init_msg(void) {

@@ -48,6 +48,28 @@ static void g2_err(const char *fmt, ...) {
         fprintf(stderr, "%s\n", msg);
     }
 }
+const char *g2_error_string(int code) {
+    switch (code) {
+        case G2_OK:                   return "ok";
+        case G2_ERR_NOT_FOUND:        return "no G2 found";
+        case G2_ERR_CONNECT:          return "could not connect to the G2";
+        case G2_ERR_RESET:            return "USB reset failed";
+        case G2_ERR_CLAIM_INTERFACE:  return "could not claim the G2's USB interface - another program may be using it";
+        case G2_ERR_SEND:             return "failed to send data to the G2";
+        case G2_ERR_RECV:             return "no response from the G2";
+        case G2_ERR_TIMEOUT:          return "the G2 did not respond in time";
+        case G2_ERR_PARSE:            return "could not parse the G2's response";
+        case G2_ERR_INVALID_PARAM:    return "invalid parameter";
+        case G2_ERR_FILE_OPEN:        return "could not open the file";
+        case G2_ERR_FILE_WRITE:       return "could not write the file";
+        case G2_ERR_NO_MEMORY:        return "out of memory";
+        case G2_ERR_NOT_IMPLEMENTED:  return "not implemented";
+        case G2_ERR_TOO_LARGE:        return "too large for the G2 - it cannot receive more than 32 KB in one message";
+        case G2_ERR:                  return "unspecified error";
+        default:                      return "unknown error";
+    }
+}
+
 static int ensure_connected(int silent) {
     if (g2_is_connected()) {
         return 0;
@@ -1815,10 +1837,9 @@ static int send_patch_upload(int slot, const char *name, int name_len, const uin
     buff[1] = msgLength & 0xff;
 
     g2_drain_pending();
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    int ret = send_bulk_msg(buff, msgLength);
     free(buff);
-    if (ret < 0) return G2_ERR_SEND;
+    if (ret < 0) return (ret == G2_ERR_TOO_LARGE) ? G2_ERR_TOO_LARGE : G2_ERR_SEND;
 
     usleep(USB_SEND_DELAY_US * 5);
     uint8_t response[64] = {0};
@@ -1914,10 +1935,9 @@ static int send_perf_upload(const char *name, int name_len, const uint8_t *secti
     buff[1] = msgLength & 0xff;
 
     g2_drain_pending();
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    int ret = send_bulk_msg(buff, msgLength);
     free(buff);
-    if (ret < 0) return G2_ERR_SEND;
+    if (ret < 0) return (ret == G2_ERR_TOO_LARGE) ? G2_ERR_TOO_LARGE : G2_ERR_SEND;
 
     /* Deliberately does NOT read an ACK, unlike send_patch_upload. Adding a
      * recv_interrupt()+g2_drain_pending() here was tested against real hardware and killed the
@@ -3484,18 +3504,13 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
     if (msgLength < 0) { free(buff); return G2_ERR_NO_MEMORY; }
 
     g2_drain_pending();
-    int transferred;
-    int ret = -1;
-    /* A single outbound transfer occasionally fails transiently over a long
-     * bank operation (confirmed on real hardware, 2026-09-14) - retry a couple
-     * of times with a brief pause rather than aborting the whole bank over one
-     * blip. */
-    for (int attempt = 0; attempt < 3 && ret < 0; attempt++) {
-        if (attempt > 0) usleep(USB_SEND_DELAY_US * 10);
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    }
+    /* send_bulk_msg completes a short write instead of restarting the frame, and
+     * retries only while nothing has gone out - which covers the transient
+     * single-transfer failures seen over a long bank operation (2026-09-14)
+     * without ever leaving the device mid-message. */
+    int ret = send_bulk_msg(buff, msgLength);
     free(buff);
-    if (ret < 0) return G2_ERR_SEND;
+    if (ret < 0) return (ret == G2_ERR_TOO_LARGE) ? G2_ERR_TOO_LARGE : G2_ERR_SEND;
 
     usleep(USB_SEND_DELAY_US);
     /* Wait on the device, don't outrun it: a flash write takes far longer than
@@ -3503,11 +3518,28 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
      * (the official editor chains the next file off HandleDumpDownOK the same
      * way). A long timeout is free on the happy path - this returns the moment
      * the marker arrives. The attempt budget is generous because unrelated
-     * system/perf notifications also land here and each consumes one. */
+     * system/perf notifications also land here and each consumes one - and so
+     * does a bare timeout, so one slow write or one burst of unrelated traffic
+     * can't sink the whole location; only a real recv error ends it early. */
     for (int attempt = 0; attempt < 20; attempt++) {
         uint8_t response[64] = {0};
         int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-        if (rret <= 0) break;
+        /* Through the listener queue a bare timeout is 0, so anything negative
+         * is a real USB error: stop now rather than spend the whole 40 s budget
+         * pretending the device might still answer, and name it so an
+         * intermittent failure is diagnosable from the log. The direct libusb
+         * path (recv_interrupt_with_retry, g2_io.c) reports a plain timeout as
+         * -1 as well, so there we can only keep waiting - otherwise the
+         * one-shot CLI aborts on the first write that takes over 2 s. */
+        if (rret < 0) {
+            if (g2_listener_active) {
+                g2_err("send-bank: USB error waiting for location %d marker: %s\n",
+                       location0 + 1, libusb_error_name(rret));
+                break;
+            }
+            continue;
+        }
+        if (rret == 0) continue;
         if ((response[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
             /* Two different messages acknowledge a write, and which one the G2
              * picks depends on what was already at the location (an overwrite of
@@ -3636,6 +3668,11 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     int aborted = 0;
     char abortReason[128] = {0};
     cJSON *failures = cJSON_CreateArray();
+    /* Locations listed in the source but too large to write; cleared in a
+     * second pass once the write loop is done - see the loop's exit. */
+    int tooLarge[128];
+    int nTooLarge = 0;
+    unsigned long dropsAtStart = g2_msg_drops;
 
     for (int location = 0; location < 128; location++) {
         bank_entry_t *e = byLocation[location];
@@ -3708,6 +3745,26 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
                                       fileData + name_end, (size_t)fsize - (size_t)name_end, &status);
         free(fileData);
 
+        if (ret == G2_ERR_TOO_LARGE) {
+            /* Nothing was sent - the device cannot take a message this big and
+             * sending it anyway wedges it (see G2_MAX_MESSAGE_LEN). The official
+             * editor fails on the same file too, so the entry is simply not
+             * transferable over USB; skip it and keep the rest of the bank. */
+            g2_err("send-bank: %s is too large for the device (%ld bytes), skipped\n",
+                   e->filepath, fsize);
+            /* Clear it, but not from here: g2_clear_patch blind-reads one
+             * message without matching it, and doing that between two writes
+             * puts a stray read in the middle of the per-location lockstep.
+             * Defer to the second pass after the loop, where it cannot affect
+             * any write. */
+            if (nTooLarge < 128) tooLarge[nTooLarge++] = location + 1;
+            char reason[80];
+            snprintf(reason, sizeof(reason), "too large for device (%ld bytes)", fsize);
+            add_bank_failure(failures, location + 1, e->filepath, reason);
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount);
+            continue;
+        }
         if (ret == G2_ERR_SEND || ret == G2_ERR_NO_MEMORY) {
             snprintf(abortReason, sizeof(abortReason), "failed to send location %d", location + 1);
             aborted = 1;
@@ -3739,6 +3796,16 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
 
     free(entries);
 
+    /* Second pass: clear the locations that were listed but too large to send.
+     * A bank download already clears every location absent from the source
+     * list, so one that is listed but unwritable must not keep unrelated data
+     * the user would see as a valid entry - location 16 of the test bank held a
+     * corrupt 34 KB performance from an earlier failed write. Skipped when the
+     * run aborted: the device has already stopped answering by then. */
+    if (!aborted) {
+        for (int i = 0; i < nTooLarge; i++) g2_clear_patch(type, bank, tooLarge[i]);
+    }
+
     /* The G2 sends a BULK_REARM after a bank write, which the daemon defers via
      * g2_pending_rearm and - once this command returns - answers with
      * rearm_with_version_update(): a full re-fetch of all 4 live slots
@@ -3765,6 +3832,15 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     cJSON_AddItemToObject(result, "failures", failures);
     cJSON_AddBoolToObject(result, "aborted", aborted);
     if (aborted) cJSON_AddStringToObject(result, "abortReason", abortReason);
+    /* Replies the listener queue evicted while this ran. Any nonzero value here
+     * means a marker may have been thrown away rather than never sent, which is
+     * what an otherwise unexplainable "no reply for location N" looks like. */
+    unsigned long drops = g2_msg_drops - dropsAtStart;
+    if (drops) {
+        cJSON_AddNumberToObject(result, "queueDrops", (double)drops);
+        g2_err("send-bank: listener queue dropped %lu message(s) during this bank - "
+               "a marker may have been evicted\n", drops);
+    }
     return result;
 }
 

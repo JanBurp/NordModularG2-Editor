@@ -85,12 +85,15 @@ cJSON *daemon_make_ok(cJSON *id) {
 	return r;
 }
 
-/* Build {"id":<id>,"ok":false,"code":<code>}. id may be NULL. Caller cJSON_Deletes. */
+/* Build {"id":<id>,"ok":false,"code":<code>,"error":"<text>"}. id may be NULL.
+ * The text is what the editor shows the user; the code stays for callers that
+ * branch on it. Caller cJSON_Deletes. */
 cJSON *daemon_make_error(cJSON *id, int code) {
 	cJSON *r = cJSON_CreateObject();
 	if (id) cJSON_AddItemToObject(r, "id", cJSON_Duplicate(id, 0));
 	cJSON_AddFalseToObject(r, "ok");
 	cJSON_AddNumberToObject(r, "code", code);
+	cJSON_AddStringToObject(r, "error", g2_error_string(code));
 	return r;
 }
 
@@ -1043,6 +1046,18 @@ int g2_daemon_run(output_format_t format, int debug) {
 		if (had_line) {
 			execute_cmd(line);
 			free(line);
+			/* If a command handler's recv_interrupt() saw the device disconnect
+			 * (sentinel=1) while waiting for a command response, it set
+			 * g2_pending_disconnect instead of the main loop's own queue poll ever
+			 * seeing the sentinel.  Reconnect now, same as the normal disconnect path
+			 * below. */
+			if (g2_pending_disconnect) {
+				g2_pending_disconnect = 0;
+				g2_pending_rearm = 0;   /* moot once do_reconnect() re-arms itself */
+				if (daemon_running) do_reconnect();
+				cmds_since_listener_check = 0;
+				continue;
+			}
 			/* If a command handler's recv_interrupt() saw a BULK_REARM (sentinel=2)
 			 * while waiting for a command response, it set g2_pending_rearm instead
 			 * of discarding it silently.  Re-arm streaming now. */

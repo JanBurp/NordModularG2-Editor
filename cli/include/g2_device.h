@@ -33,7 +33,12 @@ typedef enum {
     G2_ERR_FILE_WRITE    = -12,
     G2_ERR_NO_MEMORY     = -13,
     G2_ERR_NOT_IMPLEMENTED = -14,
+    G2_ERR_TOO_LARGE       = -15,
 } g2_error_t;
+
+/* Human-readable text for a g2_error_t, for callers that surface failures to
+ * the user (the daemon puts it in its error replies). Never NULL. */
+const char *g2_error_string(int code);
 
 /* Output format types */
 typedef enum {

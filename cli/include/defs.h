@@ -101,6 +101,18 @@ typedef enum {
 #define USB_TIMEOUT_DRAIN_MS                (50)    /* drain pending notifications */
 #define USB_TIMEOUT_STANDARD_MS             (100)   /* normal command/response */
 #define USB_TIMEOUT_LONG_MS                 (2000)  /* patch name fetch, slow ops */
+#define USB_TIMEOUT_SEND_MS                 (5000)  /* bulk-OUT write; a whole .prf2 is ~34 KB */
+
+/* Largest message the G2 will accept on bulk OUT.
+ * Empirical (2026-09-17): a 30,493-byte .prf2 (message ~30,440) writes fine, a
+ * 34,065-byte one (~34,012) is rejected with a 0x7E code-3 parse NACK - the
+ * device then reads the overflow as further molecules, renames the live slots
+ * to "Error" and stops answering until a power cycle. The official Clavia
+ * editor fails on the same file at the same bank location, so this is a
+ * firmware limit, not ours. There is no constant to copy from the reference -
+ * its transport caps a chunk at 0xffff (CBubblePort::GenerateMessages) - so
+ * this is the conservative power-of-two boundary inside the observed window. */
+#define G2_MAX_MESSAGE_LEN                  (32768)
 
 /* A performance upload is answered by no ACK we can safely read (see send_perf_upload), so the
  * only way to avoid returning while the G2 is still applying its four slots is to wait. */

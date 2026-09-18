@@ -95,7 +95,7 @@ function startDaemon() {
 						if (msg.ok) {
 							pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
 						} else {
-							pending.reject(new Error(`G2 error code: ${msg.code}`));
+							pending.reject(new Error(msg.error ?? `G2 error code: ${msg.code}`));
 						}
 					}
 				} else {
@@ -137,6 +137,11 @@ async function stopDaemon(): Promise<void> {
 	});
 }
 
+/* A bank is 128 locations of flash writes/clears — minutes, not seconds. The
+ * generic 30 s timeout rejects the promise while the daemon is still working,
+ * so the UI reports failure over a run that is actually succeeding. */
+const LONG_CMDS = new Set(["send-bank", "get-bank"]);
+
 function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
 	return new Promise((resolve, reject) => {
 		if (!daemonProcess) {
@@ -147,7 +152,7 @@ function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
 		const timeout = setTimeout(() => {
 			pendingCmds.delete(id);
 			reject(new Error(`CLI timeout: ${cmd}`));
-		}, 30_000);
+		}, LONG_CMDS.has(cmd) ? 600_000 : 30_000);
 		pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd, args });
 		// Elide inline byte-array payloads (e.g. upload-patch-data) from the log line.
