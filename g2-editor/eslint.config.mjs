@@ -47,6 +47,7 @@ const allGlobals = {
   HTMLTextAreaElement: 'readonly',
   HTMLSelectElement: 'readonly',
   DOMMatrix: 'readonly',
+  DOMPoint: 'readonly',
   SVGPoint: 'readonly',
   ResizeObserver: 'readonly',
   WheelEvent: 'readonly',
