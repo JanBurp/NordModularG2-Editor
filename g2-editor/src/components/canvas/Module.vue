@@ -53,6 +53,12 @@
 			<ModuleVeText v-if="entry.ve.type === 'text'" :ve="entry.ve"></ModuleVeText>
 			<ModuleVeLine v-else-if="entry.ve.type === 'line'" :ve="entry.ve"></ModuleVeLine>
 			<ModuleVePaths v-else-if="entry.ve.type === 'path'" :ve="entry.ve"></ModuleVePaths>
+			<DrumSynthPresetSelector
+				v-else-if="entry.ve.type === 'graph' && instance.type === 58"
+				:ve="entry.ve"
+				:lv="localLv"
+				@apply="onDrumSynthPresetApply"
+			/>
 			<ModuleGraph
 				v-else-if="(entry.ve.type === 'graph' || entry.ve.type === 'graphenv') && entry.ve.w && entry.ve.h"
 				:ve="entry.ve"
@@ -225,6 +231,7 @@
 	import ModuleMode from './ModuleMode.vue';
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
+	import DrumSynthPresetSelector from './DrumSynthPresetSelector.vue';
 	import { getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
@@ -522,6 +529,13 @@
 				? undefined
 				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, range),
 		});
+	}
+
+	// DrumSynth preset selector emits target values for its 15 params directly (it owns the preset
+	// table); applied as one batched store action so a single Ctrl+Z reverts the whole preset switch.
+	function onDrumSynthPresetApply(values: number[]) {
+		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
+		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], values, uiStore.variation, area);
 	}
 
 	function onParamHoverEnter() {
