@@ -12,7 +12,8 @@
 					<button class="px-3 py-1 text-xs rounded text-content-secondary hover:text-content-primary cursor-pointer" @click="onCancel">Cancel</button>
 					<button
 						v-if="showConfirm"
-						class="px-3 py-1 text-xs rounded bg-input text-black font-medium hover:opacity-90 cursor-pointer"
+						class="px-3 py-1 text-xs rounded bg-input text-black font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+						:disabled="disableConfirm"
 						@click="onConfirm"
 					>
 						{{ confirmLabel }}
@@ -33,8 +34,9 @@
 			confirmLabel?: string;
 			showConfirm?: boolean;
 			closeOnConfirm?: boolean;
+			disableConfirm?: boolean;
 		}>(),
-		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true },
+		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true, disableConfirm: false },
 	);
 
 	const emit = defineEmits<{
@@ -65,7 +67,7 @@
 	function onKeydown(e: KeyboardEvent) {
 		if (!props.modelValue) return;
 		if (e.key === 'Escape') onCancel();
-		if (e.key === 'Enter' && props.showConfirm) {
+		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm) {
 			(document.activeElement as HTMLElement)?.blur();
 			onConfirm();
 		}

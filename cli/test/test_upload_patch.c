@@ -276,7 +276,7 @@ static void do_upload_perf_roundtrip(const char *label, const char *filepath) {
     char out_path[256];
     snprintf(out_path, sizeof(out_path), "%s/%s_roundtrip.prf2", TMP_OUT_DIR, label);
 
-    cJSON *file_result = g2_get_perf_file(out_path);
+    cJSON *file_result = g2_get_perf_file(out_path, 0);
     TEST_ASSERT_NOT_NULL_MESSAGE(file_result, "g2_get_perf_file returned NULL");
 
     cJSON *name_item = cJSON_GetObjectItem(file_result, "name");

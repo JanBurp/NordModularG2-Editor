@@ -218,6 +218,7 @@
 		title="Bank Upload (from G2)"
 		confirm-label="Upload"
 		:close-on-confirm="false"
+		:disable-confirm="bankUpload.inProgress.value"
 		@confirm="bankUpload.confirm"
 		@cancel="bankUpload.cancel"
 	>
@@ -236,6 +237,7 @@
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankUpload.bankNum.value"
+					:disabled="bankUpload.inProgress.value"
 					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 				>
 					<option v-for="n in bankUpload.bankOptions.value" :key="n" :value="n">{{ n }}</option>
@@ -246,17 +248,25 @@
 				<div class="flex-1 flex items-center gap-1">
 					<input
 						v-model="bankUpload.folder.value"
+						:disabled="bankUpload.inProgress.value"
 						class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 						readonly
 						placeholder="Select folder..."
 					/>
-					<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankUpload.selectFolder">Browse...</button>
+					<button
+						class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4 disabled:opacity-50 disabled:cursor-not-allowed"
+						:disabled="bankUpload.inProgress.value"
+						@click="bankUpload.selectFolder"
+					>
+						Browse...
+					</button>
 				</div>
 			</div>
 			<div class="flex items-center gap-2">
 				<span class="text-sm text-content-secondary w-20">Name:</span>
 				<input
 					v-model="bankUpload.filename.value"
+					:disabled="bankUpload.inProgress.value"
 					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 					placeholder="(optional)"
 				/>
@@ -292,6 +302,7 @@
 		title="Bank Download (to G2)"
 		confirm-label="Download"
 		:close-on-confirm="false"
+		:disable-confirm="bankDownload.inProgress.value"
 		@confirm="bankDownload.confirm"
 		@cancel="bankDownload.cancel"
 	>
@@ -313,6 +324,7 @@
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankDownload.bankNum.value"
+					:disabled="bankDownload.inProgress.value"
 					class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 				>
 					<option v-for="n in bankDownload.bankOptions.value" :key="n" :value="n">{{ n }}</option>
@@ -325,7 +337,7 @@
 						:model-value="bankDownload.sourceType.value"
 						:options="SOURCE_TYPE_OPTIONS"
 						class="whitespace-nowrap"
-						@update:model-value="bankDownload.sourceType.value = $event as 'pchList' | 'folder'"
+						@update:model-value="bankDownload.setSourceType($event as 'pchList' | 'folder')"
 					/>
 				</div>
 			</div>
@@ -334,11 +346,18 @@
 				<div class="flex gap-2">
 					<input
 						v-model="bankDownload.sourcePath.value"
+						:disabled="bankDownload.inProgress.value"
 						class="flex-1 px-2 py-1 text-sm bg-surface-2 rounded border border-line-default text-content-primary"
 						readonly
 						:placeholder="bankDownload.sourceType.value === 'pchList' ? 'Select .pchList file...' : 'Select folder...'"
 					/>
-					<button class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4" @click="bankDownload.selectSource">Browse...</button>
+					<button
+						class="px-2 py-1 text-xs bg-surface-3 rounded hover:bg-surface-4 disabled:opacity-50 disabled:cursor-not-allowed"
+						:disabled="bankDownload.inProgress.value"
+						@click="bankDownload.selectSource"
+					>
+						Browse...
+					</button>
 				</div>
 			</div>
 			<div v-if="bankDownload.inProgress.value" class="space-y-1">

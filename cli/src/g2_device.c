@@ -70,6 +70,21 @@ const char *g2_error_string(int code) {
     }
 }
 
+/* Flush stale data before a direct-mode query (used before g2_get_patch, g2_list,
+ * g2_get_bank, etc.). Avoids g2_drain_pending() which can accidentally call
+ * g2_rearm() and start streaming without a listener, contaminating subsequent
+ * query responses. recv_interrupt always reads one fixed 16-byte USB interrupt
+ * packet regardless of buffer size, so a 16-byte buffer is always sufficient. */
+static void drain_stale_extended(void) {
+    uint8_t stale[16]; int n;
+    while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
+        if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
+            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+        }
+    }
+}
+
 static int ensure_connected(int silent) {
     if (g2_is_connected()) {
         return 0;
@@ -199,15 +214,7 @@ cJSON *g2_device_info(int debug) {
     /* Flush stale data before querying (direct mode only; same pattern as g2_get_patch).
      * Avoids g2_drain_pending() which can accidentally call g2_rearm() and start
      * streaming without a listener, contaminating subsequent query responses. */
-    if (!g2_listener_active) {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
@@ -335,15 +342,7 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     /* Flush stale G2 data from a previous command (direct mode only;
      * listener thread drains EP 0x81 continuously, so no flush needed). */
-    if (!g2_listener_active) {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
@@ -370,7 +369,7 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
     version = interruptResp[6];
-    if (actual_slot < 4) g2_slot_version[actual_slot] = version;
+    if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
     debug_timing("get_patch_slot_start");
@@ -581,7 +580,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
     version = interruptResp[6];
-    if (actual_slot < 4) g2_slot_version[actual_slot] = version;
+    if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
 
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
         g2_err("Failed to send get patch command\n");
@@ -817,15 +816,7 @@ cJSON *g2_list(int filter, int bank_filter) {
      * misaligning the state machine's byte offsets. Confirmed on hardware
      * (2026-09-17): a maximal 16-char name has no NUL to resync on, so it's the
      * one most likely to show a corrupted trailing character. */
-    if (!g2_listener_active) {
-        uint8_t stale[1024]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     if (filter == LIST_FILTER_ALL) {
         root = cJSON_CreateObject();
@@ -2003,7 +1994,7 @@ int g2_upload_perf_buf(const uint8_t *data, size_t len) {
     return send_perf_upload(name, ni, data + data_offset, data_len);
 }
 
-cJSON *g2_get_perf_file(const char *filename) {
+cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     uint8_t interruptResp[16] = {0};
     uint8_t selsInterrupt[16] = {0};
     uint8_t selsData[1024] = {0};
@@ -2023,15 +2014,7 @@ cJSON *g2_get_perf_file(const char *filename) {
     }
 
     /* Drain stale data (same pattern as g2_get_patch_file) */
-    if (!g2_listener_active) {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     /* Step 1: Get performance settings raw bytes (same sequence as query_perf_settings) */
     if (send_system(0x41, 0x81) == 0) {
@@ -2114,9 +2097,9 @@ cJSON *g2_get_perf_file(const char *filename) {
         free(patchData);
     }
 
-    /* Step 3: Determine output filename */
+    /* Step 3: Determine output filename (not needed for a bytes-only fetch) */
     char defaultFilename[64];
-    if (filename == NULL) {
+    if (!return_bytes && filename == NULL) {
         if (strlen(perfName) == 0)
             snprintf(defaultFilename, sizeof(defaultFilename), "performance.prf2");
         else
@@ -2209,18 +2192,31 @@ cJSON *g2_get_perf_file(const char *filename) {
     outBuf[pos++] = (uint8_t)((crc >> 8) & 0xff);
     outBuf[pos++] = (uint8_t)(crc & 0xff);
 
-    {
+    if (return_bytes) {
+        /* Hex, not base64: matches every other command's "data" field (e.g.
+         * g2_get_patch above), which the TS side already consumes as a hex string
+         * throughout the patch/performance pipeline (rawHex, serializePerformance, …). */
+        char *hexStr = malloc(pos * 2 + 1);
+        if (!hexStr) { g2_err("Memory allocation failed\n"); goto cleanup; }
+        for (size_t i = 0; i < pos; i++) snprintf(hexStr + i * 2, 3, "%02x", outBuf[i]);
+        hexStr[pos * 2] = '\0';
+        result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "name", perfName);
+        cJSON_AddNumberToObject(result, "size", (int)pos);
+        cJSON_AddStringToObject(result, "data", hexStr);
+        free(hexStr);
+    } else {
         FILE *f = fopen(filename, "wb");
         if (!f) { g2_err("Failed to open file '%s' for writing\n", filename); goto cleanup; }
         size_t written = fwrite(outBuf, 1, pos, f);
         fclose(f);
         if (written != pos) { g2_err("Failed to write complete file\n"); goto cleanup; }
-    }
 
-    result = cJSON_CreateObject();
-    cJSON_AddStringToObject(result, "file", filename);
-    cJSON_AddStringToObject(result, "name", perfName);
-    cJSON_AddNumberToObject(result, "size", (int)pos);
+        result = cJSON_CreateObject();
+        cJSON_AddStringToObject(result, "file", filename);
+        cJSON_AddStringToObject(result, "name", perfName);
+        cJSON_AddNumberToObject(result, "size", (int)pos);
+    }
 
 cleanup:
     free(perfData);
@@ -2577,15 +2573,7 @@ static int get_global_knobs_payload(uint8_t **out, uint16_t *out_len) {
 
     /* Flush stale G2 data left over from a previous command (direct mode only — the listener
      * thread drains EP 0x81 continuously, so no flush needed then). Mirrors g2_get_patch. */
-    if (!g2_listener_active) {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     if (send_system(0x41, SUB_COMMAND_GET_GLOBAL_KNOBS) < 0) {
         g2_err("Failed to send get-global-knobs command\n");
@@ -3132,21 +3120,18 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     g2_stop_comm();
 
     /* Drain stale data (same pattern as g2_get_patch_file/g2_get_perf_file). */
-    if (!g2_listener_active) {
-        uint8_t stale[16]; int n;
-        while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-            if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-                if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-            }
-        }
-    }
+    if (!g2_listener_active) drain_stale_extended();
 
     /* .pchList index: header line + one "<bank>:<location>: <name>" line per
      * written patch (format matches the reference CFlashDumper::WriteDumpList). */
     size_t listCap = 4096, listLen = 0;
     char *list = malloc(listCap);
-    if (!list) { g2_err("get-bank: out of memory\n"); return NULL; }
+    if (!list) {
+        g2_err("get-bank: out of memory\n");
+        g2_pending_rearm = 0;
+        if (g2_listener_active) g2_rearm();
+        return NULL;
+    }
     listLen += (size_t)snprintf(list, listCap, "Version=Nord Modular G2 Bank Dump\n");
 
     int writtenCount = 0, emptyCount = 0, corruptCount = 0;
@@ -3186,7 +3171,14 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
             if (msgType == RESPONSE_TYPE_EMBEDDED) {
                 /* [..][aCmd][version][0x18][status][fileType][bank][location] */
                 if (interruptResp[4] != 0x18 || interruptResp[7] != (uint8_t)(bank - 1)
-                    || interruptResp[8] != (uint8_t)location) continue;
+                    || interruptResp[8] != (uint8_t)location) {
+                    /* Someone else's message - relay it so the watch stream keeps it,
+                     * same as the RESPONSE_TYPE_EXTENDED case below. */
+                    g2_msg_t relay = {0};
+                    memcpy(relay.interrupt, interruptResp, 16);
+                    g2_emit_event(&relay);
+                    continue;
+                }
                 status = interruptResp[5];
                 got = 1;
             } else if (msgType == RESPONSE_TYPE_EXTENDED) {
@@ -3295,7 +3287,17 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         fclose(f);
         free(bulk);
 
-        if (listLen + 64 > listCap) { listCap *= 2; char *grown = realloc(list, listCap); if (!grown) { free(list); return NULL; } list = grown; }
+        if (listLen + 64 > listCap) {
+            listCap *= 2;
+            char *grown = realloc(list, listCap);
+            if (!grown) {
+                free(list);
+                g2_pending_rearm = 0;
+                if (g2_listener_active) g2_rearm();
+                return NULL;
+            }
+            list = grown;
+        }
         listLen += (size_t)snprintf(list + listLen, listCap - listLen, "%d:%d: %s\n", bank, location + 1, dispName);
         writtenCount++;
         emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, dispName);
@@ -3660,7 +3662,12 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     g2_stop_comm();
 
     bank_entry_t *entries = calloc(128, sizeof(bank_entry_t));
-    if (!entries) { g2_err("send-bank: out of memory\n"); return NULL; }
+    if (!entries) {
+        g2_err("send-bank: out of memory\n");
+        g2_pending_rearm = 0;
+        if (g2_listener_active) g2_rearm();
+        return NULL;
+    }
 
     int nEntries;
     if (source_type && strcmp(source_type, "pchList") == 0) {
@@ -3670,9 +3677,16 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     } else {
         g2_err("send-bank: source type must be 'pchList' or 'folder'\n");
         free(entries);
+        g2_pending_rearm = 0;
+        if (g2_listener_active) g2_rearm();
         return NULL;
     }
-    if (nEntries < 0) { free(entries); return NULL; }
+    if (nEntries < 0) {
+        free(entries);
+        g2_pending_rearm = 0;
+        if (g2_listener_active) g2_rearm();
+        return NULL;
+    }
 
     bank_entry_t *byLocation[128] = {0};
     for (int i = 0; i < nEntries; i++) byLocation[entries[i].location - 1] = &entries[i];
@@ -3700,13 +3714,17 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             continue;
         }
 
-        /* Wire name: basename with the NNN_ location prefix skipped (both
-         * source types share this file-naming convention). name_from_filepath
-         * re-derives its own basename, so passing it an already-prefix-
-         * stripped pointer with no further '/' in it works unchanged. */
+        /* Wire name: basename with the NNN_ location prefix skipped - but only for
+         * pchList sources, since that prefix is get-bank's own .pchList/file naming
+         * convention. A folder source has no such guarantee, and a user-named file
+         * that happens to start with 3 digits and an underscore (e.g. "123_Lead.pch2")
+         * must not have its name silently truncated. name_from_filepath re-derives
+         * its own basename, so passing it an already-prefix-stripped pointer with no
+         * further '/' in it works unchanged. */
         const char *base = strrchr(e->filepath, '/');
         base = base ? base + 1 : e->filepath;
-        if (strlen(base) > 4 && isdigit((unsigned char)base[0]) && isdigit((unsigned char)base[1]) &&
+        if (source_type && strcmp(source_type, "pchList") == 0 &&
+            strlen(base) > 4 && isdigit((unsigned char)base[0]) && isdigit((unsigned char)base[1]) &&
             isdigit((unsigned char)base[2]) && base[3] == '_') {
             base += 4;
         }

@@ -16,6 +16,14 @@ slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);
 int hex_to_bytes(const char *hex, uint8_t **out);
 
+/* Base64 encode/decode, used for byte-array command args and file buffers passed
+ * over the daemon's JSON stdin/stdout protocol (much smaller on the wire than a
+ * JSON array of decimal numbers). decode returns the decoded length or -1 on a
+ * malformed input; caller frees *out on success. encode returns a malloc'd,
+ * NUL-terminated string, or NULL on allocation failure. */
+int base64_decode(const char *b64, uint8_t **out);
+char *base64_encode(const uint8_t *data, size_t len);
+
 /* Extra bytes patch_slot_sections_canonical may add (an inserted C_CURRENT_NOTE_2 chunk) —
  * size the output buffer as in_len + this. */
 #define PCH2_CANONICAL_GROWTH 12

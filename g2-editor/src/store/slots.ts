@@ -1815,34 +1815,37 @@ export const useSlotsStore = defineStore('slots', {
 			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
 		},
 
-		// g2_get_perf_file captures the G2's *live USB* form and writes it out as a .prf2. That form
-		// is not a valid file: each patch carries 10 parameter variations where a file has 9
-		// (N_USB_VARIATIONS vs N_VARIATIONS), and the G2 rejects such a file if it is ever uploaded
-		// back. Reading the capture straight back out through the parser and serializer converts it —
-		// serializePerformance emits 9 unconditionally — and costs one extra file round-trip.
-		// Best-effort: on any failure the captured file stays as written, still openable here, just
-		// not guaranteed re-uploadable.
-		async _convertCapturedPerfToFileForm(path: string): Promise<void> {
+		// g2_get_perf_file-buf captures the G2's *live USB* form in memory and returns it as a hex
+		// "data" string (same convention as get-patch). That form is not a valid file: each patch
+		// carries 10 parameter variations where a file has 9 (N_USB_VARIATIONS vs N_VARIATIONS), and
+		// the G2 rejects such a file if it is ever uploaded back. Converting through the parser and
+		// serializer fixes this — serializePerformance emits 9 unconditionally — entirely in memory,
+		// so the file is written once instead of captured-then-rewritten. Best-effort: if conversion
+		// fails, the raw (unconverted) captured bytes are still written so the user gets a file, just
+		// not guaranteed re-uploadable — same fallback behavior as before.
+		async _saveCapturedPerfBytes(path: string, cliOutput: string): Promise<void> {
+			const result = JSON.parse(cliOutput);
+			const rawHex: string = result.data;
+			const fileBytes = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 			try {
-				const file = await window.electronAPI.patches.load(path);
-				if (!file.success || !file.data) return;
 				const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
 				const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
-				const prf2 = new PatchParser(new Uint8Array(file.data).buffer).parsePrf2();
-				if (!prf2) return;
-				const rawHex = serializePerformance(
+				const prf2 = new PatchParser(new Uint8Array(fileBytes).buffer).parsePrf2();
+				if (!prf2) throw new Error('Failed to parse the captured performance');
+				const convertedHex = serializePerformance(
 					prf2.patches,
-					stripFileHeader(file.data),
+					stripFileHeader(fileBytes),
 					prf2.patches.map((p) => extractVariations(p)),
 					prf2.globalParamPages,
 				);
 				// Only the section bytes change: the file keeps its own header ([name][0x00][version]
 				// [file type]) verbatim, so a long Clavia-style header survives the round-trip intact.
-				const header = file.data.slice(0, file.data.indexOf(0) + 3);
-				const sections = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+				const header = fileBytes.slice(0, fileBytes.indexOf(0) + 3);
+				const sections = convertedHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
 				await window.electronAPI.savePatch(path, [...header, ...sections]);
 			} catch (err) {
-				console.error('Failed to convert the captured performance to file form:', err);
+				console.error('Failed to convert the captured performance to file form, saving raw capture instead:', err);
+				await window.electronAPI.savePatch(path, fileBytes);
 			}
 		},
 
@@ -1862,13 +1865,13 @@ export const useSlotsStore = defineStore('slots', {
 					hwPath = result.filepath;
 				}
 				try {
-					await window.cli.run(['get-perf-file', hwPath]);
+					const output = await window.cli.run(['get-perf-file-buf']);
+					await this._saveCapturedPerfBytes(hwPath, output);
 				} catch (err) {
 					console.error('Failed to save performance:', err);
 					showToast('Failed to save performance.');
 					return;
 				}
-				await this._convertCapturedPerfToFileForm(hwPath);
 				this.performanceFilePath = hwPath;
 				return;
 			}

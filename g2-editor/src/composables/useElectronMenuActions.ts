@@ -49,7 +49,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		hasSelection: uiStore.selectedModules.length > 0,
 		hasClipboard: hasClipboard.value,
 		hasCurrentPatch: !!currentPatch.value,
-		hasPerformanceContext: !!deviceStore.device || SLOT_LABELS.some((s) => !!slotsStore.getPatchForSlot(s)),
+		hasPerformanceContext: !!slotsStore.performanceRawHex,
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
 

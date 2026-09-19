@@ -1,10 +1,8 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useDeviceStore } from '@/store/device';
+import { bankSizeFor, defaultBankKind } from '@/constants/ui';
 import { showToast } from './useToast';
-
-// Bank types for G2
-const BANK_TYPES = ['patch', 'performance'] as const;
 
 // Singleton state shared between the menu-action opener and the dialog component
 export const showBankUploadDialog = ref(false);
@@ -27,14 +25,18 @@ export function useBankUploadDialog() {
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
 
-	const maxBank = computed(() => (bankUploadType.value === 'performance' ? 8 : 32));
+	const maxBank = computed(() => bankSizeFor(bankUploadType.value));
 	const bankOptions = computed(() => {
 		const max = maxBank.value;
 		return Array.from({ length: max }, (_, i) => i + 1);
 	});
 
+	watch(bankUploadType, () => {
+		if (bankUploadBankNum.value > maxBank.value) bankUploadBankNum.value = maxBank.value;
+	});
+
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
-		bankUploadType.value = opts?.type ?? (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode ? 'performance' : 'patch');
+		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isPerformanceMode);
 		bankUploadBankNum.value = opts?.bankNum ?? 1;
 		bankUploadFolder.value = '';
 		bankUploadFilename.value = '';
@@ -54,6 +56,7 @@ export function useBankUploadDialog() {
 	}
 
 	async function confirm(): Promise<void> {
+		if (bankUploadInProgress.value) return;
 		if (!bankUploadFolder.value) {
 			showToast('Please select a destination folder');
 			return;
@@ -71,6 +74,8 @@ export function useBankUploadDialog() {
 			if (success) {
 				showToast(`Bank ${bankUploadBankNum.value} uploaded from G2 successfully`);
 				cancel();
+			} else {
+				showToast('Bank upload failed - check the device connection');
 			}
 		} catch (err) {
 			console.error('Bank upload failed:', err);
@@ -89,7 +94,6 @@ export function useBankUploadDialog() {
 		inProgress: bankUploadInProgress,
 		progress: bankUploadProgress,
 		bankOptions,
-		bankTypes: BANK_TYPES,
 		open,
 		confirm,
 		cancel,

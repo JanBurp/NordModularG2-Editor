@@ -188,40 +188,47 @@ describe('edited flag', () => {
 		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
 	});
 
+	function toHex(bytes: number[]): string {
+		return bytes.map((b) => b.toString(16).padStart(2, '0')).join('');
+	}
+
+	async function loadCapturedPerfFixture(): Promise<number[]> {
+		const fs = await import('fs');
+		const path = await import('path');
+		const { fileURLToPath } = await import('url');
+		const fixtures = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../test-patches');
+		return Array.from(fs.readFileSync(path.join(fixtures, 'MorphingDrumDemo.prf2')));
+	}
+
 	it('savePerformance falls back to a live hardware fetch when no .prf2 was ever loaded (hardware-native perf mode)', async () => {
+		const captured = await loadCapturedPerfFixture();
 		const store = useSlotsStore();
 		store.performanceRawHex = null; // nothing loaded from disk/browser this session
 		const device = useDeviceStore();
 		device.status = DeviceStatus.Connected;
 		device.device = { mode: 'Performance' } as any;
-		const cliRun = vi.fn().mockResolvedValue(undefined);
+		const cliRun = vi.fn().mockResolvedValue(JSON.stringify({ name: 'Live', size: captured.length, data: toHex(captured) }));
 		(globalThis as any).window.cli.run = cliRun;
+		(globalThis as any).window.electronAPI = { savePatch: vi.fn().mockResolvedValue(undefined) };
 
 		await store.savePerformance('/tmp/live.prf2');
 
-		expect(cliRun).toHaveBeenCalledWith(['get-perf-file', '/tmp/live.prf2']);
+		expect(cliRun).toHaveBeenCalledWith(['get-perf-file-buf']);
 		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
 	});
 
-	it('savePerformance rewrites the captured .prf2 in file form (g2_get_perf_file writes USB form)', async () => {
+	it('savePerformance converts the captured performance bytes into file form (get-perf-file-buf returns USB form)', async () => {
 		vi.restoreAllMocks(); // an earlier test in this block spies on serializePerformance
-		const fs = await import('fs');
-		const path = await import('path');
-		const { fileURLToPath } = await import('url');
-		const fixtures = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../test-patches');
-		const captured = Array.from(fs.readFileSync(path.join(fixtures, 'MorphingDrumDemo.prf2')));
+		const captured = await loadCapturedPerfFixture();
 
 		const store = useSlotsStore();
 		store.performanceRawHex = null;
 		const device = useDeviceStore();
 		device.status = DeviceStatus.Connected;
 		device.device = { mode: 'Performance' } as any;
-		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(JSON.stringify({ name: 'Live', size: captured.length, data: toHex(captured) }));
 		const savePatch = vi.fn().mockResolvedValue(undefined);
-		(globalThis as any).window.electronAPI = {
-			patches: { load: vi.fn().mockResolvedValue({ success: true, data: captured }) },
-			savePatch,
-		};
+		(globalThis as any).window.electronAPI = { savePatch };
 
 		await store.savePerformance('/tmp/live.prf2');
 
@@ -234,26 +241,26 @@ describe('edited flag', () => {
 		// Still a performance: first section 0x11, file-type byte 0x01.
 		expect(bytes[headerEnd - 1]).toBe(0x01);
 		expect(bytes[headerEnd]).toBe(0x11);
-		// And it is genuinely re-encoded, not a copy of the bytes that were read back.
+		// And it is genuinely re-encoded, not a copy of the bytes that were received.
 		expect(bytes.length).not.toBe(captured.length);
 	});
 
-	it('savePerformance keeps the captured file when it cannot be converted', async () => {
+	it('savePerformance saves the raw captured bytes when they cannot be converted to file form', async () => {
 		const store = useSlotsStore();
 		store.performanceRawHex = null;
 		const device = useDeviceStore();
 		device.status = DeviceStatus.Connected;
 		device.device = { mode: 'Performance' } as any;
-		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(undefined);
+		// Not a real .prf2 (no section markers) — parsePrf2() returns null, forcing the fallback.
+		const garbage = new Array(40).fill(0);
+		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(JSON.stringify({ name: 'Live', size: garbage.length, data: toHex(garbage) }));
 		const savePatch = vi.fn().mockResolvedValue(undefined);
-		(globalThis as any).window.electronAPI = {
-			patches: { load: vi.fn().mockResolvedValue({ success: false }) },
-			savePatch,
-		};
+		(globalThis as any).window.electronAPI = { savePatch };
 
 		await store.savePerformance('/tmp/live.prf2');
 
-		expect(savePatch).not.toHaveBeenCalled();
+		// Still gets a file, just the raw unconverted capture rather than silently dropping it.
+		expect(savePatch).toHaveBeenCalledWith('/tmp/live.prf2', garbage);
 		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
 	});
 

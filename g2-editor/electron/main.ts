@@ -142,6 +142,12 @@ async function stopDaemon(): Promise<void> {
  * so the UI reports failure over a run that is actually succeeding. */
 const LONG_CMDS = new Set(["send-bank", "get-bank"]);
 
+// Commands whose byte-array arg carries a whole patch/performance payload - sent
+// base64-encoded instead of a JSON array of decimal numbers, which is ~3-4x larger
+// on the wire. Kept to a known command allowlist so small numeric-array args to
+// other commands (e.g. RGB tuples) aren't accidentally base64-encoded.
+const BASE64_ARG_CMDS = new Set(["upload-patch-data", "upload-perf-data"]);
+
 function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
 	return new Promise((resolve, reject) => {
 		if (!daemonProcess) {
@@ -154,7 +160,10 @@ function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
 			reject(new Error(`CLI timeout: ${cmd}`));
 		}, LONG_CMDS.has(cmd) ? 600_000 : 30_000);
 		pendingCmds.set(id, { resolve, reject, timeout });
-		const json = JSON.stringify({ id, cmd, args });
+		const wireArgs: (string | number[])[] = BASE64_ARG_CMDS.has(cmd)
+			? args.map((a) => (Array.isArray(a) ? Buffer.from(a).toString("base64") : a))
+			: args;
+		const json = JSON.stringify({ id, cmd, args: wireArgs });
 		// Elide inline byte-array payloads (e.g. upload-patch-data) from the log line.
 		const logArgs = args.map((a) => (Array.isArray(a) ? `<${a.length} bytes>` : a));
 		console.log('[daemon-cmd]->', JSON.stringify({ id, cmd, args: logArgs }));
@@ -462,12 +471,11 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					enabled: menuState.canRedo,
 				},
 				{ type: "separator" as const },
-				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X", enabled: menuState.hasSelection },
+				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
 				{
 					label: "Copy",
 					click: () => win!.webContents.send("menu:action", "copy"),
 					accelerator: "CommandOrControl+C",
-					enabled: menuState.hasSelection,
 				},
 				{
 					label: "Paste",
@@ -479,7 +487,6 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					label: "Clear",
 					click: () => win!.webContents.send("menu:action", "delete"),
 					accelerator: "Backspace",
-					enabled: menuState.hasSelection,
 				},
 				{ type: "separator" as const },
 				{
@@ -579,7 +586,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{
 					label: "Send Controller Snapshot",
 					click: () => win!.webContents.send("menu:action", "send-controller-snapshot"),
-					accelerator: "CommandOrControl+M",
+					accelerator: "CommandOrControl+L",
 					enabled: menuState.connected,
 				},
 				{

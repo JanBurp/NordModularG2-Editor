@@ -208,6 +208,68 @@ int hex_to_bytes(const char *hex, uint8_t **out) {
     return nbytes;
 }
 
+static const char b64_alphabet[] = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";
+
+static int b64_val(char c) {
+    if (c >= 'A' && c <= 'Z') return c - 'A';
+    if (c >= 'a' && c <= 'z') return c - 'a' + 26;
+    if (c >= '0' && c <= '9') return c - '0' + 52;
+    if (c == '+') return 62;
+    if (c == '/') return 63;
+    return -1;
+}
+
+char *base64_encode(const uint8_t *data, size_t len) {
+    if (!data && len > 0) return NULL;
+    size_t out_len = 4 * ((len + 2) / 3);
+    char *out = malloc(out_len + 1);
+    if (!out) return NULL;
+    size_t i = 0, j = 0;
+    while (i < len) {
+        uint32_t a = data[i++];
+        uint32_t b = i < len ? data[i++] : 0;
+        uint32_t c = i < len ? data[i++] : 0;
+        uint32_t triple = (a << 16) | (b << 8) | c;
+        out[j++] = b64_alphabet[(triple >> 18) & 0x3F];
+        out[j++] = b64_alphabet[(triple >> 12) & 0x3F];
+        out[j++] = b64_alphabet[(triple >> 6) & 0x3F];
+        out[j++] = b64_alphabet[triple & 0x3F];
+    }
+    size_t mod = len % 3;
+    if (mod == 1) { out[out_len - 1] = '='; out[out_len - 2] = '='; }
+    else if (mod == 2) { out[out_len - 1] = '='; }
+    out[out_len] = '\0';
+    return out;
+}
+
+int base64_decode(const char *b64, uint8_t **out) {
+    *out = NULL;
+    if (!b64) return -1;
+    size_t len = strlen(b64);
+    if (len == 0) { *out = malloc(1); return *out ? 0 : -1; }
+    if (len % 4 != 0) return -1;
+    size_t pad = 0;
+    if (b64[len - 1] == '=') pad++;
+    if (len >= 2 && b64[len - 2] == '=') pad++;
+    size_t out_len = (len / 4) * 3 - pad;
+    uint8_t *buf = malloc(out_len > 0 ? out_len : 1);
+    if (!buf) return -1;
+    size_t oi = 0;
+    for (size_t i = 0; i < len; i += 4) {
+        int v0 = b64_val(b64[i]);
+        int v1 = b64_val(b64[i + 1]);
+        int v2 = (b64[i + 2] == '=') ? 0 : b64_val(b64[i + 2]);
+        int v3 = (b64[i + 3] == '=') ? 0 : b64_val(b64[i + 3]);
+        if (v0 < 0 || v1 < 0 || v2 < 0 || v3 < 0) { free(buf); return -1; }
+        uint32_t triple = ((uint32_t)v0 << 18) | ((uint32_t)v1 << 12) | ((uint32_t)v2 << 6) | (uint32_t)v3;
+        if (oi < out_len) buf[oi++] = (uint8_t)((triple >> 16) & 0xFF);
+        if (oi < out_len) buf[oi++] = (uint8_t)((triple >> 8) & 0xFF);
+        if (oi < out_len) buf[oi++] = (uint8_t)(triple & 0xFF);
+    }
+    *out = buf;
+    return (int)out_len;
+}
+
 int tokenize_command(char *buf, char **argv_out, int max_argc) {
     int argc = 0;
     char *p = buf;

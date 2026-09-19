@@ -1,15 +1,11 @@
-import { ref, computed } from 'vue';
+import { ref, computed, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useDeviceStore } from '@/store/device';
+import { bankSizeFor, defaultBankKind } from '@/constants/ui';
 import { showToast } from './useToast';
 
-// Bank types for G2
-const BANK_TYPES = ['patch', 'performance'] as const;
-
 // Source types for bank download
-const SOURCE_TYPES = ['pchList', 'folder'] as const;
-
-type SourceType = (typeof SOURCE_TYPES)[number];
+type SourceType = 'pchList' | 'folder';
 
 // Singleton state shared between the menu-action opener and the dialog component
 export const showBankDownloadDialog = ref(false);
@@ -51,14 +47,18 @@ export function useBankDownloadDialog() {
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
 
-	const maxBank = computed(() => (bankDownloadType.value === 'performance' ? 8 : 32));
+	const maxBank = computed(() => bankSizeFor(bankDownloadType.value));
 	const bankOptions = computed(() => {
 		const max = maxBank.value;
 		return Array.from({ length: max }, (_, i) => i + 1);
 	});
 
+	watch(bankDownloadType, () => {
+		if (bankDownloadBankNum.value > maxBank.value) bankDownloadBankNum.value = maxBank.value;
+	});
+
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
-		bankDownloadType.value = opts?.type ?? (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode ? 'performance' : 'patch');
+		bankDownloadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isPerformanceMode);
 		bankDownloadBankNum.value = opts?.bankNum ?? 1;
 		bankDownloadSourceType.value = 'pchList';
 		bankDownloadSourcePath.value = '';
@@ -87,6 +87,7 @@ export function useBankDownloadDialog() {
 	}
 
 	async function confirm(): Promise<void> {
+		if (bankDownloadInProgress.value) return;
 		if (!bankDownloadSourcePath.value) {
 			showToast('Please select a source .pchList file or folder');
 			return;
@@ -116,6 +117,8 @@ export function useBankDownloadDialog() {
 					showToast(`Bank downloaded to G2 bank ${bankDownloadBankNum.value} successfully`);
 				}
 				cancel();
+			} else {
+				showToast('Bank download failed - check the device connection');
 			}
 		} catch (err) {
 			console.error('Bank download failed:', err);
@@ -141,8 +144,6 @@ export function useBankDownloadDialog() {
 		progress: bankDownloadProgress,
 		showWarning: bankDownloadShowWarning,
 		bankOptions,
-		bankTypes: BANK_TYPES,
-		sourceTypes: SOURCE_TYPES,
 		open,
 		confirm,
 		cancel,

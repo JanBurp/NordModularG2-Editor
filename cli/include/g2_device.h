@@ -119,7 +119,11 @@ cJSON *query_synth_settings(const char *type);
 cJSON *query_perf_settings(int mode, const char *type);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
-cJSON *g2_get_perf_file(const char *filename);
+/* When return_bytes is set, filename may be NULL: the .prf2 is assembled in memory
+ * as usual but never written to disk, and the result carries it as a base64 "data"
+ * field instead of a "file" path (used by get-perf-file-buf to avoid a disk round
+ * trip when the caller only wants the bytes). */
+cJSON *g2_get_perf_file(const char *filename, int return_bytes);
 cJSON *g2_get_resources(const char *slot_str); /* returns {"va":[...], "fx":[...]} */
 cJSON *g2_list(int filter, int bank_filter);
 

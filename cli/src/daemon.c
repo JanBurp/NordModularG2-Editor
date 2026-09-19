@@ -135,18 +135,30 @@ static int arg_count(cJSON *args) {
 	return args ? cJSON_GetArraySize(args) : 0;
 }
 
-/* Reads a JSON array of numbers (0-255) at `idx` into a malloc'd byte buffer.
- * Returns NULL (with *out_len untouched) if the arg isn't an array. Caller frees. */
+/* Reads a byte-array arg at `idx` into a malloc'd byte buffer, either as a JSON
+ * array of numbers (0-255) or a base64-encoded string (much smaller on the wire -
+ * see main.ts's sendCmd). Returns NULL (with *out_len untouched) if the arg is
+ * neither. Caller frees. */
 static uint8_t *arg_bytes(cJSON *args, int idx, size_t *out_len) {
 	if (!args) return NULL;
-	cJSON *arr = cJSON_GetArrayItem(args, idx);
-	if (!arr || !cJSON_IsArray(arr)) return NULL;
-	int count = cJSON_GetArraySize(arr);
-	uint8_t *buf = (uint8_t *)malloc((size_t)count > 0 ? (size_t)count : 1);
-	if (!buf) return NULL;
-	for (int i = 0; i < count; i++) buf[i] = (uint8_t)cJSON_GetArrayItem(arr, i)->valueint;
-	*out_len = (size_t)count;
-	return buf;
+	cJSON *item = cJSON_GetArrayItem(args, idx);
+	if (!item) return NULL;
+	if (cJSON_IsString(item)) {
+		uint8_t *buf = NULL;
+		int len = base64_decode(item->valuestring, &buf);
+		if (len < 0) return NULL;
+		*out_len = (size_t)len;
+		return buf;
+	}
+	if (cJSON_IsArray(item)) {
+		int count = cJSON_GetArraySize(item);
+		uint8_t *buf = (uint8_t *)malloc((size_t)count > 0 ? (size_t)count : 1);
+		if (!buf) return NULL;
+		for (int i = 0; i < count; i++) buf[i] = (uint8_t)cJSON_GetArrayItem(item, i)->valueint;
+		*out_len = (size_t)count;
+		return buf;
+	}
+	return NULL;
 }
 
 static int parse_location(cJSON *args, int idx) {
@@ -688,7 +700,14 @@ static void execute_cmd(const char *line) {
 		if (ret == G2_OK) rearm_after_get_patch = 1;
 
 	} else if (strcmp(cmd, "get-perf-file") == 0) {
-		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL);
+		data = g2_get_perf_file(n >= 1 ? arg_s(args, 0) : NULL, 0);
+		ret = data ? G2_OK : G2_ERR;
+
+	} else if (strcmp(cmd, "get-perf-file-buf") == 0) {
+		/* Same capture as get-perf-file, but returns the assembled .prf2 bytes as a
+		 * hex "data" string instead of writing to disk - lets the renderer convert
+		 * and save in one shot rather than reading its own just-written file back. */
+		data = g2_get_perf_file(NULL, 1);
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-synth-settings") == 0 && n >= 1) {

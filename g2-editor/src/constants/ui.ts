@@ -50,3 +50,13 @@ export const SOURCE_TYPE_OPTIONS = [
 	{ label: '.pchList file', value: 'pchList' },
 	{ label: 'Folder', value: 'folder' },
 ];
+
+/** Number of banks the G2 has for a given bank type. */
+export const bankSizeFor = (type: 'patch' | 'performance'): number => (type === 'performance' ? 8 : 32);
+
+/** Number of locations per bank for a given bank type. */
+export const locationSizeFor = (type: 'patch' | 'performance'): number => (type === 'performance' ? 32 : 128);
+
+/** Default bank/store dialog type: performance if either the loaded slot data or the connected device is in performance mode. */
+export const defaultBankKind = (slotsIsPerformanceMode: boolean, deviceIsPerformanceMode: boolean): 'patch' | 'performance' =>
+	slotsIsPerformanceMode || deviceIsPerformanceMode ? 'performance' : 'patch';

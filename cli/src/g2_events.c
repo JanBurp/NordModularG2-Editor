@@ -248,7 +248,7 @@ static void emit_embedded_event(const uint8_t *response) {
                 case 0x38:
                     printf("{\"type\":\"patch_version\",\"slot\":\"%s\",\"version\":%u}\n",
                            SLOT_LETTER(response[5]), response[6]);
-                    if (response[5] < 4) g2_slot_version[response[5]] = response[6];
+                    if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
                     break;
                 default: {
                     char hex[32] = "";
@@ -339,7 +339,7 @@ static void emit_embedded_event(const uint8_t *response) {
                 // R_PATCH_VERSION_CHANGE: patch description updated, slot version bumped
                 uint8_t sl = response[5];
                 uint8_t ver = response[6];
-                if (sl < 4) g2_slot_version[sl] = ver;
+                if (sl < 4 && ver) g2_slot_version[sl] = ver;
                 printf("{\"type\":\"patch_version_change\",\"slot\":\"%s\",\"version\":%u}\n",
                        SLOT_LETTER(sl), ver);
                 break;
@@ -364,7 +364,7 @@ static void emit_embedded_event(const uint8_t *response) {
         if (subCmd == 0x36 || subCmd == 0x38) {
             printf("{\"type\":\"patch_version\",\"slot\":\"%s\",\"version\":%u}\n",
                    SLOT_LETTER(response[5]), response[6]);
-            if (response[5] < 4) g2_slot_version[response[5]] = response[6];
+            if (response[5] < 4 && response[6]) g2_slot_version[response[5]] = response[6];
         } else {
             char hex[32] = "";
             for (int i = 5; i <= lastByte && i - 5 < 15; i++)

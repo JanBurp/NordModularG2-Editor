@@ -236,7 +236,7 @@ static int cmd_get_patch_file(int argc, char **argv, int i) {
 
 static int cmd_get_perf_file(int argc, char **argv, int i) {
     const char *filename = (i + 1 < argc) ? argv[i + 1] : NULL;
-    cJSON *result = g2_get_perf_file(filename);
+    cJSON *result = g2_get_perf_file(filename, 0);
     if (!result) {
         if (output_format == OUTPUT_JSON)
             output_error_json("Failed to get performance file", output_format);

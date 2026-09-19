@@ -3,6 +3,7 @@ import { useBrowserStore } from '@/store/browser';
 import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
+import { bankSizeFor, locationSizeFor, defaultBankKind } from '@/constants/ui';
 import { showToast } from './useToast';
 
 // Singleton state shared between the menu-action opener and the dialog component
@@ -17,11 +18,11 @@ export function useStoreInSynthDialog() {
 	const uiStore = useUiStore();
 	const device = useDeviceStore();
 
-	const maxBank = computed(() => (kind.value === 'performance' ? 8 : 32));
-	const maxLocation = computed(() => (kind.value === 'performance' ? 32 : 128));
+	const maxBank = computed(() => bankSizeFor(kind.value));
+	const maxLocation = computed(() => locationSizeFor(kind.value));
 
 	function open(): void {
-		kind.value = slotsStore.isPerformanceMode || device.isPerformanceMode ? 'performance' : 'patch';
+		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isPerformanceMode);
 		bank.value = 1;
 		location.value = 1;
 		showDialog.value = true;
