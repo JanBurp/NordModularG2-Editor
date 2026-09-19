@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 // useModuleKeyboard.ts transitively imports utils/platform.ts, which reads `window`/`navigator`
 // at module-eval time — before any beforeEach runs. vi.hoisted() runs above the static imports
@@ -29,7 +29,14 @@ import { useModuleKeyboard } from '../useModuleKeyboard';
 beforeEach(() => {
 	setActivePinia(createPinia());
 	(globalThis as any).document.activeElement = null;
+	// useModuleKeyboard() is called directly here, outside any component's setup() — there's no
+	// jsdom/@vue/test-utils in this project (see the vi.hoisted() comment above), so its
+	// onMounted/onUnmounted window-listener wiring isn't exercised; these tests call
+	// handleKeydown directly instead. Vue warns about the missing instance; expected here.
+	vi.spyOn(console, 'warn').mockImplementation(() => {});
 });
+
+afterEach(() => vi.restoreAllMocks());
 
 // isGrabModifierPressed() is Cmd-on-Mac / Ctrl-elsewhere; setting both makes the event
 // grab-modifier-true regardless of the `isMac` stub above.

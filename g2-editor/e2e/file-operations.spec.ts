@@ -72,10 +72,10 @@ test.describe('file operations – offline', () => {
 		await page.locator('[data-testid="variation-2"]').click();
 		await expect(page.locator('[data-testid="variation-2"]')).toHaveClass(/btn-active/);
 
-		// Switch to INIT (index 8)
+		// Clicking INIT (index 8) copies the init template into the active variation
+		// rather than selecting a 9th variation — variation 3 (index 2) stays active.
 		await page.locator('[data-testid="variation-8"]').click();
-		await expect(page.locator('[data-testid="variation-8"]')).toHaveClass(/btn-active/);
-		await expect(page.locator('[data-testid="variation-2"]')).not.toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="variation-2"]')).toHaveClass(/btn-active/);
 	});
 
 	test('switching slots after loading a performance', async ({ page, sendMenuAction, mockOpenPatch }) => {
@@ -94,20 +94,20 @@ test.describe('file operations – offline', () => {
 		await expect(page.locator('[data-testid="slot-0"]')).not.toHaveClass(/btn-active/);
 
 		// On slot B: Split is active (patch data has height in split range)
-		await expect(page.getByRole('button', { name: 'Split' })).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="area-2"]')).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await expect(page.locator('[data-testid="canvas-fx"]')).toBeVisible();
 
 		// Switch to FX area
-		await page.getByRole('button', { name: 'FX' }).click();
-		await expect(page.getByRole('button', { name: 'FX' })).toHaveClass(/btn-active/);
-		await expect(page.getByRole('button', { name: 'Voice' })).not.toHaveClass(/btn-active/);
+		await page.locator('[data-testid="area-0"]').click();
+		await expect(page.locator('[data-testid="area-0"]')).toHaveClass(/btn-active/);
+		await expect(page.locator('[data-testid="area-1"]')).not.toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="canvas-fx"]')).toBeVisible();
 		await expect(page.locator('[data-testid="canvas-va"]')).not.toBeVisible();
 
 		// Switch back to Voice
-		await page.getByRole('button', { name: 'Voice' }).click();
-		await expect(page.getByRole('button', { name: 'Voice' })).toHaveClass(/btn-active/);
+		await page.locator('[data-testid="area-1"]').click();
+		await expect(page.locator('[data-testid="area-1"]')).toHaveClass(/btn-active/);
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 		await expect(page.locator('[data-testid="canvas-fx"]')).not.toBeVisible();
 

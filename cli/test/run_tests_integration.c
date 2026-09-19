@@ -71,12 +71,19 @@ static void restore_stdout(int fd) {
 static void run_test_silently(const char *name, void (*test_func)(void)) {
     fprintf(stderr, "%s ", name);
     fflush(stderr);
-    unsigned short before = Unity.TestFailures;
+    unsigned short before_fail = Unity.TestFailures;
+    unsigned short before_ignore = Unity.TestIgnores;
     int fd = suppress_stdout();
     RUN_TEST(test_func);
     restore_stdout(fd);
-    int failed = Unity.TestFailures > before;
-    fprintf(stderr, "%s%s\033[0m\n", failed ? "\033[31m" : "\033[32m", failed ? "FAIL" : "PASS");
+    int failed = Unity.TestFailures > before_fail;
+    /* TEST_IGNORE_MESSAGE("G2 device not connected"/"G2 not connected...") means the test
+     * never actually ran against hardware — call that out distinctly so it isn't misread as
+     * a real PASS when the CLI daemon/USB device wasn't available. */
+    int ignored = !failed && Unity.TestIgnores > before_ignore;
+    const char *color = failed ? "\033[31m" : ignored ? "\033[33m" : "\033[32m";
+    const char *status = failed ? "FAIL" : ignored ? "SKIP (no hardware/daemon)" : "PASS";
+    fprintf(stderr, "%s%s\033[0m\n", color, status);
     fflush(stderr);
 }
 

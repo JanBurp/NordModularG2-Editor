@@ -8,6 +8,28 @@ import path from 'path';
 const APP_ROOT = path.join(__dirname, '..', '..');
 const FIXTURES_DIR = path.join(__dirname, '..', '..', '..', 'test-patches');
 
+// Under heavy parallel load (many Electron instances launching at once), the CDP
+// connection backing app.evaluate() can be transiently unstable right after launch,
+// surfacing as either "Execution context was destroyed, most likely because of a
+// navigation" or "Resulting promise was garbage collected". Retry a few times rather
+// than failing the test on this transient race.
+const TRANSIENT_EVALUATE_ERRORS = ['Execution context was destroyed', 'Resulting promise was garbage collected'];
+
+async function evaluateWithRetry<R, Arg = void>(
+	app: ElectronApplication,
+	fn: (electron: typeof import('electron'), arg: Arg) => R,
+	arg?: Arg,
+): Promise<R> {
+	for (let attempt = 1; ; attempt++) {
+		try {
+			return await app.evaluate(fn, arg as Arg);
+		} catch (e) {
+			if (attempt >= 5 || !(e instanceof Error) || !TRANSIENT_EVALUATE_ERRORS.some((m) => e.message.includes(m))) throw e;
+			await new Promise((r) => setTimeout(r, 100));
+		}
+	}
+}
+
 export type AppFixtures = {
 	app: ElectronApplication;
 	page: Page;
@@ -36,7 +58,7 @@ export const test = base.extend<AppFixtures>({
 		await (await app.firstWindow()).waitForLoadState('domcontentloaded');
 
 		// Stub out CLI handlers so no binary is needed
-		await app.evaluate(({ ipcMain }) => {
+		await evaluateWithRetry(app, ({ ipcMain }) => {
 			for (const ch of ['cli:run', 'cli:run-batch']) {
 				ipcMain.removeHandler(ch);
 				ipcMain.handle(ch, async () => '');
@@ -59,7 +81,7 @@ export const test = base.extend<AppFixtures>({
 
 	sendMenuAction: async ({ app }, use) => {
 		const fn = async (action: string) => {
-			await app.evaluate(({ BrowserWindow }, act) => {
+			await evaluateWithRetry(app, ({ BrowserWindow }, act) => {
 				const win = BrowserWindow.getAllWindows()[0];
 				win?.webContents.send('menu:action', act);
 			}, action);
@@ -71,7 +93,7 @@ export const test = base.extend<AppFixtures>({
 		const fn = async (filename: string) => {
 			const filepath = path.join(FIXTURES_DIR, filename);
 			const data = Array.from(fs.readFileSync(filepath));
-			await app.evaluate(({ ipcMain }, args) => {
+			await evaluateWithRetry(app, ({ ipcMain }, args) => {
 				ipcMain.removeHandler('patch:open-dialog');
 				ipcMain.handle('patch:open-dialog', async () => ({
 					success: true,
@@ -87,7 +109,7 @@ export const test = base.extend<AppFixtures>({
 		let savedPath = '';
 		const fn = async () => {
 			savedPath = path.join(os.tmpdir(), `g2-test-${Date.now()}.pch2`);
-			await app.evaluate(({ ipcMain }, sp) => {
+			await evaluateWithRetry(app, ({ ipcMain }, sp) => {
 				ipcMain.removeHandler('patch:save-dialog');
 				ipcMain.handle('patch:save-dialog', async () => ({ success: true, filepath: sp }));
 			}, savedPath);
@@ -101,7 +123,7 @@ export const test = base.extend<AppFixtures>({
 		let savedPath = '';
 		const fn = async () => {
 			savedPath = path.join(os.tmpdir(), `g2-test-${Date.now()}.prf2`);
-			await app.evaluate(({ ipcMain }, sp) => {
+			await evaluateWithRetry(app, ({ ipcMain }, sp) => {
 				ipcMain.removeHandler('perf:save-dialog');
 				ipcMain.handle('perf:save-dialog', async () => ({ success: true, filepath: sp }));
 			}, savedPath);

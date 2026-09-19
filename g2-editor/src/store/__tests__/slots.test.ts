@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
@@ -256,12 +256,15 @@ describe('edited flag', () => {
 		(globalThis as any).window.cli.run = vi.fn().mockResolvedValue(JSON.stringify({ name: 'Live', size: garbage.length, data: toHex(garbage) }));
 		const savePatch = vi.fn().mockResolvedValue(undefined);
 		(globalThis as any).window.electronAPI = { savePatch };
+		// Conversion failure is the behaviour under test — expect and suppress its console.error.
+		vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		await store.savePerformance('/tmp/live.prf2');
 
 		// Still gets a file, just the raw unconverted capture rather than silently dropping it.
 		expect(savePatch).toHaveBeenCalledWith('/tmp/live.prf2', garbage);
 		expect(store.performanceFilePath).toBe('/tmp/live.prf2');
+		vi.restoreAllMocks();
 	});
 
 	it('savePerformance does nothing when performanceRawHex is null and the device is not live in Performance mode', async () => {
@@ -543,7 +546,11 @@ describe('module add/move/delete record undo even when the CLI/hardware call fai
 	beforeEach(() => {
 		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
 		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		// These tests deliberately exercise the "CLI failed" warning paths — expect and suppress them.
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
 	});
+
+	afterEach(() => vi.restoreAllMocks());
 
 	it('addModule records undo despite a rejected CLI call', async () => {
 		const store = useSlotsStore();
@@ -605,12 +612,9 @@ describe('module add/move/delete record undo even when the CLI/hardware call fai
 	});
 });
 
+// Uses the root beforeEach's resolved CLI mock — this block tests the module-swap mutation
+// logic itself, not offline resilience (that's covered above), so the CLI call should succeed.
 describe('replaceModule', () => {
-	beforeEach(() => {
-		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
-		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
-	});
-
 	// FltClassic (92) -> FltLP (87): both are real nmg2mods.ts entries. FltClassic's In (red, jack
 	// 0) has an equivalent on FltLP so its cable should survive; FltClassic's PitchVar (purple,
 	// jack 1) has no equivalent on FltLP (which only has Pitch, not PitchVar) so its cable should
@@ -697,7 +701,11 @@ describe('cable add/color/delete record undo even when the CLI/hardware call fai
 	beforeEach(() => {
 		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
 		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		// These tests deliberately exercise the "CLI failed" warning paths — expect and suppress them.
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
 	});
+
+	afterEach(() => vi.restoreAllMocks());
 
 	it('addCable records undo despite a rejected CLI call', async () => {
 		const store = useSlotsStore();
@@ -832,11 +840,14 @@ describe('downloadToSynthSlot — Download to Slot', () => {
 		useDeviceStore().status = DeviceStatus.Connected;
 		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('USB error'));
 		const loadSlotSpy = vi.spyOn(store, 'loadSlot');
+		// Upload failure is the behaviour under test — expect and suppress its console.error.
+		vi.spyOn(console, 'error').mockImplementation(() => {});
 
 		const result = await store.downloadToSynthSlot('A', 'C');
 
 		expect(result).toBe(false);
 		expect(loadSlotSpy).not.toHaveBeenCalled();
+		vi.restoreAllMocks();
 	});
 
 	it('no-ops when not connected', async () => {
@@ -909,7 +920,9 @@ describe('downloadPerformanceToSynth — Performance Download', () => {
 			store.performanceName = 'My Perf';
 			store.performanceRawHex = '00'.repeat(80);
 			useDeviceStore().status = DeviceStatus.Connected;
-			const loadSlotSpy = vi.spyOn(store, 'loadSlot');
+			// Mocked rather than a passthrough spy: the reload itself isn't under test here, and a
+			// passthrough would hit the CLI stub's undefined response and fail to parse it as JSON.
+			const loadSlotSpy = vi.spyOn(store, 'loadSlot').mockResolvedValue({ name: 'x', rawHex: '', patch: makePatch() } as any);
 
 			const resultPromise = store.downloadPerformanceToSynth();
 			await vi.runAllTimersAsync();

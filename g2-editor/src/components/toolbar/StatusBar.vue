@@ -5,6 +5,7 @@
 			:options="AREA_OPTIONS"
 			variant="variation"
 			size="small"
+			testIdPrefix="area"
 			@update:model-value="handleAreaChange"
 			@toggle-off="handleAreaToggleOff"
 		/>
