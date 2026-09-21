@@ -174,6 +174,27 @@ static int send_and_expect_ok(daemon_ctx_t *d, const char *json, int expected_id
     return -1;
 }
 
+/* Like send_and_expect_ok, but returns the full response object for expected_id instead of
+ * just ok/-1 - needed for commands like send-bank whose "data" can report ret==G2_OK (so
+ * "ok":true) while its own "aborted" field is true, since g2_send_bank always returns a
+ * result object even when it stopped partway through. Caller cJSON_Delete()s the result. */
+static cJSON *send_and_capture_response(daemon_ctx_t *d, const char *json, int expected_id) {
+    char line_buf[65536];
+    int json_len = (int)strlen(json);
+    if (write(d->in_fd, json, json_len) != json_len) return NULL;
+    if (write(d->in_fd, "\n", 1) != 1) return NULL;
+
+    for (int attempts = 0; attempts < 200; attempts++) {
+        if (read_line_timeout(d->out_fd, line_buf, sizeof(line_buf), 5) < 0) return NULL;
+        cJSON *resp = cJSON_Parse(line_buf);
+        if (!resp) continue;
+        cJSON *id_j = cJSON_GetObjectItem(resp, "id");
+        if (id_j && (int)id_j->valuedouble == expected_id) return resp;
+        cJSON_Delete(resp);
+    }
+    return NULL;
+}
+
 /* Test 1: Daemon starts — spawn the shared daemon and drain startup events until watch_armed. */
 void test_daemon_starts(void) {
     g_daemon = daemon_spawn();
@@ -222,6 +243,117 @@ void test_daemon_variation_cmd(void) {
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"variation\",\"args\":[\"2\",\"A\"]}", id);
     int r = send_and_expect_ok(&g_daemon, cmd, id);
     TEST_ASSERT_EQUAL_INT(0, r);
+}
+
+/* Bank numbers used by test_daemon_bank_chain_get_then_send, configurable per-user via env
+ * vars since bank contents/layout differ per G2 setup. *_LOAD banks are only ever read
+ * (get-bank) - never written. *_STORE banks are the disposable destination for send-bank
+ * and get freely overwritten by this test. Defaults match a typical scratch layout. */
+static int test_bank_env(const char *name, int fallback) {
+    const char *v = getenv(name);
+    return v ? atoi(v) : fallback;
+}
+
+/* One type's worth of the chained get-bank/send-bank regression check (see
+ * test_daemon_bank_chain_get_then_send for the why). Exercises both chain orders without
+ * ever writing to loadBank: get(load)->send(store) [get->send], then get(store)->send(store)
+ * [send->get, then get->send again as a same-bank round trip]. */
+static void bank_chain_one_type(daemon_ctx_t *d, const char *type_str, int loadBank, int storeBank) {
+    char dirA[64], dirB[64];
+    snprintf(dirA, sizeof(dirA), "/tmp/g2-bank-chain-%s-A-XXXXXX", type_str);
+    snprintf(dirB, sizeof(dirB), "/tmp/g2-bank-chain-%s-B-XXXXXX", type_str);
+    TEST_ASSERT_NOT_NULL(mkdtemp(dirA));
+    TEST_ASSERT_NOT_NULL(mkdtemp(dirB));
+
+    char cmd[512], listA[600], listB[600], msg[96];
+    cJSON *resp;
+
+    snprintf(listA, sizeof(listA), "%s/chain.pchList", dirA);
+    snprintf(listB, sizeof(listB), "%s/chain.pchList", dirB);
+
+    /* get(load) -> send(store): exercises the get->send transition. */
+    int id0 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-bank\",\"args\":[\"%s\",\"%d\",\"%s\",\"chain\"]}",
+             id0, type_str, loadBank, dirA);
+    resp = send_and_capture_response(d, cmd, id0);
+    snprintf(msg, sizeof(msg), "%s: get-bank(load) response", type_str);
+    TEST_ASSERT_NOT_NULL_MESSAGE(resp, msg);
+    snprintf(msg, sizeof(msg), "%s: get-bank(load) ok", type_str);
+    TEST_ASSERT_TRUE_MESSAGE(cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok")), msg);
+    cJSON_Delete(resp);
+
+    int id1 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"send-bank\",\"args\":[\"%s\",\"pchList\",\"%s\",\"%d\"]}",
+             id1, type_str, listA, storeBank);
+    resp = send_and_capture_response(d, cmd, id1);
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #1 response", type_str);
+    TEST_ASSERT_NOT_NULL_MESSAGE(resp, msg);
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #1 ok", type_str);
+    TEST_ASSERT_TRUE_MESSAGE(cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok")), msg);
+    cJSON *data1 = cJSON_GetObjectItem(resp, "data");
+    cJSON *aborted1 = data1 ? cJSON_GetObjectItem(data1, "aborted") : NULL;
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #1 did not abort", type_str);
+    TEST_ASSERT_FALSE_MESSAGE(aborted1 && cJSON_IsTrue(aborted1), msg);
+    cJSON_Delete(resp);
+
+    /* get(store) -> send(store): exercises the send->get transition, then a same-bank
+     * round trip (get->send again) using what was just written. */
+    int id2 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-bank\",\"args\":[\"%s\",\"%d\",\"%s\",\"chain\"]}",
+             id2, type_str, storeBank, dirB);
+    resp = send_and_capture_response(d, cmd, id2);
+    snprintf(msg, sizeof(msg), "%s: get-bank(store) response", type_str);
+    TEST_ASSERT_NOT_NULL_MESSAGE(resp, msg);
+    snprintf(msg, sizeof(msg), "%s: get-bank(store) ok", type_str);
+    TEST_ASSERT_TRUE_MESSAGE(cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok")), msg);
+    cJSON_Delete(resp);
+
+    int id3 = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"send-bank\",\"args\":[\"%s\",\"pchList\",\"%s\",\"%d\"]}",
+             id3, type_str, listB, storeBank);
+    resp = send_and_capture_response(d, cmd, id3);
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #2 response", type_str);
+    TEST_ASSERT_NOT_NULL_MESSAGE(resp, msg);
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #2 ok", type_str);
+    TEST_ASSERT_TRUE_MESSAGE(cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok")), msg);
+    cJSON *data2 = cJSON_GetObjectItem(resp, "data");
+    cJSON *aborted2 = data2 ? cJSON_GetObjectItem(data2, "aborted") : NULL;
+    snprintf(msg, sizeof(msg), "%s: send-bank(store) #2 did not abort", type_str);
+    TEST_ASSERT_FALSE_MESSAGE(aborted2 && cJSON_IsTrue(aborted2), msg);
+    cJSON_Delete(resp);
+}
+
+/* Test: get-bank immediately followed by send-bank, and the reverse order, must not
+ * intermittently fail with "no reply from device for location N" - regression test for
+ * the STOP_COMM/START_COMM lock/unlock scoping fix. Each bank op used to independently
+ * call g2_stop_comm()/g2_rearm() around itself; chaining two of them let a stray embedded
+ * message (from the brief re-armed window between them) get misread by g2_stop_comm()'s
+ * old unverified "first embedded message = the ack" logic as the ack for the next op,
+ * desyncing the request/response lockstep. Covers both patch and performance banks (the
+ * original repro was on a performance bank). Never writes to the *_LOAD banks - only ever
+ * overwrites the *_STORE banks - but send-bank still unconditionally overwrites whatever it
+ * writes to, so this is opt-in only: set G2_TEST_BANK_CHAIN=1 to run it. Bank numbers are
+ * configurable (defaults shown) via G2_TEST_PATCH_LOAD_BANK (1), G2_TEST_PATCH_STORE_BANK
+ * (30), G2_TEST_PERF_LOAD_BANK (1), G2_TEST_PERF_STORE_BANK (6). */
+void test_daemon_bank_chain_get_then_send(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    if (!getenv("G2_TEST_BANK_CHAIN")) {
+        TEST_IGNORE_MESSAGE("set G2_TEST_BANK_CHAIN=1 to run (destructive: overwrites the "
+                             "*_STORE scratch banks - see G2_TEST_PATCH_STORE_BANK/"
+                             "G2_TEST_PERF_STORE_BANK to configure which)");
+    }
+
+    int patchLoad  = test_bank_env("G2_TEST_PATCH_LOAD_BANK", 1);
+    int patchStore = test_bank_env("G2_TEST_PATCH_STORE_BANK", 30);
+    int perfLoad   = test_bank_env("G2_TEST_PERF_LOAD_BANK", 1);
+    int perfStore  = test_bank_env("G2_TEST_PERF_STORE_BANK", 6);
+    TEST_ASSERT_TRUE_MESSAGE(patchLoad >= 1 && patchLoad <= 32, "G2_TEST_PATCH_LOAD_BANK must be 1-32");
+    TEST_ASSERT_TRUE_MESSAGE(patchStore >= 1 && patchStore <= 32, "G2_TEST_PATCH_STORE_BANK must be 1-32");
+    TEST_ASSERT_TRUE_MESSAGE(perfLoad >= 1 && perfLoad <= 8, "G2_TEST_PERF_LOAD_BANK must be 1-8");
+    TEST_ASSERT_TRUE_MESSAGE(perfStore >= 1 && perfStore <= 8, "G2_TEST_PERF_STORE_BANK must be 1-8");
+
+    bank_chain_one_type(&g_daemon, "patch", patchLoad, patchStore);
+    bank_chain_one_type(&g_daemon, "performance", perfLoad, perfStore);
 }
 
 /* Test: select-param (hardware cursor sync) reaches g2_select_param via the daemon's

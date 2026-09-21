@@ -201,7 +201,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
          * G2's reply to set-perf-mode while G2 is still streaming — stop streaming
          * explicitly so queries in g2_emit_rearm_data() succeed. */
         emit_version_update_json(bulk, dataEnd, 1);
-        g2_stop_comm();
+        g2_lock_stream();
         g2_pending_rearm = 1;
     } else {
         printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);

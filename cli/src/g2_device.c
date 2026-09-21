@@ -1522,7 +1522,7 @@ int g2_set_perf_mode(int mode) {
      * from triggering g2_rearm() and leaving the G2 in an unread streaming state. */
     if (!g2_listener_active) {
         usleep(200000);
-        g2_stop_comm();
+        g2_lock_stream();
     }
     return G2_OK;
 }
@@ -1945,7 +1945,7 @@ static int send_perf_upload(const char *name, int name_len, const uint8_t *secti
      * uses the daemon, so that is precisely the path that had none. A plain sleep is safe here,
      * unlike the recv_interrupt above: it takes nothing from the listener queue. */
     usleep(PERF_UPLOAD_SETTLE_US);
-    if (!g2_listener_active) g2_stop_comm();
+    if (!g2_listener_active) g2_lock_stream();
     return G2_OK;
 }
 
@@ -3115,9 +3115,13 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     /* Same reason g2_send_bank stops the stream: the listener queue holds 64
      * messages and drops the OLDEST on overflow (g2_io.c), so over 128 locations
      * live LED/VU traffic evicts the answers this loop is waiting for. Always
-     * stopped, re-armed only in daemon mode - see g2_send_bank's copy of this
-     * comment. */
-    g2_stop_comm();
+     * stopped; never rearmed here — g2_lock_stream() is idempotent (a no-op if
+     * a chained bank op already left it locked) and the daemon's main loop
+     * unlocks once it has nothing else queued, so a whole burst of chained
+     * get-bank/send-bank calls only stops/restarts the stream once. In CLI/
+     * direct mode this never gets unlocked at all - see g2_send_bank's copy of
+     * this comment. */
+    g2_lock_stream();
 
     /* Drain stale data (same pattern as g2_get_patch_file/g2_get_perf_file). */
     if (!g2_listener_active) drain_stale_extended();
@@ -3128,8 +3132,6 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     char *list = malloc(listCap);
     if (!list) {
         g2_err("get-bank: out of memory\n");
-        g2_pending_rearm = 0;
-        if (g2_listener_active) g2_rearm();
         return NULL;
     }
     listLen += (size_t)snprintf(list, listCap, "Version=Nord Modular G2 Bank Dump\n");
@@ -3292,8 +3294,6 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
             char *grown = realloc(list, listCap);
             if (!grown) {
                 free(list);
-                g2_pending_rearm = 0;
-                if (g2_listener_active) g2_rearm();
                 return NULL;
             }
             list = grown;
@@ -3302,9 +3302,6 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         writtenCount++;
         emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, dispName);
     }
-
-    g2_pending_rearm = 0;
-    if (g2_listener_active) g2_rearm();
 
     cJSON *result = NULL;
     if (!aborted) {
@@ -3656,16 +3653,18 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
      * part-way through a 23-patch bank and the device eventually stops
      * accepting writes altogether. Same precaution every other direct-USB query
      * in this file takes. Always stop - a one-shot CLI run can inherit a still-
-     * streaming device from a daemon that exited without stopping it - but only
-     * re-arm (below) in daemon mode, since re-arming from the one-shot CLI would
-     * leave the device chattering into whatever command runs next. */
-    g2_stop_comm();
+     * streaming device from a daemon that exited without stopping it. Never
+     * rearmed here - g2_lock_stream() is idempotent (a no-op if a chained
+     * get-bank/send-bank already left it locked) and the daemon's main loop
+     * unlocks once it has nothing else queued, so a whole burst of chained bank
+     * ops only stops/restarts the stream once. In CLI/direct mode this never
+     * gets unlocked at all: re-arming from the one-shot CLI would leave the
+     * device chattering into whatever command runs next. */
+    g2_lock_stream();
 
     bank_entry_t *entries = calloc(128, sizeof(bank_entry_t));
     if (!entries) {
         g2_err("send-bank: out of memory\n");
-        g2_pending_rearm = 0;
-        if (g2_listener_active) g2_rearm();
         return NULL;
     }
 
@@ -3677,14 +3676,10 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     } else {
         g2_err("send-bank: source type must be 'pchList' or 'folder'\n");
         free(entries);
-        g2_pending_rearm = 0;
-        if (g2_listener_active) g2_rearm();
         return NULL;
     }
     if (nEntries < 0) {
         free(entries);
-        g2_pending_rearm = 0;
-        if (g2_listener_active) g2_rearm();
         return NULL;
     }
 
@@ -3838,22 +3833,22 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         for (int i = 0; i < nTooLarge; i++) g2_clear_patch(type, bank, tooLarge[i]);
     }
 
-    /* The G2 sends a BULK_REARM after a bank write, which the daemon defers via
-     * g2_pending_rearm and - once this command returns - answers with
-     * rearm_with_version_update(): a full re-fetch of all 4 live slots
-     * (g2_emit_rearm_data -> g2_get_patch x4). send-bank never touches the live
-     * slots, so that re-fetch has nothing to learn and every chance to misread a
-     * leftover packet ("Unexpected response type for patch data", confirmed on
-     * hardware 2026-09-14, surfacing as "Error" patches in all 4 slots). Drain
-     * what is left (bounded, so a stuck queue can't hang this command), then do
-     * the one thing the rearm is actually needed for - restart the stream this
-     * command stopped - and clear the flag so the daemon skips the re-fetch. */
+    /* The G2 sends a BULK_REARM after a bank write, which the daemon would
+     * otherwise defer via g2_pending_rearm and - once this command returns -
+     * answer with rearm_with_version_update(): a full re-fetch of all 4 live
+     * slots (g2_emit_rearm_data -> g2_get_patch x4). send-bank never touches
+     * the live slots, so that re-fetch has nothing to learn and every chance
+     * to misread a leftover packet ("Unexpected response type for patch
+     * data", confirmed on hardware 2026-09-14, surfacing as "Error" patches in
+     * all 4 slots). Drain what is left (bounded, so a stuck queue can't hang
+     * this command), then clear the flag so the daemon skips that re-fetch -
+     * the stream stays locked (g2_stream_locked) for the daemon's idle check
+     * to unlock with a plain g2_rearm() once the whole burst is done. */
     for (int i = 0; i < 50; i++) {
         uint8_t drain[64] = {0};
         if (recv_interrupt(drain, sizeof(drain), USB_TIMEOUT_STANDARD_MS) <= 0) break;
     }
     g2_pending_rearm = 0;
-    if (g2_listener_active) g2_rearm();
 
     if (aborted) g2_err("send-bank: aborted - %s\n", abortReason);
 
