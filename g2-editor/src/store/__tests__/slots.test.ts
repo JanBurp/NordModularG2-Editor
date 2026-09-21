@@ -971,6 +971,162 @@ describe('downloadPerformanceToSynth — Performance Download', () => {
 	});
 });
 
+describe('dumpOne — Dump One', () => {
+	it('sends dump-patch for the focused slot when connected and a patch is loaded', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		useDeviceStore().status = DeviceStatus.Connected;
+
+		const result = await store.dumpOne();
+
+		expect(result).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['dump-patch', 'A']);
+	});
+
+	it('no-ops when not connected', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+
+		const result = await store.dumpOne();
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalled();
+	});
+
+	it('no-ops when the focused slot has no patch', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+
+		const result = await store.dumpOne();
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalled();
+	});
+
+	it('returns false when the CLI call fails', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('USB error'));
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const result = await store.dumpOne();
+
+		expect(result).toBe(false);
+		vi.restoreAllMocks();
+	});
+});
+
+describe('uploadBankFromDevice — Bank Upload (from G2)', () => {
+	it('requests get-bank with a default name derived from type and bank when connected', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+
+		const result = await store.uploadBankFromDevice('patch', 3, '/tmp/dest');
+
+		expect(result).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['get-bank', 'patch', '3', '/tmp/dest', 'PatchBank3']);
+	});
+
+	it('passes through an explicit filename instead of the default', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+
+		await store.uploadBankFromDevice('performance', 2, '/tmp/dest', 'MyBank');
+
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['get-bank', 'performance', '2', '/tmp/dest', 'MyBank']);
+	});
+
+	it('no-ops when not connected', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+
+		const result = await store.uploadBankFromDevice('patch', 1, '/tmp/dest');
+
+		expect(result).toBe(false);
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalled();
+	});
+
+	it('returns false when the CLI call fails', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('USB error'));
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const result = await store.uploadBankFromDevice('patch', 1, '/tmp/dest');
+
+		expect(result).toBe(false);
+		vi.restoreAllMocks();
+	});
+});
+
+describe('downloadBankToDevice — Bank Download (to G2)', () => {
+	function bankResult(overrides: Partial<Record<string, unknown>> = {}) {
+		return { written: 2, cleared: 126, failed: 0, failures: [], aborted: false, ...overrides };
+	}
+
+	it('sends send-bank with the source path, then waits for names to reload, when connected', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			useDeviceStore().status = DeviceStatus.Connected;
+			const runSpy = (globalThis as any).window.cli.run as ReturnType<typeof vi.fn>;
+			runSpy.mockResolvedValue(JSON.stringify(bankResult()));
+
+			const resultPromise = store.downloadBankToDevice({ type: 'folder', folderPath: '/tmp/src' }, 5, 'patch');
+			await vi.runAllTimersAsync();
+			const result = await resultPromise;
+
+			expect(result).toEqual(bankResult());
+			expect(runSpy).toHaveBeenCalledWith(['send-bank', 'patch', 'folder', '/tmp/src', '5']);
+			expect(runSpy).toHaveBeenCalledWith(['reload-names']);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('sends the pchList filepath (not folderPath) for a pchList source', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			useDeviceStore().status = DeviceStatus.Connected;
+			const runSpy = (globalThis as any).window.cli.run as ReturnType<typeof vi.fn>;
+			runSpy.mockResolvedValue(JSON.stringify(bankResult()));
+
+			const resultPromise = store.downloadBankToDevice({ type: 'pchList', filepath: '/tmp/src/Bank1.pchList' }, 1, 'performance');
+			await vi.runAllTimersAsync();
+			await resultPromise;
+
+			expect(runSpy).toHaveBeenCalledWith(['send-bank', 'performance', 'pchList', '/tmp/src/Bank1.pchList', '1']);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
+	it('no-ops when not connected', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Disconnected;
+
+		const result = await store.downloadBankToDevice({ type: 'folder', folderPath: '/tmp/src' }, 1, 'patch');
+
+		expect(result).toBeNull();
+		expect((globalThis as any).window.cli.run).not.toHaveBeenCalled();
+	});
+
+	it('returns null when the CLI call fails', async () => {
+		const store = useSlotsStore();
+		useDeviceStore().status = DeviceStatus.Connected;
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('USB error'));
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+
+		const result = await store.downloadBankToDevice({ type: 'folder', folderPath: '/tmp/src' }, 1, 'patch');
+
+		expect(result).toBeNull();
+		vi.restoreAllMocks();
+	});
+});
+
 describe('assignedVoicesForSlot', () => {
 	it('returns the correct count for each slot label', () => {
 		const store = useSlotsStore();
