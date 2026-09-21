@@ -413,6 +413,15 @@
 		@close="closeModeDropdown"
 	/>
 
+	<DrumSynthPresetDropdown
+		v-if="dsPresetDropdownState.visible"
+		:x="dsPresetDropdownState.x"
+		:y="dsPresetDropdownState.y"
+		:selected-index="dsPresetDropdownState.selectedIndex"
+		@select="selectDsPreset"
+		@close="closeDsPresetDropdown"
+	/>
+
 	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
 
 	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
@@ -442,6 +451,8 @@
 	import { useContextMenu } from './composables/useContextMenu';
 	import ModuleModeDropdown from './components/canvas/ModuleModeDropdown.vue';
 	import { useModeDropdown } from './composables/useModeDropdown';
+	import DrumSynthPresetDropdown from './components/canvas/DrumSynthPresetDropdown.vue';
+	import { useDrumSynthPresetDropdown } from './composables/useDrumSynthPresetDropdown';
 	import SvgGradientDefs from './components/canvas/SvgGradientDefs.vue';
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
@@ -482,6 +493,7 @@
 
 	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
 	const { state: modeDropdownState, close: closeModeDropdown, select: selectMode } = useModeDropdown();
+	const { state: dsPresetDropdownState, close: closeDsPresetDropdown, select: selectDsPreset } = useDrumSynthPresetDropdown();
 	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
 	const { showHint, clearHint } = useStatusHint();
 

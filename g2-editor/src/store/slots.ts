@@ -1666,6 +1666,51 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// Batched sibling of setParam for applying several params as one user action (e.g. a
+		// DrumSynth preset), so a single Ctrl+Z reverts all of them together — same "apply the whole
+		// list, one hist.record" shape as _applyParamPages/swapParamPageSlots, not setParam's
+		// per-param coalescing (there's no rapid-drag case to coalesce here).
+		async setParams(
+			moduleId: number,
+			paramIndices: number[],
+			values: number[],
+			variation: number,
+			area: 'voice' | 'fx',
+			targetSlot?: SlotLabel,
+		): Promise<void> {
+			const slot = targetSlot ?? this._getActivePatch()?.slot;
+			if (!slot || !this.slots[slot]?.patch) return;
+
+			const { areaIdx, location } = areaConfig(area);
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const slotEntry = this.slots[slot];
+			const moduleParams = slotEntry.variations?.[variation]?.[areaKey]?.[moduleId];
+
+			const prevValues = paramIndices.map((idx, i) => moduleParams?.[idx] ?? values[i]);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						await this.setParams(moduleId, paramIndices, prevValues, variation, area, slot);
+					},
+					redo: async () => {
+						await this.setParams(moduleId, paramIndices, values, variation, area, slot);
+					},
+				});
+			}
+
+			if (moduleParams) {
+				paramIndices.forEach((idx, i) => {
+					moduleParams[idx] = values[i];
+				});
+			}
+			this._markSlotDirty(slot);
+
+			const cmds = paramIndices.map((idx, i) => ['set-param', slot, location, String(moduleId), String(idx), String(values[i]), String(variation)]);
+			await runCliBatchSafe(cmds, 'setParams');
+		},
+
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
