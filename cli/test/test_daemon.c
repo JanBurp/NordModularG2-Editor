@@ -200,9 +200,12 @@ void test_daemon_starts(void) {
     g_daemon = daemon_spawn();
     TEST_ASSERT_TRUE(g_daemon.pid > 0);
 
-    /* Drain device_info + slot_data×4 + names + watch_armed (7 lines).
-     * 2s timeout per line: instant if G2 connected, 2s total if not. */
-    cJSON *wa = read_event_of_type(&g_daemon, "watch_armed", 15, 2);
+    /* Drain usb_devices + device_info + slot_data×4 + global_knobs_data + names +
+     * synth_settings_update + watch_armed. 5s timeout per line (matches this file's other
+     * read_line_timeout calls): "names" (all patch/performance names across every bank) is
+     * the slowest line to arrive - hardware-measured at ~2.2s on a moderately full G2, so a
+     * 2s timeout was intermittently too tight and caused a false "not connected" SKIP. */
+    cJSON *wa = read_event_of_type(&g_daemon, "watch_armed", 15, 5);
     if (!wa) {
         g_daemon_ok = 1;
         TEST_IGNORE_MESSAGE("G2 not connected (no watch_armed from daemon)");
