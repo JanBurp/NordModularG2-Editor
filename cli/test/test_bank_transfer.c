@@ -16,6 +16,14 @@
  * within seconds of each other (see human_pause's own comment for why that
  * matters here), so neither does this test. That makes the whole suite slow
  * (several minutes) by design.
+ *
+ * A generalized fix for the underlying chaining bug (g2_lock_stream()/
+ * g2_unlock_stream(), see g2_io.c) has since landed, but its hardware
+ * verification is unresolved - see project_stream_lock_generalization.md
+ * ("Correction, later the same day"): an initial clean pass could not be
+ * reproduced, with reproducible "no reply" failures and one hard G2 freeze.
+ * So human_pause() stays as the defensive default here until a fresh
+ * hardware pass actually confirms the fix.
  */
 
 #include "unity.h"
@@ -40,9 +48,9 @@
  *    test only ever reads, it never writes.
  */
 #define PATCH_WRITE_TEST_BANK 6 /* confirmed empty on hardware, 2026-09-21 */
-#define PATCH_FETCH_TEST_BANK 6 /* TODO: point at a bank number you know exists on your hardware */
-#define PERF_WRITE_TEST_BANK  1 /* TODO: confirm this performance bank is actually empty on your hardware */
-#define PERF_FETCH_TEST_BANK  1 /* TODO: point at a bank number you know exists on your hardware */
+#define PATCH_FETCH_TEST_BANK 1 /* known-existing patch bank, 2026-09-21 */
+#define PERF_WRITE_TEST_BANK  7 /* confirmed empty on hardware, 2026-09-21 - bank 8 is NOT empty, avoid */
+#define PERF_FETCH_TEST_BANK  1 /* known-existing performance bank, 2026-09-21 */
 
 static int suite_initialized = 0;
 
@@ -83,7 +91,9 @@ static int copy_file(const char *src, const char *dst) {
  * operation at a time through the UI (open a dialog, pick a folder, click
  * confirm) with natural pauses in between, not several chained in a couple of
  * minutes like an earlier version of this test did. This models that pacing
- * instead of a short technical settle. */
+ * instead of a short technical settle. See this file's top comment for why
+ * this stays in place even after the g2_lock_stream()/g2_unlock_stream()
+ * fix landed. */
 static void human_pause(void) {
     sleep(15);
 }
