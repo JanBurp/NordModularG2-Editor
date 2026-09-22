@@ -74,9 +74,13 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     fflush(stderr);
     unsigned short before_fail = Unity.TestFailures;
     unsigned short before_ignore = Unity.TestIgnores;
-    int fd = suppress_stdout();
+    /* G2_TEST_VERBOSE=1 skips the stdout suppression below so Unity's actual
+     * TEST_ASSERT_*_MESSAGE failure text (printed to stdout) is visible instead
+     * of only the bare PASS/FAIL/SKIP line. */
+    int verbose = getenv("G2_TEST_VERBOSE") != NULL;
+    int fd = verbose ? -1 : suppress_stdout();
     RUN_TEST(test_func);
-    restore_stdout(fd);
+    if (!verbose) restore_stdout(fd);
     int failed = Unity.TestFailures > before_fail;
     /* TEST_IGNORE_MESSAGE("G2 device not connected"/"G2 not connected...") means the test
      * never actually ran against hardware — call that out distinctly so it isn't misread as

@@ -758,6 +758,8 @@ int send_bulk_msg(const uint8_t *buff, int len) {
      * this into a skipped entry rather than a corrupted device. */
     if (len > G2_MAX_MESSAGE_LEN) return G2_ERR_TOO_LARGE;
 
+    debug_send("bulk_msg", buff, len);
+
     int sent = 0, stalls = 0;
     while (sent < len) {
         int transferred = 0;

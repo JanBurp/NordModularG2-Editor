@@ -19,6 +19,7 @@
 #include "utils.h"
 #include "daemon.h"
 #include "cJSON.h"
+#include "g2_io.h"
 
 #define PROGRAM_NAME "g2-cli"
 #define PROGRAM_VERSION "1.0.0"
@@ -1119,6 +1120,7 @@ int main(int argc, char *argv[]) {
         }
         if (strcmp(argv[i], "--debug") == 0) {
             debug_mode = 1;
+            g2_debug = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             output_format = OUTPUT_JSON;
         } else if (argv[i][0] != '-') {
