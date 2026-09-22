@@ -12,6 +12,7 @@ import type {
 } from '@/types';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { SLOT_LABELS } from '@/constants';
+import { SEQNOTE_MODULE_TYPE, DEFAULT_PIANO_ROLL_VIEW } from '@/renderer/pianoRoll';
 
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
@@ -128,6 +129,22 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: 
 		}
 	}
 	return makeSection(SectionType.PARAMETERS, bw.flush());
+}
+
+// SeqNote's Magnifier/Octave-offset widget state rides the same $PARAM_NAMES container as real
+// param labels (see parseParamNames in nmg2PatchParser.ts) — two positional, unlabeled byte
+// entries (isString=false, paramLen=1) prepended before any real label entries. The original
+// editor emits these unconditionally for every SeqNote instance, so we do too (defaulting when
+// the module was added/edited without ever setting a view), for byte-fidelity with hardware-saved
+// patches.
+function paramLabelsForModule(m: ModuleInstance): ParamLabel[] {
+	if (m.type !== SEQNOTE_MODULE_TYPE) return m.paramLabels ?? [];
+	const { zoom, octaveOffset } = m.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+	const viewEntries: ParamLabel[] = [
+		{ paramIndex: zoom, isString: false, paramLen: 1, labels: [] },
+		{ paramIndex: octaveOffset, isString: false, paramLen: 1, labels: [] },
+	];
+	return [...viewEntries, ...(m.paramLabels ?? [])];
 }
 
 function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array | null {
@@ -488,7 +505,7 @@ function processSection(
 		// labels survive even if the template predates them.
 		const paramNamesSection = writeParamNames(
 			areaIdx as 0 | 1,
-			patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+			patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
 		);
 		if (paramNamesSection) out.push(paramNamesSection);
 		w.m5b.add(areaIdx);
@@ -496,7 +513,7 @@ function processSection(
 		if (!w.m5b.has(areaIdx)) {
 			const sec = writeParamNames(
 				areaIdx as 0 | 1,
-				patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+				patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
 			);
 			if (sec) out.push(sec);
 			w.m5b.add(areaIdx);

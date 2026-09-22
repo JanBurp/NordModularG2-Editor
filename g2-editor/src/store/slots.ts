@@ -12,8 +12,18 @@ import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
+import { DEFAULT_PIANO_ROLL_VIEW, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
-import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
+import {
+	mutAddCable,
+	mutAddModule,
+	mutDeleteCable,
+	mutDeleteModule,
+	mutMoveModule,
+	mutSetModuleColor,
+	mutSetModuleLabel,
+	mutSetPianoRollView,
+} from '../parser/patchMutations';
 import { remapParamValues, remapModeValues, remapCablesForModule } from '../parser/moduleReplace';
 import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
 import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/paramPages';
@@ -2179,6 +2189,35 @@ export const useSlotsStore = defineStore('slots', {
 			mutSetModuleLabel(patch, areaIdx, moduleId, label);
 			this._markSlotDirty(slot);
 			await runCliSafe(['set-module-name', slot, location, String(moduleId), label], 'setModuleLabel');
+		},
+
+		// SeqNote's piano-roll Magnifier/Octave view — host-editor-only UI state with no wire-protocol
+		// counterpart (see pianoRoll.ts), so unlike every other module-level setter above, there is no
+		// CLI push here. It's still real patch data (persisted via the $PARAM_NAMES section, see
+		// nmg2PatchSerializer.ts's paramLabelsForModule), so it still goes through history/dirty-marking
+		// like any other edit.
+		async setSeqNotePianoRollView(moduleId: number, area: 'voice' | 'fx', view: PianoRollView): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx } = areaConfig(area);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
+				const prevView = mod?.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+				hist.record(slot, {
+					undo: async () => {
+						await this.setSeqNotePianoRollView(moduleId, area, prevView);
+					},
+					redo: async () => {
+						await this.setSeqNotePianoRollView(moduleId, area, view);
+					},
+				});
+			}
+
+			mutSetPianoRollView(patch, areaIdx, moduleId, view);
+			this._markSlotDirty(slot);
 		},
 
 		async setPatchName(name: string): Promise<void> {

@@ -17,6 +17,7 @@ import type { ModuleInstance, ParamLabel } from '../types/module';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 import { SLOT_LABELS } from '../constants';
+import { SEQNOTE_MODULE_TYPE, type PianoRollView } from '../renderer/pianoRoll';
 
 export type {
 	ModuleInstance,
@@ -288,7 +289,22 @@ class G2Parser {
 					if (modIdx === PATCH_MORPH_MODULE_ID) this.morphParamLabelsData[this.aof >> 1] = entries;
 				} else {
 					const m = this.findModule(this.aof + areaIdx, modIdx);
-					if (m) m.paramLabels = entries;
+					if (m) {
+						// SeqNote's Magnifier/Octave-offset widgets (CPnlNoteSeqZoom/CPnlNoteSeqOffset in the
+						// original editor) persist through this same generic container, as two positional,
+						// unlabeled byte entries (isString=false, paramLen=1) — zoom first, then octave
+						// offset. Peel those off into pianoRollView; any real label entries (e.g. a renamed
+						// jack) are left in paramLabels as before.
+						const viewEntries = m.type === SEQNOTE_MODULE_TYPE ? entries.filter((e) => !e.isString && e.paramLen === 1) : [];
+						if (viewEntries.length >= 2) {
+							const [zoomEntry, offsetEntry] = viewEntries;
+							m.pianoRollView = { zoom: zoomEntry.paramIndex as PianoRollView['zoom'], octaveOffset: offsetEntry.paramIndex };
+							const remaining = entries.filter((e) => e !== zoomEntry && e !== offsetEntry);
+							if (remaining.length > 0) m.paramLabels = remaining;
+						} else {
+							m.paramLabels = entries;
+						}
+					}
 				}
 			}
 		}

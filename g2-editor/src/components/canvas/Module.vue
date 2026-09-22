@@ -167,8 +167,27 @@
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
 				/>
+				<SeqNoteStepStrip
+					v-else-if="param.n === 'KnobSeqSlider'"
+					:param-index="index"
+					:value="getParamValue(index)"
+					:x="param.x"
+					:width="SEQNOTE_STEP_WIDTH"
+					:strip-top="SEQNOTE_STRIP_TOP"
+					:strip-height="SEQNOTE_STRIP_HEIGHT"
+					:zoom="seqNotePianoRollView.zoom"
+					:octave-offset="seqNotePianoRollView.octaveOffset"
+					:dimmed="index >= seqNoteActiveStepCount"
+					:highlight="index === selectedParamIndex"
+					:morph-color="morphColorFor(index)"
+					:morph-range="morphRangeFor(index)"
+					@change="onParamChange"
+					@param-context-menu="onParamContextMenu"
+				/>
 			</g>
 		</g>
+
+		<SeqNoteViewControls v-if="instance.type === 121" :view="seqNotePianoRollView" @change="onPianoRollViewChange" />
 
 		<!-- Input jacks -->
 		<ModuleJack
@@ -232,6 +251,10 @@
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
 	import DrumSynthPresetSelector from './DrumSynthPresetSelector.vue';
+	import SeqNoteStepStrip from './SeqNoteStepStrip.vue';
+	import SeqNoteViewControls from './SeqNoteViewControls.vue';
+	import { useSeqNotePianoRoll } from '../../composables/useSeqNotePianoRoll';
+	import { SEQNOTE_STRIP_TOP, SEQNOTE_STRIP_HEIGHT, SEQNOTE_STEP_WIDTH, type PianoRollView } from '../../renderer/pianoRoll';
 	import { getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
@@ -455,6 +478,8 @@
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
 
+	const { view: seqNotePianoRollView, activeStepCount: seqNoteActiveStepCount } = useSeqNotePianoRoll(moduleDef, instance, localLv);
+
 	const uiStore = useUiStore();
 	const { showHint, clearHint } = useStatusHint();
 	const slotsStore = useSlotsStore();
@@ -536,6 +561,11 @@
 	function onDrumSynthPresetApply(values: number[]) {
 		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
 		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], values, uiStore.variation, area);
+	}
+
+	function onPianoRollViewChange(view: PianoRollView) {
+		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
+		slotsStore.setSeqNotePianoRollView(moduleIdx.value, area, view);
 	}
 
 	function onParamHoverEnter() {
