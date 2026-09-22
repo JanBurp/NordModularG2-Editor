@@ -31,6 +31,7 @@ int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
 volatile int g2_pending_disconnect = 0;
 volatile unsigned long g2_msg_drops = 0;
+volatile int g2_stream_locked = 0;
 
 static int g2_last_claim_error = 0;
 int g2_get_last_claim_error(void) { return g2_last_claim_error; }
@@ -757,6 +758,8 @@ int send_bulk_msg(const uint8_t *buff, int len) {
      * this into a skipped entry rather than a corrupted device. */
     if (len > G2_MAX_MESSAGE_LEN) return G2_ERR_TOO_LARGE;
 
+    debug_send("bulk_msg", buff, len);
+
     int sent = 0, stalls = 0;
     while (sent < len) {
         int transferred = 0;
@@ -818,20 +821,41 @@ void g2_rearm(void) {
     }
 }
 
+/* SUB_COMMAND_START_STOP (0x7d) has no protocol ack — confirmed against the
+ * reference editor's CMSynthUnlockEditorSync, which has no ReadStream/
+ * UseOnSynth anywhere: it's fire-and-forget. So there is no "the STOP_COMM
+ * ack" message to identify; this just drains whatever was already in flight
+ * (same short-timeout-until-quiet idiom as drain_stale_extended() in
+ * g2_device.c) until nothing more arrives, bounded defensively against a
+ * runaway stream. */
 void g2_stop_comm(void) {
     uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop, 2);
     uint8_t buf[16];
-    for (int tries = 0; tries < 20; tries++) {
-        int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STANDARD_MS);
+    for (int tries = 0; tries < 200; tries++) {
+        int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STALE_MS);
         if (ret <= 0) break;
         if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t sz = ((uint16_t)buf[1] << 8) | buf[2];
             if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-        } else {
-            break;  /* EMBEDDED — STOP_COMM ACK */
         }
     }
+}
+
+/* Idempotent lock/unlock over g2_stop_comm()/g2_rearm(), tracked by
+ * g2_stream_locked — see g2_io.h. Lets any number of callers stop/restart
+ * the stream around a burst of operations while only the first lock and the
+ * last unlock actually touch the wire. */
+void g2_lock_stream(void) {
+    if (g2_stream_locked) return;
+    g2_stop_comm();
+    g2_stream_locked = 1;
+}
+
+void g2_unlock_stream(void) {
+    if (!g2_stream_locked) return;
+    g2_stream_locked = 0;
+    g2_rearm();
 }
 
 /* Check if bulk payload is the all-slots version update that stops the stream */

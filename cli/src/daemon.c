@@ -192,7 +192,7 @@ static void rearm_with_version_update(void) {
 	debug_timing("rearm_data_start");
 	g2_emit_rearm_data();
 	debug_timing("rearm_data_end");
-	g2_rearm();
+	g2_unlock_stream();
 }
 
 /* ── seq: compound-frame batch execution ───────────────────────────────── */
@@ -628,6 +628,7 @@ static void execute_cmd(const char *line) {
 					if (rearm) {
 						debug_timing("select_perf_bulk_rearm_detected");
 						g2_pending_rearm = 0;
+						g2_stream_locked = 1;   /* G2 stopped itself; we never called g2_lock_stream() */
 						rearm_with_version_update();
 						debug_timing("select_perf_rearm_done");
 						break;
@@ -641,6 +642,7 @@ static void execute_cmd(const char *line) {
 					if (g2_pending_rearm) {
 						debug_timing("select_perf_pending_rearm_detected");
 						g2_pending_rearm = 0;
+						g2_stream_locked = 1;   /* defensive: idempotent even if already set */
 						rearm_with_version_update();
 						debug_timing("select_perf_rearm_done");
 						break;
@@ -767,6 +769,10 @@ static void execute_cmd(const char *line) {
 		ret = data ? G2_OK : G2_ERR;
 		if (rearm_after_get_patch) {
 			rearm_after_get_patch = 0;
+			/* The device already stopped itself (no g2_stop_comm() of ours sent);
+			 * just record that fact so g2_unlock_stream() (via g2_pending_rearm
+			 * below) knows a rearm is actually owed. */
+			g2_stream_locked = 1;
 			g2_pending_rearm = 1;
 		}
 
@@ -922,6 +928,11 @@ static void *stdin_reader(void *arg) {
 /* ── reconnect helper ──────────────────────────────────────────────────── */
 
 static void do_reconnect(void) {
+	/* Any g2_stream_locked/g2_pending_rearm state from before the disconnect is
+	 * stale — nothing backs it on the other side of a fresh connect. */
+	g2_stream_locked = 0;
+	g2_pending_rearm = 0;
+
 	g2_listener_stop();
 	g2_disconnect();
 	printf("{\"type\":\"device_disconnected\"}\n");
@@ -933,10 +944,10 @@ static void do_reconnect(void) {
 
 	/* Reset G2 firmware state — same as startup init sequence (Delphi InitSeq steps 1-2). */
 	g2_send_init();
-	g2_stop_comm();
+	g2_lock_stream();
 
 	g2_listener_start();
-	g2_rearm();
+	g2_unlock_stream();
 	/* Consume START_COMM ACK from listener queue. */
 	g2_msg_t ack;
 	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
@@ -962,8 +973,12 @@ int g2_daemon_run(output_format_t format, int debug) {
 	signal(SIGINT, daemon_stop);
 	signal(SIGTERM, daemon_stop);
 
-	pthread_t reader;
-	pthread_create(&reader, NULL, stdin_reader, NULL);
+	/* The stdin-reader thread is created after connect succeeds (below), not here.
+	 * Creating it before the first libusb device-open/claim call let daemon mode hang
+	 * indefinitely inside g2_connect_silent() on some machines, even though every
+	 * single-shot command (which never creates this thread) connects instantly in the
+	 * same environment - a libusb/pthread interaction, not anything specific to this
+	 * codebase's connect logic. */
 
 	/* Enumerate USB devices before connecting and emit the list as an event. */
 	emit_event("usb_devices", g2_list_devices_json());
@@ -979,19 +994,21 @@ int g2_daemon_run(output_format_t format, int debug) {
 				cJSON_AddStringToObject(ev, "code", libusb_error_name(g2_get_last_claim_error()));
 				emit(ev);
 				cJSON_Delete(ev);
-				pthread_detach(reader);
 				return 1;
 			}
 			usleep(100000);
 		}
 	}
-	if (!daemon_running) { pthread_detach(reader); return 0; }
+	if (!daemon_running) return 0;
 	debug_status("connected");
+
+	pthread_t reader;
+	pthread_create(&reader, NULL, stdin_reader, NULL);
 
 	/* Reset G2 state and stop streaming (Delphi InitSeq steps 1-2). */
 	g2_send_init();
 	debug_status("send_init");
-	g2_stop_comm();
+	g2_lock_stream();
 	debug_status("stop_comm");
 
 	/* Run all startup queries in direct mode (no listener yet) so that
@@ -1043,7 +1060,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 	debug_status("listener_start");
 	g2_listener_start();
 	debug_status("rearm");
-	g2_rearm();   /* sends START_COMM; ACK consumed below */
+	g2_unlock_stream();   /* sends START_COMM; ACK consumed below */
 
 	/* Wait for START_COMM ACK before declaring the daemon ready. */
 	g2_msg_t ack;
@@ -1082,12 +1099,20 @@ int g2_daemon_run(output_format_t format, int debug) {
 			 * of discarding it silently.  Re-arm streaming now. */
 			if (g2_pending_rearm) {
 				g2_pending_rearm = 0;
+				g2_stream_locked = 1;   /* covers a G2-initiated stop consumed mid-command */
 				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}
 			if (++cmds_since_listener_check < STDIN_DRAIN_BATCH) continue;
 		}
 		cmds_since_listener_check = 0;
+
+		/* Nothing left queued: unlock any stream a command left locked (bank
+		 * ops - see g2_get_bank/g2_send_bank) now that we're genuinely idle,
+		 * mirroring the reference editor's unlock-on-idle-tick behavior. A
+		 * plain unlock, not rearm_with_version_update(): nothing that reaches
+		 * this path touches the live slots. */
+		if (!had_line && g2_stream_locked) g2_unlock_stream();
 
 		/* Wait for next event from the listener. A batch of stdin commands likely means
 		 * more are still queued, so peek non-blockingly rather than stalling on them;
@@ -1108,6 +1133,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_emit_event(&msg);
 			g2_msg_free(&msg);
 			g2_pending_rearm = 0;
+			g2_stream_locked = 1;   /* G2 stopped itself; we never called g2_lock_stream() */
 			rearm_with_version_update();
 		} else {
 			/* patch_version_change arrives while streaming is active.  The following
@@ -1122,6 +1148,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 			g2_msg_free(&msg);
 			if (g2_pending_rearm) {
 				g2_pending_rearm = 0;
+				g2_stream_locked = 1;   /* defensive: idempotent even if already set */
 				rearm_with_version_update();
 				/* ACK will arrive via listener and be emitted as {"type":"ok"} next iter. */
 			}

@@ -49,6 +49,15 @@ extern volatile int g2_pending_disconnect;
  * have been thrown away - the cause of an unexplained "no reply" abort. */
 extern volatile unsigned long g2_msg_drops;
 
+/* Level-triggered: 1 while the G2's live stream is intentionally stopped and
+ * something still owes it a rearm. Set/cleared only by g2_lock_stream()/
+ * g2_unlock_stream() (and mirrored manually by callers that know the device
+ * stopped itself, e.g. select-patch/upload-perf — see daemon.c). Mirrors the
+ * reference editor's CSynth::CleanDirtyData lock-once/unlock-once-per-burst
+ * state: everything that needs the stream stopped shares this one flag
+ * instead of each caller reconstructing "are we stopped" from context. */
+extern volatile int g2_stream_locked;
+
 /* Set to 1 by daemon --debug; causes send_* functions to log hex to stdout */
 extern int g2_debug;
 
@@ -94,8 +103,18 @@ int g2_get_last_claim_error(void);
  * When listener is active, the ACK is read by the listener — no recv call here. */
 void g2_rearm(void);
 
-/* Send STOP_COMM and read the embedded ACK. Call before running direct queries
- * to guarantee the G2 is not streaming (matches Delphi InitSeq step 2). */
+/* Send STOP_COMM and drain whatever was already in flight. Call before running
+ * direct queries to guarantee the G2 is not streaming (matches Delphi InitSeq
+ * step 2). */
 void g2_stop_comm(void);
+
+/* Generic lock/unlock over g2_stop_comm()/g2_rearm(), tracked by
+ * g2_stream_locked. Idempotent: g2_lock_stream() is a no-op if already
+ * locked, g2_unlock_stream() a no-op if not — so any number of callers can
+ * lock/unlock around a burst of operations and only the first lock and the
+ * last unlock actually touch the wire. Prefer these over calling
+ * g2_stop_comm()/g2_rearm() directly. */
+void g2_lock_stream(void);
+void g2_unlock_stream(void);
 
 #endif /* G2_IO_H */
