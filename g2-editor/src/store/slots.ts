@@ -663,13 +663,13 @@ export const useSlotsStore = defineStore('slots', {
 						slotEntry.variations![toVar] = deepCloneVariationState(prevState);
 						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await window.cli.runBatch(cmds);
+						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation undo');
 					},
 					redo: async () => {
 						slotEntry.variations![toVar] = deepCloneVariationState(newState);
 						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await window.cli.runBatch(cmds);
+						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation redo');
 					},
 				});
 			}
@@ -678,7 +678,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.pendingCopyVariation[key] = (this.pendingCopyVariation[key] ?? 0) + 1;
 			slotEntry.variations[toVar] = newState;
 			this._markSlotDirty(slot);
-			await window.cli.run(['copy-variation', slot, String(fromVar), String(toVar)]);
+			await runCliSafe(['copy-variation', slot, String(fromVar), String(toVar)], 'copyVariation');
 		},
 
 		handleCopyVariationEvent(slot: SlotLabel, fromVar: number, toVar: number) {
@@ -1283,7 +1283,7 @@ export const useSlotsStore = defineStore('slots', {
 							this._markSlotDirty(slot);
 							const allUndoCmds = [...delCableCmds, ...delModCmds, ...moveCmds];
 							if (allUndoCmds.length > 0) {
-								await window.cli.runBatch(allUndoCmds);
+								await runCliBatchSafe(allUndoCmds, 'paste undo');
 							}
 						},
 						redo: async () => {
@@ -1697,7 +1697,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (mod?.modes) mod.modes[modeIdx] = value;
 			this._markSlotDirty(slot);
 
-			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
+			await runCliSafe(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)], 'setMode');
 		},
 
 		async pasteParams(pairs: PasteParamsPair[], variation: number, area: 'voice' | 'fx'): Promise<void> {
@@ -1747,7 +1747,7 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 			this._markSlotDirty(slot);
-			if (cmds.length > 0) await window.cli.runBatch(cmds);
+			if (cmds.length > 0) await runCliBatchSafe(cmds, 'pasteParams');
 		},
 
 		async loadSlot(slot: SlotLabel, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
@@ -2150,7 +2150,10 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const id of moduleIds) mutSetModuleColor(patch, areaIdx, id, color);
 			this._markSlotDirty(slot);
-			await window.cli.runBatch(moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]));
+			await runCliBatchSafe(
+				moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]),
+				'setModuleColors',
+			);
 		},
 
 		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
@@ -2175,7 +2178,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			mutSetModuleLabel(patch, areaIdx, moduleId, label);
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
+			await runCliSafe(['set-module-name', slot, location, String(moduleId), label], 'setModuleLabel');
 		},
 
 		async setPatchName(name: string): Promise<void> {
@@ -2568,7 +2571,10 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[labelIndex] = label;
 			}
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels]);
+			await runCliSafe(
+				['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels],
+				'setParamLabel',
+			);
 		},
 
 		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
@@ -2604,7 +2610,10 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[0] = label;
 			}
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label]);
+			await runCliSafe(
+				['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label],
+				'setMorphGroupLabel',
+			);
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {
