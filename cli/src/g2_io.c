@@ -195,6 +195,13 @@ int g2_connect_silent(void) {
 }
 
 int g2_disconnect(void) {
+    /* A one-shot CLI command that locked the stream (send-bank, get-bank,
+     * set-perf-mode) has no other cleanup point before the process exits -
+     * without this, the G2 is left not reporting LED/VU/param notifications
+     * until something else sends START_COMM (e.g. the daemon's own startup
+     * lock/unlock cycle). do_reconnect() already zeroes g2_stream_locked
+     * before calling this, so this is a no-op on that path. */
+    if (g2_stream_locked && g2.handle) g2_unlock_stream();
     if (g2.interface_claimed && g2.handle) {
         libusb_release_interface(g2.handle, 0);
         g2.interface_claimed = 0;

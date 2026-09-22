@@ -3690,10 +3690,11 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     int aborted = 0;
     char abortReason[128] = {0};
     cJSON *failures = cJSON_CreateArray();
-    /* Locations listed in the source but too large to write; cleared in a
-     * second pass once the write loop is done - see the loop's exit. */
-    int tooLarge[128];
-    int nTooLarge = 0;
+    /* Locations listed in the source but skipped (too large, or wrong file
+     * type for this bank); cleared in a second pass once the write loop is
+     * done - see the loop's exit. */
+    int deferredClear[128];
+    int nDeferredClear = 0;
     unsigned long dropsAtStart = g2_msg_drops;
 
     for (int location = 0; location < 128; location++) {
@@ -3767,6 +3768,21 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             continue;
         }
 
+        /* Third header byte: 0x00 = patch, 0x01 = performance (FILE_TYPE_PATCH/
+         * FILE_TYPE_PERFORMANCE, nmg2PatchSerializer.ts) - reject a source file
+         * that doesn't match the bank's own type rather than write it into a
+         * slot the device will never read back correctly. */
+        if (fileData[name_end + 2] != (uint8_t)type) {
+            g2_err("send-bank: %s is the wrong file type for location %d, skipping\n",
+                   e->filepath, location + 1);
+            add_bank_failure(failures, location + 1, e->filepath, "wrong file type for this bank");
+            free(fileData);
+            if (nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
+            failedCount++;
+            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
+            continue;
+        }
+
         int status = -1;
         int ret = send_flash_dump_raw(type, bank - 1, location, name,
                                       fileData + name_end, (size_t)fsize - (size_t)name_end, &status);
@@ -3784,7 +3800,7 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
              * puts a stray read in the middle of the per-location lockstep.
              * Defer to the second pass after the loop, where it cannot affect
              * any write. */
-            if (nTooLarge < 128) tooLarge[nTooLarge++] = location + 1;
+            if (nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
             char reason[80];
             snprintf(reason, sizeof(reason), "too large for device (%ld bytes)", fsize);
             add_bank_failure(failures, location + 1, e->filepath, reason);
@@ -3823,14 +3839,15 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
 
     free(entries);
 
-    /* Second pass: clear the locations that were listed but too large to send.
-     * A bank download already clears every location absent from the source
-     * list, so one that is listed but unwritable must not keep unrelated data
-     * the user would see as a valid entry - location 16 of the test bank held a
-     * corrupt 34 KB performance from an earlier failed write. Skipped when the
-     * run aborted: the device has already stopped answering by then. */
+    /* Second pass: clear the locations that were listed but skipped (too large,
+     * or wrong file type). A bank download already clears every location
+     * absent from the source list, so one that is listed but unwritable must
+     * not keep unrelated data the user would see as a valid entry - location
+     * 16 of the test bank held a corrupt 34 KB performance from an earlier
+     * failed write. Skipped when the run aborted: the device has already
+     * stopped answering by then. */
     if (!aborted) {
-        for (int i = 0; i < nTooLarge; i++) g2_clear_patch(type, bank, tooLarge[i]);
+        for (int i = 0; i < nDeferredClear; i++) g2_clear_patch(type, bank, deferredClear[i]);
     }
 
     /* The G2 sends a BULK_REARM after a bank write, which the daemon would
