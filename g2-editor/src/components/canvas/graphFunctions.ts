@@ -352,6 +352,33 @@ function oscShpBgraph(_ve: VisualElement, vals: number[], modes: number[] | unde
 type ThI = { xs: number; ys: number; yo: number; sustime?: number };
 type SegMethod = 'lin' | 'exp' | 'log';
 
+const ENV_ARC_STEPS = 8; // C reference (ArcTo) uses 20 angular steps; these graphs are only ~20-90px wide, so 8 is visually smooth and keeps `d` short.
+
+// Mirrors the original editor's ExpTo/LogTo (built on ArcTo, G2Editor.c ~109102-115180):
+// samples a quarter-ellipse arc tangent to the box between (x0,y0) and (x1,y1), rather
+// than a Bezier with an arbitrary control point. 'exp' centers the ellipse at (x1,y0) ->
+// steep-then-flat (decay/release). 'log' centers it at (x0,y1) -> flat-then-steep (attack).
+// Returns "L" commands to append to an in-progress path.
+function arcSegment(x0: number, y0: number, x1: number, y1: number, mode: 'exp' | 'log'): string {
+	const a = Math.abs(x1 - x0);
+	const b = Math.abs(y1 - y0);
+	if (a < 1e-6 || b < 1e-6) return `L${x1},${y1}`;
+	const cx = mode === 'exp' ? x1 : x0;
+	const cy = mode === 'exp' ? y0 : y1;
+	const theta0 = Math.atan2((y0 - cy) / b, (x0 - cx) / a);
+	const theta1 = Math.atan2((y1 - cy) / b, (x1 - cx) / a);
+	let d = '';
+	for (let i = 1; i <= ENV_ARC_STEPS; i++) {
+		if (i === ENV_ARC_STEPS) {
+			d += `L${x1},${y1}`;
+		} else {
+			const t = theta0 + ((theta1 - theta0) * i) / ENV_ARC_STEPS;
+			d += `L${cx + a * Math.cos(t)},${cy + b * Math.sin(t)}`;
+		}
+	}
+	return d;
+}
+
 class EnvSegment {
 	l: number;
 	t: number;
@@ -364,19 +391,20 @@ class EnvSegment {
 		en.tacc += this.t;
 		return `L${en.tacc * en.thi.xs},${this.l * en.thi.ys + en.thi.yo}`;
 	}
-	exp(_i: number, en: EnvCtx): string {
-		const emt1 = en.tacc + this.t * 0.16;
+	private arcTo(i: number, en: EnvCtx, mode: 'exp' | 'log'): string {
+		const idx = (i || en.segs.length) - 1;
+		const y0 = en.segs[idx].l * en.thi.ys + en.thi.yo;
+		const x0 = en.tacc * en.thi.xs;
 		en.tacc += this.t;
-		const y = this.l * en.thi.ys + en.thi.yo;
-		return `Q${emt1 * en.thi.xs},${y} ${en.tacc * en.thi.xs},${y}`;
+		const x1 = en.tacc * en.thi.xs;
+		const y1 = this.l * en.thi.ys + en.thi.yo;
+		return arcSegment(x0, y0, x1, y1, mode);
+	}
+	exp(i: number, en: EnvCtx): string {
+		return this.arcTo(i, en, 'exp');
 	}
 	log(i: number, en: EnvCtx): string {
-		const idx = (i || en.segs.length) - 1;
-		const pli = en.segs[idx].l * en.thi.ys + en.thi.yo;
-		const emt1 = en.tacc + this.t * 0.8;
-		en.tacc += this.t;
-		const y = this.l * en.thi.ys + en.thi.yo;
-		return `Q${emt1 * en.thi.xs},${pli} ${en.tacc * en.thi.xs},${y}`;
+		return this.arcTo(i, en, 'log');
 	}
 	sseg(_i: number, en: EnvCtx): string {
 		en.tacc += en.thi.sustime ?? 0;
@@ -987,13 +1015,7 @@ function waveWrapGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	return { kind: 'path', d, zeroLine: true };
 }
 
-function levScalerGraph(ve: VisualElement, vals: number[]): GraphPathResult {
-	const w = ve.w!;
-	const h = ve.h!;
-	const slopeL = ((lv(vals, 0, 64) - 64) / 64) * 8.0;
-	const bpNote = lv(vals, 1, 64);
-	const slopeR = ((lv(vals, 2, 64) - 64) / 64) * 8.0;
-
+function drawLevScaleCurve(w: number, h: number, bpNote: number, slopeL: number, slopeR: number): GraphPathResult {
 	const MAX_DB = 40;
 	const bpX = (bpNote / 127) * w;
 	const bpY = h / 2;
@@ -1008,6 +1030,87 @@ function levScalerGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	);
 
 	return { kind: 'path', d, zeroLine: true };
+}
+
+function levScalerGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const slopeL = ((lv(vals, 0, 64) - 64) / 64) * 8.0;
+	const bpNote = lv(vals, 1, 64);
+	const slopeR = ((lv(vals, 2, 64) - 64) / 64) * 8.0;
+	return drawLevScaleCurve(ve.w!, ve.h!, bpNote, slopeL, slopeR);
+}
+
+// --- FM Operator (id 180) — two graph slots: rate/level envelope + KB level-scale curve ---
+function operatorEnvGraph(vals: number[]): GraphPathResult {
+	const segs = [
+		new EnvSegment(lv(vals, 8, 0), 127 - lv(vals, 9, 0)), // R1/L1
+		new EnvSegment(lv(vals, 10, 0), 127 - lv(vals, 11, 0)), // R2/L2
+		new EnvSegment(lv(vals, 12, 0), 127 - lv(vals, 13, 0)), // R3/L3
+		new EnvSegment(lv(vals, 14, 0), 127 - lv(vals, 15, 0)), // R4/L4
+	];
+	const en: EnvCtx = { segs, tacc: 0, thi: thi28(0) };
+	return { kind: 'path', d: envGetd(en, ['exp', 'exp', 'exp', 'exp']) };
+}
+
+function operatorKbLevScaleGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const bpNote = lv(vals, 17, 64);
+	// LDepthMode/RDepthMode assumed to pick slope sign; not hardware-verified — flip if it visually reads backwards.
+	const slopeL = (lv(vals, 18, 0) ? 1 : -1) * (lv(vals, 19, 0) / 127) * 8.0;
+	const slopeR = (lv(vals, 20, 0) ? 1 : -1) * (lv(vals, 21, 0) / 127) * 8.0;
+	return drawLevScaleCurve(ve.w!, ve.h!, bpNote, slopeL, slopeR);
+}
+
+function operator(ve: VisualElement, vals: number[]): GraphResult | null {
+	if (ve.w === 85 && ve.h === 28) return operatorEnvGraph(vals);
+	if (ve.w === 63 && ve.h === 24) return operatorKbLevScaleGraph(ve, vals);
+	return null;
+}
+
+// --- Oscillator Noise (id 106) — APPROXIMATION: original CPnlTunedNoiseGraph formula not recoverable from the C source ---
+const NOISE_SEED = [0.62, 0.11, 0.83, 0.37, 0.95, 0.05, 0.71, 0.28, 0.49, 0.18, 0.92, 0.34, 0.66, 0.08, 0.77, 0.44];
+
+function oscNoiseGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const w = ve.w!;
+	const h = ve.h!;
+	const width = lv(vals, 5, 64) / 127;
+	const n = NOISE_SEED.length;
+	const midY = h / 2;
+	const amp = midY * 0.9;
+	let d = '';
+	for (let i = 0; i < n; i++) {
+		const pos = (i / (n - 1)) * 2 - 1;
+		const taper = Math.pow(1 - Math.abs(pos), 3 * (1 - width) + 0.15);
+		const x = (i / (n - 1)) * w;
+		const y = midY - (NOISE_SEED[i] * 2 - 1) * amp * taper;
+		d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
+	}
+	return { kind: 'path', d };
+}
+
+// --- Mux 8-1 X-Fade (id 60) — APPROXIMATION: original CPnlXMuxGraph::Draw formula not recoverable from the C source ---
+function muxXFadeGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const w = ve.w!;
+	const h = ve.h!;
+	const m = w / 6;
+	const xf = lv(vals, 0, 64) / 127;
+	const top = h * 0.12;
+	const bot = h * 0.88;
+	const dA = `M${m.toFixed(2)},${top.toFixed(2)} L${(w - m).toFixed(2)},${bot.toFixed(2)}`;
+	const dB = `M${m.toFixed(2)},${bot.toFixed(2)} L${(w - m).toFixed(2)},${top.toFixed(2)}`;
+	const markerX = m + xf * (w - 2 * m);
+	return { kind: 'path', d: `${dA} ${dB} M${markerX.toFixed(2)},0 L${markerX.toFixed(2)},${h}` };
+}
+
+// --- Random Trig (id 205) — APPROXIMATION: original CPnlRndTrigGraph::Draw formula not recoverable from the C source ---
+function rndTrigGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const w = ve.w!;
+	const h = ve.h!;
+	const prob = lv(vals, 0, 0) / 127;
+	const barW = w * 0.5;
+	const x0 = (w - barW) / 2;
+	const barH = prob * (h - 2);
+	const y0 = h - barH;
+	const d = `M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${(x0 + barW).toFixed(2)},${y0.toFixed(2)} L${(x0 + barW).toFixed(2)},${h} Z`;
+	return { kind: 'path', d: '', dFill: d, fill: GRAPH_COLORS.vocoderBar };
 }
 
 function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
@@ -1160,10 +1263,23 @@ function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
 	const type = lv(vals, 5, 0); // 0=Notch, 1=Peak, 2=Deep
 	if (type === 0) fb = -Math.abs(fb);
 	else if (type === 2) fb = Math.sign(fb || 1) * Math.min(0.985, Math.abs(fb) * 1.3);
+
+	// sampleResponse places 96 samples log-spaced across F_MIN..F_MAX. A comb filter's
+	// notches repeat every `fc` Hz linearly, so above some frequency the per-sample Hz gap
+	// exceeds the notch spacing and consecutive samples land on effectively random phases
+	// of the ripple, rendering as visual noise instead of a clean curve. Fade to the
+	// cycle-average magnitude past that point so only the resolvable low-frequency notches show.
+	const stepRatio = Math.pow(2, F_OCT / 96);
+	const hzAlias = fc / (2 * (stepRatio - 1));
+	const avgMag = 1 / Math.sqrt(1 + fb * fb);
+
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => {
 		const phase = (2 * Math.PI * hz) / fc;
 		const denom = 1 - 2 * fb * Math.cos(phase) + fb * fb;
-		return 1 / Math.sqrt(Math.max(1e-6, denom));
+		const mag = 1 / Math.sqrt(Math.max(1e-6, denom));
+		if (hz <= hzAlias) return mag;
+		const fade = Math.min(1, (hz - hzAlias) / hzAlias);
+		return mag * (1 - fade) + avgMag * fade;
 	});
 	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
 }
@@ -1229,6 +1345,10 @@ const moduleIdRegistry: Record<number, (ve: VisualElement, vals: number[], modes
 	34: shpExpGraph,
 	74: waveWrapGraph,
 	115: levScalerGraph,
+	106: oscNoiseGraph,
+	180: operator,
+	60: muxXFadeGraph,
+	205: rndTrigGraph,
 };
 
 export function getGraph(ve: VisualElement, lvVals: number[] | undefined, modes: number[] | undefined, moduleId?: number): GraphResult | null {
