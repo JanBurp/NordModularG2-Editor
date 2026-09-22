@@ -4,6 +4,7 @@ import { getParam } from '../renderer/parammap';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { useDeviceStore } from '../store/device';
 import { clamp } from '@/utils/math';
 
 export function useModuleParams(
@@ -15,6 +16,7 @@ export function useModuleParams(
 ) {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const deviceStore = useDeviceStore();
 	const areaKey = areaLabel === 'va' ? 'voice' : 'fx';
 
 	const localLv = computed<number[]>(() => {
@@ -55,6 +57,15 @@ export function useModuleParams(
 				value = clamp(value, p.low, p.high);
 			}
 		}
+
+		// Rnd/Clr triggers rely on the G2 hardware to compute and echo back the new step values
+		// (see randomizeOrClearSeqSteps in slots.ts), which never happens while disconnected — so
+		// compute it locally in that case. Only on the press edge (value===1), and the normal
+		// trigger-param emit below still runs too, so the button's own visual state is unaffected.
+		if (param?.type === 'TrigBtn' && value === 1 && (param.name === 'Rnd' || param.name === 'Clr') && !deviceStore.connected) {
+			slotsStore.randomizeOrClearSeqSteps(instance.value.index || 0, uiStore.variation, areaKey, param.name === 'Rnd' ? 'rnd' : 'clr');
+		}
+
 		emitParamChange(instance.value.index || 0, paramIndex, value, immediate);
 	}
 

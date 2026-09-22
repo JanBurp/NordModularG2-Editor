@@ -11,6 +11,7 @@ import type {
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
+import { getParam } from '../renderer/parammap';
 import type { ModuleDefinition } from '@/types/module';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
 import { remapParamValues, remapModeValues, remapCablesForModule } from '../parser/moduleReplace';
@@ -1615,6 +1616,54 @@ export const useSlotsStore = defineStore('slots', {
 
 			const cmds = paramIndices.map((idx, i) => ['set-param', slot, location, String(moduleId), String(idx), String(values[i]), String(variation)]);
 			await runCliBatchSafe(cmds, 'setParams');
+		},
+
+		// Rnd/Clr on sequencer modules (SeqNote/SeqVal/SeqLev/SeqCtr) normally do nothing locally:
+		// the real hardware computes the new step values and streams them back as param_change
+		// echoes (useSlotEvents.ts), a round trip that never happens while offline. This reproduces
+		// that effect locally — only called when disconnected, see useModuleParams.ts — using
+		// setParams so the whole press is one undo/redo entry. Touches both the value row
+		// (Seq1StepN) and the on/off gate row (Seq2StepN, where present).
+		async randomizeOrClearSeqSteps(moduleId: number, variation: number, area: 'voice' | 'fx', mode: 'rnd' | 'clr'): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+
+			const { areaIdx } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
+			const params = (mod ? getModule(mod.type) : null)?.params;
+			if (!params) return;
+
+			const stepIndices: number[] = [];
+			const gateIndices: number[] = [];
+			for (let n = 1; n <= 16; n++) {
+				const idx = params.findIndex((p) => p.name === `Seq1Step${n}`);
+				if (idx >= 0) stepIndices.push(idx);
+				const gateIdx = params.findIndex((p) => p.name === `Seq2Step${n}`);
+				if (gateIdx >= 0) gateIndices.push(gateIdx);
+			}
+			if (stepIndices.length === 0) return;
+
+			const stepType = getParam(params[stepIndices[0]].type);
+			if (!stepType) return;
+			const gateType = gateIndices.length > 0 ? getParam(params[gateIndices[0]].type) : undefined;
+
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const lengthIdx = params.findIndex((p) => p.name === 'Length');
+			const lengthValue = lengthIdx >= 0 ? (this.slots[slot].variations?.[variation]?.[areaKey]?.[moduleId]?.[lengthIdx] ?? 0) : undefined;
+			const activeCount = lengthValue !== undefined ? Math.min(stepIndices.length, lengthValue + 1) : stepIndices.length;
+
+			const randomIn = (low: number, high: number) => low + Math.floor(Math.random() * (high - low + 1));
+
+			const paramIndices = stepIndices.slice(0, activeCount);
+			const values = paramIndices.map(() => (mode === 'rnd' ? randomIn(stepType.low, stepType.high) : stepType.def));
+
+			if (gateType) {
+				paramIndices.push(...gateIndices.slice(0, activeCount));
+				values.push(...gateIndices.slice(0, activeCount).map(() => (mode === 'rnd' ? randomIn(gateType.low, gateType.high) : gateType.def)));
+			}
+
+			await this.setParams(moduleId, paramIndices, values, variation, area, slot);
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
