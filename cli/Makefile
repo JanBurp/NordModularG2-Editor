@@ -32,13 +32,14 @@ TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
 TEST_SRC := $(filter-out $(TEST_DIR)/run_tests.c, $(TEST_SRC))
 TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_unit.c, $(TEST_SRC))
 TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_integration.c, $(TEST_SRC))
+TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_integration_slow.c, $(TEST_SRC))
 # Exclude mocks directory
 TEST_SRC := $(filter-out $(TEST_DIR)/mocks/%, $(TEST_SRC))
 
 # Headers
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 
-.PHONY: all clean depend info test test-unit test-integration clean-tests
+.PHONY: all clean depend info test test-unit test-integration test-integration-slow clean-tests
 
 all: info $(BIN_DIR)/$(TARGET)
 
@@ -82,6 +83,13 @@ test-integration: $(TEST_BUILD_DIR)/g2-integration-tests
 	@echo "Running integration tests..."
 	./$(TEST_BUILD_DIR)/g2-integration-tests
 
+# Separate from test-integration: bank transfer tests scan whole hardware banks
+# (up to 128 round trips per bank touched) and can run well past 2 seconds - see
+# run_tests_integration_slow.c. Run this on its own when you want that coverage.
+test-integration-slow: $(TEST_BUILD_DIR)/g2-integration-tests-slow
+	@echo "Running slow integration tests (bank transfer)..."
+	./$(TEST_BUILD_DIR)/g2-integration-tests-slow
+
 $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_unit.c \
 		$(TEST_SRC) \
@@ -98,6 +106,20 @@ $(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_
 
 $(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
 	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration.c \
+		$(TEST_SRC) \
+		$(OBJ_DIR)/daemon.o \
+		$(OBJ_DIR)/g2_device.o \
+		$(OBJ_DIR)/g2_io.o \
+		$(OBJ_DIR)/g2_protocol.o \
+		$(OBJ_DIR)/g2_events.o \
+		$(OBJ_DIR)/utils.o \
+		$(OBJ_DIR)/cjson.o \
+		$(OBJ_DIR)/output.o \
+		$(LDFLAGS) -o $@
+	@echo "Built: $@"
+
+$(TEST_BUILD_DIR)/g2-integration-tests-slow: $(TEST_DIR)/run_tests_integration_slow.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration_slow.c \
 		$(TEST_SRC) \
 		$(OBJ_DIR)/daemon.o \
 		$(OBJ_DIR)/g2_device.o \

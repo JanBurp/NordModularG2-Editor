@@ -17,6 +17,7 @@
 #include <sys/select.h>
 #include "cJSON.h"
 #include "../include/g2_device.h"
+#include "../include/utils.h"
 
 typedef struct {
     int in_fd;
@@ -301,6 +302,66 @@ void test_daemon_stdin_burst_forwards_events_promptly(void) {
         printf("[test_daemon_stdin_burst_forwards_events_promptly] param_change interleaved with burst, as expected\n");
     else
         printf("[test_daemon_stdin_burst_forwards_events_promptly] no param_change observed (module 250/param 250 likely doesn't exist on the loaded patch) — command-ack correctness still verified\n");
+}
+
+/* g2_dump_patch treats slot A's cached cable version being 0 ("empty/uninitialized")
+ * as a hard error, unlike g2_send_controller_snapshot which just skips a version-0
+ * slot (confirmed on real hardware: dump-patch failed here while send-controller-
+ * snapshot right after it still passed). This shared-daemon suite otherwise never
+ * loads a scratch patch, so whatever happens to already be in slot A - including
+ * a freshly-booted "empty" state that reports version 0 - isn't guaranteed to be
+ * non-empty. Upload a real fixture first so both tests below have a deterministic,
+ * non-empty slot A regardless of prior device state. */
+static int upload_fixture_to_slot_a(daemon_ctx_t *d) {
+    FILE *f = fopen("../test-patches/DXBass FM4.pch2", "rb");
+    if (!f) return -1;
+    fseek(f, 0, SEEK_END);
+    long fsize = ftell(f);
+    rewind(f);
+    uint8_t *data = malloc((size_t)fsize);
+    if (!data) { fclose(f); return -1; }
+    if (fread(data, 1, (size_t)fsize, f) != (size_t)fsize) { fclose(f); free(data); return -1; }
+    fclose(f);
+
+    char *b64 = base64_encode(data, (size_t)fsize);
+    free(data);
+    if (!b64) return -1;
+
+    size_t cmdCap = strlen(b64) + 128;
+    char *cmd = malloc(cmdCap);
+    if (!cmd) { free(b64); return -1; }
+    int id = g_cmd_id++;
+    snprintf(cmd, cmdCap, "{\"id\":%d,\"cmd\":\"upload-patch-data\",\"args\":[\"A\",\"%s\"]}", id, b64);
+    free(b64);
+
+    int r = send_and_expect_ok(d, cmd, id);
+    free(cmd);
+    return r;
+}
+
+/* Test: dump-patch (Dump One) transmits the active slot A patch as MIDI SYSEX.
+ * Transmit-only (no flash/state write), so no cleanup is needed. */
+void test_daemon_dump_patch_cmd(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    usleep(300000); /* let the slot settle, same convention as test_upload_patch.c */
+
+    char cmd[64];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"dump-patch\",\"args\":[\"A\"]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
+    TEST_ASSERT_EQUAL_INT(0, r);
+}
+
+/* Test: send-controller-snapshot pushes all active slots' MIDI CC values to
+ * MIDI OUT. Transmit-only, no cleanup needed. */
+void test_daemon_send_controller_snapshot_cmd(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    char cmd[80];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"send-controller-snapshot\",\"args\":[]}", id);
+    int r = send_and_expect_ok(&g_daemon, cmd, id);
+    TEST_ASSERT_EQUAL_INT(0, r);
 }
 
 /* Test 6: set-perf-mode cycle — performance then patch — verifies Delphi approach:
