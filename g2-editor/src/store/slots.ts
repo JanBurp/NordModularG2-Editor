@@ -40,6 +40,11 @@ import {
 	resolveColumnCollisions,
 	extractVariations,
 	removeModuleFromVariations,
+	snapshotModuleAssignments,
+	computeAssignOne,
+	computeAssignModule,
+	computeSwap,
+	buildTouchedCmds,
 	runCliSafe,
 	runCliBatchSafe,
 	type PasteParamsPair,
@@ -80,8 +85,9 @@ function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
 	return location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
 }
 
-// Maps a morph assignment's location (0=fx/1=va) to its CLI location string.
-function morphLocationStr(location: 0 | 1): 'fx' | 'va' {
+// Maps a 0/1-style location code (fx/va) to its CLI location string. Originally morph-only, now
+// also used for Parameter Page / Global Parameter Page location strings (assignKnobCmd/assignGlobalKnobCmd).
+function locationStr01(location: 0 | 1): 'fx' | 'va' {
 	return location === 0 ? 'fx' : 'va';
 }
 
@@ -96,7 +102,7 @@ function setMorphRangeCmd(
 	groupIndex: number,
 	variation: number,
 ): string[] {
-	return ['set-morph-range', slot, morphLocationStr(location), String(moduleIndex), String(paramIndex), String(range), String(groupIndex), String(variation)];
+	return ['set-morph-range', slot, locationStr01(location), String(moduleIndex), String(paramIndex), String(range), String(groupIndex), String(variation)];
 }
 
 // Builds the CLI del-cable / add-cable command tuple for a single cable.
@@ -110,7 +116,7 @@ function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[]
 
 // Builds the CLI assign-knob command tuple for a single Parameter Page slot.
 function assignKnobCmd(slot: SlotLabel, entry: ParamPageAssignment): string[] {
-	return ['assign-knob', slot, morphLocationStr(entry.location), String(entry.moduleIndex), String(entry.paramIndex), String(entry.slotIndex)];
+	return ['assign-knob', slot, locationStr01(entry.location), String(entry.moduleIndex), String(entry.paramIndex), String(entry.slotIndex)];
 }
 
 // Builds the CLI assign-global-knob command tuple. `active` is the transport slot (uiStore.slotInFocus).
@@ -119,70 +125,11 @@ function assignGlobalKnobCmd(active: SlotLabel, entry: GlobalParamPageAssignment
 		'assign-global-knob',
 		active,
 		entry.slot,
-		morphLocationStr(entry.location),
+		locationStr01(entry.location),
 		String(entry.moduleIndex),
 		String(entry.paramIndex),
 		String(entry.slotIndex),
 	];
-}
-
-// Two-way-uniqueness single-slot assign (assignParamToPage/assignParamToGlobalPage): evicts
-// whatever currently occupies `slotIndex` and whatever `sameKey` currently occupies (its old slot),
-// then inserts `entry`. Shared by both Patch and Global variants — GlobalParamPageAssignment is a
-// structural superset of ParamPageAssignment (adds `slot`).
-function computeAssignOne<T extends ParamPageAssignment>(
-	prev: T[],
-	slotIndex: number,
-	sameKey: (k: T) => boolean,
-	entry: T,
-): { next: T[]; oldAtSlot?: T; oldKeySlot?: T } {
-	const oldAtSlot = prev.find((k) => k.slotIndex === slotIndex);
-	const oldKeySlot = prev.find(sameKey);
-	const next = prev.filter((k) => k.slotIndex !== slotIndex && !sameKey(k));
-	next.push(entry);
-	return { next, oldAtSlot, oldKeySlot };
-}
-
-// Bulk "assign whole module" (assignModuleToPage/assignModuleToGlobalPage). Evicts ALL of this
-// module's existing assignments (`sameModule`), not just ones with paramIndex < n — fixes a
-// stragglers bug where a prior larger assign left paramIndex >= n behind after a shrink.
-function computeAssignModule<T extends ParamPageAssignment>(
-	prev: T[],
-	targetSlots: number[],
-	sameModule: (k: T) => boolean,
-	makeEntry: (paramIndex: number, slotIndex: number) => T,
-): { next: T[]; touched: number[] } {
-	const targetSet = new Set(targetSlots);
-	const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !sameModule(k));
-	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(i, slotIndex)));
-	const evictedElsewhere = prev.filter((k) => sameModule(k) && !targetSet.has(k.slotIndex)).map((k) => k.slotIndex);
-	return { next, touched: [...targetSlots, ...evictedElsewhere] };
-}
-
-// Swaps (or moves, if the target is empty) two knob slots' occupants — one computed list so the
-// pair lands as a single undo entry (Patch variant) or a single CLI apply (both variants).
-function computeSwap<T extends ParamPageAssignment>(prev: T[], sourceSlotIndex: number, targetSlotIndex: number): T[] | null {
-	const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
-	if (!source) return null;
-	const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
-	const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
-	next.push({ ...source, slotIndex: targetSlotIndex } as T);
-	if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex } as T);
-	return next;
-}
-
-// Builds one assign/deassign CLI command per touched slot from the final list — shared by
-// _applyParamPages/_applyGlobalParamPages, replacing their former sequential-await loops.
-function buildTouchedCmds<T extends ParamPageAssignment>(
-	list: T[],
-	touched: number[],
-	assignCmd: (entry: T) => string[],
-	deassignCmd: (slotIndex: number) => string[],
-): string[][] {
-	return touched.map((slotIndex) => {
-		const entry = list.find((k) => k.slotIndex === slotIndex);
-		return entry ? assignCmd(entry) : deassignCmd(slotIndex);
-	});
 }
 
 const _paramInFlight = new Set<string>();
@@ -302,6 +249,51 @@ function buildVariationHardwareCmds(slot: SlotLabel, variations: VariationState[
 	return cmds;
 }
 
+// Builds the CLI add-module command tuple + any non-default set-param commands for the other
+// variations, given a module snapshot placed at `newId`/(col, row). Shared by buildModuleAddition
+// and deleteModule's undo path (which restores a snapshot directly, without going through
+// buildModuleAddition's ModuleInstance-cloning/variations-state-writing steps).
+function buildAddModuleCmd(
+	src: ModuleInstance,
+	newId: number,
+	col: number,
+	row: number,
+	slot: SlotLabel,
+	location: 'va' | 'fx',
+	numVariations: number,
+): { addModuleCmd: string[]; setParamCmds: string[][] } {
+	const paramVals0 = src.lv.slice(0, src.pcnt);
+	const addModuleCmd = [
+		'add-module',
+		slot,
+		location,
+		String(src.type),
+		String(newId),
+		String(col),
+		String(row),
+		String(src.colour),
+		String(src.modes.length),
+		...src.modes.map(String),
+		String(src.pcnt),
+		...paramVals0.map(String),
+		src.uname ?? '',
+	];
+
+	const setParamCmds: string[][] = [];
+	if (src.pcnt > 0) {
+		for (let v = 1; v < numVariations; v++) {
+			for (let p = 0; p < src.pcnt; p++) {
+				const val = src.lv[v * src.pcnt + p];
+				if (val !== undefined && val !== paramVals0[p]) {
+					setParamCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
+				}
+			}
+		}
+	}
+
+	return { addModuleCmd, setParamCmds };
+}
+
 // Shared by addModuleWithData/paste: clones `src` into a new module instance at (col, row), seeds its
 // variation param slices, and builds the CLI commands to create it on hardware.
 function buildModuleAddition(
@@ -331,34 +323,7 @@ function buildModuleAddition(
 		}
 	}
 
-	const paramVals0 = src.lv.slice(0, src.pcnt);
-	const addModuleCmd = [
-		'add-module',
-		slot,
-		location,
-		String(src.type),
-		String(newId),
-		String(col),
-		String(row),
-		String(src.colour),
-		String(src.modes.length),
-		...src.modes.map(String),
-		String(src.pcnt),
-		...paramVals0.map(String),
-		src.uname ?? '',
-	];
-
-	const setParamCmds: string[][] = [];
-	if (src.pcnt > 0 && variations) {
-		for (let v = 1; v < variations.length; v++) {
-			for (let p = 0; p < src.pcnt; p++) {
-				const val = src.lv[v * src.pcnt + p];
-				if (val !== undefined && val !== paramVals0[p]) {
-					setParamCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
-				}
-			}
-		}
-	}
+	const { addModuleCmd, setParamCmds } = buildAddModuleCmd(src, newId, col, row, slot, location, variations ? variations.length : 1);
 
 	const setParamLabelCmds: string[][] = (src.paramLabels ?? []).map((pl) => [
 		'set-param-label',
@@ -714,9 +679,14 @@ export const useSlotsStore = defineStore('slots', {
 			const slotEntry = this.slots[slot];
 			const hist = useHistoryStore();
 			const ccLocation = areaIdx === 0 ? 0 : 1;
-			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
-			const removedPagesSnap = slotEntry.paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId);
-			const removedGlobalPagesSnap = this.globalParamPages.filter((k) => k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId);
+			const { removedCCSnap, removedPagesSnap, removedGlobalPagesSnap } = snapshotModuleAssignments(
+				slotEntry.controllers,
+				slotEntry.paramPages,
+				this.globalParamPages,
+				slot,
+				ccLocation,
+				moduleId,
+			);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -745,47 +715,17 @@ export const useSlotsStore = defineStore('slots', {
 							if (removedPagesSnap.length > 0) slotE.paramPages = [...slotE.paramPages, ...removedPagesSnap];
 							if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
 							this._markSlotDirty(slot);
-							const paramVals0 = modSnap.lv.slice(0, modSnap.pcnt);
-							const allCmds: string[][] = [
-								[
-									'add-module',
-									slot,
-									location,
-									String(modSnap.type),
-									String(moduleId),
-									String(modSnap.horiz),
-									String(modSnap.vert),
-									String(modSnap.colour),
-									String(modSnap.modes.length),
-									...modSnap.modes.map(String),
-									String(modSnap.pcnt),
-									...paramVals0.map(String),
-									modSnap.uname ?? '',
-								],
-							];
-							if (slotE.variations) {
-								for (let v = 1; v < slotE.variations.length; v++) {
-									for (let p = 0; p < modSnap.pcnt; p++) {
-										const val = modSnap.lv[v * modSnap.pcnt + p];
-										if (val !== undefined && val !== paramVals0[p])
-											allCmds.push(['set-param', slot, location, String(moduleId), String(p), String(val), String(v)]);
-									}
-								}
-							}
-							for (const c of cableSnap) {
-								allCmds.push([
-									'add-cable',
-									slot,
-									location,
-									String(c.colour),
-									String(c.smod),
-									c.dir === 0 ? '0' : '1',
-									String(c.scon),
-									String(c.dmod),
-									'0',
-									String(c.dcon),
-								]);
-							}
+							const { addModuleCmd, setParamCmds } = buildAddModuleCmd(
+								modSnap,
+								moduleId,
+								modSnap.horiz,
+								modSnap.vert,
+								slot,
+								location,
+								slotE.variations?.length ?? 1,
+							);
+							const allCmds: string[][] = [addModuleCmd, ...setParamCmds];
+							for (const c of cableSnap) allCmds.push(addCableCmd(slot, location, c));
 							if (removedCCSnap.length > 0) {
 								const flatArgs = removedCCSnap.flatMap((a) => {
 									const locStr = ccLocationStr(a.location);
@@ -854,9 +794,14 @@ export const useSlotsStore = defineStore('slots', {
 			const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
 
 			const ccLocation = areaIdx === 0 ? 0 : 1;
-			const removedCCSnap = slotEntry.controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId);
-			const removedPagesSnap = slotEntry.paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId);
-			const removedGlobalPagesSnap = this.globalParamPages.filter((k) => k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId);
+			const { removedCCSnap, removedPagesSnap, removedGlobalPagesSnap } = snapshotModuleAssignments(
+				slotEntry.controllers,
+				slotEntry.paramPages,
+				this.globalParamPages,
+				slot,
+				ccLocation,
+				moduleId,
+			);
 
 			const morphLocation: 0 | 1 = areaIdx === 0 ? 0 : 1;
 			const morphSnapPerVar: MorphAssignment[][] = Array.from({ length: numVar }, (_, v) =>
@@ -942,20 +887,7 @@ export const useSlotsStore = defineStore('slots', {
 					...setParamCmds,
 					...setParamLabelCmds,
 				];
-				for (const c of remappedCables) {
-					cliCmds.push([
-						'add-cable',
-						slot,
-						location,
-						String(c.colour),
-						String(c.smod),
-						c.dir === 0 ? '0' : '1',
-						String(c.scon),
-						String(c.dmod),
-						'0',
-						String(c.dcon),
-					]);
-				}
+				for (const c of remappedCables) cliCmds.push(addCableCmd(slot, location, c));
 				await runCliBatchSafe(cliCmds, 'replaceModule');
 			} finally {
 				if (shouldRecord) hist.unlock(slot);
@@ -974,21 +906,15 @@ export const useSlotsStore = defineStore('slots', {
 						this._markSlotDirty(slot);
 						this._syncUprateAndColors(patch, areaIdx);
 
-						const undoCmds: string[][] = pushDowns.map((d) => ['move-module', slot, location, String(d.index), String(oldModSnap.horiz), String(d.fromRow)]);
-						for (const c of cableSnap) {
-							undoCmds.push([
-								'add-cable',
-								slot,
-								location,
-								String(c.colour),
-								String(c.smod),
-								c.dir === 0 ? '0' : '1',
-								String(c.scon),
-								String(c.dmod),
-								'0',
-								String(c.dcon),
-							]);
-						}
+						const undoCmds: string[][] = pushDowns.map((d) => [
+							'move-module',
+							slot,
+							location,
+							String(d.index),
+							String(oldModSnap.horiz),
+							String(d.fromRow),
+						]);
+						for (const c of cableSnap) undoCmds.push(addCableCmd(slot, location, c));
 						if (removedCCSnap.length > 0) {
 							const flatArgs = removedCCSnap.flatMap((a) => [
 								ccLocationStr(a.location),
@@ -1126,27 +1052,9 @@ export const useSlotsStore = defineStore('slots', {
 			mutAddModule(patch, areaIdx, mod);
 			this._markSlotDirty(slot);
 
-			try {
-				await window.cli.run(addModuleCmd);
-			} catch (err) {
-				console.warn('add-module CLI failed:', err);
-			}
-
-			if (setParamCmds.length > 0) {
-				try {
-					await window.cli.runBatch(setParamCmds);
-				} catch (err) {
-					console.warn('set-param batch CLI failed:', err);
-				}
-			}
-
-			if (setParamLabelCmds.length > 0) {
-				try {
-					await window.cli.runBatch(setParamLabelCmds);
-				} catch (err) {
-					console.warn('set-param-label batch CLI failed:', err);
-				}
-			}
+			await runCliSafe(addModuleCmd, 'addModuleWithData add-module');
+			if (setParamCmds.length > 0) await runCliBatchSafe(setParamCmds, 'addModuleWithData set-param batch');
+			if (setParamLabelCmds.length > 0) await runCliBatchSafe(setParamLabelCmds, 'addModuleWithData set-param-label batch');
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
@@ -1207,11 +1115,10 @@ export const useSlotsStore = defineStore('slots', {
 				if (pushDowns.length > 0) {
 					for (const p of pushDowns) mutMoveModule(patch, areaIdx, p.index, p.col, p.newRow);
 					this._markSlotDirty(slot);
-					try {
-						await window.cli.runBatch(pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]));
-					} catch (err) {
-						console.warn('move-module batch CLI failed:', err);
-					}
+					await runCliBatchSafe(
+						pushDowns.map((p) => ['move-module', slot, location, String(p.index), String(p.col), String(p.newRow)]),
+						'paste move-module batch',
+					);
 				}
 
 				const slotEntry = this.slots[slot];
@@ -1252,17 +1159,13 @@ export const useSlotsStore = defineStore('slots', {
 				}
 
 				this._markSlotDirty(slot);
-				try {
-					// Send module commands first (add-module + set-param), then cable commands.
-					// The G2 firmware cannot reference a newly-added module in the same compound
-					// frame as add-cable — splitting into two sequential batches avoids G2_ERR_SEND.
-					const moduleCmds = allCmds.filter((c) => c[0] !== 'add-cable');
-					const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
-					for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK) await window.cli.runBatch(moduleCmds.slice(i, i + BATCH_CHUNK));
-					for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK) await window.cli.runBatch(cableCmds.slice(i, i + BATCH_CHUNK));
-				} catch (err) {
-					console.warn('paste batch CLI failed:', err);
-				}
+				// Send module commands first (add-module + set-param), then cable commands.
+				// The G2 firmware cannot reference a newly-added module in the same compound
+				// frame as add-cable — splitting into two sequential batches avoids G2_ERR_SEND.
+				const moduleCmds = allCmds.filter((c) => c[0] !== 'add-cable');
+				const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
+				for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(moduleCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
+				for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(cableCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
 
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
@@ -1858,7 +1761,7 @@ export const useSlotsStore = defineStore('slots', {
 				// performance straight from the device instead. g2_get_perf_file does the
 				// entire job itself (queries all 4 slots + perf settings, writes the .prf2).
 				const device = useDeviceStore();
-				if (!device.isPerformanceMode || device.status !== DeviceStatus.Connected) return;
+				if (!device.isHardwarePerformanceMode || device.status !== DeviceStatus.Connected) return;
 				let hwPath = filepath || this.performanceFilePath;
 				if (!hwPath) {
 					//@ts-ignore
@@ -2405,7 +2308,7 @@ export const useSlotsStore = defineStore('slots', {
 			const ops = [...removed, ...to];
 			if (ops.length === 0) return;
 			const flatArgs = ops.flatMap((a) => [
-				morphLocationStr(a.location),
+				locationStr01(a.location),
 				String(a.moduleIndex),
 				String(a.paramIndex),
 				String(a.range),
@@ -2639,10 +2542,7 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[labelIndex] = label;
 			}
 			this._markSlotDirty(slot);
-			await runCliSafe(
-				['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels],
-				'setParamLabel',
-			);
+			await runCliSafe(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels], 'setParamLabel');
 		},
 
 		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
@@ -2678,10 +2578,7 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[0] = label;
 			}
 			this._markSlotDirty(slot);
-			await runCliSafe(
-				['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label],
-				'setMorphGroupLabel',
-			);
+			await runCliSafe(['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label], 'setMorphGroupLabel');
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {
@@ -3216,37 +3113,27 @@ export const useSlotsStore = defineStore('slots', {
 		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
 			const entry: ParamPageAssignment = { slotIndex, location, moduleIndex, paramIndex, isLed: 0 };
-			const { next, oldAtSlot, oldKeySlot } = computeAssignOne(
+			const { next, oldKeySlot } = computeAssignOne(
 				prev,
 				slotIndex,
 				(k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
 				entry,
 			);
-			this.slots[slot].paramPages = next;
-			this._markSlotDirty(slot);
-			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...next];
+			// oldKeySlot's own slot only needs a CLI restore on undo (the hardware auto-evicts it as
+			// part of the single assign-knob call on apply, per the two-way uniqueness doc above).
+			const undoTouched = [slotIndex, ...(oldKeySlot && oldKeySlot.slotIndex !== slotIndex ? [oldKeySlot.slotIndex] : [])];
+			await this._applyParamPages(slot, next, [slotIndex]);
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
-						this.slots[slot].paramPages = prev;
-						this._markSlotDirty(slot);
-						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
-						const deviceStore = useDeviceStore();
-						if (deviceStore.status === DeviceStatus.Connected) {
-							const cmds: string[][] = [['deassign-knob', slot, String(slotIndex)]];
-							if (oldAtSlot) cmds.push(assignKnobCmd(slot, oldAtSlot));
-							if (oldKeySlot && oldKeySlot.slotIndex !== slotIndex) cmds.push(assignKnobCmd(slot, oldKeySlot));
-							await runCliBatchSafe(cmds, 'assignParamToPage undo');
-						}
+						await this._applyParamPages(slot, prev, undoTouched);
 					},
 					redo: async () => {
 						await this.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex);
 					},
 				});
 			}
-			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignKnobCmd(slot, entry));
 		},
 
 		// Bulk module-level assign — the manual's "Assign|Page X|Multi Column" / "...|Column N" popup,
@@ -3330,29 +3217,19 @@ export const useSlotsStore = defineStore('slots', {
 
 		async deassignParamPage(slot: SlotLabel, slotIndex: number): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
-			const removed = prev.find((k) => k.slotIndex === slotIndex);
-			this.slots[slot].paramPages = prev.filter((k) => k.slotIndex !== slotIndex);
-			this._markSlotDirty(slot);
-			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...this.slots[slot].paramPages];
+			const next = prev.filter((k) => k.slotIndex !== slotIndex);
+			await this._applyParamPages(slot, next, [slotIndex]);
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
-						this.slots[slot].paramPages = prev;
-						this._markSlotDirty(slot);
-						if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...prev];
-						if (removed) {
-							const deviceStore = useDeviceStore();
-							if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignKnobCmd(slot, removed));
-						}
+						await this._applyParamPages(slot, prev, [slotIndex]);
 					},
 					redo: async () => {
 						await this.deassignParamPage(slot, slotIndex);
 					},
 				});
 			}
-			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-knob', slot, String(slotIndex)]);
 		},
 
 		// Global Parameter Pages siblings of assignParamToPage/_applyParamPages/swapParamPageSlots/
@@ -3378,7 +3255,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (oldKeySlot) this._markSlotDirty(oldKeySlot.slot);
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
-			if (active && deviceStore.status === DeviceStatus.Connected) await window.cli.run(assignGlobalKnobCmd(active, entry));
+			if (active && deviceStore.status === DeviceStatus.Connected) await runCliSafe(assignGlobalKnobCmd(active, entry), 'assignParamToGlobalPage');
 		},
 
 		// Global Parameter Pages sibling of assignModuleToPage above — no undo/redo, matching the rest
@@ -3436,7 +3313,8 @@ export const useSlotsStore = defineStore('slots', {
 			if (removed) this._markSlotDirty(removed.slot);
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
-			if (active && deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-global-knob', active, String(slotIndex)]);
+			if (active && deviceStore.status === DeviceStatus.Connected)
+				await runCliSafe(['deassign-global-knob', active, String(slotIndex)], 'deassignGlobalParamPage');
 		},
 
 		async deassignMidiCCs(slot: SlotLabel, ccs: number[]): Promise<void> {

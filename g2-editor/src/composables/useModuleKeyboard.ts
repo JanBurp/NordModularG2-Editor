@@ -212,21 +212,30 @@ export function useModuleKeyboard() {
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 
-	// Ctrl/Cmd+Up/Down nudges the selected param's morph range for the currently selected group
-	// (only when it's already assigned to that group).
-	function nudgeMorphRange(delta: number) {
+	// Resolves the currently selected param's module/slot/morph-group context, plus its existing
+	// morph assignment (if any) for the currently selected group — shared by nudgeMorphRange and
+	// toggleMorphAssign below.
+	function findSelectedMorphAssignment() {
 		const sel = uiStore.selectedParam;
-		if (!sel) return;
+		if (!sel) return undefined;
 		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
+		if (!found) return undefined;
 		const slot = uiStore.slotInFocus;
-		if (!slot) return;
+		if (!slot) return undefined;
 		const groupIndex = uiStore.selectedMorphGroup;
 		const variation = uiStore.variation;
 		const existing = slotsStore
 			.getMorphAssignments(slot, variation)
 			.find((a) => a.groupIndex === groupIndex && a.location === found.area && a.moduleIndex === sel.moduleId && a.paramIndex === sel.paramIndex);
-		if (!existing) return;
+		return { sel, found, slot, groupIndex, variation, existing };
+	}
+
+	// Ctrl/Cmd+Up/Down nudges the selected param's morph range for the currently selected group
+	// (only when it's already assigned to that group).
+	function nudgeMorphRange(delta: number) {
+		const m = findSelectedMorphAssignment();
+		if (!m?.existing) return;
+		const { sel, found, slot, groupIndex, variation, existing } = m;
 		slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, clamp(existing.range + delta, -127, 127));
 	}
 
@@ -234,17 +243,9 @@ export function useModuleKeyboard() {
 	// group — the keyboard equivalent of a Ctrl/Cmd-click on a param (see useMorphRangeDrag.ts).
 	// Assigns at the same default full range (127) the mouse paths use.
 	function toggleMorphAssign() {
-		const sel = uiStore.selectedParam;
-		if (!sel) return;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
-		const slot = uiStore.slotInFocus;
-		if (!slot) return;
-		const groupIndex = uiStore.selectedMorphGroup;
-		const variation = uiStore.variation;
-		const existing = slotsStore
-			.getMorphAssignments(slot, variation)
-			.find((a) => a.groupIndex === groupIndex && a.location === found.area && a.moduleIndex === sel.moduleId && a.paramIndex === sel.paramIndex);
+		const m = findSelectedMorphAssignment();
+		if (!m) return;
+		const { sel, found, slot, groupIndex, variation, existing } = m;
 		if (existing) slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex);
 		else slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, 127);
 	}

@@ -95,7 +95,6 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
-	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
 	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';

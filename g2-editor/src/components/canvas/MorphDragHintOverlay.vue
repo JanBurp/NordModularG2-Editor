@@ -8,6 +8,7 @@
 	import { getModule } from '@/renderer/nmg2mods';
 	import { useUiStore } from '@/store/ui';
 	import { isSlider } from '@/utils/moduleControls';
+	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -32,8 +33,8 @@
 		return [
 			{
 				text: hint.text,
-				x: (mod.horiz ?? 0) * 256 + param.x,
-				y: (mod.vert ?? 0) * 16 + param.y + yOffset,
+				x: (mod.horiz ?? 0) * MODULE_WIDTH + param.x,
+				y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + param.y + yOffset,
 			},
 		];
 	});

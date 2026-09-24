@@ -3,6 +3,48 @@ import { useSlotsStore } from '@/store/slots';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 import { PAGE_LETTERS, BANK_COUNT, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '@/renderer/paramPages';
 
+// Shared by buildParamPageMenuItems/buildGlobalParamPageMenuItems below — both build the same
+// "Assign to Page" (Page+Bank then Knob) submenu plus a "Deassign" item, differing only in the
+// assign/deassign store calls and the label text.
+function buildParamPageMenuItemsImpl(
+	slot: SlotLabel | null,
+	existing: { slotIndex: number } | undefined,
+	config: {
+		assignLabel: string;
+		deassignPrefix: string;
+		deassignDisabled: boolean;
+		assign: (slotIndex: number) => void;
+		deassign: () => void;
+	},
+): ContextMenuItem[] {
+	const assignItem: ContextMenuItem = {
+		label: config.assignLabel,
+		disabled: !slot,
+		children: PAGE_LETTERS.flatMap((letter, page) =>
+			Array.from({ length: BANK_COUNT }, (_, bank) => ({
+				label: `Page ${letter}${bank + 1}`,
+				children: Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => ({
+					label: `Knob ${knob + 1}`,
+					action: () => config.assign(slotIndexFor(bank, page, knob)),
+				})),
+			})),
+		),
+	};
+
+	let deassignLabel = config.deassignPrefix;
+	if (existing) {
+		const { page, knob } = slotIndexToBankPageKnob(existing.slotIndex);
+		deassignLabel = `${config.deassignPrefix} (Page ${PAGE_LETTERS[page]}, Knob ${knob + 1})`;
+	}
+	const deassignItem: ContextMenuItem = {
+		label: deassignLabel,
+		disabled: config.deassignDisabled,
+		action: config.deassign,
+	};
+
+	return [assignItem, deassignItem];
+}
+
 // Right-click "Assign to Page" submenu on a module parameter — two levels, Page+Bank (A1-E3, 15
 // combinations, letter-major) then Knob (1-8). Matches the manual's "Assign|Page|Knob" popup menu
 // and useMorphAssign.ts's buildMorphMenuItems shape.
@@ -16,32 +58,17 @@ export function buildParamPageMenuItems(opts: {
 	const slotsStore = useSlotsStore();
 	const { slot, location, moduleIndex, paramIndex, existing } = opts;
 
-	const assignItem: ContextMenuItem = {
-		label: 'Assign to Page',
-		disabled: !slot,
-		children: PAGE_LETTERS.flatMap((letter, page) =>
-			Array.from({ length: BANK_COUNT }, (_, bank) => ({
-				label: `Page ${letter}${bank + 1}`,
-				children: Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => ({
-					label: `Knob ${knob + 1}`,
-					action: () => slot && slotsStore.assignParamToPage(slot, slotIndexFor(bank, page, knob), location, moduleIndex, paramIndex),
-				})),
-			})),
-		),
-	};
-
-	let deassignLabel = 'Deassign';
-	if (existing) {
-		const { page, knob } = slotIndexToBankPageKnob(existing.slotIndex);
-		deassignLabel = `Deassign (Page ${PAGE_LETTERS[page]}, Knob ${knob + 1})`;
-	}
-	const deassignItem: ContextMenuItem = {
-		label: deassignLabel,
-		disabled: !existing || !slot,
-		action: () => slot && existing && slotsStore.deassignParamPage(slot, existing.slotIndex),
-	};
-
-	return [assignItem, deassignItem];
+	return buildParamPageMenuItemsImpl(slot, existing, {
+		assignLabel: 'Assign to Page',
+		deassignPrefix: 'Deassign',
+		deassignDisabled: !existing || !slot,
+		assign: (slotIndex) => {
+			if (slot) slotsStore.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex);
+		},
+		deassign: () => {
+			if (slot && existing) slotsStore.deassignParamPage(slot, existing.slotIndex);
+		},
+	});
 }
 
 // Global Parameter Pages sibling of buildParamPageMenuItems above — "Assign to Global Page"
@@ -59,32 +86,47 @@ export function buildGlobalParamPageMenuItems(opts: {
 	const slotsStore = useSlotsStore();
 	const { slot, location, moduleIndex, paramIndex, existing } = opts;
 
-	const assignItem: ContextMenuItem = {
-		label: 'Assign to Global Page',
-		disabled: !slot,
-		children: PAGE_LETTERS.flatMap((letter, page) =>
-			Array.from({ length: BANK_COUNT }, (_, bank) => ({
-				label: `Page ${letter}${bank + 1}`,
-				children: Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => ({
-					label: `Knob ${knob + 1}`,
-					action: () => slot && slotsStore.assignParamToGlobalPage(slot, slotIndexFor(bank, page, knob), location, moduleIndex, paramIndex),
-				})),
-			})),
-		),
-	};
+	return buildParamPageMenuItemsImpl(slot, existing, {
+		assignLabel: 'Assign to Global Page',
+		deassignPrefix: 'Deassign Global',
+		deassignDisabled: !existing,
+		assign: (slotIndex) => {
+			if (slot) slotsStore.assignParamToGlobalPage(slot, slotIndex, location, moduleIndex, paramIndex);
+		},
+		deassign: () => {
+			if (existing) slotsStore.deassignGlobalParamPage(existing.slotIndex);
+		},
+	});
+}
 
-	let deassignLabel = 'Deassign Global';
-	if (existing) {
-		const { page, knob } = slotIndexToBankPageKnob(existing.slotIndex);
-		deassignLabel = `Deassign Global (Page ${PAGE_LETTERS[page]}, Knob ${knob + 1})`;
-	}
-	const deassignItem: ContextMenuItem = {
-		label: deassignLabel,
-		disabled: !existing,
-		action: () => existing && slotsStore.deassignGlobalParamPage(existing.slotIndex),
-	};
+// Shared by buildModuleAssignMenuItems/buildGlobalModuleAssignMenuItems below — both bulk-assign
+// ALL of a module's parameters to consecutive Parameter Page knob slots, differing only in the
+// assign store call and the top-level menu label.
+function buildModuleAssignMenuItemsImpl(
+	slot: SlotLabel | null,
+	paramCount: number,
+	label: string,
+	assign: (slotIndex: number, count: number) => void,
+): ContextMenuItem[] {
+	if (paramCount === 0) return [];
 
-	return [assignItem, deassignItem];
+	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
+		const children: ContextMenuItem[] = [
+			{
+				label: `Multi Column (${paramCount})`,
+				action: () => assign(slotIndexFor(0, page, 0), paramCount),
+			},
+		];
+		for (let bank = 0; bank < BANK_COUNT; bank++) {
+			children.push({
+				label: `Column ${bank + 1}`,
+				action: () => assign(slotIndexFor(bank, page, 0), Math.min(paramCount, KNOBS_PER_PAGE)),
+			});
+		}
+		return { label: `Page ${letter}`, children };
+	});
+
+	return [{ label, disabled: !slot, children: pageItems }];
 }
 
 // Module-background right-click "Assign" submenu — bulk-assigns ALL of a module's parameters
@@ -95,26 +137,10 @@ export function buildGlobalParamPageMenuItems(opts: {
 export function buildModuleAssignMenuItems(opts: { slot: SlotLabel | null; location: 0 | 1; moduleIndex: number; paramCount: number }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
 	const { slot, location, moduleIndex, paramCount } = opts;
-	if (paramCount === 0) return [];
 
-	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
-		const children: ContextMenuItem[] = [
-			{
-				label: `Multi Column (${paramCount})`,
-				action: () => slot && slotsStore.assignModuleToPage(slot, slotIndexFor(0, page, 0), location, moduleIndex, paramCount),
-			},
-		];
-		for (let bank = 0; bank < BANK_COUNT; bank++) {
-			children.push({
-				label: `Column ${bank + 1}`,
-				action: () =>
-					slot && slotsStore.assignModuleToPage(slot, slotIndexFor(bank, page, 0), location, moduleIndex, Math.min(paramCount, KNOBS_PER_PAGE)),
-			});
-		}
-		return { label: `Page ${letter}`, children };
+	return buildModuleAssignMenuItemsImpl(slot, paramCount, 'Assign', (slotIndex, count) => {
+		if (slot) slotsStore.assignModuleToPage(slot, slotIndex, location, moduleIndex, count);
 	});
-
-	return [{ label: 'Assign', disabled: !slot, children: pageItems }];
 }
 
 // Global Parameter Pages sibling of buildModuleAssignMenuItems above — "Global Assign" submenu on a
@@ -128,26 +154,10 @@ export function buildGlobalModuleAssignMenuItems(opts: {
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
 	const { slot, location, moduleIndex, paramCount } = opts;
-	if (paramCount === 0) return [];
 
-	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
-		const children: ContextMenuItem[] = [
-			{
-				label: `Multi Column (${paramCount})`,
-				action: () => slot && slotsStore.assignModuleToGlobalPage(slot, slotIndexFor(0, page, 0), location, moduleIndex, paramCount),
-			},
-		];
-		for (let bank = 0; bank < BANK_COUNT; bank++) {
-			children.push({
-				label: `Column ${bank + 1}`,
-				action: () =>
-					slot && slotsStore.assignModuleToGlobalPage(slot, slotIndexFor(bank, page, 0), location, moduleIndex, Math.min(paramCount, KNOBS_PER_PAGE)),
-			});
-		}
-		return { label: `Page ${letter}`, children };
+	return buildModuleAssignMenuItemsImpl(slot, paramCount, 'Global Assign', (slotIndex, count) => {
+		if (slot) slotsStore.assignModuleToGlobalPage(slot, slotIndex, location, moduleIndex, count);
 	});
-
-	return [{ label: 'Global Assign', disabled: !slot, children: pageItems }];
 }
 
 // Alt-held state, refcounted via useKeyHoldOverlay's shared registry. Gates the Parameter Pages

@@ -9,6 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMorphRangeOverlay } from '@/composables/useMorphAssign';
+	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -36,8 +37,8 @@
 			if (!param) continue;
 			result.push({
 				text: a.range >= 0 ? `+${a.range}` : `${a.range}`,
-				x: (mod.horiz ?? 0) * 256 + param.x,
-				y: (mod.vert ?? 0) * 16 + param.y,
+				x: (mod.horiz ?? 0) * MODULE_WIDTH + param.x,
+				y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + param.y,
 			});
 		}
 		return result;

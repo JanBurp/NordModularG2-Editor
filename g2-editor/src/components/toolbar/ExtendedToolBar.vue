@@ -29,7 +29,6 @@
 	import Button from './Button.vue';
 	import ModulePicker from './ModulePicker.vue';
 	import UndoRedo from './UndoRedo.vue';
-	import ColorPicker from '../common/ColorPicker.vue';
 	import CPU from './CPU.vue';
 	import MorphGroups from './MorphGroups.vue';
 	import ParameterPagesGroup from './ParameterPagesGroup.vue';

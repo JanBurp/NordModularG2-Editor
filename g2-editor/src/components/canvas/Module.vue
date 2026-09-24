@@ -565,14 +565,26 @@
 	// table); applied as one batched store action so a single Ctrl+Z reverts the whole preset switch.
 	function onDrumSynthPresetApply(values: number[]) {
 		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
-		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], values, uiStore.variation, area);
+		slotsStore.setParams(
+			moduleIdx.value,
+			Array.from({ length: 15 }, (_, i) => i),
+			values,
+			uiStore.variation,
+			area,
+		);
 	}
 
 	// Vocoder preset buttons emit the target values for all 16 Band params directly (it owns the
 	// reroute math); applied as one batched store action, same pattern as DrumSynth.
 	function onVocoderPresetApply(values: number[]) {
 		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
-		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], values, uiStore.variation, area);
+		slotsStore.setParams(
+			moduleIdx.value,
+			Array.from({ length: 16 }, (_, i) => i),
+			values,
+			uiStore.variation,
+			area,
+		);
 	}
 
 	function onPianoRollViewChange(view: PianoRollView) {

@@ -14,7 +14,7 @@
 			width="10"
 			:y="Math.min(levelShiftY, rangeTargetShiftY)"
 			:height="Math.abs(rangeTargetShiftY - levelShiftY) + 6"
-			:fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'"
+			:fill="morphColorHex(morphColor)"
 			opacity="0.5"
 			pointer-events="none"
 		/>
@@ -23,7 +23,7 @@
 		<rect
 			width="10"
 			height="6"
-			:fill="morphColor === 'red' ? '#e0303c' : morphColor === 'blue' ? '#4a63c8' : '#666'"
+			:fill="morphColorHex(morphColor, '#666')"
 			:transform="`translate(0, ${levelShiftY})`"
 			@mousedown="onDragMouseDown"
 			@touchstart.passive="onDragMouseDown"
@@ -40,6 +40,7 @@
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
 	import { clamp } from '../../utils/math';
+	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
 		param: ModuleParam;

@@ -49,6 +49,9 @@ typedef enum {
 #define SUB_COMMAND_SET_PARAM                (0x40)
 #define SUB_COMMAND_SEL_PARAM                (0x2f)  /* Move hardware panel cursor to a param (CMParamFocusDump) */
 #define SUB_COMMAND_SEL_PARAM_PAGE           (0x2d)  /* Select front-panel Parameter Page (CMParameterPageFocus); payload = page*3 + bank, 0-14 */
+#define SUB_COMMAND_ASSIGN_KNOB              (0x25)  /* Parameter Pages knob assign (S_ASSIGN_KNOB) */
+#define SUB_COMMAND_DEASSIGN_KNOB            (0x26)  /* Parameter Pages knob deassign (S_DEASSIGN_KNOB) */
+#define SUB_COMMAND_SET_MORPH_RANGE          (0x43)  /* Morph group range assignment (S_SET_MORPH_RANGE) */
 #define SUB_COMMAND_ASSIGN_GLOBAL_KNOB       (0x1c)  /* Global Parameter Pages sibling of 0x25 (S_ASS_GLOBAL_KNOB) */
 #define SUB_COMMAND_DEASSIGN_GLOBAL_KNOB     (0x1d)  /* Global Parameter Pages sibling of 0x26 (S_DEASS_GLOB_KNOB) */
 #define SUB_COMMAND_SEL_GLOBAL_PAGE          (0x1e)  /* Global Parameter Pages sibling of SUB_COMMAND_SEL_PARAM_PAGE (S_SEL_GLOBAL_PAGE) */

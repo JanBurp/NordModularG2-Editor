@@ -46,7 +46,7 @@ export const useDeviceStore = defineStore('device', {
 		},
 		// True when the hardware itself is live in Performance mode, regardless of whether a
 		// .prf2 was ever loaded from disk in this session (see slotsStore.isPerformanceMode).
-		isPerformanceMode: (state): boolean => state.device?.mode === 'Performance',
+		isHardwarePerformanceMode: (state): boolean => state.device?.mode === 'Performance',
 		bpm: (state): number => state.device?.performance?.bpm ?? 0,
 		clockRunning: (state): boolean => state.device?.performance?.clockRunning ?? false,
 		getSlotsActiveStatus: (state): boolean[] => {

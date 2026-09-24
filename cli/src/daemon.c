@@ -543,9 +543,11 @@ static void execute_cmd(const char *line) {
 	} else if (strcmp(cmd, "set-morph-range") == 0 && n >= 7) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
+		int range = arg_i(args, 4);
+		int group = arg_i(args, 5);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_morph_range(slot, loc, arg_i(args, 2), arg_i(args, 3),
-		                          arg_i(args, 5), arg_i(args, 4), arg_i(args, 6));
+		                          group, range, arg_i(args, 6));
 
 	} else if (strcmp(cmd, "set-morph-range-batch") == 0 && n >= 7 && (n - 1) % 6 == 0) {
 		int slot = parse_slot(arg_s(args, 0));

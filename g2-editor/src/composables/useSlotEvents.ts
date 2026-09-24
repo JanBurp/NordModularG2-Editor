@@ -7,6 +7,12 @@ import { ref } from 'vue';
 import { resolveParamEcho, useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 
+// Shared by the param_page_change/global_page_change handlers below: one byte packs both
+// selectors — page = byte/3 (A-E), bank = byte%3 (1-3).
+function decodePageByte(page: number): { page: number; bank: number } {
+	return { page: Math.floor(page / 3), bank: page % 3 };
+}
+
 export function useSlotEvents(log: LogFn) {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -137,17 +143,18 @@ export function useSlotEvents(log: LogFn) {
 			// the device's own decoder ignores them, so we do too.
 			const page = ev.page as number;
 			if (page > 14) return true;
+			const decoded = decodePageByte(page);
 			if (uiStore.globalPagesActive) {
 				// Global page/bank isn't slot-scoped — accept regardless of which slot is in view.
-				uiStore.setDisplayedGlobalParamPage(Math.floor(page / 3));
-				uiStore.setSelectedGlobalParamBank(page % 3);
+				uiStore.setDisplayedGlobalParamPage(decoded.page);
+				uiStore.setSelectedGlobalParamBank(decoded.bank);
 				return true;
 			}
 			// Patch page/bank is a single global (not per-slot) view, so only the slot currently in
 			// view may move it — same reasoning as selected_param above.
 			if (ev.slot !== uiStore.slotInFocus) return true;
-			uiStore.setDisplayedParamPage(Math.floor(page / 3));
-			uiStore.setSelectedParamBank(page % 3);
+			uiStore.setDisplayedParamPage(decoded.page);
+			uiStore.setSelectedParamBank(decoded.bank);
 			return true;
 		}
 		if (ev.type === 'global_page_change') {
@@ -161,8 +168,9 @@ export function useSlotEvents(log: LogFn) {
 			// Receiving 0x1E is itself the signal the front panel is now showing Global pages (see
 			// param_page_change above for the symmetric case).
 			uiStore.setGlobalPagesActive(true);
-			uiStore.setDisplayedGlobalParamPage(Math.floor(page / 3));
-			uiStore.setSelectedGlobalParamBank(page % 3);
+			const decoded = decodePageByte(page);
+			uiStore.setDisplayedGlobalParamPage(decoded.page);
+			uiStore.setSelectedGlobalParamBank(decoded.bank);
 			return true;
 		}
 		if (ev.type === 'global_knob_map_changed') {

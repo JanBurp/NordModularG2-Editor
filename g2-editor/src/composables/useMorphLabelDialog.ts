@@ -1,31 +1,21 @@
-import { ref } from 'vue';
 import { useSlotsStore } from '@/store/slots';
+import { useEditDialog } from './useEditDialog';
 
 export function useMorphLabelDialog() {
 	const slotsStore = useSlotsStore();
-	const showMorphLabelDialog = ref(false);
-	const editingMorphLabel = ref('');
-	const editingMorphGroupIndex = ref<number | null>(null);
+	const {
+		showDialog: showMorphLabelDialog,
+		editingValue: editingMorphLabel,
+		open: openWithValue,
+		confirm: confirmMorphLabel,
+		cancel: cancelMorphLabel,
+	} = useEditDialog<string, number>('', 'setMorphGroupLabel', async (label, groupIndex) => {
+		if (groupIndex === undefined) return;
+		await slotsStore.setMorphGroupLabel(groupIndex, label);
+	});
 
 	function openMorphLabelDialog(groupIndex: number, currentLabel: string): void {
-		editingMorphGroupIndex.value = groupIndex;
-		editingMorphLabel.value = currentLabel;
-		showMorphLabelDialog.value = true;
-	}
-
-	async function confirmMorphLabel(): Promise<void> {
-		if (editingMorphGroupIndex.value === null) return;
-		try {
-			await slotsStore.setMorphGroupLabel(editingMorphGroupIndex.value, editingMorphLabel.value);
-		} catch (e: any) {
-			console.error('setMorphGroupLabel failed:', e?.message ?? e);
-		} finally {
-			showMorphLabelDialog.value = false;
-		}
-	}
-
-	function cancelMorphLabel(): void {
-		showMorphLabelDialog.value = false;
+		openWithValue(currentLabel, groupIndex);
 	}
 
 	return { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel };
