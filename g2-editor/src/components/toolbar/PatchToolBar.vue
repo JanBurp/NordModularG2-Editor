@@ -33,17 +33,11 @@
 		</div>
 
 		<ToolBarDivider />
-
-		<template v-if="mode === 'compact'">
-			<ColorPicker />
-			<ToolBarDivider />
-		</template>
-
-		<PatchLevel />
-
+		<ColorPicker />
 		<ToolBarDivider />
-
 		<CableVisibilitySelector />
+		<ToolBarDivider />
+		<PatchLevel />
 	</ToolBar>
 </template>
 

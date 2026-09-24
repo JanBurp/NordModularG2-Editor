@@ -1,10 +1,10 @@
 <template>
-	<div class="flex gap-2">
+	<div class="flex gap-1">
 		<Button variant="default" size="small" :disabled="!canUndo" @click="slotsStore.undo()" title="Undo (⌘Z)">
-			<Icon name="undo" class="w-3.5 h-3.5" />
+			<Icon name="undo" class="w-3 h-3" />
 		</Button>
 		<Button variant="default" size="small" :disabled="!canRedo" @click="slotsStore.redo()" title="Redo (⇧⌘Z)">
-			<Icon name="redo" class="w-3.5 h-3.5" />
+			<Icon name="redo" class="w-3 h-3" />
 		</Button>
 	</div>
 </template>
