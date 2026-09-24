@@ -103,14 +103,13 @@ export class Patchcord {
 		const t = gravity / 100;
 
 		// Random organic variation scaled by gravity (0 at gravity=0 → straight).
-		const angle1 = (Math.random() - 0.5) * 2;
-		const strength1 = Math.random() * 0.7 * t;
-		const angle2 = (Math.random() - 0.5) * 2;
-		const strength2 = Math.random() * 0.7 * t;
-		const dir1 = this.points[0].subtract(this.points[3]).rotate(angle1);
-		const dir2 = this.points[0].subtract(this.points[3]).rotate(angle2);
-		this.points[1] = this.points[0].subtract(dir1.multiply(strength1));
-		this.points[2] = this.points[3].add(dir2.multiply(strength2));
+		// Both control points share the same angle/strength so they stay point-symmetric
+		// about the source-dest midpoint, keeping the curve's sag centered.
+		const angle = (Math.random() - 0.5) * 2;
+		const strength = Math.random() * 0.7 * t;
+		const dir = this.points[0].subtract(this.points[3]).rotate(angle);
+		this.points[1] = this.points[0].subtract(dir.multiply(strength));
+		this.points[2] = this.points[3].add(dir.multiply(strength));
 
 		// Add gravity downward bias on top of the organic variation.
 		if (t > 0) {
