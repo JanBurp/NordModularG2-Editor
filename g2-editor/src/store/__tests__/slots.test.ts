@@ -1411,3 +1411,115 @@ describe('assignModuleToGlobalPage', () => {
 		expect(store.globalParamPages.map((k) => k.slotIndex).sort((a, b) => a - b)).toEqual([118, 119]);
 	});
 });
+
+describe('randomizeOrClearSeqSteps', () => {
+	// Real SeqNote (121) param layout: Seq1Step1..16 at indices 0-15, Seq2Step1..16 at 16-31,
+	// Loop 32, Length 33, TG 34, Rnd 35, Clr 36.
+	const LENGTH_IDX = 33;
+
+	function withVariations(voiceValues: number[], moduleIndex: number): any[] {
+		return Array.from({ length: 9 }, () => ({ fx: {}, voice: { [moduleIndex]: [...voiceValues] }, patch: {} }));
+	}
+
+	it("'clr' resets both the value row and the gate row for all 16 steps, ignoring Length", async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+		const values = Array(37).fill(10);
+		values[LENGTH_IDX] = 3; // Length only affects playback, not which steps Rnd/Clr touch
+		store.slots['A'].variations = withVariations(values, 1);
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
+
+		const result = store.slots['A'].variations![0].voice[1];
+		expect(result.slice(0, 16)).toEqual(Array(16).fill(64)); // FreqCoarse def = 64
+		expect(result.slice(16, 32)).toEqual(Array(16).fill(0)); // Seq2Step1-16 gates (OffOnBlank def = 0)
+		expect(store.isSlotEdited('A')).toBe(true);
+		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+
+	it("'rnd' on SeqNote is bounded by the module's own piano-roll zoom/octave window, not the param's full range", async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [
+			{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [], pianoRollView: { zoom: 1, octaveOffset: 5 } },
+		];
+		store.slots['A'].patch = patch;
+		const values = Array(37).fill(0);
+		values[LENGTH_IDX] = 15; // all 16 steps active
+		store.slots['A'].variations = withVariations(values, 1);
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'rnd');
+
+		// zoom=1, octaveOffset=5 -> window [48, 72] (see visibleNoteWindow in pianoRoll.ts), not [0, 127].
+		const result = store.slots['A'].variations![0].voice[1];
+		for (const v of result.slice(0, 16)) {
+			expect(v).toBeGreaterThanOrEqual(48);
+			expect(v).toBeLessThanOrEqual(72);
+		}
+		for (const v of result.slice(16, 32)) {
+			expect(v).toBeGreaterThanOrEqual(0); // gate row is unaffected by the piano-roll window
+			expect(v).toBeLessThanOrEqual(1);
+		}
+	});
+
+	it("'rnd' on a non-SeqNote sequencer (no piano-roll window) still spans the param's full range", async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations(Array(37).fill(64), 1);
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'rnd');
+
+		const result = store.slots['A'].variations![0].voice[1];
+		for (const v of result.slice(0, 16)) {
+			expect(v).toBeGreaterThanOrEqual(0);
+			expect(v).toBeLessThanOrEqual(127);
+		}
+		expect(result.slice(0, 16).some((v: number) => v !== 64)).toBe(true);
+	});
+
+	it('one press is a single undo/redo entry', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+		const values = Array(37).fill(10);
+		values[LENGTH_IDX] = 15;
+		store.slots['A'].variations = withVariations(values, 1);
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
+		expect(store.slots['A'].variations![0].voice[1].slice(0, 16)).toEqual(Array(16).fill(64));
+
+		await store.undo();
+		expect(store.slots['A'].variations![0].voice[1].slice(0, 16)).toEqual(Array(16).fill(10));
+
+		await store.redo();
+		expect(store.slots['A'].variations![0].voice[1].slice(0, 16)).toEqual(Array(16).fill(64));
+	});
+
+	it('treats all 16 steps as active for a module with no Length param (SeqCtr), resetting both rows', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations(Array(37).fill(10), 1);
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
+
+		expect(store.slots['A'].variations![0].voice[1].slice(0, 32)).toEqual(Array(32).fill(0)); // LevBipUni + OffOnBlank def = 0
+	});
+
+	it('does nothing for a module without any Seq1Step params', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 5, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+
+		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
+
+		expect(useHistoryStore().canUndo('A')).toBe(false);
+	});
+});

@@ -23,7 +23,9 @@ export function isKnob(n: string): boolean {
 }
 
 export function isSlider(n: string): boolean {
-	return ['KnobSlider', 'KnobSeqSlider'].includes(n);
+	// 'KnobSeqSlider' (SeqNote's Seq1StepN params) is rendered by SeqNotePianoRoll instead — see
+	// Module.vue's `instance.type === 121` branch.
+	return ['KnobSlider'].includes(n);
 }
 
 export function isSwitch(n: string): boolean {

@@ -1,17 +1,14 @@
 <template>
 	<ToolBar>
-		<div class="flex flex-col gap-2">
+		<div class="flex flex-col gap-1 -ml-1">
+			<UndoRedo />
 			<Button variant="default" size="xs" @click="patchFile.newPatch()">New</Button>
 			<Button variant="default" size="xs" @click="patchFile.loadInitPatch(1)">Init 1</Button>
 			<Button variant="default" size="xs" @click="patchFile.loadInitPatch(2)">Init 2</Button>
 		</div>
 
 		<template v-if="mode === 'classic'">
-			<ModulePicker class="ml-1" />
-			<div class="flex items-center flex-col gap-4 ml-4">
-				<UndoRedo />
-				<ColorPicker />
-			</div>
+			<ModulePicker />
 		</template>
 
 		<ParameterPagesGroup v-if="mode === 'compact'" compact />

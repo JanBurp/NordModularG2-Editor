@@ -11,8 +11,19 @@ import type {
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
+import { getParam } from '../renderer/parammap';
+import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
-import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetModuleColor, mutSetModuleLabel } from '../parser/patchMutations';
+import {
+	mutAddCable,
+	mutAddModule,
+	mutDeleteCable,
+	mutDeleteModule,
+	mutMoveModule,
+	mutSetModuleColor,
+	mutSetModuleLabel,
+	mutSetPianoRollView,
+} from '../parser/patchMutations';
 import { remapParamValues, remapModeValues, remapCablesForModule } from '../parser/moduleReplace';
 import { PATCH_MORPH_MODULE_ID } from '../parser/constants';
 import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/paramPages';
@@ -756,13 +767,13 @@ export const useSlotsStore = defineStore('slots', {
 						slotEntry.variations![toVar] = deepCloneVariationState(prevState);
 						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await window.cli.runBatch(cmds);
+						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation undo');
 					},
 					redo: async () => {
 						slotEntry.variations![toVar] = deepCloneVariationState(newState);
 						this._markSlotDirty(slot);
 						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await window.cli.runBatch(cmds);
+						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation redo');
 					},
 				});
 			}
@@ -771,7 +782,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.pendingCopyVariation[key] = (this.pendingCopyVariation[key] ?? 0) + 1;
 			slotEntry.variations[toVar] = newState;
 			this._markSlotDirty(slot);
-			await window.cli.run(['copy-variation', slot, String(fromVar), String(toVar)]);
+			await runCliSafe(['copy-variation', slot, String(fromVar), String(toVar)], 'copyVariation');
 		},
 
 		handleCopyVariationEvent(slot: SlotLabel, fromVar: number, toVar: number) {
@@ -1376,7 +1387,7 @@ export const useSlotsStore = defineStore('slots', {
 							this._markSlotDirty(slot);
 							const allUndoCmds = [...delCableCmds, ...delModCmds, ...moveCmds];
 							if (allUndoCmds.length > 0) {
-								await window.cli.runBatch(allUndoCmds);
+								await runCliBatchSafe(allUndoCmds, 'paste undo');
 							}
 						},
 						redo: async () => {
@@ -1711,6 +1722,80 @@ export const useSlotsStore = defineStore('slots', {
 			await runCliBatchSafe(cmds, 'setParams');
 		},
 
+		// Rnd/Clr on sequencer modules (SeqNote/SeqVal/SeqLev/SeqCtr) are computed entirely here in
+		// the editor, then pushed as ordinary set-param messages — the real editor's Rnd never asks
+		// hardware to randomize (CPnlNoteSeqClrRnd::GetRequestedChange in G2Editor.c calls rand()
+		// client-side too). Touches both the value row (Seq1StepN) and the on/off gate row
+		// (Seq2StepN, where present), for all 16 steps regardless of Length — Length only affects
+		// playback, not which steps Rnd/Clr touch; setParams makes the whole press one undo/redo entry.
+		async randomizeOrClearSeqSteps(moduleId: number, variation: number, area: 'voice' | 'fx', mode: 'rnd' | 'clr'): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+
+			const { areaIdx } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
+			const params = (mod ? getModule(mod.type) : null)?.params;
+			if (!mod || !params) return;
+
+			const stepIndices: number[] = [];
+			const gateIndices: number[] = [];
+			for (let n = 1; n <= 16; n++) {
+				const idx = params.findIndex((p) => p.name === `Seq1Step${n}`);
+				if (idx >= 0) stepIndices.push(idx);
+				const gateIdx = params.findIndex((p) => p.name === `Seq2Step${n}`);
+				if (gateIdx >= 0) gateIndices.push(gateIdx);
+			}
+			if (stepIndices.length === 0) return;
+
+			const stepType = getParam(params[stepIndices[0]].type);
+			if (!stepType) return;
+			const gateType = gateIndices.length > 0 ? getParam(params[gateIndices[0]].type) : undefined;
+
+			const randomIn = (low: number, high: number) => low + Math.floor(Math.random() * (high - low + 1));
+
+			// SeqNote's Rnd is bounded by its own piano-roll zoom/octave window (CSeqSliderGUI's
+			// GetLowLimit/GetRange in the real editor); other Seq modules have no such window and
+			// randomize across the param's full type range, as before.
+			let valueLow = stepType.low;
+			let valueHigh = stepType.high;
+			if (mod.type === SEQNOTE_MODULE_TYPE) {
+				const view = mod.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+				const window = visibleNoteWindow(view.zoom, view.octaveOffset);
+				valueLow = window.low;
+				valueHigh = window.high;
+			}
+
+			// Rnd/Clr always act on all 16 steps, regardless of Length — Length only affects playback.
+			const paramIndices = [...stepIndices];
+			const values = paramIndices.map(() => (mode === 'rnd' ? randomIn(valueLow, valueHigh) : stepType.def));
+
+			if (gateType) {
+				paramIndices.push(...gateIndices);
+				values.push(...gateIndices.map(() => (mode === 'rnd' ? randomIn(gateType.low, gateType.high) : gateType.def)));
+			}
+
+			await this.setParams(moduleId, paramIndices, values, variation, area, slot);
+		},
+
+		// The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes within *its own*
+		// stored piano-roll window, unaware of what this editor currently shows — see
+		// randomizeOrClearSeqSteps's comment. We never send the Rnd/Clr trigger param ourselves (see
+		// useModuleParams.ts), so any incoming press of it (this is called from every incoming
+		// param_change in useSlotEvents.ts) must be physical: immediately recompute and push
+		// corrected, windowed values, overwriting hardware's own out-of-range result within
+		// milliseconds — the same procedure as pressing Rnd/Clr in this editor.
+		maybeCorrectHardwareRndOrClr(slot: SlotLabel, moduleId: number, paramIndex: number, value: number, variation: number, area: 'voice' | 'fx'): void {
+			if (value !== 1) return;
+			const patch = this.slots[slot]?.patch;
+			if (!patch) return;
+			const { areaIdx } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
+			const param = mod ? getModule(mod.type)?.params?.[paramIndex] : undefined;
+			if (param?.type !== 'TrigBtn' || (param.name !== 'Rnd' && param.name !== 'Clr')) return;
+			this.randomizeOrClearSeqSteps(moduleId, variation, area, param.name === 'Rnd' ? 'rnd' : 'clr');
+		},
+
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
@@ -1742,7 +1827,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (mod?.modes) mod.modes[modeIdx] = value;
 			this._markSlotDirty(slot);
 
-			await window.cli.run(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)]);
+			await runCliSafe(['set-module-mode', slot, location, String(moduleId), String(modeIdx), String(value)], 'setMode');
 		},
 
 		async pasteParams(pairs: PasteParamsPair[], variation: number, area: 'voice' | 'fx'): Promise<void> {
@@ -1792,7 +1877,7 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 			this._markSlotDirty(slot);
-			if (cmds.length > 0) await window.cli.runBatch(cmds);
+			if (cmds.length > 0) await runCliBatchSafe(cmds, 'pasteParams');
 		},
 
 		async loadSlot(slot: SlotLabel, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
@@ -2317,7 +2402,10 @@ export const useSlotsStore = defineStore('slots', {
 
 			for (const id of moduleIds) mutSetModuleColor(patch, areaIdx, id, color);
 			this._markSlotDirty(slot);
-			await window.cli.runBatch(moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]));
+			await runCliBatchSafe(
+				moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]),
+				'setModuleColors',
+			);
 		},
 
 		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
@@ -2342,7 +2430,39 @@ export const useSlotsStore = defineStore('slots', {
 
 			mutSetModuleLabel(patch, areaIdx, moduleId, label);
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-module-name', slot, location, String(moduleId), label]);
+			await runCliSafe(['set-module-name', slot, location, String(moduleId), label], 'setModuleLabel');
+		},
+
+		// SeqNote's piano-roll Magnifier/Octave view — host-editor-only UI state with no wire-protocol
+		// counterpart (see pianoRoll.ts), so unlike every other module-level setter above, there is no
+		// CLI push here. It's still real patch data (persisted via the $PARAM_NAMES section, see
+		// nmg2PatchSerializer.ts's paramLabelsForModule), so it still goes through history/dirty-marking
+		// like any other edit. The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes
+		// within *its own* stored zoom/offset window regardless of what's pushed here — see
+		// useSlotEvents.ts's param_change handler, which corrects that by recomputing within the
+		// window shown here as soon as it sees hardware's own Rnd/Clr press echo back.
+		async setSeqNotePianoRollView(moduleId: number, area: 'voice' | 'fx', view: PianoRollView): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx } = areaConfig(area);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
+				const prevView = mod?.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+				hist.record(slot, {
+					undo: async () => {
+						await this.setSeqNotePianoRollView(moduleId, area, prevView);
+					},
+					redo: async () => {
+						await this.setSeqNotePianoRollView(moduleId, area, view);
+					},
+				});
+			}
+
+			mutSetPianoRollView(patch, areaIdx, moduleId, view);
+			this._markSlotDirty(slot);
 		},
 
 		async setPatchName(name: string): Promise<void> {
@@ -2735,7 +2855,10 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[labelIndex] = label;
 			}
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels]);
+			await runCliSafe(
+				['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels],
+				'setParamLabel',
+			);
 		},
 
 		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
@@ -2771,7 +2894,10 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[0] = label;
 			}
 			this._markSlotDirty(slot);
-			await window.cli.run(['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label]);
+			await runCliSafe(
+				['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label],
+				'setMorphGroupLabel',
+			);
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

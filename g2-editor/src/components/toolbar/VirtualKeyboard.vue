@@ -40,6 +40,7 @@
 	import Button from './Button.vue';
 	import { useDeviceStore } from '../../store/device';
 	import { MidiNote as midiNoteName } from '../../renderer/parammap';
+	import { isBlackNote } from '../../renderer/pianoRoll';
 
 	interface KeyInfo {
 		note: number;
@@ -56,11 +57,6 @@
 	const BLACK_H_FRAC = 0.62;
 	const REPEAT_MS = 250; // A guess: the manual says only "play repeatedly" with no rate given.
 
-	const IS_BLACK = [false, true, false, true, false, false, true, false, true, false, true, false];
-	function isBlack(note: number): boolean {
-		return IS_BLACK[note % 12];
-	}
-
 	const device = useDeviceStore();
 
 	const keysEl = ref<HTMLElement | null>(null);
@@ -73,7 +69,7 @@
 
 	function whiteCountFrom(note: number): number {
 		let count = 0;
-		for (let n = note; n <= 127; n++) if (!isBlack(n)) count++;
+		for (let n = note; n <= 127; n++) if (!isBlackNote(n)) count++;
 		return count;
 	}
 
@@ -94,7 +90,7 @@
 		let whiteIdx = 0;
 		let note = renderFirstNote.value;
 		while (whiteIdx < visibleWhiteCount.value && note <= 127) {
-			if (isBlack(note)) {
+			if (isBlackNote(note)) {
 				result.push({ note, black: true, x: whiteIdx * WHITE_W - blackW / 2 });
 			} else {
 				result.push({ note, black: false, x: whiteIdx * WHITE_W });

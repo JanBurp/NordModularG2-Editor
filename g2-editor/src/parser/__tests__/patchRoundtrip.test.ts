@@ -1,6 +1,6 @@
 import type { Cable, GlobalParamPageAssignment, ModuleInstance, ParamLabel, Patch } from '@/types';
 import { describe, expect, it } from 'vitest';
-import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule } from '../patchMutations';
+import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetPianoRollView } from '../patchMutations';
 
 import { PatchParser } from '../nmg2PatchParser';
 import { SectionType } from '../constants';
@@ -474,6 +474,59 @@ describe('paramLabels round-trip', () => {
 		for (const i of [0, 1] as const) {
 			expect(patchB.areas[i].modules.every((m) => !m.paramLabels)).toBe(true);
 		}
+	});
+});
+
+describe('SeqNote pianoRollView round-trip', () => {
+	// Mixturtrautonium.pch2 ships two real SeqNote (type 121) instances whose $PARAM_NAMES entries
+	// were never touched from their hardware-widget defaults (zoom=1, octaveOffset=5) — confirms the
+	// parser decodes real hardware-saved data, not just synthetic test data.
+	it('decodes the real fixture default view for both SeqNote instances', () => {
+		const { patch } = loadFixture('Mixturtrautonium.pch2');
+		const seqNotes = patch.areas[1].modules.filter((m) => m.type === 121);
+		expect(seqNotes.length).toBe(2);
+		for (const m of seqNotes) {
+			expect(m.pianoRollView).toEqual({ zoom: 1, octaveOffset: 5 });
+		}
+	});
+
+	it('round-trips a changed view and leaves other modules unaffected', () => {
+		const { name, rawHex, patch: patchA } = loadFixture('Mixturtrautonium.pch2');
+		const seqNote = patchA.areas[1].modules.find((m) => m.type === 121)!;
+		mutSetPianoRollView(patchA, 1, seqNote.index, { zoom: 2, octaveOffset: 2 });
+
+		const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const changed = patchB.areas[1].modules.find((m) => m.index === seqNote.index)!;
+		expect(changed.pianoRollView).toEqual({ zoom: 2, octaveOffset: 2 });
+
+		const other = patchB.areas[1].modules.find((m) => m.type === 121 && m.index !== seqNote.index)!;
+		expect(other.pianoRollView).toEqual({ zoom: 1, octaveOffset: 5 });
+	});
+
+	it('defaults a freshly-added SeqNote module to zoom=1/octaveOffset=5 and round-trips it', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+		const seqNoteDef = getModule(121)!;
+		const mod: ModuleInstance = {
+			type: 121,
+			index: 1,
+			horiz: 0,
+			vert: 0,
+			colour: 0,
+			uprate: 0,
+			leds: 0,
+			pcnt: seqNoteDef.params?.length ?? 0,
+			lv: [],
+			modes: [],
+		};
+		mutAddModule(patch, 1, mod);
+
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		const patchB = parsePatchFromRawHex(name, newHex);
+
+		const added = patchB.areas[1].modules.find((m) => m.index === 1);
+		expect(added?.pianoRollView).toEqual({ zoom: 1, octaveOffset: 5 });
 	});
 });
 

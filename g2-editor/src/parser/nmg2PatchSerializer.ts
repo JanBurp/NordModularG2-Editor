@@ -12,6 +12,7 @@ import type {
 } from '@/types';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { SLOT_LABELS } from '@/constants';
+import { SEQNOTE_MODULE_TYPE, DEFAULT_PIANO_ROLL_VIEW } from '@/renderer/pianoRoll';
 
 // Third header byte of a .pch2/.prf2: file type. Also feeds the CRC (see buildRawHex).
 const FILE_TYPE_PATCH = 0x00;
@@ -132,6 +133,22 @@ function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: 
 		}
 	}
 	return makeSection(SectionType.PARAMETERS, bw.flush());
+}
+
+// SeqNote's Magnifier/Octave-offset widget state rides the same $PARAM_NAMES container as real
+// param labels (see parseParamNames in nmg2PatchParser.ts) — two positional, unlabeled byte
+// entries (isString=false, paramLen=1) prepended before any real label entries. The original
+// editor emits these unconditionally for every SeqNote instance, so we do too (defaulting when
+// the module was added/edited without ever setting a view), for byte-fidelity with hardware-saved
+// patches.
+function paramLabelsForModule(m: ModuleInstance): ParamLabel[] {
+	if (m.type !== SEQNOTE_MODULE_TYPE) return m.paramLabels ?? [];
+	const { zoom, octaveOffset } = m.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+	const viewEntries: ParamLabel[] = [
+		{ paramIndex: zoom, isString: false, paramLen: 1, labels: [] },
+		{ paramIndex: octaveOffset, isString: false, paramLen: 1, labels: [] },
+	];
+	return [...viewEntries, ...(m.paramLabels ?? [])];
 }
 
 // Always emits a section: with no labelled modules the result is a valid 2-byte
@@ -484,7 +501,7 @@ function appendMissingAreaParamNames(patch: Patch, out: Uint8Array[], w: Written
 		out.push(
 			writeParamNames(
 				areaIdx,
-				modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+				modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
 			),
 		);
 		w.m5b.add(areaIdx);
@@ -538,7 +555,7 @@ function processSection(
 			out.push(
 				writeParamNames(
 					areaIdx as 0 | 1,
-					patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: m.paramLabels ?? [] })),
+					patch.areas[areaIdx].modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
 				),
 			);
 			w.m5b.add(areaIdx);

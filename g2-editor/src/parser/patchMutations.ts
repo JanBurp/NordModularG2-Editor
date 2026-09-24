@@ -1,4 +1,5 @@
 import type { Patch, ModuleInstance, Cable } from '@/types';
+import type { PianoRollView } from '@/renderer/pianoRoll';
 
 export function mutDeleteCable(patch: Patch, areaIdx: 0 | 1, cable: { smod: number; scon: number; dmod: number; dcon: number }): void {
 	const list = patch.areas[areaIdx].cableList ?? [];
@@ -26,6 +27,10 @@ export function mutSetModuleColor(patch: Patch, areaIdx: 0 | 1, moduleId: number
 
 export function mutSetModuleLabel(patch: Patch, areaIdx: 0 | 1, moduleId: number, label: string): void {
 	patch.areas[areaIdx].modules = patch.areas[areaIdx].modules.map((m) => (m.index === moduleId ? { ...m, uname: label } : m));
+}
+
+export function mutSetPianoRollView(patch: Patch, areaIdx: 0 | 1, moduleId: number, view: PianoRollView): void {
+	patch.areas[areaIdx].modules = patch.areas[areaIdx].modules.map((m) => (m.index === moduleId ? { ...m, pianoRollView: view } : m));
 }
 
 export function mutAddCable(patch: Patch, areaIdx: 0 | 1, cable: Cable): void {

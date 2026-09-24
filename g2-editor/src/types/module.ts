@@ -1,3 +1,5 @@
+import type { PianoRollView } from '../renderer/pianoRoll';
+
 export interface VisualElement {
 	type: string;
 	x?: number;
@@ -41,6 +43,10 @@ export interface ModuleInstance {
 	modes: number[];
 	uname?: string;
 	paramLabels?: ParamLabel[];
+	// SeqNote-only (type 121): the note-editor's Magnifier/Octave-offset view state. See
+	// src/renderer/pianoRoll.ts for the shape and default; persisted via the same $PARAM_NAMES
+	// wire section as paramLabels (see nmg2PatchParser.ts's parseParamNames).
+	pianoRollView?: PianoRollView;
 	[key: string]: unknown;
 }
 
