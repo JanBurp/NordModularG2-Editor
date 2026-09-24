@@ -96,6 +96,7 @@
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAddModule } from '../../composables/useAddModule';
+	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { clientToSvgPoint } from '../../renderer/svgUtils';
 
@@ -257,6 +258,7 @@
 	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
 	const { addModuleAt } = useAddModule();
+	const { graphics } = useModuleGraphics();
 
 	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
@@ -278,6 +280,7 @@
 			label: cat,
 			children: getModulesByCategory(cat).map((m) => ({
 				label: m.long || m.short,
+				icon: graphics.value[m.id],
 				action: () => addModuleAt(m.id, col, row, area),
 			})),
 		}));
