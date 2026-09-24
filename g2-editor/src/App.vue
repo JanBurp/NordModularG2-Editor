@@ -177,7 +177,7 @@
 		/>
 	</Dialog>
 
-	<AboutDialog v-model="showAboutDialog" />
+	<AboutDialog v-model="showAboutDialog" :closable="!startingUp" :connecting="startingUp" :connecting-message="loadingMessage" />
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
@@ -291,11 +291,12 @@
 
 	const isLoading = computed(
 		() =>
-			device.status === DeviceStatus.Connecting ||
-			device.status === DeviceStatus.Loading ||
-			device.modeChanging ||
-			slotsStore.uploadingFromFile ||
-			Object.values(slotsStore.slots).some((s) => s.loading),
+			!startingUp.value &&
+			(device.status === DeviceStatus.Connecting ||
+				device.status === DeviceStatus.Loading ||
+				device.modeChanging ||
+				slotsStore.uploadingFromFile ||
+				Object.values(slotsStore.slots).some((s) => s.loading)),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
@@ -357,7 +358,8 @@
 		requestKeyFocus,
 	);
 
-	const showAboutDialog = ref(false);
+	const showAboutDialog = ref(true);
+	const startingUp = ref(true);
 	const showQuickAdd = ref(false);
 	const quickAddPos = ref({ x: 0, y: 0 });
 
@@ -457,5 +459,7 @@
 				browserStore.loadSynthList();
 			}
 		}
+		showAboutDialog.value = false;
+		startingUp.value = false;
 	});
 </script>
