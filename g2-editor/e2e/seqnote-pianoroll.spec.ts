@@ -2,9 +2,10 @@ import { test, expect } from './fixtures/electron';
 import { openContextMenu, clickContextMenuItem } from './helpers';
 
 // Mixturtrautonium.pch2 ships two real SeqNote (voice-area) instances, both at their
-// hardware-widget default Magnifier/Octave view (zoom=1 [raw byte, i.e. 2 visible octaves],
-// octaveOffset=5) — see src/parser/__tests__/patchRoundtrip.test.ts's "SeqNote pianoRollView
-// round-trip" for the parser-level equivalent of this fixture fact.
+// hardware-widget default Magnifier/Octave view (zoom=1 [raw byte], octaveOffset=5, i.e. notes
+// 48-72 visible — see visibleNoteWindow in src/renderer/pianoRoll.ts) — see
+// src/parser/__tests__/patchRoundtrip.test.ts's "SeqNote pianoRollView round-trip" for the
+// parser-level equivalent of this fixture fact.
 test.describe('SeqNote piano-roll', () => {
 	test('renders 16 step strips and the default zoom band selected', async ({ page, sendMenuAction, mockOpenPatch }) => {
 		await mockOpenPatch('Mixturtrautonium.pch2');
@@ -14,7 +15,7 @@ test.describe('SeqNote piano-roll', () => {
 		const seqNote = page.locator('[data-testid="canvas-va"] [data-module-short="SeqNote"]').first();
 		await expect(seqNote.locator('[data-testid="seqnote-step"]')).toHaveCount(16);
 		await expect(seqNote.locator('[data-testid="seqnote-view-controls"]')).toBeVisible();
-		await expect(seqNote.locator('[data-testid="seqnote-zoom-band"][data-zoom="1"]')).toHaveAttribute('data-selected', 'true');
+		await expect(seqNote.locator('[data-testid="seqnote-magnifier-button"]')).toHaveAttribute('data-zoom', '1');
 	});
 
 	test('clicking within a step strip sets its note value, and undo reverts it', async ({ page, sendMenuAction, mockOpenPatch }) => {
@@ -27,16 +28,15 @@ test.describe('SeqNote piano-roll', () => {
 		await step.scrollIntoViewIfNeeded();
 		const before = await step.getAttribute('data-value');
 
-		// zoom=1 (raw) -> 2 visible octaves -> 24 semitones, octaveOffset=5 -> lowest=60, highest=83.
-		// Row index 13 from the top is note 70; away enough from the default center (64) that the
-		// click is guaranteed to actually change something.
+		// zoom=1, octaveOffset=5 -> window [48, 72] (25 semitones). Row index 2 from the top is note
+		// 70; away enough from the default center (64) that the click is guaranteed to change something.
 		const strip = step.locator('[data-testid="seqnote-step-strip"]');
 		const rect = await strip.evaluate((el) => {
 			const r = (el as SVGGraphicsElement).getBoundingClientRect();
 			return { top: r.top, left: r.left, width: r.width, height: r.height };
 		});
-		const rowIndexFromTop = 13;
-		const visibleSemitoneCount = 24;
+		const rowIndexFromTop = 2;
+		const visibleSemitoneCount = 25;
 		const targetX = rect.left + rect.width / 2;
 		const targetY = rect.top + ((rowIndexFromTop + 0.5) / visibleSemitoneCount) * rect.height;
 
@@ -53,26 +53,30 @@ test.describe('SeqNote piano-roll', () => {
 		expect(await step.getAttribute('data-value')).toBe(before);
 	});
 
-	test('the Magnifier bands are directly selectable and update the visible window', async ({ page, sendMenuAction, mockOpenPatch }) => {
+	test('the Magnifier button cycles zoom levels and updates the visible window', async ({ page, sendMenuAction, mockOpenPatch }) => {
 		await mockOpenPatch('Mixturtrautonium.pch2');
 		await sendMenuAction('open');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 
 		const seqNote = page.locator('[data-testid="canvas-va"] [data-module-short="SeqNote"]').first();
 		const highlights = seqNote.locator('[data-testid="seqnote-step-value-highlight"]');
-		const band = (zoom: 0 | 1 | 2) => seqNote.locator(`[data-testid="seqnote-zoom-band"][data-zoom="${zoom}"]`);
+		const magnifier = seqNote.locator('[data-testid="seqnote-magnifier-button"]');
 
-		await expect(band(1)).toHaveAttribute('data-selected', 'true');
+		await expect(magnifier).toHaveAttribute('data-zoom', '1');
 		const countAtDefault = await highlights.count();
 
-		await band(0).click();
-		await expect(band(0)).toHaveAttribute('data-selected', 'true');
-		await expect(band(1)).toHaveAttribute('data-selected', 'false');
-		// Narrowing from 2 to 1 visible octave changes which steps' values are still in range.
+		await magnifier.click();
+		await expect(magnifier).toHaveAttribute('data-zoom', '2');
+		// zoom 2 is the narrowest window ([60, 72] vs. zoom 1's [48, 72]), changing which steps'
+		// values are still in range.
 		expect(await highlights.count()).not.toBe(countAtDefault);
 
-		await band(2).click();
-		await expect(band(2)).toHaveAttribute('data-selected', 'true');
+		await magnifier.click();
+		await expect(magnifier).toHaveAttribute('data-zoom', '0');
+
+		// A third click cycles back to the starting zoom.
+		await magnifier.click();
+		await expect(magnifier).toHaveAttribute('data-zoom', '1');
 	});
 
 	test('the Octave stepper moves the visible window and clamps at the boundary', async ({ page, sendMenuAction, mockOpenPatch }) => {
@@ -114,6 +118,6 @@ test.describe('SeqNote piano-roll', () => {
 
 		await openContextMenu(page, step);
 		await clickContextMenuItem(page, 'Morph assign ✓ (Group 1)');
-		await expect(highlight).toHaveAttribute('fill', '#f80');
+		await expect(highlight).toHaveAttribute('fill', '#000');
 	});
 });

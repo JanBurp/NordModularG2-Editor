@@ -3,7 +3,6 @@ import { createPinia, setActivePinia } from 'pinia';
 import { computed } from 'vue';
 import { useModuleParams } from '../useModuleParams';
 import { useSlotsStore } from '@/store/slots';
-import { useDeviceStore, DeviceStatus } from '@/store/device';
 import type { ModuleInstance, ModuleDefinition } from '@/types';
 
 beforeEach(() => {
@@ -11,7 +10,7 @@ beforeEach(() => {
 });
 
 // Minimal SeqNote-shaped module def: a Rnd/Clr TrigBtn pair plus an unrelated switch, enough to
-// exercise onParamChange's Rnd/Clr offline-fallback branch without pulling in the real nmg2mods table.
+// exercise onParamChange's Rnd/Clr branch without pulling in the real nmg2mods table.
 function setup() {
 	const instance: ModuleInstance = { type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
 	const moduleDef: ModuleDefinition = {
@@ -38,55 +37,49 @@ function setup() {
 	return { onParamChange, emitParamChange };
 }
 
-describe('useModuleParams — Rnd/Clr offline fallback', () => {
-	it('triggers the local randomize action on Rnd press when disconnected, without suppressing the normal trigger emit', () => {
-		useDeviceStore().status = DeviceStatus.Disconnected;
+// The real editor always computes Rnd/Clr client-side (CPnlNoteSeqClrRnd::GetRequestedChange in
+// G2Editor.c calls rand() in the editor process, never asks hardware) — so this fires regardless
+// of connection state, then pushes the result via the normal set-param path. The button's own
+// press/release param must never reach hardware: SeqNote's firmware runs its own (unwindowed)
+// randomize on-board when it sees that trigger param, racing with the values just computed here.
+describe('useModuleParams — Rnd/Clr', () => {
+	it('triggers the local randomize action on Rnd press, and does not forward the trigger param itself', () => {
 		const spy = vi.spyOn(useSlotsStore(), 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
 		const { onParamChange, emitParamChange } = setup();
 
 		onParamChange(0, 1); // Rnd is param index 0, press = value 1
 
 		expect(spy).toHaveBeenCalledWith(1, 0, 'fx', 'rnd');
-		expect(emitParamChange).toHaveBeenCalledWith(1, 0, 1, undefined);
+		expect(emitParamChange).not.toHaveBeenCalled();
 	});
 
-	it('triggers the local clear action on Clr press when disconnected', () => {
-		useDeviceStore().status = DeviceStatus.Disconnected;
+	it('triggers the local clear action on Clr press, and does not forward the trigger param itself', () => {
 		const spy = vi.spyOn(useSlotsStore(), 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { onParamChange } = setup();
+		const { onParamChange, emitParamChange } = setup();
 
 		onParamChange(1, 1); // Clr is param index 1
 
 		expect(spy).toHaveBeenCalledWith(1, 0, 'fx', 'clr');
+		expect(emitParamChange).not.toHaveBeenCalled();
 	});
 
-	it('leaves the hardware round trip untouched when connected', () => {
-		useDeviceStore().status = DeviceStatus.Connected;
+	it('does not fire on the release edge (value 0), and still does not forward it', () => {
 		const spy = vi.spyOn(useSlotsStore(), 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { onParamChange } = setup();
-
-		onParamChange(0, 1);
-
-		expect(spy).not.toHaveBeenCalled();
-	});
-
-	it('does not fire on the release edge (value 0)', () => {
-		useDeviceStore().status = DeviceStatus.Disconnected;
-		const spy = vi.spyOn(useSlotsStore(), 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { onParamChange } = setup();
+		const { onParamChange, emitParamChange } = setup();
 
 		onParamChange(0, 0);
 
 		expect(spy).not.toHaveBeenCalled();
+		expect(emitParamChange).not.toHaveBeenCalled();
 	});
 
-	it('does not fire for a non-TrigBtn switch', () => {
-		useDeviceStore().status = DeviceStatus.Disconnected;
+	it('does not fire for a non-TrigBtn switch, and forwards it normally', () => {
 		const spy = vi.spyOn(useSlotsStore(), 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { onParamChange } = setup();
+		const { onParamChange, emitParamChange } = setup();
 
 		onParamChange(2, 1); // SomeSwitch, not Rnd/Clr
 
 		expect(spy).not.toHaveBeenCalled();
+		expect(emitParamChange).toHaveBeenCalledWith(1, 2, 1, undefined);
 	});
 });

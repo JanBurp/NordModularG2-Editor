@@ -1,11 +1,5 @@
 <template>
-	<g
-		:class="{ 'opacity-40': dimmed }"
-		data-testid="seqnote-step"
-		:data-param-index="paramIndex"
-		:data-value="value"
-		@contextmenu.stop.prevent="emit('paramContextMenu', paramIndex, $event)"
-	>
+	<g data-testid="seqnote-step" :data-param-index="paramIndex" :data-value="value" @contextmenu.stop.prevent="emit('paramContextMenu', paramIndex, $event)">
 		<rect
 			:x="x"
 			:y="stripTop"
@@ -37,7 +31,7 @@
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
-	import { isBlackNote, visibleOctaveCount } from '../../renderer/pianoRoll';
+	import { blackNoteRowYs, visibleNoteWindow } from '../../renderer/pianoRoll';
 	import { usePianoRollNoteInteraction } from '../../composables/usePianoRollNoteInteraction';
 	import { clamp } from '../../utils/math';
 
@@ -50,7 +44,6 @@
 		stripHeight: number;
 		zoom: 0 | 1 | 2;
 		octaveOffset: number;
-		dimmed?: boolean;
 		highlight?: boolean;
 		morphColor?: 'red' | 'blue' | null;
 		morphRange?: number;
@@ -61,21 +54,15 @@
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const morphFillColor = computed(() => (props.morphColor === 'red' ? '#e0303c' : props.morphColor === 'blue' ? '#4a63c8' : '#f80'));
+	const morphFillColor = computed(() => (props.morphColor === 'red' ? '#e0303c' : props.morphColor === 'blue' ? '#4a63c8' : '#000'));
 
-	const visibleSemitoneCount = computed(() => 12 * visibleOctaveCount(props.zoom));
+	const noteWindow = computed(() => visibleNoteWindow(props.zoom, props.octaveOffset));
+	const lowestVisibleNote = computed(() => noteWindow.value.low);
+	const highestVisibleNote = computed(() => noteWindow.value.high);
+	const visibleSemitoneCount = computed(() => highestVisibleNote.value - lowestVisibleNote.value + 1);
 	const rowHeight = computed(() => props.stripHeight / visibleSemitoneCount.value);
-	const lowestVisibleNote = computed(() => props.octaveOffset * 12);
-	const highestVisibleNote = computed(() => lowestVisibleNote.value + visibleSemitoneCount.value - 1);
 
-	const blackRowYs = computed(() => {
-		const ys: number[] = [];
-		for (let rowIndexFromTop = 0; rowIndexFromTop < visibleSemitoneCount.value; rowIndexFromTop++) {
-			const note = highestVisibleNote.value - rowIndexFromTop;
-			if (isBlackNote(note)) ys.push(props.stripTop + rowIndexFromTop * rowHeight.value);
-		}
-		return ys;
-	});
+	const blackRowYs = computed(() => blackNoteRowYs(props.stripTop, rowHeight.value, highestVisibleNote.value, visibleSemitoneCount.value));
 
 	const clampedValue = computed(() => clamp(props.value, 0, 127));
 	const valueInRange = computed(() => clampedValue.value >= lowestVisibleNote.value && clampedValue.value <= highestVisibleNote.value);

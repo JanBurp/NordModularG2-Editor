@@ -12,7 +12,7 @@ import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
-import { DEFAULT_PIANO_ROLL_VIEW, type PianoRollView } from '../renderer/pianoRoll';
+import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
 import {
 	mutAddCable,
@@ -1628,12 +1628,12 @@ export const useSlotsStore = defineStore('slots', {
 			await runCliBatchSafe(cmds, 'setParams');
 		},
 
-		// Rnd/Clr on sequencer modules (SeqNote/SeqVal/SeqLev/SeqCtr) normally do nothing locally:
-		// the real hardware computes the new step values and streams them back as param_change
-		// echoes (useSlotEvents.ts), a round trip that never happens while offline. This reproduces
-		// that effect locally — only called when disconnected, see useModuleParams.ts — using
-		// setParams so the whole press is one undo/redo entry. Touches both the value row
-		// (Seq1StepN) and the on/off gate row (Seq2StepN, where present).
+		// Rnd/Clr on sequencer modules (SeqNote/SeqVal/SeqLev/SeqCtr) are computed entirely here in
+		// the editor, then pushed as ordinary set-param messages — the real editor's Rnd never asks
+		// hardware to randomize (CPnlNoteSeqClrRnd::GetRequestedChange in G2Editor.c calls rand()
+		// client-side too). Touches both the value row (Seq1StepN) and the on/off gate row
+		// (Seq2StepN, where present), for all 16 steps regardless of Length — Length only affects
+		// playback, not which steps Rnd/Clr touch; setParams makes the whole press one undo/redo entry.
 		async randomizeOrClearSeqSteps(moduleId: number, variation: number, area: 'voice' | 'fx', mode: 'rnd' | 'clr'): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
@@ -1642,7 +1642,7 @@ export const useSlotsStore = defineStore('slots', {
 			const { areaIdx } = areaConfig(area);
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
 			const params = (mod ? getModule(mod.type) : null)?.params;
-			if (!params) return;
+			if (!mod || !params) return;
 
 			const stepIndices: number[] = [];
 			const gateIndices: number[] = [];
@@ -1658,22 +1658,48 @@ export const useSlotsStore = defineStore('slots', {
 			if (!stepType) return;
 			const gateType = gateIndices.length > 0 ? getParam(params[gateIndices[0]].type) : undefined;
 
-			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
-			const lengthIdx = params.findIndex((p) => p.name === 'Length');
-			const lengthValue = lengthIdx >= 0 ? (this.slots[slot].variations?.[variation]?.[areaKey]?.[moduleId]?.[lengthIdx] ?? 0) : undefined;
-			const activeCount = lengthValue !== undefined ? Math.min(stepIndices.length, lengthValue + 1) : stepIndices.length;
-
 			const randomIn = (low: number, high: number) => low + Math.floor(Math.random() * (high - low + 1));
 
-			const paramIndices = stepIndices.slice(0, activeCount);
-			const values = paramIndices.map(() => (mode === 'rnd' ? randomIn(stepType.low, stepType.high) : stepType.def));
+			// SeqNote's Rnd is bounded by its own piano-roll zoom/octave window (CSeqSliderGUI's
+			// GetLowLimit/GetRange in the real editor); other Seq modules have no such window and
+			// randomize across the param's full type range, as before.
+			let valueLow = stepType.low;
+			let valueHigh = stepType.high;
+			if (mod.type === SEQNOTE_MODULE_TYPE) {
+				const view = mod.pianoRollView ?? DEFAULT_PIANO_ROLL_VIEW;
+				const window = visibleNoteWindow(view.zoom, view.octaveOffset);
+				valueLow = window.low;
+				valueHigh = window.high;
+			}
+
+			// Rnd/Clr always act on all 16 steps, regardless of Length — Length only affects playback.
+			const paramIndices = [...stepIndices];
+			const values = paramIndices.map(() => (mode === 'rnd' ? randomIn(valueLow, valueHigh) : stepType.def));
 
 			if (gateType) {
-				paramIndices.push(...gateIndices.slice(0, activeCount));
-				values.push(...gateIndices.slice(0, activeCount).map(() => (mode === 'rnd' ? randomIn(gateType.low, gateType.high) : gateType.def)));
+				paramIndices.push(...gateIndices);
+				values.push(...gateIndices.map(() => (mode === 'rnd' ? randomIn(gateType.low, gateType.high) : gateType.def)));
 			}
 
 			await this.setParams(moduleId, paramIndices, values, variation, area, slot);
+		},
+
+		// The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes within *its own*
+		// stored piano-roll window, unaware of what this editor currently shows — see
+		// randomizeOrClearSeqSteps's comment. We never send the Rnd/Clr trigger param ourselves (see
+		// useModuleParams.ts), so any incoming press of it (this is called from every incoming
+		// param_change in useSlotEvents.ts) must be physical: immediately recompute and push
+		// corrected, windowed values, overwriting hardware's own out-of-range result within
+		// milliseconds — the same procedure as pressing Rnd/Clr in this editor.
+		maybeCorrectHardwareRndOrClr(slot: SlotLabel, moduleId: number, paramIndex: number, value: number, variation: number, area: 'voice' | 'fx'): void {
+			if (value !== 1) return;
+			const patch = this.slots[slot]?.patch;
+			if (!patch) return;
+			const { areaIdx } = areaConfig(area);
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
+			const param = mod ? getModule(mod.type)?.params?.[paramIndex] : undefined;
+			if (param?.type !== 'TrigBtn' || (param.name !== 'Rnd' && param.name !== 'Clr')) return;
+			this.randomizeOrClearSeqSteps(moduleId, variation, area, param.name === 'Rnd' ? 'rnd' : 'clr');
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
@@ -2195,7 +2221,10 @@ export const useSlotsStore = defineStore('slots', {
 		// counterpart (see pianoRoll.ts), so unlike every other module-level setter above, there is no
 		// CLI push here. It's still real patch data (persisted via the $PARAM_NAMES section, see
 		// nmg2PatchSerializer.ts's paramLabelsForModule), so it still goes through history/dirty-marking
-		// like any other edit.
+		// like any other edit. The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes
+		// within *its own* stored zoom/offset window regardless of what's pushed here — see
+		// useSlotEvents.ts's param_change handler, which corrects that by recomputing within the
+		// window shown here as soon as it sees hardware's own Rnd/Clr press echo back.
 		async setSeqNotePianoRollView(moduleId: number, area: 'voice' | 'fx', view: PianoRollView): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;

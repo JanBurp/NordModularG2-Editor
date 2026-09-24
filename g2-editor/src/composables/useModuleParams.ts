@@ -4,7 +4,6 @@ import { getParam } from '../renderer/parammap';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { useDeviceStore } from '../store/device';
 import { clamp } from '@/utils/math';
 
 export function useModuleParams(
@@ -16,7 +15,6 @@ export function useModuleParams(
 ) {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
-	const deviceStore = useDeviceStore();
 	const areaKey = areaLabel === 'va' ? 'voice' : 'fx';
 
 	const localLv = computed<number[]>(() => {
@@ -58,12 +56,18 @@ export function useModuleParams(
 			}
 		}
 
-		// Rnd/Clr triggers rely on the G2 hardware to compute and echo back the new step values
-		// (see randomizeOrClearSeqSteps in slots.ts), which never happens while disconnected — so
-		// compute it locally in that case. Only on the press edge (value===1), and the normal
-		// trigger-param emit below still runs too, so the button's own visual state is unaffected.
-		if (param?.type === 'TrigBtn' && value === 1 && (param.name === 'Rnd' || param.name === 'Clr') && !deviceStore.connected) {
-			slotsStore.randomizeOrClearSeqSteps(instance.value.index || 0, uiStore.variation, areaKey, param.name === 'Rnd' ? 'rnd' : 'clr');
+		// Rnd/Clr compute their new step values here in the editor (matching the real editor, which
+		// never asks hardware to randomize) and push them as ordinary set-param messages, same as a
+		// manually dragged slider — see randomizeOrClearSeqSteps in slots.ts. The button's own
+		// press/release must NOT reach hardware: SeqNote's firmware runs its own (unwindowed)
+		// randomize on-board when it receives this trigger param, racing with — and overwriting via
+		// its Watch-param echoes — the values we just computed. The button's press/release visual
+		// (useSwitch.ts's local `triggerActive`) doesn't depend on this emit, so skipping it is safe.
+		if (param?.type === 'TrigBtn' && (param.name === 'Rnd' || param.name === 'Clr')) {
+			if (value === 1) {
+				slotsStore.randomizeOrClearSeqSteps(instance.value.index || 0, uiStore.variation, areaKey, param.name === 'Rnd' ? 'rnd' : 'clr');
+			}
+			return;
 		}
 
 		emitParamChange(instance.value.index || 0, paramIndex, value, immediate);

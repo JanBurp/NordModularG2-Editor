@@ -182,7 +182,6 @@
 					:strip-height="SEQNOTE_STRIP_HEIGHT"
 					:zoom="seqNotePianoRollView.zoom"
 					:octave-offset="seqNotePianoRollView.octaveOffset"
-					:dimmed="index >= seqNoteActiveStepCount"
 					:highlight="index === selectedParamIndex"
 					:morph-color="morphColorFor(index)"
 					:morph-range="morphRangeFor(index)"
@@ -484,7 +483,7 @@
 		(moduleIndex, index, value) => emit('modeChange', moduleIndex, index, value),
 	);
 
-	const { view: seqNotePianoRollView, activeStepCount: seqNoteActiveStepCount } = useSeqNotePianoRoll(moduleDef, instance, localLv);
+	const { view: seqNotePianoRollView } = useSeqNotePianoRoll(instance);
 
 	const uiStore = useUiStore();
 	const { showHint, clearHint } = useStatusHint();
