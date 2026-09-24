@@ -48,6 +48,7 @@
 			rows: [
 				{ keys: ['⌘ D'], action: 'Download to Slot' },
 				{ keys: ['⌘ U'], action: 'Upload Active Slot' },
+				{ keys: ['⌘ M'], action: 'Send Controller Snapshot' },
 			],
 		},
 		{
@@ -82,7 +83,7 @@
 		{
 			title: 'Panels',
 			rows: [
-				{ keys: ['⌘ M'], action: 'Toggle Modules pane' },
+				{ keys: ['⌘ L'], action: 'Toggle Modules pane' },
 				{ keys: ['⌘ B'], action: 'Toggle Browser pane' },
 				{ keys: ['⌘ I'], action: 'Toggle Midi CC pane' },
 				{ keys: ['⌘ J'], action: 'Toggle Text pane' },

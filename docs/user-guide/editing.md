@@ -8,7 +8,7 @@ nav_order: 2
 
 ## Adding Modules
 
-Open the **Modules pane** (`Cmd+M`), search or scroll, then drag a module onto the canvas (Voice or FX area).
+Open the **Modules pane** (`Cmd+L`), search or scroll, then drag a module onto the canvas (Voice or FX area).
 
 **Quick add** — press `M`, type to search, then `Enter` or click a result to place it at the cursor position.
 

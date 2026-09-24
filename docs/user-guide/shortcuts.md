@@ -15,6 +15,12 @@ nav_order: 4
 | `Cmd+S` | Save |
 | `Cmd+Shift+S` | Save As |
 
+## Synth
+
+| Key | Action |
+|---|---|
+| `Cmd+M` | Send Controller Snapshot |
+
 ## Edit
 
 | Key | Action |
@@ -47,7 +53,7 @@ nav_order: 4
 
 | Key | Action |
 |---|---|
-| `Cmd+M` | Toggle Modules pane |
+| `Cmd+L` | Toggle Modules pane |
 | `Cmd+B` | Toggle Browser pane |
 | `Cmd+I` | Toggle Midi CC pane |
 | `Cmd+J` | Toggle Text pane |

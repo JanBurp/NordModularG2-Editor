@@ -586,7 +586,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{
 					label: "Send Controller Snapshot",
 					click: () => win!.webContents.send("menu:action", "send-controller-snapshot"),
-					accelerator: "CommandOrControl+L",
+					accelerator: "CommandOrControl+M",
 					enabled: menuState.connected,
 				},
 				{
@@ -610,7 +610,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Keyboard", click: () => win!.webContents.send("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
 				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ type: "separator" as const },
-				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+M" },
+				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
 				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
