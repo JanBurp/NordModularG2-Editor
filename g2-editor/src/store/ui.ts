@@ -39,6 +39,7 @@ export const useUiStore = defineStore('ui', {
 		displayedGlobalParamPage: 0 as number, // 0-4 (A-E), independent of displayedParamPage
 		showSvgViewer: false as boolean,
 		showKeyCommandsPage: false as boolean,
+		showQuickAdd: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
 		helpModuleTypeId: null as number | null,

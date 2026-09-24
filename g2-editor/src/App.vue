@@ -208,7 +208,7 @@
 		@close="closeDsPresetDropdown"
 	/>
 
-	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
+	<QuickAddModule v-if="uiStore.showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="uiStore.showQuickAdd = false" />
 
 	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
 
@@ -360,7 +360,6 @@
 
 	const showAboutDialog = ref(true);
 	const startingUp = ref(true);
-	const showQuickAdd = ref(false);
 	const quickAddPos = ref({ x: 0, y: 0 });
 
 	function onMouseMove(e: MouseEvent) {
@@ -372,6 +371,7 @@
 			if (e.key === 'Escape') uiStore.showKeyCommandsPage = false;
 			return;
 		}
+		if (uiStore.showQuickAdd) return;
 
 		const el = document.activeElement;
 		const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
@@ -383,7 +383,7 @@
 			switch (e.key) {
 				case 'm':
 					e.preventDefault();
-					showQuickAdd.value = true;
+					uiStore.showQuickAdd = true;
 					return;
 				case 'r':
 					e.preventDefault();
