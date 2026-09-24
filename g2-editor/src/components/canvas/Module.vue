@@ -59,6 +59,11 @@
 				:lv="localLv"
 				@apply="onDrumSynthPresetApply"
 			/>
+			<VocoderPresetSelector
+				v-else-if="entry.ve.type === 'graph' && instance.type === 108 && entry.ve.w === 154 && entry.ve.h === 12"
+				:ve="entry.ve"
+				@apply="onVocoderPresetApply"
+			/>
 			<ModuleGraph
 				v-else-if="(entry.ve.type === 'graph' || entry.ve.type === 'graphenv') && entry.ve.w && entry.ve.h"
 				:ve="entry.ve"
@@ -251,6 +256,7 @@
 	import ModuleJack from './ModuleJack.vue';
 	import ModuleGraph from './ModuleGraph.vue';
 	import DrumSynthPresetSelector from './DrumSynthPresetSelector.vue';
+	import VocoderPresetSelector from './VocoderPresetSelector.vue';
 	import SeqNoteStepStrip from './SeqNoteStepStrip.vue';
 	import SeqNoteViewControls from './SeqNoteViewControls.vue';
 	import { useSeqNotePianoRoll } from '../../composables/useSeqNotePianoRoll';
@@ -561,6 +567,13 @@
 	function onDrumSynthPresetApply(values: number[]) {
 		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
 		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14], values, uiStore.variation, area);
+	}
+
+	// Vocoder preset buttons emit the target values for all 16 Band params directly (it owns the
+	// reroute math); applied as one batched store action, same pattern as DrumSynth.
+	function onVocoderPresetApply(values: number[]) {
+		const area = props.areaLabel === 'va' ? 'voice' : 'fx';
+		slotsStore.setParams(moduleIdx.value, [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15], values, uiStore.variation, area);
 	}
 
 	function onPianoRollViewChange(view: PianoRollView) {

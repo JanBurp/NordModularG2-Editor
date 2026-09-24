@@ -13,11 +13,9 @@ export const GRAPH_COLORS = {
 	bgEnv: '#088', // background rect for graphenv (envelopes, filters, dx)
 	bg: '#088', // background rect for graph (LFO/OSC waveforms)
 	curveStroke: '#AFA', // waveform / envelope / filter curve stroke
-	envFill: '#066', // envelope path fill (matches bgEnv → invisible)
-	filterFill: '#066', // area below filter response curve
-	vocoderBar: '#AFA', // vocoder band bars
-	zeroLine: '#AFA', // 0 dB reference line in filter graphs
-	zeroLineOpacity: 0.65, // ditto, opacity
+	areaFill: '#066', // area under a curve (envelopes, filter response, comb/noise humps — matches bgEnv → invisible)
+	dimLine: '#AFA', // dimmed reference lines (filter 0 dB line, Mux8-1X rails, etc.)
+	dimLineOpacity: 0.65, // ditto, opacity
 	label: '#FF0', // slope value label (yellow text)
 	dxLine: '#AFA', // dxrouter connection lines
 	dxNodeBg: '#FF0', // dxrouter node rect
@@ -72,6 +70,7 @@ export type GraphPathResult = {
 	dFill?: string;
 	transform?: string;
 	zeroLine?: boolean;
+	dimmed?: string; // extra path(s) drawn with the same dimmed reference-line styling as zeroLine
 	label?: { text: string; x: number; y: number };
 	fill?: string;
 };
@@ -366,7 +365,14 @@ function arcSegment(x0: number, y0: number, x1: number, y1: number, mode: 'exp' 
 	const cx = mode === 'exp' ? x1 : x0;
 	const cy = mode === 'exp' ? y0 : y1;
 	const theta0 = Math.atan2((y0 - cy) / b, (x0 - cx) / a);
-	const theta1 = Math.atan2((y1 - cy) / b, (x1 - cx) / a);
+	let theta1 = Math.atan2((y1 - cy) / b, (x1 - cx) / a);
+	// The two endpoints are always exactly 90deg apart, but atan2's +-pi branch cut can make
+	// the raw theta1 look 270deg away instead of 90deg (e.g. rising 'exp' segments: theta0=pi,
+	// theta1=-pi/2). Normalize to the shortest angular path before interpolating.
+	let dtheta = theta1 - theta0;
+	if (dtheta > Math.PI) dtheta -= 2 * Math.PI;
+	if (dtheta <= -Math.PI) dtheta += 2 * Math.PI;
+	theta1 = theta0 + dtheta;
 	let d = '';
 	for (let i = 1; i <= ENV_ARC_STEPS; i++) {
 		if (i === ENV_ARC_STEPS) {
@@ -430,7 +436,7 @@ function envGetd(en: EnvCtx, modes: SegMethod[]): string {
 }
 
 const thi28 = (bit: number): ThI => (bit & 1 ? { ys: -28, xs: 15, yo: 28 } : { ys: 28, xs: 15, yo: 0 });
-const thi22x15 = (bit: number): ThI => (bit & 1 ? { ys: -22, xs: 15, yo: 22 } : { ys: 22, xs: 15, yo: 0 });
+const thi24x15 = (bit: number): ThI => (bit & 1 ? { ys: -24, xs: 15, yo: 24 } : { ys: 24, xs: 15, yo: 0 });
 const thi22x31 = (bit: number): ThI => (bit & 1 ? { ys: -22, xs: 31, yo: 22 } : { ys: 22, xs: 31, yo: 0 });
 const thi28x20 = (bit: number): ThI => (bit & 1 ? { ys: -28, xs: 20, yo: 28 } : { ys: 28, xs: 20, yo: 0 });
 
@@ -462,7 +468,7 @@ const envLELE_AHD: SegMethod[][] = [
 function adrGraph(_ve: VisualElement, vals: number[]): GraphPathResult {
 	const segs = [new EnvSegment(lv(vals, 1, 0), 0), new EnvSegment(lv(vals, 3, 0), 127)];
 	if (lv(vals, 7, 0)) segs[0].sustain = true;
-	const en: EnvCtx = { segs, tacc: 0, thi: thi22x15(lv(vals, 5, 0)) };
+	const en: EnvCtx = { segs, tacc: 0, thi: thi24x15(lv(vals, 5, 0)) };
 	en.thi.sustime = 2 - segs.reduce((a, b) => (b.sustain ? a : a + b.t), 0);
 	return { kind: 'path', d: envGetd(en, envLELE_2[lv(vals, 0, 0)] ?? envLELE_2[0]) };
 }
@@ -830,7 +836,6 @@ const F_OCT = Math.log2(F_MAX / F_MIN); // ≈ 10.58
 
 // Param value → Hz mappings
 const fltFreqToHz = (v: number) => F_MIN * Math.pow(2, v / 12);
-const freq1ToHz = (v: number) => 8.1758 * Math.pow(2, v / 12);
 const freq2ToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 7.32);
 const freq3ToHz = (v: number) => 20 * Math.pow(2, (v / 127) * 9.64);
 const eqMidFreqToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 6.32);
@@ -842,7 +847,6 @@ const eqDbFromVal = (v: number) => ((v - 63.5) * 36) / 127; // EqdB: 0→-18, 64
 const bandwidthOct = (v: number) => 2 - (1.98 * v) / 127; // EqPeakBandwidth
 const res1ToQ = (v: number) => 0.5 * Math.pow(100, v / 127); // Res_1: 0.5..50
 const level100Q = (v: number) => 0.5 + (v / 127) * 9.5; // resonance from Level_100: 0.5..10
-const fbFromBipolar = (v: number) => Math.max(-0.985, Math.min(0.985, (v - 64) / 64));
 
 // Filter response math (magnitude, not in dB)
 function lpResp(hz: number, fc: number, Q: number, order: number): number {
@@ -928,7 +932,16 @@ function sampleResponse(w: number, h: number, mag: (hz: number) => number, dbRan
 	return { d: strokeParts.join(' '), dFill };
 }
 
-const FILTER_FILL = GRAPH_COLORS.filterFill;
+const FILTER_FILL = GRAPH_COLORS.areaFill;
+
+// Not part of the original editor: FltComb and OscNoise have a Freq-type param the original
+// graph never used, unlike every other filter graph in this file (whose curve visibly shifts
+// with Freq). Gives them the same "graph moves with Freq" feel via a simple bounded horizontal
+// shift, applied as an SVG transform so it doesn't disturb any of the ported geometry above.
+const FREQ_SHIFT_FRACTION = 0.3;
+function freqShiftAmount(freqParam: number, w: number): number {
+	return (freqParam / 127 - 0.5) * w * FREQ_SHIFT_FRACTION;
+}
 
 // ---------------------------------------------------------------------------
 // Waveshaper transfer-function helper
@@ -1039,78 +1052,178 @@ function levScalerGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	return drawLevScaleCurve(ve.w!, ve.h!, bpNote, slopeL, slopeR);
 }
 
-// --- FM Operator (id 180) — two graph slots: rate/level envelope + KB level-scale curve ---
-function operatorEnvGraph(vals: number[]): GraphPathResult {
-	const segs = [
-		new EnvSegment(lv(vals, 8, 0), 127 - lv(vals, 9, 0)), // R1/L1
-		new EnvSegment(lv(vals, 10, 0), 127 - lv(vals, 11, 0)), // R2/L2
-		new EnvSegment(lv(vals, 12, 0), 127 - lv(vals, 13, 0)), // R3/L3
-		new EnvSegment(lv(vals, 14, 0), 127 - lv(vals, 15, 0)), // R4/L4
-	];
-	const en: EnvCtx = { segs, tacc: 0, thi: thi28(0) };
-	return { kind: 'path', d: envGetd(en, ['exp', 'exp', 'exp', 'exp']) };
+// --- FM Operator (id 180) — two graph slots: rate/level envelope + breakpoint level-scale curve ---
+// Panel sizes exactly match the reference editor's CPnlDXEnvGraph (85x28) and CPnlOperatorGraph
+// (63x24), confirming which algorithm belongs to which slot — despite the "Operator" class name,
+// the rate/level envelope (R1L1..R4L4) is drawn by CPnlDXEnvGraph, not CPnlOperatorGraph.
+
+// Port of CPnlDXEnvGraph::Draw: 4 rate/level stages, each stage's curvature/width shaped by
+// 1.0471^level (truncated to a byte — an 8-bit wraparound quirk in the original, preserved here).
+// L4 doubles as both the envelope's starting level and the level stage 4 curves back to.
+function operatorEnvGraph(ve: VisualElement, vals: number[]): GraphPathResult {
+	const w = ve.w! - 2; // geometry uses the post-Shrink(1) rect in the reference
+	const h = ve.h! - 2;
+	const r1 = lv(vals, 8, 0);
+	const l1 = lv(vals, 9, 0);
+	const r2 = lv(vals, 10, 0);
+	const l2 = lv(vals, 11, 0);
+	const r3 = lv(vals, 12, 0);
+	const l3 = lv(vals, 13, 0);
+	const r4 = lv(vals, 14, 0);
+	const l4 = lv(vals, 15, 0);
+
+	const xScale = (w - 3) / 480;
+	const yScale = (h - 7) / 100;
+	const powByte = (level: number) => (level === 0 ? 0 : Math.trunc(Math.pow(1.0471, level)) & 0xff);
+	const yOf = (level: number) => h - 3 - yScale * powByte(level);
+	const widthOf = (a: number, b: number, rate: number) => (Math.abs(a - b) / 99) * xScale * (99 - rate);
+
+	const y0 = yOf(l4);
+	const y1 = yOf(l1);
+	const y2 = yOf(l2);
+	const y3 = yOf(l3);
+
+	const x1 = widthOf(l4, l1, r1) + 2;
+	const x2 = widthOf(l1, l2, r2) + x1;
+	const x3 = widthOf(l2, l3, r3) + x2;
+	const xSustainEnd = w - 1 - widthOf(l3, l4, r4);
+
+	const baseline = `M1,${h - 2} L${w},${h - 2}`;
+	let curve = `M2,${y0}`;
+	curve += arcSegment(2, y0, x1, y1, 'exp');
+	curve += arcSegment(x1, y1, x2, y2, 'exp');
+	curve += arcSegment(x2, y2, x3, y3, 'exp');
+	curve += ` L${xSustainEnd},${y3}`;
+	curve += arcSegment(xSustainEnd, y3, w - 1, y0, 'exp');
+
+	const d = `${baseline} ${curve}`;
+	const dFill = `${curve} L${w},${h} L2,${h} Z`;
+	return { kind: 'path', d, dFill, fill: GRAPH_COLORS.areaFill };
 }
 
+// Port of CPnlOperatorGraph::Draw: a dashed centerline plus a breakpoint curve. Both halves
+// always meet at (bpX, vMid) exactly. Each half's *DepthMode selects sign (mode<2 → above
+// center) and shape (mode 0/3 → straight, 1/2 → curved); *Depth is the (always non-negative)
+// magnitude — the original has no bipolar/centered depth math despite the "Depth" naming.
 function operatorKbLevScaleGraph(ve: VisualElement, vals: number[]): GraphPathResult {
-	const bpNote = lv(vals, 17, 64);
-	// LDepthMode/RDepthMode assumed to pick slope sign; not hardware-verified — flip if it visually reads backwards.
-	const slopeL = (lv(vals, 18, 0) ? 1 : -1) * (lv(vals, 19, 0) / 127) * 8.0;
-	const slopeR = (lv(vals, 20, 0) ? 1 : -1) * (lv(vals, 21, 0) / 127) * 8.0;
-	return drawLevScaleCurve(ve.w!, ve.h!, bpNote, slopeL, slopeR);
+	const w = ve.w!;
+	const h = ve.h!;
+	const brPoint = lv(vals, 17, 0);
+	const attackMode = lv(vals, 18, 0); // LDepthMode: 0-3
+	const attackExtent = lv(vals, 19, 0); // LDepth
+	const decayMode = lv(vals, 20, 0); // RDepthMode: 0-3
+	const decayExtent = lv(vals, 21, 0); // RDepth
+
+	const vMidF = (h - 4) * 0.5;
+	const vMid = Math.trunc(vMidF);
+	const bpX = Math.round(((w - 2) * brPoint) / 99);
+
+	const attackUp = attackMode < 2;
+	const yAttack = Math.round(vMidF + (attackUp ? attackExtent / 2 : -attackExtent / 2));
+	const xAttack = Math.round(bpX - w - 3);
+
+	const decayUp = decayMode === 0 || decayMode === 1;
+	const yDecay = Math.round(vMidF + (decayUp ? decayExtent / 2 : -decayExtent / 2));
+	const xDecay = Math.round(bpX + w - 1);
+
+	const baseline = `M1,${vMid} L${Math.trunc(w - 2)},${vMid}`;
+
+	let curve = `M${xAttack},${yAttack}`;
+	// dir=1 -> 'exp', dir=0 -> 'log': matches the arc-center convention used by the shared
+	// envelope arcSegment helper; not independently hardware-verified for this graph.
+	curve += attackMode === 0 || attackMode === 3 ? ` L${bpX},${vMid}` : arcSegment(xAttack, yAttack, bpX, vMid, attackMode === 1 ? 'exp' : 'log');
+	curve += decayMode === 0 || decayMode === 3 ? ` L${xDecay},${yDecay}` : arcSegment(bpX, vMid, xDecay, yDecay, decayMode === 1 ? 'exp' : 'log');
+
+	return { kind: 'path', d: `${baseline} ${curve}` };
 }
 
 function operator(ve: VisualElement, vals: number[]): GraphResult | null {
-	if (ve.w === 85 && ve.h === 28) return operatorEnvGraph(vals);
+	if (ve.w === 85 && ve.h === 28) return operatorEnvGraph(ve, vals);
 	if (ve.w === 63 && ve.h === 24) return operatorKbLevScaleGraph(ve, vals);
 	return null;
 }
 
-// --- Oscillator Noise (id 106) — APPROXIMATION: original CPnlTunedNoiseGraph formula not recoverable from the C source ---
-const NOISE_SEED = [0.62, 0.11, 0.83, 0.37, 0.95, 0.05, 0.71, 0.28, 0.49, 0.18, 0.92, 0.34, 0.66, 0.08, 0.77, 0.44];
-
+// --- Oscillator Noise (id 106) ---
+// Port of CPnlTunedNoiseGraph::Draw: a flat baseline plus one symmetric "hump" built from two
+// chained cubic Beziers (each with both control points collapsed onto the baseline, giving a
+// smooth ease-in/ease-out rise to a fixed-x peak). Only the peak's width responds to the param.
 function oscNoiseGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	const w = ve.w!;
 	const h = ve.h!;
-	const width = lv(vals, 5, 64) / 127;
-	const n = NOISE_SEED.length;
-	const midY = h / 2;
-	const amp = midY * 0.9;
-	let d = '';
-	for (let i = 0; i < n; i++) {
-		const pos = (i / (n - 1)) * 2 - 1;
-		const taper = Math.pow(1 - Math.abs(pos), 3 * (1 - width) + 0.15);
-		const x = (i / (n - 1)) * w;
-		const y = midY - (NOISE_SEED[i] * 2 - 1) * amp * taper;
-		d += `${i === 0 ? 'M' : 'L'}${x.toFixed(2)},${y.toFixed(2)}`;
-	}
-	return { kind: 'path', d };
+	const p = lv(vals, 5, 64); // Width
+	const freqCoarse = lv(vals, 0, 64); // FreqCoarse, 0-127 — not read by the original graph; shifts the peak here (see FREQ_SHIFT_FRACTION)
+	const hMinus4 = h - 4;
+	const baseY = Math.round(hMinus4);
+	const topY = Math.round(baseY - 0.9 * hMinus4);
+	const unit = (w - 6) / 128;
+	// Baseline deliberately spans the full 0..w width (see hump below), so unlike FltComb the
+	// shift is baked into the peak position directly rather than wrapped in an SVG transform —
+	// a transform here would leave a gap at one edge and clip the other.
+	const midX = Math.round(unit * 64 + 1 + (freqCoarse / 127 - 0.5) * w * FREQ_SHIFT_FRACTION);
+	const spread = unit * p;
+	const rightCPx = Math.round(spread * 0.7 + midX + 4);
+	const leftCPx = Math.round(spread * -0.7 + midX - 4);
+	const rightMidX = Math.round((midX + rightCPx) / 2);
+	const leftMidX = Math.round((leftCPx + midX) / 2);
+
+	const hump =
+		`M0,${baseY} L${leftCPx},${baseY} ` +
+		`C${leftMidX},${baseY} ${leftMidX},${baseY} ${midX},${topY} ` +
+		`C${rightMidX},${baseY} ${rightMidX},${baseY} ${rightCPx},${baseY} ` +
+		`L${w},${baseY}`;
+	const dFill = `${hump} L${w},${h} L0,${h} Z`;
+	return { kind: 'path', d: hump, dFill, fill: FILTER_FILL };
 }
 
-// --- Mux 8-1 X-Fade (id 60) — APPROXIMATION: original CPnlXMuxGraph::Draw formula not recoverable from the C source ---
+// --- Mux 8-1 X-Fade (id 60) ---
+// Port of CPnlXMuxGraph::Draw: a fixed trapezoid/funnel housing (two 4-point straight-line
+// polylines, pinched together at a param-driven x offset) plus two dashed vertical rails.
 function muxXFadeGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	const w = ve.w!;
 	const h = ve.h!;
-	const m = w / 6;
-	const xf = lv(vals, 0, 64) / 127;
-	const top = h * 0.12;
-	const bot = h * 0.88;
-	const dA = `M${m.toFixed(2)},${top.toFixed(2)} L${(w - m).toFixed(2)},${bot.toFixed(2)}`;
-	const dB = `M${m.toFixed(2)},${bot.toFixed(2)} L${(w - m).toFixed(2)},${top.toFixed(2)}`;
-	const markerX = m + xf * (w - 2 * m);
-	return { kind: 'path', d: `${dA} ${dB} M${markerX.toFixed(2)},0 L${markerX.toFixed(2)},${h}` };
+	const halfW = Math.floor(w * 0.5);
+	const sixthW = Math.floor(w / 6);
+	const p = lv(vals, 0, 64);
+	const off = (p / 127) * (w - 2 * sixthW) * 0.5;
+	const yTop = 3;
+	const yBase = h - 1;
+	const pen0X = 3 * sixthW - 2 * halfW;
+	const p1x = off + 2 * sixthW - halfW;
+	const p2x = halfW - off;
+	const p3x = halfW + off;
+	const p5x = halfW + w - 2 * sixthW - off;
+	const p6x = 2 * halfW + w - 3 * sixthW;
+	const railL = sixthW;
+	const railR = w - sixthW;
+
+	const housing =
+		`M${pen0X.toFixed(2)},${yBase.toFixed(2)} L${p1x.toFixed(2)},${yTop} L${p2x.toFixed(2)},${yTop} L${p3x.toFixed(2)},${yBase.toFixed(2)} ` +
+		`M${p2x.toFixed(2)},${yBase.toFixed(2)} L${p3x.toFixed(2)},${yTop} L${p5x.toFixed(2)},${yTop} L${p6x.toFixed(2)},${yBase.toFixed(2)}`;
+	const rails = `M${railL.toFixed(2)},1 L${railL.toFixed(2)},${yBase.toFixed(2)} M${railR.toFixed(2)},1 L${railR.toFixed(2)},${yBase.toFixed(2)}`;
+	return { kind: 'path', d: housing, dimmed: rails };
 }
 
-// --- Random Trig (id 205) — APPROXIMATION: original CPnlRndTrigGraph::Draw formula not recoverable from the C source ---
+// --- Random Trig (id 205) ---
+// Port of CPnlRndTrigGraph::Draw: up to 6 vertical tick marks spread across the full graph
+// width, each gated by comparing StepProb against a distinct, non-monotonic threshold. The
+// reference declares 4 more thresholds (compared against a second, always-zero local var) that
+// can never fire — they're omitted here since they're dead code in the original too.
+const RND_TRIG_THRESHOLDS = [120, 96, 24, 60, 36];
+
 function rndTrigGraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	const w = ve.w!;
 	const h = ve.h!;
-	const prob = lv(vals, 0, 0) / 127;
-	const barW = w * 0.5;
-	const x0 = (w - barW) / 2;
-	const barH = prob * (h - 2);
-	const y0 = h - barH;
-	const d = `M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${(x0 + barW).toFixed(2)},${y0.toFixed(2)} L${(x0 + barW).toFixed(2)},${h} Z`;
-	return { kind: 'path', d: '', dFill: d, fill: GRAPH_COLORS.vocoderBar };
+	const prob = lv(vals, 0, 0);
+	const yTop = 2;
+	const yBase = h - 2;
+	const margin = 1;
+	const step = (w - 2 * margin) / 5;
+	let d = '';
+	RND_TRIG_THRESHOLDS.forEach((threshold, i) => {
+		if (prob > threshold) d += ` M${(margin + i * step).toFixed(2)},${yTop} L${(margin + i * step).toFixed(2)},${yBase.toFixed(2)}`;
+	});
+	if (prob !== 0) d += ` M${(margin + 5 * step).toFixed(2)},${yTop} L${(margin + 5 * step).toFixed(2)},${yBase.toFixed(2)}`;
+	return { kind: 'path', d };
 }
 
 function makeSlopeLabel(text: string, w: number): { text: string; x: number; y: number } {
@@ -1256,51 +1369,133 @@ function filterPhase(ve: VisualElement, vals: number[]): GraphPathResult {
 }
 
 // --- Filter Comb (id 162) ---
+// Port of CPnlFeedbackFlt::Draw (shared with Phaser), specialized to N=4 (comb's fixed tooth
+// count) and P8d=120 (comb's fixed "depth" constant). Draws a lead-in Bezier, 4 repeated
+// 2-segment "tooth" Beziers, and a closing Bezier — not a sampled frequency-response curve.
 function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
-	const fc = freq1ToHz(lv(vals, 0, 64));
-	const fbVal = lv(vals, 3, 0);
-	let fb = fbFromBipolar(fbVal);
-	const type = lv(vals, 5, 0); // 0=Notch, 1=Peak, 2=Deep
-	if (type === 0) fb = -Math.abs(fb);
-	else if (type === 2) fb = Math.sign(fb || 1) * Math.min(0.985, Math.abs(fb) * 1.3);
+	const w = ve.w!;
+	const h = ve.h!;
+	const freqParam = lv(vals, 0, 64); // Freq, 0-127 — not read by the original graph; drives horizontal movement here (see FREQ_SHIFT_FRACTION)
+	const fb = lv(vals, 3, 64); // FB, 0-127
+	const type = lv(vals, 5, 0); // Type: 0/1/2
 
-	// sampleResponse places 96 samples log-spaced across F_MIN..F_MAX. A comb filter's
-	// notches repeat every `fc` Hz linearly, so above some frequency the per-sample Hz gap
-	// exceeds the notch spacing and consecutive samples land on effectively random phases
-	// of the ripple, rendering as visual noise instead of a clean curve. Fade to the
-	// cycle-average magnitude past that point so only the resolvable low-frequency notches show.
-	const stepRatio = Math.pow(2, F_OCT / 96);
-	const hzAlias = fc / (2 * (stepRatio - 1));
-	const avgMag = 1 / Math.sqrt(1 + fb * fb);
+	const N = 4;
+	const P8D = 120;
+	const AMP_SWITCH = 2.0;
+	const SPACING_SWITCH = 6.0;
+	const OFFSET_SWITCH = -18.0;
 
-	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => {
-		const phase = (2 * Math.PI * hz) / fc;
-		const denom = 1 - 2 * fb * Math.cos(phase) + fb * fb;
-		const mag = 1 / Math.sqrt(Math.max(1e-6, denom));
-		if (hz <= hzAlias) return mag;
-		const fade = Math.min(1, (hz - hzAlias) / hzAlias);
-		return mag * (1 - fade) + avgMag * fade;
-	});
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	const vertCenter = (h - 2) * 0.5;
+	const anchorMid = Math.round(vertCenter + 0.5);
+
+	const toothSpacing = (SPACING_SWITCH * P8D) / 127;
+	const toothAmp = ((AMP_SWITCH * P8D) / 127) * 0.8125;
+	const leadC1 = (25 - Math.floor((P8D * 20) / 127)) * 0.8125;
+	const xOffset = Math.round(-(toothSpacing * (N + 1) - (w - 5)) * 0.5);
+
+	// Mode-selected y-anchors: branch on Type, then on FB relative to the 64 midpoint.
+	let f5 = 0;
+	let f6 = 0;
+	let y25 = anchorMid;
+	if (type === 0) {
+		if (fb < 64) {
+			f6 = (fb * -0.015625 + 1.0) * 15.0;
+			y25 = Math.round((fb - 64) * 0.015625 * -15.0 + vertCenter + 0.5);
+		} else {
+			f5 = (fb - 64) * 0.015625 * 15.0;
+		}
+	} else if (type === 1) {
+		if (fb >= 64) {
+			f6 = (fb - 64) * 0.015625 * -15.0;
+			y25 = Math.round(vertCenter + f6 + 0.5);
+		} else {
+			f5 = (fb - 64) * 0.015625 * 15.0;
+		}
+	} else {
+		const t = (fb - 64) * 0.015625;
+		if (fb < 64) {
+			f5 = t * 15.0;
+			f6 = t * -15.0;
+		} else {
+			f6 = t * -15.0;
+			f5 = t * 15.0;
+			y25 = Math.round(vertCenter + f6 + 0.5);
+		}
+	}
+
+	const yP0 = Math.round(f5 + vertCenter + 0.5);
+	const leadCP1x = Math.round(leadC1 + OFFSET_SWITCH + 0.5);
+	const leadCP2x = Math.round(xOffset - 3.0 + 0.5);
+	const leadCP2y = Math.round(f5 * 0.5 + vertCenter + 0.5);
+	const leadEndX = Math.round(xOffset + 0.5);
+	const penStartX = Math.trunc(OFFSET_SWITCH);
+
+	const leadIn = `M${penStartX},${y25} C${leadCP1x},${anchorMid} ${leadCP2x},${leadCP2y} ${leadEndX},${yP0}`;
+
+	const toothYa = Math.round(vertCenter + 0.5); // f10 is always 0
+	const toothYb = Math.round(f6 + vertCenter + 0.5);
+	const toothYc = Math.round(f6 + vertCenter + 0.5); // f7 is always 0, so toothYc === toothYb
+
+	let teeth = '';
+	let lastToothEndX1 = leadEndX;
+	for (let i = 0; i < N; i++) {
+		const toothX0 = toothSpacing * 2 * i + xOffset;
+		const toothX1 = toothX0 + 2 * toothSpacing;
+		const toothCPxA = Math.round(toothSpacing + toothX0 + 0.5);
+		const toothCPxB = Math.round(toothAmp + toothX0 + 0.5);
+		const toothEndX1 = Math.round(toothX1 + 0.5);
+		const toothCPxC = Math.round(toothX1 - toothAmp + 0.5);
+		teeth += ` C${toothCPxB},${toothYa} ${toothCPxA},${toothYc} ${toothCPxA},${toothYb}`;
+		teeth += ` C${toothCPxA},${toothYc} ${toothCPxC},${toothYa} ${toothEndX1},${yP0}`;
+		lastToothEndX1 = toothEndX1;
+	}
+
+	// Closing segment: the original's formula for this produced a backward-then-forward loop
+	// (visible since the teeth already reach close to the right edge) — mirrors the lead-in's own
+	// control-point spacing instead, so x increases monotonically all the way out past the edge.
+	const d1 = leadCP1x - penStartX;
+	const d2 = leadCP2x - leadCP1x;
+	const d3 = leadEndX - leadCP2x;
+	const closeCP1x = lastToothEndX1 + d1;
+	const closeCP2x = closeCP1x + d2;
+	const closeEndX = closeCP2x + d3;
+	const closing = ` C${closeCP1x},${leadCP2y} ${closeCP2x},${anchorMid} ${closeEndX},${y25}`;
+
+	const d = `${leadIn}${teeth}${closing}`;
+
+	// The lead-in/closing curves run off-canvas and don't end at the bottom, so the fill uses a
+	// flat "roof" out to the panel edges instead of following them — guarantees it always reaches
+	// the bottom at x=0/x=w rather than picking up whatever height the curve has out there. Since
+	// the whole path (including this fill) gets shifted by the Freq transform below, the corner
+	// anchors are pre-compensated by -shift so they still land exactly on x=0/x=w afterwards —
+	// otherwise the shift would carry them away from the real edges, leaving a gap on one side.
+	const shift = freqShiftAmount(freqParam, w);
+	const leftEdge = -shift;
+	const rightEdge = w - shift;
+	const dFill = `M${leftEdge},${h} L${leftEdge},${yP0} L${leadEndX},${yP0}${teeth} L${lastToothEndX1},${yP0} L${rightEdge},${yP0} L${rightEdge},${h} Z`;
+
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL, transform: `translate(${shift.toFixed(2)},0)` };
 }
 
-// --- Vocoder (id 108) — 16-band bar graph (fill only, no stroke) ---
+// --- Vocoder (id 108) ---
+// Port of CPnlVocoderGraph::Draw: NOT a bar chart. For each of 16 bands (skipped when the band's
+// value is 0), a single line runs from a fixed near-bottom anchor to an endpoint whose X (not
+// height) encodes the band value — VocoderBand's range is 0..16, matching the source's `*12`
+// column math exactly (16*12-6 = 186, within the 194px-wide panel).
 function vocoder(ve: VisualElement, vals: number[]): GraphPathResult | null {
 	// Vocoder has two graph elements; only render bars on the main analysis pane.
 	if (ve.h !== 47) return null;
-	const w = ve.w!;
 	const h = ve.h!;
-	const barW = w / 16;
-	const parts: string[] = [];
+	const yBase = h - 2;
+	let d = '';
 	for (let i = 0; i < 16; i++) {
 		const v = lv(vals, i, 0);
-		const barH = (v / 16) * (h - 2);
-		const x0 = i * barW + 1;
-		const x1 = (i + 1) * barW - 1;
-		const y0 = h - barH;
-		parts.push(`M${x0.toFixed(2)},${h} L${x0.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${y0.toFixed(2)} L${x1.toFixed(2)},${h} Z`);
+		if (v === 0) continue;
+		const x0 = 6 + i * 12;
+		const x1 = v * 12 - 6;
+		d += ` M${x0},${yBase} L${x1},-1`;
 	}
-	return { kind: 'path', d: '', dFill: parts.join(' '), fill: GRAPH_COLORS.vocoderBar };
+	return { kind: 'path', d };
 }
 
 // Helpers

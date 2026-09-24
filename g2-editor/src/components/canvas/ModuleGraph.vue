@@ -10,11 +10,20 @@
 					:y1="(ve.h ?? 0) / 2"
 					:x2="ve.w ?? 0"
 					:y2="(ve.h ?? 0) / 2"
-					:stroke="colors.zeroLine"
-					:stroke-opacity="colors.zeroLineOpacity"
+					:stroke="colors.dimLine"
+					:stroke-opacity="colors.dimLineOpacity"
 					stroke-width="0.5"
 				/>
-				<path v-if="result.dFill" :d="result.dFill" stroke="none" :fill="result.fill ?? 'none'" />
+				<path
+					v-if="result.dimmed"
+					:d="result.dimmed"
+					:transform="result.transform"
+					:stroke="colors.dimLine"
+					:stroke-opacity="colors.dimLineOpacity"
+					stroke-width="0.5"
+					fill="none"
+				/>
+				<path v-if="result.dFill" :d="result.dFill" :transform="result.transform" stroke="none" :fill="result.fill ?? 'none'" />
 				<path v-if="result.d" :d="result.d" :transform="result.transform" :stroke="colors.curveStroke" :fill="strokePathFill" />
 				<text v-if="result.label" :x="result.label.x" :y="result.label.y" :fill="colors.label" font-size="9" text-anchor="end">
 					{{ result.label.text }}
@@ -51,7 +60,7 @@
 		if (!r || r.kind !== 'path') return 'none';
 		if (r.dFill) return 'none';
 		if (r.fill !== undefined) return r.fill;
-		return props.ve.type === 'graphenv' ? colors.envFill : 'none';
+		return props.ve.type === 'graphenv' ? colors.areaFill : 'none';
 	});
 </script>
 <style scoped>
