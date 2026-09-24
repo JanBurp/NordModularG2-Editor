@@ -4,6 +4,7 @@ import { svgPath } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
 import { useCableVisibility } from './useCableVisibility';
+import { useSettingsStore } from '../store/settings';
 import { useUiStore } from '../store/ui';
 import { matchesCableJack } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
@@ -19,6 +20,7 @@ export function useJackDragInteraction(
 	onJackDragEnd: (info: JackDragInfo) => void,
 ) {
 	const { cableVisibility } = useCableVisibility();
+	const settings = useSettingsStore();
 	const uiStore = useUiStore();
 
 	let previewCable: SVGPathElement | null = null;
@@ -76,6 +78,7 @@ export function useJackDragInteraction(
 				return !isSelf && !isDrivenConflict;
 			},
 			(candidate, jackDef, x, y) => ({ ...candidate, colour: jackDef.colour, x, y }),
+			settings.cableMagneticRadius,
 		);
 	}
 

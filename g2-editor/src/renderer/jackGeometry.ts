@@ -5,8 +5,6 @@ import { svgCircle, clientToSvgPoint } from './svgUtils';
 
 // Shared by useJackDragInteraction.ts and useCableGrabInteraction.ts.
 
-export const SNAP_RANGE = 96;
-
 // Converts a mouse event into SVG user-space coordinates.
 export function toSvgCoords(svgRef: Ref<SVGSVGElement | null> | undefined, e: MouseEvent) {
 	return clientToSvgPoint(svgRef?.value ?? null, e.clientX, e.clientY);
@@ -28,7 +26,7 @@ type JackType = 'input' | 'output';
 type JackCandidate = { moduleIndex: number; connectorIndex: number; type: JackType };
 
 // Scans every jack of the given type(s) across all modules and reports the nearest one within
-// SNAP_RANGE that passes `isValid`, plus whether a same-scan candidate that FAILED validity sits
+// snapRange that passes `isValid`, plus whether a same-scan candidate that FAILED validity sits
 // nearer than any valid one — drives the "not-allowed" cursor. Shared by useJackDragInteraction.ts
 // and useCableGrabInteraction.ts, whose snap-target searches differ only in which jack type(s) to
 // scan, what counts as a valid candidate, and what extra fields to attach to the result.
@@ -38,10 +36,11 @@ export function findNearestJack<T extends { x: number; y: number }>(
 	types: JackType[],
 	isValid: (candidate: JackCandidate) => boolean,
 	build: (candidate: JackCandidate, jackDef: any, x: number, y: number) => T,
+	snapRange: number,
 ): { jack: T | null; invalidNearby: boolean } {
-	let bestDist = SNAP_RANGE;
+	let bestDist = snapRange;
 	let best: T | null = null;
-	let bestInvalidDist = SNAP_RANGE;
+	let bestInvalidDist = snapRange;
 	let invalidNearby = false;
 	for (const mod of getModules()) {
 		const modDef = getModule(mod.type);
@@ -54,7 +53,7 @@ export function findNearestJack<T extends { x: number; y: number }>(
 				const jx = jackDef.x + baseX;
 				const jy = jackDef.y + baseY;
 				const dist = Math.hypot(jx - mousePos.x, jy - mousePos.y);
-				if (dist >= SNAP_RANGE) return;
+				if (dist >= snapRange) return;
 				const candidate: JackCandidate = { moduleIndex: mod.index, connectorIndex: idx, type };
 				if (!isValid(candidate)) {
 					if (dist < bestInvalidDist) {

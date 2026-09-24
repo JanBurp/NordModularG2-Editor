@@ -41,7 +41,18 @@
 					<Slider :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">Settings:</p>
+				<p class="settings-subheader">Cable connecting:</p>
+				<SettingsRow :label="L.cableMagneticRadius">
+					<Slider
+						:model-value="settings.cableMagneticRadius"
+						:min="0"
+						:max="100"
+						:step="1"
+						@update:model-value="settings.setCableMagneticRadius($event)"
+					/>
+				</SettingsRow>
+
+				<p class="settings-subheader">Others:</p>
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
 				</SettingsRow>

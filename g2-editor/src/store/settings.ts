@@ -18,6 +18,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableGravity: 50 as number,
 		cableOpacity: 90 as number,
 		cableThickness: 1 as number,
+		cableMagneticRadius: 96 as number,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		toolbarMode: 'classic' as ToolbarMode,
@@ -79,6 +80,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setCableThickness(value: number) {
 			this.cableThickness = clamp(value, 0, 10);
+		},
+		setCableMagneticRadius(value: number) {
+			this.cableMagneticRadius = clamp(value, 0, 115);
 		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;
