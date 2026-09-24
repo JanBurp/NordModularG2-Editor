@@ -21,8 +21,9 @@
 	</Teleport>
 </template>
 <script setup lang="ts">
-	import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+	import { computed, nextTick, onMounted } from 'vue';
 	import { useSettingsStore } from '../../store/settings';
+	import { useViewportClampedPopup } from '../../composables/useViewportClampedPopup';
 	import { DRUM_SYNTH_PRESETS } from '../../renderer/drumSynthPresets';
 
 	const props = defineProps<{
@@ -39,22 +40,12 @@
 	const settingsStore = useSettingsStore();
 	const zoom = computed(() => settingsStore.canvasZoom);
 
-	const popupEl = ref<HTMLElement | null>(null);
-	const adjustedX = ref(props.x);
-	const adjustedY = ref(props.y);
-
-	// Same viewport-clamping approach as ModuleModeDropdown.vue: measure post-scale (the popup is
-	// CSS-transform-scaled to match canvas zoom), then flip above the click point if it would
-	// overflow the bottom edge.
-	async function clampToViewport() {
-		await nextTick();
-		if (!popupEl.value) return;
-		const { width: w, height: h } = popupEl.value.getBoundingClientRect();
-		adjustedX.value = Math.min(props.x, window.innerWidth - w - 4);
-		adjustedY.value = props.y + h > window.innerHeight ? props.y - h : props.y;
-	}
-
-	watch(() => [props.x, props.y, zoom.value], clampToViewport, { immediate: true });
+	const { popupEl, adjustedX, adjustedY } = useViewportClampedPopup(
+		() => props.x,
+		() => props.y,
+		() => zoom.value,
+		() => emit('close'),
+	);
 
 	// Scroll the currently-matched preset into view on open, so picking from a long list doesn't
 	// always start scrolled to the top.
@@ -68,11 +59,4 @@
 		emit('select', index);
 		emit('close');
 	}
-
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') emit('close');
-	}
-
-	onMounted(() => window.addEventListener('keydown', onKeydown));
-	onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>

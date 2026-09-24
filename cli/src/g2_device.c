@@ -439,11 +439,9 @@ cJSON *g2_get_patch(const char *slot_str) {
         }
     }
 
-    /* Step 4: Get patch notes ("Text Pad"). Read-only — the real G2 protocol has no live
-     * SET for this (confirmed against the official editor's decompiled message set: only a
-     * GET_PATCH_TEXT request exists; notes only travel to the device embedded in a full
-     * patch write, same as set-patch-description/upload-patch already handle). Non-fatal
-     * on failure; an empty text field just means notes didn't come back this time. */
+    /* Step 4: Get patch notes ("Text Pad") — read-only; see g2_device.h for why there's no
+     * live SET. Non-fatal on failure; an empty text field just means notes didn't come back
+     * this time. */
     debug_timing("get_patch_text_start");
     char *patchText = NULL;
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_TEXT, NULL, 0) == 0) {
@@ -2244,6 +2242,36 @@ int g2_copy_variation(int slot, int from_var, int to_var) {
     return G2_OK;
 }
 
+/* Shared frame builder for the WRITE_NO_RESP subcommands below (set-param, select-param,
+ * set-morph-range): packs the COMMAND_WRITE_NO_RESP|COMMAND_SLOT header, subcmd byte and
+ * payload, appends the CRC, and sends via libusb_bulk_transfer. No recv_interrupt — callers
+ * deliberately avoid send_slot()/COMMAND_REQ, whose ack would churn the connection on
+ * high-frequency writes (turning a knob, moving the panel cursor, etc). */
+static int send_write_no_resp(int slot, uint8_t version, uint8_t subcmd,
+                               const uint8_t *payload, int len) {
+    uint8_t buff[2048] = {0};
+    int pos = COMMAND_OFFSET;
+    buff[pos++] = 0x01;
+    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
+    buff[pos++] = version;
+    buff[pos++] = subcmd;
+    memcpy(&buff[pos], payload, (size_t)len);
+    pos += len;
+
+    int msgLength = pos - COMMAND_OFFSET;
+    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
+    buff[pos++] = (crc >> 8) & 0xff;
+    buff[pos++] = crc & 0xff;
+    msgLength += 4;
+    buff[0] = (msgLength >> 8) & 0xff;
+    buff[1] = msgLength & 0xff;
+
+    int transferred;
+    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
+                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
+    return (ret < 0) ? G2_ERR_SEND : G2_OK;
+}
+
 int g2_set_param(int slot, int location, int module_id,
                  int param_idx, int value, int variation) {
     if (slot < 0 || slot > 3)             { g2_err("set-param: invalid slot\n");        return G2_ERR_INVALID_PARAM; }
@@ -2260,31 +2288,9 @@ int g2_set_param(int slot, int location, int module_id,
      * version and emitting an error/ack on every single write — turning a
      * knob then floods patch_version_change + error events and destabilizes
      * the connection. COMMAND_WRITE_NO_RESP is required for this subcommand. */
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
-    buff[pos++] = 0x40; /* SUB_COMMAND_SET_PARAM */
-    buff[pos++] = (uint8_t)location;
-    buff[pos++] = (uint8_t)module_id;
-    buff[pos++] = (uint8_t)param_idx;
-    buff[pos++] = (uint8_t)value;
-    buff[pos++] = (uint8_t)variation;
-
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    return (ret < 0) ? G2_ERR_SEND : G2_OK;
-    /* No recv_interrupt — WRITE_NO_RESP */
+    uint8_t payload[5] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)param_idx,
+                           (uint8_t)value, (uint8_t)variation };
+    return send_write_no_resp(slot, version, 0x40 /* SUB_COMMAND_SET_PARAM */, payload, 5);
 }
 
 int g2_select_param(int slot, int location, int module_id, int param_idx) {
@@ -2299,30 +2305,8 @@ int g2_select_param(int slot, int location, int module_id, int param_idx) {
     /* Same category as g2_set_param: this moves the hardware panel's cursor on every
      * keyboard nav, so it must NOT go through send_slot()/COMMAND_REQ (which acks and
      * would churn the connection on rapid arrow-key repeats) — COMMAND_WRITE_NO_RESP. */
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
-    buff[pos++] = SUB_COMMAND_SEL_PARAM;
-    buff[pos++] = 0x00;
-    buff[pos++] = (uint8_t)location;
-    buff[pos++] = (uint8_t)module_id;
-    buff[pos++] = (uint8_t)param_idx;
-
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    return (ret < 0) ? G2_ERR_SEND : G2_OK;
-    /* No recv_interrupt — WRITE_NO_RESP */
+    uint8_t payload[4] = { 0x00, (uint8_t)location, (uint8_t)module_id, (uint8_t)param_idx };
+    return send_write_no_resp(slot, version, SUB_COMMAND_SEL_PARAM, payload, 4);
 }
 
 int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
@@ -2343,33 +2327,9 @@ int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
     /* Same category as g2_set_param: the Delphi reference sends S_SET_MORPH_RANGE via its
      * "responseless" table, not the acked/COMMAND_REQ path — so this must NOT go through
      * send_slot() (which always sets COMMAND_REQ). */
-    uint8_t buff[2048] = {0};
-    int pos = COMMAND_OFFSET;
-    buff[pos++] = 0x01;
-    buff[pos++] = COMMAND_WRITE_NO_RESP | COMMAND_SLOT | (uint8_t)slot;
-    buff[pos++] = version;
-    buff[pos++] = 0x43; /* S_SET_MORPH_RANGE */
-    buff[pos++] = (uint8_t)location;
-    buff[pos++] = (uint8_t)module_id;
-    buff[pos++] = (uint8_t)param_idx;
-    buff[pos++] = (uint8_t)morph_group;
-    buff[pos++] = magnitude;
-    buff[pos++] = negative;
-    buff[pos++] = (uint8_t)variation;
-
-    int msgLength = pos - COMMAND_OFFSET;
-    uint16_t crc = calc_crc16(&buff[COMMAND_OFFSET], msgLength);
-    buff[pos++] = (crc >> 8) & 0xff;
-    buff[pos++] = crc & 0xff;
-    msgLength += 4;
-    buff[0] = (msgLength >> 8) & 0xff;
-    buff[1] = msgLength & 0xff;
-
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
-                                   msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    return (ret < 0) ? G2_ERR_SEND : G2_OK;
-    /* No recv_interrupt — WRITE_NO_RESP */
+    uint8_t payload[7] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)param_idx,
+                           (uint8_t)morph_group, magnitude, negative, (uint8_t)variation };
+    return send_write_no_resp(slot, version, SUB_COMMAND_SET_MORPH_RANGE, payload, 7);
 }
 
 int g2_set_morph_range_batch(int slot, const G2MorphEntry *entries, int count) {
@@ -2460,7 +2420,7 @@ int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slo
 
     uint8_t version = cable_get_version(slot);
     uint8_t payload[5] = { (uint8_t)module_id, (uint8_t)param_idx, (uint8_t)location, 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, 0x25, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_ASSIGN_KNOB, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_deassign_knob(int slot, int slot_index) {
@@ -2470,7 +2430,7 @@ int g2_deassign_knob(int slot, int slot_index) {
 
     uint8_t version = cable_get_version(slot);
     uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, 0x26, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_DEASSIGN_KNOB, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 /* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d). CONFIRMED on real hardware
@@ -2497,7 +2457,7 @@ int g2_select_param_page(int slot, int page_id) {
  * 2-bit location, per the Delphi reference (BVE.NMG2Mess.pas AddAssignGlobalKnobMessage:
  * slotIndex(4) location(2) unused(2), module(8), param(8), unused(8), knobIndex(8)). `slot` is
  * only the transport/routing slot the command rides on — any of the 4 works interchangeably.
- * UNVERIFIED against real hardware (see g2_device.h). */
+ * UNVERIFIED against real hardware — worth a spot-check before trusting field-level semantics. */
 int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (target_slot < 0 || target_slot > 3) return G2_ERR_INVALID_PARAM;
@@ -2524,8 +2484,9 @@ int g2_deassign_global_knob(int slot, int slot_index) {
 }
 
 /* Select the active Global Parameter Page (S_SEL_GLOBAL_PAGE=0x1e) — Global Pages sibling of
- * g2_select_param_page. Same page_id packing (page*3 + bank, 0-14). UNVERIFIED against real
- * hardware; the Delphi reference itself never implements the receive/echo side of this opcode. */
+ * g2_select_param_page. Same page_id packing (page*3 + bank, 0-14). See g2_assign_global_knob
+ * above for the UNVERIFIED-against-hardware caveat; the Delphi reference itself never implements
+ * the receive/echo side of this opcode either. */
 int g2_select_global_page(int slot, int page_id) {
     if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
     if (page_id < 0 || page_id > 14)   return G2_ERR_INVALID_PARAM;
@@ -2546,8 +2507,7 @@ int g2_select_global_page(int slot, int page_id) {
  * scope=2 (system) — the same scope byte as query_synth_settings's SUB_COMMAND_GET_SYNTH_SETTINGS
  * and CMGlobalParameterPageFocusRequest (0x59) — not scope=0 (slot), so this mirrors
  * query_synth_settings's send_system()+extended-response transport, not g2_get_patch's
- * send_slot()+per-patch-version one (which a previous version of this function used, incorrectly,
- * and reliably produced garbage). Flushes stale EP 0x81 data before sending (like g2_get_patch)
+ * send_slot()+per-patch-version one. Flushes stale EP 0x81 data before sending (like g2_get_patch)
  * and validates the response's tag byte with a bounded discard-and-retry loop (like
  * get_patch_text's SUB_RESPONSE_PATCH_NOTES check) — a stray leftover bulk transfer from a
  * preceding operation would otherwise be silently misread as this chunk. Same envelope shape as

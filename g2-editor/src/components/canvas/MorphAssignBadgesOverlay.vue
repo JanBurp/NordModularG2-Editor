@@ -9,6 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMorphAssignOverlay } from '@/composables/useMorphAssign';
+	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -35,8 +36,8 @@
 				const param = moduleDef.params[i];
 				result.push({
 					text: `M${groups.join(',')}`,
-					x: (mod.horiz ?? 0) * 256 + param.x,
-					y: (mod.vert ?? 0) * 16 + param.y,
+					x: (mod.horiz ?? 0) * MODULE_WIDTH + param.x,
+					y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + param.y,
 				});
 			}
 		}

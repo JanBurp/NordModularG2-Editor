@@ -36,7 +36,7 @@ export function useBankUploadDialog() {
 	});
 
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
-		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isPerformanceMode);
+		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankUploadBankNum.value = opts?.bankNum ?? 1;
 		bankUploadFolder.value = '';
 		bankUploadFilename.value = '';

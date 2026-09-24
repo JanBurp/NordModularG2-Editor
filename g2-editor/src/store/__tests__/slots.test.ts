@@ -1162,7 +1162,7 @@ describe('assignParamToPage / deassignParamPage', () => {
 		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['assign-knob', 'A', 'va', '2', '0', '5']);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([['assign-knob', 'A', 'va', '2', '0', '5']]);
 	});
 
 	it('assigning into an occupied slot evicts the old occupant', async () => {
@@ -1210,12 +1210,12 @@ describe('assignParamToPage / deassignParamPage', () => {
 	});
 
 	it('records undo despite a rejected CLI call (offline)', async () => {
-		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('Daemon not running'));
 		const store = useSlotsStore();
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
 
-		await expect(store.assignParamToPage('A', 5, 0, 1, 0)).rejects.toThrow();
+		await store.assignParamToPage('A', 5, 0, 1, 0);
 
 		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
 		expect(useHistoryStore().canUndo('A')).toBe(true);

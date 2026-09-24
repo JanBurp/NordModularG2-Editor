@@ -1,3 +1,4 @@
+import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
@@ -85,22 +86,22 @@ export const useSettingsStore = defineStore('settings', {
 			window.electronAPI?.setTheme(value);
 		},
 		setCableGravity(value: number) {
-			this.cableGravity = Math.max(0, Math.min(100, value));
+			this.cableGravity = clamp(value, 0, 100);
 		},
 		setCableOpacity(value: number) {
-			this.cableOpacity = Math.max(0, Math.min(100, value));
+			this.cableOpacity = clamp(value, 0, 100);
 		},
 		setCableThickness(value: number) {
-			this.cableThickness = Math.max(0, Math.min(10, value));
+			this.cableThickness = clamp(value, 0, 10);
 		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;
 		},
 		setKnobSensitivity(value: number) {
-			this.knobSensitivity = Math.max(0.1, Math.min(10, value));
+			this.knobSensitivity = clamp(value, 0.1, 10);
 		},
 		setCanvasZoom(value: number) {
-			this.canvasZoom = Math.max(0.25, Math.min(3, value));
+			this.canvasZoom = clamp(value, 0.25, 3);
 		},
 		zoomIn() {
 			this.setCanvasZoom(this.canvasZoom + 0.1);

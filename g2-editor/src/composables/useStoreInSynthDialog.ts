@@ -22,7 +22,7 @@ export function useStoreInSynthDialog() {
 	const maxLocation = computed(() => locationSizeFor(kind.value));
 
 	function open(): void {
-		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isPerformanceMode);
+		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isHardwarePerformanceMode);
 		bank.value = 1;
 		location.value = 1;
 		showDialog.value = true;

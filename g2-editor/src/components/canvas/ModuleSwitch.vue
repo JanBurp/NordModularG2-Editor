@@ -104,7 +104,7 @@
 		</template>
 
 		<!-- Morph Group assignment indicator: red = assigned to the selected group, blue = another group -->
-		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'" pointer-events="none" />
+		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
 
 		<!-- Selected param underline -->
 		<rect v-if="highlight" x="0" y="12" :width="width" height="2" fill="white" pointer-events="none" />
@@ -114,6 +114,7 @@
 	import { computed, toRef } from 'vue';
 	import type { ModuleParam, ParamLabel } from '../../types';
 	import { useSwitch } from '../../composables/useSwitch';
+	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
 		param: ModuleParam;

@@ -178,7 +178,7 @@
 						maxlength="16"
 						:debounce="500"
 						@update:model-value="device.setPerfName($event)"
-						:disabled="!isPerformanceMode"
+						:disabled="!device.isHardwarePerformanceMode"
 					/>
 				</SettingsRow>
 				<SettingsRow :label="L.bpm">
@@ -316,7 +316,6 @@
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 
-	const isPerformanceMode = computed(() => device.device?.mode === 'Performance');
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const anyPatchLoaded = computed(() => SLOT_LABELS.some((slot) => !!slotsStore.getPatchForSlot(slot as SlotLabel)));
 

@@ -2,6 +2,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
+import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 import { useSettingsStore } from './settings';
@@ -114,15 +115,15 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		setSelectedMorphGroup(i: number) {
-			this.selectedMorphGroup = Math.max(0, Math.min(7, i));
+			this.selectedMorphGroup = clamp(i, 0, 7);
 		},
 
 		setSelectedParamBank(i: number) {
-			this.selectedParamBank = Math.max(0, Math.min(2, i));
+			this.selectedParamBank = clamp(i, 0, 2);
 		},
 
 		setDisplayedParamPage(i: number) {
-			this.displayedParamPage = Math.max(0, Math.min(4, i));
+			this.displayedParamPage = clamp(i, 0, 4);
 		},
 
 		// Explicit set (not a blind toggle) so both the toolbar click and an incoming hardware echo
@@ -134,11 +135,11 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		setSelectedGlobalParamBank(i: number) {
-			this.selectedGlobalParamBank = Math.max(0, Math.min(2, i));
+			this.selectedGlobalParamBank = clamp(i, 0, 2);
 		},
 
 		setDisplayedGlobalParamPage(i: number) {
-			this.displayedGlobalParamPage = Math.max(0, Math.min(4, i));
+			this.displayedGlobalParamPage = clamp(i, 0, 4);
 		},
 
 		toggleSvgViewer() {

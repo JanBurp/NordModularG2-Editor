@@ -163,7 +163,7 @@ function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; par
 	bw.write(8, labeled.length);
 	for (const e of labeled) {
 		bw.write(8, e.index);
-		const moduleLen = e.paramLabels.reduce((sum, e) => sum + 3 + e.labels.length * 7, 0);
+		const moduleLen = e.paramLabels.reduce((sum, lbl) => sum + 3 + lbl.labels.length * 7, 0);
 		bw.write(8, moduleLen);
 		for (const entry of e.paramLabels) {
 			bw.write(8, entry.isString ? 1 : 0);
@@ -409,8 +409,10 @@ function writeControllers(controllers: MidiCCAssignment[]): Uint8Array {
 	return makeSection(SectionType.CONTROLLERS, bw.flush());
 }
 
-// Mirrors parseKnobs (nmg2PatchParser.ts) exactly: fixed 120-slot array, presence bit per slot.
-function writeKnobs(knobs: ParamPageAssignment[]): Uint8Array {
+// Fixed 120-slot array (3 Banks x 5 Pages x 8 Knobs), presence bit per slot, mirroring parseKnobs /
+// parseGlobalKnobsChunk (nmg2PatchParser.ts) exactly. Shared by writeKnobs and writeGlobalKnobs,
+// which differ only in a trailing field the Global variant appends per slot via extraBitsFn.
+function writeKnobSlots<T extends ParamPageAssignment>(knobs: T[], extraBitsFn?: (k: T, bw: BitWriter) => void): Uint8Array {
 	const bySlot = new Map(knobs.map((k) => [k.slotIndex, k]));
 	const bw = new BitWriter();
 	bw.write(16, 120);
@@ -422,29 +424,23 @@ function writeKnobs(knobs: ParamPageAssignment[]): Uint8Array {
 			bw.write(8, k.moduleIndex);
 			bw.write(2, k.isLed);
 			bw.write(7, k.paramIndex);
+			extraBitsFn?.(k, bw);
 		}
 	}
-	return makeSection(SectionType.KNOBS, bw.flush());
+	return bw.flush();
+}
+
+function writeKnobs(knobs: ParamPageAssignment[]): Uint8Array {
+	return makeSection(SectionType.KNOBS, writeKnobSlots(knobs));
 }
 
 // Mirrors writeKnobs, plus a trailing 2-bit slot field per entry (0-3 = A-D) — see
 // parseGlobalKnobsChunk (nmg2PatchParser.ts) and GlobalParamPageAssignment (types/patch.ts).
 function writeGlobalKnobs(knobs: GlobalParamPageAssignment[]): Uint8Array {
-	const bySlot = new Map(knobs.map((k) => [k.slotIndex, k]));
-	const bw = new BitWriter();
-	bw.write(16, 120);
-	for (let slotIndex = 0; slotIndex < 120; slotIndex++) {
-		const k = bySlot.get(slotIndex);
-		bw.write(1, k ? 1 : 0);
-		if (k) {
-			bw.write(2, k.location);
-			bw.write(8, k.moduleIndex);
-			bw.write(2, k.isLed);
-			bw.write(7, k.paramIndex);
-			bw.write(2, SLOT_LABELS.indexOf(k.slot));
-		}
-	}
-	return makeSection(SectionType.KNOBS_GLOBAL, bw.flush());
+	return makeSection(
+		SectionType.KNOBS_GLOBAL,
+		writeKnobSlots(knobs, (k, bw) => bw.write(2, SLOT_LABELS.indexOf(k.slot))),
+	);
 }
 
 // Tracks which area sections have already been written (prevents duplicates within one slot).

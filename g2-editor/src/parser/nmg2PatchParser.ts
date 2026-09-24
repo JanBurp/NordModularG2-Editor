@@ -43,6 +43,52 @@ export function stripFileHeader(bytes: number[] | Uint8Array): string {
 		.join('');
 }
 
+// Reads bits MSB-first from a byte array, advancing an internal offset — mirrors BitWriter's
+// bit-accumulation logic (nmg2PatchSerializer.ts) in reverse. Shared by G2Parser.getBits (which
+// resets/reuses one instance across an entire file's worth of sections) and parseGlobalKnobsChunk
+// (which reads a single standalone chunk).
+class BitReader {
+	private data: Uint8Array = new Uint8Array(0);
+	bitofs = 0;
+
+	reset(data: Uint8Array): void {
+		this.data = data;
+		this.bitofs = 0;
+	}
+
+	read(numbits: number, label: string): number {
+		if (this.bitofs + numbits > this.data.length * 8)
+			throw new RangeError(`${label}: read past end of section (bit ${this.bitofs}, requesting ${numbits}, section is ${this.data.length * 8} bits)`);
+		let rv = (this.data[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1;
+		this.bitofs++;
+		while (numbits > 1) {
+			rv = (rv << 1) | ((this.data[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1);
+			this.bitofs++;
+			numbits--;
+		}
+		return rv;
+	}
+}
+
+// Reads one knob-slot record: a presence bit, then (when present) location/moduleIndex/isLed/
+// paramIndex, plus — for the Global Knobs variant — a trailing 2-bit slot field (0-3 = A-D).
+// Shared by G2Parser.parseKnobs and parseGlobalKnobsChunk, which differ only in that trailing
+// field. Returns null when the slot's presence bit is unset.
+function readKnobSlotRecord(
+	reader: BitReader,
+	hasSlotField: boolean,
+	label: string,
+): { location: 0 | 1; moduleIndex: number; isLed: number; paramIndex: number; slotBits: number } | null {
+	const assigned = reader.read(1, label);
+	if (!assigned) return null;
+	const location = reader.read(2, label) as 0 | 1;
+	const moduleIndex = reader.read(8, label);
+	const isLed = reader.read(2, label);
+	const paramIndex = reader.read(7, label);
+	const slotBits = hasSlotField ? reader.read(2, label) : 0;
+	return { location, moduleIndex, isLed, paramIndex, slotBits };
+}
+
 // Parses a raw C_KNOBS_GLOBAL ($5f) chunk payload — same 16-bit-count + per-slot-entry layout as
 // parseKnobs (see G2Parser.parseKnobs below), plus a trailing 2-bit slot field (0-3 = A-D) per
 // entry, since a Global Page slot can target a module in any of the 4 patches (see
@@ -50,30 +96,21 @@ export function stripFileHeader(bytes: number[] | Uint8Array): string {
 // because it's also used to decode the live get-global-knobs CLI response, which hands back just
 // this chunk's bytes, not a whole pch2/prf2 file to wrap in a G2Parser instance.
 export function parseGlobalKnobsChunk(data: Uint8Array): GlobalParamPageAssignment[] {
-	let bitofs = 0;
-	const getBits = (numbits: number): number => {
-		if (bitofs + numbits > data.length * 8)
-			throw new RangeError(`parseGlobalKnobsChunk: read past end of section (bit ${bitofs}, requesting ${numbits}, section is ${data.length * 8} bits)`);
-		let rv = (data[bitofs >> 3] >> (7 - (bitofs & 7))) & 1;
-		bitofs++;
-		while (numbits > 1) {
-			rv = (rv << 1) | ((data[bitofs >> 3] >> (7 - (bitofs & 7))) & 1);
-			bitofs++;
-			numbits--;
-		}
-		return rv;
-	};
-	const count = getBits(16);
+	const reader = new BitReader();
+	reader.reset(data);
+	const count = reader.read(16, 'parseGlobalKnobsChunk');
 	const list: GlobalParamPageAssignment[] = [];
 	for (let slotIndex = 0; slotIndex < count; slotIndex++) {
-		const assigned = getBits(1);
-		if (!assigned) continue;
-		const location = getBits(2) as 0 | 1;
-		const moduleIndex = getBits(8);
-		const isLed = getBits(2);
-		const paramIndex = getBits(7);
-		const slotBits = getBits(2);
-		list.push({ slotIndex, slot: SLOT_LABELS[slotBits], location, moduleIndex, isLed, paramIndex });
+		const rec = readKnobSlotRecord(reader, true, 'parseGlobalKnobsChunk');
+		if (!rec) continue;
+		list.push({
+			slotIndex,
+			slot: SLOT_LABELS[rec.slotBits],
+			location: rec.location,
+			moduleIndex: rec.moduleIndex,
+			isLed: rec.isLed,
+			paramIndex: rec.paramIndex,
+		});
 	}
 	return list;
 }
@@ -98,8 +135,7 @@ class G2Parser {
 	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
 	private aof = 0;
 	private textpad: string[] = [];
-	private rawData: Uint8Array = new Uint8Array(0);
-	private bitofs = 0;
+	private reader = new BitReader();
 	private patchParamsData: PatchParamVariation[][] = [];
 	private morphParamLabelsData: ParamLabel[][] = [];
 	private morphKeyboardAssignData: number[][] = [];
@@ -217,20 +253,8 @@ class G2Parser {
 	}
 
 	private getBits(numbits: number, initialData?: Uint8Array): number {
-		if (initialData) {
-			this.rawData = initialData;
-			this.bitofs = 0;
-		}
-		if (this.bitofs + numbits > this.rawData.length * 8)
-			throw new RangeError(`getBits: read past end of section (bit ${this.bitofs}, requesting ${numbits}, section is ${this.rawData.length * 8} bits)`);
-		let rv = (this.rawData[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1;
-		this.bitofs++;
-		while (numbits > 1) {
-			rv = (rv << 1) | ((this.rawData[this.bitofs >> 3] >> (7 - (this.bitofs & 7))) & 1);
-			this.bitofs++;
-			numbits--;
-		}
-		return rv;
+		if (initialData) this.reader.reset(initialData);
+		return this.reader.read(numbits, 'getBits');
 	}
 
 	private findModule(areaIdx: number, index: number): ModuleInstance | null {
@@ -268,6 +292,7 @@ class G2Parser {
 	private parseParamNames(data: Uint8Array): string {
 		const areaIdx = this.getBits(2, data);
 		const nummod = this.getBits(8);
+		// area 2 = morph-group labels, added alongside areas 0/1 (fx/voice) below.
 		if (areaIdx > 2) return 'Area=' + areaIdx;
 		for (let i = 0; i < nummod; i++) {
 			const modIdx = this.getBits(8);
@@ -602,13 +627,9 @@ class G2Parser {
 		const count = this.getBits(16, data);
 		const list: ParamPageAssignment[] = [];
 		for (let slotIndex = 0; slotIndex < count; slotIndex++) {
-			const assigned = this.getBits(1);
-			if (!assigned) continue;
-			const location = this.getBits(2) as 0 | 1;
-			const moduleIndex = this.getBits(8);
-			const isLed = this.getBits(2);
-			const paramIndex = this.getBits(7);
-			list.push({ slotIndex, location, moduleIndex, isLed, paramIndex });
+			const rec = readKnobSlotRecord(this.reader, false, 'getBits');
+			if (!rec) continue;
+			list.push({ slotIndex, location: rec.location, moduleIndex: rec.moduleIndex, isLed: rec.isLed, paramIndex: rec.paramIndex });
 		}
 		this.knobsData[this.aof >> 1] = list;
 	}
@@ -651,19 +672,26 @@ export class PatchParser {
 		this.patcher = new G2Parser(buffer);
 	}
 
-	parse(): Patch {
-		const controllers = this.patcher.getControllers();
-		const paramPages = this.patcher.getKnobs(0);
+	// Builds the Patch object for one slot (0 for a plain .pch2; 0-3 for a .prf2's four slots).
+	// Shared by parse() and parsePrf2(), which differ only in which slot(s) they build and how
+	// many slots' worth of areas exist — a slot's areas always sit at [slot*2, slot*2+1].
+	private buildPatchForSlot(slot: number, controllers: MidiCCAssignment[]): Patch {
+		const paramPages = this.patcher.getKnobs(slot);
 		return {
-			areas: [this.patcher.getArea(0), this.patcher.getArea(1)],
-			description: this.patcher.getpd(0) ?? undefined,
-			patchParams: this.patcher.getPatchParams(0) ?? undefined,
+			areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
+			description: this.patcher.getpd(slot) ?? undefined,
+			patchParams: this.patcher.getPatchParams(slot) ?? undefined,
 			controllers: controllers.length > 0 ? controllers : undefined,
 			paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
-			text: this.patcher.getTextPad(0) ?? undefined,
-			morphParamLabels: this.patcher.getMorphParamLabels(0) ?? undefined,
-			morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(0) ?? undefined,
+			text: this.patcher.getTextPad(slot) ?? undefined,
+			morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
+			morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(slot) ?? undefined,
 		};
+	}
+
+	parse(): Patch {
+		const controllers = this.patcher.getControllers();
+		return this.buildPatchForSlot(0, controllers);
 	}
 
 	parsePrf2(): {
@@ -676,20 +704,7 @@ export class PatchParser {
 		if (slotNames.length === 0) return null;
 		return {
 			slotNames,
-			patches: [0, 1, 2, 3].map((slot) => {
-				const paramPages = this.patcher.getKnobs(slot);
-				const controllers = this.patcher.getControllers(slot);
-				return {
-					areas: [this.patcher.getArea(slot * 2), this.patcher.getArea(slot * 2 + 1)],
-					description: this.patcher.getpd(slot) ?? undefined,
-					patchParams: this.patcher.getPatchParams(slot) ?? undefined,
-					controllers: controllers.length > 0 ? controllers : undefined,
-					paramPages: paramPages && paramPages.length > 0 ? paramPages : undefined,
-					text: this.patcher.getTextPad(slot) ?? undefined,
-					morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
-					morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(slot) ?? undefined,
-				};
-			}),
+			patches: [0, 1, 2, 3].map((slot) => this.buildPatchForSlot(slot, this.patcher.getControllers(slot))),
 			slotMeta: this.patcher.getSlotMeta(),
 			globalParamPages: this.patcher.getGlobalKnobs(),
 		};

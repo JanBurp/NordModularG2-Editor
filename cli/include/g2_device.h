@@ -277,12 +277,8 @@ int g2_select_param_page(int slot, int page_id);
 
 /* Global Parameter Pages siblings of the three functions above (S_ASS_GLOBAL_KNOB=0x1c /
  * S_DEASS_GLOB_KNOB=0x1d / S_SEL_GLOBAL_PAGE=0x1e), plus a bulk fetch (Q_GLOBAL_KNOBS=0x5e).
- * Reverse-engineered from the Delphi reference source (BVE.NMG2Mess.pas
- * AddAssignGlobalKnobMessage/AddDeassignGlobalKnobMessage/AddSelectGlobalParamPageMessage),
- * UNVERIFIED against real hardware — worth a spot-check before trusting field-level semantics.
- * `slot` is only the transport/routing slot the command rides on (any of the 4 works
- * interchangeably per the reference editor); `target_slot` (0-3, A-D) is which patch's module
- * the knob controls, encoded in the payload itself. */
+ * See g2_assign_global_knob's comment in g2_device.c for the payload layout, provenance, and
+ * the UNVERIFIED-against-real-hardware caveat that applies to this whole family. */
 int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index);
 int g2_deassign_global_knob(int slot, int slot_index);
 int g2_select_global_page(int slot, int page_id);

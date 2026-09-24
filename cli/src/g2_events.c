@@ -420,23 +420,12 @@ static void emit_embedded_event(const uint8_t *response) {
             printf("{\"type\":\"param_page_change\",\"slot\":\"%s\",\"page\":%u}\n",
                    SLOT_LETTER(slot), response[5]);
             break;
-        /* CMBarbMapChangeNotify (0x74) — a one-off real-hardware capture (2026-08-28) showed the
-         * G2 sending this, with zero payload bytes, instead of echoing S_ASSIGN_KNOB (0x25) for a
-         * front-panel knob assign. Per the decompiled reference editor, CMBarbMapChangeNotify::
-         * ReadStream only consumes the header and UseOnPatch just clears the cached knob map and
-         * marks it dirty ("Barb" is that source's internal name for a knob/controller assignment,
-         * shared with CBarbTargetSpec inside CMKnobAssign itself) — no module/param/slot-index
-         * fields, i.e. a stateless "the knob map changed, go re-fetch" ping (see knob_map_changed
-         * in useSlotEvents.ts, which reloads the slot). NOT reproducible on a follow-up pass: an
-         * unconditional raw-USB debug capture showed nothing at all sent for several repeated
-         * front-panel assigns, while ordinary param changes kept notifying normally — and Clavia's
-         * own official editor exhibits the identical gap on the same hardware. Kept as
-         * correct-if-it-ever-fires, but front-panel knob assign is a confirmed, accepted sync gap,
-         * not a bug — see the usb-protocol.md §7 follow-up note. There's no front-panel deassign
-         * gesture either (deassign is editor-only). The performance-wide sibling (0x75,
-         * CMPerfBarbMapChangeNotify, for a "Global Knob Assign" feature this editor doesn't have)
-         * is deliberately not handled here — same choice as the 0x1E CMGlobalParameterPageFocus
-         * twin. */
+        /* CMBarbMapChangeNotify (0x74): front-panel knob-map-changed ping, zero payload bytes
+         * (no module/param/slot-index fields) — decoded as a stateless "go re-fetch" signal
+         * (see knob_map_changed in useSlotEvents.ts, which reloads the slot). Best-effort/
+         * unreliable: a hardware capture caught it once for a front-panel knob assign, but a
+         * follow-up pass (and Clavia's own editor) showed nothing sent for the same gesture.
+         * See docs/technical/usb-protocol.md §7 for the full investigation. */
         case 0x74:
             printf("{\"type\":\"knob_map_changed\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
             break;

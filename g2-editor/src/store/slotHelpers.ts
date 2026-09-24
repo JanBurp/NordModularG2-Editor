@@ -1,5 +1,14 @@
 import type { Cable } from '@/renderer/cableRenderer';
-import type { ModuleInstance, Patch, PatchParamVariation, VariationState } from '@/types';
+import type {
+	GlobalParamPageAssignment,
+	MidiCCAssignment,
+	ModuleInstance,
+	ParamPageAssignment,
+	Patch,
+	PatchParamVariation,
+	SlotLabel,
+	VariationState,
+} from '@/types';
 import { NUM_VARIATIONS } from '@/types';
 
 export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'va' | 'fx' } {
@@ -106,6 +115,82 @@ export function extractVariations(patch: Patch): VariationState[] {
 export function removeModuleFromVariations(variations: VariationState[] | null, moduleId: number, areaKey: 'fx' | 'voice'): void {
 	if (!variations) return;
 	for (const v of variations) delete v[areaKey][moduleId];
+}
+
+// Shared by deleteModule/replaceModule: snapshots a module's MIDI-CC, Parameter Page, and Global
+// Parameter Page assignments before they're removed, so undo can restore them.
+export function snapshotModuleAssignments(
+	controllers: MidiCCAssignment[],
+	paramPages: ParamPageAssignment[],
+	globalParamPages: GlobalParamPageAssignment[],
+	slot: SlotLabel,
+	ccLocation: number,
+	moduleId: number,
+): { removedCCSnap: MidiCCAssignment[]; removedPagesSnap: ParamPageAssignment[]; removedGlobalPagesSnap: GlobalParamPageAssignment[] } {
+	return {
+		removedCCSnap: controllers.filter((c) => c.location === ccLocation && c.moduleIndex === moduleId),
+		removedPagesSnap: paramPages.filter((k) => k.location === ccLocation && k.moduleIndex === moduleId),
+		removedGlobalPagesSnap: globalParamPages.filter((k) => k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId),
+	};
+}
+
+// Two-way-uniqueness single-slot assign (assignParamToPage/assignParamToGlobalPage): evicts
+// whatever currently occupies `slotIndex` and whatever `sameKey` currently occupies (its old slot),
+// then inserts `entry`. Shared by both Patch and Global variants — GlobalParamPageAssignment is a
+// structural superset of ParamPageAssignment (adds `slot`).
+export function computeAssignOne<T extends ParamPageAssignment>(
+	prev: T[],
+	slotIndex: number,
+	sameKey: (k: T) => boolean,
+	entry: T,
+): { next: T[]; oldAtSlot?: T; oldKeySlot?: T } {
+	const oldAtSlot = prev.find((k) => k.slotIndex === slotIndex);
+	const oldKeySlot = prev.find(sameKey);
+	const next = prev.filter((k) => k.slotIndex !== slotIndex && !sameKey(k));
+	next.push(entry);
+	return { next, oldAtSlot, oldKeySlot };
+}
+
+// Bulk "assign whole module" (assignModuleToPage/assignModuleToGlobalPage). Evicts ALL of this
+// module's existing assignments (`sameModule`), not just ones with paramIndex < n — fixes a
+// stragglers bug where a prior larger assign left paramIndex >= n behind after a shrink.
+export function computeAssignModule<T extends ParamPageAssignment>(
+	prev: T[],
+	targetSlots: number[],
+	sameModule: (k: T) => boolean,
+	makeEntry: (paramIndex: number, slotIndex: number) => T,
+): { next: T[]; touched: number[] } {
+	const targetSet = new Set(targetSlots);
+	const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !sameModule(k));
+	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(i, slotIndex)));
+	const evictedElsewhere = prev.filter((k) => sameModule(k) && !targetSet.has(k.slotIndex)).map((k) => k.slotIndex);
+	return { next, touched: [...targetSlots, ...evictedElsewhere] };
+}
+
+// Swaps (or moves, if the target is empty) two knob slots' occupants — one computed list so the
+// pair lands as a single undo entry (Patch variant) or a single CLI apply (both variants).
+export function computeSwap<T extends ParamPageAssignment>(prev: T[], sourceSlotIndex: number, targetSlotIndex: number): T[] | null {
+	const source = prev.find((k) => k.slotIndex === sourceSlotIndex);
+	if (!source) return null;
+	const occupant = prev.find((k) => k.slotIndex === targetSlotIndex);
+	const next = prev.filter((k) => k.slotIndex !== sourceSlotIndex && k.slotIndex !== targetSlotIndex);
+	next.push({ ...source, slotIndex: targetSlotIndex } as T);
+	if (occupant) next.push({ ...occupant, slotIndex: sourceSlotIndex } as T);
+	return next;
+}
+
+// Builds one assign/deassign CLI command per touched slot from the final list — shared by
+// _applyParamPages/_applyGlobalParamPages, replacing their former sequential-await loops.
+export function buildTouchedCmds<T extends ParamPageAssignment>(
+	list: T[],
+	touched: number[],
+	assignCmd: (entry: T) => string[],
+	deassignCmd: (slotIndex: number) => string[],
+): string[][] {
+	return touched.map((slotIndex) => {
+		const entry = list.find((k) => k.slotIndex === slotIndex);
+		return entry ? assignCmd(entry) : deassignCmd(slotIndex);
+	});
 }
 
 export function resolveColumnCollisions(

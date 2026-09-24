@@ -27,8 +27,9 @@
 	</Teleport>
 </template>
 <script setup lang="ts">
-	import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
+	import { computed } from 'vue';
 	import { useSettingsStore } from '../../store/settings';
+	import { useViewportClampedPopup } from '../../composables/useViewportClampedPopup';
 	import ModuleGraph from './ModuleGraph.vue';
 	import type { ParamDefinition } from '../../types';
 
@@ -67,31 +68,16 @@
 		f: typeof props.paramDef.graph === 'string' ? props.paramDef.graph : undefined,
 	}));
 
-	const popupEl = ref<HTMLElement | null>(null);
-	const adjustedX = ref(props.x);
-	const adjustedY = ref(props.y);
-
-	async function clampToViewport() {
-		await nextTick();
-		if (!popupEl.value) return;
-		// Measured post-scale (the popup is CSS-transform-scaled to match canvas zoom), so use the
-		// rendered box, not clientWidth/clientHeight (which ignore transforms).
-		const { width: w, height: h } = popupEl.value.getBoundingClientRect();
-		adjustedX.value = Math.min(props.x, window.innerWidth - w - 4);
-		adjustedY.value = props.y + h > window.innerHeight ? props.y - h : props.y;
-	}
-
-	watch(() => [props.x, props.y, props.paramDef, zoom.value], clampToViewport, { immediate: true });
+	const { popupEl, adjustedX, adjustedY } = useViewportClampedPopup(
+		() => props.x,
+		() => props.y,
+		() => zoom.value,
+		() => emit('close'),
+		[() => props.paramDef],
+	);
 
 	function onSelect(value: number) {
 		emit('select', value);
 		emit('close');
 	}
-
-	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') emit('close');
-	}
-
-	onMounted(() => window.addEventListener('keydown', onKeydown));
-	onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 </script>

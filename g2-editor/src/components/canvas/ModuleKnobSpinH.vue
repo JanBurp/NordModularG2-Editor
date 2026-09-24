@@ -8,7 +8,7 @@
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event)"
 	>
 		<use href="#KnobSpinH" width="20" height="10" />
-		<rect v-if="morphColor" x="0" y="-2" width="20" height="2" :fill="morphColor === 'red' ? '#e0303c' : '#4a63c8'" pointer-events="none" />
+		<rect v-if="morphColor" x="0" y="-2" width="20" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
 		<rect v-if="highlight" x="0" y="11" width="20" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
@@ -16,6 +16,7 @@
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
+	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
 		param: ModuleParam;

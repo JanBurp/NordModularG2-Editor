@@ -58,7 +58,7 @@ export function useBankDownloadDialog() {
 	});
 
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
-		bankDownloadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isPerformanceMode);
+		bankDownloadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankDownloadBankNum.value = opts?.bankNum ?? 1;
 		bankDownloadSourceType.value = 'pchList';
 		bankDownloadSourcePath.value = '';

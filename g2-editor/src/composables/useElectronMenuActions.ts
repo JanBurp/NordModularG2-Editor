@@ -53,6 +53,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
 
+	function syncVariationFromCurrentPatch(): void {
+		if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+	}
+
 	onMounted(() => {
 		// Cold-start hydration: the persisted recent-files list lives in the renderer
 		// (pinia-plugin-persistedstate), so the native menu (built empty at startup) needs it once.
@@ -82,18 +86,18 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'open-performance':
 					await patchFile.openFromElectronDialog(undefined, 'performance');
-					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					syncVariationFromCurrentPatch();
 					break;
 				case 'open':
 					await patchFile.openFromElectronDialog(undefined, 'patch');
-					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					syncVariationFromCurrentPatch();
 					break;
 				case 'open-to-A':
 				case 'open-to-B':
 				case 'open-to-C':
 				case 'open-to-D':
 					await patchFile.openFromElectronDialog(action.slice(-1) as SlotLabel, 'patch');
-					if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
+					syncVariationFromCurrentPatch();
 					break;
 				case 'save-from-A':
 				case 'save-from-B':
@@ -102,7 +106,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					await slotsStore.saveSlot(action.slice(-1) as SlotLabel);
 					break;
 				case 'save':
-					if (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode) {
+					if (slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode) {
 						await slotsStore.savePerformance();
 					} else if (slotsStore.slots[uiStore.slotInFocus]?.templateRawHex) {
 						await slotsStore.saveSlot(uiStore.slotInFocus);
@@ -110,7 +114,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'save-as': {
 					const folder = useSettingsStore().path || undefined;
-					if (slotsStore.isPerformanceMode || deviceStore.isPerformanceMode) {
+					if (slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode) {
 						const result = await window.electronAPI.showSavePerfDialog(slotsStore.performanceName, folder);
 						if (result.success && result.filepath) await slotsStore.savePerformance(result.filepath);
 					} else {

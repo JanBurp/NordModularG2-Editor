@@ -34,6 +34,7 @@
 	import { blackNoteRowYs, visibleNoteWindow } from '../../renderer/pianoRoll';
 	import { usePianoRollNoteInteraction } from '../../composables/usePianoRollNoteInteraction';
 	import { clamp } from '../../utils/math';
+	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
 		paramIndex: number;
@@ -54,7 +55,7 @@
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const morphFillColor = computed(() => (props.morphColor === 'red' ? '#e0303c' : props.morphColor === 'blue' ? '#4a63c8' : '#000'));
+	const morphFillColor = computed(() => morphColorHex(props.morphColor, '#000'));
 
 	const noteWindow = computed(() => visibleNoteWindow(props.zoom, props.octaveOffset));
 	const lowestVisibleNote = computed(() => noteWindow.value.low);

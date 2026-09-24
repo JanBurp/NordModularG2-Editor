@@ -90,6 +90,17 @@ const lv = (vals: number[] | undefined, i: number, def = 0): number => {
 	return v === undefined ? def : v;
 };
 
+// Shared by lfoBgraph/lfoShpgraph/oscShpgraph/oscShpBgraph: assemble a path `d` string from a
+// keypoint array via FastVector#getstr — first point is 'M', second uses the curve/line type
+// tag, the rest are appended plain.
+function buildKeypointPath(points: FastVector[], xs: number, ys: number, yo: number, kt: 'C' | 'L', shp?: number): string {
+	let d = points[0].getstr('M', xs, ys, yo, shp) + points[1].getstr(kt, xs, ys, yo, shp);
+	points.slice(2).forEach((x) => {
+		d += x.getstr(' ', xs, ys, yo, shp);
+	});
+	return d;
+}
+
 // ---------------------------------------------------------------------------
 // LFO B graph (patchviewer:905)
 // ---------------------------------------------------------------------------
@@ -130,10 +141,7 @@ function lfoBgraph(ve: VisualElement, vals: number[]): GraphPathResult {
 	const kl = dp[wave] ?? dp[0];
 	const kt = wave === 0 ? 'C' : 'L';
 	const k = kl.concat(kl.slice(1).map((x) => x.add({ x: 2, y: 0 })));
-	let d = k[0].getstr('M', 26, xl.ys, xl.yo) + k[1].getstr(kt, 26, xl.ys, xl.yo);
-	k.slice(2).forEach((x) => {
-		d += x.getstr(' ', 26, xl.ys, xl.yo);
-	});
+	const d = buildKeypointPath(k, 26, xl.ys, xl.yo, kt);
 	return { kind: 'path', d, transform: `translate(${phase},0)` };
 }
 
@@ -171,10 +179,7 @@ function lfoShpgraph(ve: VisualElement, vals: number[]): GraphPathResult {
 			return nex;
 		}),
 	);
-	let d = k[0].getstr('M', 26, xl.ys, xl.yo, shp) + k[1].getstr(kt, 26, xl.ys, xl.yo, shp);
-	k.slice(2).forEach((x) => {
-		d += x.getstr(' ', 26, xl.ys, xl.yo, shp);
-	});
+	const d = buildKeypointPath(k, 26, xl.ys, xl.yo, kt, shp);
 	return { kind: 'path', d, transform: `translate(${phase},0)` };
 }
 
@@ -223,28 +228,34 @@ function expandWaveCurve(kl: FastVector[], shp: number): FastVector[] {
 	return newk;
 }
 
+// Shared by oscShpgraph/oscShpBgraph: the first 5 waveform-shape entries are identical between
+// the two graphs (Sine, Saw-ish x2, Square-ish, Triangle).
+const OSC_SHAPE_BASE_WAVES: OscEntry[] = [
+	[fvf(0, 0.5), fvf(1, -0.5, 0.001, getstr2), fvf(2, 0.5)],
+	[
+		[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
+		[0, 0.5, 0.15, 0, 0.8999, 0, 1.65, 0, 1.8, 0.5, 1.8, 0.5, 1.8, 0.5, 1.8, 1.0, 1.9, 1.0, 2.0, 1.0, 2.0, 0.5, 2.0, 0.5],
+	],
+	[
+		[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
+		[
+			0.3294, 0.4234, 0.6492, 0.3103, 0.95, 0.001531, 0.9667, 0.1815, 0.9833, 0.3615, 1.0, 0.5415, 1.017, 0.6948, 1.033, 0.8482, 1.05, 1.002, 1.382,
+			0.6305, 1.692, 0.5297, 2.0, 0.5,
+		],
+	],
+	[
+		[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
+		[
+			0.05, -0.05072, -0.05, -0.1, 0.5, 0.15, 1.05, -0.1, 0.95, -0.05072, 1.0, 0.4993, 1.05, 1.05, 0.95, 1.1, 1.5, 0.8485, 2.05, 1.1, 1.95, 1.05, 2.0,
+			0.4993,
+		],
+	],
+	[fvf(0, 0), fvf(0.5, -0.5, 0.0001, getstr2), fvf(1.5, 0.5, 2, getstr2), fvf(2, 0)],
+];
+
 function oscShpgraph(_ve: VisualElement, vals: number[]): GraphPathResult {
 	const dp: OscEntry[] = [
-		[fvf(0, 0.5), fvf(1, -0.5, 0.001, getstr2), fvf(2, 0.5)],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[0, 0.5, 0.15, 0, 0.8999, 0, 1.65, 0, 1.8, 0.5, 1.8, 0.5, 1.8, 0.5, 1.8, 1.0, 1.9, 1.0, 2.0, 1.0, 2.0, 0.5, 2.0, 0.5],
-		],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[
-				0.3294, 0.4234, 0.6492, 0.3103, 0.95, 0.001531, 0.9667, 0.1815, 0.9833, 0.3615, 1.0, 0.5415, 1.017, 0.6948, 1.033, 0.8482, 1.05, 1.002, 1.382,
-				0.6305, 1.692, 0.5297, 2.0, 0.5,
-			],
-		],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[
-				0.05, -0.05072, -0.05, -0.1, 0.5, 0.15, 1.05, -0.1, 0.95, -0.05072, 1.0, 0.4993, 1.05, 1.05, 0.95, 1.1, 1.5, 0.8485, 2.05, 1.1, 1.95, 1.05, 2.0,
-				0.4993,
-			],
-		],
-		[fvf(0, 0), fvf(0.5, -0.5, 0.0001, getstr2), fvf(1.5, 0.5, 2, getstr2), fvf(2, 0)],
+		...OSC_SHAPE_BASE_WAVES,
 		[
 			fvf(0, 0),
 			fvf(0, -0.5),
@@ -272,10 +283,7 @@ function oscShpgraph(_ve: VisualElement, vals: number[]): GraphPathResult {
 			kl = expandWaveCurve(kl, shp);
 		}
 	}
-	let d = kl[0].getstr('M', 19, 21.5, 11, shp) + kl[1].getstr(kt, 19, 21.5, 11, shp);
-	kl.slice(2).forEach((x) => {
-		d += x.getstr(' ', 19, 21.5, 11, shp);
-	});
+	const d = buildKeypointPath(kl, 19, 21.5, 11, kt, shp);
 	return { kind: 'path', d };
 }
 
@@ -285,26 +293,7 @@ function oscShpgraph(_ve: VisualElement, vals: number[]): GraphPathResult {
 
 function oscShpBgraph(_ve: VisualElement, vals: number[], modes: number[] | undefined): GraphPathResult {
 	const dp: OscEntry[] = [
-		[fvf(0, 0.5), fvf(1, -0.5, 0.001, getstr2), fvf(2, 0.5)],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[0, 0.5, 0.15, 0, 0.8999, 0, 1.65, 0, 1.8, 0.5, 1.8, 0.5, 1.8, 0.5, 1.8, 1.0, 1.9, 1.0, 2.0, 1.0, 2.0, 0.5, 2.0, 0.5],
-		],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[
-				0.3294, 0.4234, 0.6492, 0.3103, 0.95, 0.001531, 0.9667, 0.1815, 0.9833, 0.3615, 1.0, 0.5415, 1.017, 0.6948, 1.033, 0.8482, 1.05, 1.002, 1.382,
-				0.6305, 1.692, 0.5297, 2.0, 0.5,
-			],
-		],
-		[
-			[0, 0.5, 0.2643, 0, 0.5, 0, 0.7357, 0, 1.0, 0.5, 1.0, 0.5, 1.0, 0.5, 1.264, 1.0, 1.5, 1.0, 1.736, 1.0, 2.0, 0.5, 2.0, 0.5],
-			[
-				0.05, -0.05072, -0.05, -0.1, 0.5, 0.15, 1.05, -0.1, 0.95, -0.05072, 1.0, 0.4993, 1.05, 1.05, 0.95, 1.1, 1.5, 0.8485, 2.05, 1.1, 1.95, 1.05, 2.0,
-				0.4993,
-			],
-		],
-		[fvf(0, 0), fvf(0.5, -0.5, 0.0001, getstr2), fvf(1.5, 0.5, 2, getstr2), fvf(2, 0)],
+		...OSC_SHAPE_BASE_WAVES,
 		[
 			[0, 0.9965, 0, 0.2965, 0.000306, 0.2938, 0.000306, 0.05479, 2.0, 0.9965],
 			[0, 10, 0, 0.3, 1, 1, 1, 0.3, 2.0, 1.0],
@@ -337,10 +326,7 @@ function oscShpBgraph(_ve: VisualElement, vals: number[], modes: number[] | unde
 			kl = expandWaveCurve(kl, shp);
 		}
 	}
-	let d = kl[0].getstr('M', 19, 21.5, 11, shp) + kl[1].getstr(kt, 19, 21.5, 11, shp);
-	kl.slice(2).forEach((x) => {
-		d += x.getstr(' ', 19, 21.5, 11, shp);
-	});
+	const d = buildKeypointPath(kl, 19, 21.5, 11, kt, shp);
 	return { kind: 'path', d };
 }
 
@@ -849,9 +835,13 @@ const res1ToQ = (v: number) => 0.5 * Math.pow(100, v / 127); // Res_1: 0.5..50
 const level100Q = (v: number) => 0.5 + (v / 127) * 9.5; // resonance from Level_100: 0.5..10
 
 // Filter response math (magnitude, not in dB)
+function resonanceDenom(r: number, Q: number): number {
+	return (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+}
+
 function lpResp(hz: number, fc: number, Q: number, order: number): number {
 	const r = hz / fc;
-	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	const denom = resonanceDenom(r, Q);
 	let mag = 1 / Math.sqrt(Math.max(1e-12, denom));
 	if (order > 2) {
 		mag *= 1 / Math.sqrt(1 + Math.pow(r, 2 * (order - 2)));
@@ -867,13 +857,13 @@ function hpResp(hz: number, fc: number, Q: number, order: number): number {
 
 function bpResp(hz: number, fc: number, Q: number): number {
 	const r = hz / fc;
-	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	const denom = resonanceDenom(r, Q);
 	return r / Q / Math.sqrt(Math.max(1e-12, denom));
 }
 
 function brResp(hz: number, fc: number, Q: number): number {
 	const r = hz / fc;
-	const denom = (1 - r * r) * (1 - r * r) + (r / Q) * (r / Q);
+	const denom = resonanceDenom(r, Q);
 	return Math.abs(1 - r * r) / Math.sqrt(Math.max(1e-12, denom));
 }
 
@@ -933,6 +923,12 @@ function sampleResponse(w: number, h: number, mag: (hz: number) => number, dbRan
 }
 
 const FILTER_FILL = GRAPH_COLORS.areaFill;
+
+// Shared by the filter/EQ graph functions below: assemble the common
+// { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL, label? } result shape.
+function makeFilterGraphResult(d: string, dFill: string, label?: { text: string; x: number; y: number }): GraphPathResult {
+	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL, label };
+}
 
 // Not part of the original editor: FltComb and OscNoise have a Freq-type param the original
 // graph never used, unlike every other filter graph in this file (whose curve visibly shifts
@@ -1242,14 +1238,7 @@ function filterNord(ve: VisualElement, vals: number[]): GraphPathResult {
 	const mag = pickFilterResp(filterType, fc, Q, order);
 	const norm = gc ? gainComp(mag, fc, Q) : 1;
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
-	return {
-		kind: 'path',
-		d,
-		dFill,
-		zeroLine: true,
-		label: makeSlopeLabel(String(slopeDb), ve.w!),
-		fill: FILTER_FILL,
-	};
+	return makeFilterGraphResult(d, dFill, makeSlopeLabel(String(slopeDb), ve.w!));
 }
 
 // --- Filter Static (id 54) ---
@@ -1262,7 +1251,7 @@ function filterStatic(ve: VisualElement, vals: number[]): GraphPathResult {
 	const mag = pickFilterResp(filterType, fc, Q, order);
 	const norm = gc ? gainComp(mag, fc, Q) : 1;
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => mag(hz) * norm);
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	return makeFilterGraphResult(d, dFill);
 }
 
 // --- Filter Classic (id 92) — always LP ---
@@ -1273,14 +1262,7 @@ function filterClassic(ve: VisualElement, vals: number[]): GraphPathResult {
 	const slopeDb = [12, 18, 24][Math.max(0, Math.min(2, slopeIdx))];
 	const order = slopeDb / 6;
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, Q, order));
-	return {
-		kind: 'path',
-		d,
-		dFill,
-		zeroLine: true,
-		label: makeSlopeLabel(String(slopeDb), ve.w!),
-		fill: FILTER_FILL,
-	};
+	return makeFilterGraphResult(d, dFill, makeSlopeLabel(String(slopeDb), ve.w!));
 }
 
 // --- Filter Lowpass (id 87) — always LP, slope from mode ---
@@ -1290,14 +1272,7 @@ function filterLowpass(ve: VisualElement, vals: number[], modes: number[] | unde
 	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
 	const order = slopeDb / 6;
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => lpResp(hz, fc, 0.707, order));
-	return {
-		kind: 'path',
-		d,
-		dFill,
-		zeroLine: true,
-		label: makeSlopeLabel(String(slopeDb), ve.w!),
-		fill: FILTER_FILL,
-	};
+	return makeFilterGraphResult(d, dFill, makeSlopeLabel(String(slopeDb), ve.w!));
 }
 
 // --- Filter Highpass (id 134) — always HP, slope from mode ---
@@ -1307,14 +1282,7 @@ function filterHighpass(ve: VisualElement, vals: number[], modes: number[] | und
 	const slopeDb = [6, 12, 18, 24, 30, 36][Math.max(0, Math.min(5, slopeIdx))];
 	const order = slopeDb / 6;
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => hpResp(hz, fc, 0.707, order));
-	return {
-		kind: 'path',
-		d,
-		dFill,
-		zeroLine: true,
-		label: makeSlopeLabel(String(slopeDb), ve.w!),
-		fill: FILTER_FILL,
-	};
+	return makeFilterGraphResult(d, dFill, makeSlopeLabel(String(slopeDb), ve.w!));
 }
 
 // --- Eq 2 Band (id 32) ---
@@ -1324,7 +1292,7 @@ function eq2Band(ve: VisualElement, vals: number[]): GraphPathResult {
 	const loFc = eqLoFreqToHz(lv(vals, 4, 0));
 	const hiFc = eqHiFreqToHz(lv(vals, 5, 0));
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => loShelfResp(hz, loFc, loSlopeDb) * hiShelfResp(hz, hiFc, hiSlopeDb));
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	return makeFilterGraphResult(d, dFill);
 }
 
 // --- Eq 3 Band (id 33) ---
@@ -1340,7 +1308,7 @@ function eq3Band(ve: VisualElement, vals: number[]): GraphPathResult {
 		ve.h!,
 		(hz) => loShelfResp(hz, loFc, loSlopeDb) * peakResp(hz, midFc, midGainDb, 1.0) * hiShelfResp(hz, hiFc, hiSlopeDb),
 	);
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	return makeFilterGraphResult(d, dFill);
 }
 
 // --- Eq Peak (id 103) ---
@@ -1349,7 +1317,7 @@ function eqPeak(ve: VisualElement, vals: number[]): GraphPathResult {
 	const gainDb = eqDbFromVal(lv(vals, 1, 64));
 	const bw = bandwidthOct(lv(vals, 2, 64));
 	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => peakResp(hz, fc, gainDb, bw));
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	return makeFilterGraphResult(d, dFill);
 }
 
 // --- Filter Phase (id 102) — multi-notch ---
@@ -1365,7 +1333,7 @@ function filterPhase(ve: VisualElement, vals: number[]): GraphPathResult {
 		}
 		return Math.min(2, m);
 	});
-	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL };
+	return makeFilterGraphResult(d, dFill);
 }
 
 // --- Filter Comb (id 162) ---
