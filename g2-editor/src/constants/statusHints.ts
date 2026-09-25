@@ -8,7 +8,10 @@ const ALT = isMac ? '⌥' : 'Alt';
 
 export const STATUS_HINTS = {
 	// Canvas — hidden gestures
-	jackConnected: `${MOD}-drag: move this cable · Click: cycle through connections`,
+	jackConnectedDrag: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: cycle connections · Backspace: delete`,
+	jackConnectedClick: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: connect/cancel · Backspace: delete`,
+	jackArm: 'Click: start a cable (click again to cancel)',
+	ghostCable: 'Click cable or Enter: confirm suggested cable · Escape: dismiss',
 	moduleTitle: 'Double-click: rename · Right-click: more options',
 	moduleReplace: 'Click: replace with another module in this group',
 	paramMorph: `${CTRL}-click: assign to Morph Group · ${CTRL}-drag: set range · ${ALT}-drag: assign to Parameter Page`,

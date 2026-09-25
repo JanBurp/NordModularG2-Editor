@@ -31,9 +31,14 @@
 </template>
 
 <script setup lang="ts">
+	import { computed } from 'vue';
+	import { useSettingsStore } from '../../store/settings';
+
 	const emit = defineEmits<{ close: [] }>();
 
-	const groups = [
+	const settingsStore = useSettingsStore();
+
+	const groups = computed(() => [
 		{
 			title: 'File',
 			rows: [
@@ -120,11 +125,29 @@
 			],
 		},
 		{
+			title: 'Cabling',
+			rows: [
+				...(settingsStore.cableConnectMode === 'click'
+					? [
+							{ keys: ['Click jack → Click jack'], action: 'Arm a jack, then click another to connect (click armed jack again to cancel)' },
+							{ keys: ['Enter'], action: 'Connect armed jack to the snap-highlighted jack' },
+						]
+					: [
+							{ keys: ['Drag'], action: 'Drag from one jack to another to connect' },
+							{ keys: ['Click'], action: 'Cycle through a connected jack’s connections' },
+						]),
+				...(settingsStore.autoSuggestCable ? [{ keys: ['Click', 'Enter'], action: 'Confirm the auto-suggested cable after adding a module' }] : []),
+				{ keys: ['⌘/⌃ Click'], action: 'Grab a connected jack’s cable(s) to re-route' },
+				{ keys: ['⌘/⌃ Drag'], action: 'Move the grabbed cable' },
+				{ keys: ['Right-click'], action: 'Jack menu: Delete connected / Break out of nest' },
+			],
+		},
+		{
 			title: 'Other',
 			rows: [
-				{ keys: ['ESC'], action: 'Close dialog / menu / overlay, or clear search filter' },
+				{ keys: ['ESC'], action: 'Close dialog / menu / overlay, cancel an armed jack / ghost cable, or clear search filter' },
 				{ keys: ['F1'], action: 'Show module help' },
 			],
 		},
-	];
+	]);
 </script>

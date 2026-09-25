@@ -197,7 +197,8 @@
 		hoveredJack.value = info;
 		uiStore.hoveredJack = { ...info, area: props.area as 'va' | 'fx' };
 		const connected = (props.cables as Cable[]).some((c) => matchesCableJack(c, info.moduleIndex, info.connectorIndex, info.type));
-		if (connected) showHint('jackConnected');
+		if (connected) showHint(settingsStore.cableConnectMode === 'click' ? 'jackConnectedClick' : 'jackConnectedDrag');
+		else if (settingsStore.cableConnectMode === 'click') showHint('jackArm');
 	}
 	function onJackHoverLeave(info: JackEnd) {
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;

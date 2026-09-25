@@ -216,7 +216,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, ref } from 'vue';
+	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
@@ -245,7 +245,7 @@
 	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
-	import { useGhostCable } from './composables/useGhostCable';
+	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
 	import type { JackDragInfo } from './types';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
@@ -273,6 +273,7 @@
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
 	import { useStatusHint } from './composables/useStatusHint';
+	import { STATUS_HINTS } from './constants/statusHints';
 
 	import { SLOT_LABELS, SLOT_OPTIONS } from './constants';
 
@@ -289,6 +290,11 @@
 	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
 	const { ghostCable, clearGhostCable, confirmGhostCable } = useGhostCable();
+
+	watch(ghostCable, (ghost) => {
+		if (ghost && isGhostJack(ghost.to)) showHint('ghostCable');
+		else if (uiStore.statusHint === STATUS_HINTS.ghostCable) clearHint();
+	});
 
 	function onJackDragStart(info: JackDragInfo, area: 0 | 1) {
 		if (settingsStore.cableConnectMode === 'click') jackPatching.armOrConnect({ ...info, area });
