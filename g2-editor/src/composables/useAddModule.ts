@@ -19,11 +19,20 @@ export function setLastAddedModule(index: number, area: 'va' | 'fx') {
 	lastAddedModule = { index, area };
 }
 
+// Shared by every module-add entry point (addModuleAt below, plus the toolbar drag-and-drop path
+// in usePatchOperations.ts): runs auto-suggest-cable and updates the "last added module" fallback
+// tier. Suggestion must be computed before updating lastAddedModule — tier 3 needs the *previously*
+// added module, not this one.
+export function finalizeModuleAdd(moduleId: number, col: number, row: number, area: 'va' | 'fx') {
+	const settings = useSettingsStore();
+	const { computeGhostSuggestion } = useGhostCable();
+	if (settings.autoSuggestCable) computeGhostSuggestion(moduleId, col, row, area);
+	setLastAddedModule(moduleId, area);
+}
+
 export function useAddModule() {
 	const ui = useUiStore();
 	const slotsStore = useSlotsStore();
-	const settings = useSettingsStore();
-	const { computeGhostSuggestion } = useGhostCable();
 
 	async function addModuleAt(typeId: number, col: number, row: number, area: 'va' | 'fx') {
 		if (isAdding.value) return;
@@ -34,12 +43,7 @@ export function useAddModule() {
 			const areaNum: 0 | 1 = isVoice ? 1 : 0;
 			const modules = slotsStore.getAreaModules(ui.slotInFocus, areaNum);
 			const result = await slotsStore.dropModuleWithCollision(typeId, col, row, areaName, modules);
-			if (result) {
-				// Compute the suggestion before updating lastAddedModule — tier 3 needs the
-				// *previously* added module, not this one.
-				if (settings.autoSuggestCable) computeGhostSuggestion(result.moduleId, col, row, area);
-				setLastAddedModule(result.moduleId, area);
-			}
+			if (result) finalizeModuleAdd(result.moduleId, col, row, area);
 		} finally {
 			isAdding.value = false;
 		}

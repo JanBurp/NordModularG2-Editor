@@ -161,7 +161,7 @@ export function useJackDragInteraction(
 	// a held mouse button, so there's no mouseup listener; a window-wide mousedown commits instead.
 	watch(armedSource, (val) => {
 		if (settings.cableConnectMode !== 'click') return;
-		if (val) {
+		if (val && (val.area ?? 0) === areaIdx) {
 			const pos = getJackSvgPos(getModules, val);
 			if (pos) {
 				dragSrcPos = pos;
