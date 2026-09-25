@@ -134,3 +134,16 @@ export class Patchcord {
 		return this.points[0].toString('M') + this.points[1]!.toString('C') + this.points[2]!.toString(',') + this.points[3].toString(',');
 	}
 }
+
+/**
+ * Deterministic sag-based preview curve — no randomness, unlike Patchcord.shake() — so it stays
+ * smooth when recomputed on every mousemove (a real cable's randomized curve is only computed once,
+ * at creation; a ghost/preview cable is recomputed continuously while it follows the mouse or updates
+ * its snapped target).
+ */
+export function previewCurvePath(sx: number, sy: number, dx: number, dy: number): string {
+	const dist = Math.hypot(dx - sx, dy - sy);
+	const sag = Math.min(dist * 0.25, 60);
+	const bot = Math.max(sy, dy) + sag;
+	return `M${sx} ${sy} C${sx + (dx - sx) * 0.25} ${bot},${sx + (dx - sx) * 0.75} ${bot},${dx} ${dy}`;
+}

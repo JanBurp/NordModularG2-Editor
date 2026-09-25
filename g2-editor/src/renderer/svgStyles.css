@@ -194,3 +194,29 @@ svg.cable-dragging {
 svg.cable-invalid-target {
 	cursor: not-allowed;
 }
+
+/* Click-connect mode: the jack currently armed as the pending cable source. */
+.jack-group.armed .jack {
+	stroke: #f59e0b;
+	stroke-width: 2.5;
+}
+
+/* Cable preview ("ghost"): auto-suggested on module add, or the live click-connect preview.
+   Solid + transparent rather than dashed — a dashed stroke's gaps reveal whatever module sits
+   behind it, which reads as the cable dipping "under" that module even though it's on top. */
+.cable-ghost {
+	fill: none;
+	stroke: #000;
+	stroke-width: 3;
+	opacity: 0.45;
+	pointer-events: none;
+}
+
+/* Wider invisible hit area so clicking near the curve (not just exactly on the thin stroke) commits it. */
+.cable-ghost-hit {
+	fill: none;
+	stroke: transparent;
+	stroke-width: 14;
+	cursor: pointer;
+	pointer-events: stroke;
+}

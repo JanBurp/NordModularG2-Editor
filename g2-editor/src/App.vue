@@ -66,7 +66,7 @@
 							area="va"
 							:selected-cables="uiStore.selectedCables"
 							:selected-module-indices="voiceSelectedModules"
-							@jack-drag-start="(info) => jackPatching.handleJackDragStart({ ...info, area: 1 })"
+							@jack-drag-start="(info) => onJackDragStart(info, 1)"
 							@jack-drag-end="(info) => jackPatching.handleJackDragEnd({ ...info, area: 1 })"
 							@module-move="voiceOps.handleModuleMove"
 							@module-drop="voiceOps.handleModuleDrop"
@@ -96,7 +96,7 @@
 							area="fx"
 							:selected-cables="uiStore.selectedCables"
 							:selected-module-indices="fxSelectedModules"
-							@jack-drag-start="(info) => jackPatching.handleJackDragStart({ ...info, area: 0 })"
+							@jack-drag-start="(info) => onJackDragStart(info, 0)"
 							@jack-drag-end="(info) => jackPatching.handleJackDragEnd({ ...info, area: 0 })"
 							@module-move="fxOps.handleModuleMove"
 							@module-drop="fxOps.handleModuleDrop"
@@ -245,6 +245,9 @@
 	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
+	import { useGhostCable } from './composables/useGhostCable';
+	import { commitClickModeSnap } from './composables/useJackDragInteraction';
+	import type { JackDragInfo } from './types';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { useMorphLabelDialog } from './composables/useMorphLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
@@ -285,6 +288,12 @@
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
+	const { ghostCable, clearGhostCable, confirmGhostCable } = useGhostCable();
+
+	function onJackDragStart(info: JackDragInfo, area: 0 | 1) {
+		if (settingsStore.cableConnectMode === 'click') jackPatching.armOrConnect({ ...info, area });
+		else jackPatching.handleJackDragStart({ ...info, area });
+	}
 
 	const canvasAreaRef = ref<HTMLElement | null>(null);
 	const { isSplit, showVoice, showFx, voiceWrapperStyle, startDividerDrag } = useAreaMode(canvasAreaRef);
@@ -378,6 +387,21 @@
 		const noMod = !e.ctrlKey && !e.metaKey && !e.altKey;
 
 		if (isInput) return;
+
+		if (e.key === 'Escape') {
+			jackPatching.clearArmed();
+			clearGhostCable();
+		}
+
+		if (e.key === 'Enter') {
+			if (jackPatching.armedSource.value) {
+				e.preventDefault();
+				commitClickModeSnap();
+			} else if (ghostCable.value) {
+				e.preventDefault();
+				confirmGhostCable();
+			}
+		}
 
 		if (noMod) {
 			switch (e.key) {

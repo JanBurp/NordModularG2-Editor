@@ -1,12 +1,17 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { useSettingsStore } from '../store/settings';
 import type { Cable } from '../renderer/cableRenderer';
 import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { useGhostCable } from './useGhostCable';
+import { setLastAddedModule } from './useAddModule';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const settingsStore = useSettingsStore();
+	const { computeGhostSuggestion } = useGhostCable();
 
 	const getArea = areaGetter ?? (() => resolveSelectionArea(uiStore));
 
@@ -73,6 +78,13 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	async function handleModuleDrop({ typeId, col, row }: { typeId: number; col: number; row: number }): Promise<void> {
 		const result = await slotsStore.dropModuleWithCollision(typeId, col, row, getArea(), currentModules.value);
 		if (result?.patch?.description?.variation !== undefined) uiStore.variation = result.patch.description.variation;
+		if (result) {
+			const area = getArea() === 'voice' ? 'va' : 'fx';
+			// Compute the suggestion before updating lastAddedModule — tier 3 needs the
+			// *previously* added module, not this one.
+			if (settingsStore.autoSuggestCable) computeGhostSuggestion(result.moduleId, col, row, area);
+			setLastAddedModule(result.moduleId, area);
+		}
 	}
 
 	async function handleParamChange(moduleIndex: number, paramIndex: number, value: number, immediate = false): Promise<void> {

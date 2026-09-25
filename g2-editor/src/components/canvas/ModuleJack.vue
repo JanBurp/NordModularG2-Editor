@@ -1,7 +1,7 @@
 <template>
 	<g
 		class="jack-group"
-		:class="type"
+		:class="[type, { armed }]"
 		:data-jack="`${type}-${connectorIndex}`"
 		:data-jack-name="name"
 		@mousedown.stop="onMousedown"
@@ -59,6 +59,7 @@
 		moduleIndex: number;
 		connectorIndex: number;
 		connected?: boolean;
+		armed?: boolean;
 	}>();
 
 	const emit = defineEmits<{
@@ -113,6 +114,7 @@
 	}
 
 	function onMousedown(e: MouseEvent) {
+		if (e.button !== 0) return; // right-click opens the context menu — must not also start/arm a cable
 		e.stopPropagation();
 		emit(
 			'jackDragStart',
@@ -135,6 +137,7 @@
 	}
 
 	function onMouseup(e: MouseEvent) {
+		if (e.button !== 0) return;
 		e.stopPropagation();
 		emit('jackDragEnd', {
 			moduleIndex: props.moduleIndex,

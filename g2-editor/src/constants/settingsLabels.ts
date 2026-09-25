@@ -47,4 +47,6 @@ export const SETTINGS_LABELS = {
 	cableOpacity: 'Opacity',
 	cableThickness: 'Thickness',
 	cableMagneticRadius: 'Snap range',
+	cableConnectMode: 'Connect Mode',
+	autoSuggestCable: 'Auto-suggest Cable',
 } as const;
