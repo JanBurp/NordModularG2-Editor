@@ -136,7 +136,12 @@
 							{ keys: ['Drag'], action: 'Drag from one jack to another to connect' },
 							{ keys: ['Click'], action: 'Cycle through a connected jack’s connections' },
 						]),
-				...(settingsStore.autoSuggestCable ? [{ keys: ['Click', 'Enter'], action: 'Confirm the auto-suggested cable after adding a module' }] : []),
+				...(settingsStore.autoSuggestCable
+					? [
+							{ keys: ['Click', 'Enter'], action: 'Confirm the auto-suggested cable after adding a module' },
+							{ keys: ['Space'], action: 'Cycle to the next-best auto-suggested cable' },
+						]
+					: []),
 				{ keys: ['⌘/⌃ Click'], action: 'Grab a connected jack’s cable(s) to re-route' },
 				{ keys: ['⌘/⌃ Drag'], action: 'Move the grabbed cable' },
 				{ keys: ['Right-click'], action: 'Jack menu: Delete connected / Break out of nest' },

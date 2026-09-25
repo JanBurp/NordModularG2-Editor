@@ -3,7 +3,7 @@ import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
 import type { JackDragInfo, SlotLabel } from '@/types';
 import type { JackEnd } from './slotHelpers';
-import type { GhostCable } from '@/composables/useGhostCable';
+import type { GhostCable, GhostCandidate } from '@/composables/useGhostCable';
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
@@ -65,6 +65,10 @@ export const useUiStore = defineStore('ui', {
 		// Ghost-cable preview — drag-mode live preview, click-connect live preview, and auto-suggest
 		// alike — shared so whichever PatchCanvas instance owns the relevant area can render it.
 		ghostCable: null as GhostCable | null,
+		// Auto-suggest only: the ranked jack-pair candidates for the current ghostCable and which one
+		// is currently shown, so SPACE (cycleGhostCable in useGhostCable.ts) can step through them.
+		ghostCandidates: [] as GhostCandidate[],
+		ghostCandidateIndex: 0,
 		// Click-connect mode's currently snap-highlighted jack, shared so App.vue's Enter-key handler
 		// can commit whichever canvas's preview is live without a direct reference to that instance.
 		clickModeSnapJack: null as (JackDragInfo & { x: number; y: number }) | null,

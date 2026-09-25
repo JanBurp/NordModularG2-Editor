@@ -289,7 +289,7 @@
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
-	const { clearGhostCable, confirmGhostCable } = useGhostCable();
+	const { clearGhostCable, cycleGhostCable, confirmGhostCable } = useGhostCable();
 
 	watch(
 		() => uiStore.ghostCable,
@@ -424,7 +424,8 @@
 					return;
 				case ' ':
 					e.preventDefault();
-					toggleAllCables();
+					if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
+					else toggleAllCables();
 					return;
 			}
 		}
