@@ -195,11 +195,13 @@
 	const hoveredJack = ref<JackEnd | null>(null);
 	function onJackHoverEnter(info: JackEnd) {
 		hoveredJack.value = info;
+		uiStore.hoveredJack = { ...info, area: props.area as 'va' | 'fx' };
 		const connected = (props.cables as Cable[]).some((c) => matchesCableJack(c, info.moduleIndex, info.connectorIndex, info.type));
 		if (connected) showHint('jackConnected');
 	}
 	function onJackHoverLeave(info: JackEnd) {
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
+		if (uiStore.hoveredJack && sameJack(uiStore.hoveredJack, info)) uiStore.hoveredJack = null;
 		clearHint();
 	}
 

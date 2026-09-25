@@ -146,6 +146,11 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						document.execCommand('delete');
 						break;
 					}
+					if (uiStore.hoveredJack) {
+						const { moduleIndex, connectorIndex, type, area } = uiStore.hoveredJack;
+						await slotsStore.breakJackConnection(moduleIndex, connectorIndex, type, area === 'va' ? 'voice' : 'fx');
+						break;
+					}
 					await deleteSelection();
 					break;
 				}

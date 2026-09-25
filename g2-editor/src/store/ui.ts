@@ -2,6 +2,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
+import type { JackEnd } from './slotHelpers';
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
@@ -53,6 +54,9 @@ export const useUiStore = defineStore('ui', {
 		// Contextual one-line gesture hint shown in StatusBar while hovering a jack/title/param/CC
 		// row that has a hidden modifier-key gesture; null when nothing relevant is hovered.
 		statusHint: null as string | null,
+		// Currently hovered jack (mirrors PatchCanvas.vue's own local hoveredJack, tagged with its
+		// area) so the Delete menu action can act on it regardless of which canvas is hovered.
+		hoveredJack: null as (JackEnd & { area: 'va' | 'fx' }) | null,
 	}),
 
 	getters: {

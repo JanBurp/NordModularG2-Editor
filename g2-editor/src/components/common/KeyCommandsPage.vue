@@ -50,7 +50,7 @@
 				{ keys: ['⌘ X'], action: 'Cut selected modules' },
 				{ keys: ['⌘ V'], action: 'Paste modules' },
 				{ keys: ['⌘ A'], action: 'Select all modules' },
-				{ keys: ['Backspace'], action: 'Delete selection' },
+				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: ['⌘ Z'], action: 'Undo' },
 				{ keys: ['⇧ ⌘ Z'], action: 'Redo' },
 			],
