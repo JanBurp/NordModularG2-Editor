@@ -21,10 +21,6 @@ function sameJackInfo(a: JackInfo, b: JackInfo): boolean {
 	return a.moduleIndex === b.moduleIndex && a.connectorIndex === b.connectorIndex && a.type === b.type;
 }
 
-// Shared across every useJackPatching() call so click-connect mode's armed jack (set from one
-// PatchCanvas/App.vue instance) is visible to ModuleJack.vue's highlight logic without prop drilling.
-export const armedSource = ref<JackInfo | null>(null);
-
 export function useJackPatching() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -90,21 +86,22 @@ export function useJackPatching() {
 
 	// Click-connect mode: first click arms a source jack; a second click on the same jack cancels,
 	// otherwise attempts to connect (armed state clears either way, per the app's UX decision that
-	// an invalid second click also cancels rather than leaving the source armed).
+	// an invalid second click also cancels rather than leaving the source armed). Armed state lives
+	// in the ui store (armedJack) so ModuleJack.vue's highlight logic can read it without prop drilling.
 	async function armOrConnect(info: JackInfo): Promise<void> {
-		const armed = armedSource.value;
+		const armed = uiStore.armedJack;
 		if (!armed) {
-			armedSource.value = info;
+			uiStore.armedJack = info;
 			return;
 		}
-		armedSource.value = null;
+		uiStore.armedJack = null;
 		if (sameJackInfo(armed, info)) return;
 		await connectJacks(armed, info);
 	}
 
 	function clearArmed(): void {
-		armedSource.value = null;
+		uiStore.armedJack = null;
 	}
 
-	return { dragSource, handleJackDragStart, handleJackDragEnd, connectJacks, armedSource, armOrConnect, clearArmed };
+	return { dragSource, handleJackDragStart, handleJackDragEnd, connectJacks, armOrConnect, clearArmed };
 }

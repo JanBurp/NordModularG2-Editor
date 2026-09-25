@@ -1,8 +1,9 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
-import type { SlotLabel } from '@/types';
+import type { JackDragInfo, SlotLabel } from '@/types';
 import type { JackEnd } from './slotHelpers';
+import type { GhostCable } from '@/composables/useGhostCable';
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
@@ -57,6 +58,16 @@ export const useUiStore = defineStore('ui', {
 		// Currently hovered jack (mirrors PatchCanvas.vue's own local hoveredJack, tagged with its
 		// area) so the Delete menu action can act on it regardless of which canvas is hovered.
 		hoveredJack: null as (JackEnd & { area: 'va' | 'fx' }) | null,
+		// Click-connect mode: source jack armed by the first click (armOrConnect in
+		// useJackPatching.ts), tagged with its area so each area's useJackDragInteraction.ts
+		// instance can tell an armed jack that isn't its own apart from one that is.
+		armedJack: null as (JackDragInfo & { area?: 0 | 1 }) | null,
+		// Ghost-cable preview — drag-mode live preview, click-connect live preview, and auto-suggest
+		// alike — shared so whichever PatchCanvas instance owns the relevant area can render it.
+		ghostCable: null as GhostCable | null,
+		// Click-connect mode's currently snap-highlighted jack, shared so App.vue's Enter-key handler
+		// can commit whichever canvas's preview is live without a direct reference to that instance.
+		clickModeSnapJack: null as (JackDragInfo & { x: number; y: number }) | null,
 	}),
 
 	getters: {

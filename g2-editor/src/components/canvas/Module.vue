@@ -281,7 +281,6 @@
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { armedSource } from '../../composables/useJackPatching';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
@@ -397,7 +396,7 @@
 	const moduleIdx = computed(() => instance.value.index || 0);
 
 	function isArmedJack(connectorIndex: number, type: 'input' | 'output'): boolean {
-		const a = armedSource.value;
+		const a = uiStore.armedJack;
 		if (!a) return false;
 		const areaIdx = props.areaLabel === 'va' ? 1 : 0;
 		return a.moduleIndex === moduleIdx.value && a.connectorIndex === connectorIndex && a.type === type && (a.area ?? 0) === areaIdx;

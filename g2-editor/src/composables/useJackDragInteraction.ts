@@ -1,4 +1,4 @@
-import { onUnmounted, ref, watch } from 'vue';
+import { onUnmounted, watch } from 'vue';
 import type { Ref } from 'vue';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
@@ -7,23 +7,22 @@ import { useSettingsStore } from '../store/settings';
 import { useUiStore } from '../store/ui';
 import { matchesCableJack } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
-import { armedSource, useJackPatching } from './useJackPatching';
+import { useJackPatching } from './useJackPatching';
 import { useGhostCable } from './useGhostCable';
 import type { JackDragInfo } from '../types';
 
 type SnapJack = JackDragInfo & { x: number; y: number };
 
-// Shared across instances so App.vue's Enter-key handler can commit whichever canvas's click-connect
-// preview is currently live, without needing a direct reference to that Cables.vue instance.
-export const clickModeSnapJack = ref<SnapJack | null>(null);
-
-// Commits the currently snap-highlighted jack against the armed source. Shared by this file's own
-// window-wide mousedown commit and by App.vue's Enter-key handling.
+// Commits the currently snap-highlighted jack (ui store's clickModeSnapJack — shared across
+// instances so App.vue's Enter-key handler can commit whichever canvas's click-connect preview is
+// currently live, without needing a direct reference to that Cables.vue instance) against the armed
+// source. Shared by this file's own window-wide mousedown commit and by App.vue's Enter-key handling.
 export async function commitClickModeSnap(): Promise<void> {
-	const target = clickModeSnapJack.value;
+	const uiStore = useUiStore();
+	const target = uiStore.clickModeSnapJack;
 	if (!target) return;
 	const { armOrConnect } = useJackPatching();
-	clickModeSnapJack.value = null;
+	uiStore.clickModeSnapJack = null;
 	await armOrConnect(target);
 }
 
@@ -38,7 +37,7 @@ export function useJackDragInteraction(
 	const { cableVisibility } = useCableVisibility();
 	const settings = useSettingsStore();
 	const uiStore = useUiStore();
-	const { ghostCable, clearGhostCable } = useGhostCable();
+	const { clearGhostCable } = useGhostCable();
 
 	let dragSrcPos: { x: number; y: number } | null = null;
 	let dragSrcInfo: JackDragInfo | null = null;
@@ -112,14 +111,14 @@ export function useJackDragInteraction(
 		snapHighlight = updateSnapHighlight(svg, snapHighlight, snapJack);
 		svg.classList.toggle('cable-invalid-target', snapResult.invalidNearby);
 
-		ghostCable.value = {
+		uiStore.ghostCable = {
 			area: areaIdx,
 			from: { moduleIndex: dragSrcInfo.moduleIndex, connectorIndex: dragSrcInfo.connectorIndex, type: dragSrcInfo.type, colour: dragSrcInfo.colour },
 			to: { x: mp.x, y: mp.y },
 		};
 
 		if (settings.cableConnectMode === 'click') {
-			clickModeSnapJack.value = snapJack;
+			uiStore.clickModeSnapJack = snapJack;
 		}
 	}
 
@@ -127,7 +126,7 @@ export function useJackDragInteraction(
 	// just a precise click on it (mirrors drag mode's magnetic-snap forgiveness). Capture phase so it
 	// runs before a jack's own mousedown.stop handler would otherwise arm/re-process the click.
 	function onCommitMousedown(e: MouseEvent) {
-		if (e.button !== 0 || !clickModeSnapJack.value) return;
+		if (e.button !== 0 || !uiStore.clickModeSnapJack) return;
 		e.preventDefault();
 		e.stopPropagation();
 		commitClickModeSnap();
@@ -146,7 +145,7 @@ export function useJackDragInteraction(
 		window.removeEventListener('mouseup', onWindowMouseup);
 		window.removeEventListener('mousedown', onCommitMousedown, true);
 		clearGhostCable();
-		clickModeSnapJack.value = null;
+		uiStore.clickModeSnapJack = null;
 		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
 	}
 
@@ -159,23 +158,26 @@ export function useJackDragInteraction(
 	// Click-connect mode: arming a jack (see App.vue's armOrConnect wiring) starts the exact same
 	// live-preview machinery a real drag uses (snap detection, highlight, ghost cable) — just without
 	// a held mouse button, so there's no mouseup listener; a window-wide mousedown commits instead.
-	watch(armedSource, (val) => {
-		if (settings.cableConnectMode !== 'click') return;
-		if (val && (val.area ?? 0) === areaIdx) {
-			const pos = getJackSvgPos(getModules, val);
-			if (pos) {
-				dragSrcPos = pos;
-				dragSrcInfo = val;
-				hasDragged = false;
-				drivenNestJacks = val.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
-				window.addEventListener('mousemove', onMouseMovePreview);
-				window.addEventListener('mousedown', onCommitMousedown, true);
-				revealConnectedCables(val);
+	watch(
+		() => uiStore.armedJack,
+		(val) => {
+			if (settings.cableConnectMode !== 'click') return;
+			if (val && (val.area ?? 0) === areaIdx) {
+				const pos = getJackSvgPos(getModules, val);
+				if (pos) {
+					dragSrcPos = pos;
+					dragSrcInfo = val;
+					hasDragged = false;
+					drivenNestJacks = val.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
+					window.addEventListener('mousemove', onMouseMovePreview);
+					window.addEventListener('mousedown', onCommitMousedown, true);
+					revealConnectedCables(val);
+				}
+			} else {
+				clearDragPreview();
 			}
-		} else {
-			clearDragPreview();
-		}
-	});
+		},
+	);
 
 	function handleJackDragStart(info: JackDragInfo) {
 		if (settings.cableConnectMode === 'click') {

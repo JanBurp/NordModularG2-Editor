@@ -271,11 +271,11 @@
 	const { addModuleAt } = useAddModule();
 	const { graphics } = useModuleGraphics();
 	const { clearArmed } = useJackPatching();
-	const { ghostCable, clearGhostCable, confirmGhostCable } = useGhostCable();
+	const { clearGhostCable, confirmGhostCable } = useGhostCable();
 
 	const ghostCableForArea = computed(() => {
 		const areaIdx = props.area === 'va' ? 1 : 0;
-		return ghostCable.value && ghostCable.value.area === areaIdx ? ghostCable.value : null;
+		return uiStore.ghostCable && uiStore.ghostCable.area === areaIdx ? uiStore.ghostCable : null;
 	});
 
 	// Also clears an armed click-connect source, if any — harmless no-op for an auto-suggest ghost.

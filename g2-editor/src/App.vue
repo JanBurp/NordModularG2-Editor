@@ -289,12 +289,15 @@
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
-	const { ghostCable, clearGhostCable, confirmGhostCable } = useGhostCable();
+	const { clearGhostCable, confirmGhostCable } = useGhostCable();
 
-	watch(ghostCable, (ghost) => {
-		if (ghost && isGhostJack(ghost.to)) showHint('ghostCable');
-		else if (uiStore.statusHint === STATUS_HINTS.ghostCable) clearHint();
-	});
+	watch(
+		() => uiStore.ghostCable,
+		(ghost) => {
+			if (ghost && isGhostJack(ghost.to)) showHint('ghostCable');
+			else if (uiStore.statusHint === STATUS_HINTS.ghostCable) clearHint();
+		},
+	);
 
 	function onJackDragStart(info: JackDragInfo, area: 0 | 1) {
 		if (settingsStore.cableConnectMode === 'click') jackPatching.armOrConnect({ ...info, area });
@@ -400,10 +403,10 @@
 		}
 
 		if (e.key === 'Enter') {
-			if (jackPatching.armedSource.value) {
+			if (uiStore.armedJack) {
 				e.preventDefault();
 				commitClickModeSnap();
-			} else if (ghostCable.value) {
+			} else if (uiStore.ghostCable) {
 				e.preventDefault();
 				confirmGhostCable();
 			}

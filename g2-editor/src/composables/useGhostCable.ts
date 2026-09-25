@@ -1,4 +1,3 @@
-import { ref } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { getModule } from '../renderer/nmg2mods';
@@ -20,10 +19,6 @@ function colourRank(colour: string): number {
 	return COLOUR_PRIORITY[colour] ?? 3;
 }
 
-// Shared across every useGhostCable() call so a suggestion computed from useAddModule.ts/
-// usePatchOperations.ts is visible to whichever PatchCanvas renders it.
-const ghostCable = ref<GhostCable | null>(null);
-
 export function useGhostCable() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -36,7 +31,7 @@ export function useGhostCable() {
 		const newMod = modules.find((m: any) => m.index === newModuleIndex);
 		const newModDef = newMod ? getModule(newMod.type) : null;
 		if (!newModDef) {
-			ghostCable.value = null;
+			uiStore.ghostCable = null;
 			return;
 		}
 
@@ -57,7 +52,7 @@ export function useGhostCable() {
 			if (last && last.index !== newModuleIndex && last.area === area) sourceModIndex = last.index;
 		}
 		if (sourceModIndex === null) {
-			ghostCable.value = null;
+			uiStore.ghostCable = null;
 			return;
 		}
 
@@ -65,7 +60,7 @@ export function useGhostCable() {
 		const sourceModDef = sourceMod ? getModule(sourceMod.type) : null;
 		const outputs = sourceModDef?.outputs ?? [];
 		if (outputs.length === 0) {
-			ghostCable.value = null;
+			uiStore.ghostCable = null;
 			return;
 		}
 		let bestOutIdx = 0;
@@ -77,7 +72,7 @@ export function useGhostCable() {
 			.map((jack: any, idx: number) => ({ jack, idx }))
 			.filter(({ idx }: { idx: number }) => !isNestDrivenByOutput(cables, newModuleIndex, idx));
 		if (freeInputs.length === 0) {
-			ghostCable.value = null;
+			uiStore.ghostCable = null;
 			return;
 		}
 		let best = freeInputs[0];
@@ -85,7 +80,7 @@ export function useGhostCable() {
 			if (colourRank(cand.jack.colour) < colourRank(best.jack.colour)) best = cand;
 		}
 
-		ghostCable.value = {
+		uiStore.ghostCable = {
 			area: areaIdx,
 			from: { moduleIndex: sourceModIndex, connectorIndex: bestOutIdx, type: 'output', colour: outputs[bestOutIdx].colour },
 			to: { moduleIndex: newModuleIndex, connectorIndex: best.idx, type: 'input', colour: best.jack.colour },
@@ -93,15 +88,15 @@ export function useGhostCable() {
 	}
 
 	function clearGhostCable(): void {
-		ghostCable.value = null;
+		uiStore.ghostCable = null;
 	}
 
 	async function confirmGhostCable(): Promise<void> {
-		const ghost = ghostCable.value;
+		const ghost = uiStore.ghostCable;
 		if (!ghost || !isGhostJack(ghost.to)) return; // a live-preview ghost (to = mouse point) has nothing to confirm here
 		clearGhostCable();
 		await connectJacks({ ...ghost.from, area: ghost.area }, { ...ghost.to, area: ghost.area });
 	}
 
-	return { ghostCable, computeGhostSuggestion, clearGhostCable, confirmGhostCable };
+	return { computeGhostSuggestion, clearGhostCable, confirmGhostCable };
 }
