@@ -77,10 +77,10 @@
 	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
 
-	const props = withDefaults(
-		defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string }>(),
-		{ closable: true, connecting: false },
-	);
+	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string }>(), {
+		closable: true,
+		connecting: false,
+	});
 	const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 	const version = ref('');

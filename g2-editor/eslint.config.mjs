@@ -27,6 +27,7 @@ const allGlobals = {
   TextEncoder: 'readonly',
   TextDecoder: 'readonly',
   SVGElement: 'readonly',
+  SVGGraphicsElement: 'readonly',
   SVGPathElement: 'readonly',
   SVGTextElement: 'readonly',
   SVGLineElement: 'readonly',
