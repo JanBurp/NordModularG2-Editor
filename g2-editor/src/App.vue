@@ -66,7 +66,7 @@
 							area="va"
 							:selected-cables="uiStore.selectedCables"
 							:selected-module-indices="voiceSelectedModules"
-							@jack-drag-start="(info) => jackPatching.handleJackDragStart({ ...info, area: 1 })"
+							@jack-drag-start="(info) => onJackDragStart(info, 1)"
 							@jack-drag-end="(info) => jackPatching.handleJackDragEnd({ ...info, area: 1 })"
 							@module-move="voiceOps.handleModuleMove"
 							@module-drop="voiceOps.handleModuleDrop"
@@ -96,7 +96,7 @@
 							area="fx"
 							:selected-cables="uiStore.selectedCables"
 							:selected-module-indices="fxSelectedModules"
-							@jack-drag-start="(info) => jackPatching.handleJackDragStart({ ...info, area: 0 })"
+							@jack-drag-start="(info) => onJackDragStart(info, 0)"
 							@jack-drag-end="(info) => jackPatching.handleJackDragEnd({ ...info, area: 0 })"
 							@module-move="fxOps.handleModuleMove"
 							@module-drop="fxOps.handleModuleDrop"
@@ -391,7 +391,7 @@
 		</div>
 	</Dialog>
 
-	<AboutDialog v-model="showAboutDialog" />
+	<AboutDialog v-model="showAboutDialog" :closable="!startingUp" :connecting="startingUp" :connecting-message="loadingMessage" />
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
@@ -422,7 +422,7 @@
 		@close="closeDsPresetDropdown"
 	/>
 
-	<QuickAddModule v-if="showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="showQuickAdd = false" />
+	<QuickAddModule v-if="uiStore.showQuickAdd" :x="quickAddPos.x" :y="quickAddPos.y" @close="uiStore.showQuickAdd = false" />
 
 	<KeyCommandsPage v-if="uiStore.showKeyCommandsPage" @close="uiStore.showKeyCommandsPage = false" />
 
@@ -430,7 +430,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, ref } from 'vue';
+	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
@@ -459,6 +459,9 @@
 	import { useAreaMode } from './composables/useAreaMode';
 	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
+	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
+	import { commitClickModeSnap } from './composables/useJackDragInteraction';
+	import type { JackDragInfo } from './types';
 	import { useModuleLabelDialog } from './composables/useModuleLabelDialog';
 	import { useMorphLabelDialog } from './composables/useMorphLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
@@ -488,6 +491,7 @@
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
 	import { useStatusHint } from './composables/useStatusHint';
+	import { STATUS_HINTS } from './constants/statusHints';
 
 	import { SLOT_LABELS, SLOT_OPTIONS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
 
@@ -503,17 +507,32 @@
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
 	const jackPatching = useJackPatching();
+	const { clearGhostCable, cycleGhostCable, confirmGhostCable } = useGhostCable();
+
+	watch(
+		() => uiStore.ghostCable,
+		(ghost) => {
+			if (ghost && isGhostJack(ghost.to)) showHint('ghostCable');
+			else if (uiStore.statusHint === STATUS_HINTS.ghostCable) clearHint();
+		},
+	);
+
+	function onJackDragStart(info: JackDragInfo, area: 0 | 1) {
+		if (settingsStore.cableConnectMode === 'click') jackPatching.armOrConnect({ ...info, area });
+		else jackPatching.handleJackDragStart({ ...info, area });
+	}
 
 	const canvasAreaRef = ref<HTMLElement | null>(null);
 	const { isSplit, showVoice, showFx, voiceWrapperStyle, startDividerDrag } = useAreaMode(canvasAreaRef);
 
 	const isLoading = computed(
 		() =>
-			device.status === DeviceStatus.Connecting ||
-			device.status === DeviceStatus.Loading ||
-			device.modeChanging ||
-			slotsStore.uploadingFromFile ||
-			Object.values(slotsStore.slots).some((s) => s.loading),
+			!startingUp.value &&
+			(device.status === DeviceStatus.Connecting ||
+				device.status === DeviceStatus.Loading ||
+				device.modeChanging ||
+				slotsStore.uploadingFromFile ||
+				Object.values(slotsStore.slots).some((s) => s.loading)),
 	);
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
@@ -580,8 +599,8 @@
 		requestKeyFocus,
 	);
 
-	const showAboutDialog = ref(false);
-	const showQuickAdd = ref(false);
+	const showAboutDialog = ref(true);
+	const startingUp = ref(true);
 	const quickAddPos = ref({ x: 0, y: 0 });
 
 	function onMouseMove(e: MouseEvent) {
@@ -593,6 +612,7 @@
 			if (e.key === 'Escape') uiStore.showKeyCommandsPage = false;
 			return;
 		}
+		if (uiStore.showQuickAdd) return;
 
 		const el = document.activeElement;
 		const isInput = el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
@@ -600,11 +620,26 @@
 
 		if (isInput) return;
 
+		if (e.key === 'Escape') {
+			jackPatching.clearArmed();
+			clearGhostCable();
+		}
+
+		if (e.key === 'Enter') {
+			if (uiStore.armedJack) {
+				e.preventDefault();
+				commitClickModeSnap();
+			} else if (uiStore.ghostCable) {
+				e.preventDefault();
+				confirmGhostCable();
+			}
+		}
+
 		if (noMod) {
 			switch (e.key) {
 				case 'm':
 					e.preventDefault();
-					showQuickAdd.value = true;
+					uiStore.showQuickAdd = true;
 					return;
 				case 'r':
 					e.preventDefault();
@@ -612,7 +647,8 @@
 					return;
 				case ' ':
 					e.preventDefault();
-					toggleAllCables();
+					if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
+					else toggleAllCables();
 					return;
 			}
 		}
@@ -680,5 +716,7 @@
 				browserStore.loadSynthList();
 			}
 		}
+		showAboutDialog.value = false;
+		startingUp.value = false;
 	});
 </script>

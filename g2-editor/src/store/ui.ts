@@ -1,7 +1,9 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
-import type { SlotLabel } from '@/types';
+import type { JackDragInfo, SlotLabel } from '@/types';
+import type { JackEnd } from './slotHelpers';
+import type { GhostCable, GhostCandidate } from '@/composables/useGhostCable';
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
@@ -39,6 +41,7 @@ export const useUiStore = defineStore('ui', {
 		displayedGlobalParamPage: 0 as number, // 0-4 (A-E), independent of displayedParamPage
 		showSvgViewer: false as boolean,
 		showKeyCommandsPage: false as boolean,
+		showQuickAdd: false as boolean,
 		cableShakeCount: 0 as number,
 		draggedModuleId: null as number | null,
 		helpModuleTypeId: null as number | null,
@@ -52,6 +55,23 @@ export const useUiStore = defineStore('ui', {
 		// Contextual one-line gesture hint shown in StatusBar while hovering a jack/title/param/CC
 		// row that has a hidden modifier-key gesture; null when nothing relevant is hovered.
 		statusHint: null as string | null,
+		// Currently hovered jack (mirrors PatchCanvas.vue's own local hoveredJack, tagged with its
+		// area) so the Delete menu action can act on it regardless of which canvas is hovered.
+		hoveredJack: null as (JackEnd & { area: 'va' | 'fx' }) | null,
+		// Click-connect mode: source jack armed by the first click (armOrConnect in
+		// useJackPatching.ts), tagged with its area so each area's useJackDragInteraction.ts
+		// instance can tell an armed jack that isn't its own apart from one that is.
+		armedJack: null as (JackDragInfo & { area?: 0 | 1 }) | null,
+		// Ghost-cable preview — drag-mode live preview, click-connect live preview, and auto-suggest
+		// alike — shared so whichever PatchCanvas instance owns the relevant area can render it.
+		ghostCable: null as GhostCable | null,
+		// Auto-suggest only: the ranked jack-pair candidates for the current ghostCable and which one
+		// is currently shown, so SPACE (cycleGhostCable in useGhostCable.ts) can step through them.
+		ghostCandidates: [] as GhostCandidate[],
+		ghostCandidateIndex: 0,
+		// Click-connect mode's currently snap-highlighted jack, shared so App.vue's Enter-key handler
+		// can commit whichever canvas's preview is live without a direct reference to that instance.
+		clickModeSnapJack: null as (JackDragInfo & { x: number; y: number }) | null,
 	}),
 
 	getters: {

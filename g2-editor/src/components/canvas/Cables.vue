@@ -43,6 +43,10 @@
 			type: Object as () => JackEnd | null,
 			default: null,
 		},
+		area: {
+			type: Number as () => 0 | 1,
+			default: 0,
+		},
 	});
 
 	const emit = defineEmits<{
@@ -239,6 +243,7 @@
 		() => props.cables as any[],
 		(info) => emit('jackDragStart', info),
 		(info) => emit('jackDragEnd', info),
+		props.area,
 	);
 
 	const {

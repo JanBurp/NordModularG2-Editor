@@ -6,6 +6,7 @@ export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
+export type CableConnectMode = 'drag' | 'click';
 export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
@@ -19,6 +20,9 @@ export const useSettingsStore = defineStore('settings', {
 		cableGravity: 50 as number,
 		cableOpacity: 90 as number,
 		cableThickness: 1 as number,
+		cableMagneticRadius: 96 as number,
+		cableConnectMode: 'drag' as CableConnectMode,
+		autoSuggestCable: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		settingsSection: null as SettingsSection | null,
@@ -93,6 +97,15 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setCableThickness(value: number) {
 			this.cableThickness = clamp(value, 0, 10);
+		},
+		setCableMagneticRadius(value: number) {
+			this.cableMagneticRadius = clamp(value, 0, 115);
+		},
+		setCableConnectMode(value: CableConnectMode) {
+			this.cableConnectMode = value;
+		},
+		setAutoSuggestCable(value: boolean) {
+			this.autoSuggestCable = value;
 		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;

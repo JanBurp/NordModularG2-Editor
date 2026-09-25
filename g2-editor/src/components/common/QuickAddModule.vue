@@ -19,6 +19,9 @@
 						<span :class="['text-xs', i === navIndex ? 'text-white/70' : 'text-content-muted']">{{ m.page?.name }}</span>
 					</div>
 					<div v-if="filtered.length === 0" class="px-2 py-2 text-xs text-content-muted">No modules found</div>
+					<div v-else-if="matchingModules.length > MAX_RESULTS" class="px-2 py-1 text-xs text-content-muted">
+						+{{ matchingModules.length - MAX_RESULTS }} more — keep typing to narrow
+					</div>
 				</div>
 			</div>
 		</div>
@@ -54,8 +57,7 @@
 	const navIndex = ref(0);
 	const itemRefs = ref<(Element | null)[]>([]);
 
-	onMounted(async () => {
-		await nextTick();
+	onMounted(() => {
 		searchRef.value?.focus();
 	});
 
@@ -75,11 +77,18 @@
 
 	const allModules = computed(() => categories.value.flatMap((cat) => getModulesByCategory(cat)));
 
-	const filtered = computed(() => {
+	// Each module icon is an SVG with an embedded font, so rendering dozens at once (e.g. every
+	// module matching a single-letter query) blocks the main thread for hundreds of ms. Capping
+	// keeps typing responsive; users narrow further by typing more.
+	const MAX_RESULTS = 10;
+
+	const matchingModules = computed(() => {
 		const q = query.value.toLowerCase().trim();
 		if (!q) return allModules.value;
 		return allModules.value.filter((m) => (m.short || '').toLowerCase().includes(q) || (m.long || '').toLowerCase().includes(q));
 	});
+
+	const filtered = computed(() => matchingModules.value.slice(0, MAX_RESULTS));
 
 	watch(query, () => {
 		navIndex.value = 0;

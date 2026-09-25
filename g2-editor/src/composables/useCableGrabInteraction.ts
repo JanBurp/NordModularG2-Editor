@@ -5,6 +5,7 @@ import type { Cable } from '../renderer/cableRenderer';
 import { matchesCableJack, isCableSourceEnd, sameJack } from '../store/slotHelpers';
 import type { JackEnd } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
+import { useSettingsStore } from '../store/settings';
 import { useUiStore } from '../store/ui';
 import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
 import { isGrabModifierPressed } from '../utils/platform';
@@ -20,6 +21,7 @@ export function useCableGrabInteraction(
 	getCables: () => Cable[],
 	onCableGroupDrop: (group: Cable[], fromJack: JackEnd, toJack: JackEnd | null) => void,
 ) {
+	const settings = useSettingsStore();
 	const uiStore = useUiStore();
 
 	let grabbedJack: JackEnd | null = null;
@@ -65,7 +67,14 @@ export function useCableGrabInteraction(
 	// Reports the nearest valid drop target within range, plus whether a same-type jack that FAILED
 	// validity (wrong nest state) sits nearer than any valid one — drives the "not-allowed" cursor.
 	function findDropTarget(mouseSvgPos: { x: number; y: number }, jack: JackEnd): { jack: SnapEnd | null; invalidNearby: boolean } {
-		return findNearestJack(getModules, mouseSvgPos, [jack.type], isValidDropCandidate, (candidate, _jackDef, x, y) => ({ ...candidate, x, y }));
+		return findNearestJack(
+			getModules,
+			mouseSvgPos,
+			[jack.type],
+			isValidDropCandidate,
+			(candidate, _jackDef, x, y) => ({ ...candidate, x, y }),
+			settings.cableMagneticRadius,
+		);
 	}
 
 	// Snapshot each grabbed cable's rendered elements and current curve once, so the drag can shift them

@@ -20,6 +20,8 @@
 			@mousemove="handleSvgMouseMove"
 			@contextmenu.prevent="onCanvasContextMenu"
 			@click="
+				clearArmed();
+				clearGhostCable();
 				emit('canvasClick');
 				handleCanvasClick();
 			"
@@ -57,6 +59,8 @@
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphRangeBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphDragHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<!-- Rendered last so it always paints above every module/overlay, regardless of draw order above. -->
+			<GhostCable :modules="props.modules as any[]" :ghost="ghostCableForArea" @confirm="onGhostConfirm" />
 		</svg>
 		<Cables
 			ref="cablesRef"
@@ -64,6 +68,7 @@
 			:cables="props.cables as Cable[]"
 			:selected-cables="props.selectedCables"
 			:hovered-jack="hoveredJack"
+			:area="props.area === 'va' ? 1 : 0"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
 			@cable-group-drop="emit('cableGroupDrop', $event)"
@@ -84,6 +89,7 @@
 	import Module from './Module.vue';
 	import Cables from './Cables.vue';
 	import DragGhost from './DragGhost.vue';
+	import GhostCable from './GhostCable.vue';
 	import CCBadgesOverlay from './CCBadgesOverlay.vue';
 	import ParamValuesOverlay from './ParamValuesOverlay.vue';
 	import MorphAssignBadgesOverlay from './MorphAssignBadgesOverlay.vue';
@@ -96,6 +102,9 @@
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAddModule } from '../../composables/useAddModule';
+	import { useJackPatching } from '../../composables/useJackPatching';
+	import { useGhostCable } from '../../composables/useGhostCable';
+	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { clientToSvgPoint } from '../../renderer/svgUtils';
 
@@ -186,11 +195,14 @@
 	const hoveredJack = ref<JackEnd | null>(null);
 	function onJackHoverEnter(info: JackEnd) {
 		hoveredJack.value = info;
+		uiStore.hoveredJack = { ...info, area: props.area as 'va' | 'fx' };
 		const connected = (props.cables as Cable[]).some((c) => matchesCableJack(c, info.moduleIndex, info.connectorIndex, info.type));
-		if (connected) showHint('jackConnected');
+		if (connected) showHint(settingsStore.cableConnectMode === 'click' ? 'jackConnectedClick' : 'jackConnectedDrag');
+		else if (settingsStore.cableConnectMode === 'click') showHint('jackArm');
 	}
 	function onJackHoverLeave(info: JackEnd) {
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
+		if (uiStore.hoveredJack && sameJack(uiStore.hoveredJack, info)) uiStore.hoveredJack = null;
 		clearHint();
 	}
 
@@ -257,6 +269,20 @@
 	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
 	const { addModuleAt } = useAddModule();
+	const { graphics } = useModuleGraphics();
+	const { clearArmed } = useJackPatching();
+	const { clearGhostCable, confirmGhostCable } = useGhostCable();
+
+	const ghostCableForArea = computed(() => {
+		const areaIdx = props.area === 'va' ? 1 : 0;
+		return uiStore.ghostCable && uiStore.ghostCable.area === areaIdx ? uiStore.ghostCable : null;
+	});
+
+	// Also clears an armed click-connect source, if any — harmless no-op for an auto-suggest ghost.
+	async function onGhostConfirm() {
+		await confirmGhostCable();
+		clearArmed();
+	}
 
 	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
@@ -278,6 +304,7 @@
 			label: cat,
 			children: getModulesByCategory(cat).map((m) => ({
 				label: m.long || m.short,
+				icon: graphics.value[m.id],
 				action: () => addModuleAt(m.id, col, row, area),
 			})),
 		}));

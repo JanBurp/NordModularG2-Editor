@@ -4,7 +4,7 @@
 			<div class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
 					<span class="text-sm font-semibold text-content-primary">About {{ APP_NAME }}</span>
-					<button class="text-content-secondary hover:text-content-primary cursor-pointer" @click="close">
+					<button v-if="closable" class="text-content-secondary hover:text-content-primary cursor-pointer" @click="close">
 						<Icon name="close" class="w-3 h-3" />
 					</button>
 				</div>
@@ -55,8 +55,16 @@
 						</div>
 					</div>
 				</div>
-				<div class="flex justify-end px-4 py-3 border-t border-line-default">
-					<Button variant="default" @click="close">Close</Button>
+				<div
+					v-if="connecting || closable"
+					class="flex items-center px-4 py-3 border-t border-line-default"
+					:class="connecting ? 'justify-center gap-2' : 'justify-end'"
+				>
+					<template v-if="connecting">
+						<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
+						<span class="text-xs text-content-secondary">{{ connectingMessage || 'Connecting...' }}</span>
+					</template>
+					<Button v-else variant="default" @click="close">Close</Button>
 				</div>
 			</div>
 		</div>
@@ -69,7 +77,10 @@
 	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
 
-	const props = defineProps<{ modelValue: boolean }>();
+	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string }>(), {
+		closable: true,
+		connecting: false,
+	});
 	const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 	const version = ref('');
@@ -84,9 +95,11 @@
 				iconDataUrl.value = info.iconDataUrl;
 			}
 		},
+		{ immediate: true },
 	);
 
 	function close() {
+		if (!props.closable) return;
 		emit('update:modelValue', false);
 	}
 

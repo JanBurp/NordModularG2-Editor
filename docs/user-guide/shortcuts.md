@@ -29,9 +29,23 @@ nav_order: 4
 | `Cmd+X` | Cut selected modules; cut cables (delete only — no paste) |
 | `Cmd+V` | Paste modules at mouse cursor; layout, parameters and cables preserved |
 | `Cmd+A` | Select all modules |
-| `Backspace` | Delete selection |
+| `Backspace` | Delete selection (or hovered jack's cable/nest) |
 | `Cmd+Z` | Undo |
 | `Cmd+Shift+Z` | Redo |
+
+## Cabling
+
+| Key / Mouse | Action |
+|---|---|
+| Drag jack → jack | Connect (Settings ▸ Connect Mode: Drag — default) |
+| Click jack, then click another jack | Connect (Settings ▸ Connect Mode: Click); click the armed jack again to cancel |
+| Click connected jack | Cycle through its connections (Drag connect mode only) |
+| `Cmd/Ctrl`+Click connected jack | Grab its cable(s) to re-route |
+| `Cmd/Ctrl`+Drag | Move the grabbed cable |
+| Right-click jack | Context menu: Delete connected (remove all cables) / Break (remove just this jack from a multi-cable nest) |
+| Click ghost cable | Confirm the auto-suggested cable after adding a module (Settings ▸ Auto-suggest Cable) |
+| `Enter` | Confirm an armed-jack connection or an auto-suggested ghost cable |
+| `Escape` | Cancel an armed jack or dismiss a ghost-cable suggestion |
 
 ## Slots & Variations
 
@@ -99,4 +113,4 @@ Hold the key to show the overlay; release or press `Escape` to hide.
 |---|---|
 | `R` | Toggle clock run / stop |
 | `/` | Focus search / filter |
-| `Escape` | Close dialog / menu / overlay, or clear search filter |
+| `Escape` | Close dialog / menu / overlay, cancel an armed jack / ghost cable, or clear search filter |

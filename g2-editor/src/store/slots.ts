@@ -2219,7 +2219,7 @@ export const useSlotsStore = defineStore('slots', {
 			row: number,
 			area: 'voice' | 'fx',
 			currentModuleList: any[],
-		): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		): Promise<{ name: string; rawHex: string; patch: Patch; moduleId: number } | null> {
 			const hist = useHistoryStore();
 			const slot = useUiStore().slotInFocus;
 			const shouldRecord = !hist.isLocked(slot);
@@ -2272,7 +2272,7 @@ export const useSlotsStore = defineStore('slots', {
 					});
 				}
 
-				return result;
+				return result ? { ...result, moduleId } : null;
 			} finally {
 				if (shouldRecord) hist.unlock(slot);
 			}

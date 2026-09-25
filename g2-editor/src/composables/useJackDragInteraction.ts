@@ -1,15 +1,30 @@
-import { onUnmounted } from 'vue';
+import { onUnmounted, watch } from 'vue';
 import type { Ref } from 'vue';
-import { svgPath } from '../renderer/svgUtils';
 import { applyCableVisibility } from '../renderer/cableRenderer';
 import { toSvgCoords, getJackSvgPos, updateSnapHighlight, findNearestJack } from '../renderer/jackGeometry';
 import { useCableVisibility } from './useCableVisibility';
+import { useSettingsStore } from '../store/settings';
 import { useUiStore } from '../store/ui';
 import { matchesCableJack } from '../store/slotHelpers';
 import { computeDrivenInputJacks } from '../parser/cableGraph';
+import { useJackPatching } from './useJackPatching';
+import { useGhostCable } from './useGhostCable';
 import type { JackDragInfo } from '../types';
 
 type SnapJack = JackDragInfo & { x: number; y: number };
+
+// Commits the currently snap-highlighted jack (ui store's clickModeSnapJack — shared across
+// instances so App.vue's Enter-key handler can commit whichever canvas's click-connect preview is
+// currently live, without needing a direct reference to that Cables.vue instance) against the armed
+// source. Shared by this file's own window-wide mousedown commit and by App.vue's Enter-key handling.
+export async function commitClickModeSnap(): Promise<void> {
+	const uiStore = useUiStore();
+	const target = uiStore.clickModeSnapJack;
+	if (!target) return;
+	const { armOrConnect } = useJackPatching();
+	uiStore.clickModeSnapJack = null;
+	await armOrConnect(target);
+}
 
 export function useJackDragInteraction(
 	svgRef: Ref<SVGSVGElement | null> | undefined,
@@ -17,11 +32,13 @@ export function useJackDragInteraction(
 	getCables: () => any[],
 	onJackDragStart: (info: JackDragInfo) => void,
 	onJackDragEnd: (info: JackDragInfo) => void,
+	areaIdx: 0 | 1,
 ) {
 	const { cableVisibility } = useCableVisibility();
+	const settings = useSettingsStore();
 	const uiStore = useUiStore();
+	const { clearGhostCable } = useGhostCable();
 
-	let previewCable: SVGPathElement | null = null;
 	let dragSrcPos: { x: number; y: number } | null = null;
 	let dragSrcInfo: JackDragInfo | null = null;
 	let hasDragged = false;
@@ -76,18 +93,14 @@ export function useJackDragInteraction(
 				return !isSelf && !isDrivenConflict;
 			},
 			(candidate, jackDef, x, y) => ({ ...candidate, colour: jackDef.colour, x, y }),
+			settings.cableMagneticRadius,
 		);
 	}
 
-	function previewPath(sx: number, sy: number, dx: number, dy: number): string {
-		const dist = Math.hypot(dx - sx, dy - sy);
-		const sag = Math.min(dist * 0.25, 60);
-		const bot = Math.max(sy, dy) + sag;
-		return `M${sx} ${sy} C${sx + (dx - sx) * 0.25} ${bot},${sx + (dx - sx) * 0.75} ${bot},${dx} ${dy}`;
-	}
-
+	// Single ghost-cable preview shared by drag mode and click-connect mode alike (and by auto-suggest
+	// elsewhere): runs from the source jack to the live mouse position, updated every move.
 	function onMouseMovePreview(e: MouseEvent) {
-		if (!dragSrcPos || !svgRef?.value) return;
+		if (!dragSrcPos || !dragSrcInfo || !svgRef?.value) return;
 		hasDragged = true;
 		const mp = toSvgCoords(svgRef, e);
 		if (!mp) return;
@@ -98,24 +111,28 @@ export function useJackDragInteraction(
 		snapHighlight = updateSnapHighlight(svg, snapHighlight, snapJack);
 		svg.classList.toggle('cable-invalid-target', snapResult.invalidNearby);
 
-		const d = previewPath(dragSrcPos.x, dragSrcPos.y, mp.x, mp.y);
-		if (!previewCable) {
-			previewCable = svgPath(d, {
-				fill: 'none',
-				stroke: '#000',
-				'stroke-width': '3',
-				opacity: '0.8',
-				class: 'cable-preview nomouse',
-			});
-		} else {
-			previewCable.setAttribute('d', d);
+		uiStore.ghostCable = {
+			area: areaIdx,
+			from: { moduleIndex: dragSrcInfo.moduleIndex, connectorIndex: dragSrcInfo.connectorIndex, type: dragSrcInfo.type, colour: dragSrcInfo.colour },
+			to: { x: mp.x, y: mp.y },
+		};
+
+		if (settings.cableConnectMode === 'click') {
+			uiStore.clickModeSnapJack = snapJack;
 		}
-		svg.appendChild(previewCable);
+	}
+
+	// Click-connect mode: any mousedown anywhere commits the currently snap-highlighted jack — not
+	// just a precise click on it (mirrors drag mode's magnetic-snap forgiveness). Capture phase so it
+	// runs before a jack's own mousedown.stop handler would otherwise arm/re-process the click.
+	function onCommitMousedown(e: MouseEvent) {
+		if (e.button !== 0 || !uiStore.clickModeSnapJack) return;
+		e.preventDefault();
+		e.stopPropagation();
+		commitClickModeSnap();
 	}
 
 	function clearDragPreview() {
-		previewCable?.remove();
-		previewCable = null;
 		snapHighlight?.remove();
 		snapHighlight = null;
 		snapJack = null;
@@ -126,6 +143,9 @@ export function useJackDragInteraction(
 		svgRef?.value?.classList.remove('cable-invalid-target');
 		window.removeEventListener('mousemove', onMouseMovePreview);
 		window.removeEventListener('mouseup', onWindowMouseup);
+		window.removeEventListener('mousedown', onCommitMousedown, true);
+		clearGhostCable();
+		uiStore.clickModeSnapJack = null;
 		if (svgRef?.value) applyCableVisibility(svgRef.value, cableVisibility.value as unknown as Record<string, boolean>);
 	}
 
@@ -135,7 +155,35 @@ export function useJackDragInteraction(
 		if (localSnapJack) onJackDragEnd(localSnapJack);
 	}
 
+	// Click-connect mode: arming a jack (see App.vue's armOrConnect wiring) starts the exact same
+	// live-preview machinery a real drag uses (snap detection, highlight, ghost cable) — just without
+	// a held mouse button, so there's no mouseup listener; a window-wide mousedown commits instead.
+	watch(
+		() => uiStore.armedJack,
+		(val) => {
+			if (settings.cableConnectMode !== 'click') return;
+			if (val && (val.area ?? 0) === areaIdx) {
+				const pos = getJackSvgPos(getModules, val);
+				if (pos) {
+					dragSrcPos = pos;
+					dragSrcInfo = val;
+					hasDragged = false;
+					drivenNestJacks = val.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
+					window.addEventListener('mousemove', onMouseMovePreview);
+					window.addEventListener('mousedown', onCommitMousedown, true);
+					revealConnectedCables(val);
+				}
+			} else {
+				clearDragPreview();
+			}
+		},
+	);
+
 	function handleJackDragStart(info: JackDragInfo) {
+		if (settings.cableConnectMode === 'click') {
+			onJackDragStart(info);
+			return;
+		}
 		const pos = getJackSvgPos(getModules, info);
 		if (pos) {
 			dragSrcPos = pos;
@@ -151,6 +199,10 @@ export function useJackDragInteraction(
 	}
 
 	function handleJackDragEnd(info: JackDragInfo) {
+		// Click-connect mode never starts a drag preview (see handleJackDragStart above), so this
+		// plain-mouseup gesture on a jack is superseded by armOrConnect() and must not also cycle
+		// through the jack's connected cables.
+		if (settings.cableConnectMode === 'click') return;
 		if (!hasDragged) {
 			const cables = findAllCablesForJack(info);
 			clearDragPreview();

@@ -206,6 +206,7 @@
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
 			:connected="connectedInputs?.has(idx)"
+			:armed="isArmedJack(idx, 'input')"
 			@jackDragStart="onJackDragStart"
 			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
@@ -228,6 +229,7 @@
 			:moduleIndex="moduleIdx"
 			:connectorIndex="idx"
 			:connected="connectedOutputs?.has(idx)"
+			:armed="isArmedJack(idx, 'output')"
 			@jackDragStart="onJackDragStart"
 			@jackDragEnd="onJackDragEnd"
 			@jackDeleteConnected="(info) => emit('jackDeleteConnected', info)"
@@ -392,6 +394,13 @@
 
 	const instance = computed(() => props.instance as ModuleInstance);
 	const moduleIdx = computed(() => instance.value.index || 0);
+
+	function isArmedJack(connectorIndex: number, type: 'input' | 'output'): boolean {
+		const a = uiStore.armedJack;
+		if (!a) return false;
+		const areaIdx = props.areaLabel === 'va' ? 1 : 0;
+		return a.moduleIndex === moduleIdx.value && a.connectorIndex === connectorIndex && a.type === type && (a.area ?? 0) === areaIdx;
+	}
 
 	const moduleDef = computed<ModuleDefinition | null>(() => {
 		return getModule(instance.value.type) || null;

@@ -267,6 +267,7 @@ export function useModuleKeyboard() {
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
+		if (uiStore.showQuickAdd) return;
 		if (isInputFocused()) return;
 
 		const { key, shiftKey, altKey } = e;

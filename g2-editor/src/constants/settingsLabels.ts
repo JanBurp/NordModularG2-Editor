@@ -41,9 +41,12 @@ export const SETTINGS_LABELS = {
 	patchSustain: 'Sustain',
 	patchOctaves: 'Octaves',
 	editorPath: 'Browser Path',
-	editorHiddenModules: 'Show Hidden Modules',
+	editorHiddenModules: 'Hidden Modules',
 	editorTheme: 'Theme',
 	cableGravity: 'Gravity',
 	cableOpacity: 'Opacity',
 	cableThickness: 'Thickness',
+	cableMagneticRadius: 'Snap range',
+	cableConnectMode: 'Connect Mode',
+	autoSuggestCable: 'Auto-suggest Cable',
 } as const;

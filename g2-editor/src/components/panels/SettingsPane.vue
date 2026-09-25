@@ -41,7 +41,29 @@
 					<Slider :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
 				</SettingsRow>
 
-				<p class="settings-subheader">Settings:</p>
+				<p class="settings-subheader">Cable connecting:</p>
+				<SettingsRow :label="L.cableMagneticRadius">
+					<Slider
+						:model-value="settings.cableMagneticRadius"
+						:min="0"
+						:max="100"
+						:step="1"
+						@update:model-value="settings.setCableMagneticRadius($event)"
+					/>
+				</SettingsRow>
+				<SettingsRow :label="L.cableConnectMode">
+					<BtnGroup
+						:model-value="settings.cableConnectMode"
+						variant="variation"
+						:options="CABLE_CONNECT_MODE_OPTIONS"
+						@update:model-value="settings.setCableConnectMode($event as CableConnectMode)"
+					/>
+				</SettingsRow>
+				<SettingsRow :label="L.autoSuggestCable">
+					<CheckBox :model-value="settings.autoSuggestCable" @update:model-value="settings.setAutoSuggestCable($event)" />
+				</SettingsRow>
+
+				<p class="settings-subheader">Others:</p>
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
 				</SettingsRow>
@@ -302,7 +324,7 @@
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
-	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection } from '@/store/settings';
+	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection, type CableConnectMode } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
@@ -462,6 +484,11 @@
 		{ label: 'Vert', value: 'vertical' },
 		{ label: 'Horz', value: 'horizontal' },
 		{ label: 'Circular', value: 'circular' },
+	];
+
+	const CABLE_CONNECT_MODE_OPTIONS = [
+		{ label: 'Drag', value: 'drag' },
+		{ label: 'Click', value: 'click' },
 	];
 
 	const OFF_SEND_RECV_BOTH = [
