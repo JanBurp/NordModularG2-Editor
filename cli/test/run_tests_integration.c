@@ -31,6 +31,7 @@ extern void test_daemon_select_param_cmd(void);
 extern void test_daemon_stdin_burst_forwards_events_promptly(void);
 extern void test_daemon_dump_patch_cmd(void);
 extern void test_daemon_send_controller_snapshot_cmd(void);
+extern void test_patch_workflow_full_cycle(void);
 extern void test_daemon_perf_mode_cycle(void);
 /* watch-based tests — commented out; use test_daemon_slot_variation_commands instead
 extern void test_fullstack_with_watch(void);
@@ -209,6 +210,7 @@ int main(void) {
     run_test_silently("test_daemon_stdin_burst_forwards_events_promptly", test_daemon_stdin_burst_forwards_events_promptly);
     run_test_silently("test_daemon_dump_patch_cmd",          test_daemon_dump_patch_cmd);
     run_test_silently("test_daemon_send_controller_snapshot_cmd", test_daemon_send_controller_snapshot_cmd);
+    run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.

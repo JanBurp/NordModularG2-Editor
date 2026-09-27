@@ -22,6 +22,12 @@ static daemon_ctx_t g_daemon  = {0};
 static int g_daemon_ok = -1;   /* -1=uninitialized, 0=ok, 1=no device */
 static int g_cmd_id    = 0;
 
+/* Accessors so other files in this same test binary (e.g. test_patch_workflow.c) can
+ * reuse this one shared daemon/USB connection instead of spawning a second one. */
+daemon_ctx_t *test_daemon_shared_ctx(void) { return &g_daemon; }
+int test_daemon_shared_ok(void) { return g_daemon_ok; }
+void test_daemon_mark_disconnected(void) { g_daemon_ok = 1; }
+
 /* Test 1: Daemon starts — spawn the shared daemon and drain startup events until watch_armed. */
 void test_daemon_starts(void) {
     g_daemon = daemon_spawn();

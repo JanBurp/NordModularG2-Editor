@@ -801,6 +801,7 @@ static void execute_cmd(const char *line) {
 			cJSON_Delete(synth);
 		}
 		data = query_perf_settings(mode, NULL);
+		if (data) cJSON_AddStringToObject(data, "mode", mode ? "performance" : "patch");
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-slot-enabled") == 0 && n >= 2) {
