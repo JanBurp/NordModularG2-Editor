@@ -27,7 +27,6 @@ extern void test_daemon_starts(void);
 extern void test_daemon_get_patch_cmd(void);
 extern void test_daemon_slot_cmd(void);
 extern void test_daemon_variation_cmd(void);
-extern void test_daemon_bank_chain_get_then_send(void);
 extern void test_daemon_select_param_cmd(void);
 extern void test_daemon_stdin_burst_forwards_events_promptly(void);
 extern void test_daemon_dump_patch_cmd(void);
@@ -206,7 +205,6 @@ int main(void) {
     run_test_silently("test_daemon_get_patch_cmd",           test_daemon_get_patch_cmd);
     run_test_silently("test_daemon_slot_cmd",                test_daemon_slot_cmd);
     run_test_silently("test_daemon_variation_cmd",           test_daemon_variation_cmd);
-    run_test_silently("test_daemon_bank_chain_get_then_send", test_daemon_bank_chain_get_then_send);
     run_test_silently("test_daemon_select_param_cmd",        test_daemon_select_param_cmd);
     run_test_silently("test_daemon_stdin_burst_forwards_events_promptly", test_daemon_stdin_burst_forwards_events_promptly);
     run_test_silently("test_daemon_dump_patch_cmd",          test_daemon_dump_patch_cmd);

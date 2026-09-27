@@ -14,6 +14,7 @@
 #include "unity_internals.h"
 #include "cJSON.h"
 #include "../include/g2_device.h"
+#include "daemon_harness.h"
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
@@ -22,6 +23,7 @@
 void setUp(void) {}
 void tearDown(void) {}
 
+extern void test_bank_transfer_set_daemon(daemon_ctx_t *d);
 extern void test_bank_transfer_patch_fetch(void);
 extern void test_bank_transfer_patch_write_roundtrip(void);
 extern void test_bank_transfer_performance_fetch(void);
@@ -68,7 +70,10 @@ static const char *extract_ignore_message(FILE *capture) {
     return NULL;
 }
 
-static void run_test_silently(const char *name, void (*test_func)(void)) {
+/* Returns 1 if this test skipped because the G2 disconnected mid-run (as opposed to the
+ * pre-flight's start-of-run absence check) - main() uses this to stop immediately rather
+ * than run the remaining tests, and their sleep(5) gaps, only to skip those too. */
+static int run_test_silently(const char *name, void (*test_func)(void)) {
     fprintf(stderr, "%s ", name);
     fflush(stderr);
     unsigned short before_fail = Unity.TestFailures;
@@ -79,6 +84,7 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     int failed = Unity.TestFailures > before_fail;
     int ignored = !failed && Unity.TestIgnores > before_ignore;
     const char *reason = ignored ? extract_ignore_message(cap.capture) : NULL;
+    int disconnected = ignored && reason && strstr(reason, "not connected") != NULL;
     if (failed) {
         fprintf(stderr, "\033[31mFAIL\033[0m\n");
     } else if (ignored) {
@@ -89,14 +95,16 @@ static void run_test_silently(const char *name, void (*test_func)(void)) {
     }
     fflush(stderr);
     fclose(cap.capture);
+    return disconnected;
 }
 
 int main(void) {
     /* Pre-flight: don't even start if no G2 is attached - without this, all four tests
-     * plus their three interleaved sleep(15) calls (45s+) would run to completion just to
+     * plus their three interleaved sleep(5) calls (15s+) would run to completion just to
      * report SKIP. g2_init() is required before g2_list_devices_json() can enumerate (it
-     * reads g2.ctx); g2_exit() releases that context again immediately so ensure_g2()
-     * starts from a clean slate, same as if this check had never run. */
+     * reads g2.ctx); g2_exit() releases that context again immediately so daemon_spawn()
+     * (which itself calls g2_exit() defensively before forking) starts from a clean slate,
+     * same as if this check had never run. */
     g2_init();
     cJSON *devices = g2_list_devices_json();
     int g2_count = 0;
@@ -112,6 +120,21 @@ int main(void) {
         return 0;
     }
 
+    /* Same daemon setup as make test-integration (test_daemon.c's test_daemon_starts):
+     * spawn `g2-cli --json daemon` and wait for watch_armed. Owned here rather than by
+     * a Unity test because this runner has multiple early-return points below (mid-run
+     * disconnect bail-out) that must all still reach daemon_shutdown(). */
+    daemon_ctx_t daemon = daemon_spawn();
+    cJSON *wa = read_event_of_type(&daemon, "watch_armed", 15, 5);
+    if (!wa) {
+        fprintf(stderr, "\033[33mG2 not connected (no watch_armed from daemon). Please "
+                         "connect/reset (power-cycle or replug) the device, then re-run.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return 0;
+    }
+    cJSON_Delete(wa);
+    test_bank_transfer_set_daemon(&daemon);
+
     fprintf(stderr, "Running slow integration tests (bank transfer)...\n");
     fflush(stderr);
     UNITY_BEGIN();
@@ -119,13 +142,26 @@ int main(void) {
     /* A real user never runs these four actions back to back in under a
      * minute - same reasoning as human_pause() in test_bank_transfer.c, just
      * applied between whole test functions instead of within one. */
-    run_test_silently("test_bank_transfer_patch_fetch",                 test_bank_transfer_patch_fetch);
-    sleep(15);
-    run_test_silently("test_bank_transfer_patch_write_roundtrip",       test_bank_transfer_patch_write_roundtrip);
-    sleep(15);
-    run_test_silently("test_bank_transfer_performance_fetch",           test_bank_transfer_performance_fetch);
-    sleep(15);
+    if (run_test_silently("test_bank_transfer_patch_fetch", test_bank_transfer_patch_fetch)) {
+        fprintf(stderr, "\033[33mG2 disconnected mid-run - stopping here.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return UNITY_END();
+    }
+    sleep(5);
+    if (run_test_silently("test_bank_transfer_patch_write_roundtrip", test_bank_transfer_patch_write_roundtrip)) {
+        fprintf(stderr, "\033[33mG2 disconnected mid-run - stopping here.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return UNITY_END();
+    }
+    sleep(5);
+    if (run_test_silently("test_bank_transfer_performance_fetch", test_bank_transfer_performance_fetch)) {
+        fprintf(stderr, "\033[33mG2 disconnected mid-run - stopping here.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return UNITY_END();
+    }
+    sleep(5);
     run_test_silently("test_bank_transfer_performance_write_roundtrip", test_bank_transfer_performance_write_roundtrip);
 
+    daemon_shutdown(&daemon);
     return UNITY_END();
 }
