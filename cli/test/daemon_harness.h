@@ -31,6 +31,11 @@ cJSON *read_event_of_type(daemon_ctx_t *d, const char *expected_type,
 /* Spawn daemon subprocess. Returns context with fds and pid. */
 daemon_ctx_t daemon_spawn(void);
 
+/* Spawn daemon subprocess pinned to one specific USB bus/device address (see
+ * g2_list_devices_json()'s "bus"/"device" fields) — for multi-device tests where
+ * more than one G2 is attached and each daemon must stay on its own unit. */
+daemon_ctx_t daemon_spawn_bus_device(int bus, int device);
+
 /* Shutdown daemon: close stdin (EOF), drain pipe until daemon exits, reap. */
 void daemon_shutdown(daemon_ctx_t *d);
 

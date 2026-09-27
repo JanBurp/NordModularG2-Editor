@@ -33,6 +33,11 @@ extern void test_daemon_dump_patch_cmd(void);
 extern void test_daemon_send_controller_snapshot_cmd(void);
 extern void test_patch_workflow_full_cycle(void);
 extern void test_daemon_perf_mode_cycle(void);
+
+extern void test_daemon_multi_starts(void);
+extern void test_daemon_multi_commands_independent(void);
+extern void test_daemon_multi_no_cross_talk(void);
+extern void test_daemon_multi_kill_one_other_unaffected(void);
 /* watch-based tests — commented out; use test_daemon_slot_variation_commands instead
 extern void test_fullstack_with_watch(void);
 extern void test_watch_then_slot_then_watch(void);
@@ -212,6 +217,13 @@ int main(void) {
     run_test_silently("test_daemon_send_controller_snapshot_cmd", test_daemon_send_controller_snapshot_cmd);
     run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
+
+    /* Multi-device: needs 2 real G2 units attached, self-skips otherwise. Runs after
+     * the single-daemon shared-daemon suite above releases its own USB connection. */
+    run_test_silently("test_daemon_multi_starts",                    test_daemon_multi_starts);
+    run_test_silently("test_daemon_multi_commands_independent",      test_daemon_multi_commands_independent);
+    run_test_silently("test_daemon_multi_no_cross_talk",              test_daemon_multi_no_cross_talk);
+    run_test_silently("test_daemon_multi_kill_one_other_unaffected",  test_daemon_multi_kill_one_other_unaffected);
 
     /* Watch-based tests — disabled; preserved in test_integration.c for reference.
     run_test_with_output("test_fullstack_with_watch", test_fullstack_with_watch);

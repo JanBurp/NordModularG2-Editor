@@ -158,7 +158,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'paste-params': {
 					if (isInputFocused()) break;
-					pasteParams();
+					await pasteParams();
 					break;
 				}
 				case 'delete': {

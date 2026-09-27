@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, dialog, Menu, shell, nativeTheme } from "electron";
+import { BrowserWindow, app, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } from "electron";
 import installExtension, { VUEJS_DEVTOOLS } from "electron-devtools-installer";
 
 if (process.env.TEST_USER_DATA) {
@@ -20,10 +20,24 @@ export const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
 export const MAIN_DIST = path.join(process.env.APP_ROOT, "dist-electron");
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
-let win: BrowserWindow | null = null;
-let daemonProcess: ChildProcess | null = null;
-let cmdId = 0;
-const pendingCmds = new Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>();
+/* One BrowserWindow + one daemon subprocess per connected G2, so switching
+ * devices is just OS window focus — nothing reloads, both stay live. A window
+ * has no DeviceSession until its renderer calls devices:connect. */
+interface DeviceSession {
+	id: string;
+	bus: number;
+	device: number;
+	name: string | null;
+	window: BrowserWindow;
+	daemonProcess: ChildProcess | null;
+	cmdId: number;
+	pendingCmds: Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>;
+	menuState: MenuState;
+}
+const sessions = new Map<string, DeviceSession>();
+const sessionByWebContentsId = new Map<number, DeviceSession>();
+let activeSessionId: string | null = null;
+
 const isMac = process.platform === 'darwin';
 const platformNames: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
 const platformLabel = `${platformNames[process.platform] ?? process.platform} ${process.getSystemVersion()}`;
@@ -33,10 +47,36 @@ const cliPath = app.isPackaged
 	? path.join(process.resourcesPath, cliName)
 	: path.join(process.env.APP_ROOT!, "resources", cliName);
 
-function createWindow() {
+function safeSend(window: BrowserWindow, channel: string, ...args: unknown[]): void {
+	if (!window.isDestroyed()) window.webContents.send(channel, ...args);
+}
+
+function sendToFocused(channel: string, ...args: unknown[]): void {
+	const focused = BrowserWindow.getFocusedWindow();
+	if (focused && !focused.isDestroyed()) focused.webContents.send(channel, ...args);
+}
+
+function resolveSession(event: { sender: { id: number } }): DeviceSession | undefined {
+	return sessionByWebContentsId.get(event.sender.id);
+}
+
+function broadcastDevicesChanged(): void {
+	const list = Array.from(sessions.values()).map((s) => ({
+		id: s.id,
+		bus: s.bus,
+		device: s.device,
+		name: s.name,
+		hasDaemon: s.daemonProcess !== null,
+	}));
+	for (const window of BrowserWindow.getAllWindows()) {
+		if (!window.isDestroyed()) window.webContents.send("devices:changed", list);
+	}
+}
+
+function createAppWindow(): BrowserWindow {
 	const headless = process.env.HEADLESS === '1';
 	const state = loadWindowState();
-	win = new BrowserWindow({
+	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
 		x: state?.x,
@@ -51,28 +91,43 @@ function createWindow() {
 	});
 
 	if (!headless) {
-		if (state?.isMaximized ?? true) win.maximize();
-		win.show();
+		if (state?.isMaximized ?? true) window.maximize();
+		window.show();
 	}
 
-	trackWindowState(win);
+	trackWindowState(window);
 
 	if (VITE_DEV_SERVER_URL) {
-		win.loadURL(VITE_DEV_SERVER_URL);
+		window.loadURL(VITE_DEV_SERVER_URL);
 	} else {
-		win.loadFile(path.join(RENDERER_DIST, "index.html"));
+		window.loadFile(path.join(RENDERER_DIST, "index.html"));
 	}
+
+	// Session (if any) is bound later via devices:connect; look it up by id at
+	// close time rather than capturing it now, since binding is asynchronous.
+	const wcId = window.webContents.id;
+	window.on("closed", () => {
+		const session = sessionByWebContentsId.get(wcId);
+		if (!session) return;
+		sessionByWebContentsId.delete(wcId);
+		sessions.delete(session.id);
+		if (session.daemonProcess) session.daemonProcess.kill("SIGTERM");
+		if (activeSessionId === session.id) activeSessionId = null;
+		broadcastDevicesChanged();
+	});
+
+	return window;
 }
 
-function startDaemon() {
-	if (daemonProcess) return;
+function startDaemon(session: DeviceSession) {
+	if (session.daemonProcess) return;
 	if (!fs.existsSync(cliPath)) {
 		console.error("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
 		return;
 	}
-	console.warn('[daemon] Starting daemon process...');
-	const proc = spawn(cliPath, ["daemon"]);
-	daemonProcess = proc;
+	console.warn(`[daemon] Starting daemon process for ${session.id}...`);
+	const proc = spawn(cliPath, ["daemon", String(session.bus), String(session.device)]);
+	session.daemonProcess = proc;
 	proc.stdin?.on("error", () => {
 		// swallow EPIPE — expected when daemon exits while a write is in flight
 	});
@@ -84,14 +139,14 @@ function startDaemon() {
 		for (const line of lines) {
 			const trimmed = line.trim();
 			if (!trimmed) continue;
-			console.log(`[daemon-watch]`, line);
+			console.log(`[daemon-watch:${session.id}]`, line);
 			try {
 				const msg = JSON.parse(trimmed);
 				if (msg.id !== undefined) {
-					const pending = pendingCmds.get(msg.id);
+					const pending = session.pendingCmds.get(msg.id);
 					if (pending) {
 						clearTimeout(pending.timeout);
-						pendingCmds.delete(msg.id);
+						session.pendingCmds.delete(msg.id);
 						if (msg.ok) {
 							pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
 						} else {
@@ -99,41 +154,63 @@ function startDaemon() {
 						}
 					}
 				} else {
-					win?.webContents.send("cli:watch-event", trimmed);
+					safeSend(session.window, "cli:watch-event", trimmed);
 				}
 			} catch {
-				win?.webContents.send("cli:watch-event", trimmed);
+				safeSend(session.window, "cli:watch-event", trimmed);
 			}
 		}
 	});
 	proc.stderr?.on("data", (data: Buffer) => {
-		console.error(`[daemon-error] ${data.toString().trim()}`);
+		console.error(`[daemon-error:${session.id}] ${data.toString().trim()}`);
 	});
 	proc.on("close", (code) => {
-		const wasActive = daemonProcess === proc;
-		console.error(`[daemon] Exited with code ${code ?? 'null'}`);
-		if (wasActive) daemonProcess = null;
-		for (const pending of pendingCmds.values()) {
+		const wasActive = session.daemonProcess === proc;
+		console.error(`[daemon:${session.id}] Exited with code ${code ?? 'null'}`);
+		if (wasActive) session.daemonProcess = null;
+		for (const pending of session.pendingCmds.values()) {
 			clearTimeout(pending.timeout);
 			pending.reject(new Error("Daemon exited"));
 		}
-		pendingCmds.clear();
+		session.pendingCmds.clear();
 		if (!wasActive) return;
 		if (code !== null && code !== 0) {
-			win?.webContents.send("cli:device-disconnected");
+			safeSend(session.window, "cli:device-disconnected");
 		} else {
-			win?.webContents.send("cli:watch-done");
+			safeSend(session.window, "cli:watch-done");
 		}
+		broadcastDevicesChanged();
 	});
 }
 
-async function stopDaemon(): Promise<void> {
-	if (!daemonProcess) return;
-	const proc = daemonProcess;
-	daemonProcess = null;
+async function stopDaemon(session: DeviceSession): Promise<void> {
+	if (!session.daemonProcess) return;
+	const proc = session.daemonProcess;
+	session.daemonProcess = null;
 	return new Promise<void>((resolve) => {
 		proc.on("close", () => resolve());
 		proc.kill("SIGTERM");
+	});
+}
+
+/* Spawns g2-cli fresh for a single one-shot command (list-devices, get-device-name)
+ * and resolves with its full stdout once it exits — no persistent daemon needed. */
+function runCliOneShot(args: string[]): Promise<string> {
+	return new Promise((resolve, reject) => {
+		if (!fs.existsSync(cliPath)) {
+			reject(new Error("CLI binary not found"));
+			return;
+		}
+		const proc = spawn(cliPath, args);
+		let stdout = "";
+		let stderr = "";
+		proc.stdout?.on("data", (d: Buffer) => { stdout += d.toString(); });
+		proc.stderr?.on("data", (d: Buffer) => { stderr += d.toString(); });
+		proc.on("error", reject);
+		proc.on("close", (code) => {
+			if (code === 0) resolve(stdout);
+			else reject(new Error(stderr.trim() || `g2-cli exited with code ${code}`));
+		});
 	});
 }
 
@@ -148,61 +225,168 @@ const LONG_CMDS = new Set(["send-bank", "get-bank"]);
 // other commands (e.g. RGB tuples) aren't accidentally base64-encoded.
 const BASE64_ARG_CMDS = new Set(["upload-patch-data", "upload-perf-data"]);
 
-function sendCmd(cmd: string, args: (string | number[])[]): Promise<string> {
+function sendCmd(session: DeviceSession, cmd: string, args: (string | number[])[]): Promise<string> {
 	return new Promise((resolve, reject) => {
-		if (!daemonProcess) {
+		if (!session.daemonProcess) {
 			reject(new Error("Daemon not running"));
 			return;
 		}
-		const id = ++cmdId;
+		const id = ++session.cmdId;
 		const timeout = setTimeout(() => {
-			pendingCmds.delete(id);
+			session.pendingCmds.delete(id);
 			reject(new Error(`CLI timeout: ${cmd}`));
 		}, LONG_CMDS.has(cmd) ? 600_000 : 30_000);
-		pendingCmds.set(id, { resolve, reject, timeout });
+		session.pendingCmds.set(id, { resolve, reject, timeout });
 		const wireArgs: (string | number[])[] = BASE64_ARG_CMDS.has(cmd)
 			? args.map((a) => (Array.isArray(a) ? Buffer.from(a).toString("base64") : a))
 			: args;
 		const json = JSON.stringify({ id, cmd, args: wireArgs });
 		// Elide inline byte-array payloads (e.g. upload-patch-data) from the log line.
 		const logArgs = args.map((a) => (Array.isArray(a) ? `<${a.length} bytes>` : a));
-		console.log('[daemon-cmd]->', JSON.stringify({ id, cmd, args: logArgs }));
-		daemonProcess.stdin?.write(json + "\n");
+		console.log(`[daemon-cmd:${session.id}]->`, JSON.stringify({ id, cmd, args: logArgs }));
+		session.daemonProcess.stdin?.write(json + "\n");
 	});
 }
 
-ipcMain.handle("cli:run", async (_, args: (string | number[])[]) => {
+ipcMain.handle("cli:run", async (event, args: (string | number[])[]) => {
 	const [cmd, ...rest] = args as [string, ...(string | number[])[]];
-	if (cmd === "disconnect") { await stopDaemon(); return ""; }
-	return await sendCmd(cmd, rest);
+	const session = resolveSession(event);
+	if (cmd === "disconnect") {
+		if (session) await stopDaemon(session);
+		return "";
+	}
+	if (!session) throw new Error("Daemon not running");
+	return await sendCmd(session, cmd, rest);
 });
 
-function sendSeq(ops: string[][]): Promise<string> {
+function sendSeq(session: DeviceSession, ops: string[][]): Promise<string> {
 	return new Promise((resolve, reject) => {
-		if (!daemonProcess) { reject(new Error("Daemon not running")); return; }
-		const id = ++cmdId;
+		if (!session.daemonProcess) { reject(new Error("Daemon not running")); return; }
+		const id = ++session.cmdId;
 		const timeout = setTimeout(() => {
-			pendingCmds.delete(id);
+			session.pendingCmds.delete(id);
 			reject(new Error("CLI timeout: seq"));
 		}, 30_000);
-		pendingCmds.set(id, { resolve, reject, timeout });
+		session.pendingCmds.set(id, { resolve, reject, timeout });
 		const json = JSON.stringify({ id, cmd: "seq", args: ops });
-		console.log('[daemon-cmd]->', json);
-		daemonProcess.stdin?.write(json + "\n");
+		console.log(`[daemon-cmd:${session.id}]->`, json);
+		session.daemonProcess.stdin?.write(json + "\n");
 	});
 }
 
-ipcMain.handle("cli:run-batch", async (_, argsList: string[][]) => {
+ipcMain.handle("cli:run-batch", async (event, argsList: string[][]) => {
+	const session = resolveSession(event);
+	if (!session) throw new Error("Daemon not running");
 	if (argsList.length === 0) return [];
 	if (argsList.length === 1) {
 		const [cmd, ...rest] = argsList[0];
-		return [await sendCmd(cmd, rest)];
+		return [await sendCmd(session, cmd, rest)];
 	}
-	return [await sendSeq(argsList)];
+	return [await sendSeq(session, argsList)];
 });
 
-ipcMain.handle("cli:watch-start", async () => { await stopDaemon(); startDaemon(); });
-ipcMain.on("cli:watch-stop", () => { stopDaemon(); });
+ipcMain.handle("cli:watch-start", async (event) => {
+	const session = resolveSession(event);
+	if (!session) throw new Error("No device bound to this window");
+	await stopDaemon(session);
+	startDaemon(session);
+});
+ipcMain.on("cli:watch-stop", (event) => {
+	const session = resolveSession(event);
+	if (session) stopDaemon(session);
+});
+
+// --- Device discovery / multi-window management ---
+
+ipcMain.handle("devices:list", async () => {
+	const out = await runCliOneShot(["--json", "list-devices"]);
+	const parsed = JSON.parse(out);
+	const all: any[] = parsed.all ?? [];
+	return all
+		.filter((d) => d.isG2)
+		.map((d) => ({
+			bus: d.bus,
+			device: d.device,
+			id: `${d.bus}:${d.device}`,
+			alreadyConnected: sessions.has(`${d.bus}:${d.device}`),
+		}));
+});
+
+ipcMain.handle("devices:get-name", async (_, bus: number, device: number) => {
+	try {
+		const out = await runCliOneShot(["--json", "get-device-name", String(bus), String(device)]);
+		const parsed = JSON.parse(out);
+		return parsed.ok && parsed.name ? parsed.name : null;
+	} catch {
+		return null;
+	}
+});
+
+ipcMain.handle("devices:connect", async (event, bus: number, device: number) => {
+	const window = BrowserWindow.fromWebContents(event.sender);
+	if (!window) throw new Error("No window for this call");
+	const id = `${bus}:${device}`;
+	let session = sessionByWebContentsId.get(event.sender.id);
+	if (session) {
+		sessions.delete(session.id);
+		session.id = id;
+		session.bus = bus;
+		session.device = device;
+		session.name = null;
+	} else {
+		session = {
+			id,
+			bus,
+			device,
+			name: null,
+			window,
+			daemonProcess: null,
+			cmdId: 0,
+			pendingCmds: new Map(),
+			menuState: { ...defaultMenuState },
+		};
+		sessionByWebContentsId.set(event.sender.id, session);
+	}
+	sessions.set(id, session);
+	broadcastDevicesChanged();
+	return { id };
+});
+
+ipcMain.handle("devices:open-window", () => {
+	createAppWindow();
+});
+
+ipcMain.handle("devices:focus", (_, id: string) => {
+	sessions.get(id)?.window.focus();
+});
+
+ipcMain.handle("devices:report-name", (event, name: string) => {
+	const session = resolveSession(event);
+	if (session) {
+		session.name = name;
+		broadcastDevicesChanged();
+	}
+});
+
+// --- Clipboard (routed through the OS clipboard, not renderer state, so
+// copy/paste works across separate per-device windows/renderer processes) ---
+
+ipcMain.handle("clipboard:write", (_, entry: unknown) => {
+	clipboard.writeText(JSON.stringify({ __g2Clipboard: true, ...(entry as object) }));
+});
+
+ipcMain.handle("clipboard:read", () => {
+	try {
+		const parsed = JSON.parse(clipboard.readText());
+		if (parsed && parsed.__g2Clipboard === true) {
+			const { __g2Clipboard, ...rest } = parsed;
+			return rest;
+		}
+	} catch {
+		// clipboard holds non-JSON or non-G2 text — not ours to paste
+	}
+	return null;
+});
 
 ipcMain.handle("patches:list", async (_, folder: string) => {
 	try {
@@ -414,14 +598,14 @@ const defaultMenuState: MenuState = {
 
 function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electron.MenuItemConstructorOptions[] {
 	const slotSubmenu = (actionPrefix: string): Electron.MenuItemConstructorOptions[] =>
-		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => win!.webContents.send("menu:action", `${actionPrefix}-${s}`) }));
+		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => sendToFocused("menu:action", `${actionPrefix}-${s}`) }));
 
 	return [
 		...(isMac ? [{
 			label: "G2 Editor",
 			submenu: [
-				{ label: "About G2 Editor...", click: () => win!.webContents.send("menu:action", "show-about") },
-				{ label: "Preferences...", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
+				{ label: "About G2 Editor...", click: () => sendToFocused("menu:action", "show-about") },
+				{ label: "Preferences...", click: () => sendToFocused("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 				{ type: "separator" as const },
 				{ role: "services" as const },
 				{ type: "separator" as const },
@@ -435,26 +619,26 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 		{
 			label: "File",
 			submenu: [
-				{ label: "New Patch", click: () => win!.webContents.send("menu:action", "new-patch"), accelerator: "CommandOrControl+N" },
-				{ label: "New Performance", click: () => win!.webContents.send("menu:action", "new-performance") },
+				{ label: "New Patch", click: () => sendToFocused("menu:action", "new-patch"), accelerator: "CommandOrControl+N" },
+				{ label: "New Performance", click: () => sendToFocused("menu:action", "new-performance") },
 				{ label: "New To", submenu: slotSubmenu("new-to") },
 				{ type: "separator" as const },
-				{ label: "Open", click: () => win!.webContents.send("menu:action", "open"), accelerator: "CommandOrControl+O" },
-				{ label: "Open Performance", click: () => win!.webContents.send("menu:action", "open-performance") },
+				{ label: "Open", click: () => sendToFocused("menu:action", "open"), accelerator: "CommandOrControl+O" },
+				{ label: "Open Performance", click: () => sendToFocused("menu:action", "open-performance") },
 				{ label: "Open To", submenu: slotSubmenu("open-to") },
 				{ type: "separator" as const },
-				{ label: "Save", click: () => win!.webContents.send("menu:action", "save"), accelerator: "CommandOrControl+S" },
-				{ label: "Save As", click: () => win!.webContents.send("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
-				{ label: "Save All", click: () => win!.webContents.send("menu:action", "save-all") },
+				{ label: "Save", click: () => sendToFocused("menu:action", "save"), accelerator: "CommandOrControl+S" },
+				{ label: "Save As", click: () => sendToFocused("menu:action", "save-as"), accelerator: "Shift+CommandOrControl+S" },
+				{ label: "Save All", click: () => sendToFocused("menu:action", "save-all") },
 				{ type: "separator" as const },
 				{ label: "Save From", submenu: slotSubmenu("save-from") },
-				{ label: "Save Init Patch 1", click: () => win!.webContents.send("menu:action", "save-init-1") },
-				{ label: "Save Init Patch 2", click: () => win!.webContents.send("menu:action", "save-init-2") },
+				{ label: "Save Init Patch 1", click: () => sendToFocused("menu:action", "save-init-1") },
+				{ label: "Save Init Patch 2", click: () => sendToFocused("menu:action", "save-init-2") },
 				{ type: "separator" as const },
 				{
 					label: "Recent Files",
 					submenu: recentFiles.length
-						? recentFiles.map((f, i) => ({ label: path.basename(f.path), click: () => win!.webContents.send("menu:action", `open-recent:${i}`) }))
+						? recentFiles.map((f, i) => ({ label: path.basename(f.path), click: () => sendToFocused("menu:action", `open-recent:${i}`) }))
 						: [{ label: "(Empty)", enabled: false }],
 				},
 
@@ -463,65 +647,65 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 		{
 			label: "Edit",
 			submenu: [
-				{ label: "Undo", click: () => win!.webContents.send("menu:action", "undo"), accelerator: "CommandOrControl+Z", enabled: menuState.canUndo },
+				{ label: "Undo", click: () => sendToFocused("menu:action", "undo"), accelerator: "CommandOrControl+Z", enabled: menuState.canUndo },
 				{
 					label: "Redo",
-					click: () => win!.webContents.send("menu:action", "redo"),
+					click: () => sendToFocused("menu:action", "redo"),
 					accelerator: "Shift+CommandOrControl+Z",
 					enabled: menuState.canRedo,
 				},
 				{ type: "separator" as const },
-				{ label: "Cut", click: () => win!.webContents.send("menu:action", "cut"), accelerator: "CommandOrControl+X" },
+				{ label: "Cut", click: () => sendToFocused("menu:action", "cut"), accelerator: "CommandOrControl+X" },
 				{
 					label: "Copy",
-					click: () => win!.webContents.send("menu:action", "copy"),
+					click: () => sendToFocused("menu:action", "copy"),
 					accelerator: "CommandOrControl+C",
 				},
 				{
 					label: "Paste",
-					click: () => win!.webContents.send("menu:action", "paste"),
+					click: () => sendToFocused("menu:action", "paste"),
 					accelerator: "CommandOrControl+V",
 					enabled: menuState.hasClipboard,
 				},
 				{
 					label: "Clear",
-					click: () => win!.webContents.send("menu:action", "delete"),
+					click: () => sendToFocused("menu:action", "delete"),
 					accelerator: "Backspace",
 				},
 				{ type: "separator" as const },
 				{
 					label: "Paste Params",
-					click: () => win!.webContents.send("menu:action", "paste-params"),
+					click: () => sendToFocused("menu:action", "paste-params"),
 					accelerator: "CommandOrControl+E",
 					enabled: menuState.hasClipboard,
 				},
 				{ type: "separator" as const },
-				{ label: "Select All", click: () => win!.webContents.send("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
+				{ label: "Select All", click: () => sendToFocused("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
 			],
 		},
 		{
 			label: "View",
 			submenu: [
-				{ label: "Voice Area", click: () => win!.webContents.send("menu:action", "area-voice"), accelerator: "V" },
-				{ label: "FX Area", click: () => win!.webContents.send("menu:action", "area-fx"), accelerator: "F" },
+				{ label: "Voice Area", click: () => sendToFocused("menu:action", "area-voice"), accelerator: "V" },
+				{ label: "FX Area", click: () => sendToFocused("menu:action", "area-fx"), accelerator: "F" },
 				{ type: "separator" as const },
-				{ label: "Slot A", click: () => win!.webContents.send("menu:action", "slot-A"), accelerator: "A" },
-				{ label: "Slot B", click: () => win!.webContents.send("menu:action", "slot-B"), accelerator: "B" },
-				{ label: "Slot C", click: () => win!.webContents.send("menu:action", "slot-C"), accelerator: "C" },
-				{ label: "Slot D", click: () => win!.webContents.send("menu:action", "slot-D"), accelerator: "D" },
+				{ label: "Slot A", click: () => sendToFocused("menu:action", "slot-A"), accelerator: "A" },
+				{ label: "Slot B", click: () => sendToFocused("menu:action", "slot-B"), accelerator: "B" },
+				{ label: "Slot C", click: () => sendToFocused("menu:action", "slot-C"), accelerator: "C" },
+				{ label: "Slot D", click: () => sendToFocused("menu:action", "slot-D"), accelerator: "D" },
 				{ type: "separator" as const },
-				{ label: "Variation 1", click: () => win!.webContents.send("menu:action", "variation-1"), accelerator: "1" },
-				{ label: "Variation 2", click: () => win!.webContents.send("menu:action", "variation-2"), accelerator: "2" },
-				{ label: "Variation 3", click: () => win!.webContents.send("menu:action", "variation-3"), accelerator: "3" },
-				{ label: "Variation 4", click: () => win!.webContents.send("menu:action", "variation-4"), accelerator: "4" },
-				{ label: "Variation 5", click: () => win!.webContents.send("menu:action", "variation-5"), accelerator: "5" },
-				{ label: "Variation 6", click: () => win!.webContents.send("menu:action", "variation-6"), accelerator: "6" },
-				{ label: "Variation 7", click: () => win!.webContents.send("menu:action", "variation-7"), accelerator: "7" },
-				{ label: "Variation 8", click: () => win!.webContents.send("menu:action", "variation-8"), accelerator: "8" },
+				{ label: "Variation 1", click: () => sendToFocused("menu:action", "variation-1"), accelerator: "1" },
+				{ label: "Variation 2", click: () => sendToFocused("menu:action", "variation-2"), accelerator: "2" },
+				{ label: "Variation 3", click: () => sendToFocused("menu:action", "variation-3"), accelerator: "3" },
+				{ label: "Variation 4", click: () => sendToFocused("menu:action", "variation-4"), accelerator: "4" },
+				{ label: "Variation 5", click: () => sendToFocused("menu:action", "variation-5"), accelerator: "5" },
+				{ label: "Variation 6", click: () => sendToFocused("menu:action", "variation-6"), accelerator: "6" },
+				{ label: "Variation 7", click: () => sendToFocused("menu:action", "variation-7"), accelerator: "7" },
+				{ label: "Variation 8", click: () => sendToFocused("menu:action", "variation-8"), accelerator: "8" },
 				{ type: "separator" as const },
-				{ label: "Zoom In", click: () => win!.webContents.send("menu:action", "zoom-in"), accelerator: "CommandOrControl+=" },
-				{ label: "Zoom Out", click: () => win!.webContents.send("menu:action", "zoom-out"), accelerator: "CommandOrControl+-" },
-				{ label: "Actual Size", click: () => win!.webContents.send("menu:action", "zoom-reset"), accelerator: "CommandOrControl+0" },
+				{ label: "Zoom In", click: () => sendToFocused("menu:action", "zoom-in"), accelerator: "CommandOrControl+=" },
+				{ label: "Zoom Out", click: () => sendToFocused("menu:action", "zoom-out"), accelerator: "CommandOrControl+-" },
+				{ label: "Actual Size", click: () => sendToFocused("menu:action", "zoom-reset"), accelerator: "CommandOrControl+0" },
 			],
 		},
 		{
@@ -529,17 +713,17 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			submenu: [
 				{
 					label: "Patch Settings",
-					click: () => win!.webContents.send("menu:action", "open-patch-settings"),
+					click: () => sendToFocused("menu:action", "open-patch-settings"),
 					accelerator: "CommandOrControl+P",
 					enabled: menuState.hasCurrentPatch,
 				},
-				{ label: "Text Panel", click: () => win!.webContents.send("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
+				{ label: "Text Panel", click: () => sendToFocused("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
 				{ type: "separator" as const },
-				{ label: "Delete Unused Modules", click: () => win!.webContents.send("menu:action", "delete-unused-modules") },
+				{ label: "Delete Unused Modules", click: () => sendToFocused("menu:action", "delete-unused-modules") },
 				{ type: "separator" as const },
 				{
 					label: "Download to Slot",
-					click: () => win!.webContents.send("menu:action", "download-to-slot"),
+					click: () => sendToFocused("menu:action", "download-to-slot"),
 					accelerator: "CommandOrControl+D",
 					enabled: menuState.connected && menuState.hasCurrentPatch,
 				},
@@ -550,12 +734,12 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			submenu: [
 				{
 					label: "Performance Settings",
-					click: () => win!.webContents.send("menu:action", "open-performance-settings"),
+					click: () => sendToFocused("menu:action", "open-performance-settings"),
 					accelerator: "CommandOrControl+R",
 					enabled: menuState.hasPerformanceContext,
 				},
 				{ type: "separator" as const },
-				{ label: "Download", click: () => win!.webContents.send("menu:action", "download-performance"), enabled: menuState.connected && menuState.hasPerformanceContext },
+				{ label: "Download", click: () => sendToFocused("menu:action", "download-performance"), enabled: menuState.connected && menuState.hasPerformanceContext },
 			],
 		},
 		{
@@ -563,35 +747,35 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			submenu: [
 				{
 					label: "Synth Settings",
-					click: () => win!.webContents.send("menu:action", "open-synth-settings"),
+					click: () => sendToFocused("menu:action", "open-synth-settings"),
 					accelerator: "CommandOrControl+G",
 					enabled: menuState.connected,
 				},
 				{ type: "separator" as const },
 				{
 					label: "Upload Active Slot",
-					click: () => win!.webContents.send("menu:action", "upload-active-slot"),
+					click: () => sendToFocused("menu:action", "upload-active-slot"),
 					accelerator: "CommandOrControl+U",
 					enabled: menuState.connected,
 				},
 				{
 					label: "Save in Synth",
-					click: () => win!.webContents.send("menu:action", "store-in-synth"),
+					click: () => sendToFocused("menu:action", "store-in-synth"),
 					enabled: menuState.connected && menuState.hasCurrentPatch,
 				},
 				{ type: "separator" as const },
-				{ label: "Bank Upload (from G2)", click: () => win!.webContents.send("menu:action", "bank-upload"), enabled: menuState.connected },
-				{ label: "Bank Download (to G2)", click: () => win!.webContents.send("menu:action", "bank-download"), enabled: menuState.connected },
+				{ label: "Bank Upload (from G2)", click: () => sendToFocused("menu:action", "bank-upload"), enabled: menuState.connected },
+				{ label: "Bank Download (to G2)", click: () => sendToFocused("menu:action", "bank-download"), enabled: menuState.connected },
 				{ type: "separator" as const },
 				{
 					label: "Send Controller Snapshot",
-					click: () => win!.webContents.send("menu:action", "send-controller-snapshot"),
+					click: () => sendToFocused("menu:action", "send-controller-snapshot"),
 					accelerator: "CommandOrControl+M",
 					enabled: menuState.connected,
 				},
 				{
 					label: "Dump One",
-					click: () => win!.webContents.send("menu:action", "dump-one"),
+					click: () => sendToFocused("menu:action", "dump-one"),
 					accelerator: "CommandOrControl+1",
 					enabled: menuState.connected,
 				},
@@ -600,42 +784,53 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 		{
 			label: "Setup",
 			submenu: [
-				{ label: "Editor Options", click: () => win!.webContents.send("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
+				{ label: "Editor Options", click: () => sendToFocused("menu:action", "toggle-settings"), accelerator: "CommandOrControl+," },
 			],
 		},
 		{
 			label: "Tools",
 			submenu: [
-				{ label: "Parameter Pages", click: () => win!.webContents.send("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
-				{ label: "Keyboard", click: () => win!.webContents.send("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
-				{ label: "Browser", click: () => win!.webContents.send("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
+				{ label: "Parameter Pages", click: () => sendToFocused("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
+				{ label: "Keyboard", click: () => sendToFocused("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
+				{ label: "Browser", click: () => sendToFocused("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ type: "separator" as const },
-				{ label: "Modules", click: () => win!.webContents.send("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
-				{ label: "Midi CC Panel", click: () => win!.webContents.send("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
+				{ label: "Modules", click: () => sendToFocused("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
+				{ label: "Midi CC Panel", click: () => sendToFocused("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
-				{ label: "Extended Toolbar", click: () => win!.webContents.send("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
+				{ label: "Extended Toolbar", click: () => sendToFocused("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
 			],
 		},
 		{
 			label: "Help",
 			submenu: [
-				{ label: "Module Help", accelerator: "F1", click: () => win!.webContents.send("menu:action", "show-module-help") },
-				{ label: "Key Commands", click: () => win!.webContents.send("menu:action", "show-key-commands") },
+				{ label: "Module Help", accelerator: "F1", click: () => sendToFocused("menu:action", "show-module-help") },
+				{ label: "Key Commands", click: () => sendToFocused("menu:action", "show-key-commands") },
 				{ type: "separator" as const },
 				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
-				// { label: "ShowSVG", click: () => win!.webContents.send("menu:action", "toggle-svg-viewer") },
+				// { label: "ShowSVG", click: () => sendToFocused("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
-				{ label: "About G2 Editor...", click: () => win!.webContents.send("menu:action", "show-about") },
+				{ label: "About G2 Editor...", click: () => sendToFocused("menu:action", "show-about") },
 			],
 		},
 	];
 }
 
 let lastRecentFiles: RecentFileEntry[] = [];
+// Fallback menu state for a window that has no bound DeviceSession yet (e.g. the
+// initial window before a device is chosen) — mirrors what used to be the single
+// global menuState singleton.
 let lastMenuState: MenuState = defaultMenuState;
 
+function currentMenuState(): MenuState {
+	if (activeSessionId) {
+		const session = sessions.get(activeSessionId);
+		if (session) return session.menuState;
+	}
+	return lastMenuState;
+}
+
 function refreshMenu(): void {
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, lastMenuState)));
+	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
 }
 
 ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
@@ -643,8 +838,20 @@ ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
 	refreshMenu();
 });
 
-ipcMain.on("menu-state:update", (_, state: MenuState) => {
-	lastMenuState = state;
+ipcMain.on("menu-state:update", (event, state: MenuState) => {
+	const session = resolveSession(event);
+	if (session) {
+		session.menuState = state;
+		if (session.id === activeSessionId) refreshMenu();
+	} else {
+		lastMenuState = state;
+		if (!activeSessionId) refreshMenu();
+	}
+});
+
+app.on("browser-window-focus", (_event, window) => {
+	const session = sessionByWebContentsId.get(window.webContents.id);
+	activeSessionId = session ? session.id : null;
 	refreshMenu();
 });
 
@@ -654,9 +861,7 @@ app.on("before-quit", (e) => {
 	e.preventDefault();
 	quitting = true;
 	(async () => {
-		// await stopWatchAndWait();
-		// try { await runCliRaw(["disconnect"]); } catch { /* already disconnected */ }
-		await stopDaemon();
+		await Promise.all(Array.from(sessions.values()).map((s) => stopDaemon(s)));
 		app.quit();
 	})();
 });
@@ -677,7 +882,7 @@ app.whenReady().then(async () => {
 		}
 	}
 
-	createWindow();
+	createAppWindow();
 
 	refreshMenu();
 });

@@ -186,6 +186,8 @@ extern void test_tokenize_extra_spaces(void);
 extern void test_tokenize_set_module_color(void);
 extern void test_tokenize_respects_max_argc(void);
 
+extern void test_g2_set_target_updates_globals(void);
+
 /* Daemon is tested via integration tests (test_daemon.c), not unit tests */
 // extern void test_daemon_parse_valid_json(void);
 // extern void test_daemon_parse_bad_json(void);
@@ -387,6 +389,9 @@ int main(void) {
     RUN_TEST(test_tokenize_extra_spaces);
     RUN_TEST(test_tokenize_set_module_color);
     RUN_TEST(test_tokenize_respects_max_argc);
+
+    /* multi-device targeting */
+    RUN_TEST(test_g2_set_target_updates_globals);
 
     /* daemon JSON/queue tests — commented out, tested via integration tests instead
     RUN_TEST(test_daemon_parse_valid_json);

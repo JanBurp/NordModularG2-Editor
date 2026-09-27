@@ -37,6 +37,8 @@
 				<span class="status-dot" :class="device.dotClass" />
 				<span>{{ device.statusLabel }}</span>
 			</button>
+
+			<DeviceSwitcher v-if="!isOfflineMode" />
 		</ToolBar>
 
 		<ExtendedToolBar
@@ -175,6 +177,20 @@
 			max="240"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 		/>
+	</Dialog>
+
+	<Dialog v-model="showDevicePickerDialog" title="Select G2 Device" :show-confirm="false" @cancel="cancelDevicePicker">
+		<div class="text-sm text-content-primary mb-2">Multiple Nord Modular G2 units are connected. Choose which one to edit in this window.</div>
+		<div class="flex flex-col gap-2">
+			<button
+				v-for="c in deviceCandidates"
+				:key="c.id"
+				class="px-3 py-2 text-sm text-left rounded bg-surface-2 hover:bg-surface-3 text-content-primary"
+				@click="selectDeviceCandidate(c)"
+			>
+				{{ c.name ?? `bus ${c.bus}, device ${c.device}` }}
+			</button>
+		</div>
 	</Dialog>
 
 	<Dialog v-model="downloadToSlot.showDialog.value" title="Download to Slot" :show-confirm="false" @cancel="downloadToSlot.cancel">
@@ -490,6 +506,8 @@
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
+	import { useConnectedDevicesStore } from './store/connectedDevices';
+	import DeviceSwitcher from './components/toolbar/DeviceSwitcher.vue';
 	import { useStatusHint } from './composables/useStatusHint';
 	import { STATUS_HINTS } from './constants/statusHints';
 
@@ -506,6 +524,8 @@
 	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
+	const connectedDevices = useConnectedDevicesStore();
+	const isOfflineMode = computed(() => window.electronAPI?.isOffline ?? false);
 	const jackPatching = useJackPatching();
 	const { clearGhostCable, cycleGhostCable, confirmGhostCable } = useGhostCable();
 
@@ -666,6 +686,7 @@
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onGlobalKeydown);
 		window.removeEventListener('mousemove', onMouseMove);
+		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
 	});
 
 	useElectronMenuActions({
@@ -688,34 +709,84 @@
 		}
 	}
 
+	const showDevicePickerDialog = ref(false);
+	const deviceCandidates = ref<{ bus: number; device: number; id: string; name: string | null }[]>([]);
+
+	async function afterConnectRestoreFocus(): Promise<void> {
+		if (device.status !== DeviceStatus.Connected) return;
+		const focusedEntry = device.device?.slots?.find((s) => s.key);
+		const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
+		const idx = SLOT_LABELS.indexOf(focusLabel);
+		if (idx >= 0) {
+			const slot = SLOT_LABELS[idx];
+			uiStore.setSlotInFocus(slot);
+			const slotEntry = slotsStore.slots[slot];
+			if (slotEntry.patch) {
+				applySlotResult({ patch: slotEntry.patch, name: slotEntry.name });
+			} else {
+				applySlotResult(await slotsStore.loadSlot(slot));
+			}
+		}
+		if (!browserStore.synthPatches.length) {
+			browserStore.loadSynthList();
+		}
+	}
+
+	// Binds this window to a specific physical G2 (one BrowserWindow per device — see the
+	// multi-device plan) before running the existing single-device connect flow unchanged.
+	async function bindAndConnect(bus: number, deviceAddr: number): Promise<void> {
+		const { id } = await window.electronAPI.devices.connect(bus, deviceAddr);
+		connectedDevices.setThisId(id);
+		await connectDevice();
+	}
+
+	async function selectDeviceCandidate(c: { bus: number; device: number }): Promise<void> {
+		showDevicePickerDialog.value = false;
+		await bindAndConnect(c.bus, c.device);
+		await afterConnectRestoreFocus();
+		startingUp.value = false;
+	}
+
+	function cancelDevicePicker(): void {
+		showDevicePickerDialog.value = false;
+		device.status = DeviceStatus.Disconnected;
+		startingUp.value = false;
+	}
+
 	onMounted(async () => {
 		const { version, platform } = await window.electronAPI.getAppInfo();
 		console.log(`[startup] ${APP_NAME} v${version} — ${platform}`);
 
-		const isOffline = window.electronAPI.isOffline;
-		if (isOffline) {
+		if (isOfflineMode.value) {
 			device.status = DeviceStatus.Offline;
+			showAboutDialog.value = false;
+			startingUp.value = false;
+			return;
+		}
+
+		window.electronAPI.devices.onChanged((list) => connectedDevices.applyList(list));
+
+		const found = await window.electronAPI.devices.list();
+		const unclaimed = found.filter((d) => !d.alreadyConnected);
+		if (unclaimed.length <= 1) {
+			// Zero found: fall through to today's existing "not found" behavior unchanged.
+			// Exactly one found: bind it to this window automatically — preserves today's
+			// zero-click UX for the common single-G2 case.
+			if (unclaimed.length === 1) await bindAndConnect(unclaimed[0].bus, unclaimed[0].device);
+			else await connectDevice();
 		} else {
-			await connectDevice();
+			deviceCandidates.value = unclaimed.map((d) => ({ ...d, name: null }));
+			showDevicePickerDialog.value = true;
+			unclaimed.forEach(async (d, i) => {
+				const name = await window.electronAPI.devices.getName(d.bus, d.device);
+				const entry = deviceCandidates.value[i];
+				if (entry) entry.name = name;
+			});
+			showAboutDialog.value = false;
+			return; // startingUp/focus-restore resume in selectDeviceCandidate() once the user picks one
 		}
-		if (!isOffline && device.status === DeviceStatus.Connected) {
-			const focusedEntry = device.device?.slots?.find((s) => s.key);
-			const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
-			const idx = SLOT_LABELS.indexOf(focusLabel);
-			if (idx >= 0) {
-				const slot = SLOT_LABELS[idx];
-				uiStore.setSlotInFocus(slot);
-				const slotEntry = slotsStore.slots[slot];
-				if (slotEntry.patch) {
-					applySlotResult({ patch: slotEntry.patch, name: slotEntry.name });
-				} else {
-					applySlotResult(await slotsStore.loadSlot(slot));
-				}
-			}
-			if (!browserStore.synthPatches.length) {
-				browserStore.loadSynthList();
-			}
-		}
+
+		await afterConnectRestoreFocus();
 		showAboutDialog.value = false;
 		startingUp.value = false;
 	});

@@ -5,6 +5,8 @@
 
 #include "daemon_harness.h"
 #include "unity.h"
+#include <fcntl.h>
+#include <stdio.h>
 #include <unistd.h>
 #include <stdlib.h>
 #include <string.h>
@@ -76,7 +78,10 @@ int send_and_expect_ok_save_event(daemon_ctx_t *d, const char *json,
     return -1;
 }
 
-daemon_ctx_t daemon_spawn(void) {
+/* Shared by daemon_spawn()/daemon_spawn_bus_device(): fork+exec g2-cli with the
+ * given argv, wiring its stdin/stdout to pipes. argv[0] and the trailing NULL
+ * are the caller's responsibility. */
+static daemon_ctx_t daemon_spawn_argv(char *const argv[]) {
     daemon_ctx_t d = {0};
     int in_pipe[2], out_pipe[2];
 
@@ -85,6 +90,16 @@ daemon_ctx_t daemon_spawn(void) {
 
     pipe(in_pipe);
     pipe(out_pipe);
+    /* CLOEXEC every fd: without this, spawning a SECOND daemon while this one's
+     * pipe fds are still open in the parent leaks copies of them into that second
+     * daemon's process via fork() (dup2's targets 0/1 clear CLOEXEC regardless, so
+     * the child's own stdin/stdout still work). Otherwise the first daemon's stdin
+     * write-end never drops to a zero refcount when the parent closes its own copy
+     * (daemon_shutdown), so it never sees EOF and daemon_shutdown blocks forever. */
+    fcntl(in_pipe[0],  F_SETFD, FD_CLOEXEC);
+    fcntl(in_pipe[1],  F_SETFD, FD_CLOEXEC);
+    fcntl(out_pipe[0], F_SETFD, FD_CLOEXEC);
+    fcntl(out_pipe[1], F_SETFD, FD_CLOEXEC);
 
     pid_t pid = fork();
     TEST_ASSERT_TRUE(pid >= 0);
@@ -95,7 +110,7 @@ daemon_ctx_t daemon_spawn(void) {
         dup2(out_pipe[1], STDOUT_FILENO);
         close(in_pipe[1]); close(out_pipe[0]);
         close(in_pipe[0]); close(out_pipe[1]);
-        execl("build/bin/g2-cli", "g2-cli", "--json", "daemon", NULL);
+        execv("build/bin/g2-cli", argv);
         exit(1);
     }
 
@@ -108,6 +123,19 @@ daemon_ctx_t daemon_spawn(void) {
 
     usleep(1500000); /* allow daemon to connect and arm watch */
     return d;
+}
+
+daemon_ctx_t daemon_spawn(void) {
+    char *argv[] = {"g2-cli", "--json", "daemon", NULL};
+    return daemon_spawn_argv(argv);
+}
+
+daemon_ctx_t daemon_spawn_bus_device(int bus, int device) {
+    char bus_s[16], dev_s[16];
+    snprintf(bus_s, sizeof(bus_s), "%d", bus);
+    snprintf(dev_s, sizeof(dev_s), "%d", device);
+    char *argv[] = {"g2-cli", "--json", "daemon", bus_s, dev_s, NULL};
+    return daemon_spawn_argv(argv);
 }
 
 /* Draining prevents the daemon from getting SIGPIPE on its next stdout write

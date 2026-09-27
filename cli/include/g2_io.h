@@ -18,6 +18,15 @@
 /* The single g2 device handle — owned by g2_io.c */
 extern g2_device_t g2;
 
+/* Optional USB bus/device-address target for g2_connect()/g2_connect_silent().
+ * 0/0 (the default) means "first G2 found by VID/PID" — today's behavior, used
+ * by every single-device command/test. Set via g2_set_target() so a daemon (or
+ * a one-shot command like get-device-name) can pin itself to one specific
+ * physical unit when multiple G2s are attached. */
+extern int g2_target_bus;
+extern int g2_target_device;
+void g2_set_target(int bus, int device);
+
 /* ── Listener message type ─────────────────────────────────────────────── */
 
 typedef struct {

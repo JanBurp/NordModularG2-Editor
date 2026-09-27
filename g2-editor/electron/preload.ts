@@ -38,6 +38,22 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
 	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),
+
+	devices: {
+		list: () => ipcRenderer.invoke("devices:list"),
+		getName: (bus: number, device: number) => ipcRenderer.invoke("devices:get-name", bus, device),
+		connect: (bus: number, device: number) => ipcRenderer.invoke("devices:connect", bus, device),
+		openWindow: () => ipcRenderer.invoke("devices:open-window"),
+		focusWindow: (id: string) => ipcRenderer.invoke("devices:focus", id),
+		reportName: (name: string) => ipcRenderer.invoke("devices:report-name", name),
+		onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) =>
+			ipcRenderer.on("devices:changed", (_event, list) => cb(list)),
+		offChanged: () => ipcRenderer.removeAllListeners("devices:changed"),
+	},
+	clipboard: {
+		write: (entry: unknown) => ipcRenderer.invoke("clipboard:write", entry),
+		read: () => ipcRenderer.invoke("clipboard:read"),
+	},
 });
 
 /* Formats a command's args for the USB log, replacing any inline byte-array payload

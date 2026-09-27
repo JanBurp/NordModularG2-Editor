@@ -45,6 +45,20 @@ declare global {
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
 			selectBankFolder: () => Promise<{ success: boolean; folder?: string }>;
 			selectPchListFile: () => Promise<{ success: boolean; filepath?: string }>;
+			devices: {
+				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;
+				getName: (bus: number, device: number) => Promise<string | null>;
+				connect: (bus: number, device: number) => Promise<{ id: string }>;
+				openWindow: () => Promise<void>;
+				focusWindow: (id: string) => Promise<void>;
+				reportName: (name: string) => Promise<void>;
+				onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) => void;
+				offChanged: () => void;
+			};
+			clipboard: {
+				write: (entry: unknown) => Promise<void>;
+				read: () => Promise<unknown | null>;
+			};
 		};
 		cli: CliService;
 	}

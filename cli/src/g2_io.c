@@ -27,6 +27,14 @@ g2_device_t g2 = {
     .interface_claimed = 0
 };
 
+int g2_target_bus = 0;
+int g2_target_device = 0;
+
+void g2_set_target(int bus, int device) {
+    g2_target_bus = bus;
+    g2_target_device = device;
+}
+
 int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
 volatile int g2_pending_disconnect = 0;
@@ -150,10 +158,40 @@ cJSON *g2_list_devices_json(void) {
     return root;
 }
 
+/* Opens the G2 handle, honoring g2_target_bus/g2_target_device when set (both
+ * nonzero); falls back to the original "first G2 found" behavior otherwise, so
+ * every existing single-device caller is unaffected. When targeting a specific
+ * bus/address, libusb_open() takes its own reference on the device, so freeing
+ * the list right after (unref_devices=1) is safe — same pattern
+ * libusb_open_device_with_vid_pid() itself uses internally. */
+static libusb_device_handle *g2_open_target(void) {
+    if (g2_target_bus == 0 && g2_target_device == 0) {
+        return libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
+    }
+
+    libusb_device **devices;
+    ssize_t count = libusb_get_device_list(g2.ctx, &devices);
+    if (count < 0) return NULL;
+
+    libusb_device_handle *handle = NULL;
+    for (ssize_t idx = 0; idx < count; idx++) {
+        struct libusb_device_descriptor desc;
+        if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
+        if (desc.idVendor != VENDOR_ID || desc.idProduct != PRODUCT_ID) continue;
+        if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
+        if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
+        if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
+        break;
+    }
+
+    libusb_free_device_list(devices, 1);
+    return handle;
+}
+
 int g2_connect(void) {
     int ret;
 
-    g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
+    g2.handle = g2_open_target();
     if (!g2.handle) {
         fprintf(stderr, "G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
         return G2_ERR_NOT_FOUND;
@@ -177,7 +215,7 @@ int g2_connect(void) {
 int g2_connect_silent(void) {
     int ret;
 
-    g2.handle = libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
+    g2.handle = g2_open_target();
     if (!g2.handle) {
         return G2_ERR_NOT_FOUND;
     }
