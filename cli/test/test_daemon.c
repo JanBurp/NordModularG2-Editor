@@ -189,10 +189,88 @@ static int upload_fixture_to_slot_a(daemon_ctx_t *d) {
     return r;
 }
 
+/* Captures slot A's current patch as a fully-framed, re-uploadable pch2 buffer, so
+ * a test that must overwrite slot A (see upload_fixture_to_slot_a above) can restore
+ * it afterward. get-patch returns raw wire-order section bytes with no header/CRC;
+ * this wraps them the same way g2_get_perf_file does per-slot (canonicalize order,
+ * prepend [name][0x00][0x17][0x00], append calc_crc16 over [0x17][0x00][sections]). */
+static int capture_slot_a_patch(daemon_ctx_t *d, uint8_t **out_buf, size_t *out_len) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+    cJSON *resp = send_and_capture_response(d, cmd, id);
+    if (!resp) return -1;
+
+    cJSON *data = cJSON_GetObjectItem(resp, "data");
+    cJSON *name_item = data ? cJSON_GetObjectItem(data, "name") : NULL;
+    cJSON *hex_item  = data ? cJSON_GetObjectItem(data, "data") : NULL;
+    const char *name = name_item ? cJSON_GetStringValue(name_item) : NULL;
+    const char *hex  = hex_item  ? cJSON_GetStringValue(hex_item)  : NULL;
+    if (!name || !hex) { cJSON_Delete(resp); return -1; }
+
+    uint8_t *sections = NULL;
+    int sections_len = hex_to_bytes(hex, &sections);
+    if (sections_len <= 0) { cJSON_Delete(resp); return -1; }
+
+    size_t canon_cap = (size_t)sections_len + PCH2_CANONICAL_GROWTH;
+    uint8_t *canon = malloc(canon_cap);
+    size_t canon_len = 0;
+    if (!canon) { free(sections); cJSON_Delete(resp); return -1; }
+    patch_slot_sections_canonical(sections, (size_t)sections_len, canon, &canon_len);
+    free(sections);
+
+    size_t name_len = strlen(name);
+    size_t buf_len = name_len + 3 + canon_len + 2;
+    uint8_t *buf = malloc(buf_len);
+    if (!buf) { free(canon); cJSON_Delete(resp); return -1; }
+
+    size_t pos = 0;
+    memcpy(buf + pos, name, name_len); pos += name_len;
+    buf[pos++] = 0x00;
+    buf[pos++] = 0x17;
+    buf[pos++] = 0x00;  /* file type: patch */
+    size_t crc_start = pos - 2;
+    memcpy(buf + pos, canon, canon_len); pos += canon_len;
+    free(canon);
+    uint16_t crc = calc_crc16(buf + crc_start, (int)(pos - crc_start));
+    buf[pos++] = (uint8_t)((crc >> 8) & 0xff);
+    buf[pos++] = (uint8_t)(crc & 0xff);
+
+    cJSON_Delete(resp);
+    *out_buf = buf;
+    *out_len = pos;
+    return 0;
+}
+
+/* Uploads a buffer captured by capture_slot_a_patch back to slot A. */
+static int restore_slot_a_patch(daemon_ctx_t *d, const uint8_t *buf, size_t len) {
+    char *b64 = base64_encode(buf, len);
+    if (!b64) return -1;
+
+    size_t cmdCap = strlen(b64) + 128;
+    char *cmd = malloc(cmdCap);
+    if (!cmd) { free(b64); return -1; }
+    int id = g_cmd_id++;
+    snprintf(cmd, cmdCap, "{\"id\":%d,\"cmd\":\"upload-patch-data\",\"args\":[\"A\",\"%s\"]}", id, b64);
+    free(b64);
+
+    int r = send_and_expect_ok(d, cmd, id);
+    free(cmd);
+    return r;
+}
+
 /* Test: dump-patch (Dump One) transmits the active slot A patch as MIDI SYSEX.
- * Transmit-only (no flash/state write), so no cleanup is needed. */
+ * dump-patch itself is transmit-only, but its setup step must overwrite slot A (see
+ * upload_fixture_to_slot_a above), so this captures slot A's original patch first and
+ * restores it afterward, leaving the G2's state unchanged by the end of the test. */
 void test_daemon_dump_patch_cmd(void) {
     if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
     usleep(300000); /* let the slot settle, same convention as test_upload_patch.c */
 
@@ -200,7 +278,13 @@ void test_daemon_dump_patch_cmd(void) {
     int id = g_cmd_id++;
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"dump-patch\",\"args\":[\"A\"]}", id);
     int r = send_and_expect_ok(&g_daemon, cmd, id);
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    usleep(300000); /* let the slot settle before the next test reads it */
+
     TEST_ASSERT_EQUAL_INT(0, r);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
 /* Test: send-controller-snapshot pushes all active slots' MIDI CC values to
