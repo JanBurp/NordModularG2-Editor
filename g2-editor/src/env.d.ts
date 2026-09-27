@@ -47,7 +47,6 @@ declare global {
 			selectPchListFile: () => Promise<{ success: boolean; filepath?: string }>;
 			devices: {
 				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;
-				getName: (bus: number, device: number) => Promise<string | null>;
 				connect: (bus: number, device: number) => Promise<{ id: string }>;
 				openWindow: () => Promise<void>;
 				focusWindow: (id: string) => Promise<void>;

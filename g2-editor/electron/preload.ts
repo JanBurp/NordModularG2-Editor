@@ -41,7 +41,6 @@ contextBridge.exposeInMainWorld("electronAPI", {
 
 	devices: {
 		list: () => ipcRenderer.invoke("devices:list"),
-		getName: (bus: number, device: number) => ipcRenderer.invoke("devices:get-name", bus, device),
 		connect: (bus: number, device: number) => ipcRenderer.invoke("devices:connect", bus, device),
 		openWindow: () => ipcRenderer.invoke("devices:open-window"),
 		focusWindow: (id: string) => ipcRenderer.invoke("devices:focus", id),

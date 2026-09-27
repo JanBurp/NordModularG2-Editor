@@ -312,16 +312,6 @@ ipcMain.handle("devices:list", async () => {
 		}));
 });
 
-ipcMain.handle("devices:get-name", async (_, bus: number, device: number) => {
-	try {
-		const out = await runCliOneShot(["--json", "get-device-name", String(bus), String(device)]);
-		const parsed = JSON.parse(out);
-		return parsed.ok && parsed.name ? parsed.name : null;
-	} catch {
-		return null;
-	}
-});
-
 ipcMain.handle("devices:connect", async (event, bus: number, device: number) => {
 	const window = BrowserWindow.fromWebContents(event.sender);
 	if (!window) throw new Error("No window for this call");

@@ -94,7 +94,6 @@ static void print_usage(const char *prog) {
     printf("  get-bank <type> <bank> <folder> [<name>]                                                  Get bank from device (type: patch|performance, bank: 1-32 or 1-8)\n");
     printf("  send-bank <type> <source-type> <source-path> <bank>                                       Send bank to device (type: patch|performance, source-type: pchList|folder, bank: 1-32 or 1-8)\n");
     printf("  daemon [<bus> <device>]                                                                   Persistent connection: watch + accept JSON commands on stdin (optional bus/device pins one specific G2)\n");
-    printf("  get-device-name <bus> <device>                                                            One-shot: connect to a specific G2 and return its hardware name\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                 Run multiple commands sequentially, sharing the USB connection\n");
 }
 
@@ -957,63 +956,6 @@ static int cmd_daemon(int argc, char **argv, int i) {
     _exit(ret);
 }
 
-/* One-shot: connect to a specific bus/device, fetch just the synth's hardware name,
- * disconnect. Kept separate from list-devices (which stays a fast, dumb USB
- * enumeration) so naming a not-yet-connected G2 doesn't cost every caller of
- * list-devices a full connect+handshake. */
-static int cmd_get_device_name(int argc, char **argv, int i) {
-    if (i + 2 >= argc) {
-        if (output_format == OUTPUT_JSON)
-            output_error_json("bus and device required", output_format);
-        else
-            fprintf(stderr, "Usage: get-device-name <bus> <device>\n");
-        return 1;
-    }
-    int bus = atoi(argv[i + 1]);
-    int device = atoi(argv[i + 2]);
-    g2_set_target(bus, device);
-
-    if (g2_connect_silent() != G2_OK) {
-        g2_set_target(0, 0);
-        if (output_format == OUTPUT_JSON)
-            output_error_json("G2 not found at that bus/device", output_format);
-        else
-            fprintf(stderr, "G2 not found at that bus/device\n");
-        return 1;
-    }
-
-    int ret = 0;
-    if (g2_send_init() != G2_OK) {
-        if (output_format == OUTPUT_JSON)
-            output_error_json("Failed to initialize G2", output_format);
-        else
-            fprintf(stderr, "Failed to initialize G2\n");
-        ret = 1;
-    } else {
-        cJSON *info = g2_device_info(debug_mode);
-        if (!info) {
-            if (output_format == OUTPUT_JSON)
-                output_error_json("Failed to get device info", output_format);
-            else
-                fprintf(stderr, "Failed to get device info\n");
-            ret = 1;
-        } else {
-            cJSON *name_item = cJSON_GetObjectItem(info, "synthName");
-            cJSON *result = cJSON_CreateObject();
-            cJSON_AddBoolToObject(result, "ok", 1);
-            cJSON_AddStringToObject(result, "name",
-                (name_item && cJSON_IsString(name_item)) ? name_item->valuestring : "");
-            output_json(result, output_format);
-            cJSON_Delete(result);
-            cJSON_Delete(info);
-        }
-    }
-
-    g2_disconnect();
-    g2_set_target(0, 0);  /* don't leak this target into a later sub-command under `seq` */
-    return ret;
-}
-
 static int cmd_send_controller_snapshot(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
     return g2_send_controller_snapshot();
@@ -1153,7 +1095,6 @@ static const cmd_entry_t commands[] = {
     { "set-slot-range",        cmd_set_slot_range        },
     { "set-range-enable",      cmd_set_range_enable      },
     { "daemon",                cmd_daemon                },
-    { "get-device-name",       cmd_get_device_name       },
     { "send-controller-snapshot", cmd_send_controller_snapshot },
     { "dump-patch",        cmd_dump_patch        },
     { "get-bank",          cmd_get_bank          },

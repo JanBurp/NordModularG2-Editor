@@ -9,11 +9,11 @@ import path from 'path';
 // spec exercises. These tests launch their own Electron instance(s) without that flag instead.
 const APP_ROOT = path.join(__dirname, '..');
 
-type FakeDevice = { bus: number; device: number; name: string };
+type FakeDevice = { bus: number; device: number };
 
 // Stubs the same "no daemon/binary needed" IPC channels the shared fixture stubs (cli:run,
-// cli:run-batch, cli:watch-start), plus devices:list/devices:get-name so App.vue's startup flow
-// sees a controlled set of "connected G2s" instead of the real (hardware-less, in CI) result.
+// cli:run-batch, cli:watch-start), plus devices:list so App.vue's startup flow sees a
+// controlled set of "connected G2s" instead of the real (hardware-less, in CI) result.
 async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice[]): Promise<void> {
 	await app.evaluate(({ ipcMain }, devs) => {
 		for (const ch of ['cli:run', 'cli:run-batch']) {
@@ -24,14 +24,11 @@ async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice
 		ipcMain.handle('cli:watch-start', async () => {
 			// Deliberately does not emit watch_armed — connectDevice()'s 8s timeout is allowed
 			// to fire in the background; these tests only assert on state that's settled well
-			// before then (the picker dialog, window count), not on a reached "Connected" status.
+			// before then (window count), not on a reached "Connected" status.
 		});
 
 		ipcMain.removeHandler('devices:list');
 		ipcMain.handle('devices:list', async () => devs.map((d) => ({ bus: d.bus, device: d.device, id: `${d.bus}:${d.device}`, alreadyConnected: false })));
-
-		ipcMain.removeHandler('devices:get-name');
-		ipcMain.handle('devices:get-name', async (_e: unknown, bus: number, device: number) => devs.find((d) => d.bus === bus && d.device === device)?.name ?? null);
 	}, devices);
 }
 
@@ -51,45 +48,40 @@ const test = base.extend<{ userDataDir: string }>({
 });
 
 test.describe('multi-device — one BrowserWindow per connected G2', () => {
-	test('exactly one unclaimed device auto-binds without showing the picker dialog', async ({ userDataDir }) => {
+	test('exactly one unclaimed device auto-binds', async ({ userDataDir }) => {
 		const app = await launchApp(userDataDir);
 		try {
 			const page = await app.firstWindow();
 			await page.waitForLoadState('domcontentloaded');
-			await stubDeviceDiscovery(app, [{ bus: 2, device: 1, name: 'Studio G2' }]);
+			await stubDeviceDiscovery(app, [{ bus: 2, device: 1 }]);
 			// The real onMounted flow may have already run against the unstubbed handler before
 			// the stub landed; reload so this run observes it.
 			await page.reload();
 			await page.waitForLoadState('domcontentloaded');
 			await page.waitForSelector('[data-testid="connection-status"]');
 
-			await expect(page.getByText('Select G2 Device')).not.toBeVisible();
+			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
 		} finally {
 			await app.close();
 		}
 	});
 
-	test('multiple unclaimed devices show a picker; selecting one closes it, and "Connect Another Device" opens a second real window', async ({ userDataDir }) => {
+	test('multiple unclaimed devices: auto-binds to the first one (no picker), and "Connect Another Device" opens a second real window', async ({ userDataDir }) => {
 		const app = await launchApp(userDataDir);
 		try {
 			const page = await app.firstWindow();
 			await page.waitForLoadState('domcontentloaded');
 			await stubDeviceDiscovery(app, [
-				{ bus: 2, device: 1, name: 'Studio G2' },
-				{ bus: 0, device: 7, name: 'Rack G2' },
+				{ bus: 2, device: 1 },
+				{ bus: 0, device: 7 },
 			]);
 			await page.reload();
 			await page.waitForLoadState('domcontentloaded');
 			await page.waitForSelector('[data-testid="connection-status"]');
 
-			await expect(page.getByText('Select G2 Device')).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Studio G2' })).toBeVisible();
-			await expect(page.getByRole('button', { name: 'Rack G2' })).toBeVisible();
-
-			await page.getByRole('button', { name: 'Studio G2' }).click();
-			await expect(page.getByText('Select G2 Device')).not.toBeVisible();
-
+			// No dialog anywhere — the first candidate is bound automatically.
 			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+
 			await page.getByTitle('Connect another G2').click();
 			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(2);
 		} finally {
