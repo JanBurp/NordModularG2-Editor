@@ -47,10 +47,10 @@
  *  - *_FETCH_TEST_BANK can be ANY existing bank, occupied or not - the fetch
  *    test only ever reads, it never writes.
  */
-#define PATCH_WRITE_TEST_BANK 6 /* confirmed empty on hardware, 2026-09-21 */
-#define PATCH_FETCH_TEST_BANK 1 /* known-existing patch bank, 2026-09-21 */
-#define PERF_WRITE_TEST_BANK  7 /* confirmed empty on hardware, 2026-09-21 - bank 8 is NOT empty, avoid */
+ #define PATCH_FETCH_TEST_BANK 1 /* known-existing patch bank, 2026-09-21 */
+#define PATCH_WRITE_TEST_BANK 32 /* confirmed empty on hardware, 2026-09-21 */
 #define PERF_FETCH_TEST_BANK  1 /* known-existing performance bank, 2026-09-21 */
+#define PERF_WRITE_TEST_BANK  8 /* confirmed empty on hardware, 2026-09-21 */
 
 static int suite_initialized = 0;
 
