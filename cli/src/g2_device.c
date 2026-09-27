@@ -3072,17 +3072,6 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     if (folder == NULL) { g2_err("get-bank: folder required\n"); return NULL; }
     if (ensure_connected(1) < 0) { g2_err("get-bank: not connected\n"); return NULL; }
 
-    /* Same reason g2_send_bank stops the stream: the listener queue holds 64
-     * messages and drops the OLDEST on overflow (g2_io.c), so over 128 locations
-     * live LED/VU traffic evicts the answers this loop is waiting for. Always
-     * stopped; never rearmed here — g2_lock_stream() is idempotent (a no-op if
-     * a chained bank op already left it locked) and the daemon's main loop
-     * unlocks once it has nothing else queued, so a whole burst of chained
-     * get-bank/send-bank calls only stops/restarts the stream once. In CLI/
-     * direct mode this never gets unlocked at all - see g2_send_bank's copy of
-     * this comment. */
-    g2_lock_stream();
-
     /* Drain stale data (same pattern as g2_get_patch_file/g2_get_perf_file). */
     if (!g2_listener_active) drain_stale_extended();
 
@@ -3604,24 +3593,6 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     if (source_path == NULL) { g2_err("send-bank: source path required\n"); return NULL; }
     if (ensure_connected(1) < 0) { g2_err("send-bank: not connected\n"); return NULL; }
 
-    /* Stop the G2's live stream for the whole loop. Each write is answered by a
-     * CMFlashDumpMarker that send_flash_dump_raw has to actually receive, but
-     * the listener queue holds only MSG_QUEUE_MAX (64) messages and drops the
-     * OLDEST on overflow (g2_io.c) - over 128 locations the continuous LED/VU/
-     * param stream overruns it and takes the markers with it. Confirmed on
-     * hardware (2026-09-14): with streaming on, markers start going missing
-     * part-way through a 23-patch bank and the device eventually stops
-     * accepting writes altogether. Same precaution every other direct-USB query
-     * in this file takes. Always stop - a one-shot CLI run can inherit a still-
-     * streaming device from a daemon that exited without stopping it. Never
-     * rearmed here - g2_lock_stream() is idempotent (a no-op if a chained
-     * get-bank/send-bank already left it locked) and the daemon's main loop
-     * unlocks once it has nothing else queued, so a whole burst of chained bank
-     * ops only stops/restarts the stream once. In CLI/direct mode this never
-     * gets unlocked at all: re-arming from the one-shot CLI would leave the
-     * device chattering into whatever command runs next. */
-    g2_lock_stream();
-
     bank_entry_t *entries = calloc(128, sizeof(bank_entry_t));
     if (!entries) {
         g2_err("send-bank: out of memory\n");
@@ -3809,23 +3780,6 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
     if (!aborted) {
         for (int i = 0; i < nDeferredClear; i++) g2_clear_patch(type, bank, deferredClear[i]);
     }
-
-    /* The G2 sends a BULK_REARM after a bank write, which the daemon would
-     * otherwise defer via g2_pending_rearm and - once this command returns -
-     * answer with rearm_with_version_update(): a full re-fetch of all 4 live
-     * slots (g2_emit_rearm_data -> g2_get_patch x4). send-bank never touches
-     * the live slots, so that re-fetch has nothing to learn and every chance
-     * to misread a leftover packet ("Unexpected response type for patch
-     * data", confirmed on hardware 2026-09-14, surfacing as "Error" patches in
-     * all 4 slots). Drain what is left (bounded, so a stuck queue can't hang
-     * this command), then clear the flag so the daemon skips that re-fetch -
-     * the stream stays locked (g2_stream_locked) for the daemon's idle check
-     * to unlock with a plain g2_rearm() once the whole burst is done. */
-    for (int i = 0; i < 50; i++) {
-        uint8_t drain[64] = {0};
-        if (recv_interrupt(drain, sizeof(drain), USB_TIMEOUT_STANDARD_MS) <= 0) break;
-    }
-    g2_pending_rearm = 0;
 
     if (aborted) g2_err("send-bank: aborted - %s\n", abortReason);
 

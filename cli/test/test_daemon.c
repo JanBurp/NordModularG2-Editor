@@ -328,12 +328,12 @@ static void bank_chain_one_type(daemon_ctx_t *d, const char *type_str, int loadB
 }
 
 /* Test: get-bank immediately followed by send-bank, and the reverse order, must not
- * intermittently fail with "no reply from device for location N" - regression test for
- * the STOP_COMM/START_COMM lock/unlock scoping fix. Each bank op used to independently
- * call g2_stop_comm()/g2_rearm() around itself; chaining two of them let a stray embedded
- * message (from the brief re-armed window between them) get misread by g2_stop_comm()'s
- * old unverified "first embedded message = the ack" logic as the ack for the next op,
- * desyncing the request/response lockstep. Covers both patch and performance banks (the
+ * intermittently fail with "no reply from device for location N". get-bank/send-bank no
+ * longer stop the G2's live stream during the transfer (removed so front-panel parameter
+ * changes aren't silently lost mid-transfer) - this is the canary for the flash-dump/
+ * live-stream interleaving risk that precaution used to guard against: over 128 chained
+ * locations, continuous LED/VU/param traffic can still evict a flash-dump marker from the
+ * listener's queue before this loop reads it. Covers both patch and performance banks (the
  * original repro was on a performance bank). Never writes to the *_LOAD banks - only ever
  * overwrites the *_STORE banks - but send-bank still unconditionally overwrites whatever it
  * writes to, so this is opt-in only: set G2_TEST_BANK_CHAIN=1 to run it. Bank numbers are

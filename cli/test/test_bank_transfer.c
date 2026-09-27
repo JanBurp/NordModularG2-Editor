@@ -17,13 +17,13 @@
  * matters here), so neither does this test. That makes the whole suite slow
  * (several minutes) by design.
  *
- * A generalized fix for the underlying chaining bug (g2_lock_stream()/
- * g2_unlock_stream(), see g2_io.c) has since landed, but its hardware
- * verification is unresolved - see project_stream_lock_generalization.md
- * ("Correction, later the same day"): an initial clean pass could not be
- * reproduced, with reproducible "no reply" failures and one hard G2 freeze.
- * So human_pause() stays as the defensive default here until a fresh
- * hardware pass actually confirms the fix.
+ * get-bank/send-bank no longer stop the G2's live stream during a transfer (the
+ * g2_lock_stream()/g2_unlock_stream() precaution was removed from both, see g2_device.c)
+ * so front-panel parameter changes aren't silently lost mid-transfer - which means the
+ * flash-dump/live-stream interleaving risk that precaution used to guard against is back
+ * in play for chained bank ops. human_pause() stays as the defensive default regardless:
+ * it models realistic user pacing (one bank operation at a time through the UI), not a
+ * technical workaround for that risk.
  */
 
 #include "unity.h"

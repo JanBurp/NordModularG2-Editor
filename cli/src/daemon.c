@@ -1109,11 +1109,11 @@ int g2_daemon_run(output_format_t format, int debug) {
 		}
 		cmds_since_listener_check = 0;
 
-		/* Nothing left queued: unlock any stream a command left locked (bank
-		 * ops - see g2_get_bank/g2_send_bank) now that we're genuinely idle,
-		 * mirroring the reference editor's unlock-on-idle-tick behavior. A
-		 * plain unlock, not rearm_with_version_update(): nothing that reaches
-		 * this path touches the live slots. */
+		/* Nothing left queued: unlock any stream a command left locked (e.g.
+		 * select-patch/select-perf/set-perf-mode/upload-perf) now that we're
+		 * genuinely idle, mirroring the reference editor's unlock-on-idle-tick
+		 * behavior. A plain unlock, not rearm_with_version_update(): nothing
+		 * that reaches this path touches the live slots. */
 		if (!had_line && g2_stream_locked) g2_unlock_stream();
 
 		/* Wait for next event from the listener. A batch of stdin commands likely means
