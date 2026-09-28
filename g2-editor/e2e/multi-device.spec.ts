@@ -1,5 +1,5 @@
 import { test as base, _electron as electron, type ElectronApplication } from '@playwright/test';
-import { expect } from './fixtures/electron';
+import { expect, evaluateWithRetry } from './fixtures/electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -15,7 +15,7 @@ type FakeDevice = { bus: number; device: number };
 // cli:run-batch, cli:watch-start), plus devices:list so App.vue's startup flow sees a
 // controlled set of "connected G2s" instead of the real (hardware-less, in CI) result.
 async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice[]): Promise<void> {
-	await app.evaluate(({ ipcMain }, devs) => {
+	await evaluateWithRetry(app, ({ ipcMain }, devs) => {
 		for (const ch of ['cli:run', 'cli:run-batch']) {
 			ipcMain.removeHandler(ch);
 			ipcMain.handle(ch, async () => '');

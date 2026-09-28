@@ -15,7 +15,7 @@ const FIXTURES_DIR = path.join(__dirname, '..', '..', '..', 'test-patches');
 // than failing the test on this transient race.
 const TRANSIENT_EVALUATE_ERRORS = ['Execution context was destroyed', 'Resulting promise was garbage collected'];
 
-async function evaluateWithRetry<R, Arg = void>(
+export async function evaluateWithRetry<R, Arg = void>(
 	app: ElectronApplication,
 	fn: (electron: typeof import('electron'), arg: Arg) => R,
 	arg?: Arg,
