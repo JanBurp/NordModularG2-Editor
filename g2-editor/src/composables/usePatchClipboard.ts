@@ -1,6 +1,6 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
-import { computed, onUnmounted } from 'vue';
+import { computed, getCurrentInstance, onUnmounted } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
@@ -38,7 +38,9 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	// cross-window usage pattern — without needing an OS clipboard-changed watcher.
 	if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
 		window.addEventListener('focus', refreshHasClipboard);
-		onUnmounted(() => window.removeEventListener('focus', refreshHasClipboard));
+		if (getCurrentInstance()) {
+			onUnmounted(() => window.removeEventListener('focus', refreshHasClipboard));
+		}
 	}
 
 	function copySelection(): void {
