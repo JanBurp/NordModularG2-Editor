@@ -13,6 +13,7 @@
 #include <signal.h>
 #include <sys/wait.h>
 #include <sys/select.h>
+#include <time.h>
 #include "../include/g2_device.h"
 
 int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec) {
@@ -54,7 +55,9 @@ int send_and_expect_ok_save_event(daemon_ctx_t *d, const char *json,
     if (write(d->in_fd, "\n", 1) != 1) return -1;
     if (captured) *captured = NULL;
 
-    for (int i = 0; i < 50; i++) {
+    /* Time-bound, not attempt-bound: see send_and_expect_ok(). */
+    time_t deadline = time(NULL) + 20;
+    while (time(NULL) < deadline) {
         if (read_line_timeout(d->out_fd, buf, sizeof(buf), 5) < 0) return -1;
         cJSON *r = cJSON_Parse(buf);
         if (!r) continue;
@@ -161,7 +164,14 @@ int send_and_expect_ok(daemon_ctx_t *d, const char *json, int expected_id) {
     if (write(d->in_fd, json, json_len) != json_len) return -1;
     if (write(d->in_fd, "\n", 1) != 1) return -1;
 
-    for (int attempts = 0; attempts < 30; attempts++) {
+    /* Time-bound, not attempt-bound: a daemon that's been streaming LED/VU telemetry
+     * unread for several seconds (e.g. right after test_daemon_multi_starts, which
+     * drains the slower of two daemons first - see that test's comment) can have an
+     * arbitrarily large backlog of unrelated events ahead of this command's actual
+     * response in the pipe. A fixed attempt count gives up before reaching it; a
+     * deadline survives any backlog that clears within a reasonable time. */
+    time_t deadline = time(NULL) + 20;
+    while (time(NULL) < deadline) {
         if (read_line_timeout(d->out_fd, line_buf, sizeof(line_buf), 5) < 0) return -1;
         cJSON *resp = cJSON_Parse(line_buf);
         if (!resp) continue;
