@@ -225,34 +225,50 @@ cJSON *g2_device_info(int debug) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) {
-        g2_err("No response from G2\n");
-        goto cleanup;
-    }
+    /* Same lockstep discipline as the performance-settings step below: skip anything
+     * not tagged as the synth-settings response, relaying it via the normal event
+     * dispatcher so it isn't lost. */
+    for (int attempt = 0; attempt < 5; attempt++) {
+        ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) {
+            g2_err("No response from G2\n");
+            goto cleanup;
+        }
 
-    msgType = response[0] & 0x0f;
-    if (msgType != RESPONSE_TYPE_EXTENDED) {
-        g2_err("Unexpected response type %d\n", msgType);
-        goto cleanup;
-    }
+        msgType = response[0] & 0x0f;
+        if (msgType != RESPONSE_TYPE_EXTENDED) {
+            g2_err("Unexpected response type %d\n", msgType);
+            goto cleanup;
+        }
 
-    size = (response[1] << 8) | response[2];
-    if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
-        g2_err("Unexpected synth settings size: %u\n", size);
-        goto cleanup;
+        size = (response[1] << 8) | response[2];
+        if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
+            g2_err("Unexpected synth settings size: %u\n", size);
+            goto cleanup;
+        }
+        uint8_t *buf = malloc(size);
+        if (!buf) {
+            g2_err("Memory allocation failed\n");
+            goto cleanup;
+        }
+        if (recv_bulk(buf, size) <= 0) {
+            g2_err("Failed to read bulk data\n");
+            free(buf);
+            goto cleanup;
+        }
+        if (buf[3] == SUB_RESPONSE_SYNTH_SETTINGS) {
+            bulkData = buf;
+            bulkSize = size;
+            break;
+        }
+        g2_msg_t relay = {0};
+        memcpy(relay.interrupt, response, 16);
+        relay.bulk = buf;
+        relay.bulk_size = size;
+        g2_emit_event(&relay);
+        free(buf);
     }
-    bulkData = malloc(size);
-    if (!bulkData) {
-        g2_err("Memory allocation failed\n");
-        goto cleanup;
-    }
-    bulkSize = size;
-
-    if (recv_bulk(bulkData, size) <= 0) {
-        g2_err("Failed to read bulk data\n");
-        goto cleanup;
-    }
+    if (!bulkData) goto cleanup;
 
     if (debug) {
         fprintf(stderr, "SYNTH:%zu:", bulkSize);
@@ -282,16 +298,24 @@ cJSON *g2_device_info(int debug) {
         goto cleanup;
     }
 
+    /* Same lockstep discipline as query_perf_settings(): a stray message can arrive
+     * before our own reply - skip anything not tagged 0x11/0x29, relaying it via the
+     * normal event dispatcher so it isn't lost. */
     uint8_t perfInterrupt[16] = {0};
     if (send_system(selsData[2], 0x10) == 0) {
         usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-
-        if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+        for (int attempt = 0; attempt < 5; attempt++) {
+            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
+            if (ret <= 0 || (perfInterrupt[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
             size = (perfInterrupt[1] << 8) | perfInterrupt[2];
             if (size > 1024) size = 1024;
-            perfSize = size;
             recv_bulk(perfData, size);
+            if (perfData[3] == 0x11 || perfData[3] == 0x29) { perfSize = size; break; }
+            g2_msg_t relay = {0};
+            memcpy(relay.interrupt, perfInterrupt, 16);
+            relay.bulk = perfData;
+            relay.bulk_size = size;
+            g2_emit_event(&relay);
         }
     }
 
@@ -356,7 +380,17 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+    /* A stray message left over in the listener queue (e.g. from the daemon's own
+     * startup churn) can arrive before our own reply - loop discarding anything not
+     * tagged as the patch-version response, same lockstep pattern as the patch-notes
+     * step below. */
+    ret = 0;
+    for (int attempt = 0; attempt < 5; attempt++) {
+        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0) break;
+        if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && interruptResp[4] == SUB_RESPONSE_PATCH_VERSION) break;
+        ret = 0;
+    }
     debug_timing("get_patch_version_end");
     if (ret <= 0) {
         g2_err("No response from G2 for patch version\n");
@@ -423,22 +457,36 @@ cJSON *g2_get_patch(const char *slot_str) {
 
     usleep(100000);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
-    debug_timing("get_patch_name_end");
+    /* Same lockstep discipline as the patch-version step above: skip anything not
+     * tagged as the patch-name response, relaying it via the normal event dispatcher
+     * so it isn't lost. */
+    for (int attempt = 0; attempt < 5; attempt++) {
+        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
+        if (ret <= 0) break;
 
-    if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
-        parse_name(interruptResp + 5, patchName, sizeof(patchName));
-    } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-        uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
-        uint8_t *nameData = malloc(size);
-        if (nameData) {
+        if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+            if (interruptResp[4] != SUB_RESPONSE_PATCH_NAME) continue;
+            parse_name(interruptResp + 5, patchName, sizeof(patchName));
+            break;
+        } else if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
+            uint8_t *nameData = malloc(size);
+            if (!nameData) break;
             int bulkLen = recv_bulk(nameData, size);
-            if (bulkLen > 4) {
+            if (bulkLen > 4 && nameData[3] == SUB_RESPONSE_PATCH_NAME) {
                 parse_name(nameData + 4, patchName, sizeof(patchName));
+                free(nameData);
+                break;
             }
+            g2_msg_t relay = {0};
+            memcpy(relay.interrupt, interruptResp, 16);
+            relay.bulk = nameData;
+            relay.bulk_size = size;
+            g2_emit_event(&relay);
             free(nameData);
         }
     }
+    debug_timing("get_patch_name_end");
 
     /* Step 4: Get patch notes ("Text Pad") — read-only; see g2_device.h for why there's no
      * live SET. Non-fatal on failure; an empty text field just means notes didn't come back
@@ -2914,15 +2962,29 @@ int g2_switch_slot(const char *slot_str) {
 
     /* Step 2: GET_PERF_SETTINGS (0x10) */
     uint8_t perfIntr[16] = {0};
-    uint8_t *perfData = malloc(2048);
-    if (!perfData) return G2_ERR_NO_MEMORY;
-    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
+    uint8_t *perfData = NULL;
+    if (send_system(perf_version, 0x10) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
-    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
-    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
-    recv_bulk(perfData, size);
+    /* Same lockstep discipline as query_perf_settings(): a stray message can arrive
+     * before our own reply - skip anything not tagged 0x11/0x29, relaying it via the
+     * normal event dispatcher so it isn't lost. */
+    for (int attempt = 0; attempt < 5; attempt++) {
+        ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
+        if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
+        size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
+        if (size == 0 || size > 2048) break;
+        uint8_t *buf = malloc(2048);
+        if (!buf) return G2_ERR_NO_MEMORY;
+        recv_bulk(buf, size);
+        if (buf[3] == 0x11 || buf[3] == 0x29) { perfData = buf; break; }
+        g2_msg_t relay = {0};
+        memcpy(relay.interrupt, perfIntr, 16);
+        relay.bulk = buf;
+        relay.bulk_size = size;
+        g2_emit_event(&relay);
+        free(buf);
+    }
+    if (!perfData) return G2_ERR_RECV;
 
     /* Step 3: navigate binary to find the focused slot and per-slot active/key bytes.
      * perfData+4 → perf name (variable) → 0x11 chunk header:

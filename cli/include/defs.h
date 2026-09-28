@@ -102,7 +102,7 @@ typedef enum {
 /* USB transfer timeouts (milliseconds) */
 #define USB_TIMEOUT_STALE_MS                (20)    /* drain stale interrupt data */
 #define USB_TIMEOUT_DRAIN_MS                (50)    /* drain pending notifications */
-#define USB_TIMEOUT_STANDARD_MS             (100)   /* normal command/response */
+#define USB_TIMEOUT_STANDARD_MS             (500)   /* normal command/response - was 100ms, too tight under LED/VU telemetry load */
 #define USB_TIMEOUT_LONG_MS                 (2000)  /* patch name fetch, slow ops */
 #define USB_TIMEOUT_SEND_MS                 (5000)  /* bulk-OUT write; a whole .prf2 is ~34 KB */
 
