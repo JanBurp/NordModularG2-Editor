@@ -65,6 +65,7 @@ const char *g2_error_string(int code) {
         case G2_ERR_NO_MEMORY:        return "out of memory";
         case G2_ERR_NOT_IMPLEMENTED:  return "not implemented";
         case G2_ERR_TOO_LARGE:        return "too large for the G2 - it cannot receive more than 32 KB in one message";
+        case G2_ERR_TARGET_NOT_FOUND: return "the targeted G2 was not found - it may have been unplugged";
         case G2_ERR:                  return "unspecified error";
         default:                      return "unknown error";
     }

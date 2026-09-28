@@ -349,7 +349,10 @@
 			{ type: 'separator' },
 			{
 				label: 'Paste Params',
-				disabled: !uiStore.clipboard?.modules.length || uiStore.clipboard.modules[0].type !== instance.value.type,
+				// uiStore.hasClipboard covers a copy made in another device's window too (OS
+				// clipboard, see usePatchClipboard.ts) — buildPasteParamsPairs already filters out
+				// any module-type mismatch, so an enabled-but-inapplicable paste is a safe no-op.
+				disabled: !uiStore.hasClipboard,
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
 			{ type: 'separator' },

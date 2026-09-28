@@ -1,6 +1,6 @@
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
-import { ref } from 'vue';
+import { computed, onUnmounted } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
@@ -9,7 +9,7 @@ import { usePatchOperations } from './usePatchOperations';
 // Copy/cut write the entry through the OS clipboard (window.electronAPI.clipboard), not just
 // uiStore.clipboard, so paste works across windows too — each connected G2 gets its own
 // Electron BrowserWindow/renderer process, so a plain Pinia field is invisible to the others.
-async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>): Promise<ClipboardEntry | null> {
+export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>): Promise<ClipboardEntry | null> {
 	try {
 		const entry = (await window.electronAPI?.clipboard?.read()) as ClipboardEntry | null | undefined;
 		if (entry && Array.isArray(entry.modules)) return entry;
@@ -26,17 +26,19 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 	const getSourceArea = areaGetter ?? (() => resolveSelectionArea(uiStore));
 
-	const hasClipboard = ref(uiStore.clipboard !== null && uiStore.clipboard.modules.length > 0);
+	uiStore.hasClipboard = uiStore.clipboard !== null && uiStore.clipboard.modules.length > 0;
+	const hasClipboard = computed(() => uiStore.hasClipboard);
 
 	async function refreshHasClipboard(): Promise<void> {
 		const entry = await readClipboardEntry(uiStore);
-		hasClipboard.value = !!entry && entry.modules.length > 0;
+		uiStore.hasClipboard = !!entry && entry.modules.length > 0;
 	}
 
 	// Covers "copy in window A, click into window B, then try to paste" — the realistic
 	// cross-window usage pattern — without needing an OS clipboard-changed watcher.
 	if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
 		window.addEventListener('focus', refreshHasClipboard);
+		onUnmounted(() => window.removeEventListener('focus', refreshHasClipboard));
 	}
 
 	function copySelection(): void {
@@ -64,7 +66,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation };
 		uiStore.clipboard = entry;
-		hasClipboard.value = entry.modules.length > 0;
+		uiStore.hasClipboard = entry.modules.length > 0;
 		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
 	}
 

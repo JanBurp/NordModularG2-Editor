@@ -739,8 +739,12 @@
 	// Binds this window to a specific physical G2 (one BrowserWindow per device — see the
 	// multi-device plan) before running the existing single-device connect flow unchanged.
 	async function bindAndConnect(bus: number, deviceAddr: number): Promise<void> {
-		const { id } = await window.electronAPI.devices.connect(bus, deviceAddr);
-		connectedDevices.setThisId(id);
+		// Set thisId from the already-known bus/device (same "${bus}:${device}" id main.ts
+		// uses) before awaiting connect() — main.ts's devices:changed broadcast for this
+		// window's own session can otherwise arrive first and briefly appear as an "other"
+		// device in DeviceSwitcher while thisId is still null.
+		connectedDevices.setThisId(`${bus}:${deviceAddr}`);
+		await window.electronAPI.devices.connect(bus, deviceAddr);
 		await connectDevice();
 	}
 

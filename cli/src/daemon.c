@@ -930,6 +930,24 @@ static void *stdin_reader(void *arg) {
 
 /* ── reconnect helper ──────────────────────────────────────────────────── */
 
+/* Throttled diagnostic for a connect-retry loop stuck on G2_ERR_TARGET_NOT_FOUND
+ * (a specific bus/device target was set but not found — see g2_io.c). Without
+ * this, that state is silent: the loop just spins on usleep(100000), which
+ * looks identical to "still booting" from the Electron side. *iterations is
+ * the caller's own loop counter, reused here purely to throttle. */
+#define TARGET_WAIT_LOG_EVERY 20  /* ~2s at the loops' 100ms usleep cadence */
+
+static void report_target_wait(int *iterations) {
+	if ((*iterations)++ % TARGET_WAIT_LOG_EVERY != 0) return;
+	cJSON *ev = cJSON_CreateObject();
+	cJSON_AddStringToObject(ev, "type", "target_wait");
+	cJSON_AddNumberToObject(ev, "bus", g2_target_bus);
+	cJSON_AddNumberToObject(ev, "device", g2_target_device);
+	cJSON_AddBoolToObject(ev, "seen_last_attempt", g2_target_last_seen);
+	emit(ev);
+	cJSON_Delete(ev);
+}
+
 static void do_reconnect(void) {
 	/* Any g2_stream_locked/g2_pending_rearm state from before the disconnect is
 	 * stale — nothing backs it on the other side of a fresh connect. */
@@ -941,8 +959,12 @@ static void do_reconnect(void) {
 	printf("{\"type\":\"device_disconnected\"}\n");
 	fflush(stdout);
 
-	while (daemon_running && g2_connect_silent() < 0)
+	int reconnect_wait_iters = 0;
+	int conn_err;
+	while (daemon_running && (conn_err = g2_connect_silent()) < 0) {
+		if (conn_err == G2_ERR_TARGET_NOT_FOUND) report_target_wait(&reconnect_wait_iters);
 		usleep(100000);
+	}
 	if (!daemon_running) return;
 
 	/* Reset G2 firmware state — same as startup init sequence (Delphi InitSeq steps 1-2). */
@@ -990,6 +1012,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 	debug_status("connect_wait");
 	{
 		int conn_err;
+		int wait_iters = 0;
 		while (daemon_running && (conn_err = g2_connect_silent()) < 0) {
 			if (conn_err == G2_ERR_CLAIM_INTERFACE) {
 				cJSON *ev = cJSON_CreateObject();
@@ -999,6 +1022,7 @@ int g2_daemon_run(output_format_t format, int debug) {
 				cJSON_Delete(ev);
 				return 1;
 			}
+			if (conn_err == G2_ERR_TARGET_NOT_FOUND) report_target_wait(&wait_iters);
 			usleep(100000);
 		}
 	}

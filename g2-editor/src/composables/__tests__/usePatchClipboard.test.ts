@@ -147,4 +147,22 @@ describe('usePatchClipboard — hasClipboard', () => {
 
 		expect(hasClipboard.value).toBe(true);
 	});
+
+	// hasClipboard is backed by uiStore.hasClipboard (a Pinia field), not a per-call local ref —
+	// two independent usePatchClipboard() instances (e.g. Module.vue's context menu vs the
+	// toolbar's menu-state watcher) must observe the same flip instead of each owning a stale copy.
+	it('is shared across independent usePatchClipboard() instances via the store', () => {
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(0)]);
+		useUiStore().selectModules([0], 'va');
+
+		const first = usePatchClipboard();
+		const second = usePatchClipboard();
+		expect(first.hasClipboard.value).toBe(false);
+		expect(second.hasClipboard.value).toBe(false);
+
+		first.copySelection();
+
+		expect(second.hasClipboard.value).toBe(true);
+	});
 });

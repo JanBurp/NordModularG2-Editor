@@ -34,6 +34,11 @@ typedef enum {
     G2_ERR_NO_MEMORY     = -13,
     G2_ERR_NOT_IMPLEMENTED = -14,
     G2_ERR_TOO_LARGE       = -15,
+    /* A specific USB bus/device target was set (see g2_set_target(), g2_io.h)
+     * but no matching G2 was found — distinct from G2_ERR_NOT_FOUND (no
+     * target set, nothing at all attached), so a multi-device daemon can
+     * tell "my targeted unit vanished" apart from "nothing here". */
+    G2_ERR_TARGET_NOT_FOUND = -16,
 } g2_error_t;
 
 /* Human-readable text for a g2_error_t, for callers that surface failures to

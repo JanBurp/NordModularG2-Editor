@@ -2,9 +2,9 @@ import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import type { Cable } from '../renderer/cableRenderer';
-import type { ClipboardEntry } from '@/types/patch';
 import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 import { finalizeModuleAdd } from './useAddModule';
+import { readClipboardEntry } from './usePatchClipboard';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -122,15 +122,9 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 
 	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
 	async function handlePasteParams(moduleIndex: number): Promise<void> {
-		// Read via the OS clipboard first — a copy may have happened in another window's
+		// Reads via the OS clipboard first — a copy may have happened in another window's
 		// process (one BrowserWindow per connected G2, see usePatchClipboard.ts).
-		let clipboard: ClipboardEntry | null = uiStore.clipboard;
-		try {
-			const entry = (await window.electronAPI?.clipboard?.read()) as ClipboardEntry | null | undefined;
-			if (entry && Array.isArray(entry.modules)) clipboard = entry;
-		} catch {
-			// fall back to the same-window cache above
-		}
+		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
 		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
 		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targets, currentModules.value);

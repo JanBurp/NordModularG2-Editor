@@ -188,6 +188,7 @@ extern void test_tokenize_respects_max_argc(void);
 
 extern void test_g2_set_target_updates_globals(void);
 extern void test_g2_set_target_by_index_out_of_range(void);
+extern void test_g2_connect_target_set_not_found_is_distinguishable(void);
 
 /* Daemon is tested via integration tests (test_daemon.c), not unit tests */
 // extern void test_daemon_parse_valid_json(void);
@@ -394,6 +395,7 @@ int main(void) {
     /* multi-device targeting */
     RUN_TEST(test_g2_set_target_updates_globals);
     RUN_TEST(test_g2_set_target_by_index_out_of_range);
+    RUN_TEST(test_g2_connect_target_set_not_found_is_distinguishable);
 
     /* daemon JSON/queue tests — commented out, tested via integration tests instead
     RUN_TEST(test_daemon_parse_valid_json);

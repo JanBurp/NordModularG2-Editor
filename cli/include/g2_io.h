@@ -21,7 +21,20 @@ extern g2_device_t g2;
 /* Optional USB bus/device-address target for g2_connect()/g2_connect_silent().
  * 0/0 (the default) means "first G2 found by VID/PID" — today's behavior, used
  * by every single-device command/test. Set via g2_set_target() so a daemon can
- * pin itself to one specific physical unit when multiple G2s are attached. */
+ * pin itself to one specific physical unit when multiple G2s are attached.
+ *
+ * Bus/device addresses are ephemeral (the OS reassigns them on replug), so
+ * there is an inherent TOCTOU between resolving a target and later opening
+ * it — resolving the index (g2_set_target_by_index) and opening the target
+ * (g2_open_target(), g2_io.c) are deliberately two separate enumeration
+ * passes rather than one merged pass; see the comments at both call sites for
+ * why collapsing them wouldn't actually close the window that matters. The
+ * chosen mitigation is g2_target_last_seen below plus G2_ERR_TARGET_NOT_FOUND
+ * (g2_device.h): narrow what's narrowable, make the rest loud instead of a
+ * silent generic "not found". A future, more robust option would be
+ * targeting by USB serial number instead of bus/device — not pursued here
+ * since it's unverified whether the G2 exposes a usable serial descriptor at
+ * all (see g2_open_target() in g2_io.c). */
 extern int g2_target_bus;
 extern int g2_target_device;
 void g2_set_target(int bus, int device);
@@ -31,6 +44,14 @@ void g2_set_target(int bus, int device);
  * bus/device pair. Returns 0 on success, -1 if fewer than index+1 G2 units
  * are currently attached. */
 int g2_set_target_by_index(int index);
+
+/* Set by g2_open_target() on every call where a target is set (g2_target_bus/
+ * g2_target_device nonzero): 1 if a device matching that bus/device was found
+ * in the enumeration list (regardless of whether libusb_open() on it then
+ * succeeded), 0 if it was absent entirely. Lets a caller tell "the targeted
+ * G2 was never there" apart from "it was there and vanished between
+ * enumeration and open" — the TOCTOU instant actually firing. */
+extern int g2_target_last_seen;
 
 /* ── Listener message type ─────────────────────────────────────────────── */
 

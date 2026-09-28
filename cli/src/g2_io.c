@@ -29,6 +29,7 @@ g2_device_t g2 = {
 
 int g2_target_bus = 0;
 int g2_target_device = 0;
+int g2_target_last_seen = 0;
 
 void g2_set_target(int bus, int device) {
     g2_target_bus = bus;
@@ -42,7 +43,17 @@ static int is_g2_device(const struct libusb_device_descriptor *desc) {
 /* Resolves the `index`-th attached G2 unit (0-based, same enumeration order
  * as g2_list_devices_json()'s "all" array) to its bus/device pair and calls
  * g2_set_target() with it. Returns 0 on success, -1 if fewer than index+1
- * G2 units are currently attached. */
+ * G2 units are currently attached.
+ *
+ * This enumeration pass is deliberately independent of g2_open_target()'s own
+ * later pass rather than opening the device here and handing off a cached
+ * handle: the only caller of this function (--device <n>, see main.c) turns
+ * around and calls g2_connect()/g2_connect_silent() immediately after with no
+ * I/O in between, so that gap is negligible. The path that actually matters
+ * for multi-device replug risk is `daemon <bus> <device>` (bus/device passed
+ * in directly from a separate, earlier process — see main.c) and every
+ * reconnect for the life of that daemon — an inherently cross-process/
+ * long-lived race no amount of restructuring here can close. See g2_io.h. */
 int g2_set_target_by_index(int index) {
     libusb_device **devices;
     ssize_t count = libusb_get_device_list(g2.ctx, &devices);
@@ -202,17 +213,29 @@ static libusb_device_handle *g2_open_target(void) {
         return libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
     }
 
+    /* This enumeration pass is independent of g2_set_target_by_index()'s (if
+     * that was how the target was chosen) — unavoidable given libusb has no
+     * "resolve and open atomically" call, and not worth adding a consume-once
+     * cached-handle handoff for: the TOCTOU window this could theoretically
+     * close is negligible for the one caller with no I/O in between
+     * (--device <n>, see main.c); every other caller (a daemon's initial
+     * connect and every later reconnect, see daemon.c) re-opens by bus/device
+     * repeatedly for the life of the process regardless, so the race is
+     * inherent there and not something a single merged pass would fix. See
+     * g2_io.h for the chosen mitigation (g2_target_last_seen below). */
     libusb_device **devices;
     ssize_t count = libusb_get_device_list(g2.ctx, &devices);
     if (count < 0) return NULL;
 
     libusb_device_handle *handle = NULL;
+    g2_target_last_seen = 0;
     for (ssize_t idx = 0; idx < count; idx++) {
         struct libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
         if (!is_g2_device(&desc)) continue;
         if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
         if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
+        g2_target_last_seen = 1;
         if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
         break;
     }
@@ -226,6 +249,13 @@ int g2_connect(void) {
 
     g2.handle = g2_open_target();
     if (!g2.handle) {
+        if (g2_target_bus || g2_target_device) {
+            fprintf(stderr, "G2 not found at bus %d device %d (%s)\n",
+                    g2_target_bus, g2_target_device,
+                    g2_target_last_seen ? "was seen during enumeration, open failed - likely unplugged mid-connect"
+                                         : "not present in the last enumeration");
+            return G2_ERR_TARGET_NOT_FOUND;
+        }
         fprintf(stderr, "G2 not found (VID=%04x, PID=%04x)\n", VENDOR_ID, PRODUCT_ID);
         return G2_ERR_NOT_FOUND;
     }
@@ -250,7 +280,7 @@ int g2_connect_silent(void) {
 
     g2.handle = g2_open_target();
     if (!g2.handle) {
-        return G2_ERR_NOT_FOUND;
+        return (g2_target_bus || g2_target_device) ? G2_ERR_TARGET_NOT_FOUND : G2_ERR_NOT_FOUND;
     }
 
     ret = libusb_claim_interface(g2.handle, 0);

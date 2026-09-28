@@ -78,6 +78,15 @@ function resolveSession(event: { sender: { id: number } }): DeviceSession | unde
 	return sessionByWebContentsId.get(event.sender.id);
 }
 
+// Frees a session's claim on its bus:device id (sessions, the map that gates rediscovery
+// and the Window/DeviceSwitcher lists) without touching sessionByWebContentsId — that map's
+// lifetime is tied to the window, not the daemon, so a window can keep routing IPC to a
+// session whose daemon just died (see startDaemon's retry-in-place re-claim below).
+function unregisterSession(session: DeviceSession): void {
+	if (sessions.get(session.id) === session) sessions.delete(session.id);
+	if (activeSessionId === session.id) activeSessionId = null;
+}
+
 function broadcastDevicesChanged(): void {
 	const list = Array.from(sessions.values()).map((s) => ({
 		id: s.id,
@@ -148,9 +157,8 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 		const session = sessionByWebContentsId.get(wcId);
 		if (!session) return;
 		sessionByWebContentsId.delete(wcId);
-		sessions.delete(session.id);
-		if (session.daemonProcess) session.daemonProcess.kill("SIGTERM");
-		if (activeSessionId === session.id) activeSessionId = null;
+		unregisterSession(session);
+		void stopDaemon(session);
 		broadcastDevicesChanged();
 	});
 
@@ -162,6 +170,16 @@ function startDaemon(session: DeviceSession) {
 	if (!fs.existsSync(cliPath)) {
 		console.error("[daemon] CLI binary not found at", cliPath, "— skipping daemon start");
 		return;
+	}
+	// Re-claim the id if a prior crash freed it (see unregisterSession) — but never steal
+	// it from a different session that claimed it in the meantime; that window just stays
+	// local (routes IPC via sessionByWebContentsId only, absent from sessions/DeviceSwitcher).
+	const owner = sessions.get(session.id);
+	if (!owner) {
+		sessions.set(session.id, session);
+		broadcastDevicesChanged();
+	} else if (owner !== session) {
+		console.warn(`[daemon] ${session.id} was claimed by another window while this one was disconnected — continuing locally without rejoining the device list.`);
 	}
 	console.warn(`[daemon] Starting daemon process for ${session.id}...`);
 	const proc = spawn(cliPath, ["daemon", String(session.bus), String(session.device)]);
@@ -212,6 +230,7 @@ function startDaemon(session: DeviceSession) {
 		}
 		session.pendingCmds.clear();
 		if (!wasActive) return;
+		unregisterSession(session);
 		if (code !== null && code !== 0) {
 			safeSend(session.window, "cli:device-disconnected");
 		} else {
@@ -369,8 +388,18 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 	if (!window) throw new Error("No window for this call");
 	const id = `${bus}:${device}`;
 	let session = sessionByWebContentsId.get(event.sender.id);
+	const owner = sessions.get(id);
+	if (owner && owner !== session) {
+		throw new Error(`Device ${id} is already connected in another window`);
+	}
 	if (session) {
-		sessions.delete(session.id);
+		if (session.id !== id) {
+			// Rebinding this window to a different device — stop any daemon still bound to
+			// the old bus/device first, so it never keeps routing commands to it (main.ts's
+			// startDaemon guard would otherwise treat the daemon as still "this session's").
+			await stopDaemon(session);
+			sessions.delete(session.id);
+		}
 		session.id = id;
 		session.bus = bus;
 		session.device = device;
@@ -654,12 +683,36 @@ function cycleWindow(direction: 1 | -1): void {
 	revealWindow(list[nextIdx].window);
 }
 
+// Creates a hidden-or-visible window pre-bound to (bus, device): registers its DeviceSession
+// into both maps synchronously (before the renderer even loads) so the id is claimed
+// immediately, closing the window between "decided to claim this device" and "renderer
+// eventually calls devices:connect" that a caller could otherwise race through twice.
+function registerNewSession(bus: number, device: number, cascadeIndex = 0, visible = false): DeviceSession {
+	const window = createAppWindow(cascadeIndex, visible);
+	const id = `${bus}:${device}`;
+	const session: DeviceSession = {
+		id,
+		bus,
+		device,
+		name: null,
+		status: "connecting" as DeviceStatus,
+		window,
+		daemonProcess: null,
+		cmdId: 0,
+		pendingCmds: new Map(),
+		menuState: { ...defaultMenuState },
+	};
+	sessions.set(id, session);
+	sessionByWebContentsId.set(window.webContents.id, session);
+	pendingAssignment.set(window.webContents.id, { bus, device, showSplash: false });
+	return session;
+}
+
 // Reveals (or opens) the window bound to (bus, device) — the single "pick this device"
 // action shared by DeviceSwitcher and the Window menu. Sessions discovered via
 // discoverDevices already have a (hidden) window and just need revealing; a bus/device
 // with no session yet (not currently reachable from the UI, but kept as a safety fallback)
-// gets a fresh one via the same createAppWindow + pendingAssignment pairing the
-// parallel-startup path uses (app.whenReady below).
+// gets a fresh one via registerNewSession, matching the parallel-startup path's pairing.
 function openOrFocusDevice(bus: number, device: number): void {
 	const id = `${bus}:${device}`;
 	const existing = sessions.get(id);
@@ -667,9 +720,14 @@ function openOrFocusDevice(bus: number, device: number): void {
 		revealWindow(existing.window);
 		return;
 	}
-	const window = createAppWindow();
-	pendingAssignment.set(window.webContents.id, { bus, device, showSplash: false });
+	registerNewSession(bus, device, 0, true);
+	broadcastDevicesChanged();
 }
+
+// Guards discoverDevices against overlapping invocations (e.g. two quick "Add Device..."
+// clicks) racing on the same await listAttachedDevices() and both claiming the same
+// not-yet-registered device — a second call while one is in flight is just a no-op.
+let discoveryInFlight = false;
 
 // Scans for currently-unclaimed G2s (device turned on after launch) and, for each one,
 // pre-registers a DeviceSession bound to a hidden window right away — so it starts
@@ -678,35 +736,24 @@ function openOrFocusDevice(bus: number, device: number): void {
 // The window stays hidden (no focus stolen from the current one) until openOrFocusDevice
 // reveals it.
 async function discoverDevices(): Promise<void> {
-	const devices = await listAttachedDevices().catch(() => []);
-	const unclaimed = devices.filter((d) => !d.alreadyConnected);
-	if (unclaimed.length === 0) {
-		await dialog.showMessageBox({
-			type: "info",
-			message: "No new devices found.",
-			icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
-		});
-		return;
+	if (discoveryInFlight) return;
+	discoveryInFlight = true;
+	try {
+		const devices = await listAttachedDevices().catch(() => []);
+		const unclaimed = devices.filter((d) => !d.alreadyConnected);
+		if (unclaimed.length === 0) {
+			await dialog.showMessageBox({
+				type: "info",
+				message: "No new devices found.",
+				icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
+			});
+			return;
+		}
+		unclaimed.forEach((d) => registerNewSession(d.bus, d.device));
+		broadcastDevicesChanged();
+	} finally {
+		discoveryInFlight = false;
 	}
-	unclaimed.forEach((d) => {
-		const window = createAppWindow(0, false);
-		const session: DeviceSession = {
-			id: d.id,
-			bus: d.bus,
-			device: d.device,
-			name: null,
-			status: "connecting" as DeviceStatus,
-			window,
-			daemonProcess: null,
-			cmdId: 0,
-			pendingCmds: new Map(),
-			menuState: { ...defaultMenuState },
-		};
-		sessions.set(d.id, session);
-		sessionByWebContentsId.set(window.webContents.id, session);
-		pendingAssignment.set(window.webContents.id, { bus: d.bus, device: d.device, showSplash: false });
-	});
-	broadcastDevicesChanged();
 }
 
 function windowMenuItems(): Electron.MenuItemConstructorOptions[] {

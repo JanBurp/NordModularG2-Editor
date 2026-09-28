@@ -47,6 +47,10 @@ export const useUiStore = defineStore('ui', {
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
 		clipboard: null as ClipboardEntry | null,
+		// Whether a paste-able entry exists, either locally or (last refreshed) on the OS
+		// clipboard — a Pinia field so every consumer (menu enablement, context menus) shares
+		// one source of truth instead of each usePatchClipboard() call owning its own copy.
+		hasClipboard: false as boolean,
 		lastMousePos: null as { col: number; row: number; area: 'va' | 'fx' } | null,
 		// Live morph-range Ctrl/Cmd-drag hint, read by MorphDragHintOverlay (canvas-level, rendered
 		// after every module) so the badge always paints above other modules instead of being hidden
