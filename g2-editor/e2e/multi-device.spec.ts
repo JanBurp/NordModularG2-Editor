@@ -66,7 +66,7 @@ test.describe('multi-device — one BrowserWindow per connected G2', () => {
 		}
 	});
 
-	test('multiple unclaimed devices: auto-binds to the first one (no picker), and "Connect Another Device" opens a second real window', async ({ userDataDir }) => {
+	test('multiple unclaimed devices: auto-binds to the first one (no picker)', async ({ userDataDir }) => {
 		const app = await launchApp(userDataDir);
 		try {
 			const page = await app.firstWindow();
@@ -81,9 +81,6 @@ test.describe('multi-device — one BrowserWindow per connected G2', () => {
 
 			// No dialog anywhere — the first candidate is bound automatically.
 			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
-
-			await page.getByTitle('Connect another G2').click();
-			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(2);
 		} finally {
 			await app.close();
 		}

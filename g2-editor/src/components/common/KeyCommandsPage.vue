@@ -72,6 +72,7 @@
 			title: 'Slots & Variations',
 			rows: [
 				{ keys: ['A-D'], action: 'Select slot A - D' },
+				{ keys: ['⌃ Tab', '⌃ ⇧ Tab'], action: 'Cycle to next / previous slot' },
 				{ keys: ['1–8'], action: 'Select variation 1–8' },
 				{ keys: ['R'], action: 'Toggle clock run / stop' },
 			],
@@ -160,6 +161,7 @@
 			rows: [
 				{ keys: ['ESC'], action: 'Close dialog / menu / overlay, cancel an armed jack / ghost cable, or clear search filter' },
 				{ keys: ['F1'], action: 'Show module help' },
+				{ keys: ['⌘ `'], action: 'Cycle to next device window (macOS default, not app-registered)' },
 			],
 		},
 	]);

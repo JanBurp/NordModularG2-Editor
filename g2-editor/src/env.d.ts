@@ -41,6 +41,7 @@ declare global {
 				error?: string;
 			}>;
 			getAppInfo: () => Promise<{ version: string; platform: string; iconDataUrl: string }>;
+			claimStartupSplash: () => Promise<boolean>;
 			openExternal: (url: string) => void;
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
 			selectBankFolder: () => Promise<{ success: boolean; folder?: string }>;
@@ -48,9 +49,9 @@ declare global {
 			devices: {
 				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;
 				connect: (bus: number, device: number) => Promise<{ id: string }>;
-				openWindow: () => Promise<void>;
 				focusWindow: (id: string) => Promise<void>;
 				reportName: (name: string) => Promise<void>;
+				getAssignment: () => Promise<{ bus: number; device: number; showSplash: boolean } | null>;
 				onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) => void;
 				offChanged: () => void;
 			};

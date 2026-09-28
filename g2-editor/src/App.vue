@@ -533,7 +533,7 @@
 
 	const isLoading = computed(
 		() =>
-			!startingUp.value &&
+			(!startingUp.value || !showAboutDialog.value) &&
 			(device.status === DeviceStatus.Connecting ||
 				device.status === DeviceStatus.Loading ||
 				device.modeChanging ||
@@ -605,7 +605,22 @@
 		requestKeyFocus,
 	);
 
-	const showAboutDialog = ref(true);
+	// Mirrors handleSlotClick's own "can't focus an inactive slot while several are
+	// active" guard (useSlotManagement.ts) so cycling only ever lands on a selectable slot.
+	function cycleSlot(direction: 1 | -1): void {
+		const slots = device.device?.slots;
+		const activeCount = slots ? slots.filter((s) => s.active).length : 0;
+		const selectable =
+			slots && activeCount > 1
+				? SLOT_LABELS.map((_, i) => i).filter((i) => slots.find((s) => s.slot === SLOT_LABELS[i])?.active)
+				: SLOT_LABELS.map((_, i) => i);
+		if (selectable.length === 0) return;
+		const pos = selectable.indexOf(SLOT_LABELS.indexOf(uiStore.slotInFocus));
+		const nextPos = pos === -1 ? 0 : (pos + direction + selectable.length) % selectable.length;
+		handleSlotClick(selectable[nextPos]);
+	}
+
+	const showAboutDialog = ref(false);
 	const startingUp = ref(true);
 	const quickAddPos = ref({ x: 0, y: 0 });
 
@@ -625,6 +640,12 @@
 		const noMod = !e.ctrlKey && !e.metaKey && !e.altKey;
 
 		if (isInput) return;
+
+		if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
+			e.preventDefault();
+			cycleSlot(e.shiftKey ? -1 : 1);
+			return;
+		}
 
 		if (e.key === 'Escape') {
 			jackPatching.clearArmed();
@@ -736,13 +757,22 @@
 
 		window.electronAPI.devices.onChanged((list) => connectedDevices.applyList(list));
 
-		// Always auto-bind to the first not-yet-connected G2 found, even when several are
-		// attached — no picker. The other units (if any) show up in the toolbar's device
-		// switcher (DeviceSwitcher.vue) once connected, where you can switch to or open them.
-		const found = await window.electronAPI.devices.list();
-		const unclaimed = found.filter((d) => !d.alreadyConnected);
-		if (unclaimed.length > 0) await bindAndConnect(unclaimed[0].bus, unclaimed[0].device);
-		else await connectDevice();
+		// A parallel-startup window is pre-assigned a specific device by the main process,
+		// which also decides showSplash there (synchronously, in creation order) — not left to
+		// whichever window's onMounted happens to run first, which would be a real race between
+		// independent renderer processes. A window with no assignment (the single-window
+		// fallback when no devices were found at launch) falls back to claimStartupSplash().
+		const assignment = await window.electronAPI.devices.getAssignment();
+		if (assignment) {
+			showAboutDialog.value = assignment.showSplash;
+			await bindAndConnect(assignment.bus, assignment.device);
+		} else {
+			showAboutDialog.value = await window.electronAPI.claimStartupSplash();
+			const found = await window.electronAPI.devices.list();
+			const unclaimed = found.filter((d) => !d.alreadyConnected);
+			if (unclaimed.length > 0) await bindAndConnect(unclaimed[0].bus, unclaimed[0].device);
+			else await connectDevice();
+		}
 
 		await afterConnectRestoreFocus();
 		showAboutDialog.value = false;

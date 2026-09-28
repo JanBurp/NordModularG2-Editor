@@ -38,6 +38,20 @@ const sessions = new Map<string, DeviceSession>();
 const sessionByWebContentsId = new Map<number, DeviceSession>();
 let activeSessionId: string | null = null;
 
+// Pre-assigns a startup window to a specific physical device (set right after the
+// window is created, before its renderer loads) so parallel startup windows each
+// bind to a distinct device instead of racing on devices:list's "first unclaimed".
+// showSplash is decided here too, synchronously, in creation order — deterministic,
+// unlike leaving it to whichever renderer's onMounted happens to run first (a real
+// race between independent renderer processes, which one lost was effectively random).
+const pendingAssignment = new Map<number, { bus: number; device: number; showSplash: boolean }>();
+
+// Shows the About/credits splash only for the first window of an app launch; every
+// other window just shows its own connecting spinner instead — see devices:get-assignment
+// / claim-startup-splash. Used directly by parallel-launch windows' showSplash above; kept
+// as a fallback IPC for the single-window (no devices found) case, which has no assignment.
+let startupSplashClaimed = false;
+
 const isMac = process.platform === 'darwin';
 const platformNames: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
 const platformLabel = `${platformNames[process.platform] ?? process.platform} ${process.getSystemVersion()}`;
@@ -71,16 +85,21 @@ function broadcastDevicesChanged(): void {
 	for (const window of BrowserWindow.getAllWindows()) {
 		if (!window.isDestroyed()) window.webContents.send("devices:changed", list);
 	}
+	refreshMenu();
 }
 
-function createAppWindow(): BrowserWindow {
+function createAppWindow(cascadeIndex = 0): BrowserWindow {
 	const headless = process.env.HEADLESS === '1';
 	const state = loadWindowState();
+	// All windows share one saved position (window-state.json has no per-window slot), so
+	// opening several at once would otherwise stack them exactly on top of each other —
+	// cascade non-maximized ones so they're visually distinguishable and cycling is legible.
+	const cascade = cascadeIndex * 32;
 	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
-		x: state?.x,
-		y: state?.y,
+		x: state?.x !== undefined ? state.x + cascade : undefined,
+		y: state?.y !== undefined ? state.y + cascade : undefined,
 		show: !headless,
 		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
@@ -298,7 +317,7 @@ ipcMain.on("cli:watch-stop", (event) => {
 
 // --- Device discovery / multi-window management ---
 
-ipcMain.handle("devices:list", async () => {
+async function listAttachedDevices(): Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]> {
 	const out = await runCliOneShot(["--json", "list-devices"]);
 	const parsed = JSON.parse(out);
 	const all: any[] = parsed.all ?? [];
@@ -310,6 +329,20 @@ ipcMain.handle("devices:list", async () => {
 			id: `${d.bus}:${d.device}`,
 			alreadyConnected: sessions.has(`${d.bus}:${d.device}`),
 		}));
+}
+
+ipcMain.handle("devices:list", async () => listAttachedDevices());
+
+ipcMain.handle("devices:get-assignment", (event) => {
+	const assignment = pendingAssignment.get(event.sender.id) ?? null;
+	pendingAssignment.delete(event.sender.id);
+	return assignment;
+});
+
+ipcMain.handle("app:claim-startup-splash", () => {
+	const isFirst = !startupSplashClaimed;
+	startupSplashClaimed = true;
+	return isFirst;
 });
 
 ipcMain.handle("devices:connect", async (event, bus: number, device: number) => {
@@ -340,10 +373,6 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 	sessions.set(id, session);
 	broadcastDevicesChanged();
 	return { id };
-});
-
-ipcMain.handle("devices:open-window", () => {
-	createAppWindow();
 });
 
 ipcMain.handle("devices:focus", (_, id: string) => {
@@ -586,6 +615,27 @@ const defaultMenuState: MenuState = {
 	hasPerformanceContext: false,
 };
 
+// Focuses the next (or previous) device window in creation order, wrapping around —
+// the Cmd+` native-app convention for cycling windows of the frontmost application.
+function cycleWindow(direction: 1 | -1): void {
+	const list = Array.from(sessions.values());
+	if (list.length < 2) return;
+	const idx = list.findIndex((s) => s.id === activeSessionId);
+	const nextIdx = idx === -1 ? 0 : (idx + direction + list.length) % list.length;
+	list[nextIdx].window.focus();
+}
+
+function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
+	const list = Array.from(sessions.values());
+	if (list.length === 0) return [{ label: "No Devices Connected", enabled: false }];
+	return list.map((s) => ({
+		label: s.name ?? `bus ${s.bus} dev ${s.device}`,
+		type: "checkbox" as const,
+		checked: s.id === activeSessionId,
+		click: () => s.window.focus(),
+	}));
+}
+
 function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electron.MenuItemConstructorOptions[] {
 	const slotSubmenu = (actionPrefix: string): Electron.MenuItemConstructorOptions[] =>
 		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => sendToFocused("menu:action", `${actionPrefix}-${s}`) }));
@@ -791,6 +841,22 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			],
 		},
 		{
+			label: "Window",
+			submenu: [
+				...windowMenuItems(),
+				{ type: "separator" as const },
+				{
+					// No accelerator: CommandOrControl+` is macOS's own reserved "cycle windows of the
+					// frontmost app" shortcut, which already works for any standard multi-window app
+					// (including this one) without us registering anything — doing so ourselves risked
+					// conflicting with (and breaking) that native behavior instead of complementing it.
+					label: "Cycle to Next Window",
+					enabled: sessions.size > 1,
+					click: () => cycleWindow(1),
+				},
+			],
+		},
+		{
 			label: "Help",
 			submenu: [
 				{ label: "Module Help", accelerator: "F1", click: () => sendToFocused("menu:action", "show-module-help") },
@@ -872,7 +938,27 @@ app.whenReady().then(async () => {
 		}
 	}
 
-	createAppWindow();
+	// Auto-bind every not-yet-connected G2 found in parallel, one window each — no
+	// picker, matching devices:connect's existing single-device "no picker" behavior.
+	// Falls back to one plain window (today's offline/no-device behavior) if
+	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
+	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
+	// hardware-agnostic window — see isOffline in preload.ts).
+	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
+	const unclaimed = devices.filter((d) => !d.alreadyConnected);
+	if (unclaimed.length === 0) {
+		createAppWindow();
+	} else {
+		// Each window's own show()/maximize() call (in createAppWindow) steals focus from
+		// whichever window was shown before it, so the LAST one created ends up frontmost —
+		// that's the one the user actually sees at startup, so it's the one that gets the splash.
+		const frontmostIndex = unclaimed.length - 1;
+		unclaimed.forEach((d, i) => {
+			const window = createAppWindow(i);
+			if (i === frontmostIndex) startupSplashClaimed = true;
+			pendingAssignment.set(window.webContents.id, { bus: d.bus, device: d.device, showSplash: i === frontmostIndex });
+		});
+	}
 
 	refreshMenu();
 });

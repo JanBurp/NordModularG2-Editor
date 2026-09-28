@@ -36,15 +36,16 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	selectBankFolder: () => ipcRenderer.invoke("bank:select-folder"),
 	selectPchListFile: () => ipcRenderer.invoke("bank:select-pchlist"),
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
+	claimStartupSplash: () => ipcRenderer.invoke("app:claim-startup-splash"),
 	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
 	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),
 
 	devices: {
 		list: () => ipcRenderer.invoke("devices:list"),
 		connect: (bus: number, device: number) => ipcRenderer.invoke("devices:connect", bus, device),
-		openWindow: () => ipcRenderer.invoke("devices:open-window"),
 		focusWindow: (id: string) => ipcRenderer.invoke("devices:focus", id),
 		reportName: (name: string) => ipcRenderer.invoke("devices:report-name", name),
+		getAssignment: () => ipcRenderer.invoke("devices:get-assignment"),
 		onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) =>
 			ipcRenderer.on("devices:changed", (_event, list) => cb(list)),
 		offChanged: () => ipcRenderer.removeAllListeners("devices:changed"),
