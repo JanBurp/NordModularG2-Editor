@@ -19,6 +19,7 @@
 #include "daemon.h"
 
 int g2_watch_verbose = 1;
+int g2_daemon_mode = 0;
 static int g_events_perf_mode = 1; /* 1=Performance, 0=Patch; updated by C_SYNTH_SETTINGS bulk event */
 
 #define BULK_REARM 1
@@ -519,6 +520,11 @@ void g2_emit_rearm_data(void) {
  * type in the interrupt header. Extended messages carry bulk payload; embedded
  * messages are contained entirely in the 16-byte interrupt frame. */
 void g2_emit_event(const g2_msg_t *msg) {
+    if (!g2_daemon_mode) {
+        fprintf(stderr, "[relay] unexpected message received (type 0x%02x), discarded from stdout\n",
+                msg->interrupt[0] & 0x0f);
+        return;
+    }
     uint8_t msgType = msg->interrupt[0] & 0x0f;
     if (msgType == RESPONSE_TYPE_EXTENDED) {
         if (msg->bulk && msg->bulk_size > 0)

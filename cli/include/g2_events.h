@@ -14,6 +14,14 @@
 /* 1 = emit LED/volume JSON; 0 = suppress (set via daemon "verbose" command) */
 extern int g2_watch_verbose;
 
+/* 1 = running as `daemon`, where multi-line JSON-per-event stdout is the intended
+ * streaming protocol; 0 (default) = a one-shot command, where a caller/script expects
+ * exactly one JSON object on stdout. Set once, at the top of g2_daemon_run(). Gates
+ * whether g2_emit_event() relays a stray/unexpected message to stdout (daemon mode) or
+ * stderr (one-shot mode, so it's still visible without breaking the single-object
+ * contract). */
+extern int g2_daemon_mode;
+
 /* Format msg as JSON and write to stdout. */
 void g2_emit_event(const g2_msg_t *msg);
 

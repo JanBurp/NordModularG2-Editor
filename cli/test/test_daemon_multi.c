@@ -52,8 +52,14 @@ void test_daemon_multi_starts(void) {
     TEST_ASSERT_TRUE(g_da.pid > 0);
     TEST_ASSERT_TRUE(g_db.pid > 0);
 
-    cJSON *wa_a = read_event_of_type(&g_da, "watch_armed", 15, 5);
-    cJSON *wa_b = read_event_of_type(&g_db, "watch_armed", 15, 5);
+    /* 20s per line, not 5s: "names" (full patch/performance list) is the slowest startup
+     * event, hardware-measured 2026-09-28 at ~10.9s / ~5.2s for the two attached units -
+     * driven entirely by each device's own catalog size, not by contention between the two
+     * daemons (confirmed: same gap solo and paired, within measurement noise). See
+     * test_daemon.c's identical read_event_of_type("watch_armed", ...) for the single-daemon
+     * case of the same underlying cost. */
+    cJSON *wa_a = read_event_of_type(&g_da, "watch_armed", 15, 20);
+    cJSON *wa_b = read_event_of_type(&g_db, "watch_armed", 15, 20);
     int both_armed = (wa_a != NULL) && (wa_b != NULL);
     if (wa_a) cJSON_Delete(wa_a);
     if (wa_b) cJSON_Delete(wa_b);

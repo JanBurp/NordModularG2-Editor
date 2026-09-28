@@ -992,6 +992,7 @@ static void do_reconnect(void) {
 
 int g2_daemon_run(output_format_t format, int debug) {
 	(void)format;
+	g2_daemon_mode = 1;
 	g2_debug = debug;
 	g2_set_error_callback(daemon_error_cb, NULL);
 
