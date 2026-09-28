@@ -35,6 +35,7 @@ static void print_usage(const char *prog) {
     printf("  -V, --version     Show version\n");
     printf("  --json            Output as single-line JSON\n");
     printf("  --debug           Show debug info (raw USB data in hex)\n");
+    printf("  --device <n>      Target the n-th G2 found (0-based, see list-devices); default 0 (first found)\n");
     printf("\nCommands (implemented):\n");
     printf("  list-devices                                                                              List USB devices (debug)\n");
     printf("  connect                                                                                   Connect to G2 (auto-detect)\n");
@@ -1121,6 +1122,7 @@ static int dispatch_command(int argc, char **argv, int i) {
 int main(int argc, char *argv[]) {
     int i;
     const char *command = NULL;
+    int device_index = -1;
 
     /* Parse global options */
     for (i = 1; i < argc; i++) {
@@ -1137,6 +1139,12 @@ int main(int argc, char *argv[]) {
             g2_debug = 1;
         } else if (strcmp(argv[i], "--json") == 0) {
             output_format = OUTPUT_JSON;
+        } else if (strcmp(argv[i], "--device") == 0) {
+            if (i + 1 >= argc) {
+                fprintf(stderr, "--device requires a value\n");
+                return 1;
+            }
+            device_index = atoi(argv[++i]);
         } else if (argv[i][0] != '-') {
             command = argv[i];
             break;
@@ -1158,6 +1166,15 @@ int main(int argc, char *argv[]) {
         return 1;
     }
     atexit(g2_exit);
+
+    if (device_index >= 0 && g2_set_target_by_index(device_index) != 0) {
+        if (output_format == OUTPUT_JSON) {
+            output_error_json("No G2 device found at index", output_format);
+        } else {
+            fprintf(stderr, "No G2 device found at index %d\n", device_index);
+        }
+        return 1;
+    }
 
     return dispatch_command(argc, argv, i);
 }

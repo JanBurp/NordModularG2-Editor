@@ -26,6 +26,12 @@ extern int g2_target_bus;
 extern int g2_target_device;
 void g2_set_target(int bus, int device);
 
+/* Resolves the `index`-th attached G2 unit (0-based, same enumeration order
+ * as g2_list_devices_json()'s "all" array) and calls g2_set_target() with its
+ * bus/device pair. Returns 0 on success, -1 if fewer than index+1 G2 units
+ * are currently attached. */
+int g2_set_target_by_index(int index);
+
 /* ── Listener message type ─────────────────────────────────────────────── */
 
 typedef struct {

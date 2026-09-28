@@ -35,6 +35,39 @@ void g2_set_target(int bus, int device) {
     g2_target_device = device;
 }
 
+static int is_g2_device(const struct libusb_device_descriptor *desc) {
+    return desc->idVendor == VENDOR_ID && desc->idProduct == PRODUCT_ID;
+}
+
+/* Resolves the `index`-th attached G2 unit (0-based, same enumeration order
+ * as g2_list_devices_json()'s "all" array) to its bus/device pair and calls
+ * g2_set_target() with it. Returns 0 on success, -1 if fewer than index+1
+ * G2 units are currently attached. */
+int g2_set_target_by_index(int index) {
+    libusb_device **devices;
+    ssize_t count = libusb_get_device_list(g2.ctx, &devices);
+    if (count < 0) return -1;
+
+    int seen = 0, bus = 0, device = 0, ok = 0;
+    for (ssize_t i = 0; i < count; i++) {
+        struct libusb_device_descriptor desc;
+        if (libusb_get_device_descriptor(devices[i], &desc) != 0) continue;
+        if (!is_g2_device(&desc)) continue;
+        if (seen == index) {
+            bus = libusb_get_bus_number(devices[i]);
+            device = libusb_get_device_address(devices[i]);
+            ok = 1;
+            break;
+        }
+        seen++;
+    }
+    libusb_free_device_list(devices, 1);
+    if (!ok) return -1;
+
+    g2_set_target(bus, device);
+    return 0;
+}
+
 int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
 volatile int g2_pending_disconnect = 0;
@@ -99,7 +132,7 @@ int g2_list_devices(void) {
 
         int ret = libusb_get_device_descriptor(dev, &desc);
         if (ret == 0) {
-            const char *g2_label = (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID) ? " ← Nord G2" : "";
+            const char *g2_label = is_g2_device(&desc) ? " ← Nord G2" : "";
             printf("  %04x:%04x (bus %d, device %d)%s\n",
                    desc.idVendor, desc.idProduct,
                    libusb_get_bus_number(dev),
@@ -124,7 +157,7 @@ cJSON *g2_list_devices_json(void) {
         for (ssize_t i = 0; i < count; i++) {
             struct libusb_device_descriptor desc;
             if (libusb_get_device_descriptor(devices[i], &desc) != 0) continue;
-            int isG2 = (desc.idVendor == VENDOR_ID && desc.idProduct == PRODUCT_ID);
+            int isG2 = is_g2_device(&desc);
             cJSON *entry = cJSON_CreateObject();
             char vid[5], pid[5];
             snprintf(vid, sizeof(vid), "%04x", desc.idVendor);
@@ -177,7 +210,7 @@ static libusb_device_handle *g2_open_target(void) {
     for (ssize_t idx = 0; idx < count; idx++) {
         struct libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
-        if (desc.idVendor != VENDOR_ID || desc.idProduct != PRODUCT_ID) continue;
+        if (!is_g2_device(&desc)) continue;
         if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
         if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
         if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
