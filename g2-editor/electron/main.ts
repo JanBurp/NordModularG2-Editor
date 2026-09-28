@@ -11,6 +11,7 @@ import fs from "node:fs";
 import { spawn, type ChildProcess } from "child_process";
 import { loadWindowState, trackWindowState } from "./windowState";
 import type { MenuState } from "../src/types/index";
+import type { DeviceStatus } from "../src/store/device";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -22,12 +23,15 @@ export const RENDERER_DIST = path.join(process.env.APP_ROOT, "dist");
 
 /* One BrowserWindow + one daemon subprocess per connected G2, so switching
  * devices is just OS window focus — nothing reloads, both stay live. A window
- * has no DeviceSession until its renderer calls devices:connect. */
+ * usually gets its DeviceSession once its renderer calls devices:connect, except
+ * a device discovered via "Add Device" (see discoverDevices) which is pre-registered
+ * with a hidden window right away, so it starts connecting in the background. */
 interface DeviceSession {
 	id: string;
 	bus: number;
 	device: number;
 	name: string | null;
+	status: DeviceStatus;
 	window: BrowserWindow;
 	daemonProcess: ChildProcess | null;
 	cmdId: number;
@@ -81,6 +85,7 @@ function broadcastDevicesChanged(): void {
 		device: s.device,
 		name: s.name,
 		hasDaemon: s.daemonProcess !== null,
+		status: s.status,
 	}));
 	for (const window of BrowserWindow.getAllWindows()) {
 		if (!window.isDestroyed()) window.webContents.send("devices:changed", list);
@@ -88,7 +93,19 @@ function broadcastDevicesChanged(): void {
 	refreshMenu();
 }
 
-function createAppWindow(cascadeIndex = 0): BrowserWindow {
+// Shows (maximizing first, matching a freshly-created window's usual state) and focuses a
+// window that may still be hidden — used when a background-connected device (see
+// discoverDevices) is picked from DeviceSwitcher/Window menu. A no-op beyond focus() if
+// the window is already visible, so it never re-maximizes a window the user resized.
+function revealWindow(window: BrowserWindow): void {
+	if (!window.isVisible()) {
+		if (process.env.HEADLESS !== '1') window.maximize();
+		window.show();
+	}
+	window.focus();
+}
+
+function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	const headless = process.env.HEADLESS === '1';
 	const state = loadWindowState();
 	// All windows share one saved position (window-state.json has no per-window slot), so
@@ -100,7 +117,7 @@ function createAppWindow(cascadeIndex = 0): BrowserWindow {
 		height: state?.height ?? 600,
 		x: state?.x !== undefined ? state.x + cascade : undefined,
 		y: state?.y !== undefined ? state.y + cascade : undefined,
-		show: !headless,
+		show: visible && !headless,
 		icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
 		webPreferences: {
 			preload: path.join(__dirname, "../preload/preload.js"),
@@ -109,7 +126,9 @@ function createAppWindow(cascadeIndex = 0): BrowserWindow {
 		},
 	});
 
-	if (!headless) {
+	// visible=false (see discoverDevices) leaves the window hidden and unmaximized —
+	// it's revealed later via revealWindow, which maximizes at that point instead.
+	if (!headless && visible) {
 		if (state?.isMaximized ?? true) window.maximize();
 		window.show();
 	}
@@ -356,12 +375,14 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 		session.bus = bus;
 		session.device = device;
 		session.name = null;
+		session.status = "connecting" as DeviceStatus;
 	} else {
 		session = {
 			id,
 			bus,
 			device,
 			name: null,
+			status: "connecting" as DeviceStatus,
 			window,
 			daemonProcess: null,
 			cmdId: 0,
@@ -375,14 +396,22 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 	return { id };
 });
 
-ipcMain.handle("devices:focus", (_, id: string) => {
-	sessions.get(id)?.window.focus();
+ipcMain.handle("devices:switch-to", (_, bus: number, device: number) => {
+	openOrFocusDevice(bus, device);
 });
 
 ipcMain.handle("devices:report-name", (event, name: string) => {
 	const session = resolveSession(event);
 	if (session) {
 		session.name = name;
+		broadcastDevicesChanged();
+	}
+});
+
+ipcMain.handle("devices:report-status", (event, status: DeviceStatus) => {
+	const session = resolveSession(event);
+	if (session) {
+		session.status = status;
 		broadcastDevicesChanged();
 	}
 });
@@ -622,7 +651,62 @@ function cycleWindow(direction: 1 | -1): void {
 	if (list.length < 2) return;
 	const idx = list.findIndex((s) => s.id === activeSessionId);
 	const nextIdx = idx === -1 ? 0 : (idx + direction + list.length) % list.length;
-	list[nextIdx].window.focus();
+	revealWindow(list[nextIdx].window);
+}
+
+// Reveals (or opens) the window bound to (bus, device) — the single "pick this device"
+// action shared by DeviceSwitcher and the Window menu. Sessions discovered via
+// discoverDevices already have a (hidden) window and just need revealing; a bus/device
+// with no session yet (not currently reachable from the UI, but kept as a safety fallback)
+// gets a fresh one via the same createAppWindow + pendingAssignment pairing the
+// parallel-startup path uses (app.whenReady below).
+function openOrFocusDevice(bus: number, device: number): void {
+	const id = `${bus}:${device}`;
+	const existing = sessions.get(id);
+	if (existing) {
+		revealWindow(existing.window);
+		return;
+	}
+	const window = createAppWindow();
+	pendingAssignment.set(window.webContents.id, { bus, device, showSplash: false });
+}
+
+// Scans for currently-unclaimed G2s (device turned on after launch) and, for each one,
+// pre-registers a DeviceSession bound to a hidden window right away — so it starts
+// connecting (daemon, device_info/name, status) in the background immediately, the same
+// way the parallel-startup path does, instead of waiting for the user to switch to it.
+// The window stays hidden (no focus stolen from the current one) until openOrFocusDevice
+// reveals it.
+async function discoverDevices(): Promise<void> {
+	const devices = await listAttachedDevices().catch(() => []);
+	const unclaimed = devices.filter((d) => !d.alreadyConnected);
+	if (unclaimed.length === 0) {
+		await dialog.showMessageBox({
+			type: "info",
+			message: "No new devices found.",
+			icon: path.join(process.env.APP_ROOT!, "resources", "icon.png"),
+		});
+		return;
+	}
+	unclaimed.forEach((d) => {
+		const window = createAppWindow(0, false);
+		const session: DeviceSession = {
+			id: d.id,
+			bus: d.bus,
+			device: d.device,
+			name: null,
+			status: "connecting" as DeviceStatus,
+			window,
+			daemonProcess: null,
+			cmdId: 0,
+			pendingCmds: new Map(),
+			menuState: { ...defaultMenuState },
+		};
+		sessions.set(d.id, session);
+		sessionByWebContentsId.set(window.webContents.id, session);
+		pendingAssignment.set(window.webContents.id, { bus: d.bus, device: d.device, showSplash: false });
+	});
+	broadcastDevicesChanged();
 }
 
 function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
@@ -632,7 +716,7 @@ function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
 		label: s.name ?? `bus ${s.bus} dev ${s.device}`,
 		type: "checkbox" as const,
 		checked: s.id === activeSessionId,
-		click: () => s.window.focus(),
+		click: () => revealWindow(s.window),
 	}));
 }
 
@@ -850,10 +934,15 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					// frontmost app" shortcut, which already works for any standard multi-window app
 					// (including this one) without us registering anything — doing so ourselves risked
 					// conflicting with (and breaking) that native behavior instead of complementing it.
+					// (Tried registering it ourselves to also reach a still-hidden discovered device —
+					// didn't work reliably, reverted; a hidden window still won't respond to Cmd+` until
+					// it's been revealed once via DeviceSwitcher/Window menu.)
 					label: "Cycle to Next Window",
 					enabled: sessions.size > 1,
 					click: () => cycleWindow(1),
 				},
+				{ type: "separator" as const },
+				{ label: "Add Device...", click: () => { void discoverDevices(); } },
 			],
 		},
 		{

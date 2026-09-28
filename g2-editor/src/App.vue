@@ -24,6 +24,7 @@
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
 				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
+				<DeviceSwitcher v-if="!isOfflineMode" />
 			</template>
 
 			<button
@@ -34,11 +35,9 @@
 				@mouseenter="showHint('connectionToggle')"
 				@mouseleave="clearHint"
 			>
-				<span class="status-dot" :class="device.dotClass" />
+				<ConnectionDot :status="device.status" />
 				<span>{{ device.statusLabel }}</span>
 			</button>
-
-			<DeviceSwitcher v-if="!isOfflineMode" />
 		</ToolBar>
 
 		<ExtendedToolBar
@@ -494,6 +493,7 @@
 	import { useSettingsStore } from './store/settings';
 	import { useConnectedDevicesStore } from './store/connectedDevices';
 	import DeviceSwitcher from './components/toolbar/DeviceSwitcher.vue';
+	import ConnectionDot from './components/common/ConnectionDot.vue';
 	import { useStatusHint } from './composables/useStatusHint';
 	import { STATUS_HINTS } from './constants/statusHints';
 

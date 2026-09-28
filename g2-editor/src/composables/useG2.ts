@@ -1,6 +1,6 @@
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 
-import { ref } from 'vue';
+import { ref, watch } from 'vue';
 import { bankDownloadProgress } from './useBankDownloadDialog';
 import { bankUploadProgress } from './useBankUploadDialog';
 import { useDeviceEvents } from './useDeviceEvents';
@@ -36,6 +36,14 @@ export function useG2() {
 			fn(`[USB] ${now()} ${direction} ${event} ${message}`);
 		}
 	};
+
+	watch(
+		() => store.status,
+		(status) => {
+			window.electronAPI?.devices?.reportStatus(status).catch(() => {});
+		},
+		{ immediate: true },
+	);
 
 	const deviceEvents = useDeviceEvents(log);
 	const slotEvents = useSlotEvents(log);

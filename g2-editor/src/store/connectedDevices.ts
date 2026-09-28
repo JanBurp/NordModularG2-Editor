@@ -1,4 +1,5 @@
 import { defineStore } from 'pinia';
+import { DeviceStatus } from './device';
 
 export interface ConnectedDeviceInfo {
 	id: string;
@@ -6,6 +7,7 @@ export interface ConnectedDeviceInfo {
 	device: number;
 	name: string | null;
 	hasDaemon: boolean;
+	status: DeviceStatus;
 }
 
 // Cross-window "who else is connected" list (one Electron BrowserWindow per physical G2 —

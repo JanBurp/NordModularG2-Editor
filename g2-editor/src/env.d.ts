@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import type { MenuAction, MenuState } from './types/index';
 import type { CliService } from './types/cli';
+import type { DeviceStatus } from './store/device';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -49,10 +50,13 @@ declare global {
 			devices: {
 				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;
 				connect: (bus: number, device: number) => Promise<{ id: string }>;
-				focusWindow: (id: string) => Promise<void>;
+				switchTo: (bus: number, device: number) => Promise<void>;
 				reportName: (name: string) => Promise<void>;
+				reportStatus: (status: DeviceStatus) => Promise<void>;
 				getAssignment: () => Promise<{ bus: number; device: number; showSplash: boolean } | null>;
-				onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) => void;
+				onChanged: (
+					cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean; status: DeviceStatus }[]) => void,
+				) => void;
 				offChanged: () => void;
 			};
 			clipboard: {

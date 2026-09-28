@@ -1,5 +1,6 @@
 import { contextBridge, ipcRenderer } from "electron";
 import type { MenuAction, MenuState } from "../src/types/index";
+import type { DeviceStatus } from "../src/store/device";
 
 function now(): string {
 	const d = new Date();
@@ -43,11 +44,13 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	devices: {
 		list: () => ipcRenderer.invoke("devices:list"),
 		connect: (bus: number, device: number) => ipcRenderer.invoke("devices:connect", bus, device),
-		focusWindow: (id: string) => ipcRenderer.invoke("devices:focus", id),
+		switchTo: (bus: number, device: number) => ipcRenderer.invoke("devices:switch-to", bus, device),
 		reportName: (name: string) => ipcRenderer.invoke("devices:report-name", name),
+		reportStatus: (status: DeviceStatus) => ipcRenderer.invoke("devices:report-status", status),
 		getAssignment: () => ipcRenderer.invoke("devices:get-assignment"),
-		onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean }[]) => void) =>
-			ipcRenderer.on("devices:changed", (_event, list) => cb(list)),
+		onChanged: (
+			cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean; status: DeviceStatus }[]) => void,
+		) => ipcRenderer.on("devices:changed", (_event, list) => cb(list)),
 		offChanged: () => ipcRenderer.removeAllListeners("devices:changed"),
 	},
 	clipboard: {

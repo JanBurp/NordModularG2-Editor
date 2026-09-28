@@ -25,6 +25,10 @@ const STATUS_MAP: Record<DeviceStatus, { textClass: string; dotClass: string; la
 	[DeviceStatus.DriverError]: { textClass: 'text-red-400', dotClass: 'bg-red-500', label: 'driver error' },
 };
 
+export function statusDotClass(status: DeviceStatus): string {
+	return STATUS_MAP[status]?.dotClass ?? 'bg-surface-3';
+}
+
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
 		status: DeviceStatus.Disconnected,
@@ -38,7 +42,7 @@ export const useDeviceStore = defineStore('device', {
 	getters: {
 		connected: (state) => state.status === DeviceStatus.Connected,
 		statusClass: (state): string => STATUS_MAP[state.status]?.textClass ?? 'text-content-secondary',
-		dotClass: (state): string => STATUS_MAP[state.status]?.dotClass ?? 'bg-surface-3',
+		dotClass: (state): string => statusDotClass(state.status),
 		statusLabel: (state): string => STATUS_MAP[state.status]?.label ?? 'unknown',
 		perfName: (state): string => {
 			if (state.device?.mode === 'Performance') return state.device.performance?.name ?? '---';
