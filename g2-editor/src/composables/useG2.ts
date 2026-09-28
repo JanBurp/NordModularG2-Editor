@@ -28,6 +28,12 @@ function now(): string {
 
 const CONNECT_TIMEOUT_MS = 20000;
 
+export interface NamesLoadProgress {
+	location: number;
+	total: number;
+}
+export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
+
 export function useG2() {
 	const store = useDeviceStore();
 	const isDaemonRunning = ref(false);
@@ -55,6 +61,7 @@ export function useG2() {
 		window.cli.offWatchEvent();
 		window.cli.offDeviceDisconnected();
 		window.cli.offWatchDone();
+		namesLoadProgress.value = null;
 		let resolveArmed!: () => void;
 		let rejectArmed!: (e: Error) => void;
 		const armed = new Promise<void>((resolve, reject) => {
@@ -106,6 +113,7 @@ export function useG2() {
 						clearTimeout(activityTimer);
 						activityTimer = null;
 					}
+					namesLoadProgress.value = null;
 					resolveArmed();
 					return;
 				}
@@ -159,6 +167,10 @@ export function useG2() {
 						failed: ev.failed,
 						name: ev.name ?? '',
 					};
+					return;
+				}
+				if (ev.type === 'names_progress') {
+					namesLoadProgress.value = { location: ev.location, total: ev.total };
 					return;
 				}
 				if (ledEvents.handleEvent(ev)) return;

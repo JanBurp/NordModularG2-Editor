@@ -57,12 +57,22 @@
 				</div>
 				<div
 					v-if="connecting || closable"
-					class="flex items-center px-4 py-3 border-t border-line-default"
-					:class="connecting ? 'justify-center gap-2' : 'justify-end'"
+					class="flex flex-col px-4 py-3 border-t border-line-default gap-2"
+					:class="connecting ? 'items-center' : 'items-end'"
 				>
 					<template v-if="connecting">
-						<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
-						<span class="text-xs text-content-secondary">{{ connectingMessage || 'Connecting...' }}</span>
+						<div class="flex items-center gap-2">
+							<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
+							<span class="text-xs text-content-secondary">
+								{{ connectingMessage || 'Connecting...' }}{{ namesLoadProgress ? ` (${namesLoadProgress.location}/${namesLoadProgress.total})` : '' }}
+							</span>
+						</div>
+						<div v-if="namesLoadProgress" class="w-full h-1.5 bg-surface-2 rounded overflow-hidden">
+							<div
+								class="h-full bg-orange-400 transition-all"
+								:style="{ width: `${(namesLoadProgress.location / namesLoadProgress.total) * 100}%` }"
+							></div>
+						</div>
 					</template>
 					<Button v-else variant="default" @click="close">Close</Button>
 				</div>
@@ -76,6 +86,7 @@
 	import Button from '@/components/toolbar/Button.vue';
 	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
+	import { namesLoadProgress } from '@/composables/useG2';
 
 	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string }>(), {
 		closable: true,

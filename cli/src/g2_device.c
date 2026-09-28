@@ -919,7 +919,12 @@ cJSON *g2_list(int filter, int bank_filter) {
             }
 
             if (g2_daemon_mode) {
-                printf("{\"type\":\"names_progress\"}\n");
+                /* Patches: banks 1-32, performances: banks 1-8 (same bounds enforced
+                 * for send-bank/get-bank elsewhere in this file) - gives a real,
+                 * non-guessed total for a determinate progress bar. */
+                int total_banks = (filter == LIST_FILTER_PATCHES) ? 32 : (filter == LIST_FILTER_PERFORMANCES) ? 8 : 32 + 8;
+                int banks_done = (filter == LIST_FILTER_ALL && mode == PERFORMANCE_MODE) ? 32 + bank : bank;
+                printf("{\"type\":\"names_progress\",\"location\":%d,\"total\":%d}\n", banks_done + 1, total_banks);
                 fflush(stdout);
             }
 
