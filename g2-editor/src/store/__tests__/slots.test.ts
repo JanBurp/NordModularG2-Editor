@@ -1214,11 +1214,14 @@ describe('assignParamToPage / deassignParamPage', () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
+		// runCliBatchSafe's offline fallback is the behaviour under test — expect and suppress its console.warn.
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 		await store.assignParamToPage('A', 5, 0, 1, 0);
 
 		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
+		vi.restoreAllMocks();
 	});
 });
 

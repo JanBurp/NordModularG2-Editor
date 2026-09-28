@@ -99,12 +99,15 @@ describe('useBankDownloadDialog — confirm()', () => {
 		dialog.open();
 		dialog.sourceType.value = 'folder';
 		dialog.sourcePath.value = '/tmp/src';
+		// Partial failures deliberately log via console.warn - expect and suppress it.
+		const warnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {});
 
 		await dialog.confirm();
 
 		// confirm() calls cancel() on every non-null result, including partial failures -
 		// same as the clean-success path; the distinct toast is the only difference.
 		expect(dialog.showDialog.value).toBe(false);
+		warnSpy.mockRestore();
 	});
 
 	it('leaves the dialog open when the download fails outright', async () => {

@@ -26,6 +26,8 @@ function now(): string {
 	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
+const CONNECT_TIMEOUT_MS = 20000;
+
 export function useG2() {
 	const store = useDeviceStore();
 	const isDaemonRunning = ref(false);

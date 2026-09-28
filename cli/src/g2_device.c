@@ -918,6 +918,11 @@ cJSON *g2_list(int filter, int bank_filter) {
                 break;
             }
 
+            if (g2_daemon_mode) {
+                printf("{\"type\":\"names_progress\"}\n");
+                fflush(stdout);
+            }
+
             uint8_t *data = response + 9;
             int pos = 0;
 
