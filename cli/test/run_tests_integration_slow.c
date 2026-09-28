@@ -125,7 +125,7 @@ int main(void) {
      * a Unity test because this runner has multiple early-return points below (mid-run
      * disconnect bail-out) that must all still reach daemon_shutdown(). */
     daemon_ctx_t daemon = daemon_spawn();
-    cJSON *wa = read_event_of_type(&daemon, "watch_armed", 15, 5);
+    cJSON *wa = read_event_of_type(&daemon, "watch_armed", 15, 20);
     if (!wa) {
         fprintf(stderr, "\033[33mG2 not connected (no watch_armed from daemon). Please "
                          "connect/reset (power-cycle or replug) the device, then re-run.\033[0m\n");
