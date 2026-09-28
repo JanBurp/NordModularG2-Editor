@@ -23,10 +23,11 @@ typedef struct {
 /* Read one newline-terminated line from fd. Returns byte count or -1 on timeout/error. */
 int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec);
 
-/* Read lines until one has "type":expected_type. Returns parsed cJSON or NULL on timeout.
- * Caller cJSON_Delete()s the result. */
+/* Read lines until one has "type":expected_type, or until timeout_sec elapses overall
+ * (each individual line waits up to line_timeout_sec). Returns parsed cJSON or NULL on
+ * timeout. Caller cJSON_Delete()s the result. */
 cJSON *read_event_of_type(daemon_ctx_t *d, const char *expected_type,
-                           int max_lines, int timeout_sec);
+                           int timeout_sec, int line_timeout_sec);
 
 /* Spawn daemon subprocess. Returns context with fds and pid. */
 daemon_ctx_t daemon_spawn(void);

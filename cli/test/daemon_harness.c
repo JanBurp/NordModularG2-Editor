@@ -32,10 +32,14 @@ int read_line_timeout(int fd, char *buf, int bufsize, int timeout_sec) {
 }
 
 cJSON *read_event_of_type(daemon_ctx_t *d, const char *expected_type,
-                           int max_lines, int timeout_sec) {
+                           int timeout_sec, int line_timeout_sec) {
+    /* Time-bound, not attempt-bound: see send_and_expect_ok(). Startup now interleaves
+     * a "names_progress" line per bank (up to 40) ahead of "watch_armed" - a fixed
+     * attempt count gives up before reaching it; a deadline survives any backlog. */
     char buf[65536];
-    for (int i = 0; i < max_lines; i++) {
-        if (read_line_timeout(d->out_fd, buf, sizeof(buf), timeout_sec) < 0) return NULL;
+    time_t deadline = time(NULL) + timeout_sec;
+    while (time(NULL) < deadline) {
+        if (read_line_timeout(d->out_fd, buf, sizeof(buf), line_timeout_sec) < 0) return NULL;
         cJSON *ev = cJSON_Parse(buf);
         if (!ev) continue;
         cJSON *t = cJSON_GetObjectItem(ev, "type");

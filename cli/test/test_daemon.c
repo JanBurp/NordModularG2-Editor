@@ -33,17 +33,19 @@ void test_daemon_starts(void) {
     g_daemon = daemon_spawn();
     TEST_ASSERT_TRUE(g_daemon.pid > 0);
 
-    /* Drain usb_devices + device_info + slot_data×4 + global_knobs_data + names +
+    /* Drain usb_devices + device_info + slot_data×4 + global_knobs_data + names_progress
+     * (one line per bank, up to 40 - added for the startup progress bar) + names +
      * synth_settings_update + watch_armed. "names" (all patch/performance names across every
      * bank) is the slowest line to arrive - originally hardware-measured at ~2.2s on a
      * moderately full G2 (2s was intermittently too tight, bumped to 5s). Re-measured
      * 2026-09-28 against two units with larger catalogs: consistently ~10.9s and ~5.2s
      * solo AND under two-daemon contention (contention itself adds no measurable delay -
      * this is pure per-device g2_list() enumeration cost, proportional to catalog size), so
-     * 5s is intermittently too tight again. 20s gives ~2x headroom above the worst measured
-     * value without masking a genuine hang (this is a bounded per-line timeout, not a
-     * blanket wait). */
-    cJSON *wa = read_event_of_type(&g_daemon, "watch_armed", 15, 20);
+     * 5s is intermittently too tight again. Line count now varies with catalog size (one
+     * names_progress per bank), so this is time-bound rather than attempt-bound: 40s overall
+     * gives ~4x headroom above the worst measured startup, and 20s per line still catches a
+     * genuine hang on any single line without masking it. */
+    cJSON *wa = read_event_of_type(&g_daemon, "watch_armed", 40, 20);
     if (!wa) {
         g_daemon_ok = 1;
         TEST_IGNORE_MESSAGE("G2 not connected (no watch_armed from daemon)");
