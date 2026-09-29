@@ -59,15 +59,15 @@ function handleDrop(target: Element, payload: ParamDragPayload) {
 	const slot = useUiStore().slotInFocus;
 	if (!slot) return;
 
-	// Dropped onto a Parameter Pages knob (ParameterPages.vue's knob wrapper, tagged data-knob-slot)?
-	// data-knob-global marks a Global Pages cell (present only while the toolbar's Global Pages
+	// Dropped anywhere on a Parameter Pages column (ParameterPagesGroup.vue's cell, tagged data-cell-slot)?
+	// data-cell-global marks a Global Pages cell (present only while the toolbar's Global Pages
 	// toggle is on) vs. the default per-Patch cell.
 	let cellEl: Element | null = target;
-	while (cellEl && !cellEl.hasAttribute('data-knob-slot')) cellEl = cellEl.parentElement;
+	while (cellEl && !cellEl.hasAttribute('data-cell-slot')) cellEl = cellEl.parentElement;
 	if (!cellEl) return;
-	const slotIndex = parseInt(cellEl.getAttribute('data-knob-slot') ?? '');
+	const slotIndex = parseInt(cellEl.getAttribute('data-cell-slot') ?? '');
 	if (isNaN(slotIndex)) return;
-	if (cellEl.hasAttribute('data-knob-global')) {
+	if (cellEl.hasAttribute('data-cell-global')) {
 		useSlotsStore().assignParamToGlobalPage(slot, slotIndex, payload.location, payload.moduleIndex, payload.paramIndex);
 	} else {
 		useSlotsStore().assignParamToPage(slot, slotIndex, payload.location, payload.moduleIndex, payload.paramIndex);
