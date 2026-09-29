@@ -4,7 +4,7 @@
 			<div class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
 					<span class="text-sm font-semibold text-content-primary">About {{ APP_NAME }}</span>
-					<button v-if="closable" class="text-content-secondary hover:text-content-primary cursor-pointer" @click="close">
+					<button v-if="closable" class="hover:text-content-primary cursor-pointer" @click="close">
 						<Icon name="close" class="w-3 h-3" />
 					</button>
 				</div>
@@ -12,17 +12,16 @@
 					<img v-if="iconDataUrl" :src="iconDataUrl" class="w-16 h-16" alt="G2 Editor icon" />
 					<div>
 						<div class="text-base font-bold text-content-primary">{{ APP_NAME }}</div>
-						<div class="text-xs text-content-secondary mt-0.5">v{{ version }}</div>
+						<div class="text-xs mt-0.5">v{{ version }}</div>
 					</div>
-					<div class="text-xs text-content-secondary">Editor for the Nord Modular G2</div>
-					<div class="text-xs text-content-secondary">by Jan den Besten</div>
+					<div class="text-xs">Editor for the Nord Modular G2 - by Jan den Besten</div>
 					<button class="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0" @click="openSite">
 						janburp.github.io/NordModularG2-Editor
 					</button>
 
 					<div class="w-full border-t border-line-default pt-3 flex flex-col gap-2 text-left">
-						<p class="text-xs text-content-muted italic text-center">Use this editor at your own risk.</p>
-						<p class="text-xs text-content-muted text-center">
+						<p class="text-xs italic text-center">Use this editor at your own risk.</p>
+						<p class="text-xs text-center">
 							Thanks to the Nord G2 community at
 							<button
 								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
@@ -36,14 +35,21 @@
 							>
 								Delphi Editor
 							</button>
-							and the
+							, ian-s for the
 							<button
 								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
 								@click="openLink('https://electro-music.com/patchviewer/')"
 							>
 								patchviewer
 							</button>
-							by ian-s. Chris Purusha, Åka Danielson and BlueHell and all others who tested or donated to make this work possible.
+							, Chris Purusha for sharing tech info and his own take on an
+							<button
+								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
+								@click="openLink('https://github.com/chrispurusha/G2-Edit')"
+							>
+								editor
+							</button>
+							, Åka Danielson for graphics, BlueHell for lending an Engine, and all others who tested or donated to make this work possible.
 						</p>
 						<div class="flex justify-center pt-1">
 							<button
@@ -63,8 +69,9 @@
 					<template v-if="connecting">
 						<div class="flex items-center gap-2">
 							<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
-							<span class="text-xs text-content-secondary">
-								{{ connectingMessage || 'Connecting...' }}{{ namesLoadProgress ? ` (${namesLoadProgress.location}/${namesLoadProgress.total})` : '' }}
+							<span class="text-xs">
+								{{ connectingMessage || 'Connecting...'
+								}}{{ namesLoadProgress ? ` (${namesLoadProgress.location}/${namesLoadProgress.total})` : '' }}
 							</span>
 						</div>
 						<div v-if="namesLoadProgress" class="w-full h-1.5 bg-surface-2 rounded overflow-hidden">
