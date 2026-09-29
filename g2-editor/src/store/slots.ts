@@ -2748,13 +2748,19 @@ export const useSlotsStore = defineStore('slots', {
 			if (!mod) return;
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
+			// Positions other than labelIndex have never been customized, so pad with the
+			// param's default names instead of '' — an explicit '' renders as a blank button
+			// (see useSwitch.ts's displayNames, which only falls back to the default for
+			// undefined entries, not empty strings).
+			const defaultNames = getModule(mod.type)?.params?.[paramIndex]?.type
+				? getParam(getModule(mod.type)!.params![paramIndex].type)?.names
+				: undefined;
 			if (!entry) {
-				const labels = Array<string>(labelIndex + 1).fill('');
-				labels[labelIndex] = label;
+				const labels = Array.from({ length: labelIndex + 1 }, (_, i) => (i === labelIndex ? label : (defaultNames?.[i] ?? '')));
 				entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };
 				mod.paramLabels.push(entry);
 			} else {
-				while (entry.labels.length <= labelIndex) entry.labels.push('');
+				while (entry.labels.length <= labelIndex) entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
 				entry.labels[labelIndex] = label;
 			}
 			this._markSlotDirty(slot);
