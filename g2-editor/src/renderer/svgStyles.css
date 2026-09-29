@@ -198,11 +198,11 @@ svg.cable-invalid-target {
 /* Dragging a new cable from a jack (useJackDragInteraction.ts) with no valid target under the
    pointer yet — the plug cursor. A valid target under the pointer swaps to the forked
    "connecting" variant below; an invalid target is handled by cable-invalid-target above. */
-svg.jack-drag-active:not(.cable-invalid-target) {
+svg[data-jack-drag]:not(.cable-invalid-target) {
 	cursor: url('../assets/cursors/cable-drag.png') 1 3, crosshair;
 }
 
-svg.jack-drag-active.cable-valid-target:not(.cable-invalid-target) {
+svg[data-jack-drag='valid']:not(.cable-invalid-target) {
 	cursor: url('../assets/cursors/cable-connect.png') 1 7, crosshair;
 }
 

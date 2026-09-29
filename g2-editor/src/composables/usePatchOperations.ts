@@ -24,6 +24,20 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
+	// Shared by deleteUnusedModules/deleteUnusedCables below: walks both areas, lets the caller
+	// compute which modules/cables to drop for that area's data, and skips the store call when
+	// there's nothing to delete.
+	async function deleteUnusedInAreas(computeTargets: (modules: any[], cables: any[]) => { moduleIds?: number[]; cableList?: Cable[] }): Promise<void> {
+		for (const area of ['voice', 'fx'] as const) {
+			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const { moduleIds = [], cableList = [] } = computeTargets(modules, cables);
+			if (moduleIds.length > 0 || cableList.length > 0) {
+				await slotsStore.deleteSelection(moduleIds, cableList, area, modules, cables);
+			}
+		}
+	}
+
 	async function deleteUnusedModules(): Promise<void> {
 		const { getModule } = await import('../renderer/nmg2mods');
 		const NAME_MODULE_TYPE = 126;
@@ -31,17 +45,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		const isUntouchedNameModule = (m: any) =>
 			m.type === NAME_MODULE_TYPE && (m.colour || 0) === 0 && (m.uname ?? '') === (getModule(m.type)?.short ?? 'Module') + m.index;
 
-		for (const area of ['voice', 'fx'] as const) {
-			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
-			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
-			const unusedIds = modules
+		await deleteUnusedInAreas((modules, cables) => ({
+			moduleIds: modules
 				.filter((m: any) => !cables.some((c: any) => c.smod === m.index || c.dmod === m.index))
 				.filter((m: any) => m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m))
-				.map((m: any) => m.index as number);
-			if (unusedIds.length > 0) {
-				await slotsStore.deleteSelection(unusedIds, [], area, modules, cables);
-			}
-		}
+				.map((m: any) => m.index as number),
+		}));
 	}
 
 	// Removes cables that no longer do anything useful:
@@ -55,15 +64,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	//   alone.
 	async function deleteUnusedCables(): Promise<void> {
 		const WHITE = 6;
-		for (const area of ['voice', 'fx'] as const) {
-			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
-			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
+		await deleteUnusedInAreas((modules, cables) => {
 			const moduleIds = new Set(modules.map((m: any) => m.index));
-			const unused = cables.filter((c: any) => !moduleIds.has(c.smod) || !moduleIds.has(c.dmod) || (c.colour === WHITE && c.userColour === undefined));
-			if (unused.length > 0) {
-				await slotsStore.deleteSelection([], unused, area, modules, cables);
-			}
-		}
+			return {
+				cableList: cables.filter((c: any) => !moduleIds.has(c.smod) || !moduleIds.has(c.dmod) || (c.colour === WHITE && c.userColour === undefined)),
+			};
+		});
 	}
 
 	async function handleModuleMove({
