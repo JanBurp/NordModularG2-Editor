@@ -8,37 +8,39 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
-### Added
+### New
 - Assigning Morph Groups
 - Assigning Parameter Pages
 - Patch text notes
-- Mini-modules picker, also wired into Quick Add Module popup and right-click context menu
+- Bank (patch & performance) upload/download, with Patch Browser integration
+- Replace Module (swap a module in place)
+- Selected module follows/sync selected module on synth
+- Mini-modules picker
 - Cable hovering emphasizes the whole connected nest
 - Mouse-wheel interaction
 - Zoom for patch area only
 - New / Init 1 / Init 2 patch buttons
 - Recent files in File menu
-- Improved MIDI Learn
 - Window size/position persisted across sessions
 - Toasts, error popups, and contextual hints (UX review pass)
 - Compact mode for the Extended Toolbar
-- Bank (patch & performance) upload/download over USB, with Patch Browser integration
-- Replace Module (swap a module in place)
 - Click-click cabling mode, auto-connect/auto-suggest cabling, configurable cable snap range
 - Delete a cable via keyboard while it's highlighted
 - SeqNote piano-roll editor
 - Sequencer Random/Clear
 - Drum Synth presets
-- Vocoder preset selector
+- Vocoder graph & preset selector
 
 ### Changed
 - Toolbar layout reorganized
 - Styling/UX polish across canvas, Morph Groups, Parameter Pages
 - Undo/redo history improvements
+- Improved MIDI Learn
 - CMD-L / CMD-M shortcuts swapped
-- Module graph visualizations fixed/expanded
+- Module graph visualizations fixed and now all modules have graphs
 
 ### Fixed
+- Saving settings did not work allways (Windows)
 - Patch category not saving correctly
 - Editing actions not registering in undo history (offline mode)
 - Light theme issues
