@@ -109,7 +109,11 @@
 						<!-- Bank header (collapsible) -->
 						<li
 							class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
-							:class="group.patches.length === 0 ? 'opacity-40' : ''"
+							:class="[
+								group.patches.length === 0 ? 'opacity-40' : '',
+								bankNavIndex.get(group.bank) === selectedNavIndex ? 'bg-surface-3 ring-1 ring-inset ring-accent-primary' : '',
+							]"
+							:data-nav-idx="bankNavIndex.get(group.bank)"
 							@click="browser.toggleBank(group.bank)"
 							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
 						>
@@ -214,14 +218,43 @@
 
 	function onBrowserKeydown(e: KeyboardEvent) {
 		if (!props.isActive) return;
+		if (e.key === 'Escape') return resetNavIndex();
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
-		if (e.key === 'ArrowLeft') {
-			e.stopImmediatePropagation();
-			cycleView(-1);
-		} else if (e.key === 'ArrowRight') {
-			e.stopImmediatePropagation();
-			cycleView(1);
+		if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
+		const { key } = e;
+		const isActivate = key === 'Enter' || key === ' ';
+		if (isActivate && (e.target as HTMLElement).tagName === 'BUTTON') return;
+		if (!isActivate && key !== 'ArrowUp' && key !== 'ArrowDown' && key !== 'ArrowLeft' && key !== 'ArrowRight') return;
+		e.preventDefault();
+		e.stopImmediatePropagation();
+		if (key === 'ArrowUp') return navigate(-1);
+		if (key === 'ArrowDown') return navigate(1);
+		const item = flatNavItems.value[selectedNavIndex.value];
+		if (!item && (key === 'ArrowLeft' || key === 'ArrowRight')) return cycleView(key === 'ArrowLeft' ? -1 : 1);
+		if (key === 'ArrowLeft') {
+			if (browser.view === 'disk') {
+				if (diskParentName.value) browser.navigateUp();
+				resetNavIndex();
+			} else if (isBankItem(item)) setBankOpen(item.bank, false);
+			else if (item) selectedNavIndex.value = bankNavIndex.value.get((item as SynthPatch).bank) ?? selectedNavIndex.value;
+			return;
 		}
+		activateItem(item);
+	}
+
+	function setBankOpen(bank: number, open: boolean) {
+		if (browser.isBankCollapsed(bank) === open) browser.toggleBank(bank);
+	}
+
+	function activateItem(item: NavItem | undefined) {
+		if (!item) return;
+		if (isBankItem(item)) return setBankOpen(item.bank, true);
+		if (browser.view === 'disk') {
+			selectDisk(item as DiskEntry);
+			if ((item as DiskEntry).isDir) resetNavIndex();
+			return;
+		}
+		selectSynth(item as SynthPatch, browser.view === 'performances' ? 'performance' : 'patch');
 	}
 
 	/* Group a flat SynthPatch list by bank number */
@@ -337,15 +370,27 @@
 		pendingClearBank.value = null;
 	}
 
-	const flatNavItems = computed<(DiskEntry | SynthPatch)[]>(() => {
+	type BankNavItem = { kind: 'bank'; bank: number };
+	type NavItem = DiskEntry | SynthPatch | BankNavItem;
+	const isBankItem = (item: NavItem | undefined): item is BankNavItem => !!item && 'kind' in item && item.kind === 'bank';
+
+	const flatNavItems = computed<NavItem[]>(() => {
 		if (browser.view === 'disk') return [...filteredDiskDirs.value, ...filteredDiskFiles.value];
-		return currentGroups.value.filter((g) => !browser.isBankCollapsed(g.bank)).flatMap((g) => g.patches);
+		return currentGroups.value.flatMap((g) => [{ kind: 'bank', bank: g.bank } as BankNavItem, ...(browser.isBankCollapsed(g.bank) ? [] : g.patches)]);
 	});
 
 	// item → index lookup, so per-row rendering is O(1) instead of indexOf's O(n) (twice per row).
 	const flatNavIndex = computed(() => {
-		const m = new Map<DiskEntry | SynthPatch, number>();
+		const m = new Map<NavItem, number>();
 		flatNavItems.value.forEach((item, i) => m.set(item, i));
+		return m;
+	});
+
+	const bankNavIndex = computed(() => {
+		const m = new Map<number, number>();
+		flatNavItems.value.forEach((item, i) => {
+			if (isBankItem(item)) m.set(item.bank, i);
+		});
 		return m;
 	});
 
@@ -403,11 +448,15 @@
 		return parts.length > 1 ? parts[parts.length - 2] || '/' : '';
 	});
 
-	function navigate(direction: 1 | -1) {
-		navStep(direction);
+	function scrollToSelected() {
 		requestAnimationFrame(() => {
 			document.querySelector(`[data-nav-idx="${selectedNavIndex.value}"]`)?.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 		});
+	}
+
+	function navigate(direction: 1 | -1) {
+		navStep(direction);
+		scrollToSelected();
 	}
 
 	async function onViewChange(view: string | number | null | (string | number)[]) {
@@ -415,6 +464,7 @@
 		browser.view = v;
 		settings.browserView = v;
 		searchQuery.value = '';
+		resetNavIndex();
 		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && !browser.loading && device.connected) {
 			await browser.loadSynthList();
 		}
@@ -439,11 +489,7 @@
 	function handleEnter() {
 		if (selectedNavIndex.value >= 0) {
 			const item = flatNavItems.value[selectedNavIndex.value];
-			if (item) {
-				if (browser.view === 'disk') return selectDisk(item as DiskEntry);
-				selectSynth(item as SynthPatch, browser.view === 'performances' ? 'performance' : 'patch');
-				return;
-			}
+			if (item) return activateItem(item);
 		}
 		if (browser.view === 'disk' && flatNavItems.value.length > 0) {
 			selectDisk(flatNavItems.value[0] as DiskEntry);

@@ -95,7 +95,20 @@ nav_order: 4
 | `Cmd+,` | Toggle Settings pane |
 | `Cmd+T` | Toggle Extended Toolbar |
 | `Cmd+F` | Toggle Parameter Pages |
-| `←` / `→` | Switch Disk/Patches/Performances tab (Browser pane focused) |
+
+## Browser Pane
+
+Arrow keys work whether or not the search box is focused. Banks (Patches/Performances) get a cursor row too; on the Disk tab folders take their place.
+
+| Key | Action |
+|---|---|
+| `↑` / `↓` | Move cursor over banks / folders and items |
+| `←` / `→` | Switch Disk/Patches/Performances tab (only while no cursor is set) |
+| `←` | Collapse the bank under the cursor; on Disk, go up one folder |
+| `→` / `Enter` / `Space` | Expand the bank, open the folder, or load the item under the cursor |
+| `Escape` | Reset the cursor |
+
+The cursor also resets when you switch tab or start/stop filtering. (`Space` types a space while the search box is focused.)
 
 ## Morph Groups
 

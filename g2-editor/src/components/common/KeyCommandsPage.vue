@@ -97,7 +97,16 @@
 				{ keys: ['⌘ T'], action: 'Toggle Extended Toolbar' },
 				{ keys: ['⌘ F'], action: 'Toggle Parameter Pages' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
-				{ keys: ['←', '→'], action: 'Switch Disk/Patches/Performances tab (Browser pane focused)' },
+			],
+		},
+		{
+			title: 'Browser Pane',
+			rows: [
+				{ keys: ['↑', '↓'], action: 'Move cursor over banks / folders and items' },
+				{ keys: ['←', '→'], action: 'Switch Disk/Patches/Performances tab (while no cursor is set)' },
+				{ keys: ['←'], action: 'Collapse bank under cursor / go up one folder (Disk)' },
+				{ keys: ['→', '↵', 'Space'], action: 'Expand bank / open folder / load item under cursor' },
+				{ keys: ['ESC'], action: 'Reset cursor' },
 			],
 		},
 		{
