@@ -149,7 +149,9 @@
 </script>
 <style scoped>
 	.jack {
-		cursor: crosshair;
+		cursor:
+			url('../../assets/cursors/jack-hover.png') 1 3,
+			crosshair;
 	}
 
 	.jack:hover {

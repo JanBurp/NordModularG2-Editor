@@ -44,6 +44,28 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
+	// Removes cables that no longer do anything useful:
+	// - left pointing at a module index that no longer exists in that area — the same "orphaned
+	//   data" cableRenderer.ts already defends against at render time (see its "Cable skipped:
+	//   module not found" warning), most commonly leftover from a loaded hardware/file patch.
+	// - auto-colored white (colour 6) with no userColour override — cableGraph.ts's
+	//   findGroupOutputColor only ever assigns white to a daisy-chain cable when no real output is
+	//   driving its group, i.e. it carries no signal. A user-chosen white cable always has
+	//   userColour set (see Cable.userColour), so deliberately white-painted real cables are left
+	//   alone.
+	async function deleteUnusedCables(): Promise<void> {
+		const WHITE = 6;
+		for (const area of ['voice', 'fx'] as const) {
+			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
+			const moduleIds = new Set(modules.map((m: any) => m.index));
+			const unused = cables.filter((c: any) => !moduleIds.has(c.smod) || !moduleIds.has(c.dmod) || (c.colour === WHITE && c.userColour === undefined));
+			if (unused.length > 0) {
+				await slotsStore.deleteSelection([], unused, area, modules, cables);
+			}
+		}
+	}
+
 	async function handleModuleMove({
 		indices,
 		dCol,
@@ -186,6 +208,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		currentModules,
 		deleteSelection,
 		deleteUnusedModules,
+		deleteUnusedCables,
 		handleModuleMove,
 		handleModuleDrop,
 		handleParamChange,

@@ -80,3 +80,56 @@ describe('usePatchOperations — handlePasteParams', () => {
 		expect(pasteParamsSpy).not.toHaveBeenCalled();
 	});
 });
+
+describe('usePatchOperations — deleteUnusedCables', () => {
+	it('removes only cables whose smod/dmod no longer exists in that area, across both voice and fx', async () => {
+		const slotsStore = useSlotsStore();
+		const validCable = { smod: 1, scon: 0, dmod: 2, dcon: 0, dir: 1, colour: 0 };
+		const orphanedDest = { smod: 1, scon: 1, dmod: 99, dcon: 0, dir: 1, colour: 0 };
+		const orphanedSrc = { smod: 88, scon: 0, dmod: 3, dcon: 0, dir: 1, colour: 0 };
+		seedArea(slotsStore, 'A', 1, [makeModule(1), makeModule(2)], [validCable, orphanedDest]);
+		seedArea(slotsStore, 'A', 0, [makeModule(3)], [orphanedSrc]);
+		const deleteSelectionSpy = vi.spyOn(slotsStore, 'deleteSelection').mockResolvedValue(undefined as any);
+
+		const { deleteUnusedCables } = usePatchOperations();
+		await deleteUnusedCables();
+
+		expect(deleteSelectionSpy).toHaveBeenCalledTimes(2);
+		expect(deleteSelectionSpy).toHaveBeenCalledWith([], [orphanedDest], 'voice', expect.anything(), expect.anything());
+		expect(deleteSelectionSpy).toHaveBeenCalledWith([], [orphanedSrc], 'fx', expect.anything(), expect.anything());
+	});
+
+	it('does nothing when every cable references an existing module', async () => {
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(1), makeModule(2)], [{ smod: 1, scon: 0, dmod: 2, dcon: 0, dir: 1, colour: 0 }]);
+		seedArea(slotsStore, 'A', 0, [], []);
+		const deleteSelectionSpy = vi.spyOn(slotsStore, 'deleteSelection').mockResolvedValue(undefined as any);
+
+		const { deleteUnusedCables } = usePatchOperations();
+		await deleteUnusedCables();
+
+		expect(deleteSelectionSpy).not.toHaveBeenCalled();
+	});
+
+	it('removes auto-colored white cables (no signal driving them) but keeps a deliberately user-painted white cable', async () => {
+		const slotsStore = useSlotsStore();
+		const validCable = { smod: 1, scon: 0, dmod: 2, dcon: 0, dir: 1, colour: 0 };
+		const autoWhiteOrphan = { smod: 3, scon: 0, dmod: 4, dcon: 0, dir: 0, colour: 6 }; // no userColour — daisy-chain link with no driving output
+		const userPaintedWhite = { smod: 1, scon: 1, dmod: 5, dcon: 0, dir: 1, colour: 6, userColour: 6 }; // deliberate choice on a real cable
+		seedArea(
+			slotsStore,
+			'A',
+			1,
+			[makeModule(1), makeModule(2), makeModule(3), makeModule(4), makeModule(5)],
+			[validCable, autoWhiteOrphan, userPaintedWhite],
+		);
+		seedArea(slotsStore, 'A', 0, [], []);
+		const deleteSelectionSpy = vi.spyOn(slotsStore, 'deleteSelection').mockResolvedValue(undefined as any);
+
+		const { deleteUnusedCables } = usePatchOperations();
+		await deleteUnusedCables();
+
+		expect(deleteSelectionSpy).toHaveBeenCalledTimes(1);
+		expect(deleteSelectionSpy).toHaveBeenCalledWith([], [autoWhiteOrphan], 'voice', expect.anything(), expect.anything());
+	});
+});

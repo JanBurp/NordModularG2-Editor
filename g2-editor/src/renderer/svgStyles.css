@@ -182,17 +182,28 @@ fieldset {
 
 svg.cable-grab-mode .cable-hit {
 	pointer-events: stroke;
-	cursor: grab;
+	cursor: url('../assets/cursors/cable-grab.png') 4 4, grab;
 }
 
 /* Active cable-grab drag (mousedown through mouseup) — overrides the ambient 'grab' cursor above. */
 svg.cable-dragging {
-	cursor: grabbing;
+	cursor: url('../assets/cursors/cable-grabbing.png') 6 7, grabbing;
 }
 
 /* Hovering an incompatible drop target during a new-cable drag or a cable-grab drag. */
 svg.cable-invalid-target {
 	cursor: not-allowed;
+}
+
+/* Dragging a new cable from a jack (useJackDragInteraction.ts) with no valid target under the
+   pointer yet — the plug cursor. A valid target under the pointer swaps to the forked
+   "connecting" variant below; an invalid target is handled by cable-invalid-target above. */
+svg.jack-drag-active:not(.cable-invalid-target) {
+	cursor: url('../assets/cursors/cable-drag.png') 1 3, crosshair;
+}
+
+svg.jack-drag-active.cable-valid-target:not(.cable-invalid-target) {
+	cursor: url('../assets/cursors/cable-connect.png') 1 7, crosshair;
 }
 
 /* Click-connect mode: the jack currently armed as the pending cable source. */

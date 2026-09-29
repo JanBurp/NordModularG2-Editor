@@ -24,6 +24,7 @@ export type MenuAction =
 	| 'save-init-2'
 	| 'delete'
 	| 'delete-unused-modules'
+	| 'delete-unused-cables'
 	| 'select-all'
 	| 'paste-params'
 	| 'toggle-modules'

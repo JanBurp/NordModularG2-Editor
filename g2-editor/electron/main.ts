@@ -891,6 +891,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Text Panel", click: () => sendToFocused("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
 				{ type: "separator" as const },
 				{ label: "Delete Unused Modules", click: () => sendToFocused("menu:action", "delete-unused-modules") },
+				{ label: "Delete Unused Cables", click: () => sendToFocused("menu:action", "delete-unused-cables") },
 				{ type: "separator" as const },
 				{
 					label: "Download to Slot",

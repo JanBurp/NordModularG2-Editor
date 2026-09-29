@@ -110,6 +110,7 @@ export function useJackDragInteraction(
 		snapJack = snapResult.jack;
 		snapHighlight = updateSnapHighlight(svg, snapHighlight, snapJack);
 		svg.classList.toggle('cable-invalid-target', snapResult.invalidNearby);
+		svg.classList.toggle('cable-valid-target', !!snapJack);
 
 		uiStore.ghostCable = {
 			area: areaIdx,
@@ -140,7 +141,7 @@ export function useJackDragInteraction(
 		dragSrcInfo = null;
 		drivenNestJacks = null;
 		hasDragged = false;
-		svgRef?.value?.classList.remove('cable-invalid-target');
+		svgRef?.value?.classList.remove('cable-invalid-target', 'cable-valid-target', 'jack-drag-active');
 		window.removeEventListener('mousemove', onMouseMovePreview);
 		window.removeEventListener('mouseup', onWindowMouseup);
 		window.removeEventListener('mousedown', onCommitMousedown, true);
@@ -169,6 +170,7 @@ export function useJackDragInteraction(
 					dragSrcInfo = val;
 					hasDragged = false;
 					drivenNestJacks = val.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
+					svgRef?.value?.classList.add('jack-drag-active');
 					window.addEventListener('mousemove', onMouseMovePreview);
 					window.addEventListener('mousedown', onCommitMousedown, true);
 					revealConnectedCables(val);
@@ -191,6 +193,7 @@ export function useJackDragInteraction(
 			hasDragged = false;
 			// Only output-jack drags consult driven-nest jacks (see findSnapJack); compute once here.
 			drivenNestJacks = info.type === 'output' ? computeDrivenInputJacks(getCables()) : null;
+			svgRef?.value?.classList.add('jack-drag-active');
 			window.addEventListener('mousemove', onMouseMovePreview);
 			window.addEventListener('mouseup', onWindowMouseup);
 			revealConnectedCables(info);
