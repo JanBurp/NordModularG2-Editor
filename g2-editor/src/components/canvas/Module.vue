@@ -78,6 +78,7 @@
 				:values="localLv"
 				:modes="instance.modes"
 				:modeDefs="moduleDef.modes || []"
+				:override-text="instance.type === 68 && entry.ve.ref === 0 && localLv[2] === 1 ? 'MASTER' : undefined"
 			/>
 			<ModuleVeLed
 				v-else-if="entry.ve.type === 'led' || entry.ve.type === 'ledArray'"

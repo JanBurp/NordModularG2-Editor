@@ -115,6 +115,7 @@ const parammap: Record<string, ParamDefinition> = {
 	NoteRange: { low: 0, high: 127, def: 0, defin: ['0 ~ {+-}0, 1 ~ {+-}0.5, 64 ~ {+-}32, 126 ~ {+-}63.0, 127 ~ {+-}64.0'], comments: '' },
 	NoteZoneThru: { width: 50, low: 0, high: 1, def: 0, defin: ['0 ~ Notes Only, 1 ~ Note+Ctrls'], comments: '' },
 	OffOn: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], canLabel: true, comments: '' },
+	OffOnMomentary: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], canLabel: true, trigger: true, comments: '' },
 	TrigBtn: { width: 18, names: ['Ch#'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], trigger: true, comments: '' },
 	OffOn2: { names: ['Off', 'On'], low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: 'Alternative for punch etc' },
 	OffOnBlank: { names: [''], width: 12, low: 0, high: 1, def: 0, defin: ['0 ~ Off, 1 ~ On'], comments: '' },

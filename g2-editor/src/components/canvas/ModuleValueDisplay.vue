@@ -1,7 +1,8 @@
 <template>
 	<rect :x="ve.x" :y="ve.y" :width="ve.w" height="14" fill="#666" />
 	<text v-if="ve.ref !== undefined" :x="(ve.x || 0) + (ve.w || 0) / 2" :y="(ve.y || 0) + 10" fill="#fff" font-size="8" text-anchor="middle">
-		<template v-if="t === 'number' && typeof ve.ref === 'number' && ve.ref !== null">
+		<template v-if="overrideText !== undefined">{{ overrideText }}</template>
+		<template v-else-if="t === 'number' && typeof ve.ref === 'number' && ve.ref !== null">
 			{{ formatValue(getParamValue(ve.ref), props.params[ve.ref]?.type || '') }}
 		</template>
 		<template v-else-if="Array.isArray(ve.ref)">
@@ -20,6 +21,7 @@
 		values: number[];
 		modes?: number[];
 		modeDefs?: ModuleMode[];
+		overrideText?: string;
 	}>();
 
 	function getParamValue(index: number): number {
