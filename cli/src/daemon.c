@@ -668,9 +668,18 @@ static void execute_cmd(const char *line) {
 		ret = g2_clear_bank(type, arg_i(args, 1), 1, 128);
 
 	} else if (strcmp(cmd, "reload-names") == 0) {
+		/* g2_list needs a quiet wire: with the stream running, live LED/VU pushes interleave
+		 * with the list replies and the bank loop stalls (seen when this ran right after
+		 * watch_armed). Same stop / restart / consume-ACK dance as the reconnect path. */
 		g2_listener_stop();
+		g2_lock_stream();
 		emit_event("names", g2_list(LIST_FILTER_ALL, 0));
 		g2_listener_start();
+		g2_unlock_stream();
+		{
+			g2_msg_t ack;
+			if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0) g2_msg_free(&ack);
+		}
 		ret = G2_OK;
 
 	} else if (strcmp(cmd, "upload-patch") == 0 && n >= 2) {
@@ -1074,8 +1083,8 @@ int g2_daemon_run(output_format_t format, int debug) {
 		}
 	}
 
-	debug_status("startup_list");
-	emit_event("names", g2_list(LIST_FILTER_ALL, 0));
+	/* Patch/performance names (~40 bank round-trips, the bulk of startup) are deliberately not
+	 * fetched here: the editor requests them with "reload-names" once watch_armed is out. */
 
 	debug_status("startup_synth_settings");
 	cJSON *startup_synth = query_synth_settings("synth_settings_update");

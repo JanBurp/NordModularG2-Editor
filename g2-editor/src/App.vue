@@ -458,7 +458,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
-	import { useG2 } from './composables/useG2';
+	import { startupMark, useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
@@ -738,7 +738,7 @@
 			}
 		}
 		if (!browserStore.synthPatches.length) {
-			browserStore.loadSynthList();
+			browserStore.reloadNames();
 		}
 	}
 
@@ -751,10 +751,12 @@
 		// device in DeviceSwitcher while thisId is still null.
 		connectedDevices.setThisId(`${bus}:${deviceAddr}`);
 		await window.electronAPI.devices.connect(bus, deviceAddr);
+		startupMark('devices.connect done');
 		await connectDevice({ silent: showAboutDialog.value });
 	}
 
 	onMounted(async () => {
+		startupMark('onMounted');
 		const { version, platform } = await window.electronAPI.getAppInfo();
 		console.log(`[startup] ${APP_NAME} v${version} — ${platform}`);
 
@@ -773,6 +775,7 @@
 		// independent renderer processes. A window with no assignment (the single-window
 		// fallback when no devices were found at launch) falls back to claimStartupSplash().
 		const assignment = await window.electronAPI.devices.getAssignment();
+		startupMark(`assignment ${assignment ? 'received' : 'none'}`);
 		if (assignment) {
 			showAboutDialog.value = assignment.showSplash;
 			await bindAndConnect(assignment.bus, assignment.device);
@@ -784,9 +787,12 @@
 			else await connectDevice({ silent: showAboutDialog.value });
 		}
 
+		startupMark('connectDevice returned');
 		await afterConnectRestoreFocus();
+		startupMark('afterConnectRestoreFocus done');
 		// Keep the splash open on a failed connect so the user sees why (message + Close in AboutDialog).
 		if (device.status === DeviceStatus.Connected) showAboutDialog.value = false;
 		startingUp.value = false;
+		startupMark('splash closed / startup done');
 	});
 </script>

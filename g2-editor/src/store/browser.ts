@@ -57,6 +57,20 @@ export const useBrowserStore = defineStore('browser', {
 			this.synthPerformances = perfs;
 		},
 
+		/* Startup: the daemon no longer sends names itself; ask for them once armed.
+		 * The `names` watch event applies the data, this only tracks the loading state. */
+		async reloadNames(): Promise<void> {
+			this.loading = true;
+			this.error = '';
+			try {
+				await window.cli.run(['reload-names']);
+			} catch (e: any) {
+				this.error = e.message;
+			} finally {
+				this.loading = false;
+			}
+		},
+
 		/* Fallback: load list with separate CLI call */
 		async loadSynthList(): Promise<void> {
 			this.loading = true;

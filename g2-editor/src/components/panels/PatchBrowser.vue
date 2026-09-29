@@ -411,7 +411,7 @@
 		browser.view = v;
 		settings.browserView = v;
 		searchQuery.value = '';
-		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && device.connected) {
+		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && !browser.loading && device.connected) {
 			await browser.loadSynthList();
 		}
 		if (v === 'disk' && !browser.diskFolder && settings.path) {

@@ -26,6 +26,11 @@ function now(): string {
 	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
+// TEMPORARY startup timing marks (grep "[timing]"); correlate with main-process marks by wall-clock time.
+export function startupMark(label: string): void {
+	console.log(`[timing] ${now()} renderer: ${label}`);
+}
+
 export interface NamesLoadProgress {
 	location: number;
 	total: number;
@@ -106,6 +111,7 @@ export function useG2() {
 			}
 			try {
 				const ev = JSON.parse(line);
+				if (!isDaemonRunning.value && ev.type !== 'names_progress') startupMark(`event ${ev.type}${ev.slot ? ` ${ev.slot}` : ''}`);
 				if (ev.type === 'watch_armed') {
 					if (activityTimer !== null) {
 						clearTimeout(activityTimer);
@@ -183,7 +189,9 @@ export function useG2() {
 			}
 		});
 
+		startupMark('watchStart requested');
 		await window.cli.watchStart();
+		startupMark('watchStart resolved (daemon spawned)');
 		activityTimer = setTimeout(() => rejectArmed(new Error('Connection timeout')), 8000);
 		await armed;
 		// activityTimer already null'd when watch_armed was handled (or null'd by error paths)

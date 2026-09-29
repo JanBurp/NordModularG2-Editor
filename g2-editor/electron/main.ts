@@ -144,6 +144,8 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 
 	trackWindowState(window);
 
+	startupMark("window created, loading renderer");
+	window.webContents.once("did-finish-load", () => startupMark("renderer did-finish-load"));
 	if (VITE_DEV_SERVER_URL) {
 		window.loadURL(VITE_DEV_SERVER_URL);
 	} else {
@@ -182,12 +184,14 @@ function startDaemon(session: DeviceSession) {
 		console.warn(`[daemon] ${session.id} was claimed by another window while this one was disconnected — continuing locally without rejoining the device list.`);
 	}
 	console.warn(`[daemon] Starting daemon process for ${session.id}...`);
+	startupMark("spawning daemon");
 	const proc = spawn(cliPath, ["daemon", String(session.bus), String(session.device)]);
 	session.daemonProcess = proc;
 	proc.stdin?.on("error", () => {
 		// swallow EPIPE — expected when daemon exits while a write is in flight
 	});
 	let buffer = "";
+	let armedSeen = false; // timing marks only cover the startup sequence
 	proc.stdout?.on("data", (data: Buffer) => {
 		buffer += data.toString();
 		const lines = buffer.split("\n");
@@ -196,6 +200,9 @@ function startDaemon(session: DeviceSession) {
 			const trimmed = line.trim();
 			if (!trimmed) continue;
 			console.log(`[daemon-watch:${session.id}]`, line);
+			const evType = /"type":"([^"]+)"/.exec(trimmed)?.[1];
+			if (evType && evType !== "names_progress" && !armedSeen) startupMark(`daemon event ${evType}`);
+			if (evType === "watch_armed") armedSeen = true;
 			try {
 				const msg = JSON.parse(trimmed);
 				if (msg.id !== undefined) {
@@ -1059,7 +1066,13 @@ app.on("before-quit", (e) => {
 	})();
 });
 
+// TEMPORARY startup timing marks (grep "[timing]"); wall-clock time so they line up with renderer marks.
+function startupMark(label: string): void {
+	console.log(`[timing] ${new Date().toISOString().slice(11, 23)} main: ${label}`);
+}
+
 app.whenReady().then(async () => {
+	startupMark("app ready");
 	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
 
 	if (isMac) {
@@ -1083,6 +1096,7 @@ app.whenReady().then(async () => {
 	// hardware-agnostic window — see isOffline in preload.ts).
 	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
+	startupMark(`enumeration done (${unclaimed.length} unclaimed)`);
 	if (unclaimed.length === 0) {
 		createAppWindow();
 	} else {
