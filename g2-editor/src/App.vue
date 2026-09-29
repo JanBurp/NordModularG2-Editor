@@ -392,7 +392,7 @@
 		</div>
 	</Dialog>
 
-	<AboutDialog v-model="showAboutDialog" :closable="!startingUp" :connecting="startingUp" :connecting-message="loadingMessage" />
+	<AboutDialog v-model="showAboutDialog" :closable="!startingUp" :connecting="startingUp" :connecting-message="loadingMessage" :message="aboutMessage" />
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
@@ -540,6 +540,12 @@
 				slotsStore.uploadingFromFile ||
 				Object.values(slotsStore.slots).some((s) => s.loading)),
 	);
+	const aboutMessage = computed(() => {
+		if (startingUp.value || device.status === DeviceStatus.Connected || device.status === DeviceStatus.Offline) return '';
+		return device.status === DeviceStatus.DriverError
+			? 'USB driver error: the G2 could not be opened.'
+			: 'G2 not connected. Connect your Nord Modular G2 via USB and reconnect.';
+	});
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
 		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
@@ -745,7 +751,7 @@
 		// device in DeviceSwitcher while thisId is still null.
 		connectedDevices.setThisId(`${bus}:${deviceAddr}`);
 		await window.electronAPI.devices.connect(bus, deviceAddr);
-		await connectDevice();
+		await connectDevice({ silent: showAboutDialog.value });
 	}
 
 	onMounted(async () => {
@@ -775,11 +781,12 @@
 			const found = await window.electronAPI.devices.list();
 			const unclaimed = found.filter((d) => !d.alreadyConnected);
 			if (unclaimed.length > 0) await bindAndConnect(unclaimed[0].bus, unclaimed[0].device);
-			else await connectDevice();
+			else await connectDevice({ silent: showAboutDialog.value });
 		}
 
 		await afterConnectRestoreFocus();
-		showAboutDialog.value = false;
+		// Keep the splash open on a failed connect so the user sees why (message + Close in AboutDialog).
+		if (device.status === DeviceStatus.Connected) showAboutDialog.value = false;
 		startingUp.value = false;
 	});
 </script>

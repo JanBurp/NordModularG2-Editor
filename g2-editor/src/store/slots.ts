@@ -2759,9 +2759,7 @@ export const useSlotsStore = defineStore('slots', {
 			// param's default names instead of '' — an explicit '' renders as a blank button
 			// (see useSwitch.ts's displayNames, which only falls back to the default for
 			// undefined entries, not empty strings).
-			const defaultNames = getModule(mod.type)?.params?.[paramIndex]?.type
-				? getParam(getModule(mod.type)!.params![paramIndex].type)?.names
-				: undefined;
+			const defaultNames = getModule(mod.type)?.params?.[paramIndex]?.type ? getParam(getModule(mod.type)!.params![paramIndex].type)?.names : undefined;
 			if (!entry) {
 				const labels = Array.from({ length: labelIndex + 1 }, (_, i) => (i === labelIndex ? label : (defaultNames?.[i] ?? '')));
 				entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };

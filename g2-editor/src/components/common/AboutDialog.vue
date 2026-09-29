@@ -81,7 +81,10 @@
 							></div>
 						</div>
 					</template>
-					<Button v-else variant="default" @click="close">Close</Button>
+					<template v-else>
+						<p v-if="message" class="text-xs text-yellow-500 self-center text-center">{{ message }}</p>
+						<Button variant="default" @click="close">Close</Button>
+					</template>
 				</div>
 			</div>
 		</div>
@@ -95,7 +98,7 @@
 	import { APP_NAME } from '@/constants';
 	import { namesLoadProgress } from '@/composables/useG2';
 
-	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string }>(), {
+	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string; message?: string }>(), {
 		closable: true,
 		connecting: false,
 	});

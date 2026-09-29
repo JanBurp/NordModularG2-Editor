@@ -1,4 +1,3 @@
-import type { Cable } from '@/renderer/cableRenderer';
 import type { ClipboardEntry } from '@/types/patch';
 import { computed, getCurrentInstance, onUnmounted } from 'vue';
 import { useSlotsStore } from '../store/slots';

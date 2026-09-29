@@ -26,8 +26,6 @@ function now(): string {
 	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
-const CONNECT_TIMEOUT_MS = 20000;
-
 export interface NamesLoadProgress {
 	location: number;
 	total: number;
@@ -201,7 +199,7 @@ export function useG2() {
 		window.cli.offWatchDone();
 	}
 
-	async function connectDevice(): Promise<void> {
+	async function connectDevice(opts: { silent?: boolean } = {}): Promise<void> {
 		if (typeof window === 'undefined' || !window.cli) {
 			store.status = DeviceStatus.Unsupported;
 			log('•', 'Connect', 'CLI not available');
@@ -220,7 +218,7 @@ export function useG2() {
 			if (e.message !== 'usb_driver_error') {
 				store.status = DeviceStatus.Disconnected;
 				log('←', 'Connect', `G2 not found: ${e.message}`);
-				showToast(`G2 not found: ${e.message}`);
+				if (!opts.silent) showToast(`G2 not found: ${e.message}`);
 			}
 			stopWatch();
 		}
