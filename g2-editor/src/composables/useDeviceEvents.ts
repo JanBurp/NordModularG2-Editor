@@ -23,7 +23,10 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'names') {
-			if (ev.data) browserStore.applyNamesData(ev.data);
+			if (ev.data) {
+				browserStore.applyNamesData(ev.data);
+				if (store.device?.synthName) browserStore.cacheNames(store.device.synthName, ev.data);
+			}
 			notifyNamesReloaded();
 			log('←', 'Watch', 'names');
 			return true;

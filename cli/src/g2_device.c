@@ -455,8 +455,6 @@ cJSON *g2_get_patch(const char *slot_str) {
         goto cleanup;
     }
 
-    usleep(100000);
-
     /* Same lockstep discipline as the patch-version step above: skip anything not
      * tagged as the patch-name response, relaying it via the normal event dispatcher
      * so it isn't lost. */
@@ -494,7 +492,6 @@ cJSON *g2_get_patch(const char *slot_str) {
     debug_timing("get_patch_text_start");
     char *patchText = NULL;
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_TEXT, NULL, 0) == 0) {
-        usleep(100000);
         /* A straggler notification from a preceding operation (e.g. an upload) can still be
          * in flight when our request's answer arrives. Rather than trust whatever packet
          * shows up first, loop discarding anything that isn't tagged as a notes response

@@ -97,7 +97,11 @@
 						<Icon :name="allBanksExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 					</button>
 				</div>
-				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
+				<StateMessage
+					v-if="browser.loading && !browser.synthPatches.length && !browser.synthPerformances.length"
+					variant="loading"
+					message="Loading from G2..."
+				/>
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Patches grouped by bank -->

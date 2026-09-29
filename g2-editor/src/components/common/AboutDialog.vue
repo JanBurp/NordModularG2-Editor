@@ -69,16 +69,7 @@
 					<template v-if="connecting">
 						<div class="flex items-center gap-2">
 							<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
-							<span class="text-xs">
-								{{ connectingMessage || 'Connecting...'
-								}}{{ namesLoadProgress ? ` (${namesLoadProgress.location}/${namesLoadProgress.total})` : '' }}
-							</span>
-						</div>
-						<div v-if="namesLoadProgress" class="w-full h-1.5 bg-surface-2 rounded overflow-hidden">
-							<div
-								class="h-full bg-orange-400 transition-all"
-								:style="{ width: `${(namesLoadProgress.location / namesLoadProgress.total) * 100}%` }"
-							></div>
+							<span class="text-xs">{{ connectingMessage || 'Connecting...' }}</span>
 						</div>
 					</template>
 					<template v-else>
@@ -96,7 +87,6 @@
 	import Button from '@/components/toolbar/Button.vue';
 	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
-	import { namesLoadProgress } from '@/composables/useG2';
 
 	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string; message?: string }>(), {
 		closable: true,

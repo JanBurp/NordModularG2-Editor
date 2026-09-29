@@ -1086,13 +1086,6 @@ int g2_daemon_run(output_format_t format, int debug) {
 	/* Patch/performance names (~40 bank round-trips, the bulk of startup) are deliberately not
 	 * fetched here: the editor requests them with "reload-names" once watch_armed is out. */
 
-	debug_status("startup_synth_settings");
-	cJSON *startup_synth = query_synth_settings("synth_settings_update");
-	if (startup_synth) {
-		emit(startup_synth);
-		cJSON_Delete(startup_synth);
-	}
-
 	/* All startup queries done. Start listener and arm streaming. */
 	debug_status("listener_start");
 	g2_listener_start();

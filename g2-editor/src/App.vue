@@ -458,7 +458,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
-	import { startupMark, useG2 } from './composables/useG2';
+	import { useG2 } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
@@ -551,6 +551,7 @@
 		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
+		if (browserStore.loading) return 'Loading synth state...';
 		return 'Loading patch...';
 	});
 
@@ -626,6 +627,8 @@
 		handleSlotClick(selectable[nextPos]);
 	}
 
+	// Minimum time the startup splash stays up, so a fast connect doesn't flash it.
+	const SPLASH_MIN_MS = 2500;
 	const showAboutDialog = ref(false);
 	const startingUp = ref(true);
 	const quickAddPos = ref({ x: 0, y: 0 });
@@ -738,6 +741,7 @@
 			}
 		}
 		if (!browserStore.synthPatches.length) {
+			browserStore.applyCachedNames(device.device?.synthName ?? '');
 			browserStore.reloadNames();
 		}
 	}
@@ -751,12 +755,10 @@
 		// device in DeviceSwitcher while thisId is still null.
 		connectedDevices.setThisId(`${bus}:${deviceAddr}`);
 		await window.electronAPI.devices.connect(bus, deviceAddr);
-		startupMark('devices.connect done');
 		await connectDevice({ silent: showAboutDialog.value });
 	}
 
 	onMounted(async () => {
-		startupMark('onMounted');
 		const { version, platform } = await window.electronAPI.getAppInfo();
 		console.log(`[startup] ${APP_NAME} v${version} — ${platform}`);
 
@@ -767,6 +769,7 @@
 			return;
 		}
 
+		const splashStart = Date.now();
 		window.electronAPI.devices.onChanged((list) => connectedDevices.applyList(list));
 
 		// A parallel-startup window is pre-assigned a specific device by the main process,
@@ -775,7 +778,6 @@
 		// independent renderer processes. A window with no assignment (the single-window
 		// fallback when no devices were found at launch) falls back to claimStartupSplash().
 		const assignment = await window.electronAPI.devices.getAssignment();
-		startupMark(`assignment ${assignment ? 'received' : 'none'}`);
 		if (assignment) {
 			showAboutDialog.value = assignment.showSplash;
 			await bindAndConnect(assignment.bus, assignment.device);
@@ -787,12 +789,13 @@
 			else await connectDevice({ silent: showAboutDialog.value });
 		}
 
-		startupMark('connectDevice returned');
 		await afterConnectRestoreFocus();
-		startupMark('afterConnectRestoreFocus done');
 		// Keep the splash open on a failed connect so the user sees why (message + Close in AboutDialog).
-		if (device.status === DeviceStatus.Connected) showAboutDialog.value = false;
+		if (device.status === DeviceStatus.Connected) {
+			const remaining = SPLASH_MIN_MS - (Date.now() - splashStart);
+			if (showAboutDialog.value && remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
+			showAboutDialog.value = false;
+		}
 		startingUp.value = false;
-		startupMark('splash closed / startup done');
 	});
 </script>

@@ -17,6 +17,8 @@ export interface DiskEntry {
 	isDir: boolean;
 }
 
+const NAMES_CACHE_PREFIX = 'g2-names:';
+
 export const useBrowserStore = defineStore('browser', {
 	state: () => ({
 		view: 'patches' as 'patches' | 'performances' | 'disk',
@@ -55,6 +57,25 @@ export const useBrowserStore = defineStore('browser', {
 			}
 			this.synthPatches = patches;
 			this.synthPerformances = perfs;
+		},
+
+		/* Last-known names per synth, so the browser is populated at once while the (slow) device
+		 * read runs; the `names` event that follows replaces them. */
+		applyCachedNames(synthName: string): void {
+			try {
+				const raw = window.localStorage.getItem(NAMES_CACHE_PREFIX + synthName);
+				if (raw) this.applyNamesData(JSON.parse(raw));
+			} catch {
+				// unreadable cache: fall back to the device read
+			}
+		},
+
+		cacheNames(synthName: string, names: any): void {
+			try {
+				window.localStorage.setItem(NAMES_CACHE_PREFIX + synthName, JSON.stringify(names));
+			} catch {
+				// storage full/unavailable: cache is best-effort
+			}
 		},
 
 		/* Startup: the daemon no longer sends names itself; ask for them once armed.

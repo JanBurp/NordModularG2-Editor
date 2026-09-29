@@ -37,6 +37,9 @@ interface DeviceSession {
 	cmdId: number;
 	pendingCmds: Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>;
 	menuState: MenuState;
+	// Set while the daemon was started before its renderer attached (see the startup loop in
+	// app.whenReady): watch events are held here and flushed by cli:watch-start.
+	earlyEvents?: string[] | null;
 }
 const sessions = new Map<string, DeviceSession>();
 const sessionByWebContentsId = new Map<number, DeviceSession>();
@@ -144,8 +147,6 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 
 	trackWindowState(window);
 
-	startupMark("window created, loading renderer");
-	window.webContents.once("did-finish-load", () => startupMark("renderer did-finish-load"));
 	if (VITE_DEV_SERVER_URL) {
 		window.loadURL(VITE_DEV_SERVER_URL);
 	} else {
@@ -184,14 +185,12 @@ function startDaemon(session: DeviceSession) {
 		console.warn(`[daemon] ${session.id} was claimed by another window while this one was disconnected — continuing locally without rejoining the device list.`);
 	}
 	console.warn(`[daemon] Starting daemon process for ${session.id}...`);
-	startupMark("spawning daemon");
 	const proc = spawn(cliPath, ["daemon", String(session.bus), String(session.device)]);
 	session.daemonProcess = proc;
 	proc.stdin?.on("error", () => {
 		// swallow EPIPE — expected when daemon exits while a write is in flight
 	});
 	let buffer = "";
-	let armedSeen = false; // timing marks only cover the startup sequence
 	proc.stdout?.on("data", (data: Buffer) => {
 		buffer += data.toString();
 		const lines = buffer.split("\n");
@@ -199,27 +198,31 @@ function startDaemon(session: DeviceSession) {
 		for (const line of lines) {
 			const trimmed = line.trim();
 			if (!trimmed) continue;
-			console.log(`[daemon-watch:${session.id}]`, line);
-			const evType = /"type":"([^"]+)"/.exec(trimmed)?.[1];
-			if (evType && evType !== "names_progress" && !armedSeen) startupMark(`daemon event ${evType}`);
-			if (evType === "watch_armed") armedSeen = true;
-			try {
-				const msg = JSON.parse(trimmed);
-				if (msg.id !== undefined) {
-					const pending = session.pendingCmds.get(msg.id);
-					if (pending) {
-						clearTimeout(pending.timeout);
-						session.pendingCmds.delete(msg.id);
-						if (msg.ok) {
-							pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
-						} else {
-							pending.reject(new Error(msg.error ?? `G2 error code: ${msg.code}`));
-						}
-					}
-				} else {
-					safeSend(session.window, "cli:watch-event", trimmed);
+			// Truncated: slot_data/names lines are multi-KB and this runs on the main thread.
+			console.log(`[daemon-watch:${session.id}]`, line.length > 300 ? `${line.slice(0, 300)}… (${line.length} chars)` : line);
+			// Only command responses ({"id":...}) need parsing here; events go to the renderer verbatim.
+			let msg: any;
+			if (trimmed.startsWith('{"id":')) {
+				try {
+					msg = JSON.parse(trimmed);
+				} catch {
+					// forward as an event below
 				}
-			} catch {
+			}
+			if (msg?.id !== undefined) {
+				const pending = session.pendingCmds.get(msg.id);
+				if (pending) {
+					clearTimeout(pending.timeout);
+					session.pendingCmds.delete(msg.id);
+					if (msg.ok) {
+						pending.resolve(msg.data ? JSON.stringify(msg.data) : "");
+					} else {
+						pending.reject(new Error(msg.error ?? `G2 error code: ${msg.code}`));
+					}
+				}
+			} else if (session.earlyEvents) {
+				session.earlyEvents.push(trimmed);
+			} else {
 				safeSend(session.window, "cli:watch-event", trimmed);
 			}
 		}
@@ -352,6 +355,14 @@ ipcMain.handle("cli:run-batch", async (event, argsList: string[][]) => {
 ipcMain.handle("cli:watch-start", async (event) => {
 	const session = resolveSession(event);
 	if (!session) throw new Error("No device bound to this window");
+	if (session.earlyEvents && session.daemonProcess) {
+		// Daemon was started ahead of the renderer: the listener is registered now, hand over what it missed.
+		const held = session.earlyEvents;
+		session.earlyEvents = null;
+		for (const line of held) safeSend(session.window, "cli:watch-event", line);
+		return;
+	}
+	session.earlyEvents = null;
 	await stopDaemon(session);
 	startDaemon(session);
 });
@@ -390,6 +401,21 @@ ipcMain.handle("app:claim-startup-splash", () => {
 	return isFirst;
 });
 
+function newSession(id: string, bus: number, device: number, window: BrowserWindow): DeviceSession {
+	return {
+		id,
+		bus,
+		device,
+		name: null,
+		status: "connecting" as DeviceStatus,
+		window,
+		daemonProcess: null,
+		cmdId: 0,
+		pendingCmds: new Map(),
+		menuState: { ...defaultMenuState },
+	};
+}
+
 ipcMain.handle("devices:connect", async (event, bus: number, device: number) => {
 	const window = BrowserWindow.fromWebContents(event.sender);
 	if (!window) throw new Error("No window for this call");
@@ -413,18 +439,7 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 		session.name = null;
 		session.status = "connecting" as DeviceStatus;
 	} else {
-		session = {
-			id,
-			bus,
-			device,
-			name: null,
-			status: "connecting" as DeviceStatus,
-			window,
-			daemonProcess: null,
-			cmdId: 0,
-			pendingCmds: new Map(),
-			menuState: { ...defaultMenuState },
-		};
+		session = newSession(id, bus, device, window);
 		sessionByWebContentsId.set(event.sender.id, session);
 	}
 	sessions.set(id, session);
@@ -1066,13 +1081,7 @@ app.on("before-quit", (e) => {
 	})();
 });
 
-// TEMPORARY startup timing marks (grep "[timing]"); wall-clock time so they line up with renderer marks.
-function startupMark(label: string): void {
-	console.log(`[timing] ${new Date().toISOString().slice(11, 23)} main: ${label}`);
-}
-
 app.whenReady().then(async () => {
-	startupMark("app ready");
 	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
 
 	if (isMac) {
@@ -1096,7 +1105,6 @@ app.whenReady().then(async () => {
 	// hardware-agnostic window — see isOffline in preload.ts).
 	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
-	startupMark(`enumeration done (${unclaimed.length} unclaimed)`);
 	if (unclaimed.length === 0) {
 		createAppWindow();
 	} else {
@@ -1108,6 +1116,12 @@ app.whenReady().then(async () => {
 			const window = createAppWindow(i);
 			if (i === frontmostIndex) startupSplashClaimed = true;
 			pendingAssignment.set(window.webContents.id, { bus: d.bus, device: d.device, showSplash: i === frontmostIndex });
+			// Start the daemon now instead of after the renderer has loaded and mounted, so USB init
+			// overlaps renderer boot; its events are held until the renderer calls cli:watch-start.
+			const session = newSession(d.id, d.bus, d.device, window);
+			session.earlyEvents = [];
+			sessionByWebContentsId.set(window.webContents.id, session);
+			startDaemon(session);
 		});
 	}
 
