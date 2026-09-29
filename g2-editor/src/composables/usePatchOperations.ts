@@ -42,8 +42,13 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		const { getModule } = await import('../renderer/nmg2mods');
 		const NAME_MODULE_TYPE = 126;
 		// A Name bar has no jacks (always "unused"); only sweep it away if the user never customized it.
-		const isUntouchedNameModule = (m: any) =>
-			m.type === NAME_MODULE_TYPE && (m.colour || 0) === 0 && (m.uname ?? '') === (getModule(m.type)?.short ?? 'Module') + m.index;
+		// Default names are "<short><digits>" (see addModule); the digits are no longer the module's
+		// index, so match the shape rather than reconstructing the exact value.
+		const isUntouchedNameModule = (m: any) => {
+			if (m.type !== NAME_MODULE_TYPE || (m.colour || 0) !== 0) return false;
+			const base = (getModule(m.type)?.short ?? 'Module').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+			return new RegExp(`^${base}\\d+$`).test(m.uname ?? '');
+		};
 
 		await deleteUnusedInAreas((modules, cables) => ({
 			moduleIds: modules

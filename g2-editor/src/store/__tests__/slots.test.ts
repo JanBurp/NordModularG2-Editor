@@ -612,6 +612,51 @@ describe('module add/move/delete record undo even when the CLI/hardware call fai
 	});
 });
 
+describe('addModule default name suffix', () => {
+	beforeEach(() => {
+		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('Daemon not running'));
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+	});
+
+	afterEach(() => vi.restoreAllMocks());
+
+	it('numbers same-type modules by count, ignoring unrelated instance IDs', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.addModule(26, 7, 0, 0, 'voice'); // LfoA (short "LfoA"), instance id 7
+		await store.addModule(5, 12, 1, 0, 'voice'); // unrelated Invert module, instance id 12
+		await store.addModule(26, 20, 2, 0, 'voice'); // second LfoA, instance id 20
+
+		const modules = patch.areas[1].modules;
+		expect(modules.find((m: any) => m.index === 7).uname).toBe('LfoA1');
+		expect(modules.find((m: any) => m.index === 20).uname).toBe('LfoA2');
+	});
+
+	it('continues from the highest existing suffix, even across areas', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[0].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'LfoA5' }];
+		store.slots['A'].patch = patch;
+
+		await store.addModule(26, 2, 0, 0, 'voice');
+
+		expect(patch.areas[1].modules[0].uname).toBe('LfoA6');
+	});
+
+	it('starts at 1 when no same-type module has a parseable suffix', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'Bass' }];
+		store.slots['A'].patch = patch;
+
+		await store.addModule(26, 2, 1, 0, 'voice');
+
+		expect(patch.areas[1].modules[1].uname).toBe('LfoA1');
+	});
+});
+
 // Uses the root beforeEach's resolved CLI mock — this block tests the module-swap mutation
 // logic itself, not offline resilience (that's covered above), so the CLI call should succeed.
 describe('replaceModule', () => {

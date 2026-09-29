@@ -1071,7 +1071,14 @@ export const useSlotsStore = defineStore('slots', {
 			const modeVals: number[] = Array(numModes).fill(0);
 			const numParams = modDef?.params?.length ?? 0;
 			const paramVals: number[] = (modDef?.params ?? []).map((p) => getParam(p.type)?.def ?? 64);
-			const uname = (modDef?.short ?? 'Module') + moduleId;
+			const base = modDef?.short ?? 'Module';
+			const sameType = [...patch.areas[0].modules, ...patch.areas[1].modules].filter((m) => m.type === typeId);
+			let maxSuffix = 0;
+			for (const m of sameType) {
+				const match = m.uname?.match(/(\d+)$/);
+				if (match) maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
+			}
+			const uname = base + (maxSuffix + 1);
 
 			const lv: number[] = Array(numParams * NUM_VARIATIONS);
 			for (let v = 0; v < NUM_VARIATIONS; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
