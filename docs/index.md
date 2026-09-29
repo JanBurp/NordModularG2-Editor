@@ -22,7 +22,7 @@ See the [Changelog](../CHANGELOG.md) for more details
 |---|---|
 | Core USB, Parsing, Basic Editing, etc. | ✅ Done |
 | Undo/Redo, MIDI CC assignment, Browser, Variation copy, Led's in patch, etc. | ✅ Done |
-| Morph Editing, Parameter Pages Assignment | 🔄 In progress |
+| Morph Editing, Parameter Pages Assignment | ✅ Done |
 | Patch Adjuster, Mutator, Advanced Features | 🗓 Planned |
 
 ### Video of first proof of concept (30 April 2026)

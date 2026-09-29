@@ -10,12 +10,14 @@ export const STATUS_HINTS = {
 	// Canvas — hidden gestures
 	jackConnectedDrag: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: cycle connections · Backspace: delete`,
 	jackConnectedClick: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: connect/cancel · Backspace: delete`,
-	jackArm: 'Click: start a cable (click again to cancel)',
-	ghostCable: 'Click cable or Enter: confirm suggested cable · Space: next suggestion · Escape: dismiss',
+	jackArm: 'Click: start a cable · Click again: cancel',
+	ghostCable: 'Enter: confirm suggested cable · Space: next suggestion · Escape: dismiss',
 	moduleTitle: 'Double-click: rename · Right-click: more options',
-	moduleReplace: 'Click: replace with another module in this group',
+	moduleReplace: 'Click: replace module',
 	paramMorph: `${CTRL}-click: assign to Morph Group · ${CTRL}-drag: set range · ${ALT}-drag: assign to Parameter Page`,
-	ccRow: 'Drag to move this CC to another number',
+	ccRow: 'Click: select · Drag: reassign CC',
+	paramPageKnob: `${CTRL}-drag: set morph range · ${ALT}-drag: assign/swap · Right-click: more options`,
+	morphKnob: 'Right-click: rename, clear, copy · Drop CC here: assign',
 
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
@@ -23,21 +25,21 @@ export const STATUS_HINTS = {
 	areaFx: 'F: show FX (again: Split)',
 
 	// StatusBar — side panel tabs
-	paneBrowser: `${MOD}B: browse patches, performances, and disk files`,
-	paneModules: `${MOD}M: drag modules onto the canvas`,
-	paneMidicc: `${MOD}I: view and edit MIDI CC assignments`,
-	paneText: `${MOD}J: patch notes, saved with the patch`,
+	paneBrowser: `${MOD}B: browse patches & files`,
+	paneModules: `${MOD}L: drag modules onto the canvas`,
+	paneMidicc: `${MOD}I: MIDI CC assignments`,
+	paneText: `${MOD}J: patch notes`,
 	paneSettings: `${MOD}, : editor, device, and patch settings`,
 
 	// Toolbars
 	variationCopy: 'Drag or right-click: copy to another variation',
 	variationInit: 'Click: reset current variation to INIT',
-	slotIndicators: 'Top dot: has keyboard focus · Bottom dot: active on hardware',
+	slotIndicators: `Shift-click: toggle active · ${CTRL}-click: toggle focus`,
 	connectionToggle: 'Click: connect / disconnect G2',
 	renamePatch: 'Click: rename patch',
 	renamePerf: 'Click: rename performance',
 	setBpm: 'Click: set tempo',
-	cableShake: 'Re-render cable curves (new shapes for overlapping cables)',
+	cableShake: 'Redraw overlapping cables',
 } as const;
 
 export type StatusHintKey = keyof typeof STATUS_HINTS;

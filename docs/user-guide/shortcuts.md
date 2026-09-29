@@ -19,7 +19,10 @@ nav_order: 4
 
 | Key | Action |
 |---|---|
+| `Cmd+G` | Open Synth Settings |
+| `Cmd+U` | Upload Active Slot |
 | `Cmd+M` | Send Controller Snapshot |
+| `Cmd+1` | Dump One |
 
 ## Edit
 
@@ -29,6 +32,7 @@ nav_order: 4
 | `Cmd+X` | Cut selected modules; cut cables (delete only — no paste) |
 | `Cmd+V` | Paste modules at mouse cursor; layout, parameters and cables preserved |
 | `Cmd+A` | Select all modules |
+| `Cmd+E` | Paste Params |
 | `Backspace` | Delete selection (or hovered jack's cable/nest) |
 | `Cmd+Z` | Undo |
 | `Cmd+Shift+Z` | Redo |
@@ -62,6 +66,22 @@ nav_order: 4
 | `F` | Show FX area (Split if already FX-only) |
 | `Space` | Show / hide all cables |
 | `Ctrl+Space` | Shake cables |
+| `Cmd+=` | Zoom in |
+| `Cmd+-` | Zoom out |
+| `Cmd+0` | Actual size |
+
+## Patch
+
+| Key | Action |
+|---|---|
+| `Cmd+P` | Open Patch Settings |
+| `Cmd+D` | Download to Slot |
+
+## Performance
+
+| Key | Action |
+|---|---|
+| `Cmd+R` | Open Performance Settings |
 
 ## Panels
 
@@ -71,6 +91,7 @@ nav_order: 4
 | `Cmd+B` | Toggle Browser pane |
 | `Cmd+I` | Toggle Midi CC pane |
 | `Cmd+J` | Toggle Text pane |
+| `Cmd+K` | Toggle Keyboard pane |
 | `Cmd+,` | Toggle Settings pane |
 | `Cmd+T` | Toggle Extended Toolbar |
 | `Cmd+F` | Toggle Parameter Pages |

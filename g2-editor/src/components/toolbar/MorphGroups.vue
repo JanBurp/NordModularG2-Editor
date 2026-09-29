@@ -7,6 +7,8 @@
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
 					@dragover.prevent
 					@drop="onMorphCCDrop(i, $event)"
+					@mouseenter="showHint('morphKnob')"
+					@mouseleave="clearHint"
 				>
 					<svg
 						v-if="showCCOverlay && getMorphCC(i) !== null"
@@ -51,6 +53,7 @@
 	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { usePatchParams } from '../../composables/usePatchParams';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
@@ -60,6 +63,7 @@
 	const deviceStore = useDeviceStore();
 	const { open: openContextMenu } = useContextMenu();
 	const { showCCOverlay } = useMidiCCOverlay();
+	const { showHint, clearHint } = useStatusHint();
 
 	const { patchParams } = usePatchParams();
 

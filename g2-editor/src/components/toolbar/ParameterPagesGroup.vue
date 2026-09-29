@@ -28,6 +28,8 @@
 				@dragstart="onKnobDragStart(cell, $event)"
 				@dragover.prevent
 				@drop.prevent="onKnobDrop(cell, $event)"
+				@mouseenter="showHint('paramPageKnob')"
+				@mouseleave="clearHint"
 				class="-mb-1"
 			>
 				<!-- Unassigned slots render the same Knob, just at value 0 and inert (the cell-level
@@ -106,6 +108,7 @@
 	import { useAltHeld } from '../../composables/useParamPageAssign';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../../renderer/paramPages';
 	import { serializeDragPayload, parseDragPayload } from '../../utils/dragPayload';
@@ -122,6 +125,7 @@
 	const { open: openContextMenu } = useContextMenu();
 	const { altHeld } = useAltHeld();
 	const { startDrag: startMorphRangeDrag } = useMorphRangeDrag();
+	const { showHint, clearHint } = useStatusHint();
 
 	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value }));
 	const bankOptions = [1, 2, 3];
