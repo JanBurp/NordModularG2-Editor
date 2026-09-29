@@ -287,6 +287,29 @@ static int execute_seq(cJSON *args) {
                 arg_i(sub, 3), arg_i(sub, 4), num_labels < 128 ? num_labels : 128, labels);
             n_ops++;
 
+        } else if (strcmp(scmd, "assign-knob") == 0 && sn >= 6) {
+            if (s_loc < 0 || s_loc > 1 || arg_i(sub,5) < 0 || arg_i(sub,5) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
+            g2_build_assign_knob_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5));
+            n_ops++;
+
+        } else if (strcmp(scmd, "deassign-knob") == 0 && sn >= 3) {
+            /* [cmd, slot, knob] — no location arg, so sub[2] is the knob index */
+            if (arg_i(sub,2) < 0 || arg_i(sub,2) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
+            g2_build_deassign_knob_op(op, p, arg_i(sub,2));
+            n_ops++;
+
+        } else if (strcmp(scmd, "assign-global-knob") == 0 && sn >= 7) {
+            /* [cmd, transportSlot, targetSlot, loc, mod, param, knob] — sub[2] is the target slot, not a location */
+            int target = parse_slot(arg_s(sub, 2)), gloc = parse_location_str(arg_s(sub, 3));
+            if (target == SLOT_INVALID || gloc < 0 || gloc > 1 || arg_i(sub,6) < 0 || arg_i(sub,6) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
+            g2_build_assign_global_knob_op(op, p, target, gloc, arg_i(sub,4), arg_i(sub,5), arg_i(sub,6));
+            n_ops++;
+
+        } else if (strcmp(scmd, "deassign-global-knob") == 0 && sn >= 3) {
+            if (arg_i(sub,2) < 0 || arg_i(sub,2) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
+            g2_build_deassign_global_knob_op(op, p, arg_i(sub,2));
+            n_ops++;
+
         } else if (strcmp(scmd, "set-param") == 0 && sn >= 7) {
             /* CMD_NO_RESP — cannot go in the compound frame; queued for after */
             if (n_sp < SEQ_MAX_OPS)

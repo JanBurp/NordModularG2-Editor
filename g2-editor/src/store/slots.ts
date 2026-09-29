@@ -3346,10 +3346,11 @@ export const useSlotsStore = defineStore('slots', {
 				(k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
 				entry,
 			);
-			// oldKeySlot's own slot only needs a CLI restore on undo (the hardware auto-evicts it as
-			// part of the single assign-knob call on apply, per the two-way uniqueness doc above).
-			const undoTouched = [slotIndex, ...(oldKeySlot && oldKeySlot.slotIndex !== slotIndex ? [oldKeySlot.slotIndex] : [])];
-			await this._applyParamPages(slot, next, [slotIndex]);
+			// The hardware does NOT auto-evict (the reference editor sends an explicit deassign first),
+			// so the param's old slot is deassigned BEFORE the new assign.
+			const vacated = oldKeySlot && oldKeySlot.slotIndex !== slotIndex ? [oldKeySlot.slotIndex] : [];
+			await this._applyParamPages(slot, next, [...vacated, slotIndex]);
+			const undoTouched = [slotIndex, ...vacated];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
@@ -3413,6 +3414,7 @@ export const useSlotsStore = defineStore('slots', {
 				(entry) => assignKnobCmd(slot, entry),
 				(slotIndex) => ['deassign-knob', slot, String(slotIndex)],
 			);
+			console.log('[ParamPages] apply', slot, 'touched', touched, 'cmds', cmds);
 			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyParamPages');
 		},
 

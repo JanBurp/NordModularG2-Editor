@@ -1228,6 +1228,11 @@ describe('assignParamToPage / deassignParamPage', () => {
 		await store.assignParamToPage('A', 9, 0, 1, 0);
 
 		expect(store.slots['A'].paramPages).toEqual([{ slotIndex: 9, location: 0, moduleIndex: 1, paramIndex: 0, isLed: 0 }]);
+		// The hardware doesn't auto-evict: the old knob is deassigned first, then the new one assigned.
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-knob', 'A', '5'],
+			['assign-knob', 'A', 'fx', '1', '0', '9'],
+		]);
 	});
 
 	it('deassignParamPage removes the record and undo restores it', async () => {

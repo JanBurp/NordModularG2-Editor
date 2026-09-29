@@ -300,6 +300,169 @@ void test_daemon_dump_patch_cmd(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
+/* Reads one bit-field of `n` bits (MSB-first) at *bitpos from `buf`. */
+static unsigned knob_bits(const uint8_t *buf, size_t *bitpos, int n) {
+    unsigned v = 0;
+    for (int i = 0; i < n; i++, (*bitpos)++)
+        v = (v << 1) | ((buf[*bitpos >> 3] >> (7 - (*bitpos & 7))) & 1);
+    return v;
+}
+
+/* Decodes knob `knob` from a knob-list payload: 16-bit count, then per knob a presence bit and
+ * (when set) location(2) module(8) led(2) param(7) [+ target-slot(2) when `has_slot_field`, the
+ * Global variant], same as the editor's readKnobSlotRecord. Returns 1 if assigned (fills the out
+ * params; `tslot` may be NULL), 0 if empty, -1 if the list is shorter than `knob`. */
+static int decode_knob(const uint8_t *p, int knob, int has_slot_field, int *loc, int *mod, int *par, int *tslot) {
+    size_t bit = 0;
+    unsigned count = knob_bits(p, &bit, 16);
+    if ((unsigned)knob >= count) return -1;
+    int result = 0;
+    for (int k = 0; k <= knob; k++) {
+        if (!knob_bits(p, &bit, 1)) continue;
+        unsigned l = knob_bits(p, &bit, 2), m = knob_bits(p, &bit, 8);
+        knob_bits(p, &bit, 2);
+        unsigned pr = knob_bits(p, &bit, 7);
+        unsigned ts = has_slot_field ? knob_bits(p, &bit, 2) : 0;
+        if (k == knob) { *loc = (int)l; *mod = (int)m; *par = (int)pr; if (tslot) *tslot = (int)ts; result = 1; }
+    }
+    return result;
+}
+
+/* get-patch A, then decodes knob `knob` from its C_KNOBS (0x62) section. */
+static int read_slot_a_knob(daemon_ctx_t *d, int knob, int *loc, int *mod, int *par) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+    cJSON *resp = send_and_capture_response(d, cmd, id);
+    if (!resp) return -1;
+    cJSON *data = cJSON_GetObjectItem(resp, "data");
+    cJSON *hex_item = data ? cJSON_GetObjectItem(data, "data") : NULL;
+    const char *hex = hex_item ? cJSON_GetStringValue(hex_item) : NULL;
+    uint8_t *sec = NULL;
+    int len = hex ? hex_to_bytes(hex, &sec) : -1;
+    int result = -1;
+    for (int o = 0; len > 0 && o + 3 <= len; ) {
+        int n = (sec[o + 1] << 8) | sec[o + 2];
+        if (sec[o] == 0x62 && o + 3 + n <= len) {
+            result = decode_knob(sec + o + 3, knob, 0, loc, mod, par, NULL);
+            break;
+        }
+        o += 3 + n;
+    }
+    free(sec);
+    cJSON_Delete(resp);
+    return result;
+}
+
+/* get-global-knobs, then decodes knob `knob` from the C_KNOBS_GLOBAL payload (same layout plus a
+ * target-slot field). Same return convention as read_slot_a_knob. */
+static int read_global_knob(daemon_ctx_t *d, int knob, int *loc, int *mod, int *par, int *tslot) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-global-knobs\",\"args\":[]}", id);
+    cJSON *resp = send_and_capture_response(d, cmd, id);
+    if (!resp) return -1;
+    cJSON *data = cJSON_GetObjectItem(resp, "data");
+    cJSON *hex_item = data ? cJSON_GetObjectItem(data, "data") : NULL;
+    const char *hex = hex_item ? cJSON_GetStringValue(hex_item) : NULL;
+    uint8_t *raw = NULL;
+    int len = hex ? hex_to_bytes(hex, &raw) : -1;
+    int result = len >= 2 ? decode_knob(raw, knob, 1, loc, mod, par, tslot) : -1;
+    free(raw);
+    cJSON_Delete(resp);
+    return result;
+}
+
+/* Test: assign-knob lands on the intended module/param/location. ok:true from the daemon only
+ * means the USB write succeeded (the G2 never NACKs a bad field), and a wrong location byte
+ * (bare `1` instead of `1<<6` for VA) once left the G2 in a bad state — so read the knob back via
+ * get-patch. Same seq the editor sends when a param is moved to another knob: deassign the old
+ * knob, then assign the new one (seq once rejected both ops with "invalid parameter"). Uses the DXBass FM4 fixture: knob 0 holds
+ * VA module 1 param 0, knob 6 is free. Restores slot A afterwards. */
+void test_daemon_assign_knob_cmd(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    usleep(300000);
+
+    int loc = -1, mod = -1, par = -1;
+    int before0 = read_slot_a_knob(&g_daemon, 0, &loc, &mod, &par);
+    int before6 = read_slot_a_knob(&g_daemon, 6, &loc, &mod, &par);
+    int r_seq = -1, after0 = -1, after6 = -1;
+    if (before0 == 1 && before6 == 0) {
+        /* One compound "seq" frame, exactly as the editor's runBatch sends it. */
+        char cmd[160];
+        int id = g_cmd_id++;
+        snprintf(cmd, sizeof(cmd),
+                 "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"deassign-knob\",\"A\",\"0\"],[\"assign-knob\",\"A\",\"va\",\"1\",\"0\",\"6\"]]}", id);
+        r_seq = send_and_expect_ok(&g_daemon, cmd, id);
+        usleep(300000);
+        int l0, m0, p0;
+        after0 = read_slot_a_knob(&g_daemon, 0, &l0, &m0, &p0);
+        after6 = read_slot_a_knob(&g_daemon, 6, &loc, &mod, &par);
+    }
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    usleep(300000);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, before0, "fixture: knob 0 should be assigned");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, before6, "fixture: knob 6 should be free");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_seq, "seq [deassign-knob, assign-knob] should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, after0, "old knob 0 should be empty after deassign");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, after6, "knob 6 should be assigned (G2 still answers get-patch)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, loc, "knob 6 location should be VA (1)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, mod, "knob 6 module");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, par, "knob 6 param");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
+}
+
+/* Test: assign-global-knob / deassign-global-knob through "seq" (the editor's runBatch path) land
+ * on the intended target slot/module/param/location, read back via get-global-knobs. Picks the
+ * highest free global knob, assigns VA module 1 param 0 of slot B to it, checks it, then deassigns
+ * and checks it's empty again — leaving the performance's global knobs as found. */
+void test_daemon_assign_global_knob_cmd(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    int loc, mod, par, ts, knob = -1;
+    for (int k = 119; k >= 0; k--) {
+        int r = read_global_knob(&g_daemon, k, &loc, &mod, &par, &ts);
+        TEST_ASSERT_TRUE_MESSAGE(r >= 0, "setup: get-global-knobs failed");
+        if (r == 0) { knob = k; break; }
+    }
+    TEST_ASSERT_TRUE_MESSAGE(knob >= 0, "setup: no free global knob");
+
+    char cmd[192];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd),
+             "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"assign-global-knob\",\"A\",\"B\",\"va\",\"1\",\"0\",\"%d\"]]}", id, knob);
+    int r_assign = send_and_expect_ok(&g_daemon, cmd, id);
+    usleep(300000);
+    loc = mod = par = ts = -1;
+    int after_assign = read_global_knob(&g_daemon, knob, &loc, &mod, &par, &ts);
+
+    id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd),
+             "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"deassign-global-knob\",\"A\",\"%d\"]]}", id, knob);
+    int r_deassign = send_and_expect_ok(&g_daemon, cmd, id);
+    usleep(300000);
+    int l2, m2, p2, t2;
+    int after_deassign = read_global_knob(&g_daemon, knob, &l2, &m2, &p2, &t2);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_assign, "seq [assign-global-knob] should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, after_assign, "global knob should be assigned");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, ts, "global knob target slot should be B (1)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, loc, "global knob location should be VA (1)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, mod, "global knob module");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, par, "global knob param");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_deassign, "seq [deassign-global-knob] should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, after_deassign, "global knob should be empty after deassign");
+}
+
 /* Test: send-controller-snapshot pushes all active slots' MIDI CC values to
  * MIDI OUT. Transmit-only, no cleanup needed. */
 void test_daemon_send_controller_snapshot_cmd(void) {

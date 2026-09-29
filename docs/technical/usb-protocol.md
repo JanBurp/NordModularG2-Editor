@@ -444,7 +444,7 @@ These are combined into slot-command messages. Each message can contain multiple
 | `0x1E` | SEL_GLOBAL_PAGE (`g2_select_global_page`, confirmed 2026-08-28: editor→hardware page-select works) | `page` | via parent message; the hardware's own echo of this arrives system-wide as `global_page_change` (see the Performance messages / `aCmd==0x04` table below), not slot-scoped like this send side |
 | `0x22` | ASSIGN_MIDICC | `loc mod param cc` | Embedded ACK |
 | `0x23` | DEASSIGN_MIDICC | `cc` | Embedded ACK |
-| `0x25` | ASSIGN_KNOB | `mod param loc 00 knob_index` | Embedded ACK — real hardware accepts it without error (2026-08-28), but the front panel never echoes 0x25 itself for its own knob assigns (see `0x74` below), so the field offsets aren't independently confirmed |
+| `0x25` | ASSIGN_KNOB | `mod param (loc<<6) 00 knob_index` — location is a 2-bit field + 6 pad bits, MSB-first (Delphi `AddAssignKnobMessage`), unlike MIDI CC's bare location byte; sending bare `loc` made VA assigns land as FX and left the G2 in a bad state | Embedded ACK — the hardware accepts any value without error (no NACK for a nonexistent module), and the front panel never echoes 0x25 itself for its own knob assigns (see `0x74` below), so verify via get-patch |
 | `0x26` | DEASSIGN_KNOB | `00 knob_index` | Embedded ACK — same caveat; also, deassign has no front-panel gesture at all (editor-only) |
 | `0x2D` | SEL_PARAM_PAGE | `page_id` | Embedded ACK |
 

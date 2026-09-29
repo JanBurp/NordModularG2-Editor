@@ -2457,6 +2457,19 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
     return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
+void g2_build_assign_knob_op(G2Op *op, uint8_t *buf, int loc, int module_id, int param_idx, int slot_index) {
+    /* Delphi writes location as a 2-bit field followed by 6 pad bits, MSB-first (TBitWriter buffers
+     * a Byte), so the third byte is location<<6 — NOT the bare location value like MIDI CC's. */
+    buf[0]=(uint8_t)module_id; buf[1]=(uint8_t)param_idx; buf[2]=(uint8_t)(loc << 6);
+    buf[3]=0x00; buf[4]=(uint8_t)slot_index;
+    op->cmd=SUB_COMMAND_ASSIGN_KNOB; op->payload=buf; op->len=5;
+}
+
+void g2_build_deassign_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
+    buf[0]=0x00; buf[1]=(uint8_t)slot_index;
+    op->cmd=SUB_COMMAND_DEASSIGN_KNOB; op->payload=buf; op->len=2;
+}
+
 /* Parameter Pages knob assignment (S_ASSIGN_KNOB=0x25 / S_DEASSIGN_KNOB=0x26). slot_index is the
  * knob's address 0-119 (3 Banks x 5 Pages x 8 Knobs — see g2-editor/src/renderer/paramPages.ts).
  * Same acked COMMAND_REQ envelope as MIDI CC assign (send_slot), NOT the raw WRITE_NO_RESP
@@ -2464,8 +2477,10 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
  * reference editor (BVE.NMG2Mess.pas AddAssignKnobMessage/AddDeAssignKnobMessage) cross-checked
  * against decompiled G2Editor.c opcodes. Confirmed on real hardware (2026-08-28) to be accepted
  * without error, but the front panel never echoes 0x25/0x26 back (see g2_events.c's 0x74 case),
- * so there's no independent confirmation the individual fields (module/param/location/slot_index)
- * land on the intended byte offsets — worth a visual spot-check before fully trusting this. */
+ * and it does not reject bad fields either (no ack of validity) — so verify assigns via get-patch.
+ * Unlike the reference editor's compound message (deassign old knob, deassign occupant, assign,
+ * select page), this sends only the bare assign; the editor deassigns the param's old knob first
+ * (see assignParamToPage) but does not explicitly clear an occupied target knob. */
 int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
@@ -2475,8 +2490,14 @@ int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slo
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t payload[5] = { (uint8_t)module_id, (uint8_t)param_idx, (uint8_t)location, 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, SUB_COMMAND_ASSIGN_KNOB, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+    uint8_t payload[5]; G2Op op;
+    g2_build_assign_knob_op(&op, payload, location, module_id, param_idx, slot_index);
+    if (g2_debug) {
+        printf("{\"debug\":\"assign_knob\",\"slot\":%d,\"version\":%u,\"location\":%d,\"module\":%d,\"param\":%d,\"knob\":%d}\n",
+               slot, version, location, module_id, param_idx, slot_index);
+        fflush(stdout);
+    }
+    return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_deassign_knob(int slot, int slot_index) {
@@ -2485,8 +2506,13 @@ int g2_deassign_knob(int slot, int slot_index) {
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, SUB_COMMAND_DEASSIGN_KNOB, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+    uint8_t payload[2]; G2Op op;
+    g2_build_deassign_knob_op(&op, payload, slot_index);
+    if (g2_debug) {
+        printf("{\"debug\":\"deassign_knob\",\"slot\":%d,\"version\":%u,\"knob\":%d}\n", slot, version, slot_index);
+        fflush(stdout);
+    }
+    return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 /* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d). CONFIRMED on real hardware
@@ -2507,6 +2533,17 @@ int g2_select_param_page(int slot, int page_id) {
     return send_slot((uint8_t)slot, version, SUB_COMMAND_SEL_PARAM_PAGE, &payload, 1) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
+void g2_build_assign_global_knob_op(G2Op *op, uint8_t *buf, int target_slot, int loc, int module_id, int param_idx, int slot_index) {
+    buf[0]=(uint8_t)((target_slot << 4) | (loc << 2)); buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)param_idx;
+    buf[3]=0x00; buf[4]=(uint8_t)slot_index;
+    op->cmd=SUB_COMMAND_ASSIGN_GLOBAL_KNOB; op->payload=buf; op->len=5;
+}
+
+void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
+    buf[0]=0x00; buf[1]=(uint8_t)slot_index;
+    op->cmd=SUB_COMMAND_DEASSIGN_GLOBAL_KNOB; op->payload=buf; op->len=2;
+}
+
 /* Global Parameter Pages knob assignment (S_ASS_GLOBAL_KNOB=0x1c / S_DEASS_GLOB_KNOB=0x1d).
  * Mirrors g2_assign_knob/g2_deassign_knob above, with one difference: the payload's first byte
  * folds in a 4-bit target-slot nibble (which patch's module the knob controls) alongside the
@@ -2524,9 +2561,9 @@ int g2_assign_global_knob(int slot, int target_slot, int location, int module_id
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t first = (uint8_t)((target_slot << 4) | (location << 2));
-    uint8_t payload[5] = { first, (uint8_t)module_id, (uint8_t)param_idx, 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, SUB_COMMAND_ASSIGN_GLOBAL_KNOB, payload, 5) < 0 ? G2_ERR_SEND : G2_OK;
+    uint8_t payload[5]; G2Op op;
+    g2_build_assign_global_knob_op(&op, payload, target_slot, location, module_id, param_idx, slot_index);
+    return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 int g2_deassign_global_knob(int slot, int slot_index) {
@@ -2535,8 +2572,9 @@ int g2_deassign_global_knob(int slot, int slot_index) {
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
-    uint8_t payload[2] = { 0x00, (uint8_t)slot_index };
-    return send_slot((uint8_t)slot, version, SUB_COMMAND_DEASSIGN_GLOBAL_KNOB, payload, 2) < 0 ? G2_ERR_SEND : G2_OK;
+    uint8_t payload[2]; G2Op op;
+    g2_build_deassign_global_knob_op(&op, payload, slot_index);
+    return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
 /* Select the active Global Parameter Page (S_SEL_GLOBAL_PAGE=0x1e) — Global Pages sibling of
