@@ -26,9 +26,9 @@
 					{{ midiNoteName(k.note) }}
 				</div>
 				<span
-					v-if="k.note === soundingNote"
-					class="absolute left-1/2 -translate-x-1/2 bottom-1 w-1.5 h-1.5 rounded-full"
-					:class="k.black ? 'bg-white' : 'bg-black'"
+					v-if="k.note === soundingNote && dotVisible"
+					class="absolute left-1/2 -translate-x-1/2 w-3 h-3 rounded-full"
+					:class="k.black ? 'bg-white bottom-2' : 'bg-black bottom-4'"
 				/>
 			</div>
 		</div>
@@ -55,7 +55,7 @@
 	const WHITE_H = 86;
 	const BLACK_W_FRAC = 0.62;
 	const BLACK_H_FRAC = 0.62;
-	const REPEAT_MS = 250; // A guess: the manual says only "play repeatedly" with no rate given.
+	const REPEAT_MS = 500; // A guess: the manual says only "play repeatedly" with no rate given.
 
 	const device = useDeviceStore();
 
@@ -107,6 +107,7 @@
 	}
 
 	const soundingNote = ref<number | null>(null);
+	const dotVisible = ref(true); // only ever false between Repeat strikes
 	const lastNote = ref<number | null>(null);
 	const drone = ref(false);
 	const repeat = ref(false);
@@ -151,6 +152,10 @@
 		if (soundingNote.value !== null) device.playNote(soundingNote.value, false);
 		device.playNote(lastNote.value, true).finally(() => (strikePending = false));
 		soundingNote.value = lastNote.value;
+		dotVisible.value = true; // blink: visible for the first half of each repeat period
+		setTimeout(() => {
+			if (repeat.value) dotVisible.value = false;
+		}, REPEAT_MS / 2);
 	}
 
 	function startRepeatTimer() {
@@ -177,6 +182,7 @@
 			startRepeatTimer();
 		} else {
 			stopRepeatTimer();
+			dotVisible.value = true;
 			if (!drone.value) silence();
 		}
 	}
