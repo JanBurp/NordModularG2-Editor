@@ -39,7 +39,7 @@ test.describe('replace module', () => {
 		const trigger = page.locator('[data-testid="canvas-va"] [data-module-short="FltLP"] [data-testid="module-replace-trigger"]');
 		await trigger.hover();
 
-		await expect(page.getByText('Click: replace with another module in this group')).toBeVisible();
+		await expect(page.getByText('Click: replace module')).toBeVisible();
 	});
 
 	test('Replace Module appears in the right-click context menu with a submenu of candidates', async ({ page, sendMenuAction }) => {

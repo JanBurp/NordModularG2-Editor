@@ -3428,7 +3428,6 @@ export const useSlotsStore = defineStore('slots', {
 				(entry) => assignKnobCmd(slot, entry),
 				(slotIndex) => ['deassign-knob', slot, String(slotIndex)],
 			);
-			console.log('[ParamPages] apply', slot, 'touched', touched, 'cmds', cmds);
 			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyParamPages');
 		},
 
