@@ -10,10 +10,9 @@
 
 		<ToolBarDivider />
 
-		<Select v-model="selectedVoiceMode" :options="VOICEMODE_OPTIONS" title="Voice mode" />
-		<div class="flex items-center gap-1 w-20">
-			<Select v-model="selectedVoices" :options="VOICES" title="Voice count" :disabled="selectedVoiceMode !== 0" />
-			<ToolBarBigLabel>({{ assignedVoices }})</ToolBarBigLabel>
+		<div class="flex items-center gap-1.5">
+			<ToolBarLabel>Voice Mode:</ToolBarLabel>
+			<Select v-model="voiceSelection" :options="voiceOptions" title="Voice mode / count" class="w-18" />
 		</div>
 
 		<ToolBarDivider />
@@ -46,7 +45,6 @@
 
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
-	import ToolBarBigLabel from './ToolBarBigLabel.vue';
 	import ToolBarText from './ToolBarText.vue';
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
@@ -57,7 +55,7 @@
 	import { useUiStore } from '../../store/ui';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
-	import { VOICEMODE_OPTIONS, VOICES } from '../../types/patch';
+	import { VOICES } from '../../types/patch';
 	import ColorPicker from '../common/ColorPicker.vue';
 
 	withDefaults(defineProps<{ patchName: string; mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
@@ -81,25 +79,37 @@
 		},
 	});
 
-	const selectedVoiceMode = computed({
-		get: () => currentPatch.value?.description?.monopoly ?? 1,
-		set: (val: number) => {
-			if (currentPatch.value?.description) {
-				slotsStore.setPatchDescriptionField('monopoly', Number(val));
-				slotsStore.setPatchDescription();
-			}
+	// One dropdown for monopoly + voices: 0 = Mono, 1 = Legato, 2 + voices = poly with that many voices.
+	const MONO_ID = 0;
+	const LEGATO_ID = 1;
+	const POLY_BASE_ID = 2;
+
+	const voiceSelection = computed({
+		get: () => {
+			const desc = currentPatch.value?.description;
+			if (!desc || desc.monopoly === 1) return MONO_ID;
+			if (desc.monopoly === 2) return LEGATO_ID;
+			return POLY_BASE_ID + desc.voices;
 		},
-	});
-	const selectedVoices = computed({
-		get: () => currentPatch.value?.description?.voices ?? 0,
-		set: (val: number) => {
-			if (currentPatch.value?.description) {
-				slotsStore.setPatchDescriptionField('voices', Number(val));
-				slotsStore.setPatchDescription();
-			}
+		set: (val: number | string) => {
+			if (!currentPatch.value?.description) return;
+			const id = Number(val);
+			slotsStore.setPatchDescriptionField('monopoly', id === MONO_ID ? 1 : id === LEGATO_ID ? 2 : 0);
+			if (id >= POLY_BASE_ID) slotsStore.setPatchDescriptionField('voices', id - POLY_BASE_ID);
+			slotsStore.setPatchDescription();
 		},
 	});
 	const assignedVoices = computed(() => slotsStore.assignedVoicesForSlot(uiStore.slotInFocus));
+	const voiceOptions = computed(() => {
+		const desc = currentPatch.value?.description;
+		const isPoly = !!desc && desc.monopoly === 0;
+		// 1 voice equals Mono, so "1" is only listed when a loaded patch is poly with a single voice
+		const poly = VOICES.slice(isPoly && desc.voices === 0 ? 0 : 1).map((v) => ({
+			id: POLY_BASE_ID + v.id,
+			name: isPoly && v.id === desc.voices ? `${v.name} (${assignedVoices.value})` : v.name,
+		}));
+		return [{ id: MONO_ID, name: 'Mono' }, { id: LEGATO_ID, name: 'Legato' }, ...poly];
+	});
 
 	const { open: openContextMenu } = useContextMenu();
 	const dragFrom = ref<number | null>(null);
