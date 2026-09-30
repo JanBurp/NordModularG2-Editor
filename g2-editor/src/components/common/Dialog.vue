@@ -68,11 +68,14 @@
 		if (!props.modelValue) return;
 		if (e.key === 'Escape') onCancel();
 		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm) {
+			// Capture phase + stop: otherwise global handlers (e.g. PatchBrowser's Enter = activate item) swallow or double-handle it
+			e.preventDefault();
+			e.stopImmediatePropagation();
 			(document.activeElement as HTMLElement)?.blur();
 			onConfirm();
 		}
 	}
 
-	onMounted(() => window.addEventListener('keydown', onKeydown));
-	onUnmounted(() => window.removeEventListener('keydown', onKeydown));
+	onMounted(() => window.addEventListener('keydown', onKeydown, true));
+	onUnmounted(() => window.removeEventListener('keydown', onKeydown, true));
 </script>
