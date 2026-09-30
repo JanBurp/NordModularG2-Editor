@@ -291,7 +291,33 @@ describe('setMorphGroupLabel', () => {
 
 		expect(patch.morphParamLabels).toEqual([{ paramIndex: 8, isString: true, paramLen: 8, labels: ['Foo'] }]);
 		expect(store.isSlotEdited('A')).toBe(true);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['set-param-label', 'A', 'patch', '1', '8', 'Foo']);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['set-module-labels', 'A', 'patch', '1', '8', '1', 'Foo']);
+	});
+
+	it('sends every already-named group in one command (the device replaces the whole list)', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		store.slots['A'].patch = patch;
+
+		await store.setMorphGroupLabel(0, 'Mod');
+		await store.setMorphGroupLabel(1, 'Wheel');
+		await store.setMorphGroupLabel(3, 'Vel');
+
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith([
+			'set-module-labels',
+			'A',
+			'patch',
+			'1',
+			'8',
+			'1',
+			'Mod',
+			'9',
+			'1',
+			'Wheel',
+			'11',
+			'1',
+			'Vel',
+		]);
 	});
 
 	it('updates the existing entry in place when the group is renamed again', async () => {
@@ -1574,5 +1600,89 @@ describe('randomizeOrClearSeqSteps', () => {
 		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
 
 		expect(useHistoryStore().canUndo('A')).toBe(false);
+	});
+});
+
+describe('setParamLabel — 4-button switch keeps the other button names', () => {
+	async function findSwitch() {
+		const { getAllModules } = await import('@/renderer/nmg2mods');
+		const { getParam } = await import('@/renderer/parammap');
+		for (const m of getAllModules()) {
+			const idx = (m.params ?? []).findIndex((p) => {
+				const d = getParam(p.type);
+				return d?.canLabel && d.names?.length === 4;
+			});
+			if (idx >= 0) return { mod: m, paramIndex: idx, names: getParam(m.params![idx].type)!.names! };
+		}
+		throw new Error('no multi-button canLabel switch found');
+	}
+
+	it.each([0, 1])('renaming button %i sends and stores all other buttons with their default names', async (labelIndex) => {
+		const { mod, paramIndex, names } = await findSwitch();
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[0].modules.push({ index: 1, type: mod.id, paramLabels: undefined });
+		store.slots['A'].patch = patch;
+
+		await store.setParamLabel(1, paramIndex, 'Foo', 'fx', labelIndex);
+
+		const expected = names.map((n, i) => (i === labelIndex ? 'Foo' : n));
+		expect(patch.areas[0].modules[0].paramLabels[0].labels).toEqual(expected);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith([
+			'set-module-labels',
+			'A',
+			expect.any(String),
+			'1',
+			String(paramIndex),
+			String(expected.length),
+			...expected,
+		]);
+	});
+
+	it('renaming one of the four separate On buttons (Mixer 4-1 C) leaves the other three untouched', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[0].modules.push({ index: 1, type: 123, paramLabels: undefined });
+		store.slots['A'].patch = patch;
+
+		for (const [i, name] of ['Mic', 'Piano', 'Bass', 'Drums'].entries()) await store.setParamLabel(1, 4 + i, name, 'fx');
+		await store.setParamLabel(1, 4, 'Line', 'fx');
+
+		// The device replaces a module's whole label list per message, so the last command must carry all four.
+		const run = (globalThis as any).window.cli.run;
+		expect(run).toHaveBeenLastCalledWith(['set-module-labels', 'A', 'fx', '1', '4', '1', 'Line', '5', '1', 'Piano', '6', '1', 'Bass', '7', '1', 'Drums']);
+
+		const labels = patch.areas[0].modules[0].paramLabels.map((pl: any) => [pl.paramIndex, pl.labels]);
+		expect(labels).toEqual([
+			[4, ['Line']],
+			[5, ['Piano']],
+			[6, ['Bass']],
+			[7, ['Drums']],
+		]);
+	});
+
+	it('skips label-less padding entries already present on the module (real patches have them)', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		const pad = { paramIndex: 0, isString: false, paramLen: 0, labels: [] };
+		patch.areas[0].modules.push({ index: 1, type: 123, paramLabels: [{ paramIndex: 7, isString: true, paramLen: 8, labels: ['Synth'] }, pad, pad] });
+		store.slots['A'].patch = patch;
+
+		await store.setParamLabel(1, 4, 'Mic', 'fx');
+
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['set-module-labels', 'A', 'fx', '1', '7', '1', 'Synth', '4', '1', 'Mic']);
+	});
+
+	it('undo restores the default name instead of a blank button', async () => {
+		const { mod, paramIndex, names } = await findSwitch();
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[0].modules.push({ index: 1, type: mod.id, paramLabels: undefined });
+		store.slots['A'].patch = patch;
+
+		await store.setParamLabel(1, paramIndex, 'Foo', 'fx', 1);
+		await store.undo();
+
+		expect(patch.areas[0].modules[0].paramLabels[0].labels).toEqual(names);
 	});
 });

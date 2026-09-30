@@ -198,7 +198,7 @@ static void rearm_with_version_update(void) {
 /* ── seq: compound-frame batch execution ───────────────────────────────── */
 
 #define SEQ_MAX_OPS   128
-#define SEQ_OP_BUFSZ 1024  /* large enough for set-param-label worst case */
+#define SEQ_OP_BUFSZ 1024  /* large enough for set-module-labels worst case */
 
 typedef struct { int loc, mod, param, val, var; } SetParamEntry;
 
@@ -279,13 +279,12 @@ static int execute_seq(cJSON *args) {
             g2_build_set_module_label_op(op, p, s_loc, arg_i(sub,3), arg_s(sub,4));
             n_ops++;
 
-        } else if (strcmp(scmd, "set-param-label") == 0 && sn >= 6) {
-            int num_labels = sn - 5;
-            const char *labels[128];
-            for (int li = 0; li < num_labels && li < 128; li++) labels[li] = arg_s(sub, 5 + li);
-            g2_build_set_param_label_op(op, p, s_loc,
-                arg_i(sub, 3), arg_i(sub, 4), num_labels < 128 ? num_labels : 128, labels);
-            n_ops++;
+        } else if (strcmp(scmd, "set-module-labels") == 0 && sn >= 6) {
+            const char *tok[SEQ_OP_BUFSZ];
+            int ntok = sn - 4 < SEQ_OP_BUFSZ ? sn - 4 : SEQ_OP_BUFSZ;
+            for (int ti = 0; ti < ntok; ti++) tok[ti] = arg_s(sub, 4 + ti);
+            ret = g2_build_set_module_labels_op(op, p, s_loc, arg_i(sub, 3), ntok, tok);
+            if (ret == G2_OK) n_ops++;
 
         } else if (strcmp(scmd, "assign-knob") == 0 && sn >= 6) {
             if (s_loc < 0 || s_loc > 1 || arg_i(sub,5) < 0 || arg_i(sub,5) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
@@ -490,15 +489,15 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_module_label(slot, loc, arg_i(args, 2), arg_s(args, 3));
 
-	} else if (strcmp(cmd, "set-param-label") == 0 && n >= 5) {
+	} else if (strcmp(cmd, "set-module-labels") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else {
-			int num_labels = n - 4;
-			const char *labels[128];
-			for (int li = 0; li < num_labels && li < 128; li++) labels[li] = arg_s(args, 4 + li);
-			ret = g2_set_param_label(slot, loc, arg_i(args, 2), arg_i(args, 3), num_labels < 128 ? num_labels : 128, labels);
+			const char *tok[G2_MODULE_LABELS_BUFSZ];
+			int ntok = n - 3 < G2_MODULE_LABELS_BUFSZ ? n - 3 : G2_MODULE_LABELS_BUFSZ;
+			for (int ti = 0; ti < ntok; ti++) tok[ti] = arg_s(args, 3 + ti);
+			ret = g2_set_module_labels(slot, loc, arg_i(args, 2), ntok, tok);
 		}
 
 	} else if (strcmp(cmd, "set-param") == 0 && n >= 6) {

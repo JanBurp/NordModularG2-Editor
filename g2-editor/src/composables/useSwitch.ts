@@ -38,8 +38,10 @@ export function useSwitch(
 		if (label.value) {
 			const customLabels = label.value.labels;
 			const baseNames = names.value.length > 0 ? names.value : optionNames.value;
-			if (!Array.isArray(baseNames) || customLabels.length >= baseNames.length) return customLabels;
-			return (baseNames as string[]).map((n, i) => customLabels[i] ?? n);
+			if (!Array.isArray(baseNames)) return customLabels;
+			// '' counts as "never customized" too (older saves / hardware entries), else the button renders blank
+			const count = Math.max(baseNames.length, customLabels.length);
+			return Array.from({ length: count }, (_, i) => customLabels[i] || (baseNames as string[])[i] || '');
 		}
 		if (names.value[0] === 'Ch#' && param.value.name) {
 			const name = param.value.name;

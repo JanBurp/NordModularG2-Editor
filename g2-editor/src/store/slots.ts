@@ -3,6 +3,7 @@ import type {
 	MidiCCAssignment,
 	ModuleInstance,
 	MorphAssignment,
+	ParamLabel,
 	ParamPageAssignment,
 	Patch,
 	PatchParamVariation,
@@ -121,6 +122,18 @@ function setMorphRangeCmd(
 }
 
 // Builds the CLI del-cable / add-cable command tuple for a single cable.
+// The device replaces a module's WHOLE label list per message, so all labelled params go in one command.
+function setModuleLabelsCmd(slot: SlotLabel, location: 'va' | 'fx' | 'patch', moduleIndex: number, paramLabels: ParamLabel[]): string[] {
+	return [
+		'set-module-labels',
+		slot,
+		location,
+		String(moduleIndex),
+		// label-less entries (parsed paddings with paramLen 0) carry nothing and the builder rejects count 0
+		...paramLabels.filter((pl) => pl.labels.length > 0).flatMap((pl) => [String(pl.paramIndex), String(pl.labels.length), ...pl.labels]),
+	];
+}
+
 function delCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[] {
 	return ['del-cable', slot, location, String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
 }
@@ -340,14 +353,7 @@ function buildModuleAddition(
 
 	const { addModuleCmd, setParamCmds } = buildAddModuleCmd(src, newId, col, row, slot, location, variations ? variations.length : 1);
 
-	const setParamLabelCmds: string[][] = (src.paramLabels ?? []).map((pl) => [
-		'set-param-label',
-		slot,
-		location,
-		String(newId),
-		String(pl.paramIndex),
-		...pl.labels,
-	]);
+	const setParamLabelCmds = src.paramLabels?.length ? [setModuleLabelsCmd(slot, location, newId, src.paramLabels)] : [];
 
 	return { mod, addModuleCmd, setParamCmds, setParamLabelCmds };
 }
@@ -366,6 +372,11 @@ interface SlotEntry {
 	paramPages: ParamPageAssignment[];
 	edited: boolean; // true when the slot has unsaved edits since last load/save
 	textDirty: boolean; // true when patch notes have been edited but not yet pushed to the device
+}
+
+function paramDefaultNames(moduleType: number | undefined, paramIndex: number): string[] | undefined {
+	const type = moduleType === undefined ? undefined : getModule(moduleType)?.params?.[paramIndex]?.type;
+	return type ? getParam(type)?.names : undefined;
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -2740,7 +2751,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 				const existingLabel = mod?.paramLabels?.find((pl) => pl.paramIndex === paramIndex);
-				const prevLabel = existingLabel?.labels?.[labelIndex] ?? '';
+				const prevLabel = existingLabel?.labels?.[labelIndex] || paramDefaultNames(mod?.type, paramIndex)?.[labelIndex] || '';
 				hist.record(slot, {
 					undo: async () => {
 						await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area, labelIndex);
@@ -2759,21 +2770,24 @@ export const useSlotsStore = defineStore('slots', {
 			// param's default names instead of '' — an explicit '' renders as a blank button
 			// (see useSwitch.ts's displayNames, which only falls back to the default for
 			// undefined entries, not empty strings).
-			const defaultNames = getModule(mod.type)?.params?.[paramIndex]?.type ? getParam(getModule(mod.type)!.params![paramIndex].type)?.names : undefined;
+			const defaultNames = paramDefaultNames(mod.type, paramIndex);
 			if (!entry) {
-				const labels = Array.from({ length: labelIndex + 1 }, (_, i) => (i === labelIndex ? label : (defaultNames?.[i] ?? '')));
+				const labels = Array.from({ length: Math.max(labelIndex + 1, defaultNames?.length ?? 0) }, (_, i) =>
+					i === labelIndex ? label : (defaultNames?.[i] ?? ''),
+				);
 				entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };
 				mod.paramLabels.push(entry);
 			} else {
-				while (entry.labels.length <= labelIndex) entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
+				while (entry.labels.length <= labelIndex || entry.labels.length < (defaultNames?.length ?? 0))
+					entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
 				entry.labels[labelIndex] = label;
 			}
 			this._markSlotDirty(slot);
-			await runCliSafe(['set-param-label', slot, location, String(moduleIndex), String(paramIndex), ...entry.labels], 'setParamLabel');
+			await runCliSafe(setModuleLabelsCmd(slot, location, moduleIndex, mod.paramLabels), 'setParamLabel');
 		},
 
 		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
-		// fixed PATCH_MORPH pseudo-module (location=2/"patch") — same $PARAM_NAMES/set-param-label
+		// fixed PATCH_MORPH pseudo-module (location=2/"patch") — same $PARAM_NAMES/set-module-labels
 		// mechanism as setParamLabel above, decoupled from morph modulation assignments.
 		async setMorphGroupLabel(groupIndex: number, label: string): Promise<void> {
 			const ctx = this._getActivePatch();
@@ -2805,7 +2819,7 @@ export const useSlotsStore = defineStore('slots', {
 				entry.labels[0] = label;
 			}
 			this._markSlotDirty(slot);
-			await runCliSafe(['set-param-label', slot, 'patch', String(PATCH_MORPH_MODULE_ID), String(paramIndex), label], 'setMorphGroupLabel');
+			await runCliSafe(setModuleLabelsCmd(slot, 'patch', PATCH_MORPH_MODULE_ID, patch.morphParamLabels), 'setMorphGroupLabel');
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

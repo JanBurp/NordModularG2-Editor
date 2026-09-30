@@ -375,7 +375,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x37` | SET_PATCH (upload) | see §9 | Embedded ACK |
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
-| `0x42` | SET_PARAM_LABEL | `loc mod_id param_idx label_idx label` | Embedded ACK |
+| `0x42` | SET_PARAM_LABEL | `loc mod_id module_len (is_string param_len param_idx labels...)*` | Embedded ACK |
 | `0x43` | SET_MORPH_RANGE *(not implemented yet)* | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
 | `0x44` | COPY_VARIATION | `from to` | Embedded ACK (also broadcast as `copy_variation` watch event to all listeners) |
 | `0x4C` | GET_PARAMS *(not implemented yet)* | `location` | Extended bulk |
@@ -419,7 +419,7 @@ move-module              <slot> <loc> <mod> <col> <row>             (0x34)
 upload-patch             <slot> <file>                              (0x37, slot scope)
 upload-perf              <file>                                    (0x37, system scope — see caveat above)
 set-param                <slot> <loc> <mod> <param> <val> <var>    (0x40)
-set-param-label          <slot> <loc> <mod> <param> <label> ...    (0x42)
+set-module-labels        <slot> <loc> <mod> <param> <n> <label>... (0x42, all params of the module)
 copy-variation           <slot> <from> <to>                        (0x44)
 add-cable                <slot> <loc> ...                          (0x50)
 del-cable                <slot> <loc> ...                          (0x51)
@@ -585,6 +585,8 @@ Slot command `0x42` sets a text label for a parameter's value slot(s).
 [6 .. 6+7*label_idx-1]   empty label slots (zeros), one per position 0..label_idx-1
 [6+7*label_idx .. +6]    target label text, null-padded to exactly 7 bytes
 ```
+
+**The message replaces the module's whole label list.** Confirmed on hardware and in the original editor (`CMCustomData::WriteStream` sends the module's entire custom data): a message carrying one param's entry blanks every other labelled param of that module. To rename one button of a multi-param switch (e.g. Mixer On1..On4), send all labelled params in one message — `module_len` then covers every entry, each `[is_string, param_len, param_idx, labels...]`. The only CLI command for it is `set-module-labels <slot> <loc> <mod> <param> <count> <label>... [<param> <count> <label>...]` (also usable in `seq`) builds it (the old single-param `set-param-label` was removed because it blanked the module's other params); Morph Group labels use it too, with location `patch`. `module_len` is one byte, so the combined entries are limited to 255 bytes.
 
 **Key points:**
 - Labels are **null-padded** (not space-padded) to 7 bytes each
@@ -1241,14 +1243,13 @@ The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_
   ["add-module",       "<slot>", "<loc>", type, id, col, row, colour, n_modes, mode0..., n_params, param0..., "name"],
   ["set-module-color", "<slot>", "<loc>", module_id, color],
   ["set-module-name",  "<slot>", "<loc>", module_id, "name"],
-  ["set-param-label",  "<slot>", "<loc>", module_id, param_idx, "label0", "label1", ...],
+  ["set-module-labels", "<slot>", "<loc>", module_id, param_idx, count, "label0", ..., param_idx2, count2, ...],
   ["set-param",        "<slot>", "<loc>", module_id, param_idx, value, variation]
 ]}
 ```
 
 Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
 
-> **`set-param-label` in `seq` — no `label_idx` arg:** unlike the doc's general SET_PARAM_LABEL description in §8b, the `seq` form takes a variadic label list with no separate `label_idx` — each label's position in the trailing array *is* its index (`num_labels = sn - 5` in `execute_seq()`, `cli/src/daemon.c:253-259`).
 
 > **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through (`daemon.c:238-239`) — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. Use the standalone `add-module` command if you need non-default parameter values applied immediately (e.g. pasting a module with non-default variation values).
 

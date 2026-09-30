@@ -1223,21 +1223,26 @@ void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
     op->cmd = 0x33; op->payload = buf; op->len = (int)(2 + nlen + (nlen < 16 ? 1 : 0));
 }
 
-void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
-                                  int loc, int module_id, int param_idx,
-                                  int num_labels, const char **labels) {
-    int payload_len = 6 + 7 * num_labels;
-    int idx = 0;
-    buf[idx++] = (uint8_t)loc; buf[idx++] = (uint8_t)module_id;
-    buf[idx++] = (uint8_t)(3 + 7 * num_labels); buf[idx++] = 1;
-    buf[idx++] = (uint8_t)(1 + 7 * num_labels); buf[idx++] = (uint8_t)param_idx;
-    for (int i = 0; i < num_labels; i++) {
-        const char *lbl = (labels && labels[i]) ? labels[i] : "";
-        size_t llen = strlen(lbl); if (llen > 7) llen = 7;
-        for (int j = 0; j < 7; j++) buf[idx++] = (j < (int)llen) ? (uint8_t)lbl[j] : 0;
+/* SET_PARAM_LABEL (0x42) replaces the module's WHOLE label list (the original editor's
+ * CMCustomData::WriteStream sends the module's entire custom data), so every labelled param of the
+ * module must be in one message. tok = groups of "<param-idx> <count> <label>*count". Returns 0, or
+ * G2_ERR_INVALID_PARAM on a malformed group or a list over the 255-byte module_len field. */
+int g2_build_set_module_labels_op(G2Op *op, uint8_t *buf, int loc, int module_id, int ntok, const char **tok) {
+    int idx = 3;
+    for (int i = 0; i < ntok; ) {
+        int param = atoi(tok[i++]);
+        int count = i < ntok ? atoi(tok[i++]) : 0;
+        if (count < 1 || i + count > ntok || idx - 3 + 3 + 7 * count > 255) return G2_ERR_INVALID_PARAM;
+        buf[idx++] = 1; buf[idx++] = (uint8_t)(1 + 7 * count); buf[idx++] = (uint8_t)param;
+        for (int k = 0; k < count; k++, i++) {
+            size_t llen = strlen(tok[i]); if (llen > 7) llen = 7;
+            memset(buf + idx, 0, 7); memcpy(buf + idx, tok[i], llen); idx += 7;
+        }
     }
-    if (idx < payload_len) memset(buf + idx, 0, (size_t)(payload_len - idx));
-    op->cmd = 0x42; op->payload = buf; op->len = payload_len;
+    if (idx == 3) return G2_ERR_INVALID_PARAM;
+    buf[0] = (uint8_t)loc; buf[1] = (uint8_t)module_id; buf[2] = (uint8_t)(idx - 3);
+    op->cmd = 0x42; op->payload = buf; op->len = idx;
+    return G2_OK;
 }
 
 /* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
@@ -1439,20 +1444,21 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
     return G2_OK;
 }
 
-int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels) {
+int g2_set_module_labels(int slot, int location, int module_id, int ntok, const char **tok) {
+    if (slot < 0 || slot > 3)            { g2_err("set-module-labels: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 2)    { g2_err("set-module-labels: location must be 0(fx), 1(va) or 2(patch)\n"); return G2_ERR_INVALID_PARAM; }
 
-    if (slot < 0 || slot > 3)            { g2_err("set-param-label: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (location < 0 || location > 2)    { g2_err("set-param-label: location must be 0(fx), 1(va) or 2(patch)\n"); return G2_ERR_INVALID_PARAM; }
-    if (num_labels <= 0 || num_labels > 128) { g2_err("set-param-label: num_labels out of range\n"); return G2_ERR_INVALID_PARAM; }
-
-    if (ensure_connected(0) < 0) { g2_err("set-param-label: failed to connect\n"); return G2_ERR_CONNECT; }
+    uint8_t buf[G2_MODULE_LABELS_BUFSZ]; G2Op op;
+    if (g2_build_set_module_labels_op(&op, buf, location, module_id, ntok, tok) != G2_OK) {
+        g2_err("set-module-labels: malformed <param> <count> <label>... groups or list too long\n");
+        return G2_ERR_INVALID_PARAM;
+    }
+    if (ensure_connected(0) < 0) { g2_err("set-module-labels: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-    uint8_t buf[6 + 7 * 128]; G2Op op;
-    g2_build_set_param_label_op(&op, buf, location, module_id, param_idx, num_labels, labels);
     if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("set-param-label: failed to send\n");
+        g2_err("set-module-labels: failed to send\n");
         return G2_ERR_SEND;
     }
     usleep(USB_SEND_DELAY_US);

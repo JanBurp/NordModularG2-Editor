@@ -421,6 +421,128 @@ void test_daemon_assign_knob_cmd(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
+/* Collects the labels of `mod` (VA area) param `param` from get-patch A's PARAM_NAMES (0x5B)
+ * sections — bit-packed: area(2) modcount(8), then per module modIdx(8) moduleLen(8) and entries
+ * isString(8) paramLen(8) paramIdx(8) + 7-byte labels (same layout as the editor's parseParamNames).
+ * Returns the label count (0 = no entry for that param), -1 on get-patch failure. */
+static int read_slot_a_param_labels(daemon_ctx_t *d, int mod, int param, char out[][8], int max) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+    cJSON *resp = send_and_capture_response(d, cmd, id);
+    if (!resp) return -1;
+    cJSON *data = cJSON_GetObjectItem(resp, "data");
+    cJSON *hex_item = data ? cJSON_GetObjectItem(data, "data") : NULL;
+    const char *hex = hex_item ? cJSON_GetStringValue(hex_item) : NULL;
+    uint8_t *sec = NULL;
+    int len = hex ? hex_to_bytes(hex, &sec) : -1;
+    int found = -1;
+    for (int o = 0; len > 0 && o + 3 <= len; ) {
+        int n = (sec[o + 1] << 8) | sec[o + 2];
+        if (sec[o] == 0x5B && o + 3 + n <= len) {
+            const uint8_t *p = sec + o + 3;
+            size_t bit = 0;
+            unsigned area = knob_bits(p, &bit, 2), nummod = knob_bits(p, &bit, 8);
+            for (unsigned i = 0; i < nummod; i++) {
+                unsigned m = knob_bits(p, &bit, 8);
+                int remaining = (int)knob_bits(p, &bit, 8);
+                while (remaining > 0) {
+                    knob_bits(p, &bit, 8);
+                    unsigned plen = knob_bits(p, &bit, 8);
+                    unsigned pidx = plen > 0 ? knob_bits(p, &bit, 8) : 0;
+                    remaining -= plen > 0 ? 3 : 2;
+                    int count = plen > 1 ? (int)((plen - 1) / 7) : 0;
+                    for (int j = 0; j < count; j++) {
+                        char lbl[8] = {0};
+                        for (int k = 0; k < 7; k++) lbl[k] = (char)knob_bits(p, &bit, 8);
+                        remaining -= 7;
+                        if (area == 1 && (int)m == mod && (int)pidx == param && j < max) memcpy(out[j], lbl, 8);
+                    }
+                    if (area == 1 && (int)m == mod && (int)pidx == param) found = count;
+                }
+            }
+        }
+        o += 3 + n;
+    }
+    free(sec);
+    cJSON_Delete(resp);
+    return found < 0 ? 0 : found;
+}
+
+/* Sends set-module-labels for params first_param..first_param+n-1 of `mod` (one label each) — the
+ * whole label list in one message, as the editor does, since the device replaces the module's list. */
+static int set_slot_a_module_labels(daemon_ctx_t *d, int mod, int first_param, int n, const char *const *labels) {
+    char cmd[512];
+    int id = g_cmd_id++;
+    int len = snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"set-module-labels\",\"args\":[\"A\",\"va\",\"%d\"", id, mod);
+    for (int i = 0; i < n; i++)
+        len += snprintf(cmd + len, sizeof(cmd) - (size_t)len, ",\"%d\",\"1\",\"%s\"", first_param + i, labels[i]);
+    snprintf(cmd + len, sizeof(cmd) - (size_t)len, "]}");
+    int r = send_and_expect_ok(d, cmd, id);
+    usleep(300000);
+    return r;
+}
+
+/* Test: renaming buttons of a 4-button switch (set-module-labels) keeps every other button's label. Mixer 4-1 C
+ * (type 123) has four OffOn buttons On1..On4 (params 4-7), each with its own label entry. The
+ * daemon's ok:true only means the USB write went out, so each label is read back via get-patch
+ * after every rename: all four must be present, and renaming one again must leave the other three
+ * untouched. Restores slot A afterwards. */
+void test_daemon_set_param_label_four_button_switch(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    static const char *names[4] = {"Mic", "Piano", "Bass", "Drums"};
+    const int MIX = 90, FIRST_BTN = 4;
+    char lbl[4][1][8];
+    int cnt[4];
+    int r_add = -1, r_set[4] = {-1, -1, -1, -1}, r_again = -1;
+    int step1_ok = 1, step2_ok = 1;
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    usleep(300000);
+
+    char cmd[160];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"add-module\",\"args\":[\"A\",\"va\",\"123\",\"%d\",\"0\",\"60\",\"0\",\"0\",\"0\",\"Mix\"]}", id, MIX);
+    r_add = send_and_expect_ok(&g_daemon, cmd, id);
+    usleep(300000);
+
+    /* Step 1: rename all four buttons one after another; after each rename every button set so
+     * far must still read back with its own name. */
+    for (int b = 0; b < 4 && r_add == 0; b++) {
+        r_set[b] = set_slot_a_module_labels(&g_daemon, MIX, FIRST_BTN, b + 1, names);
+        for (int k = 0; k <= b; k++) {
+            memset(lbl, 0, sizeof(lbl));
+            cnt[k] = read_slot_a_param_labels(&g_daemon, MIX, FIRST_BTN + k, lbl[k], 1);
+            if (cnt[k] < 1 || strcmp(lbl[k][0], names[k]) != 0) step1_ok = 0;
+        }
+    }
+
+    /* Step 2: rename button 0 again; buttons 1-3 must keep their names. */
+    const char *renamed[4] = {"Line", names[1], names[2], names[3]};
+    r_again = set_slot_a_module_labels(&g_daemon, MIX, FIRST_BTN, 4, renamed);
+    memset(lbl, 0, sizeof(lbl));
+    for (int k = 0; k < 4; k++) cnt[k] = read_slot_a_param_labels(&g_daemon, MIX, FIRST_BTN + k, lbl[k], 1);
+    if (cnt[0] < 1 || strcmp(lbl[0][0], "Line") != 0) step2_ok = 0;
+    for (int k = 1; k < 4; k++)
+        if (cnt[k] < 1 || strcmp(lbl[k][0], names[k]) != 0) step2_ok = 0;
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    usleep(300000);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_add, "add-module Mixer 4-1 C should be accepted");
+    for (int b = 0; b < 4; b++) TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_set[b], "set-module-labels should be accepted");
+    TEST_ASSERT_TRUE_MESSAGE(step1_ok, "after renaming On1..On4, every button must read back with its own label");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_again, "second set-module-labels should be accepted");
+    TEST_ASSERT_TRUE_MESSAGE(step2_ok, "renaming On1 again must keep the labels of On2..On4");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
+}
+
 /* Test: assign-global-knob / deassign-global-knob through "seq" (the editor's runBatch path) land
  * on the intended target slot/module/param/location, read back via get-global-knobs. Picks the
  * highest free global knob, assigns VA module 1 param 0 of slot B to it, checks it, then deassigns

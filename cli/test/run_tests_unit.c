@@ -147,12 +147,11 @@ extern void test_select_param_invalid_param_idx_high(void);
 extern void test_upload_patch_buf_invalid_slot_low(void);
 extern void test_upload_patch_buf_invalid_slot_high(void);
 
-extern void test_set_param_label_invalid_slot_low(void);
-extern void test_set_param_label_invalid_slot_high(void);
-extern void test_set_param_label_invalid_location(void);
-extern void test_set_param_label_invalid_label_idx(void);
-extern void test_set_param_label_null_label(void);
-extern void test_set_param_label_empty_label(void);
+extern void test_build_set_module_labels_four_buttons(void);
+extern void test_set_module_labels_invalid_location(void);
+extern void test_set_module_labels_malformed_groups(void);
+extern void test_build_set_module_labels_rejects_malformed(void);
+extern void test_set_module_labels_invalid_slot(void);
 
 extern void test_set_module_label_invalid_slot_low(void);
 extern void test_set_module_label_invalid_slot_high(void);
@@ -348,13 +347,12 @@ int main(void) {
     RUN_TEST(test_upload_patch_buf_invalid_slot_low);
     RUN_TEST(test_upload_patch_buf_invalid_slot_high);
 
-    /* set-param-label validation tests */
-    RUN_TEST(test_set_param_label_invalid_slot_low);
-    RUN_TEST(test_set_param_label_invalid_slot_high);
-    RUN_TEST(test_set_param_label_invalid_location);
-    RUN_TEST(test_set_param_label_invalid_label_idx);
-    RUN_TEST(test_set_param_label_null_label);
-    RUN_TEST(test_set_param_label_empty_label);
+    /* set-module-labels tests */
+    RUN_TEST(test_build_set_module_labels_four_buttons);
+    RUN_TEST(test_set_module_labels_invalid_location);
+    RUN_TEST(test_set_module_labels_malformed_groups);
+    RUN_TEST(test_build_set_module_labels_rejects_malformed);
+    RUN_TEST(test_set_module_labels_invalid_slot);
 
     /* set-module-name validation tests */
     RUN_TEST(test_set_module_label_invalid_slot_low);

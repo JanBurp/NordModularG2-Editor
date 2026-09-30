@@ -166,8 +166,11 @@ int g2_set_module_color(int slot, int location, int module_id, int color);
 /* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
 int g2_set_module_label(int slot, int location, int module_id, const char *label);
 
-/* Set param labels: slot 0-3, location 0=fx/1=va, labels[0..num_labels-1] max 7 chars each */
-int g2_set_param_label(int slot, int location, int module_id, int param_idx, int num_labels, const char **labels);
+/* Set ALL labelled params of a module in one message (the device replaces the module's whole label
+ * list, so a message naming one param blanks the module's others). location 0=fx/1=va/2=patch
+ * (morph groups). tok = groups of
+ * "<param-idx> <count> <label>*count", labels max 7 chars. */
+int g2_set_module_labels(int slot, int location, int module_id, int ntok, const char **tok);
 
 /* Set module mode: slot 0-3, location 0=fx/1=va, param index, value */
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val);
@@ -195,8 +198,11 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int color);
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, const char *label);
-void g2_build_set_param_label_op(G2Op *op, uint8_t *buf,
-    int loc, int module_id, int param_idx, int num_labels, const char **labels);
+
+/* Builds SET_PARAM_LABEL with all of a module's labelled params; see g2_set_module_labels. */
+#define G2_MODULE_LABELS_BUFSZ 258  /* 3-byte header + 255-byte module_len */
+int g2_build_set_module_labels_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int ntok, const char **tok);
 
 /* Send multiple patch mutations as a single compound USB frame.
  * All ops must target the same slot. Version is fetched once; drain+delay happen once. */

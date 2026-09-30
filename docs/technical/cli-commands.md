@@ -100,7 +100,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | Command | Arguments | Description |
 |---|---|---|
 | `set-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <value> <variation>` | Set module parameter value |
-| `set-param-label` | `<slot> <va\|fx> <module-id> <param-idx> <label-idx> <label>` | Set parameter label |
+| `set-module-labels` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <count> <label>... [<param-idx> <count> <label>...]` | Set the labels of all labelled params of a module (replaces the module's whole list) |
 | `copy-variation` | `<slot> <from> <to>` | Copy all parameter values from one variation to another (0-based indices) |
 
 ## MIDI CC Assignments

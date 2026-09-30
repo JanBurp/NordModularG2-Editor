@@ -72,7 +72,7 @@ static void print_usage(const char *prog) {
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
-    printf("  set-param-label <slot> <va|fx|patch> <module-id> <param-idx> <label0> [label1 ...]         Set parameter labels (all labels from index 0)\n");
+    printf("  set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [...]       Set ALL labelled params of a module (group repeats per param)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                      Set a module parameter value\n");
     printf("  assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>                      Assign a MIDI CC number to a parameter\n");
@@ -470,18 +470,14 @@ static int cmd_set_module_name(int argc, char **argv, int i) {
     return g2_set_module_label(slot, location, module_id, argv[i + 4]);
 }
 
-static int cmd_set_param_label(int argc, char **argv, int i) {
+static int cmd_set_module_labels(int argc, char **argv, int i) {
     if (i + 5 >= argc) {
-        fprintf(stderr, "Usage: set-param-label <slot> <va|fx|patch> <module-id> <param-idx> <label0> [label1 ...]\n");
+        fprintf(stderr, "Usage: set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [<param-idx> <count> <label>...]\n");
         return 1;
     }
-    int slot      = parse_slot(argv[i + 1]);
-    if (slot == SLOT_INVALID) { fprintf(stderr, "set-param-label: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
-    int location  = parse_location_str(argv[i + 2]);
-    int module_id = atoi(argv[i + 3]);
-    int param_idx = atoi(argv[i + 4]);
-    int num_labels = argc - (i + 5);
-    return g2_set_param_label(slot, location, module_id, param_idx, num_labels, (const char **)(argv + i + 5));
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-labels: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_set_module_labels(slot, parse_location_str(argv[i + 2]), atoi(argv[i + 3]), argc - (i + 4), (const char **)(argv + i + 4));
 }
 
 static int cmd_set_module_mode(int argc, char **argv, int i) {
@@ -1068,7 +1064,7 @@ static const cmd_entry_t commands[] = {
     { "get-global-knobs",      cmd_get_global_knobs      },
     { "set-morph-range",       cmd_set_morph_range       },
     { "set-morph-range-batch", cmd_set_morph_range_batch },
-    { "set-param-label",  cmd_set_param_label  },
+    { "set-module-labels", cmd_set_module_labels },
     { "set-module-mode",  cmd_set_module_mode  },
     { "set-param",        cmd_set_param        },
     { "select-param",     cmd_select_param     },

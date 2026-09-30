@@ -15,5 +15,5 @@ export const SectionType = {
 
 // Fixed pseudo-module holding the 8 Morph Groups (location=2/"patch"). Params 0-7 are the
 // morph dial values (handled elsewhere, via the PATCH_MORPH parameter section); params 8-15
-// are the renamable per-group labels (group i's label = param 8+i), via $PARAM_NAMES/set-param-label.
+// are the renamable per-group labels (group i's label = param 8+i), via $PARAM_NAMES/set-module-labels.
 export const PATCH_MORPH_MODULE_ID = 0x01;
