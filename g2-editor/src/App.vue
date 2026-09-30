@@ -542,9 +542,7 @@
 	);
 	const aboutMessage = computed(() => {
 		if (startingUp.value || device.status === DeviceStatus.Connected || device.status === DeviceStatus.Offline) return '';
-		return device.status === DeviceStatus.DriverError
-			? 'USB driver error: the G2 could not be opened.'
-			: 'G2 not connected. Connect your Nord Modular G2 via USB and reconnect.';
+		return device.status === DeviceStatus.DriverError ? 'USB driver error: the G2 could not be opened.' : 'G2 not connected.';
 	});
 	const loadingMessage = computed(() => {
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';

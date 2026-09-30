@@ -42,14 +42,15 @@
 							>
 								patchviewer
 							</button>
-							, Chris Purusha for sharing tech info and his own take on an
+							, Chris Purusha for sharing tech info and his
 							<button
 								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
 								@click="openLink('https://github.com/chrispurusha/G2-Edit')"
 							>
 								editor
 							</button>
-							, Åka Danielson for graphics, BlueHell for lending an Engine, and all others who tested or donated to make this work possible.
+							, Åka Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who tested or donated to make this work
+							possible.
 						</p>
 						<div class="flex justify-center pt-1">
 							<button
@@ -73,7 +74,7 @@
 						</div>
 					</template>
 					<template v-else>
-						<p v-if="message" class="text-xs text-yellow-500 self-center text-center">{{ message }}</p>
+						<p v-if="message" class="text-xs text-red-500 self-center text-center">{{ message }}</p>
 						<Button variant="default" @click="close">Close</Button>
 					</template>
 				</div>
