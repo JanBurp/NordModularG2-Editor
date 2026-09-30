@@ -1827,6 +1827,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
+			useDeviceStore().markOriginStale(slot);
 			this.slots[slot].patch = patch;
 			this.slots[slot].variations = extractVariations(patch);
 			this.slots[slot].name = name;

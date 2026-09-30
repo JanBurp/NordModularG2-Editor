@@ -23,6 +23,7 @@ nav_order: 4
 | `Cmd+U` | Upload Active Slot |
 | `Cmd+M` | Send Controller Snapshot |
 | `Cmd+1` | Dump One |
+| `Option+S` | Save in Synth (store the patch in a synth bank) |
 
 ## Edit
 

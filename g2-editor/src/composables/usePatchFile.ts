@@ -199,6 +199,7 @@ export function usePatchFile() {
 				const targetSlot = uiStore.slotInFocus;
 				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(targetSlot);
+				device.clearOriginStale(targetSlot);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
 				showToast('Failed to select synth patch — check device connection.');

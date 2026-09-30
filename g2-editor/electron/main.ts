@@ -955,6 +955,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{
 					label: "Save in Synth",
 					click: () => sendToFocused("menu:action", "store-in-synth"),
+					accelerator: "Alt+S",
 					enabled: menuState.connected && menuState.hasCurrentPatch,
 				},
 				{ type: "separator" as const },

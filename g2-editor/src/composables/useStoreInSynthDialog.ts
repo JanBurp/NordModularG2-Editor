@@ -4,6 +4,7 @@ import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { bankSizeFor, locationSizeFor, defaultBankKind } from '@/constants/ui';
+import { slotOrigin } from './useSlotOrigin';
 import { showToast } from './useToast';
 
 // Singleton state shared between the menu-action opener and the dialog component
@@ -23,8 +24,9 @@ export function useStoreInSynthDialog() {
 
 	function open(): void {
 		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isHardwarePerformanceMode);
-		bank.value = 1;
-		location.value = 1;
+		const origin = kind.value === 'patch' ? slotOrigin(uiStore.slotInFocus) : null;
+		bank.value = origin?.bank ?? 1;
+		location.value = origin?.location ?? 1;
 		showDialog.value = true;
 	}
 

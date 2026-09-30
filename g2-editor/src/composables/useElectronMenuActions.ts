@@ -227,6 +227,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				}
 				case 'store-in-synth':
+					if (isInputFocused()) break;
 					useStoreInSynthDialog().open();
 					break;
 				case 'area-voice':

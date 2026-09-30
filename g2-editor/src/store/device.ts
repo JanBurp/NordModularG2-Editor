@@ -37,6 +37,8 @@ export const useDeviceStore = defineStore('device', {
 		pendingPerfBank: null as number | null,
 		pendingPerfLoc: null as number | null,
 		lastMidiCC: null as number | null,
+		// Slots whose patch no longer matches the bank/patch the device reports (new patch, disk load).
+		staleOriginSlots: [] as SlotLabel[],
 	}),
 
 	getters: {
@@ -180,7 +182,19 @@ export const useDeviceStore = defineStore('device', {
 		updatePerfSettings(ev: { performance?: PerformanceData | null; slots: Device['slots'] }) {
 			if (!this.device) return;
 			this.device.performance = ev.performance ?? null;
+			for (const s of ev.slots) {
+				const old = this.device.slots.find((o) => o.slot === s.slot);
+				if (old && (old.bank !== s.bank || old.patch !== s.patch)) this.clearOriginStale(s.slot);
+			}
 			this.device.slots = ev.slots;
+		},
+
+		markOriginStale(slot: SlotLabel) {
+			if (!this.staleOriginSlots.includes(slot)) this.staleOriginSlots.push(slot);
+		},
+
+		clearOriginStale(slot: SlotLabel) {
+			this.staleOriginSlots = this.staleOriginSlots.filter((s) => s !== slot);
 		},
 
 		toggleSlotActive(slot: SlotLabel) {
