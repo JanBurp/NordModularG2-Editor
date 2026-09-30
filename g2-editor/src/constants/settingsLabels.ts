@@ -48,5 +48,5 @@ export const SETTINGS_LABELS = {
 	cableThickness: 'Thickness',
 	cableMagneticRadius: 'Snap range',
 	cableConnectMode: 'Connect Mode',
-	autoSuggestCable: 'Auto-suggest Cable',
+	autoSuggestCable: 'Auto-suggest Cable (experimental)',
 } as const;

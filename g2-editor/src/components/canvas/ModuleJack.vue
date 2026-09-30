@@ -150,7 +150,7 @@
 <style scoped>
 	.jack {
 		cursor:
-			url('../../assets/cursors/jack-hover.png') 1 3,
+			image-set(url('../../assets/cursors/jack-hover.svg') 0.6x) 1 5,
 			crosshair;
 	}
 

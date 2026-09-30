@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<svg width="16px" height="11px" viewBox="0 0 16 11" version="1.1" xmlns="http://www.w3.org/2000/svg" xmlns:xlink="http://www.w3.org/1999/xlink">
+    <!-- Generator: Sketch 52.6 (67491) - http://www.bohemiancoding.com/sketch -->
+    <title>jack-hover</title>
+    <desc>Created with Sketch.</desc>
+    <g id="Page-1" stroke="none" stroke-width="1" fill="none" fill-rule="evenodd">
+        <g id="JackSimple">
+            <path d="M10,2 C14.1659076,3.78729716 12.083843,1.82334307 14.8737046,10.6832008" id="Path" stroke="#000000" stroke-linecap="round"></path>
+            <rect id="Rectangle" stroke="#4A4A4A" fill="#FFFFFF" x="0.5" y="1.5" width="7" height="2" rx="1"></rect>
+            <rect id="Rectangle" stroke="#000000" fill="#4A4A4A" x="5.5" y="0.5" width="6" height="4"></rect>
+        </g>
+    </g>
+</svg>

@@ -182,12 +182,9 @@ fieldset {
 
 svg.cable-grab-mode .cable-hit {
 	pointer-events: stroke;
-	cursor: url('../assets/cursors/cable-grab.png') 4 4, grab;
-}
-
-/* Active cable-grab drag (mousedown through mouseup) — overrides the ambient 'grab' cursor above. */
-svg.cable-dragging {
-	cursor: url('../assets/cursors/cable-grabbing.png') 6 7, grabbing;
+	cursor:
+		image-set(url('../assets/cursors/cable-grab.svg') 0.6x) 1 15,
+		grab;
 }
 
 /* Hovering an incompatible drop target during a new-cable drag or a cable-grab drag. */
@@ -195,15 +192,27 @@ svg.cable-invalid-target {
 	cursor: not-allowed;
 }
 
-/* Dragging a new cable from a jack (useJackDragInteraction.ts) with no valid target under the
-   pointer yet — the plug cursor. A valid target under the pointer swaps to the forked
-   "connecting" variant below; an invalid target is handled by cable-invalid-target above. */
-svg[data-jack-drag]:not(.cable-invalid-target) {
-	cursor: url('../assets/cursors/cable-drag.png') 1 3, crosshair;
+/* Any cable drag (new cable from a jack via useJackDragInteraction.ts, or an active cable-grab drag,
+   mousedown through mouseup) keeps the jack cursor; a valid target under the pointer swaps to the
+   "connecting" variant. An invalid target is handled by cable-invalid-target above. */
+svg[data-jack-drag]:not(.cable-invalid-target),
+svg.cable-dragging:not(.cable-invalid-target) {
+	cursor:
+		image-set(url('../assets/cursors/jack-hover.svg') 0.6x) 1 5,
+		crosshair;
 }
 
 svg[data-jack-drag='valid']:not(.cable-invalid-target) {
-	cursor: url('../assets/cursors/cable-connect.png') 1 7, crosshair;
+	cursor:
+		image-set(url('../assets/cursors/cable-connect.svg') 0.6x) 1 5,
+		crosshair;
+}
+
+/* While any cable drag is active, elements under the pointer (jacks, module titles, knobs…) must not
+   swap in their own cursor — they inherit the one chosen on the <svg> above. */
+svg[data-jack-drag] *,
+svg.cable-dragging * {
+	cursor: inherit !important;
 }
 
 /* Click-connect mode: the jack currently armed as the pending cable source. */
