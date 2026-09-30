@@ -696,7 +696,10 @@ static void execute_cmd(const char *line) {
 		 * watch_armed). Same stop / restart / consume-ACK dance as the reconnect path. */
 		g2_listener_stop();
 		g2_lock_stream();
-		emit_event("names", g2_list(LIST_FILTER_ALL, 0));
+		/* Optional arg "partial": also stream names_partial events while reading (the complete
+		 * "names" event still follows). Default: one complete "names" event at the end. */
+		const char *mode_arg = arg_s(args, 0);
+		emit_event("names", g2_list_ex(LIST_FILTER_ALL, 0, mode_arg && strcmp(mode_arg, "partial") == 0));
 		g2_listener_start();
 		g2_unlock_stream();
 		{

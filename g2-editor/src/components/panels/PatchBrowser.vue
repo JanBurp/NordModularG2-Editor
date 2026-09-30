@@ -97,11 +97,7 @@
 						<Icon :name="allBanksExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 					</button>
 				</div>
-				<StateMessage
-					v-if="browser.loading && !browser.synthPatches.length && !browser.synthPerformances.length"
-					variant="loading"
-					message="Loading from G2..."
-				/>
+				<StateMessage v-if="browser.loading && !browser.loadingBanks" variant="loading" message="Loading from G2..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Patches grouped by bank -->
@@ -121,7 +117,10 @@
 								<Icon :name="browser.isBankCollapsed(group.bank) ? 'chevronRight' : 'chevronDown'" class="w-2.5 h-2.5" />
 							</span>
 							<span class="text-content-secondary font-medium">Bank {{ group.bank }}</span>
-							<span class="text-content-secondary ml-auto">{{ group.patches.length }}</span>
+							<span class="ml-auto flex items-center gap-2 text-content-secondary">
+								<Spinner v-if="browser.isBankLoading(browser.view === 'performances' ? 'performance' : 'patch', group.bank)" />
+								{{ group.patches.length }}
+							</span>
 						</li>
 						<!-- Patch entries -->
 						<template v-if="!browser.isBankCollapsed(group.bank)">
@@ -169,6 +168,7 @@
 	import ListItem from '../browser/ListItem.vue';
 	import Icon from '../common/Icon.vue';
 	import Dialog from '../common/Dialog.vue';
+	import Spinner from '../common/Spinner.vue';
 
 	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {

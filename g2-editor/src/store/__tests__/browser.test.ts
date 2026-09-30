@@ -41,3 +41,76 @@ describe('browser store — storePatch category propagation', () => {
 		expect(browser.synthPerformances[0].category).toBeUndefined();
 	});
 });
+
+describe('browser store — streamed names load', () => {
+	const part = (kind: 'patch' | 'performance', bank: number, complete: boolean, banks: Record<string, any[]>) => ({ kind, bank, complete, banks });
+
+	it('reloadNames asks the daemon for partial names and clears the old lists first', async () => {
+		const browser = useBrowserStore();
+		browser.synthPatches = [{ bank: 1, location: 1, name: 'Stale' }];
+		let during: any;
+		(window as any).cli.run = vi.fn().mockImplementation(async () => {
+			during = { patches: [...browser.synthPatches], loadingBanks: { ...browser.loadingBanks } };
+		});
+
+		await browser.reloadNames();
+
+		expect((window as any).cli.run).toHaveBeenCalledWith(['reload-names', 'partial']);
+		expect(during).toEqual({ patches: [], loadingBanks: { patch: 1, performance: 1 } });
+		expect(browser.loadingBanks).toBeNull();
+		expect(browser.loading).toBe(false);
+	});
+
+	it('appends partial entries per kind, with category only for patches', () => {
+		const browser = useBrowserStore();
+		browser.loadingBanks = { patch: 1, performance: 1 };
+
+		browser.applyNamesPartial(
+			part('patch', 2, false, { '1': [{ location: 1, name: 'A', category: 'bass' }], '2': [{ location: 1, name: 'B', category: 'lead' }] }),
+		);
+		browser.applyNamesPartial(part('performance', 1, false, { '1': [{ location: 1, name: 'P' }] }));
+
+		expect(browser.synthPatches).toEqual([
+			{ bank: 1, location: 1, name: 'A', category: 'bass' },
+			{ bank: 2, location: 1, name: 'B', category: 'lead' },
+		]);
+		expect(browser.synthPerformances).toEqual([{ bank: 1, location: 1, name: 'P' }]);
+	});
+
+	it('marks banks at or beyond the reached bank as loading, per kind', () => {
+		const browser = useBrowserStore();
+		browser.loadingBanks = { patch: 1, performance: 1 };
+
+		browser.applyNamesPartial(part('patch', 3, false, {}));
+
+		expect(browser.isBankLoading('patch', 2)).toBe(false);
+		expect(browser.isBankLoading('patch', 3)).toBe(true);
+		expect(browser.isBankLoading('patch', 32)).toBe(true);
+		expect(browser.isBankLoading('performance', 1)).toBe(true);
+	});
+
+	it('a complete part ends loading for that kind only', () => {
+		const browser = useBrowserStore();
+		browser.loadingBanks = { patch: 1, performance: 1 };
+
+		browser.applyNamesPartial(part('patch', 1, true, {}));
+
+		expect(browser.isBankLoading('patch', 32)).toBe(false);
+		expect(browser.isBankLoading('performance', 1)).toBe(true);
+	});
+
+	it('reports no bank as loading outside a streamed load', () => {
+		expect(useBrowserStore().isBankLoading('patch', 1)).toBe(false);
+	});
+
+	it('the final names data replaces the streamed lists and ends the streamed load', () => {
+		const browser = useBrowserStore();
+		browser.loadingBanks = { patch: 1, performance: 1 };
+		browser.applyNamesPartial(part('patch', 1, false, { '1': [{ location: 1, name: 'Partial', category: 'bass' }] }));
+
+		browser.applyNamesData({ patches: { '1': [{ location: 1, name: 'Final', category: 'lead' }] }, performances: {} });
+
+		expect(browser.synthPatches).toEqual([{ bank: 1, location: 1, name: 'Final', category: 'lead' }]);
+		expect(browser.loadingBanks).toBeNull();
+	});
+});

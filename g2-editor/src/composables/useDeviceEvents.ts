@@ -15,31 +15,21 @@ export function useDeviceEvents(log: LogFn) {
 	const browserStore = useBrowserStore();
 	const uiStore = useUiStore();
 
-	// Names can arrive before the synth's name is known; cache them once it is.
-	let uncachedNames: any = null;
-	function cacheNamesIfKnown() {
-		const synthName = store.device?.synthName;
-		if (!uncachedNames || !synthName) return;
-		browserStore.cacheNames(synthName, uncachedNames);
-		uncachedNames = null;
-	}
-
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
 			store.applyDeviceInfo(ev.data);
-			cacheNamesIfKnown();
 			log('←', 'Watch', `device_info name=${ev.data?.synthName ?? '?'}`);
 			if (ev.data?.synthName) window.electronAPI?.devices?.reportName(ev.data.synthName).catch(() => {});
 			return true;
 		}
 		if (ev.type === 'names') {
-			if (ev.data) {
-				browserStore.applyNamesData(ev.data);
-				uncachedNames = ev.data;
-				cacheNamesIfKnown();
-			}
+			if (ev.data) browserStore.applyNamesData(ev.data);
 			notifyNamesReloaded();
 			log('←', 'Watch', 'names');
+			return true;
+		}
+		if (ev.type === 'names_partial') {
+			browserStore.applyNamesPartial(ev.data);
 			return true;
 		}
 		if (ev.type === 'patch_cleared') {
@@ -72,7 +62,6 @@ export function useDeviceEvents(log: LogFn) {
 			const prevPerfBank = store.device?.perfBank;
 			const prevPerfLoc = store.device?.perfLoc;
 			store.updateSynthSettings(ev);
-			cacheNamesIfKnown();
 			log('←', 'Watch', `synth mode=${ev.mode} name=${ev.synthName}`);
 			if (slotsStore.uploadingFromFile) return true;
 			const modeSwitched = !!prevMode && ev.mode !== prevMode;

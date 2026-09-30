@@ -739,7 +739,6 @@
 			}
 		}
 		if (!browserStore.synthPatches.length) {
-			browserStore.applyCachedNames(device.device?.synthName ?? '');
 			browserStore.reloadNames();
 		}
 	}

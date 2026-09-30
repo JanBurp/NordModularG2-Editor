@@ -17,7 +17,14 @@ export interface DiskEntry {
 	isDir: boolean;
 }
 
-const NAMES_CACHE_PREFIX = 'g2-names:';
+function bankEntries(bankStr: string, entries: any[], withCategory: boolean): SynthPatch[] {
+	return entries.map((e) => ({
+		bank: Number(bankStr),
+		location: e.location,
+		name: e.name,
+		...(withCategory && { category: e.category }),
+	}));
+}
 
 export const useBrowserStore = defineStore('browser', {
 	state: () => ({
@@ -28,67 +35,52 @@ export const useBrowserStore = defineStore('browser', {
 		diskFolder: '' as string,
 		diskEntries: [] as DiskEntry[],
 		loading: false,
+		/* First bank (1-based) the device has not finished reading yet, per kind; null unless a streamed load runs. */
+		loadingBanks: null as { patch: number; performance: number } | null,
 		error: '' as string,
 	}),
 
 	actions: {
 		/* Populate from startup JSON `names` field (avoids extra `list` call) */
 		applyNamesData(names: any): void {
-			const patches: SynthPatch[] = [];
-			const perfs: SynthPatch[] = [];
-			for (const [bankStr, entries] of Object.entries(names?.patches ?? {})) {
-				for (const e of entries as any[]) {
-					patches.push({
-						bank: Number(bankStr),
-						location: e.location,
-						name: e.name,
-						category: e.category,
-					});
-				}
-			}
-			for (const [bankStr, entries] of Object.entries(names?.performances ?? {})) {
-				for (const e of entries as any[]) {
-					perfs.push({
-						bank: Number(bankStr),
-						location: e.location,
-						name: e.name,
-					});
-				}
-			}
-			this.synthPatches = patches;
-			this.synthPerformances = perfs;
+			const toEntries = (banks: any, withCategory: boolean): SynthPatch[] =>
+				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[], withCategory));
+			this.synthPatches = toEntries(names?.patches, true);
+			this.synthPerformances = toEntries(names?.performances, false);
+			this.loadingBanks = null;
 		},
 
-		/* Last-known names per synth, so the browser is populated at once while the (slow) device
-		 * read runs; the `names` event that follows replaces them. */
-		applyCachedNames(synthName: string): void {
-			try {
-				const raw = window.localStorage.getItem(NAMES_CACHE_PREFIX + synthName);
-				if (raw) this.applyNamesData(JSON.parse(raw));
-			} catch {
-				// unreadable cache: fall back to the device read
+		/* Streamed part of the names list (`names_partial` watch event): append the entries and
+		 * note how far the device read has come (banks below `bank` are complete). */
+		applyNamesPartial(part: { kind: 'patch' | 'performance'; bank: number; complete: boolean; banks: Record<string, any[]> }): void {
+			const list = part.kind === 'performance' ? this.synthPerformances : this.synthPatches;
+			for (const [bankStr, entries] of Object.entries(part.banks ?? {})) {
+				list.push(...bankEntries(bankStr, entries, part.kind === 'patch'));
 			}
+			if (this.loadingBanks) this.loadingBanks[part.kind] = part.complete ? Infinity : part.bank;
 		},
 
-		cacheNames(synthName: string, names: any): void {
-			try {
-				window.localStorage.setItem(NAMES_CACHE_PREFIX + synthName, JSON.stringify(names));
-			} catch {
-				// storage full/unavailable: cache is best-effort
-			}
+		/* True while the device is still reading this bank (only during a streamed load). */
+		isBankLoading(kind: 'patch' | 'performance', bank: number): boolean {
+			return !!this.loadingBanks && bank >= this.loadingBanks[kind];
 		},
 
-		/* Startup: the daemon no longer sends names itself; ask for them once armed.
-		 * The `names` watch event applies the data, this only tracks the loading state. */
+		/* Startup: the daemon no longer sends names itself; ask for them once armed, streamed per
+		 * bank (`names_partial` events fill the lists as they arrive). The final `names` event
+		 * applies the complete data, this only tracks the loading state. */
 		async reloadNames(): Promise<void> {
 			this.loading = true;
 			this.error = '';
+			this.synthPatches = [];
+			this.synthPerformances = [];
+			this.loadingBanks = { patch: 1, performance: 1 };
 			try {
-				await window.cli.run(['reload-names']);
+				await window.cli.run(['reload-names', 'partial']);
 			} catch (e: any) {
 				this.error = e.message;
 			} finally {
 				this.loading = false;
+				this.loadingBanks = null;
 			}
 		},
 

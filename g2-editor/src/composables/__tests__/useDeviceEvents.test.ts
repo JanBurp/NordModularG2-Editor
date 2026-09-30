@@ -31,3 +31,21 @@ describe('useDeviceEvents — patch_stored category propagation', () => {
 		expect(browser.synthPerformances[0].category).toBeUndefined();
 	});
 });
+
+describe('useDeviceEvents — names_partial', () => {
+	it('routes streamed names into the browser store', async () => {
+		const browser = useBrowserStore();
+		browser.loadingBanks = { patch: 1, performance: 1 };
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		const handled = await handleEvent({
+			type: 'names_partial',
+			data: { kind: 'patch', bank: 2, complete: false, banks: { '1': [{ location: 1, name: 'A', category: 'bass' }] } },
+		});
+
+		expect(handled).toBe(true);
+		expect(browser.synthPatches).toEqual([{ bank: 1, location: 1, name: 'A', category: 'bass' }]);
+		expect(browser.isBankLoading('patch', 1)).toBe(false);
+		expect(browser.isBankLoading('patch', 2)).toBe(true);
+	});
+});
