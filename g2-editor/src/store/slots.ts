@@ -851,6 +851,8 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 
+			// The device must lose the module's cables explicitly (official editor emits cable deletes before the module delete).
+			const connectedCables = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId);
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			if (removedCCSnap.length > 0)
@@ -861,7 +863,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.globalParamPages = this.globalParamPages.filter((k) => !(k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
-			const deleteCmds: string[][] = [['del-module', slot, location, String(moduleId)]];
+			const deleteCmds: string[][] = [...connectedCables.map((c) => delCableCmd(slot, location, c)), ['del-module', slot, location, String(moduleId)]];
 			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 			for (const p of removedGlobalPagesSnap) deleteCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 			await runCliBatchSafe(deleteCmds, 'deleteModule');
@@ -992,8 +994,13 @@ export const useSlotsStore = defineStore('slots', {
 					...setParamCmds,
 					...setParamLabelCmds,
 				];
-				for (const c of remappedCables) cliCmds.push(addCableCmd(slot, location, c));
 				await runCliBatchSafe(cliCmds, 'replaceModule');
+				// Separate frame: the firmware can't reference a just-added module in the same frame as add-cable (see paste).
+				if (remappedCables.length > 0)
+					await runCliBatchSafe(
+						remappedCables.map((c) => addCableCmd(slot, location, c)),
+						'replaceModule cables',
+					);
 			} finally {
 				if (shouldRecord) hist.unlock(slot);
 			}

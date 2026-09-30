@@ -730,6 +730,27 @@ describe('replaceModule', () => {
 		expect(remainingCables[0].scon).toBe(0); // FltLP's In is jack 0 too
 	});
 
+	it('sends del-cable before del-module, and add-cable in a frame after add-module', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [fltClassicStub(1)];
+		patch.areas[1].cableList = [{ colour: 0, smod: 1, scon: 0, dir: 1, dmod: 9, dcon: 0 }];
+		store.slots['A'].patch = patch;
+		const runBatch = (globalThis as any).window.cli.runBatch as ReturnType<typeof vi.fn>;
+		runBatch.mockClear();
+
+		await store.replaceModule(1, FLT_LP, 'voice');
+
+		const batches: string[][][] = runBatch.mock.calls.map((c: any[]) => c[0]);
+		const names = batches.map((b) => b.map((cmd) => cmd[0]));
+		expect(names[0]).toEqual(['del-cable', 'del-module']);
+		const addModuleIdx = names.findIndex((b) => b.includes('add-module'));
+		const addCableIdx = names.findIndex((b) => b.includes('add-cable'));
+		expect(addModuleIdx).toBeGreaterThan(0);
+		expect(addCableIdx).toBeGreaterThan(addModuleIdx);
+		expect(names[addModuleIdx]).not.toContain('add-cable');
+	});
+
 	it('undo restores the original module type and cables', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();

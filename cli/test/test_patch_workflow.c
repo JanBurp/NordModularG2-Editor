@@ -306,3 +306,95 @@ void test_patch_workflow_full_cycle(void) {
     TEST_ASSERT_NULL_MESSAGE(setupFail, setupFail);
     TEST_ASSERT_NULL_MESSAGE(bodyFail, bodyFail);
 }
+
+/* Naive binary substring search (memmem isn't portable across our build targets). */
+static int wf_buf_contains(const uint8_t *buf, size_t len, const char *needle) {
+    size_t n = strlen(needle);
+    if (n == 0 || len < n) return 0;
+    for (size_t i = 0; i + n <= len; i++)
+        if (memcmp(buf + i, needle, n) == 0) return 1;
+    return 0;
+}
+
+/* Sends one raw "seq" frame (args are nested arrays, which wf_cmd can't express). */
+static int wf_seq(daemon_ctx_t *d, const char *ops_json) {
+    int id = g_wf_cmd_id++;
+    char buf[1024];
+    snprintf(buf, sizeof(buf), "{\"id\":%d,\"cmd\":\"seq\",\"args\":[%s]}", id, ops_json);
+    return send_and_expect_ok(d, buf, id);
+}
+
+/* Replace-module regression: the editor's "replace" (triangle menu) has no device command of its
+ * own - like the official editor (G2Editor.c CPatchData::GetReplaceModuleMolecules) it is
+ * composed of del-cable(s), del-module, add-module, add-cable. Sending del-module without first
+ * deleting the module's cables, then re-adding the same module index with add-module+add-cable in
+ * one frame, left the G2 in a bad state and dropped the USB connection. This replays the
+ * editor's exact sequence (OscPM -> OscB, same index) twice and checks the device still answers
+ * get-patch and holds the new module. Restores slot A afterwards, like the full-cycle test. */
+void test_patch_workflow_replace_module(void) {
+    if (test_daemon_shared_ok() != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    daemon_ctx_t *d = test_daemon_shared_ctx();
+
+    cJSON *perfBefore = wf_get_perf_settings_data(d);
+    int commFailed = 0;
+    const char *setupFail = NULL;
+    uint8_t *original = NULL;
+    size_t originalLen = 0;
+    if (wf_cmd(d, "slot", 1, "A") != 0) { setupFail = "setup: select slot A failed"; commFailed = 1; }
+    if (!setupFail && wf_capture_slot_a_patch(d, &original, &originalLen) != 0) { setupFail = "setup: capture original slot A patch failed"; commFailed = 1; }
+    if (!setupFail && wf_upload_fixture_to_slot_a(d, "../test-patches/EmptyPatch.pch2") != 0) { setupFail = "setup: upload empty-patch fixture failed"; commFailed = 1; }
+
+    const char *bodyFail = NULL;
+    #define WF_STEP(callexpr, msg) \
+        do { if (!bodyFail && (callexpr) != 0) { bodyFail = (msg); commFailed = 1; } } while (0)
+
+    if (!setupFail) {
+        /* OscPM (183) id 1 -> Out2 (4) id 2 */
+        WF_STEP(wf_cmd(d, "add-module", 10, "A","va","183","1","0","0","2","0","0","OscPM1"), "add-module OscPM failed");
+        WF_STEP(wf_cmd(d, "add-module", 10, "A","va","4","2","1","0","6","0","0","Out2"), "add-module Out2 failed");
+        WF_STEP(wf_cmd(d, "add-cable", 9, "A","va","1","1","1","0","2","0","0"), "add-cable OscPM->Out2 failed");
+
+        /* Replace OscPM with OscB (7), then replace that again: the same index is reused both times. */
+        const char *newNames[2] = { "OscB1", "OscB2" };
+        for (int i = 0; i < 2 && !bodyFail; i++) {
+            char ops[256];
+            /* editor batch 1: delete cables, then the module */
+            WF_STEP(wf_cmd(d, "del-cable", 8, "A","va","1","1","0","2","0","0"), "replace: del-cable failed");
+            WF_STEP(wf_cmd(d, "del-module", 3, "A","va","1"), "replace: del-module failed");
+            /* editor batch 2: add-module (same index/position); batch 3: add-cable */
+            snprintf(ops, sizeof(ops), "[\"add-module\",\"A\",\"va\",\"7\",\"1\",\"0\",\"0\",\"2\",\"0\",\"0\",\"%s\"]", newNames[i]);
+            WF_STEP(wf_seq(d, ops), "replace: seq add-module failed");
+            WF_STEP(wf_seq(d, "[\"add-cable\",\"A\",\"va\",\"1\",\"1\",\"1\",\"0\",\"2\",\"0\",\"0\"]"), "replace: seq add-cable failed");
+            if (!bodyFail) usleep(300000);
+
+            /* The real failure mode: the device stops answering. A get-patch must still work
+             * and must contain the replacement module's name. */
+            uint8_t *snap = NULL;
+            size_t snapLen = 0;
+            WF_STEP(wf_capture_slot_a_patch(d, &snap, &snapLen), "replace: get-patch after replace failed (device lost?)");
+            if (!bodyFail && !wf_buf_contains(snap, snapLen, newNames[i])) bodyFail = "replace: replacement module name not found in patch";
+            free(snap);
+        }
+    }
+    #undef WF_STEP
+
+    const char *cleanupFail = NULL;
+    if (original && wf_upload_patch_data(d, original, originalLen) != 0) {
+        cleanupFail = "cleanup: restore original slot A patch failed";
+        commFailed = 1;
+    }
+    free(original);
+    usleep(300000);
+
+    cJSON *perfAfter = wf_get_perf_settings_data(d);
+    if (!cleanupFail && !(perfBefore && perfAfter && cJSON_Compare(perfBefore, perfAfter, 1)))
+        cleanupFail = "cleanup: perf-settings snapshot changed across test (mode/slots drifted)";
+    cJSON_Delete(perfBefore);
+    cJSON_Delete(perfAfter);
+
+    if (commFailed) test_daemon_mark_disconnected();
+
+    TEST_ASSERT_NULL_MESSAGE(cleanupFail, cleanupFail);
+    TEST_ASSERT_NULL_MESSAGE(setupFail, setupFail);
+    TEST_ASSERT_NULL_MESSAGE(bodyFail, bodyFail);
+}
