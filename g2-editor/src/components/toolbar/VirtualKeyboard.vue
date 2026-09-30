@@ -140,10 +140,16 @@
 		firstNote.value = Math.max(0, Math.min(127, firstNote.value + semitones));
 	}
 
+	// The daemon runs commands one at a time, so a strike is skipped while the previous one is still
+	// in flight — otherwise a slow device lets the timer pile up an unbounded backlog that outlives
+	// Repeat being switched off and delays every other command (e.g. Save to Synth).
+	let strikePending = false;
+
 	function strikeRepeat() {
-		if (lastNote.value === null) return;
+		if (lastNote.value === null || strikePending) return;
+		strikePending = true;
 		if (soundingNote.value !== null) device.playNote(soundingNote.value, false);
-		device.playNote(lastNote.value, true);
+		device.playNote(lastNote.value, true).finally(() => (strikePending = false));
 		soundingNote.value = lastNote.value;
 	}
 

@@ -28,6 +28,7 @@ static void *g2_error_cb_ctx = NULL;
 
 /* Patch version cache per slot (0-3 = A-D), 0 = unknown */
 uint8_t g2_slot_version[4] = {0};
+uint8_t g2_perf_version_cache = 0;   /* 0 = unknown; cleared by version_update events */
 
 void g2_set_error_callback(g2_error_cb_t cb, void *ctx) {
     g2_error_cb = cb;
@@ -1790,6 +1791,7 @@ static int get_perf_version(uint8_t *out_version) {
     int ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
     *out_version = pv_resp[6];
+    g2_perf_version_cache = pv_resp[6];
     return G2_OK;
 }
 
@@ -1849,14 +1851,13 @@ int g2_play_note(int note, int on) {
     if (note < 0 || note > 127) { g2_err("play-note: note out of range\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("play-note: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
-    uint8_t version;
-    if (get_perf_version(&version) < 0) return G2_ERR;
+    /* Fire-and-forget with a cached perf version, like the reference (COMMAND_WRITE_NO_RESP): Repeat
+     * sends ~8 of these per second, and the daemon runs commands serially, so a per-note version
+     * round trip plus a reply wait made the queue grow without bound. */
+    uint8_t version = g2_perf_version_cache;
+    if (!version && get_perf_version(&version) < 0) return G2_ERR;
     uint8_t cmd[3] = { SUB_COMMAND_PLAY_NOTE, on ? 0 : 1, (uint8_t)note };
     if (send_system_data(version, cmd, 3) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    uint8_t response[16] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
-    g2_drain_pending();
     return G2_OK;
 }
 

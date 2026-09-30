@@ -205,9 +205,9 @@ export const useDeviceStore = defineStore('device', {
 				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']).catch((err: unknown) => console.error('set-slot-enabled failed:', err));
 		},
 
-		playNote(note: number, on: boolean) {
-			if (this.status === DeviceStatus.Connected)
-				window.cli.run(['play-note', String(note), on ? '1' : '0']).catch((err: unknown) => console.error('play-note failed:', err));
+		playNote(note: number, on: boolean): Promise<unknown> {
+			if (this.status !== DeviceStatus.Connected) return Promise.resolve();
+			return window.cli.run(['play-note', String(note), on ? '1' : '0']).catch((err: unknown) => console.error('play-note failed:', err));
 		},
 
 		toggleSlotKey(slot: SlotLabel) {

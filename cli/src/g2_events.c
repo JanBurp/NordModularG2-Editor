@@ -29,6 +29,7 @@ static int g_events_perf_mode = 1; /* 1=Performance, 0=Patch; updated by C_SYNTH
  * update_cache=1 also writes the slot versions into g2_slot_version[]. */
 static void emit_version_update_json(const uint8_t *bulk, int dataEnd, int update_cache) {
     uint8_t perf_ver = (dataEnd > 4) ? bulk[4] : 0;
+    g2_perf_version_cache = 0;
     printf("{\"type\":\"version_update\",\"perf_version\":%u,\"slot_versions\":[", perf_ver);
     int first = 1;
     for (int i = 5; i + 2 < dataEnd; i += 3) {
@@ -245,6 +246,7 @@ static void emit_embedded_event(const uint8_t *response) {
         if (version == 0x40) {
             switch (subCmd) {
                 case 0x1F:
+                    g2_perf_version_cache = 0;
                     printf("{\"type\":\"version_update\",\"perf_version\":%u}\n", response[5]);
                     break;
                 case 0x36:
