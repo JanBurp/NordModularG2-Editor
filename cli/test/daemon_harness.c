@@ -199,7 +199,10 @@ cJSON *send_and_capture_response(daemon_ctx_t *d, const char *json, int expected
     if (write(d->in_fd, json, json_len) != json_len) return NULL;
     if (write(d->in_fd, "\n", 1) != 1) return NULL;
 
-    for (int attempts = 0; attempts < 200; attempts++) {
+    /* Deadline, not an attempt count: led_data piles up in the pipe between tests and a bank
+     * transfer adds 128 progress events, either of which exhausts a fixed line count. */
+    time_t deadline = time(NULL) + 60;
+    while (time(NULL) < deadline) {
         if (read_line_timeout(d->out_fd, line_buf, sizeof(line_buf), 5) < 0) return NULL;
         cJSON *resp = cJSON_Parse(line_buf);
         if (!resp) continue;

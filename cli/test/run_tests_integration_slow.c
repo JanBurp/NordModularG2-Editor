@@ -28,6 +28,8 @@ extern void test_bank_transfer_patch_fetch(void);
 extern void test_bank_transfer_patch_write_roundtrip(void);
 extern void test_bank_transfer_performance_fetch(void);
 extern void test_bank_transfer_performance_write_roundtrip(void);
+extern void test_daemon_reload_names_complete(void);
+extern void test_daemon_reload_names_partial(void);
 
 typedef struct { int saved_fd; FILE *capture; } stdout_capture_t;
 
@@ -160,7 +162,19 @@ int main(void) {
         return UNITY_END();
     }
     sleep(5);
-    run_test_silently("test_bank_transfer_performance_write_roundtrip", test_bank_transfer_performance_write_roundtrip);
+    if (run_test_silently("test_bank_transfer_performance_write_roundtrip", test_bank_transfer_performance_write_roundtrip)) {
+        fprintf(stderr, "\033[33mG2 disconnected mid-run - stopping here.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return UNITY_END();
+    }
+    sleep(5);
+    if (run_test_silently("test_daemon_reload_names_complete", test_daemon_reload_names_complete)) {
+        fprintf(stderr, "\033[33mG2 disconnected mid-run - stopping here.\033[0m\n");
+        daemon_shutdown(&daemon);
+        return UNITY_END();
+    }
+    sleep(5);
+    run_test_silently("test_daemon_reload_names_partial", test_daemon_reload_names_partial);
 
     daemon_shutdown(&daemon);
     return UNITY_END();
