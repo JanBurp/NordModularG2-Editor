@@ -99,6 +99,7 @@ export interface PerformanceData {
 	rangeEnable: boolean;
 	bpm: number;
 	clockRunning: boolean;
+	knobSourceGlobal?: boolean; // Parameter Pages source: false = Patch, true = Global (SHIFT+GLOBAL)
 }
 
 export interface Device {

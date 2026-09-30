@@ -672,6 +672,33 @@ export const useSlotsStore = defineStore('slots', {
 			await runCliSafe(['select-param-page', active, String(pageId)], 'selectParamPage');
 		},
 
+		// Asks the G2 which Parameter Page it is showing (Q_PARAM_PAGE, 0x58). The answer arrives as
+		// a regular param_page_change event (useSlotEvents), so nothing is returned here.
+		async requestParamPage(): Promise<void> {
+			const ui = useUiStore();
+			const active = ui.slotInFocus;
+			if (!active) return;
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
+			// Global pages don't differ per slot, so a slot change has nothing to re-read there.
+			if (ui.globalPagesActive) return;
+			await runCliSafe(['get-param-page', active], 'requestParamPage');
+		},
+
+		// Re-reads whichever page the toolbar is showing now: the Global page in Global source,
+		// otherwise the focused slot's Patch page. For after a Patch/Global switch.
+		async requestVisibleParamPage(): Promise<void> {
+			if (useUiStore().globalPagesActive) await this.requestGlobalParamPage();
+			else await this.requestParamPage();
+		},
+
+		// Global twin of requestParamPage (Q_GLOBAL_PAGE, 0x59); answered by a global_page_change event.
+		async requestGlobalParamPage(): Promise<void> {
+			const active = useUiStore().slotInFocus;
+			if (!active) return;
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
+			await runCliSafe(['get-global-page', active], 'requestGlobalParamPage');
+		},
+
 		// Global Parameter Pages sibling of selectParamPage (S_SEL_GLOBAL_PAGE, 0x1e). `active` here
 		// is only the transport slot the command rides on — any of the 4 works interchangeably, per
 		// the reference editor (global pages aren't addressed by slot).

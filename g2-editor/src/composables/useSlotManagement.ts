@@ -54,6 +54,7 @@ export function useSlotManagement(
 		if (patch?.description?.variation !== undefined) uiStore.variation = patch.description.variation;
 		if (device.status === DeviceStatus.Connected) {
 			applySlotResult(await slotsStore.selectSlot(slot));
+			await slotsStore.requestParamPage();
 			if (needsKeyChange) requestKeyFocus(slot, previouslyKeyed);
 		}
 	}
@@ -84,7 +85,10 @@ export function useSlotManagement(
 		if (slot === null) return;
 		hardwareSlotChange.value = null;
 		uiStore.setSlotInFocus(slot);
-		if (device.status === DeviceStatus.Connected) applySlotResult(await slotsStore.loadSlot(slot));
+		if (device.status === DeviceStatus.Connected) {
+			applySlotResult(await slotsStore.loadSlot(slot));
+			await slotsStore.requestParamPage();
+		}
 	});
 
 	watch(hardwareVariationChange, (change) => {

@@ -418,6 +418,11 @@ static void emit_embedded_event(const uint8_t *response) {
                    SLOT_LETTER(slot), response[6] == 0 ? "fx" : (response[6] == 1 ? "va" : "patch"),
                    response[7], response[8]);
             break;
+        /* Reply to the 0x59 global-page request arrives slot-tagged (unlike the system-wide
+         * 0x1E echo handled in the aCmd==0x04 switch above). Same global_page_change event. */
+        case 0x1E:
+            printf("{\"type\":\"global_page_change\",\"page\":%u}\n", response[5]);
+            break;
         /* Front-panel Parameter Page change (CMParameterPageFocus). Same sub-command the editor
          * sends via g2_select_param_page, echoed back on every page/bank button press. The single
          * payload byte packs both selectors: page = byte/3 (A-E), bank = byte%3 (1-3). */

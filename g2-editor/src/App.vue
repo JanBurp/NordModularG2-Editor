@@ -737,6 +737,12 @@
 			} else {
 				applySlotResult(await slotsStore.loadSlot(slot));
 			}
+			// 0x58 always answers with the Patch page, 0x59 with the Global page. Ask for the Patch
+			// page while still in Patch view; in Global source the 0x1E reply then flips the view
+			// to Global and sets the Global page.
+			uiStore.setGlobalPagesActive(false);
+			await slotsStore.requestParamPage();
+			if (device.device?.performance?.knobSourceGlobal) await slotsStore.requestGlobalParamPage();
 		}
 		if (!browserStore.synthPatches.length) {
 			browserStore.reloadNames();

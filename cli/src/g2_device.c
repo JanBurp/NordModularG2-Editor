@@ -2579,6 +2579,26 @@ int g2_select_param_page(int slot, int page_id) {
     return send_slot((uint8_t)slot, version, SUB_COMMAND_SEL_PARAM_PAGE, &payload, 1) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
+/* Request the current Parameter Page (Q_PARAM_PAGE=0x58). Decompiled Clavia editor:
+ * CMParameterPageFocusRequest::WriteStream is Initialize(0x58, 2 [request class], 1), sent by
+ * CPatch::CleanDirtyData right after the patch-header request. Fire-and-forget: the answer is
+ * the same 0x2D message the front panel emits on a page press (see g2_events.c). */
+int g2_request_param_page(int slot) {
+    if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)       return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_GET_PARAM_PAGE, NULL, 0) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
+int g2_request_global_page(int slot) {
+    if (slot < 0 || slot > 3)          return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(0) < 0)       return G2_ERR_CONNECT;
+
+    uint8_t version = cable_get_version(slot);
+    return send_slot((uint8_t)slot, version, SUB_COMMAND_GET_GLOBAL_PAGE, NULL, 0) < 0 ? G2_ERR_SEND : G2_OK;
+}
+
 void g2_build_assign_global_knob_op(G2Op *op, uint8_t *buf, int target_slot, int loc, int module_id, int param_idx, int slot_index) {
     buf[0]=(uint8_t)((target_slot << 4) | (loc << 2)); buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)param_idx;
     buf[3]=0x00; buf[4]=(uint8_t)slot_index;

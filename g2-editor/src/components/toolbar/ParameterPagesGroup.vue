@@ -300,13 +300,13 @@
 
 	// The real mode-switch is the SHIFT+GLOBAL front-panel combo (set-knob-source, opcode 0x3F
 	// sub-mode 0x02 — confirmed against real hardware 2026-08-28), NOT the page-select opcodes.
-	// Push that first so the front panel actually switches source, then re-push the (new mode's)
-	// currently-displayed page/bank so it also shows the right page within that source.
-	function onToggleGlobalPages() {
+	// Push that first so the front panel actually switches source, then read back the page the
+	// G2 shows in that source (it keeps a separate Patch and Global page) instead of pushing ours.
+	async function onToggleGlobalPages() {
 		const next = !uiStore.globalPagesActive;
 		uiStore.setGlobalPagesActive(next);
-		slotsStore.setKnobSource(next);
-		pushParamPage();
+		await slotsStore.setKnobSource(next);
+		await slotsStore.requestVisibleParamPage();
 	}
 
 	function onBankSelect(bank: number) {

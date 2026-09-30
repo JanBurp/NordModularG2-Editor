@@ -546,6 +546,16 @@ static int cmd_select_param_page(int argc, char **argv, int i) {
     return g2_select_param_page(slot, atoi(argv[i + 2]));
 }
 
+static int cmd_get_param_page(int argc, char **argv, int i) {
+    if (i + 1 >= argc) {
+        fprintf(stderr, "Usage: get-param-page <slot>\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "get-param-page: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    return g2_request_param_page(slot);
+}
+
 static int cmd_assign_midicc(int argc, char **argv, int i) {
     if (i + 5 >= argc) {
         fprintf(stderr, "Usage: assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>\n");
@@ -1069,6 +1079,7 @@ static const cmd_entry_t commands[] = {
     { "set-param",        cmd_set_param        },
     { "select-param",     cmd_select_param     },
     { "select-param-page", cmd_select_param_page },
+    { "get-param-page",   cmd_get_param_page   },
     { "copy-variation",   cmd_copy_variation   },
     { "select-patch",     cmd_select_patch     },
     { "select-perf",      cmd_select_perf      },

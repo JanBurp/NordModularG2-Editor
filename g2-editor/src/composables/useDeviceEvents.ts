@@ -137,6 +137,7 @@ export function useDeviceEvents(log: LogFn) {
 			// page within whichever source this sets). Receiving it is the signal for which source
 			// the front panel now shows, so mirror it into the toolbar toggle.
 			uiStore.setGlobalPagesActive(ev.global === 1);
+			await slotsStore.requestVisibleParamPage();
 			log('←', 'Watch', `knob_source_change global=${ev.global}`);
 			return true;
 		}

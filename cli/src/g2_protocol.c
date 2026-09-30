@@ -267,6 +267,11 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     cJSON_AddBoolToObject(perf, "rangeEnable", rangeEnable);
     cJSON_AddNumberToObject(perf, "bpm", bpm);
     cJSON_AddBoolToObject(perf, "clockRunning", clockRun);
+    /* Patch/Global knob-assign source (the SHIFT+GLOBAL toggle, see the 0x3F case in g2_events.c):
+     * low 2 bits of remaining[4] (FUnknown4); FSelectedSlot is the separate bits 3-2 of the same
+     * byte, so it doesn't affect this mask. Hardware-confirmed
+     * 2026-09-30: 0x00 in Patch source, 0x01 after pressing SHIFT+GLOBAL. */
+    cJSON_AddBoolToObject(perf, "knobSourceGlobal", remaining[4] & 0x3);
     cJSON_AddItemToObject(root, "performance", perf);
 
     cJSON *slots = cJSON_CreateArray();

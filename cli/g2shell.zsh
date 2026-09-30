@@ -16,7 +16,7 @@ _G2_CMDS=(
   get-perf-settings set-slot-enabled set-slot-key
   add-module del-module move-module set-module-color set-module-name set-module-mode
   add-cable del-cable set-cable-color
-  set-param set-module-labels copy-variation
+  set-param set-module-labels copy-variation get-param-page get-global-page
   verbose debug
 )
 

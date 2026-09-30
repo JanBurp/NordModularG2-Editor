@@ -426,6 +426,8 @@ del-cable                <slot> <loc> ...                          (0x51)
 set-cable-color          <slot> <loc> ... <color>                  (0x54)
 variation                <slot> <variation>                        (0x35 then 0x6A)
 select-param-page        <slot> <page-id>                          (0x2D, page-id = page*3 + bank)
+get-param-page           <slot>                                    (0x58, reply arrives as a 0x2D event)
+get-global-page          <slot>                                    (0x59, reply arrives as a slot-tagged 0x1E event)
 set-patch-description    <slot> <14-byte body>                     (0x21)
 voice-mode / voice-count <slot> <value>                            (0x21, via read-modify-write — see caveat above)
 get-resources            <slot>                                    (0x71, queried for loc 0 and 1)
@@ -447,6 +449,8 @@ These are combined into slot-command messages. Each message can contain multiple
 | `0x25` | ASSIGN_KNOB | `mod param (loc<<6) 00 knob_index` — location is a 2-bit field + 6 pad bits, MSB-first (Delphi `AddAssignKnobMessage`), unlike MIDI CC's bare location byte; sending bare `loc` made VA assigns land as FX and left the G2 in a bad state | Embedded ACK — the hardware accepts any value without error (no NACK for a nonexistent module), and the front panel never echoes 0x25 itself for its own knob assigns (see `0x74` below), so verify via get-patch |
 | `0x26` | DEASSIGN_KNOB | `00 knob_index` | Embedded ACK — same caveat; also, deassign has no front-panel gesture at all (editor-only) |
 | `0x2D` | SEL_PARAM_PAGE | `page_id` | Embedded ACK |
+| `0x58` | GET_PARAM_PAGE (`g2_request_param_page`) | none (slot-scoped request, `send_slot`) | The G2 answers with an ordinary `0x2D` message (`param_page_change` event). Confirmed on hardware 2026-09-30; the editor sends it at connect and on every slot change. Always the *Patch* page, even while the front panel is in Global source |
+| `0x59` | GET_GLOBAL_PAGE (`g2_request_global_page`) | none (slot-scoped, `send_slot`) | Reply is `0x1E` + page byte, tagged with the slot (unlike the system-wide `0x1E` echo). Always the Global page. Confirmed on hardware 2026-09-30. The Patch/Global source itself is the low 2 bits of perf-header byte `remaining[4]` (`0`=Patch, `1`=Global), reported as `knobSourceGlobal` |
 
 ### SEL_PARAM_PAGE (`0x2D`) — front-panel Parameter Page
 

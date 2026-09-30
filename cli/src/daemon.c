@@ -518,6 +518,16 @@ static void execute_cmd(const char *line) {
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_select_param_page(slot, arg_i(args, 1));
 
+	} else if (strcmp(cmd, "get-param-page") == 0 && n >= 1) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_request_param_page(slot);
+
+	} else if (strcmp(cmd, "get-global-page") == 0 && n >= 1) {
+		int slot = parse_slot(arg_s(args, 0));
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_request_global_page(slot);
+
 	} else if (strcmp(cmd, "assign-midicc") == 0 && n >= 5) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);

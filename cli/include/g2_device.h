@@ -292,6 +292,14 @@ int g2_deassign_knob(int slot, int slot_index);
  * editor (G2Editor.c CMParameterPageFocus::WriteStream / G2Demo.c GetPageId). */
 int g2_select_param_page(int slot, int page_id);
 
+/* Ask the G2 which Parameter Page it is showing (Q_PARAM_PAGE=0x58, CMParameterPageFocusRequest,
+ * slot-scoped). No direct return value: the reply is the 0x2D message, which the listener turns
+ * into a param_page_change event. */
+int g2_request_param_page(int slot);
+
+/* Global Parameter Pages twin (Q_GLOBAL_PAGE=0x59); the reply is a 0x1E message (global_page_change). */
+int g2_request_global_page(int slot);
+
 /* Global Parameter Pages siblings of the three functions above (S_ASS_GLOBAL_KNOB=0x1c /
  * S_DEASS_GLOB_KNOB=0x1d / S_SEL_GLOBAL_PAGE=0x1e), plus a bulk fetch (Q_GLOBAL_KNOBS=0x5e).
  * See g2_assign_global_knob's comment in g2_device.c for the payload layout, provenance, and
