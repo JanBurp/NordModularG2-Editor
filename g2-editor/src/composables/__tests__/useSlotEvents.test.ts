@@ -211,4 +211,21 @@ describe('useSlotEvents — hardware-echo resync preserves undo/dirty state', ()
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(hist.canUndo('A')).toBe(true);
 	});
+	it('hardware patch_description updates voices/mode in place without a reload', async () => {
+		const { name, rawHex } = await loadFixture();
+		const store = useSlotsStore();
+		const { handleEvent } = useSlotEvents(() => {});
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		const run = vi.fn();
+		(globalThis as any).window = { cli: { run } };
+
+		// Captured from a G2: 18 voices (raw 17), legato
+		await handleEvent({ type: 'patch_version_change', slot: 'A', version: 0 });
+		await handleEvent({ type: 'patch_description', slot: 'A', data: [0, 15, 0, 236, 0, 0, 1, 0, 0, 36, 65, 122, 95, 224, 16, 0, 0] });
+		await handleEvent({ type: 'resources_used', slot: 'A', data: Array(29).fill(0) });
+
+		expect(store.slots['A'].patch!.description!.voices).toBe(17);
+		expect(store.slots['A'].patch!.description!.monopoly).toBe(2);
+		expect(run).not.toHaveBeenCalled();
+	});
 });

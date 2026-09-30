@@ -268,7 +268,21 @@ export function useSlotEvents(log: LogFn) {
 		if (ev.type === 'patch_version_change') {
 			log('←', 'Watch', `patch_version_change slot=${ev.slot} ver=${ev.version}`);
 			const sl = ev.slot as SlotLabel;
-			if (sl) pendingSlotReload.add(sl);
+			// version 0 = bulk C_PATCH_DESCR (description only): applied in place by 'patch_description'.
+			if (sl && ev.version !== 0) pendingSlotReload.add(sl);
+			return true;
+		}
+		if (ev.type === 'patch_description' && Array.isArray(ev.data)) {
+			// data = [size_hi, size_lo, body…]; layout in docs/technical/usb-protocol.md (PatchDescription).
+			const sl = ev.slot as SlotLabel;
+			const desc = slotsStore.slots[sl]?.patch?.description;
+			const body: number[] = ev.data.slice(2);
+			if (desc && body.length > 11) {
+				desc.voices = ((body[7] & 0x07) << 2) | (body[8] >> 6);
+				desc.monopoly = (body[11] >> 4) & 0x03;
+				slotsStore._markSlotDirty(sl);
+			}
+			log('←', 'Watch', `patch_description slot=${ev.slot} voices=${desc?.voices} mode=${desc?.monopoly}`);
 			return true;
 		}
 		if (ev.type === 'patch_update') {

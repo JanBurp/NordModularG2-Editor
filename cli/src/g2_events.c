@@ -191,7 +191,9 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
                 /* Bulk C_PATCH_DESCR: hardware notifies patch description changed */
                 printf("{\"type\":\"patch_version_change\",\"slot\":\"%s\",\"version\":0}\n",
                        SLOT_LETTER(bslot));
-                fflush(stdout); break;
+                printf("{\"type\":\"patch_description\",\"slot\":\"%s\",\"data\":[", SLOT_LETTER(bslot));
+                for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
+                printf("]}\n"); fflush(stdout); break;
             default:
                 printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
                 for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
