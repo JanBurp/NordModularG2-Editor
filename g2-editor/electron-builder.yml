@@ -9,6 +9,8 @@ files:
   - dist-electron/**/*
   - resources/**/*
 
+afterPack: ./scripts/after-pack.js
+
 extraResources:
   - from: ../doc/help
     to: doc/help
@@ -17,14 +19,39 @@ extraResources:
   - from: resources/patches
     to: patches
 
+fileAssociations:
+  - ext: pch2
+    name: Nord G2 Patch
+    description: Nord Modular G2 Patch
+    role: Editor
+  - ext: prf2
+    name: Nord G2 Performance
+    description: Nord Modular G2 Performance
+    role: Editor
+
 mac:
   artifactName: "G2-Editor-${arch}.${ext}"
   target:
     - dmg
   category: public.app-category.music
+  electronLanguages:
+    - en
+    - nl
   extraResources:
     - from: resources/g2-cli
       to: g2-cli
+  extendInfo:
+    UTExportedTypeDeclarations:
+      - UTTypeIdentifier: com.nord.g2.patch
+        UTTypeDescription: Nord Modular G2 Patch
+        UTTypeConformsTo: [public.data]
+        UTTypeTagSpecification:
+          public.filename-extension: [pch2]
+      - UTTypeIdentifier: com.nord.g2.performance
+        UTTypeDescription: Nord Modular G2 Performance
+        UTTypeConformsTo: [public.data]
+        UTTypeTagSpecification:
+          public.filename-extension: [prf2]
 
 win:
   artifactName: "G2-Editor-Setup.${ext}"

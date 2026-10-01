@@ -77,6 +77,39 @@ function sendToFocused(channel: string, ...args: unknown[]): void {
 	if (focused && !focused.isDestroyed()) focused.webContents.send(channel, ...args);
 }
 
+// Files handed to us by the OS (open-file / argv). Held until a renderer has registered its
+// listener (app:open-file-ready), since on a cold start they arrive before any window exists.
+const pendingOpenFiles: string[] = [];
+const openFileReadyIds = new Set<number>();
+
+function openFileInApp(filepath: string): void {
+	if (!/\.(pch2|prf2)$/i.test(filepath)) return;
+	const ready = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed() && openFileReadyIds.has(w.webContents.id));
+	const target = ready.find((w) => w.isFocused()) ?? ready[0];
+	if (!target) {
+		pendingOpenFiles.push(filepath);
+		return;
+	}
+	revealWindow(target);
+	target.webContents.send("file:open", filepath);
+}
+
+ipcMain.handle("app:open-file-ready", (event) => {
+	openFileReadyIds.add(event.sender.id);
+	for (const filepath of pendingOpenFiles.splice(0)) openFileInApp(filepath);
+});
+
+app.on("open-file", (event, filepath) => {
+	event.preventDefault();
+	openFileInApp(filepath);
+});
+
+// Windows/Linux pass the file as an argument; a second launch is forwarded to the running instance.
+// Packaged builds only, so parallel dev/e2e instances (which share no userData) aren't blocked.
+if (app.isPackaged && !app.requestSingleInstanceLock()) app.quit();
+app.on("second-instance", (_event, argv) => argv.slice(1).forEach(openFileInApp));
+if (!isMac) pendingOpenFiles.push(...process.argv.slice(1).filter((arg) => /\.(pch2|prf2)$/i.test(arg)));
+
 function resolveSession(event: { sender: { id: number } }): DeviceSession | undefined {
 	return sessionByWebContentsId.get(event.sender.id);
 }

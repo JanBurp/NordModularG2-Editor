@@ -30,6 +30,8 @@ declare global {
 			loadModuleGraphics: () => Promise<Record<number, string>>;
 			onMenuAction: (cb: (action: MenuAction) => void) => void;
 			offMenuAction: () => void;
+			onOpenFile: (cb: (filepath: string) => void) => void;
+			offOpenFile: () => void;
 			updateRecentFiles: (files: { path: string; kind: 'patch' | 'performance' }[]) => void;
 			updateMenuState: (state: MenuState) => void;
 			savePatch: (filepath: string, data: number[]) => Promise<void>;

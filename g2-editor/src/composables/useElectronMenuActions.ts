@@ -341,7 +341,18 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		});
 	});
 
+	// Files opened from the OS (double-click / "Open With" / dock drop) arrive via main.
+	onMounted(() => {
+		window.electronAPI?.onOpenFile(async (filepath: string) => {
+			const kind = /\.prf2$/i.test(filepath) ? 'performance' : 'patch';
+			useSettingsStore().addRecentFile(filepath, kind);
+			await patchFile.handlePatchSelect({ type: 'disk', filepath, kind });
+			syncVariationFromCurrentPatch();
+		});
+	});
+
 	onUnmounted(() => {
+		window.electronAPI?.offOpenFile();
 		window.electronAPI?.offMenuAction();
 	});
 }

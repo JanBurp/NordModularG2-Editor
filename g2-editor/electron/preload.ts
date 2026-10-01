@@ -25,6 +25,12 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	onMenuAction: (cb: (action: MenuAction) => void) =>
 		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),
 	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
+	// Registers the listener, then tells main this window can take files (flushes any queued ones).
+	onOpenFile: (cb: (filepath: string) => void) => {
+		ipcRenderer.on("file:open", (_, filepath) => cb(filepath as string));
+		ipcRenderer.invoke("app:open-file-ready");
+	},
+	offOpenFile: () => ipcRenderer.removeAllListeners("file:open"),
 	updateRecentFiles: (files: { path: string; kind: "patch" | "performance" }[]) =>
 		ipcRenderer.send("recent-files:update", files),
 	updateMenuState: (state: MenuState) => ipcRenderer.send("menu-state:update", state),
