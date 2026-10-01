@@ -30,6 +30,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Sequencer Random/Clear
 - Drum Synth presets
 - Vocoder graph & preset selector
+- Faster startup (partial bank loading)
+- Vertical spinner on selected knobs
 
 ### Changed
 - Toolbar layout reorganized
@@ -46,6 +48,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Light theme issues
 - File saving (pch2 & prf2)
 - Patch parser/serializer bugs (roundtrip issues)
+- Voice mode not picked up / patch reloaded
+- Label/name handling
 
 ### Breaking
 - Files saved before this version of this editor could be badly formatted
