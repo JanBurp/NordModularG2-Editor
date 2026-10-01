@@ -263,7 +263,7 @@
 	import SeqNoteViewControls from './SeqNoteViewControls.vue';
 	import { useSeqNotePianoRoll } from '../../composables/useSeqNotePianoRoll';
 	import { SEQNOTE_STRIP_TOP, SEQNOTE_STRIP_HEIGHT, SEQNOTE_STEP_WIDTH, type PianoRollView } from '../../renderer/pianoRoll';
-	import { getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
+	import { getAssignableParams, getModule, getReplaceCandidates } from '../../renderer/nmg2mods';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
@@ -338,12 +338,12 @@
 	function onContextMenu(e: MouseEvent) {
 		const slot = uiStore.slotInFocus;
 		const location = props.areaLabel === 'va' ? 1 : 0;
-		const paramCount = moduleDef.value?.params?.length ?? 0;
+		const paramIndices = moduleDef.value ? getAssignableParams(moduleDef.value) : [];
 		openContextMenu(e, [
 			{ label: 'Rename…', action: () => onTitleDblClick() },
 			{ type: 'separator' },
-			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
-			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramCount }),
+			...buildModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndices }),
+			...buildGlobalModuleAssignMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndices }),
 			{ type: 'separator' },
 			{ label: 'Replace Module', disabled: replaceCandidates.value.length === 0, children: buildReplaceMenuItems() },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },

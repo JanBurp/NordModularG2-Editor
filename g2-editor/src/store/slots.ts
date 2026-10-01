@@ -3422,14 +3422,15 @@ export const useSlotsStore = defineStore('slots', {
 		// one param, generalized to N so re-running this always leaves the module cleanly assigned
 		// rather than stragglers elsewhere). Truncates rather than erroring if there isn't enough room
 		// left before slot 119 — mirrors autoAssignMidiCC's cc>119 cutoff.
-		async assignModuleToPage(slot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
-			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
+		async assignModuleToPage(slot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, paramIndices: number[]): Promise<void> {
+			const n = Math.min(paramIndices.length, TOTAL_KNOB_SLOTS - startSlotIndex);
 			if (n <= 0) return;
 			const prev = [...this.slots[slot].paramPages];
 			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
 			const { next, touched } = computeAssignModule<ParamPageAssignment>(
 				prev,
 				targetSlots,
+				paramIndices,
 				(k) => k.location === location && k.moduleIndex === moduleIndex,
 				(paramIndex, slotIndex) => ({ slotIndex, location, moduleIndex, paramIndex, isLed: 0 }),
 			);
@@ -3441,7 +3442,7 @@ export const useSlotsStore = defineStore('slots', {
 						await this._applyParamPages(slot, prev, touched);
 					},
 					redo: async () => {
-						await this.assignModuleToPage(slot, startSlotIndex, location, moduleIndex, count);
+						await this.assignModuleToPage(slot, startSlotIndex, location, moduleIndex, paramIndices);
 					},
 				});
 			}
@@ -3537,13 +3538,20 @@ export const useSlotsStore = defineStore('slots', {
 
 		// Global Parameter Pages sibling of assignModuleToPage above — no undo/redo, matching the rest
 		// of this Global section's "no undo in this first pass" design decision.
-		async assignModuleToGlobalPage(targetSlot: SlotLabel, startSlotIndex: number, location: 0 | 1, moduleIndex: number, count: number): Promise<void> {
-			const n = Math.min(count, TOTAL_KNOB_SLOTS - startSlotIndex);
+		async assignModuleToGlobalPage(
+			targetSlot: SlotLabel,
+			startSlotIndex: number,
+			location: 0 | 1,
+			moduleIndex: number,
+			paramIndices: number[],
+		): Promise<void> {
+			const n = Math.min(paramIndices.length, TOTAL_KNOB_SLOTS - startSlotIndex);
 			if (n <= 0) return;
 			const targetSlots = Array.from({ length: n }, (_, i) => startSlotIndex + i);
 			const { next, touched } = computeAssignModule<GlobalParamPageAssignment>(
 				this.globalParamPages,
 				targetSlots,
+				paramIndices,
 				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex,
 				(paramIndex, slotIndex) => ({ slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 }),
 			);

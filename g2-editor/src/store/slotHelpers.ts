@@ -157,12 +157,13 @@ export function computeAssignOne<T extends ParamPageAssignment>(
 export function computeAssignModule<T extends ParamPageAssignment>(
 	prev: T[],
 	targetSlots: number[],
+	paramIndices: number[],
 	sameModule: (k: T) => boolean,
 	makeEntry: (paramIndex: number, slotIndex: number) => T,
 ): { next: T[]; touched: number[] } {
 	const targetSet = new Set(targetSlots);
 	const next = prev.filter((k) => !targetSet.has(k.slotIndex) && !sameModule(k));
-	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(i, slotIndex)));
+	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(paramIndices[i], slotIndex)));
 	const evictedElsewhere = prev.filter((k) => sameModule(k) && !targetSet.has(k.slotIndex)).map((k) => k.slotIndex);
 	return { next, touched: [...targetSlots, ...evictedElsewhere] };
 }

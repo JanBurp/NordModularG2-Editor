@@ -2,7 +2,7 @@ import { onMounted, onUnmounted } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
 import { DeviceStatus, useDeviceStore } from '../store/device';
-import { getModule } from '../renderer/nmg2mods';
+import { getModule, getParamNavOrder } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { useParamEditDialog } from './useParamEditDialog';
 import type { ModuleInstance } from '../types';
@@ -185,11 +185,12 @@ export function useModuleKeyboard() {
 		const found = findModuleAnywhere(moduleId);
 		if (!found) return;
 		const moduleDef = getModule(found.module.type);
-		const params = moduleDef?.params;
-		if (!params || params.length === 0) return;
+		if (!moduleDef?.params?.length) return;
+		const order = getParamNavOrder(moduleDef);
 
 		const currentParamIndex = uiStore.selectedParam?.moduleId === moduleId ? uiStore.selectedParam.paramIndex : -1;
-		const newIndex = currentParamIndex < 0 ? 0 : (currentParamIndex + dir + params.length) % params.length;
+		const pos = order.indexOf(currentParamIndex);
+		const newIndex = order[pos < 0 ? 0 : (pos + dir + order.length) % order.length];
 		uiStore.setSelectedParam(moduleId, newIndex);
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}

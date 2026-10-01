@@ -96,6 +96,10 @@ export interface ModuleDefinition {
 	inputs?: ModuleInput[];
 	outputs?: ModuleOutput[];
 	params?: ModuleParam[];
+	// Original editor's order for key navigation/Assign (indices into params); absent = params order.
+	paramOrder?: number[];
+	// Param indices the original editor's Assign skips (another param links to them).
+	assignSkip?: number[];
 	modes?: ModuleMode[];
 	ve?: VisualElement[];
 }

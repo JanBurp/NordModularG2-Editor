@@ -17,6 +17,7 @@ vi.hoisted(() => {
 // navigateParam's Left/Right cycling has something to cycle through.
 vi.mock('@/renderer/nmg2mods', () => ({
 	getModule: () => ({ params: [{ type: 0 }, { type: 0 }] }),
+	getParamNavOrder: () => [0, 1],
 }));
 
 import { createPinia, setActivePinia } from 'pinia';

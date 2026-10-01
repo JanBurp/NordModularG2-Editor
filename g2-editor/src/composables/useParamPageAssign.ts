@@ -104,23 +104,23 @@ export function buildGlobalParamPageMenuItems(opts: {
 // assign store call and the top-level menu label.
 function buildModuleAssignMenuItemsImpl(
 	slot: SlotLabel | null,
-	paramCount: number,
+	paramIndices: number[],
 	label: string,
-	assign: (slotIndex: number, count: number) => void,
+	assign: (slotIndex: number, paramIndices: number[]) => void,
 ): ContextMenuItem[] {
-	if (paramCount === 0) return [];
+	if (paramIndices.length === 0) return [];
 
 	const pageItems: ContextMenuItem[] = PAGE_LETTERS.map((letter, page) => {
 		const children: ContextMenuItem[] = [
 			{
-				label: `Multi Column (${paramCount})`,
-				action: () => assign(slotIndexFor(0, page, 0), paramCount),
+				label: `Multi Column (${paramIndices.length})`,
+				action: () => assign(slotIndexFor(0, page, 0), paramIndices),
 			},
 		];
 		for (let bank = 0; bank < BANK_COUNT; bank++) {
 			children.push({
 				label: `Column ${bank + 1}`,
-				action: () => assign(slotIndexFor(bank, page, 0), Math.min(paramCount, KNOBS_PER_PAGE)),
+				action: () => assign(slotIndexFor(bank, page, 0), paramIndices.slice(0, KNOBS_PER_PAGE)),
 			});
 		}
 		return { label: `Page ${letter}`, children };
@@ -130,16 +130,16 @@ function buildModuleAssignMenuItemsImpl(
 }
 
 // Module-background right-click "Assign" submenu — bulk-assigns ALL of a module's parameters
-// (moduleDef.params, in order) to consecutive Parameter Page knob slots. Matches the manual's
+// (moduleDef's Assign order, minus params the original skips) to consecutive Parameter Page knob slots. Matches the manual's
 // "Assign|Page X|Multi Column" / "Assign|Page X|Column N" popup menu: Multi Column spreads the
 // module across as many pages as it needs starting at that page's first column; Column N confines
 // it to that single 8-knob column (both truncate rather than erroring — see assignModuleToPage).
-export function buildModuleAssignMenuItems(opts: { slot: SlotLabel | null; location: 0 | 1; moduleIndex: number; paramCount: number }): ContextMenuItem[] {
+export function buildModuleAssignMenuItems(opts: { slot: SlotLabel | null; location: 0 | 1; moduleIndex: number; paramIndices: number[] }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
-	const { slot, location, moduleIndex, paramCount } = opts;
+	const { slot, location, moduleIndex, paramIndices } = opts;
 
-	return buildModuleAssignMenuItemsImpl(slot, paramCount, 'Assign', (slotIndex, count) => {
-		if (slot) slotsStore.assignModuleToPage(slot, slotIndex, location, moduleIndex, count);
+	return buildModuleAssignMenuItemsImpl(slot, paramIndices, 'Assign', (slotIndex, indices) => {
+		if (slot) slotsStore.assignModuleToPage(slot, slotIndex, location, moduleIndex, indices);
 	});
 }
 
@@ -150,13 +150,13 @@ export function buildGlobalModuleAssignMenuItems(opts: {
 	slot: SlotLabel | null;
 	location: 0 | 1;
 	moduleIndex: number;
-	paramCount: number;
+	paramIndices: number[];
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
-	const { slot, location, moduleIndex, paramCount } = opts;
+	const { slot, location, moduleIndex, paramIndices } = opts;
 
-	return buildModuleAssignMenuItemsImpl(slot, paramCount, 'Global Assign', (slotIndex, count) => {
-		if (slot) slotsStore.assignModuleToGlobalPage(slot, slotIndex, location, moduleIndex, count);
+	return buildModuleAssignMenuItemsImpl(slot, paramIndices, 'Global Assign', (slotIndex, indices) => {
+		if (slot) slotsStore.assignModuleToGlobalPage(slot, slotIndex, location, moduleIndex, indices);
 	});
 }
 

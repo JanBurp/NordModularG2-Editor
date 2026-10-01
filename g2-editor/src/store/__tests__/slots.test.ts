@@ -1405,7 +1405,7 @@ describe('assignModuleToPage', () => {
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
 
-		await store.assignModuleToPage('A', 8, 1, 2, 3);
+		await store.assignModuleToPage('A', 8, 1, 2, [0, 1, 2]);
 
 		expect(store.slots['A'].paramPages).toEqual([
 			{ slotIndex: 8, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
@@ -1428,7 +1428,7 @@ describe('assignModuleToPage', () => {
 		await store.assignParamToPage('A', 9, 0, 9, 9); // occupant of a target slot
 		await store.assignParamToPage('A', 40, 1, 2, 1); // module 2's param 1, previously parked elsewhere
 
-		await store.assignModuleToPage('A', 8, 1, 2, 3);
+		await store.assignModuleToPage('A', 8, 1, 2, [0, 1, 2]);
 
 		expect(at(9)).toMatchObject({ moduleIndex: 2, paramIndex: 1 }); // evicted occupant's slot now holds module 2 param 1
 		expect(at(40)).toBeUndefined(); // stray moved into the contiguous run
@@ -1438,7 +1438,7 @@ describe('assignModuleToPage', () => {
 	it('undo/redo round-trips the whole run as one entry', async () => {
 		const store = useSlotsStore();
 		store.slots['A'].patch = makePatch();
-		await store.assignModuleToPage('A', 8, 1, 2, 3);
+		await store.assignModuleToPage('A', 8, 1, 2, [0, 1, 2]);
 		const assigned = [...store.slots['A'].paramPages];
 
 		await store.undo();
@@ -1452,7 +1452,7 @@ describe('assignModuleToPage', () => {
 		const store = useSlotsStore();
 		store.slots['A'].patch = makePatch();
 
-		await store.assignModuleToPage('A', 118, 0, 5, 5);
+		await store.assignModuleToPage('A', 118, 0, 5, [0, 1, 2, 3, 4]);
 
 		expect(store.slots['A'].paramPages.map((k) => k.slotIndex).sort((a, b) => a - b)).toEqual([118, 119]);
 	});
@@ -1461,7 +1461,7 @@ describe('assignModuleToPage', () => {
 		const store = useSlotsStore();
 		store.slots['A'].patch = makePatch();
 
-		await store.assignModuleToPage('A', 120, 0, 5, 5);
+		await store.assignModuleToPage('A', 120, 0, 5, [0, 1, 2, 3, 4]);
 
 		expect(store.slots['A'].paramPages).toEqual([]);
 	});
@@ -1479,7 +1479,7 @@ describe('assignModuleToGlobalPage', () => {
 	it('assigns count consecutive global slots targeting the given patch slot, with no undo entry', async () => {
 		const store = useSlotsStore();
 
-		await store.assignModuleToGlobalPage('B', 16, 0, 7, 2);
+		await store.assignModuleToGlobalPage('B', 16, 0, 7, [0, 1]);
 
 		expect(store.globalParamPages).toEqual([
 			{ slotIndex: 16, slot: 'B', location: 0, moduleIndex: 7, paramIndex: 0, isLed: 0 },
@@ -1497,7 +1497,7 @@ describe('assignModuleToGlobalPage', () => {
 		await store.assignParamToGlobalPage('B', 17, 1, 9, 9);
 		await store.assignParamToGlobalPage('B', 50, 0, 7, 1);
 
-		await store.assignModuleToGlobalPage('B', 16, 0, 7, 2);
+		await store.assignModuleToGlobalPage('B', 16, 0, 7, [0, 1]);
 
 		expect(at(17)).toMatchObject({ moduleIndex: 7, paramIndex: 1 });
 		expect(at(50)).toBeUndefined();
@@ -1506,7 +1506,7 @@ describe('assignModuleToGlobalPage', () => {
 	it('truncates instead of overrunning slot 119', async () => {
 		const store = useSlotsStore();
 
-		await store.assignModuleToGlobalPage('B', 118, 0, 5, 5);
+		await store.assignModuleToGlobalPage('B', 118, 0, 5, [0, 1, 2, 3, 4]);
 
 		expect(store.globalParamPages.map((k) => k.slotIndex).sort((a, b) => a - b)).toEqual([118, 119]);
 	});
