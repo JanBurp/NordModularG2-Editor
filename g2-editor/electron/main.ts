@@ -1023,7 +1023,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Key Commands", click: () => sendToFocused("menu:action", "show-key-commands") },
 				{ type: "separator" as const },
 				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
-				// { label: "ShowSVG", click: () => sendToFocused("menu:action", "toggle-svg-viewer") },
+				{ label: "ShowSVG", click: () => sendToFocused("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
 				{ label: "About G2 Editor...", click: () => sendToFocused("menu:action", "show-about") },
 			],

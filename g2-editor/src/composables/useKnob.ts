@@ -6,7 +6,7 @@ import { useDragInteraction } from './useDragInteraction';
 import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 
-const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
+export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 const CURSORS: Record<string, string> = { vertical: 'ns-resize', horizontal: 'ew-resize', circular: 'crosshair' };
 
 // Converts a mouse position relative to the knob center to a knob angle in degrees.

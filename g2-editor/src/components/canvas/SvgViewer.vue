@@ -74,6 +74,7 @@
 		{ id: 'KnobSlider' },
 		{ id: 'KnobSpin' },
 		{ id: 'KnobSpinH' },
+		{ id: 'KnobSpinV' },
 		{ id: 'KnobSmall' },
 		{ id: 'KnobMedium' },
 		{ id: 'KnobReset' },

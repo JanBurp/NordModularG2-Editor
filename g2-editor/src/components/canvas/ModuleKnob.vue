@@ -52,9 +52,6 @@
 			@mousedown.stop
 			@click.stop="resetToDefault()"
 		/>
-
-		<!-- Selected param underline -->
-		<rect v-if="highlight" :x="0" :y="radius * 2 + 3" :width="radius * 2 + 4" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -67,7 +64,6 @@
 		param: ModuleParam;
 		value: number;
 		paramIndex: number;
-		highlight?: boolean;
 		morphColor?: 'red' | 'blue' | null;
 		morphRange?: number;
 	}>();

@@ -156,6 +156,10 @@
 					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
 					<path stoke="none" fill="#333" d="M6,2.5 l0,5 -2.5,-2.5 z M14,2.5 l0,5 2.5,-2.5 z" />
 				</g>
+				<g id="KnobSpinV" stroke="#333">
+					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
+					<path stoke="none" fill="#333" d="M2.5,4 l5,0 -2.5,3 z M12.5,6.5 l5,0 -2.5,-3 z" />
+				</g>
 				<g id="KnobSmall" stroke="#333">
 					<line x1="0.5" y1="17.5" x2="2.5" y2="15.5" />
 					<line x1="18.5" y1="17.5" x2="16.5" y2="15.5" />

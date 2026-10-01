@@ -171,6 +171,12 @@ body {
 	cursor: grab !important;
 }
 
+/* The Knob's KnobSpinV spinner stays clickable under Alt (fast step), so keep its pointer cursor. */
+.alt-assign [data-knob-slot] .knob-spin-v,
+.alt-assign [data-knob-slot] .knob-spin-v * {
+	cursor: pointer !important;
+}
+
 /* Canvas -> toolbar drag in progress: one cursor everywhere, including outside the canvas SVG. */
 .param-dragging,
 .param-dragging * {

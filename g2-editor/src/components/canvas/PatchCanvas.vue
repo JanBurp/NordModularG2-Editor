@@ -59,6 +59,7 @@
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphRangeBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphDragHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<KnobSpinOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" @change="onParamChange" />
 			<!-- Rendered last so it always paints above every module/overlay, regardless of draw order above. -->
 			<GhostCable :modules="props.modules as any[]" :ghost="ghostCableForArea" @confirm="onGhostConfirm" />
 		</svg>
@@ -92,6 +93,7 @@
 	import GhostCable from './GhostCable.vue';
 	import CCBadgesOverlay from './CCBadgesOverlay.vue';
 	import ParamValuesOverlay from './ParamValuesOverlay.vue';
+	import KnobSpinOverlay from './KnobSpinOverlay.vue';
 	import MorphAssignBadgesOverlay from './MorphAssignBadgesOverlay.vue';
 	import MorphRangeBadgesOverlay from './MorphRangeBadgesOverlay.vue';
 	import MorphDragHintOverlay from './MorphDragHintOverlay.vue';

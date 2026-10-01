@@ -124,7 +124,6 @@
 					:param="param"
 					:value="getParamValue(index)"
 					:param-index="index"
-					:highlight="index === selectedParamIndex"
 					:morph-color="morphColorFor(index)"
 					:morph-range="morphRangeFor(index)"
 					@change="onParamChange"
