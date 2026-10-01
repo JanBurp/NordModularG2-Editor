@@ -12,7 +12,21 @@
 					<img v-if="iconDataUrl" :src="iconDataUrl" class="w-16 h-16" alt="G2 Editor icon" />
 					<div>
 						<div class="text-base font-bold text-content-primary">{{ APP_NAME }}</div>
-						<div class="text-xs mt-0.5">v{{ version }}</div>
+						<div class="text-xs mt-0.5">
+							v{{ version }}
+							<span v-if="updateState === 'checking'"> - checking for update</span>
+							<span v-else-if="updateState === 'available'">
+								- update
+								<button
+									class="text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0 text-xs"
+									@click="openLink(DOWNLOAD_URL)"
+								>
+									v{{ latestVersion }}
+								</button>
+								available
+							</span>
+							<span v-else-if="updateState === 'current'"> - up to date</span>
+						</div>
 					</div>
 					<div class="text-xs">Editor for the Nord Modular G2 - by Jan den Besten</div>
 					<button class="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0" @click="openSite">
@@ -97,6 +111,19 @@
 
 	const version = ref('');
 	const iconDataUrl = ref('');
+	const updateState = ref<'idle' | 'checking' | 'available' | 'current'>('idle');
+	const latestVersion = ref('');
+	const DOWNLOAD_URL = 'https://janburp.github.io/NordModularG2-Editor/getting-started/';
+
+	function isNewer(latest: string, current: string): boolean {
+		const a = latest.split('.').map(Number);
+		const b = current.split('.').map(Number);
+		for (let i = 0; i < Math.max(a.length, b.length); i++) {
+			const d = (a[i] || 0) - (b[i] || 0);
+			if (d) return d > 0;
+		}
+		return false;
+	}
 
 	watch(
 		() => props.modelValue,
@@ -105,6 +132,16 @@
 				const info = await window.electronAPI.getAppInfo();
 				version.value = info.version;
 				iconDataUrl.value = info.iconDataUrl;
+				updateState.value = 'checking';
+				const latest = await window.electronAPI.getLatestVersion();
+				if (!latest) {
+					updateState.value = 'idle';
+				} else if (isNewer(latest, info.version)) {
+					latestVersion.value = latest;
+					updateState.value = 'available';
+				} else {
+					updateState.value = 'current';
+				}
 			}
 		},
 		{ immediate: true },

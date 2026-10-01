@@ -677,6 +677,17 @@ ipcMain.handle("app:info", () => ({
 	iconDataUrl: `data:image/png;base64,${fs.readFileSync(path.join(process.env.APP_ROOT!, "resources", "icon.png")).toString("base64")}`,
 }));
 
+ipcMain.handle("app:latestVersion", async (): Promise<string | null> => {
+	try {
+		const res = await fetch("https://api.github.com/repos/JanBurp/NordModularG2-Editor/releases/latest", { signal: AbortSignal.timeout(5000) });
+		if (!res.ok) return null;
+		const { tag_name } = (await res.json()) as { tag_name?: string };
+		return tag_name ? tag_name.replace(/^v/, "") : null;
+	} catch {
+		return null;
+	}
+});
+
 ipcMain.on("shell:openExternal", (_, url: string) => { shell.openExternal(url); });
 
 ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {

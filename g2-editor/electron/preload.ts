@@ -37,6 +37,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	selectBankFolder: () => ipcRenderer.invoke("bank:select-folder"),
 	selectPchListFile: () => ipcRenderer.invoke("bank:select-pchlist"),
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
+	getLatestVersion: () => ipcRenderer.invoke("app:latestVersion"),
 	claimStartupSplash: () => ipcRenderer.invoke("app:claim-startup-splash"),
 	openExternal: (url: string) => ipcRenderer.send("shell:openExternal", url),
 	setTheme: (mode: "system" | "light" | "dark") => ipcRenderer.invoke("theme:set", mode),

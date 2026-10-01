@@ -42,6 +42,7 @@ declare global {
 				error?: string;
 			}>;
 			getAppInfo: () => Promise<{ version: string; platform: string; iconDataUrl: string }>;
+			getLatestVersion: () => Promise<string | null>;
 			claimStartupSplash: () => Promise<boolean>;
 			openExternal: (url: string) => void;
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
