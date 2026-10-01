@@ -58,7 +58,7 @@
 						:key="entry.path"
 						:data-nav-idx="filteredDiskDirs.length + i"
 						:selected="filteredDiskDirs.length + i === selectedNavIndex"
-						@click="selectDisk(entry)"
+						@click="isDoubleClick(entry.path) && selectDisk(entry)"
 					>
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
@@ -129,7 +129,7 @@
 								:key="`${p.bank}-${p.location}`"
 								:data-nav-idx="flatNavIndex.get(p)"
 								:selected="flatNavIndex.get(p) === selectedNavIndex"
-								@click="selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
+								@click="isDoubleClick(`${p.bank}-${p.location}`) && selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
 							>
 								<template #icon>{{ p.bank }}-{{ p.location }}</template>
@@ -471,6 +471,16 @@
 		if (v === 'disk' && !browser.diskFolder && settings.path) {
 			await browser.loadDiskList(settings.path);
 		}
+	}
+
+	// Own double-click detection: in the Electron window MouseEvent.detail stays 1 and native dblclick often doesn't fire.
+	const DOUBLE_CLICK_MS = 400;
+	let lastClick = { key: '', t: 0 };
+	function isDoubleClick(key: string): boolean {
+		const now = performance.now();
+		const isDouble = key === lastClick.key && now - lastClick.t < DOUBLE_CLICK_MS;
+		lastClick = isDouble ? { key: '', t: 0 } : { key, t: now };
+		return isDouble;
 	}
 
 	function selectDisk(entry: DiskEntry) {
