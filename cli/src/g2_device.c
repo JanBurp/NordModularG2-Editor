@@ -77,13 +77,20 @@ const char *g2_error_string(int code) {
  * g2_rearm() and start streaming without a listener, contaminating subsequent
  * query responses. recv_interrupt always reads one fixed 16-byte USB interrupt
  * packet regardless of buffer size, so a 16-byte buffer is always sufficient. */
+/* Read and discard the bulk payload an EXTENDED interrupt header announced. Only needed
+ * in direct mode: with the listener active the bulk was already read and queued, and the
+ * next recv_interrupt() frees it. Leaving it unread would be taken as the next reply. */
+static void discard_bulk(uint16_t sz) {
+    if (g2_listener_active || !sz) return;
+    uint8_t *b = malloc(sz);
+    if (b) { recv_bulk(b, sz); free(b); }
+}
+
 static void drain_stale_extended(void) {
     uint8_t stale[16]; int n;
     while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-        if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)stale[1] << 8) | stale[2];
-            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-        }
+        if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED)
+            discard_bulk(((uint16_t)stale[1] << 8) | stale[2]);
     }
 }
 
@@ -245,6 +252,7 @@ cJSON *g2_device_info(int debug) {
         size = (response[1] << 8) | response[2];
         if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
             g2_err("Unexpected synth settings size: %u\n", size);
+            discard_bulk(size);
             goto cleanup;
         }
         uint8_t *buf = malloc(size);
@@ -257,7 +265,7 @@ cJSON *g2_device_info(int debug) {
             free(buf);
             goto cleanup;
         }
-        if (buf[3] == SUB_RESPONSE_SYNTH_SETTINGS) {
+        if (size > 3 && buf[3] == SUB_RESPONSE_SYNTH_SETTINGS) {
             bulkData = buf;
             bulkSize = size;
             break;
@@ -641,11 +649,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     }
 
     if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        /* Temporary diagnostic - see the matching one in g2_get_patch above. */
-        char rhex[35] = "";
-        for (int k = 0; k < ret && k < 16; k++) snprintf(rhex + k * 2, 3, "%02x", interruptResp[k]);
-        g2_err("Unexpected response type for patch data (slot=%d, version=%d, ret=%d, raw_hex=%s)",
-               actual_slot, version, ret, rhex);
+        g2_err("Unexpected response type for patch data\n");
         goto cleanup;
     }
 
@@ -1231,13 +1235,14 @@ void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
 int g2_build_set_module_labels_op(G2Op *op, uint8_t *buf, int loc, int module_id, int ntok, const char **tok) {
     int idx = 3;
     for (int i = 0; i < ntok; ) {
-        int param = atoi(tok[i++]);
-        int count = i < ntok ? atoi(tok[i++]) : 0;
+        int param = atoi(tok[i] ? tok[i] : ""); i++;
+        int count = i < ntok ? atoi(tok[i] ? tok[i] : "") : 0; i++;
         if (count < 1 || i + count > ntok || idx - 3 + 3 + 7 * count > 255) return G2_ERR_INVALID_PARAM;
         buf[idx++] = 1; buf[idx++] = (uint8_t)(1 + 7 * count); buf[idx++] = (uint8_t)param;
         for (int k = 0; k < count; k++, i++) {
-            size_t llen = strlen(tok[i]); if (llen > 7) llen = 7;
-            memset(buf + idx, 0, 7); memcpy(buf + idx, tok[i], llen); idx += 7;
+            const char *label = tok[i] ? tok[i] : "";   /* NULL = non-string JSON arg */
+            size_t llen = strlen(label); if (llen > 7) llen = 7;
+            memset(buf + idx, 0, 7); memcpy(buf + idx, label, llen); idx += 7;
         }
     }
     if (idx == 3) return G2_ERR_INVALID_PARAM;
@@ -1939,19 +1944,28 @@ static int send_patch_upload(int slot, const char *name, int name_len, const uin
     return G2_OK;
 }
 
+/* Reads an open file in full. Returns a malloc'd buffer (caller frees) and its size, or
+ * NULL if the file is empty, unreadable or out of memory. */
+static uint8_t *read_whole_file(FILE *f, long *fsize) {
+    if (fseek(f, 0, SEEK_END) != 0) return NULL;
+    long n = ftell(f);
+    if (n <= 0 || fseek(f, 0, SEEK_SET) != 0) return NULL;
+    uint8_t *data = malloc((size_t)n);
+    if (data && fread(data, 1, (size_t)n, f) != (size_t)n) { free(data); data = NULL; }
+    *fsize = n;
+    return data;
+}
+
 int g2_upload_patch(int slot, const char *filepath) {
     if (slot < 0 || slot > 3)    return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
 
     FILE *f = fopen(filepath, "rb");
     if (!f) return G2_ERR_FILE_OPEN;
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    rewind(f);
-    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
-    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
-    fread(file_data, 1, (size_t)fsize, f);
+    long fsize;
+    uint8_t *file_data = read_whole_file(f, &fsize);
     fclose(f);
+    if (!file_data) return G2_ERR_FILE_OPEN;
 
     /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
      * Use filename (without extension) as the patch name. */
@@ -2054,13 +2068,10 @@ int g2_upload_perf(const char *filepath) {
 
     FILE *f = fopen(filepath, "rb");
     if (!f) return G2_ERR_FILE_OPEN;
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    rewind(f);
-    uint8_t *file_data = (uint8_t *)malloc((size_t)fsize);
-    if (!file_data) { fclose(f); return G2_ERR_NO_MEMORY; }
-    fread(file_data, 1, (size_t)fsize, f);
+    long fsize;
+    uint8_t *file_data = read_whole_file(f, &fsize);
     fclose(f);
+    if (!file_data) return G2_ERR_FILE_OPEN;
 
     /* prf2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
      * Use filename (without extension) as the performance name. */
@@ -3084,10 +3095,10 @@ int g2_switch_slot(const char *slot_str) {
         if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
         size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
         if (size == 0 || size > 2048) break;
-        uint8_t *buf = malloc(2048);
+        uint8_t *buf = calloc(1, 2048);
         if (!buf) return G2_ERR_NO_MEMORY;
-        recv_bulk(buf, size);
-        if (buf[3] == 0x11 || buf[3] == 0x29) { perfData = buf; break; }
+        if (recv_bulk(buf, size) <= 0) { free(buf); break; }
+        if (size > 3 && (buf[3] == 0x11 || buf[3] == 0x29)) { perfData = buf; break; }
         g2_msg_t relay = {0};
         memcpy(relay.interrupt, perfIntr, 16);
         relay.bulk = buf;
@@ -3237,6 +3248,18 @@ static void emit_bank_upload_progress(int location, int total, int written, int 
     fflush(stdout);
 }
 
+/* Copies a device-supplied name into out as a safe single path component: path
+ * separators and characters illegal on common filesystems become '_', and a leading
+ * '.' (so ".." and hidden files) does too. Not static: exercised by unit tests. */
+void sanitize_filename(const char *name, char *out, size_t outSize) {
+    size_t i = 0;
+    for (; name[i] && i + 1 < outSize; i++) {
+        unsigned char c = (unsigned char)name[i];
+        out[i] = (strchr("/\\:*?\"<>|", c) || c < 0x20 || c == 0x7f || (i == 0 && c == '.')) ? '_' : (char)c;
+    }
+    out[i] = '\0';
+}
+
 cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     if (type < 0 || type > 1) { g2_err("get-bank: invalid type\n"); return NULL; }
     if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
@@ -3308,7 +3331,7 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
                 got = 1;
             } else if (msgType == RESPONSE_TYPE_EXTENDED) {
                 size = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-                if (size < 8) continue;
+                if (size < 8) { discard_bulk(size); continue; }
                 bulk = malloc(size);
                 if (!bulk) { snprintf(abortReason, sizeof(abortReason), "out of memory at location %d", location + 1); aborted = 1; break; }
                 if (recv_bulk(bulk, size) <= 0) {
@@ -3372,7 +3395,9 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
          * when it fills all 16 bytes (utils.c, same convention as
          * perf_settings_normalize_slots). Scanning for a NUL instead swallows the
          * first size byte of a 16-character name. */
-        size_t nameField = (size_t)parse_name(payload + 3, patchName, sizeof(patchName));
+        uint8_t nameBuf[16] = {0};   /* zero-padded copy: parse_name must not read past the payload */
+        memcpy(nameBuf, payload + 3, payloadSize - 3 < sizeof(nameBuf) ? payloadSize - 3 : sizeof(nameBuf));
+        size_t nameField = (size_t)parse_name(nameBuf, patchName, sizeof(patchName));
         size_t bodyOfs = 3 + nameField + 3;
         if (bodyOfs > payloadSize) {
             free(bulk);
@@ -3390,13 +3415,15 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         uint8_t *body = payload + bodyOfs;
 
         const char *baseName = strlen(patchName) ? patchName : "Untitled";
+        char fileBase[32];   /* baseName made safe as a file name; baseName itself stays the on-disk header */
+        sanitize_filename(baseName, fileBase, sizeof(fileBase));
 
         int occurrence = 0;
-        for (int i = 0; i < writtenCount; i++) if (strcmp(writtenNames[i], baseName) == 0) occurrence++;
+        for (int i = 0; i < writtenCount; i++) if (strcmp(writtenNames[i], fileBase) == 0) occurrence++;
         char dispName[40];
-        if (occurrence == 0) snprintf(dispName, sizeof(dispName), "%s", baseName);
-        else snprintf(dispName, sizeof(dispName), "%s%d", baseName, occurrence + 1);
-        snprintf(writtenNames[writtenCount], sizeof(writtenNames[0]), "%s", baseName);
+        if (occurrence == 0) snprintf(dispName, sizeof(dispName), "%s", fileBase);
+        else snprintf(dispName, sizeof(dispName), "%s%d", fileBase, occurrence + 1);
+        snprintf(writtenNames[writtenCount], sizeof(writtenNames[0]), "%s", fileBase);
 
         char filename[1024];
         snprintf(filename, sizeof(filename), "%s/%s.%s", folder, dispName, type == 0 ? "pch2" : "prf2");
@@ -3618,8 +3645,7 @@ int build_flash_dump_raw_frame(int type, int bank0, int location0, const char *n
  * step, g2_get_global_knobs, query_perf_settings): the listener thread keeps
  * running, so an unrelated notification can still land between the write and
  * its marker; those are relayed on as events instead of being mistaken for the
- * answer. g2_send_bank stops the live stream around the whole loop, which keeps
- * that traffic down to a trickle.
+ * answer.
  * Note that recv_interrupt() (g2_io.c) never hands back an aCmd <= 0x03 frame
  * while the listener is active - it emits it as an event and keeps waiting - so
  * a 0x7E NACK cannot be observed here directly; no marker at all is what a
@@ -3716,11 +3742,13 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
             }
             /* Somebody else's bulk - relay it so the watch stream keeps it,
              * same as query_perf_settings does while waiting for its own reply. */
-            g2_msg_t relay = {0};
-            memcpy(relay.interrupt, response, 16);
-            relay.bulk = bulk;
-            relay.bulk_size = (uint16_t)bret;
-            g2_emit_event(&relay);
+            if (bret > 0) {
+                g2_msg_t relay = {0};
+                memcpy(relay.interrupt, response, 16);
+                relay.bulk = bulk;
+                relay.bulk_size = (uint16_t)bret;
+                g2_emit_event(&relay);
+            }
             free(bulk);
         }
     }
@@ -3838,20 +3866,16 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
             continue;
         }
-        fseek(f, 0, SEEK_END);
-        long fsize = ftell(f);
-        rewind(f);
-        uint8_t *fileData = malloc((size_t)fsize);
+        long fsize;
+        uint8_t *fileData = read_whole_file(f, &fsize);
+        fclose(f);
         if (!fileData) {
-            fclose(f);
-            g2_err("send-bank: out of memory reading %s\n", e->filepath);
-            add_bank_failure(failures, location + 1, e->filepath, "out of memory reading file");
+            g2_err("send-bank: cannot read %s, skipping location %d\n", e->filepath, location + 1);
+            add_bank_failure(failures, location + 1, e->filepath, "cannot read source file");
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
             continue;
         }
-        fread(fileData, 1, (size_t)fsize, f);
-        fclose(f);
 
         char name[17] = {0};
         name_from_filepath(base, name, 16);

@@ -1,10 +1,17 @@
 <template>
 	<Teleport to="body">
 		<div class="fixed inset-0 z-50 bg-black/90 flex items-center justify-center" @click.self="emit('close')">
-			<div class="bg-surface-1 border border-line-default rounded shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6">
+			<div
+				role="dialog"
+				aria-modal="true"
+				aria-label="Keyboard Shortcuts"
+				class="bg-surface-1 border border-line-default rounded shadow-xl w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6"
+			>
 				<div class="flex items-center justify-between mb-5">
 					<h2 class="text-content-primary text-lg font-semibold">Keyboard Shortcuts</h2>
-					<button class="text-content-secondary hover:text-content-primary text-xl leading-none px-2" @click="emit('close')">&times;</button>
+					<button class="text-content-secondary hover:text-content-primary text-xl leading-none px-2" aria-label="Close" @click="emit('close')">
+						&times;
+					</button>
 				</div>
 
 				<div class="grid grid-cols-2 gap-6 text-sm">
@@ -120,7 +127,7 @@
 				{ keys: ['←'], action: 'Collapse bank under cursor / go up one folder (Disk)' },
 				{ keys: ['→', '↵', 'Space'], action: 'Expand bank / open folder / load item under cursor' },
 				{ keys: ['ESC'], action: 'Reset cursor' },
-					{ keys: ['Double-click'], action: 'Load file / patch / performance (a single click only selects)' },
+				{ keys: ['Double-click'], action: 'Load file / patch / performance (a single click only selects)' },
 			],
 		},
 		{
@@ -150,7 +157,7 @@
 				{ keys: ['←', '→'], action: 'Navigate parameters (original editor’s order)' },
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
-					{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1 (Alt: ±16)' },
+				{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1 (Alt: ±16)' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
 				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },

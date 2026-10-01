@@ -182,11 +182,13 @@ int send_and_expect_ok(daemon_ctx_t *d, const char *json, int expected_id) {
         cJSON *id_j = cJSON_GetObjectItem(resp, "id");
         if (id_j && (int)id_j->valuedouble == expected_id) {
             int ok = cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok"));
+            if (!ok) fprintf(stderr, "\n[send_and_expect_ok] not ok: %.300s\n", line_buf);
             cJSON_Delete(resp);
             return ok ? 0 : -1;
         }
         cJSON_Delete(resp);
     }
+    fprintf(stderr, "\n[send_and_expect_ok] no response for id %d within 20s\n", expected_id);
     return -1;
 }
 
@@ -211,4 +213,22 @@ cJSON *send_and_capture_response(daemon_ctx_t *d, const char *json, int expected
         cJSON_Delete(resp);
     }
     return NULL;
+}
+
+/* Poll until the daemon's device answers a get-patch A again (a patch upload or an edit
+ * leaves the G2 busy applying it, and until then it times out writes and reads), instead
+ * of sleeping a fixed time and hoping. Gives up after ~10 s. */
+int daemon_wait_ready(daemon_ctx_t *d) {
+    static int probe_id = 900000;
+    for (int attempt = 0; attempt < 50; attempt++) {
+        char cmd[64];
+        int id = probe_id++;
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+        cJSON *resp = send_and_capture_response(d, cmd, id);
+        int ok = resp && cJSON_IsTrue(cJSON_GetObjectItem(resp, "ok"));
+        cJSON_Delete(resp);
+        if (ok) return 0;
+        usleep(200000);
+    }
+    return -1;
 }

@@ -5,7 +5,6 @@ import { getJackSvgPos } from '../renderer/jackGeometry';
 import { isNestDrivenByOutput } from '../parser/cableGraph';
 import { getEffectiveJackColor } from '../constants';
 import { useJackPatching } from './useJackPatching';
-import { getLastAddedModule } from './useAddModule';
 
 export type GhostJack = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
 export type GhostPoint = { x: number; y: number };
@@ -21,6 +20,14 @@ export function isGhostJack(to: GhostJack | GhostPoint): to is GhostJack {
 // uprated, so a currently-blue input still counts as a match for a red output.
 function colourFamily(colour: string): string {
 	return getEffectiveJackColor(colour, true);
+}
+
+// Most recently added module (any entry point, see finalizeModuleAdd in useAddModule.ts) for
+// auto-suggest's fallback tier. Lives here, not in useAddModule.ts, so the import stays one-way.
+let lastAddedModule: { index: number; area: 'va' | 'fx'; slot: string } | null = null;
+
+export function setLastAddedModule(index: number, area: 'va' | 'fx', slot: string) {
+	lastAddedModule = { index, area, slot };
 }
 
 export function useGhostCable() {
@@ -52,8 +59,8 @@ export function useGhostCable() {
 			if (above) sourceModIndex = above.index;
 		}
 		if (sourceModIndex === null) {
-			const last = getLastAddedModule();
-			if (last && last.index !== newModuleIndex && last.area === area) sourceModIndex = last.index;
+			const last = lastAddedModule;
+			if (last && last.index !== newModuleIndex && last.area === area && last.slot === uiStore.slotInFocus) sourceModIndex = last.index;
 		}
 		if (sourceModIndex === null) {
 			uiStore.ghostCable = null;

@@ -90,10 +90,12 @@ int g2_get_last_claim_error(void) { return g2_last_claim_error; }
 
 static void debug_send(const char *fn, const uint8_t *buf, int len) {
     if (!g2_debug) return;
+    flockfile(stdout);
     printf("{\"debug\":\"send\",\"fn\":\"%s\",\"hex\":\"", fn);
     for (int i = 0; i < len; i++) printf("%02x", buf[i]);
     printf("\"}\n");
     fflush(stdout);
+    funlockfile(stdout);
 }
 
 /* Mirrors debug_send but for the listener thread's raw interrupt reads — every 16-byte header
@@ -102,10 +104,12 @@ static void debug_send(const char *fn, const uint8_t *buf, int len) {
  * message the listener itself drops without ever queuing it. */
 static void debug_recv(const uint8_t *hdr) {
     if (!g2_debug) return;
+    flockfile(stdout);   /* keep the line whole against the main thread's own stdout JSON */
     printf("{\"debug\":\"recv\",\"fn\":\"listener\",\"hex\":\"");
     for (int i = 0; i < 16; i++) printf("%02x", hdr[i]);
     printf("\"}\n");
     fflush(stdout);
+    funlockfile(stdout);
 }
 
 int g2_init(void) {
@@ -296,8 +300,7 @@ int g2_connect_silent(void) {
 }
 
 int g2_disconnect(void) {
-    /* A one-shot CLI command that locked the stream (send-bank, get-bank,
-     * set-perf-mode) has no other cleanup point before the process exits -
+    /* A one-shot CLI command that locked the stream (set-perf-mode) has no other cleanup point before the process exits -
      * without this, the G2 is left not reporting LED/VU/param notifications
      * until something else sends START_COMM (e.g. the daemon's own startup
      * lock/unlock cycle). do_reconnect() already zeroes g2_stream_locked
@@ -412,6 +415,7 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     if (ret >= 0) debug_send("sys_data", buff, msgLength);
+    else fprintf(stderr, "send_system_data: write failed: %s\n", libusb_error_name(ret));
     return (ret < 0) ? -1 : 0;
 }
 
@@ -451,6 +455,7 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     }
     if (ret >= 0) debug_send("slot", buff, msgLength);
+    else fprintf(stderr, "send_slot: write failed: %s\n", libusb_error_name(ret));
     return (ret < 0) ? -1 : 0;
 }
 
@@ -491,6 +496,7 @@ int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops) {
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
     }
     if (ret >= 0) debug_send("slot_batch", buff, msgLength);
+    else fprintf(stderr, "send_slot_batch: write failed: %s\n", libusb_error_name(ret));
     return (ret < 0) ? -1 : 0;
 }
 
@@ -640,6 +646,15 @@ static void *listener_thread(void *arg) {
                         msg.sentinel = 2;
                         mq_push(msg);
                         continue;
+                    }
+                } else {
+                    /* Out of memory: still consume the bulk so it isn't taken as
+                     * the next read. */
+                    uint8_t scratch[512];
+                    for (int left = size; left > 0; ) {
+                        int n = listener_recv_bulk(scratch, (uint16_t)(left > 512 ? 512 : left));
+                        if (n <= 0) break;
+                        left -= n;
                     }
                 }
             }

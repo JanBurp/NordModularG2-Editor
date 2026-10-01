@@ -9,7 +9,7 @@ import type {
 	PatchParamVariation,
 	VariationState,
 } from '@/types';
-import { PATCH_PARAM_KEYS, NUM_VARIATIONS } from '@/types/patch';
+import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getModule } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
@@ -142,6 +142,10 @@ function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[]
 	return ['add-cable', slot, location, String(c.colour), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
 }
 
+function assignMidiCCBatchCmd(slot: SlotLabel, ccs: MidiCCAssignment[]): string[] {
+	return ['assign-midicc-batch', slot, ...ccs.flatMap((a) => [ccLocationStr(a.location), String(a.moduleIndex), String(a.paramIndex), String(a.cc)])];
+}
+
 // Builds the CLI assign-knob command tuple for a single Parameter Page slot.
 function assignKnobCmd(slot: SlotLabel, entry: ParamPageAssignment): string[] {
 	return ['assign-knob', slot, locationStr01(entry.location), String(entry.moduleIndex), String(entry.paramIndex), String(entry.slotIndex)];
@@ -193,6 +197,8 @@ export function resolveParamEcho(key: string, value: number): void {
 }
 
 function sendCoalesced(key: string, cmd: string[]): void {
+	if (useDeviceStore().status !== DeviceStatus.Connected) return;
+
 	if (_paramInFlight.has(key)) {
 		_paramPending.set(key, cmd);
 		return;
@@ -517,6 +523,8 @@ export const useSlotsStore = defineStore('slots', {
 			// Patch notes ("Text Pad") aren't part of the bulk patch dump — the daemon fetches
 			// them separately (GET_PATCH_TEXT) and reports them as `text` alongside `name`.
 			if (result.text) patch.text = result.text;
+			// An echo reload must not clobber notes edited locally but not yet pushed to the device.
+			if (preserveHistory && this.slots[slot].textDirty && this.slots[slot].patch) patch.text = this.slots[slot].patch!.text;
 
 			this.slots[slot].name = name;
 			this.slots[slot].rawHex = rawHex;
@@ -631,6 +639,8 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async selectSlot(slot: SlotLabel): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+			if (useDeviceStore().status !== DeviceStatus.Connected) return null;
+
 			const hasPatch = !!this.slots[slot].patch;
 			this.slots[slot].loading = !hasPatch;
 			this.slots[slot].error = null;
@@ -654,8 +664,8 @@ export const useSlotsStore = defineStore('slots', {
 
 		async selectVariation(variation: number): Promise<void> {
 			const active = useUiStore().slotInFocus;
-			if (!active) return;
-			await window.cli.run(['variation', String(variation + 1), active]);
+			if (!active || useDeviceStore().status !== DeviceStatus.Connected) return;
+			await runCliSafe(['variation', String(variation + 1), active], 'selectVariation');
 		},
 
 		// Moves the G2's front-panel Parameter Page selection (S_SEL_PARAM_PAGE, 0x2d). The device
@@ -819,6 +829,7 @@ export const useSlotsStore = defineStore('slots', {
 				ccLocation,
 				moduleId,
 			);
+			const morphSnap = this._snapshotModuleMorph(slot, ccLocation, [moduleId]);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -834,6 +845,8 @@ export const useSlotsStore = defineStore('slots', {
 					const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
 					hist.record(slot, {
 						undo: async () => {
+							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the delete
+							if (!patch) return;
 							mutAddModule(patch, areaIdx, { ...modSnap, lv: [...modSnap.lv], modes: [...modSnap.modes] });
 							const slotE = this.slots[slot];
 							if (slotE.variations) {
@@ -857,19 +870,15 @@ export const useSlotsStore = defineStore('slots', {
 								slotE.variations?.length ?? 1,
 							);
 							const allCmds: string[][] = [addModuleCmd, ...setParamCmds];
+							if (modSnap.paramLabels?.length) allCmds.push(setModuleLabelsCmd(slot, location, moduleId, modSnap.paramLabels));
 							for (const c of cableSnap) allCmds.push(addCableCmd(slot, location, c));
-							if (removedCCSnap.length > 0) {
-								const flatArgs = removedCCSnap.flatMap((a) => {
-									const locStr = ccLocationStr(a.location);
-									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
-								});
-								allCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
-							}
+							if (removedCCSnap.length > 0) allCmds.push(assignMidiCCBatchCmd(slot, removedCCSnap));
 							for (const p of removedPagesSnap) allCmds.push(assignKnobCmd(slot, p));
 							for (const p of removedGlobalPagesSnap) allCmds.push(assignGlobalKnobCmd(slot, p));
 							if (allCmds.length > 0) {
 								await runCliBatchSafe(allCmds, 'deleteModule undo');
 							}
+							await this._restoreModuleMorph(slot, morphSnap);
 						},
 						redo: async () => {
 							await this.deleteModule(moduleId, area);
@@ -882,6 +891,7 @@ export const useSlotsStore = defineStore('slots', {
 			const connectedCables = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId);
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
+			this._dropModuleMorph(slot, morphSnap);
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
 			if (removedPagesSnap.length > 0)
@@ -937,10 +947,7 @@ export const useSlotsStore = defineStore('slots', {
 				moduleId,
 			);
 
-			const morphLocation: 0 | 1 = areaIdx === 0 ? 0 : 1;
-			const morphSnapPerVar: MorphAssignment[][] = Array.from({ length: numVar }, (_, v) =>
-				(slotEntry.variations?.[v]?.patch.morphAssignments ?? []).filter((a) => a.location === morphLocation && a.moduleIndex === moduleId),
-			);
+			const morphSnapPerVar = this._snapshotModuleMorph(slot, ccLocation, [moduleId]);
 
 			const shouldRecord = !hist.isLocked(slot);
 			if (shouldRecord) hist.lock(slot);
@@ -949,6 +956,7 @@ export const useSlotsStore = defineStore('slots', {
 			// (same collision resolver used by drag-move/palette-drop/paste); computed after
 			// deleteModule so the old module is already excluded from its own column.
 			let pushDowns: { index: number; fromRow: number; newRow: number }[] = [];
+			let remappedCables: ReturnType<typeof remapCablesForModule> = [];
 
 			try {
 				await this.deleteModule(moduleId, area);
@@ -962,18 +970,6 @@ export const useSlotsStore = defineStore('slots', {
 					fromRow: colMods.find((m) => m.index === d.index)!.vert,
 				}));
 				for (const d of pushDowns) mutMoveModule(patch, areaIdx, d.index, oldModSnap.horiz, d.newRow);
-
-				// deleteModule doesn't know about morph assignments; drop the replaced module's own
-				// (mirrors the "drop always" fallback the CC/paramPage cleanup above already applies).
-				for (let v = 0; v < numVar; v++) {
-					if (morphSnapPerVar[v].length === 0) continue;
-					this._mutateMorphAssignments(
-						slot,
-						v,
-						(prev) => prev.filter((a) => !(a.location === morphLocation && a.moduleIndex === moduleId)),
-						async () => {},
-					);
-				}
 
 				const newPcnt = newDef.params?.length ?? 0;
 				const newLv = Array(newPcnt * numVar);
@@ -1009,7 +1005,7 @@ export const useSlotsStore = defineStore('slots', {
 				);
 				mutAddModule(patch, areaIdx, mod);
 
-				const remappedCables = remapCablesForModule(cableSnap, moduleId, oldDef, newDef);
+				remappedCables = remapCablesForModule(cableSnap, moduleId, oldDef, newDef);
 				for (const c of remappedCables) mutAddCable(patch, areaIdx, c);
 
 				this._markSlotDirty(slot);
@@ -1035,7 +1031,15 @@ export const useSlotsStore = defineStore('slots', {
 			if (shouldRecord) {
 				hist.record(slot, {
 					undo: async () => {
-						mutDeleteModule(patch, areaIdx, moduleId); // remove the post-replace module (+ its remapped cables) before restoring the original
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the replace
+						if (!patch) return;
+						// Remove the replacement (+ its remapped cables) locally and on the device before restoring the original,
+						// otherwise add-module would collide with the replacement's index.
+						mutDeleteModule(patch, areaIdx, moduleId);
+						await runCliBatchSafe(
+							[...remappedCables.map((c) => delCableCmd(slot, location, c)), ['del-module', slot, location, String(moduleId)]],
+							'replaceModule undo del-module',
+						);
 						for (const d of pushDowns) mutMoveModule(patch, areaIdx, d.index, oldModSnap.horiz, d.fromRow);
 						await this.addModuleWithData(oldModSnap, moduleId, oldModSnap.horiz, oldModSnap.vert, area);
 						for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
@@ -1054,27 +1058,11 @@ export const useSlotsStore = defineStore('slots', {
 							String(d.fromRow),
 						]);
 						for (const c of cableSnap) undoCmds.push(addCableCmd(slot, location, c));
-						if (removedCCSnap.length > 0) {
-							const flatArgs = removedCCSnap.flatMap((a) => [
-								ccLocationStr(a.location),
-								String(a.moduleIndex),
-								String(a.paramIndex),
-								String(a.cc),
-							]);
-							undoCmds.push(['assign-midicc-batch', slot, ...flatArgs]);
-						}
+						if (removedCCSnap.length > 0) undoCmds.push(assignMidiCCBatchCmd(slot, removedCCSnap));
 						for (const p of removedPagesSnap) undoCmds.push(assignKnobCmd(slot, p));
 						for (const p of removedGlobalPagesSnap) undoCmds.push(assignGlobalKnobCmd(slot, p));
 						if (undoCmds.length > 0) await runCliBatchSafe(undoCmds, 'replaceModule undo');
-
-						for (let v = 0; v < numVar; v++) {
-							if (morphSnapPerVar[v].length === 0) continue;
-							const vState = this.slots[slot].variations?.[v];
-							if (!vState) continue;
-							const current = vState.patch.morphAssignments;
-							vState.patch.morphAssignments = [...current, ...morphSnapPerVar[v]];
-							await this._resyncMorphAssignments(slot, v, current, vState.patch.morphAssignments);
-						}
+						await this._restoreModuleMorph(slot, morphSnapPerVar);
 					},
 					redo: async () => {
 						await this.replaceModule(moduleId, newTypeId, area);
@@ -1317,6 +1305,8 @@ export const useSlotsStore = defineStore('slots', {
 					const addedIds = entries.map((e) => e.newId);
 					hist.record(slot, {
 						undo: async () => {
+							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+							if (!patch) return;
 							// Delete added cables first
 							const delCableCmds = addedCables.map((c) => [
 								'del-cable',
@@ -1510,6 +1500,8 @@ export const useSlotsStore = defineStore('slots', {
 				});
 				hist.record(slot, {
 					undo: async () => {
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+						if (!patch) return;
 						// Delete the added cable
 						mutDeleteCable(patch, areaIdx, addedCable);
 						this._markSlotDirty(slot);
@@ -1594,10 +1586,11 @@ export const useSlotsStore = defineStore('slots', {
 			const slotEntry = this.slots[slot];
 
 			// Capture prev value before mutation
-			const prevValue = slotEntry.variations?.[variation]?.[areaKey]?.[moduleId]?.[paramIdx] ?? value;
+			const moduleParams = slotEntry.variations?.[variation]?.[areaKey]?.[moduleId];
+			const prevValue = moduleParams?.[paramIdx] ?? value;
 
 			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
+			if (moduleParams && !hist.isLocked(slot)) {
 				const cKey = `param:${area}:${moduleId}:${paramIdx}:${variation}`;
 				const box = { initial: prevValue, latest: value };
 				hist.record(
@@ -1615,13 +1608,12 @@ export const useSlotsStore = defineStore('slots', {
 				);
 			}
 
-			if (slotEntry.variations?.[variation]?.[areaKey]?.[moduleId]) {
-				slotEntry.variations[variation][areaKey][moduleId][paramIdx] = value;
-			}
+			if (moduleParams) moduleParams[paramIdx] = value;
 			this._markSlotDirty(slot);
 
 			const key = `${slot}:${location}:${moduleId}:${paramIdx}:${variation}`;
 			const cmd = ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)];
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
 			if (immediate) {
 				window.cli
 					.run(cmd)
@@ -1683,10 +1675,10 @@ export const useSlotsStore = defineStore('slots', {
 		// client-side too). Touches both the value row (Seq1StepN) and the on/off gate row
 		// (Seq2StepN, where present), for all 16 steps regardless of Length — Length only affects
 		// playback, not which steps Rnd/Clr touch; setParams makes the whole press one undo/redo entry.
-		async randomizeOrClearSeqSteps(moduleId: number, variation: number, area: 'voice' | 'fx', mode: 'rnd' | 'clr'): Promise<void> {
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot, patch } = ctx;
+		async randomizeOrClearSeqSteps(moduleId: number, variation: number, area: 'voice' | 'fx', mode: 'rnd' | 'clr', targetSlot?: SlotLabel): Promise<void> {
+			const slot = targetSlot ?? this._getActivePatch()?.slot;
+			const patch = slot ? this.slots[slot]?.patch : null;
+			if (!slot || !patch) return;
 
 			const { areaIdx } = areaConfig(area);
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
@@ -1748,7 +1740,7 @@ export const useSlotsStore = defineStore('slots', {
 			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
 			const param = mod ? getModule(mod.type)?.params?.[paramIndex] : undefined;
 			if (param?.type !== 'TrigBtn' || (param.name !== 'Rnd' && param.name !== 'Clr')) return;
-			this.randomizeOrClearSeqSteps(moduleId, variation, area, param.name === 'Rnd' ? 'rnd' : 'clr');
+			this.randomizeOrClearSeqSteps(moduleId, variation, area, param.name === 'Rnd' ? 'rnd' : 'clr', slot);
 		},
 
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
@@ -2196,6 +2188,7 @@ export const useSlotsStore = defineStore('slots', {
 					};
 				})
 				.filter((t): t is { index: number; fromCol: number; fromRow: number; toCol: number; toRow: number; height: number } => t !== null);
+			if (targets.length === 0) return null;
 
 			const occupantsByCol = new Map<number, { row: number; height: number }[]>();
 			for (const t of targets) {
@@ -2239,6 +2232,8 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
 					undo: async () => {
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+						if (!patch) return;
 						const undoCmds: string[][] = [];
 						for (const m of pushedBack) {
 							mutMoveModule(patch, areaIdx, m.index, m.col, m.fromRow);
@@ -2438,7 +2433,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].name = name;
 			this._markSlotDirty(slot);
 			if (useDeviceStore().status === DeviceStatus.Connected) {
-				await window.cli.run(['set-patch-name', slot, name]);
+				await runCliSafe(['set-patch-name', slot, name], 'setPatchName');
 			}
 		},
 
@@ -2456,7 +2451,7 @@ export const useSlotsStore = defineStore('slots', {
 			const hex = Array.from(bytes)
 				.map((b) => b.toString(16).padStart(2, '0'))
 				.join('');
-			await window.cli.run(['set-patch-description', slot, hex]);
+			await runCliSafe(['set-patch-description', slot, hex], 'setPatchDescription');
 		},
 
 		// Shared by PatchToolBar/SettingsPane (category, voice mode, voice count) and ui.ts's
@@ -2584,7 +2579,32 @@ export const useSlotsStore = defineStore('slots', {
 				String(a.groupIndex),
 				String(variation),
 			]);
-			await window.cli.run(['set-morph-range-batch', slot, ...flatArgs]);
+			await runCliSafe(['set-morph-range-batch', slot, ...flatArgs], '_resyncMorphAssignments');
+		},
+
+		// Per-variation morph assignments that target any of `moduleIds` at `location` (0=fx, 1=va); used to
+		// drop them when modules are deleted and to restore them on undo.
+		_snapshotModuleMorph(slot: SlotLabel, location: number, moduleIds: number[]): MorphAssignment[][] {
+			return (this.slots[slot].variations ?? []).map((v) =>
+				v.patch.morphAssignments.filter((a) => a.location === location && moduleIds.includes(a.moduleIndex)),
+			);
+		},
+
+		_dropModuleMorph(slot: SlotLabel, snap: MorphAssignment[][]): void {
+			snap.forEach((list, v) => {
+				const p = this.slots[slot].variations?.[v]?.patch;
+				if (list.length > 0 && p) p.morphAssignments = p.morphAssignments.filter((a) => !list.includes(a));
+			});
+		},
+
+		async _restoreModuleMorph(slot: SlotLabel, snap: MorphAssignment[][]): Promise<void> {
+			for (let v = 0; v < snap.length; v++) {
+				const vState = this.slots[slot].variations?.[v];
+				if (snap[v].length === 0 || !vState) continue;
+				const current = vState.patch.morphAssignments;
+				vState.patch.morphAssignments = [...current, ...snap[v]];
+				await this._resyncMorphAssignments(slot, v, current, vState.patch.morphAssignments);
+			}
 		},
 
 		// Shared plumbing for assign/deassign/clear/copy below, which all replace the whole
@@ -2782,9 +2802,10 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const { areaIdx, location } = areaConfig(area);
 
+			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
+			if (!mod) return;
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
-				const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
 				const existingLabel = mod?.paramLabels?.find((pl) => pl.paramIndex === paramIndex);
 				const prevLabel = existingLabel?.labels?.[labelIndex] || paramDefaultNames(mod?.type, paramIndex)?.[labelIndex] || '';
 				hist.record(slot, {
@@ -2797,8 +2818,6 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 
-			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
-			if (!mod) return;
 			if (!mod.paramLabels) mod.paramLabels = [];
 			let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
 			// Positions other than labelIndex have never been customized, so pad with the
@@ -2832,7 +2851,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
-				const prevLabel = patch.morphParamLabels?.find((pl) => pl.paramIndex === paramIndex)?.labels?.[0] ?? '';
+				const prevLabel = patch.morphParamLabels?.find((pl) => pl.paramIndex === paramIndex)?.labels?.[0] || MORPH_NAMES[groupIndex];
 				hist.record(slot, {
 					undo: async () => {
 						await this.setMorphGroupLabel(groupIndex, prevLabel);
@@ -2871,6 +2890,8 @@ export const useSlotsStore = defineStore('slots', {
 				const prevColorMap = matching.map((c) => ({ ...c }));
 				hist.record(slot, {
 					undo: async () => {
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+						if (!patch) return;
 						patch.areas[areaIdx].cableList = (patch.areas[areaIdx].cableList ?? []).map((c) => {
 							const orig = prevColorMap.find((b) => b.smod === c.smod && b.scon === c.scon && b.dmod === c.dmod && b.dcon === c.dcon);
 							// Restore both colour and userColour (orig was captured before the user-set)
@@ -2933,6 +2954,8 @@ export const useSlotsStore = defineStore('slots', {
 				const deletedCables = matching.map((c) => ({ ...c }));
 				hist.record(slot, {
 					undo: async () => {
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+						if (!patch) return;
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
 						await runCliBatchSafe(
@@ -2974,6 +2997,8 @@ export const useSlotsStore = defineStore('slots', {
 				const addedCables = newCables.map((c) => ({ ...c }));
 				hist.record(slot, {
 					undo: async () => {
+						const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
+						if (!patch) return;
 						for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
@@ -3098,6 +3123,8 @@ export const useSlotsStore = defineStore('slots', {
 				let cableSnaps: Cable[] = [];
 				let pagesSnaps: ParamPageAssignment[] = [];
 				let globalPagesSnaps: GlobalParamPageAssignment[] = [];
+				let ccSnaps: MidiCCAssignment[] = [];
+				let morphSnap: MorphAssignment[][] = [];
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -3149,6 +3176,11 @@ export const useSlotsStore = defineStore('slots', {
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
 					const pageLocation = areaIdx === 0 ? 0 : 1;
+					// Controllers + morph assignments of the deleted modules go too (same as deleteModule); undo restores them.
+					ccSnaps = this.slots[slot].controllers.filter((c) => c.location === pageLocation && selectedModules.includes(c.moduleIndex));
+					this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSnaps.includes(c));
+					morphSnap = this._snapshotModuleMorph(slot, pageLocation, selectedModules);
+					this._dropModuleMorph(slot, morphSnap);
 					pagesSnaps = this.slots[slot].paramPages.filter((k) => k.location === pageLocation && selectedModules.includes(k.moduleIndex));
 					if (pagesSnaps.length > 0) {
 						this.slots[slot].paramPages = this.slots[slot].paramPages.filter(
@@ -3191,6 +3223,8 @@ export const useSlotsStore = defineStore('slots', {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 					hist.record(slot, {
 						undo: async () => {
+							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the delete
+							if (!patch) return;
 							for (const mod of modSnaps) {
 								mutAddModule(patch, areaIdx, { ...mod, lv: [...mod.lv], modes: [...mod.modes] });
 								const slotE = this.slots[slot];
@@ -3202,6 +3236,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
+							if (ccSnaps.length > 0) this.slots[slot].controllers = [...this.slots[slot].controllers, ...ccSnaps];
 							if (pagesSnaps.length > 0) this.slots[slot].paramPages = [...this.slots[slot].paramPages, ...pagesSnaps];
 							if (globalPagesSnaps.length > 0) this.globalParamPages = [...this.globalParamPages, ...globalPagesSnaps];
 							this._markSlotDirty(slot);
@@ -3223,6 +3258,7 @@ export const useSlotsStore = defineStore('slots', {
 									...paramVals0.map(String),
 									mod.uname ?? '',
 								]);
+								if (mod.paramLabels?.length) allCmds.push(setModuleLabelsCmd(slot, location, mod.index, mod.paramLabels));
 								const slotE = this.slots[slot];
 								if (slotE.variations) {
 									for (let v = 1; v < slotE.variations.length; v++) {
@@ -3249,6 +3285,7 @@ export const useSlotsStore = defineStore('slots', {
 									String(cn.dcon),
 								]);
 							}
+							if (ccSnaps.length > 0) allCmds.push(assignMidiCCBatchCmd(slot, ccSnaps));
 							for (const p of pagesSnaps) allCmds.push(assignKnobCmd(slot, p));
 							for (const p of globalPagesSnaps) allCmds.push(assignGlobalKnobCmd(slot, p));
 							try {
@@ -3258,6 +3295,7 @@ export const useSlotsStore = defineStore('slots', {
 							} catch (err) {
 								console.warn('deleteSelection undo: CLI failed (offline?):', err);
 							}
+							await this._restoreModuleMorph(slot, morphSnap);
 						},
 						redo: async () => {
 							const currentCtx = this._getActivePatch();
@@ -3328,16 +3366,12 @@ export const useSlotsStore = defineStore('slots', {
 							const oldAssignment = prevControllers.find((c) => c.cc === cc);
 							if (oldAssignment) {
 								const oldLocStr = ccLocationStr(oldAssignment.location);
-								await window.cli.run([
-									'assign-midicc',
-									slot,
-									oldLocStr,
-									String(oldAssignment.moduleIndex),
-									String(oldAssignment.paramIndex),
-									String(cc),
-								]);
+								await runCliSafe(
+									['assign-midicc', slot, oldLocStr, String(oldAssignment.moduleIndex), String(oldAssignment.paramIndex), String(cc)],
+									'assignMidiCC undo',
+								);
 							} else {
-								await window.cli.run(['deassign-midicc', slot, String(cc)]);
+								await runCliSafe(['deassign-midicc', slot, String(cc)], 'assignMidiCC undo');
 							}
 						}
 					},
@@ -3348,7 +3382,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status === DeviceStatus.Connected)
-				await window.cli.run(['assign-midicc', slot, locStr, String(moduleIndex), String(paramIndex), String(cc)]);
+				await runCliSafe(['assign-midicc', slot, locStr, String(moduleIndex), String(paramIndex), String(cc)], 'assignMidiCC');
 		},
 
 		async deassignMidiCC(slot: SlotLabel, cc: number): Promise<void> {
@@ -3368,7 +3402,10 @@ export const useSlotsStore = defineStore('slots', {
 							const deviceStore = useDeviceStore();
 							if (deviceStore.status === DeviceStatus.Connected) {
 								const locStr = ccLocationStr(restored.location);
-								await window.cli.run(['assign-midicc', slot, locStr, String(restored.moduleIndex), String(restored.paramIndex), String(cc)]);
+								await runCliSafe(
+									['assign-midicc', slot, locStr, String(restored.moduleIndex), String(restored.paramIndex), String(cc)],
+									'deassignMidiCC undo',
+								);
 							}
 						}
 					},
@@ -3378,7 +3415,7 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected) await window.cli.run(['deassign-midicc', slot, String(cc)]);
+			if (deviceStore.status === DeviceStatus.Connected) await runCliSafe(['deassign-midicc', slot, String(cc)], 'deassignMidiCC');
 		},
 
 		// Assigns a module parameter to a Parameter Page knob slot (0-119). Enforces two-way
@@ -3618,11 +3655,7 @@ export const useSlotsStore = defineStore('slots', {
 						const restored = prevControllers.filter((c) => ccSet.has(c.cc));
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && restored.length > 0) {
-							const flatArgs = restored.flatMap((a) => {
-								const locStr = ccLocationStr(a.location);
-								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
-							});
-							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
+							await runCliSafe(assignMidiCCBatchCmd(slot, restored), 'deassignMidiCCs undo');
 						}
 					},
 					redo: async () => {
@@ -3631,7 +3664,8 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0) await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
+			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
+				await runCliSafe(['deassign-midicc-batch', slot, ...ccs.map(String)], 'deassignMidiCCs');
 		},
 
 		async deassignAllMidiCC(slot: SlotLabel): Promise<void> {
@@ -3649,11 +3683,7 @@ export const useSlotsStore = defineStore('slots', {
 						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected && prevControllers.length > 0) {
-							const flatArgs = prevControllers.flatMap((a) => {
-								const locStr = ccLocationStr(a.location);
-								return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
-							});
-							await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
+							await runCliSafe(assignMidiCCBatchCmd(slot, prevControllers), 'deassignAllMidiCC undo');
 						}
 					},
 					redo: async () => {
@@ -3662,7 +3692,8 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0) await window.cli.run(['deassign-midicc-batch', slot, ...ccs.map(String)]);
+			if (deviceStore.status === DeviceStatus.Connected && ccs.length > 0)
+				await runCliSafe(['deassign-midicc-batch', slot, ...ccs.map(String)], 'deassignAllMidiCC');
 		},
 
 		async autoAssignMidiCC(slot: SlotLabel, targets: { location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[]): Promise<void> {
@@ -3679,24 +3710,20 @@ export const useSlotsStore = defineStore('slots', {
 			const prevControllers = [...this.slots[slot].controllers];
 			this.slots[slot].controllers = [...this.slots[slot].controllers.filter((c) => !newCCSet.has(c.cc)), ...newAssignments];
 			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...this.slots[slot].controllers];
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot) && newAssignments.length > 0) {
 				hist.record(slot, {
 					undo: async () => {
 						this.slots[slot].controllers = prevControllers;
 						this._markSlotDirty(slot);
+						if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...prevControllers];
 						const deviceStore = useDeviceStore();
 						if (deviceStore.status === DeviceStatus.Connected) {
 							const cmds: string[][] = [['deassign-midicc-batch', slot, ...newAssignments.map((a) => String(a.cc))]];
 							const restored = prevControllers.filter((c) => newCCSet.has(c.cc));
-							if (restored.length > 0) {
-								const flatArgs = restored.flatMap((a) => {
-									const locStr = ccLocationStr(a.location);
-									return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
-								});
-								cmds.push(['assign-midicc-batch', slot, ...flatArgs]);
-							}
-							await window.cli.runBatch(cmds);
+							if (restored.length > 0) cmds.push(assignMidiCCBatchCmd(slot, restored));
+							await runCliBatchSafe(cmds, 'autoAssignMidiCC undo');
 						}
 					},
 					redo: async () => {
@@ -3705,13 +3732,8 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 			const deviceStore = useDeviceStore();
-			if (deviceStore.status === DeviceStatus.Connected && newAssignments.length > 0) {
-				const flatArgs = newAssignments.flatMap((a) => {
-					const locStr = ccLocationStr(a.location);
-					return [locStr, String(a.moduleIndex), String(a.paramIndex), String(a.cc)];
-				});
-				await window.cli.run(['assign-midicc-batch', slot, ...flatArgs]);
-			}
+			if (deviceStore.status === DeviceStatus.Connected && newAssignments.length > 0)
+				await runCliSafe(assignMidiCCBatchCmd(slot, newAssignments), 'autoAssignMidiCC');
 		},
 	},
 });

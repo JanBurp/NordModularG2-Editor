@@ -56,6 +56,8 @@ function modSnap(m: ModuleInstance) {
 		colour: m.colour,
 		uprate: m.uprate,
 		leds: m.leds,
+		uname: m.uname,
+		paramLabels: m.paramLabels,
 		modes: [...(m.modes ?? [])],
 		lv: [...(m.lv ?? [])].map((v) => v ?? 0),
 	};
@@ -84,6 +86,7 @@ function expectPatchEqual(a: Patch, b: Patch) {
 		expect(cabsB).toEqual(cabsA);
 	}
 	expect(b.description).toEqual(a.description);
+	expect(b.morphParamLabels ?? []).toEqual(a.morphParamLabels ?? []);
 	expect(b.patchParams).toEqual(a.patchParams);
 	expect(b.controllers ?? []).toEqual(a.controllers ?? []);
 	expect(b.paramPages ?? []).toEqual(a.paramPages ?? []);
@@ -124,6 +127,11 @@ describe('patch round-trip: parse → serialize → parse', () => {
 	for (const file of ['EmptyPatch.pch2', 'Basics  NL2.pch2', 'DXBass FM4.pch2']) {
 		it(file, () => {
 			const { name, rawHex, patch: patchA } = loadFixture(file);
+			// Guard against a vacuous comparison: non-empty fixtures must actually carry modules and cables.
+			if (file !== 'EmptyPatch.pch2') {
+				expect(patchA.areas[1].modules.length).toBeGreaterThan(0);
+				expect((patchA.areas[1].cableList ?? []).length).toBeGreaterThan(0);
+			}
 			const newHex = serializePatch(name, patchA, rawHex, extractVariations(patchA));
 			const patchB = parsePatchFromRawHex(name, newHex);
 			expectPatchEqual(patchA, patchB);
@@ -232,6 +240,8 @@ describe('addModule', () => {
 		expect(added.index).toBe(1);
 		expect(added.horiz).toBe(3);
 		expect(added.vert).toBe(7);
+		expect(added.colour).toBe(0);
+		expect(added.pcnt).toBe(0);
 		expect(added.modes).toEqual([]);
 		expect(added.lv).toEqual([]);
 	});
@@ -263,6 +273,9 @@ describe('addModule', () => {
 		const added = patchB.areas[1].modules.find((m) => m.index === 2)!;
 		expect(added).toBeDefined();
 		expect(added.pcnt).toBe(pcnt);
+		expect(added.type).toBe(4);
+		expect(added.horiz).toBe(1);
+		expect(added.vert).toBe(2);
 		expect(added.lv).toEqual(lv);
 	});
 });
@@ -290,6 +303,10 @@ describe('addCable', () => {
 		expect(cables).toHaveLength(existingCount + 1);
 		const found = cables.find((c) => c.smod === 2 && c.scon === 0 && c.dmod === 1 && c.dcon === 0 && c.colour === 2);
 		expect(found).toBeDefined();
+		expect(found!.dir).toBe(1);
+		// Existing cables are untouched
+		const original = loadFixture('Basics  NL2.pch2').patch.areas[1].cableList ?? [];
+		expect(cables.slice(0, existingCount).map(cableSnap)).toEqual(original.map(cableSnap));
 	});
 });
 
@@ -1443,6 +1460,15 @@ describe('patch text round-trip: parse → serialize → parse', () => {
 		const patchB = parsePatchFromRawHex(name, newHex);
 
 		expect(patchB.text).toBe(patch.text);
+	});
+
+	it('replaces characters outside Latin-1 with ? instead of masking them into unrelated bytes', () => {
+		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
+		patch.text = 'a\u0141b\u20acc';
+
+		const patchB = parsePatchFromRawHex(name, serializePatch(name, patch, rawHex, extractVariations(patch)));
+
+		expect(patchB.text).toBe('a?b?c');
 	});
 
 	it('text survives file save/load cycle', () => {

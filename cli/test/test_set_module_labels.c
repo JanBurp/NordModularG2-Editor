@@ -49,3 +49,16 @@ void test_set_module_labels_malformed_groups(void) {
     const char *tok[] = {"4", "2", "Mic"};
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_module_labels(0, 1, 1, 3, tok));
 }
+
+/* A non-string JSON arg reaches the builder as NULL (daemon.c arg_s): treated as "", never dereferenced. */
+void test_build_set_module_labels_null_tokens_do_not_crash(void) {
+    const char *null_label[] = {"4", "1", NULL};
+    const char *null_param[] = {NULL, "1", "Mic"};
+    const char *null_count[] = {"4", NULL, "Mic"};
+    uint8_t buf[G2_MODULE_LABELS_BUFSZ]; G2Op op;
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_build_set_module_labels_op(&op, buf, 1, 1, 3, null_label));
+    TEST_ASSERT_EQUAL_STRING("", (const char *)(buf + 3 + 3));
+    TEST_ASSERT_EQUAL_INT(G2_OK, g2_build_set_module_labels_op(&op, buf, 1, 1, 3, null_param));
+    TEST_ASSERT_EQUAL_HEX8(0, buf[3 + 2]);   /* param idx 0 */
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_build_set_module_labels_op(&op, buf, 1, 1, 3, null_count));
+}

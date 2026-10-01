@@ -1,6 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 import { test, expect } from './fixtures/electron';
+import { getStatusCounts } from './helpers';
 
 // These are the one place main.ts's real "patches:init-save-path"/"patches:init-load-path"
 // handlers run unmocked - the e2e fixture only stubs cli:run/cli:run-batch/cli:watch-start,
@@ -10,22 +11,24 @@ test.describe('file operations – save/load init patch', () => {
 		await mockOpenPatch('-- Welcome G2 --.pch2');
 		await sendMenuAction('open');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		const savedCounts = await getStatusCounts(page);
 
 		await sendMenuAction('save-init-1');
-		await page.waitForTimeout(500);
 
 		const userDataDir = await app.evaluate(() => process.env.TEST_USER_DATA as string);
 		const initPath = path.join(userDataDir, 'patches', 'init-1.pch2');
-		expect(fs.existsSync(initPath)).toBe(true);
-		expect(fs.statSync(initPath).size).toBeGreaterThan(0);
+		await expect.poll(() => fs.existsSync(initPath) && fs.statSync(initPath).size).toBeGreaterThan(0);
 
 		// Load a different patch, then load Init 1 back via the toolbar button.
 		await mockOpenPatch('DXBass FM4.pch2');
 		await sendMenuAction('open');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
 
+		// The test is only meaningful if the other patch actually differs from the saved one.
+		await expect.poll(() => getStatusCounts(page)).not.toEqual(savedCounts);
+
 		await page.getByRole('button', { name: 'Init 1' }).click();
-		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await expect.poll(() => getStatusCounts(page)).toEqual(savedCounts);
 	});
 
 	test('Init 2 falls back to the bundled EmptyPatch.pch2 when no snapshot has been saved yet', async ({ app, page }) => {

@@ -53,4 +53,7 @@ int send_and_expect_ok_save_event(daemon_ctx_t *d, const char *json,
                                    int expected_id, const char *capture_type,
                                    cJSON **captured);
 
+/* Poll (get-patch A) until the G2 answers again after an upload/edit; 0 = ready, -1 = gave up. */
+int daemon_wait_ready(daemon_ctx_t *d);
+
 #endif

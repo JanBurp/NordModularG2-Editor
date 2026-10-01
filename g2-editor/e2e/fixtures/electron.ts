@@ -15,16 +15,20 @@ const FIXTURES_DIR = path.join(__dirname, '..', '..', '..', 'test-patches');
 // than failing the test on this transient race.
 const TRANSIENT_EVALUATE_ERRORS = ['Execution context was destroyed', 'Resulting promise was garbage collected'];
 
+// Hard cap on the whole retry loop, on top of the attempt count (each attempt can itself be slow).
+const EVALUATE_RETRY_TIMEOUT_MS = 10_000;
+
 export async function evaluateWithRetry<R, Arg = void>(
 	app: ElectronApplication,
 	fn: (electron: typeof import('electron'), arg: Arg) => R,
 	arg?: Arg,
 ): Promise<R> {
+	const deadline = Date.now() + EVALUATE_RETRY_TIMEOUT_MS;
 	for (let attempt = 1; ; attempt++) {
 		try {
 			return await app.evaluate(fn, arg as Arg);
 		} catch (e) {
-			if (attempt >= 5 || !(e instanceof Error) || !TRANSIENT_EVALUATE_ERRORS.some((m) => e.message.includes(m))) throw e;
+			if (attempt >= 5 || Date.now() > deadline || !(e instanceof Error) || !TRANSIENT_EVALUATE_ERRORS.some((m) => e.message.includes(m))) throw e;
 			await new Promise((r) => setTimeout(r, 100));
 		}
 	}

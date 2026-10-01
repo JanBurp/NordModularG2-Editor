@@ -7,6 +7,30 @@ function now(): string {
 	return [d.getHours(), d.getMinutes(), d.getSeconds()].map((n) => String(n).padStart(2, '0')).join(':') + '.' + String(d.getMilliseconds()).padStart(3, '0');
 }
 
+/* on/off pair that only removes the listeners registered through it, so unrelated
+ * listeners on the same channel are left alone. */
+function listenerGroup(channel: string) {
+	const wrapped = new Set<(...args: any[]) => void>();
+	return {
+		on: (handler: (...args: any[]) => void) => {
+			const w = (_: unknown, ...args: any[]) => handler(...args);
+			wrapped.add(w);
+			ipcRenderer.on(channel, w);
+		},
+		off: () => {
+			for (const w of wrapped) ipcRenderer.removeListener(channel, w);
+			wrapped.clear();
+		},
+	};
+}
+
+const menuAction = listenerGroup("menu:action");
+const openFile = listenerGroup("file:open");
+const devicesChanged = listenerGroup("devices:changed");
+const watchEvent = listenerGroup("cli:watch-event");
+const watchDone = listenerGroup("cli:watch-done");
+const deviceDisconnected = listenerGroup("cli:device-disconnected");
+
 contextBridge.exposeInMainWorld("electronAPI", {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
 	isMac: process.platform === 'darwin',
@@ -22,15 +46,14 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),
 	loadModuleGraphics: () => ipcRenderer.invoke("modules:load-graphics"),
 
-	onMenuAction: (cb: (action: MenuAction) => void) =>
-		ipcRenderer.on("menu:action", (_, action) => cb(action as MenuAction)),
-	offMenuAction: () => ipcRenderer.removeAllListeners("menu:action"),
+	onMenuAction: (cb: (action: MenuAction) => void) => menuAction.on(cb),
+	offMenuAction: () => menuAction.off(),
 	// Registers the listener, then tells main this window can take files (flushes any queued ones).
 	onOpenFile: (cb: (filepath: string) => void) => {
-		ipcRenderer.on("file:open", (_, filepath) => cb(filepath as string));
+		openFile.on(cb);
 		ipcRenderer.invoke("app:open-file-ready");
 	},
-	offOpenFile: () => ipcRenderer.removeAllListeners("file:open"),
+	offOpenFile: () => openFile.off(),
 	updateRecentFiles: (files: { path: string; kind: "patch" | "performance" }[]) =>
 		ipcRenderer.send("recent-files:update", files),
 	updateMenuState: (state: MenuState) => ipcRenderer.send("menu-state:update", state),
@@ -57,8 +80,8 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		getAssignment: () => ipcRenderer.invoke("devices:get-assignment"),
 		onChanged: (
 			cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean; status: DeviceStatus }[]) => void,
-		) => ipcRenderer.on("devices:changed", (_event, list) => cb(list)),
-		offChanged: () => ipcRenderer.removeAllListeners("devices:changed"),
+		) => devicesChanged.on(cb),
+		offChanged: () => devicesChanged.off(),
 	},
 	clipboard: {
 		write: (entry: unknown) => ipcRenderer.invoke("clipboard:write", entry),
@@ -83,10 +106,10 @@ contextBridge.exposeInMainWorld("cli", {
 	},
 	watchStart: () => ipcRenderer.invoke("cli:watch-start"),
 	watchStop: () => ipcRenderer.send("cli:watch-stop"),
-	onWatchEvent: (cb: (line: string) => void) => ipcRenderer.on("cli:watch-event", (_event, line) => cb(line)),
-	offWatchEvent: () => ipcRenderer.removeAllListeners("cli:watch-event"),
-	onWatchDone: (cb: () => void) => ipcRenderer.on("cli:watch-done", () => cb()),
-	offWatchDone: () => ipcRenderer.removeAllListeners("cli:watch-done"),
-	onDeviceDisconnected: (cb: () => void) => ipcRenderer.on("cli:device-disconnected", () => cb()),
-	offDeviceDisconnected: () => ipcRenderer.removeAllListeners("cli:device-disconnected"),
+	onWatchEvent: (cb: (line: string) => void) => watchEvent.on(cb),
+	offWatchEvent: () => watchEvent.off(),
+	onWatchDone: (cb: () => void) => watchDone.on(() => cb()),
+	offWatchDone: () => watchDone.off(),
+	onDeviceDisconnected: (cb: () => void) => deviceDisconnected.on(() => cb()),
+	offDeviceDisconnected: () => deviceDisconnected.off(),
 });

@@ -367,6 +367,7 @@ typedef struct {
     char filepath[1024];
 } bank_entry_t;
 
+void sanitize_filename(const char *name, char *out, size_t outSize);
 int parse_pchlist(const char *pchListPath, int type, bank_entry_t *entries, int maxEntries);
 int scan_bank_folder(const char *folderPath, int type, bank_entry_t *entries, int maxEntries);
 int build_flash_dump_raw_frame(int type, int bank0, int location0, const char *name,

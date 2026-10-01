@@ -34,9 +34,14 @@ export function useStoreInSynthDialog() {
 		showDialog.value = false;
 		const name = kind.value === 'performance' ? slotsStore.performanceName : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
 		const slotIdx = Math.min(3, uiStore.selectedSlotIndex) as 0 | 1 | 2 | 3;
-		await browser.storePatch(slotIdx, bank.value, location.value, kind.value, name);
-		if (kind.value === 'performance' || slotsStore.getPatchForSlot(uiStore.slotInFocus)) {
-			showToast(`Saved ${kind.value} at ${bank.value}-${location.value}`);
+		try {
+			await browser.storePatch(slotIdx, bank.value, location.value, kind.value, name);
+			if (kind.value === 'performance' || slotsStore.getPatchForSlot(uiStore.slotInFocus)) {
+				showToast(`Saved ${kind.value} at ${bank.value}-${location.value}`);
+			}
+		} catch (err) {
+			console.error('Save in synth failed:', err);
+			showToast('Failed to save in synth — check device connection.');
 		}
 	}
 

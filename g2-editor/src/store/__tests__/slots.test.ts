@@ -4,6 +4,8 @@ import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
 import { useDeviceStore, DeviceStatus } from '@/store/device';
 
+afterEach(() => vi.useRealTimers());
+
 beforeEach(() => {
 	setActivePinia(createPinia());
 	(globalThis as any).window = { cli: { run: vi.fn().mockResolvedValue(undefined), runBatch: vi.fn().mockResolvedValue([]) } };
@@ -340,7 +342,7 @@ describe('setMorphGroupLabel', () => {
 		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
 
 		await store.undo();
-		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('');
+		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Wheel');
 
 		await store.redo();
 		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
@@ -832,6 +834,194 @@ describe('cable add/color/delete record undo even when the CLI/hardware call fai
 
 		expect(patch.areas[1].cableList).toHaveLength(0);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
+	});
+});
+
+describe('undo after an echo reload replaced the patch object', () => {
+	const FLT_CLASSIC = 92;
+	const FLT_LP = 87;
+
+	function stub(index: number, type = 5, vert = 0) {
+		return { index, type, horiz: 0, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	}
+
+	// Simulates _applyPatchOutput's echo reload: same content, new patch object.
+	function reload(store: ReturnType<typeof useSlotsStore>) {
+		const fresh = JSON.parse(JSON.stringify(store.slots['A'].patch));
+		store.slots['A'].patch = fresh;
+		return fresh;
+	}
+
+	it('deleteModule undo restores the module into the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [stub(1)];
+		store.slots['A'].patch = patch;
+
+		await store.deleteModule(1, 'voice');
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].modules.map((m: any) => m.index)).toEqual([1]);
+		expect(patch.areas[1].modules).toHaveLength(0);
+	});
+
+	it('deleteModule drops its morph assignments and undo restores them', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [stub(1)];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = [
+			{ fx: {}, voice: { 1: [] }, patch: { morphAssignments: [{ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: 0, range: 5 }] } },
+		] as any;
+
+		await store.deleteModule(1, 'voice');
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toHaveLength(1);
+	});
+
+	it('deleteSelection drops controllers + morph assignments and undo restores them (into the reloaded patch)', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [stub(1), stub(2, 5, 2)];
+		store.slots['A'].patch = patch;
+		store.slots['A'].controllers = [
+			{ cc: 5, location: 1, moduleIndex: 1, paramIndex: 0 },
+			{ cc: 6, location: 1, moduleIndex: 2, paramIndex: 0 },
+		];
+		store.slots['A'].variations = [
+			{ fx: {}, voice: {}, patch: { morphAssignments: [{ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: 0, range: 5 }] } },
+		] as any;
+
+		await store.deleteSelection([1], [], 'voice', patch.areas[1].modules, patch.areas[1].cableList);
+		expect(store.slots['A'].controllers.map((c) => c.cc)).toEqual([6]);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].modules.map((m: any) => m.index).sort()).toEqual([1, 2]);
+		expect(store.slots['A'].controllers.map((c) => c.cc).sort()).toEqual([5, 6]);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toHaveLength(1);
+		const batches = (globalThis as any).window.cli.runBatch.mock.calls.flatMap((c: any[]) => c[0]);
+		expect(batches.some((cmd: string[]) => cmd[0] === 'assign-midicc-batch')).toBe(true);
+	});
+
+	it('replaceModule undo removes the replacement on the device first and restores into the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [stub(1, FLT_CLASSIC)];
+		store.slots['A'].patch = patch;
+
+		await store.replaceModule(1, FLT_LP, 'voice');
+		const fresh = reload(store);
+		const runBatch = (globalThis as any).window.cli.runBatch as ReturnType<typeof vi.fn>;
+		const run = (globalThis as any).window.cli.run as ReturnType<typeof vi.fn>;
+		runBatch.mockClear();
+		run.mockClear();
+
+		await store.undo();
+
+		expect(fresh.areas[1].modules).toHaveLength(1); // no duplicate index
+		expect(fresh.areas[1].modules[0].type).toBe(FLT_CLASSIC);
+		const order = [...runBatch.mock.calls.flatMap((c: any[]) => c[0]), ...run.mock.calls.map((c: any[]) => c[0])].map((cmd: string[]) => cmd[0]);
+		expect(order.indexOf('del-module')).toBeGreaterThanOrEqual(0);
+		expect(order.indexOf('del-module')).toBeLessThan(order.indexOf('add-module'));
+	});
+
+	it('addCable undo removes the cable from the reloaded patch', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', 1);
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].cableList).toHaveLength(0);
+	});
+
+	it('deleteConnectedCables undo re-adds the cable to the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].cableList = [{ colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 }];
+		store.slots['A'].patch = patch;
+
+		await store.deleteConnectedCables(2, 0, 'input', 'voice');
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].cableList).toHaveLength(1);
+	});
+
+	it('setCableColor undo restores the colour in the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].cableList = [{ colour: 1, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 }];
+		store.slots['A'].patch = patch;
+
+		await store.setCableColor(2, 0, 'input', 5, 'voice');
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].cableList[0].colour).toBe(1);
+	});
+
+	it('breakJackConnection (_swapCables) undo restores the cables in the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].cableList = [
+			{ colour: 0, smod: 0, scon: 0, dir: 1, dmod: 10, dcon: 0 },
+			{ colour: 0, smod: 10, scon: 0, dir: 0, dmod: 11, dcon: 0 },
+		];
+		store.slots['A'].patch = patch;
+
+		await store.breakJackConnection(10, 0, 'input', 'voice');
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].cableList).toHaveLength(2);
+	});
+
+	it('moveModulesWithCollision undo moves the module back in the reloaded patch', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [stub(1)];
+		store.slots['A'].patch = patch;
+
+		await store.moveModulesWithCollision([1], 1, 0, 'voice', patch.areas[1].modules);
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].modules[0].horiz).toBe(0);
+	});
+
+	it('moveModulesWithCollision with unknown indices is a no-op and records nothing', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		expect(await store.moveModulesWithCollision([99], 1, 0, 'voice', [])).toBeNull();
+		expect(useHistoryStore().canUndo('A')).toBe(false);
+	});
+
+	it('setParamLabel on a missing module records nothing', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.setParamLabel(42, 0, 'x', 'voice');
+		expect(useHistoryStore().canUndo('A')).toBe(false);
+	});
+
+	it('paste undo removes the pasted module from the reloaded patch', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+
+		await store.paste([{ src: stub(0) as any, newId: 3, col: 0, row: 0 }], [], 'voice');
+		const fresh = reload(store);
+		await store.undo();
+
+		expect(fresh.areas[1].modules).toHaveLength(0);
 	});
 });
 

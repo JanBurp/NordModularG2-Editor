@@ -258,15 +258,15 @@ void test_patch_workflow_full_cycle(void) {
 
         WF_STEP(wf_capture_slot_a_patch(d, &canonBefore, &canonBeforeLen), "roundtrip: capture after live edits failed");
         WF_STEP(wf_upload_patch_data(d, canonBefore, canonBeforeLen), "roundtrip: upload #1 failed");
-        if (!bodyFail) usleep(300000); /* let the slot settle before reading it back, same convention as test_daemon.c */
+        if (!bodyFail) daemon_wait_ready(d);
         WF_STEP(wf_capture_slot_a_patch(d, &snap1, &snap1Len), "roundtrip: capture #1 failed");
 
         WF_STEP(wf_upload_patch_data(d, snap1, snap1Len), "roundtrip: upload #2 failed");
-        if (!bodyFail) usleep(300000);
+        if (!bodyFail) daemon_wait_ready(d);
         WF_STEP(wf_capture_slot_a_patch(d, &snap2, &snap2Len), "roundtrip: capture #2 failed");
 
         WF_STEP(wf_upload_patch_data(d, snap2, snap2Len), "roundtrip: upload #3 failed");
-        if (!bodyFail) usleep(300000);
+        if (!bodyFail) daemon_wait_ready(d);
         WF_STEP(wf_capture_slot_a_patch(d, &snap3, &snap3Len), "roundtrip: capture #3 failed");
 
         /* Comparison-only check - NOT a command failure, so doesn't set commFailed. */
@@ -289,7 +289,7 @@ void test_patch_workflow_full_cycle(void) {
     free(original);
     free(canonBefore);
     free(canonAfter);
-    usleep(300000); /* let the slot settle before reading global state again, same convention as test_daemon.c */
+    daemon_wait_ready(d);
 
     cJSON *perfAfter = wf_get_perf_settings_data(d);
     if (!cleanupFail && !(perfBefore && perfAfter && cJSON_Compare(perfBefore, perfAfter, 1)))
@@ -365,7 +365,7 @@ void test_patch_workflow_replace_module(void) {
             snprintf(ops, sizeof(ops), "[\"add-module\",\"A\",\"va\",\"7\",\"1\",\"0\",\"0\",\"2\",\"0\",\"0\",\"%s\"]", newNames[i]);
             WF_STEP(wf_seq(d, ops), "replace: seq add-module failed");
             WF_STEP(wf_seq(d, "[\"add-cable\",\"A\",\"va\",\"1\",\"1\",\"1\",\"0\",\"2\",\"0\",\"0\"]"), "replace: seq add-cable failed");
-            if (!bodyFail) usleep(300000);
+            if (!bodyFail) daemon_wait_ready(d);
 
             /* The real failure mode: the device stops answering. A get-patch must still work
              * and must contain the replacement module's name. */
@@ -384,7 +384,7 @@ void test_patch_workflow_replace_module(void) {
         commFailed = 1;
     }
     free(original);
-    usleep(300000);
+    daemon_wait_ready(d);
 
     cJSON *perfAfter = wf_get_perf_settings_data(d);
     if (!cleanupFail && !(perfBefore && perfAfter && cJSON_Compare(perfBefore, perfAfter, 1)))

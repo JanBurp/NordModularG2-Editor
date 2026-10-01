@@ -220,6 +220,7 @@
 		confirm-label="Upload"
 		:close-on-confirm="false"
 		:disable-confirm="bankUpload.inProgress.value"
+		:prevent-close="bankUpload.inProgress.value"
 		@confirm="bankUpload.confirm"
 		@cancel="bankUpload.cancel"
 	>
@@ -304,6 +305,7 @@
 		confirm-label="Download"
 		:close-on-confirm="false"
 		:disable-confirm="bankDownload.inProgress.value"
+		:prevent-close="bankDownload.inProgress.value"
 		@confirm="bankDownload.confirm"
 		@cancel="bankDownload.cancel"
 	>
@@ -669,7 +671,9 @@
 			}
 		}
 
-		if (noMod) {
+		// Plain-key shortcuts must not hijack keys meant for a focused control or an open dialog
+		const ownsKeys = el instanceof HTMLElement && el.closest('button, [role=slider], [role=menuitem], [role=option], [role=dialog]');
+		if (noMod && !ownsKeys && !document.querySelector('[role=dialog]')) {
 			switch (e.key) {
 				case 'm':
 					e.preventDefault();
@@ -762,13 +766,20 @@
 	}
 
 	onMounted(async () => {
+		try {
+			await startup();
+		} finally {
+			startingUp.value = false;
+		}
+	});
+
+	async function startup(): Promise<void> {
 		const { version, platform } = await window.electronAPI.getAppInfo();
 		console.log(`[startup] ${APP_NAME} v${version} — ${platform}`);
 
 		if (isOfflineMode.value) {
 			device.status = DeviceStatus.Offline;
 			showAboutDialog.value = false;
-			startingUp.value = false;
 			return;
 		}
 
@@ -799,6 +810,5 @@
 			if (showAboutDialog.value && remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
 			showAboutDialog.value = false;
 		}
-		startingUp.value = false;
-	});
+	}
 </script>

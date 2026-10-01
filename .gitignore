@@ -28,3 +28,6 @@ g2-editor/resources/g2-cli
 
 # Docs (Jekyll build output — committed for Pages but excluded from future builds)
 docs/_site/
+
+# TypeScript incremental build info
+g2-editor/tsconfig.node.tsbuildinfo

@@ -221,3 +221,28 @@ void test_build_flash_dump_raw_frame_buffer_too_small(void) {
 
     TEST_ASSERT_EQUAL_INT(-1, len);
 }
+
+/* ---- sanitize_filename (device-supplied names reaching get-bank file paths) ---- */
+
+void test_sanitize_filename_replaces_path_separators(void) {
+    char out[32];
+    sanitize_filename("a/b\\c:d", out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("a_b_c_d", out);
+}
+
+void test_sanitize_filename_neutralises_dot_dot(void) {
+    char out[32];
+    sanitize_filename("..", out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("_.", out);
+    sanitize_filename("../x", out, sizeof(out));
+    TEST_ASSERT_NULL(strchr(out, '/'));
+    TEST_ASSERT_NOT_EQUAL('.', out[0]);
+}
+
+void test_sanitize_filename_keeps_plain_name_and_truncates(void) {
+    char out[8];
+    sanitize_filename("Lead 1", out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("Lead 1", out);
+    sanitize_filename("0123456789", out, sizeof(out));
+    TEST_ASSERT_EQUAL_STRING("0123456", out);
+}

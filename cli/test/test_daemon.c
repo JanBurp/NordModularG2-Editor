@@ -285,7 +285,7 @@ void test_daemon_dump_patch_cmd(void) {
                                   "setup: capture slot A before overwrite");
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
-    usleep(300000); /* let the slot settle, same convention as test_upload_patch.c */
+    daemon_wait_ready(&g_daemon);
 
     char cmd[64];
     int id = g_cmd_id++;
@@ -294,7 +294,7 @@ void test_daemon_dump_patch_cmd(void) {
 
     int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
     free(saved_buf);
-    usleep(300000); /* let the slot settle before the next test reads it */
+    daemon_wait_ready(&g_daemon);
 
     TEST_ASSERT_EQUAL_INT(0, r);
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
@@ -387,7 +387,7 @@ void test_daemon_assign_knob_cmd(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
                                   "setup: capture slot A before overwrite");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
 
     int loc = -1, mod = -1, par = -1;
     int before0 = read_slot_a_knob(&g_daemon, 0, &loc, &mod, &par);
@@ -400,7 +400,7 @@ void test_daemon_assign_knob_cmd(void) {
         snprintf(cmd, sizeof(cmd),
                  "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"deassign-knob\",\"A\",\"0\"],[\"assign-knob\",\"A\",\"va\",\"1\",\"0\",\"6\"]]}", id);
         r_seq = send_and_expect_ok(&g_daemon, cmd, id);
-        usleep(300000);
+        daemon_wait_ready(&g_daemon);
         int l0, m0, p0;
         after0 = read_slot_a_knob(&g_daemon, 0, &l0, &m0, &p0);
         after6 = read_slot_a_knob(&g_daemon, 6, &loc, &mod, &par);
@@ -408,7 +408,7 @@ void test_daemon_assign_knob_cmd(void) {
 
     int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
     free(saved_buf);
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(1, before0, "fixture: knob 0 should be assigned");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, before6, "fixture: knob 6 should be free");
@@ -479,7 +479,7 @@ static int set_slot_a_module_labels(daemon_ctx_t *d, int mod, int first_param, i
         len += snprintf(cmd + len, sizeof(cmd) - (size_t)len, ",\"%d\",\"1\",\"%s\"", first_param + i, labels[i]);
     snprintf(cmd + len, sizeof(cmd) - (size_t)len, "]}");
     int r = send_and_expect_ok(d, cmd, id);
-    usleep(300000);
+    daemon_wait_ready(d);
     return r;
 }
 
@@ -503,13 +503,13 @@ void test_daemon_set_param_label_four_button_switch(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
                                   "setup: capture slot A before overwrite");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
 
     char cmd[160];
     int id = g_cmd_id++;
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"add-module\",\"args\":[\"A\",\"va\",\"123\",\"%d\",\"0\",\"60\",\"0\",\"0\",\"0\",\"Mix\"]}", id, MIX);
     r_add = send_and_expect_ok(&g_daemon, cmd, id);
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
 
     /* Step 1: rename all four buttons one after another; after each rename every button set so
      * far must still read back with its own name. */
@@ -533,7 +533,7 @@ void test_daemon_set_param_label_four_button_switch(void) {
 
     int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
     free(saved_buf);
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_add, "add-module Mixer 4-1 C should be accepted");
     for (int b = 0; b < 4; b++) TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_set[b], "set-module-labels should be accepted");
@@ -563,7 +563,7 @@ void test_daemon_assign_global_knob_cmd(void) {
     snprintf(cmd, sizeof(cmd),
              "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"assign-global-knob\",\"A\",\"B\",\"va\",\"1\",\"0\",\"%d\"]]}", id, knob);
     int r_assign = send_and_expect_ok(&g_daemon, cmd, id);
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
     loc = mod = par = ts = -1;
     int after_assign = read_global_knob(&g_daemon, knob, &loc, &mod, &par, &ts);
 
@@ -571,7 +571,7 @@ void test_daemon_assign_global_knob_cmd(void) {
     snprintf(cmd, sizeof(cmd),
              "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"deassign-global-knob\",\"A\",\"%d\"]]}", id, knob);
     int r_deassign = send_and_expect_ok(&g_daemon, cmd, id);
-    usleep(300000);
+    daemon_wait_ready(&g_daemon);
     int l2, m2, p2, t2;
     int after_deassign = read_global_knob(&g_daemon, knob, &l2, &m2, &p2, &t2);
 

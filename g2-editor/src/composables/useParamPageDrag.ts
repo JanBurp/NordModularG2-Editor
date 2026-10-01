@@ -34,25 +34,36 @@ export function useParamPageDragState() {
 export function startParamPageDrag(e: MouseEvent, payload: ParamDragPayload) {
 	e.preventDefault();
 	e.stopPropagation();
+	if (state.active) return; // a drag is already running (its listeners are still attached)
 	state.active = true;
 	state.payload = payload;
 	state.x = e.clientX;
 	state.y = e.clientY;
 
+	function end() {
+		document.removeEventListener('mousemove', onMove);
+		document.removeEventListener('mouseup', onUp);
+		document.removeEventListener('keydown', onKey, true);
+		window.removeEventListener('blur', end);
+		state.active = false;
+		state.payload = null;
+	}
 	function onMove(ev: MouseEvent) {
 		state.x = ev.clientX;
 		state.y = ev.clientY;
 	}
 	function onUp(ev: MouseEvent) {
-		document.removeEventListener('mousemove', onMove);
-		document.removeEventListener('mouseup', onUp);
-		state.active = false;
-		state.payload = null;
+		end();
 		const target = document.elementFromPoint(ev.clientX, ev.clientY);
 		if (target) handleDrop(target, payload);
 	}
+	function onKey(ev: KeyboardEvent) {
+		if (ev.key === 'Escape') end();
+	}
 	document.addEventListener('mousemove', onMove);
 	document.addEventListener('mouseup', onUp);
+	document.addEventListener('keydown', onKey, true);
+	window.addEventListener('blur', end);
 }
 
 function handleDrop(target: Element, payload: ParamDragPayload) {

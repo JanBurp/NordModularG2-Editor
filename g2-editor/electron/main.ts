@@ -41,6 +41,7 @@ interface DeviceSession {
 	// app.whenReady): watch events are held here and flushed by cli:watch-start.
 	earlyEvents?: string[] | null;
 }
+const MAX_EARLY_EVENTS = 10_000;
 const sessions = new Map<string, DeviceSession>();
 const sessionByWebContentsId = new Map<number, DeviceSession>();
 let activeSessionId: string | null = null;
@@ -106,8 +107,10 @@ app.on("open-file", (event, filepath) => {
 
 // Windows/Linux pass the file as an argument; a second launch is forwarded to the running instance.
 // Packaged builds only, so parallel dev/e2e instances (which share no userData) aren't blocked.
-if (app.isPackaged && !app.requestSingleInstanceLock()) app.quit();
-app.on("second-instance", (_event, argv) => argv.slice(1).forEach(openFileInApp));
+const gotInstanceLock = !app.isPackaged || app.requestSingleInstanceLock();
+if (!gotInstanceLock) app.quit();
+app.on("second-instance", (_event, argv, workingDirectory) =>
+	argv.slice(1).forEach((arg) => openFileInApp(path.resolve(workingDirectory, arg))));
 if (!isMac) pendingOpenFiles.push(...process.argv.slice(1).filter((arg) => /\.(pch2|prf2)$/i.test(arg)));
 
 function resolveSession(event: { sender: { id: number } }): DeviceSession | undefined {
@@ -178,7 +181,7 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 		window.show();
 	}
 
-	trackWindowState(window);
+	trackWindowState(window, cascade);
 
 	if (VITE_DEV_SERVER_URL) {
 		window.loadURL(VITE_DEV_SERVER_URL);
@@ -190,6 +193,8 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	// close time rather than capturing it now, since binding is asynchronous.
 	const wcId = window.webContents.id;
 	window.on("closed", () => {
+		pendingAssignment.delete(wcId);
+		openFileReadyIds.delete(wcId);
 		const session = sessionByWebContentsId.get(wcId);
 		if (!session) return;
 		sessionByWebContentsId.delete(wcId);
@@ -254,7 +259,7 @@ function startDaemon(session: DeviceSession) {
 					}
 				}
 			} else if (session.earlyEvents) {
-				session.earlyEvents.push(trimmed);
+				if (session.earlyEvents.length < MAX_EARLY_EVENTS) session.earlyEvents.push(trimmed);
 			} else {
 				safeSend(session.window, "cli:watch-event", trimmed);
 			}
@@ -263,7 +268,7 @@ function startDaemon(session: DeviceSession) {
 	proc.stderr?.on("data", (data: Buffer) => {
 		console.error(`[daemon-error:${session.id}] ${data.toString().trim()}`);
 	});
-	proc.on("close", (code) => {
+	const onExit = (code: number | null) => {
 		const wasActive = session.daemonProcess === proc;
 		console.error(`[daemon:${session.id}] Exited with code ${code ?? 'null'}`);
 		if (wasActive) session.daemonProcess = null;
@@ -280,15 +285,32 @@ function startDaemon(session: DeviceSession) {
 			safeSend(session.window, "cli:watch-done");
 		}
 		broadcastDevicesChanged();
+	};
+	// Spawn failure (e.g. EACCES/ENOENT): 'close' may never fire, so report the disconnect here.
+	proc.on("error", (err) => {
+		console.error(`[daemon:${session.id}] Failed to run:`, err);
+		onExit(1);
 	});
+	proc.on("close", onExit);
 }
 
 async function stopDaemon(session: DeviceSession): Promise<void> {
 	if (!session.daemonProcess) return;
 	const proc = session.daemonProcess;
 	session.daemonProcess = null;
+	if (proc.exitCode !== null || proc.signalCode !== null) return;
 	return new Promise<void>((resolve) => {
-		proc.on("close", () => resolve());
+		// The daemon finishes its in-flight command before exiting on SIGTERM (reload-names takes ~6 s).
+		// SIGKILL mid-command leaves the G2 unresponsive until power-cycled, so only use it as a last
+		// resort for a truly stuck daemon; resolve regardless so close/quit never hang.
+		const killTimer = setTimeout(() => proc.kill("SIGKILL"), 30000);
+		const giveUpTimer = setTimeout(() => done(), 32000);
+		const done = () => {
+			clearTimeout(killTimer);
+			clearTimeout(giveUpTimer);
+			resolve();
+		};
+		proc.on("close", done);
 		proc.kill("SIGTERM");
 	});
 }
@@ -348,8 +370,28 @@ function sendCmd(session: DeviceSession, cmd: string, args: (string | number[])[
 	});
 }
 
+// Commands the renderer actually sends (derived from cli.run/runBatch usages in src/).
+const ALLOWED_CMDS = new Set([
+	"add-cable", "add-module", "assign-global-knob", "assign-knob", "assign-midicc", "assign-midicc-batch",
+	"clear-bank", "clear-patch", "copy-variation", "deassign-global-knob", "deassign-knob", "deassign-midicc",
+	"deassign-midicc-batch", "del-cable", "del-module", "disconnect", "dump-patch", "get-bank", "get-global-knobs",
+	"get-global-page", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
+	"list", "move-module", "play-note", "reload-names", "select-global-page", "select-param", "select-param-page",
+	"select-patch", "select-perf", "send-bank", "send-controller-snapshot", "set-cable-color", "set-knob-source",
+	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode",
+	"set-module-name", "set-morph-range", "set-morph-range-batch", "set-param", "set-patch-description",
+	"set-patch-name", "set-perf-mode", "set-perf-name", "set-range-enable", "set-slot-enabled", "set-slot-hold",
+	"set-slot-key", "set-slot-range", "set-synth-settings", "slot", "store-patch", "upload-patch",
+	"upload-patch-data", "upload-perf", "upload-perf-data", "variation",
+]);
+
+function assertAllowedCmd(cmd: unknown): asserts cmd is string {
+	if (typeof cmd !== "string" || !ALLOWED_CMDS.has(cmd)) throw new Error(`Command not allowed: ${String(cmd)}`);
+}
+
 ipcMain.handle("cli:run", async (event, args: (string | number[])[]) => {
 	const [cmd, ...rest] = args as [string, ...(string | number[])[]];
+	assertAllowedCmd(cmd);
 	const session = resolveSession(event);
 	if (cmd === "disconnect") {
 		if (session) await stopDaemon(session);
@@ -378,6 +420,7 @@ ipcMain.handle("cli:run-batch", async (event, argsList: string[][]) => {
 	const session = resolveSession(event);
 	if (!session) throw new Error("Daemon not running");
 	if (argsList.length === 0) return [];
+	argsList.forEach(([cmd]) => assertAllowedCmd(cmd));
 	if (argsList.length === 1) {
 		const [cmd, ...rest] = argsList[0];
 		return [await sendCmd(session, cmd, rest)];
@@ -523,11 +566,15 @@ ipcMain.handle("clipboard:read", () => {
 ipcMain.handle("patches:list", async (_, folder: string) => {
 	try {
 		const names = fs.readdirSync(folder).sort();
-		const entries = names.map((name) => {
+		const entries = names.flatMap((name) => {
 			const full = path.join(folder, name);
-			const isDir = fs.statSync(full).isDirectory();
-			return { name, path: full, isDir };
-		}).filter((e) => e.isDir || e.name.endsWith(".pch2") || e.name.endsWith(".prf2"));
+			try {
+				const isDir = fs.statSync(full).isDirectory();
+				return isDir || /\.(pch2|prf2)$/i.test(name) ? [{ name, path: full, isDir }] : [];
+			} catch {
+				return []; // broken symlink / unreadable entry
+			}
+		});
 		return { success: true, entries };
 	} catch (e: any) {
 		return { success: false, error: e.message, entries: [] };
@@ -558,7 +605,12 @@ ipcMain.handle("patches:builtin-path", (_, name: string) => {
 
 // Resolves the path to load for "Init N": a user-saved snapshot in userData if one
 // exists, else the bundled EmptyPatch.pch2 (same fallback "New Patch" always uses).
+function assertSlot(slot: unknown): asserts slot is number {
+	if (!Number.isInteger(slot) || (slot as number) < 0 || (slot as number) > 3) throw new Error("Invalid slot");
+}
+
 ipcMain.handle("patches:init-load-path", (_, slot: number) => {
+	assertSlot(slot);
 	const initPath = path.join(app.getPath("userData"), "patches", `init-${slot}.pch2`);
 	if (fs.existsSync(initPath)) return initPath;
 	return path.join(builtinPatchesDir(), "EmptyPatch.pch2");
@@ -566,6 +618,7 @@ ipcMain.handle("patches:init-load-path", (_, slot: number) => {
 
 // Resolves the write target for "Save Init Patch N", ensuring its directory exists.
 ipcMain.handle("patches:init-save-path", (_, slot: number) => {
+	assertSlot(slot);
 	const dir = path.join(app.getPath("userData"), "patches");
 	fs.mkdirSync(dir, { recursive: true });
 	return path.join(dir, `init-${slot}.pch2`);
@@ -581,6 +634,7 @@ ipcMain.handle("patches:set-folder", async (event) => {
 });
 
 ipcMain.handle("patch:save", async (_, filepath: string, data: number[]) => {
+	if (typeof filepath !== "string" || !/\.(pch2|prf2)$/i.test(filepath)) throw new Error("Invalid file type");
 	fs.writeFileSync(filepath, Buffer.from(data));
 });
 
@@ -629,6 +683,7 @@ ipcMain.handle("help:load", (_, shortName: string) => {
 	const helpDir = app.isPackaged
 		? path.join(process.resourcesPath, "doc", "help")
 		: path.join(process.env.APP_ROOT!, "..", "doc", "help");
+	if (typeof shortName !== "string" || !/^[\w.-]+$/.test(shortName)) return null;
 	const filePath = path.join(helpDir, `${shortName}.md`);
 	try {
 		return fs.readFileSync(filePath, "utf-8");
@@ -642,7 +697,8 @@ let cachedGraphicsFontFace: string | null | undefined;
 function loadGraphicsFontFace(): string | null {
 	if (cachedGraphicsFontFace !== undefined) return cachedGraphicsFontFace;
 	try {
-		const fontPath = path.join(process.env.APP_ROOT!, "public", "fonts", "SairaCondensed-Bold.ttf");
+		// Packaged: vite copies public/ into dist/ (which electron-builder ships); dev reads public/ directly.
+		const fontPath = path.join(app.isPackaged ? RENDERER_DIST : path.join(process.env.APP_ROOT!, "public"), "fonts", "SairaCondensed-Bold.ttf");
 		const b64 = fs.readFileSync(fontPath).toString("base64");
 		cachedGraphicsFontFace = `@font-face{font-family:'Saira Condensed';font-weight:700;font-style:normal;src:url(data:font/ttf;base64,${b64}) format('truetype');}`;
 	} catch (e) {
@@ -700,8 +756,12 @@ ipcMain.handle("patch:open-dialog", async (event, kind?: "patch" | "performance"
 	});
 	if (result.canceled || !result.filePaths[0]) return { success: false };
 	const filepath = result.filePaths[0];
-	const buf = fs.readFileSync(filepath);
-	return { success: true, filepath, data: Array.from(buf) };
+	try {
+		const buf = fs.readFileSync(filepath);
+		return { success: true, filepath, data: Array.from(buf) };
+	} catch (e: any) {
+		return { success: false, error: e.message };
+	}
 });
 
 ipcMain.handle("app:info", () => ({
@@ -721,7 +781,13 @@ ipcMain.handle("app:latestVersion", async (): Promise<string | null> => {
 	}
 });
 
-ipcMain.on("shell:openExternal", (_, url: string) => { shell.openExternal(url); });
+ipcMain.on("shell:openExternal", (_, url: string) => {
+	try {
+		if (new URL(url).protocol === "https:") void shell.openExternal(url);
+	} catch {
+		// not a valid URL
+	}
+});
 
 ipcMain.handle("theme:set", (_, mode: "system" | "light" | "dark") => {
 	nativeTheme.themeSource = mode;
@@ -1127,6 +1193,7 @@ app.on("before-quit", (e) => {
 });
 
 app.whenReady().then(async () => {
+	if (!gotInstanceLock) return;
 	console.log(`[startup] G2 Editor v${app.getVersion()} — ${platformLabel}`);
 
 	if (isMac) {

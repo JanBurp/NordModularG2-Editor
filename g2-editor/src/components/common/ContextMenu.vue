@@ -5,8 +5,9 @@
 		<ul
 			ref="menuEl"
 			role="menu"
+			tabindex="-1"
 			data-testid="context-menu"
-			class="fixed z-50 min-w-40 max-h-[90vh] overflow-y-auto bg-surface-2 border border-line-default rounded shadow-xl py-1 text-sm text-content-primary list-none m-0 p-0"
+			class="fixed z-50 min-w-40 max-h-[90vh] overflow-y-auto bg-surface-2 border border-line-default rounded shadow-xl py-1 text-sm text-content-primary list-none m-0 p-0 outline-none"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px' }"
 			@mouseenter="cancelClose"
 			@mouseleave="scheduleClose(300)"
@@ -28,6 +29,7 @@
 				<li
 					v-else
 					role="menuitem"
+					tabindex="-1"
 					:ref="(el) => setItemRef(idx, el as HTMLElement | null)"
 					class="flex items-center justify-between px-3 py-1.5 select-none"
 					:class="[
@@ -130,12 +132,30 @@
 		emit('close');
 	}
 
+	// Keyboard: Up/Down moves focus over enabled items, Enter/Space activates, Right opens a submenu.
 	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') emit('close');
+		if (e.key === 'Escape') return emit('close');
+		const enabled = [...itemRefs.keys()].filter((i) => !props.items[i].disabled).sort((a, b) => a - b);
+		const cur = enabled.findIndex((i) => itemRefs.get(i) === document.activeElement);
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			const next =
+				cur < 0 ? (e.key === 'ArrowDown' ? 0 : enabled.length - 1) : (cur + (e.key === 'ArrowDown' ? 1 : -1) + enabled.length) % enabled.length;
+			itemRefs.get(enabled[next])?.focus();
+		} else if (cur >= 0 && (e.key === 'Enter' || e.key === ' ')) {
+			e.preventDefault();
+			onItemClick(props.items[enabled[cur]]);
+		} else if (cur >= 0 && e.key === 'ArrowRight' && props.items[enabled[cur]].children) {
+			e.preventDefault();
+			onItemEnter(enabled[cur]);
+		}
 	}
 
 	onMounted(() => {
-		if (props.isRoot) window.addEventListener('keydown', onKeydown);
+		if (props.isRoot) {
+			window.addEventListener('keydown', onKeydown);
+			nextTick(() => menuEl.value?.focus()); // so arrow keys go to the menu, not the canvas shortcuts
+		}
 	});
 
 	onUnmounted(() => {

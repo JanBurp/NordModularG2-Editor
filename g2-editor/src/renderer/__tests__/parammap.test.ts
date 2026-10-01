@@ -42,6 +42,12 @@ describe('icon-based mode switches', () => {
 		expect(paramDef.img).toBeFalsy();
 	});
 
+	it.each(ICON_MODE_TYPES)('%s has a positive-height frame and a non-empty option list', (type) => {
+		const paramDef = getParam(type) as ParamDefinition;
+		expect(paramDef.defin?.[0].split(',').length).toBeGreaterThan(1);
+		expect(paramDef.high).toBeGreaterThan(paramDef.low);
+	});
+
 	it('HpLpSlopeMode option count matches its value range', () => {
 		// (OscWaveform_3 is excluded here: its defin already skips value 3, a pre-existing gap
 		// unrelated to the graph migration — see nmg2mods.ts history.)
@@ -54,6 +60,19 @@ describe('icon-based mode switches', () => {
 		for (const mod of getAllModules()) {
 			for (const mode of mod.modes ?? []) {
 				expect(getParam(mode.type), `${mod.short}.${mode.name} (${mode.type})`).toBeDefined();
+			}
+		}
+	});
+});
+
+describe('module parameter types', () => {
+	it('every param type referenced in nmg2mods.ts resolves to a parammap entry with a valid range and a numeric default', () => {
+		for (const mod of getAllModules()) {
+			for (const p of mod.params ?? []) {
+				const def = getParam(p.type) as ParamDefinition;
+				expect(def, `${mod.short}.${p.name} (${p.type})`).toBeDefined();
+				expect(def.low, `${mod.short}.${p.name} low<=high`).toBeLessThanOrEqual(def.high);
+				expect(typeof def.def, `${mod.short}.${p.name} has a numeric default`).toBe('number');
 			}
 		}
 	});

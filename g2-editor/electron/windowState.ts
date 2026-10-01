@@ -29,12 +29,22 @@ export function loadWindowState(): WindowState | null {
 	}
 }
 
-export function trackWindowState(win: BrowserWindow) {
+// cascade is the offset createAppWindow added to the saved position; it is removed again on save
+// so cascaded windows don't walk the shared base position down-right on every launch.
+export function trackWindowState(win: BrowserWindow, cascade = 0) {
 	let timeout: ReturnType<typeof setTimeout> | null = null;
+	let shown = win.isVisible();
+	win.once("show", () => { shown = true; });
 
 	const save = () => {
-		const state: WindowState = { ...win.getNormalBounds(), isMaximized: win.isMaximized() };
-		fs.writeFileSync(stateFile(), JSON.stringify(state));
+		if (!shown || win.isDestroyed()) return;
+		const b = win.getNormalBounds();
+		const state: WindowState = { ...b, x: b.x - cascade, y: b.y - cascade, isMaximized: win.isMaximized() };
+		try {
+			fs.writeFileSync(stateFile(), JSON.stringify(state));
+		} catch (e) {
+			console.warn("Failed to save window state:", e);
+		}
 	};
 
 	const scheduleSave = () => {

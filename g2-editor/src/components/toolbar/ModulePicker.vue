@@ -33,7 +33,7 @@
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
-					alt="graphics[m.id]"
+					:alt="m.long || m.short"
 				/>
 				<div
 					v-else
@@ -78,6 +78,10 @@
 
 	const { selectedIndex: focusedIndex, navigate, reset: resetFocusedIndex } = useListNav(() => modules.value.length);
 	watch(selectedCategory, () => resetFocusedIndex());
+	// Hidden category can disappear (toggle); fall back instead of showing a stale/empty selection
+	watch(categories, (cats) => {
+		if (!cats.includes(selectedCategory.value)) selectedCategory.value = cats[0];
+	});
 
 	function cycleCategory(direction: 1 | -1) {
 		const idx = categories.value.indexOf(selectedCategory.value);
@@ -87,6 +91,9 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.key === 'Tab') {
+			// Cycle through categories, but let Tab leave past the first/last one
+			const idx = categories.value.indexOf(selectedCategory.value);
+			if (e.shiftKey ? idx <= 0 : idx === categories.value.length - 1) return;
 			e.preventDefault();
 			cycleCategory(e.shiftKey ? -1 : 1);
 		} else if (e.key === '.' || e.key === '>') {

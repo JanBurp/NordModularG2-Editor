@@ -66,6 +66,10 @@
 
 		<!-- Drop zone hint -->
 		<div class="shrink-0 py-1 px-2 text-center text-content-muted border-t border-line-default text-[10px]">F8 - show CC's on params</div>
+
+		<Dialog v-model="showRemoveAllDialog" title="Remove All CC Assignments" @confirm="confirmRemoveAll">
+			<p class="text-sm text-content-primary">Remove all {{ controllers.length }} CC assignments?</p>
+		</Dialog>
 	</div>
 </template>
 
@@ -80,6 +84,7 @@
 	import { setBadgeDragImage } from '@/utils/badgeLayout';
 	import { serializeDragPayload, parseDragPayload } from '@/utils/dragPayload';
 	import type { MidiCCAssignment } from '@/types';
+	import Dialog from '@/components/common/Dialog.vue';
 
 	type CCRow = { cc: number; assignment: MidiCCAssignment | null };
 
@@ -90,6 +95,7 @@
 
 	const selectedRows = ref<Set<number>>(new Set());
 	let lastSelectedCC: number | null = null;
+	const showRemoveAllDialog = ref(false);
 
 	const slot = computed(() => uiStore.slotInFocus);
 
@@ -163,9 +169,14 @@
 		await slotsStore.deassignMidiCCs(s, ccs);
 	}
 
-	async function removeAll() {
+	function removeAll() {
+		if (!slot.value || controllers.value.length === 0) return;
+		showRemoveAllDialog.value = true;
+	}
+
+	async function confirmRemoveAll() {
 		const s = slot.value;
-		if (!s || controllers.value.length === 0) return;
+		if (!s) return;
 		selectedRows.value = new Set();
 		await slotsStore.deassignAllMidiCC(s);
 	}

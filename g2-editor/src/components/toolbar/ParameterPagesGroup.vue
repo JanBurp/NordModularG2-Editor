@@ -52,7 +52,6 @@
 					class="btn btn-xs w-full truncate text-center"
 					:class="{ 'opacity-40': cell.assignment && !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
 					@mousedown="onButtonMouseDown(cell)"
-					@mouseup="onButtonMouseUp(cell)"
 					@click="onButtonClick(cell)"
 				>
 					{{ cell.buttonValueLabel }}
@@ -373,14 +372,12 @@
 	// (1) on mousedown and released (0) on mouseup — sending a single "cycled" value on click, as
 	// non-trigger params do below, doesn't match how the device actually treats it and the optimistic
 	// echo-confirmation never matches what the device reports back.
+	// Release is listened for on window so letting go outside the button (or the app window) still sends 0.
 	function onButtonMouseDown(cell: Cell) {
-		if (!cell.assignment || !cell.buttonIsTrigger) return;
-		onButtonChange(cell.assignment, cell.buttonParamIndex, 1);
-	}
-
-	function onButtonMouseUp(cell: Cell) {
-		if (!cell.assignment || !cell.buttonIsTrigger) return;
-		onButtonChange(cell.assignment, cell.buttonParamIndex, 0);
+		const a = cell.assignment;
+		if (!a || !cell.buttonIsTrigger) return;
+		onButtonChange(a, cell.buttonParamIndex, 1);
+		window.addEventListener('mouseup', () => onButtonChange(a, cell.buttonParamIndex, 0), { once: true });
 	}
 
 	// Non-trigger params (e.g. OffOnBlank) cycle through their [low, high] range on click, mirroring

@@ -152,6 +152,10 @@ extern void test_set_module_labels_invalid_location(void);
 extern void test_set_module_labels_malformed_groups(void);
 extern void test_build_set_module_labels_rejects_malformed(void);
 extern void test_set_module_labels_invalid_slot(void);
+extern void test_build_set_module_labels_null_tokens_do_not_crash(void);
+extern void test_sanitize_filename_replaces_path_separators(void);
+extern void test_sanitize_filename_neutralises_dot_dot(void);
+extern void test_sanitize_filename_keeps_plain_name_and_truncates(void);
 
 extern void test_set_module_label_invalid_slot_low(void);
 extern void test_set_module_label_invalid_slot_high(void);
@@ -353,6 +357,10 @@ int main(void) {
     RUN_TEST(test_set_module_labels_malformed_groups);
     RUN_TEST(test_build_set_module_labels_rejects_malformed);
     RUN_TEST(test_set_module_labels_invalid_slot);
+    RUN_TEST(test_build_set_module_labels_null_tokens_do_not_crash);
+    RUN_TEST(test_sanitize_filename_replaces_path_separators);
+    RUN_TEST(test_sanitize_filename_neutralises_dot_dot);
+    RUN_TEST(test_sanitize_filename_keeps_plain_name_and_truncates);
 
     /* set-module-name validation tests */
     RUN_TEST(test_set_module_label_invalid_slot_low);

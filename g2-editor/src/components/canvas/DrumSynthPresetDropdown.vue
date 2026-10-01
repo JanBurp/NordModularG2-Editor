@@ -4,13 +4,17 @@
 		<div
 			ref="popupEl"
 			data-testid="drumsynth-preset-dropdown"
+			role="listbox"
 			class="fixed z-50 min-w-16 max-h-80 overflow-y-auto bg-surface-2 border border-line-default shadow-lg flex flex-col"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px', transform: `scale(${zoom})`, transformOrigin: 'top left' }"
 		>
 			<div
 				v-for="(preset, i) in DRUM_SYNTH_PRESETS"
 				:key="preset.name"
-				class="px-2 py-1 text-xs whitespace-nowrap cursor-pointer"
+				role="option"
+				tabindex="-1"
+				:aria-selected="i === selectedIndex"
+				class="px-2 py-1 text-xs whitespace-nowrap cursor-pointer outline-none focus-visible:ring-1 focus-visible:ring-inset focus-visible:ring-blue-500"
 				:class="i === selectedIndex ? 'bg-input text-black' : 'text-content-primary hover:bg-surface-3'"
 				:data-testid="`drumsynth-preset-option-${i}`"
 				@click="onSelect(i)"

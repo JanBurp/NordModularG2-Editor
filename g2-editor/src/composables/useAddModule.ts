@@ -2,22 +2,9 @@ import { ref } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
 import { useSettingsStore } from '../store/settings';
-import { useGhostCable } from './useGhostCable';
+import { useGhostCable, setLastAddedModule } from './useGhostCable';
 
 const isAdding = ref(false);
-
-let lastAddedModule: { index: number; area: 'va' | 'fx' } | null = null;
-
-// Tracked across all four add-module entry points (this file's addModuleAt, plus the toolbar
-// drag-and-drop path handled in usePatchOperations.ts) for auto-suggest's "most recently added
-// module" fallback tier.
-export function getLastAddedModule() {
-	return lastAddedModule;
-}
-
-export function setLastAddedModule(index: number, area: 'va' | 'fx') {
-	lastAddedModule = { index, area };
-}
 
 // Shared by every module-add entry point (addModuleAt below, plus the toolbar drag-and-drop path
 // in usePatchOperations.ts): runs auto-suggest-cable and updates the "last added module" fallback
@@ -27,7 +14,7 @@ export function finalizeModuleAdd(moduleId: number, col: number, row: number, ar
 	const settings = useSettingsStore();
 	const { computeGhostSuggestion } = useGhostCable();
 	if (settings.autoSuggestCable) computeGhostSuggestion(moduleId, col, row, area);
-	setLastAddedModule(moduleId, area);
+	setLastAddedModule(moduleId, area, useUiStore().slotInFocus);
 }
 
 export function useAddModule() {

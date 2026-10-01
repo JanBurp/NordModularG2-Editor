@@ -106,7 +106,7 @@ export function useModuleKeyboard() {
 			} else {
 				const nextColIdx = sortedColKeys.findIndex((c) => c > cur.horiz);
 				if (nextColIdx >= 0) {
-					next = columns.get(sortedColKeys[nextColIdx])!.sort((a, b) => a.vert - b.vert)[0];
+					next = [...columns.get(sortedColKeys[nextColIdx])!].sort((a, b) => a.vert - b.vert)[0];
 				} else if (isSplit && area === 1) {
 					// Voice bottom-right → cross to FX top-left
 					const target = getTopLeftModule(0);
@@ -116,7 +116,7 @@ export function useModuleKeyboard() {
 					}
 				} else {
 					// Wrap within same area to first column top
-					next = columns.get(sortedColKeys[0])!.sort((a, b) => a.vert - b.vert)[0];
+					next = [...columns.get(sortedColKeys[0])!].sort((a, b) => a.vert - b.vert)[0];
 				}
 			}
 		} else if (key === 'ArrowUp') {
@@ -126,7 +126,7 @@ export function useModuleKeyboard() {
 			} else {
 				const prevColKey = [...sortedColKeys].reverse().find((c) => c < cur.horiz);
 				if (prevColKey !== undefined) {
-					next = columns.get(prevColKey)!.sort((a, b) => b.vert - a.vert)[0];
+					next = [...columns.get(prevColKey)!].sort((a, b) => b.vert - a.vert)[0];
 				} else if (isSplit && area === 0) {
 					// FX top-left → cross to Voice bottom-right
 					const target = getBottomRightModule(1);
@@ -136,14 +136,14 @@ export function useModuleKeyboard() {
 					}
 				} else {
 					// Wrap within same area to last column bottom
-					next = columns.get(sortedColKeys[sortedColKeys.length - 1])!.sort((a, b) => b.vert - a.vert)[0];
+					next = [...columns.get(sortedColKeys[sortedColKeys.length - 1])!].sort((a, b) => b.vert - a.vert)[0];
 				}
 			}
 		} else if (key === 'ArrowRight') {
 			const nextColKey = sortedColKeys.find((c) => c > cur.horiz);
 			if (nextColKey !== undefined) {
 				// Always lands on the target column's top module (matches G2 panel cursor nav)
-				next = columns.get(nextColKey)!.sort((a, b) => a.vert - b.vert)[0];
+				next = [...columns.get(nextColKey)!].sort((a, b) => a.vert - b.vert)[0];
 			} else if (isSplit && area === 1) {
 				const target = getTopLeftModule(0);
 				if (target) {
@@ -155,7 +155,7 @@ export function useModuleKeyboard() {
 			const prevColKey = [...sortedColKeys].reverse().find((c) => c < cur.horiz);
 			if (prevColKey !== undefined) {
 				// Always lands on the target column's top module (matches G2 panel cursor nav)
-				next = columns.get(prevColKey)!.sort((a, b) => a.vert - b.vert)[0];
+				next = [...columns.get(prevColKey)!].sort((a, b) => a.vert - b.vert)[0];
 			} else if (isSplit && area === 0) {
 				const target = getBottomRightModule(1);
 				if (target) {
@@ -270,6 +270,8 @@ export function useModuleKeyboard() {
 		if (showDialog.value) return;
 		if (uiStore.showQuickAdd) return;
 		if (isInputFocused()) return;
+		// A focused slider/button group already handled this arrow key itself
+		if (e.defaultPrevented || (document.activeElement as HTMLElement | null)?.closest('[role=slider], [role=menu], [role=listbox]')) return;
 
 		const { key, shiftKey, altKey } = e;
 

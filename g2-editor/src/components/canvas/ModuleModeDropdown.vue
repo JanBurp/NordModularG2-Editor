@@ -5,10 +5,21 @@
 		<div
 			ref="popupEl"
 			data-testid="mode-dropdown"
+			role="listbox"
 			class="fixed z-50 bg-surface-2 shadow-lg flex flex-col"
 			:style="{ left: adjustedX + 'px', top: adjustedY + 'px', transform: `scale(${zoom})`, transformOrigin: 'top left' }"
 		>
-			<svg v-for="i in optionCount" :key="i - 1" :width="rowWidth" :height="rowHeight" class="overflow-hidden! cursor-pointer" @click="onSelect(i - 1)">
+			<svg
+				v-for="i in optionCount"
+				:key="i - 1"
+				:width="rowWidth"
+				:height="rowHeight"
+				class="overflow-hidden! cursor-pointer"
+				role="option"
+				tabindex="-1"
+				:aria-selected="i - 1 === value"
+				@click="onSelect(i - 1)"
+			>
 				<rect x="0" y="0" :width="rowWidth" :height="rowHeight" :fill="i - 1 === value && !isGraph ? '#AAA' : '#CCC'" stroke="#333" />
 				<ModuleGraph v-if="isGraph" :ve="graphVe" :lv="lv" :modes="[i - 1]" :module-id="moduleId" />
 				<use v-else :href="`#${paramDef.img}`" :transform="`translate(0, ${(i - 1) * itemHeight})`" />

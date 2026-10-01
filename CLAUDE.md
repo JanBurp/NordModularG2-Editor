@@ -42,7 +42,7 @@ Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + Ty
 ### CLI (C tool)
 ```bash
 cd cli && make          # build
-cd cli && make test     # run tests (unit + integration; integration self-skips per-test without a G2 attached)
+cd cli && make test     # run tests (unit + integration; with no G2 detected the integration runners exit 1 "NOT RUN" unless G2_ALLOW_NO_DEVICE=1; individual tests still self-skip)
 cd cli && make test-integration-slow  # bank-transfer tests (get-bank/send-bank); not part of `make test` since a full bank scan/roundtrip can take well over 2s
 ./cli/build/bin/g2-cli --help
 cd cli && ./g2tmux.sh   # tmux split: daemon output + command shell (recommended)

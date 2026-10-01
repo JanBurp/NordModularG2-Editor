@@ -155,3 +155,23 @@ describe('coalescing', () => {
 		expect(store.slots['A'].past.length).toBe(2);
 	});
 });
+
+describe('coalescing is cleared by undo/redo', () => {
+	it('a record with the same key after an undo starts a new entry instead of being swallowed', () => {
+		const store = useHistoryStore();
+		store.record('A', entry(), 'k', { initial: 0, latest: 1 });
+		store.popUndo('A');
+		store.record('A', entry(), 'k', { initial: 1, latest: 2 });
+		expect(store.canUndo('A')).toBe(true);
+	});
+
+	it('popRedo also drops pending coalescing state', () => {
+		const store = useHistoryStore();
+		store.record('A', entry());
+		store.popUndo('A');
+		store.record('A', entry(), 'k', { initial: 0, latest: 1 });
+		store.popUndo('A');
+		store.popRedo('A');
+		expect(store.slots.A.coalescing.size).toBe(0);
+	});
+});

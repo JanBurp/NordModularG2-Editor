@@ -57,8 +57,19 @@ describe('browser store — streamed names load', () => {
 
 		expect((window as any).cli.run).toHaveBeenCalledWith(['reload-names', 'partial']);
 		expect(during).toEqual({ patches: [], loadingBanks: { patch: 1, performance: 1 } });
-		expect(browser.loadingBanks).toBeNull();
+		// Cleared by the final `names` event (applyNamesData), not by the command returning.
+		expect(browser.loadingBanks).toEqual({ patch: 1, performance: 1 });
 		expect(browser.loading).toBe(false);
+		browser.applyNamesData({});
+		expect(browser.loadingBanks).toBeNull();
+	});
+
+	it('reloadNames clears loadingBanks when the command fails', async () => {
+		const browser = useBrowserStore();
+		(window as any).cli.run = vi.fn().mockRejectedValue(new Error('boom'));
+		await browser.reloadNames();
+		expect(browser.loadingBanks).toBeNull();
+		expect(browser.error).toBe('boom');
 	});
 
 	it('appends partial entries per kind, with category only for patches', () => {

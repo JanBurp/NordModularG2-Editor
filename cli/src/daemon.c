@@ -1140,6 +1140,18 @@ int g2_daemon_run(output_format_t format, int debug) {
 	int cmds_since_listener_check = 0;
 
 	while (daemon_running) {
+		/* If a recv_interrupt() (inside a command handler, or any other caller
+		 * outside the main loop's own queue poll) saw the device disconnect
+		 * (sentinel=1), it set g2_pending_disconnect instead of the main loop ever
+		 * seeing the sentinel.  Reconnect now, same as the normal disconnect path
+		 * below - checked at the top so the idle path covers it too. */
+		if (g2_pending_disconnect) {
+			g2_pending_disconnect = 0;
+			g2_pending_rearm = 0;   /* moot once do_reconnect() re-arms itself */
+			if (daemon_running) do_reconnect();
+			cmds_since_listener_check = 0;
+			continue;
+		}
 		/* Drain stdin commands, but yield to the listener queue every STDIN_DRAIN_BATCH
 		 * commands even if more are still queued (see STDIN_DRAIN_BATCH doc comment). */
 		char *line = daemon_dequeue();
@@ -1147,22 +1159,10 @@ int g2_daemon_run(output_format_t format, int debug) {
 		if (had_line) {
 			execute_cmd(line);
 			free(line);
-			/* If a command handler's recv_interrupt() saw the device disconnect
-			 * (sentinel=1) while waiting for a command response, it set
-			 * g2_pending_disconnect instead of the main loop's own queue poll ever
-			 * seeing the sentinel.  Reconnect now, same as the normal disconnect path
-			 * below. */
-			if (g2_pending_disconnect) {
-				g2_pending_disconnect = 0;
-				g2_pending_rearm = 0;   /* moot once do_reconnect() re-arms itself */
-				if (daemon_running) do_reconnect();
-				cmds_since_listener_check = 0;
-				continue;
-			}
 			/* If a command handler's recv_interrupt() saw a BULK_REARM (sentinel=2)
 			 * while waiting for a command response, it set g2_pending_rearm instead
 			 * of discarding it silently.  Re-arm streaming now. */
-			if (g2_pending_rearm) {
+			if (g2_pending_rearm && !g2_pending_disconnect) {
 				g2_pending_rearm = 0;
 				g2_stream_locked = 1;   /* covers a G2-initiated stop consumed mid-command */
 				rearm_with_version_update();
@@ -1172,8 +1172,8 @@ int g2_daemon_run(output_format_t format, int debug) {
 		}
 		cmds_since_listener_check = 0;
 
-		/* Nothing left queued: unlock any stream a command left locked (e.g.
-		 * select-patch/select-perf/set-perf-mode/upload-perf) now that we're
+		/* Nothing left queued: unlock any stream a command left locked (select-patch/
+		 * select-perf/set-perf-mode/upload-perf) now that we're
 		 * genuinely idle, mirroring the reference editor's unlock-on-idle-tick
 		 * behavior. A plain unlock, not rearm_with_version_update(): nothing
 		 * that reaches this path touches the live slots. */

@@ -61,10 +61,14 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 
 		document.addEventListener('mouseup', onMouseUp, { once: true });
 		document.addEventListener('touchend', onMouseUp, { once: true });
+		window.addEventListener('blur', onMouseUp, { once: true });
 	}
 
 	function onMouseUp() {
 		stopRepeat();
+		document.removeEventListener('mouseup', onMouseUp);
+		document.removeEventListener('touchend', onMouseUp);
+		window.removeEventListener('blur', onMouseUp);
 	}
 
 	function onDoubleClick() {
@@ -73,9 +77,7 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 	}
 
 	onUnmounted(() => {
-		stopRepeat();
-		document.removeEventListener('mouseup', onMouseUp);
-		document.removeEventListener('touchend', onMouseUp);
+		onMouseUp();
 	});
 
 	return {

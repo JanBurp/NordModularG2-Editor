@@ -58,6 +58,11 @@ export function useBankDownloadDialog() {
 	});
 
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
+		// Re-opening mid-transfer must keep the running progress visible, not reset it
+		if (bankDownloadInProgress.value) {
+			showBankDownloadDialog.value = true;
+			return;
+		}
 		bankDownloadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankDownloadBankNum.value = opts?.bankNum ?? 1;
 		bankDownloadSourceType.value = 'pchList';

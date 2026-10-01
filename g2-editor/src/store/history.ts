@@ -69,8 +69,17 @@ export const useHistoryStore = defineStore('history', {
 			h.past = [...h.past.slice(-(MAX_HISTORY - 1)), entry];
 		},
 
+		clearCoalescing(slot: SlotLabel): void {
+			const h = this.slots[slot];
+			for (const state of h.coalescing.values()) {
+				if (state.timer !== null) clearTimeout(state.timer);
+			}
+			h.coalescing.clear();
+		},
+
 		popUndo(slot: SlotLabel): HistoryEntry | null {
 			const h = this.slots[slot];
+			this.clearCoalescing(slot);
 			if (!h.past.length) return null;
 			const entry = h.past[h.past.length - 1];
 			h.past = h.past.slice(0, -1);
@@ -80,6 +89,7 @@ export const useHistoryStore = defineStore('history', {
 
 		popRedo(slot: SlotLabel): HistoryEntry | null {
 			const h = this.slots[slot];
+			this.clearCoalescing(slot);
 			if (!h.future.length) return null;
 			const entry = h.future[0];
 			h.future = h.future.slice(1);
@@ -102,10 +112,7 @@ export const useHistoryStore = defineStore('history', {
 		},
 
 		clearHistory(slot: SlotLabel): void {
-			const h = this.slots[slot];
-			for (const state of h.coalescing.values()) {
-				if (state.timer !== null) clearTimeout(state.timer);
-			}
+			this.clearCoalescing(slot);
 			this.slots[slot] = makeSlotHistory();
 		},
 

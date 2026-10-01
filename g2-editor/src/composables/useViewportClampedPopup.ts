@@ -2,7 +2,8 @@ import { nextTick, onMounted, onUnmounted, ref, watch, type WatchSource } from '
 
 // Shared logic for canvas-anchored popups (ModuleModeDropdown.vue, DrumSynthPresetDropdown.vue):
 // clamps the popup into the viewport whenever its anchor/zoom (or any extra dep) changes, and
-// closes it on Escape.
+// closes it on Escape. Keyboard access: the popup's `[role=option]` children are focusable
+// (initial focus on the `aria-selected` one), Up/Down moves between them, Enter/Space picks.
 export function useViewportClampedPopup(
 	getX: () => number,
 	getY: () => number,
@@ -26,11 +27,25 @@ export function useViewportClampedPopup(
 
 	watch([getX, getY, getZoom, ...extraWatchSources], clampToViewport, { immediate: true });
 
+	const options = () => Array.from(popupEl.value?.querySelectorAll<HTMLElement>('[role=option]') ?? []);
+
 	function onKeydown(e: KeyboardEvent) {
-		if (e.key === 'Escape') onClose();
+		if (e.key === 'Escape') return onClose();
+		const opts = options();
+		const idx = opts.indexOf(document.activeElement as HTMLElement);
+		if (e.key === 'ArrowDown' || e.key === 'ArrowUp') {
+			e.preventDefault();
+			opts[Math.max(0, Math.min(opts.length - 1, idx + (e.key === 'ArrowDown' ? 1 : -1)))]?.focus();
+		} else if ((e.key === 'Enter' || e.key === ' ') && idx >= 0) {
+			e.preventDefault();
+			opts[idx].dispatchEvent(new MouseEvent('click', { bubbles: true })); // SVG rows have no .click()
+		}
 	}
 
-	onMounted(() => window.addEventListener('keydown', onKeydown));
+	onMounted(() => {
+		window.addEventListener('keydown', onKeydown);
+		nextTick(() => (options().find((o) => o.getAttribute('aria-selected') === 'true') ?? options()[0])?.focus());
+	});
 	onUnmounted(() => window.removeEventListener('keydown', onKeydown));
 
 	return { popupEl, adjustedX, adjustedY };

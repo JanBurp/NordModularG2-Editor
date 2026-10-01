@@ -42,16 +42,15 @@
 
 /* ---- Configuration: designated scratch/reference banks -------------------
  * Confirm these on YOUR hardware before relying on them.
- *  - *_WRITE_TEST_BANK must actually be EMPTY - do_bank_roundtrip verifies
- *    this once and skips (never writes) if it isn't, but pick a bank you
- *    don't mind being briefly written to and cleared back to empty anyway.
+ *  - *_WRITE_TEST_BANK is DESTRUCTIVE: do_bank_roundtrip overwrites whatever is
+ *    in it and leaves it EMPTY afterwards. Pick a scratch bank you don't need.
  *  - *_FETCH_TEST_BANK can be ANY existing bank, occupied or not - the fetch
  *    test only ever reads, it never writes.
  */
  #define PATCH_FETCH_TEST_BANK 1 /* known-existing patch bank, 2026-09-21 */
-#define PATCH_WRITE_TEST_BANK 32 /* confirmed empty on hardware, 2026-09-21 */
+#define PATCH_WRITE_TEST_BANK 32 /* scratch bank: overwritten and cleared by the test */
 #define PERF_FETCH_TEST_BANK  1 /* known-existing performance bank, 2026-09-21 */
-#define PERF_WRITE_TEST_BANK  8 /* confirmed empty on hardware, 2026-09-21 */
+#define PERF_WRITE_TEST_BANK  8 /* scratch bank: overwritten and cleared by the test */
 
 /* Injected by run_tests_integration_slow.c's main() via test_bank_transfer_set_daemon,
  * which owns spawn/shutdown (see that file for why: it has early-return points on
@@ -133,7 +132,7 @@ static cJSON *do_send_bank_cmd(const char *type_str, const char *source_path, in
  * nothing to verify empty and nothing to clean up. */
 static void do_bank_fetch(int type, int bank) {
     if (!g_daemon || g_device_lost) TEST_IGNORE_MESSAGE("G2 device not connected");
-    usleep(300000); /* let G2 settle, same convention as test_upload_patch.c */
+    daemon_wait_ready(g_daemon);
     mkdir(TMP_DIR, 0755);
     mkdir(DUMP_DIR, 0755);
 
@@ -151,9 +150,9 @@ static void do_bank_fetch(int type, int bank) {
  * to-empty step entirely, leaving a real test patch sitting in the bank until
  * it was found and cleared by hand. Every check from here on only records a
  * message; nothing calls TEST_ASSERT until cleanup has run. */
-static void do_bank_roundtrip(int type, int bank, const char *label) {
+static void do_bank_roundtrip(int type, int bank) {
     if (!g_daemon || g_device_lost) TEST_IGNORE_MESSAGE("G2 device not connected");
-    usleep(300000); /* let G2 settle, same convention as test_upload_patch.c */
+    daemon_wait_ready(g_daemon);
     mkdir(TMP_DIR, 0755);
     mkdir(SRC_DIR, 0755);
     mkdir(EMPTY_DIR, 0755);
@@ -161,23 +160,15 @@ static void do_bank_roundtrip(int type, int bank, const char *label) {
 
     const char *type_str = (type == 0) ? "patch" : "performance";
 
-    /* Confirm the configured bank is actually empty before writing anything -
-     * a config mismatch (wrong bank number, or a patch saved there since this
-     * was set up) is a reason to skip, not to silently overwrite real data. */
+    /* Sanity check that get-bank works on the scratch bank before writing. Existing
+     * content is not a reason to skip: the write below overwrites it and the
+     * cleanup step clears the whole bank. */
     cJSON *precheck = do_get_bank_cmd(type_str, bank, DUMP_DIR, "BankTransferPrecheck");
     if (!precheck || !cJSON_IsTrue(cJSON_GetObjectItem(precheck, "ok"))) {
         if (precheck) cJSON_Delete(precheck);
-        TEST_IGNORE_MESSAGE("could not read the configured write-test bank - device not responding?");
+        TEST_FAIL_MESSAGE("get-bank of the configured write-test bank failed - device is present but get-bank is broken");
     }
-    cJSON *precheckData = cJSON_GetObjectItem(precheck, "data");
-    cJSON *precheckWritten = precheckData ? cJSON_GetObjectItem(precheckData, "written") : NULL;
-    int precheckW = precheckWritten ? (int)precheckWritten->valuedouble : -1;
     cJSON_Delete(precheck);
-    if (precheckW != 0) {
-        char msg[192];
-        snprintf(msg, sizeof(msg), "configured %s write-test bank %d is not empty (written=%d) - update *_WRITE_TEST_BANK in test_bank_transfer.c", label, bank, precheckW);
-        TEST_IGNORE_MESSAGE(msg);
-    }
 
     /* Build a 2-entry scratch source folder and an empty folder for cleanup,
      * from an existing tiny fixture (content doesn't matter - only that it's a
@@ -192,7 +183,7 @@ static void do_bank_roundtrip(int type, int bank, const char *label) {
 
     const char *failMsg = NULL;
 
-    /* --- Write the 2-entry scratch bank into the empty bank --- */
+    /* --- Write the 2-entry scratch bank into the scratch bank --- */
     human_pause();
     cJSON *sendResp = do_send_bank_cmd(type_str, SRC_DIR, bank);
     if (!sendResp || !cJSON_IsTrue(cJSON_GetObjectItem(sendResp, "ok"))) {
@@ -263,7 +254,7 @@ void test_bank_transfer_patch_fetch(void) {
 }
 
 void test_bank_transfer_patch_write_roundtrip(void) {
-    do_bank_roundtrip(0, PATCH_WRITE_TEST_BANK, "patch");
+    do_bank_roundtrip(0, PATCH_WRITE_TEST_BANK);
 }
 
 void test_bank_transfer_performance_fetch(void) {
@@ -271,7 +262,7 @@ void test_bank_transfer_performance_fetch(void) {
 }
 
 void test_bank_transfer_performance_write_roundtrip(void) {
-    do_bank_roundtrip(1, PERF_WRITE_TEST_BANK, "performance");
+    do_bank_roundtrip(1, PERF_WRITE_TEST_BANK);
 }
 
 /* Number of name entries under data.<group> ("patches"/"performances") of a "names" event. */

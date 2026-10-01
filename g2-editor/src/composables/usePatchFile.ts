@@ -20,6 +20,9 @@ type Prf2Data = {
  * device never sends the matching synth_settings_update (error/disconnect mid-load). */
 export const PERF_SETTLE_TIMEOUT_MS = 5000;
 
+// Shared so a re-select (from any usePatchFile instance) cancels the previous settle watchdog
+let perfSelectTimer: ReturnType<typeof setTimeout> | undefined;
+
 export function usePatchFile() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -133,7 +136,8 @@ export function usePatchFile() {
 		device.modeChanging = true;
 		device.pendingPerfBank = bank - 1;
 		device.pendingPerfLoc = location - 1;
-		setTimeout(() => {
+		clearTimeout(perfSelectTimer);
+		perfSelectTimer = setTimeout(() => {
 			if (device.pendingPerfBank === bank - 1 && device.pendingPerfLoc === location - 1) {
 				console.warn('Performance select did not settle in time');
 				showToast('Performance switch did not complete — check device connection.');
@@ -150,6 +154,7 @@ export function usePatchFile() {
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
 			showToast('Failed to select synth performance — check device connection.');
+			clearTimeout(perfSelectTimer);
 			device.clearPendingPerf();
 		}
 	}

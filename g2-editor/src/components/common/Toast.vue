@@ -1,6 +1,6 @@
 <template>
 	<Teleport to="body">
-		<div class="fixed bottom-10 right-3 z-50 flex flex-col gap-1.5 items-end pointer-events-none">
+		<div class="fixed bottom-10 right-3 z-50 flex flex-col gap-1.5 items-end pointer-events-none" role="status" aria-live="polite">
 			<div
 				v-for="t in toasts"
 				:key="t.id"

@@ -63,13 +63,19 @@ export function remapCablesForModule(cables: Cable[], moduleId: number, oldDef: 
 	const oldInputs = jackListFor(oldDef, 'input');
 	const oldOutputs = jackListFor(oldDef, 'output');
 
+	// Memoised per old connector so every cable on the same old jack (fan-out) maps to the same new jack.
+	const mapped = new Map<string, number | null>();
+
 	function remapEnd(mod: number, con: number, kind: 'input' | 'output'): number | null {
 		if (mod !== moduleId) return con;
+		const key = `${kind}:${con}`;
+		if (mapped.has(key)) return mapped.get(key)!;
 		const oldJack = (kind === 'input' ? oldInputs : oldOutputs)[con];
-		if (!oldJack) return null;
 		const consumed = kind === 'input' ? consumedInputs : consumedOutputs;
 		const newJacks = kind === 'input' ? newInputs : newOutputs;
-		return findAndConsumeJack(newJacks, consumed, oldJack.name, oldJack.colour);
+		const result = oldJack ? findAndConsumeJack(newJacks, consumed, oldJack.name, oldJack.colour) : null;
+		mapped.set(key, result);
+		return result;
 	}
 
 	const result: Cable[] = [];

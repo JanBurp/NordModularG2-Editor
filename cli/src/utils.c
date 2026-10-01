@@ -110,6 +110,8 @@ static const uint8_t kSlotChunkOrder[] = {
 static const uint8_t kCurrentNoteDefault[] = {
     0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00
 };
+_Static_assert(sizeof(kCurrentNoteDefault) == PCH2_CANONICAL_GROWTH,
+               "PCH2_CANONICAL_GROWTH (utils.h) must equal sizeof(kCurrentNoteDefault)");
 
 /* Rewrites one slot's section train into kSlotChunkOrder, preserving each section's bytes and
  * the relative order of repeated ids (the three 0x5b keep their morph-first ordering). A missing

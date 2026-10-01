@@ -111,4 +111,14 @@ describe('remapCablesForModule', () => {
 		expect(result[0].dmod).toBe(7);
 		expect(result[0].dcon).toBe(3);
 	});
+
+	it('keeps every fan-out cable from the same old output on the same new jack', () => {
+		const newDef = def({ outputs: [{ name: 'Out', colour: 'red', x: 0, y: 0 }] });
+		const cables = [cable(1, 0, 2, 0), cable(1, 0, 3, 1)]; // one output feeding two inputs
+		const result = remapCablesForModule(cables, 1, oldDef, newDef);
+		expect(result).toEqual([
+			{ ...cables[0], scon: 0 },
+			{ ...cables[1], scon: 0 },
+		]);
+	});
 });

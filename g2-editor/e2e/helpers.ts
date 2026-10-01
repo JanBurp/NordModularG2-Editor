@@ -1,4 +1,4 @@
-import type { Locator, Page } from '@playwright/test';
+import { expect, type Locator, type Page } from '@playwright/test';
 
 /**
  * Drop a module from the ModulesPane onto the voice canvas by dispatching
@@ -165,7 +165,7 @@ export async function openContextMenu(page: Page, locator: Locator): Promise<voi
 /** Click a context menu item by its visible label text. */
 export async function clickContextMenuItem(page: Page, label: string): Promise<void> {
 	await page.getByRole('menuitem', { name: label, exact: true }).click();
-	await page.waitForTimeout(100);
+	await expect(page.locator('[data-testid="context-menu"]')).toHaveCount(0);
 }
 
 /** Hover a context menu item to open its submenu. */

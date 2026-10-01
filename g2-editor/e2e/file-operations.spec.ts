@@ -40,10 +40,8 @@ test.describe('file operations – offline', () => {
 
 		const savedPath = await mockSaveDialog();
 		await sendMenuAction('save-as');
-		await page.waitForTimeout(500);
 
-		expect(fs.existsSync(savedPath)).toBe(true);
-		expect(fs.statSync(savedPath).size).toBeGreaterThan(0);
+		await expect.poll(() => fs.existsSync(savedPath) && fs.statSync(savedPath).size).toBeGreaterThan(0);
 	});
 
 	test('save (Ctrl+S) writes to existing path', async ({ page, sendMenuAction, mockOpenPatch }) => {

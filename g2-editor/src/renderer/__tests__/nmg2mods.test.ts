@@ -9,17 +9,18 @@ describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
 	it('matches Mix4-1B and Mix4-1C (same category, identical jack sets)', () => {
 		const a = getModule(19); // Mix4-1B
 		const b = getModule(123); // Mix4-1C
-		expect(a).toBeDefined();
-		expect(b).toBeDefined();
+		expect(a?.short).toBe('Mix4-1B');
+		expect(b?.short).toBe('Mix4-1C');
 		expect(areModulesReplaceCompatible(a!, b!)).toBe(true);
+		expect(areModulesReplaceCompatible(b!, a!)).toBe(true); // symmetric
 		expect(getReplaceCandidates(19).map((m) => m.id)).toContain(123);
 	});
 
 	it('matches modules in the same category even with very different jack sets (LFOs)', () => {
 		const lfoA = getModule(26); // LfoA: 2 inputs, 1 blue output
 		const clkGen = getModule(68); // ClkGen: 1 input, 4 yellow outputs
-		expect(lfoA).toBeDefined();
-		expect(clkGen).toBeDefined();
+		expect(lfoA?.short).toBe('LfoA');
+		expect(clkGen?.short).toBe('ClkGen');
 		expect(areModulesReplaceCompatible(lfoA!, clkGen!)).toBe(true);
 		expect(getReplaceCandidates(26).map((m) => m.id)).toContain(68);
 	});
@@ -27,7 +28,11 @@ describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
 	it('matches Keyboard against other In/Out modules despite very different jack signatures', () => {
 		const keyboard = getModule(1); // Keyboard
 		expect(keyboard).toBeDefined();
-		expect(getReplaceCandidates(1).length).toBeGreaterThan(0);
+		const candidates = getReplaceCandidates(1);
+		expect(candidates.length).toBeGreaterThan(0);
+		expect(candidates.some((m) => m.id === 1)).toBe(false);
+		// Every candidate must be reported compatible by the predicate itself.
+		for (const c of candidates) expect(areModulesReplaceCompatible(keyboard!, c)).toBe(true);
 	});
 
 	it('does not match modules across different categories', () => {

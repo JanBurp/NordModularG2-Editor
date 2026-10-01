@@ -79,6 +79,7 @@ test-unit: $(TEST_BUILD_DIR)/g2-unit-tests
 	@echo "Running unit tests..."
 	./$(TEST_BUILD_DIR)/g2-unit-tests
 
+# Needs a G2 on USB: with none detected the runner exits 1 ("NOT RUN") unless G2_ALLOW_NO_DEVICE=1 is set.
 test-integration: $(TEST_BUILD_DIR)/g2-integration-tests
 	@echo "Running integration tests..."
 	./$(TEST_BUILD_DIR)/g2-integration-tests

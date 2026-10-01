@@ -18,6 +18,7 @@
 #include <unistd.h>
 #include <fcntl.h>
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 
 void setUp(void) {}
@@ -119,7 +120,14 @@ int main(void) {
     if (g2_count == 0) {
         fprintf(stderr, "\033[33mNo Nord G2 detected on USB. Please connect/reset "
                          "(power-cycle or replug) the device, then re-run.\033[0m\n");
-        return 0;
+        /* Not silently green: nothing ran. Only an explicit opt-in (CI / hardware-free
+         * checkouts) turns this into exit 0. */
+        if (getenv("G2_ALLOW_NO_DEVICE")) {
+            fprintf(stderr, "\033[33mINTEGRATION TESTS NOT RUN (G2_ALLOW_NO_DEVICE set)\033[0m\n");
+            return 0;
+        }
+        fprintf(stderr, "\033[31mINTEGRATION TESTS NOT RUN - set G2_ALLOW_NO_DEVICE=1 to accept this\033[0m\n");
+        return 1;
     }
 
     /* Same daemon setup as make test-integration (test_daemon.c's test_daemon_starts):

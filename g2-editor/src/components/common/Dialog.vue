@@ -1,7 +1,20 @@
 <template>
 	<Teleport to="body">
-		<div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="onCancel">
-			<div ref="dialogEl" class="bg-surface-1 border border-line-default rounded shadow-xl min-w-72 max-w-md w-full mx-4">
+		<div
+			v-if="modelValue"
+			class="fixed inset-0 z-50 flex items-center justify-center bg-black/50"
+			@mousedown.self="backdropDown = true"
+			@mouseup.self="onBackdropUp"
+			@mousedown.capture="onMouseDownCapture"
+		>
+			<div
+				ref="dialogEl"
+				role="dialog"
+				aria-modal="true"
+				:aria-label="title"
+				tabindex="-1"
+				class="bg-surface-1 border border-line-default rounded shadow-xl min-w-72 max-w-md w-full mx-4 outline-none"
+			>
 				<div class="px-4 py-3 border-b border-line-default">
 					<span class="text-sm font-semibold text-content-primary">{{ title }}</span>
 				</div>
@@ -35,8 +48,9 @@
 			showConfirm?: boolean;
 			closeOnConfirm?: boolean;
 			disableConfirm?: boolean;
+			preventClose?: boolean;
 		}>(),
-		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true, disableConfirm: false },
+		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true, disableConfirm: false, preventClose: false },
 	);
 
 	const emit = defineEmits<{
@@ -51,23 +65,60 @@
 	}
 
 	function onCancel() {
+		if (props.preventClose) return;
 		emit('cancel');
 		emit('update:modelValue', false);
 	}
 
 	const dialogEl = ref<HTMLElement | null>(null);
+	let previouslyFocused: HTMLElement | null = null;
+
+	// Only a click that both starts and ends on the backdrop closes (not a text-selection drag released outside the box)
+	let backdropDown = false;
+	function onMouseDownCapture(e: MouseEvent) {
+		if (e.target !== e.currentTarget) backdropDown = false;
+	}
+	function onBackdropUp() {
+		if (backdropDown) onCancel();
+		backdropDown = false;
+	}
 
 	watch(
 		() => props.modelValue,
 		(open) => {
-			if (open) nextTick(() => dialogEl.value?.querySelector<HTMLElement>('input, textarea')?.focus());
+			if (open) {
+				previouslyFocused = document.activeElement as HTMLElement | null;
+				nextTick(() => (dialogEl.value?.querySelector<HTMLElement>('input, textarea') ?? dialogEl.value)?.focus());
+			} else {
+				previouslyFocused?.focus();
+				previouslyFocused = null;
+			}
 		},
 	);
+
+	function trapTab(e: KeyboardEvent) {
+		const items = Array.from(
+			dialogEl.value?.querySelectorAll<HTMLElement>('input, textarea, select, button, [tabindex]:not([tabindex="-1"])') ?? [],
+		).filter((el) => !el.hasAttribute('disabled'));
+		if (items.length === 0) return e.preventDefault();
+		const first = items[0];
+		const last = items[items.length - 1];
+		const active = document.activeElement;
+		if (e.shiftKey && (active === first || !dialogEl.value?.contains(active))) {
+			e.preventDefault();
+			last.focus();
+		} else if (!e.shiftKey && (active === last || !dialogEl.value?.contains(active))) {
+			e.preventDefault();
+			first.focus();
+		}
+	}
 
 	function onKeydown(e: KeyboardEvent) {
 		if (!props.modelValue) return;
 		if (e.key === 'Escape') onCancel();
-		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm) {
+		if (e.key === 'Tab') trapTab(e);
+		// A focused button (e.g. Cancel) handles Enter itself via its click
+		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm && document.activeElement?.tagName !== 'BUTTON') {
 			// Capture phase + stop: otherwise global handlers (e.g. PatchBrowser's Enter = activate item) swallow or double-handle it
 			e.preventDefault();
 			e.stopImmediatePropagation();

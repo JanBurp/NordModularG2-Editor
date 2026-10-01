@@ -393,7 +393,10 @@ function buildRawHex(sections: Uint8Array[], fileType: number = FILE_TYPE_PATCH)
 
 function writeTextPad(text: string): Uint8Array {
 	const data = new Uint8Array(text.length);
-	for (let i = 0; i < text.length; i++) data[i] = text.charCodeAt(i) & 0xff;
+	for (let i = 0; i < text.length; i++) {
+		const c = text.charCodeAt(i);
+		data[i] = c > 0xff ? 0x3f : c; // '?' for chars outside Latin-1 instead of masking them into unrelated bytes
+	}
 	return makeSection(SectionType.SEPARATOR, data);
 }
 
@@ -493,7 +496,7 @@ function appendMissingAreaParamNames(patch: Patch, out: Uint8Array[], w: Written
 	for (const areaIdx of [0, 1] as const) {
 		if (w.m5b.has(areaIdx)) continue;
 		const modules = patch.areas[areaIdx]?.modules ?? [];
-		if (!modules.some((m) => m.paramLabels && m.paramLabels.length > 0)) continue;
+		if (!modules.some((m) => paramLabelsForModule(m).length > 0)) continue;
 		out.push(
 			writeParamNames(
 				areaIdx,
@@ -678,12 +681,7 @@ export function serializePerformance(
 			wroteGlobalKnobs = true;
 		} else if (type === SectionType.SEPARATOR) {
 			const patch = patches[slotIdx] ?? patches[0];
-			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
-				out.push(writeControllers(patch.controllers));
-			}
-			if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
-				out.push(writeKnobs(patch.paramPages));
-			}
+			// Appended in the order hardware/.prf2 files carry them: 0x65, 0x62, 0x60, then the 0x5b names, then 0x6f.
 			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 				out.push(
 					writeMorphParamSection(
@@ -692,6 +690,13 @@ export function serializePerformance(
 					),
 				);
 			}
+			if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
+				out.push(writeKnobs(patch.paramPages));
+			}
+			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
+				out.push(writeControllers(patch.controllers));
+			}
+
 			if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
 				out.push(writeParamNames(2, morphParamNamesEntries(patch)));
 			}
@@ -715,12 +720,6 @@ export function serializePerformance(
 		ofs += 3 + siz;
 	}
 	const lastPatch = patches[slotIdx] ?? patches[0];
-	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
-		out.push(writeControllers(lastPatch.controllers));
-	}
-	if (!w.m62 && lastPatch?.paramPages && lastPatch.paramPages.length > 0) {
-		out.push(writeKnobs(lastPatch.paramPages));
-	}
 	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
 		out.push(
 			writeMorphParamSection(
@@ -729,6 +728,13 @@ export function serializePerformance(
 			),
 		);
 	}
+	if (!w.m62 && lastPatch?.paramPages && lastPatch.paramPages.length > 0) {
+		out.push(writeKnobs(lastPatch.paramPages));
+	}
+	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
+		out.push(writeControllers(lastPatch.controllers));
+	}
+
 	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
 		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch)));
 	}

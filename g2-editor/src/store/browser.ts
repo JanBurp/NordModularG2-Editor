@@ -73,14 +73,20 @@ export const useBrowserStore = defineStore('browser', {
 			this.error = '';
 			this.synthPatches = [];
 			this.synthPerformances = [];
-			this.loadingBanks = { patch: 1, performance: 1 };
+			const mine = (this.loadingBanks = { patch: 1, performance: 1 });
 			try {
 				await window.cli.run(['reload-names', 'partial']);
+				// Safety net so the spinners can't stick if the final `names` event never arrives.
+				setTimeout(() => {
+					if (this.loadingBanks === mine) this.loadingBanks = null;
+				}, 10000);
 			} catch (e: any) {
 				this.error = e.message;
+				// On success the command only means "request sent": names_partial events may still be in flight,
+				// and the final `names` event (applyNamesData) is what clears loadingBanks.
+				this.loadingBanks = null;
 			} finally {
 				this.loading = false;
-				this.loadingBanks = null;
 			}
 		},
 

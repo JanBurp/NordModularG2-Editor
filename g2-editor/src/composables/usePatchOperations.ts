@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
+import { useHistoryStore, type HistoryEntry } from '../store/history';
 import type { Cable } from '../renderer/cableRenderer';
 import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 import { finalizeModuleAdd } from './useAddModule';
@@ -26,15 +27,35 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 
 	// Shared by deleteUnusedModules/deleteUnusedCables below: walks both areas, lets the caller
 	// compute which modules/cables to drop for that area's data, and skips the store call when
-	// there's nothing to delete.
+	// there's nothing to delete. The per-area undo entries are merged into one so a single Undo
+	// restores both areas.
 	async function deleteUnusedInAreas(computeTargets: (modules: any[], cables: any[]) => { moduleIds?: number[]; cableList?: Cable[] }): Promise<void> {
+		const hist = useHistoryStore();
+		const slot = uiStore.slotInFocus;
+		const topEntry = () => hist.slots[slot].past[hist.slots[slot].past.length - 1];
+		const recorded: HistoryEntry[] = [];
 		for (const area of ['voice', 'fx'] as const) {
 			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
 			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
 			const { moduleIds = [], cableList = [] } = computeTargets(modules, cables);
 			if (moduleIds.length > 0 || cableList.length > 0) {
+				const before = topEntry();
 				await slotsStore.deleteSelection(moduleIds, cableList, area, modules, cables);
+				if (topEntry() && topEntry() !== before) recorded.push(topEntry());
 			}
+		}
+		if (recorded.length === 2) {
+			recorded.forEach(() => hist.popUndo(slot));
+			hist.record(slot, {
+				undo: async () => {
+					await recorded[1].undo();
+					await recorded[0].undo();
+				},
+				redo: async () => {
+					await recorded[0].redo();
+					await recorded[1].redo();
+				},
+			});
 		}
 	}
 

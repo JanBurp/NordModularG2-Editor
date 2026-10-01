@@ -36,6 +36,11 @@ export function useBankUploadDialog() {
 	});
 
 	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
+		// Re-opening mid-transfer must keep the running progress visible, not reset it
+		if (bankUploadInProgress.value) {
+			showBankUploadDialog.value = true;
+			return;
+		}
 		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankUploadBankNum.value = opts?.bankNum ?? 1;
 		bankUploadFolder.value = '';

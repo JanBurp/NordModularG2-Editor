@@ -95,7 +95,7 @@ describe('useSlotEvents — hardware Rnd/Clr correction', () => {
 
 		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 35, value: 1, variation: 0 });
 
-		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'rnd');
+		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'rnd', 'A');
 	});
 
 	it('does the same for Clr (param 36)', async () => {
@@ -105,7 +105,7 @@ describe('useSlotEvents — hardware Rnd/Clr correction', () => {
 
 		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 36, value: 1, variation: 0 });
 
-		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'clr');
+		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'clr', 'A');
 	});
 
 	it('does not fire on the release edge (value 0)', async () => {

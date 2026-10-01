@@ -1,10 +1,10 @@
 <template>
 	<Teleport to="body">
 		<div v-if="modelValue" class="fixed inset-0 z-50 flex items-center justify-center bg-black/50" @click.self="close">
-			<div class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
+			<div role="dialog" aria-modal="true" :aria-label="`About ${APP_NAME}`" class="bg-surface-2 border border-line-default rounded shadow-xl w-88 mx-4">
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
 					<span class="text-sm font-semibold text-content-primary">About {{ APP_NAME }}</span>
-					<button v-if="closable" class="hover:text-content-primary cursor-pointer" @click="close">
+					<button v-if="closable" class="hover:text-content-primary cursor-pointer" aria-label="Close" @click="close">
 						<Icon name="close" class="w-3 h-3" />
 					</button>
 				</div>
