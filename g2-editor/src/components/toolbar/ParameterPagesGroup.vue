@@ -115,7 +115,7 @@
 	import { getModule } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { getParam } from '../../renderer/parammap';
-	import { formatValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { formatValue, formatCombinedValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
 	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
 
@@ -182,12 +182,21 @@
 		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
 		const slot = assignmentSlot(a);
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
-		const value = slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex]?.[paramIndex] ?? 64;
+		const moduleValues = slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex];
+		const value = moduleValues?.[paramIndex] ?? 64;
 		const paramMeta = paramDef ? getParam(paramDef.type) : undefined;
+		// A param that leads a combined canvas display (e.g. Osc Freq = [coarse, fine, FreqMode]) is
+		// formatted the same way as there, so the mode param (the cell's button) drives the text.
+		const combined = moduleInfo?.moduleDef?.ve?.find((e) => e.type === 'valueDisplay' && Array.isArray(e.ref) && e.ref[0] === paramIndex);
 		return {
 			label: paramDef?.name ?? String(paramIndex),
 			value,
-			valueLabel: paramDef ? formatValue(value, paramDef.type) : String(value),
+			valueLabel:
+				combined && moduleValues
+					? formatCombinedValue(combined.ref as number[], combined.func, moduleInfo?.moduleDef?.params, moduleValues)
+					: paramDef
+						? formatValue(value, paramDef.type)
+						: String(value),
 			low: paramMeta?.low ?? 0,
 			high: paramMeta?.high ?? 127,
 			isTrigger: paramMeta?.trigger === true,
