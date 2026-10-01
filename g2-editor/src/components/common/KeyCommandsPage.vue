@@ -51,9 +51,19 @@
 		{
 			title: 'Synth',
 			rows: [
-				{ keys: ['⌘ D'], action: 'Download to Slot' },
+				{ keys: ['⌘ G'], action: 'Open Synth Settings' },
 				{ keys: ['⌘ U'], action: 'Upload Active Slot' },
 				{ keys: ['⌘ M'], action: 'Send Controller Snapshot' },
+				{ keys: ['⌘ 1'], action: 'Dump One' },
+				{ keys: ['⌥ S'], action: 'Save in Synth' },
+			],
+		},
+		{
+			title: 'Patch & Performance',
+			rows: [
+				{ keys: ['⌘ P'], action: 'Open Patch Settings' },
+				{ keys: ['⌘ D'], action: 'Download to Slot' },
+				{ keys: ['⌘ R'], action: 'Open Performance Settings' },
 			],
 		},
 		{
@@ -63,6 +73,7 @@
 				{ keys: ['⌘ X'], action: 'Cut selected modules' },
 				{ keys: ['⌘ V'], action: 'Paste modules' },
 				{ keys: ['⌘ A'], action: 'Select all modules' },
+				{ keys: ['⌘ E'], action: 'Paste Params' },
 				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: ['⌘ Z'], action: 'Undo' },
 				{ keys: ['⇧ ⌘ Z'], action: 'Redo' },
@@ -84,6 +95,7 @@
 				{ keys: ['F'], action: 'Show FX area (Split if already FX-only)' },
 				{ keys: ['Space'], action: 'Show / hide all cables' },
 				{ keys: ['Ctrl+Space'], action: 'Shake cables' },
+				{ keys: ['⌘ =', '⌘ -', '⌘ 0'], action: 'Zoom in / out / actual size' },
 			],
 		},
 		{
@@ -93,6 +105,7 @@
 				{ keys: ['⌘ B'], action: 'Toggle Browser pane' },
 				{ keys: ['⌘ I'], action: 'Toggle Midi CC pane' },
 				{ keys: ['⌘ J'], action: 'Toggle Text pane' },
+				{ keys: ['⌘ K'], action: 'Toggle Keyboard pane' },
 				{ keys: ['⌘ ,'], action: 'Toggle Settings pane' },
 				{ keys: ['⌘ T'], action: 'Toggle Extended Toolbar' },
 				{ keys: ['⌘ F'], action: 'Toggle Parameter Pages' },
@@ -107,6 +120,7 @@
 				{ keys: ['←'], action: 'Collapse bank under cursor / go up one folder (Disk)' },
 				{ keys: ['→', '↵', 'Space'], action: 'Expand bank / open folder / load item under cursor' },
 				{ keys: ['ESC'], action: 'Reset cursor' },
+					{ keys: ['Double-click'], action: 'Load file / patch / performance (a single click only selects)' },
 			],
 		},
 		{
@@ -133,13 +147,21 @@
 			rows: [
 				{ keys: ['M'], action: 'Quick add module' },
 				{ keys: ['Shift + ← → ↑ ↓'], action: 'Navigate between modules' },
-				{ keys: ['←', '→'], action: 'Navigate parameters' },
+				{ keys: ['←', '→'], action: 'Navigate parameters (original editor’s order)' },
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
+					{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1 (Alt: ±16)' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
 				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },
 				{ keys: ['Enter'], action: 'Add selected module (Module Picker toolbar)' },
+			],
+		},
+		{
+			title: 'Parameter Pages',
+			rows: [
+				{ keys: ['Alt + Drag'], action: 'Drag a page cell onto a canvas parameter or another cell to assign it' },
+				{ keys: ['Right-click module'], action: 'Assign / Global Assign all its parameters (Page ▸ Multi Column / Column N)' },
 			],
 		},
 		{

@@ -100,7 +100,7 @@ Three tabs: **Disk**, **Patches**, **Performances**. With the Browser pane focus
 ### Disk Tab
 
 - `↑` — parent folder; `…` — system folder picker; **Search** filters files (Esc clears)
-- Click folder to navigate in; click `.pch2` / `.prf2` to load into the active slot
+- Click folder to navigate in; double-click a `.pch2` / `.prf2` to load it into the active slot
 
 ### Patches / Performances Tabs (G2 connected)
 
@@ -110,7 +110,7 @@ Patches and performances stored on the G2, grouped by bank.
 |---|---|
 | Click bank header | Collapse / expand bank |
 | ▶ / ▼ button (top-right) | Expand all / collapse all banks |
-| Click entry | Load patch or performance |
+| Double-click entry | Load patch or performance |
 | `/` or focus search | Jump to search; `↑`/`↓` moves selection, `Enter` loads, `Esc` clears |
 
 Search auto-expands any bank with a match and restores collapse state when cleared.

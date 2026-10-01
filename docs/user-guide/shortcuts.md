@@ -50,6 +50,7 @@ nav_order: 4
 | Right-click jack | Context menu: Delete connected (remove all cables) / Break (remove just this jack from a multi-cable nest) |
 | Click ghost cable | Confirm the auto-suggested cable after adding a module (Settings ▸ Auto-suggest Cable) |
 | `Enter` | Confirm an armed-jack connection or an auto-suggested ghost cable |
+| `Space` | Cycle to the next-best auto-suggested cable (Auto-suggest Cable on) |
 | `Escape` | Cancel an armed jack or dismiss a ghost-cable suggestion |
 
 ## Slots & Variations
@@ -58,6 +59,7 @@ nav_order: 4
 |---|---|
 | `A` / `B` / `C` / `D` | Select slot A / B / C / D |
 | `1–8` | Select variation 1–8 |
+| `Ctrl+Tab` / `Ctrl+Shift+Tab` | Cycle to next / previous slot |
 
 ## View & Areas
 
@@ -108,6 +110,7 @@ Arrow keys work whether or not the search box is focused. Banks (Patches/Perform
 | `←` | Collapse the bank under the cursor; on Disk, go up one folder |
 | `→` / `Enter` / `Space` | Expand the bank, open the folder, or load the item under the cursor |
 | `Escape` | Reset the cursor |
+| Double-click | Load the file, patch or performance (a single click only selects) |
 
 The cursor also resets when you switch tab or start/stop filtering. (`Space` types a space while the search box is focused.)
 
@@ -115,9 +118,11 @@ The cursor also resets when you switch tab or start/stop filtering. (`Space` typ
 
 | Key | Action |
 |---|---|
-| `Cmd+1–8` | Select active Morph Group |
-| `Cmd+Enter` | Assign / deassign selected parameter to active Morph Group |
-| `Cmd+↑` / `Cmd+↓` | Nudge morph range of selected parameter |
+| `Cmd/Ctrl`+Click parameter | Assign / deassign it to the selected Morph Group |
+| `Cmd/Ctrl`+Drag assigned knob/slider | Set morph range |
+| `Ctrl+1–8` | Select active Morph Group (`Cmd+1` is Dump One) |
+| `Cmd/Ctrl+Enter` | Assign / deassign selected parameter to active Morph Group |
+| `Cmd/Ctrl+↑` / `Cmd/Ctrl+↓` | Nudge morph range of selected parameter |
 
 ## Overlays
 
@@ -136,11 +141,22 @@ Hold the key to show the overlay; release or press `Escape` to hide.
 |---|---|
 | `M` | Quick add module at cursor position |
 | `Shift+Arrow` | Navigate between modules |
-| `←` / `→` | Navigate parameters (module selected) |
-| `↑` / `↓` | Adjust parameter ±1 |
+| `←` / `→` | Navigate parameters (module selected), in the original editor's order |
+| `↑` / `↓` | Adjust parameter ±1 (also for a selected knob) |
 | `Alt+↑` / `Alt+↓` | Adjust parameter ±16 |
+| Click / hold ▲▼ spinner | Spinner under a selected knob: ±1; with `Alt` ±16 |
 | `L` | Assign last received MIDI CC to selected parameter |
+| `Tab` / `Shift+Tab` | Cycle module category (Module Picker toolbar) |
+| `,` / `.` | Select module (Module Picker toolbar) |
+| `Enter` | Add selected module (Module Picker toolbar) |
 | `F1` | Show module help |
+
+## Parameter Pages
+
+| Key / Mouse | Action |
+|---|---|
+| `Alt`+Drag a page cell | Drag it onto a canvas parameter or another cell to assign it |
+| Right-click module | Assign / Global Assign all its parameters (Page ▸ Multi Column / Column N) |
 
 ## Other
 

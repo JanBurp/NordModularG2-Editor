@@ -54,7 +54,14 @@ Open the **Modules pane** (`Cmd+L`), search or scroll, then drag a module onto t
 
 **Right-click a parameter** for a precise-entry dialog (dropdown for enums, number field for numeric, with optional MIDI note display), or **Rename label** to set a custom display name.
 
-**Keyboard** (module selected): `←`/`→` navigate parameters, `↑`/`↓` adjust ±1, `Alt+↑`/`Alt+↓` adjust ±16.
+A **selected knob** shows a small ▲▼ spinner below it: click/hold for ±1, or with `Alt` for ±16.
+
+**Keyboard** (module selected): `←`/`→` navigate parameters (in the original editor's order), `↑`/`↓` adjust ±1, `Alt+↑`/`Alt+↓` adjust ±16.
+
+### Parameter Pages
+
+- **Assign a parameter** — hold `Alt` and drag a page cell (the whole cell, not just the knob) onto a canvas parameter, or onto another cell.
+- **Assign a whole module** — right-click the module background → **Assign** / **Global Assign** → Page ▸ *Multi Column* or *Column N*. Parameters follow the original editor's order.
 
 ---
 
