@@ -166,14 +166,14 @@ body {
    ModuleKnob.vue/Knob.vue put on the widget under the pointer. */
 .alt-assign [data-param-index],
 .alt-assign [data-param-index] *,
-.alt-assign [data-knob-slot],
-.alt-assign [data-knob-slot] * {
+.alt-assign [data-cell-slot],
+.alt-assign [data-cell-slot] * {
 	cursor: grab !important;
 }
 
 /* The Knob's KnobSpinV spinner stays clickable under Alt (fast step), so keep its pointer cursor. */
-.alt-assign [data-knob-slot] .knob-spin-v,
-.alt-assign [data-knob-slot] .knob-spin-v * {
+.alt-assign [data-cell-slot] .knob-spin-v,
+.alt-assign [data-cell-slot] .knob-spin-v * {
 	cursor: pointer !important;
 }
 

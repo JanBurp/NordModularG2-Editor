@@ -8,6 +8,8 @@
 			:class="{ 'opacity-40': !cell.assignment, 'w-14!': compact }"
 			:data-cell-slot="cell.slotIndex"
 			:data-cell-global="uiStore.globalPagesActive ? '' : undefined"
+			:draggable="altHeld"
+			@dragstart="onKnobDragStart(cell, $event)"
 			@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			@dragover.prevent
 			@drop.prevent="onKnobDrop(cell, $event)"
@@ -19,16 +21,12 @@
 				<div class="text-xs text-black truncate">{{ cell.valueLabel }}</div>
 			</div>
 
-			<!-- The knob alone is the Alt+drag source, so data-knob-slot lives here and the grab cursor
-			     (style.css's .alt-assign rules) covers only the knob. The whole cell column is the drop
-			     target (data-cell-slot, @drop above). The wrapper stays hit-testable while the Knob
-			     inside goes pointer-events-none under Alt, so the gesture never races useKnob.ts's
+			<!-- The whole cell column is both the Alt+drag source (:draggable/@dragstart above) and the drop
+			     target (data-cell-slot, @drop above); style.css's .alt-assign rules give it the grab cursor.
+			     The Knob inside goes pointer-events-none under Alt, so the gesture never races useKnob.ts's
 			     value-drag. Empty slots drag too: dropping one on a canvas param assigns that param here. -->
 			<div
-				:data-knob-slot="cell.slotIndex"
-				:draggable="altHeld"
 				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
-				@dragstart="onKnobDragStart(cell, $event)"
 				@mouseenter="showHint('paramPageKnob')"
 				@mouseleave="clearHint"
 				class="-mb-1"
