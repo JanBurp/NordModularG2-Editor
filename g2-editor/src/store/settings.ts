@@ -19,7 +19,7 @@ export const useSettingsStore = defineStore('settings', {
 		theme: 'system' as ThemeMode,
 		cableGravity: 50 as number,
 		cableOpacity: 90 as number,
-		cableThickness: 1 as number,
+		cableThickness: 1.5 as number,
 		cableMagneticRadius: 96 as number,
 		cableConnectMode: 'drag' as CableConnectMode,
 		autoSuggestCable: false as boolean,
@@ -90,13 +90,13 @@ export const useSettingsStore = defineStore('settings', {
 			window.electronAPI?.setTheme(value);
 		},
 		setCableGravity(value: number) {
-			this.cableGravity = clamp(value, 0, 100);
+			this.cableGravity = clamp(value, 0, 200);
 		},
 		setCableOpacity(value: number) {
 			this.cableOpacity = clamp(value, 0, 100);
 		},
 		setCableThickness(value: number) {
-			this.cableThickness = clamp(value, 0, 10);
+			this.cableThickness = clamp(value, 0, 3);
 		},
 		setCableMagneticRadius(value: number) {
 			this.cableMagneticRadius = clamp(value, 0, 115);
@@ -126,5 +126,11 @@ export const useSettingsStore = defineStore('settings', {
 			this.canvasZoom = 1;
 		},
 	},
-	persist: true,
+	persist: {
+		// Restored state bypasses the setters; re-clamp values whose range has shrunk.
+		afterRestore: ({ store }) => {
+			store.setCableGravity(store.cableGravity);
+			store.setCableThickness(store.cableThickness);
+		},
+	},
 });

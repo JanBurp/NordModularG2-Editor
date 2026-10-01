@@ -11,7 +11,6 @@
 		makeCableKey,
 		applyCableVisibility,
 		updateCableStyles,
-		updateCableGravity,
 		applyVisibilityToElement,
 		emphasizeCableByKey,
 	} from '../../renderer/cableRenderer';
@@ -78,6 +77,7 @@
 			makePatchCables(props.modules as CableModule[], props.cables as Cable[], svg, {
 				selectedCables: props.selectedCables as Cable[],
 				gravity: settings.cableGravity,
+				seed: uiStore.cableSeed,
 				opacity: settings.cableOpacity,
 				thickness: settings.cableThickness,
 				onCableGrabStart: handleCableGrabStart,
@@ -128,6 +128,7 @@
 				const cableOptions = {
 					selectedCables: props.selectedCables,
 					gravity: settings.cableGravity,
+					seed: uiStore.cableSeed,
 					opacity: settings.cableOpacity,
 					thickness: settings.cableThickness,
 					onCableGrabStart: handleCableGrabStart,
@@ -200,13 +201,11 @@
 		},
 	);
 
-	// Gravity: shift existing control points — no re-randomization.
+	// Gravity changes handle lengths, so recompute all curves (same seed → same twist).
 	watch(
 		() => settings.cableGravity,
-		(newVal, oldVal) => {
-			nextTick(() => {
-				if (svgRef?.value) updateCableGravity(svgRef.value, oldVal, newVal);
-			});
+		() => {
+			nextTick(() => renderCables());
 		},
 	);
 

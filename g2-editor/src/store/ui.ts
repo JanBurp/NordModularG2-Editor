@@ -5,6 +5,7 @@ import type { JackDragInfo, SlotLabel } from '@/types';
 import type { JackEnd } from './slotHelpers';
 import type { GhostCable, GhostCandidate } from '@/composables/useGhostCable';
 import { clamp } from '@/utils/math';
+import { newCableSeed } from '@/renderer/patchcord';
 import { defineStore } from 'pinia';
 import { useDeviceStore } from './device';
 import { useSettingsStore } from './settings';
@@ -43,6 +44,7 @@ export const useUiStore = defineStore('ui', {
 		showKeyCommandsPage: false as boolean,
 		showQuickAdd: false as boolean,
 		cableShakeCount: 0 as number,
+		cableSeed: newCableSeed() as number,
 		draggedModuleId: null as number | null,
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
@@ -196,6 +198,7 @@ export const useUiStore = defineStore('ui', {
 
 		shakeCables() {
 			this.cableShakeCount++;
+			this.cableSeed = newCableSeed();
 		},
 
 		setAreaFbar(fbar: number) {

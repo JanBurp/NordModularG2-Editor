@@ -32,13 +32,25 @@
 
 				<p class="settings-subheader">Cable rendering:</p>
 				<SettingsRow :label="L.cableGravity">
-					<Slider :model-value="settings.cableGravity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableGravity($event)" />
+					<Slider
+						:model-value="toPercent(settings.cableGravity, CABLE_GRAVITY_MAX)"
+						:min="0"
+						:max="100"
+						:step="1"
+						@update:model-value="settings.setCableGravity(fromPercent($event, CABLE_GRAVITY_MAX))"
+					/>
 				</SettingsRow>
 				<SettingsRow :label="L.cableOpacity">
 					<Slider :model-value="settings.cableOpacity" :min="0" :max="100" :step="1" @update:model-value="settings.setCableOpacity($event)" />
 				</SettingsRow>
 				<SettingsRow :label="L.cableThickness">
-					<Slider :model-value="settings.cableThickness" :min="0" :max="6.5" :step="0.5" @update:model-value="settings.setCableThickness($event)" />
+					<Slider
+						:model-value="toPercent(settings.cableThickness, CABLE_THICKNESS_MAX)"
+						:min="0"
+						:max="100"
+						:step="1"
+						@update:model-value="settings.setCableThickness(fromPercent($event, CABLE_THICKNESS_MAX))"
+					/>
 				</SettingsRow>
 
 				<p class="settings-subheader">Cable connecting:</p>
@@ -332,6 +344,12 @@
 	import type { PatchParamVariation } from '@/types/patch';
 
 	const L = SETTINGS_LABELS;
+
+	// Cable sliders show 0-100 whatever the internal range is (cosmetic only).
+	const CABLE_GRAVITY_MAX = 200;
+	const CABLE_THICKNESS_MAX = 3;
+	const toPercent = (value: number, max: number) => Math.round((value / max) * 100);
+	const fromPercent = (percent: number, max: number) => (percent / 100) * max;
 
 	const device = useDeviceStore();
 	const settings = useSettingsStore();

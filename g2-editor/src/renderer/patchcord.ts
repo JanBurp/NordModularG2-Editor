@@ -1,142 +1,88 @@
 /**
  * Patchcord (Cable) Math and Rendering for Nord Modular G2
  *
- * Handles Bezier curve calculations for patch cables
+ * Handles Bezier curve calculations for patch cables (control points ported from the original G2 editor)
  */
+
+const HALF_PI = Math.PI / 2;
+const THIRD_PI = Math.PI / 3;
+const DEFAULT_GRAVITY = 50; // gravity at which the curve is exactly the original G2 editor's
+
+/** One global random byte (0..255) seeding every cable's twist; re-rolled on "Shake cables". */
+export function newCableSeed(): number {
+	return Math.floor(Math.random() * 256);
+}
 
 /**
- * FastVector - 2D vector math for patchcord calculations
+ * Ported from G2Editor.c TwistAngel: adds a piecewise-linear zig-zag offset (max +-60 degrees) to angle `a`,
+ * driven by the wrapped sum a + phi.
  */
-class FastVector {
-	x: number;
-	y: number;
-	x2?: number;
+export function twistAngle(a: number, phi: number): number {
+	let v = a + phi;
+	while (v > Math.PI) v -= 2 * Math.PI;
+	while (v < -Math.PI) v += 2 * Math.PI;
+	let offset: number;
+	if (v < -HALF_PI) offset = ((v + Math.PI) * -THIRD_PI) / HALF_PI;
+	else if (v < 0) offset = ((v + HALF_PI) * 2 * THIRD_PI) / HALF_PI - THIRD_PI;
+	else if (v < HALF_PI) offset = (v * -2 * THIRD_PI) / HALF_PI + THIRD_PI;
+	else offset = ((v - HALF_PI) * THIRD_PI) / HALF_PI - THIRD_PI;
+	return offset + a;
+}
 
-	constructor(x: number, y: number, x2?: number) {
-		this.x = x;
-		this.y = y;
-		this.x2 = x2;
-	}
+/**
+ * Ported from G2Editor.c CRenderSnakeABC::GetControlpoints. Returns the two Bezier control points
+ * (cpA next to (ax,ay), cpB next to (bx,by)). Handle length scales with gravity: 0 = straight line,
+ * DEFAULT_GRAVITY = original shape, above = more bulge.
+ */
+export function cableControlPoints(ax: number, ay: number, bx: number, by: number, gravity: number, seed: number): [[number, number], [number, number]] {
+	const d = Math.hypot(bx - ax, by - ay);
+	let theta = Math.atan2(by - ay, bx - ax);
+	let theta2 = theta + Math.PI;
+	if (theta2 > Math.PI) theta2 -= 2 * Math.PI;
 
-	/**
-	 * Add a scalar or vector
-	 */
-	add(B: number | FastVector): FastVector {
-		if (typeof B === 'number') {
-			return new FastVector(this.x + B, this.y + B);
-		}
-		return new FastVector(this.x + B.x, this.y + B.y);
-	}
+	const len = (d < 45 ? d / 3 : d / 5 + 9) * (gravity / DEFAULT_GRAVITY);
+	const phi = Math.sin(seed + ax + ay + bx + by) * 2 * Math.PI;
 
-	/**
-	 * Subtract a scalar or vector
-	 */
-	subtract(B: number | FastVector): FastVector {
-		if (typeof B === 'number') {
-			return new FastVector(this.x - B, this.y - B);
-		}
-		return new FastVector(this.x - B.x, this.y - B.y);
+	if (d >= 100) {
+		theta = twistAngle(theta, phi);
+		theta2 = twistAngle(theta2, phi);
+	} else {
+		const w = (d / 100) ** 2;
+		const twisted = w >= 0.5 ? w : 0.5;
+		const straight = w >= 0.5 ? 1 - w : 0.5;
+		theta = straight * theta + twisted * twistAngle(theta, phi);
+		theta2 = straight * theta2 + twisted * twistAngle(theta2, phi);
 	}
-
-	/**
-	 * Multiply by a scalar or vector
-	 */
-	multiply(B: number | FastVector): FastVector {
-		if (typeof B === 'number') {
-			return new FastVector(this.x * B, this.y * B);
-		}
-		return new FastVector(this.x * B.x, this.y * B.y);
-	}
-
-	/**
-	 * Rotate vector by angle (radians)
-	 */
-	rotate(angle: number): FastVector {
-		const sa = Math.sin(angle);
-		const ca = Math.cos(angle);
-		return new FastVector(ca * this.x - sa * this.y, sa * this.x + ca * this.y);
-	}
-
-	/**
-	 * Get string representation for path commands
-	 */
-	getstr(p: string, xs: number, ys: number, yo: number): string {
-		return p + this.x * xs + ',' + (this.y * ys + yo);
-	}
-
-	/**
-	 * Convert to SVG path string
-	 */
-	toString(pre = ''): string {
-		return `${pre}${this.x} ${this.y}`;
-	}
+	return [
+		[Math.round(ax + Math.cos(theta) * len), Math.round(ay + Math.sin(theta) * len)],
+		[Math.round(bx + Math.cos(theta2) * len), Math.round(by + Math.sin(theta2) * len)],
+	];
 }
 
 /**
  * Patchcord class for rendering patch cables
  *
- * Represents a cable connection between two jacks with Bezier curves
+ * Represents a cable connection between two jacks as one cubic Bezier
  */
 export class Patchcord {
-	points: FastVector[];
+	constructor(
+		private sx: number,
+		private sy: number,
+		private dx: number,
+		private dy: number,
+	) {}
 
 	/**
-	 * Create a patchcord from source to destination
-	 *
-	 * @param sx - Source X
-	 * @param sy - Source Y
-	 * @param dx - Destination X
-	 * @param dy - Destination Y
+	 * SVG path data "M dst C cp1,cp2,src" (cp1 next to dst, cp2 next to src).
 	 */
-	constructor(sx: number, sy: number, dx: number, dy: number) {
-		this.points = [];
-		this.points[3] = new FastVector(sx, sy);
-		this.points[0] = new FastVector(dx, dy);
-	}
-
-	/**
-	 * Set Bezier control points combining random organic variation with a gravity-based downward bias.
-	 * gravity=0: straight line (no variation, no droop).
-	 * gravity=100: full random variation + maximum downward droop.
-	 */
-	shake(gravity: number): void {
-		const t = gravity / 100;
-
-		// Random organic variation scaled by gravity (0 at gravity=0 → straight).
-		// Both control points share the same angle/strength so they stay point-symmetric
-		// about the source-dest midpoint, keeping the curve's sag centered.
-		const angle = (Math.random() - 0.5) * 2;
-		const strength = Math.random() * 0.7 * t;
-		const dir = this.points[0].subtract(this.points[3]).rotate(angle);
-		this.points[1] = this.points[0].subtract(dir.multiply(strength));
-		this.points[2] = this.points[3].add(dir.multiply(strength));
-
-		// Add gravity downward bias on top of the organic variation.
-		if (t > 0) {
-			const src = this.points[3];
-			const dst = this.points[0];
-			const dx = src.x - dst.x;
-			const dy = src.y - dst.y;
-			const length = Math.sqrt(dx * dx + dy * dy);
-			const midY = (src.y + dst.y) / 2;
-			const maxY = Math.max(src.y, dst.y);
-			const d = t * (maxY - midY + length * 0.2) * (4 / 3);
-			this.points[1] = new FastVector(this.points[1].x, this.points[1].y + d);
-			this.points[2] = new FastVector(this.points[2].x, this.points[2].y + d);
-		}
-	}
-
-	/**
-	 * Generate SVG path data for the cable using gravity-based droop.
-	 */
-	getCurvePath(gravity = 50): string {
-		this.shake(gravity);
-		return this.points[0].toString('M') + this.points[1]!.toString('C') + this.points[2]!.toString(',') + this.points[3].toString(',');
+	getCurvePath(gravity = DEFAULT_GRAVITY, seed = 0): string {
+		const [cp1, cp2] = cableControlPoints(this.dx, this.dy, this.sx, this.sy, gravity, seed);
+		return `M${this.dx} ${this.dy}C${cp1[0]} ${cp1[1]},${cp2[0]} ${cp2[1]},${this.sx} ${this.sy}`;
 	}
 }
 
 /**
- * Deterministic sag-based preview curve — no randomness, unlike Patchcord.shake() — so it stays
+ * Deterministic sag-based preview curve — no randomness, unlike Patchcord — so it stays
  * smooth when recomputed on every mousemove (a real cable's randomized curve is only computed once,
  * at creation; a ghost/preview cable is recomputed continuously while it follows the mouse or updates
  * its snapped target).

@@ -43,7 +43,7 @@ export const SETTINGS_LABELS = {
 	editorPath: 'Browser Path',
 	editorHiddenModules: 'Hidden Modules',
 	editorTheme: 'Theme',
-	cableGravity: 'Gravity',
+	cableGravity: 'Curved',
 	cableOpacity: 'Opacity',
 	cableThickness: 'Thickness',
 	cableMagneticRadius: 'Snap range',

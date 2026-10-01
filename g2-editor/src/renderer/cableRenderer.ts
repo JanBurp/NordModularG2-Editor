@@ -32,6 +32,7 @@ export interface CableRenderOptions {
 	onCableGrabStart?: (e: MouseEvent, cable: Cable) => void;
 	selectedCables?: Cable[];
 	gravity?: number;
+	seed?: number;
 	opacity?: number;
 	thickness?: number;
 }
@@ -47,6 +48,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 	const borderStroke = mainStroke + 2 + (options?.thickness ?? 1) * 0.3;
 	const opacity = (options?.opacity ?? 90) / 100;
 	const gravity = options?.gravity ?? 50;
+	const seed = options?.seed ?? 0;
 	cables.forEach((cable) => {
 		const dir = cable.dir ?? 1;
 
@@ -81,7 +83,7 @@ export function makePatchCables(modules: Module[], cables: Cable[], svgElement: 
 		const dy = dcon.y + dmod.vert * MODULE_ROW_HEIGHT;
 
 		const pc = new Patchcord(sx, sy, dx, dy);
-		const d = pc.getCurvePath(gravity);
+		const d = pc.getCurvePath(gravity, seed);
 		const color = CABLE_SVG_COLORS[cable.colour] ?? CABLE_SVG_COLORS[0];
 
 		const isSelected = selectedKeys.has(makeCableKey(cable));
@@ -249,23 +251,5 @@ export function updateCableStyles(svgElement: SVGElement, opacity: number, thick
 	});
 	svgElement.querySelectorAll<SVGPathElement>('.svgcableborder').forEach((el) => {
 		el.setAttribute('style', `stroke-width: ${borderStroke}; --cable-border-width: ${borderStroke}px;`);
-	});
-}
-
-// Shifts control point y-coordinates on all cable paths by the delta between old and new gravity,
-// preserving the random organic shape and only changing the downward droop.
-export function updateCableGravity(svgElement: SVGElement, oldGravity: number, newGravity: number): void {
-	svgElement.querySelectorAll<SVGPathElement>('[data-cable-key]').forEach((el) => {
-		const d = el.getAttribute('d');
-		if (!d) return;
-		const p = parseCablePath(d);
-		if (!p) return;
-		const [dx, dy, cp1x, cp1y, cp2x, cp2y, sx, sy] = p;
-		const diffX = sx - dx,
-			diffY = sy - dy;
-		const length = Math.sqrt(diffX * diffX + diffY * diffY);
-		const base = Math.max(sy, dy) - (sy + dy) / 2 + length * 0.2;
-		const delta = ((newGravity - oldGravity) / 100) * base * (4 / 3);
-		el.setAttribute('d', `M${dx} ${dy}C${cp1x} ${cp1y + delta},${cp2x} ${cp2y + delta},${sx} ${sy}`);
 	});
 }
