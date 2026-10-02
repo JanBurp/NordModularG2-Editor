@@ -88,7 +88,50 @@ volatile int g2_stream_locked = 0;
 static int g2_last_claim_error = 0;
 int g2_get_last_claim_error(void) { return g2_last_claim_error; }
 
+/* Frame trace: ring of the most recent frames in both directions (LED/volume
+ * stream excluded), dumped on disconnect so a wedge can be correlated with what
+ * went over the wire just before it. Written by the main thread (sends) and the
+ * listener thread (receives), hence the mutex. */
+#define G2_TRACE_N     64
+#define G2_TRACE_BYTES 24
+typedef struct { long long ms; char dir; int len; uint8_t b[G2_TRACE_BYTES]; } g2_trace_ent;
+static g2_trace_ent    g2_trace_ring[G2_TRACE_N];
+static unsigned        g2_trace_count;
+static pthread_mutex_t g2_trace_mu = PTHREAD_MUTEX_INITIALIZER;
+
+static long long trace_now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
+}
+
+void g2_trace(char dir, const uint8_t *buf, int len) {
+    pthread_mutex_lock(&g2_trace_mu);
+    g2_trace_ent *e = &g2_trace_ring[g2_trace_count++ % G2_TRACE_N];
+    e->ms = trace_now_ms();
+    e->dir = dir;
+    e->len = len;
+    memcpy(e->b, buf, (size_t)(len < G2_TRACE_BYTES ? len : G2_TRACE_BYTES));
+    pthread_mutex_unlock(&g2_trace_mu);
+}
+
+void g2_trace_dump(void) {
+    long long now = trace_now_ms();
+    pthread_mutex_lock(&g2_trace_mu);
+    unsigned total = g2_trace_count < G2_TRACE_N ? g2_trace_count : G2_TRACE_N;
+    fprintf(stderr, "[trace] last %u frames (> sent, < received), oldest first:\n", total);
+    for (unsigned i = g2_trace_count - total; i < g2_trace_count; i++) {
+        const g2_trace_ent *e = &g2_trace_ring[i % G2_TRACE_N];
+        int n = e->len < G2_TRACE_BYTES ? e->len : G2_TRACE_BYTES;
+        fprintf(stderr, "[trace] -%5lld ms %c len=%-5d ", now - e->ms, e->dir, e->len);
+        for (int j = 0; j < n; j++) fprintf(stderr, "%02x", e->b[j]);
+        fprintf(stderr, "%s\n", e->len > n ? "..." : "");
+    }
+    pthread_mutex_unlock(&g2_trace_mu);
+}
+
 static void debug_send(const char *fn, const uint8_t *buf, int len) {
+    g2_trace('>', buf, len);
     if (!g2_debug) return;
     flockfile(stdout);
     printf("{\"debug\":\"send\",\"fn\":\"%s\",\"hex\":\"", fn);
@@ -667,6 +710,8 @@ static void *listener_thread(void *arg) {
             }
         }
 
+        if (!(msg.bulk && msg.bulk_size > 3 && (msg.bulk[3] == 0x39 || msg.bulk[3] == 0x3A)))
+            g2_trace('<', msg.bulk ? msg.bulk : msg.interrupt, msg.bulk ? msg.bulk_size : 16);
         mq_push(msg);
     }
     return NULL;

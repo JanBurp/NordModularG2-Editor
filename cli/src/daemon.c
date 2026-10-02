@@ -180,6 +180,29 @@ long long now_ms(void) {
 	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }
 
+/* Disconnect diagnostic: command timestamps (ring) so a drop can be correlated
+ * with a burst of commands. Logged to stderr only. */
+#define DIAG_RING 256
+static long long diag_ts[DIAG_RING];
+static unsigned  diag_n;
+static char      diag_last_cmd[32];
+
+static void diag_record_cmd(const char *cmd) {
+	diag_ts[diag_n++ % DIAG_RING] = now_ms();
+	snprintf(diag_last_cmd, sizeof(diag_last_cmd), "%s", cmd);
+}
+
+static void diag_log_disconnect(const char *why, int ret) {
+	long long now = now_ms();
+	unsigned in_1s = 0, total = diag_n < DIAG_RING ? diag_n : DIAG_RING;
+	for (unsigned i = 0; i < total; i++)
+		if (now - diag_ts[i] <= 1000) in_1s++;
+	long long since_last = diag_n ? now - diag_ts[(diag_n - 1) % DIAG_RING] : -1;
+	fprintf(stderr, "[diag] disconnect (%s, ret=%d): %u cmds in last 1s%s, last cmd '%s' %lld ms ago, msg_drops=%lu\n",
+	        why, ret, in_1s, in_1s == DIAG_RING ? "+" : "", diag_last_cmd, since_last, g2_msg_drops);
+	g2_trace_dump();
+}
+
 void debug_timing(const char *label) {
 	if (!g2_debug) return;
 	printf("{\"debug\":\"timing\",\"label\":\"%s\",\"ms\":%lld}\n", label, now_ms());
@@ -359,6 +382,7 @@ static void execute_cmd(const char *line) {
 		emit(r); cJSON_Delete(r); cJSON_Delete(req);
 		return;
 	}
+	diag_record_cmd(cmd_j->valuestring);
 
 	const char *cmd = cmd_j->valuestring;
 	int n = arg_count(args);
@@ -903,6 +927,7 @@ static void execute_cmd(const char *line) {
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||
 	    ret == G2_ERR_CONNECT || ret == G2_ERR_RESET) {
+		diag_log_disconnect("command error", ret);
 		printf("{\"type\":\"device_disconnected\"}\n");
 		fflush(stdout);
 	}
@@ -998,6 +1023,7 @@ static void do_reconnect(void) {
 	g2_stream_locked = 0;
 	g2_pending_rearm = 0;
 
+	diag_log_disconnect("listener/no device", 0);
 	g2_listener_stop();
 	g2_disconnect();
 	printf("{\"type\":\"device_disconnected\"}\n");

@@ -2380,6 +2380,7 @@ static int send_write_no_resp(int slot, uint8_t version, uint8_t subcmd,
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
+    g2_trace('>', buff, msgLength);
     int transferred;
     int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff,
                                    msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);

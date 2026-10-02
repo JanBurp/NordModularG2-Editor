@@ -84,6 +84,11 @@ extern volatile int g2_pending_disconnect;
  * have been thrown away - the cause of an unexplained "no reply" abort. */
 extern volatile unsigned long g2_msg_drops;
 
+/* Frame trace ring: g2_trace() records a sent ('>') or received ('<') frame,
+ * g2_trace_dump() prints the recent ones to stderr (called on disconnect). */
+void g2_trace(char dir, const uint8_t *buf, int len);
+void g2_trace_dump(void);
+
 /* Level-triggered: 1 while the G2's live stream is intentionally stopped and
  * something still owes it a rearm. Set/cleared only by g2_lock_stream()/
  * g2_unlock_stream() (and mirrored manually by callers that know the device
