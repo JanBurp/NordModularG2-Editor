@@ -165,6 +165,7 @@ extern void test_set_module_label_empty_label(void);
 
 extern void test_set_perf_mode_invalid_mode_low(void);
 extern void test_set_perf_mode_invalid_mode_high(void);
+extern void test_set_perf_mode_invalid_shift(void);
 extern void test_set_perf_name_null_name(void);
 extern void test_set_perf_name_empty_name(void);
 
@@ -372,6 +373,7 @@ int main(void) {
     /* set-perf-mode and set-perf-name parameter validation tests */
     RUN_TEST(test_set_perf_mode_invalid_mode_low);
     RUN_TEST(test_set_perf_mode_invalid_mode_high);
+    RUN_TEST(test_set_perf_mode_invalid_shift);
     RUN_TEST(test_set_perf_name_null_name);
     RUN_TEST(test_set_perf_name_empty_name);
 

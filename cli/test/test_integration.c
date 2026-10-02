@@ -416,7 +416,7 @@ void test_set_perf_mode_cycle(void) {
     delay_between_tests();
 
     fprintf(stderr, "set-perf-mode: switching to performance\n");
-    int ret1 = g2_set_perf_mode(1);
+    int ret1 = g2_set_perf_mode(1, 0);
     TEST_ASSERT_EQUAL_INT(G2_OK, ret1);
     delay_between_tests();
 
@@ -427,7 +427,7 @@ void test_set_perf_mode_cycle(void) {
     delay_between_tests();
 
     fprintf(stderr, "set-perf-mode: switching back to patch\n");
-    int ret2 = g2_set_perf_mode(0);
+    int ret2 = g2_set_perf_mode(0, 0);
     TEST_ASSERT_EQUAL_INT(G2_OK, ret2);
     delay_between_tests();
 

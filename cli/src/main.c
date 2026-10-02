@@ -50,7 +50,7 @@ static void print_usage(const char *prog) {
     printf("  upload-patch <slot> <filepath>                                                            Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                    Upload .prf2 performance file\n");
     printf("  set-synth-settings <json>                                                                 Set all synth settings from JSON object\n");
-    printf("  set-perf-mode <patch|performance>                                                         Switch between patch and performance mode\n");
+    printf("  set-perf-mode <patch|performance> [shift]                                                 Switch between patch and performance mode (shift = SHIFT+PERF)\n");
     printf("  set-perf-name <name>                                                                      Set the current performance name\n");
     printf("  get-perf-settings                                                                         Get current performance settings\n");
     printf("  set-patch-name <slot> <name>                                                              Set patch name for a slot\n");
@@ -892,12 +892,12 @@ static int cmd_upload_perf(int argc, char **argv, int i) {
 }
 
 static int cmd_set_perf_mode(int argc, char **argv, int i) {
-    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-mode <patch|performance>\n"); return 1; }
+    if (i + 1 >= argc) { fprintf(stderr, "Usage: set-perf-mode <patch|performance> [shift]\n"); return 1; }
     const char *m = argv[i + 1];
     int mode = (strcmp(m, "performance") == 0) ? 1 : (strcmp(m, "patch") == 0) ? 0 : -1;
     if (mode < 0) { fprintf(stderr, "set-perf-mode: mode must be 'patch' or 'performance'\n"); return 1; }
     if (g2_send_init() != G2_OK) return 1;
-    int ret = g2_set_perf_mode(mode);
+    int ret = g2_set_perf_mode(mode, i + 2 < argc && strcmp(argv[i + 2], "shift") == 0);
     if (ret == G2_OK) {
         if (output_format == OUTPUT_JSON) {
             cJSON *r = cJSON_CreateObject();

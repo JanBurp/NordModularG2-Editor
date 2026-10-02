@@ -35,7 +35,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `reload-names` | `[partial]` | Re-fetch patch/performance name list from G2 and emit `names` event. With `partial` (daemon only), also emits a `names_partial` event per USB response while reading: `{"type":"names_partial","data":{"kind":"patch"\|"performance","bank":N,"complete":bool,"banks":{"<n>":[{location,name,category?}]}}}` — banks below `bank` are complete, `complete` ends that kind. `names_progress` is emitted in both modes; the complete `names` event always follows. |
 | `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank) |
 | `get-perf-settings` | | Get current performance settings |
-| `set-perf-mode` | `<patch\|performance>` | Switch between patch and performance mode |
+| `set-perf-mode` | `<patch\|performance> [shift]` | Switch between patch and performance mode. With `shift` it acts as SHIFT+PERF: patch→performance creates a new performance ("New Performance") from the current slot patches (key/active kept); performance→patch keeps the performance's patches in the slots |
 | `set-perf-name` | `<name>` | Set performance name |
 | `set-patch-name` | `<slot> <name>` | Set patch name |
 | `set-patch-description` | `<slot> <hexdata>` | Set patch description (hex-encoded) |
@@ -142,6 +142,7 @@ get-patch A             # read patch from slot A
 variation 4 B           # select variation 4 on slot B
 verbose off             # suppress LED/volume updates
 set-perf-mode patch     # switch to patch mode
+set-perf-mode performance shift   # SHIFT+PERF: new performance from the slot patches
 stop                    # kill daemon
 start                   # restart daemon
 ```

@@ -88,12 +88,12 @@ export const useDeviceStore = defineStore('device', {
 			}
 		},
 
-		async togglePerfMode() {
+		async togglePerfMode(shift = false) {
 			if (!this.device || this.status !== DeviceStatus.Connected) return;
 			const newMode = this.device.mode === 'Performance' ? 'patch' : 'performance';
 			this.modeChanging = true;
 			try {
-				await window.cli.run(['set-perf-mode', newMode]);
+				await window.cli.run(['set-perf-mode', newMode, ...(shift ? ['shift'] : [])]);
 			} catch (e) {
 				this.modeChanging = false;
 				throw e;

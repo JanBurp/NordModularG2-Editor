@@ -224,7 +224,7 @@ int g2_upload_perf_buf(const uint8_t *data, size_t len);
 int g2_set_synth_settings(cJSON *params);
 
 /* Performance mode and name */
-int g2_set_perf_mode(int mode);
+int g2_set_perf_mode(int mode, int shift);
 int g2_set_perf_name(const char *name);
 
 /* Patch name: slot 0-3, name max 16 chars */

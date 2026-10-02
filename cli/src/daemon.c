@@ -773,7 +773,7 @@ static void execute_cmd(const char *line) {
 		if (mode < 0) {
 			ret = G2_ERR_INVALID_PARAM;
 		} else {
-			ret = g2_set_perf_mode(mode);
+			ret = g2_set_perf_mode(mode, n >= 2 && strcmp(arg_s(args, 1), "shift") == 0);
 		}
 
 	} else if (strcmp(cmd, "set-perf-name") == 0 && n >= 1) {

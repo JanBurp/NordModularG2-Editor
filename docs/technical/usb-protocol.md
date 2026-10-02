@@ -223,7 +223,7 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK *(not implemented yet)* | — | Embedded (`R_EXT_MASTER_CLOCK`) |
 | `0x3D` | MIDI_DUMP *(not implemented yet)* | — | None |
-| `0x3E mm 00` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance) | Bulk `0x0C/0x1F` version_update (see §13) |
+| `0x3E mm ss` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance), `ss`=SHIFT state (0=plain PERF, 1=SHIFT+PERF: patch→perf creates a new performance from the slot patches, perf→patch keeps its patches in the slots; hardware-verified) | Bulk `0x0C/0x1F` version_update (see §13) |
 | `0x56 oo nn` | PLAY_NOTE *(not implemented yet)* | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
@@ -233,7 +233,7 @@ However, some commands that need to be version-matched use the **performance ver
 
 ```
 set-synth-settings   <...>                    (0x03)
-set-perf-mode        <mode>                   (0x3E)
+set-perf-mode        <mode> [shift]           (0x3E)
 select-patch         <slot> <bank> <loc>      (0x0A)
 select-perf          <bank> <loc>             (0x0A, slot byte=4)
 store-patch          <slot> <bank> <loc>      (0x0B)

@@ -8,11 +8,15 @@
 #include "../include/g2_device.h"
 
 void test_set_perf_mode_invalid_mode_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_mode(-1));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_mode(-1, 0));
 }
 
 void test_set_perf_mode_invalid_mode_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_mode(2));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_mode(2, 0));
+}
+
+void test_set_perf_mode_invalid_shift(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_mode(1, 2));
 }
 
 void test_set_perf_name_null_name(void) {

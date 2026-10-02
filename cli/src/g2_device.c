@@ -1615,11 +1615,12 @@ int g2_set_synth_settings(cJSON *params) {
     return G2_OK;
 }
 
-int g2_set_perf_mode(int mode) {
-    if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(performance) or 1(patch)\n"); return G2_ERR_INVALID_PARAM; }
+int g2_set_perf_mode(int mode, int shift) {
+    if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(patch) or 1(performance)\n"); return G2_ERR_INVALID_PARAM; }
+    if (shift < 0 || shift > 1) { g2_err("set-perf-mode: shift must be 0 or 1\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-perf-mode: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
-    uint8_t cmd[3] = { 0x3E, (uint8_t)mode, 0x00 };
+    uint8_t cmd[3] = { 0x3E, (uint8_t)mode, (uint8_t)shift };
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
     /* In daemon mode: listener handles the response (aCmd=0x0C, sub=0x1F mode/slot data)
      * and sets g2_pending_rearm for the main loop.

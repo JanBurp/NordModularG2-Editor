@@ -23,7 +23,7 @@
 				/>
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
-				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle()">Perf</Button>
+				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle($event)">Perf</Button>
 				<DeviceSwitcher v-if="!isOfflineMode" />
 			</template>
 
@@ -719,9 +719,9 @@
 	useModuleKeyboard();
 	useWindowTitle();
 
-	async function handlePerfModeToggle(): Promise<void> {
+	async function handlePerfModeToggle(e: MouseEvent): Promise<void> {
 		try {
-			await device.togglePerfMode();
+			await device.togglePerfMode(e.shiftKey);
 		} catch (e: any) {
 			console.error('togglePerfMode failed:', e?.message ?? e);
 		}
