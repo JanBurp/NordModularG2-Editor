@@ -36,6 +36,7 @@ export const useSettingsStore = defineStore('settings', {
 		knobSensitivity: 1 as number,
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
+		bankFolder: '' as string,
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
@@ -78,6 +79,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setPath(value: string) {
 			this.path = value;
+		},
+		setBankFolder(value: string) {
+			this.bankFolder = value;
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;

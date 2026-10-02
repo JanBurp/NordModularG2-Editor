@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useDeviceStore } from '@/store/device';
+import { useSettingsStore } from '@/store/settings';
 import { bankSizeFor, defaultBankKind } from '@/constants/ui';
 import { showToast } from './useToast';
 
@@ -46,6 +47,7 @@ export function waitForNamesReload(timeoutMs = 5000): Promise<void> {
 export function useBankDownloadDialog() {
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
+	const settings = useSettingsStore();
 
 	const maxBank = computed(() => bankSizeFor(bankDownloadType.value));
 	const bankOptions = computed(() => {
@@ -84,9 +86,10 @@ export function useBankDownloadDialog() {
 				bankDownloadSourcePath.value = result.filepath;
 			}
 		} else {
-			const result = await window.electronAPI.selectBankFolder();
+			const result = await window.electronAPI.selectBankFolder(bankDownloadSourcePath.value || settings.bankFolder);
 			if (result.success && result.folder) {
 				bankDownloadSourcePath.value = result.folder;
+				settings.setBankFolder(result.folder);
 			}
 		}
 	}
@@ -135,7 +138,7 @@ export function useBankDownloadDialog() {
 
 	function setSourceType(type: SourceType): void {
 		bankDownloadSourceType.value = type;
-		bankDownloadSourcePath.value = '';
+		bankDownloadSourcePath.value = type === 'folder' ? settings.bankFolder : '';
 	}
 
 	return {

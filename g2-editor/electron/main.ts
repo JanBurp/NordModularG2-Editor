@@ -660,9 +660,10 @@ ipcMain.handle("perf:save-dialog", async (event, defaultName?: string, folder?: 
 	return { success: true, filepath: result.filePath };
 });
 
-ipcMain.handle("bank:select-folder", async (event) => {
+ipcMain.handle("bank:select-folder", async (event, defaultPath?: string) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
+		defaultPath: defaultPath || undefined,
 		properties: ["openDirectory"],
 	});
 	if (result.canceled || !result.filePaths[0]) return { success: false };

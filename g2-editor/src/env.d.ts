@@ -48,7 +48,7 @@ declare global {
 			claimStartupSplash: () => Promise<boolean>;
 			openExternal: (url: string) => void;
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
-			selectBankFolder: () => Promise<{ success: boolean; folder?: string }>;
+			selectBankFolder: (defaultPath?: string) => Promise<{ success: boolean; folder?: string }>;
 			selectPchListFile: () => Promise<{ success: boolean; filepath?: string }>;
 			devices: {
 				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;

@@ -1,6 +1,7 @@
 import { ref, computed, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useDeviceStore } from '@/store/device';
+import { useSettingsStore } from '@/store/settings';
 import { bankSizeFor, defaultBankKind } from '@/constants/ui';
 import { showToast } from './useToast';
 
@@ -24,6 +25,7 @@ export const bankUploadProgress = ref<BankUploadProgress | null>(null);
 export function useBankUploadDialog() {
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
+	const settings = useSettingsStore();
 
 	const maxBank = computed(() => bankSizeFor(bankUploadType.value));
 	const bankOptions = computed(() => {
@@ -43,7 +45,7 @@ export function useBankUploadDialog() {
 		}
 		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankUploadBankNum.value = opts?.bankNum ?? 1;
-		bankUploadFolder.value = '';
+		bankUploadFolder.value = settings.bankFolder;
 		bankUploadFilename.value = '';
 		bankUploadProgress.value = null;
 		showBankUploadDialog.value = true;
@@ -54,9 +56,10 @@ export function useBankUploadDialog() {
 	}
 
 	async function selectFolder(): Promise<void> {
-		const result = await window.electronAPI.selectBankFolder();
+		const result = await window.electronAPI.selectBankFolder(bankUploadFolder.value || settings.bankFolder);
 		if (result.success && result.folder) {
 			bankUploadFolder.value = result.folder;
+			settings.setBankFolder(result.folder);
 		}
 	}
 

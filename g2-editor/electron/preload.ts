@@ -63,7 +63,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 	showSaveDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("patch:save-dialog", defaultName, folder),
 	showSavePerfDialog: (defaultName?: string, folder?: string) => ipcRenderer.invoke("perf:save-dialog", defaultName, folder),
 	openPatchDialog: (kind?: "patch" | "performance") => ipcRenderer.invoke("patch:open-dialog", kind),
-	selectBankFolder: () => ipcRenderer.invoke("bank:select-folder"),
+	selectBankFolder: (defaultPath?: string) => ipcRenderer.invoke("bank:select-folder", defaultPath),
 	selectPchListFile: () => ipcRenderer.invoke("bank:select-pchlist"),
 	getAppInfo: () => ipcRenderer.invoke("app:info"),
 	getLatestVersion: () => ipcRenderer.invoke("app:latestVersion"),
