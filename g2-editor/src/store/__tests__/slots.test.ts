@@ -163,16 +163,92 @@ describe('edited flag', () => {
 		for (const s of ['A', 'B', 'C', 'D'] as const) expect(store.isSlotEdited(s)).toBe(false);
 	});
 
+	// Loads the fixture the way a hardware get-patch delivers it: section bytes with neither the
+	// trailing CRC (2 bytes) nor the file-only empty notes section 0x6f 0x00 0x00 (3 bytes).
+	async function loadHardwareStyleSlot(store: ReturnType<typeof useSlotsStore>): Promise<void> {
+		const { rawHex } = await loadFixture();
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: 'Fixture', data: rawHex.slice(0, -10) }));
+	}
+
 	it('saveSlot resets the edited flag after a successful save', async () => {
 		const store = useSlotsStore();
-		store.slots['A'].patch = makePatch();
-		store.slots['A'].rawHex = '00'.repeat(20); // non-null: skips re-serialization, isolating the save-reset behavior
+		await loadHardwareStyleSlot(store);
 		store.slots['A'].edited = true;
 		(globalThis as any).window.electronAPI = { savePatch: vi.fn().mockResolvedValue(undefined) };
 
 		await store.saveSlot('A', '/tmp/test.pch2');
 
 		expect(store.isSlotEdited('A')).toBe(false);
+	});
+
+	it('saveSlot writes the official text header and a valid CRC even for an unedited hardware-loaded slot', async () => {
+		const store = useSlotsStore();
+		await loadHardwareStyleSlot(store);
+		expect(store.slots['A'].edited).toBe(false);
+		const savePatch = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.electronAPI = { savePatch };
+
+		await store.saveSlot('A', '/tmp/unedited.pch2');
+
+		expect(savePatch).toHaveBeenCalledTimes(1);
+		const bytes: number[] = savePatch.mock.calls[0][1];
+		const nul = bytes.indexOf(0);
+		expect(new TextDecoder().decode(new Uint8Array(bytes.slice(0, nul)))).toBe(
+			'Version=Nord Modular G2 File Format 1\r\nType=Patch\r\nVersion=23\r\nInfo=BUILD 320\r\n',
+		);
+		expect(bytes.slice(nul + 1, nul + 3)).toEqual([0x17, 0x00]);
+		// The section train must end exactly 2 bytes before EOF: those 2 bytes are the CRC, not patch data.
+		let pos = nul + 3;
+		while (pos + 3 <= bytes.length) {
+			const size = (bytes[pos + 1] << 8) | bytes[pos + 2];
+			if (pos + 3 + size > bytes.length) break;
+			pos += 3 + size;
+		}
+		expect(bytes.length - pos).toBe(2);
+		// CRC-16/CCITT (poly 0x1021, init 0) over [0x17][0x00][sections].
+		let crc = 0;
+		for (const b of bytes.slice(nul + 1, -2)) {
+			crc ^= b << 8;
+			for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+		}
+		expect((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1]).toBe(crc);
+	});
+
+	it('savePerformance writes the official text header and a valid CRC', async () => {
+		const fs = await import('fs');
+		const path = await import('path');
+		const { fileURLToPath } = await import('url');
+		const { PatchParser, stripFileHeader } = await import('@/parser/nmg2PatchParser');
+		const fixture = path.resolve(fileURLToPath(new URL('.', import.meta.url)), '../../../../test-patches/EmptyPerf.prf2');
+		const fileBytes = Array.from(fs.readFileSync(fixture));
+		const prf2 = new PatchParser(new Uint8Array(fileBytes).buffer).parsePrf2()!;
+		const store = useSlotsStore();
+		store.loadPerformanceFile(prf2.patches, prf2.slotNames, 'EmptyPerf', stripFileHeader(fileBytes), undefined, prf2.globalParamPages);
+		const savePatch = vi.fn().mockResolvedValue(undefined);
+		(globalThis as any).window.electronAPI = { savePatch };
+
+		await store.savePerformance('/tmp/perf.prf2');
+
+		expect(savePatch).toHaveBeenCalledTimes(1);
+		const bytes: number[] = savePatch.mock.calls[0][1];
+		const nul = bytes.indexOf(0);
+		expect(new TextDecoder().decode(new Uint8Array(bytes.slice(0, nul)))).toBe(
+			'Version=Nord Modular G2 File Format 1\r\nType=Performance\r\nVersion=23\r\nInfo=BUILD 320\r\n',
+		);
+		expect(bytes.slice(nul + 1, nul + 3)).toEqual([0x17, 0x01]);
+		let pos = nul + 3;
+		while (pos + 3 <= bytes.length) {
+			const size = (bytes[pos + 1] << 8) | bytes[pos + 2];
+			if (pos + 3 + size > bytes.length) break;
+			pos += 3 + size;
+		}
+		expect(bytes.length - pos).toBe(2);
+		let crc = 0;
+		for (const b of bytes.slice(nul + 1, -2)) {
+			crc ^= b << 8;
+			for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+		}
+		expect((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1]).toBe(crc);
 	});
 
 	it('savePerformance resets the edited flag for all 4 slots after a successful save', async () => {

@@ -324,6 +324,9 @@ int g2_set_morph_range_batch(int slot, const G2MorphEntry *entries, int count);
  * Updated by g2_get_patch, watch loop patch_version events, and g2_select_variation.
  * Invalidated on version_update all-slots event. */
 extern uint8_t g2_slot_version[4];
+/* 1 = the G2 answered a version query with 0, so g2_slot_version[] == 0 is a known value
+ * rather than "unknown". Invalidated together with g2_slot_version. */
+extern uint8_t g2_slot_version_zero[4];
 extern uint8_t g2_perf_version_cache;
 
 /* Slot active/key: read-modify-write on C_PERF_SETTINGS (0x11).

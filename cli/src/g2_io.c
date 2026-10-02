@@ -686,6 +686,7 @@ static void *listener_thread(void *arg) {
                     if (msg.bulk_size > 3 &&
                         msg.bulk[1] == 0x04 && msg.bulk[2] == 0x40 && msg.bulk[3] == 0x1f) {
                         memset(g2_slot_version, 0, sizeof(g2_slot_version));
+                        memset(g2_slot_version_zero, 0, sizeof(g2_slot_version_zero));
                         msg.sentinel = 2;
                         mq_push(msg);
                         continue;

@@ -515,3 +515,32 @@ void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
     TEST_ASSERT_EQUAL_INT(sizeof(in), out_len);
     TEST_ASSERT_EQUAL_UINT8_ARRAY(in, out, sizeof(in));
 }
+
+void test_pch2_file_from_sections_header_and_crc(void) {
+    const uint8_t sections[] = { 0x21, 0x00, 0x03, 1, 2, 3, 0x5b, 0x00, 0x02, 9, 8 };
+    uint8_t out[256] = {0};
+    size_t out_len = sizeof(out);
+    TEST_ASSERT_EQUAL_INT(0, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
+
+    size_t hl = strlen(PCH2_TEXT_HEADER);
+    TEST_ASSERT_EQUAL_INT(hl + 3 + sizeof(sections) + 2, out_len);
+    TEST_ASSERT_EQUAL_MEMORY(PCH2_TEXT_HEADER, out, hl);
+    TEST_ASSERT_EQUAL_UINT8(0x00, out[hl]);
+    TEST_ASSERT_EQUAL_UINT8(0x17, out[hl + 1]);
+    TEST_ASSERT_EQUAL_UINT8(0x00, out[hl + 2]);
+    TEST_ASSERT_EQUAL_MEMORY(sections, out + hl + 3, sizeof(sections));
+
+    /* CRC covers [0x17][0x00][sections] and is the last 2 bytes, big-endian. */
+    uint16_t crc = calc_crc16(out + hl + 1, (int)(sizeof(sections) + 2));
+    TEST_ASSERT_EQUAL_UINT8(crc >> 8,   out[out_len - 2]);
+    TEST_ASSERT_EQUAL_UINT8(crc & 0xff, out[out_len - 1]);
+}
+
+void test_pch2_file_from_sections_buffer_too_small(void) {
+    const uint8_t sections[] = { 0x21, 0x00, 0x01, 7 };
+    uint8_t out[8] = {0};
+    size_t out_len = sizeof(out);
+    TEST_ASSERT_EQUAL_INT(-1, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
+    /* On failure out_len reports the required size. */
+    TEST_ASSERT_EQUAL_INT(strlen(PCH2_TEXT_HEADER) + 3 + sizeof(sections) + 2, out_len);
+}

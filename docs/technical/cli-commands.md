@@ -23,8 +23,8 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | Command | Arguments | Description |
 |---|---|---|
 | `get-patch` | `<slot>` | Get patch from slot as JSON |
-| `get-patch-file` | `<slot> [file]` | Save patch as .pch2 file |
-| `get-perf-file` | `[file]` | Save current performance as .prf2 file |
+| `get-patch-file` | `<slot> [file]` | Save patch as .pch2 file (official text header, sections, trailing CRC) |
+| `get-perf-file` | `[file]` | Save current performance as .prf2 file (official text header, sections, trailing CRC) |
 | `upload-patch` | `<slot> <filepath>` | Upload .pch2 to slot |
 | `upload-perf` | `<filepath>` | Upload .prf2 performance |
 | `select-patch` | `<slot> <bank> <loc>` | Load bank patch into slot (bank 1–32, loc 1–127) |

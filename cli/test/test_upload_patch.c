@@ -67,20 +67,6 @@ static int read_pch2_sections(const char *path, uint8_t *buf, size_t bufsz) {
     return data_len;
 }
 
-/* Read raw section data from a file written by g2_get_patch_file (no text header, no CRC).
- * Returns number of bytes read, or -1 on error. */
-static int read_raw_sections(const char *path, uint8_t *buf, size_t bufsz) {
-    FILE *f = fopen(path, "rb");
-    if (!f) return -1;
-    fseek(f, 0, SEEK_END);
-    long fsize = ftell(f);
-    rewind(f);
-    if (fsize <= 0 || (size_t)fsize > bufsz) { fclose(f); return -1; }
-    fread(buf, 1, (size_t)fsize, f);
-    fclose(f);
-    return (int)fsize;
-}
-
 /* Collect section type IDs from a section byte stream into out[]. Returns count. */
 static int collect_section_ids(const uint8_t *sections, int len, uint8_t *out, int maxout) {
     int pos = 0, count = 0;
@@ -151,7 +137,7 @@ static void do_upload_roundtrip(const char *label, const char *filepath) {
     /* --- Compare section IDs of original vs roundtrip --- */
     uint8_t orig_sections[32768], rt_sections[32768];
     int orig_len = read_pch2_sections(filepath, orig_sections, sizeof(orig_sections));
-    int rt_len   = read_raw_sections(out_path,  rt_sections,  sizeof(rt_sections));
+    int rt_len   = read_pch2_sections(out_path,  rt_sections,  sizeof(rt_sections));
 
     TEST_ASSERT_TRUE_MESSAGE(orig_len > 0, "could not read original pch2 sections");
     TEST_ASSERT_TRUE_MESSAGE(rt_len   > 0, "could not read roundtrip pch2 sections");
@@ -221,7 +207,7 @@ static void do_upload_buf_roundtrip(const char *label, const char *filepath) {
 
     uint8_t orig_sections[32768], rt_sections[32768];
     int orig_len = read_pch2_sections(filepath, orig_sections, sizeof(orig_sections));
-    int rt_len   = read_raw_sections(out_path,  rt_sections,  sizeof(rt_sections));
+    int rt_len   = read_pch2_sections(out_path,  rt_sections,  sizeof(rt_sections));
 
     TEST_ASSERT_TRUE_MESSAGE(orig_len > 0, "could not read original pch2 sections");
     TEST_ASSERT_TRUE_MESSAGE(rt_len   > 0, "could not read roundtrip pch2 sections");

@@ -1960,7 +1960,7 @@ export const useSlotsStore = defineStore('slots', {
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+			const { serializePerformance, PRF2_TEXT_HEADER } = await import('../parser/nmg2PatchSerializer');
 			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
 				.map((s) => {
 					const e = this.slots[s];
@@ -1975,11 +1975,12 @@ export const useSlotsStore = defineStore('slots', {
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
 			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
 			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
-			// 0x17 = format version, 0x01 = file type "performance" (0x00 is a patch) — real .prf2
-			// files carry 0x01 here. Our own loader detects a performance by its 0x11 section, but
-			// other editors read this byte.
-			const data = [...nameBytes, 0x00, 0x17, 0x01, ...sectionBytes];
+			// Official text header, as the original editor writes it (the performance name lives in the
+			// file name, not the header). 0x17 = format version, 0x01 = file type "performance" (0x00 is
+			// a patch) — real .prf2 files carry 0x01 here. Our own loader detects a performance by its
+			// 0x11 section, but other editors read this byte.
+			const headerBytes = Array.from(new TextEncoder().encode(PRF2_TEXT_HEADER));
+			const data = [...headerBytes, 0x00, 0x17, 0x01, ...sectionBytes];
 			try {
 				await window.electronAPI.savePatch(path, data);
 			} catch (err) {
@@ -1992,7 +1993,7 @@ export const useSlotsStore = defineStore('slots', {
 			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
 		},
 
-		// Shared by saveSlot/pushPatchToDevice: builds the .pch2 byte layout
+		// Shared by saveSlot (via exportSlotToFile)/pushPatchToDevice: builds the .pch2 byte layout
 		// ([nameBytes][0x00][0x17][0x00][sectionBytes]), re-serializing from templateRawHex only
 		// if the cache was invalidated by an edit since the last serialize (or if forceReserialize
 		// is set — see pushPatchToDevice: rawHex fetched straight from hardware via get-patch/
@@ -2001,7 +2002,9 @@ export const useSlotsStore = defineStore('slots', {
 		// strips the file's last 2 bytes assuming they're that CRC — uploading a cached,
 		// never-locally-reserialized rawHex silently truncates 2 real bytes of patch data on the
 		// device. forceReserialize bypasses the cache so the CRC-appending path always runs.
-		async _buildPchBytes(entry: SlotEntry, forceReserialize = false): Promise<number[]> {
+		// textHeader: lead with the official editor's "Version=..." text header instead of the patch
+		// name (files only — upload-patch-data reads the wire name from the buffer's leading bytes).
+		async _buildPchBytes(entry: SlotEntry, forceReserialize = false, textHeader = false): Promise<number[]> {
 			if (!entry.rawHex || forceReserialize) {
 				if (!entry.templateRawHex) throw new Error('No template rawHex to serialize from');
 				const { serializePatch } = await import('../parser/nmg2PatchSerializer');
@@ -2010,8 +2013,10 @@ export const useSlotsStore = defineStore('slots', {
 				entry.rawHex = serializePatch(entry.name, entry.patch!, entry.templateRawHex, entry.variations ?? []);
 			}
 			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			const nameBytes = Array.from(new TextEncoder().encode(entry.name));
-			return [...nameBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			let prefix = entry.name;
+			if (textHeader) prefix = (await import('../parser/nmg2PatchSerializer')).PCH2_TEXT_HEADER;
+			const prefixBytes = Array.from(new TextEncoder().encode(prefix));
+			return [...prefixBytes, 0x00, 0x17, 0x00, ...sectionBytes];
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
@@ -2038,7 +2043,10 @@ export const useSlotsStore = defineStore('slots', {
 			if (!entry?.patch) return false;
 			if (!entry.rawHex && !entry.templateRawHex) return false;
 			try {
-				const data = await this._buildPchBytes(entry);
+				// forceReserialize: an unedited slot's cached rawHex came straight from hardware and
+				// has no CRC, which would produce a file that every .pch2 reader (and our own
+				// upload-patch) mistakes for truncated — see _buildPchBytes' CRC comment.
+				const data = await this._buildPchBytes(entry, true, true);
 				await window.electronAPI.savePatch(filepath, data);
 				return true;
 			} catch (err) {

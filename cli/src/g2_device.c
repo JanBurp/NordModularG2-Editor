@@ -28,6 +28,7 @@ static void *g2_error_cb_ctx = NULL;
 
 /* Patch version cache per slot (0-3 = A-D), 0 = unknown */
 uint8_t g2_slot_version[4] = {0};
+uint8_t g2_slot_version_zero[4] = {0};   /* G2 replied version 0: a real value, don't re-query */
 uint8_t g2_perf_version_cache = 0;   /* 0 = unknown; cleared by version_update events */
 
 void g2_set_error_callback(g2_error_cb_t cb, void *ctx) {
@@ -712,16 +713,29 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    FILE *f = fopen(filename, "wb");
-    if (!f) {
-        g2_err("Failed to open file '%s' for writing\n", filename);
+    /* patch_usb_to_pch2 yields bare sections; a loadable .pch2 also needs the text header
+     * and the trailing CRC (see pch2_file_from_sections). */
+    size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + 2;
+    uint8_t *fileData = malloc(fileSize);
+    if (!fileData || pch2_file_from_sections(pch2Data, pch2Size, fileData, &fileSize) < 0) {
+        g2_err("Failed to build PCH2 file\n");
+        free(fileData);
         free(pch2Data);
         goto cleanup;
     }
-
-    size_t written = fwrite(pch2Data, 1, pch2Size, f);
-    fclose(f);
     free(pch2Data);
+
+    FILE *f = fopen(filename, "wb");
+    if (!f) {
+        g2_err("Failed to open file '%s' for writing\n", filename);
+        free(fileData);
+        goto cleanup;
+    }
+
+    size_t written = fwrite(fileData, 1, fileSize, f);
+    fclose(f);
+    free(fileData);
+    pch2Size = fileSize;
 
     if (written != pch2Size) {
         g2_err("Failed to write complete file\n");
@@ -1253,7 +1267,7 @@ int g2_build_set_module_labels_op(G2Op *op, uint8_t *buf, int loc, int module_id
 
 /* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
 static uint8_t cable_get_version(int slot) {
-    if (g2_slot_version[slot]) return g2_slot_version[slot];
+    if (g2_slot_version[slot] || g2_slot_version_zero[slot]) return g2_slot_version[slot];
     /* cache miss — ask G2 (fallback for first use before get-patch).
      * recv_interrupt() is listener-safe (pulls from the shared message queue
      * when g2_listener_active), same as every other call site in this file. */
@@ -1264,6 +1278,7 @@ static uint8_t cable_get_version(int slot) {
     int ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) return 0; /* timeout or error */
     if (slota[6]) g2_slot_version[slot] = slota[6];
+    else if (slota[4] == 0x36) g2_slot_version_zero[slot] = 1;   /* a real version reply, not a stray packet */
     return slota[6];
 }
 
@@ -1878,7 +1893,17 @@ static int locate_section_data(const uint8_t *data, long fsize, int *name_end, i
     while (ne < fsize && data[ne]) ne++;
     *name_end = ne;
     *data_offset = ne + 3;   /* skip NUL + 0x17 + 0x00 */
-    *data_len = (int)fsize - *data_offset - 2;  /* exclude trailing 2-byte CRC */
+    /* A trailing 2-byte CRC exists only when the section train ends 2 bytes before EOF.
+     * Files saved from get-patch carry none: cutting 2 bytes there truncates the last
+     * section, and the G2 parses our frame's CRC as patch data, renames the live slots
+     * to "Error" and hangs. */
+    long pos = *data_offset;
+    while (pos + 3 <= fsize) {
+        long n = ((long)data[pos + 1] << 8) | data[pos + 2];
+        if (pos + 3 + n > fsize) break;
+        pos += 3 + n;
+    }
+    *data_len = (int)fsize - *data_offset - (pos == fsize ? 0 : 2);
     return (*data_len > 0) ? 0 : -1;
 }
 
@@ -2243,7 +2268,7 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     size_t perf_sect_len = (perf_sect_offset + 2 < perfSize) ? (perfSize - perf_sect_offset - 2) : 0;
     perf_settings_normalize_slots(perfData + perf_sect_offset, perf_sect_len);
 
-    size_t header_len = strlen(perfName) + 3;  /* name + null + 0x17 + file type */
+    size_t header_len = strlen(PRF2_TEXT_HEADER) + 3;  /* text header + null + 0x17 + file type */
     size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */
     size_t slots_sect_len = 0;
     for (int s = 0; s < 4; s++)
@@ -2255,10 +2280,10 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
 
     size_t pos = 0;
 
-    /* File header: [perfName\0][0x17][0x01].
+    /* File header: [text header\0][0x17][0x01], as the official editor writes it.
      * 0x17 = format version, 0x01 = file type "performance" (0x00 is a patch). */
-    size_t pnlen = strlen(perfName);
-    memcpy(outBuf + pos, perfName, pnlen); pos += pnlen;
+    size_t hdrlen = strlen(PRF2_TEXT_HEADER);
+    memcpy(outBuf + pos, PRF2_TEXT_HEADER, hdrlen); pos += hdrlen;
     outBuf[pos++] = 0x00;
     outBuf[pos++] = 0x17;
     outBuf[pos++] = 0x01;
@@ -3386,10 +3411,13 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
          * [fileType][bank][location][name..NUL][size_hi][size_lo][version][body].
          * The body is already the whole file from its name-terminating NUL
          * onward ([0x00][version][type][sections][CRC]), so the file on disk is
-         * simply the name followed by it - the same layout the editor writes
-         * (slots.ts saveSlot). No patch_usb_to_pch2/perf_sections_to_prf2
+         * simply the official text header followed by it - what the original
+         * editor's CFlashDumper writes (CPatchFilePort::SaveFromDump goes
+         * through the same WriteDataFile as a normal save), and the layout the
+         * editor's Save writes. No patch_usb_to_pch2/perf_sections_to_prf2
          * conversion is involved, and patches and performances are identical
-         * here apart from the type byte the body already carries. */
+         * here apart from the type byte the body already carries and the
+         * header's Type= line. */
         uint8_t *payload = bulk + 4;
         size_t payloadSize = size - 4;
         char patchName[32] = {0};
@@ -3417,7 +3445,7 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
         uint8_t *body = payload + bodyOfs;
 
         const char *baseName = strlen(patchName) ? patchName : "Untitled";
-        char fileBase[32];   /* baseName made safe as a file name; baseName itself stays the on-disk header */
+        char fileBase[32];   /* baseName made safe as a file name - the name lives only in the file name */
         sanitize_filename(baseName, fileBase, sizeof(fileBase));
 
         int occurrence = 0;
@@ -3429,8 +3457,9 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
 
         char filename[1024];
         snprintf(filename, sizeof(filename), "%s/%s.%s", folder, dispName, type == 0 ? "pch2" : "prf2");
+        const char *textHeader = type == 0 ? PCH2_TEXT_HEADER : PRF2_TEXT_HEADER;
         FILE *f = fopen(filename, "wb");
-        if (!f || fwrite(baseName, 1, strlen(baseName), f) != strlen(baseName)
+        if (!f || fwrite(textHeader, 1, strlen(textHeader), f) != strlen(textHeader)
                || fwrite(body, 1, bodyLen, f) != bodyLen) {
             if (f) fclose(f);
             free(bulk);

@@ -90,6 +90,35 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
     return 0;
 }
 
+/* Wrap section data in a .pch2 file: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE].
+ * CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write checksums
+ * and every real .pch2 carries); without it a reader (including our own upload-patch)
+ * takes the last 2 section bytes for the CRC and truncates the patch. */
+int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
+                            uint8_t *out, size_t *out_len) {
+    if (!sections || !out || !out_len) return -1;
+
+    size_t header_len = strlen(PCH2_TEXT_HEADER);
+    size_t total = header_len + 3 + sections_len + 2;
+    if (*out_len < total) {
+        *out_len = total;
+        return -1;
+    }
+
+    memcpy(out, PCH2_TEXT_HEADER, header_len);
+    out[header_len]     = 0x00;
+    out[header_len + 1] = 0x17;
+    out[header_len + 2] = 0x00;
+    memcpy(out + header_len + 3, sections, sections_len);
+
+    uint16_t crc = calc_crc16(out + header_len + 1, (int)(sections_len + 2));
+    out[total - 2] = (crc >> 8) & 0xff;
+    out[total - 1] = crc & 0xff;
+
+    *out_len = total;
+    return 0;
+}
+
 /* Canonical per-slot chunk order inside a .prf2/.pch2, as written by both reference editors
  * (Delphi TG2FilePatch.Write, G2Editor.c CPatchFile_13::WriteMolecules) and as both .prf2
  * fixtures carry it. The G2 rejects a performance upload whose slots deviate from it —

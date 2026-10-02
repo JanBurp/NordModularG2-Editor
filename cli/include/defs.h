@@ -128,5 +128,11 @@ typedef enum {
 #define PCH2_USB_CHUNK1_END                 (0x15)  /* exclusive end of first pch2 chunk */
 #define PCH2_USB_CHUNK2_START               (0x17)  /* start of second pch2 chunk */
 #define PCH2_USB_TAIL_SIZE                  (0x02)  /* trailing CRC bytes in USB frame */
+/* Text header of a .pch2/.prf2 as the official editor writes it (G2Editor.c builds the same four
+ * lines; values are those of its newest files). A NUL, then 0x17 and the file type byte
+ * (0x00 patch, 0x01 performance), then the sections follow it. */
+#define G2_TEXT_HEADER(type) "Version=Nord Modular G2 File Format 1\r\nType=" type "\r\nVersion=23\r\nInfo=BUILD 320\r\n"
+#define PCH2_TEXT_HEADER G2_TEXT_HEADER("Patch")
+#define PRF2_TEXT_HEADER G2_TEXT_HEADER("Performance")
 
 #endif /* __G2_DEFS_H__ */

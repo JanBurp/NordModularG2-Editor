@@ -45,6 +45,13 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
                       uint8_t *usb_data, size_t *usb_len);
 
+/* Wrap section data (as returned by patch_usb_to_pch2) in a .pch2 file as the official editor
+ * writes it: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE]. The CRC covers
+ * [0x17][0x00][sections]. *out_len is the capacity on entry and the file size on return
+ * (or the required size on -1). */
+int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
+                            uint8_t *out, size_t *out_len);
+
 /* Performance format conversion (PRF2 file <-> section data) */
 int perf_prf2_to_sections(const uint8_t *prf2, size_t prf2_len,
                            uint8_t *sections_out, size_t *sections_len);

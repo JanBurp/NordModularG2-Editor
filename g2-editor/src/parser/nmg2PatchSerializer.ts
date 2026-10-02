@@ -18,6 +18,13 @@ import { SEQNOTE_MODULE_TYPE, DEFAULT_PIANO_ROLL_VIEW } from '@/renderer/pianoRo
 const FILE_TYPE_PATCH = 0x00;
 const FILE_TYPE_PERFORMANCE = 0x01;
 
+// Text header the official editor writes at the start of a .pch2/.prf2 (a NUL, then 0x17 and the
+// file type byte, then the sections follow). Same values as its newest files; cli/include/defs.h
+// (G2_TEXT_HEADER) mirrors it.
+const textHeader = (type: string) => `Version=Nord Modular G2 File Format 1\r\nType=${type}\r\nVersion=23\r\nInfo=BUILD 320\r\n`;
+export const PCH2_TEXT_HEADER = textHeader('Patch');
+export const PRF2_TEXT_HEADER = textHeader('Performance');
+
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef, 0x1231, 0x0210, 0x3273,
