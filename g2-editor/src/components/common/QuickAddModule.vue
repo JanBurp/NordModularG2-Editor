@@ -33,7 +33,7 @@
 <script setup lang="ts">
 	import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 	import SearchInput from './SearchInput.vue';
-	import { getModulesByCategory } from '../../renderer/nmg2mods';
+	import { filterCategoryModules } from '../../renderer/moduleSearch';
 	import { useAddModule } from '../../composables/useAddModule';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { useVisibleCategories } from '../../composables/useVisibleCategories';
@@ -77,18 +77,12 @@
 		itemRefs.value[i] = el instanceof Element ? el : null;
 	}
 
-	const allModules = computed(() => categories.value.flatMap((cat) => getModulesByCategory(cat)));
-
 	// Each module icon is an SVG with an embedded font, so rendering dozens at once (e.g. every
 	// module matching a single-letter query) blocks the main thread for hundreds of ms. Capping
 	// keeps typing responsive; users narrow further by typing more.
 	const MAX_RESULTS = 10;
 
-	const matchingModules = computed(() => {
-		const q = query.value.toLowerCase().trim();
-		if (!q) return allModules.value;
-		return allModules.value.filter((m) => (m.short || '').toLowerCase().includes(q) || (m.long || '').toLowerCase().includes(q));
-	});
+	const matchingModules = computed(() => categories.value.flatMap((cat) => filterCategoryModules(cat, query.value)));
 
 	const filtered = computed(() => matchingModules.value.slice(0, MAX_RESULTS));
 

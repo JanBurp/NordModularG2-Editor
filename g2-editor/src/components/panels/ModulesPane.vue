@@ -72,6 +72,7 @@
 	import SearchInput from '../common/SearchInput.vue';
 	import Icon from '../common/Icon.vue';
 	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
+	import { filterCategoryModules } from '../../renderer/moduleSearch';
 	import type { ModuleDefinition } from '@/types';
 	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
@@ -245,51 +246,11 @@
 	}
 
 	function categoryMatchesSearch(category: string): boolean {
-		if (!searchQuery.value) return true;
-
-		const query = searchQuery.value.toLowerCase();
-
-		if (query.includes(' ')) {
-			const [catQuery, modQuery] = query.split(' ');
-			if (category.toLowerCase().includes(catQuery)) {
-				if (!modQuery) return true;
-				const modules = getModulesByCategoryRaw(category);
-				return modules.some((m) => (m.short || '').toLowerCase().includes(modQuery) || (m.long || '').toLowerCase().includes(modQuery));
-			}
-			return false;
-		}
-
-		if (category.toLowerCase().includes(query)) return true;
-
-		const modules = getModulesByCategoryRaw(category);
-		return modules.some((m) => (m.short || '').toLowerCase().includes(query) || (m.long || '').toLowerCase().includes(query));
+		return !searchQuery.value || getModulesByCategory(category).length > 0;
 	}
 
 	function getModulesByCategory(category: string): ModuleDefinition[] {
-		let modules = getModulesByCategoryRaw(category);
-
-		if (searchQuery.value) {
-			const query = searchQuery.value.toLowerCase();
-			let modQuery = query;
-
-			if (query.includes(' ')) {
-				const [catQuery, mod] = query.split(' ');
-				if (category.toLowerCase().includes(catQuery)) {
-					modQuery = mod;
-				} else {
-					return [];
-				}
-			}
-
-			if (modQuery) {
-				modules = modules.filter((m) => {
-					const name = (m.short || '').toLowerCase();
-					return name.includes(modQuery);
-				});
-			}
-		}
-
-		return modules;
+		return filterCategoryModules(category, searchQuery.value);
 	}
 
 	function getModuleHeight(module: ModuleDefinition) {
