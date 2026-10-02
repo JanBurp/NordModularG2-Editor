@@ -16,7 +16,7 @@
 			preserveAspectRatio="xMinYMin meet"
 			style="min-width: 100%"
 			xmlns="http://www.w3.org/2000/svg"
-			@mousedown="handleCanvasMousedown"
+			@mousedown="onCanvasMousedown"
 			@mousemove="handleSvgMouseMove"
 			@contextmenu.prevent="onCanvasContextMenu"
 			@click="
@@ -312,6 +312,24 @@
 		}));
 
 		openContextMenu(e, items);
+	}
+
+	// Own double-click detection on mousedown: native dblclick is unreliable in Electron, and the click event target is
+	// unreliable because handleCanvasMousedown disables svg pointer-events until mouseup.
+	// Only the bare canvas (svg or its big area-letter background) counts as "empty"; modules/overlays are other targets.
+	const DOUBLE_CLICK_MS = 400;
+	let lastEmptyClick = 0;
+	function onCanvasMousedown(e: MouseEvent) {
+		handleCanvasMousedown(e);
+		if (e.button !== 0) return;
+		const t = e.target as Element;
+		if (t !== svgRef.value && !(t.parentNode === svgRef.value && t.tagName === 'text')) return;
+		const now = performance.now();
+		if (now - lastEmptyClick < DOUBLE_CLICK_MS) {
+			lastEmptyClick = 0;
+			e.preventDefault(); // otherwise the mousedown's default focus change steals focus from the search input
+			uiStore.showQuickAdd = true;
+		} else lastEmptyClick = now;
 	}
 
 	function handleSvgMouseMove(e: MouseEvent) {
