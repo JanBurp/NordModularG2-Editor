@@ -4,12 +4,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // right-third jack filtering, top/bottom ordering and stereo L/R pairing.
 vi.mock('@/renderer/nmg2mods', () => {
 	const defs: Record<number, any> = {
-		// Blue output (uprate-able to red) bottom-right, plus ineligible: yellow, and red but left third.
+		// Purple output (uprate-able to red) bottom-right, plus ineligible: yellow, red but left third,
+		// and a static blue (never uprated) that is bottommost.
 		10: {
 			outputs: [
 				{ name: 'Gate', colour: 'yellow', x: 240, y: 40 },
 				{ name: 'Left', colour: 'red', x: 20, y: 40 },
-				{ name: 'Out', colour: 'blue', x: 240, y: 20 },
+				{ name: 'Out', colour: 'purple', x: 240, y: 20 },
+				{ name: 'Ctl', colour: 'blue', x: 240, y: 50 },
 			],
 		},
 		// Two eligible outputs: top-right and bottom-right.
@@ -88,9 +90,9 @@ function suggest(srcType: number, dstType: number) {
 const jack = (moduleIndex: number, connectorIndex: number, type: 'input' | 'output', colour = 'red') => ({ moduleIndex, connectorIndex, type, colour });
 
 describe('useGhostCable — computeGhostSuggestion audio jacks', () => {
-	it('only considers audio-rate (red/blue/purple) jacks in the right third', () => {
+	it('only considers audio-rate (red/purple) jacks in the right third', () => {
 		const ghost = suggest(10, 20);
-		expect(ghost?.from).toEqual(jack(1, 2, 'output', 'blue')); // not yellow Gate / left-third Left
+		expect(ghost?.from).toEqual(jack(1, 2, 'output', 'purple')); // not yellow Gate / left-third Left / static blue Ctl
 		expect(ghost?.to).toEqual(jack(2, 2, 'input', 'purple')); // not left-third Left
 		expect(useUiStore().ghostCandidates.length).toBe(2); // 1 output x 2 inputs
 	});

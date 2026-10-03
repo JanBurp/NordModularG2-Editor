@@ -65,15 +65,15 @@ export const DEFAULT_CABLE_VISIBILITY: Record<CableColorName, boolean> = {
 
 /**
  * Returns the effective jack colour accounting for module uprate.
- * "purple" in module defs is a mod-rate signal identical to "blue" for signal-rate purposes.
- * When uprated: blue/purple → red, yellow → orange.
+ * Module defs encode the original editor's per-connector Bandwidth flag in the colour name:
+ * "purple" (Dynamic control) and "orange" (Dynamic logic) follow the module's uprate state,
+ * red/blue/yellow are Static and never change (cf. CPnl{Control,Logic}Hole::GetColor in G2Editor.c).
+ * Dynamic: purple → blue, or red when uprated; orange → yellow, or orange when uprated.
  */
 export function getEffectiveJackColor(defaultColour: string, uprated: boolean): string {
-	const base = defaultColour === 'purple' ? 'blue' : defaultColour;
-	if (!uprated) return base;
-	if (base === 'blue') return 'red';
-	if (base === 'yellow') return 'orange';
-	return base;
+	if (defaultColour === 'purple') return uprated ? 'red' : 'blue';
+	if (defaultColour === 'orange') return uprated ? 'orange' : 'yellow';
+	return defaultColour;
 }
 
 /**

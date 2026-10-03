@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { findConnectedInputCables, findDrivingOutputCable, findGroupOutputColor, findJackNestCables, inferUserColours } from '../cableGraph';
+import {
+	autoRecolorCables,
+	computeUprateSet,
+	findConnectedInputCables,
+	findDrivingOutputCable,
+	findGroupOutputColor,
+	findJackNestCables,
+	inferUserColours,
+} from '../cableGraph';
 import type { Cable } from '@/renderer/cableRenderer';
 import type { ModuleDefinition } from '@/types/module';
 
@@ -190,5 +198,51 @@ describe('inferUserColours', () => {
 		const result = inferUserColours([out, matching, mismatched], new Set(), modDefs);
 		expect(result[1].userColour).toBeUndefined();
 		expect(result[2].userColour).toBe(4);
+	});
+});
+
+describe('computeUprateSet + autoRecolorCables', () => {
+	function jacks(colours: string[]) {
+		return colours.map((colour) => ({ name: '', colour, x: 0, y: 0 }));
+	}
+	function def(inputs: string[], outputs: string[]): ModuleDefinition {
+		return { id: 0, short: '', long: '', height: 1, inputs: jacks(inputs), outputs: jacks(outputs) } as ModuleDefinition;
+	}
+	function run(cables: Cable[], defs: ModuleDefinition[]) {
+		const modules = defs.map((d, index) => ({ index, def: d }));
+		const uprated = computeUprateSet(cables, modules);
+		return { uprated, recolored: autoRecolorCables(cables, uprated, new Map(modules.map((m) => [m.index, m.def]))) };
+	}
+	const RED = 0,
+		BLUE = 1,
+		YELLOW = 2,
+		ORANGE = 3;
+
+	it('a Dynamic-logic (orange) output on a non-uprated module gets a yellow cable and uprates nothing', () => {
+		const { uprated, recolored } = run([cable(0, 0, 1, 0, 1)], [def([], ['orange']), def(['orange'], [])]);
+		expect(uprated.size).toBe(0);
+		expect(recolored[0].colour).toBe(YELLOW);
+	});
+
+	it('red into a static blue input does not uprate the module', () => {
+		const { uprated } = run([cable(0, 0, 1, 0, 1)], [def([], ['red']), def(['blue'], ['purple'])]);
+		expect(uprated.has(1)).toBe(false);
+	});
+
+	it('red into a purple input uprates: Dynamic outputs go red/orange, static outputs keep their colour', () => {
+		const cables = [cable(0, 0, 1, 0, 1), cable(1, 0, 2, 0, 1), cable(1, 1, 2, 1, 1), cable(1, 2, 2, 2, 1), cable(1, 3, 2, 3, 1)];
+		const { uprated, recolored } = run(cables, [
+			def([], ['red']),
+			def(['purple'], ['purple', 'orange', 'yellow', 'blue']),
+			def(['blue', 'yellow', 'yellow', 'blue'], []),
+		]);
+		expect(uprated.has(1)).toBe(true);
+		expect(recolored.slice(1).map((c) => c.colour)).toEqual([RED, ORANGE, YELLOW, BLUE]);
+	});
+
+	it('red reaching a purple input only through an input-to-input chain still uprates the module', () => {
+		const cables = [cable(0, 0, 1, 0, 1), cable(1, 0, 2, 0, 0)];
+		const { uprated } = run(cables, [def([], ['red']), def(['red'], []), def(['purple'], [])]);
+		expect(uprated.has(2)).toBe(true);
 	});
 });

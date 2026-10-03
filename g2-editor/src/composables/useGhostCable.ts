@@ -16,16 +16,16 @@ export function isGhostJack(to: GhostJack | GhostPoint): to is GhostJack {
 	return 'moduleIndex' in to;
 }
 
-// A jack's colour can flip when its module is uprated (see getEffectiveJackColor): blue/purple -> red,
-// yellow -> orange. Two jacks are considered the same "family" if they'd display the same colour once
-// uprated, so a currently-blue input still counts as a match for a red output.
+// A Dynamic jack's colour can flip when its module is uprated (see getEffectiveJackColor): purple -> red,
+// orange -> orange (from yellow). Two jacks are considered the same "family" if they'd display the same
+// colour once uprated, so a currently-blue purple input still counts as a match for a red output.
 function colourFamily(colour: string): string {
 	return getEffectiveJackColor(colour, true);
 }
 
 type IndexedJack = { jack: any; idx: number };
 
-// Auto-suggest only considers audio-rate jacks (red, or blue/purple which can be uprated to red) in the
+// Auto-suggest only considers audio-rate jacks (red, or purple which can be uprated to red) in the
 // right third of the module, where Osc/Filter/FX/Level/Mixer/... keep their audio inputs and outputs.
 function isAudioJackOnRight(jack: any): boolean {
 	return colourFamily(jack.colour) === 'red' && jack.x >= (MODULE_WIDTH * 2) / 3;

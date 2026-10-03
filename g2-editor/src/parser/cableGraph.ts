@@ -125,9 +125,12 @@ export function computeDrivenInputJacks(cableList: Cable[]): Set<string> {
 	return drivenNestJacks;
 }
 
-// Computes which modules are uprated (audio-rate promoted) given the current cable topology.
-// A module is uprated when any of its blue/yellow/purple inputs receives a red/orange signal.
-// The red/orange can come from a static-red output OR from a blue/purple output whose module is already uprated.
+const isDynamic = (colour: string | undefined) => colour === 'purple' || colour === 'orange';
+
+// Computes which modules are uprated (audio-rate promoted) given the current cable topology,
+// mirroring CPatchData::GenerateBandwidthChangeMolecules in G2Editor.c: a module is uprated when
+// any of its Dynamic (purple/orange) inputs is driven — directly or via an input-to-input chain —
+// by a static red output, or by a Dynamic output of an already-uprated module.
 // Iterates to fixed-point to handle cascading uprate.
 export function computeUprateSet(cables: Cable[], modules: Array<{ index: number; def: ModuleDefinition }>): Set<number> {
 	const uprated = new Set<number>();
@@ -135,22 +138,18 @@ export function computeUprateSet(cables: Cable[], modules: Array<{ index: number
 	let changed = true;
 	while (changed) {
 		changed = false;
-		for (const cable of cables) {
-			if ((cable.dir ?? 1) !== 1) continue;
-			const srcDef = modDefs.get(cable.smod);
-			const dstDef = modDefs.get(cable.dmod);
-			if (!srcDef || !dstDef) continue;
-			const srcOutput = srcDef.outputs?.[cable.scon];
-			const dstInput = dstDef.inputs?.[cable.dcon];
-			if (!srcOutput || !dstInput) continue;
-			const effectiveSrc = getEffectiveJackColor(srcOutput.colour, uprated.has(cable.smod));
-			// Destination is uprate-eligible if its base colour is blue or yellow (purple normalised to blue)
-			const dstBase = dstInput.colour === 'purple' ? 'blue' : dstInput.colour;
-			if ((effectiveSrc === 'red' || effectiveSrc === 'orange') && (dstBase === 'blue' || dstBase === 'yellow')) {
-				if (!uprated.has(cable.dmod)) {
-					uprated.add(cable.dmod);
-					changed = true;
-				}
+		for (const { index, def } of modules) {
+			if (uprated.has(index)) continue;
+			const audioDriven = (def.inputs ?? []).some((input, con) => {
+				if (!isDynamic(input.colour)) return false;
+				const driver = findDrivingOutputCable(cables, index, con);
+				if (!driver) return false;
+				const srcColour = modDefs.get(driver.smod)?.outputs?.[driver.scon]?.colour;
+				return srcColour === 'red' || (isDynamic(srcColour) && uprated.has(driver.smod));
+			});
+			if (audioDriven) {
+				uprated.add(index);
+				changed = true;
 			}
 		}
 	}
