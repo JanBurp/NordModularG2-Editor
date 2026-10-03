@@ -804,6 +804,7 @@ const defaultMenuState: MenuState = {
 	hasClipboard: false,
 	hasCurrentPatch: false,
 	hasPerformanceContext: false,
+	isPerformanceMode: false,
 };
 
 // Focuses the next (or previous) device window in creation order, wrapping around —
@@ -1041,7 +1042,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					label: "Performance Settings",
 					click: () => sendToFocused("menu:action", "open-performance-settings"),
 					accelerator: "CommandOrControl+R",
-					enabled: menuState.hasPerformanceContext,
+					enabled: menuState.isPerformanceMode,
 				},
 				{ type: "separator" as const },
 				{ label: "Download", click: () => sendToFocused("menu:action", "download-performance"), enabled: menuState.connected && menuState.hasPerformanceContext },

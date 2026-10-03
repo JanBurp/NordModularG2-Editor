@@ -73,6 +73,7 @@ export interface MenuState {
 	hasClipboard: boolean;
 	hasCurrentPatch: boolean;
 	hasPerformanceContext: boolean;
+	isPerformanceMode: boolean;
 }
 
 export interface SlotInfo {

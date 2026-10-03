@@ -50,6 +50,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		hasClipboard: hasClipboard.value,
 		hasCurrentPatch: !!currentPatch.value,
 		hasPerformanceContext: !!slotsStore.performanceRawHex,
+		isPerformanceMode: slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode,
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
 
