@@ -8,9 +8,10 @@
 	</text>
 </template>
 <script setup lang="ts">
-	import { computed, ref } from 'vue';
+	import { computed, onMounted, ref, watch } from 'vue';
 
-	const text = ref<HTMLDivElement>();
+	const text = ref<SVGTextElement>();
+	const textWidth = ref(0);
 
 	const props = defineProps<{
 		isName: boolean;
@@ -19,14 +20,21 @@
 		hasReplaceTrigger?: boolean;
 	}>();
 
+	// getBBox is in SVG user units (zoom-independent); re-measure whenever the text can change.
+	function measure() {
+		textWidth.value = text.value?.getBBox().width ?? 0;
+	}
+	onMounted(() => {
+		measure();
+		document.fonts?.ready.then(measure);
+	});
+	watch([() => props.displayName, () => props.isName, () => props.selected], measure, { flush: 'post' });
+
 	// Reserve room for the replace-module trigger (a 17-wide hit area, see Module.vue) plus a
 	// small gap, so its chevron doesn't overlap the module name.
 	const REPLACE_TRIGGER_RESERVED_WIDTH = 16;
 
-	const nameWidth = computed(() => {
-		const rect = text.value?.getBoundingClientRect(); //  .getComputedTextLength();
-		return (rect?.width ?? 0) + 6;
-	});
+	const nameWidth = computed(() => textWidth.value + 6);
 
 	const nameHeight = computed(() => {
 		if (props.isName) {
