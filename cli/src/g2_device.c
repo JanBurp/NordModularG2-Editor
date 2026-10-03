@@ -928,6 +928,13 @@ cJSON *g2_list(int filter, int bank_filter) {
                 if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
                 uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
                 ret = recv_bulk(response, sz < sizeof(response) ? sz : sizeof(response));
+                /* Never leave part of a payload on EP 0x82: every later bulk read would be
+                 * one message behind (see recv_interrupt_with_retry). */
+                for (uint8_t drop[512]; sz > sizeof(response); ) {
+                    uint16_t n = sz - sizeof(response) < sizeof(drop) ? sz - sizeof(response) : sizeof(drop);
+                    if (recv_bulk(drop, n) <= 0) break;
+                    sz -= n;
+                }
             }
 
             if (ret <= 9) {
@@ -1243,8 +1250,9 @@ static uint8_t cable_get_version(int slot) {
     usleep(USB_SEND_DELAY_US);
     int ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
     if (ret <= 0) return 0; /* timeout or error */
+    if (slota[4] != 0x36 || slota[5] != slot) return 0;   /* stray packet or another slot's version */
     if (slota[6]) g2_slot_version[slot] = slota[6];
-    else if (slota[4] == 0x36) g2_slot_version_zero[slot] = 1;   /* a real version reply, not a stray packet */
+    else g2_slot_version_zero[slot] = 1;   /* a real version 0, don't re-query */
     return slota[6];
 }
 

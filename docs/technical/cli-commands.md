@@ -32,7 +32,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `store-patch` | `<slot> <bank> <loc>` | Store slot's patch to bank location (slot 0-3, use slot 4 for performances) |
 | `clear-patch` | `<patch\|performance> <bank> <loc>` | Clear a single bank location |
 | `clear-bank` | `<patch\|performance> <bank>` | Clear all entries in a bank (locations 1–128) |
-| `reload-names` | `[partial]` | Re-fetch patch/performance name list from G2 and emit `names` event. With `partial` (daemon only), also emits a `names_partial` event per USB response while reading: `{"type":"names_partial","data":{"kind":"patch"\|"performance","bank":N,"complete":bool,"banks":{"<n>":[{location,name,category?}]}}}` — banks below `bank` are complete, `complete` ends that kind. `names_progress` is emitted in both modes; the complete `names` event always follows. |
+| `reload-names` | | Re-fetch patch/performance name list from G2: emits a `names_progress` event per bank (daemon only), then the complete `names` event. |
 | `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank) |
 | `get-perf-settings` | | Get current performance settings |
 | `set-perf-mode` | `<patch\|performance> [shift]` | Switch between patch and performance mode. With `shift` it acts as SHIFT+PERF: patch→performance creates a new performance ("New Performance") from the current slot patches (key/active kept); performance→patch keeps the performance's patches in the slots |

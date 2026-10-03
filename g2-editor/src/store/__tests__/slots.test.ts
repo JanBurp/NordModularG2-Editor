@@ -170,6 +170,30 @@ describe('edited flag', () => {
 		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: 'Fixture', data: rawHex.slice(0, -10) }));
 	}
 
+	// Asserts the saved bytes are [official text header][NUL][0x17][fileType][sections][CRC16 BE].
+	function expectOfficialFileLayout(bytes: number[], type: string, fileType: number): void {
+		const nul = bytes.indexOf(0);
+		expect(new TextDecoder().decode(new Uint8Array(bytes.slice(0, nul)))).toBe(
+			`Version=Nord Modular G2 File Format 1\r\nType=${type}\r\nVersion=23\r\nInfo=BUILD 320\r\n`,
+		);
+		expect(bytes.slice(nul + 1, nul + 3)).toEqual([0x17, fileType]);
+		// The section train must end exactly 2 bytes before EOF: those 2 bytes are the CRC, not patch data.
+		let pos = nul + 3;
+		while (pos + 3 <= bytes.length) {
+			const size = (bytes[pos + 1] << 8) | bytes[pos + 2];
+			if (pos + 3 + size > bytes.length) break;
+			pos += 3 + size;
+		}
+		expect(bytes.length - pos).toBe(2);
+		// CRC-16/CCITT (poly 0x1021, init 0) over [0x17][fileType][sections].
+		let crc = 0;
+		for (const b of bytes.slice(nul + 1, -2)) {
+			crc ^= b << 8;
+			for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
+		}
+		expect((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1]).toBe(crc);
+	}
+
 	it('saveSlot resets the edited flag after a successful save', async () => {
 		const store = useSlotsStore();
 		await loadHardwareStyleSlot(store);
@@ -191,27 +215,7 @@ describe('edited flag', () => {
 		await store.saveSlot('A', '/tmp/unedited.pch2');
 
 		expect(savePatch).toHaveBeenCalledTimes(1);
-		const bytes: number[] = savePatch.mock.calls[0][1];
-		const nul = bytes.indexOf(0);
-		expect(new TextDecoder().decode(new Uint8Array(bytes.slice(0, nul)))).toBe(
-			'Version=Nord Modular G2 File Format 1\r\nType=Patch\r\nVersion=23\r\nInfo=BUILD 320\r\n',
-		);
-		expect(bytes.slice(nul + 1, nul + 3)).toEqual([0x17, 0x00]);
-		// The section train must end exactly 2 bytes before EOF: those 2 bytes are the CRC, not patch data.
-		let pos = nul + 3;
-		while (pos + 3 <= bytes.length) {
-			const size = (bytes[pos + 1] << 8) | bytes[pos + 2];
-			if (pos + 3 + size > bytes.length) break;
-			pos += 3 + size;
-		}
-		expect(bytes.length - pos).toBe(2);
-		// CRC-16/CCITT (poly 0x1021, init 0) over [0x17][0x00][sections].
-		let crc = 0;
-		for (const b of bytes.slice(nul + 1, -2)) {
-			crc ^= b << 8;
-			for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-		}
-		expect((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1]).toBe(crc);
+		expectOfficialFileLayout(savePatch.mock.calls[0][1], 'Patch', 0x00);
 	});
 
 	it('savePerformance writes the official text header and a valid CRC', async () => {
@@ -230,25 +234,7 @@ describe('edited flag', () => {
 		await store.savePerformance('/tmp/perf.prf2');
 
 		expect(savePatch).toHaveBeenCalledTimes(1);
-		const bytes: number[] = savePatch.mock.calls[0][1];
-		const nul = bytes.indexOf(0);
-		expect(new TextDecoder().decode(new Uint8Array(bytes.slice(0, nul)))).toBe(
-			'Version=Nord Modular G2 File Format 1\r\nType=Performance\r\nVersion=23\r\nInfo=BUILD 320\r\n',
-		);
-		expect(bytes.slice(nul + 1, nul + 3)).toEqual([0x17, 0x01]);
-		let pos = nul + 3;
-		while (pos + 3 <= bytes.length) {
-			const size = (bytes[pos + 1] << 8) | bytes[pos + 2];
-			if (pos + 3 + size > bytes.length) break;
-			pos += 3 + size;
-		}
-		expect(bytes.length - pos).toBe(2);
-		let crc = 0;
-		for (const b of bytes.slice(nul + 1, -2)) {
-			crc ^= b << 8;
-			for (let i = 0; i < 8; i++) crc = crc & 0x8000 ? ((crc << 1) ^ 0x1021) & 0xffff : (crc << 1) & 0xffff;
-		}
-		expect((bytes[bytes.length - 2] << 8) | bytes[bytes.length - 1]).toBe(crc);
+		expectOfficialFileLayout(savePatch.mock.calls[0][1], 'Performance', 0x01);
 	});
 
 	it('savePerformance resets the edited flag for all 4 slots after a successful save', async () => {

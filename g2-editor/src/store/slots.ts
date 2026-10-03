@@ -1994,7 +1994,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Shared by saveSlot (via exportSlotToFile)/pushPatchToDevice: builds the .pch2 byte layout
-		// ([nameBytes][0x00][0x17][0x00][sectionBytes]), re-serializing from templateRawHex only
+		// ([nameBytes or text header][0x00][0x17][0x00][sectionBytes]), re-serializing from templateRawHex only
 		// if the cache was invalidated by an edit since the last serialize (or if forceReserialize
 		// is set — see pushPatchToDevice: rawHex fetched straight from hardware via get-patch/
 		// slot_data has NO trailing CRC (g2_get_patch's patch_usb_to_pch2 strips it on read), while
