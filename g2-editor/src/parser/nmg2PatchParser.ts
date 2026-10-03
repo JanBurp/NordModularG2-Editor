@@ -303,8 +303,8 @@ class G2Parser {
 			while (bytesRemaining >= 2) {
 				const isString = this.getBits(8);
 				const paramLen = this.getBits(8);
-				// Hardware pads a module's block with empty/garbage bytes after its real entries.
-				if (paramLen === 0 || paramLen + 2 > bytesRemaining) break;
+				// A too-short set-module-labels leaves a garbage tail in the device's fixed-size block; stop there.
+				if (paramLen + 2 > bytesRemaining) break;
 				const paramIndex = paramLen > 0 ? this.getBits(8) : 0;
 				bytesRemaining -= paramLen > 0 ? 3 : 2;
 				const entry: ParamLabel = {

@@ -21,12 +21,13 @@ export function resolveSwitchDisplayNames(param: ModuleParam, paramDef: ParamDef
 	const names = paramDef.names || [];
 	if (label) {
 		const customLabels = label.labels;
-		const baseNames = names.length > 0 ? names : resolveOptionNames(paramDef);
+		const baseNames = param.label ?? (names.length > 0 ? names : resolveOptionNames(paramDef));
 		if (!Array.isArray(baseNames)) return customLabels;
 		// '' counts as "never customized" too (older saves / hardware entries), else the button renders blank
 		const count = Math.max(baseNames.length, customLabels.length);
 		return Array.from({ length: count }, (_, i) => customLabels[i] || (baseNames as string[])[i] || '');
 	}
+	if (param.label) return param.label;
 	if (names[0] === 'Ch#' && param.name) {
 		const last = param.name.substring(param.name.length - 1);
 		if (!isNaN(Number(last))) return ['Ch ' + last];

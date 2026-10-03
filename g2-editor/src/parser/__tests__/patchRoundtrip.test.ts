@@ -1545,8 +1545,21 @@ describe('paramNames hardware padding', () => {
 		const header = Array.from(new TextEncoder().encode('Version=Nord Modular G2 File Format 1\r\n')).concat([0, 0x17, 0]);
 		// the parser reads a fixed 320-byte header window, so trail the file with an ignored (unknown-type) section
 		const pad = new Array(320).fill(0);
-		const file = new Uint8Array([...header, SectionType.PARAM_NAMES, body.length >> 8, body.length & 0xff, ...body, 0x7f, pad.length >> 8, pad.length & 0xff, ...pad, 0, 0]);
+		const file = new Uint8Array([
+			...header,
+			SectionType.PARAM_NAMES,
+			body.length >> 8,
+			body.length & 0xff,
+			...body,
+			0x7f,
+			pad.length >> 8,
+			pad.length & 0xff,
+			...pad,
+			0,
+			0,
+		]);
 		const patch = new PatchParser(file.buffer as ArrayBuffer).parse();
-		expect(patch.morphParamLabels!.map((e) => e.labels[0])).toEqual(['Kick', 'Snare', 'HiHat']);
+		// the zero bytes parse as label-less (paramLen 0) entries, as in normal files; the 0x3d garbage is dropped
+		expect(patch.morphParamLabels!.filter((e) => e.labels.length).map((e) => e.labels[0])).toEqual(['Kick', 'Snare', 'HiHat']);
 	});
 });

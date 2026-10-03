@@ -3,6 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
 import { useDeviceStore, DeviceStatus } from '@/store/device';
+import { MORPH_NAMES } from '@/types/patch';
 
 afterEach(() => vi.useRealTimers());
 
@@ -346,6 +347,9 @@ describe('edited flag', () => {
 });
 
 describe('setMorphGroupLabel', () => {
+	// The device's morph label block is fixed-size: all 8 groups (params 8-15), unnamed ones at their defaults.
+	const morphCmd = (labels: string[]) => ['set-module-labels', 'A', 'patch', '1', ...labels.flatMap((l, i) => [String(8 + i), '1', l])];
+
 	it('mutates patch.morphParamLabels, marks the slot dirty, and pushes the right CLI command', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
@@ -353,12 +357,13 @@ describe('setMorphGroupLabel', () => {
 
 		await store.setMorphGroupLabel(0, 'Foo');
 
-		expect(patch.morphParamLabels).toEqual([{ paramIndex: 8, isString: true, paramLen: 8, labels: ['Foo'] }]);
+		expect(patch.morphParamLabels).toHaveLength(8);
+		expect(patch.morphParamLabels![0]).toEqual({ paramIndex: 8, isString: true, paramLen: 8, labels: ['Foo'] });
 		expect(store.isSlotEdited('A')).toBe(true);
-		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['set-module-labels', 'A', 'patch', '1', '8', '1', 'Foo']);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(morphCmd(['Foo', ...MORPH_NAMES.slice(1)]));
 	});
 
-	it('sends every already-named group in one command (the device replaces the whole list)', async () => {
+	it('sends all 8 groups in one command, keeping earlier renames (the device replaces the whole block)', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
@@ -367,21 +372,7 @@ describe('setMorphGroupLabel', () => {
 		await store.setMorphGroupLabel(1, 'Wheel');
 		await store.setMorphGroupLabel(3, 'Vel');
 
-		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith([
-			'set-module-labels',
-			'A',
-			'patch',
-			'1',
-			'8',
-			'1',
-			'Mod',
-			'9',
-			'1',
-			'Wheel',
-			'11',
-			'1',
-			'Vel',
-		]);
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(morphCmd(['Mod', 'Wheel', MORPH_NAMES[2], 'Vel', ...MORPH_NAMES.slice(4)]));
 	});
 
 	it('updates the existing entry in place when the group is renamed again', async () => {
@@ -392,7 +383,7 @@ describe('setMorphGroupLabel', () => {
 		await store.setMorphGroupLabel(2, 'First');
 		await store.setMorphGroupLabel(2, 'Second');
 
-		expect(patch.morphParamLabels).toEqual([{ paramIndex: 10, isString: true, paramLen: 8, labels: ['Second'] }]);
+		expect(patch.morphParamLabels!.map((pl: any) => pl.labels[0])).toEqual([...MORPH_NAMES.slice(0, 2), 'Second', ...MORPH_NAMES.slice(3)]);
 	});
 
 	it('participates in undo/redo', async () => {
@@ -1892,15 +1883,11 @@ describe('randomizeOrClearSeqSteps', () => {
 describe('setParamLabel — 4-button switch keeps the other button names', () => {
 	async function findSwitch() {
 		const { getAllModules } = await import('@/renderer/nmg2mods');
-		const { getParam } = await import('@/renderer/parammap');
 		for (const m of getAllModules()) {
-			const idx = (m.params ?? []).findIndex((p) => {
-				const d = getParam(p.type);
-				return d?.canLabel && d.names?.length === 4;
-			});
-			if (idx >= 0) return { mod: m, paramIndex: idx, names: getParam(m.params![idx].type)!.names! };
+			const idx = (m.params ?? []).findIndex((p) => p.label?.length === 4);
+			if (idx >= 0) return { mod: m, paramIndex: idx, names: m.params![idx].label! };
 		}
-		throw new Error('no multi-button canLabel switch found');
+		throw new Error('no multi-button label switch found');
 	}
 
 	it.each([0, 1])('renaming button %i sends and stores all other buttons with their default names', async (labelIndex) => {
@@ -1947,7 +1934,7 @@ describe('setParamLabel — 4-button switch keeps the other button names', () =>
 		]);
 	});
 
-	it('skips label-less padding entries already present on the module (real patches have them)', async () => {
+	it('sends the full fixed-size block: padding dropped, missing label params filled with defaults', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		const pad = { paramIndex: 0, isString: false, paramLen: 0, labels: [] };
@@ -1956,7 +1943,25 @@ describe('setParamLabel — 4-button switch keeps the other button names', () =>
 
 		await store.setParamLabel(1, 4, 'Mic', 'fx');
 
-		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['set-module-labels', 'A', 'fx', '1', '7', '1', 'Synth', '4', '1', 'Mic']);
+		// Mixer 4-1 C's block is always 40 bytes on the device: On1-On4 (params 4-7), one 10-byte entry each.
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith([
+			'set-module-labels',
+			'A',
+			'fx',
+			'1',
+			'4',
+			'1',
+			'Mic',
+			'5',
+			'1',
+			'Ch 2',
+			'6',
+			'1',
+			'Ch 3',
+			'7',
+			'1',
+			'Synth',
+		]);
 	});
 
 	it('undo restores the default name instead of a blank button', async () => {

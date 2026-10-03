@@ -269,7 +269,6 @@
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
 	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
-	import { getParam } from '../../renderer/parammap';
 	import { useModuleParams } from '../../composables/useModuleParams';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
@@ -661,12 +660,12 @@
 		const items: any[] = [];
 
 		if (param && isSwitch(param.n)) {
-			if (getParam(param.type)?.canLabel) {
+			if (param.label) {
 				const label = getParamLabel(paramIndex);
+				const currentLabel = label?.labels?.[labelIndex] || param.label[labelIndex] || '';
 				items.push({
 					label: 'Rename label',
-					action: () =>
-						emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel: label?.labels?.[labelIndex] ?? '', labelIndex }),
+					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel, labelIndex }),
 				});
 			}
 		} else {

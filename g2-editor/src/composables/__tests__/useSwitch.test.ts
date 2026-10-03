@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ref } from 'vue';
 import { useSwitch, resolveSwitchDisplayNames } from '../useSwitch';
 import { getParam } from '../../renderer/parammap';
+import { getModule } from '../../renderer/nmg2mods';
 
 function makeSwitch(labels: string[]) {
 	const param = ref({ name: 'Sw', type: 'sw_2', n: 'Switch', x: 0, y: 0 } as any);
@@ -34,5 +35,12 @@ describe('resolveSwitchDisplayNames', () => {
 
 	it('uses default names without a user label', () => {
 		expect(resolveSwitchDisplayNames(param, def, undefined)).toEqual(def.names);
+	});
+
+	it("uses the module's own default label (Mix1-1A 'On' button shows 'Ch 1'), also for a blank stored label", () => {
+		const on = getModule(184)!.params![1];
+		const offOn = getParam(on.type)!;
+		expect(resolveSwitchDisplayNames(on, offOn, undefined)).toEqual(['Ch 1']);
+		expect(resolveSwitchDisplayNames(on, offOn, { paramIndex: 1, isString: true, paramLen: 8, labels: [''] })).toEqual(['Ch 1']);
 	});
 });

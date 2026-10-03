@@ -389,8 +389,19 @@ interface SlotEntry {
 }
 
 function paramDefaultNames(moduleType: number | undefined, paramIndex: number): string[] | undefined {
-	const type = moduleType === undefined ? undefined : getModule(moduleType)?.params?.[paramIndex]?.type;
-	return type ? getParam(type)?.names : undefined;
+	return moduleType === undefined ? undefined : getModule(moduleType)?.params?.[paramIndex]?.label;
+}
+
+// A module's label block has a fixed, type-defined size: the original editor always sends one entry per label
+// control (CPanel::CustomDataItemRequestChange), and a shorter set-module-labels leaves a zero/garbage tail in the
+// device's block. So expand to every label control, in param order, defaulting the never-renamed ones.
+function fullLabelBlock(moduleType: number, paramLabels: ParamLabel[]): ParamLabel[] {
+	const labelled = (getModule(moduleType)?.params ?? []).flatMap((p, paramIndex) => (p.label ? [{ paramIndex, names: p.label }] : []));
+	if (labelled.length === 0) return paramLabels;
+	return labelled.map(({ paramIndex, names }) => {
+		const labels = paramLabels.find((pl) => pl.paramIndex === paramIndex)?.labels ?? [];
+		return { paramIndex, isString: true, paramLen: 1 + names.length * 7, labels: names.map((n, i) => labels[i] || n) };
+	});
 }
 
 export const useSlotsStore = defineStore('slots', {
@@ -2852,6 +2863,7 @@ export const useSlotsStore = defineStore('slots', {
 					entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
 				entry.labels[labelIndex] = label;
 			}
+			mod.paramLabels = fullLabelBlock(mod.type, mod.paramLabels);
 			this._markSlotDirty(slot);
 			await runCliSafe(setModuleLabelsCmd(slot, location, moduleIndex, mod.paramLabels), 'setParamLabel');
 		},
@@ -2878,16 +2890,16 @@ export const useSlotsStore = defineStore('slots', {
 				});
 			}
 
-			if (!patch.morphParamLabels) patch.morphParamLabels = [];
-			let entry = patch.morphParamLabels.find((pl) => pl.paramIndex === paramIndex);
-			if (!entry) {
-				// isString: true matches how the real hardware encodes morph group labels
-				// (confirmed from a shipped .pch2's own $PARAM_NAMES(areaIdx=2) section).
-				entry = { paramIndex, isString: true, paramLen: 8, labels: [label] };
-				patch.morphParamLabels.push(entry);
-			} else {
-				entry.labels[0] = label;
-			}
+			// Like fullLabelBlock: the device's block is fixed-size, so always all 8 groups (params 8-15).
+			// isString: true matches how the real hardware encodes morph group labels
+			// (confirmed from a shipped .pch2's own $PARAM_NAMES(areaIdx=2) section).
+			const prev = patch.morphParamLabels ?? [];
+			patch.morphParamLabels = MORPH_NAMES.map((name, i) => ({
+				paramIndex: 8 + i,
+				isString: true,
+				paramLen: 8,
+				labels: [i === groupIndex ? label : (prev.find((pl) => pl.paramIndex === 8 + i)?.labels[0] ?? name)],
+			}));
 			this._markSlotDirty(slot);
 			await runCliSafe(setModuleLabelsCmd(slot, 'patch', PATCH_MORPH_MODULE_ID, patch.morphParamLabels), 'setMorphGroupLabel');
 		},

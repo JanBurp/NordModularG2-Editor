@@ -144,7 +144,6 @@ export interface ParamDefinition {
 	rows?: number;
 	img?: string;
 	h?: number;
-	canLabel?: boolean;
 	trigger?: boolean;
 	graph?: boolean | string;
 }
