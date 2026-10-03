@@ -1647,10 +1647,11 @@ int g2_set_perf_name(const char *name) {
     if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
     uint8_t response[16] = {0};
+    /* The name-only ack is an embedded 0x04/0x29 message, which recv_interrupt() relays as a
+     * perf_name event and skips in daemon mode — so a timeout here is expected, not an error. */
     int ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) { g2_err("No response from G2 for set-perf-name\n"); return G2_ERR; }
     /* Check for EXTENDED response (bulk event) - must be consumed or it blocks further communication */
-    if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+    if (ret > 0 && (response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
         uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
         if (bulkSize > 0) {
             uint8_t *bulk = malloc(bulkSize);

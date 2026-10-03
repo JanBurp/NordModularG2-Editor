@@ -454,7 +454,7 @@ void test_set_perf_name(void) {
 
     fprintf(stderr, "set-perf-name: setting performance name\n");
     int ret = g2_set_perf_name("TestPerf");
-    TEST_ASSERT_TRUE(ret == G2_OK || ret == G2_ERR);
+    TEST_ASSERT_EQUAL_INT(G2_OK, ret);
     delay_between_tests();
 
     fprintf(stderr, "get-patch: verify connection still works after perf name change\n");
