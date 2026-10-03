@@ -376,10 +376,7 @@
 		return openSections.value.has(section);
 	}
 	function onToggle(section: SettingsSection, v: boolean) {
-		const next = new Set(openSections.value);
-		if (v) next.add(section);
-		else next.delete(section);
-		openSections.value = next;
+		openSections.value = v ? new Set([section]) : new Set();
 	}
 
 	const selectedCategory = computed({
