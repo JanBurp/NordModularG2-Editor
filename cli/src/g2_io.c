@@ -645,8 +645,8 @@ static int listener_recv_bulk(uint8_t *data, uint16_t size) {
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN,
                                    data + received, size - received,
                                    &transferred, USB_TIMEOUT_STANDARD_MS);
-        if (ret == 0 && transferred > 0) received += transferred;
-        else retries--;
+        received += transferred;   /* bytes that arrived with a timeout are consumed too */
+        if (ret != 0 || transferred == 0) retries--;
     }
     return received;
 }
@@ -760,12 +760,22 @@ void g2_listener_stop(void) {
 int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries) {
     int transferred = 0;
     int ret;
+    /* One message per read. Every interrupt message is a full 16-byte packet (the
+     * endpoint's max packet size), so a larger request never ends on a short packet:
+     * it swallows the following headers too, and their bulk payloads are then never
+     * read - the same orphaned-payload wedge as below. */
+    if (size > 16) size = 16;
     for (int i = 0; i < retries; i++) {
         /* Use bulk_transfer even on the interrupt endpoint: g2_recv_response does
          * the same and libusb_interrupt_transfer on macOS can ignore timeouts
          * after many rapid transfers, causing the watch loop to hang. */
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_INTERRUPT_IN, response, size, &transferred, timeout_ms);
-        if (ret == 0 && transferred > 0) {
+        /* A header that lands right at the timeout comes back as LIBUSB_ERROR_TIMEOUT
+         * with transferred == 16: the G2 has sent it, so it must be used. Dropping it
+         * leaves its bulk payload unread on EP 0x82, every later bulk read is one
+         * message behind, and the G2 stops answering until a power cycle.
+         * Hardware-confirmed: the listener hits this several times per test run. */
+        if (transferred > 0 && (ret == 0 || ret == LIBUSB_ERROR_TIMEOUT)) {
             return transferred;
         }
         if (ret == LIBUSB_ERROR_NO_DEVICE) return LIBUSB_ERROR_NO_DEVICE;
@@ -897,11 +907,8 @@ int recv_bulk(uint8_t *data, uint16_t size) {
     int received = 0;
     while (retries > 0 && received < size) {
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN, data + received, size - received, &transferred, USB_TIMEOUT_STANDARD_MS);
-        if (ret == 0 && transferred > 0) {
-            received += transferred;
-        } else {
-            retries--;
-        }
+        received += transferred;   /* bytes that arrived with a timeout are consumed too */
+        if (ret != 0 || transferred == 0) retries--;
     }
     return received;
 }

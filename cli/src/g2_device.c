@@ -947,9 +947,14 @@ cJSON *g2_list_ex(int filter, int bank_filter, int partial) {
                 return NULL;
             }
 
-            ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_STANDARD_MS);
-            if (ret <= 0) {
-                ret = recv_bulk(response, sizeof(response));
+            /* The reply is an EXTENDED message: a 16-byte header announcing the payload
+             * size, then the payload itself on the bulk endpoint. Skip anything else. */
+            ret = 0;
+            for (int attempt = 0; attempt < 5 && ret <= 0; attempt++) {
+                if (recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS) <= 0) break;
+                if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
+                uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
+                ret = recv_bulk(response, sz < sizeof(response) ? sz : sizeof(response));
             }
 
             if (ret <= 9) {
