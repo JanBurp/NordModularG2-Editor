@@ -71,10 +71,9 @@
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import Icon from '../common/Icon.vue';
-	import { getModule, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
+	import { getModule, getDefaultParamValues, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import { filterCategoryModules } from '../../renderer/moduleSearch';
 	import type { ModuleDefinition } from '@/types';
-	import { getParam } from '../../renderer/parammap';
 	import { useUiStore } from '@/store/ui';
 	import { useSettingsStore } from '@/store/settings';
 	import { useModuleHelp } from '../../composables/useModuleHelp';
@@ -259,28 +258,13 @@
 
 	function getModuleInstance(moduleId: number) {
 		if (!moduleInstances.has(moduleId)) {
-			const modDef = getModule(moduleId);
-			const defaultLv =
-				modDef?.params?.map((param) => {
-					const paramType = param.type;
-					const paramName = param.name;
-					const p = getParam(paramType);
-					if (p?.def !== undefined) {
-						return p.def;
-					}
-					if (paramType?.includes('Freq')) return 64;
-					if (paramType?.includes('Res')) return 30;
-					if (paramName?.includes('Slope') || paramName?.includes('Gain')) return 64;
-					return 64;
-				}) || [];
-
 			moduleInstances.set(moduleId, {
 				type: moduleId,
 				index: 0,
 				horiz: 0,
 				vert: 0,
 				colour: 0,
-				lv: defaultLv,
+				lv: getDefaultParamValues(moduleId),
 				modes: [],
 			});
 		}

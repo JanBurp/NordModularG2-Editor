@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { areModulesReplaceCompatible, getModule, getReplaceCandidates } from '../nmg2mods';
+import { areModulesReplaceCompatible, getDefaultParamValues, getModule, getReplaceCandidates } from '../nmg2mods';
 
 // These lock in areModulesReplaceCompatible's behaviour against real entries in nmg2mods.ts, since
 // the heuristic is an approximation of Clavia's unrecoverable "replace group" table (see the doc
@@ -56,5 +56,13 @@ describe('areModulesReplaceCompatible / getReplaceCandidates', () => {
 		expect(getReplaceCandidates(126)).toEqual([]);
 		// Name bar shares the "In/Out" category with Keyboard, but must never be offered as a target.
 		expect(getReplaceCandidates(1).some((m) => m.id === 126)).toBe(false);
+	});
+});
+
+describe('getDefaultParamValues', () => {
+	it('defaults Vocoder bands to preset 0 (band i -> i+1) and keeps Emphasis/Monitor defs', () => {
+		const vals = getDefaultParamValues(108);
+		expect(vals.slice(0, 16)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
+		expect(vals).toHaveLength(18);
 	});
 });

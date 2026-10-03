@@ -1,6 +1,7 @@
 import { computed } from 'vue';
 import type { ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
+import { getDefaultParamValues } from '../renderer/nmg2mods';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
@@ -20,12 +21,7 @@ export function useModuleParams(
 	const localLv = computed<number[]>(() => {
 		const params = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[instance.value.index];
 		if (params) return params;
-		return (
-			moduleDef.value?.params?.map((param) => {
-				const p = getParam(param.type);
-				return p?.def ?? 64;
-			}) ?? []
-		);
+		return getDefaultParamValues(instance.value.type);
 	});
 
 	function getParamValue(index: number): number {

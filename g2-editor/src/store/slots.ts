@@ -1097,13 +1097,12 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const uiStore = useUiStore();
 
-			const { getModule } = await import('../renderer/nmg2mods');
-			const { getParam } = await import('../renderer/parammap');
+			const { getModule, getDefaultParamValues } = await import('../renderer/nmg2mods');
 			const modDef = getModule(typeId);
 			const numModes = modDef?.modes?.length ?? 0;
 			const modeVals: number[] = Array(numModes).fill(0);
 			const numParams = modDef?.params?.length ?? 0;
-			const paramVals: number[] = (modDef?.params ?? []).map((p) => getParam(p.type)?.def ?? 64);
+			const paramVals = getDefaultParamValues(typeId);
 			const base = modDef?.short ?? 'Module';
 			const sameType = [...patch.areas[0].modules, ...patch.areas[1].modules].filter((m) => m.type === typeId);
 			let maxSuffix = 0;

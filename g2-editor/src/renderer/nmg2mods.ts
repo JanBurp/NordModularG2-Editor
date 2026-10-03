@@ -1,5 +1,6 @@
 // @ts-nocheck
 import type { ModuleDefinition } from '../types/index.ts';
+import { getParam } from './parammap.ts';
 
 // prettier-ignore
 const modules: ModuleDefinition[] = [
@@ -194,6 +195,19 @@ const sortedCategories = Array.from(categoryModulesMap.entries())
 
 export function getModule(id: number): ModuleDefinition | undefined {
 	return moduleMap.get(id);
+}
+
+const VOCODER_TYPE_ID = 108;
+
+// Vocoder preset "0": analysis band i feeds synthesis band i+1 (0 = Off), which is what makes the graph show.
+export function vocoderPreset0(bandIndex: number): number {
+	return bandIndex + 1;
+}
+
+export function getDefaultParamValues(typeId: number): number[] {
+	const values = (getModule(typeId)?.params ?? []).map((p) => getParam(p.type)?.def ?? 64);
+	if (typeId === VOCODER_TYPE_ID) for (let i = 0; i < 16; i++) values[i] = vocoderPreset0(i);
+	return values;
 }
 
 // Param indices in the original editor's navigation order (left/right arrows).

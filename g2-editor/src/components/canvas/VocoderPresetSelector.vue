@@ -11,6 +11,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
+	import { vocoderPreset0 } from '../../renderer/nmg2mods';
 
 	const props = defineProps<{
 		ve: VisualElement;
@@ -35,7 +36,7 @@
 	function computeValue(label: (typeof BUTTONS)[number], bandIndex: number): number {
 		switch (label) {
 			case '0':
-				return bandIndex + 1;
+				return vocoderPreset0(bandIndex);
 			case 'Inv':
 				return 16 - bandIndex;
 			case 'Rnd':
