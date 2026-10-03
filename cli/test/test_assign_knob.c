@@ -8,39 +8,52 @@
 #include "../include/g2_device.h"
 
 void test_assign_knob_invalid_slot_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(-1, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(-1, 0, 1, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_slot_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(4, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(4, 0, 1, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_location(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 2, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 2, 1, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_module_id_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, -1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, -1, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_module_id_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 256, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 256, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_param_idx_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, -1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, -1, 0, 0));
 }
 
 void test_assign_knob_invalid_param_idx_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 256, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 256, 0, 0));
 }
 
 void test_assign_knob_invalid_slot_index_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 1, -1));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 1, -1, 0));
 }
 
 void test_assign_knob_invalid_slot_index_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 1, 120));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 1, 120, 0));
+}
+
+void test_assign_knob_invalid_is_led(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 0, 1, 1, 0, 2));
+}
+
+void test_assign_knob_op_led_bit(void) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_assign_knob_op(&op, buf, 1, 7, 3, 9, 0);
+    TEST_ASSERT_EQUAL_UINT8(0x40, buf[2]);
+    g2_build_assign_knob_op(&op, buf, 1, 7, 3, 9, 1);
+    TEST_ASSERT_EQUAL_UINT8(0x50, buf[2]);
+    TEST_ASSERT_EQUAL_UINT8(7, buf[0]); TEST_ASSERT_EQUAL_UINT8(3, buf[1]); TEST_ASSERT_EQUAL_UINT8(9, buf[4]);
 }
 
 void test_deassign_knob_invalid_slot_low(void) {

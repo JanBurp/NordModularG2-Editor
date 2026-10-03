@@ -1506,7 +1506,20 @@ describe('assignParamToPage / deassignParamPage', () => {
 		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
-		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([['assign-knob', 'A', 'va', '2', '0', '5']]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([['assign-knob', 'A', 'va', '2', '0', '5', '0']]);
+	});
+
+	it('a level meter and a param with the same index are distinct assignments, and the meter carries isLed to the CLI', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 1, 2, 0);
+		await store.assignParamToPage('A', 6, 1, 2, 0, 1);
+
+		expect(store.slots['A'].paramPages).toEqual([
+			{ slotIndex: 5, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 6, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 1 },
+		]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([['assign-knob', 'A', 'va', '2', '0', '6', '1']]);
 	});
 
 	it('assigning into an occupied slot evicts the old occupant', async () => {
@@ -1530,7 +1543,7 @@ describe('assignParamToPage / deassignParamPage', () => {
 		// The hardware doesn't auto-evict: the old knob is deassigned first, then the new one assigned.
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
 			['deassign-knob', 'A', '5'],
-			['assign-knob', 'A', 'fx', '1', '0', '9'],
+			['assign-knob', 'A', 'fx', '1', '0', '9', '0'],
 		]);
 	});
 
@@ -1594,7 +1607,7 @@ describe('swapParamPageSlots', () => {
 		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
 			['deassign-knob', 'A', '3'],
-			['assign-knob', 'A', 'va', '2', '5', '9'],
+			['assign-knob', 'A', 'va', '2', '5', '9', '0'],
 		]);
 	});
 
@@ -1668,9 +1681,9 @@ describe('assignModuleToPage', () => {
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
-			['assign-knob', 'A', 'va', '2', '0', '8'],
-			['assign-knob', 'A', 'va', '2', '1', '9'],
-			['assign-knob', 'A', 'va', '2', '2', '10'],
+			['assign-knob', 'A', 'va', '2', '0', '8', '0'],
+			['assign-knob', 'A', 'va', '2', '1', '9', '0'],
+			['assign-knob', 'A', 'va', '2', '2', '10', '0'],
 		]);
 	});
 

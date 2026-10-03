@@ -36,7 +36,7 @@
 				     drag/drop still works on empty cells. -->
 				<Knob
 					:value="cell.value"
-					:class="{ 'pointer-events-none': altHeld || !cell.assignment }"
+					:class="{ 'pointer-events-none': altHeld || !cell.assignment || cell.assignment.isLed }"
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
@@ -102,6 +102,7 @@
 	const { compact = false } = defineProps<{ compact?: boolean }>();
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
+	import { useLedStore } from '../../store/led';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAltHeld } from '../../composables/useParamPageAssign';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
@@ -234,6 +235,18 @@
 		morphRange: undefined as number | undefined,
 	};
 
+	// Live level (0-127) of the level meter a LED-assigned cell points at. LED number = rank of the
+	// module's vu elements by x (see Module.vue's onVuContextMenu); the led store keys them `vu-N` in
+	// element order. Patch-level assignments only, so the led store's focused slot is the right one.
+	const ledStore = useLedStore();
+	function meterLevel(a: ParamPageAssignment | GlobalParamPageAssignment, moduleInfo: ReturnType<typeof resolveModule>): number {
+		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
+		const target = [...vus].sort((p, q) => (p.x as number) - (q.x as number))[a.paramIndex];
+		if (!target) return 0;
+		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`);
+		return raw === 255 ? 0 : Math.min(raw, 127);
+	}
+
 	const cells = computed<Cell[]>(() => {
 		const global = uiStore.globalPagesActive;
 		const slot = uiStore.slotInFocus;
@@ -248,6 +261,19 @@
 			const moduleLabel = moduleInfo
 				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
 				: String(assignment.moduleIndex);
+			// Level-meter target (isLed=1): paramIndex is a LED number, not a param. The hardware shows
+			// it as a circular VU around the knob; here the knob mirrors the live level, read-only.
+			if (assignment.isLed) {
+				return {
+					slotIndex,
+					assignment,
+					...emptyCell,
+					moduleLabel,
+					paramLabel: `Meter ${assignment.paramIndex + 1}`,
+					valueLabel: '[LED]',
+					value: meterLevel(assignment, moduleInfo),
+				};
+			}
 			const knobDisplay = resolveParamDisplay(assignment, assignment.paramIndex, moduleInfo);
 			// The physical button below the knob often targets a DIFFERENT module parameter (e.g.
 			// Sequencer step-value knobs pair with a step-on/off button), or has no button function

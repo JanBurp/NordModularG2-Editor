@@ -87,7 +87,9 @@
 				:active-step="ledStateMap[entry.key]?.step ?? 255"
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
-			<LevelMeter v-else-if="entry.ve.type === 'vu'" :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
+			<g v-else-if="entry.ve.type === 'vu'" @contextmenu.stop.prevent="onVuContextMenu($event, entry.ve)">
+				<LevelMeter :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
+			</g>
 			<ModuleVeLed v-else-if="entry.ve.type === 'ledGroup'" :ve="entry.ve" :led-on="false" :active-step="ledStateMap[entry.key]?.step ?? 255" />
 			<ModuleVeGroupLabel v-else-if="entry.ve.type === 'groupLabel'" :ve="entry.ve"></ModuleVeGroupLabel>
 		</template>
@@ -279,7 +281,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem, VisualElement } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
@@ -363,6 +365,22 @@
 			{ type: 'separator' },
 			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
 		]);
+	}
+
+	// Right-click on a level meter: assign it to a Parameter Page knob (isLed=1). The LED number the
+	// hardware expects is the meter's GroupId in the original panel data; in every module that has
+	// meters, GroupId rises with the meter's x position (e.g. 4-In: x153..231 = 0..3).
+	function onVuContextMenu(e: MouseEvent, ve: VisualElement) {
+		const slot = uiStore.slotInFocus;
+		const location = props.areaLabel === 'va' ? 1 : 0;
+		const ledNo = (moduleDef.value?.ve ?? [])
+			.filter((v) => v.type === 'vu')
+			.sort((a, b) => (a.x as number) - (b.x as number))
+			.indexOf(ve);
+		const existing = slotsStore.slots[slot].paramPages.find(
+			(k) => k.isLed === 1 && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === ledNo,
+		);
+		openContextMenu(e, buildParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing, isLed: 1 }));
 	}
 
 	function onJackDragStart(info: JackDragInfo, e: MouseEvent) {

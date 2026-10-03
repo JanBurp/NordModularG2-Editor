@@ -148,7 +148,15 @@ function assignMidiCCBatchCmd(slot: SlotLabel, ccs: MidiCCAssignment[]): string[
 
 // Builds the CLI assign-knob command tuple for a single Parameter Page slot.
 function assignKnobCmd(slot: SlotLabel, entry: ParamPageAssignment): string[] {
-	return ['assign-knob', slot, locationStr01(entry.location), String(entry.moduleIndex), String(entry.paramIndex), String(entry.slotIndex)];
+	return [
+		'assign-knob',
+		slot,
+		locationStr01(entry.location),
+		String(entry.moduleIndex),
+		String(entry.paramIndex),
+		String(entry.slotIndex),
+		String(entry.isLed),
+	];
 }
 
 // Builds the CLI assign-global-knob command tuple. `active` is the transport slot (uiStore.slotInFocus).
@@ -3430,14 +3438,15 @@ export const useSlotsStore = defineStore('slots', {
 		// uniqueness like the real hardware/reference editor (BVE.NMG2Mess.pas's
 		// CreateAssignKnobMessage): if slotIndex already holds a different param, that old
 		// occupant is evicted; if this param already occupies a different slot, that old slot is
-		// cleared too. Both changes land in one undo entry.
-		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
+		// cleared too. Both changes land in one undo entry. With isLed=1 the target is a level meter
+		// and paramIndex is its LED number; a meter and a param with the same index are distinct.
+		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number, isLed: 0 | 1 = 0): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
-			const entry: ParamPageAssignment = { slotIndex, location, moduleIndex, paramIndex, isLed: 0 };
+			const entry: ParamPageAssignment = { slotIndex, location, moduleIndex, paramIndex, isLed };
 			const { next, oldKeySlot } = computeAssignOne(
 				prev,
 				slotIndex,
-				(k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
+				(k) => k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex && k.isLed === isLed,
 				entry,
 			);
 			// The hardware does NOT auto-evict (the reference editor sends an explicit deassign first),
@@ -3452,7 +3461,7 @@ export const useSlotsStore = defineStore('slots', {
 						await this._applyParamPages(slot, prev, undoTouched);
 					},
 					redo: async () => {
-						await this.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex);
+						await this.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
 					},
 				});
 			}
@@ -3476,7 +3485,7 @@ export const useSlotsStore = defineStore('slots', {
 				prev,
 				targetSlots,
 				paramIndices,
-				(k) => k.location === location && k.moduleIndex === moduleIndex,
+				(k) => k.location === location && k.moduleIndex === moduleIndex && !k.isLed,
 				(paramIndex, slotIndex) => ({ slotIndex, location, moduleIndex, paramIndex, isLed: 0 }),
 			);
 			await this._applyParamPages(slot, next, touched);

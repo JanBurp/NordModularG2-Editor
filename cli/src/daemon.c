@@ -311,7 +311,7 @@ static int execute_seq(cJSON *args) {
 
         } else if (strcmp(scmd, "assign-knob") == 0 && sn >= 6) {
             if (s_loc < 0 || s_loc > 1 || arg_i(sub,5) < 0 || arg_i(sub,5) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
-            g2_build_assign_knob_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5));
+            g2_build_assign_knob_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), sn >= 7 ? arg_i(sub,6) : 0);
             n_ops++;
 
         } else if (strcmp(scmd, "deassign-knob") == 0 && sn >= 3) {
@@ -567,7 +567,7 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		int loc  = parse_location(args, 1);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
-		else ret = g2_assign_knob(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4));
+		else ret = g2_assign_knob(slot, loc, arg_i(args, 2), arg_i(args, 3), arg_i(args, 4), n >= 6 ? arg_i(args, 5) : 0);
 
 	} else if (strcmp(cmd, "deassign-knob") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));

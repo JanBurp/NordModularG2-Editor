@@ -2516,10 +2516,12 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count) {
     return send_slot_batch((uint8_t)slot, version, ops, count) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
-void g2_build_assign_knob_op(G2Op *op, uint8_t *buf, int loc, int module_id, int param_idx, int slot_index) {
+void g2_build_assign_knob_op(G2Op *op, uint8_t *buf, int loc, int module_id, int param_idx, int slot_index, int is_led) {
     /* Delphi writes location as a 2-bit field followed by 6 pad bits, MSB-first (TBitWriter buffers
-     * a Byte), so the third byte is location<<6 — NOT the bare location value like MIDI CC's. */
-    buf[0]=(uint8_t)module_id; buf[1]=(uint8_t)param_idx; buf[2]=(uint8_t)(loc << 6);
+     * a Byte), so the third byte is location<<6 — NOT the bare location value like MIDI CC's.
+     * The next 2 bits are the target type (Delphi/G2Editor.c EDeviceAssignType: 0=param, 1=LED/level
+     * meter); for a level meter param_idx is the LED number, not a param index. */
+    buf[0]=(uint8_t)module_id; buf[1]=(uint8_t)param_idx; buf[2]=(uint8_t)((loc << 6) | (is_led << 4));
     buf[3]=0x00; buf[4]=(uint8_t)slot_index;
     op->cmd=SUB_COMMAND_ASSIGN_KNOB; op->payload=buf; op->len=5;
 }
@@ -2540,20 +2542,21 @@ void g2_build_deassign_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
  * Unlike the reference editor's compound message (deassign old knob, deassign occupant, assign,
  * select page), this sends only the bare assign; the editor deassigns the param's old knob first
  * (see assignParamToPage) but does not explicitly clear an occupied target knob. */
-int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index) {
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index, int is_led) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
     if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
     if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
     if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (is_led < 0 || is_led > 1)           return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
     uint8_t payload[5]; G2Op op;
-    g2_build_assign_knob_op(&op, payload, location, module_id, param_idx, slot_index);
+    g2_build_assign_knob_op(&op, payload, location, module_id, param_idx, slot_index, is_led);
     if (g2_debug) {
-        printf("{\"debug\":\"assign_knob\",\"slot\":%d,\"version\":%u,\"location\":%d,\"module\":%d,\"param\":%d,\"knob\":%d}\n",
-               slot, version, location, module_id, param_idx, slot_index);
+        printf("{\"debug\":\"assign_knob\",\"slot\":%d,\"version\":%u,\"location\":%d,\"module\":%d,\"param\":%d,\"knob\":%d,\"led\":%d}\n",
+               slot, version, location, module_id, param_idx, slot_index, is_led);
         fflush(stdout);
     }
     return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;

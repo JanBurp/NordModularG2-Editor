@@ -183,7 +183,7 @@ void g2_build_add_cable_op(G2Op *op, uint8_t *buf, int loc, int color,
 void g2_build_set_cable_color_op(G2Op *op, uint8_t *buf, int loc, int color,
     int fm, int fct, int fci, int tm, int tct, int tci);
 void g2_build_del_module_op(G2Op *op, uint8_t *buf, int loc, int module_id);
-void g2_build_assign_knob_op(G2Op *op, uint8_t *buf, int loc, int module_id, int param_idx, int slot_index);
+void g2_build_assign_knob_op(G2Op *op, uint8_t *buf, int loc, int module_id, int param_idx, int slot_index, int is_led);
 void g2_build_deassign_knob_op(G2Op *op, uint8_t *buf, int slot_index);
 void g2_build_assign_global_knob_op(G2Op *op, uint8_t *buf, int target_slot, int loc, int module_id, int param_idx, int slot_index);
 void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index);
@@ -281,7 +281,7 @@ int g2_deassign_midicc_batch(int slot, const int *cc_nums, int count);
  * but the front panel never echoes 0x25/0x26 itself (see g2_events.c's 0x74 case), so the exact
  * field-level semantics (which byte lands on which knob) haven't been independently re-verified
  * against the decompiled CMKnobAssign::WriteStream bit layout — worth a visual spot-check. */
-int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index);
+int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index, int is_led);
 int g2_deassign_knob(int slot, int slot_index);
 
 /* Select the front-panel Parameter Page (S_SEL_PARAM_PAGE=0x2d, CMParameterPageFocus). page_id

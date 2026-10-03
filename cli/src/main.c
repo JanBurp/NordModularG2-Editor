@@ -79,7 +79,7 @@ static void print_usage(const char *prog) {
     printf("  deassign-midicc <slot> <cc-num>                                                          Remove a MIDI CC assignment\n");
     printf("  assign-midicc-batch <slot> [<va|fx|patch> <mod> <par> <cc>]...                          Assign multiple MIDI CCs in one USB frame\n");
     printf("  deassign-midicc-batch <slot> <cc-num>...                                                Remove multiple MIDI CC assignments in one USB frame\n");
-    printf("  assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>                         Assign a parameter to a Parameter Page knob (0-119)\n");
+    printf("  assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index> [led]                  Assign a parameter (or, with led=1, a level meter by LED number) to a Parameter Page knob (0-119)\n");
     printf("  deassign-knob <slot> <slot-index>                                                       Remove a Parameter Page knob assignment\n");
     printf("  select-param-page <slot> <page-id>                                                      Select the front-panel Parameter Page (page-id = page*3 + bank, 0-14)\n");
     printf("  assign-global-knob <slot> <target-slot> <va|fx> <module-id> <param-idx> <slot-index>    Assign a parameter to a Global Parameter Page knob (0-119)\n");
@@ -622,7 +622,7 @@ static int cmd_deassign_midicc_batch(int argc, char **argv, int i) {
 
 static int cmd_assign_knob(int argc, char **argv, int i) {
     if (i + 5 >= argc) {
-        fprintf(stderr, "Usage: assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index>\n");
+        fprintf(stderr, "Usage: assign-knob <slot> <va|fx> <module-id> <param-idx> <slot-index> [led]\n");
         return 1;
     }
     int slot       = parse_slot(argv[i + 1]);
@@ -631,7 +631,8 @@ static int cmd_assign_knob(int argc, char **argv, int i) {
     int mod_id     = atoi(argv[i + 3]);
     int param      = atoi(argv[i + 4]);
     int slot_index = atoi(argv[i + 5]);
-    return g2_assign_knob(slot, location, mod_id, param, slot_index);
+    int is_led     = (i + 6 < argc && argv[i + 6][0] >= '0' && argv[i + 6][0] <= '9') ? atoi(argv[i + 6]) : 0;
+    return g2_assign_knob(slot, location, mod_id, param, slot_index, is_led);
 }
 
 static int cmd_deassign_knob(int argc, char **argv, int i) {

@@ -128,7 +128,7 @@ export interface ParamPageAssignment {
 	location: 0 | 1; // 0=FX, 1=Voice
 	moduleIndex: number;
 	paramIndex: number;
-	isLed: number; // 0-3, semantics unconfirmed (TKnob.FIsLed) — preserved verbatim, not exposed in UI
+	isLed: number; // 0=param, 1=level meter (paramIndex is then its LED number); 2-bit field, EDeviceAssignType in G2Editor.c
 }
 
 // The Global Parameter Pages sibling of ParamPageAssignment (same 120-slot 3 Banks x 5 Pages x 8

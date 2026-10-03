@@ -52,18 +52,19 @@ export function buildParamPageMenuItems(opts: {
 	slot: SlotLabel | null;
 	location: 0 | 1;
 	moduleIndex: number;
-	paramIndex: number;
+	paramIndex: number; // LED number when isLed
 	existing: ParamPageAssignment | undefined;
+	isLed?: 0 | 1; // 1 = level meter target, see ParamPageAssignment.isLed
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
-	const { slot, location, moduleIndex, paramIndex, existing } = opts;
+	const { slot, location, moduleIndex, paramIndex, existing, isLed = 0 } = opts;
 
 	return buildParamPageMenuItemsImpl(slot, existing, {
 		assignLabel: 'Assign to Page',
 		deassignPrefix: 'Deassign',
 		deassignDisabled: !existing || !slot,
 		assign: (slotIndex) => {
-			if (slot) slotsStore.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex);
+			if (slot) slotsStore.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
 		},
 		deassign: () => {
 			if (slot && existing) slotsStore.deassignParamPage(slot, existing.slotIndex);
