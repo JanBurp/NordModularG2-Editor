@@ -166,7 +166,7 @@ const parammap: Record<string, ParamDefinition> = {
 	ReverbTime: { low: 0, high: 127, def: 0, defin: ['0 ~ 0.0ms, 127 ~ 3.000s', '0 ~ 0.0ms, 127 ~ 6.000s', '0 ~ 0.0ms, 127 ~ 9.000s', '0 ~ 0.0ms, 127 ~ 12.00s'], comments: 'Small, Medium, Large, Hall. Determined by [RoomType]' },
 	Rnd_1: { width: 32, height: 12, low: 0, high: 1, def: 0, defin: ['0 ~ Rnd1, 1 ~ Rnd2'], comments: '' },
 	RndEdge: { width: 24, low: 0, high: 4, def: 0, defin: ['0 ~ 0%, 1 ~ 25%, 2 ~ 50%, 3 ~ 75%, 4 ~ 100%'], comments: '' },
-	RndStepPulse: { width: 46, height: 12, low: 0, high: 1, def: 0, defin: ['0 ~ Step, 1 ~ Pulse'], comments: '' },
+	RndStepPulse: { width: 35, height: 20, img: 'ModeRndStepPulse', h: -20, low: 0, high: 1, def: 0, defin: ['0 ~ Step, 1 ~ Pulse'], comments: '' },
 	RoomType: { width: 44, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ Small, 1 ~ Medium, 2 ~ Large, 3 ~ Hall'], comments: 'Determines ranges for [ReverbTime]' },
 	SaturateCurve: { names: ['1', '2', '3', '4'], low: 0, high: 3, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4'], comments: '' },
 	ScratchDelay: { width: 28, low: 0, high: 3, def: 2, defin: ['0 ~ 12.5m, 1 ~ 25m, 2 ~ 50m, 3 ~ 100m'], comments: 'mili seconds' },

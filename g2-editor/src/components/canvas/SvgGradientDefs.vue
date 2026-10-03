@@ -123,6 +123,12 @@
 					fill="none"
 					d="M 16,18 L 16,8 C 16,6 19,6 18,4 C 17,2 14,3 15,4 M 5,29 Q 16,24 27,29 M 8,31 L 11,35 M 12,31 L 15,35 M 16,31 L 19,35 M 20,31 L 23,35 M 24,31 L 27,35 M 6,53 Q 16,46 26,53 M 6,53 Q 16,60 26,53 M 6,53 L 26,53 M 12.5,69 A 3.5,3.5 0 1 1 19.5,69 A 3.5,3.5 0 1 1 12.5,69 z M 16,72.5 L 16,81"
 				/>
+				<path
+					id="ModeRndStepPulse"
+					stroke="none"
+					fill="#222"
+					d="M1,15h3v1h-3z M2,35h31v1h-31z M3,11h1v4h-1z M3,25h1v10h-1z M4,11h2v1h-2z M5,12h1v6h-1z M6,17h2v1h-2z M7,3h1v14h-1z M8,3h2v1h-2z M8,25h1v10h-1z M9,4h1v3h-1z M10,6h2v1h-2z M10,25h1v10h-1z M11,2h1v4h-1z M12,2h2v1h-2z M13,3h1v8h-1z M14,10h2v1h-2z M14,25h1v10h-1z M15,11h1v3h-1z M16,13h2v1h-2z M17,14h1v2h-1z M18,15h2v1h-2z M19,6h1v9h-1z M19,25h1v10h-1z M20,6h2v1h-2z M21,7h1v3h-1z M21,25h1v10h-1z M22,9h2v1h-2z M23,10h1v7h-1z M24,16h2v1h-2z M25,11h1v5h-1z M26,11h2v1h-2z M27,12h1v6h-1z M27,25h1v10h-1z M28,17h2v1h-2z M29,15h1v2h-1z M30,15h2v1h-2z M31,13h1v2h-1z M31,25h1v10h-1z M32,13h2v1h-2z"
+				/>
 				<g id="check">
 					<path stroke="#666" d="M0,0 l10,0 0,10 -10,0 0,-10" />
 				</g>

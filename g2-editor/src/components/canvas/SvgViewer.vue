@@ -66,6 +66,7 @@
 		{ id: 'ModeGate' },
 		{ id: 'ModeClkDiv' },
 		{ id: 'ModeDriver' },
+		{ id: 'ModeRndStepPulse' },
 		{ id: 'check' },
 		{ id: 'onoff' },
 		{ id: 'input' },
