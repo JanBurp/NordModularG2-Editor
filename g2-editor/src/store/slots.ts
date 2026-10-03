@@ -1871,6 +1871,7 @@ export const useSlotsStore = defineStore('slots', {
 		): void {
 			const labels: SlotLabel[] = ['A', 'B', 'C', 'D'];
 			const hist = useHistoryStore();
+			delete useDeviceStore().storedLocation.perf;
 			for (let i = 0; i < 4; i++) {
 				const slotName = slotNames[i] || name;
 				this.slots[labels[i]].patch = patches[i];

@@ -134,6 +134,7 @@ export function usePatchFile() {
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
 		device.modeChanging = true;
+		delete device.storedLocation.perf;
 		device.pendingPerfBank = bank - 1;
 		device.pendingPerfLoc = location - 1;
 		clearTimeout(perfSelectTimer);

@@ -16,3 +16,15 @@ export function slotOrigin(slot: SlotLabel): { bank: number; location: number } 
 	const entry = useBrowserStore().synthPatches.find((p) => p.bank === bank && p.location === location);
 	return name && name !== 'EmptyPatch' && entry?.name.trim() === name ? { bank, location } : null;
 }
+
+// 1-based bank/location of the performance the device reports as loaded, or null when unknown.
+// Trusted only when the performance name matches the synth's entry at that location.
+export function performanceOrigin(): { bank: number; location: number } | null {
+	const device = useDeviceStore().device;
+	if (!device || device.mode !== 'Performance') return null;
+	const bank = device.perfBank + 1;
+	const location = device.perfLoc + 1;
+	const name = device.performance?.name.trim();
+	const entry = useBrowserStore().synthPerformances.find((p) => p.bank === bank && p.location === location);
+	return name && entry?.name.trim() === name ? { bank, location } : null;
+}

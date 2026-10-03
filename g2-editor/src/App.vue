@@ -208,7 +208,7 @@
 					v-model.number="storeInSynth.location.value"
 					class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
 				>
-					<option v-for="l in storeInSynth.maxLocation.value" :key="l" :value="l">{{ l }}</option>
+					<option v-for="l in storeInSynth.maxLocation.value" :key="l" :value="l">{{ storeInSynth.locationLabel(l) }}</option>
 				</select>
 			</div>
 		</div>

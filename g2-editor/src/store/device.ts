@@ -39,6 +39,8 @@ export const useDeviceStore = defineStore('device', {
 		lastMidiCC: null as number | null,
 		// Slots whose patch no longer matches the bank/patch the device reports (new patch, disk load).
 		staleOriginSlots: [] as SlotLabel[],
+		// 1-based bank/location a slot's patch (or the performance, key 'perf') was last stored at via Save in Synth.
+		storedLocation: {} as Partial<Record<SlotLabel | 'perf', { bank: number; location: number }>>,
 	}),
 
 	getters: {
@@ -184,16 +186,26 @@ export const useDeviceStore = defineStore('device', {
 			this.device.performance = ev.performance ?? null;
 			for (const s of ev.slots) {
 				const old = this.device.slots.find((o) => o.slot === s.slot);
-				if (old && (old.bank !== s.bank || old.patch !== s.patch)) this.clearOriginStale(s.slot);
+				if (!old || (old.bank === s.bank && old.patch === s.patch)) continue;
+				const stored = this.storedLocation[s.slot];
+				// The echo of our own store reports the stored location; keep the memory then.
+				if (stored?.bank === s.bank + 1 && stored.location === s.patch + 1) continue;
+				this.clearOriginStale(s.slot);
 			}
 			this.device.slots = ev.slots;
 		},
 
+		setStoredLocation(key: SlotLabel | 'perf', bank: number, location: number) {
+			this.storedLocation[key] = { bank, location };
+		},
+
 		markOriginStale(slot: SlotLabel) {
+			delete this.storedLocation[slot];
 			if (!this.staleOriginSlots.includes(slot)) this.staleOriginSlots.push(slot);
 		},
 
 		clearOriginStale(slot: SlotLabel) {
+			delete this.storedLocation[slot];
 			this.staleOriginSlots = this.staleOriginSlots.filter((s) => s !== slot);
 		},
 

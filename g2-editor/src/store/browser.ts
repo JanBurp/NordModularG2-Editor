@@ -1,6 +1,7 @@
 import { defineStore } from 'pinia';
 import { SLOT_LABELS } from '@/constants';
 import { getCategorySlug } from '@/constants/categories';
+import { useDeviceStore } from './device';
 import { useSlotsStore } from './slots';
 import { showToast } from '@/composables/useToast';
 
@@ -113,6 +114,8 @@ export const useBrowserStore = defineStore('browser', {
 				const category =
 					kind === 'patch' ? getCategorySlug(useSlotsStore().getPatchForSlot(SLOT_LABELS[slotIndex])?.description?.category ?? 0) : undefined;
 				this.upsertPatch(bank, location, kind, name ?? '', category);
+				useDeviceStore().setStoredLocation(kind === 'performance' ? 'perf' : SLOT_LABELS[slotIndex], bank, location);
+				showToast(`Saved ${kind} at ${bank}-${location}`);
 			} catch (e: any) {
 				showToast(e.message);
 			}

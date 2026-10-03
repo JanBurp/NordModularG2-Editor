@@ -4,7 +4,7 @@ import { useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { bankSizeFor, locationSizeFor, defaultBankKind } from '@/constants/ui';
-import { slotOrigin } from './useSlotOrigin';
+import { slotOrigin, performanceOrigin } from './useSlotOrigin';
 import { showToast } from './useToast';
 
 // Singleton state shared between the menu-action opener and the dialog component
@@ -22,9 +22,21 @@ export function useStoreInSynthDialog() {
 	const maxBank = computed(() => bankSizeFor(kind.value));
 	const maxLocation = computed(() => locationSizeFor(kind.value));
 
+	const locationNames = computed(() => {
+		const list = kind.value === 'performance' ? browser.synthPerformances : browser.synthPatches;
+		return new Map(list.filter((p) => p.bank === bank.value).map((p) => [p.location, p.name]));
+	});
+
+	const locationLabel = (l: number): string => {
+		const name = locationNames.value.get(l);
+		return name ? `${l} – ${name}` : `${l}`;
+	};
+
+	const storeKey =() => (kind.value === 'performance' ? 'perf' : uiStore.slotInFocus);
+
 	function open(): void {
 		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isHardwarePerformanceMode);
-		const origin = kind.value === 'patch' ? slotOrigin(uiStore.slotInFocus) : null;
+		const origin = device.storedLocation[storeKey()] ?? (kind.value === 'patch' ? slotOrigin(uiStore.slotInFocus) : performanceOrigin());
 		bank.value = origin?.bank ?? 1;
 		location.value = origin?.location ?? 1;
 		showDialog.value = true;
@@ -32,13 +44,13 @@ export function useStoreInSynthDialog() {
 
 	async function confirm(): Promise<void> {
 		showDialog.value = false;
-		const name = kind.value === 'performance' ? slotsStore.performanceName : (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
+		const name =
+			kind.value === 'performance'
+				? (device.device?.performance?.name ?? slotsStore.performanceName)
+				: (slotsStore.getPatchName(uiStore.slotInFocus) ?? '(no patch)');
 		const slotIdx = Math.min(3, uiStore.selectedSlotIndex) as 0 | 1 | 2 | 3;
 		try {
 			await browser.storePatch(slotIdx, bank.value, location.value, kind.value, name);
-			if (kind.value === 'performance' || slotsStore.getPatchForSlot(uiStore.slotInFocus)) {
-				showToast(`Saved ${kind.value} at ${bank.value}-${location.value}`);
-			}
 		} catch (err) {
 			console.error('Save in synth failed:', err);
 			showToast('Failed to save in synth — check device connection.');
@@ -49,5 +61,5 @@ export function useStoreInSynthDialog() {
 		showDialog.value = false;
 	}
 
-	return { showDialog, bank, location, kind, maxBank, maxLocation, open, confirm, cancel };
+	return { showDialog, bank, location, kind, maxBank, maxLocation, locationLabel, open, confirm, cancel };
 }
