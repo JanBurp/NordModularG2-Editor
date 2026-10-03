@@ -4,6 +4,41 @@ import { getParam } from '../renderer/parammap';
 import type { ModuleParam, ParamDefinition, ParamLabel } from '../types';
 import { clamp } from '@/utils/math';
 
+function resolveOptionNames(paramDef: ParamDefinition): string[] {
+	const def = paramDef.defin;
+	if (def && def.length > 0) {
+		const options = def[0].split(',').map((s) => {
+			const parts = s.split('~');
+			return parts.length >= 2 ? parts[1].trim() : s.trim();
+		});
+		if (options.length > 0 && options[0] !== '') return options;
+	}
+	return paramDef.names || [];
+}
+
+// Text shown for a switch's option(s), honouring user labels. Shared by the canvas switch and ParamPages.
+export function resolveSwitchDisplayNames(param: ModuleParam, paramDef: ParamDefinition, label: ParamLabel | undefined): string[] | string {
+	const names = paramDef.names || [];
+	if (label) {
+		const customLabels = label.labels;
+		const baseNames = names.length > 0 ? names : resolveOptionNames(paramDef);
+		if (!Array.isArray(baseNames)) return customLabels;
+		// '' counts as "never customized" too (older saves / hardware entries), else the button renders blank
+		const count = Math.max(baseNames.length, customLabels.length);
+		return Array.from({ length: count }, (_, i) => customLabels[i] || (baseNames as string[])[i] || '');
+	}
+	if (names[0] === 'Ch#' && param.name) {
+		const last = param.name.substring(param.name.length - 1);
+		if (!isNaN(Number(last))) return ['Ch ' + last];
+	}
+	if (names.length === 1) {
+		if (names[0] === '') return '';
+		return [param.name];
+	}
+	if (names.length > 0) return names;
+	return resolveOptionNames(paramDef);
+}
+
 export function useSwitch(
 	param: Ref<ModuleParam> | ComputedRef<ModuleParam>,
 	value: Ref<number> | ComputedRef<number>,
@@ -22,39 +57,9 @@ export function useSwitch(
 	const hasBitmap = computed(() => !!bmp.value);
 	const maskh = computed(() => paramDef.value.maskh || 11);
 
-	const optionNames = computed(() => {
-		const def = defin.value;
-		if (def && def.length > 0) {
-			const options = def[0].split(',').map((s) => {
-				const parts = s.split('~');
-				return parts.length >= 2 ? parts[1].trim() : s.trim();
-			});
-			if (options.length > 0 && options[0] !== '') return options;
-		}
-		return names.value;
-	});
+	const optionNames = computed(() => resolveOptionNames(paramDef.value));
 
-	const displayNames = computed(() => {
-		if (label.value) {
-			const customLabels = label.value.labels;
-			const baseNames = names.value.length > 0 ? names.value : optionNames.value;
-			if (!Array.isArray(baseNames)) return customLabels;
-			// '' counts as "never customized" too (older saves / hardware entries), else the button renders blank
-			const count = Math.max(baseNames.length, customLabels.length);
-			return Array.from({ length: count }, (_, i) => customLabels[i] || (baseNames as string[])[i] || '');
-		}
-		if (names.value[0] === 'Ch#' && param.value.name) {
-			const name = param.value.name;
-			const last = name.substring(name.length - 1);
-			if (!isNaN(Number(last))) return ['Ch ' + last];
-		}
-		if (names.value.length === 1) {
-			if (names.value[0] === '') return '';
-			return [param.value.name];
-		}
-		if (names.value && names.value.length > 0) return names.value;
-		return optionNames.value;
-	});
+	const displayNames = computed(() => resolveSwitchDisplayNames(param.value, paramDef.value, label.value));
 
 	const itemsPerRow = computed(() => Math.ceil(names.value.length / rows.value));
 

@@ -116,6 +116,7 @@
 	import { getParam } from '../../renderer/parammap';
 	import { formatValue, formatCombinedValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
+	import { resolveSwitchDisplayNames } from '../../composables/useSwitch';
 	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
 
 	const slotsStore = useSlotsStore();
@@ -177,7 +178,7 @@
 		a: ParamPageAssignment | GlobalParamPageAssignment,
 		paramIndex: number,
 		moduleInfo: ReturnType<typeof resolveModule>,
-	): { label: string; value: number; valueLabel: string; low: number; high: number; isTrigger: boolean } {
+	): { label: string; userLabel?: string; value: number; valueLabel: string; low: number; high: number; isTrigger: boolean } {
 		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
 		const slot = assignmentSlot(a);
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
@@ -187,15 +188,25 @@
 		// A param that leads a combined canvas display (e.g. Osc Freq = [coarse, fine, FreqMode]) is
 		// formatted the same way as there, so the mode param (the cell's button) drives the text.
 		const combined = moduleInfo?.moduleDef?.ve?.find((e) => e.type === 'valueDisplay' && Array.isArray(e.ref) && e.ref[0] === paramIndex);
+		let label = paramDef?.name ?? String(paramIndex);
+		let valueLabel =
+			combined && moduleValues
+				? formatCombinedValue(combined.ref as number[], combined.func, moduleInfo?.moduleDef?.params, moduleValues)
+				: paramDef
+					? formatValue(value, paramDef.type)
+					: String(value);
+		// User-renamed switch options: show the same text as the canvas switch (useSwitch.ts)
+		const userLabel = moduleInfo?.mod.paramLabels?.find((l) => l.paramIndex === paramIndex);
+		if (userLabel && paramDef && paramMeta) {
+			const names = resolveSwitchDisplayNames(paramDef, paramMeta, userLabel);
+			if (paramMeta.names?.length === 1) label = names[0] || label;
+			else if (Array.isArray(names)) valueLabel = names[clamp(value, paramMeta.low ?? 0, paramMeta.high ?? names.length - 1)] || valueLabel;
+		}
 		return {
-			label: paramDef?.name ?? String(paramIndex),
+			label,
+			userLabel: paramMeta?.names?.length === 1 ? userLabel?.labels[0] || undefined : undefined,
 			value,
-			valueLabel:
-				combined && moduleValues
-					? formatCombinedValue(combined.ref as number[], combined.func, moduleInfo?.moduleDef?.params, moduleValues)
-					: paramDef
-						? formatValue(value, paramDef.type)
-						: String(value),
+			valueLabel,
 			low: paramMeta?.low ?? 0,
 			high: paramMeta?.high ?? 127,
 			isTrigger: paramMeta?.trigger === true,
@@ -261,7 +272,8 @@
 				slotIndex,
 				assignment,
 				moduleLabel,
-				paramLabel: knobDisplay.label,
+				// A knob paired with a user-labeled button (e.g. Mixer level + mute) is named by that label
+				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,
 				valueLabel: knobDisplay.valueLabel,
 				hasButton,
