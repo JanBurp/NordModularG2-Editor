@@ -3,7 +3,7 @@ import { describe, expect, it } from 'vitest';
 import { mutAddCable, mutAddModule, mutDeleteCable, mutDeleteModule, mutMoveModule, mutSetPianoRollView } from '../patchMutations';
 
 import { PatchParser } from '../nmg2PatchParser';
-import { SectionType } from '../constants';
+import { PATCH_MORPH_MODULE_ID, SectionType } from '../constants';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
@@ -1528,5 +1528,25 @@ describe('prf2 patch text per-slot mutation round-trip', () => {
 		for (let s = 1; s <= 3; s++) {
 			expect(reparsed[s].text ?? '').toBe(before[s - 1]);
 		}
+	});
+});
+
+describe('paramNames hardware padding', () => {
+	it('ignores padding/garbage after the real entries within a module block', () => {
+		// Hardware get-patch for a real patch sent moduleLen=40 but only 3 real entries, followed by
+		// zero/garbage bytes where the original editor's file has a 4th. Morph scope (area 2) needs no modules.
+		const label = (i: number, s: string) => [1, 8, i, ...Array.from({ length: 7 }, (_, k) => s.charCodeAt(k) || 0)];
+		const entries = [...label(8, 'Kick'), ...label(9, 'Snare'), ...label(10, 'HiHat'), 0, 0, 0, 0, 0, 0, 0x3d, 0x3d, 0, 0];
+		const bytes = [PATCH_MORPH_MODULE_ID, entries.length, ...entries];
+		// 2-bit area (2) + 8-bit module count (1), then the bytes, MSB-first
+		let bits = '10' + '00000001' + bytes.map((b) => b.toString(2).padStart(8, '0')).join('');
+		bits = bits.padEnd(Math.ceil(bits.length / 8) * 8, '0');
+		const body = bits.match(/.{8}/g)!.map((b) => parseInt(b, 2));
+		const header = Array.from(new TextEncoder().encode('Version=Nord Modular G2 File Format 1\r\n')).concat([0, 0x17, 0]);
+		// the parser reads a fixed 320-byte header window, so trail the file with an ignored (unknown-type) section
+		const pad = new Array(320).fill(0);
+		const file = new Uint8Array([...header, SectionType.PARAM_NAMES, body.length >> 8, body.length & 0xff, ...body, 0x7f, pad.length >> 8, pad.length & 0xff, ...pad, 0, 0]);
+		const patch = new PatchParser(file.buffer as ArrayBuffer).parse();
+		expect(patch.morphParamLabels!.map((e) => e.labels[0])).toEqual(['Kick', 'Snare', 'HiHat']);
 	});
 });

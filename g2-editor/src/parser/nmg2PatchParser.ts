@@ -298,10 +298,13 @@ class G2Parser {
 			const modIdx = this.getBits(8);
 			const moduleLen = this.getBits(8);
 			const entries: ParamLabel[] = [];
+			const moduleEndBit = this.reader.bitofs + moduleLen * 8;
 			let bytesRemaining = moduleLen;
-			while (bytesRemaining > 0) {
+			while (bytesRemaining >= 2) {
 				const isString = this.getBits(8);
 				const paramLen = this.getBits(8);
+				// Hardware pads a module's block with empty/garbage bytes after its real entries.
+				if (paramLen === 0 || paramLen + 2 > bytesRemaining) break;
 				const paramIndex = paramLen > 0 ? this.getBits(8) : 0;
 				bytesRemaining -= paramLen > 0 ? 3 : 2;
 				const entry: ParamLabel = {
@@ -327,6 +330,7 @@ class G2Parser {
 				}
 				entries.push(entry);
 			}
+			this.reader.bitofs = moduleEndBit;
 			if (entries.length > 0) {
 				if (areaIdx === 2) {
 					if (modIdx === PATCH_MORPH_MODULE_ID) this.morphParamLabelsData[this.aof >> 1] = entries;
