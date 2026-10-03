@@ -10,7 +10,7 @@ const nameMatches = (m: ModuleDefinition, q: string) => (m.short || '').toLowerC
  */
 export function filterCategoryModules(category: string, query: string): ModuleDefinition[] {
 	const modules = getModulesByCategory(category);
-	const q = query.toLowerCase();
+	const q = query.trim().toLowerCase();
 	if (!q) return modules;
 
 	const categoryMatches = (term: string) => category.toLowerCase().includes(term);

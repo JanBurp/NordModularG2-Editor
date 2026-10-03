@@ -640,7 +640,7 @@ void g2_msg_free(g2_msg_t *msg) {
 
 /* Direct bulk read used only by the listener thread — bypasses recv_bulk shim. */
 static int listener_recv_bulk(uint8_t *data, uint16_t size) {
-    int transferred, ret, received = 0, retries = 5;
+    int transferred = 0, ret, received = 0, retries = 5;
     while (retries > 0 && received < size) {
         ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_IN,
                                    data + received, size - received,
@@ -901,7 +901,7 @@ int recv_bulk(uint8_t *data, uint16_t size) {
         return n;
     }
 
-    int transferred;
+    int transferred = 0;
     int ret;
     int retries = 5;
     int received = 0;

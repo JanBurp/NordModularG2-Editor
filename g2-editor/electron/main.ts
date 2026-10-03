@@ -684,7 +684,7 @@ ipcMain.handle("help:load", (_, shortName: string) => {
 	const helpDir = app.isPackaged
 		? path.join(process.resourcesPath, "doc", "help")
 		: path.join(process.env.APP_ROOT!, "..", "doc", "help");
-	if (typeof shortName !== "string" || !/^[\w.-]+$/.test(shortName)) return null;
+	if (typeof shortName !== "string" || !/^[\w.&-]+$/.test(shortName)) return null;
 	const filePath = path.join(helpDir, `${shortName}.md`);
 	try {
 		return fs.readFileSync(filePath, "utf-8");

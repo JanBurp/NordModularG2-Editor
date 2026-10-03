@@ -95,7 +95,10 @@ export const test = base.extend<AppFixtures>({
 
 	mockOpenPatch: async ({ app }, use) => {
 		const fn = async (filename: string) => {
-			const filepath = path.join(FIXTURES_DIR, filename);
+			// Open a temp copy so tests that save in place never rewrite the checked-in fixture.
+			const userDataDir = await app.evaluate(() => process.env.TEST_USER_DATA as string);
+			const filepath = path.join(userDataDir, filename);
+			fs.copyFileSync(path.join(FIXTURES_DIR, filename), filepath);
 			const data = Array.from(fs.readFileSync(filepath));
 			await evaluateWithRetry(app, ({ ipcMain }, args) => {
 				ipcMain.removeHandler('patch:open-dialog');
