@@ -1,28 +1,54 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-// Module type -> definition, just enough of each to exercise computeGhostSuggestion's jack-pair
-// ranking: colour-family matching plus jack-position distance.
+// Module type -> definition, just enough of each to exercise computeGhostSuggestion: audio-rate
+// right-third jack filtering, top/bottom ordering and stereo L/R pairing.
 vi.mock('@/renderer/nmg2mods', () => {
 	const defs: Record<number, any> = {
-		// Single blue output. Blue's uprated family is 'red' (getEffectiveJackColor), so it should
-		// match a red input even though it displays as blue right now.
-		10: { outputs: [{ name: 'Out0', colour: 'blue', x: 0, y: 0 }] },
-		// Two red outputs at different positions, for the same-family tie-break-by-distance case.
+		// Blue output (uprate-able to red) bottom-right, plus ineligible: yellow, and red but left third.
+		10: {
+			outputs: [
+				{ name: 'Gate', colour: 'yellow', x: 240, y: 40 },
+				{ name: 'Left', colour: 'red', x: 20, y: 40 },
+				{ name: 'Out', colour: 'blue', x: 240, y: 20 },
+			],
+		},
+		// Two eligible outputs: top-right and bottom-right.
 		11: {
 			outputs: [
-				{ name: 'Out0', colour: 'red', x: 0, y: 0 },
-				{ name: 'Out1', colour: 'red', x: 50, y: 50 },
+				{ name: 'Top', colour: 'red', x: 240, y: 10 },
+				{ name: 'Bottom', colour: 'red', x: 240, y: 40 },
 			],
 		},
-		// A close but mismatched (yellow) input, and a far but family-matching (red) input.
+		// Eligible inputs at different heights (bottom listed first), plus an ineligible left one.
 		20: {
 			inputs: [
-				{ name: 'In0', colour: 'yellow', x: 1, y: 0 },
-				{ name: 'In1', colour: 'red', x: 100, y: 100 },
+				{ name: 'Low', colour: 'red', x: 200, y: 40 },
+				{ name: 'Left', colour: 'red', x: 10, y: 5 },
+				{ name: 'High', colour: 'purple', x: 200, y: 10 },
 			],
 		},
-		// Single red input, close to Out0 of module 11 and far from Out1.
-		21: { inputs: [{ name: 'In0', colour: 'red', x: 5, y: 5 }] },
+		// Only ineligible inputs.
+		21: {
+			inputs: [
+				{ name: 'Left', colour: 'red', x: 10, y: 5 },
+				{ name: 'Ctl', colour: 'yellow', x: 240, y: 5 },
+			],
+		},
+		// Stereo output / stereo input / mono output / mono input.
+		30: {
+			outputs: [
+				{ name: 'OutL', colour: 'red', x: 220, y: 20 },
+				{ name: 'OutR', colour: 'red', x: 246, y: 20 },
+			],
+		},
+		31: {
+			inputs: [
+				{ name: 'InL', colour: 'red', x: 220, y: 18 },
+				{ name: 'InR', colour: 'red', x: 246, y: 18 },
+			],
+		},
+		32: { outputs: [{ name: 'Out', colour: 'red', x: 246, y: 20 }] },
+		33: { inputs: [{ name: 'In', colour: 'red', x: 246, y: 18 }] },
 	};
 	return { getModule: (type: number) => defs[type] };
 });
@@ -50,33 +76,62 @@ beforeEach(() => {
 	setActivePinia(createPinia());
 });
 
-describe('useGhostCable — computeGhostSuggestion ranking', () => {
-	it('prefers a colour-family match over a closer but mismatched jack', () => {
-		const uiStore = useUiStore();
-		seed([moduleStub(1, 10), moduleStub(2, 20)]);
-		uiStore.selectedModules = [1];
-		uiStore.selectedModulesArea = 'va';
+function suggest(srcType: number, dstType: number) {
+	const uiStore = useUiStore();
+	seed([moduleStub(1, srcType), moduleStub(2, dstType)]);
+	uiStore.selectedModules = [1];
+	uiStore.selectedModulesArea = 'va';
+	useGhostCable().computeGhostSuggestion(2, 0, 0, 'va');
+	return uiStore.ghostCable;
+}
 
-		const { computeGhostSuggestion } = useGhostCable();
-		computeGhostSuggestion(2, 0, 0, 'va');
+const jack = (moduleIndex: number, connectorIndex: number, type: 'input' | 'output', colour = 'red') => ({ moduleIndex, connectorIndex, type, colour });
 
-		expect(uiStore.ghostCable).toEqual({
-			area: 1,
-			from: { moduleIndex: 1, connectorIndex: 0, type: 'output', colour: 'blue' },
-			to: { moduleIndex: 2, connectorIndex: 1, type: 'input', colour: 'red' }, // In1, not the closer In0
-		});
+describe('useGhostCable — computeGhostSuggestion audio jacks', () => {
+	it('only considers audio-rate (red/blue/purple) jacks in the right third', () => {
+		const ghost = suggest(10, 20);
+		expect(ghost?.from).toEqual(jack(1, 2, 'output', 'blue')); // not yellow Gate / left-third Left
+		expect(ghost?.to).toEqual(jack(2, 2, 'input', 'purple')); // not left-third Left
+		expect(useUiStore().ghostCandidates.length).toBe(2); // 1 output x 2 inputs
 	});
 
-	it('breaks ties within a matched colour family by picking the closest jack', () => {
-		const uiStore = useUiStore();
-		seed([moduleStub(1, 11), moduleStub(2, 21)]);
-		uiStore.selectedModules = [1];
-		uiStore.selectedModulesArea = 'va';
+	it('prefers the topmost input and the bottommost output', () => {
+		const ghost = suggest(11, 20);
+		expect(ghost?.from).toMatchObject({ connectorIndex: 1 }); // Bottom
+		expect(ghost?.to).toMatchObject({ connectorIndex: 2 }); // High
+	});
 
-		const { computeGhostSuggestion } = useGhostCable();
-		computeGhostSuggestion(2, 0, 0, 'va');
+	it('suggests nothing when a module has no eligible jack', () => {
+		expect(suggest(11, 21)).toBeNull();
+	});
+});
 
-		expect(uiStore.ghostCable?.from).toEqual({ moduleIndex: 1, connectorIndex: 0, type: 'output', colour: 'red' }); // Out0, closer than Out1
+describe('useGhostCable — stereo', () => {
+	it('connects L->L and R->R for stereo output to stereo input', () => {
+		const ghost = suggest(30, 31);
+		expect(ghost?.from).toEqual(jack(1, 0, 'output'));
+		expect(ghost?.to).toEqual(jack(2, 0, 'input'));
+		expect(ghost?.extra).toEqual({ from: jack(1, 1, 'output'), to: jack(2, 1, 'input') });
+	});
+
+	it('feeds both inputs from a mono output', () => {
+		const ghost = suggest(32, 31);
+		expect(ghost?.from).toEqual(jack(1, 0, 'output'));
+		expect(ghost?.extra).toEqual({ from: jack(1, 0, 'output'), to: jack(2, 1, 'input') });
+	});
+
+	it('uses only the left output for a mono input', () => {
+		const ghost = suggest(30, 33);
+		expect(ghost?.from).toEqual(jack(1, 0, 'output'));
+		expect(ghost?.extra).toBeUndefined();
+	});
+
+	it('confirmGhostCable connects both cables of a stereo suggestion', async () => {
+		suggest(30, 31);
+		const slotsStore = useSlotsStore();
+		const spy = vi.spyOn(slotsStore, 'addCable').mockResolvedValue(undefined as any);
+		await useGhostCable().confirmGhostCable();
+		expect(spy).toHaveBeenCalledTimes(2);
 	});
 });
 

@@ -1,16 +1,16 @@
 <template>
-	<g v-if="pathD">
-		<path :d="pathD" class="cable-ghost" />
+	<g v-for="(d, i) in pathDs" :key="i">
+		<path :d="d" class="cable-ghost" />
 		<!-- Only a jack-to-jack ghost (auto-suggest) is directly clickable; a live-preview ghost
 		     (to = mouse point, click-connect/drag) commits via the window-wide snap click instead. -->
-		<path v-if="toIsJack" :d="pathD" class="cable-ghost-hit" @click.stop="emit('confirm')" />
+		<path v-if="toIsJack" :d="d" class="cable-ghost-hit" @click.stop="emit('confirm')" />
 	</g>
 </template>
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import { getJackSvgPos } from '../../renderer/jackGeometry';
 	import { previewCurvePath } from '../../renderer/patchcord';
-	import { isGhostJack, type GhostCable } from '../../composables/useGhostCable';
+	import { isGhostJack, type GhostCable, type GhostJack, type GhostPoint } from '../../composables/useGhostCable';
 
 	const props = defineProps<{
 		modules: any[];
@@ -21,11 +21,16 @@
 
 	const toIsJack = computed(() => !!props.ghost && isGhostJack(props.ghost.to));
 
-	const pathD = computed(() => {
-		if (!props.ghost) return '';
-		const from = getJackSvgPos(() => props.modules, props.ghost.from);
-		const to = isGhostJack(props.ghost.to) ? getJackSvgPos(() => props.modules, props.ghost.to) : props.ghost.to;
-		if (!from || !to) return '';
-		return previewCurvePath(from.x, from.y, to.x, to.y);
+	function curve(from: GhostJack, to: GhostJack | GhostPoint): string {
+		const f = getJackSvgPos(() => props.modules, from);
+		const t = isGhostJack(to) ? getJackSvgPos(() => props.modules, to) : to;
+		return f && t ? previewCurvePath(f.x, f.y, t.x, t.y) : '';
+	}
+
+	// One path per cable: the main ghost, plus the second cable of a stereo suggestion.
+	const pathDs = computed(() => {
+		const g = props.ghost;
+		if (!g) return [];
+		return [curve(g.from, g.to), g.extra ? curve(g.extra.from, g.extra.to) : ''].filter(Boolean);
 	});
 </script>
