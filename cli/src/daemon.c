@@ -729,10 +729,7 @@ static void execute_cmd(const char *line) {
 		 * watch_armed). Same stop / restart / consume-ACK dance as the reconnect path. */
 		g2_listener_stop();
 		g2_lock_stream();
-		/* Optional arg "partial": also stream names_partial events while reading (the complete
-		 * "names" event still follows). Default: one complete "names" event at the end. */
-		const char *mode_arg = arg_s(args, 0);
-		emit_event("names", g2_list_ex(LIST_FILTER_ALL, 0, mode_arg && strcmp(mode_arg, "partial") == 0));
+		emit_event("names", g2_list(LIST_FILTER_ALL, 0));
 		g2_listener_start();
 		g2_unlock_stream();
 		{
@@ -1144,8 +1141,12 @@ int g2_daemon_run(output_format_t format, int debug) {
 		}
 	}
 
-	/* Patch/performance names (~40 bank round-trips, the bulk of startup) are deliberately not
-	 * fetched here: the editor requests them with "reload-names" once watch_armed is out. */
+	/* Patch/performance bank names, last before START_COMM — same as the reference editor
+	 * (CSynth::CleanDirtyData: slots, global knobs, flash name lists, then START_COMM).
+	 * g2_list() emits names_progress per bank, which also keeps the editor's startup
+	 * inactivity timer alive. */
+	debug_status("startup_names");
+	emit_event("names", g2_list(LIST_FILTER_ALL, 0));
 
 	/* All startup queries done. Start listener and arm streaming. */
 	debug_status("listener_start");

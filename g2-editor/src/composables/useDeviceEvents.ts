@@ -28,10 +28,6 @@ export function useDeviceEvents(log: LogFn) {
 			log('←', 'Watch', 'names');
 			return true;
 		}
-		if (ev.type === 'names_partial') {
-			browserStore.applyNamesPartial(ev.data);
-			return true;
-		}
 		if (ev.type === 'patch_cleared') {
 			browserStore.removePatch(ev.bank, ev.location, ev.kind);
 			log('←', 'Watch', `patch_cleared ${ev.kind} ${ev.bank}-${ev.location}`);

@@ -131,8 +131,6 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
 cJSON *g2_get_perf_file(const char *filename, int return_bytes);
 cJSON *g2_get_resources(const char *slot_str); /* returns {"va":[...], "fx":[...]} */
 cJSON *g2_list(int filter, int bank_filter);
-/* Daemon mode + partial: also emits a "names_partial" event per USB response (see g2_device.c). */
-cJSON *g2_list_ex(int filter, int bank_filter, int partial);
 
 /* Control commands */
 int g2_select_slot(const char *slot_str);

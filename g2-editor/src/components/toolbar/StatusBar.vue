@@ -11,16 +11,7 @@
 		/>
 
 		<div class="flex items-center gap-3 min-w-0">
-			<div v-if="browserStore.loading && namesLoadProgress" class="flex items-center gap-2 shrink-0" data-testid="names-progress">
-				<span>Loading banks {{ namesLoadProgress.location }}/{{ namesLoadProgress.total }}</span>
-				<div class="w-24 h-1.5 bg-surface-2 rounded overflow-hidden">
-					<div
-						class="h-full bg-orange-400 transition-all"
-						:style="{ width: `${(namesLoadProgress.location / namesLoadProgress.total) * 100}%` }"
-					></div>
-				</div>
-			</div>
-			<span v-else class="cursor-pointer hover:text-content-primary truncate" @click="uiStore.showKeyCommandsPage = true">
+			<span class="cursor-pointer hover:text-content-primary truncate" @click="uiStore.showKeyCommandsPage = true">
 				{{ uiStore.statusHint ?? 'Click for keyboard shortcuts' }}
 			</span>
 		</div>
@@ -38,8 +29,6 @@
 
 <script setup lang="ts">
 	import { useUiStore } from '../../store/ui';
-	import { useBrowserStore } from '../../store/browser';
-	import { namesLoadProgress } from '../../composables/useG2';
 	import BtnGroup from './BtnGroup.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
 	import { useSettingsStore } from '../../store/settings';
@@ -47,7 +36,6 @@
 	import { useAreaMode } from '../../composables/useAreaMode';
 
 	const uiStore = useUiStore();
-	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
 </script>

@@ -86,6 +86,9 @@
 							<div class="animate-spin w-4 h-4 border-2 border-line-default border-t-content-primary rounded-full" />
 							<span class="text-xs">{{ connectingMessage || 'Connecting...' }}</span>
 						</div>
+						<div v-if="progress !== undefined" class="w-full h-1.5 bg-surface-2 rounded overflow-hidden">
+							<div class="h-full bg-orange-400 transition-all" :style="{ width: `${progress * 100}%` }"></div>
+						</div>
 					</template>
 					<template v-else>
 						<p v-if="message" class="text-xs text-red-500 self-center text-center">{{ message }}</p>
@@ -103,10 +106,13 @@
 	import Icon from '@/components/common/Icon.vue';
 	import { APP_NAME } from '@/constants';
 
-	const props = withDefaults(defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string; message?: string }>(), {
-		closable: true,
-		connecting: false,
-	});
+	const props = withDefaults(
+		defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string; progress?: number; message?: string }>(),
+		{
+			closable: true,
+			connecting: false,
+		},
+	);
 	const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
 
 	const version = ref('');

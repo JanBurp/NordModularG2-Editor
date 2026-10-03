@@ -265,29 +265,16 @@ void test_bank_transfer_performance_write_roundtrip(void) {
     do_bank_roundtrip(1, PERF_WRITE_TEST_BANK);
 }
 
-/* Number of name entries under data.<group> ("patches"/"performances") of a "names" event. */
-static int names_group_count(cJSON *data, const char *group) {
-    int n = 0;
-    cJSON *bank;
-    cJSON_ArrayForEach(bank, cJSON_GetObjectItem(data, group)) n += cJSON_GetArraySize(bank);
-    return n;
-}
-
-/* Send reload-names (with optional "partial" arg) and read events until its response.
- * Returns the number of names_partial events seen; *names_out gets the final "names" event's
- * data (caller cJSON_Delete()s), *partial_entries the entry count summed over all parts, and
- * *last_perf_complete whether the last performance part had complete:true. */
-static int reload_names_collect(int partial, cJSON **names_out, int *partial_entries, int *last_perf_complete) {
+/* Send reload-names and read events until its response. Returns the final "names" event's
+ * data (caller cJSON_Delete()s), or NULL if none arrived. */
+static cJSON *reload_names_collect(void) {
     char cmd[96];
     int id = g_cmd_id++;
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"reload-names\",\"args\":[%s]}", id, partial ? "\"partial\"" : "");
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"reload-names\",\"args\":[]}", id);
     TEST_ASSERT_TRUE(write(g_daemon->in_fd, cmd, strlen(cmd)) == (ssize_t)strlen(cmd));
     TEST_ASSERT_TRUE(write(g_daemon->in_fd, "\n", 1) == 1);
 
-    int parts = 0;
-    *names_out = NULL;
-    *partial_entries = 0;
-    *last_perf_complete = 0;
+    cJSON *names = NULL;
     static char buf[1 << 20]; /* the complete "names" line is large */
     for (int i = 0; i < 400; i++) {
         if (read_line_timeout(g_daemon->out_fd, buf, sizeof(buf), 30) < 0) { g_device_lost = 1; break; }
@@ -295,47 +282,22 @@ static int reload_names_collect(int partial, cJSON **names_out, int *partial_ent
         if (!r) continue;
         cJSON *t = cJSON_GetObjectItem(r, "type");
         cJSON *rid = cJSON_GetObjectItem(r, "id");
-        if (t && strcmp(t->valuestring, "names_partial") == 0) {
-            parts++;
-            cJSON *d = cJSON_GetObjectItem(r, "data");
-            cJSON *bank;
-            cJSON_ArrayForEach(bank, cJSON_GetObjectItem(d, "banks")) *partial_entries += cJSON_GetArraySize(bank);
-            if (strcmp(cJSON_GetObjectItem(d, "kind")->valuestring, "performance") == 0)
-                *last_perf_complete = cJSON_IsTrue(cJSON_GetObjectItem(d, "complete"));
-        } else if (t && strcmp(t->valuestring, "names") == 0) {
-            *names_out = cJSON_DetachItemFromObject(r, "data");
+        if (t && strcmp(t->valuestring, "names") == 0) {
+            names = cJSON_DetachItemFromObject(r, "data");
         } else if (rid && rid->valueint == id) {
             cJSON_Delete(r);
-            return parts;
+            return names;
         }
         cJSON_Delete(r);
     }
     TEST_FAIL_MESSAGE("no response to reload-names");
-    return parts;
+    return names;
 }
 
-/* Test: reload-names default returns one complete "names" event and no names_partial events. */
+/* Test: reload-names returns one complete "names" event. */
 void test_daemon_reload_names_complete(void) {
     if (!g_daemon || g_device_lost) TEST_IGNORE_MESSAGE("G2 device not connected");
-    cJSON *names;
-    int entries, perf_complete;
-    int parts = reload_names_collect(0, &names, &entries, &perf_complete);
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, parts, "default mode must not stream names_partial");
+    cJSON *names = reload_names_collect();
     TEST_ASSERT_NOT_NULL_MESSAGE(names, "complete names event");
-    cJSON_Delete(names);
-}
-
-/* Test: reload-names "partial" streams names_partial events (last performance part complete)
- * and still ends with the complete "names" event; the streamed entries add up to it. */
-void test_daemon_reload_names_partial(void) {
-    if (!g_daemon || g_device_lost) TEST_IGNORE_MESSAGE("G2 device not connected");
-    cJSON *names;
-    int entries, perf_complete;
-    int parts = reload_names_collect(1, &names, &entries, &perf_complete);
-    TEST_ASSERT_TRUE_MESSAGE(parts > 0, "partial mode streams names_partial events");
-    TEST_ASSERT_TRUE_MESSAGE(perf_complete, "last performance part is complete");
-    TEST_ASSERT_NOT_NULL_MESSAGE(names, "complete names event still follows");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(names_group_count(names, "patches") + names_group_count(names, "performances"), entries,
-                                  "streamed entries add up to the complete list");
     cJSON_Delete(names);
 }

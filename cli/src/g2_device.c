@@ -850,33 +850,6 @@ static const char* g2categories[16] = {
 #define LIST_LAST      LIST_CONTINUE
 
 cJSON *g2_list(int filter, int bank_filter) {
-    return g2_list_ex(filter, bank_filter, 0);
-}
-
-/* Daemon "names_partial" event for one list response: {kind, bank, complete, banks:{"<n>":[...]}}.
- * "bank" is the 1-based bank the read has reached: banks below it are complete. "complete" means
- * this kind's list has ended. Takes ownership of banks. */
-static void emit_names_partial(int mode, int bank, int complete, cJSON *banks) {
-    cJSON *ev = cJSON_CreateObject();
-    cJSON *data = cJSON_CreateObject();
-    cJSON_AddStringToObject(ev, "type", "names_partial");
-    cJSON_AddStringToObject(data, "kind", mode == 0 ? "patch" : "performance");
-    cJSON_AddNumberToObject(data, "bank", bank);
-    cJSON_AddBoolToObject(data, "complete", complete);
-    cJSON_AddItemToObject(data, "banks", banks);
-    cJSON_AddItemToObject(ev, "data", data);
-    char *out = cJSON_PrintUnformatted(ev);
-    if (out) {
-        printf("%s\n", out);
-        fflush(stdout);
-        free(out);
-    }
-    cJSON_Delete(ev);
-}
-
-/* partial: in daemon mode, also emit a names_partial event per response so the caller can show
- * banks as they arrive (the complete list is still returned at the end). */
-cJSON *g2_list_ex(int filter, int bank_filter, int partial) {
     uint8_t response[1024] = {0};
     uint8_t cmdData[4] = {0};
     cJSON *root = NULL;
@@ -978,8 +951,6 @@ cJSON *g2_list_ex(int filter, int bank_filter, int partial) {
 
             uint8_t *data = response + 9;
             int pos = 0;
-            int resp_mode = mode;
-            cJSON *delta = (partial && g2_daemon_mode) ? cJSON_CreateObject() : NULL;
 
             while (pos < data_len) {
                 uint8_t c = data[pos];
@@ -1029,14 +1000,6 @@ cJSON *g2_list_ex(int filter, int bank_filter, int partial) {
                         }
                     }
 
-                    if (delta) {
-                        cJSON *deltaBank = cJSON_GetObjectItem(delta, bankKey);
-                        if (!deltaBank) {
-                            deltaBank = cJSON_CreateArray();
-                            cJSON_AddItemToObject(delta, bankKey, deltaBank);
-                        }
-                        cJSON_AddItemToArray(deltaBank, cJSON_Duplicate(item, 1));
-                    }
                     cJSON_AddItemToArray(bankArray, item);
 
                     patch++;
@@ -1081,8 +1044,6 @@ cJSON *g2_list_ex(int filter, int bank_filter, int partial) {
                     pos++;
                 }
             }
-
-            if (delta) emit_names_partial(resp_mode, bank + 1, mode != resp_mode, delta);
         }
     }
 

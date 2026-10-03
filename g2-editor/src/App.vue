@@ -394,7 +394,14 @@
 		</div>
 	</Dialog>
 
-	<AboutDialog v-model="showAboutDialog" :closable="!startingUp" :connecting="startingUp" :connecting-message="loadingMessage" :message="aboutMessage" />
+	<AboutDialog
+		v-model="showAboutDialog"
+		:closable="!startingUp"
+		:connecting="startingUp"
+		:connecting-message="loadingMessage"
+		:progress="namesProgress"
+		:message="aboutMessage"
+	/>
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
@@ -460,7 +467,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
-	import { useG2 } from './composables/useG2';
+	import { useG2, namesLoadProgress } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
@@ -547,6 +554,7 @@
 		return device.status === DeviceStatus.DriverError ? 'USB driver error: the G2 could not be opened.' : 'G2 not connected.';
 	});
 	const loadingMessage = computed(() => {
+		if (namesLoadProgress.value) return `Loading banks ${namesLoadProgress.value.location}/${namesLoadProgress.value.total}...`;
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
 		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
 		if (device.modeChanging) return 'Loading performance...';
@@ -554,6 +562,8 @@
 		if (browserStore.loading) return 'Loading synth state...';
 		return 'Loading patch...';
 	});
+
+	const namesProgress = computed(() => (namesLoadProgress.value ? namesLoadProgress.value.location / namesLoadProgress.value.total : undefined));
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 	const voiceModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, 1));
@@ -628,7 +638,7 @@
 	}
 
 	// Minimum time the startup splash stays up, so a fast connect doesn't flash it.
-	const SPLASH_MIN_MS = 2500;
+	const SPLASH_MIN_MS = 1000;
 	const showAboutDialog = ref(false);
 	const startingUp = ref(true);
 	const quickAddPos = ref({ x: 0, y: 0 });
@@ -747,9 +757,6 @@
 			uiStore.setGlobalPagesActive(false);
 			await slotsStore.requestParamPage();
 			if (device.device?.performance?.knobSourceGlobal) await slotsStore.requestGlobalParamPage();
-		}
-		if (!browserStore.synthPatches.length) {
-			browserStore.reloadNames();
 		}
 	}
 

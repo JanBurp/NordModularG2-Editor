@@ -35,8 +35,6 @@ export const useBrowserStore = defineStore('browser', {
 		diskFolder: '' as string,
 		diskEntries: [] as DiskEntry[],
 		loading: false,
-		/* First bank (1-based) the device has not finished reading yet, per kind; null unless a streamed load runs. */
-		loadingBanks: null as { patch: number; performance: number } | null,
 		error: '' as string,
 	}),
 
@@ -47,47 +45,6 @@ export const useBrowserStore = defineStore('browser', {
 				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[], withCategory));
 			this.synthPatches = toEntries(names?.patches, true);
 			this.synthPerformances = toEntries(names?.performances, false);
-			this.loadingBanks = null;
-		},
-
-		/* Streamed part of the names list (`names_partial` watch event): append the entries and
-		 * note how far the device read has come (banks below `bank` are complete). */
-		applyNamesPartial(part: { kind: 'patch' | 'performance'; bank: number; complete: boolean; banks: Record<string, any[]> }): void {
-			const list = part.kind === 'performance' ? this.synthPerformances : this.synthPatches;
-			for (const [bankStr, entries] of Object.entries(part.banks ?? {})) {
-				list.push(...bankEntries(bankStr, entries, part.kind === 'patch'));
-			}
-			if (this.loadingBanks) this.loadingBanks[part.kind] = part.complete ? Infinity : part.bank;
-		},
-
-		/* True while the device is still reading this bank (only during a streamed load). */
-		isBankLoading(kind: 'patch' | 'performance', bank: number): boolean {
-			return !!this.loadingBanks && bank >= this.loadingBanks[kind];
-		},
-
-		/* Startup: the daemon no longer sends names itself; ask for them once armed, streamed per
-		 * bank (`names_partial` events fill the lists as they arrive). The final `names` event
-		 * applies the complete data, this only tracks the loading state. */
-		async reloadNames(): Promise<void> {
-			this.loading = true;
-			this.error = '';
-			this.synthPatches = [];
-			this.synthPerformances = [];
-			const mine = (this.loadingBanks = { patch: 1, performance: 1 });
-			try {
-				await window.cli.run(['reload-names', 'partial']);
-				// Safety net so the spinners can't stick if the final `names` event never arrives.
-				setTimeout(() => {
-					if (this.loadingBanks === mine) this.loadingBanks = null;
-				}, 10000);
-			} catch (e: any) {
-				this.error = e.message;
-				// On success the command only means "request sent": names_partial events may still be in flight,
-				// and the final `names` event (applyNamesData) is what clears loadingBanks.
-				this.loadingBanks = null;
-			} finally {
-				this.loading = false;
-			}
 		},
 
 		/* Fallback: load list with separate CLI call */
