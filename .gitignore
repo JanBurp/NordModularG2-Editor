@@ -31,3 +31,6 @@ docs/_site/
 
 # TypeScript incremental build info
 g2-editor/tsconfig.node.tsbuildinfo
+
+# Duration test output
+g2-editor/duration-report/
