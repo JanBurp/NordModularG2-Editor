@@ -4,6 +4,7 @@ import { getModule } from '../renderer/nmg2mods';
 import { isNestDrivenByOutput } from '../parser/cableGraph';
 import { getEffectiveJackColor, MODULE_WIDTH } from '../constants';
 import { useJackPatching } from './useJackPatching';
+import type { Cable } from '../renderer/cableRenderer';
 
 export type GhostJack = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
 export type GhostPoint = { x: number; y: number };
@@ -46,12 +47,13 @@ function toUnits(jacks: IndexedJack[]): IndexedJack[][] {
 
 const unitY = (unit: IndexedJack[]) => Math.min(...unit.map((j) => j.jack.y));
 
-// Most recently added module (any entry point, see finalizeModuleAdd in useAddModule.ts) for
-// auto-suggest's fallback tier. Lives here, not in useAddModule.ts, so the import stays one-way.
-let lastAddedModule: { index: number; area: 'va' | 'fx'; slot: string } | null = null;
+const moduleHeight = (m: any): number => getModule(m.type)?.height ?? 2;
 
-export function setLastAddedModule(index: number, area: 'va' | 'fx', slot: string) {
-	lastAddedModule = { index, area, slot };
+// Nearest module in column `col` ending at/above `row` ('above'), or starting at/below `row` ('below').
+function nearestInColumn(modules: any[], col: number, row: number, dir: 'above' | 'below', excludeIndex: number): any {
+	const fits = (m: any) => m.index !== excludeIndex && m.horiz === col && (dir === 'above' ? m.vert + moduleHeight(m) <= row : m.vert >= row);
+	const closer = (m: any, best: any) => (dir === 'above' ? m.vert > best.vert : m.vert < best.vert);
+	return modules.filter(fits).reduce((best: any, m: any) => (!best || closer(m, best) ? m : best), null);
 }
 
 export function useGhostCable() {
@@ -59,52 +61,15 @@ export function useGhostCable() {
 	const uiStore = useUiStore();
 	const { connectJacks } = useJackPatching();
 
-	function computeGhostSuggestion(newModuleIndex: number, col: number, row: number, area: 'va' | 'fx'): void {
-		const areaIdx: 0 | 1 = area === 'va' ? 1 : 0;
-		const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx);
-		const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaIdx);
-		const newMod = modules.find((m: any) => m.index === newModuleIndex);
-		const newModDef = newMod ? getModule(newMod.type) : null;
-		if (!newModDef) {
-			uiStore.ghostCable = null;
-			return;
-		}
-
-		let sourceModIndex: number | null = null;
-		if (uiStore.selectedModules.length === 1 && uiStore.selectedModulesArea === area) {
-			sourceModIndex = uiStore.selectedModules[0];
-		}
-		if (sourceModIndex === null) {
-			const above = modules.find((m: any) => {
-				if (m.index === newModuleIndex || m.horiz !== col) return false;
-				const height = getModule(m.type)?.height ?? 2;
-				return m.vert + height === row;
-			});
-			if (above) sourceModIndex = above.index;
-		}
-		if (sourceModIndex === null) {
-			const last = lastAddedModule;
-			if (last && last.index !== newModuleIndex && last.area === area && last.slot === uiStore.slotInFocus) sourceModIndex = last.index;
-		}
-		if (sourceModIndex === null) {
-			uiStore.ghostCable = null;
-			return;
-		}
-
-		const sourceMod = modules.find((m: any) => m.index === sourceModIndex);
-		const sourceModDef = sourceMod ? getModule(sourceMod.type) : null;
-		const outputs = (sourceModDef?.outputs ?? [])
+	// Proposes ghost cable(s) from sourceMod's audio outputs into targetMod's free audio inputs.
+	function suggestBetween(sourceMod: any, targetMod: any, cables: Cable[], areaIdx: 0 | 1): void {
+		const outputs = (getModule(sourceMod.type)?.outputs ?? [])
 			.map((jack: any, idx: number) => ({ jack, idx }))
 			.filter(({ jack }: IndexedJack) => isAudioJackOnRight(jack));
-		if (outputs.length === 0) {
-			uiStore.ghostCable = null;
-			return;
-		}
-
-		const freeInputs = (newModDef.inputs ?? [])
+		const freeInputs = (getModule(targetMod.type)?.inputs ?? [])
 			.map((jack: any, idx: number) => ({ jack, idx }))
-			.filter(({ jack, idx }: IndexedJack) => isAudioJackOnRight(jack) && !isNestDrivenByOutput(cables, newModuleIndex, idx));
-		if (freeInputs.length === 0) {
+			.filter(({ jack, idx }: IndexedJack) => isAudioJackOnRight(jack) && !isNestDrivenByOutput(cables, targetMod.index, idx));
+		if (outputs.length === 0 || freeInputs.length === 0) {
 			uiStore.ghostCable = null;
 			return;
 		}
@@ -113,8 +78,8 @@ export function useGhostCable() {
 		// (module layouts put the main audio in at top-right and out at bottom-right). A stereo input gets
 		// two cables: L->L and R->R from a stereo output, or the single output into both L and R.
 		const pair = (out: IndexedJack, inp: IndexedJack): GhostPair => ({
-			from: { moduleIndex: sourceModIndex!, connectorIndex: out.idx, type: 'output', colour: out.jack.colour },
-			to: { moduleIndex: newModuleIndex, connectorIndex: inp.idx, type: 'input', colour: inp.jack.colour },
+			from: { moduleIndex: sourceMod.index, connectorIndex: out.idx, type: 'output', colour: getEffectiveJackColor(out.jack.colour, sourceMod.uprate === 1) },
+			to: { moduleIndex: targetMod.index, connectorIndex: inp.idx, type: 'input', colour: getEffectiveJackColor(inp.jack.colour, targetMod.uprate === 1) },
 		});
 		const outUnits = toUnits(outputs).sort((a, b) => unitY(b) - unitY(a));
 		const candidates: GhostCandidate[] = toUnits(freeInputs)
@@ -129,6 +94,44 @@ export function useGhostCable() {
 		uiStore.ghostCandidates = candidates;
 		uiStore.ghostCandidateIndex = 0;
 		uiStore.ghostCable = { area: areaIdx, ...candidates[0] };
+	}
+
+	// Source is the nearest module above the new one in the same column (a gap in between is allowed).
+	function computeGhostSuggestion(newModuleIndex: number, col: number, row: number, area: 'va' | 'fx'): void {
+		const areaIdx: 0 | 1 = area === 'va' ? 1 : 0;
+		const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx);
+		const newMod = modules.find((m: any) => m.index === newModuleIndex);
+		const sourceMod = nearestInColumn(modules, col, row, 'above', newModuleIndex);
+		if (!newMod || !getModule(newMod.type) || !sourceMod) {
+			uiStore.ghostCable = null;
+			return;
+		}
+		suggestBetween(sourceMod, newMod, slotsStore.getAreaCables(uiStore.slotInFocus, areaIdx), areaIdx);
+	}
+
+	// After deleting a module that was cabled audio-wise between the nearest module above and below it
+	// (same column), proposes bridging above -> below. cablesBefore is the area's cable list before the delete.
+	function suggestAfterDelete(deleted: any, cablesBefore: Cable[], area: 'va' | 'fx'): void {
+		const areaIdx: 0 | 1 = area === 'va' ? 1 : 0;
+		const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx);
+		const above = nearestInColumn(modules, deleted.horiz, deleted.vert, 'above', deleted.index);
+		const below = nearestInColumn(modules, deleted.horiz, deleted.vert + moduleHeight(deleted), 'below', deleted.index);
+		const linked = (c: Cable) => (c.dir ?? 1) === 1;
+		const fromAbove =
+			above &&
+			cablesBefore.some(
+				(c) => linked(c) && c.smod === above.index && c.dmod === deleted.index && isAudioJackOnRight(getModule(above.type)?.outputs?.[c.scon] ?? {}),
+			);
+		const intoBelow =
+			below &&
+			cablesBefore.some(
+				(c) => linked(c) && c.smod === deleted.index && c.dmod === below.index && isAudioJackOnRight(getModule(below.type)?.inputs?.[c.dcon] ?? {}),
+			);
+		if (!fromAbove || !intoBelow) {
+			uiStore.ghostCable = null;
+			return;
+		}
+		suggestBetween(above, below, slotsStore.getAreaCables(uiStore.slotInFocus, areaIdx), areaIdx);
 	}
 
 	function clearGhostCable(): void {
@@ -154,5 +157,5 @@ export function useGhostCable() {
 		if (ghost.extra) await connectJacks({ ...ghost.extra.from, area: ghost.area }, { ...ghost.extra.to, area: ghost.area });
 	}
 
-	return { computeGhostSuggestion, clearGhostCable, cycleGhostCable, confirmGhostCable };
+	return { computeGhostSuggestion, suggestAfterDelete, clearGhostCable, cycleGhostCable, confirmGhostCable };
 }

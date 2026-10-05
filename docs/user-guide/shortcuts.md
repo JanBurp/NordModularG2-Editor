@@ -48,7 +48,7 @@ nav_order: 4
 | `Cmd/Ctrl`+Click connected jack | Grab its cable(s) to re-route |
 | `Cmd/Ctrl`+Drag | Move the grabbed cable |
 | Right-click jack | Context menu: Delete connected (remove all cables) / Break (remove just this jack from a multi-cable nest) |
-| Click ghost cable | Confirm the auto-suggested cable after adding a module (Settings ▸ Auto-suggest Cable) |
+| Click ghost cable | Confirm the auto-suggested cable after adding or deleting a module (Settings ▸ Auto-suggest Cable) |
 | `Enter` | Confirm an armed-jack connection or an auto-suggested ghost cable |
 | `Space` | Cycle to the next-best auto-suggested cable (Auto-suggest Cable on) |
 | `Escape` | Cancel an armed jack or dismiss a ghost-cable suggestion |
