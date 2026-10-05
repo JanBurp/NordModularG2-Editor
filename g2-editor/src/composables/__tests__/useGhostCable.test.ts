@@ -78,13 +78,11 @@ beforeEach(() => {
 	setActivePinia(createPinia());
 });
 
+// Source module at (0,0) directly above the new module at (0,2) (mock defs have no height -> default 2).
 function suggest(srcType: number, dstType: number) {
-	const uiStore = useUiStore();
-	seed([moduleStub(1, srcType), moduleStub(2, dstType)]);
-	uiStore.selectedModules = [1];
-	uiStore.selectedModulesArea = 'va';
-	useGhostCable().computeGhostSuggestion(2, 0, 0, 'va');
-	return uiStore.ghostCable;
+	seed([moduleStub(1, srcType, 0, 0), moduleStub(2, dstType, 0, 2)]);
+	useGhostCable().computeGhostSuggestion(2, 0, 2, 'va');
+	return useUiStore().ghostCable;
 }
 
 const jack = (moduleIndex: number, connectorIndex: number, type: 'input' | 'output', colour = 'red') => ({ moduleIndex, connectorIndex, type, colour });
@@ -92,9 +90,18 @@ const jack = (moduleIndex: number, connectorIndex: number, type: 'input' | 'outp
 describe('useGhostCable — computeGhostSuggestion audio jacks', () => {
 	it('only considers audio-rate (red/purple) jacks in the right third', () => {
 		const ghost = suggest(10, 20);
-		expect(ghost?.from).toEqual(jack(1, 2, 'output', 'purple')); // not yellow Gate / left-third Left / static blue Ctl
-		expect(ghost?.to).toEqual(jack(2, 2, 'input', 'purple')); // not left-third Left
+		expect(ghost?.from).toEqual(jack(1, 2, 'output', 'blue')); // not yellow Gate / left-third Left / static blue Ctl
+		expect(ghost?.to).toEqual(jack(2, 2, 'input', 'blue')); // not left-third Left
 		expect(useUiStore().ghostCandidates.length).toBe(2); // 1 output x 2 inputs
+	});
+
+	it('resolves Dynamic (purple) jacks to their effective colour, never cable colour purple', async () => {
+		seed([{ ...moduleStub(1, 10, 0, 0), uprate: 1 }, moduleStub(2, 20, 0, 2)]);
+		useGhostCable().computeGhostSuggestion(2, 0, 2, 'va');
+		expect(useUiStore().ghostCable?.from.colour).toBe('red');
+		const spy = vi.spyOn(useSlotsStore(), 'addCable').mockResolvedValue(undefined as any);
+		await useGhostCable().confirmGhostCable();
+		expect(spy.mock.calls[0][7]).toBe(0); // red, not 5 (purple)
 	});
 
 	it('prefers the topmost input and the bottommost output', () => {
@@ -105,6 +112,21 @@ describe('useGhostCable — computeGhostSuggestion audio jacks', () => {
 
 	it('suggests nothing when a module has no eligible jack', () => {
 		expect(suggest(11, 21)).toBeNull();
+	});
+
+	it('uses the nearest module above in the same column, across a gap', () => {
+		seed([moduleStub(1, 10, 0, 0), moduleStub(3, 11, 0, 3), moduleStub(2, 20, 0, 8)]);
+		useGhostCable().computeGhostSuggestion(2, 0, 8, 'va');
+		expect(useUiStore().ghostCable?.from.moduleIndex).toBe(3);
+	});
+
+	it('only uses the module above as source, not a selected one elsewhere', () => {
+		const uiStore = useUiStore();
+		seed([moduleStub(1, 11, 1, 0), moduleStub(2, 20, 0, 2)]);
+		uiStore.selectedModules = [1];
+		uiStore.selectedModulesArea = 'va';
+		useGhostCable().computeGhostSuggestion(2, 0, 2, 'va');
+		expect(uiStore.ghostCable).toBeNull();
 	});
 });
 
@@ -137,15 +159,50 @@ describe('useGhostCable — stereo', () => {
 	});
 });
 
+describe('useGhostCable — suggestAfterDelete', () => {
+	const cable = (smod: number, scon: number, dmod: number, dcon: number) => ({ colour: 0, smod, scon, dmod, dcon, dir: 1 });
+
+	// Deleted module 2 (type 32/33 jacks irrelevant, only its cables count) sat between 1 above and 3 below.
+	function afterDelete(srcType: number, dstType: number, cablesBefore: any[], belowVert = 4) {
+		seed([moduleStub(1, srcType, 0, 0), moduleStub(3, dstType, 0, belowVert)]);
+		useGhostCable().suggestAfterDelete(moduleStub(2, 33, 0, 2), cablesBefore, 'va');
+		return useUiStore().ghostCable;
+	}
+
+	it('bridges the modules above and below the deleted one', () => {
+		const ghost = afterDelete(32, 33, [cable(1, 0, 2, 0), cable(2, 0, 3, 0)]);
+		expect(ghost?.from).toEqual(jack(1, 0, 'output'));
+		expect(ghost?.to).toEqual(jack(3, 0, 'input'));
+	});
+
+	it('allows a gap between the deleted module and the one below', () => {
+		expect(afterDelete(32, 33, [cable(1, 0, 2, 0), cable(2, 0, 3, 0)], 7)).not.toBeNull();
+	});
+
+	it('suggests nothing when one side was not cabled to the deleted module', () => {
+		expect(afterDelete(32, 33, [cable(1, 0, 2, 0)])).toBeNull();
+		expect(afterDelete(32, 33, [cable(2, 0, 3, 0)])).toBeNull();
+	});
+
+	it('suggests nothing when the cable from above is not on an audio jack', () => {
+		expect(afterDelete(10, 33, [cable(1, 0, 2, 0), cable(2, 0, 3, 0)])).toBeNull(); // output 0 = yellow Gate
+	});
+
+	it('bridges stereo L->L / R->R', () => {
+		const ghost = afterDelete(30, 31, [cable(1, 0, 2, 0), cable(2, 0, 3, 0)]);
+		expect(ghost?.from).toEqual(jack(1, 0, 'output'));
+		expect(ghost?.to).toEqual(jack(3, 0, 'input'));
+		expect(ghost?.extra).toEqual({ from: jack(1, 1, 'output'), to: jack(3, 1, 'input') });
+	});
+});
+
 describe('useGhostCable — cycleGhostCable', () => {
 	it('advances through ranked candidates and wraps back to the first after the last', () => {
 		const uiStore = useUiStore();
-		seed([moduleStub(1, 11), moduleStub(2, 20)]);
-		uiStore.selectedModules = [1];
-		uiStore.selectedModulesArea = 'va';
+		seed([moduleStub(1, 11, 0, 0), moduleStub(2, 20, 0, 2)]);
 
 		const { computeGhostSuggestion, cycleGhostCable } = useGhostCable();
-		computeGhostSuggestion(2, 0, 0, 'va');
+		computeGhostSuggestion(2, 0, 2, 'va');
 
 		expect(uiStore.ghostCandidates.length).toBe(4); // 2 outputs x 2 free inputs
 		const first = uiStore.ghostCable;

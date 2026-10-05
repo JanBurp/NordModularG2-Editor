@@ -2,19 +2,16 @@ import { ref } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
 import { useSettingsStore } from '../store/settings';
-import { useGhostCable, setLastAddedModule } from './useGhostCable';
+import { useGhostCable } from './useGhostCable';
 
 const isAdding = ref(false);
 
 // Shared by every module-add entry point (addModuleAt below, plus the toolbar drag-and-drop path
-// in usePatchOperations.ts): runs auto-suggest-cable and updates the "last added module" fallback
-// tier. Suggestion must be computed before updating lastAddedModule — tier 3 needs the *previously*
-// added module, not this one.
+// in usePatchOperations.ts): runs auto-suggest-cable.
 export function finalizeModuleAdd(moduleId: number, col: number, row: number, area: 'va' | 'fx') {
 	const settings = useSettingsStore();
 	const { computeGhostSuggestion } = useGhostCable();
 	if (settings.autoSuggestCable) computeGhostSuggestion(moduleId, col, row, area);
-	setLastAddedModule(moduleId, area, useUiStore().slotInFocus);
 }
 
 export function useAddModule() {

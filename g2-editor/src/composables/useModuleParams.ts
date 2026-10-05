@@ -1,7 +1,7 @@
 import { computed } from 'vue';
 import type { ComputedRef } from 'vue';
 import { getParam } from '../renderer/parammap';
-import { getDefaultParamValues } from '../renderer/nmg2mods';
+import { getDefaultParamValues, getParamDefault } from '../renderer/nmg2mods';
 import type { ModuleInstance, ModuleDefinition, ParamLabel } from '../types';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
@@ -29,11 +29,7 @@ export function useModuleParams(
 			return localLv.value[index];
 		}
 		const param = moduleDef.value?.params?.[index];
-		if (param) {
-			const p = getParam(param.type);
-			return p?.def ?? 64;
-		}
-		return 64;
+		return param ? getParamDefault(param) : 64;
 	}
 
 	function getParamLabel(index: number): ParamLabel | undefined {

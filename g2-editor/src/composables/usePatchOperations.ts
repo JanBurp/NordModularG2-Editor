@@ -4,7 +4,9 @@ import { useUiStore } from '../store/ui';
 import { useHistoryStore, type HistoryEntry } from '../store/history';
 import type { Cable } from '../renderer/cableRenderer';
 import { AREA_FULL_MESSAGE, areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { useSettingsStore } from '../store/settings';
 import { finalizeModuleAdd } from './useAddModule';
+import { useGhostCable } from './useGhostCable';
 import { readClipboardEntry } from './usePatchClipboard';
 import { showToast } from './useToast';
 
@@ -17,9 +19,22 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const currentModules = computed(() => slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(getArea()).areaIdx));
 	const currentCables = computed(() => slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(getArea()).areaIdx));
 
+	// Runs a delete; with auto-suggest on and a single module deleted, then proposes a ghost cable bridging
+	// the modules above and below it (see suggestAfterDelete).
+	async function withDeleteSuggestion(moduleIndices: number[], run: () => Promise<unknown>): Promise<void> {
+		const deleted = moduleIndices.length === 1 ? currentModules.value.find((m: any) => m.index === moduleIndices[0]) : undefined;
+		const suggest =
+			useSettingsStore().autoSuggestCable && deleted ? { deleted: { ...deleted }, cables: currentCables.value.map((c: any) => ({ ...c })) } : null;
+		await run();
+		if (suggest) useGhostCable().suggestAfterDelete(suggest.deleted, suggest.cables, getArea() === 'voice' ? 'va' : 'fx');
+	}
+
 	async function deleteSelection(): Promise<void> {
 		try {
-			await slotsStore.deleteSelection(uiStore.selectedModules, uiStore.selectedCables, getArea(), currentModules.value, currentCables.value);
+			const modules = uiStore.selectedModules;
+			await withDeleteSuggestion(modules, () =>
+				slotsStore.deleteSelection(modules, uiStore.selectedCables, getArea(), currentModules.value, currentCables.value),
+			);
 		} finally {
 			uiStore.clearSelection();
 			uiStore.selectedCables = [];
@@ -160,7 +175,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function handleModuleDelete(moduleIndex: number): Promise<void> {
-		await slotsStore.deleteModule(moduleIndex, getArea());
+		await withDeleteSuggestion([moduleIndex], () => slotsStore.deleteModule(moduleIndex, getArea()));
 		uiStore.selectModules(
 			uiStore.selectedModules.filter((i) => i !== moduleIndex),
 			uiStore.selectedModulesArea ?? (getArea() === 'voice' ? 'va' : 'fx'),

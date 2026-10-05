@@ -65,4 +65,12 @@ describe('getDefaultParamValues', () => {
 		expect(vals.slice(0, 16)).toEqual(Array.from({ length: 16 }, (_, i) => i + 1));
 		expect(vals).toHaveLength(18);
 	});
+
+	it('defaults Mixer channel On switches to on, but leaves other OffOn params off', () => {
+		expect(getDefaultParamValues(123).slice(4, 8)).toEqual([1, 1, 1, 1]); // Mix4-1C On1..On4
+		const env = getModule(20); // EnvADSR
+		const offOnIdx = env!.params!.findIndex((p) => p.type === 'OffOn');
+		expect(offOnIdx).toBeGreaterThanOrEqual(0);
+		expect(getDefaultParamValues(20)[offOnIdx]).toBe(0);
+	});
 });

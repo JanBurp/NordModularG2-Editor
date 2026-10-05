@@ -185,7 +185,7 @@
 						]),
 				...(settingsStore.autoSuggestCable
 					? [
-							{ keys: ['Click', 'Enter'], action: 'Confirm the auto-suggested cable after adding a module' },
+							{ keys: ['Click', 'Enter'], action: 'Confirm the auto-suggested cable after adding or deleting a module' },
 							{ keys: ['Space'], action: 'Cycle to the next-best auto-suggested cable' },
 						]
 					: []),

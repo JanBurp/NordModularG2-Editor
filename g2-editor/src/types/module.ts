@@ -57,6 +57,8 @@ export interface ModuleParam {
 	x: number;
 	y: number;
 	w?: number;
+	// Overrides the param type's default.
+	def?: number;
 	// Default text of the original editor's label control (one per button); absent = not renamable.
 	label?: string[];
 }
