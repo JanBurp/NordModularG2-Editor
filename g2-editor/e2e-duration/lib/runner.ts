@@ -139,6 +139,10 @@ export class Runner {
 			if (this.lossAt !== null || DOWN_STATUSES.includes(this.status)) await this.recover('status');
 			else if (Date.now() - lastProbe > PROBE_EVERY_MS) {
 				lastProbe = Date.now();
+				const actions = this.log.events.filter((e) => e.kind === 'action');
+				this.log.log('main', {
+					line: `[duration-test] ${Math.round((deadline - Date.now()) / 60_000)} min left; ${actions.length} actions (${actions.filter((e) => !e.ok).length} failed), ${this.incidents} incidents`,
+				});
 				if (!(await this.probe())) await this.recover('probe');
 			}
 

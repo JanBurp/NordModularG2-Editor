@@ -24,6 +24,8 @@ export class EventLog {
 		const ev: LogEvent = { t: Date.now(), kind, ...data };
 		this.events.push(ev);
 		fs.writeSync(this.fd, JSON.stringify(ev) + '\n');
+		const line = progressLine(ev);
+		if (line) console.log(`${new Date(ev.t).toLocaleTimeString()} ${line}`);
 		return ev;
 	}
 
@@ -35,6 +37,28 @@ export class EventLog {
 
 	close(): void {
 		fs.closeSync(this.fd);
+	}
+}
+
+/** One-line terminal summary for the events worth watching live; daemon/console traffic stays in events.jsonl only. */
+function progressLine(ev: LogEvent): string | null {
+	switch (ev.kind) {
+		case 'action':
+			return `${ev.ok ? 'ok  ' : 'FAIL'} ${ev.name} (${ev.ms} ms) ${ev.ok ? (ev.note ?? '') : ev.error}`;
+		case 'status':
+			return `status: ${ev.status}`;
+		case 'probe':
+			return ev.ok ? 'probe ok' : `PROBE FAILED ${ev.error ?? ''}`;
+		case 'incident':
+			return `INCIDENT #${ev.id}: ${ev.cause}, recovery: ${ev.level}, down ${Math.round((Number(ev.end) - Number(ev.start)) / 1000)} s`;
+		case 'reset':
+			return `power cycle (${ev.reason}): ${ev.ok ? 'back' : 'NOT BACK'} after ${Math.round(Number(ev.ms) / 1000)} s`;
+		case 'error':
+			return `ERROR ${ev.line}`;
+		case 'main':
+			return String(ev.line ?? '').startsWith('[duration-test]') ? String(ev.line) : null;
+		default:
+			return null;
 	}
 }
 
