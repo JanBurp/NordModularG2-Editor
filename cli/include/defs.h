@@ -119,6 +119,12 @@ typedef enum {
  * this is the conservative power-of-two boundary inside the observed window. */
 #define G2_MAX_MESSAGE_LEN                  (32768)
 
+/* Module indices run 1..127 per area (official editor: CPatchData::GetUniqueID, which also
+ * borrows bit 7 as a temporary flag). Hardware-observed 2026-10-04: add-module with index 128
+ * gets a 0x7E code-3 NACK, and a follow-up add/cable on that index wedges the G2 until a
+ * power cycle. */
+#define G2_MAX_MODULE_INDEX                 (127)
+
 /* A performance upload is answered by no ACK we can safely read (see send_perf_upload), so the
  * only way to avoid returning while the G2 is still applying its four slots is to wait. */
 #define PERF_UPLOAD_SETTLE_US               (600000)

@@ -34,6 +34,7 @@ extern void test_daemon_assign_knob_cmd(void);
 extern void test_daemon_assign_global_knob_cmd(void);
 extern void test_daemon_set_param_label_four_button_switch(void);
 extern void test_daemon_send_controller_snapshot_cmd(void);
+extern void test_daemon_get_patch_right_after_add_modules(void);
 extern void test_patch_workflow_full_cycle(void);
 extern void test_patch_workflow_replace_module(void);
 extern void test_daemon_perf_mode_cycle(void);
@@ -229,6 +230,7 @@ int main(void) {
     run_test_silently("test_daemon_assign_global_knob_cmd",  test_daemon_assign_global_knob_cmd);
     run_test_silently("test_daemon_set_param_label_four_button_switch", test_daemon_set_param_label_four_button_switch);
     run_test_silently("test_daemon_send_controller_snapshot_cmd", test_daemon_send_controller_snapshot_cmd);
+    run_test_silently("test_daemon_get_patch_right_after_add_modules", test_daemon_get_patch_right_after_add_modules);
     run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_patch_workflow_replace_module",  test_patch_workflow_replace_module);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);

@@ -1,10 +1,13 @@
-import type { ElectronApplication, Page } from '@playwright/test';
+import { errors, type ElectronApplication, type Page } from '@playwright/test';
 import { evaluateWithRetry } from '../../e2e/fixtures/electron';
 import { createCable, deleteModule, dropModuleOnCanvas } from '../../e2e/helpers';
 import type { G2Snapshot } from './cli';
-import { sleep } from './cli';
+import { sleep, waitFor } from './cli';
 
 const SLOTS = ['A', 'B', 'C', 'D'];
+const KNOB_TIMEOUT_MS = 3000;
+// An add can wait behind a daemon rearm (all-slot snapshot) before the editor shows it.
+const ADD_TIMEOUT_MS = 6000;
 // Module ids from nmg2mods (see e2e/cable-editing.spec.ts)
 const OSC = { id: 97, short: 'OscA' };
 const FLT = { id: 92, short: 'FltClassic' };
@@ -93,22 +96,36 @@ export const ACTIONS: ActionDef[] = [
 		name: 'tweakParam',
 		weight: 5,
 		run: async (c) => {
-			const knobs = c.page.locator('[data-testid^="canvas-"] [data-param-index]');
+			// The inactive canvas stays in the DOM (v-show), so only visible knobs are candidates.
+			const knobs = c.page.locator('[data-testid^="canvas-"]:visible [data-param-index]');
 			const n = await knobs.count();
 			if (n === 0) return 'skipped: no params on canvas';
 			const knob = knobs.nth(int(c, n));
-			await knob.scrollIntoViewIfNeeded();
-			const r = await knob.evaluate((el) => {
-				const b = (el as Element).getBoundingClientRect();
-				return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-			});
 			const delta = (c.rnd() < 0.5 ? -1 : 1) * 10 * (2 + int(c, 6));
+			let param: string | null;
+			let r: { x: number; y: number };
+			try {
+				param = await knob.getAttribute('data-param-index', { timeout: KNOB_TIMEOUT_MS });
+				await knob.scrollIntoViewIfNeeded({ timeout: KNOB_TIMEOUT_MS });
+				r = await knob.evaluate(
+					(el) => {
+						const b = (el as Element).getBoundingClientRect();
+						return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+					},
+					undefined,
+					{ timeout: KNOB_TIMEOUT_MS },
+				);
+			} catch (e) {
+				// A slot reload remounts the canvas (:key = patch name) between count() and nth().
+				if (e instanceof errors.TimeoutError) return 'skipped: canvas remounted';
+				throw e;
+			}
 			await c.page.mouse.move(r.x, r.y);
 			await c.page.mouse.wheel(0, delta);
 			await sleep(400);
 			await c.page.mouse.wheel(0, -delta); // put the value back so the patch stays roughly as loaded
 			await sleep(400);
-			return `wheel ${delta} on param #${await knob.getAttribute('data-param-index')}`;
+			return `wheel ${delta} on param #${param}`;
 		},
 	},
 	{
@@ -123,9 +140,14 @@ export const ACTIONS: ActionDef[] = [
 			const cablesBefore = await cableCount(c.page);
 			await dropModuleOnCanvas(c.page, OSC.id, 3 + int(c, 6), int(c, 12));
 			await dropModuleOnCanvas(c.page, FLT.id, 3 + int(c, 6), 14 + int(c, 6));
-			await sleep(1000);
-			const added = (await moduleIdxs(c.page)).filter((i) => !before.includes(i));
-			if (added.length !== 2) throw new Error(`expected 2 new modules, found ${added.length}`);
+			let added: number[] = [];
+			await waitFor(async () => (added = (await moduleIdxs(c.page)).filter((i) => !before.includes(i))).length === 2, ADD_TIMEOUT_MS, 200);
+			if (added.length !== 2) {
+				const diag = `slot ${slot}, before [${before}], after [${await moduleIdxs(c.page)}]`;
+				// More than 2 new: the whole slot was reloaded (e.g. a hardware load), our two can't be told apart.
+				if (added.length > 2) return `skipped: slot reloaded (${diag})`;
+				throw new Error(`expected 2 new modules, found ${added.length} (${diag})`);
+			}
 			const xIsOsc = (await locate(c.page, added[0], OSC.short)) >= 0;
 			const [osc, flt] = xIsOsc ? [added[0], added[1]] : [added[1], added[0]];
 			// Register before cabling so a failure below still gets cleaned up on the next round.

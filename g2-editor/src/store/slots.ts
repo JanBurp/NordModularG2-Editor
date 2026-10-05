@@ -34,7 +34,9 @@ import type { SlotLabel } from '@/types';
 import { defineStore } from 'pinia';
 import { showToast } from '../composables/useToast';
 import {
+	AREA_FULL_MESSAGE,
 	areaConfig,
+	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
 	isCableSourceEnd,
@@ -406,6 +408,8 @@ function fullLabelBlock(moduleType: number, paramLabels: ParamLabel[]): ParamLab
 
 export const useSlotsStore = defineStore('slots', {
 	state: () => ({
+		/** Bumped by every local edit (_markSlotDirty); lets a hardware snapshot detect edits made after it was taken. */
+		editSeq: { A: 0, B: 0, C: 0, D: 0 } as Record<SlotLabel, number>,
 		slotFilePaths: {
 			A: '',
 			B: '',
@@ -576,6 +580,7 @@ export const useSlotsStore = defineStore('slots', {
 		_markSlotDirty(slot: SlotLabel): void {
 			this.slots[slot].rawHex = null;
 			this.slots[slot].edited = true;
+			this.editSeq[slot]++;
 		},
 
 		async dumpOne(): Promise<boolean> {
@@ -2304,7 +2309,11 @@ export const useSlotsStore = defineStore('slots', {
 				const { getModule } = await import('../renderer/nmg2mods');
 				const ids = currentModuleList.map((m: any) => m.index as number);
 				// Redo relies on this ID being free; if the user adds a module after undoing, the same ID may be reused and redo will conflict.
-				const moduleId = ids.length > 0 ? Math.max(...ids) + 1 : 1;
+				const moduleId = freeModuleIds(ids, 1)?.[0];
+				if (moduleId === undefined) {
+					showToast(AREA_FULL_MESSAGE);
+					return null;
+				}
 				const height = getModule(typeId)?.height ?? 2;
 				const colMods = currentModuleList
 					.filter((m: any) => m.horiz === col)

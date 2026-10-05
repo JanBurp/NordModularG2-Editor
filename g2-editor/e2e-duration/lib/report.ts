@@ -18,6 +18,11 @@ export function classify(lines: string[], ctx: { enumerated: boolean | null; tri
 	const driver = find(/usb_driver_error/);
 	if (driver) return { cause: 'USB interface claim problem (usb_driver_error): another process holds the G2?', evidence: driver };
 
+	// Checked before [diag]: a rejected command (e.g. add-module with index 128) can wedge the G2, so
+	// the later disconnect is a consequence, not the cause.
+	const nack = find(/"type":"error","slot":"[A-D]","code":\d+/);
+	if (nack) return { cause: `G2 rejected a command (NACK code ${nack.match(/"code":(\d+)/)?.[1]}) before the loss`, evidence: nack };
+
 	const diag = find(/\[diag\] disconnect \(/);
 	if (diag) {
 		const m = diag.match(/disconnect \(([^,)]+), ret=(-?\d+)\)/);

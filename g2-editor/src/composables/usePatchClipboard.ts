@@ -2,8 +2,9 @@ import type { ClipboardEntry } from '@/types/patch';
 import { computed, getCurrentInstance, onUnmounted } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
+import { AREA_FULL_MESSAGE, areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
+import { showToast } from './useToast';
 
 // Copy/cut write the entry through the OS clipboard (window.electronAPI.clipboard), not just
 // uiStore.clipboard, so paste works across windows too — each connected G2 gets its own
@@ -99,7 +100,9 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		// Generate new IDs against the destination area
 		const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);
-		const { entries, remappedCables } = buildCloneEntries(clipboard.modules, clipboard.cables, existingIds, dCol, dRow);
+		const clone = buildCloneEntries(clipboard.modules, clipboard.cables, existingIds, dCol, dRow);
+		if (!clone) return showToast(AREA_FULL_MESSAGE);
+		const { entries, remappedCables } = clone;
 		await slotsStore.paste(entries, remappedCables, area);
 
 		uiStore.selectModules(

@@ -21,6 +21,13 @@ describe('classify', () => {
 	it('driver error wins', () => {
 		expect(classify(['{"type":"usb_driver_error","data":"LIBUSB_ERROR_BUSY"}'], { enumerated: true, trigger: 'status' }).cause).toMatch(/claim/);
 	});
+	it('a NACK before the loss wins over the disconnect it caused', () => {
+		const c = classify(
+			['[daemon-watch:2:1] {"type":"error","slot":"A","code":3}', '[diag] disconnect (command error, ret=-6): 1 cmds in last 1s'],
+			{ enumerated: true, trigger: 'probe' },
+		);
+		expect(c.cause).toMatch(/NACK code 3/);
+	});
 	it('silent hang and unknown', () => {
 		expect(classify([], { enumerated: true, trigger: 'probe' }).cause).toMatch(/Silent hang/);
 		expect(classify([], { enumerated: null, trigger: 'status' }).cause).toMatch(/Unknown/);

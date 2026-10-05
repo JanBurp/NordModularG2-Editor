@@ -8,7 +8,9 @@ import { powerCycle } from './shelly';
 const PROBE_EVERY_MS = 5 * 60_000;
 const PROBE_TIMEOUT_MS = 30_000;
 const ACTION_TIMEOUT_MS = 90_000;
-const SELF_RECONNECT_MS = 60_000;
+// A spontaneous G2 reboot took ~105 s to re-enumerate (duration run 2026-10-04), so wait longer than that before escalating.
+const SELF_RECONNECT_MS = 150_000;
+const SELF_PROBE_EVERY_MS = 30_000;
 const EDITOR_RECONNECT_MS = 45_000;
 const AFTER_POWER_MS = 90_000;
 const MAX_POWER_CYCLES = 3;
@@ -71,10 +73,12 @@ export class Runner {
 		}
 	}
 
-	private async clickReconnect(): Promise<void> {
-		if (!DOWN_STATUSES.includes(this.status)) return;
+	/** Returns whether it clicked. */
+	private async clickReconnect(): Promise<boolean> {
+		if (!DOWN_STATUSES.includes(this.status)) return false;
 		this.log.log('main', { line: `[duration-test] clicking connection-status (was "${this.status}")` });
 		await this.page.locator('[data-testid="connection-status"]').click().catch(() => undefined);
+		return true;
 	}
 
 	/**
@@ -95,15 +99,16 @@ export class Runner {
 		let healthy = false;
 
 		if (trigger === 'probe') {
-			// Connected but silent: give it one more chance before escalating.
-			await sleep(30_000);
-			healthy = this.status === 'connected' && (await this.probe());
+			// Connected but silent: keep probing for a while before escalating.
+			healthy = await waitFor(async () => this.status === 'connected' && (await this.probe()), SELF_RECONNECT_MS, SELF_PROBE_EVERY_MS);
 		} else {
 			healthy = (await this.waitConnected(SELF_RECONNECT_MS)) && (await this.probe());
 			if (!healthy) {
-				level = 'editor-reconnect';
-				await this.clickReconnect();
+				// Only credit the click when the G2 was on USB to reconnect to; otherwise it came back by itself.
+				const onUsb = (await g2Count()) > 0;
+				const clicked = await this.clickReconnect();
 				healthy = (await this.waitConnected(EDITOR_RECONNECT_MS)) && (await this.probe());
+				if (healthy && clicked && onUsb) level = 'editor-reconnect';
 			}
 		}
 		while (!healthy && cycles < MAX_POWER_CYCLES) {

@@ -83,7 +83,9 @@ export const test = base.extend<AppFixtures>({
 		await use(page);
 	},
 
-	sendMenuAction: async ({ app }, use) => {
+	// Depends on `page` so the renderer has mounted (and registered its menu:action listener)
+	// before any action is sent; otherwise a hook requesting only sendMenuAction races the mount.
+	sendMenuAction: async ({ app, page: _page }, use) => {
 		const fn = async (action: string) => {
 			await evaluateWithRetry(app, ({ BrowserWindow }, act) => {
 				const win = BrowserWindow.getAllWindows()[0];

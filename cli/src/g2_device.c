@@ -102,6 +102,46 @@ static int ensure_connected(int silent) {
     return silent ? g2_connect_silent() : g2_connect();
 }
 
+/* GET_PATCH_VERSION for slot 0-3, or 4 for the performance.
+ * The G2 queues this query behind edits it is still applying: right after two add-modules it
+ * answered after ~555 ms (duration test 2026-10-04), just past a 500 ms wait. So the reply is
+ * matched by tag + slot within USB_TIMEOUT_LONG_MS. Anything else that arrives meanwhile is
+ * relayed as an event once the reply is in; relaying earlier could start a nested query (e.g.
+ * synth_settings_update -> query_perf_settings) that swallows our reply. An extended message's
+ * bulk is always read, so it can't be taken for a later reply. */
+#define VERSION_STRAY_MAX 16
+static int query_version(int slot, uint8_t *out) {
+    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
+    if (send_system_data(0x41, cmd, sizeof(cmd)) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+
+    g2_msg_t strays[VERSION_STRAY_MAX];
+    int n_strays = 0, ret = G2_ERR_RECV;
+    long long left, deadline = now_ms() + USB_TIMEOUT_LONG_MS;
+    while ((left = deadline - now_ms()) > 0) {
+        uint8_t resp[16] = {0};
+        if (recv_interrupt(resp, sizeof(resp), (int)left) <= 0) break;
+        if ((resp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && resp[4] == SUB_RESPONSE_PATCH_VERSION && resp[5] == slot) {
+            *out = resp[6];
+            ret = G2_OK;
+            break;
+        }
+        g2_msg_t m = {0};
+        memcpy(m.interrupt, resp, sizeof(resp));
+        if ((resp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)resp[1] << 8) | resp[2];
+            m.bulk = sz ? malloc(sz) : NULL;
+            if (m.bulk) m.bulk_size = (uint16_t)recv_bulk(m.bulk, sz);
+            else discard_bulk(sz);
+        }
+        if (n_strays < VERSION_STRAY_MAX) { strays[n_strays++] = m; continue; }
+        g2_emit_event(&m);
+        g2_msg_free(&m);
+    }
+    for (int i = 0; i < n_strays; i++) { g2_emit_event(&strays[i]); g2_msg_free(&strays[i]); }
+    return ret;
+}
+
 int g2_send_init(void) {
     uint8_t response[16] = {0};
 
@@ -382,38 +422,16 @@ cJSON *g2_get_patch(const char *slot_str) {
     /* Step 1: Get version for the slot */
     /* Send: [CMD_SYS, 0x41, 0x35, slot] */
     debug_timing("get_patch_version_start");
-    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
-    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+    ret = query_version(actual_slot, &version);
+    debug_timing("get_patch_version_end");
+    if (ret == G2_ERR_SEND) {
         g2_err("Failed to send get patch version command\n");
         goto cleanup;
     }
-
-    usleep(USB_SEND_DELAY_US);
-
-    /* A stray message left over in the listener queue (e.g. from the daemon's own
-     * startup churn) can arrive before our own reply - loop discarding anything not
-     * tagged as the patch-version response, same lockstep pattern as the patch-notes
-     * step below. */
-    ret = 0;
-    for (int attempt = 0; attempt < 5; attempt++) {
-        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0) break;
-        if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && interruptResp[4] == SUB_RESPONSE_PATCH_VERSION) break;
-        ret = 0;
-    }
-    debug_timing("get_patch_version_end");
-    if (ret <= 0) {
+    if (ret != G2_OK) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
     }
-    /* Embedded response format: [length][data...][CRC]
-     * The version byte sits at index 6 of the raw 16-byte interrupt response.
-     * Need at least 7 bytes to access index 6 safely. */
-    if (ret < 7) {
-        g2_err("Short response from G2 for patch version (%d bytes)\n", ret);
-        goto cleanup;
-    }
-    version = interruptResp[6];
     if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
 
     /* Step 2: Get patch data with version */
@@ -620,20 +638,15 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
 
     g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
-    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)actual_slot};
-    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+    ret = query_version(actual_slot, &version);
+    if (ret == G2_ERR_SEND) {
         g2_err("Failed to send get patch version command\n");
         goto cleanup;
     }
-
-    usleep(USB_SEND_DELAY_US);
-
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) {
+    if (ret != G2_OK) {
         g2_err("No response from G2 for patch version\n");
         goto cleanup;
     }
-    version = interruptResp[6];
     if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
 
     if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
@@ -800,14 +813,7 @@ int g2_select_slot(const char *slot_str) {
      * Per doc/usb.md §6: SELECT_SLOT is a performance-level command.
      * Send only sub-cmd 0x09 (Delphi PerfSelectSlot). The g2ctl.py 0x07 bitmask
      * step resets all slots' active/key state as a side effect and must not be used. */
-    {
-        uint8_t pv_cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, 4};
-        uint8_t pv_resp[16] = {0};
-        send_system_data(0x41, pv_cmd, 2);
-        usleep(USB_SEND_DELAY_US);
-        int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
-        version = (pv_ret > 0 && pv_resp[6]) ? pv_resp[6] : 0x41;
-    }
+    if (query_version(4, &version) != G2_OK || !version) version = 0x41;
 
     data[0] = 0x09;
     data[1] = slot;
@@ -1058,7 +1064,6 @@ cJSON *g2_list(int filter, int bank_filter) {
 }
 
 int g2_select_variation(int variation, int slot) {
-    uint8_t slota[16] = {0};
     int ret;
     uint8_t extraData[1] = {0};
 
@@ -1079,32 +1084,16 @@ int g2_select_variation(int variation, int slot) {
 
     g2_drain_pending();
 
-    /* Step 1: Send [CMD_SYS, 0x41, 0x35, slot] to get slot info */
-    uint8_t cmdData[4] = {0x35, (uint8_t)slot};
-    if (send_system_data(0x41, cmdData, 2) < 0) {
-        g2_err("Failed to send variation command 1\n");
-        return G2_ERR_SEND;
+    /* Step 1: get the slot's patch version */
+    uint8_t version;
+    ret = query_version(slot, &version);
+    if (ret != G2_OK) {
+        g2_err(ret == G2_ERR_SEND ? "Failed to send variation command 1\n" : "No response from G2 for variation command 1\n");
+        return ret;
     }
-    usleep(USB_SEND_DELAY_US);
-
-    /* Skip LED (0x39) and volume (0x3A) streaming notifications to reach the version response */
-    ret = -1;
-    for (int attempt = 0; attempt < 20; attempt++) {
-        ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0) break;
-        uint8_t subCmd = slota[4];
-        if (subCmd == 0x39 || subCmd == 0x3A) { ret = -1; continue; }
-        break;
-    }
-    if (ret <= 0) {
-        g2_err("No response from G2 for variation command 1\n");
-        return G2_ERR_RECV;
-    }
-    uint8_t version = slota[6];
     if (version) g2_slot_version[slot] = version;
 
-    /* Step 2: Send [CMD_A + slot, version, 0x6a, variation - 1]
-     * Version comes from slota[6] (matches Python embedded_message output) */
+    /* Step 2: Send [CMD_A + slot, version, 0x6a, variation - 1] */
     extraData[0] = variation - 1;
     if (send_slot(slot, version, 0x6a, extraData, 1) < 0) {
         g2_err("Failed to send variation command 2\n");
@@ -1183,6 +1172,10 @@ void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
 int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
                             int type_id, int module_id, int col, int row, int color,
                             int num_modes, const int *mode_vals, const char *name) {
+    if (module_id < 1 || module_id > G2_MAX_MODULE_INDEX) {
+        g2_err("add-module: module-id must be 1-%d\n", G2_MAX_MODULE_INDEX);
+        return G2_ERR_INVALID_PARAM;
+    }
     int pos = 0;
     buf[pos++]=(uint8_t)type_id; buf[pos++]=(uint8_t)loc;
     buf[pos++]=(uint8_t)module_id; buf[pos++]=(uint8_t)col;
@@ -1241,19 +1234,12 @@ int g2_build_set_module_labels_op(G2Op *op, uint8_t *buf, int loc, int module_id
 /* ── Helper: get version for slot using GET_PATCH_VERSION (with cache) */
 static uint8_t cable_get_version(int slot) {
     if (g2_slot_version[slot] || g2_slot_version_zero[slot]) return g2_slot_version[slot];
-    /* cache miss — ask G2 (fallback for first use before get-patch).
-     * recv_interrupt() is listener-safe (pulls from the shared message queue
-     * when g2_listener_active), same as every other call site in this file. */
-    uint8_t slota[16] = {0};
-    uint8_t cmdData[2] = {0x35, (uint8_t)slot};
-    if (send_system_data(0x41, cmdData, 2) < 0) return 0;
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(slota, sizeof(slota), USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) return 0; /* timeout or error */
-    if (slota[4] != 0x36 || slota[5] != slot) return 0;   /* stray packet or another slot's version */
-    if (slota[6]) g2_slot_version[slot] = slota[6];
+    /* cache miss — ask G2 (fallback for first use before get-patch) */
+    uint8_t version;
+    if (query_version(slot, &version) != G2_OK) return 0;
+    if (version) g2_slot_version[slot] = version;
     else g2_slot_version_zero[slot] = 1;   /* a real version 0, don't re-query */
-    return slota[6];
+    return version;
 }
 
 int g2_add_cable(int slot, int location, int color,
@@ -1381,13 +1367,15 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     if (slot < 0 || slot > 3)          { g2_err("add-module: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
     if (location < 0 || location > 1)  { g2_err("add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
 
+    uint8_t buf[512]; G2Op op;
+    int built = g2_build_add_module_op(&op, buf, location, type_id, module_id, col, row, color,
+                                       num_modes, mode_vals, name);
+    if (built < 0) return built;
+
     if (ensure_connected(0) < 0) { g2_err("add-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-    uint8_t buf[512]; G2Op op;
-    g2_build_add_module_op(&op, buf, location, type_id, module_id, col, row, color,
-                           num_modes, mode_vals, name);
     if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
         g2_err("add-module: failed to send\n");
         return G2_ERR_SEND;
@@ -1627,13 +1615,8 @@ int g2_set_perf_name(const char *name) {
     if (ensure_connected(0) < 0) { g2_err("set-perf-name: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
 
-    uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
-    uint8_t pv_resp[16] = {0};
-    send_system_data(0x41, pv_cmd, 2);
-    usleep(USB_SEND_DELAY_US);
-    int pv_ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (pv_ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
-    uint8_t version = pv_resp[6];
+    uint8_t version;
+    if (query_version(4, &version) != G2_OK) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
 
     size_t nlen = strlen(name);
     if (nlen > 16) nlen = 16;
@@ -1780,14 +1763,8 @@ int g2_set_voice_count(int slot, int count) {
 }
 
 static int get_perf_version(uint8_t *out_version) {
-    uint8_t pv_cmd[2] = { SUB_COMMAND_GET_PATCH_VERSION, 4 };
-    uint8_t pv_resp[16] = {0};
-    send_system_data(0x41, pv_cmd, 2);
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(pv_resp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
-    *out_version = pv_resp[6];
-    g2_perf_version_cache = pv_resp[6];
+    if (query_version(4, out_version) != G2_OK) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
+    g2_perf_version_cache = *out_version;
     return G2_OK;
 }
 
@@ -2167,15 +2144,13 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     for (int slot = 0; slot < 4; slot++) {
         g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
-        uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
-        if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) {
+        uint8_t version;
+        int ret = query_version(slot, &version);
+        if (ret == G2_ERR_SEND) {
             g2_err("Failed to get patch version for slot %c\n", "ABCD"[slot]);
             goto cleanup;
         }
-        usleep(USB_SEND_DELAY_US);
-        int ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0) { g2_err("No version response for slot %c\n", "ABCD"[slot]); goto cleanup; }
-        uint8_t version = interruptResp[6];
+        if (ret != G2_OK) { g2_err("No version response for slot %c\n", "ABCD"[slot]); goto cleanup; }
 
         if (send_slot(slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
             g2_err("Failed to request patch for slot %c\n", "ABCD"[slot]);
@@ -2798,12 +2773,9 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (slot < 0 || slot > 3) { g2_err("Invalid slot: %s\n", slot_str); return NULL; }
 
     /* Get patch version */
-    uint8_t cmd1[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
-    if (send_system_data(0x41, cmd1, sizeof(cmd1)) < 0) { g2_err("Failed to get version\n"); return NULL; }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) { g2_err("No version response\n"); return NULL; }
-    version = interruptResp[6];
+    ret = query_version(slot, &version);
+    if (ret == G2_ERR_SEND) { g2_err("Failed to get version\n"); return NULL; }
+    if (ret != G2_OK) { g2_err("No version response\n"); return NULL; }
 
     /* Query FX area (loc=0) */
     uint8_t loc = 0;

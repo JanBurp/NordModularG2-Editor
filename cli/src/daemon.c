@@ -289,9 +289,9 @@ static int execute_seq(cJSON *args) {
             for (int m = 0; m < num_modes && m < 64; m++) mode_vals[m] = arg_i(sub, j++);
             int num_params = arg_i(sub, j++);
             j += num_params;  /* skip param_vals — G2 initialises to defaults */
-            g2_build_add_module_op(op, p, s_loc,
-                arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), arg_i(sub,7),
-                num_modes, mode_vals, arg_s(sub, j));
+            if (g2_build_add_module_op(op, p, s_loc,
+                    arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), arg_i(sub,7),
+                    num_modes, mode_vals, arg_s(sub, j)) < 0) { ret = G2_ERR_INVALID_PARAM; break; }
             n_ops++;
 
         } else if (strcmp(scmd, "set-module-color") == 0 && sn >= 5) {

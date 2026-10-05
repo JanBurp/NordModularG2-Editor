@@ -14,6 +14,10 @@ export function useDeviceEvents(log: LogFn) {
 	const slotsStore = useSlotsStore();
 	const browserStore = useBrowserStore();
 	const uiStore = useUiStore();
+	// The daemon prints version_update, then snapshots all slots for the paired synth_settings_update.
+	// Commands queued meanwhile (e.g. an optimistic add-module) only run after the snapshot, so a slot
+	// edited since version_update gets a fresh get-patch instead of the stale snapshot.
+	let editSeqAtRearm: Record<SlotLabel, number> | null = null;
 
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
@@ -83,8 +87,16 @@ export function useDeviceEvents(log: LogFn) {
 			}
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
+				const seen = editSeqAtRearm;
+				editSeqAtRearm = null;
 				const results = await Promise.allSettled(
-					ev.patches.filter((p: any) => p?.data).map((p: any) => slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p))),
+					ev.patches
+						.filter((p: any) => p?.data)
+						.map((p: any) =>
+							seen && slotsStore.editSeq[p.slot as SlotLabel] !== seen[p.slot as SlotLabel]
+								? slotsStore.loadSlot(p.slot as SlotLabel, true)
+								: slotsStore._applyPatchOutput(p.slot as SlotLabel, JSON.stringify(p)),
+						),
 				);
 				results.forEach((r, i) => {
 					if (r.status === 'rejected') console.error(`Watch: patch load failed for index ${i}:`, r.reason);
@@ -150,6 +162,7 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'version_update') {
+			editSeqAtRearm = { ...slotsStore.editSeq };
 			log('←', 'Watch', `version_update perf=${ev.perf_version} slots=[${(ev.slot_versions ?? []).map((s: any) => s.version).join(',')}]`);
 			return true;
 		}

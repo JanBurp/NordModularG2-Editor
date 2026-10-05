@@ -3,9 +3,10 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useHistoryStore, type HistoryEntry } from '../store/history';
 import type { Cable } from '../renderer/cableRenderer';
-import { areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import { AREA_FULL_MESSAGE, areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
 import { finalizeModuleAdd } from './useAddModule';
 import { readClipboardEntry } from './usePatchClipboard';
+import { showToast } from './useToast';
 
 export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
@@ -114,7 +115,9 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		if (isCopy) {
 			const selected = currentModules.value.filter((m: any) => indices.includes(m.index));
 			const existingIds = currentModules.value.map((m: any) => m.index as number);
-			const { entries, remappedCables } = buildCloneEntries(selected, currentCables.value, existingIds, dCol, dRow);
+			const clone = buildCloneEntries(selected, currentCables.value, existingIds, dCol, dRow);
+			if (!clone) return showToast(AREA_FULL_MESSAGE);
+			const { entries, remappedCables } = clone;
 			await slotsStore.paste(entries, remappedCables, area);
 			uiStore.selectModules(
 				entries.map((e) => e.newId),

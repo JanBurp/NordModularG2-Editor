@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { buildPasteParamsPairs, resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
+import { buildCloneEntries, buildPasteParamsPairs, freeModuleIds, MAX_MODULE_INDEX, resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
 
 function mod(index: number, type: number, pcnt: number, lv: number[], modes: number[]): any {
 	return { index, type, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv, modes };
@@ -105,5 +105,38 @@ describe('buildPasteParamsPairs', () => {
 		const source = [mod(1, 5, 1, [7], []), mod(2, 6, 1, [8], [])];
 		const current = [mod(10, 5, 1, [], [])];
 		expect(buildPasteParamsPairs(source, 0, [10], current)).toEqual([{ targetId: 10, paramValues: [7], modeValues: [] }]);
+	});
+});
+
+describe('freeModuleIds', () => {
+	const range = (from: number, to: number) => Array.from({ length: to - from + 1 }, (_, i) => from + i);
+
+	it('starts at 1 in an empty area', () => {
+		expect(freeModuleIds([], 2)).toEqual([1, 2]);
+	});
+
+	it('reuses the lowest gaps instead of max+1', () => {
+		expect(freeModuleIds([1, 3, 4, 7], 3)).toEqual([2, 5, 6]);
+	});
+
+	it('never hands out an index above 127', () => {
+		expect(freeModuleIds(range(1, 126), 1)).toEqual([127]);
+		expect(freeModuleIds(range(1, MAX_MODULE_INDEX), 1)).toBeNull();
+		expect(freeModuleIds(range(2, 127), 2)).toBeNull();
+	});
+});
+
+describe('buildCloneEntries', () => {
+	it('assigns free indices and remaps cables onto them', () => {
+		const src = [mod(5, 97, 0, [], []), mod(9, 92, 0, [], [])];
+		const cables = [{ smod: 5, dmod: 9, colour: 0, scon: 0, dcon: 0, dir: 1 }] as any;
+		const r = buildCloneEntries(src, cables, [1, 2, 4], 0, 0)!;
+		expect(r.entries.map((e) => e.newId)).toEqual([3, 5]);
+		expect(r.remappedCables[0]).toMatchObject({ newSmod: 3, newDmod: 5 });
+	});
+
+	it('returns null when the area has no room', () => {
+		const used = Array.from({ length: 126 }, (_, i) => i + 1);
+		expect(buildCloneEntries([mod(1, 97, 0, [], []), mod(2, 92, 0, [], [])], [], used, 0, 0)).toBeNull();
 	});
 });

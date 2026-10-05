@@ -221,6 +221,20 @@ export function resolveColumnCollisions(
 		}));
 }
 
+/** Module indices are 1..127 per area. The official editor takes the lowest free one
+ * (CPatchData::GetUniqueID); 128 is NACKed by the G2 and a follow-up add/cable wedges it. */
+export const MAX_MODULE_INDEX = 127;
+export const AREA_FULL_MESSAGE = `No room for more modules: an area holds at most ${MAX_MODULE_INDEX}.`;
+
+/** The `count` lowest unused module indices, or null when the area has no room for them. */
+export function freeModuleIds(existingIds: number[], count: number): number[] | null {
+	const used = new Set(existingIds);
+	const ids: number[] = [];
+	for (let i = 1; i <= MAX_MODULE_INDEX && ids.length < count; i++) if (!used.has(i)) ids.push(i);
+	return ids.length === count ? ids : null;
+}
+
+/** Returns null when the destination area has no room for the clones. */
 export function buildCloneEntries(
 	modules: ModuleInstance[],
 	cables: Cable[],
@@ -230,13 +244,12 @@ export function buildCloneEntries(
 ): {
 	entries: { src: ModuleInstance; newId: number; col: number; row: number }[];
 	remappedCables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[];
-} {
-	let nextId = existingIds.length > 0 ? Math.max(...existingIds) + 1 : 1;
+} | null {
+	const newIds = freeModuleIds(existingIds, modules.length);
+	if (!newIds) return null;
 
 	const idMap = new Map<number, number>();
-	for (const mod of modules) {
-		idMap.set(mod.index, nextId++);
-	}
+	modules.forEach((mod, i) => idMap.set(mod.index, newIds[i]));
 
 	const entries = modules.map((mod) => ({
 		src: mod,

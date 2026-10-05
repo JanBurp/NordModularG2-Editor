@@ -31,3 +31,43 @@ describe('useDeviceEvents — patch_stored category propagation', () => {
 		expect(browser.synthPerformances[0].category).toBeUndefined();
 	});
 });
+
+describe('useDeviceEvents — rearm snapshot vs. local edits', () => {
+	const snapshot = {
+		type: 'synth_settings_update',
+		mode: 'Patch',
+		patches: [
+			{ slot: 'A', data: 'aa' },
+			{ slot: 'B', data: 'bb' },
+		],
+	};
+
+	it('re-fetches a slot edited after version_update instead of applying the stale snapshot', async () => {
+		const slots = useSlotsStore();
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
+		const apply = vi.spyOn(slots, '_applyPatchOutput').mockResolvedValue(undefined as any);
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		await handleEvent({ type: 'version_update', scope: 'all_slots' });
+		slots._markSlotDirty('B'); // optimistic add-module while the daemon was taking the snapshot
+		await handleEvent(snapshot);
+
+		expect(load).toHaveBeenCalledWith('B', true);
+		expect(apply).toHaveBeenCalledTimes(1);
+		expect(apply.mock.calls[0][0]).toBe('A');
+	});
+
+	it('applies the whole snapshot when nothing was edited in between', async () => {
+		const slots = useSlotsStore();
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
+		const apply = vi.spyOn(slots, '_applyPatchOutput').mockResolvedValue(undefined as any);
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		slots._markSlotDirty('B'); // before the rearm: already part of the snapshot
+		await handleEvent({ type: 'version_update', scope: 'all_slots' });
+		await handleEvent(snapshot);
+
+		expect(load).not.toHaveBeenCalled();
+		expect(apply.mock.calls.map((c) => c[0])).toEqual(['A', 'B']);
+	});
+});

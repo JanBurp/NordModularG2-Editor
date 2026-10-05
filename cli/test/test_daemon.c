@@ -543,6 +543,48 @@ void test_daemon_set_param_label_four_button_switch(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
+/* Test: a get-patch right after two add-modules must succeed. The G2 answers the version query
+ * late (~555 ms seen in the 2026-10-04 duration test) while it is still applying the adds; the old
+ * 500 ms wait failed and the real reply then surfaced as a stray patch_version event. Uses module
+ * indices 126/127 (the highest valid ones). Restores slot A afterwards. */
+void test_daemon_get_patch_right_after_add_modules(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    daemon_wait_ready(&g_daemon);
+
+    char cmd[200];
+    int r_add[2];
+    for (int i = 0; i < 2; i++) {
+        int id = g_cmd_id++;
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"add-module\",\"args\":[\"A\",\"va\",\"%d\",\"%d\",\"%d\",\"0\",\"0\",\"0\",\"0\",\"M%d\"]}",
+                 id, i ? 92 : 97, 126 + i, 10 + i, i);
+        r_add[i] = send_and_expect_ok(&g_daemon, cmd, id);
+    }
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"B\"]}", id);
+    int r_get = send_and_expect_ok(&g_daemon, cmd, id);
+    int stray = 0;
+    for (cJSON *ev; (ev = read_event_of_type(&g_daemon, "patch_version", 2, 1)) != NULL; cJSON_Delete(ev)) {
+        cJSON *slot = cJSON_GetObjectItem(ev, "slot");
+        if (cJSON_IsString(slot) && strcmp(slot->valuestring, "B") == 0) stray = 1;
+    }
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    daemon_wait_ready(&g_daemon);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_add[0], "add-module 126 should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_add[1], "add-module 127 should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_get, "get-patch B right after the adds must succeed");
+    TEST_ASSERT_FALSE_MESSAGE(stray, "the version reply must not surface later as a stray patch_version event");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
+}
+
 /* Test: assign-global-knob / deassign-global-knob through "seq" (the editor's runBatch path) land
  * on the intended target slot/module/param/location, read back via get-global-knobs. Picks the
  * highest free global knob, assigns VA module 1 param 0 of slot B to it, checks it, then deassigns
