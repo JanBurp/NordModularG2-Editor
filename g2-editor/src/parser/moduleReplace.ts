@@ -1,6 +1,6 @@
 import type { Cable } from '@/types/patch';
 import type { ModuleDefinition, ModuleParam, ModuleMode } from '@/types/module';
-import { getParam } from '@/renderer/parammap';
+import { getParamDefault } from '@/renderer/nmg2mods';
 
 // Matches each `newDef` param/mode to the first not-yet-consumed `oldDef` entry with the same
 // name and type (the type string encodes the value domain, so matching it approximates the real
@@ -23,7 +23,7 @@ export function remapParamValues(oldDef: ModuleDefinition, newDef: ModuleDefinit
 	return newParams.map((p, i) => {
 		const oldIdx = remap[i];
 		if (oldIdx !== null && oldValues[oldIdx] !== undefined) return oldValues[oldIdx];
-		return getParam(p.type)?.def ?? 64;
+		return getParamDefault(p);
 	});
 }
 
