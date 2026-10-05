@@ -25,12 +25,7 @@
 			     target (data-cell-slot, @drop above); style.css's .alt-assign rules give it the grab cursor.
 			     The Knob inside goes pointer-events-none under Alt, so the gesture never races useKnob.ts's
 			     value-drag. Empty slots drag too: dropping one on a canvas param assigns that param here. -->
-			<div
-				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
-				@mouseenter="showHint('paramPageKnob')"
-				@mouseleave="clearHint"
-				class="-mb-1"
-			>
+			<div @mousedown.capture="onKnobMorphMouseDown(cell, $event)" @mouseenter="showHint('paramPageKnob')" @mouseleave="clearHint" class="-mb-1">
 				<!-- Unassigned slots render the same Knob, just at value 0 and inert (the cell-level
 				     opacity above dims it). The wrapper keeps its own pointer events, so the assign
 				     drag/drop still works on empty cells. -->

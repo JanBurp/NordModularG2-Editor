@@ -78,8 +78,18 @@ export function useGhostCable() {
 		// (module layouts put the main audio in at top-right and out at bottom-right). A stereo input gets
 		// two cables: L->L and R->R from a stereo output, or the single output into both L and R.
 		const pair = (out: IndexedJack, inp: IndexedJack): GhostPair => ({
-			from: { moduleIndex: sourceMod.index, connectorIndex: out.idx, type: 'output', colour: getEffectiveJackColor(out.jack.colour, sourceMod.uprate === 1) },
-			to: { moduleIndex: targetMod.index, connectorIndex: inp.idx, type: 'input', colour: getEffectiveJackColor(inp.jack.colour, targetMod.uprate === 1) },
+			from: {
+				moduleIndex: sourceMod.index,
+				connectorIndex: out.idx,
+				type: 'output',
+				colour: getEffectiveJackColor(out.jack.colour, sourceMod.uprate === 1),
+			},
+			to: {
+				moduleIndex: targetMod.index,
+				connectorIndex: inp.idx,
+				type: 'input',
+				colour: getEffectiveJackColor(inp.jack.colour, targetMod.uprate === 1),
+			},
 		});
 		const outUnits = toUnits(outputs).sort((a, b) => unitY(b) - unitY(a));
 		const candidates: GhostCandidate[] = toUnits(freeInputs)

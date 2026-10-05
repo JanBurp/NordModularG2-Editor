@@ -32,7 +32,7 @@ export function useStoreInSynthDialog() {
 		return name ? `${l} – ${name}` : `${l}`;
 	};
 
-	const storeKey =() => (kind.value === 'performance' ? 'perf' : uiStore.slotInFocus);
+	const storeKey = () => (kind.value === 'performance' ? 'perf' : uiStore.slotInFocus);
 
 	function open(): void {
 		kind.value = defaultBankKind(slotsStore.isPerformanceMode, device.isHardwarePerformanceMode);
