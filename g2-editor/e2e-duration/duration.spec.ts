@@ -3,14 +3,28 @@ import { execFileSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
 import { CLI_PATH, g2Count, runCli, runningDaemons, snapshotG2, type G2Snapshot } from './lib/cli';
+import { ACTIONS } from './lib/actions/index';
+import type { ActionCtx } from './lib/actions/ctx';
+import { ModuleQueue } from './lib/actions/moduleQueue';
 import { EventLog } from './lib/eventLog';
 import { launchReal } from './lib/launch';
 import { buildReport, type RunMeta } from './lib/report';
 import { Runner } from './lib/runner';
 import { powerCycle, shellyPreflight } from './lib/shelly';
 
+/*
+ * Options (environment variables):
+ *   DURATION_HOURS     run length (default 4)
+ *   ACTION_INTERVAL_S  mean pause between actions, jittered 0.5-1.5x (default 6)
+ *   BURST_P            chance per step of a burst of fast actions (default 1/6)
+ *   BURST_MAX          most actions in one burst (default 15, at least 5)
+ *   SEED               replay a run's random sequence (printed in the report)
+ *   DURATION_HEADED=1  show the editor window so you can watch; don't click or type in it while it runs
+ */
 const HOURS = Number(process.env.DURATION_HOURS ?? 4);
-const INTERVAL_S = Number(process.env.ACTION_INTERVAL_S ?? 20);
+const INTERVAL_S = Number(process.env.ACTION_INTERVAL_S ?? 6);
+const BURST_P = Number(process.env.BURST_P ?? 1 / 6);
+const BURST_MAX = Number(process.env.BURST_MAX ?? 15);
 const SEED = Number(process.env.SEED ?? Date.now() % 2 ** 31);
 
 // mulberry32: small deterministic PRNG so a run can be replayed with SEED=<n>
@@ -62,13 +76,24 @@ test('G2 duration test', async () => {
 				log.log('reset', { reason: `startup: ${e}`, ok, ms: Date.now() - t0 });
 			}
 		}
+		// An empty listing silently disables patch loading for the whole run (seen 2026-10-05).
+		if (Object.keys(initial!.patchBanks).length === 0) {
+			log.log('main', { line: '[duration-test] bank listing has no patches; retrying in 30 s' });
+			await new Promise((r) => setTimeout(r, 30_000));
+			initial = await snapshotG2();
+			if (Object.keys(initial.patchBanks).length === 0) throw new Error('G2 bank listing returned no patches twice; is the G2 fully booted?');
+		}
 		meta.initial = initial;
 		log.log('meta', { initial });
 
 		const launched = await launchReal(log);
 		cleanup = launched.cleanup;
-		const ctx = { page: launched.page, app: launched.app, snap: initial!, rnd: rng(SEED), own: new Map<string, number[]>() };
-		runner = new Runner(ctx, log);
+		const rnd = rng(SEED);
+		const modules = new ModuleQueue(rnd);
+		meta.actionNames = ACTIONS.map((a) => a.name);
+		meta.moduleTypes = modules.all.map((m) => m.short);
+		const ctx: ActionCtx = { page: launched.page, app: launched.app, log, snap: initial!, mode: initial!.mode, rnd, own: new Map(), modules };
+		runner = new Runner(ctx, log, { p: BURST_P, max: BURST_MAX });
 		runner.startPolling();
 
 		// The editor connects by itself at startup; one click if it did not.

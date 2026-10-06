@@ -40,3 +40,33 @@ describe('sendControllerSnapshot — Send Controller Snapshot', () => {
 		vi.restoreAllMocks();
 	});
 });
+
+describe('toggleSlotActive — keyboard hand-off', () => {
+	const slot = (s: string, active: boolean, key: boolean) => ({ slot: s, active, key, hold: false, range: { lower: 0, upper: 127 } });
+
+	it('deselecting the keyed slot moves the keyboard to the first slot still selected, with one command', () => {
+		const store = useDeviceStore();
+		store.status = DeviceStatus.Connected;
+		store.device = { slots: [slot('A', true, true), slot('B', false, false), slot('C', true, false), slot('D', true, false)] } as any;
+
+		store.toggleSlotActive('A');
+
+		expect(store.device!.slots.map((s) => [s.slot, s.active, s.key])).toEqual([
+			['A', false, false],
+			['B', false, false],
+			['C', true, true],
+			['D', true, false],
+		]);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledTimes(1);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['set-slot-enabled', 'A', '0']);
+	});
+
+	it('deselecting an unkeyed slot leaves the keyboard alone', () => {
+		const store = useDeviceStore();
+		store.device = { slots: [slot('A', true, true), slot('B', true, false)] } as any;
+
+		store.toggleSlotActive('B');
+
+		expect(store.device!.slots.map((s) => s.key)).toEqual([true, false]);
+	});
+});

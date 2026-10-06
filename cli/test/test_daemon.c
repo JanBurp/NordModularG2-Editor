@@ -585,6 +585,60 @@ void test_daemon_get_patch_right_after_add_modules(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
+/* Reads the four slots' key flags from get-perf-settings; 0 = ok, -1 = no/odd answer. */
+static int read_slot_keys(daemon_ctx_t *d, int keys[4]) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
+    cJSON *resp = send_and_capture_response(d, cmd, id);
+    cJSON *slots = resp ? cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), "slots") : NULL;
+    int ok = cJSON_GetArraySize(slots) == 4 ? 0 : -1;
+    for (int i = 0; ok == 0 && i < 4; i++) keys[i] = cJSON_IsTrue(cJSON_GetObjectItem(cJSON_GetArrayItem(slots, i), "key"));
+    cJSON_Delete(resp);
+    return ok;
+}
+
+/* Test: rapid set-slot-key writes right after a get-patch (which triggers a stream rearm burst).
+ * Each set-slot-key is a read-modify-write of the whole performance settings; it used to take the
+ * first extended message as its reply and not wait for the write's ack, so a burst of them wedged the
+ * G2 (duration test 2026-10-05). Afterwards the G2 must still answer and the key flags must read back
+ * exactly as last written. Restores the original key flags. */
+void test_daemon_set_slot_key_burst(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    int orig[4], after[4];
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, read_slot_keys(&g_daemon, orig), "setup: read key flags");
+
+    char cmd[128];
+    int failures = 0;
+    int want[4] = {orig[0], orig[1], orig[2], orig[3]};
+    for (int round = 0; round < 10; round++) {
+        if (round % 3 == 0) {
+            int id = g_cmd_id++;
+            snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+            if (send_and_expect_ok(&g_daemon, cmd, id) != 0) failures++;
+        }
+        int slot = round % 4;
+        want[slot] = !want[slot];
+        int id = g_cmd_id++;
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"set-slot-key\",\"args\":[\"%c\",\"%d\"]}", id, "ABCD"[slot], want[slot]);
+        if (send_and_expect_ok(&g_daemon, cmd, id) != 0) failures++;
+    }
+    int read_ok = read_slot_keys(&g_daemon, after);
+
+    for (int i = 0; i < 4; i++) {
+        if (want[i] == orig[i]) continue;
+        int id = g_cmd_id++;
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"set-slot-key\",\"args\":[\"%c\",\"%d\"]}", id, "ABCD"[i], orig[i]);
+        send_and_expect_ok(&g_daemon, cmd, id);
+    }
+    daemon_wait_ready(&g_daemon);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, failures, "every get-patch / set-slot-key in the burst must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, read_ok, "the G2 must still answer get-perf-settings after the burst");
+    TEST_ASSERT_EQUAL_INT_ARRAY_MESSAGE(want, after, 4, "key flags must read back exactly as last written");
+}
+
 /* Test: assign-global-knob / deassign-global-knob through "seq" (the editor's runBatch path) land
  * on the intended target slot/module/param/location, read back via get-global-knobs. Picks the
  * highest free global knob, assigns VA module 1 param 0 of slot B to it, checks it, then deassigns

@@ -786,8 +786,9 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
 
 /* When listener active: pull from queue, skip LED/vol extended msgs.
  * Extended msgs store their bulk in pending_bulk for a subsequent recv_bulk() call.
- * When listener inactive: direct libusb call (original behaviour). */
-int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
+ * When listener inactive: direct libusb call (original behaviour).
+ * keep_acks: hand generic ok/error acks back too, for a caller that waits for its own write's ack. */
+static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, int keep_acks) {
     if (!g2_listener_active)
         return recv_interrupt_with_retry(response, size, timeout_ms, 1);
 
@@ -841,7 +842,7 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
         if ((msg.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
             uint8_t aCmd = msg.interrupt[2];
             uint8_t subCmd = msg.interrupt[4];
-            if ((aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
+            if (!keep_acks && (aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
                 g2_msg_free(&msg);
                 continue;
             }
@@ -886,6 +887,14 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
         return copy;
     }
     return 0;   /* timeout */
+}
+
+int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
+    return recv_interrupt_filtered(response, size, timeout_ms, 0);
+}
+
+int recv_interrupt_acks(uint8_t *response, int size, int timeout_ms) {
+    return recv_interrupt_filtered(response, size, timeout_ms, 1);
 }
 
 /* When listener active: return bulk that recv_interrupt() saved in pending_bulk.

@@ -1,0 +1,163 @@
+import { getModule } from '../../../src/renderer/nmg2mods';
+import { isSwitch } from '../../../src/utils/moduleControls';
+import { sleep } from '../cli';
+import { type ActionCtx, type ActionDef, type OwnModule, clickItem, focusOwn, int, menuLabels, moduleLocator, openMenu, orSkip, pick, pickOwn, pickParam, selectModule, UI_TIMEOUT_MS } from './ctx';
+import { hasOwn } from './modules';
+
+const center = async (c: ActionCtx, el: import('@playwright/test').Locator) => {
+	await el.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
+	return el.evaluate(
+		(e) => {
+			const b = (e as Element).getBoundingClientRect();
+			return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
+		},
+		undefined,
+		{ timeout: UI_TIMEOUT_MS },
+	);
+};
+
+const hasModes = (m: OwnModule) => (getModule(m.type)?.modes?.length ?? 0) > 0;
+/** Params that get "Rename label": switches with a label list (Module.vue onParamContextMenu). */
+const labelledParams = (m: OwnModule) =>
+	(getModule(m.type)?.params ?? []).flatMap((p, i) => (p.label && isSwitch(p.n) ? [i] : []));
+
+export const PARAM_ACTIONS: ActionDef[] = [
+	{
+		// Any visible knob, also the user's own modules: the wheel is put back afterwards.
+		name: 'tweakParam',
+		weight: 5,
+		burst: true,
+		run: async (c, fast) =>
+			orSkip('canvas remounted', async () => {
+				// The inactive canvas stays in the DOM (v-show), so only visible knobs are candidates.
+				const knobs = c.page.locator('[data-testid^="canvas-"]:visible [data-param-index]');
+				let n = await knobs.count();
+				if (n === 0 && !fast) {
+					await focusOwn(c); // an empty patch: go to a slot with the test's own modules
+					n = await knobs.count();
+				}
+				if (n === 0) return 'skipped: no params on canvas';
+				const knob = knobs.nth(int(c, n));
+				const param = await knob.getAttribute('data-param-index', { timeout: UI_TIMEOUT_MS });
+				const r = await center(c, knob);
+				await c.page.mouse.move(r.x, r.y);
+				// A fast spin: several quick wheel ticks the way a human flicks a knob.
+				const ticks = fast ? 4 + int(c, 6) : 1;
+				const delta = (c.rnd() < 0.5 ? -1 : 1) * 10 * (2 + int(c, 6));
+				for (let i = 0; i < ticks; i++) await c.page.mouse.wheel(0, delta);
+				await sleep(fast ? 80 : 400);
+				for (let i = 0; i < ticks; i++) await c.page.mouse.wheel(0, -delta); // put the value back
+				await sleep(fast ? 80 : 400);
+				return `wheel ${ticks}x${delta} on param #${param}`;
+			}),
+	},
+	{
+		name: 'dragParam',
+		weight: 2,
+		enabled: hasOwn,
+		run: async (c) =>
+			orSkip('param gone', async () => {
+				const m = await pickOwn(c);
+				const p = m && (await pickParam(c, m));
+				if (!p) return 'skipped: no own module with params';
+				const r = await center(c, p.el);
+				const dy = (c.rnd() < 0.5 ? -1 : 1) * (10 + int(c, 40));
+				await c.page.mouse.move(r.x, r.y);
+				await c.page.mouse.down();
+				await c.page.mouse.move(r.x, r.y + dy, { steps: 5 });
+				await c.page.mouse.move(r.x, r.y, { steps: 5 }); // and back
+				await c.page.mouse.up();
+				return `dragged param #${p.index} of ${m!.short}#${m!.idx} by ${dy}px and back`;
+			}),
+	},
+	{
+		// Title click selects the module and its first param; arrows step params and values.
+		name: 'keyboardParam',
+		weight: 2,
+		burst: true,
+		enabled: hasOwn,
+		run: async (c, fast) =>
+			orSkip('module gone', async () => {
+				const m = await pickOwn(c);
+				if (!m) return 'skipped: no own module';
+				await selectModule(c, m);
+				for (let i = int(c, 3); i > 0; i--) await c.page.keyboard.press('ArrowRight');
+				const key = c.rnd() < 0.5 ? 'ArrowUp' : 'ArrowDown';
+				const big = c.rnd() < 0.25;
+				const steps = 1 + int(c, fast ? 8 : 4);
+				for (let i = 0; i < steps; i++) await c.page.keyboard.press(big ? `Alt+${key}` : key);
+				return `${steps}x ${big ? 'Alt+' : ''}${key} on ${m.short}#${m.idx}`;
+			}),
+	},
+	{
+		name: 'setMode',
+		weight: 1,
+		enabled: hasOwn,
+		run: async (c) =>
+			orSkip('mode control gone', async () => {
+				const m = await pickOwn(c, hasModes);
+				if (!m) return 'skipped: no own module with modes';
+				const modes = moduleLocator(c.page, m).locator('g.modes > svg');
+				const n = await modes.count();
+				if (n === 0) return `skipped: ${m.short} has no modes`;
+				const k = int(c, n);
+				await modes.nth(k).click({ timeout: UI_TIMEOUT_MS });
+				const dropdown = c.page.locator('[data-testid="mode-dropdown"]');
+				if (await dropdown.isVisible()) {
+					const options = dropdown.locator('svg[role=option]');
+					const o = int(c, await options.count());
+					await options.nth(o).click({ timeout: UI_TIMEOUT_MS });
+					return `mode ${k} of ${m.short}#${m.idx} → option ${o}`;
+				}
+				return `mode ${k} of ${m.short}#${m.idx} cycled`;
+			}),
+	},
+	{
+		name: 'setParamValue',
+		weight: 1,
+		enabled: hasOwn,
+		run: async (c) =>
+			orSkip('Set Value dialog', async () => {
+				const m = await pickOwn(c);
+				const p = m && (await pickParam(c, m));
+				if (!p) return 'skipped: no own module with params';
+				await openMenu(c.page, p.el);
+				if (!(await menuLabels(c.page)).includes('Set Value')) return 'skipped: param has no Set Value (switch)';
+				await clickItem(c.page, 'Set Value');
+				const dialog = c.page.getByRole('dialog', { name: 'Set Value' });
+				const select = dialog.locator('select');
+				if ((await select.count()) > 0) {
+					await select.selectOption({ index: int(c, await select.locator('option').count()) }, { timeout: UI_TIMEOUT_MS });
+				} else {
+					const input = dialog.locator('input.settings-input');
+					// Number inputs take a raw value; MIDI-note text inputs take a note name.
+					await input.fill((await input.getAttribute('type')) === 'number' ? String(int(c, 128)) : `C${1 + int(c, 6)}`, { timeout: UI_TIMEOUT_MS });
+				}
+				await dialog.getByRole('button', { name: 'OK' }).click({ timeout: UI_TIMEOUT_MS });
+				await dialog.waitFor({ state: 'hidden', timeout: UI_TIMEOUT_MS });
+				return `Set Value on param #${p.index} of ${m!.short}#${m!.idx}`;
+			}),
+	},
+	{
+		// Exercises the fixed-size param-label block (set-module-labels).
+		name: 'renameSwitchLabel',
+		weight: 1,
+		enabled: hasOwn,
+		run: async (c) =>
+			orSkip('Rename Label dialog', async () => {
+				const m = await pickOwn(c, (o) => labelledParams(o).length > 0);
+				if (!m) return 'skipped: no own module with labelled switches';
+				const index = pick(c, labelledParams(m));
+				const p = { el: moduleLocator(c.page, m).locator(`[data-param-index="${index}"]`).first(), index };
+				await openMenu(c.page, p.el);
+				if (!(await menuLabels(c.page)).includes('Rename label')) return `skipped: param #${p.index} of ${m.short} offers no Rename label`;
+				await clickItem(c.page, 'Rename label');
+				const name = `L${int(c, 1000)}`;
+				const dialog = c.page.getByRole('dialog', { name: 'Rename Label' });
+				await dialog.locator('input').fill(name, { timeout: UI_TIMEOUT_MS });
+				await dialog.getByRole('button', { name: 'Rename' }).click({ timeout: UI_TIMEOUT_MS });
+				await dialog.waitFor({ state: 'hidden', timeout: UI_TIMEOUT_MS });
+				return `label of param #${p.index} on ${m.short}#${m.idx} → ${name}`;
+			}),
+	},
+];

@@ -44,11 +44,34 @@ describe('buildSessions / buildReport', () => {
 		expect(s[0].incident?.id).toBe(1);
 		expect(s[1].endedByRun).toBe(true);
 	});
+	it('folds a blip inside an incident recovery into that incident', () => {
+		const inc: LogEvent = { ...incident, start: T0 + 100 * 1000, end: T0 + 200 * 1000 };
+		const evs = [st(0, 'connected'), st(100, 'lost'), inc, st(150, 'connected'), st(152, 'lost'), st(200, 'connected')];
+		const s = buildSessions(evs, T0 + 300 * 1000);
+		expect(s.map((x) => [x.start, x.endedByRun])).toEqual([
+			[T0, false],
+			[T0 + 200 * 1000, true],
+		]);
+	});
 	it('verdict follows recovery level', () => {
 		const meta = { startedAt: T0, endedAt: T0 + 300_000, plannedMs: 300_000, seed: 1, commit: 'abc' };
 		expect(buildReport(events, meta).verdict).toBe('DEGRADED');
 		const pc = events.map((e) => (e.kind === 'incident' ? { ...e, level: 'power-cycle' } : e));
 		expect(buildReport(pc, meta).verdict).toBe('FAIL');
 		expect(buildReport([st(0, 'connected')], meta).verdict).toBe('PASS');
+	});
+	it('lists never-run actions, skips and module coverage', () => {
+		const meta = { startedAt: T0, endedAt: T0 + 300_000, plannedMs: 300_000, seed: 1, commit: 'abc', actionNames: ['addModules', 'copyVariation'], moduleTypes: ['OscA', 'LfoA', 'Mix4-1A'] };
+		const evs: LogEvent[] = [
+			st(0, 'connected'),
+			{ t: T0 + 1000, kind: 'action', name: 'addModules', ok: true, note: 'added OscA' },
+			{ t: T0 + 2000, kind: 'action', name: 'addModules', ok: true, note: 'skipped: resources at 95%' },
+			{ t: T0 + 1000, kind: 'module', short: 'OscA' },
+		];
+		const { markdown, json } = buildReport(evs, meta);
+		expect(markdown).toContain('| addModules | 1 | 1 | 0 |');
+		expect(markdown).toContain('| copyVariation | 0 | 0 | 0 |');
+		expect(markdown).toContain('Used 1 of 3 types.');
+		expect(json.moduleTypesUnused).toEqual(['LfoA', 'Mix4-1A']);
 	});
 });

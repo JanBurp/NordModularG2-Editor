@@ -407,6 +407,15 @@
 
 	<DriverErrorDialog @retry="toggleConnection" />
 
+	<Dialog v-model="reconnectSyncPending" title="G2 Reconnected" :show-confirm="false">
+		<div class="text-sm text-content-primary mb-2">The G2 reconnected and may hold different patches than the editor. Which side is right?</div>
+		<div class="flex flex-col gap-2">
+			<Button variant="default" data-testid="sync-from-g2" @click="connectDevice({ silent: true })">G2 → Editor (reload from the G2)</Button>
+			<Button variant="default" data-testid="sync-to-g2" @click="syncToG2">Editor → G2 (upload the editor's patches)</Button>
+		</div>
+		<div class="text-xs text-content-secondary mt-2">Cancel stays offline; click the connection status to reload later.</div>
+	</Dialog>
+
 	<ParamEditDialog />
 
 	<ContextMenu v-if="ctxState.visible" :items="ctxState.items" :x="ctxState.x" :y="ctxState.y" @close="closeCtxMenu" />
@@ -467,7 +476,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
-	import { useG2, namesLoadProgress } from './composables/useG2';
+	import { useG2, namesLoadProgress, reconnectSyncPending } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
@@ -614,12 +623,11 @@
 	const downloadToSlot = useDownloadToSlotDialog();
 	const storeInSynth = useStoreInSynthDialog();
 
-	const { connectDevice, toggleConnection, hardwareVariationChange, hardwareSlotChange, requestKeyFocus } = useG2();
+	const { connectDevice, toggleConnection, syncToG2, hardwareVariationChange, hardwareSlotChange } = useG2();
 
 	const { handleSlotClick, handleSlotShiftClick, handleSlotCtrlClick, handleVariationClick, applySlotResult } = useSlotManagement(
 		hardwareSlotChange,
 		hardwareVariationChange,
-		requestKeyFocus,
 	);
 
 	// Mirrors handleSlotClick's own "can't focus an inactive slot while several are

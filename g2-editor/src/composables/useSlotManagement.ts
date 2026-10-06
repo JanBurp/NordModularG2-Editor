@@ -6,11 +6,7 @@ import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { SLOT_LABELS } from '@/constants';
 
-export function useSlotManagement(
-	hardwareSlotChange: Ref<SlotLabel | null>,
-	hardwareVariationChange: Ref<{ slot: SlotLabel; variation: number } | null>,
-	requestKeyFocus: (slot: SlotLabel, previouslyKeyed: SlotLabel[]) => void,
-) {
+export function useSlotManagement(hardwareSlotChange: Ref<SlotLabel | null>, hardwareVariationChange: Ref<{ slot: SlotLabel; variation: number } | null>) {
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -25,25 +21,19 @@ export function useSlotManagement(
 		const idx = value as number;
 		const slot = SLOT_LABELS[idx];
 
+		// Focus only (0x09): like the reference editor, a slot switch never moves the keyboard.
+		// The keyboard only moves when the slot holding it is deselected (device.toggleSlotActive).
 		const slots = device.device?.slots;
-		let previouslyKeyed: SlotLabel[] = [];
-		let needsKeyChange = false;
 		if (slots) {
 			const activeCount = slots.filter((s) => s.active).length;
 			const target = slots.find((s) => s.slot === slot);
 
 			if (activeCount > 1 && !target?.active) return;
 
-			needsKeyChange = !target?.key;
-			if (needsKeyChange) previouslyKeyed = slots.filter((s) => s.key && s.slot !== slot).map((s) => s.slot);
-
+			// With at most one slot selected, the G2 itself makes the focused slot the selected, keyed one.
 			if (activeCount <= 1) {
 				slots.forEach((s) => {
 					s.active = s.slot === slot;
-					s.key = s.slot === slot;
-				});
-			} else if (needsKeyChange) {
-				slots.forEach((s) => {
 					s.key = s.slot === slot;
 				});
 			}
@@ -55,7 +45,6 @@ export function useSlotManagement(
 		if (device.status === DeviceStatus.Connected) {
 			applySlotResult(await slotsStore.selectSlot(slot));
 			await slotsStore.requestParamPage();
-			if (needsKeyChange) requestKeyFocus(slot, previouslyKeyed);
 		}
 	}
 

@@ -1,4 +1,6 @@
+import { SLOT_LABELS } from '@/constants';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
+import { useSlotsStore } from '@/store/slots';
 
 import { ref, watch } from 'vue';
 import { bankDownloadProgress } from './useBankDownloadDialog';
@@ -32,8 +34,13 @@ export interface NamesLoadProgress {
 }
 export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
 
+// The daemon reconnected by itself (e.g. after a G2 power cycle), so the G2 may now hold different patches than
+// the editor. The status stays Lost (edits stay offline) until the user picks a sync direction.
+export const reconnectSyncPending = ref(false);
+
 export function useG2() {
 	const store = useDeviceStore();
+	const slotsStore = useSlotsStore();
 	const isDaemonRunning = ref(false);
 
 	const log: LogFn = (direction, event, message, category) => {
@@ -129,13 +136,14 @@ export function useG2() {
 				}
 				if (ev.type === 'device_disconnected') {
 					store.status = DeviceStatus.Lost;
+					reconnectSyncPending.value = false;
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
 					showToast('G2 disconnected — check the USB cable.');
 					return;
 				}
 				if (ev.type === 'device_reconnected') {
-					store.status = DeviceStatus.Connected;
 					log('•', 'Connect', 'G2 reconnected');
+					reconnectSyncPending.value = true;
 					return;
 				}
 				if (ev.type === 'usb_driver_error') {
@@ -206,6 +214,7 @@ export function useG2() {
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
+		reconnectSyncPending.value = false;
 		store.status = DeviceStatus.Connecting;
 		log('•', 'Daemon', 'Starting...');
 		try {
@@ -241,11 +250,19 @@ export function useG2() {
 		return await connectDevice();
 	}
 
+	// Editor → G2: keep the editor's patches and re-upload every slot that has one.
+	async function syncToG2(): Promise<void> {
+		reconnectSyncPending.value = false;
+		store.status = DeviceStatus.Connected;
+		log('•', 'Connect', 'Re-uploading editor patches after reconnect');
+		for (const slot of SLOT_LABELS) if (slotsStore.slots[slot]?.patch) await slotsStore.downloadToSynthSlot(slot, slot);
+	}
+
 	return {
 		connectDevice,
 		toggleConnection,
+		syncToG2,
 		hardwareVariationChange: slotEvents.hardwareVariationChange,
 		hardwareSlotChange: slotEvents.hardwareSlotChange,
-		requestKeyFocus: slotEvents.requestKeyFocus,
 	};
 }

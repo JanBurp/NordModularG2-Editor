@@ -213,6 +213,13 @@ export const useDeviceStore = defineStore('device', {
 			const entry = this.device?.slots.find((s) => s.slot === slot);
 			if (!entry) return;
 			entry.active = !entry.active;
+			// Deselecting the keyed slot hands the keyboard to the first slot still selected; the CLI
+			// does the same in that one write (reference editor: CPerformance::SetSlotSelection).
+			if (!entry.active && entry.key) {
+				entry.key = false;
+				const next = this.device!.slots.find((s) => s.active);
+				if (next) next.key = true;
+			}
 			if (this.status === DeviceStatus.Connected)
 				window.cli.run(['set-slot-enabled', slot, entry.active ? '1' : '0']).catch((err: unknown) => console.error('set-slot-enabled failed:', err));
 		},

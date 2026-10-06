@@ -102,44 +102,129 @@ static int ensure_connected(int silent) {
     return silent ? g2_connect_silent() : g2_connect();
 }
 
-/* GET_PATCH_VERSION for slot 0-3, or 4 for the performance.
- * The G2 queues this query behind edits it is still applying: right after two add-modules it
- * answered after ~555 ms (duration test 2026-10-04), just past a 500 ms wait. So the reply is
- * matched by tag + slot within USB_TIMEOUT_LONG_MS. Anything else that arrives meanwhile is
- * relayed as an event once the reply is in; relaying earlier could start a nested query (e.g.
- * synth_settings_update -> query_perf_settings) that swallows our reply. An extended message's
- * bulk is always read, so it can't be taken for a later reply. */
-#define VERSION_STRAY_MAX 16
-static int query_version(int slot, uint8_t *out) {
-    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
-    if (send_system_data(0x41, cmd, sizeof(cmd)) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
+/* Accepts the reply a caller waits for: the 16-byte interrupt header, plus the bulk of an extended message. */
+typedef int (*reply_match_fn)(const uint8_t *intr, const uint8_t *bulk, uint16_t bulk_size, int arg);
 
-    g2_msg_t strays[VERSION_STRAY_MAX];
+/* Waits up to USB_TIMEOUT_LONG_MS for the message `match` accepts and hands it back in *reply (free
+ * with g2_msg_free). Anything else that arrives meanwhile is relayed as an event once the wait is
+ * over; relaying earlier could start a nested query (e.g. synth_settings_update ->
+ * query_perf_settings) that swallows our reply. An extended message's bulk is always read, so it
+ * can't be taken for a later reply. keep_acks: also see generic ok/error acks (a write's ack). */
+#define STRAY_MAX 16
+static int await_reply(reply_match_fn match, int arg, int keep_acks, g2_msg_t *reply) {
+    g2_msg_t strays[STRAY_MAX];
     int n_strays = 0, ret = G2_ERR_RECV;
     long long left, deadline = now_ms() + USB_TIMEOUT_LONG_MS;
     while ((left = deadline - now_ms()) > 0) {
-        uint8_t resp[16] = {0};
-        if (recv_interrupt(resp, sizeof(resp), (int)left) <= 0) break;
-        if ((resp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && resp[4] == SUB_RESPONSE_PATCH_VERSION && resp[5] == slot) {
-            *out = resp[6];
+        g2_msg_t m = {0};
+        int n = keep_acks ? recv_interrupt_acks(m.interrupt, 16, (int)left) : recv_interrupt(m.interrupt, 16, (int)left);
+        if (n <= 0) break;
+        if ((m.interrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)m.interrupt[1] << 8) | m.interrupt[2];
+            m.bulk = sz ? calloc(1, sz) : NULL;
+            if (m.bulk) {
+                int got = recv_bulk(m.bulk, sz);
+                m.bulk_size = got > 0 ? (uint16_t)got : 0;
+            } else {
+                discard_bulk(sz);
+            }
+        }
+        if (match(m.interrupt, m.bulk, m.bulk_size, arg)) {
+            *reply = m;
             ret = G2_OK;
             break;
         }
-        g2_msg_t m = {0};
-        memcpy(m.interrupt, resp, sizeof(resp));
-        if ((resp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)resp[1] << 8) | resp[2];
-            m.bulk = sz ? malloc(sz) : NULL;
-            if (m.bulk) m.bulk_size = (uint16_t)recv_bulk(m.bulk, sz);
-            else discard_bulk(sz);
-        }
-        if (n_strays < VERSION_STRAY_MAX) { strays[n_strays++] = m; continue; }
+        if (n_strays < STRAY_MAX) { strays[n_strays++] = m; continue; }
         g2_emit_event(&m);
         g2_msg_free(&m);
     }
     for (int i = 0; i < n_strays; i++) { g2_emit_event(&strays[i]); g2_msg_free(&strays[i]); }
     return ret;
+}
+
+static int is_version_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int slot) {
+    (void)bulk; (void)n;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && intr[4] == SUB_RESPONSE_PATCH_VERSION && intr[5] == slot;
+}
+
+/* GET_PATCH_VERSION for slot 0-3, or 4 for the performance.
+ * The G2 queues this query behind edits it is still applying: right after two add-modules it
+ * answered after ~555 ms (duration test 2026-10-04), just past a 500 ms wait. */
+static int query_version(int slot, uint8_t *out) {
+    uint8_t cmd[2] = {SUB_COMMAND_GET_PATCH_VERSION, (uint8_t)slot};
+    if (send_system_data(0x41, cmd, sizeof(cmd)) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    g2_msg_t r;
+    int ret = await_reply(is_version_reply, slot, 0, &r);
+    if (ret == G2_OK) { *out = r.interrupt[6]; g2_msg_free(&r); }
+    return ret;
+}
+
+/* The performance settings as one read-modify-write unit (see perf_settings_read). */
+typedef struct {
+    g2_msg_t msg;       /* the GET_PERF_SETTINGS reply; msg.bulk holds the data */
+    uint8_t version;    /* performance version the write is addressed with */
+    uint8_t *chunk;     /* the C_PERF_SETTINGS chunk in msg.bulk: [0x11][size hi][size lo][settings...] */
+    uint8_t *slot[4];   /* each slot's fields after its name: +0 active, +1 key, +2 hold, +5/+6 range */
+} perf_settings_t;
+
+static int is_perf_settings(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)arg;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[3] == 0x29;
+}
+
+static int is_system_ack(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)bulk; (void)n; (void)arg;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && intr[2] == 0x0C && (intr[4] == 0x7F || intr[4] == 0x7E);
+}
+
+/* Reads the performance settings: perf name (0x29), then the 0x11 chunk with the 4 slots.
+ * Only the tagged reply is accepted. Writing back whatever message arrived first (a rearm burst, or
+ * the update our own previous write caused) sent garbage settings to the G2 and wedged it
+ * (duration test 2026-10-05, set-slot-key fired on every slot switch). */
+static int perf_settings_read(perf_settings_t *ps) {
+    memset(ps, 0, sizeof(*ps));
+    if (query_version(4, &ps->version) != G2_OK) return G2_ERR_RECV;
+    if (send_system(ps->version, 0x10) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    int ret = await_reply(is_perf_settings, 0, 0, &ps->msg);
+    if (ret != G2_OK) return ret;
+
+    uint8_t *end = ps->msg.bulk + ps->msg.bulk_size;
+    char name[32];
+    uint8_t *p = ps->msg.bulk + 4;
+    p += parse_name(p, name, (size_t)(end - p < 17 ? end - p : 17));
+    if (p + 3 > end || p[0] != 0x11 || p + 3 + (((uint16_t)p[1] << 8) | p[2]) > end) goto bad;
+    ps->chunk = p;
+    uint8_t *s = p + 11;
+    for (int i = 0; i < 4; i++) {
+        if (s >= end) goto bad;
+        int nl = parse_name(s, name, (size_t)(end - s < 17 ? end - s : 17));
+        if (s + nl + 7 > end) goto bad;
+        ps->slot[i] = s + nl;
+        s += nl + 10;
+    }
+    return G2_OK;
+bad:
+    g2_err("perf settings: malformed reply (%u bytes)\n", ps->msg.bulk_size);
+    g2_msg_free(&ps->msg);
+    return G2_ERR_PARSE;
+}
+
+/* Writes the (edited) chunk back and waits for the G2's ack, so the next command can't overtake it
+ * (the reference editor keeps one message in flight, CBubblePort::SendMessages). Frees ps. */
+static int perf_settings_write(perf_settings_t *ps) {
+    uint16_t inner = ((uint16_t)ps->chunk[1] << 8) | ps->chunk[2];
+    int sent = send_system_data(ps->version, ps->chunk, (size_t)3 + inner);
+    g2_msg_free(&ps->msg);
+    if (sent < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    g2_msg_t ack;
+    if (await_reply(is_system_ack, 0, 1, &ack) != G2_OK) { g2_err("perf settings: no ack from G2\n"); return G2_ERR_RECV; }
+    int nack = ack.interrupt[4] == 0x7E;
+    g2_msg_free(&ack);
+    if (nack) { g2_err("perf settings: G2 rejected the write\n"); return G2_ERR; }
+    return G2_OK;
 }
 
 int g2_send_init(void) {
@@ -2834,79 +2919,25 @@ cJSON *g2_get_resources(const char *slot_str) {
     return arr;
 }
 
-/* Read the current perf settings, patch one byte for the target slot, and
- * write the full blob back using SET_PERF_SETTINGS (sub-cmd 0x11).
- * field_offset: 0 = active (bit 0), 1 = key (bit 0). */
+/* Sets one per-slot byte of the performance settings: 0 = active, 1 = key, 2 = hold.
+ * Deselecting the slot that has the keyboard hands the keyboard to the first slot still
+ * selected, in the same write (reference editor: CPerformance::SetSlotSelection). */
 static int g2_set_slot_perf_field(int slot_idx, int field_offset, int value) {
     if (slot_idx < 0 || slot_idx > 3) { g2_err("set-slot-perf: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-slot-perf: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
 
-    /* Step 1: UNKNOWN_1 (0x81) → perf version at selsData[2] */
-    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
-    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
-    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
-    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-    uint8_t perf_version = selsData[2];
-
-    /* Step 2: GET_PERF_SETTINGS (0x10) */
-    uint8_t perfIntr[16] = {0};
-    uint8_t *perfData = malloc(2048);
-    if (!perfData) return G2_ERR_NO_MEMORY;
-    size_t perfSize = 0;
-    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
-    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
-    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
-    perfSize = size;
-    recv_bulk(perfData, perfSize);
-
-    /* Step 3: navigate binary (same path as perf_parse_and_add) to find the
-     * target slot's field byte and patch it in-place. */
-    char tmpName[32];
-    const uint8_t *remaining = perfData + 4;
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    remaining += nameLen;
-    const uint8_t *slotPtr = remaining + 11;
-    const uint8_t *perfEnd = perfData + perfSize;
-    int found = 0;
-    for (int i = 0; i < 4; i++) {
-        if (slotPtr >= perfEnd) break;
-        int maxName = (int)(perfEnd - slotPtr);
-        if (maxName > 17) maxName = 17;
-        nameLen = parse_name(slotPtr, tmpName, maxName);
-        if (slotPtr + nameLen + 7 > perfEnd) break;
-        if (i == slot_idx) {
-            size_t byte_offset = (size_t)(slotPtr - perfData) + (size_t)nameLen + (size_t)field_offset;
-            perfData[byte_offset] = (uint8_t)(value & 0xFF);
-            found = 1;
-            break;
+    perf_settings_t ps;
+    int ret = perf_settings_read(&ps);
+    if (ret != G2_OK) return ret;
+    ps.slot[slot_idx][field_offset] = (uint8_t)(value & 0xFF);
+    if (field_offset == 0 && !value && (ps.slot[slot_idx][1] & 1)) {
+        ps.slot[slot_idx][1] = 0;
+        for (int i = 0; i < 4; i++) {
+            if (i != slot_idx && (ps.slot[i][0] & 1)) { ps.slot[i][1] = 1; break; }
         }
-        slotPtr += nameLen + 10;
     }
-    if (!found) { free(perfData); return G2_ERR_PARSE; }
-
-    /* Step 4: send the C_PERF_SETTINGS chunk — matches Delphi CreateSetPerfSettingsMessage:
-     * [0x11][sizeHi][sizeLo][settings data]. 'remaining' points to the 0x11 byte. */
-    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
-    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
-    free(perfData);
-    if (send_ret < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-
-    /* Step 5: drain ACK in direct mode; in daemon mode the listener handles it
-     * and consuming here would silently swallow slot_change/perf_name events. */
-    if (!g2_listener_active) {
-        uint8_t ackResp[16] = {0};
-        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
-        g2_drain_pending();
-    }
-    return G2_OK;
+    return perf_settings_write(&ps);
 }
 
 int g2_set_slot_enabled(int slot_idx, int value) {
@@ -2926,115 +2957,25 @@ int g2_set_slot_range(int slot_idx, int lower, int upper) {
     if (ensure_connected(0) < 0) { g2_err("set-slot-range: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
 
-    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
-    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
-    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
-    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-    uint8_t perf_version = selsData[2];
-
-    uint8_t perfIntr[16] = {0};
-    uint8_t *perfData = malloc(2048);
-    if (!perfData) return G2_ERR_NO_MEMORY;
-    size_t perfSize = 0;
-    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
-    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
-    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
-    perfSize = size;
-    recv_bulk(perfData, perfSize);
-
-    char tmpName[32];
-    const uint8_t *remaining = perfData + 4;
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    remaining += nameLen;
-    const uint8_t *slotPtr = remaining + 11;
-    const uint8_t *perfEnd = perfData + perfSize;
-    int found = 0;
-    for (int i = 0; i < 4; i++) {
-        if (slotPtr >= perfEnd) break;
-        int maxName = (int)(perfEnd - slotPtr);
-        if (maxName > 17) maxName = 17;
-        nameLen = parse_name(slotPtr, tmpName, maxName);
-        if (slotPtr + nameLen + 7 > perfEnd) break;
-        if (i == slot_idx) {
-            size_t base = (size_t)(slotPtr - perfData) + (size_t)nameLen;
-            perfData[base + 5] = (uint8_t)(lower & 0xFF);
-            perfData[base + 6] = (uint8_t)(upper & 0xFF);
-            found = 1;
-            break;
-        }
-        slotPtr += nameLen + 10;
-    }
-    if (!found) { free(perfData); return G2_ERR_PARSE; }
-
-    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
-    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
-    free(perfData);
-    if (send_ret < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-
-    if (!g2_listener_active) {
-        uint8_t ackResp[16] = {0};
-        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
-        g2_drain_pending();
-    }
-    return G2_OK;
+    perf_settings_t ps;
+    int ret = perf_settings_read(&ps);
+    if (ret != G2_OK) return ret;
+    ps.slot[slot_idx][5] = (uint8_t)(lower & 0xFF);
+    ps.slot[slot_idx][6] = (uint8_t)(upper & 0xFF);
+    return perf_settings_write(&ps);
 }
 
-/* Modify a single byte in the performance header (at remaining[offset]):
- * remaining[5]=rangeEnable (KB Split) */
+/* Modify a single byte of the C_PERF_SETTINGS chunk (chunk[offset]):
+ * chunk[5]=rangeEnable (KB Split) */
 static int g2_set_perf_header_byte(int offset, int value) {
     if (ensure_connected(0) < 0) { g2_err("set-perf-header: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
 
-    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
-    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
-    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
-    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-    uint8_t perf_version = selsData[2];
-
-    uint8_t perfIntr[16] = {0};
-    uint8_t *perfData = malloc(2048);
-    if (!perfData) return G2_ERR_NO_MEMORY;
-    size_t perfSize = 0;
-    if (send_system(perf_version, 0x10) < 0) { free(perfData); return G2_ERR_SEND; }
-    usleep(USB_SEND_DELAY_US);
-    ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) { free(perfData); return G2_ERR_RECV; }
-    size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
-    if (size == 0 || size > 2048) { free(perfData); return G2_ERR_RECV; }
-    perfSize = size;
-    recv_bulk(perfData, perfSize);
-
-    char tmpName[32];
-    const uint8_t *remaining = perfData + 4;
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    remaining += nameLen;
-
-    size_t byte_offset = (size_t)(remaining - perfData) + (size_t)offset;
-    if (byte_offset >= perfSize) { free(perfData); return G2_ERR_PARSE; }
-    perfData[byte_offset] = (uint8_t)(value & 0xFF);
-
-    uint16_t inner_size = ((uint16_t)remaining[1] << 8) | remaining[2];
-    int send_ret = send_system_data(perf_version, remaining, (size_t)3 + inner_size);
-    free(perfData);
-    if (send_ret < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-
-    if (!g2_listener_active) {
-        uint8_t ackResp[16] = {0};
-        recv_interrupt(ackResp, 16, USB_TIMEOUT_STANDARD_MS);
-        g2_drain_pending();
-    }
-    return G2_OK;
+    perf_settings_t ps;
+    int ret = perf_settings_read(&ps);
+    if (ret != G2_OK) return ret;
+    ps.chunk[offset] = (uint8_t)(value & 0xFF);
+    return perf_settings_write(&ps);
 }
 
 int g2_set_rangeEnable(int value) { return g2_set_perf_header_byte(5, value); }
@@ -3049,92 +2990,24 @@ int g2_switch_slot(const char *slot_str) {
     if (ensure_connected(0) < 0) return G2_ERR_CONNECT;
     g2_drain_pending();
 
-    /* Step 1: UNKNOWN_1 (0x81) → perf version at selsData[2] */
-    uint8_t selsIntr[16] = {0}, selsData[256] = {0};
-    if (send_system(0x41, 0x81) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(selsIntr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (selsIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return G2_ERR_RECV;
-    uint16_t size = (uint16_t)((selsIntr[1] << 8) | selsIntr[2]);
-    recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-    uint8_t perf_version = selsData[2];
-
-    /* Step 2: GET_PERF_SETTINGS (0x10) */
-    uint8_t perfIntr[16] = {0};
-    uint8_t *perfData = NULL;
-    if (send_system(perf_version, 0x10) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    /* Same lockstep discipline as query_perf_settings(): a stray message can arrive
-     * before our own reply - skip anything not tagged 0x11/0x29, relaying it via the
-     * normal event dispatcher so it isn't lost. */
-    for (int attempt = 0; attempt < 5; attempt++) {
-        ret = recv_interrupt(perfIntr, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0 || (perfIntr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
-        size = (uint16_t)((perfIntr[1] << 8) | perfIntr[2]);
-        if (size == 0 || size > 2048) break;
-        uint8_t *buf = calloc(1, 2048);
-        if (!buf) return G2_ERR_NO_MEMORY;
-        if (recv_bulk(buf, size) <= 0) { free(buf); break; }
-        if (size > 3 && (buf[3] == 0x11 || buf[3] == 0x29)) { perfData = buf; break; }
-        g2_msg_t relay = {0};
-        memcpy(relay.interrupt, perfIntr, 16);
-        relay.bulk = buf;
-        relay.bulk_size = size;
-        g2_emit_event(&relay);
-        free(buf);
-    }
-    if (!perfData) return G2_ERR_RECV;
-
-    /* Step 3: navigate binary to find the focused slot and per-slot active/key bytes.
-     * perfData+4 → perf name (variable) → 0x11 chunk header:
-     *   [3]=FUnknown2(8b), [4]=FUnknown3(4b)|FSelectedSlot(2b)|FUnknown4(2b)
-     * Slot data at remaining+11: each slot = name(variable) + 10 bytes
-     *   [+0]=active, [+1]=key, rest=hold/bank/patch/range/pad */
-    char tmpName[32];
-    const uint8_t *remaining = perfData + 4;
-    int nameLen = parse_name(remaining, tmpName, sizeof(tmpName));
-    remaining += nameLen;
-    int focused = (remaining[4] >> 2) & 0x3;
-
-    const uint8_t *slotPtr = remaining + 11;
-    const uint8_t *perfEnd  = perfData + size;
-    size_t target_off = 0, focused_off = 0;
-    int target_active = 0, found_target = 0, found_focused = 0;
-    for (int i = 0; i < 4; i++) {
-        if (slotPtr >= perfEnd) break;
-        int mx = (int)(perfEnd - slotPtr); if (mx > 17) mx = 17;
-        nameLen = parse_name(slotPtr, tmpName, mx);
-        if (slotPtr + nameLen + 7 > perfEnd) break;
-        size_t base = (size_t)(slotPtr - perfData) + (size_t)nameLen;
-        if (i == target)  { target_off  = base; target_active = perfData[base] & 1; found_target  = 1; }
-        if (i == focused) { focused_off = base;                                      found_focused = 1; }
-        slotPtr += nameLen + 10;
-    }
-    if (!found_target) { free(perfData); return G2_ERR_PARSE; }
+    perf_settings_t ps;
+    int ret = perf_settings_read(&ps);
+    if (ret != G2_OK) return ret;
 
     /* Fast path: slot already active — just focus it */
-    if (target_active) { free(perfData); return g2_select_slot(slot_str); }
+    if (ps.slot[target][0] & 1) { g2_msg_free(&ps.msg); return g2_select_slot(slot_str); }
 
-    /* Activate target slot, deactivate currently-focused slot */
-    perfData[target_off + 0] = 1;
-    perfData[target_off + 1] = 1;
-    if (found_focused && focused != target) {
-        perfData[focused_off + 0] = 0;
-        perfData[focused_off + 1] = 0;
+    /* Activate and key the target slot, deactivate and unkey the currently-focused one.
+     * chunk[4] = FUnknown3(4b)|FSelectedSlot(2b)|FUnknown4(2b). */
+    int focused = (ps.chunk[4] >> 2) & 0x3;
+    ps.slot[target][0] = 1;
+    ps.slot[target][1] = 1;
+    if (focused != target) {
+        ps.slot[focused][0] = 0;
+        ps.slot[focused][1] = 0;
     }
-
-    /* Step 4: send SET_PERF_SETTINGS (0x11); chunk starts at `remaining` (the 0x11 byte) */
-    uint16_t inner = ((uint16_t)remaining[1] << 8) | remaining[2];
-    int sret = send_system_data(perf_version, remaining, (size_t)3 + inner);
-    free(perfData);
-    if (sret < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    /* Drain SET_PERF_SETTINGS ACK from listener queue. */
-    {
-        uint8_t ack[16] = {0};
-        recv_interrupt(ack, 16, USB_TIMEOUT_STANDARD_MS);
-        if (!g2_listener_active) g2_drain_pending();
-    }
+    ret = perf_settings_write(&ps);
+    if (ret != G2_OK) return ret;
 
     /* Step 5: SELECT_SLOT (0x09) — send directly, no GET_PATCH_VERSION.
      * In daemon mode, perf_settings_update sits in the queue after the ACK;

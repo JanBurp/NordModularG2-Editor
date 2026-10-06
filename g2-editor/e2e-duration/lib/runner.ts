@@ -1,5 +1,7 @@
 import type { Page } from '@playwright/test';
-import { cliRun, pickAction, type ActionCtx } from './actions';
+import { ACTIONS } from './actions/index';
+import { cliRun, closeMenus, type ActionCtx, type ActionDef } from './actions/ctx';
+import { pickAction, planBurst, weighted } from './actions/pick';
 import { g2Count, sleep, waitFor } from './cli';
 import type { EventLog } from './eventLog';
 import { classify, DOWN_STATUSES, type Incident, type RecoveryLevel } from './report';
@@ -25,10 +27,13 @@ export class Runner {
 	private lastAction = '';
 	private incidents = 0;
 	private poller?: NodeJS.Timeout;
+	/** Actions run at least once (coverage-first picking). */
+	private readonly ran = new Set<string>();
 
 	constructor(
 		private readonly ctx: ActionCtx,
 		private readonly log: EventLog,
+		private readonly burst: { p: number; max: number },
 	) {}
 
 	private get page(): Page {
@@ -46,6 +51,12 @@ export class Runner {
 	/** Records every status transition with its own timestamp, independent of the (possibly blocked) action loop. */
 	startPolling(): void {
 		this.poller = setInterval(async () => {
+			// After a silent reconnect (e.g. a power cycle) the G2 is the truth: reload the editor from it.
+			const syncFromG2 = this.page.locator('[data-testid="sync-from-g2"]');
+			if (await syncFromG2.isVisible().catch(() => false)) {
+				this.log.log('main', { line: '[duration-test] reconnect dialog: G2 → Editor' });
+				await syncFromG2.click().catch(() => undefined);
+			}
 			const s = await this.readStatus();
 			if (s === this.status || s === 'unknown') return;
 			this.status = s;
@@ -132,6 +143,18 @@ export class Runner {
 		if (!healthy) throw new Error(`G2 did not recover after ${cycles} power cycles (incident #${id})`);
 	}
 
+	private async runOne(action: ActionDef, fast = false): Promise<void> {
+		const t0 = Date.now();
+		try {
+			const note = await withTimeout(Promise.resolve(action.run(this.ctx, fast)), ACTION_TIMEOUT_MS, action.name);
+			this.log.log('action', { name: action.name, ok: true, ms: Date.now() - t0, note, ...(fast && { fast }) });
+		} catch (e) {
+			this.log.log('action', { name: action.name, ok: false, ms: Date.now() - t0, error: String(e).slice(0, 300), ...(fast && { fast }) });
+		}
+		await closeMenus(this.page).catch(() => undefined); // a failed action can leave a menu or dialog open
+		this.lastAction = action.name;
+	}
+
 	/** Runs until `deadline`; resolves normally, or throws when a recovery fails. */
 	async run(deadline: number, intervalMs: number): Promise<void> {
 		let lastProbe = Date.now();
@@ -146,15 +169,19 @@ export class Runner {
 				if (!(await this.probe())) await this.recover('probe');
 			}
 
-			const action = pickAction(this.ctx);
-			const t0 = Date.now();
-			try {
-				const note = await withTimeout(Promise.resolve(action.run(this.ctx)), ACTION_TIMEOUT_MS, action.name);
-				this.log.log('action', { name: action.name, ok: true, ms: Date.now() - t0, note });
-			} catch (e) {
-				this.log.log('action', { name: action.name, ok: false, ms: Date.now() - t0, error: String(e).slice(0, 300) });
+			const enabled = ACTIONS.filter((a) => a.enabled?.(this.ctx) ?? true);
+			const gaps = planBurst(this.ctx.rnd, this.burst.p, this.burst.max);
+			if (gaps) {
+				this.log.log('main', { line: `[duration-test] burst of ${gaps.length} fast actions` });
+				const pool = enabled.filter((a) => a.burst);
+				for (const gap of gaps) {
+					await this.runOne(weighted(pool, this.ctx.rnd), true);
+					if (this.lossAt !== null || !this.log.events.at(-1)?.ok) break;
+					await sleep(gap);
+				}
+			} else {
+				await this.runOne(pickAction(enabled, this.ctx.rnd, this.ran));
 			}
-			this.lastAction = action.name;
 
 			// An action that fails or hangs while the status still says "connected" is a silent-hang candidate.
 			if (this.status === 'connected' && this.lossAt === null && !this.log.events.at(-1)?.ok && !(await this.probe())) await this.recover('probe');

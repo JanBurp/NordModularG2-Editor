@@ -129,6 +129,8 @@ int send_bulk_msg(const uint8_t *buff, int len);
  * When g2_listener_active == 1 these route through the listener queue so that
  * device functions work correctly without conflicting with the listener thread. */
 int recv_interrupt(uint8_t *response, int size, int timeout_ms);
+/* Like recv_interrupt, but also returns generic ok/error acks (aCmd 0x04/0x0C, sub 0x7F/0x7E). */
+int recv_interrupt_acks(uint8_t *response, int size, int timeout_ms);
 int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries);
 int recv_bulk(uint8_t *data, uint16_t size);
 

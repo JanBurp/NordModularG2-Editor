@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export type EventKind = 'meta' | 'status' | 'action' | 'probe' | 'incident' | 'reset' | 'daemon' | 'main' | 'console' | 'error';
+export type EventKind = 'meta' | 'status' | 'action' | 'probe' | 'incident' | 'reset' | 'daemon' | 'main' | 'console' | 'error' | 'module';
 
 export interface LogEvent {
 	/** ms since epoch */
@@ -44,7 +44,7 @@ export class EventLog {
 function progressLine(ev: LogEvent): string | null {
 	switch (ev.kind) {
 		case 'action':
-			return `${ev.ok ? 'ok  ' : 'FAIL'} ${ev.name} (${ev.ms} ms) ${ev.ok ? (ev.note ?? '') : ev.error}`;
+			return `${ev.ok ? 'ok  ' : 'FAIL'}${ev.fast ? ' »' : ''} ${ev.name} (${ev.ms} ms) ${ev.ok ? (ev.note ?? '') : ev.error}`;
 		case 'status':
 			return `status: ${ev.status}`;
 		case 'probe':

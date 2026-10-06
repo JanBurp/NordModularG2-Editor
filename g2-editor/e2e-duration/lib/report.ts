@@ -82,6 +82,10 @@ export interface RunMeta {
 	seed: number;
 	commit: string;
 	initial?: G2Snapshot;
+	/** Every action the run could pick, so never-run ones show up as 0. */
+	actionNames?: string[];
+	/** Short names of every user-addable module type. */
+	moduleTypes?: string[];
 	final?: { ok: boolean; mode?: string; error?: string };
 	aborted?: string;
 }
@@ -102,7 +106,8 @@ export function buildSessions(events: LogEvent[], endedAt: number): Session[] {
 		}
 	}
 	if (open !== null) sessions.push({ start: open, end: endedAt, endedByRun: true });
-	return sessions;
+	// A blip inside an incident's recovery (e.g. the G2 re-enumerating once while booting after a power cycle) belongs to that incident.
+	return sessions.filter((s) => s.endedByRun || !incidents.some((i) => i.start <= s.start && s.end <= i.end));
 }
 
 function nearest(incidents: Incident[], t: number): Incident | undefined {
@@ -129,12 +134,17 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 
 	const verdict: Verdict = meta.aborted || incidents.some((i) => i.level === 'failed') || powerCyclesNeeded > 0 ? 'FAIL' : incidents.length > 0 ? 'DEGRADED' : 'PASS';
 
-	const byType = new Map<string, { ok: number; failed: number }>();
+	const byType = new Map<string, { ok: number; failed: number; skipped: number }>((meta.actionNames ?? []).map((n) => [n, { ok: 0, failed: 0, skipped: 0 }]));
 	for (const a of actions) {
-		const c = byType.get(String(a.name)) ?? { ok: 0, failed: 0 };
-		a.ok ? c.ok++ : c.failed++;
+		const c = byType.get(String(a.name)) ?? { ok: 0, failed: 0, skipped: 0 };
+		if (!a.ok) c.failed++;
+		else if (String(a.note ?? '').startsWith('skipped')) c.skipped++;
+		else c.ok++;
 		byType.set(String(a.name), c);
 	}
+	const usedTypes = new Set(events.filter((e) => e.kind === 'module').map((e) => String(e.short)));
+	const unusedTypes = (meta.moduleTypes ?? []).filter((t) => !usedTypes.has(t));
+	const bursts = events.filter((e) => e.kind === 'main' && String(e.line).startsWith('[duration-test] burst')).length;
 
 	const L: string[] = [];
 	L.push(`# G2 duration test report — ${verdict}`, '');
@@ -171,9 +181,11 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 		L.push('');
 	}
 
-	L.push('## Actions', '', '| Action | OK | Failed |', '|---|---|---|');
-	for (const [name, c] of [...byType].sort()) L.push(`| ${name} | ${c.ok} | ${c.failed} |`);
+	L.push('## Actions', '', `${bursts} fast bursts.`, '', '| Action | OK | Skipped | Failed |', '|---|---|---|---|');
+	for (const [name, c] of [...byType].sort()) L.push(`| ${name} | ${c.ok} | ${c.skipped} | ${c.failed} |`);
+	L.push('', '## Module types', '', `Used ${usedTypes.size} of ${meta.moduleTypes?.length ?? '?'} types.`);
+	if (unusedTypes.length) L.push('', `Not used: ${unusedTypes.join(', ')}`);
 	L.push('');
 
-	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, actions: Object.fromEntries(byType) } };
+	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, actions: Object.fromEntries(byType), moduleTypesUsed: [...usedTypes], moduleTypesUnused: unusedTypes, bursts } };
 }
