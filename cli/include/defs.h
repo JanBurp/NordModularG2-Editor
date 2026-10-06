@@ -125,6 +125,10 @@ typedef enum {
  * power cycle. */
 #define G2_MAX_MODULE_INDEX                 (127)
 
+/* Fx-In is the only module the official editor allows in just one area (CBuildModule::IsValidContext
+ * mask, read from the Mac v1.62 binary): FX only. Every other module type is valid in both areas. */
+#define G2_MODULE_TYPE_FX_IN                (127)
+
 /* A performance upload is answered by no ACK we can safely read (see send_perf_upload), so the
  * only way to avoid returning while the G2 is still applying its four slots is to wait. */
 #define PERF_UPLOAD_SETTLE_US               (600000)

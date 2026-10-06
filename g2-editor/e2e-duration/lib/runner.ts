@@ -51,12 +51,6 @@ export class Runner {
 	/** Records every status transition with its own timestamp, independent of the (possibly blocked) action loop. */
 	startPolling(): void {
 		this.poller = setInterval(async () => {
-			// After a silent reconnect (e.g. a power cycle) the G2 is the truth: reload the editor from it.
-			const syncFromG2 = this.page.locator('[data-testid="sync-from-g2"]');
-			if (await syncFromG2.isVisible().catch(() => false)) {
-				this.log.log('main', { line: '[duration-test] reconnect dialog: G2 → Editor' });
-				await syncFromG2.click().catch(() => undefined);
-			}
 			const s = await this.readStatus();
 			if (s === this.status || s === 'unknown') return;
 			this.status = s;

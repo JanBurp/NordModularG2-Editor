@@ -153,6 +153,7 @@ extern void test_upload_patch_buf_invalid_slot_high(void);
 
 extern void test_build_set_module_labels_four_buttons(void);
 extern void test_build_add_module_rejects_out_of_range_index(void);
+extern void test_build_add_module_allows_fx_in_only_in_fx(void);
 extern void test_add_module_rejects_index_128_without_usb(void);
 extern void test_set_module_labels_invalid_location(void);
 extern void test_set_module_labels_malformed_groups(void);
@@ -365,6 +366,7 @@ int main(void) {
     /* set-module-labels tests */
     RUN_TEST(test_build_set_module_labels_four_buttons);
     RUN_TEST(test_build_add_module_rejects_out_of_range_index);
+    RUN_TEST(test_build_add_module_allows_fx_in_only_in_fx);
     RUN_TEST(test_add_module_rejects_index_128_without_usb);
     RUN_TEST(test_set_module_labels_invalid_location);
     RUN_TEST(test_set_module_labels_malformed_groups);

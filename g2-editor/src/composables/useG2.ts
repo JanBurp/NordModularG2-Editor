@@ -34,10 +34,6 @@ export interface NamesLoadProgress {
 }
 export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
 
-// The daemon reconnected by itself (e.g. after a G2 power cycle), so the G2 may now hold different patches than
-// the editor. The status stays Lost (edits stay offline) until the user picks a sync direction.
-export const reconnectSyncPending = ref(false);
-
 export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -136,14 +132,14 @@ export function useG2() {
 				}
 				if (ev.type === 'device_disconnected') {
 					store.status = DeviceStatus.Lost;
-					reconnectSyncPending.value = false;
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
 					showToast('G2 disconnected — check the USB cable.');
 					return;
 				}
 				if (ev.type === 'device_reconnected') {
+					store.status = DeviceStatus.Connected;
 					log('•', 'Connect', 'G2 reconnected');
-					reconnectSyncPending.value = true;
+					void reuploadSlots();
 					return;
 				}
 				if (ev.type === 'usb_driver_error') {
@@ -214,7 +210,6 @@ export function useG2() {
 			log('•', 'Connect', 'CLI not available');
 			return;
 		}
-		reconnectSyncPending.value = false;
 		store.status = DeviceStatus.Connecting;
 		log('•', 'Daemon', 'Starting...');
 		try {
@@ -250,10 +245,10 @@ export function useG2() {
 		return await connectDevice();
 	}
 
-	// Editor → G2: keep the editor's patches and re-upload every slot that has one.
-	async function syncToG2(): Promise<void> {
-		reconnectSyncPending.value = false;
-		store.status = DeviceStatus.Connected;
+	// After the daemon reconnected by itself (cable re-plug, G2 power cycle) the editor is the truth, like the official
+	// editor (CSynth ctor → CPerformance::ConnectSynth(perf, synth, true) re-sends the still-open performance): re-upload
+	// every slot, so a rebooted G2 doesn't keep different patches than the editor shows.
+	async function reuploadSlots(): Promise<void> {
 		log('•', 'Connect', 'Re-uploading editor patches after reconnect');
 		for (const slot of SLOT_LABELS) if (slotsStore.slots[slot]?.patch) await slotsStore.downloadToSynthSlot(slot, slot);
 	}
@@ -261,7 +256,6 @@ export function useG2() {
 	return {
 		connectDevice,
 		toggleConnection,
-		syncToG2,
 		hardwareVariationChange: slotEvents.hardwareVariationChange,
 		hardwareSlotChange: slotEvents.hardwareSlotChange,
 	};

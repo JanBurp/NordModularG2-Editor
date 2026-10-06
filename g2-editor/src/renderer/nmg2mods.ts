@@ -197,6 +197,14 @@ export function getModule(id: number): ModuleDefinition | undefined {
 	return moduleMap.get(id);
 }
 
+const FX_IN_TYPE_ID = 127;
+
+// The official editor's per-module context mask (CBuildModule::IsValidContext, read from the Mac v1.62 binary)
+// allows every module in both areas except Fx-In, which only works in the FX area.
+export function isValidInArea(typeId: number, area: 'voice' | 'fx'): boolean {
+	return area === 'fx' || typeId !== FX_IN_TYPE_ID;
+}
+
 const VOCODER_TYPE_ID = 108;
 
 // Vocoder preset "0": analysis band i feeds synthesis band i+1 (0 = Off), which is what makes the graph show.
@@ -263,16 +271,16 @@ export function areModulesReplaceCompatible(a: ModuleDefinition, b: ModuleDefini
 	return !!a.page?.name && a.page.name === b.page?.name;
 }
 
-export function getReplaceCandidates(moduleTypeId: number): ModuleDefinition[] {
+export function getReplaceCandidates(moduleTypeId: number, area: 'voice' | 'fx'): ModuleDefinition[] {
 	const def = getModule(moduleTypeId);
 	if (!def) return [];
 	const overrideGroup = findOverrideGroup(def.id);
 	if (overrideGroup) {
 		return overrideGroup
-			.filter((id) => id !== def.id)
+			.filter((id) => id !== def.id && isValidInArea(id, area))
 			.map((id) => getModule(id))
 			.filter((m): m is ModuleDefinition => !!m);
 	}
 	if (!def.page?.name) return [];
-	return getModulesByCategory(def.page.name).filter((m) => areModulesReplaceCompatible(def, m));
+	return getModulesByCategory(def.page.name).filter((m) => isValidInArea(m.id, area) && areModulesReplaceCompatible(def, m));
 }

@@ -11,7 +11,7 @@ import type {
 } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
-import { getModule } from '../renderer/nmg2mods';
+import { getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
@@ -2300,6 +2300,10 @@ export const useSlotsStore = defineStore('slots', {
 			area: 'voice' | 'fx',
 			currentModuleList: any[],
 		): Promise<{ name: string; rawHex: string; patch: Patch; moduleId: number } | null> {
+			if (!isValidInArea(typeId, area)) {
+				showToast(`${getModule(typeId)?.long ?? 'This module'} only works in the FX area.`);
+				return null;
+			}
 			const hist = useHistoryStore();
 			const slot = useUiStore().slotInFocus;
 			const shouldRecord = !hist.isLocked(slot);

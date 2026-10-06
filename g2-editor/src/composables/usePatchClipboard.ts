@@ -87,20 +87,27 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
 		const { areaIdx } = areaConfig(area);
 
+		// Leave out modules that can't go in the destination area (Fx-In in the voice area), and their cables
+		const { getModule, isValidInArea } = await import('../renderer/nmg2mods');
+		const modules = clipboard.modules.filter((m) => isValidInArea(m.type, area));
+		if (modules.length < clipboard.modules.length) showToast('Fx Input only works in the FX area — not pasted.');
+		if (modules.length === 0) return;
+		const kept = new Set(modules.map((m) => m.index));
+		const cables = clipboard.cables.filter((c) => kept.has(c.smod) && kept.has(c.dmod));
+
 		// Compute target top-left from mouse or fall back to +2 offset from clipboard origin
-		const minCol = Math.min(...clipboard.modules.map((m) => m.horiz));
-		const minRow = Math.min(...clipboard.modules.map((m) => m.vert));
+		const minCol = Math.min(...modules.map((m) => m.horiz));
+		const minRow = Math.min(...modules.map((m) => m.vert));
 		const targetCol = mousePos ? mousePos.col : minCol + 2;
 		const targetRow = mousePos ? mousePos.row : minRow + 2;
 		const dCol = targetCol - minCol;
 
-		const { getModule } = await import('../renderer/nmg2mods');
-		const moduleRects = clipboard.modules.map((m) => ({ vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
+		const moduleRects = modules.map((m) => ({ vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
 		const dRow = resolvePasteRowOffset(moduleRects, dCol, targetRow - minRow);
 
 		// Generate new IDs against the destination area
 		const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);
-		const clone = buildCloneEntries(clipboard.modules, clipboard.cables, existingIds, dCol, dRow);
+		const clone = buildCloneEntries(modules, cables, existingIds, dCol, dRow);
 		if (!clone) return showToast(AREA_FULL_MESSAGE);
 		const { entries, remappedCables } = clone;
 		await slotsStore.paste(entries, remappedCables, area);

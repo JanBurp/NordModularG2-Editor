@@ -426,7 +426,7 @@
 		return getModule(instance.value.type) || null;
 	});
 
-	const replaceCandidates = computed<ModuleDefinition[]>(() => getReplaceCandidates(instance.value.type));
+	const replaceCandidates = computed<ModuleDefinition[]>(() => getReplaceCandidates(instance.value.type, props.areaLabel === 'va' ? 'voice' : 'fx'));
 
 	function buildReplaceMenuItems(): ContextMenuItem[] {
 		return replaceCandidates.value.map((def) => ({

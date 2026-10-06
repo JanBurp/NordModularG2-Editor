@@ -1261,6 +1261,10 @@ int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
         g2_err("add-module: module-id must be 1-%d\n", G2_MAX_MODULE_INDEX);
         return G2_ERR_INVALID_PARAM;
     }
+    if (type_id == G2_MODULE_TYPE_FX_IN && loc != 0) {
+        g2_err("add-module: Fx-In (type %d) only works in the fx area\n", G2_MODULE_TYPE_FX_IN);
+        return G2_ERR_INVALID_PARAM;
+    }
     int pos = 0;
     buf[pos++]=(uint8_t)type_id; buf[pos++]=(uint8_t)loc;
     buf[pos++]=(uint8_t)module_id; buf[pos++]=(uint8_t)col;

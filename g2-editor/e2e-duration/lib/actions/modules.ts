@@ -1,4 +1,5 @@
 import { dropModuleOnCanvas } from '../../../e2e/helpers';
+import { isValidInArea } from '../../../src/renderer/nmg2mods';
 import { sleep, waitFor } from '../cli';
 import {
 	type ActionCtx,
@@ -62,6 +63,7 @@ export const MODULE_ACTIONS: ActionDef[] = [
 			const added: string[] = [];
 			for (let k = 1 + int(c, 3); k > 0; k--) {
 				const def = c.modules.next();
+				if (!isValidInArea(def.id, area === 'va' ? 'voice' : 'fx')) continue; // the editor refuses it (Fx-In in VA)
 				const before = await moduleIdxs(c.page, area);
 				await dropModuleOnCanvas(c.page, def.id, OWN_COL0 + int(c, OWN_COLS), int(c, 40), area);
 				const fresh = await waitNewIdxs(c, area, before, 1);
