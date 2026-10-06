@@ -11,8 +11,30 @@ describe('filterCategoryModules', () => {
 		expect(filterCategoryModules(cat, '')).toEqual(mods);
 	});
 
-	it('single term matching the category name returns the whole category', () => {
-		expect(filterCategoryModules(cat, cat.toLowerCase())).toEqual(mods);
+	it('single term matches module names only, not the category name', () => {
+		expect(filterCategoryModules('Env', 'env').every((m) => `${m.short} ${m.long}`.toLowerCase().includes('env'))).toBe(true);
+	});
+
+	it('single term matches module names across all groups', () => {
+		const groups = getAllCategories().filter((c) => filterCategoryModules(c, 'ad').length > 0);
+		expect(groups.length).toBeGreaterThan(1);
+	});
+
+	it('"env " shows only the Env group with all its modules', () => {
+		for (const c of getAllCategories()) {
+			expect(filterCategoryModules(c, 'env ')).toEqual(c === 'Env' ? getModulesByCategory('Env') : []);
+		}
+	});
+
+	it('"env ad" shows only Env modules with "ad" in the name', () => {
+		const res = filterCategoryModules('Env', 'env ad');
+		expect(res.length).toBeGreaterThan(0);
+		expect(res.every((m) => `${m.short} ${m.long}`.toLowerCase().includes('ad'))).toBe(true);
+		expect(filterCategoryModules('Filter', 'env ad')).toEqual([]);
+	});
+
+	it('extra spaces between group and module are ignored', () => {
+		expect(filterCategoryModules('Env', 'env   ad')).toEqual(filterCategoryModules('Env', 'env ad'));
 	});
 
 	it('single term matches module names', () => {
