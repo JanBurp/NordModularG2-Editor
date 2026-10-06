@@ -11,6 +11,7 @@ const allGlobals = {
   window: 'readonly',
   document: 'readonly',
   navigator: 'readonly',
+  performance: 'readonly',
   console: 'readonly',
   URL: 'readonly',
   Blob: 'readonly',
