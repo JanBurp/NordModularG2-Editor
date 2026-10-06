@@ -145,13 +145,20 @@ export function usePatchFile() {
 				device.clearPendingPerf();
 			}
 		}, PERF_SETTLE_TIMEOUT_MS);
-		// Device is already in Performance mode here (this only fires from the synth-performance
-		// browser list) — skip device.setPerformanceMode()'s redundant 'set-perf-mode' round trip,
-		// which otherwise adds a full serial USB transaction in front of select-perf.
-		if (device.device?.performance) device.device.performance.name = `Bank ${bank} / ${location}`;
+		// Like the official editor (CFlashData::LoadPerformance): only the flash load, no mode change —
+		// the G2 decides the mode and the editor follows what it reports.
+		const name = `Bank ${bank} / ${location}`;
+		if (device.device?.performance) device.device.performance.name = name;
 		try {
 			await window.cli.run(['select-perf', String(bank), String(location)]);
-			slotsStore.$patch({ performanceName: `Bank ${bank} / ${location}`, performanceFilePath: '', performanceRawHex: null });
+			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null });
+			// In Patch mode the G2 loads the performance's patches but reports no perfBank/perfLoc to match
+			// (perfBank=129), so the pending select would only end in the timeout toast. select-perf answers
+			// after the whole load cascade, so it's done here.
+			if (!device.isHardwarePerformanceMode) {
+				clearTimeout(perfSelectTimer);
+				device.clearPendingPerf();
+			}
 		} catch (err) {
 			console.error('Failed to select synth performance:', err);
 			showToast('Failed to select synth performance — check device connection.');

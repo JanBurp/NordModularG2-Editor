@@ -65,6 +65,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		window.electronAPI?.updateRecentFiles(useSettingsStore().recentFiles.map((f) => ({ ...f })));
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
+			if (deviceStore.resyncing) return; // edits would collide with the post-reconnect performance re-send
 			if (action.startsWith('open-recent:')) {
 				const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
 				if (entry) await patchFile.handlePatchSelect({ type: 'disk', filepath: entry.path, kind: entry.kind });

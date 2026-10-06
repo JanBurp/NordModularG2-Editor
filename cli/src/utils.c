@@ -33,18 +33,15 @@ uint16_t calc_crc16(uint8_t *buff, int length) {
     return crc;
 }
 
-/* Extract a printable ASCII name from a G2 name field.
- * Stops at the first non-printable byte (NUL or control char).
+/* Extract a name from a G2 name field: up to 16 bytes, NUL-terminated only when shorter
+ * (Delphi ReadClaviaString). Any other byte is part of the name — a non-printable one is shown
+ * as '?'. Stopping at it instead left the rest of the message misaligned: a G2 Engine whose
+ * stored synth name was "\x01" read every synth setting 2 bytes off, mode bit included.
  * Returns the number of bytes consumed including the terminating NUL (if present). */
 int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     size_t i;
-    for (i = 0; i < 16 && i < bufsize - 1; i++) {
-        if (data[i] >= 0x20 && data[i] <= 0x7f) {
-            buf[i] = data[i];
-        } else {
-            break;
-        }
-    }
+    for (i = 0; i < 16 && i < bufsize - 1 && data[i] != 0; i++)
+        buf[i] = (data[i] >= 0x20 && data[i] <= 0x7f) ? (char)data[i] : '?';
     buf[i] = '\0';
     if (i < 16 && data[i] == 0) {
         return (int)(i + 1);

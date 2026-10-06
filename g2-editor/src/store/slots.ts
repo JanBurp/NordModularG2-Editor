@@ -1,4 +1,5 @@
 import type {
+	Device,
 	GlobalParamPageAssignment,
 	MidiCCAssignment,
 	ModuleInstance,
@@ -2136,18 +2137,29 @@ export const useSlotsStore = defineStore('slots', {
 			return ok;
 		},
 
-		// Performance → "Download": push the locally-authored performance (a .prf2 loaded while
-		// working in local mode) to the connected synth via upload-perf-data. Requires a performance
-		// template to reserialize from — re-uploads the in-memory edits, not the stale disk file.
+		// Performance → "Download": push the editor's performance (a .prf2 loaded while working in
+		// local mode, or one loaded from the G2) to the connected synth — the in-memory edits, not
+		// the stale disk file. A performance upload only makes sense with the synth in Performance
+		// mode — same precondition usePatchFile's applyPerformanceFile establishes before its own
+		// upload-perf. A file's own perf settings are kept; a G2-loaded one is rebuilt from the
+		// device store.
 		async downloadPerformanceToSynth(): Promise<boolean> {
-			if (!this.performanceRawHex) {
-				showToast('No local performance to download — load a .prf2 into the editor first.');
-				return false;
-			}
+			const device = useDeviceStore();
+			const name = this.performanceName || device.device?.performance?.name || '';
+			return this._uploadPerformance(() => device.setPerformanceMode(name), this.performanceRawHex ? undefined : (device.device ?? undefined));
+		},
+
+		// Uploads the editor's whole performance with upload-perf-data, like the official editor's
+		// CMCompletePerformanceDump. `prepare` runs inside the upload guard (mode switch). With
+		// `settings`, the 0x11 perf settings are rebuilt from them; without, the .prf2 template's
+		// own are kept. Without a .prf2 template the performance is assembled from the slots'
+		// templates (patches loaded from the G2).
+		async _uploadPerformance(prepare: () => Promise<void>, settings?: Pick<Device, 'performance' | 'slots'>): Promise<boolean> {
 			const device = useDeviceStore();
 			if (device.status !== DeviceStatus.Connected) return false;
 			if (this.uploadingFromFile) return false;
-			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
+			const labels = ['A', 'B', 'C', 'D'] as SlotLabel[];
+			const patches = labels
 				.map((s) => {
 					const e = this.slots[s];
 					if (e.patch) {
@@ -2161,17 +2173,25 @@ export const useSlotsStore = defineStore('slots', {
 				showToast('Cannot download performance — not all slots contain a patch.');
 				return false;
 			}
+			const { buildPerformanceTemplate, serializePerformance, writePerfSettings } = await import('../parser/nmg2PatchSerializer');
+			const perfSettings = settings?.performance ? writePerfSettings(settings.performance, settings.slots) : undefined;
+			let template = this.performanceRawHex;
+			if (!template) {
+				const slotTemplates = labels.map((s) => this.slots[s].templateRawHex);
+				if (!perfSettings || slotTemplates.some((t) => !t)) {
+					showToast('Cannot download performance — no performance data to rebuild it from.');
+					return false;
+				}
+				template = buildPerformanceTemplate(slotTemplates as string[], perfSettings);
+			}
+			const name = this.performanceName || settings?.performance?.name || '';
 			this.uploadingFromFile = true;
 			try {
-				// A performance upload only makes sense with the synth in Performance mode —
-				// same precondition usePatchFile's applyPerformanceFile establishes before its
-				// own upload-perf.
-				await device.setPerformanceMode(this.performanceName);
-				const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
-				const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
-				const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
+				await prepare();
+				const variationsArray = labels.map((s) => this.slots[s].variations ?? []);
+				const newRawHex = serializePerformance(patches, template, variationsArray, this.globalParamPages, perfSettings);
 				const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-				const nameBytes = Array.from(new TextEncoder().encode(this.performanceName));
+				const nameBytes = Array.from(new TextEncoder().encode(name));
 				const data = [...nameBytes, 0x00, 0x17, 0x01, ...sectionBytes];
 				await window.cli.run(['upload-perf-data', data]);
 				// Same reasoning as downloadToSynthSlot: reload all 4 slots explicitly (with retry —
@@ -2179,7 +2199,7 @@ export const useSlotsStore = defineStore('slots', {
 				// which isn't confirmed for a full upload. Sequentially, not in parallel — four
 				// concurrent retry chains mean up to 12 get-patch calls racing a G2 that is still
 				// applying the performance internally.
-				for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) await this._reloadSlotAfterUpload(s);
+				for (const s of labels) await this._reloadSlotAfterUpload(s);
 				return true;
 			} catch (err) {
 				console.error('Failed to download performance to G2:', err);

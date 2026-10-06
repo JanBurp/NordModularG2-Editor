@@ -7,7 +7,7 @@ import { PATCH_MORPH_MODULE_ID, SectionType } from '../constants';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
-import { serializePatch, serializePerformance } from '../nmg2PatchSerializer';
+import { buildPerformanceTemplate, serializePatch, serializePerformance, writePerfSettings } from '../nmg2PatchSerializer';
 import { extractVariations } from '../../store/slotHelpers';
 import { computeUprateSet, inferUserColours } from '../cableGraph';
 import { getModule } from '../../renderer/nmg2mods';
@@ -1561,5 +1561,95 @@ describe('paramNames hardware padding', () => {
 		const patch = new PatchParser(file.buffer as ArrayBuffer).parse();
 		// the zero bytes parse as label-less (paramLen 0) entries, as in normal files; the 0x3d garbage is dropped
 		expect(patch.morphParamLabels!.filter((e) => e.labels.length).map((e) => e.labels[0])).toEqual(['Kick', 'Snare', 'HiHat']);
+	});
+});
+
+// ── performance rebuilt from editor state (reconnect re-send, Download of a G2-loaded perf) ────
+
+const toHex = (b: Uint8Array) => Array.from(b, (x) => x.toString(16).padStart(2, '0')).join('');
+const CANONICAL_SLOT = [0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a, 0x6f];
+
+describe('writePerfSettings (C_PERF_SETTINGS 0x11)', () => {
+	it("rebuilds EmptyPerf.prf2's own 0x11 byte for byte from its parsed fields", () => {
+		const { rawHex } = loadFixturePrf2('EmptyPerf.prf2');
+		const fixture = extractSection(rawHex, SectionType.PERF_DATA)!;
+		const names = ['EmptyPatch', 'No name', 'No name', 'No name'];
+		const slots = (['A', 'B', 'C', 'D'] as const).map((slot, i) => ({
+			slot,
+			name: names[i],
+			active: i === 0,
+			key: i === 0,
+			hold: false,
+			bank: i === 0 ? 1 : 0,
+			patch: 0,
+			range: { lower: 0, upper: 0 },
+		}));
+		const built = writePerfSettings({ name: 'EmptyPerf', focus: 'A', rangeEnable: false, bpm: 0x1e, clockRunning: false }, slots);
+		expect(toHex(built)).toBe(fixture);
+	});
+
+	it('packs focus/knob source in header byte 1 and omits the NUL after a 16-char slot name', () => {
+		const slots = (['A', 'B', 'C', 'D'] as const).map((slot) => ({
+			slot,
+			name: slot === 'B' ? '185stepsequencer' : 'x',
+			active: true,
+			key: false,
+			hold: true,
+			bank: 3,
+			patch: 7,
+			range: { lower: 36, upper: 96 },
+		}));
+		const b = writePerfSettings({ name: 'p', focus: 'C', rangeEnable: true, bpm: 120, clockRunning: true, knobSourceGlobal: true }, slots).slice(3);
+		expect(Array.from(b.slice(0, 8))).toEqual([0, (2 << 2) | 1, 1, 120, 0, 1, 0, 0]);
+		const slotA = 8 + 2; // 'x' + NUL
+		expect(Array.from(b.slice(slotA, slotA + 10))).toEqual([1, 0, 1, 3, 7, 36, 96, 0, 0, 0]);
+		const slotB = slotA + 10 + 16; // 16-char name, no terminator
+		expect(new TextDecoder().decode(b.slice(slotA + 10, slotB))).toBe('185stepsequencer');
+		expect(Array.from(b.slice(slotB, slotB + 10))).toEqual([1, 0, 1, 3, 7, 36, 96, 1, 0, 0]);
+	});
+});
+
+describe('buildPerformanceTemplate — performance from hardware (get-patch order) slot templates', () => {
+	// get-patch answers 0x5a before 0x5b, omits 0x69 and has no 0x6f text section (see patch_slot_sections_canonical).
+	function usbOrderTemplate(rawHex: string): string {
+		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		const secs: Uint8Array[] = [];
+		for (let ofs = 0; ofs < bytes.length - 2; ) {
+			const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+			if (bytes[ofs] !== 0x69 && bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
+			ofs = end;
+		}
+		const order = (t: number) => (t === 0x5a ? 0 : t === 0x5b ? 1 : -1);
+		secs.sort((a, b) => (order(a[0]) >= 0 && order(b[0]) >= 0 ? order(a[0]) - order(b[0]) : 0));
+		return secs.map(toHex).join('');
+	}
+
+	it('yields the canonical slot trains and uploads the same patches', () => {
+		const slotFiles = ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2'];
+		const fixtures = slotFiles.map(loadFixture);
+		const patches = fixtures.map((f) => f.patch);
+		const slots = (['A', 'B', 'C', 'D'] as const).map((slot, i) => ({
+			slot,
+			name: fixtures[i].name.slice(0, 16),
+			active: true,
+			key: i === 0,
+			hold: false,
+			bank: 0,
+			patch: i,
+			range: { lower: 0, upper: 127 },
+		}));
+		const perfSettings = writePerfSettings({ name: 'Rebuilt', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false }, slots);
+		const template = buildPerformanceTemplate(
+			fixtures.map((f) => usbOrderTemplate(f.rawHex)),
+			perfSettings,
+		);
+		const hex = serializePerformance(patches, template, patches.map(extractVariations), [], perfSettings);
+		const blocks = sectionBlocks(hex);
+		expect(blocks[0][0]).toBe(SectionType.PERF_DATA);
+		for (let s = 0; s < 4; s++) expect(s === 0 ? blocks[0].slice(1) : blocks[s]).toEqual(CANONICAL_SLOT);
+		expect(blocks[4]).toEqual([SectionType.KNOBS_GLOBAL]);
+		expect(extractSection(hex, SectionType.PERF_DATA)).toBe(toHex(perfSettings));
+		const { patches: back } = parsePerfFromRawHex('Rebuilt', hex);
+		for (let s = 0; s < 4; s++) expectPatchEqual(patches[s], back[s]);
 	});
 });

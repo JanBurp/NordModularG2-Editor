@@ -1273,14 +1273,46 @@ describe('downloadPerformanceToSynth — Performance Download', () => {
 		}
 	});
 
-	it('refuses without a local performance template (performanceRawHex)', async () => {
+	it('refuses without a .prf2 template when the slots have no templates to rebuild from', async () => {
 		const store = useSlotsStore();
+		for (const s of ['A', 'B', 'C', 'D'] as const) store.slots[s].patch = makePatch();
 		useDeviceStore().status = DeviceStatus.Connected;
 
 		const result = await store.downloadPerformanceToSynth();
 
 		expect(result).toBe(false);
 		expect((globalThis as any).window.cli.run).not.toHaveBeenCalledWith(expect.arrayContaining(['upload-perf-data']));
+	});
+
+	it('rebuilds a G2-loaded performance (no .prf2 template) from the slot templates and device perf settings', async () => {
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			const device = useDeviceStore();
+			for (const s of ['A', 'B', 'C', 'D'] as const) {
+				store.slots[s].patch = makePatch();
+				store.slots[s].variations = [];
+				store.slots[s].templateRawHex = '6f0000'; // any section train will do for the assembly
+			}
+			device.status = DeviceStatus.Connected;
+			device.device = {
+				mode: 'Performance',
+				performance: { name: 'From G2', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false },
+				slots: [],
+			} as any;
+			vi.spyOn(store, 'loadSlot').mockResolvedValue({ name: 'x', rawHex: '', patch: makePatch() } as any);
+
+			const resultPromise = store.downloadPerformanceToSynth();
+			await vi.runAllTimersAsync();
+
+			expect(await resultPromise).toBe(true);
+			const call = (globalThis as any).window.cli.run.mock.calls.find((c: any[]) => c[0][0] === 'upload-perf-data');
+			const data: number[] = call[0][1];
+			const name = Array.from(new TextEncoder().encode('From G2'));
+			expect(data.slice(0, name.length + 4)).toEqual([...name, 0x00, 0x17, 0x01, 0x11]);
+		} finally {
+			vi.useRealTimers();
+		}
 	});
 
 	it('refuses when not all slots contain a patch', async () => {

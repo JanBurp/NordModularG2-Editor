@@ -22,7 +22,13 @@
 					<slot />
 				</div>
 				<div class="flex justify-end gap-2 px-4 py-3 border-t border-line-default">
-					<button class="px-3 py-1 text-xs rounded text-content-secondary hover:text-content-primary cursor-pointer" @click="onCancel">Cancel</button>
+					<button
+						v-if="showCancel"
+						class="px-3 py-1 text-xs rounded text-content-secondary hover:text-content-primary cursor-pointer"
+						@click="onCancel"
+					>
+						Cancel
+					</button>
 					<button
 						v-if="showConfirm"
 						class="px-3 py-1 text-xs rounded bg-input text-black font-medium hover:opacity-90 cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
@@ -46,11 +52,12 @@
 			title: string;
 			confirmLabel?: string;
 			showConfirm?: boolean;
+			showCancel?: boolean;
 			closeOnConfirm?: boolean;
 			disableConfirm?: boolean;
 			preventClose?: boolean;
 		}>(),
-		{ confirmLabel: 'OK', showConfirm: true, closeOnConfirm: true, disableConfirm: false, preventClose: false },
+		{ confirmLabel: 'OK', showConfirm: true, showCancel: true, closeOnConfirm: true, disableConfirm: false, preventClose: false },
 	);
 
 	const emit = defineEmits<{

@@ -25,7 +25,7 @@ extern void test_parse_slot_invalid_returns_current(void);
 extern void test_parse_name_simple(void);
 extern void test_parse_name_with_null(void);
 extern void test_parse_name_truncates_long(void);
-extern void test_parse_name_stops_at_non_printable(void);
+extern void test_parse_name_keeps_non_printable(void);
 extern void test_parse_name_empty(void);
 extern void test_parse_name_only_null(void);
 
@@ -43,6 +43,7 @@ extern void test_parse_tuning_cent(void);
 extern void test_parse_global_octave_shift(void);
 extern void test_parse_pedal(void);
 extern void test_parse_mem_protect(void);
+extern void test_parse_settings_control_char_name(void);
 
 extern void test_patch_focus_c(void);
 extern void test_perf_focus_c(void);
@@ -233,7 +234,7 @@ int main(void) {
     RUN_TEST(test_parse_name_simple);
     RUN_TEST(test_parse_name_with_null);
     RUN_TEST(test_parse_name_truncates_long);
-    RUN_TEST(test_parse_name_stops_at_non_printable);
+    RUN_TEST(test_parse_name_keeps_non_printable);
     RUN_TEST(test_parse_name_empty);
     RUN_TEST(test_parse_name_only_null);
 
@@ -251,6 +252,7 @@ int main(void) {
     RUN_TEST(test_parse_global_octave_shift);
     RUN_TEST(test_parse_pedal);
     RUN_TEST(test_parse_mem_protect);
+    RUN_TEST(test_parse_settings_control_char_name);
 
     /* Real G2 data tests - require mock files in test/mocks/ */
     RUN_TEST(test_patch_focus_c);

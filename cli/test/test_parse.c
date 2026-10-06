@@ -59,12 +59,12 @@ void test_parse_name_truncates_long(void) {
     TEST_ASSERT_EQUAL_INT(15, len);
 }
 
-void test_parse_name_stops_at_non_printable(void) {
+void test_parse_name_keeps_non_printable(void) {
     uint8_t data[] = "Test\xffMore";
     char buf[32] = {0};
     int len = parse_name(data, buf, sizeof(buf));
-    TEST_ASSERT_EQUAL_STRING("Test", buf);
-    TEST_ASSERT_EQUAL_INT(4, len);
+    TEST_ASSERT_EQUAL_STRING("Test?More", buf);
+    TEST_ASSERT_EQUAL_INT(10, len);  /* consumed up to and including the NUL */
 }
 
 void test_parse_name_empty(void) {

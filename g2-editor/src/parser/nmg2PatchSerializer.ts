@@ -9,6 +9,8 @@ import type {
 	ParamPageAssignment,
 	ParamLabel,
 	GlobalParamPageAssignment,
+	PerformanceData,
+	SlotInfo,
 } from '@/types';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { SLOT_LABELS } from '@/constants';
@@ -666,6 +668,7 @@ export function serializePerformance(
 	templateRawHex: string,
 	variationsArray: VariationState[][],
 	globalParamPages: GlobalParamPageAssignment[] = [],
+	perfSettings?: Uint8Array,
 ): string {
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
@@ -680,7 +683,9 @@ export function serializePerformance(
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		if (type === SectionType.KNOBS_GLOBAL) {
+		if (type === SectionType.PERF_DATA && perfSettings) {
+			out.push(perfSettings);
+		} else if (type === SectionType.KNOBS_GLOBAL) {
 			// writeGlobalKnobs([]) already produces a valid fixed-size empty bitmap — call it
 			// unconditionally (like CONTROLLERS/KNOBS/MORPH_PARAMS above) instead of dropping
 			// the section when there are no global page assignments to write.
@@ -751,5 +756,64 @@ export function serializePerformance(
 	if (!wroteGlobalKnobs && globalParamPages.length > 0) {
 		out.push(writeGlobalKnobs(globalParamPages));
 	}
+	return buildRawHex(out, FILE_TYPE_PERFORMANCE);
+}
+
+/**
+ * C_PERF_SETTINGS (0x11) rebuilt from parsed fields, the way the official editor writes it
+ * (G2Editor.c CPerformanceHeader WriteStream) — it keeps no raw copy either. Layout as
+ * perf_parse_and_add (cli/src/g2_protocol.c) reads it: 8-byte header [unknown, focus<<2 |
+ * knobSource, rangeEnable, bpm, unknown, clockRun, 0, 0], then per slot the name (NUL-terminated
+ * only when shorter than 16 chars) and active, key, hold, bank, patch, rangeLow, rangeHigh,
+ * slot index, 0, 0. Bytes we don't parse are written as 0, as the official editor does.
+ */
+export function writePerfSettings(perf: PerformanceData, slots: SlotInfo[]): Uint8Array {
+	const focus = Math.max(0, SLOT_LABELS.indexOf(perf.focus as (typeof SLOT_LABELS)[number]));
+	const out = [0, (focus << 2) | (perf.knobSourceGlobal ? 1 : 0), +perf.rangeEnable, perf.bpm, 0, +perf.clockRunning, 0, 0];
+	SLOT_LABELS.forEach((label, i) => {
+		const s = slots.find((x) => x.slot === label);
+		const name = Array.from(new TextEncoder().encode(s?.name ?? '')).slice(0, 16);
+		out.push(...name);
+		if (name.length < 16) out.push(0);
+		out.push(+!!s?.active, +!!s?.key, +!!s?.hold, s?.bank ?? 0, s?.patch ?? 0, s?.range.lower ?? 0, s?.range.upper ?? 127, i, 0, 0);
+	});
+	return makeSection(SectionType.PERF_DATA, Uint8Array.from(out));
+}
+
+// Canonical per-slot chunk order of a .prf2 (port of kSlotChunkOrder, cli/src/utils.c). The G2
+// rejects a performance upload whose slots deviate from it.
+const SLOT_CHUNK_ORDER = [0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a];
+// Idle C_CURRENT_NOTE_2 chunk GET_PATCH never returns but a performance upload requires (kCurrentNoteDefault, utils.c).
+const CURRENT_NOTE_DEFAULT = Uint8Array.of(0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00);
+
+// Port of patch_slot_sections_canonical (utils.c): reorders one slot's sections, inserts a missing
+// 0x69, keeps unknown sections at the end and drops a 0x6f (the caller closes each slot with one).
+// Stops at a section that would overrun — the trailing CRC of a serialized template.
+function canonicalSlotSections(bytes: Uint8Array): Uint8Array[] {
+	const secs: Uint8Array[] = [];
+	for (let ofs = 0; ofs + 3 <= bytes.length; ) {
+		const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+		if (end > bytes.length) break;
+		if (bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
+		ofs = end;
+	}
+	const out: Uint8Array[] = [];
+	for (const id of SLOT_CHUNK_ORDER) {
+		const i = secs.findIndex((x) => x[0] === id);
+		if (i >= 0) out.push(...secs.splice(i, 1));
+		else if (id === 0x69) out.push(CURRENT_NOTE_DEFAULT);
+	}
+	return [...out, ...secs];
+}
+
+/**
+ * Performance template for serializePerformance from four single-slot templates (e.g. hardware
+ * get-patch data) — the in-memory counterpart of g2_get_perf_file's assembly: 0x11, then each
+ * slot's sections in canonical order closed by a 0x6f, then one 0x5f.
+ */
+export function buildPerformanceTemplate(slotTemplates: string[], perfSettings: Uint8Array): string {
+	const out = [perfSettings];
+	for (const t of slotTemplates) out.push(...canonicalSlotSections(hexToBytes(t)), makeSection(SectionType.SEPARATOR, new Uint8Array(0)));
+	out.push(writeGlobalKnobs([]));
 	return buildRawHex(out, FILE_TYPE_PERFORMANCE);
 }

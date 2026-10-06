@@ -34,6 +34,8 @@ export const useDeviceStore = defineStore('device', {
 		status: DeviceStatus.Disconnected,
 		device: null as Device | null,
 		modeChanging: false,
+		// Re-sending the editor's performance after a reconnect; edits are blocked meanwhile.
+		resyncing: false,
 		pendingPerfBank: null as number | null,
 		pendingPerfLoc: null as number | null,
 		lastMidiCC: null as number | null,

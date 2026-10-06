@@ -1,5 +1,6 @@
 import { SLOT_LABELS } from '@/constants';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
+import type { Device } from '@/types';
 import { useSlotsStore } from '@/store/slots';
 
 import { ref, watch } from 'vue';
@@ -79,7 +80,7 @@ export function useG2() {
 				activityTimer = null;
 			}
 			if (wasRunning) {
-				store.status = DeviceStatus.Lost;
+				markLost();
 				log('•', 'Connect', 'Daemon exited unexpectedly');
 			} else {
 				rejectArmed(new Error('Daemon exited'));
@@ -131,15 +132,14 @@ export function useG2() {
 					return;
 				}
 				if (ev.type === 'device_disconnected') {
-					store.status = DeviceStatus.Lost;
+					markLost();
 					log('•', 'Connect', 'G2 disconnected — cable unplugged?');
-					showToast('G2 disconnected — check the USB cable.');
 					return;
 				}
 				if (ev.type === 'device_reconnected') {
 					store.status = DeviceStatus.Connected;
 					log('•', 'Connect', 'G2 reconnected');
-					void reuploadSlots();
+					void resyncAfterReconnect();
 					return;
 				}
 				if (ev.type === 'usb_driver_error') {
@@ -245,12 +245,40 @@ export function useG2() {
 		return await connectDevice();
 	}
 
+	// What the editor had when contact was lost; events after the reconnect report the (possibly
+	// rebooted) G2's state instead, which must not replace it.
+	let lostSnapshot: Pick<Device, 'mode' | 'performance' | 'slots'> | null = null;
+
+	function markLost(): void {
+		if (store.status !== DeviceStatus.Lost && store.device)
+			lostSnapshot = JSON.parse(JSON.stringify({ mode: store.device.mode, performance: store.device.performance, slots: store.device.slots }));
+		store.status = DeviceStatus.Lost;
+	}
+
 	// After the daemon reconnected by itself (cable re-plug, G2 power cycle) the editor is the truth, like the official
-	// editor (CSynth ctor → CPerformance::ConnectSynth(perf, synth, true) re-sends the still-open performance): re-upload
-	// every slot, so a rebooted G2 doesn't keep different patches than the editor shows.
-	async function reuploadSlots(): Promise<void> {
-		log('•', 'Connect', 'Re-uploading editor patches after reconnect');
-		for (const slot of SLOT_LABELS) if (slotsStore.slots[slot]?.patch) await slotsStore.downloadToSynthSlot(slot, slot);
+	// editor (CSynth ctor → CPerformance::ConnectSynth(perf, synth, true) → CleanDirtyData): first force the G2 back
+	// into the mode it had, then re-send the whole performance — in Patch mode too. Edits stay blocked meanwhile.
+	async function resyncAfterReconnect(): Promise<void> {
+		const snap = lostSnapshot;
+		lostSnapshot = null;
+		store.resyncing = true;
+		try {
+			log('•', 'Connect', 'Re-sending editor performance after reconnect');
+			const ok =
+				!!snap?.performance &&
+				(await slotsStore._uploadPerformance(async () => {
+					if (store.device && store.device.mode !== snap.mode)
+						await window.cli.run(['set-perf-mode', snap.mode === 'Performance' ? 'performance' : 'patch']);
+				}, snap));
+			// The performance upload leaves the G2 in Perf mode (hardware-observed). Back to Patch with SHIFT, which keeps
+			// the uploaded patches in the slots instead of reloading the Patch-mode ones. The mode reported here is
+			// current: the upload's rearm (and its synth_settings_update) comes with the first reload's get-patch.
+			if (ok && snap.mode !== 'Performance' && store.device?.mode === 'Performance') await window.cli.run(['set-perf-mode', 'patch', 'shift']);
+			// No performance to rebuild (e.g. an empty slot): fall back to re-uploading the slots one by one.
+			if (!ok) for (const slot of SLOT_LABELS) if (slotsStore.slots[slot]?.patch) await slotsStore.downloadToSynthSlot(slot, slot);
+		} finally {
+			store.resyncing = false;
+		}
 	}
 
 	return {

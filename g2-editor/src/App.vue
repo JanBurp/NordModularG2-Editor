@@ -405,6 +405,11 @@
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
 
+	<Dialog v-model="showDisconnected" title="G2 disconnected" :show-cancel="false">
+		<div class="text-sm text-content-primary">Lost contact with the G2 — check the USB cable and power.</div>
+		<div class="mt-2 text-xs text-content-secondary">The editor keeps your patches and sends them to the G2 again when it reconnects.</div>
+	</Dialog>
+
 	<DriverErrorDialog @retry="toggleConnection" />
 
 	<ParamEditDialog />
@@ -516,6 +521,21 @@
 
 	const device = useDeviceStore();
 	const slotsStore = useSlotsStore();
+
+	// Like the official editor's "lost contact" alert; closes by itself once the G2 is back.
+	const showDisconnected = ref(false);
+	watch(
+		() => device.status,
+		(status) => (showDisconnected.value = status === DeviceStatus.Lost),
+	);
+	// Swallow every key while the performance is re-sent after a reconnect. Capture phase on window, registered before
+	// any component's own listener, so no shortcut can edit a patch underneath the overlay.
+	function blockKeysWhileResyncing(e: KeyboardEvent) {
+		if (!device.resyncing) return;
+		e.preventDefault();
+		e.stopImmediatePropagation();
+	}
+	window.addEventListener('keydown', blockKeysWhileResyncing, true);
 	const uiStore = useUiStore();
 	const browserStore = useBrowserStore();
 	const settingsStore = useSettingsStore();
@@ -543,7 +563,8 @@
 	const isLoading = computed(
 		() =>
 			(!startingUp.value || !showAboutDialog.value) &&
-			(device.status === DeviceStatus.Connecting ||
+			(device.resyncing ||
+				device.status === DeviceStatus.Connecting ||
 				device.status === DeviceStatus.Loading ||
 				device.modeChanging ||
 				slotsStore.uploadingFromFile ||
@@ -554,6 +575,7 @@
 		return device.status === DeviceStatus.DriverError ? 'USB driver error: the G2 could not be opened.' : 'G2 not connected.';
 	});
 	const loadingMessage = computed(() => {
+		if (device.resyncing) return 'Reloading patches to G2...';
 		if (namesLoadProgress.value) return `Loading banks ${namesLoadProgress.value.location}/${namesLoadProgress.value.total}...`;
 		if (device.status === DeviceStatus.Connecting) return 'Connecting...';
 		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
@@ -712,6 +734,7 @@
 	});
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onGlobalKeydown);
+		window.removeEventListener('keydown', blockKeysWhileResyncing, true);
 		window.removeEventListener('mousemove', onMouseMove);
 		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
 	});

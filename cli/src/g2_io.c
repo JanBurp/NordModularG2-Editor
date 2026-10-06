@@ -130,15 +130,19 @@ void g2_trace_dump(void) {
     pthread_mutex_unlock(&g2_trace_mu);
 }
 
-static void debug_send(const char *fn, const uint8_t *buf, int len) {
-    g2_trace('>', buf, len);
+static void debug_hex(const char *dir, const char *fn, const uint8_t *buf, int len) {
     if (!g2_debug) return;
-    flockfile(stdout);
-    printf("{\"debug\":\"send\",\"fn\":\"%s\",\"hex\":\"", fn);
+    flockfile(stdout);   /* keep the line whole against the other thread's own stdout JSON */
+    printf("{\"debug\":\"%s\",\"fn\":\"%s\",\"hex\":\"", dir, fn);
     for (int i = 0; i < len; i++) printf("%02x", buf[i]);
     printf("\"}\n");
     fflush(stdout);
     funlockfile(stdout);
+}
+
+static void debug_send(const char *fn, const uint8_t *buf, int len) {
+    g2_trace('>', buf, len);
+    debug_hex("send", fn, buf, len);
 }
 
 /* Mirrors debug_send but for the listener thread's raw interrupt reads — every 16-byte header
@@ -146,13 +150,7 @@ static void debug_send(const char *fn, const uint8_t *buf, int len) {
  * to route RESPONSE_TYPE_EXTENDED/EMBEDDED; this catches anything upstream of that, including a
  * message the listener itself drops without ever queuing it. */
 static void debug_recv(const uint8_t *hdr) {
-    if (!g2_debug) return;
-    flockfile(stdout);   /* keep the line whole against the main thread's own stdout JSON */
-    printf("{\"debug\":\"recv\",\"fn\":\"listener\",\"hex\":\"");
-    for (int i = 0; i < 16; i++) printf("%02x", hdr[i]);
-    printf("\"}\n");
-    fflush(stdout);
-    funlockfile(stdout);
+    debug_hex("recv", "listener", hdr, 16);
 }
 
 int g2_init(void) {
@@ -648,6 +646,7 @@ static int listener_recv_bulk(uint8_t *data, uint16_t size) {
         received += transferred;   /* bytes that arrived with a timeout are consumed too */
         if (ret != 0 || transferred == 0) retries--;
     }
+    debug_hex("recv", "listener_bulk", data, received);
     return received;
 }
 

@@ -5,6 +5,7 @@
 #include "unity.h"
 #include "unity_internals.h"
 #include "test_parse_settings.h"
+#include "../include/g2_protocol.h"
 #include <string.h>
 
 static int json_has_string(cJSON *obj, const char *key, const char *expected) {
@@ -383,5 +384,22 @@ void test_parse_mem_protect(void) {
 
     TEST_ASSERT(json_has_bool(result, "memProtect", 1));
 
+    cJSON_Delete(result);
+}
+
+/* Real synth-settings reply from a G2 Engine (2026-10-06) whose stored name is "\x01". Stopping the
+ * name at the 0x01 read every field 2 bytes early: Performance mode came out as Patch and the mode
+ * byte (0x81) as perfBank 129. The pedal byte, always written as 0x40 | polarity, pins the alignment. */
+void test_parse_settings_control_char_name(void) {
+    static const uint8_t bulk[] = {
+        0x01, 0x0c, 0x00, 0x03, 0x01, 0x00, 0x81, 0x00, 0x00, 0x00, 0x00, 0x10, 0x10, 0x10, 0x10, 0x10,
+        0x10, 0x00, 0x03, 0x03, 0x00, 0x64, 0x00, 0x00, 0x06, 0x00, 0x40, 0x10, 0x00, 0x00, 0x00, 0x00,
+    };
+    cJSON *result = build_synth_bulk_json(bulk, NULL);
+    TEST_ASSERT_NOT_NULL(result);
+    TEST_ASSERT_EQUAL_STRING("?", cJSON_GetObjectItem(result, "synthName")->valuestring);
+    TEST_ASSERT_EQUAL_STRING("Performance", cJSON_GetObjectItem(result, "mode")->valuestring);
+    TEST_ASSERT_EQUAL_INT(0, (int)cJSON_GetObjectItem(result, "perfBank")->valuedouble);
+    TEST_ASSERT_EQUAL_INT(16, (int)cJSON_GetObjectItem(cJSON_GetObjectItem(result, "pedal"), "gain")->valuedouble);
     cJSON_Delete(result);
 }
