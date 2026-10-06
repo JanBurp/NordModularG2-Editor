@@ -68,9 +68,17 @@ describe('getDefaultParamValues', () => {
 
 	it('defaults Mixer channel On switches to on, but leaves other OffOn params off', () => {
 		expect(getDefaultParamValues(123).slice(4, 8)).toEqual([1, 1, 1, 1]); // Mix4-1C On1..On4
-		const env = getModule(20); // EnvADSR
-		const offOnIdx = env!.params!.findIndex((p) => p.type === 'OffOn');
-		expect(offOnIdx).toBeGreaterThanOrEqual(0);
-		expect(getDefaultParamValues(20)[offOnIdx]).toBe(0);
+		const echoIdx = getModule(57)!.params!.findIndex((p) => p.name === 'Echo'); // Automate
+		expect(echoIdx).toBeGreaterThanOrEqual(0);
+		expect(getDefaultParamValues(57)[echoIdx]).toBe(0);
+	});
+
+	it('defaults Env KB switches to on', () => {
+		// EnvADSR, ModADSR, EnvAHD, EnvMulti, EnvADR, EnvADDSR, ModAHD
+		for (const id of [20, 23, 46, 52, 84, 119, 169]) {
+			const kbIdx = getModule(id)!.params!.findIndex((p) => p.name === 'KB');
+			expect(kbIdx).toBeGreaterThanOrEqual(0);
+			expect(getDefaultParamValues(id)[kbIdx]).toBe(1);
+		}
 	});
 });
