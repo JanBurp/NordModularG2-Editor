@@ -12,6 +12,9 @@
 #include <stdlib.h>
 #include <stdio.h>
 #include <string.h>
+#include <signal.h>
+#include <sys/wait.h>
+#include <time.h>
 #include "cJSON.h"
 #include "../include/utils.h"
 #include "daemon_harness.h"
@@ -639,6 +642,7 @@ void test_daemon_set_slot_key_burst(void) {
     TEST_ASSERT_EQUAL_INT_ARRAY_MESSAGE(want, after, 4, "key flags must read back exactly as last written");
 }
 
+
 /* Test: assign-global-knob / deassign-global-knob through "seq" (the editor's runBatch path) land
  * on the intended target slot/module/param/location, read back via get-global-knobs. Picks the
  * highest free global knob, assigns VA module 1 param 0 of slot B to it, checks it, then deassigns
@@ -735,3 +739,77 @@ void test_daemon_perf_mode_cycle(void) {
     daemon_shutdown(&g_daemon);
 }
 
+/* Runs a one-shot `g2-cli --json <args>` and returns its parsed stdout (caller deletes), or NULL. */
+static cJSON *run_oneshot(const char *args) {
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "build/bin/g2-cli --json %s 2>/dev/null", args);
+    FILE *f = popen(cmd, "r");
+    if (!f) return NULL;
+    size_t cap = 1 << 16, len = 0;
+    char *buf = malloc(cap);
+    for (size_t n; buf && (n = fread(buf + len, 1, cap - len - 1, f)) > 0; ) {
+        len += n;
+        if (len + 1 == cap) buf = realloc(buf, cap *= 2);
+    }
+    pclose(f);
+    if (!buf) return NULL;
+    buf[len] = '\0';
+    cJSON *json = cJSON_Parse(buf);
+    free(buf);
+    return json;
+}
+
+/* 1 if every bank of `group` ("patches"/"performances") lists each location once. */
+static int locations_unique(cJSON *names, const char *group) {
+    cJSON *bank;
+    cJSON_ArrayForEach(bank, cJSON_GetObjectItem(names, group)) {
+        uint8_t seen[256] = {0};
+        cJSON *e;
+        cJSON_ArrayForEach(e, bank) {
+            if (seen[cJSON_GetObjectItem(e, "location")->valueint & 0xff]++) return 0;
+        }
+    }
+    return 1;
+}
+
+/* Test: one-shot get-patch and list while the G2 is still streaming (a daemon killed without
+ * STOP_COMM leaves it so). Both used to take the first extended message as their reply: get-patch
+ * returned LED/VU payloads as patch data (8 of 8 calls), list read every page one request late -
+ * pages listed twice, performances under patch banks. Seen in the duration test of 2026-10-06
+ * (44 of 704 get-patch replies, 3 of 4 bank snapshots) and reproduced exactly this way. Runs after
+ * the shared daemon is gone; leaves the G2 streaming, which a daemon start handles. */
+void test_oneshot_queries_with_stream_left_on(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    daemon_ctx_t d = daemon_spawn();
+    TEST_ASSERT_TRUE_MESSAGE(d.pid > 0, "setup: spawn daemon");
+    /* Kill it idle, after startup has armed the stream: killing it mid-transfer leaves a payload
+     * unread and wedges the G2. Its output is drained meanwhile - a full pipe blocks the daemon
+     * mid-operation, which wedged the G2 too. */
+    char line[4096];
+    for (time_t end = time(NULL) + 8; time(NULL) < end; ) read_line_timeout(d.out_fd, line, sizeof(line), 1);
+    kill(d.pid, SIGKILL);
+    waitpid(d.pid, NULL, 0);
+    close(d.in_fd);
+    close(d.out_fd);
+
+    char args[32], msg[64];
+    for (int i = 0; i < 4; i++) {
+        snprintf(args, sizeof(args), "get-patch %c", "ABCD"[i]);
+        cJSON *p = run_oneshot(args);
+        cJSON *data = cJSON_GetObjectItem(p, "data");
+        int ok = cJSON_IsString(data) && strncmp(data->valuestring, "21", 2) == 0;
+        cJSON_Delete(p);
+        snprintf(msg, sizeof(msg), "slot %c: patch data must start with 0x21", "ABCD"[i]);
+        TEST_ASSERT_TRUE_MESSAGE(ok, msg);
+    }
+
+    cJSON *a = run_oneshot("list");
+    cJSON *b = run_oneshot("list");
+    int same = a && b && cJSON_Compare(a, b, 1);
+    int uniq = a && locations_unique(a, "patches") && locations_unique(a, "performances");
+    cJSON_Delete(a);
+    cJSON_Delete(b);
+    TEST_ASSERT_TRUE_MESSAGE(same, "two listings must be identical");
+    TEST_ASSERT_TRUE_MESSAGE(uniq, "no bank may list a location twice");
+}

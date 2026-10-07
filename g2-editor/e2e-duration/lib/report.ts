@@ -1,4 +1,4 @@
-import type { G2Snapshot } from './cli';
+import { bankListProblems, type G2Snapshot } from './cli';
 import type { LogEvent } from './eventLog';
 
 export const DOWN_STATUSES = ['lost', 'disconnected', 'driver error', 'offline', 'not available'];
@@ -124,21 +124,67 @@ const fmtTime = (t: number) => new Date(t).toLocaleTimeString('en-GB');
 
 export type Verdict = 'PASS' | 'DEGRADED' | 'FAIL';
 
+/** An orSkip note for a UI element that didn't appear in time: a skip, but possibly a UI bug. */
+export const UI_TIMEOUT_NOTE = /\((timeout: |element detached)/;
+
+export interface Anomaly {
+	what: string;
+	count: number;
+	example: string;
+}
+
+/**
+ * Things that went wrong without a disconnect or a failed action: editor warnings/errors, G2 replies of the
+ * wrong kind, slot names the G2 only shows after a malformed message, a garbled bank listing, and editor
+ * state that differs from the G2's. Each one turns a PASS into DEGRADED.
+ */
+export function findAnomalies(events: LogEvent[], meta: RunMeta): Anomaly[] {
+	const found = new Map<string, Anomaly>();
+	const add = (what: string, example: string) => {
+		const a = found.get(what) ?? { what, count: 0, example: example.slice(0, 300) };
+		a.count++;
+		found.set(what, a);
+	};
+	for (const e of events) {
+		const line = String(e.line ?? '');
+		// The editor's connection log ("[USB] 08:37:34.897 • Daemon Ready") goes out as warnings too; it isn't one.
+		if (e.kind === 'console') {
+			if (!/^\[USB\] \d\d:\d\d:\d\d\.\d+ [•→←]/.test(line)) add(`editor: ${line.replace(/\d+/g, 'N').slice(0, 100)}`, line);
+		}
+		else if (e.kind === 'consistency' && (e.diffs as string[] | undefined)?.length) add('editor shows something else than the G2 has', `slot ${e.slot}: ${(e.diffs as string[]).join('; ')}`);
+		else if (e.kind === 'main' && line.includes('"ok":true,"data":{"slot":')) {
+			const tag = line.match(/"size":\d+,"data":"([0-9a-f]{2})/)?.[1];
+			if (tag && tag !== '21') add('get-patch reply is not patch data', line);
+		} else if (e.kind === 'main' && line.includes('"type":"perf_settings"')) {
+			for (const [, name] of line.matchAll(/"name":"([^"]*)"/g)) {
+				if (name === 'Error') add('G2 shows a slot/performance named "Error" (it does after a malformed message)', line);
+				else if (/[?\x00-\x1f]/.test(name)) add('garbled slot/performance name in perf_settings', `"${name}" in ${line}`);
+			}
+		}
+	}
+	if (meta.initial) for (const p of bankListProblems(meta.initial)) add('bank listing out of step', p);
+	return [...found.values()].sort((a, b) => b.count - a.count);
+}
+
 export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: string; json: Record<string, unknown>; verdict: Verdict } {
 	const incidents = events.filter((e) => e.kind === 'incident') as unknown as Incident[];
 	const sessions = buildSessions(events, meta.endedAt);
 	const actions = events.filter((e) => e.kind === 'action');
 	const probes = events.filter((e) => e.kind === 'probe');
+	const checks = events.filter((e) => e.kind === 'consistency');
 	const resets = events.filter((e) => e.kind === 'reset');
 	const powerCyclesNeeded = incidents.filter((i) => i.level === 'power-cycle' || i.level === 'failed').length;
 
-	const verdict: Verdict = meta.aborted || incidents.some((i) => i.level === 'failed') || powerCyclesNeeded > 0 ? 'FAIL' : incidents.length > 0 ? 'DEGRADED' : 'PASS';
+	const anomalies = findAnomalies(events, meta);
+	const verdict: Verdict = meta.aborted || incidents.some((i) => i.level === 'failed') || powerCyclesNeeded > 0 ? 'FAIL' : incidents.length > 0 || anomalies.length > 0 ? 'DEGRADED' : 'PASS';
 
-	const byType = new Map<string, { ok: number; failed: number; skipped: number }>((meta.actionNames ?? []).map((n) => [n, { ok: 0, failed: 0, skipped: 0 }]));
+	const byType = new Map<string, { ok: number; failed: number; skipped: number; timeout: number }>((meta.actionNames ?? []).map((n) => [n, { ok: 0, failed: 0, skipped: 0, timeout: 0 }]));
 	for (const a of actions) {
-		const c = byType.get(String(a.name)) ?? { ok: 0, failed: 0, skipped: 0 };
+		const c = byType.get(String(a.name)) ?? { ok: 0, failed: 0, skipped: 0, timeout: 0 };
+		const note = String(a.note ?? '');
 		if (!a.ok) c.failed++;
-		else if (String(a.note ?? '').startsWith('skipped')) c.skipped++;
+		else if (note.startsWith('skipped') && UI_TIMEOUT_NOTE.test(note)) c.timeout++;
+		else if (note.startsWith('skipped')) c.skipped++;
 		else c.ok++;
 		byType.set(String(a.name), c);
 	}
@@ -161,7 +207,8 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 	L.push('', '## Summary', '');
 	L.push(`- Sessions: ${sessions.length}, incidents (disconnects/hangs): ${incidents.length}`);
 	L.push(`- Recovered by itself: ${incidents.filter((i) => i.level === 'self').length}, by editor reconnect: ${incidents.filter((i) => i.level === 'editor-reconnect').length}, **needed G2 power cycle: ${powerCyclesNeeded}** (${resets.length} power cycles executed in total)`);
-	L.push(`- Actions: ${actions.length} (${actions.filter((a) => !a.ok).length} failed); health probes: ${probes.length} (${probes.filter((p) => !p.ok).length} failed)`, '');
+	L.push(`- Actions: ${actions.length} (${actions.filter((a) => !a.ok).length} failed); health probes: ${probes.length} (${probes.filter((p) => !p.ok).length} failed)`);
+	L.push(`- Editor/G2 consistency checks: ${checks.length} (${checks.filter((c) => (c.diffs as string[] | undefined)?.length).length} differed, ${checks.filter((c) => c.error).length} errors); anomalies: ${anomalies.length}`, '');
 
 	L.push('## Sessions', '', '| # | Start | Duration | Ended by | Probable cause | Recovery |', '|---|---|---|---|---|---|');
 	sessions.forEach((s, i) => {
@@ -181,11 +228,19 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 		L.push('');
 	}
 
-	L.push('## Actions', '', `${bursts} fast bursts.`, '', '| Action | OK | Skipped | Failed |', '|---|---|---|---|');
-	for (const [name, c] of [...byType].sort()) L.push(`| ${name} | ${c.ok} | ${c.skipped} | ${c.failed} |`);
+	L.push('## Anomalies', '');
+	if (anomalies.length === 0) L.push('None.');
+	else {
+		L.push('| Count | What | Example |', '|---|---|---|');
+		for (const a of anomalies) L.push(`| ${a.count} | ${a.what.replace(/\|/g, '\\|')} | \`${a.example.slice(0, 160).replace(/\|/g, '\\|').replace(/`/g, "'")}\` |`);
+	}
+	L.push('');
+
+	L.push('## Actions', '', `${bursts} fast bursts. UI timeout = a menu/dialog that didn't appear in time (screenshots in failures/).`, '', '| Action | OK | Skipped | UI timeout | Failed |', '|---|---|---|---|---|');
+	for (const [name, c] of [...byType].sort()) L.push(`| ${name} | ${c.ok} | ${c.skipped} | ${c.timeout} | ${c.failed} |`);
 	L.push('', '## Module types', '', `Used ${usedTypes.size} of ${meta.moduleTypes?.length ?? '?'} types.`);
 	if (unusedTypes.length) L.push('', `Not used: ${unusedTypes.join(', ')}`);
 	L.push('');
 
-	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, actions: Object.fromEntries(byType), moduleTypesUsed: [...usedTypes], moduleTypesUnused: unusedTypes, bursts } };
+	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, anomalies, actions: Object.fromEntries(byType), moduleTypesUsed: [...usedTypes], moduleTypesUnused: unusedTypes, bursts } };
 }

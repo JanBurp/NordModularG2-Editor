@@ -2,7 +2,7 @@ import { test } from '@playwright/test';
 import { execFileSync, spawn } from 'child_process';
 import fs from 'fs';
 import path from 'path';
-import { CLI_PATH, g2Count, runCli, runningDaemons, snapshotG2, type G2Snapshot } from './lib/cli';
+import { bankListProblems, CLI_PATH, g2Count, runCli, runningDaemons, snapshotG2, type G2Snapshot } from './lib/cli';
 import { ACTIONS } from './lib/actions/index';
 import type { ActionCtx } from './lib/actions/ctx';
 import { ModuleQueue } from './lib/actions/moduleQueue';
@@ -82,6 +82,12 @@ test('G2 duration test', async () => {
 			await new Promise((r) => setTimeout(r, 30_000));
 			initial = await snapshotG2();
 			if (Object.keys(initial.patchBanks).length === 0) throw new Error('G2 bank listing returned no patches twice; is the G2 fully booted?');
+		}
+		// A listing that got out of step: once more, the report flags it if it stays that way.
+		const problems = bankListProblems(initial!);
+		if (problems.length) {
+			log.log('main', { line: `[duration-test] bank listing out of step (${problems.join('; ')}); retrying` });
+			initial = await snapshotG2();
 		}
 		meta.initial = initial;
 		log.log('meta', { initial });

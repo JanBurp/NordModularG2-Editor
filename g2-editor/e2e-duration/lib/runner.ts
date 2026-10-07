@@ -1,14 +1,18 @@
 import type { Page } from '@playwright/test';
+import fs from 'fs';
+import path from 'path';
 import { ACTIONS } from './actions/index';
 import { cliRun, closeMenus, type ActionCtx, type ActionDef } from './actions/ctx';
 import { pickAction, planBurst, weighted } from './actions/pick';
 import { g2Count, sleep, waitFor } from './cli';
 import type { EventLog } from './eventLog';
-import { classify, DOWN_STATUSES, type Incident, type RecoveryLevel } from './report';
+import { checkConsistency } from './consistency';
+import { classify, DOWN_STATUSES, type Incident, type RecoveryLevel, UI_TIMEOUT_NOTE } from './report';
 import { powerCycle } from './shelly';
 
 const PROBE_EVERY_MS = 5 * 60_000;
 const PROBE_TIMEOUT_MS = 30_000;
+const CONSISTENCY_EVERY_MS = 2 * 60_000;
 const ACTION_TIMEOUT_MS = 90_000;
 // A spontaneous G2 reboot took ~105 s to re-enumerate (duration run 2026-10-04), so wait longer than that before escalating.
 const SELF_RECONNECT_MS = 150_000;
@@ -78,6 +82,26 @@ export class Runner {
 		}
 	}
 
+	/** Logs whether the focused slot as the editor shows it matches the G2's copy (see checkConsistency). */
+	private async checkConsistency(): Promise<void> {
+		try {
+			this.log.log('consistency', await withTimeout(checkConsistency(this.page), PROBE_TIMEOUT_MS, 'consistency check'));
+		} catch (e) {
+			this.log.log('consistency', { error: String(e).slice(0, 300) });
+		}
+	}
+
+	/** Screenshot plus open menus/dialogs and the recent log lines, for an action that failed or timed out on the UI. */
+	private async saveFailure(name: string, what: string): Promise<void> {
+		const base = path.join(this.log.dir, 'failures', `${Date.now()}-${name}`);
+		fs.mkdirSync(path.dirname(base), { recursive: true });
+		await this.page.screenshot({ path: `${base}.png` }).catch(() => undefined);
+		const ui = await this.page
+			.evaluate(() => ({ menus: document.querySelectorAll('[data-testid="context-menu"]').length, dialogs: document.querySelectorAll('[role="dialog"]').length }))
+			.catch(() => null);
+		fs.writeFileSync(`${base}.json`, JSON.stringify({ what, ui, recent: this.log.recentLines(10_000) }, null, 2));
+	}
+
 	/** Returns whether it clicked. */
 	private async clickReconnect(): Promise<boolean> {
 		if (!DOWN_STATUSES.includes(this.status)) return false;
@@ -142,8 +166,10 @@ export class Runner {
 		try {
 			const note = await withTimeout(Promise.resolve(action.run(this.ctx, fast)), ACTION_TIMEOUT_MS, action.name);
 			this.log.log('action', { name: action.name, ok: true, ms: Date.now() - t0, note, ...(fast && { fast }) });
+			if (typeof note === 'string' && UI_TIMEOUT_NOTE.test(note)) await this.saveFailure(action.name, note);
 		} catch (e) {
 			this.log.log('action', { name: action.name, ok: false, ms: Date.now() - t0, error: String(e).slice(0, 300), ...(fast && { fast }) });
+			await this.saveFailure(action.name, String(e));
 		}
 		await closeMenus(this.page).catch(() => undefined); // a failed action can leave a menu or dialog open
 		this.lastAction = action.name;
@@ -152,6 +178,7 @@ export class Runner {
 	/** Runs until `deadline`; resolves normally, or throws when a recovery fails. */
 	async run(deadline: number, intervalMs: number): Promise<void> {
 		let lastProbe = Date.now();
+		let lastCheck = Date.now();
 		while (Date.now() < deadline) {
 			if (this.lossAt !== null || DOWN_STATUSES.includes(this.status)) await this.recover('status');
 			else if (Date.now() - lastProbe > PROBE_EVERY_MS) {
@@ -161,6 +188,9 @@ export class Runner {
 					line: `[duration-test] ${Math.round((deadline - Date.now()) / 60_000)} min left; ${actions.length} actions (${actions.filter((e) => !e.ok).length} failed), ${this.incidents} incidents`,
 				});
 				if (!(await this.probe())) await this.recover('probe');
+			} else if (this.status === 'connected' && Date.now() - lastCheck > CONSISTENCY_EVERY_MS) {
+				lastCheck = Date.now();
+				await this.checkConsistency();
 			}
 
 			const enabled = ACTIONS.filter((a) => a.enabled?.(this.ctx) ?? true);

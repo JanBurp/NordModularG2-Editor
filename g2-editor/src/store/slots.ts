@@ -178,14 +178,15 @@ function assignGlobalKnobCmd(active: SlotLabel, entry: GlobalParamPageAssignment
 const _paramInFlight = new Set<string>();
 const _paramPending = new Map<string, string[]>();
 
-// Best-effort confirmation that a set-param actually reached the device: the G2
-// echoes back a param_change watch event whenever a param really changes. If none
-// arrives, the device likely silently dropped the command (see g2_io.c send_slot
-// doc comment on stale version bytes) — this is an inference from absence, not a
-// confirmed rejection, so it only warns and never blocks/throttles sending.
+// Best-effort confirmation that a set-morph-range actually reached the device: the G2
+// echoes back a morph_change watch event. If none arrives, the device likely silently
+// dropped the command (see g2_io.c send_slot doc comment on stale version bytes) — this
+// is an inference from absence, not a confirmed rejection, so it only warns and never
+// blocks/throttles sending. set-param gets no such echo: 0 of 2255 host set-params were
+// answered by a param_change in the 2026-10-06 duration test, so arming those only warned falsely.
 const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<typeof setTimeout> }>();
 // The daemon drains all queued stdin commands before forwarding watch events (see cli/src/daemon.c),
-// so a burst of sends (e.g. a fast knob/morph-range drag) can delay a legitimate echo past a short
+// so a burst of sends (e.g. a fast morph-range drag) can delay a legitimate echo past a short
 // timeout. 500ms gives real confirmations more room while still catching a truly dropped command.
 const PARAM_ECHO_TIMEOUT_MS = 500;
 
@@ -194,7 +195,7 @@ function armParamEcho(key: string, value: number): void {
 	if (existing) clearTimeout(existing.timer);
 	const timer = setTimeout(() => {
 		_paramAwaitingEcho.delete(key);
-		console.warn(`[USB] set-param not confirmed by device: ${key} v=${value}`);
+		console.warn(`[USB] morph range not confirmed by device: ${key} v=${value}`);
 	}, PARAM_ECHO_TIMEOUT_MS);
 	_paramAwaitingEcho.set(key, { value, timer });
 }
@@ -224,7 +225,7 @@ function sendCoalesced(key: string, cmd: string[]): void {
 			if (pending) {
 				_paramPending.delete(key);
 				sendCoalesced(key, pending);
-			} else {
+			} else if (cmd[0] === 'set-morph-range') {
 				armParamEcho(key, Number(cmd[5]));
 			}
 		});
@@ -1639,10 +1640,7 @@ export const useSlotsStore = defineStore('slots', {
 			const cmd = ['set-param', slot, location, String(moduleId), String(paramIdx), String(value), String(variation)];
 			if (useDeviceStore().status !== DeviceStatus.Connected) return;
 			if (immediate) {
-				window.cli
-					.run(cmd)
-					.then(() => armParamEcho(key, value))
-					.catch((err: unknown) => console.error('setParam failed:', err));
+				window.cli.run(cmd).catch((err: unknown) => console.error('setParam failed:', err));
 			} else {
 				sendCoalesced(key, cmd);
 			}

@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'vitest';
 import type { LogEvent } from './eventLog';
-import { buildReport, buildSessions, classify } from './report';
+import { bankListProblems } from './cli';
+import { diffStates } from './consistency';
+import { buildReport, buildSessions, classify, findAnomalies } from './report';
 
 const T0 = 1_700_000_000_000;
 const st = (t: number, status: string): LogEvent => ({ t: T0 + t * 1000, kind: 'status', status });
@@ -69,9 +71,62 @@ describe('buildSessions / buildReport', () => {
 			{ t: T0 + 1000, kind: 'module', short: 'OscA' },
 		];
 		const { markdown, json } = buildReport(evs, meta);
-		expect(markdown).toContain('| addModules | 1 | 1 | 0 |');
-		expect(markdown).toContain('| copyVariation | 0 | 0 | 0 |');
+		expect(markdown).toContain('| addModules | 1 | 1 | 0 | 0 |');
+		expect(markdown).toContain('| copyVariation | 0 | 0 | 0 | 0 |');
 		expect(markdown).toContain('Used 1 of 3 types.');
 		expect(json.moduleTypesUnused).toEqual(['LfoA', 'Mix4-1A']);
+	});
+});
+
+describe('anomalies', () => {
+	const meta = { startedAt: T0, endedAt: T0 + 300_000, plannedMs: 300_000, seed: 1, commit: 'abc' };
+	const main = (line: string): LogEvent => ({ t: T0, kind: 'main', line });
+
+	it('finds wrong get-patch replies, "Error"/garbled names and editor warnings', () => {
+		const a = findAnomalies(
+			[
+				main('[daemon-watch:2:1] {"id":950,"ok":true,"data":{"slot":"A","name":"InitPatch1","text":"","size":56,"data":"7201040f0f14"}}'),
+				main('[daemon-watch:2:1] {"id":951,"ok":true,"data":{"slot":"A","name":"x","text":"","size":7907,"data":"21000f01fc"}}'),
+				main('[daemon-watch:2:1] {"type":"perf_settings","performance":{"name":"Error"},"slots":[{"slot":"A","name":"??q?B?"},{"slot":"B","name":"dust"}]}'),
+				{ t: T0, kind: 'console', line: 'Cable skipped: module not found (source=3, dest=4)' },
+				{ t: T0, kind: 'console', line: 'Cable skipped: module not found (source=7, dest=9)' },
+				{ t: T0, kind: 'console', line: '[USB] 08:37:37.073 • Daemon Ready' },
+			],
+			meta,
+		);
+		expect(a.map((x) => [x.what, x.count])).toEqual([
+			['editor: Cable skipped: module not found (source=N, dest=N)', 2],
+			['get-patch reply is not patch data', 1],
+			['G2 shows a slot/performance named "Error" (it does after a malformed message)', 1],
+			['garbled slot/performance name in perf_settings', 1],
+		]);
+	});
+	it('flags a bank listing out of step and editor/G2 differences; any anomaly makes the verdict DEGRADED', () => {
+		const initial = { mode: 'Patch', slots: [], patchBanks: { '1': [{ location: 1, name: 'a' }, { location: 2, name: 'b' }, { location: 1, name: 'a' }] }, perfBanks: {} };
+		const evs: LogEvent[] = [st(0, 'connected'), { t: T0 + 1000, kind: 'consistency', slot: 'A', diffs: ['va modules only on G2: 3:OscA'] }];
+		const r = buildReport(evs, { ...meta, initial });
+		expect(r.verdict).toBe('DEGRADED');
+		expect(r.markdown).toContain('| 1 | bank listing out of step | `patch bank 1: 1 of 3 entries repeat a location` |');
+		expect(r.markdown).toContain('editor shows something else than the G2 has');
+		expect(buildReport([st(0, 'connected'), { t: T0 + 1000, kind: 'consistency', slot: 'A', diffs: [] }], meta).verdict).toBe('PASS');
+	});
+	it('counts UI timeouts apart from skips', () => {
+		const evs: LogEvent[] = [st(0, 'connected'), { t: T0 + 1000, kind: 'action', name: 'assignKnob', ok: true, note: 'skipped: assign menu (timeout: locator.waitFor: Timeout 3000ms exceeded.)' }];
+		expect(buildReport(evs, { ...meta, actionNames: ['assignKnob'] }).markdown).toContain('| assignKnob | 0 | 0 | 1 | 0 |');
+	});
+});
+
+describe('bankListProblems / diffStates', () => {
+	it('a clean listing has no problems', () => {
+		expect(bankListProblems({ patchBanks: { '1': [{ location: 1, name: 'a' }] }, perfBanks: { '2': [{ location: 1, name: 'p' }] } })).toEqual([]);
+	});
+	it('lists what only one side has', () => {
+		const empty = { modules: [], cables: [] };
+		const editor = { va: { modules: ['1:OscA', '2:LfoA'], cables: ['1-0-2-0'] }, fx: empty };
+		const device = { va: { modules: ['1:OscA', '3:Mix4-1A'], cables: ['1-0-2-0'] }, fx: empty };
+		expect(diffStates(editor, device)).toEqual(['va modules only in editor: 2:LfoA', 'va modules only on G2: 3:Mix4-1A']);
+		expect(diffStates(editor, editor)).toEqual([]);
+		const reversed = { va: { modules: editor.va.modules, cables: ['2-0-1-0'] }, fx: empty };
+		expect(diffStates(editor, reversed)).toEqual([]);
 	});
 });

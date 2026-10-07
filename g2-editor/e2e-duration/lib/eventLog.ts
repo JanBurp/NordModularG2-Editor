@@ -1,7 +1,7 @@
 import fs from 'fs';
 import path from 'path';
 
-export type EventKind = 'meta' | 'status' | 'action' | 'probe' | 'incident' | 'reset' | 'daemon' | 'main' | 'console' | 'error' | 'module';
+export type EventKind = 'meta' | 'status' | 'action' | 'probe' | 'incident' | 'reset' | 'daemon' | 'main' | 'console' | 'error' | 'module' | 'consistency';
 
 export interface LogEvent {
 	/** ms since epoch */
@@ -55,6 +55,8 @@ function progressLine(ev: LogEvent): string | null {
 			return `power cycle (${ev.reason}): ${ev.ok ? 'back' : 'NOT BACK'} after ${Math.round(Number(ev.ms) / 1000)} s`;
 		case 'error':
 			return `ERROR ${ev.line}`;
+		case 'consistency':
+			return ev.error ? `consistency check failed: ${ev.error}` : (ev.diffs as string[]).length ? `EDITOR ≠ G2 (slot ${ev.slot}): ${(ev.diffs as string[]).join('; ')}` : null;
 		case 'main':
 			return String(ev.line ?? '').startsWith('[duration-test]') ? String(ev.line) : null;
 		default:

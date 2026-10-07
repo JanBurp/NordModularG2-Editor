@@ -36,6 +36,7 @@ extern void test_daemon_set_param_label_four_button_switch(void);
 extern void test_daemon_send_controller_snapshot_cmd(void);
 extern void test_daemon_get_patch_right_after_add_modules(void);
 extern void test_daemon_set_slot_key_burst(void);
+extern void test_oneshot_queries_with_stream_left_on(void);
 extern void test_patch_workflow_full_cycle(void);
 extern void test_patch_workflow_replace_module(void);
 extern void test_daemon_perf_mode_cycle(void);
@@ -236,6 +237,7 @@ int main(void) {
     run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_patch_workflow_replace_module",  test_patch_workflow_replace_module);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
+    run_test_silently("test_oneshot_queries_with_stream_left_on", test_oneshot_queries_with_stream_left_on);
 
     /* Multi-device: needs 2 real G2 units attached, self-skips otherwise. Runs after
      * the single-daemon shared-daemon suite above releases its own USB connection. */

@@ -160,6 +160,71 @@ static int query_version(int slot, uint8_t *out) {
     return ret;
 }
 
+/* Patch data reply (bulk: [0]0x01 [1]0x08|slot [2]version [3]C_PATCH_DESCR ... module list at
+ * PCH2_USB_CHUNK2_START, the layout patch_usb_to_pch2 relies on). The tag matters: a resources_used
+ * (0x72) message has the same shape and was taken for the patch 44 times in a 4 h duration test
+ * (2026-10-06), giving the editor an empty patch built from garbage. The module-list check keeps a
+ * bare C_PATCH_DESCR change notification (g2_events.c) from passing as the reply. */
+static int is_patch_data_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int slot) {
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > PCH2_USB_CHUNK2_START + PCH2_USB_TAIL_SIZE &&
+           bulk[1] == (0x08 | slot) && bulk[3] == C_PATCH_DESCR && bulk[PCH2_USB_CHUNK2_START] == SUB_RESPONSE_MODULE_LIST;
+}
+
+/* Patch name reply: embedded (tag at [4]) or extended (tag at bulk[3]). */
+static int is_patch_name_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)arg;
+    if ((intr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) return intr[4] == SUB_RESPONSE_PATCH_NAME;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[3] == SUB_RESPONSE_PATCH_NAME;
+}
+
+/* Version, patch data (USB format, caller frees *data) and name of `slot`; only tagged replies are
+ * accepted (see await_reply). A missing name is not an error: name stays "". */
+static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *size, char *name, size_t name_size) {
+    g2_msg_t r;
+    *data = NULL;
+    name[0] = '\0';
+
+    /* Flush stale G2 data from a previous command (direct mode only;
+     * listener thread drains EP 0x81 continuously, so no flush needed). */
+    if (!g2_listener_active) drain_stale_extended();
+
+    debug_timing("get_patch_version_start");
+    int ret = query_version(slot, version);
+    debug_timing("get_patch_version_end");
+    if (ret == G2_ERR_SEND) { g2_err("Failed to send get patch version command\n"); return ret; }
+    if (ret != G2_OK) { g2_err("No response from G2 for patch version\n"); return ret; }
+    if (*version) g2_slot_version[slot] = *version;
+
+    debug_timing("get_patch_slot_start");
+    if (send_slot(slot, *version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
+        g2_err("Failed to send get patch command\n");
+        return G2_ERR_SEND;
+    }
+    usleep(USB_SEND_DELAY_US);
+    if (await_reply(is_patch_data_reply, slot, 0, &r) != G2_OK) {
+        g2_err("No patch data from G2\n");
+        return G2_ERR_RECV;
+    }
+    debug_timing("get_patch_slot_end");
+    *data = r.bulk;
+    *size = r.bulk_size;
+
+    debug_timing("get_patch_name_start");
+    if (send_slot(slot, *version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
+        g2_err("Failed to send get patch name command\n");
+        free(*data);
+        *data = NULL;
+        return G2_ERR_SEND;
+    }
+    if (await_reply(is_patch_name_reply, 0, 0, &r) == G2_OK) {
+        if (r.bulk) parse_name(r.bulk + 4, name, name_size);
+        else parse_name(r.interrupt + 5, name, name_size);
+        g2_msg_free(&r);
+    }
+    debug_timing("get_patch_name_end");
+    return G2_OK;
+}
+
 /* The performance settings as one read-modify-write unit (see perf_settings_read). */
 typedef struct {
     g2_msg_t msg;       /* the GET_PERF_SETTINGS reply; msg.bulk holds the data */
@@ -500,104 +565,8 @@ cJSON *g2_get_patch(const char *slot_str) {
     }
     actual_slot = slot;
 
-    /* Flush stale G2 data from a previous command (direct mode only;
-     * listener thread drains EP 0x81 continuously, so no flush needed). */
-    if (!g2_listener_active) drain_stale_extended();
-
-    /* Step 1: Get version for the slot */
-    /* Send: [CMD_SYS, 0x41, 0x35, slot] */
-    debug_timing("get_patch_version_start");
-    ret = query_version(actual_slot, &version);
-    debug_timing("get_patch_version_end");
-    if (ret == G2_ERR_SEND) {
-        g2_err("Failed to send get patch version command\n");
-        goto cleanup;
-    }
-    if (ret != G2_OK) {
-        g2_err("No response from G2 for patch version\n");
-        goto cleanup;
-    }
-    if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
-
-    /* Step 2: Get patch data with version */
-    debug_timing("get_patch_slot_start");
-    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-        g2_err("Failed to send get patch command\n");
-        goto cleanup;
-    }
-
-    usleep(USB_SEND_DELAY_US);
-
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) {
-        g2_err("No interrupt response for patch data\n");
-        goto cleanup;
-    }
-    if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        g2_err("Unexpected response type for patch data\n");
-        goto cleanup;
-    }
-
-    patchSize = (interruptResp[1] << 8) | interruptResp[2];
-    if (patchSize == 0) {
-        g2_err("Received empty patch data\n");
-        goto cleanup;
-    }
-    patchData = malloc(patchSize);
-    if (!patchData) {
-        g2_err("Memory allocation failed\n");
-        goto cleanup;
-    }
-
-    ret = recv_bulk(patchData, patchSize);
-    debug_timing("get_patch_slot_end");
-    if (ret <= 0) {
-        g2_err("Failed to read patch bulk data\n");
-        free(patchData);
-        patchData = NULL;
-        goto cleanup;
-    }
-
-    /* Step 3: Get patch name */
-    debug_timing("get_patch_name_start");
-    char patchName[32] = {0};
-    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
-        g2_err("Failed to send get patch name command\n");
-        free(patchData);
-        patchData = NULL;
-        goto cleanup;
-    }
-
-    /* Same lockstep discipline as the patch-version step above: skip anything not
-     * tagged as the patch-name response, relaying it via the normal event dispatcher
-     * so it isn't lost. */
-    for (int attempt = 0; attempt < 5; attempt++) {
-        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
-        if (ret <= 0) break;
-
-        if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
-            if (interruptResp[4] != SUB_RESPONSE_PATCH_NAME) continue;
-            parse_name(interruptResp + 5, patchName, sizeof(patchName));
-            break;
-        } else if ((interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
-            uint8_t *nameData = malloc(size);
-            if (!nameData) break;
-            int bulkLen = recv_bulk(nameData, size);
-            if (bulkLen > 4 && nameData[3] == SUB_RESPONSE_PATCH_NAME) {
-                parse_name(nameData + 4, patchName, sizeof(patchName));
-                free(nameData);
-                break;
-            }
-            g2_msg_t relay = {0};
-            memcpy(relay.interrupt, interruptResp, 16);
-            relay.bulk = nameData;
-            relay.bulk_size = size;
-            g2_emit_event(&relay);
-            free(nameData);
-        }
-    }
-    debug_timing("get_patch_name_end");
+    char patchName[32];
+    if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
 
     /* Step 4: Get patch notes ("Text Pad") — read-only; see g2_device.h for why there's no
      * live SET. Non-fatal on failure; an empty text field just means notes didn't come back
@@ -699,12 +668,9 @@ cleanup:
 
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int slot;
-    int actual_slot;
     uint8_t version;
-    uint8_t interruptResp[16] = {0};
     uint8_t *patchData = NULL;
     uint16_t patchSize = 0;
-    int ret;
     if (ensure_connected(1) < 0) {
         g2_err("Failed to connect to G2\n");
         return NULL;
@@ -719,74 +685,10 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         g2_err("Invalid slot: %s (use A, B, C, or D)\n", slot_str);
         goto cleanup;
     }
-    actual_slot = slot;
-
     g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
-    ret = query_version(actual_slot, &version);
-    if (ret == G2_ERR_SEND) {
-        g2_err("Failed to send get patch version command\n");
-        goto cleanup;
-    }
-    if (ret != G2_OK) {
-        g2_err("No response from G2 for patch version\n");
-        goto cleanup;
-    }
-    if (actual_slot < 4 && version) g2_slot_version[actual_slot] = version;
-
-    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-        g2_err("Failed to send get patch command\n");
-        goto cleanup;
-    }
-
-    usleep(USB_SEND_DELAY_US);
-
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0) {
-        g2_err("No interrupt response for patch data\n");
-        goto cleanup;
-    }
-
-    if ((interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-        g2_err("Unexpected response type for patch data\n");
-        goto cleanup;
-    }
-
-    patchSize = (interruptResp[1] << 8) | interruptResp[2];
-    patchData = malloc(patchSize);
-    if (!patchData) {
-        g2_err("Memory allocation failed\n");
-        goto cleanup;
-    }
-
-    ret = recv_bulk(patchData, patchSize);
-    if (ret <= 0) {
-        g2_err("Failed to read patch bulk data\n");
-        goto cleanup;
-    }
-
-    char patchName[32] = {0};
-    if (send_slot(actual_slot, version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
-        g2_err("Failed to send get patch name command\n");
-        goto cleanup;
-    }
-
-    usleep(100000);
-
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_LONG_MS);
-    if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
-        parse_name(interruptResp + 5, patchName, sizeof(patchName));
-    } else if (ret > 0 && (interruptResp[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-        uint16_t size = (interruptResp[1] << 8) | interruptResp[2];
-        uint8_t *nameData = malloc(size);
-        if (nameData) {
-            int bulkLen = recv_bulk(nameData, size);
-            if (bulkLen > 4) {
-                parse_name(nameData + 4, patchName, sizeof(patchName));
-            }
-            free(nameData);
-        }
-    }
+    char patchName[32];
+    if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
 
     char defaultFilename[64];
     if (filename == NULL) {
@@ -940,6 +842,12 @@ static const char* g2categories[16] = {
 #define LIST_CONTINUE  5
 #define LIST_LAST      LIST_CONTINUE
 
+/* Reply to the 0x14 list request (bulk: [0]0x01 [1]0x0c [2]0x00 [3]R_LIST_NAMES ...). */
+static int is_list_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)arg;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[1] == COMMAND_SYS && bulk[3] == R_LIST_NAMES;
+}
+
 cJSON *g2_list(int filter, int bank_filter) {
     uint8_t response[1024] = {0};
     uint8_t cmdData[4] = {0};
@@ -1011,21 +919,15 @@ cJSON *g2_list(int filter, int bank_filter) {
                 return NULL;
             }
 
-            /* The reply is an EXTENDED message: a 16-byte header announcing the payload
-             * size, then the payload itself on the bulk endpoint. Skip anything else. */
+            /* Only the tagged reply counts: taking a stray LED/meter message (0x39/0x3a) for it
+             * left every later request reading the previous request's answer - duplicated
+             * pages, performances listed under patch banks (duration test 2026-10-06). */
+            g2_msg_t r;
             ret = 0;
-            for (int attempt = 0; attempt < 5 && ret <= 0; attempt++) {
-                if (recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS) <= 0) break;
-                if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
-                uint16_t sz = ((uint16_t)response[1] << 8) | response[2];
-                ret = recv_bulk(response, sz < sizeof(response) ? sz : sizeof(response));
-                /* Never leave part of a payload on EP 0x82: every later bulk read would be
-                 * one message behind (see recv_interrupt_with_retry). */
-                for (uint8_t drop[512]; sz > sizeof(response); ) {
-                    uint16_t n = sz - sizeof(response) < sizeof(drop) ? sz - sizeof(response) : sizeof(drop);
-                    if (recv_bulk(drop, n) <= 0) break;
-                    sz -= n;
-                }
+            if (await_reply(is_list_reply, 0, 0, &r) == G2_OK) {
+                ret = r.bulk_size < sizeof(response) ? r.bulk_size : (int)sizeof(response);
+                memcpy(response, r.bulk, ret);
+                g2_msg_free(&r);
             }
 
             if (ret <= 9) {
@@ -1232,14 +1134,17 @@ void g2_build_add_cable_op(G2Op *op, uint8_t *buf, int loc, int color,
     op->cmd=0x50; op->payload=buf; op->len=5;
 }
 
+/* S_CABLE_COLOR: [loc<<3 | color][from mod][kind<<6 | idx][to mod][kind<<6 | idx], as
+ * BVE.NMG2Mess.pas writes (AddSetCableColorMessage) and parses it. This used to send del-cable's
+ * first byte plus a trailing color byte: the G2 took the extra byte for a further command, NACKed
+ * it (code 3) and renamed the slot "Error" (duration tests 2026-10-06/07). */
 void g2_build_set_cable_color_op(G2Op *op, uint8_t *buf, int loc, int color,
                                   int fm, int fct, int fci, int tm, int tct, int tci) {
     if (fct == 0) swap_connectors(&fm, &fct, &fci, &tm, &tct, &tci);
-    buf[0]=(uint8_t)((1<<1)|(loc&1)); buf[1]=(uint8_t)fm;
+    buf[0]=(uint8_t)(((loc&1)<<3)|(color&7)); buf[1]=(uint8_t)fm;
     buf[2]=(uint8_t)(((fct&3)<<6)|(fci&0x3f));
     buf[3]=(uint8_t)tm; buf[4]=(uint8_t)(((tct&3)<<6)|(tci&0x3f));
-    buf[5]=(uint8_t)color;
-    op->cmd=0x54; op->payload=buf; op->len=6;
+    op->cmd=0x54; op->payload=buf; op->len=5;
 }
 
 void g2_build_del_module_op(G2Op *op, uint8_t *buf, int loc, int module_id) {
@@ -1393,7 +1298,7 @@ int g2_set_cable_color(int slot, int location, int color,
 
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
-    uint8_t buf[6]; G2Op op;
+    uint8_t buf[5]; G2Op op;
     g2_build_set_cable_color_op(&op, buf, location, color,
                                 from_mod, from_con_type, from_con_id,
                                 to_mod, to_con_type, to_con_id);

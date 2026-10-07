@@ -1,8 +1,8 @@
 import { getModule } from '../../../src/renderer/nmg2mods';
 import { isSwitch } from '../../../src/utils/moduleControls';
 import { sleep } from '../cli';
-import { type ActionCtx, type ActionDef, type OwnModule, clickItem, focusOwn, int, menuLabels, moduleLocator, openMenu, orSkip, pick, pickOwn, pickParam, selectModule, UI_TIMEOUT_MS } from './ctx';
-import { hasOwn } from './modules';
+import { type ActionCtx, type ActionDef, clickItem, int, menuLabels, moduleLocator, openMenu, orSkip, pick, pickOwn, pickParam, selectModule, UI_TIMEOUT_MS } from './ctx';
+import { hasOwn, pickOrAddOwn } from './modules';
 
 const center = async (c: ActionCtx, el: import('@playwright/test').Locator) => {
 	await el.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
@@ -16,10 +16,10 @@ const center = async (c: ActionCtx, el: import('@playwright/test').Locator) => {
 	);
 };
 
-const hasModes = (m: OwnModule) => (getModule(m.type)?.modes?.length ?? 0) > 0;
+const hasModes = (type: number) => (getModule(type)?.modes?.length ?? 0) > 0;
+const hasParams = (type: number) => (getModule(type)?.params?.length ?? 0) > 0;
 /** Params that get "Rename label": switches with a label list (Module.vue onParamContextMenu). */
-const labelledParams = (m: OwnModule) =>
-	(getModule(m.type)?.params ?? []).flatMap((p, i) => (p.label && isSwitch(p.n) ? [i] : []));
+const labelledParams = (type: number) => (getModule(type)?.params ?? []).flatMap((p, i) => (p.label && isSwitch(p.n) ? [i] : []));
 
 export const PARAM_ACTIONS: ActionDef[] = [
 	{
@@ -33,7 +33,9 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				const knobs = c.page.locator('[data-testid^="canvas-"]:visible [data-param-index]');
 				let n = await knobs.count();
 				if (n === 0 && !fast) {
-					await focusOwn(c); // an empty patch: go to a slot with the test's own modules
+					// An empty patch: go to a slot with the test's own modules, or add one.
+					const m = await pickOrAddOwn(c, hasParams);
+					if (typeof m === 'string') return m;
 					n = await knobs.count();
 				}
 				if (n === 0) return 'skipped: no params on canvas';
@@ -92,11 +94,10 @@ export const PARAM_ACTIONS: ActionDef[] = [
 	{
 		name: 'setMode',
 		weight: 1,
-		enabled: hasOwn,
 		run: async (c) =>
 			orSkip('mode control gone', async () => {
-				const m = await pickOwn(c, hasModes);
-				if (!m) return 'skipped: no own module with modes';
+				const m = await pickOrAddOwn(c, hasModes);
+				if (typeof m === 'string') return m;
 				const modes = moduleLocator(c.page, m).locator('g.modes > svg');
 				const n = await modes.count();
 				if (n === 0) return `skipped: ${m.short} has no modes`;
@@ -142,12 +143,11 @@ export const PARAM_ACTIONS: ActionDef[] = [
 		// Exercises the fixed-size param-label block (set-module-labels).
 		name: 'renameSwitchLabel',
 		weight: 1,
-		enabled: hasOwn,
 		run: async (c) =>
 			orSkip('Rename Label dialog', async () => {
-				const m = await pickOwn(c, (o) => labelledParams(o).length > 0);
-				if (!m) return 'skipped: no own module with labelled switches';
-				const index = pick(c, labelledParams(m));
+				const m = await pickOrAddOwn(c, (t) => labelledParams(t).length > 0);
+				if (typeof m === 'string') return m;
+				const index = pick(c, labelledParams(m.type));
 				const p = { el: moduleLocator(c.page, m).locator(`[data-param-index="${index}"]`).first(), index };
 				await openMenu(c.page, p.el);
 				if (!(await menuLabels(c.page)).includes('Rename label')) return `skipped: param #${p.index} of ${m.short} offers no Rename label`;

@@ -83,6 +83,8 @@ typedef enum {
 #define SUB_RESPONSE_PARAM_CHANGE            (0x40)
 #define SUB_RESPONSE_CABLE_LIST              (0x52)
 #define SUB_RESPONSE_PATCH_NOTES              (0x6f)
+#define C_PATCH_DESCR                        (0x21)  /* first section of a patch data reply */
+#define R_LIST_NAMES                         (0x13)  /* reply tag of the 0x14 list request */
 
 /* Command types */
 #define COMMAND_REQ                          (0x20)  /* High nibble, expects response */

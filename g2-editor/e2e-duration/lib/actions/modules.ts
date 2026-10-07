@@ -1,5 +1,6 @@
 import { dropModuleOnCanvas } from '../../../e2e/helpers';
 import { isValidInArea } from '../../../src/renderer/nmg2mods';
+import type { ModuleDefinition } from '../../../src/types';
 import { sleep, waitFor } from '../cli';
 import {
 	type ActionCtx,
@@ -45,6 +46,34 @@ export async function waitNewIdxs(c: ActionCtx, area: Area, before: number[], n:
 
 export const hasOwn = (c: ActionCtx) => [...c.own.values()].some((l) => l.length > 0);
 
+/** Drops `def` far right on `area` of the focused slot and records it as an own module. A "skipped: …" note when the slot reloaded meanwhile; throws when it never shows up. */
+export async function addOwnModule(c: ActionCtx, def: ModuleDefinition, area: Area): Promise<OwnModule | string> {
+	const slot = await focusedSlot(c.page);
+	const before = await moduleIdxs(c.page, area);
+	await dropModuleOnCanvas(c.page, def.id, OWN_COL0 + int(c, OWN_COLS), int(c, 40), area);
+	const fresh = await waitNewIdxs(c, area, before, 1);
+	const diag = `${def.short} in slot ${slot} ${area}, before [${before}], new [${fresh}]`;
+	if (fresh.length > 1) return `skipped: slot reloaded (${diag})`;
+	if (fresh.length === 0) throw new Error(`added module not on canvas: ${diag}`);
+	const own: OwnModule = { idx: fresh[0], area, type: def.id, short: def.short };
+	c.own.set(slot, [...(c.own.get(slot) ?? []), own]);
+	c.log.log('module', { type: def.id, short: def.short, area, slot });
+	return own;
+}
+
+/** A random own module of a type `accept` takes; when the focused slot has none, adds one in the voice area (if there is room). */
+export async function pickOrAddOwn(c: ActionCtx, accept: (type: number) => boolean): Promise<OwnModule | string> {
+	const m = await pickOwn(c, (o) => accept(o.type));
+	if (m) return m;
+	if ((await liveOwn(c)).mods.length >= MAX_OWN_PER_SLOT) return `skipped: no matching own module and the cap of ${MAX_OWN_PER_SLOT} is reached`;
+	const peaks = await resourcePeaks(c.page);
+	if (peaks && peaks.va >= RESOURCE_LIMIT) return `skipped: no matching own module and slot at ${peaks.va}% VA`;
+	const defs = c.modules.all.filter((d) => accept(d.id) && isValidInArea(d.id, 'voice'));
+	if (defs.length === 0) return 'skipped: no module type qualifies';
+	await showArea(c, 'va');
+	return addOwnModule(c, pick(c, defs), 'va');
+}
+
 export const MODULE_ACTIONS: ActionDef[] = [
 	{
 		// Every user-addable type in turn (ModuleQueue), 1-3 per call, VA or FX.
@@ -64,15 +93,8 @@ export const MODULE_ACTIONS: ActionDef[] = [
 			for (let k = 1 + int(c, 3); k > 0; k--) {
 				const def = c.modules.next();
 				if (!isValidInArea(def.id, area === 'va' ? 'voice' : 'fx')) continue; // the editor refuses it (Fx-In in VA)
-				const before = await moduleIdxs(c.page, area);
-				await dropModuleOnCanvas(c.page, def.id, OWN_COL0 + int(c, OWN_COLS), int(c, 40), area);
-				const fresh = await waitNewIdxs(c, area, before, 1);
-				const diag = `${def.short} in slot ${slot} ${area}, before [${before}], new [${fresh}]`;
-				if (fresh.length > 1) return `skipped: slot reloaded (${diag})`;
-				if (fresh.length === 0) throw new Error(`added module not on canvas: ${diag}`);
-				const own: OwnModule = { idx: fresh[0], area, type: def.id, short: def.short };
-				c.own.set(slot, [...(c.own.get(slot) ?? []), own]);
-				c.log.log('module', { type: def.id, short: def.short, area, slot });
+				const own = await addOwnModule(c, def, area);
+				if (typeof own === 'string') return own;
 				added.push(def.short);
 			}
 			return `added ${added.join('+')} to slot ${slot} ${area}`;

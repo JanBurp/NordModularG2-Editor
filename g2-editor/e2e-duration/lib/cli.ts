@@ -67,3 +67,15 @@ export async function snapshotG2(): Promise<G2Snapshot> {
 		perfBanks: list.performances ?? {},
 	};
 }
+
+/** What is wrong with a bank listing: a location listed twice in a bank means the list replies got out of step (seen 2026-10-06). */
+export function bankListProblems(snap: Pick<G2Snapshot, 'patchBanks' | 'perfBanks'>): string[] {
+	const out: string[] = [];
+	for (const [kind, banks] of [['patch', snap.patchBanks], ['performance', snap.perfBanks]] as const) {
+		for (const [bank, list] of Object.entries(banks)) {
+			const dup = list.length - new Set(list.map((e) => e.location)).size;
+			if (dup) out.push(`${kind} bank ${bank}: ${dup} of ${list.length} entries repeat a location`);
+		}
+	}
+	return out;
+}

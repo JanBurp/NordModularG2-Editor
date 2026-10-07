@@ -79,7 +79,6 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'param_change') {
 			log('←', 'Watch', `param s=${ev.slot} area=${ev.area} m=${ev.module} p=${ev.param} v=${ev.value}`, 'param');
-			resolveParamEcho(`${ev.slot}:${ev.area}:${ev.module}:${ev.param}:${ev.variation}`, ev.value as number);
 			const slotLabel = ev.slot as SlotLabel;
 			if (!slotLabel || slotsStore.slots[slotLabel]?.loading) return true;
 			const areaKey = ev.area === 'va' ? 'voice' : 'fx';
