@@ -2012,6 +2012,13 @@ describe('setParamLabel — 4-button switch keeps the other button names', () =>
 });
 
 describe('failed edit push', () => {
+	beforeEach(() => {
+		// These tests deliberately exercise the "CLI failed" warning paths — expect and suppress them.
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+	});
+
+	afterEach(() => vi.restoreAllMocks());
+
 	it('reloads the slot from the G2 when an edit fails while connected', async () => {
 		const slots = useSlotsStore();
 		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
