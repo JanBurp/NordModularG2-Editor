@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import g2ModuleDefaults from './g2ModuleDefaults.json';
 import { areModulesReplaceCompatible, getDefaultParamValues, getModule, getReplaceCandidates, isValidInArea } from '../nmg2mods';
 
 // These lock in areModulesReplaceCompatible's behaviour against real entries in nmg2mods.ts, since
@@ -94,5 +95,13 @@ describe('getDefaultParamValues', () => {
 			expect(kbIdx).toBeGreaterThanOrEqual(0);
 			expect(getDefaultParamValues(id)[kbIdx]).toBe(1);
 		}
+	});
+});
+
+// Param values the G2 itself gives each module type on add-module (it ignores the values the editor sends):
+// read back from the hardware for all 166 addable types, 2026-10-08. All 8 variations held the same values.
+describe('getDefaultParamValues matches the G2', () => {
+	it.each(Object.entries(g2ModuleDefaults))('type %s', (typeId, values) => {
+		expect(getDefaultParamValues(Number(typeId))).toEqual(values);
 	});
 });
