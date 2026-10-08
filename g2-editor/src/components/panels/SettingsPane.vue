@@ -29,6 +29,18 @@
 						@update:model-value="settings.setKnobSensitivity($event)"
 					/>
 				</SettingsRow>
+				<SettingsRow label="Wheel Sensitivity">
+					<Slider
+						:model-value="settings.wheelSensitivity"
+						:min="0.25"
+						:max="4"
+						:step="0.25"
+						@update:model-value="settings.setWheelSensitivity($event)"
+					/>
+				</SettingsRow>
+				<SettingsRow label="Reverse Wheel">
+					<CheckBox :model-value="settings.wheelReverse" @update:model-value="settings.setWheelReverse($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">Cable rendering:</p>
 				<SettingsRow :label="L.cableGravity">

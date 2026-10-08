@@ -34,6 +34,8 @@ export const useSettingsStore = defineStore('settings', {
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,
 		knobSensitivity: 1 as number,
+		wheelReverse: false as boolean,
+		wheelSensitivity: 1 as number,
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
@@ -116,6 +118,12 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setKnobSensitivity(value: number) {
 			this.knobSensitivity = clamp(value, 0.1, 10);
+		},
+		setWheelReverse(value: boolean) {
+			this.wheelReverse = value;
+		},
+		setWheelSensitivity(value: number) {
+			this.wheelSensitivity = clamp(value, 0.25, 4);
 		},
 		setCanvasZoom(value: number) {
 			this.canvasZoom = clamp(value, 0.25, 3);
