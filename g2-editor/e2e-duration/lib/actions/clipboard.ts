@@ -1,5 +1,5 @@
 import { sleep } from '../cli';
-import { type ActionCtx, type ActionDef, type OwnModule, focusOwn, focusedSlot, int, menuAction, moduleIdxs, orSkip, pick, pickOwn, selectModule } from './ctx';
+import { type ActionCtx, type ActionDef, type OwnModule, focusOwn, focusedSlot, int, menuAction, moduleIdxs, orSkip, pick, pickOwn, selectModule, showArea } from './ctx';
 import { hasOwn, waitNewIdxs } from './modules';
 
 /** Hovers an empty cell far right on the canvas, so paste lands there (paste uses the last mouse position). */
@@ -42,6 +42,7 @@ export const CLIPBOARD_ACTIONS: ActionDef[] = [
 				if (mods.length === 0) return 'skipped: no own module';
 				const src = pick(c, mods);
 				const dst = pick(c, mods.filter((o) => o.type === src.type && o.area === src.area));
+				await showArea(c, src.area);
 				await selectModule(c, src);
 				await menuAction(c, 'copy');
 				await sleep(200);

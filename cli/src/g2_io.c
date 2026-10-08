@@ -866,8 +866,9 @@ static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, 
              * a query can swallow a live param_change and misread an unrelated
              * data byte (e.g. a module ID) as the version, corrupting
              * g2_slot_version[] with a bogus value that then gets stamped on
-             * every subsequent set-param — which the G2 silently rejects. */
-            if (aCmd <= 0x03) {
+             * every subsequent set-param — which the G2 silently rejects.
+             * keep_acks: a 0x7F/0x7E here may be the NACK an edit waits for (its slot tag can't be trusted). */
+            if (aCmd <= 0x03 && !(keep_acks && (subCmd == 0x7F || subCmd == 0x7E))) {
                 g2_emit_event(&msg);
                 g2_msg_free(&msg);
                 continue;

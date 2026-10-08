@@ -223,7 +223,8 @@ static void rearm_with_version_update(void) {
 #define SEQ_MAX_OPS   128
 #define SEQ_OP_BUFSZ 1024  /* large enough for set-module-labels worst case */
 
-typedef struct { int loc, mod, param, val, var; } SetParamEntry;
+/* Sent one by one after the compound frame: set-param (CMD_NO_RESP) or, with mode set, set-module-mode. */
+typedef struct { int mode, loc, mod, param, val, var; } SetParamEntry;
 
 static int execute_seq(cJSON *args) {
     int n_subs = cJSON_GetArraySize(args);
@@ -335,7 +336,12 @@ static int execute_seq(cJSON *args) {
         } else if (strcmp(scmd, "set-param") == 0 && sn >= 7) {
             /* CMD_NO_RESP — cannot go in the compound frame; queued for after */
             if (n_sp < SEQ_MAX_OPS)
-                sp_entries[n_sp++] = (SetParamEntry){ s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6) };
+                sp_entries[n_sp++] = (SetParamEntry){ 0, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6) };
+
+        } else if (strcmp(scmd, "set-module-mode") == 0 && sn >= 6) {
+            /* queued with the set-params so the paste order holds; not tried inside a compound frame */
+            if (n_sp < SEQ_MAX_OPS)
+                sp_entries[n_sp++] = (SetParamEntry){ 1, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), 0 };
 
         } else {
             ret = G2_ERR_INVALID_PARAM;
@@ -345,9 +351,11 @@ static int execute_seq(cJSON *args) {
     if (ret == G2_OK && n_ops > 0)
         ret = g2_batch_ops(batch_slot, ops, n_ops);
 
-    for (int i = 0; i < n_sp && ret == G2_OK; i++)
-        ret = g2_set_param(batch_slot, sp_entries[i].loc, sp_entries[i].mod,
-                           sp_entries[i].param, sp_entries[i].val, sp_entries[i].var);
+    for (int i = 0; i < n_sp && ret == G2_OK; i++) {
+        SetParamEntry *e = &sp_entries[i];
+        ret = e->mode ? g2_set_module_mode(batch_slot, e->loc, e->mod, e->param, e->val)
+                      : g2_set_param(batch_slot, e->loc, e->mod, e->param, e->val, e->var);
+    }
 
     free(ops);
     free(pool);

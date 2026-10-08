@@ -68,6 +68,7 @@ const char *g2_error_string(int code) {
         case G2_ERR_NOT_IMPLEMENTED:  return "not implemented";
         case G2_ERR_TOO_LARGE:        return "too large for the G2 - it cannot receive more than 32 KB in one message";
         case G2_ERR_TARGET_NOT_FOUND: return "the targeted G2 was not found - it may have been unplugged";
+        case G2_ERR_REJECTED:         return "the G2 rejected the edit";
         case G2_ERR:                  return "unspecified error";
         default:                      return "unknown error";
     }
@@ -1236,6 +1237,33 @@ static uint8_t cable_get_version(int slot) {
     return version;
 }
 
+/* An edit's answer: ok (0x7F, aCmd 0x08+slot) or a NACK (0x7E). A NACK's slot tag can't be trusted:
+ * a slot-D add-module NACK arrived tagged slot A (duration test 2026-10-07), so any slot's counts. */
+static int is_edit_ack(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int slot) {
+    (void)bulk; (void)n;
+    if ((intr[0] & 0x0f) != RESPONSE_TYPE_EMBEDDED || intr[2] == 0x04 || intr[2] == 0x0C) return 0;
+    return intr[4] == 0x7E || (intr[4] == 0x7F && intr[2] == 0x08 + slot);
+}
+
+/* Sends ops as one slot edit frame and waits for the G2's ok/NACK. Edits used to be fire-and-forget,
+ * so a NACKed add-module still returned ok and the editor kept cabling a module the G2 had refused
+ * until it wedged (duration test 2026-10-07). Waiting also keeps one edit in flight, like the
+ * reference editor. Every edit is answered, ~50-450 ms (same run). */
+static int send_slot_edit(int slot, const char *what, const G2Op *ops, int n_ops) {
+    g2_drain_pending();
+    uint8_t version = cable_get_version(slot);
+    if (send_slot_batch((uint8_t)slot, version, ops, n_ops) < 0) {
+        g2_err("%s: failed to send\n", what);
+        return G2_ERR_SEND;
+    }
+    g2_msg_t ack;
+    if (await_reply(is_edit_ack, slot, 1, &ack) != G2_OK) { g2_err("%s: no answer from the G2\n", what); return G2_ERR_RECV; }
+    int nack = ack.interrupt[4] == 0x7E, code = ack.interrupt[5];
+    g2_msg_free(&ack);
+    if (nack) { g2_err("%s: G2 rejected the edit (code %d)\n", what, code); return G2_ERR_REJECTED; }
+    return G2_OK;
+}
+
 int g2_add_cable(int slot, int location, int color,
                  int from_mod, int from_con_type, int from_con_id,
                  int to_mod,   int to_con_type,   int to_con_id) {
@@ -1246,19 +1274,11 @@ int g2_add_cable(int slot, int location, int color,
 
     if (ensure_connected(0) < 0) { g2_err("add-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[5]; G2Op op;
     g2_build_add_cable_op(&op, buf, location, color,
                           from_mod, from_con_type, from_con_id,
                           to_mod, to_con_type, to_con_id);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("add-cable: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "add-cable", &op, 1);
 }
 
 int g2_del_cable(int slot, int location,
@@ -1270,19 +1290,11 @@ int g2_del_cable(int slot, int location,
 
     if (ensure_connected(0) < 0) { g2_err("del-cable: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[5]; G2Op op;
     g2_build_del_cable_op(&op, buf, location,
                           from_mod, from_con_type, from_con_id,
                           to_mod, to_con_type, to_con_id);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("del-cable: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "del-cable", &op, 1);
 }
 
 int g2_set_cable_color(int slot, int location, int color,
@@ -1296,19 +1308,11 @@ int g2_set_cable_color(int slot, int location, int color,
 
     if (ensure_connected(0) < 0) { g2_err("set-cable-color: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[5]; G2Op op;
     g2_build_set_cable_color_op(&op, buf, location, color,
                                 from_mod, from_con_type, from_con_id,
                                 to_mod, to_con_type, to_con_id);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("set-cable-color: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "set-cable-color", &op, 1);
 }
 
 int g2_del_module(int slot, int location, int module_id) {
@@ -1318,17 +1322,9 @@ int g2_del_module(int slot, int location, int module_id) {
 
     if (ensure_connected(0) < 0) { g2_err("del-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[2]; G2Op op;
     g2_build_del_module_op(&op, buf, location, module_id);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("del-module: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "del-module", &op, 1);
 }
 
 int g2_move_module(int slot, int location, int module_id, int col, int row) {
@@ -1338,17 +1334,9 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
 
     if (ensure_connected(0) < 0) { g2_err("move-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[4]; G2Op op;
     g2_build_move_module_op(&op, buf, location, module_id, col, row);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("move-module: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "move-module", &op, 1);
 }
 
 int g2_add_module(int slot, int location, int type_id, int module_id,
@@ -1368,15 +1356,7 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 
     if (ensure_connected(0) < 0) { g2_err("add-module: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("add-module: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "add-module", &op, 1);
 }
 
 int g2_set_module_color(int slot, int location, int module_id, int color) {
@@ -1387,17 +1367,9 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
 
     if (ensure_connected(0) < 0) { g2_err("set-module-color: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[3]; G2Op op;
     g2_build_set_module_color_op(&op, buf, location, module_id, color);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("set-module-color: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "set-module-color", &op, 1);
 }
 
 int g2_set_module_label(int slot, int location, int module_id, const char *label) {
@@ -1408,17 +1380,9 @@ int g2_set_module_label(int slot, int location, int module_id, const char *label
 
     if (ensure_connected(0) < 0) { g2_err("set-module-name: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     uint8_t buf[20]; G2Op op;
     g2_build_set_module_label_op(&op, buf, location, module_id, label);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("set-module-name: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "set-module-name", &op, 1);
 }
 
 int g2_set_module_labels(int slot, int location, int module_id, int ntok, const char **tok) {
@@ -1432,15 +1396,7 @@ int g2_set_module_labels(int slot, int location, int module_id, int ntok, const 
     }
     if (ensure_connected(0) < 0) { g2_err("set-module-labels: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
-    if (send_slot(slot, version, op.cmd, op.payload, (size_t)op.len) < 0) {
-        g2_err("set-module-labels: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "set-module-labels", &op, 1);
 }
 
 int g2_batch_ops(int slot, const G2Op *ops, int n_ops) {
@@ -1448,16 +1404,7 @@ int g2_batch_ops(int slot, const G2Op *ops, int n_ops) {
     if (n_ops <= 0)               return G2_OK;
     if (ensure_connected(0) < 0) { g2_err("seq: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
-
-    if (send_slot_batch((uint8_t)slot, version, ops, n_ops) < 0) {
-        g2_err("seq: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    return send_slot_edit(slot, "seq", ops, n_ops);
 }
 
 int g2_set_module_mode(int slot, int location, int module_id, int param, int val) {
@@ -1467,17 +1414,9 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
 
     if (ensure_connected(0) < 0) { g2_err("set-module-mode: failed to connect\n"); return G2_ERR_CONNECT; }
 
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
-
     uint8_t extra[4] = { (uint8_t)location, (uint8_t)module_id, (uint8_t)param, (uint8_t)val };
-    if (send_slot(slot, version, 0x2B, extra, 4) < 0) {
-        g2_err("set-module-mode: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    G2Op op = { .cmd = 0x2B, .payload = extra, .len = 4 };
+    return send_slot_edit(slot, "set-module-mode", &op, 1);
 }
 
 int g2_select_patch(int slot, int bank, int location) {

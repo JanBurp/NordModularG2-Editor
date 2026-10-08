@@ -7,6 +7,7 @@ import { useUiStore } from '@/store/ui';
 import { getCategorySlug } from '@/constants/categories';
 import { PERF_SETTLE_TIMEOUT_MS } from './usePatchFile';
 import { notifyNamesReloaded } from './useBankDownloadDialog';
+import { showToast } from './useToast';
 import type { LogFn } from './useG2';
 
 export function useDeviceEvents(log: LogFn) {
@@ -21,6 +22,10 @@ export function useDeviceEvents(log: LogFn) {
 
 	async function handleEvent(ev: any): Promise<boolean> {
 		if (ev.type === 'device_info') {
+			// The daemon sends data:null when its startup query failed (seen after a reconnect, duration
+			// test 2026-10-07). Applying it nulled the device, and every later synth_settings_update was
+			// then dropped: Perf button dead, BPM 0. Keep the last known device; the updates refresh it.
+			if (!ev.data) return true;
 			store.applyDeviceInfo(ev.data);
 			log('←', 'Watch', `device_info name=${ev.data?.synthName ?? '?'}`);
 			if (ev.data?.synthName) window.electronAPI?.devices?.reportName(ev.data.synthName).catch(() => {});
@@ -116,6 +121,12 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'perf_settings') {
+			// The G2 answers a performance load it refuses with this name and keeps the old perfBank/perfLoc,
+			// so the pending select would only end in the generic timeout toast.
+			if (ev.performance?.name === 'Perf. Corrupt' && store.pendingPerfBank !== null) {
+				showToast(`The G2 could not load performance ${store.pendingPerfBank + 1}/${(store.pendingPerfLoc ?? 0) + 1} ("Perf. Corrupt")`);
+				store.clearPendingPerf();
+			}
 			store.updatePerfSettings(ev);
 			log('←', 'Watch', `perf_settings ${ev.performance ? 'perf=' + ev.performance.name : ev.patches ? 'patches=' + ev.patches.name : ''}`);
 			// Clears the overlay opened for a hardware-initiated performance switch

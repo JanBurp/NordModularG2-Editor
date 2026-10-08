@@ -97,9 +97,30 @@ describe('anomalies', () => {
 		expect(a.map((x) => [x.what, x.count])).toEqual([
 			['editor: Cable skipped: module not found (source=N, dest=N)', 2],
 			['get-patch reply is not patch data', 1],
-			['G2 shows a slot/performance named "Error" (it does after a malformed message)', 1],
+			['G2 renamed a slot/performance "Error" (it does after a malformed or rejected message)', 1],
 			['garbled slot/performance name in perf_settings', 1],
 		]);
+	});
+	it('counts a bad name once per change, and links a rejected edit to its command', () => {
+		const ps = (a: string, perf = 'P') => main(`[daemon-watch:2:1] {"type":"perf_settings","performance":{"name":"${perf}"},"slots":[{"slot":"A","name":"${a}"}]}`);
+		const a = findAnomalies(
+			[
+				ps('x'),
+				ps('Error'),
+				ps('Error'),
+				ps('y'),
+				ps('Error', 'Perf. Corrupt'),
+				main('[daemon-cmd:2:1]-> {"id":7,"cmd":"add-module","args":["D","va","61"]}'),
+				main('[daemon-watch:2:1] {"id":7,"ok":false,"code":-17,"error":"the G2 rejected the edit"}'),
+			],
+			meta,
+		);
+		expect(a.map((x) => [x.what, x.count])).toEqual([
+			['G2 renamed a slot/performance "Error" (it does after a malformed or rejected message)', 2],
+			['G2 could not load a stored performance ("Perf. Corrupt")', 1],
+			['G2 rejected an edit (NACK)', 1],
+		]);
+		expect(a[2].example).toBe('{"id":7,"cmd":"add-module","args":["D","va","61"]}');
 	});
 	it('flags a bank listing out of step and editor/G2 differences; any anomaly makes the verdict DEGRADED', () => {
 		const initial = { mode: 'Patch', slots: [], patchBanks: { '1': [{ location: 1, name: 'a' }, { location: 2, name: 'b' }, { location: 1, name: 'a' }] }, perfBanks: {} };
@@ -121,12 +142,14 @@ describe('bankListProblems / diffStates', () => {
 		expect(bankListProblems({ patchBanks: { '1': [{ location: 1, name: 'a' }] }, perfBanks: { '2': [{ location: 1, name: 'p' }] } })).toEqual([]);
 	});
 	it('lists what only one side has', () => {
-		const empty = { modules: [], cables: [] };
-		const editor = { va: { modules: ['1:OscA', '2:LfoA'], cables: ['1-0-2-0'] }, fx: empty };
-		const device = { va: { modules: ['1:OscA', '3:Mix4-1A'], cables: ['1-0-2-0'] }, fx: empty };
+		const empty = { modules: [], cables: [], params: [] };
+		const editor = { va: { modules: ['1:OscA', '2:LfoA'], cables: ['1-0-2-0'], params: ['1 modes=0'] }, fx: empty };
+		const device = { va: { modules: ['1:OscA', '3:Mix4-1A'], cables: ['1-0-2-0'], params: ['1 modes=0'] }, fx: empty };
 		expect(diffStates(editor, device)).toEqual(['va modules only in editor: 2:LfoA', 'va modules only on G2: 3:Mix4-1A']);
 		expect(diffStates(editor, editor)).toEqual([]);
-		const reversed = { va: { modules: editor.va.modules, cables: ['2-0-1-0'] }, fx: empty };
+		const reversed = { va: { ...editor.va, cables: ['2-0-1-0'] }, fx: empty };
 		expect(diffStates(editor, reversed)).toEqual([]);
+		const moded = { va: { ...editor.va, params: ['1 modes=2'] }, fx: empty };
+		expect(diffStates(moded, editor)).toEqual(['va params only in editor: 1 modes=2', 'va params only on G2: 1 modes=0']);
 	});
 });

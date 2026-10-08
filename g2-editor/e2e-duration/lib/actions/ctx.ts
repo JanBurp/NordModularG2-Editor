@@ -68,7 +68,9 @@ export const moduleLocator = (page: Page, m: Pick<OwnModule, 'area' | 'idx'>): L
 /** Shows the canvas of `area` (area-1 = voice, area-0 = FX). Clicking the already-active button toggles it off, so only click when needed. */
 export async function showArea(c: ActionCtx, area: Area): Promise<void> {
 	const canvas = c.page.locator(`[data-testid="canvas-${area}"]`);
-	if (await canvas.isVisible()) return;
+	// Split view can squeeze a pane to a sliver (FX ~10 px, 2026-10-07): it is "visible" but nothing in it is
+	// clickable. Clicking the area's button (not active while split) shows it alone.
+	if ((await canvas.isVisible()) && ((await canvas.boundingBox())?.height ?? 0) > 100) return;
 	const btn = c.page.locator(`[data-testid="area-${area === 'va' ? 1 : 0}"]`);
 	if (!((await btn.getAttribute('class', { timeout: UI_TIMEOUT_MS })) ?? '').includes('btn-active')) await btn.click({ timeout: UI_TIMEOUT_MS });
 	await canvas.waitFor({ state: 'visible', timeout: UI_TIMEOUT_MS });
@@ -149,13 +151,16 @@ export async function orSkip(what: string, f: () => Promise<string | void>): Pro
 	} catch (e) {
 		if (e instanceof errors.TimeoutError) return `skipped: ${what} (timeout: ${e.message.split('\n')[0].slice(0, 120)})`;
 		if (String(e).includes('Element is not attached to the DOM')) return `skipped: ${what} (element detached)`;
+		if (e instanceof NotClickable) return `skipped: ${what} (${e.message})`;
 		throw e;
 	}
 }
 
-/** Waits for the context menu to close, pressing Escape if an action left it open. */
+/** Waits for the context menu to close, pressing Escape if an action left it open. Also the Quick Add popup a double click on empty canvas opens. */
 export async function closeMenus(page: Page): Promise<void> {
-	for (let i = 0; i < 3 && ((await page.locator('[data-testid="context-menu"]').count()) > 0 || (await page.getByRole('dialog').count()) > 0); i++) {
+	const open = async () =>
+		(await page.locator('[data-testid="context-menu"]').count()) > 0 || (await page.getByRole('dialog').count()) > 0 || (await page.locator('input[placeholder="Add module..."]').count()) > 0;
+	for (let i = 0; i < 3 && (await open()); i++) {
 		await page.keyboard.press('Escape');
 		await sleep(150);
 	}
@@ -163,13 +168,39 @@ export async function closeMenus(page: Page): Promise<void> {
 
 const menus = (page: Page) => page.locator('[data-testid="context-menu"]');
 
-/** Right-clicks the centre of `target` (works on SVG <g>) and waits for the menu. */
-export async function openMenu(page: Page, target: Locator): Promise<void> {
+/** A point (or element) the harness can't click: clipped by its pane or covered. orSkip makes it a skip with the reason. */
+export class NotClickable extends Error {}
+
+/**
+ * A point where `target` itself is hit (works on SVG <g>): the centre when that's on it, else the first point of a
+ * grid over its box. The box can be much larger than what shows: a multi-frame mode bitmap's box spans the whole
+ * sprite sheet (ModuleMode.vue), and clicking its centre missed the icon (setMode, 2026-10-07).
+ */
+export async function hitPoint(target: Locator): Promise<{ x: number; y: number }> {
 	await target.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
-	const r = await target.evaluate((el) => {
-		const b = (el as Element).getBoundingClientRect();
-		return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-	}, undefined, { timeout: UI_TIMEOUT_MS });
+	const p = await target.evaluate(
+		(el) => {
+			const b = el.getBoundingClientRect();
+			const pts = [[0.5, 0.5]];
+			for (let j = 1; j < 10; j++) for (let i = 1; i < 6; i++) pts.push([i / 6, j / 10]);
+			for (const [fx, fy] of pts) {
+				const x = b.left + b.width * fx;
+				const y = b.top + b.height * fy;
+				const hit = document.elementFromPoint(x, y);
+				if (hit && el.contains(hit)) return { x, y };
+			}
+			return null;
+		},
+		undefined,
+		{ timeout: UI_TIMEOUT_MS },
+	);
+	if (!p) throw new NotClickable('target clipped or covered');
+	return p;
+}
+
+/** Right-clicks `target` (see hitPoint) and waits for the menu. */
+export async function openMenu(page: Page, target: Locator): Promise<void> {
+	const r = await hitPoint(target);
 	await page.mouse.click(r.x, r.y, { button: 'right' });
 	await menus(page).first().waitFor({ state: 'visible', timeout: UI_TIMEOUT_MS });
 }
@@ -178,6 +209,9 @@ export async function openMenu(page: Page, target: Locator): Promise<void> {
 export async function openModuleMenu(page: Page, m: OwnModule): Promise<void> {
 	const title = moduleLocator(page, m).locator('[data-drag-handle]');
 	await title.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
+	// The real pointer, left wherever the last action put it, could rest on a submenu item of the new menu and open
+	// it, and the items are looked up in the deepest menu (2026-10-07: "Replace Module" open, "Rename…" not found).
+	await page.mouse.move(1, 1);
 	await title.evaluate(
 		(el) => {
 			const b = el.getBoundingClientRect();

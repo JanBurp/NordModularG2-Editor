@@ -4,6 +4,7 @@ import { useSlotsStore } from '@/store/slots';
 import { useHistoryStore } from '@/store/history';
 import { useDeviceStore, DeviceStatus } from '@/store/device';
 import { MORPH_NAMES } from '@/types/patch';
+import { runCliBatchSafe, runCliSafe } from '@/store/slotHelpers';
 
 afterEach(() => vi.useRealTimers());
 
@@ -2007,5 +2008,56 @@ describe('setParamLabel — 4-button switch keeps the other button names', () =>
 		await store.undo();
 
 		expect(patch.areas[0].modules[0].paramLabels[0].labels).toEqual(names);
+	});
+});
+
+describe('failed edit push', () => {
+	it('reloads the slot from the G2 when an edit fails while connected', async () => {
+		const slots = useSlotsStore();
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
+		useDeviceStore().status = DeviceStatus.Connected;
+		(window as any).cli.runBatch.mockRejectedValue(new Error("Error invoking remote method 'cli:run-batch': Error: the G2 rejected the edit"));
+
+		await runCliBatchSafe(
+			[
+				['add-module', 'C', 'va', '61'],
+				['add-cable', 'C', 'va'],
+			],
+			'test',
+		);
+
+		expect(load).toHaveBeenCalledWith('C', true);
+	});
+
+	it('sends no set-module-labels for a module whose labels are all empty', async () => {
+		const slots = useSlotsStore();
+		slots.slots['A'].patch = makePatch();
+		const src = {
+			type: 184,
+			index: 1,
+			horiz: 0,
+			vert: 0,
+			color: 0,
+			name: 'Mix1-1A1',
+			lv: [],
+			modes: [],
+			paramLabels: [{ paramIndex: 0, labels: [] }],
+		} as any;
+
+		await slots.addModuleWithData(src, 17, 0, 0, 'voice');
+
+		const batches = (window as any).cli.runBatch.mock.calls.map((c: any[]) => c[0]);
+		expect(batches.flat().some((cmd: string[]) => cmd[0] === 'set-module-labels')).toBe(false);
+	});
+
+	it('keeps the local edit when offline', async () => {
+		const slots = useSlotsStore();
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		(window as any).cli.run.mockRejectedValue(new Error('not connected'));
+
+		await runCliSafe(['add-module', 'A', 'va', '61'], 'test');
+
+		expect(load).not.toHaveBeenCalled();
 	});
 });

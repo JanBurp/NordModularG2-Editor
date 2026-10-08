@@ -281,6 +281,13 @@ export function resolvePasteRowOffset(modules: { vert: number; height: number }[
 	return maxBottom - minRow;
 }
 
+// Told about every failed push (set by the slots store), which re-reads the slot when the G2 was
+// reachable: the local edit is then ahead of the G2.
+let cliFailureHandler: ((cmd: string[], err: unknown) => void) | null = null;
+export function setCliFailureHandler(fn: typeof cliFailureHandler): void {
+	cliFailureHandler = fn;
+}
+
 // Pushing a mutation to hardware is always best-effort: the offline case (or a mid-command
 // disconnect) must not surface as an error, since the local edit already succeeded.
 export async function runCliSafe(cmd: string[], label: string): Promise<void> {
@@ -288,6 +295,7 @@ export async function runCliSafe(cmd: string[], label: string): Promise<void> {
 		await window.cli.run(cmd);
 	} catch (err) {
 		console.warn(`${label}: CLI failed (offline?):`, err);
+		cliFailureHandler?.(cmd, err);
 	}
 }
 
@@ -296,5 +304,6 @@ export async function runCliBatchSafe(cmds: string[][], label: string): Promise<
 		await window.cli.runBatch(cmds);
 	} catch (err) {
 		console.warn(`${label}: CLI failed (offline?):`, err);
+		if (cmds.length > 0) cliFailureHandler?.(cmds[0], err);
 	}
 }

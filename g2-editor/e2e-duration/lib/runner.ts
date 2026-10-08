@@ -165,6 +165,9 @@ export class Runner {
 		const t0 = Date.now();
 		try {
 			const note = await withTimeout(Promise.resolve(action.run(this.ctx, fast)), ACTION_TIMEOUT_MS, action.name);
+			// The editor only logs a push the CLI refused (runCliSafe), so the action itself returns fine.
+			const refused = this.log.events.find((e) => e.kind === 'console' && e.t >= t0 && String(e.line).includes('CLI failed'));
+			if (refused) throw new Error(String(refused.line).slice(0, 300));
 			this.log.log('action', { name: action.name, ok: true, ms: Date.now() - t0, note, ...(fast && { fast }) });
 			if (typeof note === 'string' && UI_TIMEOUT_NOTE.test(note)) await this.saveFailure(action.name, note);
 		} catch (e) {

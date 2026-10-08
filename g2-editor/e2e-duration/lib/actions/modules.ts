@@ -61,17 +61,18 @@ export async function addOwnModule(c: ActionCtx, def: ModuleDefinition, area: Ar
 	return own;
 }
 
-/** A random own module of a type `accept` takes; when the focused slot has none, adds one in the voice area (if there is room). */
+/** A random own module of a type `accept` takes; when the focused slot has none, adds one in the voice area, or in FX when VA is full. */
 export async function pickOrAddOwn(c: ActionCtx, accept: (type: number) => boolean): Promise<OwnModule | string> {
 	const m = await pickOwn(c, (o) => accept(o.type));
 	if (m) return m;
 	if ((await liveOwn(c)).mods.length >= MAX_OWN_PER_SLOT) return `skipped: no matching own module and the cap of ${MAX_OWN_PER_SLOT} is reached`;
 	const peaks = await resourcePeaks(c.page);
-	if (peaks && peaks.va >= RESOURCE_LIMIT) return `skipped: no matching own module and slot at ${peaks.va}% VA`;
-	const defs = c.modules.all.filter((d) => accept(d.id) && isValidInArea(d.id, 'voice'));
-	if (defs.length === 0) return 'skipped: no module type qualifies';
-	await showArea(c, 'va');
-	return addOwnModule(c, pick(c, defs), 'va');
+	// Bank patches often fill VA (~99 %, 2026-10-07), which skipped most mode/label actions.
+	const defsIn = (a: Area) => c.modules.all.filter((d) => accept(d.id) && isValidInArea(d.id, a === 'va' ? 'voice' : 'fx'));
+	const area = (['va', 'fx'] as const).find((a) => (!peaks || peaks[a] < RESOURCE_LIMIT) && defsIn(a).length > 0);
+	if (!area) return `skipped: no matching own module and no room for one${peaks ? ` (${peaks.va}% VA / ${peaks.fx}% FX)` : ''}`;
+	await showArea(c, area);
+	return addOwnModule(c, pick(c, defsIn(area)), area);
 }
 
 export const MODULE_ACTIONS: ActionDef[] = [

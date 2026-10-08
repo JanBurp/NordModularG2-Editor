@@ -1,12 +1,13 @@
 import { sleep } from '../cli';
 import { type ActionCtx, type ActionDef, clickItem, ensureShown, hoverItem, int, menuLabels, openMenu, orSkip, pick, pickOwn, pickParam } from './ctx';
 import { hasOwn } from './modules';
+import { hasParams } from './params';
 
 const PAGES = ['A', 'B', 'C', 'D', 'E'].flatMap((p) => [1, 2, 3].map((b) => `Page ${p}${b}`));
 
 /** Right-click an own param; returns its menu labels, or a skip note. */
 async function paramMenu(c: ActionCtx): Promise<{ labels: string[]; what: string } | string> {
-	const m = await pickOwn(c);
+	const m = await pickOwn(c, (o) => hasParams(o.type));
 	const p = m && (await pickParam(c, m));
 	if (!p) return 'skipped: no own module with params';
 	await openMenu(c.page, p.el);

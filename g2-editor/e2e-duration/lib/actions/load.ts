@@ -51,10 +51,10 @@ export const LOAD_ACTIONS: ActionDef[] = [
 				if (label.startsWith('skipped')) return label;
 				c.own.clear();
 				await sleep(8000);
-				// The G2 substitutes "Perf. Corrupt" when the stored performance won't load (seen 2026-10-05, bank 2/25).
+				// The G2 substitutes "Perf. Corrupt" when it won't load a stored performance. Not the data: the same
+				// locations loaded fine before and after (2026-10-07), so it's G2 health, reported as an anomaly.
 				const loaded = (await c.page.locator('span.text.w-36.cursor-pointer').first().innerText({ timeout: UI_TIMEOUT_MS })).trim();
-				if (loaded === 'Perf. Corrupt') throw new Error(`G2 loaded "Perf. Corrupt" for ${label}: stored performance is damaged`);
-				return `performance ${label}`;
+				return loaded === 'Perf. Corrupt' ? `G2 refused performance ${label} ("Perf. Corrupt")` : `performance ${label}`;
 			}),
 	},
 ];

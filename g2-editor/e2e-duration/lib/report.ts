@@ -20,8 +20,8 @@ export function classify(lines: string[], ctx: { enumerated: boolean | null; tri
 
 	// Checked before [diag]: a rejected command (e.g. add-module with index 128) can wedge the G2, so
 	// the later disconnect is a consequence, not the cause.
-	const nack = find(/"type":"error","slot":"[A-D]","code":\d+/);
-	if (nack) return { cause: `G2 rejected a command (NACK code ${nack.match(/"code":(\d+)/)?.[1]}) before the loss`, evidence: nack };
+	const nack = find(/"type":"error","slot":"[A-D]","code":\d+|"error":"the G2 rejected the edit"/);
+	if (nack) return { cause: `G2 rejected a command (NACK${nack.includes('"type":"error"') ? ` code ${nack.match(/"code":(\d+)/)?.[1]}` : ''}) before the loss`, evidence: nack };
 
 	const diag = find(/\[diag\] disconnect \(/);
 	if (diag) {
@@ -133,11 +133,27 @@ export interface Anomaly {
 	example: string;
 }
 
+/** Names the G2 substitutes: "Error" after a message it rejected, the others for a stored patch/performance it won't load. */
+const G2_BAD_NAMES: Record<string, string> = {
+	Error: 'G2 renamed a slot/performance "Error" (it does after a malformed or rejected message)',
+	'Patch Corrupt': 'G2 could not load a stored patch ("Patch Corrupt")',
+	'Perf. Corrupt': 'G2 could not load a stored performance ("Perf. Corrupt")',
+};
+
 /**
  * Things that went wrong without a disconnect or a failed action: editor warnings/errors, G2 replies of the
- * wrong kind, slot names the G2 only shows after a malformed message, a garbled bank listing, and editor
- * state that differs from the G2's. Each one turns a PASS into DEGRADED.
+ * wrong kind, edits the G2 rejected, slot names the G2 only shows after a malformed message or a failed load,
+ * a garbled bank listing, and editor state that differs from the G2's. Each one turns a PASS into DEGRADED.
  */
+/** The JSON object of a "[daemon-…] {…}" log line, or null. */
+function parseJson(line: string): any {
+	try {
+		return JSON.parse(line.slice(line.indexOf('{')));
+	} catch {
+		return null;
+	}
+}
+
 export function findAnomalies(events: LogEvent[], meta: RunMeta): Anomaly[] {
 	const found = new Map<string, Anomaly>();
 	const add = (what: string, example: string) => {
@@ -145,6 +161,9 @@ export function findAnomalies(events: LogEvent[], meta: RunMeta): Anomaly[] {
 		a.count++;
 		found.set(what, a);
 	};
+	// perf_settings repeats a bad name on every update, so only a change to one counts.
+	const lastName = new Map<string, string>();
+	const cmdById = new Map<string, string>();
 	for (const e of events) {
 		const line = String(e.line ?? '');
 		// The editor's connection log ("[USB] 08:37:34.897 • Daemon Ready") goes out as warnings too; it isn't one.
@@ -156,11 +175,23 @@ export function findAnomalies(events: LogEvent[], meta: RunMeta): Anomaly[] {
 			const tag = line.match(/"size":\d+,"data":"([0-9a-f]{2})/)?.[1];
 			if (tag && tag !== '21') add('get-patch reply is not patch data', line);
 		} else if (e.kind === 'main' && line.includes('"type":"perf_settings"')) {
-			for (const [, name] of line.matchAll(/"name":"([^"]*)"/g)) {
-				if (name === 'Error') add('G2 shows a slot/performance named "Error" (it does after a malformed message)', line);
-				else if (/[?\x00-\x1f]/.test(name)) add('garbled slot/performance name in perf_settings', `"${name}" in ${line}`);
+			const ps = parseJson(line);
+			const named = [['performance', ps?.performance?.name], ...(ps?.slots ?? []).map((s: { slot: string; name: string }) => [s.slot, s.name])];
+			for (const [where, name] of named) {
+				if (typeof name !== 'string') continue;
+				const changed = lastName.get(where) !== name;
+				lastName.set(where, name);
+				if (G2_BAD_NAMES[name]) {
+					if (changed) add(G2_BAD_NAMES[name], `${where}: ${line}`);
+				} else if (/[?\x00-\x1f]/.test(name)) add('garbled slot/performance name in perf_settings', `"${name}" in ${line}`);
 			}
-		}
+		} else if (e.kind === 'main' && line.includes('-> {"id":')) {
+			const id = line.match(/-> \{"id":(\d+)/)?.[1];
+			if (id) cmdById.set(id, line.slice(line.indexOf('->') + 3));
+		} else if (e.kind === 'main' && line.includes('"error":"the G2 rejected the edit"')) {
+			const id = line.match(/"id":(\d+)/)?.[1];
+			add('G2 rejected an edit (NACK)', (id && cmdById.get(id)) ?? line);
+		} else if (e.kind === 'main' && /"type":"error","slot":"[A-D]"/.test(line)) add('G2 NACK outside a waited-for edit', line);
 	}
 	if (meta.initial) for (const p of bankListProblems(meta.initial)) add('bank listing out of step', p);
 	return [...found.values()].sort((a, b) => b.count - a.count);

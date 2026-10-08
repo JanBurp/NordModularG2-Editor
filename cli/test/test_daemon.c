@@ -588,6 +588,37 @@ void test_daemon_get_patch_right_after_add_modules(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
+/* Test: a paste batch with a mode change. seq rejected set-module-mode ("invalid parameter"), so every
+ * pasteParams onto a module with modes failed (8x in the 2026-10-07 duration test). Edits now wait for
+ * the G2's ok/NACK, so the ok here also means the G2 accepted the add and the mode change.
+ * Adds an OscD (type 96, one mode) at index 126 and restores slot A afterwards. */
+void test_daemon_seq_set_module_mode(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    daemon_wait_ready(&g_daemon);
+
+    char cmd[300];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"add-module\",\"args\":[\"A\",\"va\",\"96\",\"126\",\"10\",\"0\",\"0\",\"1\",\"0\",\"0\",\"OscD1\"]}", id);
+    int r_add = send_and_expect_ok(&g_daemon, cmd, id);
+    id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"seq\",\"args\":[[\"set-param\",\"A\",\"va\",\"126\",\"0\",\"70\",\"0\"],[\"set-module-mode\",\"A\",\"va\",\"126\",\"0\",\"2\"]]}", id);
+    int r_seq = send_and_expect_ok(&g_daemon, cmd, id);
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    daemon_wait_ready(&g_daemon);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_add, "add-module OscD should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_seq, "seq [set-param, set-module-mode] should be accepted");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
+}
+
 /* Reads the four slots' key flags from get-perf-settings; 0 = ok, -1 = no/odd answer. */
 static int read_slot_keys(daemon_ctx_t *d, int keys[4]) {
     int id = g_cmd_id++;

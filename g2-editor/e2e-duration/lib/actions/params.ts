@@ -1,23 +1,13 @@
 import { getModule } from '../../../src/renderer/nmg2mods';
 import { isSwitch } from '../../../src/utils/moduleControls';
 import { sleep } from '../cli';
-import { type ActionCtx, type ActionDef, clickItem, int, menuLabels, moduleLocator, openMenu, orSkip, pick, pickOwn, pickParam, selectModule, UI_TIMEOUT_MS } from './ctx';
+import { type ActionDef, clickItem, hitPoint, int, menuLabels, moduleLocator, openMenu, orSkip, pick, pickOwn, pickParam, selectModule, UI_TIMEOUT_MS } from './ctx';
 import { hasOwn, pickOrAddOwn } from './modules';
 
-const center = async (c: ActionCtx, el: import('@playwright/test').Locator) => {
-	await el.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
-	return el.evaluate(
-		(e) => {
-			const b = (e as Element).getBoundingClientRect();
-			return { x: b.left + b.width / 2, y: b.top + b.height / 2 };
-		},
-		undefined,
-		{ timeout: UI_TIMEOUT_MS },
-	);
-};
-
 const hasModes = (type: number) => (getModule(type)?.modes?.length ?? 0) > 0;
-const hasParams = (type: number) => (getModule(type)?.params?.length ?? 0) > 0;
+export const hasParams = (type: number) => (getModule(type)?.params?.length ?? 0) > 0;
+/** Knobs/sliders: switches have no Set Value. */
+const knobParams = (type: number) => (getModule(type)?.params ?? []).flatMap((p, i) => (isSwitch(p.n) ? [] : [i]));
 /** Params that get "Rename label": switches with a label list (Module.vue onParamContextMenu). */
 const labelledParams = (type: number) => (getModule(type)?.params ?? []).flatMap((p, i) => (p.label && isSwitch(p.n) ? [i] : []));
 
@@ -41,7 +31,7 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				if (n === 0) return 'skipped: no params on canvas';
 				const knob = knobs.nth(int(c, n));
 				const param = await knob.getAttribute('data-param-index', { timeout: UI_TIMEOUT_MS });
-				const r = await center(c, knob);
+				const r = await hitPoint(knob);
 				await c.page.mouse.move(r.x, r.y);
 				// A fast spin: several quick wheel ticks the way a human flicks a knob.
 				const ticks = fast ? 4 + int(c, 6) : 1;
@@ -62,7 +52,7 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				const m = await pickOwn(c);
 				const p = m && (await pickParam(c, m));
 				if (!p) return 'skipped: no own module with params';
-				const r = await center(c, p.el);
+				const r = await hitPoint(p.el);
 				const dy = (c.rnd() < 0.5 ? -1 : 1) * (10 + int(c, 40));
 				await c.page.mouse.move(r.x, r.y);
 				await c.page.mouse.down();
@@ -102,7 +92,8 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				const n = await modes.count();
 				if (n === 0) return `skipped: ${m.short} has no modes`;
 				const k = int(c, n);
-				await modes.nth(k).click({ timeout: UI_TIMEOUT_MS });
+				const at = await hitPoint(modes.nth(k));
+				await c.page.mouse.click(at.x, at.y);
 				const dropdown = c.page.locator('[data-testid="mode-dropdown"]');
 				if (await dropdown.isVisible()) {
 					const options = dropdown.locator('svg[role=option]');
@@ -119,11 +110,12 @@ export const PARAM_ACTIONS: ActionDef[] = [
 		enabled: hasOwn,
 		run: async (c) =>
 			orSkip('Set Value dialog', async () => {
-				const m = await pickOwn(c);
-				const p = m && (await pickParam(c, m));
-				if (!p) return 'skipped: no own module with params';
+				const m = await pickOrAddOwn(c, (t) => knobParams(t).length > 0);
+				if (typeof m === 'string') return m;
+				const index = pick(c, knobParams(m.type));
+				const p = { el: moduleLocator(c.page, m).locator(`[data-param-index="${index}"]`).first(), index };
 				await openMenu(c.page, p.el);
-				if (!(await menuLabels(c.page)).includes('Set Value')) return 'skipped: param has no Set Value (switch)';
+				if (!(await menuLabels(c.page)).includes('Set Value')) return `skipped: param #${index} of ${m.short} offers no Set Value`;
 				await clickItem(c.page, 'Set Value');
 				const dialog = c.page.getByRole('dialog', { name: 'Set Value' });
 				const select = dialog.locator('select');
@@ -136,7 +128,7 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				}
 				await dialog.getByRole('button', { name: 'OK' }).click({ timeout: UI_TIMEOUT_MS });
 				await dialog.waitFor({ state: 'hidden', timeout: UI_TIMEOUT_MS });
-				return `Set Value on param #${p.index} of ${m!.short}#${m!.idx}`;
+				return `Set Value on param #${p.index} of ${m.short}#${m.idx}`;
 			}),
 	},
 	{

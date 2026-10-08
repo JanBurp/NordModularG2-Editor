@@ -2,7 +2,11 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createPinia, setActivePinia } from 'pinia';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
+import { useDeviceStore } from '@/store/device';
+import { useToast } from '../useToast';
 import { useDeviceEvents } from '../useDeviceEvents';
+
+const { toasts } = useToast();
 
 beforeEach(() => {
 	setActivePinia(createPinia());
@@ -69,5 +73,32 @@ describe('useDeviceEvents — rearm snapshot vs. local edits', () => {
 
 		expect(load).not.toHaveBeenCalled();
 		expect(apply.mock.calls.map((c) => c[0])).toEqual(['A', 'B']);
+	});
+});
+
+describe('useDeviceEvents — device_info / perf load failures', () => {
+	it('keeps the known device when device_info carries no data', async () => {
+		const device = useDeviceStore();
+		device.applyDeviceInfo({ synthName: 'G2' } as any);
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		await handleEvent({ type: 'device_info', data: null });
+
+		expect(device.device).toEqual({ synthName: 'G2' });
+	});
+
+	it('ends a pending performance select when the G2 answers "Perf. Corrupt"', async () => {
+		const device = useDeviceStore();
+		vi.spyOn(device, 'updatePerfSettings').mockImplementation(() => {});
+		device.pendingPerfBank = 1;
+		device.pendingPerfLoc = 24;
+		device.modeChanging = true;
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		await handleEvent({ type: 'perf_settings', performance: { name: 'Perf. Corrupt' } });
+
+		expect(device.pendingPerfBank).toBeNull();
+		expect(device.modeChanging).toBe(false);
+		expect(toasts.at(-1)?.message).toContain('could not load performance 2/25');
 	});
 });

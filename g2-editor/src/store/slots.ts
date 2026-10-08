@@ -32,6 +32,7 @@ import { slotIndexFor, KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS } from '../renderer/para
 
 import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
+import { SLOT_LABELS } from '@/constants';
 import { defineStore } from 'pinia';
 import { showToast } from '../composables/useToast';
 import {
@@ -51,6 +52,7 @@ import {
 	buildTouchedCmds,
 	runCliSafe,
 	runCliBatchSafe,
+	setCliFailureHandler,
 	type PasteParamsPair,
 } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
@@ -126,6 +128,12 @@ function setMorphRangeCmd(
 
 // Builds the CLI del-cable / add-cable command tuple for a single cable.
 // The device replaces a module's WHOLE label list per message, so all labelled params go in one command.
+// Whether setModuleLabelsCmd has anything to send: an all-empty list built a command without
+// labels, which the CLI rejects and failed a whole paste batch (duration test 2026-10-07).
+function hasParamLabels(paramLabels: ParamLabel[] | undefined): paramLabels is ParamLabel[] {
+	return !!paramLabels?.some((pl) => pl.labels.length > 0);
+}
+
 function setModuleLabelsCmd(slot: SlotLabel, location: 'va' | 'fx' | 'patch', moduleIndex: number, paramLabels: ParamLabel[]): string[] {
 	return [
 		'set-module-labels',
@@ -371,7 +379,7 @@ function buildModuleAddition(
 
 	const { addModuleCmd, setParamCmds } = buildAddModuleCmd(src, newId, col, row, slot, location, variations ? variations.length : 1);
 
-	const setParamLabelCmds = src.paramLabels?.length ? [setModuleLabelsCmd(slot, location, newId, src.paramLabels)] : [];
+	const setParamLabelCmds = hasParamLabels(src.paramLabels) ? [setModuleLabelsCmd(slot, location, newId, src.paramLabels)] : [];
 
 	return { mod, addModuleCmd, setParamCmds, setParamLabelCmds };
 }
@@ -407,6 +415,17 @@ function fullLabelBlock(moduleType: number, paramLabels: ParamLabel[]): ParamLab
 		return { paramIndex, isString: true, paramLen: 1 + names.length * 7, labels: names.map((n, i) => labels[i] || n) };
 	});
 }
+
+// A failed edit push leaves the editor ahead of the G2. Re-read the slot rather than build on an edit
+// the G2 never applied: cabling an add-module the G2 had NACKed wedged it (duration test 2026-10-07).
+// Offline the local edit is the truth, so nothing to do then.
+setCliFailureHandler((cmd, err) => {
+	const slot = cmd[1] as SlotLabel;
+	if (!SLOT_LABELS.includes(slot) || useDeviceStore().status !== DeviceStatus.Connected) return;
+	const reason = err instanceof Error ? err.message.replace(/^.*Error: /, '') : String(err);
+	showToast(`Slot ${slot}: the G2 did not take ${cmd[0]} (${reason}) — reloaded the slot from the G2`);
+	void useSlotsStore().loadSlot(slot, true);
+});
 
 export const useSlotsStore = defineStore('slots', {
 	state: () => ({
@@ -896,7 +915,7 @@ export const useSlotsStore = defineStore('slots', {
 								slotE.variations?.length ?? 1,
 							);
 							const allCmds: string[][] = [addModuleCmd, ...setParamCmds];
-							if (modSnap.paramLabels?.length) allCmds.push(setModuleLabelsCmd(slot, location, moduleId, modSnap.paramLabels));
+							if (hasParamLabels(modSnap.paramLabels)) allCmds.push(setModuleLabelsCmd(slot, location, moduleId, modSnap.paramLabels));
 							for (const c of cableSnap) allCmds.push(addCableCmd(slot, location, c));
 							if (removedCCSnap.length > 0) allCmds.push(assignMidiCCBatchCmd(slot, removedCCSnap));
 							for (const p of removedPagesSnap) allCmds.push(assignKnobCmd(slot, p));
@@ -3317,7 +3336,7 @@ export const useSlotsStore = defineStore('slots', {
 									...paramVals0.map(String),
 									mod.uname ?? '',
 								]);
-								if (mod.paramLabels?.length) allCmds.push(setModuleLabelsCmd(slot, location, mod.index, mod.paramLabels));
+								if (hasParamLabels(mod.paramLabels)) allCmds.push(setModuleLabelsCmd(slot, location, mod.index, mod.paramLabels));
 								const slotE = this.slots[slot];
 								if (slotE.variations) {
 									for (let v = 1; v < slotE.variations.length; v++) {
