@@ -2032,8 +2032,32 @@ describe('failed edit push', () => {
 			],
 			'test',
 		);
+		await new Promise((r) => setTimeout(r, 0));
 
 		expect(load).toHaveBeenCalledWith('C', true);
+	});
+
+	it('waits for the rest of the edit, then reloads once and drops the history', async () => {
+		const slots = useSlotsStore();
+		const hist = useHistoryStore();
+		hist.record('B', { undo: async () => {}, redo: async () => {} } as any);
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue({} as any);
+		useDeviceStore().status = DeviceStatus.Connected;
+		let pending = 1;
+		(window as any).cli.pending = () => pending;
+		(window as any).cli.run.mockRejectedValue(new Error('the G2 rejected the edit'));
+
+		await runCliSafe(['add-module', 'B', 'va', '61'], 'test');
+		await runCliSafe(['add-cable', 'B', 'va'], 'test');
+		await new Promise((r) => setTimeout(r, 0));
+		expect(load).not.toHaveBeenCalled(); // a later step of the edit is still in flight
+
+		pending = 0;
+		await new Promise((r) => setTimeout(r, 150));
+		expect(load).toHaveBeenCalledTimes(1);
+		expect(load).toHaveBeenCalledWith('B', true);
+		expect(hist.canUndo('B')).toBe(false);
+		delete (window as any).cli.pending;
 	});
 
 	it('sends no set-module-labels for a module whose labels are all empty', async () => {

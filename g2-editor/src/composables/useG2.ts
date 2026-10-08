@@ -266,16 +266,23 @@ export function useG2() {
 			log('•', 'Connect', 'Re-sending editor performance after reconnect');
 			const ok =
 				!!snap?.performance &&
-				(await slotsStore._uploadPerformance(async () => {
-					if (store.device && store.device.mode !== snap.mode)
-						await window.cli.run(['set-perf-mode', snap.mode === 'Performance' ? 'performance' : 'patch']);
-				}, snap));
+				(await slotsStore._uploadPerformance(
+					async () => {
+						if (store.device && store.device.mode !== snap.mode)
+							await window.cli.run(['set-perf-mode', snap.mode === 'Performance' ? 'performance' : 'patch']);
+					},
+					snap,
+					true,
+				));
 			// The performance upload leaves the G2 in Perf mode (hardware-observed). Back to Patch with SHIFT, which keeps
 			// the uploaded patches in the slots instead of reloading the Patch-mode ones. The mode reported here is
 			// current: the upload's rearm (and its synth_settings_update) comes with the first reload's get-patch.
 			if (ok && snap.mode !== 'Performance' && store.device?.mode === 'Performance') await window.cli.run(['set-perf-mode', 'patch', 'shift']);
 			// No performance to rebuild (e.g. an empty slot): fall back to re-uploading the slots one by one.
 			if (!ok) for (const slot of SLOT_LABELS) if (slotsStore.slots[slot]?.patch) await slotsStore.downloadToSynthSlot(slot, slot);
+		} catch (err) {
+			console.error('Re-sending the performance after reconnect failed:', err);
+			showToast('Could not re-send the patches to the G2 after reconnecting — check the G2, then use Download.');
 		} finally {
 			store.resyncing = false;
 		}

@@ -1249,7 +1249,17 @@ static int is_edit_ack(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int
  * so a NACKed add-module still returned ok and the editor kept cabling a module the G2 had refused
  * until it wedged (duration test 2026-10-07). Waiting also keeps one edit in flight, like the
  * reference editor. Every edit is answered, ~50-450 ms (same run). */
+/* Slot of an edit that got no answer in time, -1 if none. The G2 answers every edit, so its ack may still
+ * come; only one edit is ever in flight, so an edit ack before the next send is that late one and must not
+ * be taken as the next edit's answer (a late NACK would fail a good edit, a late ok pass a refused one). */
+static int edit_ack_owed_slot = -1;
+
 static int send_slot_edit(int slot, const char *what, const G2Op *ops, int n_ops) {
+    if (edit_ack_owed_slot >= 0) {
+        g2_msg_t late;
+        if (await_reply(is_edit_ack, edit_ack_owed_slot, 1, &late) == G2_OK) g2_msg_free(&late);
+        edit_ack_owed_slot = -1;
+    }
     g2_drain_pending();
     uint8_t version = cable_get_version(slot);
     if (send_slot_batch((uint8_t)slot, version, ops, n_ops) < 0) {
@@ -1257,7 +1267,11 @@ static int send_slot_edit(int slot, const char *what, const G2Op *ops, int n_ops
         return G2_ERR_SEND;
     }
     g2_msg_t ack;
-    if (await_reply(is_edit_ack, slot, 1, &ack) != G2_OK) { g2_err("%s: no answer from the G2\n", what); return G2_ERR_RECV; }
+    if (await_reply(is_edit_ack, slot, 1, &ack) != G2_OK) {
+        g2_err("%s: no answer from the G2\n", what);
+        edit_ack_owed_slot = slot;
+        return G2_ERR_RECV;
+    }
     int nack = ack.interrupt[4] == 0x7E, code = ack.interrupt[5];
     g2_msg_free(&ack);
     if (nack) { g2_err("%s: G2 rejected the edit (code %d)\n", what, code); return G2_ERR_REJECTED; }

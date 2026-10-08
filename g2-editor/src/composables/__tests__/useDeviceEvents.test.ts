@@ -74,6 +74,23 @@ describe('useDeviceEvents — rearm snapshot vs. local edits', () => {
 		expect(load).not.toHaveBeenCalled();
 		expect(apply.mock.calls.map((c) => c[0])).toEqual(['A', 'B']);
 	});
+
+	it('drops the version_update snapshot when its update is skipped during an upload', async () => {
+		const slots = useSlotsStore();
+		const load = vi.spyOn(slots, 'loadSlot').mockResolvedValue(null);
+		const apply = vi.spyOn(slots, '_applyPatchOutput').mockResolvedValue(undefined as any);
+		const { handleEvent } = useDeviceEvents(() => {});
+
+		await handleEvent({ type: 'version_update', scope: 'all_slots' });
+		slots.uploadingFromFile = true;
+		await handleEvent(snapshot);
+		slots.uploadingFromFile = false;
+		slots._markSlotDirty('B'); // long after: a later rearm's snapshot already includes it
+		await handleEvent(snapshot);
+
+		expect(load).not.toHaveBeenCalled();
+		expect(apply.mock.calls.map((c) => c[0])).toEqual(['A', 'B']);
+	});
 });
 
 describe('useDeviceEvents — device_info / perf load failures', () => {

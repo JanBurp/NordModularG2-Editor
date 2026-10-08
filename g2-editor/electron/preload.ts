@@ -95,15 +95,23 @@ function fmtArgs(args: (string | number[])[]): string {
 	return args.map((a) => (Array.isArray(a) ? `<${a.length} bytes>` : a)).join(' ');
 }
 
+/* Commands sent but not yet answered, so the renderer can tell when no edit is mid-flight. */
+let pending = 0;
+function track<T>(p: Promise<T>): Promise<T> {
+	pending++;
+	return p.finally(() => pending--);
+}
+
 contextBridge.exposeInMainWorld("cli", {
 	run: (args: (string | number[])[]) => {
 		console.log(`[USB] ${now()} → Cmd ${fmtArgs(args)}`);
-		return ipcRenderer.invoke("cli:run", args);
+		return track(ipcRenderer.invoke("cli:run", args));
 	},
 	runBatch: (argsList: string[][]) => {
 		argsList.forEach((a) => console.log(`[USB] ${now()} → Cmd ${a.join(' ')}`));
-		return ipcRenderer.invoke("cli:run-batch", argsList);
+		return track(ipcRenderer.invoke("cli:run-batch", argsList));
 	},
+	pending: () => pending,
 	watchStart: () => ipcRenderer.invoke("cli:watch-start"),
 	watchStop: () => ipcRenderer.send("cli:watch-stop"),
 	onWatchEvent: (cb: (line: string) => void) => watchEvent.on(cb),

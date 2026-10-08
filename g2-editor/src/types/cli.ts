@@ -1,6 +1,7 @@
 export interface CliService {
 	run(args: (string | number[])[]): Promise<string>;
 	runBatch(argsList: string[][]): Promise<string[]>;
+	pending?(): number;
 	watchStart(): Promise<void>;
 	watchStop(): void;
 	onWatchEvent(cb: (line: string) => void): void;

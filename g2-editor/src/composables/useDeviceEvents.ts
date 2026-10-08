@@ -68,6 +68,10 @@ export function useDeviceEvents(log: LogFn) {
 			const prevPerfLoc = store.device?.perfLoc;
 			store.updateSynthSettings(ev);
 			log('←', 'Watch', `synth mode=${ev.mode} name=${ev.synthName}`);
+			// Consumed by its paired update even when that one is skipped or carries no patches, so it
+			// can't go stale for a later rearm.
+			const seen = editSeqAtRearm;
+			editSeqAtRearm = null;
 			if (slotsStore.uploadingFromFile) return true;
 			const modeSwitched = !!prevMode && ev.mode !== prevMode;
 			// A hardware button press can switch to a different performance while
@@ -92,8 +96,6 @@ export function useDeviceEvents(log: LogFn) {
 			}
 			if (ev.patches && Array.isArray(ev.patches)) {
 				// Daemon pre-loaded all slots before rearming (Delphi approach) — apply directly
-				const seen = editSeqAtRearm;
-				editSeqAtRearm = null;
 				const results = await Promise.allSettled(
 					ev.patches
 						.filter((p: any) => p?.data)

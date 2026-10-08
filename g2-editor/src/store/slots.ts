@@ -419,12 +419,27 @@ function fullLabelBlock(moduleType: number, paramLabels: ParamLabel[]): ParamLab
 // A failed edit push leaves the editor ahead of the G2. Re-read the slot rather than build on an edit
 // the G2 never applied: cabling an add-module the G2 had NACKed wedged it (duration test 2026-10-07).
 // Offline the local edit is the truth, so nothing to do then.
+// The reload waits until no command is in flight, so a multi-step edit (paste, delete-selection, undo) has
+// sent its last step first, and a burst of failures collapses into one toast and one get-patch. History is
+// dropped: it holds an edit the G2 never applied, and undoing that would just be rejected again.
+const reloadPending = new Set<SlotLabel>();
+function reloadWhenIdle(slot: SlotLabel, waitedMs = 0): void {
+	if ((window.cli.pending?.() ?? 0) > 0 && waitedMs < 5000) {
+		setTimeout(() => reloadWhenIdle(slot, waitedMs + 100), 100);
+		return;
+	}
+	reloadPending.delete(slot);
+	void useSlotsStore()
+		.loadSlot(slot, true)
+		.then((loaded) => loaded && useHistoryStore().clearHistory(slot));
+}
 setCliFailureHandler((cmd, err) => {
 	const slot = cmd[1] as SlotLabel;
-	if (!SLOT_LABELS.includes(slot) || useDeviceStore().status !== DeviceStatus.Connected) return;
+	if (!SLOT_LABELS.includes(slot) || useDeviceStore().status !== DeviceStatus.Connected || reloadPending.has(slot)) return;
+	reloadPending.add(slot);
 	const reason = err instanceof Error ? err.message.replace(/^.*Error: /, '') : String(err);
 	showToast(`Slot ${slot}: the G2 did not take ${cmd[0]} (${reason}) — reloaded the slot from the G2`);
-	void useSlotsStore().loadSlot(slot, true);
+	setTimeout(() => reloadWhenIdle(slot), 0);
 });
 
 export const useSlotsStore = defineStore('slots', {
@@ -2170,8 +2185,10 @@ export const useSlotsStore = defineStore('slots', {
 		// CMCompletePerformanceDump. `prepare` runs inside the upload guard (mode switch). With
 		// `settings`, the 0x11 perf settings are rebuilt from them; without, the .prf2 template's
 		// own are kept. Without a .prf2 template the performance is assembled from the slots'
-		// templates (patches loaded from the G2).
-		async _uploadPerformance(prepare: () => Promise<void>, settings?: Pick<Device, 'performance' | 'slots'>): Promise<boolean> {
+		// templates (patches loaded from the G2). `silent` drops the Download toasts for a caller the
+		// user didn't start (reconnect resync), which reports a failure itself.
+		async _uploadPerformance(prepare: () => Promise<void>, settings?: Pick<Device, 'performance' | 'slots'>, silent = false): Promise<boolean> {
+			const toast = silent ? () => {} : showToast;
 			const device = useDeviceStore();
 			if (device.status !== DeviceStatus.Connected) return false;
 			if (this.uploadingFromFile) return false;
@@ -2187,7 +2204,7 @@ export const useSlotsStore = defineStore('slots', {
 				})
 				.filter(Boolean);
 			if (patches.length !== 4) {
-				showToast('Cannot download performance — not all slots contain a patch.');
+				toast('Cannot download performance — not all slots contain a patch.');
 				return false;
 			}
 			const { buildPerformanceTemplate, serializePerformance, writePerfSettings } = await import('../parser/nmg2PatchSerializer');
@@ -2196,7 +2213,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!template) {
 				const slotTemplates = labels.map((s) => this.slots[s].templateRawHex);
 				if (!perfSettings || slotTemplates.some((t) => !t)) {
-					showToast('Cannot download performance — no performance data to rebuild it from.');
+					toast('Cannot download performance — no performance data to rebuild it from.');
 					return false;
 				}
 				template = buildPerformanceTemplate(slotTemplates as string[], perfSettings);
@@ -2220,7 +2237,7 @@ export const useSlotsStore = defineStore('slots', {
 				return true;
 			} catch (err) {
 				console.error('Failed to download performance to G2:', err);
-				showToast('Failed to download performance — check device connection.');
+				toast('Failed to download performance — check device connection.');
 				return false;
 			} finally {
 				this.uploadingFromFile = false;
