@@ -1,6 +1,6 @@
 import type { Cable } from '@/types/patch';
 import type { ModuleDefinition, ModuleParam, ModuleMode } from '@/types/module';
-import { getParamDefault } from '@/renderer/nmg2mods';
+import { getDefaultParamValues, getParamDefault } from '@/renderer/nmg2mods';
 
 // Matches each `newDef` param/mode to the first not-yet-consumed `oldDef` entry with the same
 // name and type (the type string encodes the value domain, so matching it approximates the real
@@ -20,10 +20,12 @@ export function remapParamValues(oldDef: ModuleDefinition, newDef: ModuleDefinit
 	const oldParams: ModuleParam[] = oldDef.params ?? [];
 	const newParams: ModuleParam[] = newDef.params ?? [];
 	const remap = buildIndexRemap(oldParams, newParams);
+	// Module-level defaults first: they include per-module presets (Vocoder bands) that per-param defaults miss.
+	const defaults = getDefaultParamValues(newDef.id);
 	return newParams.map((p, i) => {
 		const oldIdx = remap[i];
 		if (oldIdx !== null && oldValues[oldIdx] !== undefined) return oldValues[oldIdx];
-		return getParamDefault(p);
+		return defaults[i] ?? getParamDefault(p);
 	});
 }
 

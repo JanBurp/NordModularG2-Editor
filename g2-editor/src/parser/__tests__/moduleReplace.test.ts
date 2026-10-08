@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import { remapCablesForModule, remapModeValues, remapParamValues } from '../moduleReplace';
 import type { Cable } from '@/types/patch';
 import type { ModuleDefinition } from '@/types/module';
+import { getModule } from '@/renderer/nmg2mods';
+import g2Defaults from '@/renderer/__tests__/g2ModuleDefaults.json';
 
 function cable(smod: number, scon: number, dmod: number, dcon: number, dir = 1): Cable {
 	return { smod, scon, dmod, dcon, dir, colour: 1 };
@@ -51,6 +53,11 @@ describe('remapParamValues', () => {
 			],
 		});
 		expect(remapParamValues(oldDef, newDef, [10, 20])).toEqual([10, 20]);
+	});
+
+	it('uses the hardware Vocoder band preset for unmatched params, like a fresh module', () => {
+		const vocoder = getModule(108)!;
+		expect(remapParamValues(def({ params: [] }), vocoder, [])).toEqual((g2Defaults as Record<string, number[]>)['108']);
 	});
 });
 
