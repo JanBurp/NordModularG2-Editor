@@ -963,6 +963,7 @@ export const useSlotsStore = defineStore('slots', {
 			const deleteCmds: string[][] = [...connectedCables.map((c) => delCableCmd(slot, location, c)), ['del-module', slot, location, String(moduleId)]];
 			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 			for (const p of removedGlobalPagesSnap) deleteCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
+			await this._clearModuleMorphOnDevice(slot, morphSnap);
 			await runCliBatchSafe(deleteCmds, 'deleteModule');
 
 			return { name: slotEntry.name, rawHex: '', patch };
@@ -2691,6 +2692,13 @@ export const useSlotsStore = defineStore('slots', {
 			});
 		},
 
+		// Zeroes the snapshotted morph ranges on the device; must run before the del-module, as the official
+		// editor does (CMorphMap::GetDeleteModuleMolecules). Deleting a still-morphed module corrupts the G2
+		// until power-off: it then NACKs every add of module types 58-61 (duration test 2026-10-08).
+		async _clearModuleMorphOnDevice(slot: SlotLabel, snap: MorphAssignment[][]): Promise<void> {
+			for (let v = 0; v < snap.length; v++) if (snap[v].length > 0) await this._resyncMorphAssignments(slot, v, snap[v], []);
+		},
+
 		async _restoreModuleMorph(slot: SlotLabel, snap: MorphAssignment[][]): Promise<void> {
 			for (let v = 0; v < snap.length; v++) {
 				const vState = this.slots[slot].variations?.[v];
@@ -3293,6 +3301,7 @@ export const useSlotsStore = defineStore('slots', {
 						for (const p of globalPagesSnaps) cliCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 					}
 					this._markSlotDirty(slot);
+					await this._clearModuleMorphOnDevice(slot, morphSnap);
 					if (cliCmds.length > 0) {
 						await runCliBatchSafe(cliCmds, 'deleteSelection');
 					}

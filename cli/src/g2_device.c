@@ -1599,41 +1599,29 @@ int g2_set_patch_name(int slot, const char *name) {
     if (slot < 0 || slot > 3)  { g2_err("set-patch-name: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (!name || !*name)       { g2_err("set-patch-name: name must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-patch-name: failed to connect\n"); return G2_ERR_CONNECT; }
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     size_t nlen = strlen(name);
     if (nlen > 16) nlen = 16;
     uint8_t payload[16];
     memcpy(payload, name, nlen);
     if (nlen < 16) payload[nlen] = 0x00;
-    if (send_slot(slot, version, 0x27, payload, (int)(nlen + (nlen < 16 ? 1 : 0))) < 0) {
-        g2_err("set-patch-name: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    G2Op op = { .cmd = 0x27, .payload = payload, .len = (int)(nlen + (nlen < 16 ? 1 : 0)) };
+    return send_slot_edit(slot, "set-patch-name", &op, 1);
 }
 
 int g2_set_patch_description(int slot, const uint8_t *data, int len) {
     if (slot < 0 || slot > 3) { g2_err("set-patch-description: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (!data || len <= 0)    { g2_err("set-patch-description: no data\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-patch-description: failed to connect\n"); return G2_ERR_CONNECT; }
-    g2_drain_pending();
-    uint8_t version = cable_get_version(slot);
     /* G2 uses chunk format for C_PATCH_DESCR: [0x21][size_hi][size_lo][data] */
     uint8_t payload[2 + 64];
     if (len > 62) { g2_err("set-patch-description: data too long\n"); return G2_ERR_INVALID_PARAM; }
     payload[0] = (len >> 8) & 0xFF;
     payload[1] = len & 0xFF;
     memcpy(payload + 2, data, len);
-    if (send_slot(slot, version, 0x21, payload, 2 + len) < 0) {
-        g2_err("set-patch-description: failed to send\n");
-        return G2_ERR_SEND;
-    }
-    usleep(USB_SEND_DELAY_US);
-    g2_drain_pending();
-    return G2_OK;
+    /* Waits for the G2's answer like every other edit: fire-and-forget let this ack land on the next
+     * edit's await_reply, so a NACK got blamed on an add-module (duration test 2026-10-08). */
+    G2Op op = { .cmd = 0x21, .payload = payload, .len = 2 + len };
+    return send_slot_edit(slot, "set-patch-description", &op, 1);
 }
 
 /* No g2_set_patch_notes(): confirmed twice on real hardware (both hangs) plus three independent

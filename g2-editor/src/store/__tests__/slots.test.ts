@@ -891,6 +891,41 @@ describe('cable add/color/delete record undo even when the CLI/hardware call fai
 	});
 });
 
+// Deleting a still-morphed module corrupted the G2 until power-off (it then NACKed every add of
+// module types 58-61), so the morph ranges must be zeroed on the device before the del-module.
+describe('module delete zeroes its morph ranges on the device first', () => {
+	function setup() {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ index: 1, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = [
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+			{ fx: {}, voice: {}, patch: { morphAssignments: [{ groupIndex: 5, location: 1, moduleIndex: 1, paramIndex: 3, range: 127 }] } },
+		] as any;
+		useDeviceStore().status = DeviceStatus.Connected;
+		const sent: string[][] = [];
+		(globalThis as any).window.cli.run = vi.fn(async (cmd: string[]) => void sent.push(cmd));
+		(globalThis as any).window.cli.runBatch = vi.fn(async (cmds: string[][]) => (sent.push(...cmds), []));
+		return { store, patch, sent };
+	}
+	const zeroed = ['set-morph-range-batch', 'A', 'va', '1', '3', '0', '5', '1'];
+
+	it('deleteModule', async () => {
+		const { store, sent } = setup();
+		await store.deleteModule(1, 'voice');
+		expect(sent.findIndex((c) => c.join() === zeroed.join())).toBeGreaterThanOrEqual(0);
+		expect(sent.findIndex((c) => c.join() === zeroed.join())).toBeLessThan(sent.findIndex((c) => c[0] === 'del-module'));
+	});
+
+	it('deleteSelection', async () => {
+		const { store, patch, sent } = setup();
+		await store.deleteSelection([1], [], 'voice', patch.areas[1].modules, patch.areas[1].cableList);
+		expect(sent.findIndex((c) => c.join() === zeroed.join())).toBeGreaterThanOrEqual(0);
+		expect(sent.findIndex((c) => c.join() === zeroed.join())).toBeLessThan(sent.findIndex((c) => c[0] === 'del-module'));
+	});
+});
+
 describe('undo after an echo reload replaced the patch object', () => {
 	const FLT_CLASSIC = 92;
 	const FLT_LP = 87;

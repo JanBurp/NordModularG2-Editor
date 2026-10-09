@@ -1,5 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { buildCloneEntries, buildPasteParamsPairs, freeModuleIds, MAX_MODULE_INDEX, resolveColumnCollisions, resolvePasteRowOffset } from '../slotHelpers';
+import {
+	buildCloneEntries,
+	buildPasteParamsPairs,
+	freeModuleIds,
+	isCableSourceEnd,
+	MAX_MODULE_INDEX,
+	resolveColumnCollisions,
+	resolvePasteRowOffset,
+} from '../slotHelpers';
 
 function mod(index: number, type: number, pcnt: number, lv: number[], modes: number[]): any {
 	return { index, type, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv, modes };
@@ -138,5 +146,21 @@ describe('buildCloneEntries', () => {
 	it('returns null when the area has no room', () => {
 		const used = Array.from({ length: 126 }, (_, i) => i + 1);
 		expect(buildCloneEntries([mod(1, 97, 0, [], []), mod(2, 92, 0, [], [])], [], used, 0, 0)).toBeNull();
+	});
+});
+
+describe('isCableSourceEnd', () => {
+	const cable = (smod: number, scon: number, dir: number, dmod: number, dcon: number): any => ({ colour: 0, smod, scon, dir, dmod, dcon });
+
+	it('treats the input end of an output→input self-loop as the dmod end', () => {
+		const loop = cable(3, 0, 1, 3, 0);
+		expect(isCableSourceEnd(loop, { moduleIndex: 3, connectorIndex: 0, type: 'input' })).toBe(false);
+		expect(isCableSourceEnd(loop, { moduleIndex: 3, connectorIndex: 0, type: 'output' })).toBe(true);
+	});
+
+	it('resolves both ends of an input→input cable', () => {
+		const chain = cable(1, 0, 0, 2, 1);
+		expect(isCableSourceEnd(chain, { moduleIndex: 1, connectorIndex: 0, type: 'input' })).toBe(true);
+		expect(isCableSourceEnd(chain, { moduleIndex: 2, connectorIndex: 1, type: 'input' })).toBe(false);
 	});
 });
