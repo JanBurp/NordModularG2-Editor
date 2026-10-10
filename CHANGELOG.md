@@ -30,8 +30,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Sequencer Random/Clear
 - Drum Synth presets
 - Vocoder graph & preset selector
-- Faster startup (partial bank loading)
+- RndPattern dropdown graphics
 - Vertical spinner on selected knobs
+- Open .pch2 / .prf2 files with the editor (file association)
+- Double-click on canvas opens QuickAdd module popup
+- VU meters can be assigned to Parameter Pages
+- Reconnect dialog; editor re-uploads its slots after a reconnect
 
 ### Changed
 - Toolbar layout reorganized
@@ -40,6 +44,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved MIDI Learn
 - CMD-L / CMD-M shortcuts swapped
 - Module graph visualizations fixed and now all modules have graphs
+- Auto-connect / auto-suggest cabling
+- Module default parameter values now match the hardware (e.g. Env KB and Mixer switches default on)
 
 ### Fixed
 - Saving settings did not work allways (Windows)
@@ -50,6 +56,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch parser/serializer bugs (roundtrip issues)
 - Voice mode not picked up / patch reloaded
 - Label/name handling
+- Several causes of the G2 hanging / not responding (USB timeouts, module index limit, deleting morphed modules, cable color changes, performance settings)
+- Bank transfers producing wrong files or "Error" slots
+- Performance shown as Patch mode (synth settings misread)
+- Setting performance name gave an error
+- Performance Settings menu item wrongly dimmed
+- Edits overwritten by stale synth data after reconnect
+- Cable colors for uprated signals, and some modules with mixed-up connectors/parameters
 
 ### Breaking
 - Files saved before this version of this editor could be badly formatted
