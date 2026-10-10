@@ -99,7 +99,12 @@ test('G2 duration test', async () => {
 		meta.actionNames = ACTIONS.map((a) => a.name);
 		meta.moduleTypes = modules.all.map((m) => m.short);
 		const ctx: ActionCtx = { page: launched.page, app: launched.app, log, snap: initial!, mode: initial!.mode, rnd, own: new Map(), modules };
-		runner = new Runner(ctx, log, { p: BURST_P, max: BURST_MAX });
+		runner = new Runner(ctx, log, { p: BURST_P, max: BURST_MAX }, async () => {
+			await cleanup?.();
+			const again = await launchReal(log);
+			cleanup = again.cleanup;
+			return again;
+		});
 		runner.startPolling();
 
 		// The editor connects by itself at startup; one click if it did not.

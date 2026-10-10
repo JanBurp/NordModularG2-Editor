@@ -84,48 +84,20 @@ function seedSeqNote() {
 	return store;
 }
 
-// The G2's own onboard Rnd/Clr (pressed directly on the unit) ignores this editor's piano-roll
-// window; since the editor never sends this trigger param itself (see useModuleParams.ts), any
-// incoming param_change for it must be a physical press, corrected via a windowed recompute.
-describe('useSlotEvents — hardware Rnd/Clr correction', () => {
-	it("recomputes and pushes windowed values when hardware's own Rnd press echoes back (Rnd is param 35)", async () => {
+// A Rnd/Clr triggered on the G2 itself is not answered with an editor randomize: the official editor
+// only randomizes on its own button click. A patch that keeps triggering Rnd made the editor push
+// its own steps after every G2 randomize, racing the G2's step echoes (duration test 2026-10-09).
+describe('useSlotEvents — Rnd/Clr triggered on the G2', () => {
+	it('takes the G2 step values without randomizing in the editor', async () => {
 		const store = seedSeqNote();
 		const spy = vi.spyOn(store, 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
 		const { handleEvent } = useSlotEvents(() => {});
 
 		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 35, value: 1, variation: 0 });
-
-		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'rnd', 'A');
-	});
-
-	it('does the same for Clr (param 36)', async () => {
-		const store = seedSeqNote();
-		const spy = vi.spyOn(store, 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { handleEvent } = useSlotEvents(() => {});
-
-		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 36, value: 1, variation: 0 });
-
-		expect(spy).toHaveBeenCalledWith(1, 0, 'voice', 'clr', 'A');
-	});
-
-	it('does not fire on the release edge (value 0)', async () => {
-		const store = seedSeqNote();
-		const spy = vi.spyOn(store, 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { handleEvent } = useSlotEvents(() => {});
-
-		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 35, value: 0, variation: 0 });
+		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 0, value: 77, variation: 0 });
 
 		expect(spy).not.toHaveBeenCalled();
-	});
-
-	it('does not fire for an unrelated param on the same module', async () => {
-		const store = seedSeqNote();
-		const spy = vi.spyOn(store, 'randomizeOrClearSeqSteps').mockResolvedValue(undefined);
-		const { handleEvent } = useSlotEvents(() => {});
-
-		await handleEvent({ type: 'param_change', slot: 'A', area: 'va', module: 1, param: 0, value: 1, variation: 0 });
-
-		expect(spy).not.toHaveBeenCalled();
+		expect(store.slots['A'].variations![0].voice[1][0]).toBe(77);
 	});
 });
 

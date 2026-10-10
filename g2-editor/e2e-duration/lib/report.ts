@@ -44,6 +44,8 @@ export function classify(lines: string[], ctx: { enumerated: boolean | null; tri
 		return { cause: `Command error (ret=${ret})` + suffix, evidence: diag };
 	}
 
+	const closed = find(/\[duration-test\] Electron app closed/);
+	if (closed) return { cause: 'Editor app closed (window closed / app quit); the G2 was not involved', evidence: find(/\[window\]|\[app\]/) ?? closed };
 	const exit = find(/Exited with code|Daemon exited/);
 	if (exit) return { cause: 'Daemon process exited without a [diag] line (crash?)', evidence: exit };
 	if (ctx.trigger === 'probe') return { cause: 'Silent hang: connected but get-patch got no answer' };
@@ -52,7 +54,7 @@ export function classify(lines: string[], ctx: { enumerated: boolean | null; tri
 	return { cause: 'Unknown (no diagnostic lines captured)' };
 }
 
-export type RecoveryLevel = 'self' | 'editor-reconnect' | 'power-cycle' | 'failed';
+export type RecoveryLevel = 'self' | 'editor-reconnect' | 'app-relaunch' | 'power-cycle' | 'failed';
 
 export interface Incident {
 	id: number;
@@ -237,7 +239,7 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 	if (meta.final) L.push(`- G2 after the run (one-shot \`startup\`): ${meta.final.ok ? `answers (${meta.final.mode})` : `**no answer** — ${meta.final.error}`}`);
 	L.push('', '## Summary', '');
 	L.push(`- Sessions: ${sessions.length}, incidents (disconnects/hangs): ${incidents.length}`);
-	L.push(`- Recovered by itself: ${incidents.filter((i) => i.level === 'self').length}, by editor reconnect: ${incidents.filter((i) => i.level === 'editor-reconnect').length}, **needed G2 power cycle: ${powerCyclesNeeded}** (${resets.length} power cycles executed in total)`);
+	L.push(`- Recovered by itself: ${incidents.filter((i) => i.level === 'self').length}, by editor reconnect: ${incidents.filter((i) => i.level === 'editor-reconnect').length}, by app relaunch: ${incidents.filter((i) => i.level === 'app-relaunch').length}, **needed G2 power cycle: ${powerCyclesNeeded}** (${resets.length} power cycles executed in total)`);
 	L.push(`- Actions: ${actions.length} (${actions.filter((a) => !a.ok).length} failed); health probes: ${probes.length} (${probes.filter((p) => !p.ok).length} failed)`);
 	L.push(`- Editor/G2 consistency checks: ${checks.length} (${checks.filter((c) => (c.diffs as string[] | undefined)?.length).length} differed, ${checks.filter((c) => c.error).length} errors); anomalies: ${anomalies.length}`, '');
 

@@ -926,6 +926,33 @@ describe('module delete zeroes its morph ranges on the device first', () => {
 	});
 });
 
+// The G2 ignores add-module's param values, so a re-created module must get a set-param for every
+// value that differs from the hardware default — variation 0 included (replace/paste/undo drifted).
+describe('re-created module sends its non-default params for every variation', () => {
+	const ENV_ADDSR = 119; // hardware defaults [1, 0, 0, 54, 100, 54, 70, 14, 1, 0, 0]
+
+	it('deleteModule undo', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		const lv = [1, 0, 0, 54, 127, 54, 70, 14, 1, 0, 0];
+		patch.areas[1].modules = [{ index: 4, type: ENV_ADDSR, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 11, lv, modes: [] }];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = [
+			{ fx: {}, voice: { 4: [...lv] }, patch: { morphAssignments: [] } },
+			{ fx: {}, voice: { 4: [...lv] }, patch: { morphAssignments: [] } },
+		] as any;
+		await store.deleteModule(4, 'voice');
+		const runBatch = (globalThis as any).window.cli.runBatch as ReturnType<typeof vi.fn>;
+		runBatch.mockClear();
+
+		await store.undo();
+
+		const sent: string[][] = runBatch.mock.calls.flatMap((c: any[]) => c[0]);
+		const setParams = sent.filter((c) => c[0] === 'set-param').map((c) => c.slice(3).join(' '));
+		expect(setParams).toEqual(['4 4 127 0', '4 4 127 1']);
+	});
+});
+
 describe('undo after an echo reload replaced the patch object', () => {
 	const FLT_CLASSIC = 92;
 	const FLT_LP = 87;

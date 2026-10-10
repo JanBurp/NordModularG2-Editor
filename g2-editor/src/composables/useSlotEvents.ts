@@ -87,10 +87,6 @@ export function useSlotEvents(log: LogFn) {
 				vState[areaKey][ev.module as number][ev.param as number] = ev.value;
 				slotsStore._markSlotDirty(slotLabel);
 			}
-			// The G2's own onboard Rnd/Clr (see slots.ts's comment) ignores this editor's piano-roll
-			// window; since we never send this trigger param ourselves, any incoming press must be a
-			// physical button — correct it immediately with a windowed recompute.
-			slotsStore.maybeCorrectHardwareRndOrClr(slotLabel, ev.module as number, ev.param as number, ev.value as number, ev.variation as number, areaKey);
 			return true;
 		}
 		if (ev.type === 'selected_param') {

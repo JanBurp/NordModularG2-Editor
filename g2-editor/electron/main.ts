@@ -192,6 +192,9 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	// Session (if any) is bound later via devices:connect; look it up by id at
 	// close time rather than capturing it now, since binding is asynchronous.
 	const wcId = window.webContents.id;
+	// Diagnostics: a duration run (2026-10-09) lost its only window with nothing in the log.
+	window.on("close", () => console.log(`[window] close requested (webContents ${wcId})`));
+	window.webContents.on("render-process-gone", (_e, details) => console.log(`[window] renderer gone (webContents ${wcId}): ${details.reason} (exit ${details.exitCode})`));
 	window.on("closed", () => {
 		pendingAssignment.delete(wcId);
 		openFileReadyIds.delete(wcId);
@@ -1183,8 +1186,11 @@ app.on("browser-window-focus", (_event, window) => {
 	refreshMenu();
 });
 
+app.on("child-process-gone", (_e, details) => console.log(`[app] child process gone: ${details.type} ${details.reason} (exit ${details.exitCode})`));
+
 let quitting = false;
 app.on("before-quit", (e) => {
+	if (!quitting) console.log("[app] quit requested");
 	if (quitting) return;
 	e.preventDefault();
 	quitting = true;

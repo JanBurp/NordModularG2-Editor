@@ -12,7 +12,7 @@ import type {
 } from '@/types';
 import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
-import { getModule, isValidInArea } from '../renderer/nmg2mods';
+import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
@@ -333,14 +333,16 @@ function buildAddModuleCmd(
 		src.uname ?? '',
 	];
 
+	// The G2 ignores add-module's param values and starts from its own defaults, so every value that
+	// differs from those needs a set-param, variation 0 included (the official editor sends a full
+	// param dump after CMModuleNew, CPatchData::GetNewModulesMolecules).
+	const defaults = getDefaultParamValues(src.type);
 	const setParamCmds: string[][] = [];
-	if (src.pcnt > 0) {
-		for (let v = 1; v < numVariations; v++) {
-			for (let p = 0; p < src.pcnt; p++) {
-				const val = src.lv[v * src.pcnt + p];
-				if (val !== undefined && val !== paramVals0[p]) {
-					setParamCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
-				}
+	for (let v = 0; v < numVariations; v++) {
+		for (let p = 0; p < src.pcnt; p++) {
+			const val = src.lv[v * src.pcnt + p];
+			if (val !== undefined && val !== defaults[p]) {
+				setParamCmds.push(['set-param', slot, location, String(newId), String(p), String(val), String(v)]);
 			}
 		}
 	}
@@ -1782,24 +1784,6 @@ export const useSlotsStore = defineStore('slots', {
 			await this.setParams(moduleId, paramIndices, values, variation, area, slot);
 		},
 
-		// The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes within *its own*
-		// stored piano-roll window, unaware of what this editor currently shows — see
-		// randomizeOrClearSeqSteps's comment. We never send the Rnd/Clr trigger param ourselves (see
-		// useModuleParams.ts), so any incoming press of it (this is called from every incoming
-		// param_change in useSlotEvents.ts) must be physical: immediately recompute and push
-		// corrected, windowed values, overwriting hardware's own out-of-range result within
-		// milliseconds — the same procedure as pressing Rnd/Clr in this editor.
-		maybeCorrectHardwareRndOrClr(slot: SlotLabel, moduleId: number, paramIndex: number, value: number, variation: number, area: 'voice' | 'fx'): void {
-			if (value !== 1) return;
-			const patch = this.slots[slot]?.patch;
-			if (!patch) return;
-			const { areaIdx } = areaConfig(area);
-			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleId);
-			const param = mod ? getModule(mod.type)?.params?.[paramIndex] : undefined;
-			if (param?.type !== 'TrigBtn' || (param.name !== 'Rnd' && param.name !== 'Clr')) return;
-			this.randomizeOrClearSeqSteps(moduleId, variation, area, param.name === 'Rnd' ? 'rnd' : 'clr', slot);
-		},
-
 		async setMode(moduleId: number, modeIdx: number, value: number, variation: number, area: 'voice' | 'fx'): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
@@ -2483,10 +2467,9 @@ export const useSlotsStore = defineStore('slots', {
 		// counterpart (see pianoRoll.ts), so unlike every other module-level setter above, there is no
 		// CLI push here. It's still real patch data (persisted via the $PARAM_NAMES section, see
 		// nmg2PatchSerializer.ts's paramLabelsForModule), so it still goes through history/dirty-marking
-		// like any other edit. The G2's own onboard Rnd/Clr (pressed directly on the unit) randomizes
-		// within *its own* stored zoom/offset window regardless of what's pushed here — see
-		// useSlotEvents.ts's param_change handler, which corrects that by recomputing within the
-		// window shown here as soon as it sees hardware's own Rnd/Clr press echo back.
+		// like any other edit. A Rnd/Clr triggered on the G2 itself (knob, CC, morph) randomizes within
+		// *its own* stored window; its step values are taken as they come, like the official editor
+		// does (it only randomizes on its own button click, CPnlNoteSeqClrRnd::HandleChangeRequests).
 		async setSeqNotePianoRollView(moduleId: number, area: 'voice' | 'fx', view: PianoRollView): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
@@ -3346,33 +3329,18 @@ export const useSlotsStore = defineStore('slots', {
 							this._markSlotDirty(slot);
 							const allCmds: string[][] = [];
 							for (const mod of modSnaps) {
-								const paramVals0 = mod.lv.slice(0, mod.pcnt);
-								allCmds.push([
-									'add-module',
+								const { addModuleCmd, setParamCmds } = buildAddModuleCmd(
+									mod,
+									mod.index,
+									mod.horiz,
+									mod.vert,
 									slot,
 									location,
-									String(mod.type),
-									String(mod.index),
-									String(mod.horiz),
-									String(mod.vert),
-									String(mod.colour),
-									String(mod.modes.length),
-									...mod.modes.map(String),
-									String(mod.pcnt),
-									...paramVals0.map(String),
-									mod.uname ?? '',
-								]);
+									this.slots[slot].variations?.length ?? 1,
+								);
+								allCmds.push(addModuleCmd);
 								if (hasParamLabels(mod.paramLabels)) allCmds.push(setModuleLabelsCmd(slot, location, mod.index, mod.paramLabels));
-								const slotE = this.slots[slot];
-								if (slotE.variations) {
-									for (let v = 1; v < slotE.variations.length; v++) {
-										for (let p = 0; p < mod.pcnt; p++) {
-											const val = mod.lv[v * mod.pcnt + p];
-											if (val !== undefined && val !== paramVals0[p])
-												allCmds.push(['set-param', slot, location, String(mod.index), String(p), String(val), String(v)]);
-										}
-									}
-								}
+								allCmds.push(...setParamCmds);
 							}
 							for (const c of cableSnaps) {
 								const cn = { ...c, dir: c.dir ?? 1 };

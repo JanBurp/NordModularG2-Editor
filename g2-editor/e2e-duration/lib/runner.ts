@@ -38,6 +38,8 @@ export class Runner {
 		private readonly ctx: ActionCtx,
 		private readonly log: EventLog,
 		private readonly burst: { p: number; max: number },
+		/** Starts a fresh editor when the old one closed; the G2 itself needs nothing then. */
+		private readonly relaunch?: () => Promise<{ page: Page; app: ActionCtx['app'] }>,
 	) {}
 
 	private get page(): Page {
@@ -127,7 +129,16 @@ export class Runner {
 		let cycles = 0;
 		let healthy = false;
 
-		if (trigger === 'probe') {
+		if (this.page.isClosed() && this.relaunch) {
+			// The editor app itself went away (2026-10-09 run): power-cycling the G2 cannot bring a closed page back.
+			level = 'app-relaunch';
+			const fresh = await this.relaunch();
+			this.ctx.page = fresh.page;
+			this.ctx.app = fresh.app;
+			this.status = 'unknown';
+			if (!(await this.waitConnected(EDITOR_RECONNECT_MS))) await this.clickReconnect();
+			healthy = (await this.waitConnected(EDITOR_RECONNECT_MS)) && (await this.probe());
+		} else if (trigger === 'probe') {
 			// Connected but silent: keep probing for a while before escalating.
 			healthy = await waitFor(async () => this.status === 'connected' && (await this.probe()), SELF_RECONNECT_MS, SELF_PROBE_EVERY_MS);
 		} else {
