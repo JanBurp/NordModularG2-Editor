@@ -34,6 +34,7 @@
 #include <string.h>
 #include <unistd.h>
 #include <sys/stat.h>
+#include <time.h>
 
 #define TMP_DIR   "/tmp/g2-bank-transfer-test"
 #define SRC_DIR   TMP_DIR "/src"
@@ -276,7 +277,10 @@ static cJSON *reload_names_collect(void) {
 
     cJSON *names = NULL;
     static char buf[1 << 20]; /* the complete "names" line is large */
-    for (int i = 0; i < 400; i++) {
+    /* Deadline, not a line count: led_data backlog from the previous tests plus the
+     * per-bank names_progress lines exceed any fixed count (see send_and_capture_response). */
+    time_t deadline = time(NULL) + 120;
+    while (time(NULL) < deadline) {
         if (read_line_timeout(g_daemon->out_fd, buf, sizeof(buf), 30) < 0) { g_device_lost = 1; break; }
         cJSON *r = cJSON_Parse(buf);
         if (!r) continue;
