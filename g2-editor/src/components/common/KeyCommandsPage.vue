@@ -71,6 +71,7 @@
 				{ keys: ['⌘ P'], action: 'Open Patch Settings' },
 				{ keys: ['⌘ D'], action: 'Download to Slot' },
 				{ keys: ['⌘ R'], action: 'Open Performance Settings' },
+				{ keys: ['⇧ Click Perf'], action: 'Toggle Performance mode with SHIFT' },
 			],
 		},
 		{
@@ -84,6 +85,9 @@
 				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: ['⌘ Z'], action: 'Undo' },
 				{ keys: ['⇧ ⌘ Z'], action: 'Redo' },
+				{ keys: ['⇧ Click', '⇧ Drag'], action: 'Add module(s) to selection' },
+				{ keys: ['⌘/⌃ Drag'], action: 'Copy module(s)' },
+				{ keys: ['⌥ Click'], action: 'Module context menu' },
 			],
 		},
 		{
@@ -91,6 +95,8 @@
 			rows: [
 				{ keys: ['A-D'], action: 'Select slot A - D' },
 				{ keys: ['⌃ Tab', '⌃ ⇧ Tab'], action: 'Cycle to next / previous slot' },
+				{ keys: ['⇧ Click slot'], action: 'Toggle slot Active' },
+				{ keys: ['⌘/⌃ Click slot'], action: 'Toggle slot Keyboard' },
 				{ keys: ['1–8'], action: 'Select variation 1–8' },
 				{ keys: ['R'], action: 'Toggle clock run / stop' },
 			],
@@ -133,11 +139,11 @@
 		{
 			title: 'Morph Groups',
 			rows: [
-				{ keys: ['⌃ Click'], action: 'Assign / deassign parameter to selected Morph Group' },
-				{ keys: ['⌃ Drag'], action: 'Set morph range (assigned knob/slider)' },
-				{ keys: ['⌃ ↑', '⌃ ↓'], action: 'Nudge morph range of selected parameter' },
-				{ keys: ['⌃ 1–8'], action: 'Select active Morph Group' },
-				{ keys: ['⌃ ↵'], action: 'Assign / deassign selected parameter to active Morph Group' },
+				{ keys: ['⌘/⌃ Click'], action: 'Assign / deassign parameter to selected Morph Group' },
+				{ keys: ['⌘/⌃ Drag'], action: 'Set morph range (assigned knob/slider)' },
+				{ keys: ['⌘/⌃ ↑', '⌘/⌃ ↓'], action: 'Nudge morph range of selected parameter' },
+				{ keys: ['⌥ 1–8'], action: 'Select active Morph Group' },
+				{ keys: ['⌘/⌃ ↵'], action: 'Assign / deassign selected parameter to active Morph Group' },
 			],
 		},
 		{
@@ -158,6 +164,8 @@
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
 				{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1 (Alt: ±16)' },
+				{ keys: ['⌥ Click spinner'], action: 'Step ±16' },
+				{ keys: ['⇧ Drag knob'], action: 'Fine adjust' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
 				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },

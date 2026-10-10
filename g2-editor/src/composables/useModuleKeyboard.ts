@@ -273,10 +273,11 @@ export function useModuleKeyboard() {
 		// A focused slider/button group already handled this arrow key itself
 		if (e.defaultPrevented || (document.activeElement as HTMLElement | null)?.closest('[role=slider], [role=menu], [role=listbox]')) return;
 
-		const { key, shiftKey, altKey } = e;
+		const { key, code, shiftKey, altKey } = e;
 
-		if (isGrabModifierPressed(e) && key >= '1' && key <= '8') {
-			uiStore.setSelectedMorphGroup(Number(key) - 1);
+		// e.code, not e.key: on macOS Option+digit yields '¡', '™', …
+		if (altKey && !shiftKey && !isGrabModifierPressed(e) && /^Digit[1-8]$/.test(code)) {
+			uiStore.setSelectedMorphGroup(Number(code.slice(5)) - 1);
 			e.preventDefault();
 			return;
 		}
