@@ -20,6 +20,11 @@
 #include "g2_events.h"
 #include "utils.h"
 
+#ifdef _WIN32   /* MinGW has no POSIX flockfile; MSVCRT equivalents */
+#define flockfile   _lock_file
+#define funlockfile _unlock_file
+#endif
+
 /* Global device state */
 g2_device_t g2 = {
     .ctx = NULL,
