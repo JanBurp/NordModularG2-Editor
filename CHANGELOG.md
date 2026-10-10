@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-10-10
+
 ### New
 - Assigning Morph Groups
 - Assigning Parameter Pages
