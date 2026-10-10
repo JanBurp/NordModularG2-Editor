@@ -1,5 +1,5 @@
 <template>
-	<div class="h-full flex flex-col overflow-hidden">
+	<div ref="rootRef" class="h-full flex flex-col overflow-hidden">
 		<!-- Tab switcher -->
 		<BtnGroup :options="viewOptions" :model-value="browser.view" variant="tab" stretch @update:model-value="onViewChange" class="mb-2 w-full" />
 
@@ -193,6 +193,7 @@
 	const bankDownloadDialog = useBankDownloadDialog();
 	const bankUploadDialog = useBankUploadDialog();
 
+	const rootRef = ref<HTMLElement>();
 	const searchRef = ref();
 	const searchQuery = ref('');
 	const showClearBankDialog = ref(false);
@@ -212,8 +213,15 @@
 		onViewChange(viewOptions[next].value);
 	}
 
+	let pointerInside = false;
+	function onPointerdown(e: PointerEvent) {
+		pointerInside = !!rootRef.value?.contains(e.target as Node);
+	}
+
 	function onBrowserKeydown(e: KeyboardEvent) {
-		if (!props.isActive) return;
+		// Only after a click in the pane, so canvas arrow-key editing keeps working (pointer, not focus:
+		// module title-bar mousedown is preventDefault'ed and doesn't move focus)
+		if (!props.isActive || !pointerInside) return;
 		if (e.key === 'Escape') return resetNavIndex();
 		if (e.target instanceof HTMLInputElement || e.target instanceof HTMLTextAreaElement) return;
 		if (e.ctrlKey || e.metaKey || e.altKey || e.shiftKey) return;
@@ -417,10 +425,12 @@
 		browser.setCollapsedBanks([...settings.browserCollapsedBanks]);
 		onViewChange(settings.browserView);
 		window.addEventListener('keydown', onBrowserKeydown);
+		window.addEventListener('pointerdown', onPointerdown, true);
 	});
 
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onBrowserKeydown);
+		window.removeEventListener('pointerdown', onPointerdown, true);
 	});
 
 	watch(

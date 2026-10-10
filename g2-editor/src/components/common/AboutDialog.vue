@@ -56,15 +56,8 @@
 							>
 								patchviewer
 							</button>
-							, Chris Purusha for sharing tech info and his
-							<button
-								class="text-blue-500 hover:text-blue-400 underline bg-transparent border-0 p-0 cursor-pointer text-xs"
-								@click="openLink('https://github.com/chrispurusha/G2-Edit')"
-							>
-								editor
-							</button>
-							, Åka Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who tested or donated to make this work
-							possible.
+							, Chris Purusha for sharing tech info, Åka Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who
+							tested or donated to make this work possible.
 						</p>
 						<div class="flex justify-center pt-1">
 							<button

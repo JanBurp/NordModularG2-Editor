@@ -74,13 +74,32 @@ function seedSelectedParam() {
 }
 
 describe('useModuleKeyboard — keyboard Morph Group select/assign', () => {
-	it('Ctrl/Cmd+3 selects Morph Group 3 (index 2)', () => {
+	it('Alt/Option+3 selects Morph Group 3 (index 2), matched on e.code', () => {
 		const uiStore = useUiStore();
 		const { handleKeydown } = useModuleKeyboard();
 
-		handleKeydown(grabKey('3'));
+		// macOS Option+3 yields key '£'
+		handleKeydown({
+			key: '£',
+			code: 'Digit3',
+			ctrlKey: false,
+			metaKey: false,
+			shiftKey: false,
+			altKey: true,
+			preventDefault: vi.fn(),
+		} as unknown as KeyboardEvent);
 
 		expect(uiStore.selectedMorphGroup).toBe(2);
+	});
+
+	it('Ctrl/Cmd+3 does not select a Morph Group (Cmd+1 is Dump One)', () => {
+		const uiStore = useUiStore();
+		const before = uiStore.selectedMorphGroup;
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown({ ...grabKey('3'), code: 'Digit3' } as KeyboardEvent);
+
+		expect(uiStore.selectedMorphGroup).toBe(before);
 	});
 
 	it('Ctrl/Cmd+Enter assigns the selected param to the active group at range 127', () => {
