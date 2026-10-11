@@ -926,6 +926,47 @@ describe('module delete zeroes its morph ranges on the device first', () => {
 	});
 });
 
+// Deleting an audio source recolors the cables that remain (uprate lost); undo must recolor them back.
+describe('delete undo restores colours of remaining cables', () => {
+	const NOISE = 31; // red output
+	const LEV_AMP = 81; // purple in, purple out
+	const RED = 0,
+		BLUE = 1;
+
+	function setup() {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+		patch.areas[1].modules = [mod(1, NOISE), mod(2, LEV_AMP), mod(3, LEV_AMP)];
+		patch.areas[1].cableList = [
+			{ colour: RED, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 },
+			{ colour: RED, smod: 2, scon: 0, dir: 1, dmod: 3, dcon: 0 },
+		];
+		store.slots['A'].patch = patch;
+		store._syncUprateAndColors(patch, 1);
+		const remaining = () => patch.areas[1].cableList.find((c: any) => c.smod === 2 && c.dmod === 3);
+		return { store, patch, remaining };
+	}
+
+	it('deleteSelection', async () => {
+		const { store, patch, remaining } = setup();
+		await store.deleteSelection([1], [], 'voice', patch.areas[1].modules, patch.areas[1].cableList);
+		expect(remaining().colour).toBe(BLUE);
+		await store.undo();
+		expect(remaining().colour).toBe(RED);
+		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
+	});
+
+	it('deleteModule', async () => {
+		const { store, patch, remaining } = setup();
+		await store.deleteModule(1, 'voice');
+		expect(remaining().colour).toBe(BLUE);
+		await store.undo();
+		expect(remaining().colour).toBe(RED);
+		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
+	});
+});
+
 // The G2 ignores add-module's param values, so a re-created module must get a set-param for every
 // value that differs from the hardware default — variation 0 included (replace/paste/undo drifted).
 describe('re-created module sends its non-default params for every variation', () => {
