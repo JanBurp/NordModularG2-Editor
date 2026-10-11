@@ -6,6 +6,7 @@
 		@dragover.prevent="handleDragOver"
 		@dragleave="clearDropGhost"
 		@drop.prevent="handleModuleDropOnWrapper"
+		@wheel="onWrapperWheel"
 	>
 		<svg
 			ref="svgRef"
@@ -178,6 +179,16 @@
 
 	const settingsStore = useSettingsStore();
 	const zoom = computed(() => settingsStore.canvasZoom);
+
+	// Chromium heuristic: trackpad wheel events report wheelDeltaY === -3 * deltaY; mouse-wheel notches don't.
+	function isTrackpadWheel(e: WheelEvent) {
+		const wheelDeltaY = (e as WheelEvent & { wheelDeltaY?: number }).wheelDeltaY;
+		return wheelDeltaY !== undefined && wheelDeltaY === -3 * e.deltaY;
+	}
+	// Knob/slider wheel handlers run first (bubbling); this only blocks canvas scrolling by a mouse wheel.
+	function onWrapperWheel(e: WheelEvent) {
+		if (settingsStore.wheelPreventScroll && !isTrackpadWheel(e)) e.preventDefault();
+	}
 
 	const wrapperEl = ref<HTMLDivElement | null>(null);
 	const containerWidth = ref(0);
