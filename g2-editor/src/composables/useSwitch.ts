@@ -101,6 +101,9 @@ export function useSwitch(
 		emitChange(paramIndex.value, low + ((current - low + 1) % range));
 	}
 
+	// Button index clicked last, until the mouse leaves it
+	let cycleAnchor: number | null = null;
+
 	function onButtonClick(index: number) {
 		if (mode.value !== 'VR' && mode.value !== 'HR') {
 			onCycleValue();
@@ -108,8 +111,15 @@ export function useSwitch(
 			const low = paramDef.value.low || 0;
 			const high = paramDef.value.high || names.value.length - 1 || 0;
 			const newValue = clamp(index, low, high);
-			if (newValue !== value.value) emitChange(paramIndex.value, newValue);
+			// Repeated clicks without leaving the button (or a click on the active option) cycle to the next option
+			if (cycleAnchor === index || newValue === activeIndex.value) onCycleValue();
+			else emitChange(paramIndex.value, newValue);
+			cycleAnchor = index;
 		}
+	}
+
+	function onButtonLeave() {
+		cycleAnchor = null;
 	}
 
 	function onTriggerDown() {
@@ -141,6 +151,7 @@ export function useSwitch(
 		getButtonX,
 		getButtonY,
 		onButtonClick,
+		onButtonLeave,
 		onCycleValue,
 		isTrigger,
 		onTriggerDown,

@@ -44,3 +44,52 @@ describe('resolveSwitchDisplayNames', () => {
 		expect(resolveSwitchDisplayNames(on, offOn, { paramIndex: 1, isString: true, paramLen: 8, labels: [''] })).toEqual(['Ch 1']);
 	});
 });
+
+describe('useSwitch onButtonClick (HR/VR)', () => {
+	function click(value: number, index: number) {
+		const emitted: number[] = [];
+		const param = ref({ name: 'Slope', type: 'ClassicSlope', n: 'Slope', x: 0, y: 0 } as any);
+		useSwitch(param, ref(value), ref(undefined), ref(0), (_i, v) => emitted.push(v)).onButtonClick(index);
+		return emitted;
+	}
+
+	it('selects the clicked option when it is not active', () => {
+		expect(click(1, 2)).toEqual([2]);
+	});
+
+	it('advances to the next option when the active option is clicked', () => {
+		expect(click(1, 1)).toEqual([2]);
+	});
+
+	it('wraps to the first option when the active last option is clicked', () => {
+		expect(click(2, 2)).toEqual([0]);
+	});
+});
+
+describe('useSwitch repeated clicks on the same button', () => {
+	function setup() {
+		const value = ref(0);
+		const param = ref({ name: 'Dst', type: 'Dst_1', n: 'Dst', x: 0, y: 0 } as any);
+		const sw = useSwitch(param, value, ref(undefined), ref(0), (_i, v) => (value.value = v));
+		return { value, sw };
+	}
+
+	it('keeps cycling while the mouse stays on the clicked button', () => {
+		const { value, sw } = setup();
+		sw.onButtonClick(2);
+		expect(value.value).toBe(2);
+		sw.onButtonClick(2);
+		expect(value.value).toBe(3);
+		sw.onButtonClick(2);
+		expect(value.value).toBe(4);
+	});
+
+	it('selects the option under the mouse again after leaving the button', () => {
+		const { value, sw } = setup();
+		sw.onButtonClick(2);
+		sw.onButtonClick(2);
+		sw.onButtonLeave();
+		sw.onButtonClick(2);
+		expect(value.value).toBe(2);
+	});
+});
