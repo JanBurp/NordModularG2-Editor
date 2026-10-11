@@ -56,7 +56,7 @@
 							>
 								patchviewer
 							</button>
-							, Chris Purusha for sharing tech info, Åka Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who
+							, Chris Purusha for sharing tech info, Åke Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who
 							tested or donated to make this work possible.
 						</p>
 						<div class="flex justify-center pt-1">
