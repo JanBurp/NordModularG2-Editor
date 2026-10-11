@@ -158,7 +158,7 @@ Bit-packed. One section per area (areaIdx 0 = FX, 1 = Voice).
 | Bits | Field | Width | Notes |
 |------|-------|-------|-------|
 | +0–7 | `type` | 8 | Module type ID (maps to module definition database) |
-| +8–15 | `index` | 8 | Unique ID within area |
+| +8–15 | `index` | 8 | Unique ID within area, **1..127** (128+ is NACKed by the G2 — see usb-protocol §7, Module constraints) |
 | +16–22 | `horiz` | 7 | Column position (0–19) |
 | +23–29 | `vert` | 7 | Row position |
 | +30–37 | `colour` | 8 | Module colour |
@@ -321,7 +321,9 @@ Bit-packed. One section per area. Stores user-defined text labels for parameter 
 
 Each label slot is 7 characters, null-padded. `paramLen − 1` must be a multiple of 7.
 
-> This mirrors the USB `SET_PARAM_LABEL` wire format described in `usb.md §8b`.
+A module's block holds one entry for **every** label param of its type, so the block size is fixed per module type. A block with fewer entries corrupts the device copy; see [USB protocol §8b](usb-protocol.md#8b-set_param_label-wire-format).
+
+> This mirrors the USB `SET_PARAM_LABEL` wire format described in [USB protocol §8b](usb-protocol.md#8b-set_param_label-wire-format).
 
 Parser: `parseParamNames` (`nmg2PatchParser.ts:225–265`).
 
