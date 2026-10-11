@@ -41,6 +41,9 @@
 				<SettingsRow label="Reverse Wheel">
 					<CheckBox :model-value="settings.wheelReverse" @update:model-value="settings.setWheelReverse($event)" />
 				</SettingsRow>
+				<SettingsRow label="Prevent wheel scroll">
+					<CheckBox :model-value="settings.wheelPreventScroll" @update:model-value="settings.setWheelPreventScroll($event)" />
+				</SettingsRow>
 
 				<p class="settings-subheader">Cable rendering:</p>
 				<SettingsRow :label="L.cableGravity">

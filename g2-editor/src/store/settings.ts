@@ -36,6 +36,7 @@ export const useSettingsStore = defineStore('settings', {
 		knobSensitivity: 1 as number,
 		wheelReverse: false as boolean,
 		wheelSensitivity: 1 as number,
+		wheelPreventScroll: false as boolean,
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
@@ -124,6 +125,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setWheelSensitivity(value: number) {
 			this.wheelSensitivity = clamp(value, 0.25, 4);
+		},
+		setWheelPreventScroll(value: boolean) {
+			this.wheelPreventScroll = value;
 		},
 		setCanvasZoom(value: number) {
 			this.canvasZoom = clamp(value, 0.25, 3);
