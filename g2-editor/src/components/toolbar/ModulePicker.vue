@@ -110,7 +110,7 @@
 	}
 
 	// Fixed to the widest category's icon row so switching categories never resizes the toolbar.
-	const ICON_SIZE = 24; // w-6/h-6
+	const ICON_SIZE = 33;
 	const ICON_GAP = 4; // gap-1
 	const maxModuleCount = computed(() => Math.max(1, ...categories.value.map((c) => getModulesByCategory(c).length)));
 	const pickerWidthPx = computed(() => maxModuleCount.value * ICON_SIZE + (maxModuleCount.value - 1) * ICON_GAP);
