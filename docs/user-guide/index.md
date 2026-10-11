@@ -104,7 +104,6 @@ Active after clicking in the browser.
 | `←` / `→` | Navigate parameters (original editor's order) |
 | `↑` / `↓` | Adjust parameter ±1 |
 | `⌥ ↑` / `⌥ ↓` | Adjust parameter ±16 |
-| `⌥`+click spinner | Step ±16 |
 | `⇧`+drag knob | Fine adjust |
 | `L` | Assign last received MIDI CC to selected parameter |
 | `Tab` / `⇧ Tab` | Cycle module category (Module Picker toolbar) |
