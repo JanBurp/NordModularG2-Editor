@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.1] - 2026-10-12
+
 ### New
 - Setting "Prevent wheel scroll": a mouse wheel no longer scrolls the patch canvas (knobs/sliders still respond; trackpad scrolling unaffected)
 
