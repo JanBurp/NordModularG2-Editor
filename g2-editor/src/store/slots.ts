@@ -1734,7 +1734,14 @@ export const useSlotsStore = defineStore('slots', {
 		// Multi-module, both-area sibling of setParams for the Patch Adjuster: one knob drag rewrites
 		// every claimed param, so it's one coalesced undo entry (like setParam's drag coalescing) and
 		// each param is sent through sendCoalesced, with only actually-changed values going out.
-		async setParamsMulti(changes: ParamChange[], variation: number, coalesceKey?: string, targetSlot?: SlotLabel): Promise<void> {
+		// `knob` (the adjuster knob's before/after position) is handed back to `restore` on undo/redo.
+		async setParamsMulti(
+			changes: ParamChange[],
+			variation: number,
+			coalesceKey?: string,
+			targetSlot?: SlotLabel,
+			knob?: { from: number; to: number; restore: (value: number) => void },
+		): Promise<void> {
 			const slot = targetSlot ?? this._getActivePatch()?.slot;
 			const vState = slot ? this.slots[slot]?.variations?.[variation] : undefined;
 			if (!slot || !vState || changes.length === 0) return;
@@ -1743,19 +1750,22 @@ export const useSlotsStore = defineStore('slots', {
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
-				const box = { initial: prevValues, latest: changes.map((c) => c.value) };
-				const withValues = (values: number[]) => changes.map((c, i) => ({ ...c, value: values[i] }));
+				// The param set is part of the key: box values are positional, so a drag whose claimed
+				// params change (module add/delete, EnvADR DcyRel) must start a new entry.
+				const key = coalesceKey && `${coalesceKey}|${changes.map((c) => `${c.area}:${c.moduleId}:${c.paramIdx}`).join(',')}`;
+				const box = { initial: { values: prevValues, knob: knob?.from }, latest: { values: changes.map((c) => c.value), knob: knob?.to } };
+				const apply = async (state: { values: number[]; knob?: number }) => {
+					const restored = changes.map((c, i) => ({ ...c, value: state.values[i] }));
+					await this.setParamsMulti(restored, variation, undefined, slot);
+					if (knob && state.knob !== undefined) knob.restore(state.knob);
+				};
 				hist.record(
 					slot,
 					{
-						undo: async () => {
-							await this.setParamsMulti(withValues(box.initial), variation, undefined, slot);
-						},
-						redo: async () => {
-							await this.setParamsMulti(withValues(box.latest), variation, undefined, slot);
-						},
+						undo: () => apply(box.initial),
+						redo: () => apply(box.latest),
 					},
-					coalesceKey,
+					key,
 					box,
 				);
 			}

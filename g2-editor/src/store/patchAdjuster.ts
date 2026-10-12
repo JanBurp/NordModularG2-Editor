@@ -5,6 +5,7 @@ import { ADJUSTER_KNOBS, adjusterKnobFor, type AdjusterKnob } from '../renderer/
 import { useSlotsStore } from './slots';
 import { useUiStore } from './ui';
 import type { ParamChange } from './slotHelpers';
+import type { SlotLabel } from '../types';
 
 // Port of the official editor's "Global Modifiers" (CPatch::ApplyDistribution / ResetUntouchedData in
 // G2Editor.c). Each knob scales every param it claims in the focused variation relative to a baseline
@@ -93,7 +94,9 @@ export const usePatchAdjusterStore = defineStore('patchAdjuster', {
 		},
 
 		setKnob(knob: AdjusterKnob, value: number) {
-			const prevK = knobOffset(this.knobs[knob]);
+			const { slotInFocus: slot, variation } = useUiStore();
+			const from = this.knobs[knob];
+			const prevK = knobOffset(from);
 			const k = knobOffset(value);
 			this.knobs[knob] = value;
 
@@ -109,7 +112,24 @@ export const usePatchAdjusterStore = defineStore('patchAdjuster', {
 				this.lastWritten[p.key] = v;
 				changes.push({ area: p.area, moduleId: p.moduleId, paramIdx: p.paramIdx, value: v });
 			}
-			void useSlotsStore().setParamsMulti(changes, useUiStore().variation, `adjuster:${knob}:${useUiStore().variation}`);
+			void useSlotsStore().setParamsMulti(changes, variation, `adjuster:${knob}:${variation}`, undefined, {
+				from,
+				to: value,
+				restore: (v) => this.restoreKnob(knob, v, slot, variation),
+			});
+		},
+
+		// Undo/redo of a knob move: put the knob back and rebase its params on the restored values,
+		// so the next move continues from them. Only meaningful while that slot/variation is focused.
+		restoreKnob(knob: AdjusterKnob, value: number, slot: SlotLabel, variation: number) {
+			const ui = useUiStore();
+			if (ui.slotInFocus !== slot || ui.variation !== variation) return;
+			const k = knobOffset(value);
+			this.knobs[knob] = value;
+			for (const p of claimedParams(knob)) {
+				this.baseline[p.key] = inverseAdjust(p.live, k, p.max, this.baseline[p.key] ?? p.live);
+				this.lastWritten[p.key] = p.live;
+			}
 		},
 	},
 });

@@ -130,4 +130,50 @@ describe('usePatchAdjusterStore', () => {
 		expect(voice()[1][1]).toBe(40);
 		expect(voice()[2][1]).toBe(30);
 	});
+
+	it('undo/redo moves the knob back and the next move continues from the restored values', async () => {
+		const { slots, adjuster, voice } = setup();
+		adjuster.setKnob('attack', 32);
+		adjuster.setKnob('attack', 0);
+		await slots.undo();
+		expect(adjuster.knobs.attack).toBe(64);
+		expect(voice()[1][1]).toBe(40);
+		adjuster.setKnob('attack', 32); // k = -0.5 from the restored baseline 40
+		expect(voice()[1][1]).toBe(20);
+
+		await slots.undo();
+		await slots.redo();
+		expect(adjuster.knobs.attack).toBe(32);
+		expect(voice()[1][1]).toBe(20);
+		adjuster.setKnob('attack', 64);
+		expect(voice()[1][1]).toBe(40);
+	});
+
+	it('undo leaves the knobs alone when another variation is focused', async () => {
+		const { slots, adjuster, voice } = setup();
+		adjuster.setKnob('attack', 0);
+		useUiStore().variation = 1;
+		adjuster.commit();
+		await slots.undo();
+		expect(voice(0)[1][1]).toBe(40);
+		expect(adjuster.knobs.attack).toBe(64);
+	});
+
+	it('a drag whose claimed params change mid-coalesce starts a new undo entry', async () => {
+		const { slots, adjuster, voice } = setup();
+		adjuster.setKnob('decay', 0); // claims EnvADSR Decay + EnvADR Dcy/Rel
+		expect(voice()[2][3]).toBe(0);
+		voice()[2][7] = 1; // DcyRel on: EnvADR Dcy/Rel now belongs to Release
+		adjuster.setKnob('decay', 127); // claims only EnvADSR Decay
+		expect(useHistoryStore().slots.A.past).toHaveLength(2);
+
+		await slots.undo();
+		await slots.undo();
+		expect(voice()[1][2]).toBe(60);
+		expect(voice()[2][3]).toBe(50);
+		await slots.redo();
+		await slots.redo();
+		expect(voice()[1][2]).toBe(127);
+		expect(voice()[2][3]).toBe(0);
+	});
 });

@@ -45,7 +45,8 @@
 				/>
 				<KnobResetMarker v-if="isReset" :radius="radius" :value="value" @reset="resetToDefault()" />
 				<!-- Increment/decrement spinner (only while the knob is selected) -->
-				<!-- pointer-events="all" keeps it clickable when ParameterPagesGroup sets pointer-events-none on the Knob during Alt (Alt+drag assign); .prevent stops that draggable wrapper from starting a drag from the spinner. -->
+				<!-- pointer-events="all" keeps it clickable when ParameterPagesGroup sets pointer-events-none on the Knob during
+				     Alt (Alt+drag assign); .prevent stops that draggable wrapper from starting a drag from the spinner. -->
 				<g
 					v-if="selected"
 					class="knob-spin-v"
