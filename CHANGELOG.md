@@ -8,6 +8,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Parameter Pages Overview sidepanel
+
+
 ## [0.7.1] - 2026-10-12
 
 ### New
