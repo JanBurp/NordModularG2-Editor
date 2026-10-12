@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 - Splash screen stays when update available
+- Better rendering of modules
 
 ## [0.7.1] - 2026-10-12
 
