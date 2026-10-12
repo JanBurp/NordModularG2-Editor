@@ -33,6 +33,13 @@ export interface PasteParamsPair {
 	modeValues: number[];
 }
 
+export interface ParamChange {
+	area: 'voice' | 'fx';
+	moduleId: number;
+	paramIdx: number;
+	value: number;
+}
+
 // Pairs copied modules with target ids by order, keeping only same-type pairs, and slices each
 // source module's `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt).
 export function buildPasteParamsPairs(

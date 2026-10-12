@@ -54,6 +54,7 @@ import {
 	runCliBatchSafe,
 	setCliFailureHandler,
 	type PasteParamsPair,
+	type ParamChange,
 } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
@@ -1728,6 +1729,53 @@ export const useSlotsStore = defineStore('slots', {
 
 			const cmds = paramIndices.map((idx, i) => ['set-param', slot, location, String(moduleId), String(idx), String(values[i]), String(variation)]);
 			await runCliBatchSafe(cmds, 'setParams');
+		},
+
+		// Multi-module, both-area sibling of setParams for the Patch Adjuster: one knob drag rewrites
+		// every claimed param, so it's one coalesced undo entry (like setParam's drag coalescing) and
+		// each param is sent through sendCoalesced, with only actually-changed values going out.
+		async setParamsMulti(changes: ParamChange[], variation: number, coalesceKey?: string, targetSlot?: SlotLabel): Promise<void> {
+			const slot = targetSlot ?? this._getActivePatch()?.slot;
+			const vState = slot ? this.slots[slot]?.variations?.[variation] : undefined;
+			if (!slot || !vState || changes.length === 0) return;
+
+			const prevValues = changes.map((c) => vState[c.area][c.moduleId]?.[c.paramIdx] ?? c.value);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const box = { initial: prevValues, latest: changes.map((c) => c.value) };
+				const withValues = (values: number[]) => changes.map((c, i) => ({ ...c, value: values[i] }));
+				hist.record(
+					slot,
+					{
+						undo: async () => {
+							await this.setParamsMulti(withValues(box.initial), variation, undefined, slot);
+						},
+						redo: async () => {
+							await this.setParamsMulti(withValues(box.latest), variation, undefined, slot);
+						},
+					},
+					coalesceKey,
+					box,
+				);
+			}
+
+			changes.forEach((c, i) => {
+				const moduleParams = vState[c.area][c.moduleId];
+				if (!moduleParams || prevValues[i] === c.value) return;
+				moduleParams[c.paramIdx] = c.value;
+				const { location } = areaConfig(c.area);
+				sendCoalesced(`${slot}:${location}:${c.moduleId}:${c.paramIdx}:${variation}`, [
+					'set-param',
+					slot,
+					location,
+					String(c.moduleId),
+					String(c.paramIdx),
+					String(c.value),
+					String(variation),
+				]);
+			});
+			this._markSlotDirty(slot);
 		},
 
 		// Rnd/Clr on sequencer modules (SeqNote/SeqVal/SeqLev/SeqCtr) are computed entirely here in

@@ -117,7 +117,7 @@
 					</div>
 				</template>
 
-				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto" />
+				<BottomPanel v-if="settingsStore.showVirtualKeyboard" class="mt-auto" />
 			</div>
 
 			<SidePanel v-if="settingsStore.showRightPane" />
@@ -459,7 +459,7 @@
 	import ParameterPages from './components/toolbar/ParameterPages.vue';
 	import ParamDragGhost from './components/common/ParamDragGhost.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
-	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
+	import BottomPanel from './components/toolbar/BottomPanel.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';

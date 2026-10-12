@@ -43,3 +43,17 @@ describe('addRecentFile', () => {
 		expect(window.electronAPI!.updateRecentFiles).toHaveBeenCalledWith(store.recentFiles);
 	});
 });
+
+describe('toggleVirtualKeyboard', () => {
+	it('cycles hidden → Keyboard → Keyboard + Patch Adjuster → hidden', () => {
+		const store = useSettingsStore();
+		const state = () => [store.showVirtualKeyboard, store.showPatchAdjuster];
+		expect(state()).toEqual([false, false]);
+		store.toggleVirtualKeyboard();
+		expect(state()).toEqual([true, false]);
+		store.toggleVirtualKeyboard();
+		expect(state()).toEqual([true, true]);
+		store.toggleVirtualKeyboard();
+		expect(state()).toEqual([false, false]);
+	});
+});

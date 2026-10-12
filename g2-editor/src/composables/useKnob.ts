@@ -7,6 +7,7 @@ import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
+export const KNOB_RESET_CENTRE = 64; // value KnobReset's centre marker resets to
 const CURSORS: Record<string, string> = { vertical: 'ns-resize', horizontal: 'ew-resize', circular: 'crosshair' };
 
 // Converts a mouse position relative to the knob center to a knob angle in degrees.
@@ -83,7 +84,7 @@ export function useKnob(
 		onMouseDown(event);
 	}
 
-	function resetToDefault(defaultVal = 64) {
+	function resetToDefault(defaultVal = KNOB_RESET_CENTRE) {
 		emitChange(defaultVal);
 	}
 

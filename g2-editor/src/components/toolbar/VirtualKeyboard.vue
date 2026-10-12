@@ -1,5 +1,5 @@
 <template>
-	<div class="flex bg-surface-1 border-t border-line-subtle select-none" data-testid="virtual-keyboard">
+	<div class="flex select-none" data-testid="virtual-keyboard">
 		<div class="flex flex-col gap-2 px-2 py-2 border-line-subtle shrink-0 justify-between">
 			<div class="flex gap-2 justify-between">
 				<Button class="w-6" variant="default" size="small" @click="scrollBy(-12)">&lt;&lt;</Button>
