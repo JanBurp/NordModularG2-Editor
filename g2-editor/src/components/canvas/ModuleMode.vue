@@ -2,7 +2,7 @@
 	<svg :x="x" :y="y" :width="totalWidth" :height="height" :viewBox="`0 0 ${totalWidth} ${height}`" class="overflow-hidden! cursor-pointer" @click="onClick">
 		<rect x="0" y="0" :width="iconWidth" :height="height" fill="#CCC" stroke="#333" />
 		<ModuleGraph v-if="isGraph" :ve="graphVe" :lv="lv" :modes="[value]" :module-id="moduleId" />
-		<use v-else-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(0, ${offset})`" />
+		<use v-else-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(${imgShift[0]}, ${offset + imgShift[1]})`" />
 		<text
 			v-else
 			x="50%"
@@ -56,6 +56,7 @@
 	const bitmapId = computed(() => paramDef.value.img || '');
 	const hasPopup = computed(() => isGraph.value || !!bitmapId.value);
 	const itemHeight = computed(() => paramDef.value.h || -18);
+	const imgShift = computed(() => paramDef.value.imgShift ?? [0, 0]);
 
 	const offset = computed(() => {
 		return props.value * itemHeight.value;

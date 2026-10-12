@@ -22,16 +22,17 @@
 			>
 				<rect x="0" y="0" :width="rowWidth" :height="rowHeight" :fill="i - 1 === value && !isGraph ? '#AAA' : '#CCC'" stroke="#333" />
 				<ModuleGraph v-if="isGraph" :ve="graphVe" :lv="lv" :modes="[i - 1]" :module-id="moduleId" />
-				<use v-else :href="`#${paramDef.img}`" :transform="`translate(0, ${(i - 1) * itemHeight})`" />
+				<use v-else :href="`#${paramDef.img}`" :transform="`translate(${imgShift[0]}, ${(i - 1) * itemHeight + imgShift[1]})`" />
+				<!-- The graph paints its own background, so darken the selected graph with an overlay instead -->
 				<rect
 					v-if="isGraph && i - 1 === value"
-					x="0.75"
-					y="0.75"
-					:width="rowWidth - 1.5"
-					:height="rowHeight - 1.5"
-					fill="none"
-					stroke="#FFF"
-					stroke-width="1.5"
+					x="0"
+					y="0"
+					:width="rowWidth"
+					:height="rowHeight"
+					fill="#000"
+					fill-opacity="0.25"
+					pointer-events="none"
 				/>
 			</svg>
 		</div>
@@ -62,6 +63,7 @@
 	const zoom = computed(() => settingsStore.canvasZoom);
 
 	const itemHeight = computed(() => props.paramDef.h || -18);
+	const imgShift = computed(() => props.paramDef.imgShift ?? [0, 0]);
 	const optionCount = computed(() => props.paramDef.high - props.paramDef.low + 1);
 	const isGraph = computed(() => !!props.paramDef.graph);
 
@@ -92,3 +94,12 @@
 		emit('close');
 	}
 </script>
+<style scoped>
+	/* No browser focus outline (the selected row gets focus on open); keyboard-focused rows darken like the selected one */
+	[role='option']:focus {
+		outline: none;
+	}
+	[role='option']:focus-visible:not([aria-selected='true']) {
+		filter: brightness(0.85);
+	}
+</style>

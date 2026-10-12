@@ -70,6 +70,8 @@
 				<path id="Bitmappwr" stroke="#222" fill="none" :d="bitmapPaths['pwr']" />
 				<path id="Bitmapsharp" stroke="none" fill="#222" :d="bitmapPaths['sharp']" />
 				<path id="Bitmapbox" stroke="#222" fill="#none" :d="bitmapPaths['box']" />
+				<path id="Bitmaptrig1" stroke="none" fill="#222" :d="bitmapPaths['trig1']" />
+				<path id="Bitmaptrig2" stroke="none" fill="#222" :d="bitmapPaths['trig2']" />
 				<path id="BitmapCurve" stroke="#222" fill="#088" :d="bitmapPaths['Curve']" />
 				<path id="BitmapSeqLp" stroke="none" fill="#222" fill-rule="evenodd" :d="bitmapPaths['SeqLp']" />
 				<path id="BitmapOutputMode" stroke="none" fill="#000" :d="bitmapPaths['OutputMode']" />

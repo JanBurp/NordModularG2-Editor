@@ -144,6 +144,7 @@ export interface ParamDefinition {
 	rows?: number;
 	img?: string;
 	h?: number;
+	imgShift?: [number, number]; // [dx, dy] to centre img frames in a box larger/smaller than the frame
 	trigger?: boolean;
 	graph?: boolean | string;
 }
