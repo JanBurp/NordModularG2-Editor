@@ -69,7 +69,7 @@
 				<path id="Bitmapff2" stroke="none" fill="#222" fill-rule="evenodd" :d="bitmapPaths['ff2']" />
 				<path id="Bitmappwr" stroke="#222" fill="none" :d="bitmapPaths['pwr']" />
 				<path id="Bitmapsharp" stroke="none" fill="#222" :d="bitmapPaths['sharp']" />
-				<path id="Bitmapbox" stroke="#222" fill="#none" :d="bitmapPaths['box']" />
+				<path id="Bitmapbox" stroke="#222" fill="none" :d="bitmapPaths['box']" />
 				<path id="Bitmaptrig1" stroke="none" fill="#222" :d="bitmapPaths['trig1']" />
 				<path id="Bitmapgate2" stroke="none" fill="#222" :d="bitmapPaths['gate2']" />
 				<path id="Bitmapsend" stroke="none" fill="#646464" fill-rule="evenodd" :d="bitmapPaths['send']" />
