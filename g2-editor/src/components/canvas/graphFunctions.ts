@@ -822,7 +822,6 @@ const F_OCT = Math.log2(F_MAX / F_MIN); // ≈ 10.58
 
 // Param value → Hz mappings
 const fltFreqToHz = (v: number) => F_MIN * Math.pow(2, v / 12);
-const freq2ToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 7.32);
 const freq3ToHz = (v: number) => 20 * Math.pow(2, (v / 127) * 9.64);
 const eqMidFreqToHz = (v: number) => 100 * Math.pow(2, (v / 127) * 6.32);
 const eqLoFreqToHz = (v: number) => [80, 110, 160][Math.max(0, Math.min(2, v))];
@@ -1320,38 +1319,35 @@ function eqPeak(ve: VisualElement, vals: number[]): GraphPathResult {
 	return makeFilterGraphResult(d, dFill);
 }
 
-// --- Filter Phase (id 102) — multi-notch ---
+// --- Filter Phase (id 102) ---
+// CPnlPhaserGraph (PANL Graph Func 13, dependencies Spread,FB,NotchCount,Type).
 function filterPhase(ve: VisualElement, vals: number[]): GraphPathResult {
-	const fc = freq2ToHz(lv(vals, 1, 64));
-	const notchCount = lv(vals, 4, 2) + 1; // 0..5 → 1..6
-	const type = lv(vals, 9, 0); // 0=Notch, 1=Peak, 2=Deep
-	const Q = type === 2 ? 8 : type === 1 ? 4 : 2;
-	const { d, dFill } = sampleResponse(ve.w!, ve.h!, (hz) => {
-		let m = 1;
-		for (let k = 1; k <= notchCount; k++) {
-			m *= type === 1 ? bpResp(hz, fc * k, Q) * 1.5 + 0.3 : brResp(hz, fc * k, Q);
-		}
-		return Math.min(2, m);
-	});
-	return makeFilterGraphResult(d, dFill);
+	// Freq is not read by the original graph; drives horizontal movement here (see FREQ_SHIFT_FRACTION)
+	return feedbackFltGraph(ve.w!, ve.h!, lv(vals, 4, 2), lv(vals, 5, 64), lv(vals, 3, 64), lv(vals, 9, 0), lv(vals, 1, 64));
 }
 
 // --- Filter Comb (id 162) ---
-// Port of CPnlFeedbackFlt::Draw (shared with Phaser), specialized to N=4 (comb's fixed tooth
-// count) and P8d=120 (comb's fixed "depth" constant). Draws a lead-in Bezier, 4 repeated
-// 2-segment "tooth" Beziers, and a closing Bezier — not a sampled frequency-response curve.
+// CPnlCombFltGraph: fixed tooth count 4 and fixed "depth" 120 (CPnlCombFltGraph::UpdateGraphics).
 function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
-	const w = ve.w!;
-	const h = ve.h!;
-	const freqParam = lv(vals, 0, 64); // Freq, 0-127 — not read by the original graph; drives horizontal movement here (see FREQ_SHIFT_FRACTION)
-	const fb = lv(vals, 3, 64); // FB, 0-127
-	const type = lv(vals, 5, 0); // Type: 0/1/2
+	// Freq is not read by the original graph; drives horizontal movement here (see FREQ_SHIFT_FRACTION)
+	return feedbackFltGraph(ve.w!, ve.h!, 4, 120, lv(vals, 3, 64), lv(vals, 5, 0), lv(vals, 0, 64));
+}
 
-	const N = 4;
-	const P8D = 120;
-	const AMP_SWITCH = 2.0;
-	const SPACING_SWITCH = 6.0;
-	const OFFSET_SWITCH = -18.0;
+// [amp, spacing, offset] per tooth count — the switch on this[0x8c] in CPnlFeedbackFlt::Draw.
+const FEEDBACK_FLT_SHAPES: [number, number, number][] = [
+	[6, 10, -11],
+	[5, 9, -11],
+	[4, 8, -13],
+	[3, 7, -16],
+	[2, 6, -18],
+	[1, 5, -21],
+];
+
+// Port of CPnlFeedbackFlt::Draw (shared by FltComb and FltPhase). Draws a lead-in Bezier, N
+// repeated 2-segment "tooth" Beziers, and a closing Bezier — not a sampled frequency-response curve.
+// N = tooth count (0..5), P8D = tooth spacing/depth (0..127), fb = FB (0..127), type = Type (0/1/2).
+function feedbackFltGraph(w: number, h: number, N: number, P8D: number, fb: number, type: number, freqParam: number): GraphPathResult {
+	const [AMP_SWITCH, SPACING_SWITCH, OFFSET_SWITCH] = FEEDBACK_FLT_SHAPES[N] ?? [0, 0, -11];
 
 	const vertCenter = (h - 2) * 0.5;
 	const anchorMid = Math.round(vertCenter + 0.5);
@@ -1429,18 +1425,15 @@ function filterComb(ve: VisualElement, vals: number[]): GraphPathResult {
 	const closeEndX = closeCP2x + d3;
 	const closing = ` C${closeCP1x},${leadCP2y} ${closeCP2x},${anchorMid} ${closeEndX},${y25}`;
 
-	const d = `${leadIn}${teeth}${closing}`;
-
-	// The lead-in/closing curves run off-canvas and don't end at the bottom, so the fill uses a
-	// flat "roof" out to the panel edges instead of following them — guarantees it always reaches
-	// the bottom at x=0/x=w rather than picking up whatever height the curve has out there. Since
-	// the whole path (including this fill) gets shifted by the Freq transform below, the corner
-	// anchors are pre-compensated by -shift so they still land exactly on x=0/x=w afterwards —
-	// otherwise the shift would carry them away from the real edges, leaving a gap on one side.
+	// The lead-in/closing curves don't always reach the panel edges (e.g. high Spread, few teeth),
+	// so both ends are extended flat at y25 out to x=0/x=w; the fill follows the line and drops to
+	// the bottom there. Since the whole path gets shifted by the Freq transform below, the edges
+	// are pre-compensated by -shift so they still land exactly on x=0/x=w afterwards.
 	const shift = freqShiftAmount(freqParam, w);
-	const leftEdge = -shift;
-	const rightEdge = w - shift;
-	const dFill = `M${leftEdge},${h} L${leftEdge},${yP0} L${leadEndX},${yP0}${teeth} L${lastToothEndX1},${yP0} L${rightEdge},${yP0} L${rightEdge},${h} Z`;
+	const leftX = Math.min(penStartX, -shift);
+	const rightX = Math.max(closeEndX, w - shift);
+	const d = `M${leftX},${y25} L${leadIn.slice(1)}${teeth}${closing} L${rightX},${y25}`;
+	const dFill = `${d} L${rightX},${h} L${leftX},${h} Z`;
 
 	return { kind: 'path', d, dFill, zeroLine: true, fill: FILTER_FILL, transform: `translate(${shift.toFixed(2)},0)` };
 }
