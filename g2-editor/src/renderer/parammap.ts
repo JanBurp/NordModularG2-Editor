@@ -5,7 +5,7 @@ const CLK_FORMAT =
 
 // prettier-ignore
 const parammap: Record<string, ParamDefinition> = {
-	ActiveMonitor: { names: [''], width: 11, bmp: 'pwr', low: 0, high: 1, def: 1, defin: ['0 ~ Monitor,1 ~ Active '], comments: '' },
+	ActiveMonitor: { names: [''], width: 12, height: 12, bmp: 'pwr', low: 0, high: 1, def: 1, defin: ['0 ~ Monitor,1 ~ Active '], comments: '' },
 	AdAr: { low: 0, high: 1, def: 0, defin: ['0 ~ AD, 1 ~ AR'], comments: 'Selects between Decay and Release modes' },
 	Bipolar_127: { low: 0, high: 127, def: 0, defin: ['0 ~ -64, 64 ~ 0, 127 ~ 64'], comments: 'not necesarraly a linear control' },
 	BipPosNeg: { names: ['Bip', 'Pos', 'Neg'], width: 18, low: 0, high: 2, def: 0, defin: ['0 ~ Bip, 1 ~ Pos, 2 ~ Neg'], comments: '' },

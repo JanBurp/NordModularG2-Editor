@@ -12,11 +12,11 @@
 				:x="0"
 				:y="0"
 				:width="width"
-				height="11"
+				:height="height"
 				class="switch-bitmap"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect x="0" y="0" :width="width" height="11" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<rect x="0" y="0" :width="width" :height="height" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
@@ -109,7 +109,7 @@
 		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
 
 		<!-- Selected param underline -->
-		<rect v-if="highlight" x="0" y="12" :width="width" height="2" fill="white" pointer-events="none" />
+		<rect v-if="highlight" x="0" :y="height + 1" :width="width" height="2" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -142,6 +142,7 @@
 		hasBitmap,
 		maskh,
 		width,
+		height,
 		getButtonX,
 		getButtonY,
 		onButtonClick,
