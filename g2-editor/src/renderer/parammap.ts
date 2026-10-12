@@ -42,7 +42,7 @@ const parammap: Record<string, ParamDefinition> = {
 	EnvNR: { names: ['N', 'R'], width: 14, low: 0, high: 1, def: 0, defin: ['0 ~ Normal, 1 ~ Reset'], comments: '' },
 	EnvShape_3: { bmp: 'Curve', w: 20, maskh: 10, names: ['', '', '', ''], low: 0, high: 3, def: 0, defin: ['0 ~ LogExp, 1 ~ LinExp, 2 ~ ExpExp, 3 ~ LinLin'], comments: '' },
 	EnvTime: { f: 'adsrT', low: 0, high: 127, def: 0, defin: ['0 ~ 0.5m, 127 ~ 45.0s'], comments: '' },
-	EqdB: { low: 64, high: 127, def: 0, defin: ['0 ~ -18.0 dB, 64 ~ 0.0 dB, 127 ~ 18.0 dB'], comments: '' },
+	EqdB: { low: 0, high: 127, def: 64, defin: ['0 ~ -18.0 dB, 64 ~ 0.0 dB, 127 ~ 18.0 dB'], comments: '' },
 	EqHiFreq: { width: 19, low: 0, high: 2, def: 0, defin: ['0 ~ 6K, 1 ~ 8K, 2 ~ 12K'], comments: '' },
 	EqLoFreq: { width: 19, low: 0, high: 2, def: 0, defin: ['0 ~ 80, 1 ~ 110, 2 ~ 160'], comments: '' },
 	EqMidFreq: { low: 0, high: 127, def: 93, defin: ['0 ~ 100 Hz, 64 ~ 910 Hz, 93 ~ 2.48 kHz, 127 ~ 8.00 kHz'], comments: '' },
