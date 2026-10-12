@@ -61,7 +61,7 @@ import { useSlotsStore } from '@/store/slots';
 import { useGhostCable } from '../useGhostCable';
 
 function moduleStub(index: number, type: number, horiz = 0, vert = 0) {
-	return { index, type, horiz, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	return { index, type, horiz, vert, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 }
 
 function seed(modules: ReturnType<typeof moduleStub>[]) {

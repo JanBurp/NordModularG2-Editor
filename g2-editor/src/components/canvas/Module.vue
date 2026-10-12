@@ -240,6 +240,18 @@
 			@jackHoverEnter="(info) => emit('jackHoverEnter', info)"
 			@jackHoverLeave="(info) => emit('jackHoverLeave', info)"
 		/>
+		<!-- Patch Mutator: modules excluded from mutation get a red frame while the mutator is open (inset so neighbours don't hide it) -->
+		<rect
+			v-if="mutatorOpen && instance.mutaLock"
+			x="1.5"
+			y="1.5"
+			width="253"
+			:height="height - 3"
+			fill="none"
+			stroke="#e00"
+			stroke-width="3"
+			pointer-events="none"
+		/>
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
 		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
@@ -286,6 +298,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
+	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
@@ -347,6 +360,7 @@
 			{ type: 'separator' },
 			{ label: 'Replace Module', disabled: replaceCandidates.value.length === 0, children: buildReplaceMenuItems() },
 			{ label: 'Delete', action: () => emit('moduleDelete', moduleIdx.value) },
+			{ label: `${instance.value.mutaLock ? '✓ ' : ''}Exclude From Mutation`, action: toggleMutaLock },
 			{ type: 'separator' },
 			{
 				label: 'Paste Params',
@@ -364,6 +378,13 @@
 			{ type: 'separator' },
 			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
 		]);
+	}
+
+	// Applies to the whole selection when this module is part of it (manual ch. 7).
+	function toggleMutaLock() {
+		const inSelection = props.isSelected && uiStore.selectedModulesArea === props.areaLabel;
+		const ids = inSelection ? uiStore.selectedModules : [moduleIdx.value];
+		slotsStore.setMutationLock(ids, !instance.value.mutaLock, props.areaLabel === 'va' ? 'voice' : 'fx');
 	}
 
 	// Right-click on a level meter: assign it to a Parameter Page knob (isLed=1). The LED number the
@@ -517,6 +538,8 @@
 	const uiStore = useUiStore();
 	const { showHint, clearHint } = useStatusHint();
 	const slotsStore = useSlotsStore();
+	const settingsStore = useSettingsStore();
+	const mutatorOpen = computed(() => settingsStore.showRightPane && settingsStore.rightPaneTab === 'mutator');
 	const deviceStore = useDeviceStore();
 
 	const selectedParamIndex = computed(() => {

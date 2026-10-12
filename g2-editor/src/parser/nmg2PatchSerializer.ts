@@ -13,6 +13,7 @@ import type {
 	SlotInfo,
 } from '@/types';
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
+import { NUM_VARIATIONS, MUTATOR_VARIATION } from '@/types/patch';
 import { SLOT_LABELS } from '@/constants';
 import { SEQNOTE_MODULE_TYPE, DEFAULT_PIANO_ROLL_VIEW } from '@/renderer/pianoRoll';
 
@@ -101,7 +102,7 @@ function writeModuleList(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array 
 		bw.write(7, m.vert);
 		bw.write(8, m.colour);
 		bw.write(1, m.uprate);
-		bw.write(1, m.leds);
+		bw.write(1, m.mutaLock);
 		bw.write(6, 0); // 6 padding bits (parser discards these)
 		const nmodes = m.modes?.length ?? 0;
 		bw.write(4, nmodes);
@@ -126,17 +127,20 @@ function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
 	return makeSection(SectionType.CABLE_LIST, bw.flush());
 }
 
-function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: VariationState[]): Uint8Array {
+// Variation indices written to a patch file; the Patch Mutator's audition dump writes only MUTATOR_VARIATION.
+const FILE_VARIATIONS = Array.from({ length: NUM_VARIATIONS }, (_, v) => v);
+
+function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: VariationState[], vars = FILE_VARIATIONS): Uint8Array {
 	const withParams = modules.filter((m) => m.pcnt > 0);
 	const aKey = areaIdx === 0 ? 'fx' : 'voice';
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
 	bw.write(8, withParams.length);
-	bw.write(8, withParams.length > 0 ? 9 : 0);
+	bw.write(8, withParams.length > 0 ? vars.length : 0);
 	for (const m of withParams) {
 		bw.write(8, m.index);
 		bw.write(7, m.pcnt);
-		for (let v = 0; v < 9; v++) {
+		for (const v of vars) {
 			bw.write(8, v);
 			for (let p = 0; p < m.pcnt; p++) bw.write(7, variations[v]?.[aKey]?.[m.index]?.[p] ?? 0);
 		}
@@ -216,16 +220,15 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 	return makeSection(SectionType.MODULE_NAMES, data);
 }
 
-function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
-	const NUM_VAR = 9;
+function writePatchParamSection(params: PatchParamVariation[], vars = FILE_VARIATIONS): Uint8Array {
 	const bw = new BitWriter();
 	bw.write(2, 2); // areaIdx = 2
 	bw.write(8, 7); // 7 sub-sections
-	bw.write(8, NUM_VAR);
+	bw.write(8, vars.length);
 	// Sub 1: Morphs
 	bw.write(8, 1);
 	bw.write(7, 16);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphDials?.[j] ?? 0);
 		for (let j = 0; j < 8; j++) bw.write(7, params[v]?.morphModes?.[j] ?? 0);
@@ -233,7 +236,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 2: Volume
 	bw.write(8, 2);
 	bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.patchVol ?? 0);
 		bw.write(7, params[v]?.activeMuted ?? 0);
@@ -241,7 +244,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 3: Glide
 	bw.write(8, 3);
 	bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.glide ?? 0);
 		bw.write(7, params[v]?.glideTime ?? 0);
@@ -249,7 +252,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 4: Bend
 	bw.write(8, 4);
 	bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.bend ?? 0);
 		bw.write(7, params[v]?.semi ?? 0);
@@ -257,7 +260,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 5: Vibrato
 	bw.write(8, 5);
 	bw.write(7, 3);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.vibrato ?? 0);
 		bw.write(7, params[v]?.cents ?? 0);
@@ -266,7 +269,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 6: Arp
 	bw.write(8, 6);
 	bw.write(7, 4);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.arpeggiator ?? 0);
 		bw.write(7, params[v]?.arpTime ?? 0);
@@ -276,7 +279,7 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 	// Sub 7: OctaveShift + Sustain
 	bw.write(8, 7);
 	bw.write(7, 2);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		bw.write(8, v);
 		bw.write(7, params[v]?.octaveShift ?? 0);
 		bw.write(7, params[v]?.sustain ?? 0);
@@ -289,11 +292,10 @@ function writePatchParamSection(params: PatchParamVariation[]): Uint8Array {
 // values, patch volume, glide, etc.) — mirrors nmg2PatchParser.ts's parseMorphParameters exactly.
 // Never writes a record with range === 0 (the real format deletes such records; presence of a
 // record is what marks the assignment, there's no separate bitmask).
-function writeMorphParamSection(params: PatchParamVariation[], keyboardAssign?: number[]): Uint8Array {
-	const NUM_VAR = 9;
+function writeMorphParamSection(params: PatchParamVariation[], keyboardAssign?: number[], vars = FILE_VARIATIONS): Uint8Array {
 	const NMORPHS = 8;
 	const bw = new BitWriter();
-	bw.write(8, NUM_VAR);
+	bw.write(8, vars.length);
 	bw.write(4, 8); // MorphCount, constant 8 (NMORPHS)
 	// 8 morph modes, 2 bits each — 16 bits, per G2Editor.c CMorphMapData_11::WriteStream. This
 	// used to be 20 bits of "Reserved1", paid back with a 4-bit filler after every variation. The
@@ -305,7 +307,7 @@ function writeMorphParamSection(params: PatchParamVariation[], keyboardAssign?: 
 	// One 2-bit keyboard-morph-assign value per morph group, preserved from the source rather
 	// than zeroed — see Patch.morphKeyboardAssign.
 	for (let j = 0; j < NMORPHS; j++) bw.write(2, keyboardAssign?.[j] ?? 0);
-	for (let v = 0; v < NUM_VAR; v++) {
+	for (const v of vars) {
 		// Every assignment is written, including range 0. Filtering those out dropped real data:
 		// 27 of 361,430 morph assignments across the 4,055-patch reference library have range 0,
 		// and the reference reader (G2Editor.c CMorphMapData_11::ReadStream) AddMorph()s every
@@ -323,6 +325,29 @@ function writeMorphParamSection(params: PatchParamVariation[], keyboardAssign?: 
 		}
 	}
 	return makeSection(SectionType.MORPH_PARAMS, bw.flush());
+}
+
+// The official Patch Mutator audition dump (CMMutaParamDump): Parameters for the patch-settings,
+// VA and FX contexts plus the Morph section, each holding only `variation`. Sent with send-sections.
+export function serializeVariationDump(patch: Patch, state: VariationState, variation: number): Uint8Array {
+	const vars = [variation];
+	const variations: VariationState[] = [];
+	variations[variation] = state;
+	const params: PatchParamVariation[] = [];
+	params[variation] = state.patch;
+	const sections = [
+		writePatchParamSection(params, vars),
+		writeParameters(1, patch.areas[1].modules, variations, vars),
+		writeParameters(0, patch.areas[0].modules, variations, vars),
+		writeMorphParamSection(params, patch.morphKeyboardAssign, vars),
+	];
+	const out = new Uint8Array(sections.reduce((n, s) => n + s.length, 0));
+	let ofs = 0;
+	for (const s of sections) {
+		out.set(s, ofs);
+		ofs += s.length;
+	}
+	return out;
 }
 
 export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDescription): Uint8Array | null {
@@ -366,7 +391,7 @@ function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uin
 	bw.write(1, desc.purple);
 	bw.write(1, desc.white);
 	bw.write(2, desc.monopoly);
-	bw.write(8, desc.variation);
+	bw.write(8, desc.variation === MUTATOR_VARIATION ? 0 : desc.variation);
 	bw.write(8, desc.category);
 	const result = bw.flush();
 	if (result.length >= secData.length) return result;
@@ -615,7 +640,8 @@ function processSection(
  * it is used to copy preserved sections (especially the patch description whose
  * first 61 bits are discarded during parsing and cannot be reconstructed).
  */
-export function serializePatch(name: string, patch: Patch, templateRawHex: string, variations: VariationState[]): string {
+export function serializePatch(name: string, patch: Patch, templateRawHex: string, liveVariations: VariationState[]): string {
+	const variations = liveVariations.slice(0, NUM_VARIATIONS); // drop the Patch Mutator's live-only variation
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2; // exclude trailing CRC bytes
 	const out: Uint8Array[] = [];
@@ -666,10 +692,11 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 export function serializePerformance(
 	patches: Patch[],
 	templateRawHex: string,
-	variationsArray: VariationState[][],
+	liveVariationsArray: VariationState[][],
 	globalParamPages: GlobalParamPageAssignment[] = [],
 	perfSettings?: Uint8Array,
 ): string {
+	const variationsArray = liveVariationsArray.map((v) => v.slice(0, NUM_VARIATIONS)); // drop the Patch Mutator's live-only variation
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2;
 	const out: Uint8Array[] = [];

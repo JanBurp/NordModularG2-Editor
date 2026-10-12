@@ -50,7 +50,7 @@ function arrowKey(key: string, shiftKey = false): KeyboardEvent {
 }
 
 function moduleStub(index: number, horiz = 0, vert = 0) {
-	return { index, type: 5, horiz, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	return { index, type: 5, horiz, vert, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 }
 
 // Seeds a slot with one module in the Voice area, a selected param on it, and an empty

@@ -2,7 +2,7 @@ import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
@@ -28,7 +28,6 @@ export const useSettingsStore = defineStore('settings', {
 		settingsSection: null as SettingsSection | null,
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
-		showPatchAdjuster: false as boolean,
 		showParamPages: false as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
@@ -52,11 +51,8 @@ export const useSettingsStore = defineStore('settings', {
 			const order: ToolbarMode[] = ['hidden', 'classic', 'compact'];
 			this.toolbarMode = order[(order.indexOf(this.toolbarMode) + 1) % order.length];
 		},
-		// Cmd-K cycles: hidden → Keyboard → Keyboard + Patch Adjuster → hidden.
 		toggleVirtualKeyboard() {
-			if (!this.showVirtualKeyboard) this.showVirtualKeyboard = true;
-			else if (!this.showPatchAdjuster) this.showPatchAdjuster = true;
-			else this.showVirtualKeyboard = this.showPatchAdjuster = false;
+			this.showVirtualKeyboard = !this.showVirtualKeyboard;
 		},
 		toggleParamPages() {
 			this.showParamPages = !this.showParamPages;

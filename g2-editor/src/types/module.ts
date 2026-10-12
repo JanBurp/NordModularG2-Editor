@@ -37,7 +37,7 @@ export interface ModuleInstance {
 	vert: number;
 	colour: number;
 	uprate: number;
-	leds: number;
+	mutaLock: number; // Patch Mutator "Exclude From Mutation" (module-record bit after uprate)
 	pcnt: number;
 	lv: number[];
 	modes: number[];

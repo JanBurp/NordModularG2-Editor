@@ -35,5 +35,5 @@ void test_set_morph_range_invalid_range_high(void) {
 }
 
 void test_set_morph_range_invalid_variation(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, 50, 9));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_morph_range(0, 0, 1, 1, 0, 50, 10)); /* 9 = Patch Mutator variation, valid */
 }

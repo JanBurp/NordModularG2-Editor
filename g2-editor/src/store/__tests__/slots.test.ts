@@ -113,7 +113,7 @@ describe('paste', () => {
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
 
-		const modInstance = (index: number) => ({ type: 1, index, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+		const modInstance = (index: number) => ({ type: 1, index, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] });
 		const entries = [
 			{ src: modInstance(1), newId: 1, col: 0, row: 0 },
 			{ src: modInstance(2), newId: 2, col: 3, row: 0 },
@@ -405,7 +405,7 @@ describe('setMorphGroupLabel', () => {
 
 describe('pasteParams', () => {
 	function moduleInstance(index: number, type: number, pcnt: number, modes: number[]): any {
-		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv: [], modes };
+		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt, lv: [], modes };
 	}
 
 	function withVariations(voiceValues: number[]): any[] {
@@ -622,7 +622,7 @@ describe('_applyPatchOutput / loadSlot — preserveHistory', () => {
 // mutation had already happened.
 describe('module add/move/delete record undo even when the CLI/hardware call fails (offline)', () => {
 	function moduleStub(index: number) {
-		return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	beforeEach(() => {
@@ -719,7 +719,7 @@ describe('addModule default name suffix', () => {
 	it('continues from the highest existing suffix, even across areas', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[0].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'LfoA5' }];
+		patch.areas[0].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [], uname: 'LfoA5' }];
 		store.slots['A'].patch = patch;
 
 		await store.addModule(26, 2, 0, 0, 'voice');
@@ -730,7 +730,7 @@ describe('addModule default name suffix', () => {
 	it('starts at 1 when no same-type module has a parseable suffix', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'Bass' }];
+		patch.areas[1].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [], uname: 'Bass' }];
 		store.slots['A'].patch = patch;
 
 		await store.addModule(26, 2, 1, 0, 'voice');
@@ -750,7 +750,7 @@ describe('replaceModule', () => {
 	const FLT_LP = 87;
 
 	function fltClassicStub(index: number) {
-		return { index, type: FLT_CLASSIC, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type: FLT_CLASSIC, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	it('changes the module type while keeping the same index, and records one undo entry', async () => {
@@ -827,8 +827,8 @@ describe('replaceModule', () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		patch.areas[1].modules = [
-			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
-			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] },
 		];
 		store.slots['A'].patch = patch;
 
@@ -897,7 +897,7 @@ describe('module delete zeroes its morph ranges on the device first', () => {
 	function setup() {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ index: 1, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ index: 1, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = [
 			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
@@ -936,7 +936,7 @@ describe('delete undo restores colours of remaining cables', () => {
 	function setup() {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+		const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] });
 		patch.areas[1].modules = [mod(1, NOISE), mod(2, LEV_AMP), mod(3, LEV_AMP)];
 		patch.areas[1].cableList = [
 			{ colour: RED, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 },
@@ -976,7 +976,7 @@ describe('re-created module sends its non-default params for every variation', (
 		const store = useSlotsStore();
 		const patch = makePatch();
 		const lv = [1, 0, 0, 54, 127, 54, 70, 14, 1, 0, 0];
-		patch.areas[1].modules = [{ index: 4, type: ENV_ADDSR, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 11, lv, modes: [] }];
+		patch.areas[1].modules = [{ index: 4, type: ENV_ADDSR, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 11, lv, modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = [
 			{ fx: {}, voice: { 4: [...lv] }, patch: { morphAssignments: [] } },
@@ -999,7 +999,7 @@ describe('undo after an echo reload replaced the patch object', () => {
 	const FLT_LP = 87;
 
 	function stub(index: number, type = 5, vert = 0) {
-		return { index, type, horiz: 0, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type, horiz: 0, vert, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	// Simulates _applyPatchOutput's echo reload: same content, new patch object.
@@ -1916,7 +1916,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it("'clr' resets both the value row and the gate row for all 16 steps, ignoring Length", async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(10);
 		values[LENGTH_IDX] = 3; // Length only affects playback, not which steps Rnd/Clr touch
@@ -1935,7 +1935,19 @@ describe('randomizeOrClearSeqSteps', () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		patch.areas[1].modules = [
-			{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [], pianoRollView: { zoom: 1, octaveOffset: 5 } },
+			{
+				type: 121,
+				index: 1,
+				horiz: 0,
+				vert: 0,
+				colour: 0,
+				uprate: 0,
+				mutaLock: 0,
+				pcnt: 37,
+				lv: [],
+				modes: [],
+				pianoRollView: { zoom: 1, octaveOffset: 5 },
+			},
 		];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(0);
@@ -1959,7 +1971,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it("'rnd' on a non-SeqNote sequencer (no piano-roll window) still spans the param's full range", async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = withVariations(Array(37).fill(64), 1);
 
@@ -1976,7 +1988,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('one press is a single undo/redo entry', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(10);
 		values[LENGTH_IDX] = 15;
@@ -1995,7 +2007,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('treats all 16 steps as active for a module with no Length param (SeqCtr), resetting both rows', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = withVariations(Array(37).fill(10), 1);
 
@@ -2007,7 +2019,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('does nothing for a module without any Seq1Step params', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 5, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 5, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 
 		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');

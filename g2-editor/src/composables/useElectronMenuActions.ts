@@ -8,6 +8,7 @@ import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
 import { useHistoryStore } from '@/store/history';
+import { useMutatorStore } from '@/store/mutator';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
@@ -23,6 +24,11 @@ interface MenuActionOptions {
 	handleSlotClick: (idx: number) => void;
 	handleVariationClick: (idx: number) => Promise<void>;
 	showAbout?: () => void;
+}
+
+// Keyboard focus inside the Patch Mutator pane: keys 1-8 pick a mutator box instead of a variation.
+function isMutatorFocused(): boolean {
+	return document.activeElement?.closest('[data-mutator-pane]') != null;
 }
 
 function isInputFocused(): boolean {
@@ -266,7 +272,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'variation-8': {
 					if (isInputFocused()) break;
 					const variation = parseInt(action.substring(10, 11));
-					await handleVariationClick(variation - 1);
+					if (isMutatorFocused()) await useMutatorStore().focusNumber(variation);
+					else await handleVariationClick(variation - 1);
 					break;
 				}
 				case 'toggle-svg-viewer':
@@ -277,6 +284,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'toggle-parameter-overview':
 					useSettingsStore().toggleSidebar('overview');
+					break;
+				case 'toggle-patch-mutator':
+					useSettingsStore().toggleSidebar('mutator');
 					break;
 				case 'toggle-text-panel':
 					useSettingsStore().toggleSidebar('text');

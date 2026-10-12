@@ -10,10 +10,11 @@ import type {
 	PatchParamVariation,
 	VariationState,
 } from '@/types';
-import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES } from '@/types/patch';
+import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES, MUTATOR_VARIATION } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
+import { defaultMutaLock } from '../renderer/mutator';
 import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
 import {
@@ -55,6 +56,7 @@ import {
 	setCliFailureHandler,
 	type PasteParamsPair,
 	type ParamChange,
+	BATCH_CHUNK,
 } from './slotHelpers';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useUiStore } from './ui';
@@ -99,8 +101,6 @@ function parseResourceMemory(d: number[], o: number): number {
 }
 
 export type { SlotLabel };
-
-const BATCH_CHUNK = 128;
 
 // Maps a controller location code to its CLI location string.
 function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
@@ -264,46 +264,6 @@ function deepCloneVariationState(v: VariationState): VariationState {
 	};
 }
 
-function buildVariationHardwareCmds(slot: SlotLabel, variations: VariationState[], varIdx: number): string[][] {
-	const vState = variations[varIdx];
-	const cmds: string[][] = [];
-	const v = String(varIdx);
-
-	for (const [moduleId, params] of Object.entries(vState.fx)) {
-		for (let p = 0; p < params.length; p++) {
-			cmds.push(['set-param', slot, 'fx', moduleId, String(p), String(params[p]), v]);
-		}
-	}
-	for (const [moduleId, params] of Object.entries(vState.voice)) {
-		for (let p = 0; p < params.length; p++) {
-			cmds.push(['set-param', slot, 'va', moduleId, String(p), String(params[p]), v]);
-		}
-	}
-
-	for (let i = 0; i < 8; i++) {
-		cmds.push(['set-param', slot, 'patch', '1', String(i), String(vState.patch.morphDials[i] ?? 0), v]);
-		cmds.push(['set-param', slot, 'patch', '1', String(8 + i), String(vState.patch.morphModes[i] ?? 0), v]);
-	}
-
-	const patch = vState.patch as unknown as Record<string, number>;
-	for (let pi = 0; pi < PATCH_PARAM_KEYS.length; pi++) {
-		const key = PATCH_PARAM_KEYS[pi];
-		const value = patch[key as string] ?? 0;
-		let section = SECTION_STARTS[SECTION_STARTS.length - 1].section;
-		let local = pi - SECTION_STARTS[SECTION_STARTS.length - 1].start;
-		for (let si = 0; si < SECTION_STARTS.length - 1; si++) {
-			if (pi >= SECTION_STARTS[si].start && pi < SECTION_STARTS[si + 1].start) {
-				section = SECTION_STARTS[si].section;
-				local = pi - SECTION_STARTS[si].start;
-				break;
-			}
-		}
-		cmds.push(['set-param', slot, 'patch', String(section), String(local), String(value), v]);
-	}
-
-	return cmds;
-}
-
 // Builds the CLI add-module command tuple + any non-default set-param commands for the other
 // variations, given a module snapshot placed at `newId`/(col, row). Shared by buildModuleAddition
 // and deleteModule's undo path (which restores a snapshot directly, without going through
@@ -332,6 +292,7 @@ function buildAddModuleCmd(
 		String(src.pcnt),
 		...paramVals0.map(String),
 		src.uname ?? '',
+		String(src.mutaLock),
 	];
 
 	// The G2 ignores add-module's param values and starts from its own defaults, so every value that
@@ -394,7 +355,7 @@ interface SlotEntry {
 	rawHex: string | null;
 	templateRawHex: string | null; // last valid rawHex from hardware/file; never cleared
 	patch: Patch | null;
-	variations: VariationState[] | null; // 9 elements (0-8); null when no patch loaded
+	variations: VariationState[] | null; // 10 elements: 0-7, 8 = INIT, 9 = MUTATOR_VARIATION (live only); null when no patch loaded
 	resources: SlotResources;
 	assignedVoices: number;
 	controllers: MidiCCAssignment[];
@@ -725,6 +686,16 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
+		// Makes `variation` the one shown and played. The Patch Mutator's live-only variation is never
+		// stored as the patch's active variation.
+		async activateVariation(variation: number): Promise<void> {
+			const ui = useUiStore();
+			ui.variation = variation;
+			const patch = this.slots[ui.slotInFocus]?.patch;
+			if (patch?.description && variation !== MUTATOR_VARIATION) patch.description.variation = variation;
+			await this.selectVariation(variation);
+		},
+
 		async selectVariation(variation: number): Promise<void> {
 			const active = useUiStore().slotInFocus;
 			if (!active || useDeviceStore().status !== DeviceStatus.Connected) return;
@@ -839,18 +810,8 @@ export const useSlotsStore = defineStore('slots', {
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
-					undo: async () => {
-						slotEntry.variations![toVar] = deepCloneVariationState(prevState);
-						this._markSlotDirty(slot);
-						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation undo');
-					},
-					redo: async () => {
-						slotEntry.variations![toVar] = deepCloneVariationState(newState);
-						this._markSlotDirty(slot);
-						const cmds = buildVariationHardwareCmds(slot, slotEntry.variations!, toVar);
-						if (cmds.length > 0) await runCliBatchSafe(cmds, 'copyVariation redo');
-					},
+					undo: () => this._writeVariationState(slot, toVar, prevState, 'copyVariation undo'),
+					redo: () => this._writeVariationState(slot, toVar, newState, 'copyVariation redo'),
 				});
 			}
 
@@ -859,6 +820,37 @@ export const useSlotsStore = defineStore('slots', {
 			slotEntry.variations[toVar] = newState;
 			this._markSlotDirty(slot);
 			await runCliSafe(['copy-variation', slot, String(fromVar), String(toVar)], 'copyVariation');
+		},
+
+		// Replaces one whole variation and pushes it to the G2 as one param dump (the official
+		// CMMutaParamDump: patch settings, VA, FX and morph ranges of just this variation). A burst of
+		// single set-params instead loses some of them on the G2 (hardware-verified). No history:
+		// callers record their own undo. Writes to the Patch Mutator's live-only variation don't mark
+		// the patch as edited.
+		async _writeVariationState(slot: SlotLabel, variation: number, state: VariationState, label: string): Promise<void> {
+			const entry = this.slots[slot];
+			if (!entry.variations || !entry.patch) return;
+			entry.variations[variation] = deepCloneVariationState(state);
+			if (variation !== MUTATOR_VARIATION) this._markSlotDirty(slot);
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
+			const { serializeVariationDump } = await import('../parser/nmg2PatchSerializer');
+			await runCliSafe(['send-sections', slot, Array.from(serializeVariationDump(entry.patch, state, variation))], label);
+		},
+
+		// Overwrites a variation with `state` as one undoable step (Patch Mutator "v" / drop on a variation).
+		async applyVariationState(slot: SlotLabel, variation: number, state: VariationState): Promise<void> {
+			const entry = this.slots[slot];
+			if (!entry.variations) return;
+			const prevState = deepCloneVariationState(entry.variations[variation]);
+			const newState = deepCloneVariationState(state);
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: () => this._writeVariationState(slot, variation, prevState, 'applyVariationState undo'),
+					redo: () => this._writeVariationState(slot, variation, newState, 'applyVariationState redo'),
+				});
+			}
+			await this._writeVariationState(slot, variation, newState, 'applyVariationState');
 		},
 
 		handleCopyVariationEvent(slot: SlotLabel, fromVar: number, toVar: number) {
@@ -1052,7 +1044,7 @@ export const useSlotsStore = defineStore('slots', {
 					vert: oldModSnap.vert,
 					colour: oldModSnap.colour,
 					uprate: 0,
-					leds: 0,
+					mutaLock: defaultMutaLock(newTypeId),
 					pcnt: newPcnt,
 					lv: newLv,
 					modes: newModes,
@@ -1188,7 +1180,7 @@ export const useSlotsStore = defineStore('slots', {
 				vert: row,
 				colour: uiStore.moduleColor,
 				uprate: 0,
-				leds: 0,
+				mutaLock: defaultMutaLock(typeId),
 				pcnt: numParams,
 				lv,
 				modes: modeVals,
@@ -1219,6 +1211,7 @@ export const useSlotsStore = defineStore('slots', {
 					String(numParams),
 					...paramVals.map(String),
 					uname,
+					String(mod.mutaLock),
 				],
 				'addModule',
 			);
@@ -1363,8 +1356,8 @@ export const useSlotsStore = defineStore('slots', {
 				// frame as add-cable — splitting into two sequential batches avoids G2_ERR_SEND.
 				const moduleCmds = allCmds.filter((c) => c[0] !== 'add-cable');
 				const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
-				for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(moduleCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
-				for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(cableCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
+				await runCliBatchSafe(moduleCmds, 'paste batch');
+				await runCliBatchSafe(cableCmds, 'paste batch');
 
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
@@ -2495,6 +2488,36 @@ export const useSlotsStore = defineStore('slots', {
 			await runCliBatchSafe(
 				moduleIds.map((id) => ['set-module-color', slot, location, String(id), String(color)]),
 				'setModuleColors',
+			);
+		},
+
+		// Patch Mutator "Exclude From Mutation" (saved with the patch).
+		async setMutationLock(moduleIds: number[], locked: boolean, area: 'voice' | 'fx'): Promise<void> {
+			if (moduleIds.length === 0) return;
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { slot, patch } = ctx;
+			const { areaIdx, location } = areaConfig(area);
+			const mods = moduleIds.map((id) => findModuleByIndex(patch.areas[areaIdx].modules, id)).filter((m) => m !== undefined);
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				const prev = mods.map((m) => ({ id: m.index, locked: m.mutaLock === 1 }));
+				hist.record(slot, {
+					undo: async () => {
+						for (const p of prev) await this.setMutationLock([p.id], p.locked, area);
+					},
+					redo: async () => {
+						await this.setMutationLock(moduleIds, locked, area);
+					},
+				});
+			}
+
+			for (const m of mods) m.mutaLock = locked ? 1 : 0;
+			this._markSlotDirty(slot);
+			await runCliBatchSafe(
+				mods.map((m) => ['set-mutation-lock', slot, location, String(m.index), locked ? '1' : '0']),
+				'setMutationLock',
 			);
 		},
 

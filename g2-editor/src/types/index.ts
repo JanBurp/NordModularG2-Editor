@@ -32,6 +32,7 @@ export type MenuAction =
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'
 	| 'toggle-keyboard'
+	| 'toggle-patch-mutator'
 	| 'area-voice'
 	| 'area-fx'
 	| 'area-split'

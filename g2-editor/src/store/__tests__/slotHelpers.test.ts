@@ -10,7 +10,7 @@ import {
 } from '../slotHelpers';
 
 function mod(index: number, type: number, pcnt: number, lv: number[], modes: number[]): any {
-	return { index, type, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv, modes };
+	return { index, type, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt, lv, modes };
 }
 
 describe('resolveColumnCollisions', () => {

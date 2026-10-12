@@ -55,7 +55,7 @@ function modSnap(m: ModuleInstance) {
 		vert: m.vert,
 		colour: m.colour,
 		uprate: m.uprate,
-		leds: m.leds,
+		mutaLock: m.mutaLock,
 		uname: m.uname,
 		paramLabels: m.paramLabels,
 		modes: [...(m.modes ?? [])],
@@ -225,7 +225,7 @@ describe('addModule', () => {
 			vert: 7,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -261,7 +261,7 @@ describe('addModule', () => {
 			vert: 2,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt,
 			lv,
 			modes: [],
@@ -323,9 +323,9 @@ describe('cable colour persistence (userColour inference)', () => {
 		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
 
 		// Keyboard (type 1): output 0 "Pitch" is blue (index 1), output 1 "Gate" is yellow (index 2).
-		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 		// 2-Out (type 4): destination with plain inputs, no outputs.
-		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 		mutAddModule(patch, 1, kbd);
 		mutAddModule(patch, 1, out);
 
@@ -350,8 +350,8 @@ describe('cable colour persistence (userColour inference)', () => {
 
 	it('does not pin a colour that happens to equal the natural default (documented limitation)', () => {
 		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
-		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
-		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		const kbd: ModuleInstance = { type: 1, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const out: ModuleInstance = { type: 4, index: 2, horiz: 3, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 		mutAddModule(patch, 1, kbd);
 		mutAddModule(patch, 1, out);
 
@@ -382,7 +382,7 @@ describe('chained edits round-trip', () => {
 			vert: 10,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -466,7 +466,7 @@ describe('paramLabels round-trip', () => {
 			vert: 0,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -532,7 +532,7 @@ describe('SeqNote pianoRollView round-trip', () => {
 			vert: 0,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: seqNoteDef.params?.length ?? 0,
 			lv: [],
 			modes: [],
@@ -664,7 +664,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 			vert: 3,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -678,7 +678,7 @@ describe('file save/load round-trip (simulates App.vue saveSlot → handleFileLo
 			vert: 3,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -1179,7 +1179,7 @@ describe('prf2 per-slot mutation round-trip', () => {
 			vert: 1,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],
@@ -1209,7 +1209,7 @@ describe('prf2 per-slot mutation round-trip', () => {
 			vert: 3,
 			colour: 0,
 			uprate: 0,
-			leds: 0,
+			mutaLock: 0,
 			pcnt: 0,
 			lv: [],
 			modes: [],

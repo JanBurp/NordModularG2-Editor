@@ -61,7 +61,7 @@ static void print_usage(const char *prog) {
     printf("  play-note <note 0-127> <0|1>                                                              Virtual Keyboard: sound (1) or release (0) a note\n");
     printf("  list [type] [bank <n>]                                                                    List patches and performances\n");
     printf("  slot <A|B|C|D>                                                                            Change active slot (activates if inactive)\n");
-    printf("  variation <1-8> <A-D>                                                                     Select variation for slot\n");
+    printf("  variation <1-10> <A-D>                                                                    Select variation for slot (10 = Patch Mutator audition)\n");
     printf("  set-slot-enabled <slot> <0|1>                                                             Enable or disable a slot\n");
     printf("  set-slot-key <slot> <0|1>                                                                 Assign or unassign keyboard to a slot\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>  Add cable between two jacks\n");
@@ -71,6 +71,8 @@ static void print_usage(const char *prog) {
     printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
+    printf("  set-mutation-lock <slot> <va|fx> <module-id> <0|1>                                        Exclude a module from Patch Mutator changes\n");
+    printf("  send-sections <slot> <hex>                                                                Send whole patch sections ([type][len16][data]...) as one edit\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
     printf("  set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [...]       Set ALL labelled params of a module (group repeats per param)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
@@ -415,7 +417,7 @@ static int cmd_move_module(int argc, char **argv, int i) {
 static int cmd_add_module(int argc, char **argv, int i) {
     if (i + 8 >= argc) {
         fprintf(stderr, "Usage: add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color>"
-                        " <num-modes> [mode-vals...] <num-params> [param-vals...] <name>\n");
+                        " <num-modes> [mode-vals...] <num-params> [param-vals...] <name> [muta-lock:0|1]\n");
         return 1;
     }
     int slot      = parse_slot(argv[i + 1]);
@@ -441,7 +443,8 @@ static int cmd_add_module(int argc, char **argv, int i) {
         param_vals[p] = atoi(argv[j++]);
 
     const char *name = (j < argc) ? argv[j] : "Module";
-    return g2_add_module(slot, location, type_id, module_id, col, row, color,
+    int muta_lock = (j + 1 < argc) ? atoi(argv[j + 1]) : 0;
+    return g2_add_module(slot, location, type_id, module_id, col, row, color, muta_lock,
                          num_modes, mode_vals, num_params, param_vals, name);
 }
 
@@ -456,6 +459,34 @@ static int cmd_set_module_color(int argc, char **argv, int i) {
     int module_id = atoi(argv[i + 3]);
     int color     = atoi(argv[i + 4]);
     return g2_set_module_color(slot, location, module_id, color);
+}
+
+static int cmd_send_sections(int argc, char **argv, int i) {
+    if (i + 2 >= argc) {
+        fprintf(stderr, "Usage: send-sections <slot> <hex>\n");
+        return 1;
+    }
+    int slot = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "send-sections: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    uint8_t *data = NULL;
+    int nbytes = hex_to_bytes(argv[i + 2], &data);
+    if (nbytes <= 0) { fprintf(stderr, "send-sections: invalid hex\n"); free(data); return 1; }
+    int ret = g2_send_sections(slot, data, (size_t)nbytes);
+    free(data);
+    return ret;
+}
+
+static int cmd_set_mutation_lock(int argc, char **argv, int i) {
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: set-mutation-lock <slot> <va|fx> <module-id> <0|1>\n");
+        return 1;
+    }
+    int slot      = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-mutation-lock: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location  = parse_location_str(argv[i + 2]);
+    int module_id = atoi(argv[i + 3]);
+    int locked    = atoi(argv[i + 4]);
+    return g2_set_mutation_lock(slot, location, module_id, locked);
 }
 
 static int cmd_set_module_name(int argc, char **argv, int i) {
@@ -1062,6 +1093,8 @@ static const cmd_entry_t commands[] = {
     { "move-module",      cmd_move_module      },
     { "add-module",       cmd_add_module       },
     { "set-module-color", cmd_set_module_color },
+    { "set-mutation-lock", cmd_set_mutation_lock },
+    { "send-sections",    cmd_send_sections    },
     { "set-module-name",  cmd_set_module_name  },
     { "assign-midicc",         cmd_assign_midicc         },
     { "deassign-midicc",       cmd_deassign_midicc       },

@@ -45,15 +45,12 @@ describe('addRecentFile', () => {
 });
 
 describe('toggleVirtualKeyboard', () => {
-	it('cycles hidden → Keyboard → Keyboard + Patch Adjuster → hidden', () => {
+	it('shows and hides the keyboard', () => {
 		const store = useSettingsStore();
-		const state = () => [store.showVirtualKeyboard, store.showPatchAdjuster];
-		expect(state()).toEqual([false, false]);
+		expect(store.showVirtualKeyboard).toBe(false);
 		store.toggleVirtualKeyboard();
-		expect(state()).toEqual([true, false]);
+		expect(store.showVirtualKeyboard).toBe(true);
 		store.toggleVirtualKeyboard();
-		expect(state()).toEqual([true, true]);
-		store.toggleVirtualKeyboard();
-		expect(state()).toEqual([false, false]);
+		expect(store.showVirtualKeyboard).toBe(false);
 	});
 });

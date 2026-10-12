@@ -377,7 +377,7 @@ class G2Parser {
 			mod.vert = this.getBits(7);
 			mod.colour = this.getBits(8);
 			mod.uprate = this.getBits(1);
-			mod.leds = this.getBits(1);
+			mod.mutaLock = this.getBits(1);
 			this.getBits(6);
 			const nmodes = this.getBits(4);
 			mod.modes = [];

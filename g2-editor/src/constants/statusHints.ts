@@ -34,6 +34,7 @@ export const STATUS_HINTS = {
 	paneModules: `${MOD}L: drag modules onto the canvas`,
 	paneMidicc: `${MOD}I: MIDI CC assignments`,
 	paneOverview: `⇧${MOD}F: all Parameter Pages at once`,
+	paneMutator: `${MOD}2: Patch Mutator — breed new sounds from this patch`,
 	paneText: `${MOD}J: patch notes`,
 	paneSettings: `${MOD}, : editor, device, and patch settings`,
 

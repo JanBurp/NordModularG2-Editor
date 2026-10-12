@@ -1055,8 +1055,8 @@ int g2_select_variation(int variation, int slot) {
     int ret;
     uint8_t extraData[1] = {0};
 
-    if (variation < 1 || variation > 8) {
-        g2_err("Invalid variation: %d (must be 1-8)\n", variation);
+    if (variation < 1 || variation > 10) {
+        g2_err("Invalid variation: %d (must be 1-10; 10 = Patch Mutator audition)\n", variation);
         return G2_ERR_INVALID_PARAM;
     }
 
@@ -1161,7 +1161,7 @@ void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
 }
 
 int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
-                            int type_id, int module_id, int col, int row, int color,
+                            int type_id, int module_id, int col, int row, int color, int muta_lock,
                             int num_modes, const int *mode_vals, const char *name) {
     if (module_id < 1 || module_id > G2_MAX_MODULE_INDEX) {
         g2_err("add-module: module-id must be 1-%d\n", G2_MAX_MODULE_INDEX);
@@ -1175,7 +1175,7 @@ int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
     buf[pos++]=(uint8_t)type_id; buf[pos++]=(uint8_t)loc;
     buf[pos++]=(uint8_t)module_id; buf[pos++]=(uint8_t)col;
     buf[pos++]=(uint8_t)row; buf[pos++]=(uint8_t)(color&0xff);
-    buf[pos++]=0x00; buf[pos++]=0x00; /* upRate, isLed */
+    buf[pos++]=0x00; buf[pos++]=(uint8_t)(muta_lock ? 1 : 0); /* upRate, Exclude From Mutation (see set-mutation-lock) */
     if (num_modes < 0) num_modes = 0;
     if (num_modes > 16) num_modes = 16;  /* bound: caller buffers hold at most this many */
     for (int m=0; m<num_modes; m++)
@@ -1192,6 +1192,14 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
                                    int loc, int module_id, int color) {
     buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)color;
     op->cmd=0x31; op->payload=buf; op->len=3;
+}
+
+/* Patch Mutator "Exclude From Mutation" (official CMMutaLock::WriteStream, tag 0x90): same
+ * loc/module/value layout as set-module-color. Stored as the module record bit after upRate. */
+void g2_build_set_mutation_lock_op(G2Op *op, uint8_t *buf,
+                                   int loc, int module_id, int locked) {
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)(locked ? 1 : 0);
+    op->cmd=0x90; op->payload=buf; op->len=3;
 }
 
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
@@ -1354,7 +1362,7 @@ int g2_move_module(int slot, int location, int module_id, int col, int row) {
 }
 
 int g2_add_module(int slot, int location, int type_id, int module_id,
-                  int col, int row, int color,
+                  int col, int row, int color, int muta_lock,
                   int num_modes, const int *mode_vals,
                   int num_params, const int *param_vals,
                   const char *name) {
@@ -1364,7 +1372,7 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
     if (location < 0 || location > 1)  { g2_err("add-module: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
 
     uint8_t buf[512]; G2Op op;
-    int built = g2_build_add_module_op(&op, buf, location, type_id, module_id, col, row, color,
+    int built = g2_build_add_module_op(&op, buf, location, type_id, module_id, col, row, color, muta_lock,
                                        num_modes, mode_vals, name);
     if (built < 0) return built;
 
@@ -1384,6 +1392,33 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
     uint8_t buf[3]; G2Op op;
     g2_build_set_module_color_op(&op, buf, location, module_id, color);
     return send_slot_edit(slot, "set-module-color", &op, 1);
+}
+
+/* Sends whole patch sections ([type][len16][data], as in a .pch2) as one slot edit. The Patch
+ * Mutator uses it for the official audition dump (CMMutaParamDump): Parameters (0x4d) for the
+ * patch-settings, VA and FX contexts plus Morph (0x65), each holding only variation 9. */
+int g2_send_sections(int slot, const uint8_t *buf, size_t len) {
+    if (slot < 0 || slot > 3) { g2_err("send-sections: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
+    size_t ofs = 0;
+    while (ofs + 3 <= len) ofs += 3 + (size_t)((buf[ofs + 1] << 8) | buf[ofs + 2]);
+    if (len < 3 || ofs != len) { g2_err("send-sections: not a sequence of whole sections\n"); return G2_ERR_INVALID_PARAM; }
+    if (ensure_connected(0) < 0) { g2_err("send-sections: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    G2Op op = { .cmd = buf[0], .payload = (uint8_t *)buf + 1, .len = (int)len - 1 };
+    return send_slot_edit(slot, "send-sections", &op, 1);
+}
+
+int g2_set_mutation_lock(int slot, int location, int module_id, int locked) {
+
+    if (slot < 0 || slot > 3)          { g2_err("set-mutation-lock: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("set-mutation-lock: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (locked < 0 || locked > 1)      { g2_err("set-mutation-lock: locked must be 0 or 1\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { g2_err("set-mutation-lock: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    uint8_t buf[3]; G2Op op;
+    g2_build_set_mutation_lock_op(&op, buf, location, module_id, locked);
+    return send_slot_edit(slot, "set-mutation-lock", &op, 1);
 }
 
 int g2_set_module_label(int slot, int location, int module_id, const char *label) {
@@ -2303,7 +2338,7 @@ int g2_set_param(int slot, int location, int module_id,
     if (location < 0 || location > 2)     { g2_err("set-param: invalid location\n");    return G2_ERR_INVALID_PARAM; }
     if (module_id < 0 || module_id > 255) { g2_err("set-param: invalid module-id\n");   return G2_ERR_INVALID_PARAM; }
     if (param_idx < 0 || param_idx > 255) { g2_err("set-param: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
-    if (variation < 0 || variation > 8)   { g2_err("set-param: variation must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
+    if (variation < 0 || variation > 9)   { g2_err("set-param: variation must be 0-9\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0)          { g2_err("set-param: not connected\n");       return G2_ERR_CONNECT; }
 
     uint8_t version = cable_get_version(slot);
@@ -2342,7 +2377,7 @@ int g2_set_morph_range(int slot, int location, int module_id, int param_idx,
     if (param_idx < 0 || param_idx > 255) { g2_err("set-morph-range: invalid param-idx\n");   return G2_ERR_INVALID_PARAM; }
     if (morph_group < 0 || morph_group > 7) { g2_err("set-morph-range: invalid morph-group\n"); return G2_ERR_INVALID_PARAM; }
     if (range < -127 || range > 127)      { g2_err("set-morph-range: range must be -127..127\n"); return G2_ERR_INVALID_PARAM; }
-    if (variation < 0 || variation > 8)   { g2_err("set-morph-range: variation must be 0-8\n"); return G2_ERR_INVALID_PARAM; }
+    if (variation < 0 || variation > 9)   { g2_err("set-morph-range: variation must be 0-9\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0)          { g2_err("set-morph-range: not connected\n");       return G2_ERR_CONNECT; }
 
     uint8_t version = cable_get_version(slot);

@@ -155,13 +155,19 @@ int g2_set_cable_color(int slot, int location, int color,
 int g2_del_module(int slot, int location, int module_id);
 int g2_move_module(int slot, int location, int module_id, int col, int row);
 int g2_add_module(int slot, int location, int type_id, int module_id,
-                  int col, int row, int color,
+                  int col, int row, int color, int muta_lock,
                   int num_modes, const int *mode_vals,
                   int num_params, const int *param_vals,
                   const char *name);
 
 /* Set module color: slot 0-3, location 0=fx/1=va, color 0-6 */
 int g2_set_module_color(int slot, int location, int module_id, int color);
+
+/* Whole .pch2-style sections ([type][len16][data]...) sent as one slot edit (Patch Mutator audition) */
+int g2_send_sections(int slot, const uint8_t *buf, size_t len);
+
+/* Patch Mutator "Exclude From Mutation": slot 0-3, location 0=fx/1=va, locked 0/1 */
+int g2_set_mutation_lock(int slot, int location, int module_id, int locked);
 
 /* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
 int g2_set_module_label(int slot, int location, int module_id, const char *label);
@@ -192,10 +198,12 @@ void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index);
 void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
     int module_id, int col, int row);
 int  g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
-    int type_id, int module_id, int col, int row, int color,
+    int type_id, int module_id, int col, int row, int color, int muta_lock,
     int num_modes, const int *mode_vals, const char *name);
 void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int color);
+void g2_build_set_mutation_lock_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int locked);
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, const char *label);
 

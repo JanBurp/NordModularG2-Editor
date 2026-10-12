@@ -290,13 +290,18 @@ static int execute_seq(cJSON *args) {
             for (int m = 0; m < num_modes && m < 64; m++) mode_vals[m] = arg_i(sub, j++);
             int num_params = arg_i(sub, j++);
             j += num_params;  /* skip param_vals — G2 initialises to defaults */
+            int muta_lock = (j + 1 < sn) ? arg_i(sub, j + 1) : 0;
             if (g2_build_add_module_op(op, p, s_loc,
-                    arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), arg_i(sub,7),
+                    arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), arg_i(sub,7), muta_lock,
                     num_modes, mode_vals, arg_s(sub, j)) < 0) { ret = G2_ERR_INVALID_PARAM; break; }
             n_ops++;
 
         } else if (strcmp(scmd, "set-module-color") == 0 && sn >= 5) {
             g2_build_set_module_color_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
+            n_ops++;
+
+        } else if (strcmp(scmd, "set-mutation-lock") == 0 && sn >= 5) {
+            g2_build_set_mutation_lock_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
             n_ops++;
 
         } else if (strcmp(scmd, "set-module-name") == 0 && sn >= 5) {
@@ -494,10 +499,11 @@ static void execute_cmd(const char *line) {
 		int param_vals[256] = {0};
 		for (int p = 0; p < num_params && p < 256; p++) param_vals[p] = arg_i(args, j++);
 		const char *name = arg_s(args, j);
+		int muta_lock = (j + 1 < n) ? arg_i(args, j + 1) : 0;
 		if ((num_modes < 0 || num_modes > 16) || (name && strlen(name) > 16)) {
 			ret = G2_ERR_INVALID_PARAM;
 		} else {
-			ret = g2_add_module(slot, loc, type_id, module_id, col, row, color,
+			ret = g2_add_module(slot, loc, type_id, module_id, col, row, color, muta_lock,
 			                    num_modes, mode_vals, num_params, param_vals,
 			                    name ? name : "Module");
 		}
@@ -514,6 +520,12 @@ static void execute_cmd(const char *line) {
 		int loc  = parse_location(args, 1);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_module_color(slot, loc, arg_i(args, 2), arg_i(args, 3));
+
+	} else if (strcmp(cmd, "set-mutation-lock") == 0 && n >= 4) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_mutation_lock(slot, loc, arg_i(args, 2), arg_i(args, 3));
 
 	} else if (strcmp(cmd, "set-module-name") == 0 && n >= 4) {
 		int slot = parse_slot(arg_s(args, 0));
@@ -750,6 +762,14 @@ static void execute_cmd(const char *line) {
 		int slot = parse_slot(arg_s(args, 0));
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_upload_patch(slot, arg_s(args, 1));
+
+	} else if (strcmp(cmd, "send-sections") == 0 && n >= 2) {
+		int slot = parse_slot(arg_s(args, 0));
+		size_t buf_len = 0;
+		uint8_t *buf = arg_bytes(args, 1, &buf_len);
+		if (slot == SLOT_INVALID || !buf) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_send_sections(slot, buf, buf_len);
+		free(buf);
 
 	} else if (strcmp(cmd, "upload-patch-data") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));

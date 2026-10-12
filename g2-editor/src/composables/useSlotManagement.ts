@@ -57,16 +57,10 @@ export function useSlotManagement(hardwareSlotChange: Ref<SlotLabel | null>, har
 	}
 
 	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {
-		const idx = value as number;
-		uiStore.variation = idx;
-		const patch = slotsStore.slots[uiStore.slotInFocus]?.patch;
-		if (patch?.description) patch.description.variation = idx;
-		if (device.status === DeviceStatus.Connected) {
-			try {
-				await slotsStore.selectVariation(idx);
-			} catch (e: any) {
-				console.error('selectVariation failed:', e?.message ?? e);
-			}
+		try {
+			await slotsStore.activateVariation(value as number);
+		} catch (e: any) {
+			console.error('selectVariation failed:', e?.message ?? e);
 		}
 	}
 
