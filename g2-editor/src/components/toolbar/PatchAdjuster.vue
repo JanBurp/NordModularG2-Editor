@@ -1,6 +1,6 @@
 <template>
-	<div class="flex items-end gap-1 px-3 py-2 select-none" data-testid="patch-adjuster">
-		<div v-for="{ knob, label } in ADJUSTER_KNOBS" :key="knob" class="flex flex-col items-center w-16 gap-1" :class="{ 'ml-4': knob === 'modRate' }">
+	<div class="flex items-end gap-2 px-2 py-4 select-none" data-testid="patch-adjuster">
+		<div v-for="{ knob, label } in ADJUSTER_KNOBS" :key="knob" class="flex flex-col items-center w-18 gap-2" :class="{ 'ml-8': knob === 'modRate' }">
 			<Knob type="KnobReset" :value="adjuster.knobs[knob]" @change="(v) => adjuster.setKnob(knob, v)" />
 			<span class="text-xs leading-none whitespace-nowrap">{{ label }}</span>
 		</div>

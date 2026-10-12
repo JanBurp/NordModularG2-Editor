@@ -1,13 +1,16 @@
 <template>
 	<div class="flex flex-col h-full overflow-y-auto text-xs text-content-primary bg-surface-0 select-none">
 		<!-- Patch Adjuster (official Ctrl-3 floater): global offsets for the focused sound -->
-		<h2 class="px-2 py-1 text-sm font-bold bg-surface-1 border-y border-line-default">Patch Adjuster</h2>
+		<h2 class="px-2 text-sm font-bold bg-surface-1 py-2">Patch Adjuster</h2>
+
 		<PatchAdjuster class="justify-center" />
 
-		<h2 class="px-2 py-1 text-sm font-bold bg-surface-1 border-y border-line-default">Patch Mutator</h2>
+		<h2 class="px-2 text-sm font-bold bg-surface-1 py-2">Patch Mutator</h2>
+
 		<StateMessage v-if="!connected" variant="empty" message="The Patch Mutator needs a connected G2." />
 		<!-- Mutator keys only act while focus is in this section (not on the adjuster's knobs) -->
-		<div v-else data-mutator-pane tabindex="0" class="flex flex-col gap-3 p-2 outline-none" @keydown="onKeydown">
+
+		<div v-else data-mutator-pane tabindex="0" class="flex flex-col gap-3 px-2 py-4 outline-none" @keydown="onKeydown">
 			<!-- Settings and breeding operations -->
 			<div class="flex items-end gap-3">
 				<div class="flex flex-col items-center gap-1">
