@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Parameter Pages Overview sidepanel
 - Patch Adjuster
+- Better rendering of modules
 
 ## [0.7.1] - 2026-10-12
 
