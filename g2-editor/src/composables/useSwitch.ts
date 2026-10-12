@@ -52,6 +52,7 @@ export function useSwitch(
 	const names = computed(() => paramDef.value.names || []);
 	const defin = computed(() => paramDef.value.defin || []);
 	const width = computed(() => param.value.w || paramDef.value.width || 18);
+	const height = computed(() => paramDef.value.height || 11);
 	const mode = computed(() => paramDef.value.mode);
 	const rows = computed(() => paramDef.value.rows || 1);
 	const bmp = computed(() => paramDef.value.bmp);
@@ -137,6 +138,7 @@ export function useSwitch(
 		names,
 		defin,
 		width,
+		height,
 		mode,
 		rows,
 		bmp,
