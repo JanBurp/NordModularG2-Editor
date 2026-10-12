@@ -21,10 +21,13 @@ Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/def
 | Interrupt IN endpoint | `0x81` |
 | Bulk IN endpoint | `0x82` |
 
-**Timeouts:**
-- Standard: 100 ms
-- Long (patch name): 2000 ms
-- Send delay (after every bulk write): 10 ms (`usleep(10000)`)
+**Timeouts** (`cli/include/defs.h`):
+- Stale interrupt drain: 20 ms (`USB_TIMEOUT_STALE_MS`)
+- Pending-notification drain: 50 ms (`USB_TIMEOUT_DRAIN_MS`)
+- Standard command/response: 500 ms (`USB_TIMEOUT_STANDARD_MS`). It used to be 100 ms, which was too tight under LED/VU telemetry load.
+- Long (patch name, slow ops): 2000 ms (`USB_TIMEOUT_LONG_MS`)
+- Bulk-OUT write: 5000 ms (`USB_TIMEOUT_SEND_MS`). A whole `.prf2` is ~34 KB. A partial write resumes at the offset already sent.
+- Send delay (after every bulk write): 10 ms (`USB_SEND_DELAY_US`)
 
 > Note: the interrupt endpoint (`0x81`) is polled with `libusb_bulk_transfer`, not `libusb_interrupt_transfer`. On macOS, interrupt_transfer can ignore timeouts after rapid transfers and hang the watch loop.
 
@@ -334,6 +337,12 @@ Use this when the target slot needs to be activated before focusing. Steps:
 
 Setting only the `active`, `key`, or `hold` field for one slot uses the same full GET_PERF_SETTINGS → modify one byte → SET_PERF_SETTINGS read-modify-write pattern, without the final SELECT_SLOT step. Field offsets in the slot block: `active`=0, `key`=1, `hold`=2.
 
+> **Every perf-settings read-modify-write must use `perf_settings_read()` / `perf_settings_write()`** (`cli/src/g2_device.c`). The read waits for the tagged `0x29` reply via `await_reply` (§12), and the write waits for the G2's `0x0C` ack. All per-slot flags, `set-slot-range`, `set-range-enable` and `switch-slot` go through these helpers.
+>
+> Before 2026-10-05 the four RMW copies took the first extended message as the reply: no tag check, buffer not zeroed, length ignored. They also never waited for the write's ack, and the editor fired two or more of them on every slot switch. During bursts, rearms, or right after a get-patch this wrote garbage settings back. The G2 wedged (RECV timeout / USB drop) and afterwards reported "Perf. Corrupt" on loads until it was power cycled.
+>
+> Like the official editor, a slot click in the editor is now **focus-only** (`0x09`). Do not add per-switch key moves back. Regression test: `test_daemon_set_slot_key_burst`.
+
 #### Two-field slot update — `set-slot-range`
 
 `g2_set_slot_range` patches both the range-lower (field offset 5) and range-upper (field offset 6) bytes in **one** read-modify-write round-trip. Do not call `g2_set_slot_perf_field` twice in sequence: the first SET_PERF_SETTINGS write causes the G2 to emit a `perf_settings_update` event and briefly stop responding; a second immediate round-trip hits `G2_ERR_RECV` (-7).
@@ -382,7 +391,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x4F` | GET_PARAM_NAMES *(not implemented yet)* | `location` | Extended bulk |
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
-| `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con color` | Embedded ACK |
+| `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con` — 5 bytes, colour is inside `flags` (§8) | Embedded ACK |
 | `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
 | `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Embedded; note/velocity at `[5..6]` |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
@@ -434,6 +443,32 @@ get-resources            <slot>                                    (0x71, querie
 ```
 
 Nearly every command above also sends `0x35` (GET_PATCH_VERSION) first to fetch/cache the patch version — this happens transparently via `cable_get_version()` and isn't repeated in the list above.
+
+### Edit acknowledgement (`send_slot_edit`)
+
+Every structural slot edit goes through `send_slot_edit()` (`cli/src/g2_device.c`): send the frame, then wait for the G2's answer. This covers add/del cable, set-cable-color, add/del/move module, module colour/name/labels/mode, patch name/description, and `seq` frames. Before 2026-10-08 edits were fire-and-forget. A NACKed add-module still returned `ok`, the editor then cabled the module the G2 had refused, and the G2 wedged.
+
+| Answer | Wire (embedded) | Result |
+|--------|-----------------|--------|
+| ok | `62 01 08+slot <ver> 7f` | `G2_OK` |
+| NACK | sub-cmd `0x7E`, error code at `[5]` | `G2_ERR_REJECTED` (-17), no disconnect |
+| nothing within 2 s (`USB_TIMEOUT_LONG_MS`) | — | `G2_ERR_RECV` (-7); the daemon emits `device_disconnected` |
+
+- **The slot tag on a NACK is unreliable.** A slot-D add-module NACK arrived tagged slot A, so any NACK counts while waiting.
+- The G2 answers every edit, typically in 50–450 ms and up to ~750 ms when edits are queued. Only one edit is in flight at a time, like the reference editor's `CBubblePort`.
+- **Late acks:** if an edit timed out, `edit_ack_owed_slot` makes the next `send_slot_edit` first wait for and discard that late answer. Otherwise it would be credited to the new edit. Not hardware-verified, because a timeout is hard to force.
+- `SET_PARAM` (`0x40`, `COMMAND_WRITE_NO_RESP`) is never acked. Do not wait for it.
+- New slot-edit commands must use `send_slot_edit`, not `send_slot` + drain.
+
+### Module constraints
+
+These rules are enforced by both the CLI and the editor. Breaking any of them has wedged or corrupted a real G2.
+
+- **Module index is 1..127 per area** (`G2_MAX_MODULE_INDEX`, guarded in `g2_build_add_module_op`). Index 128 is NACKed with code 3, and a follow-up add/cable to it wedged the G2 until it was power cycled. Allocate the lowest free index the way the official `CPatchData::GetUniqueID` does (`freeModuleIds()` in `slotHelpers.ts`); never use `max + 1`.
+- **Fx-In (type 127) is FX-area only.** Source: the official Mac v1.62 editor binary, which still has its symbols. In it, the `IsValidContext` mask (`SModuleInfo+0x20`) is `0b111` (all areas) for 171 of 172 module types. Fx-In's mask is `0b001` (context 0 = FX). This is strongly supported but not hardware-confirmed. It is guarded by `G2_MODULE_TYPE_FX_IN` and `isValidInArea()` in `nmg2mods.ts`.
+- **ADD_MODULE parameter values are ignored.** The G2 sets a new module's params to its own defaults. These defaults were measured on hardware for all 166 addable types (`src/renderer/__tests__/g2ModuleDefaults.json`). Delphi `ModuleDef.xml` agrees on 793 of 794 params; the exception is Fx-In Pad (G2 = 1).
+- **Zero a module's morph ranges before DEL_MODULE.** If a module that still has a morph assignment is deleted, the G2 stays corrupted until power-off. From then on, every add of types 58–61 (DrumSynth, CompLev, Mux8-1X, Clip) gets NACK code 3 and the slot is renamed "Error". The official editor zeroes morphs (and deassigns knobs/controllers) before `CMModuleDelete` (`CMorphMap::GetDeleteModuleMolecules`). Dangling knob or MIDI-CC assignments alone do not trigger it. Editor: `_clearModuleMorphOnDevice` in `slots.ts`.
+- A slot named **"Error"** after an edit means the G2 NACKed it (code 3, "Error in synth.") and wiped the slot. The name persists through re-uploads until another patch is loaded over it.
 
 ### Knob & MIDI Assignment Sub-Commands
 
@@ -560,6 +595,17 @@ Bit 1  : always 1
 Bit 0  : location  0=FX, 1=VA
 ```
 
+### SET_CABLE_COLOR flags byte
+
+```
+((location & 1) << 3) | (color & 7)
+
+Bit 3  : location  0=FX, 1=VA
+Bits 2-0: color    0-6
+```
+
+The full payload is 5 bytes: `[flags][from_mod][from_con][to_mod][to_con]` (reference: `BVE.NMG2Mess.pas` `AddSetCableColorMessage` and its parser). Before 2026-10-07 the CLI sent DEL_CABLE's flags byte plus a trailing colour byte (6 bytes). The G2 answered with NACK code 3, renamed the slot "Error" and wiped its cable lists. Unit test `test_set_cable_color_payload_layout` pins the bytes.
+
 ### Connector byte (from_con / to_con)
 
 ```
@@ -592,6 +638,8 @@ Slot command `0x42` sets a text label for a parameter's value slot(s).
 
 **The message replaces the module's whole label list.** Confirmed on hardware and in the original editor (`CMCustomData::WriteStream` sends the module's entire custom data): a message carrying one param's entry blanks every other labelled param of that module. To rename one button of a multi-param switch (e.g. Mixer On1..On4), send all labelled params in one message — `module_len` then covers every entry, each `[is_string, param_len, param_idx, labels...]`. The only CLI command for it is `set-module-labels <slot> <loc> <mod> <param> <count> <label>... [<param> <count> <label>...]` (also usable in `seq`) builds it (the old single-param `set-param-label` was removed because it blanked the module's other params); Morph Group labels use it too, with location `patch`. `module_len` is one byte, so the combined entries are limited to 255 bytes.
 
+**The block size is fixed per module type.** The official editor always sends one entry for every label control of the module (decompiled `HandleModuleCustomDataDump` size check, `CustomDataItemRequestChange`). For example, Mix4-1C is always 40 bytes for params 4–7. If fewer entries are sent, the device keeps the old block size and leaves a zero/garbage tail. This crashed parsing of a "RhytmGen" patch (2026-10-03). Always send the module's full label set with default texts for the untouched params. The label params and their defaults are the `label: string[]` field in `nmg2mods.ts` (34 params on 20 modules, taken from the official PANL resources). The editor builds the block with `fullLabelBlock()` in `slots.ts`. Morph Group labels always send all 8 entries (params 8–15).
+
 **Key points:**
 - Labels are **null-padded** (not space-padded) to 7 bytes each
 - `label_idx` (0–127) determines which slot within the parameter to set
@@ -613,7 +661,7 @@ payload = [location, module_id, 10, 1, 8, param_idx, 'G', 'a', 't', 'e', 0, 0, 0
 ### Retrieve sequence
 
 1. **GET_PATCH_VERSION** (system cmd `0x41 0x35 slot`) → version from `response[6]`
-2. **GET_PATCH** (slot cmd `0x3C`, scope `0x28+slot`, version) → Extended bulk → raw USB binary
+2. **GET_PATCH** (slot cmd `0x3C`, scope `0x28+slot`, version) → Extended bulk → raw USB binary (tag-checked with `is_patch_data_reply`, see §12)
 3. **GET_PATCH_NAME** (slot cmd `0x28`) → name string
 
 ### USB binary → PCH2 conversion
@@ -649,6 +697,10 @@ Uses a fixed version byte `0x53` (not the dynamic patch version). Packet layout:
 `section_data` = file bytes starting at `name_end + 3` (skip NUL + `0x17` + `0x00`), excluding the trailing 2-byte PCH2 CRC.
 
 After sending, wait `5 × 10 ms = 50 ms` then read one interrupt response + drain pending.
+
+### ~32 KB outbound message ceiling
+
+The G2 firmware cannot receive an outbound message larger than ~32 KB. This applies to `upload-perf` (`0x37`) and to bank downloads (flash dump) alike. A 34 KB performance gets `{"type":"error","code":3}`, the live slots are renamed "Error", and the device may stop answering until it is power cycled. The official Clavia editor fails on the same file at the same bank location, so no editor can work around it. Inbound transfers (get-bank) of the same size work. The CLI refuses such messages up front: `G2_MAX_MESSAGE_LEN` (32768) → `G2_ERR_TOO_LARGE` (-15), and bank transfers skip the entry and continue. Patches (1.5–7 KB) never come close to the limit; only large performances do.
 
 ### Patch Binary Chunk Types
 
@@ -694,27 +746,30 @@ To set via USB, use `SET_PATCH_DESCRIPTION` (subCmd `0x21`) with the full 14-byt
 
 ## 10. Synth Settings Response
 
-The bulk data from GET_SYNTH_SETTINGS (`0x02`) is parsed at fixed byte offsets:
+The bulk data from GET_SYNTH_SETTINGS (`0x02`) starts with the synth name at `bulk[4]`. Every other field sits at a fixed offset from `base = 4 + nameLen` (`build_synth_bulk_json` in `cli/src/g2_protocol.c`). This is the same layout as the SET request in §10a:
 
 | Offset | Field | Notes |
 |--------|-------|-------|
-| 4+ | Synth name | Variable length, null-terminated (up to 16 chars); use `parse_name(bulkData + 4, name, size)` to extract |
-| 4 + nameLen | Mode | Bit 7: 0=Patch, 1=Performance; where `nameLen` is the return value from `parse_name()` |
-| 4 + nameLen + 1 | Perf Bank | — |
-| 4 + nameLen + 2 | Perf Location | — |
-| 17 | MIDI Slot A channel | Stored 0-indexed; CLI outputs +1 (= channel 1-16) |
-| 18 | MIDI Slot B channel | |
-| 19 | MIDI Slot C channel | |
-| 20 | MIDI Slot D channel | |
-| 21 | MIDI global channel | |
-| 22 | Sysex ID | CLI adds 1 when reporting |
-| 23 | Local On | Bit 7 |
-| 24 | Prog Change | Bit 0=recv, Bit 1=send |
-| 25 | Clock | Bit 0=recv (1=on); Bit 1=send (inverted: 0=on, 1=off) |
-| 28 | Tune cents | Raw byte |
-| 30 | Tune semitones | Raw byte |
-| 32 | Pedal polarity | Bit 0 |
-| 34 | Control pedal gain | `gain = 1.0 + 0.5 * val / 32.0` |
+| 4 | Synth name | ClaviaString: up to 16 chars, NUL-terminated only when shorter than 16. `nameLen = parse_name(bulk + 4, …)` = name chars + NUL if present |
+| base+0 | Mode | Bit 7: 0=Patch, 1=Performance |
+| base+1 | `0x00` | — |
+| base+2 | Perf Bank | Cached for the SET message |
+| base+3 | Perf Location | Cached for the SET message |
+| base+4 | Memory protect | Bit 7 |
+| base+5..9 | MIDI channels A, B, C, D, global | Stored 0-indexed; CLI outputs +1 (= channel 1-16) |
+| base+10 | Sysex ID | 0-indexed (16 = All); CLI adds 1 when reporting |
+| base+11 | Local On | Bit 7 |
+| base+12 | Prog Change | Bit 1=recv, bit 0=send |
+| base+13 | Controllers | Bit 1=recv, bit 0=send |
+| base+14 | Clock | Bit 6=send; bit 5=ignore external clock (0 = recv on) |
+| base+15 | Tune cents | `int8` |
+| base+16 | Global octave shift active | Bit 7 |
+| base+17 | Global octave shift | `int8` |
+| base+18 | Tune semitones | `int8` |
+| base+20 | Pedal polarity | Bit 7 (our writer always ORs `0x40` into this byte) |
+| base+21 | Control pedal gain | 0–32 |
+
+> **Name parsing rule (Delphi `ReadClaviaString`):** read bytes up to a NUL or 16 bytes, whichever comes first. Do not stop at non-printable bytes; they are shown as `?`. On 2026-10-06 a G2 Engine had the stored name `"\x01"`. The old `parse_name` stopped at that byte without consuming it, so every following field was read 2 bytes early: Performance mode showed as Patch, and the mode byte `0x81` showed up as perfBank 129. A settings write after such a misread (e.g. a rename) stores the shifted values back. One sanity check is that the pedal byte (base+20) has `0x40` set. If a single unit reports strange synth settings, capture the raw bytes with `g2-cli --debug daemon` (it logs bulk payloads as `listener_bulk`) before touching the parser.
 
 ### Performance settings (second query)
 
@@ -835,6 +890,28 @@ Read exactly `size` bytes from EP `0x82` (bulk in).
 [5+] data
 [last-1, last]  CRC-16
 ```
+
+### Reading replies: never trust the first packet
+
+The G2 sends notifications (LED/VU, version changes, resources, …) at any time, so a reply is not guaranteed to be the next message. Two rules came out of the hang investigations:
+
+**1. Never drop a header that arrives together with a timeout.** An interrupt read on EP `0x81` that times out just as a header arrives returns `LIBUSB_ERROR_TIMEOUT` **with `transferred = 16`**. The old code discarded it because `ret != 0`. The bulk payload announced by that header then stayed unread on EP `0x82`, so every later bulk read was one message behind. G2 output stalled and OUT writes started to time out. Only a power cycle (or USB reset + resync) recovered. This was the root cause of the "G2 stops answering" hangs. LED streaming only gave the race more chances to happen. Fix in `g2_io.c`:
+- accept the data on a timeout when `transferred > 0`;
+- cap interrupt reads at 16 bytes, because a larger request swallows the following headers;
+- count the bytes that came with a timeout in the bulk loops.
+
+A reliable desync detector: every bulk payload ends in a CRC-16, so `calc_crc16` over the whole payload must be 0.
+
+**2. Match the reply by its tag.** Every request/response read goes through `await_reply()` (`cli/src/g2_device.c`) with a predicate. Anything else that arrives meanwhile is relayed as an event after the wait. Examples:
+
+| Request | Predicate | Match |
+|---------|-----------|-------|
+| GET_PATCH data | `is_patch_data_reply` | `bulk[1] == 0x08\|slot`, `bulk[3] == 0x21` (C_PATCH_DESCR), and the module list (`0x4A`) at the second chunk. A bare `0x21` change notification does not match |
+| LIST_PATCHES | `is_list_reply` | `bulk[1] == 0x0C`, `bulk[3] == 0x13` (R_LIST_NAMES) |
+| GET_PERF_SETTINGS | — | tagged `0x29` reply (`perf_settings_read`, §6b) |
+| slot edits | `is_edit_ack` | §7, Edit acknowledgement |
+
+Before 2026-10-07 the patch-data step and `g2_list` took the first extended message as the reply. In a 4 h duration run, 44 of 704 get-patch replies were really `resources_used` (`0x72`) or other payloads, and one stray LED/VU message taken as a list reply shifted every later list request by one answer. **Deterministic repro:** start a daemon, let it idle ~8 s (stream armed), then SIGKILL it so no STOP_COMM is sent. The G2 keeps streaming, and a one-shot `get-patch` / `list` then sees LED/VU data first. Test: `test_oneshot_queries_with_stream_left_on` (`cli/test/test_daemon.c`).
 
 ---
 
@@ -1125,10 +1202,14 @@ Codes carried in `subCmd` (response[4] in embedded messages) that identify what 
 | `-11` | `G2_ERR_FILE_OPEN` | File open failed |
 | `-12` | `G2_ERR_FILE_WRITE` | File write failed |
 | `-13` | `G2_ERR_NO_MEMORY` | Memory allocation failed |
+| `-14` | `G2_ERR_NOT_IMPLEMENTED` | Not implemented |
+| `-15` | `G2_ERR_TOO_LARGE` | Message larger than `G2_MAX_MESSAGE_LEN` (see §9) |
+| `-16` | `G2_ERR_TARGET_NOT_FOUND` | A specific USB bus/device target was set (`g2_set_target()`) but that G2 is not attached |
+| `-17` | `G2_ERR_REJECTED` | The G2 NACKed an edit (§7, Edit acknowledgement); the connection stays up |
 
 ---
 
-## 14. Daemon Thread Architecture
+## 19. Daemon Thread Architecture
 
 The daemon (`g2-cli daemon`) uses a listener-thread model matching the Delphi editor's `TListeningThread` pattern.
 
@@ -1255,7 +1336,9 @@ The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_
 Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
 
 
-> **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through (`daemon.c:238-239`) — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. Use the standalone `add-module` command if you need non-default parameter values applied immediately (e.g. pasting a module with non-default variation values).
+> **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through (`daemon.c:238-239`) — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. The G2 ignores parameter values in ADD_MODULE anyway (§7, Module constraints), so non-default values must always be sent afterwards as `set-param` (e.g. pasting a module with non-default variation values).
+
+> **`seq` waits for the edit ack:** the compound frame goes through `send_slot_edit` (§7). A NACK fails the whole `seq` call with `G2_ERR_REJECTED` (-17), and the deferred `set-param` entries are then not sent.
 
 > **`set-param` in `seq` — deferred execution:** `set-param` uses `COMMAND_WRITE_NO_RESP` and cannot be packed into the compound USB frame. The daemon queues all `set-param` entries into a `SetParamEntry[]` array and executes them sequentially via `g2_set_param()` **after** `g2_batch_ops()` returns. This keeps structural mutations (add/del/move module, add/del cable) atomic in one frame while still allowing parameter values in the same `seq` call — essential for copy/paste of modules with non-default variation values.
 

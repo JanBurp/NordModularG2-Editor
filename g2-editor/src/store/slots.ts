@@ -918,6 +918,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
+							this._syncUprateAndColors(patch, areaIdx);
 							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
 							if (removedPagesSnap.length > 0) slotE.paramPages = [...slotE.paramPages, ...removedPagesSnap];
 							if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
@@ -953,6 +954,7 @@ export const useSlotsStore = defineStore('slots', {
 			const connectedCables = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId);
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
+			this._syncUprateAndColors(patch, areaIdx);
 			this._dropModuleMorph(slot, morphSnap);
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
@@ -3323,6 +3325,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
+							this._syncUprateAndColors(patch, areaIdx);
 							if (ccSnaps.length > 0) this.slots[slot].controllers = [...this.slots[slot].controllers, ...ccSnaps];
 							if (pagesSnaps.length > 0) this.slots[slot].paramPages = [...this.slots[slot].paramPages, ...pagesSnaps];
 							if (globalPagesSnaps.length > 0) this.globalParamPages = [...this.globalParamPages, ...globalPagesSnaps];

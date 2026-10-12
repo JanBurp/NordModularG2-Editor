@@ -8,20 +8,24 @@ const ALT = isMac ? '⌥' : 'Alt';
 
 export const STATUS_HINTS = {
 	// Canvas — hidden gestures
-	jackConnectedDrag: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: cycle connections · Backspace: delete`,
-	jackConnectedClick: `${MOD}-drag: move · ${MOD}-click: grab to re-route · Click: connect/cancel · Backspace: delete`,
+	// Order: plain adjust · fine/faster · Morph · Parameter Page · other · Right-click
+	jackConnectedDrag: `Click: cycle connections · ${MOD}-drag: move · ${MOD}-click: grab to re-route · Backspace: delete`,
+	jackConnectedClick: `Click: connect/cancel · ${MOD}-drag: move · ${MOD}-click: grab to re-route · Backspace: delete`,
 	jackArm: 'Click: start a cable · Click again: cancel',
 	ghostCable: 'Enter: confirm suggested cable · Space: next suggestion · Escape: dismiss',
-	moduleTitle: 'Double-click: rename · Right-click: more options',
+	moduleTitle: 'Drag: move · Shift-click: add to selection · Double-click: rename · Right-click: more options',
 	moduleReplace: 'Click: replace module',
-	paramMorph: `${CTRL}-click: assign to Morph Group · ${CTRL}-drag: set range · ${ALT}-drag: assign to Parameter Page`,
+	paramKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
+	paramSlider: `Drag/Wheel: adjust · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
+	paramSpinner: `Click/Hold/Wheel: step · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
+	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
 	ccRow: 'Click: select · Drag: reassign CC',
-	paramPageKnob: `${CTRL}-drag: set morph range · ${ALT}-drag: assign/swap · Right-click: more options`,
-	morphKnob: 'Right-click: rename, clear, copy · Drop CC here: assign',
+	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Right-click: more options`,
+	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Drop CC here: assign · Right-click: rename, clear, copy',
 
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
-	areaSplit: 'Space: show/hide cables · Ctrl-Space: shake cables',
+	areaSplit: `Space: show/hide cables · ${CTRL}-Space: shake cables`,
 	areaFx: 'F: show FX (again: Split)',
 
 	// StatusBar — side panel tabs
@@ -34,7 +38,7 @@ export const STATUS_HINTS = {
 	// Toolbars
 	variationCopy: 'Drag or right-click: copy to another variation',
 	variationInit: 'Click: reset current variation to INIT',
-	slotIndicators: `Shift-click: toggle active · ${CTRL}-click: toggle focus`,
+	slotIndicators: `Shift-click: toggle active · ${MOD}-click: toggle focus`,
 	connectionToggle: 'Click: connect / disconnect G2',
 	renamePatch: 'Click: rename patch',
 	renamePerf: 'Click: rename performance',

@@ -16,7 +16,7 @@ A cross-platform editor for the Nord Modular G2 synthesizer. The original Clavia
 
 ## Project Status
 
-See the [Changelog](../CHANGELOG.md) for more details
+See the [Changelog](https://github.com/JanBurp/NordModularG2-Editor/blob/main/CHANGELOG.md) for more details
 
 | Goal | Status |
 |---|---|

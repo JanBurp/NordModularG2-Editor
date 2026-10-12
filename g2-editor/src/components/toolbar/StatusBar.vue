@@ -11,8 +11,13 @@
 		/>
 
 		<div class="flex items-center gap-3 min-w-0">
-			<span class="cursor-pointer hover:text-content-primary truncate" @click="uiStore.showKeyCommandsPage = true">
-				{{ uiStore.statusHint ?? 'Click for keyboard shortcuts' }}
+			<span
+				class="flex gap-4 min-w-0 overflow-hidden whitespace-nowrap cursor-pointer hover:text-content-primary"
+				@click="uiStore.showKeyCommandsPage = true"
+			>
+				<span v-for="(part, i) in hintParts" :key="i">
+					<span v-if="part.key" class="text-content-primary">{{ part.key }}:</span> {{ part.text }}
+				</span>
 			</span>
 		</div>
 
@@ -28,6 +33,7 @@
 </template>
 
 <script setup lang="ts">
+	import { computed } from 'vue';
 	import { useUiStore } from '../../store/ui';
 	import BtnGroup from './BtnGroup.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
@@ -38,4 +44,12 @@
 	const uiStore = useUiStore();
 	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
+
+	// 'Key: text · Key: text' → parts; the key (gesture/modifier) is highlighted.
+	const hintParts = computed(() =>
+		(uiStore.statusHint ?? 'Click for keyboard shortcuts').split(' · ').map((part) => {
+			const i = part.indexOf(': ');
+			return i < 0 ? { key: '', text: part } : { key: part.slice(0, i), text: part.slice(i + 2) };
+		}),
+	);
 </script>

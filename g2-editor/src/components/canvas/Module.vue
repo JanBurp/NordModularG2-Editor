@@ -118,7 +118,7 @@
 				:data-module-index="moduleIdx"
 				class="cursor-pointer"
 				@mousedown.capture="onParamMorphMouseDown(index, $event)"
-				@mouseenter="onParamHoverEnter"
+				@mouseenter="onParamHoverEnter(param.n)"
 				@mouseleave="onParamHoverLeave"
 			>
 				<ModuleKnob
@@ -621,8 +621,11 @@
 		slotsStore.setSeqNotePianoRollView(moduleIdx.value, area, view);
 	}
 
-	function onParamHoverEnter() {
-		showHint('paramMorph');
+	function onParamHoverEnter(n: string) {
+		if (isSwitch(n)) showHint('paramSwitch');
+		else if (isSpinner(n) || isSpinnerH(n)) showHint('paramSpinner');
+		else if (isSlider(n)) showHint('paramSlider');
+		else showHint('paramKnob');
 	}
 	function onParamHoverLeave() {
 		clearHint();

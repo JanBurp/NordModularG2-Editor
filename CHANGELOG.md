@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Setting "Prevent wheel scroll": a mouse wheel no longer scrolls the patch canvas (knobs/sliders still respond; trackpad scrolling unaffected)
+
+### Changed
+- Improved click behaviour on switches
+- Improved status-bar hints
+
+### Fixed
+- Fixed In/Out mini-module icons (arrows)
+- Some mini-modules not visible in Module Picker
+- Cable coloring with undo/redo
+- Typo in About dialog
+- Dead changelog link in documentation
+
 ## [0.7.0] - 2026-10-10
 
 ### New

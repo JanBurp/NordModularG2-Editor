@@ -4,7 +4,6 @@ export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSpinV' | 'KnobSlider';
 
 export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
 	const STEP = 1;
-	const ALT_STEP = 16; // same big step as ALT+ArrowUp/Down in useModuleKeyboard
 	const INITIAL_DELAY = 300;
 	const REPEAT_INTERVAL = 50;
 
@@ -22,10 +21,10 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 		}
 	}
 
-	function startRepeat(direction: 1 | -1, step: number) {
+	function startRepeat(direction: 1 | -1) {
 		intervalId = setInterval(() => {
 			const value = getValue();
-			const newValue = direction === 1 ? Math.min(127, value + step) : Math.max(0, value - step);
+			const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
 			onChange(paramIndex, newValue);
 		}, REPEAT_INTERVAL);
 	}
@@ -49,13 +48,12 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 			return;
 		}
 
-		const step = e.altKey ? ALT_STEP : STEP;
 		const value = getValue();
-		const newValue = direction === 1 ? Math.min(127, value + step) : Math.max(0, value - step);
+		const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
 		onChange(paramIndex, newValue);
 
 		timeoutId = setTimeout(() => {
-			startRepeat(direction, step);
+			startRepeat(direction);
 			timeoutId = null;
 		}, INITIAL_DELAY);
 

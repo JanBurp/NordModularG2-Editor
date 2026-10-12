@@ -46,6 +46,7 @@
 				class="switch-bitmap"
 				:class="{ active: index === activeIndex }"
 				@click="onButtonClick(index)"
+				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
 				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
@@ -87,6 +88,7 @@
 				class="switch-button"
 				:class="{ active: index === activeIndex }"
 				@click="onButtonClick(index)"
+				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
 				<rect
@@ -143,6 +145,7 @@
 		getButtonX,
 		getButtonY,
 		onButtonClick,
+		onButtonLeave,
 		onCycleValue,
 		isTrigger,
 		onTriggerDown,
