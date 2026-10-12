@@ -29,6 +29,8 @@ export const useSettingsStore = defineStore('settings', {
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
+		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
+		patchMutatorOpen: true as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
