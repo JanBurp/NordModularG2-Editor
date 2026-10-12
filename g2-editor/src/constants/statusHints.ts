@@ -21,6 +21,7 @@ export const STATUS_HINTS = {
 	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
 	ccRow: 'Click: select · Drag: reassign CC',
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Right-click: more options`,
+	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
 	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Drop CC here: assign · Right-click: rename, clear, copy',
 
 	// StatusBar — area switch
@@ -32,6 +33,7 @@ export const STATUS_HINTS = {
 	paneBrowser: `${MOD}B: browse patches & files`,
 	paneModules: `${MOD}L: drag modules onto the canvas`,
 	paneMidicc: `${MOD}I: MIDI CC assignments`,
+	paneOverview: `⇧${MOD}F: all Parameter Pages at once`,
 	paneText: `${MOD}J: patch notes`,
 	paneSettings: `${MOD}, : editor, device, and patch settings`,
 

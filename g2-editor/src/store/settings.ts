@@ -2,7 +2,7 @@ import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';

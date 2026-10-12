@@ -110,6 +110,15 @@ body {
 	@apply h-5 px-1 text-xs;
 }
 
+/* Parameter Page display box (toolbar + Parameter Overview). Unassigned = black with only a border,
+   so the empty displays stay visible as drop targets. */
+.param-display {
+	@apply rounded-xs px-1 text-center text-black truncate border border-input-dimmed bg-input-dimmed cursor-grab;
+}
+.param-display-empty {
+	@apply bg-transparent;
+}
+
 .btn-group-item {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
 }

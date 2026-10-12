@@ -122,6 +122,7 @@
 				{ keys: ['⌘ ,'], action: 'Toggle Settings pane' },
 				{ keys: ['⌘ T'], action: 'Toggle Extended Toolbar' },
 				{ keys: ['⌘ F'], action: 'Toggle Parameter Pages' },
+				{ keys: ['⇧ ⌘ F'], action: 'Toggle Parameter Overview' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
 			],
 		},
@@ -174,7 +175,7 @@
 		{
 			title: 'Parameter Pages',
 			rows: [
-				{ keys: ['Alt + Drag'], action: 'Drag a page cell onto a canvas parameter or another cell to assign it' },
+				{ keys: ['Drag display box', 'Alt + Drag'], action: 'Drag a page cell onto a canvas parameter or another cell to assign it' },
 				{ keys: ['Right-click module'], action: 'Assign / Global Assign all its parameters (Page ▸ Multi Column / Column N)' },
 			],
 		},

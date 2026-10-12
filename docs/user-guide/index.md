@@ -81,6 +81,7 @@ nav_order: 3
 | `⌘ ,` | Toggle Settings pane |
 | `⌘ T` | Toggle Extended Toolbar |
 | `⌘ F` | Toggle Parameter Pages |
+| `⇧ ⌘ F` | Toggle Parameter Overview |
 | `/` | Focus search (Modules / Browser pane) |
 
 ## Browser Pane
@@ -134,7 +135,19 @@ Active after clicking in the browser.
 
 | Key | Action |
 |---|---|
-| `⌥`+drag page cell | Assign it to a canvas parameter or another cell |
+| Drag display box / `⌥`+drag page cell | Assign it to a canvas parameter or another cell |
+
+### Parameter Overview (`⇧ ⌘ F`)
+
+A wide side pane that shows all Parameter Pages (A–E, rows 1–3) at once. The same gestures as the Parameter Pages toolbar apply: click-and-hold a display box and drag it onto a canvas parameter to assign it, or onto another box to move the assignment; `⌥`+drag a canvas parameter onto a box to assign it there; right-click a box for Deassign and Morph options.
+
+| Button | Action |
+|---|---|
+| Assign MIDI | Give every assigned knob (and its button) without a MIDI CC the next free CC, in page order |
+| Clear MIDI | Remove the MIDI CCs of all assigned knobs and buttons (other CC assignments are kept; undoable) |
+| View MIDI | Show the assigned CC# instead of the parameter name |
+| View Buttons | Show the button parameters instead of the knob parameters |
+| Global Pages | Toggle between the focused slot's pages and the Global Parameter Pages |
 
 ## Cabling
 

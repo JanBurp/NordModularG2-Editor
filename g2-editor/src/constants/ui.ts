@@ -22,6 +22,7 @@ export const PANE_TAB_OPTIONS = [
 	{ label: 'Browser', value: 'browser', hint: 'paneBrowser' as StatusHintKey },
 	{ label: 'Modules', value: 'modules', hint: 'paneModules' as StatusHintKey },
 	{ label: 'Midi CC', value: 'midicc', hint: 'paneMidicc' as StatusHintKey },
+	{ label: 'Overview', value: 'overview', hint: 'paneOverview' as StatusHintKey },
 	{ label: 'Text', value: 'text', hint: 'paneText' as StatusHintKey },
 	{ label: 'Settings', value: 'settings', hint: 'paneSettings' as StatusHintKey },
 ];

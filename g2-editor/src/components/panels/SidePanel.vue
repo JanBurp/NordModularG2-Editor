@@ -1,5 +1,5 @@
 <template>
-	<div class="w-68 bg-surface-1 border-l border-line-subtle flex flex-col">
+	<div :class="settingsStore.rightPaneTab === 'overview' ? 'w-184' : 'w-68'" class="bg-surface-1 border-l border-line-subtle flex flex-col">
 		<div class="flex-1 overflow-hidden overflow-y-auto">
 			<PatchBrowser
 				ref="browserRef"
@@ -9,6 +9,7 @@
 			/>
 			<ModulesPane ref="modulesPaneRef" v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
 			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
+			<ParamOverviewPane v-show="settingsStore.rightPaneTab === 'overview'" />
 			<TextPane v-show="settingsStore.rightPaneTab === 'text'" />
 			<SettingsPane v-show="settingsStore.rightPaneTab === 'settings'" :isActive="settingsStore.rightPaneTab === 'settings'" />
 		</div>
@@ -21,6 +22,7 @@
 	import ModulesPane from './ModulesPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
+	import ParamOverviewPane from './ParamOverviewPane.vue';
 	import TextPane from './TextPane.vue';
 	import { useSettingsStore } from '@/store/settings';
 	import { usePatchFile } from '@/composables/usePatchFile';

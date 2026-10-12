@@ -1105,6 +1105,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Browser", click: () => sendToFocused("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ type: "separator" as const },
 				{ label: "Modules", click: () => sendToFocused("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
+				{ label: "Parameter Overview", click: () => sendToFocused("menu:action", "toggle-parameter-overview"), accelerator: "Shift+CommandOrControl+F" },
 				{ label: "Midi CC Panel", click: () => sendToFocused("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => sendToFocused("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
