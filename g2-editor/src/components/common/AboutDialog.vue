@@ -18,12 +18,11 @@
 							<span v-else-if="updateState === 'available'">
 								- update
 								<button
-									class="text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0 text-xs"
+									class="text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0 text-xs text-red-400"
 									@click="openLink(DOWNLOAD_URL)"
 								>
-									v{{ latestVersion }}
+									<strong>v{{ latestVersion }}</strong> available
 								</button>
-								available
 							</span>
 							<span v-else-if="updateState === 'current'"> - up to date</span>
 						</div>
@@ -106,7 +105,7 @@
 			connecting: false,
 		},
 	);
-	const emit = defineEmits<{ 'update:modelValue': [value: boolean] }>();
+	const emit = defineEmits<{ 'update:modelValue': [value: boolean]; 'update-available': [] }>();
 
 	const version = ref('');
 	const iconDataUrl = ref('');
@@ -138,6 +137,7 @@
 				} else if (isNewer(latest, info.version)) {
 					latestVersion.value = latest;
 					updateState.value = 'available';
+					emit('update-available');
 				} else {
 					updateState.value = 'current';
 				}

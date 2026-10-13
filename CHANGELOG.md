@@ -12,6 +12,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Parameter Pages Overview sidepanel
 - Patch Adjuster
 - Better rendering of modules
+- Splash screen stays when update available
 
 ## [0.7.1] - 2026-10-12
 
