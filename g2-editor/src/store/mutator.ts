@@ -300,7 +300,7 @@ export const useMutatorStore = defineStore('mutator', {
 			const apply = async (list: { v: number; state: VariationState }[], label: string) => {
 				for (const { v, state } of list) await slots._writeVariationState(slot, v, state, label);
 			};
-			hist.record(slot, { undo: () => apply(prev, 'rowToVariations undo'), redo: () => apply(writes, 'rowToVariations redo') });
+			if (!hist.isLocked(slot)) hist.record(slot, { undo: () => apply(prev, 'rowToVariations undo'), redo: () => apply(writes, 'rowToVariations redo') });
 			await apply(writes, 'rowToVariations');
 		},
 

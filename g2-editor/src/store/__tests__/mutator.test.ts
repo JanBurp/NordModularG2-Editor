@@ -51,6 +51,18 @@ describe('mutator store', () => {
 		expect(adjuster.knobs.attack).toBe(64);
 	});
 
+	it('INIT into the auditioned mutator variation is a param dump, not copy-variation (G2 knows 0-8 only)', async () => {
+		await loadAnalogue();
+		await useMutatorStore().mutate({ kind: 'variation', index: 0 });
+		const run = (globalThis as any).window.cli.run;
+		run.mockClear();
+		const slots = useSlotsStore();
+		await slots.copyVariation(8, MUTATOR_VARIATION);
+		expect(run).not.toHaveBeenCalledWith(expect.arrayContaining(['copy-variation']));
+		expect(run).toHaveBeenCalledWith(['send-sections', 'A', expect.any(Array)]);
+		expect(slots.slots.A.variations![MUTATOR_VARIATION]).toEqual(slots.slots.A.variations![8]);
+	});
+
 	it('undo restores the boxes', async () => {
 		await loadAnalogue();
 		const m = useMutatorStore();

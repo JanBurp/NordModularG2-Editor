@@ -803,6 +803,11 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot } = ctx;
 			const slotEntry = this.slots[slot];
 			if (!slotEntry.variations) return;
+			// The G2's copy-variation only knows 0-8; the Patch Mutator's variation goes as a param dump.
+			if (fromVar === MUTATOR_VARIATION || toVar === MUTATOR_VARIATION) {
+				await this.applyVariationState(slot, toVar, slotEntry.variations[fromVar]);
+				return;
+			}
 
 			const prevState = deepCloneVariationState(slotEntry.variations[toVar]);
 			const newState = deepCloneVariationState(slotEntry.variations[fromVar]);
