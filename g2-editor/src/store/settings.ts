@@ -31,6 +31,7 @@ export const useSettingsStore = defineStore('settings', {
 		showParamPages: false as boolean,
 		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
 		patchMutatorOpen: true as boolean,
+		patchMutatorKeysOpen: true as boolean,
 		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],

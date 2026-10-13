@@ -24,6 +24,10 @@ export const STATUS_HINTS = {
 	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
 	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Drop CC here: assign · Right-click: rename, clear, copy',
 
+	// Patch Mutator — sound boxes
+	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,
+	mutaStorage: `Click: audition · Double-click: mutate from this sound · Drag: move/copy · Shift-drop: interpolate · ${ALT}-drop: cross · Right-click: delete`,
+
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
 	areaSplit: `Space: show/hide cables · ${CTRL}-Space: shake cables`,

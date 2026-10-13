@@ -143,6 +143,12 @@
 				</div>
 			</div>
 		</Collapsible>
+
+		<Collapsible v-model="settings.patchMutatorKeysOpen" title="Key Commands">
+			<div class="grid grid-cols-2 gap-6">
+				<KeyCommandTable v-for="group in KEY_GROUPS" :key="group.title" :title="group.title" :rows="group.rows" />
+			</div>
+		</Collapsible>
 	</div>
 </template>
 
@@ -154,16 +160,19 @@
 	import BracketLabel from './BracketLabel.vue';
 	import MutaBox from './MutaBox.vue';
 	import PatchAdjuster from '../toolbar/PatchAdjuster.vue';
+	import KeyCommandTable, { type KeyCommandGroup } from '../common/KeyCommandTable.vue';
 	import { useMutatorStore, STORAGE_COLS, STORAGE_ROWS, NUM_VISIBLE_VARIATIONS, type BoxRef } from '../../store/mutator';
 	import { useUiStore } from '../../store/ui';
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import { NUM_CHILDREN, QUICK_LOCKS } from '../../renderer/mutator';
 
 	const mutator = useMutatorStore();
 	const uiStore = useUiStore();
 	const settings = useSettingsStore();
 	const { open: openContextMenu } = useContextMenu();
+	const { showHint, clearHint } = useStatusHint();
 
 	const s = computed(() => mutator.current);
 
@@ -194,6 +203,8 @@
 				if (e.dataTransfer?.types.includes(DRAG_TYPE)) e.preventDefault();
 			},
 			onDrop: (e: DragEvent) => onDrop(r, e),
+			onMouseenter: () => showHint(r.kind === 'storage' ? 'mutaStorage' : 'mutaBox'),
+			onMouseleave: clearHint,
 		};
 	}
 
@@ -243,6 +254,28 @@
 		x: () => mutator.breed('cross'),
 		s: () => mutator.storeFocused(),
 	};
+
+	// Shown in the Key Commands section; keep in sync with KEYS.
+	const KEY_GROUPS: KeyCommandGroup[] = [
+		{
+			title: 'Focus & Store',
+			rows: [
+				{ keys: ['1–8'], action: 'Mother / Child 1–6 / Father' },
+				{ keys: ['← → ↑ ↓'], action: 'Nearest filled box' },
+				{ keys: ['O', 'T'], action: 'Copy to Mother / Father' },
+				{ keys: ['S'], action: 'Copy to first empty storage' },
+			],
+		},
+		{
+			title: 'Breed',
+			rows: [
+				{ keys: ['U'], action: 'Mutate Mother' },
+				{ keys: ['E'], action: 'Mutate focused sound' },
+				{ keys: ['N'], action: 'Randomize' },
+				{ keys: ['I', 'X'], action: 'Interpolate / Cross parents' },
+			],
+		},
+	];
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
