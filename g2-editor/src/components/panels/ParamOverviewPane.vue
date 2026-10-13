@@ -17,10 +17,10 @@
 					<span class="text-content-muted mr-1">{{ letter }}</span>
 					<span class="text-content-secondary">{{ PAGE_NAMES[page] }}</span>
 				</div>
-				<div class="border border-line-default rounded-xs px-2 py-1 flex flex-col gap-1">
-					<div v-for="bank in BANK_COUNT" :key="bank" class="flex items-end gap-2">
+				<div class="border border-line-default rounded-xs px-1.5 py-1 flex flex-col gap-1">
+					<div v-for="bank in BANK_COUNT" :key="bank" class="flex items-end gap-1.5">
 						<span class="w-2 text-content-muted pb-0.5">{{ bank }}</span>
-						<div class="flex-1 grid grid-cols-4 gap-3">
+						<div class="flex-1 grid grid-cols-4 gap-2">
 							<div v-for="pair in 4" :key="pair" class="grid grid-cols-2 gap-1">
 								<div
 									v-for="cell in pages[page][bank - 1].slice((pair - 1) * 2, pair * 2)"
@@ -37,7 +37,9 @@
 									@mouseleave="clearHint"
 								>
 									<div class="truncate font-bold text-center">{{ cell.moduleHeader }}</div>
-									<div class="param-display" :class="{ 'param-display-empty': !cell.assignment }">{{ displayText(cell) }}</div>
+									<div class="param-display px-0! text-[11px]" :class="{ 'param-display-empty': !cell.assignment }">
+										{{ displayText(cell) }}
+									</div>
 								</div>
 							</div>
 						</div>

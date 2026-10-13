@@ -123,9 +123,10 @@
 				</div>
 
 				<!-- Quick Locks: a lit button = that category is locked -->
-				<div class="flex flex-col items-center gap-1">
-					<span>Quick Locks during One Parent operations</span>
-					<div class="flex gap-1.5">
+				<div class="self-center flex flex-col gap-4">
+					<!-- label stretches to the button row; bracket from the centre of the first lock to the centre of the last: half a column = (row - 6 gaps) / 14 -->
+					<BracketLabel title="Quick Locks during One Parent operations" class="px-[calc((100%-120px)/14)]" />
+					<div class="grid grid-cols-7 gap-5">
 						<div v-for="q in QUICK_LOCKS" :key="q.label" class="flex flex-col items-center gap-1">
 							<Button
 								variant="toggle"

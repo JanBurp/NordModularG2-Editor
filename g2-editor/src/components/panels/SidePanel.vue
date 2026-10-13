@@ -1,6 +1,6 @@
 <template>
 	<div
-		:class="['overview', 'mutator'].includes(settingsStore.rightPaneTab) ? 'w-184' : 'w-68'"
+		:class="['overview', 'mutator'].includes(settingsStore.rightPaneTab) ? 'w-150' : 'w-68'"
 		class="bg-surface-1 border-l border-line-subtle flex flex-col"
 	>
 		<div class="flex-1 overflow-hidden overflow-y-auto">
