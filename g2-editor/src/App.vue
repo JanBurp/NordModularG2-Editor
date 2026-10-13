@@ -401,6 +401,7 @@
 		:connecting-message="loadingMessage"
 		:progress="namesProgress"
 		:message="aboutMessage"
+		@update-available="onUpdateAvailable"
 	/>
 
 	<LoadingOverlay :show="isLoading" :message="loadingMessage" />
@@ -661,7 +662,13 @@
 	// Minimum time the startup splash stays up, so a fast connect doesn't flash it.
 	const SPLASH_MIN_MS = 1000;
 	const showAboutDialog = ref(false);
+	const updateAvailable = ref(false);
 	const startingUp = ref(true);
+
+	function onUpdateAvailable() {
+		updateAvailable.value = true;
+		showAboutDialog.value = true; // check may finish after the splash already auto-closed
+	}
 	const quickAddPos = ref({ x: 0, y: 0 });
 
 	function onMouseMove(e: MouseEvent) {
@@ -837,7 +844,7 @@
 		if (device.status === DeviceStatus.Connected) {
 			const remaining = SPLASH_MIN_MS - (Date.now() - splashStart);
 			if (showAboutDialog.value && remaining > 0) await new Promise((resolve) => setTimeout(resolve, remaining));
-			showAboutDialog.value = false;
+			if (!updateAvailable.value) showAboutDialog.value = false;
 		}
 	}
 </script>
