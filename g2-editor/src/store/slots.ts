@@ -250,7 +250,7 @@ const SECTION_STARTS = [
 	{ section: 8, start: 15 },
 ];
 
-function deepCloneVariationState(v: VariationState): VariationState {
+export function deepCloneVariationState(v: VariationState): VariationState {
 	return {
 		fx: Object.fromEntries(Object.entries(v.fx).map(([k, arr]) => [k, [...arr]])),
 		voice: Object.fromEntries(Object.entries(v.voice).map(([k, arr]) => [k, [...arr]])),

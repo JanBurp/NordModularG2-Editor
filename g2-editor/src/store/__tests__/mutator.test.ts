@@ -72,6 +72,52 @@ describe('mutator store', () => {
 		expect(m.current.children.every((c) => c === null)).toBe(true);
 	});
 
+	it('focus changes are undo steps, so undoing an edit never lands in another box', async () => {
+		await loadAnalogue();
+		const slots = useSlotsStore();
+		const m = useMutatorStore();
+		await m.mutate({ kind: 'variation', index: 0 }); // auditions child 1
+		const [id, vals] = Object.entries(slots.slots.A.variations![MUTATOR_VARIATION].voice)[0];
+		const orig = vals[0];
+		const edited = (orig + 1) % 128;
+		await slots.setParam(Number(id), 0, edited, MUTATOR_VARIATION, 'voice');
+		await m.focusBox({ kind: 'child', index: 1 });
+		const child2 = JSON.stringify(slots.slots.A.variations![MUTATOR_VARIATION]);
+
+		await slots.undo(); // back to child 1, edit still there
+		expect(m.focus).toEqual({ kind: 'child', index: 0 });
+		expect(slots.slots.A.variations![MUTATOR_VARIATION].voice[Number(id)][0]).toBe(edited);
+		await slots.undo(); // the edit itself
+		expect(slots.slots.A.variations![MUTATOR_VARIATION].voice[Number(id)][0]).toBe(orig);
+		await slots.redo();
+		await slots.redo();
+		expect(m.focus).toEqual({ kind: 'child', index: 1 });
+		expect(JSON.stringify(slots.slots.A.variations![MUTATOR_VARIATION])).toBe(child2);
+	});
+
+	it('selecting a variation is an undo step that brings back the focused box', async () => {
+		await loadAnalogue();
+		const m = useMutatorStore();
+		await m.mutate({ kind: 'variation', index: 0 });
+		await m.focusBox({ kind: 'variation', index: 2 });
+		expect(useUiStore().variation).toBe(2);
+		await useSlotsStore().undo();
+		expect(useUiStore().variation).toBe(MUTATOR_VARIATION);
+		expect(m.focus).toEqual({ kind: 'child', index: 0 });
+	});
+
+	it('re-focusing the focused box or variation adds no undo step', async () => {
+		await loadAnalogue();
+		const m = useMutatorStore();
+		const hist = useHistoryStore();
+		await m.focusBox({ kind: 'variation', index: useUiStore().variation });
+		expect(hist.canUndo('A')).toBe(false);
+		await m.mutate({ kind: 'variation', index: 0 });
+		const depth = hist.slots.A.past.length;
+		await m.focusBox({ kind: 'child', index: 0 });
+		expect(hist.slots.A.past.length).toBe(depth);
+	});
+
 	it('storage → storage drag moves the sound', async () => {
 		await loadAnalogue();
 		const m = useMutatorStore();

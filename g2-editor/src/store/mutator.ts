@@ -7,7 +7,7 @@ import { markRaw, toRaw } from 'vue';
 import type { SlotLabel } from '@/types';
 import { MUTATOR_VARIATION, type VariationState } from '@/types/patch';
 import * as M from '../renderer/mutator';
-import { useSlotsStore } from './slots';
+import { useSlotsStore, deepCloneVariationState } from './slots';
 import { useUiStore } from './ui';
 import { useHistoryStore } from './history';
 import { usePatchAdjusterStore } from './patchAdjuster';
@@ -66,6 +66,14 @@ const snapshot = (s: Boxes): Boxes => ({
 });
 
 const sameRef = (a: BoxRef | null, b: BoxRef | null) => a?.kind === b?.kind && a?.index === b?.index;
+
+// What one undo step restores: the boxes, the active variation and the sound in MUTATOR_VARIATION
+// (official CUndoRedoPair of CMMutaParamDump + CMMutaSetMarker + CMParamSettingFocus).
+interface StepState {
+	boxes: Boxes;
+	variation: number;
+	live: VariationState | undefined;
+}
 
 export const useMutatorStore = defineStore('mutator', {
 	state: () => ({
@@ -150,21 +158,42 @@ export const useMutatorStore = defineStore('mutator', {
 			return v ? M.genomeFromVariation(v) : null;
 		},
 
+		_state(slot: SlotLabel): StepState {
+			const live = useSlotsStore().slots[slot].variations?.[MUTATOR_VARIATION];
+			return { boxes: snapshot(this.slots[slot]), variation: useUiStore().variation, live: live && deepCloneVariationState(live) };
+		},
+
+		async _restore(slot: SlotLabel, st: StepState): Promise<void> {
+			Object.assign(this.slots[slot], snapshot(st.boxes));
+			const slots = useSlotsStore();
+			const live = slots.slots[slot].variations?.[MUTATOR_VARIATION];
+			if (st.live && JSON.stringify(live) !== JSON.stringify(st.live)) await slots._writeVariationState(slot, MUTATOR_VARIATION, st.live, 'mutator undo');
+			if (this._slot() === slot) await slots.activateVariation(st.variation);
+		},
+
+		// Runs `action` as one undoable step. Param edits made afterwards get their own entries (no
+		// coalescing across the step), so undo never moves an edit from one box to another.
+		async _step(action: (slot: SlotLabel) => Promise<void>): Promise<void> {
+			const slot = this._slot();
+			const hist = useHistoryStore();
+			const before = this._state(slot);
+			await action(slot);
+			if (hist.isLocked(slot)) return;
+			const after = this._state(slot);
+			hist.clearCoalescing(slot);
+			hist.record(slot, { undo: () => this._restore(slot, before), redo: () => this._restore(slot, after) });
+		},
+
 		// Applies `change` to the boxes as one undoable step, then focuses `focusAfter`.
 		async _commit(change: (s: Boxes) => void, focusAfter?: BoxRef): Promise<void> {
-			const slot = this._slot();
-			const s = this.slots[slot];
-			const before = snapshot(s);
-			change(s);
-			if (focusAfter) s.focus = focusAfter;
-			const after = snapshot(s);
-			const restore = async (b: Boxes) => {
-				Object.assign(this.slots[slot], snapshot(b));
-				if (this.slots[slot].focus && this._slot() === slot && useUiStore().variation === MUTATOR_VARIATION)
-					await this._audition(slot, this.slots[slot].focus!);
-			};
-			useHistoryStore().record(slot, { undo: () => restore(before), redo: () => restore(after) });
-			if (focusAfter) await this._audition(slot, focusAfter);
+			await this._step(async (slot) => {
+				const s = this.slots[slot];
+				change(s);
+				if (focusAfter) {
+					s.focus = focusAfter;
+					await this._audition(slot, focusAfter);
+				}
+			});
 		},
 
 		async _audition(slot: SlotLabel, ref: BoxRef): Promise<void> {
@@ -177,16 +206,21 @@ export const useMutatorStore = defineStore('mutator', {
 			usePatchAdjusterStore().commit();
 		},
 
+		// Focusing a box or a variation is an undo step, like in the official editor (box:
+		// CMutaSynthData::GetFocusIndividMolecules; variation: CPatch::InternalSetFocusedParamSetting).
 		async focusBox(ref: BoxRef): Promise<void> {
 			this._syncFocused();
-			if (ref.kind === 'variation') {
-				this.current.focus = null;
-				await useSlotsStore().activateVariation(ref.index);
-				return;
-			}
-			if (!this.genomeAt(ref)) return;
-			this.current.focus = ref;
-			await this._audition(this._slot(), ref);
+			if (ref.kind === 'variation' ? this.focus === null && useUiStore().variation === ref.index : sameRef(this.focus, ref)) return;
+			if (ref.kind !== 'variation' && !this.genomeAt(ref)) return;
+			await this._step(async (slot) => {
+				if (ref.kind === 'variation') {
+					this.slots[slot].focus = null;
+					await useSlotsStore().activateVariation(ref.index);
+				} else {
+					this.slots[slot].focus = ref;
+					await this._audition(slot, ref);
+				}
+			});
 		},
 
 		// Keys 1-8: 1 = Mother, 2-7 = children, 8 = Father.

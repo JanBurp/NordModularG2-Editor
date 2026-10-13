@@ -3,6 +3,7 @@ import { watch } from 'vue';
 import type { SlotLabel } from '@/types';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useSlotsStore } from '@/store/slots';
+import { useMutatorStore } from '@/store/mutator';
 import { useUiStore } from '@/store/ui';
 import { SLOT_LABELS } from '@/constants';
 
@@ -56,9 +57,11 @@ export function useSlotManagement(hardwareSlotChange: Ref<SlotLabel | null>, har
 		device.toggleSlotKey(SLOT_LABELS[value as number]);
 	}
 
+	// An undo step (official CPatch::InternalSetFocusedParamSetting), via the mutator store since it
+	// also restores a Patch Mutator box that had the focus.
 	async function handleVariationClick(value: string | number | (string | number)[]): Promise<void> {
 		try {
-			await slotsStore.activateVariation(value as number);
+			await useMutatorStore().focusBox({ kind: 'variation', index: value as number });
 		} catch (e: any) {
 			console.error('selectVariation failed:', e?.message ?? e);
 		}
