@@ -7,9 +7,8 @@
 		</Collapsible>
 
 		<Collapsible v-model="settings.patchMutatorOpen" title="Patch Mutator">
-			<StateMessage v-if="!connected" variant="empty" message="The Patch Mutator needs a connected G2." />
 			<!-- Mutator keys only act while focus is in this section (not on the adjuster's knobs) -->
-			<div v-else data-mutator-pane tabindex="0" class="flex flex-col gap-3 outline-none" @keydown="onKeydown">
+			<div data-mutator-pane tabindex="0" class="flex flex-col gap-3 outline-none" @keydown="onKeydown">
 				<!-- Settings and breeding operations. Grid without column gaps (cells carry the spacing) so the
 				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross. -->
 				<div class="grid grid-cols-[repeat(6,auto)] justify-start items-center gap-y-1 [&>*]:px-2">
@@ -150,13 +149,11 @@
 	import { computed } from 'vue';
 	import Button from '../toolbar/Button.vue';
 	import Knob from '../common/Knob.vue';
-	import StateMessage from '../browser/StateMessage.vue';
 	import Collapsible from '../common/Collapsible.vue';
 	import BracketLabel from './BracketLabel.vue';
 	import MutaBox from './MutaBox.vue';
 	import PatchAdjuster from '../toolbar/PatchAdjuster.vue';
 	import { useMutatorStore, STORAGE_COLS, STORAGE_ROWS, NUM_VISIBLE_VARIATIONS, type BoxRef } from '../../store/mutator';
-	import { useDeviceStore, DeviceStatus } from '../../store/device';
 	import { useUiStore } from '../../store/ui';
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
@@ -165,11 +162,9 @@
 	const mutator = useMutatorStore();
 	const uiStore = useUiStore();
 	const settings = useSettingsStore();
-	const deviceStore = useDeviceStore();
 	const { open: openContextMenu } = useContextMenu();
 
 	const s = computed(() => mutator.current);
-	const connected = computed(() => deviceStore.status === DeviceStatus.Connected);
 
 	const familyRow: BoxRef[] = [
 		{ kind: 'mother', index: 0 },
@@ -249,7 +244,7 @@
 	};
 
 	function onKeydown(e: KeyboardEvent) {
-		if (e.metaKey || e.ctrlKey || e.altKey || !connected.value) return;
+		if (e.metaKey || e.ctrlKey || e.altKey) return;
 		const action = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
 		if (!action) return;
 		e.preventDefault();
