@@ -100,9 +100,13 @@
 								@contextmenu.prevent="onStorageContextMenu(ref, $event)"
 							/>
 						</div>
-						<div class="flex flex-col justify-center gap-1 w-6.5">
-							<Button variant="default" size="xs" title="Clear Row" @click="mutator.clearStorage(rowIndices(row - 1))">x</Button>
-							<Button variant="default" size="xs" title="Copy to Variations" @click="mutator.rowToVariations(row - 1)">v</Button>
+						<div class="flex flex-col justify-center items-center gap-1 w-6.5">
+							<Button variant="default" size="xs" class="w-6.5 h-6.5! px-0!" title="Clear Row" @click="mutator.clearStorage(rowIndices(row - 1))">
+								<Icon name="close" class="w-2.5 h-2.5" />
+							</Button>
+							<Button variant="default" size="xs" class="w-6.5 h-6.5! px-0!" title="Copy to Variations" @click="mutator.rowToVariations(row - 1)">
+								<Icon name="chevronDown" class="w-2.5 h-2.5" />
+							</Button>
 						</div>
 					</div>
 				</div>
@@ -156,6 +160,7 @@
 	import { computed } from 'vue';
 	import Button from '../toolbar/Button.vue';
 	import Knob from '../common/Knob.vue';
+	import Icon from '../common/Icon.vue';
 	import Collapsible from '../common/Collapsible.vue';
 	import BracketLabel from './BracketLabel.vue';
 	import MutaBox from './MutaBox.vue';
