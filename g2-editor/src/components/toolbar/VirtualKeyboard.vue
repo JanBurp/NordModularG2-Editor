@@ -20,7 +20,8 @@
 				class="absolute top-0 rounded-b-sm cursor-pointer"
 				:class="k.black ? 'bg-black' : 'bg-white border border-neutral-400'"
 				:style="keyStyle(k)"
-				@pointerdown.prevent="pressKey(k.note)"
+				@pointerdown.prevent="pointerDown($event, k.note)"
+				@pointerenter="glideTo(k.note)"
 			>
 				<div v-if="k.note % 12 === 0" class="absolute bottom-4 text-xs leading-none text-neutral-500 pointer-events-none w-full text-center">
 					{{ midiNoteName(k.note) }}
@@ -140,7 +141,23 @@
 		if (repeat.value) startRepeatTimer(); // fresh press resets the re-strike window, matching the reference
 	}
 
+	let pointerHeld = false;
+
+	function pointerDown(e: PointerEvent, note: number) {
+		// Touch implicitly captures the pointer to the first key, which would stop pointerenter firing
+		// on the others — release it so a held finger can glide across keys like the mouse does.
+		(e.target as Element).releasePointerCapture(e.pointerId);
+		pointerHeld = true;
+		pressKey(note);
+	}
+
+	// Moving onto another key while the pointer is held plays that key instead.
+	function glideTo(note: number) {
+		if (pointerHeld && soundingNote.value !== note) pressKey(note);
+	}
+
 	function releaseKey() {
+		pointerHeld = false;
 		// Mirrors the reference: a key release only silences the note when neither Drone nor Repeat
 		// is engaged — that's exactly what those two toggles mean.
 		if (drone.value || repeat.value) return;
