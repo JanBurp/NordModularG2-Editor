@@ -43,6 +43,7 @@ export const useUiStore = defineStore('ui', {
 		showSvgViewer: false as boolean,
 		showKeyCommandsPage: false as boolean,
 		showQuickAdd: false as boolean,
+		mutatorFocused: false as boolean, // keyboard focus is in the Patch Mutator pane (dims the canvas)
 		cableShakeCount: 0 as number,
 		cableSeed: newCableSeed() as number,
 		draggedModuleId: null as number | null,

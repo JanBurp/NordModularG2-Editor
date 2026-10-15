@@ -8,7 +8,17 @@
 
 		<Collapsible v-model="settings.patchMutatorOpen" title="Patch Mutator">
 			<!-- Mutator keys only act while focus is in this section (not on the adjuster's knobs) -->
-			<div data-mutator-pane tabindex="0" class="flex flex-col gap-3 outline-none" @keydown="onKeydown">
+			<!-- Dimmed while the keys belong to the patch (the canvas dims instead while this has focus) -->
+			<div
+				ref="paneRef"
+				data-mutator-pane
+				tabindex="0"
+				class="flex flex-col gap-3 outline-none transition-opacity"
+				:class="{ 'opacity-60': !uiStore.mutatorFocused }"
+				@keydown="onKeydown"
+				@focusin="uiStore.mutatorFocused = true"
+				@focusout="onFocusout"
+			>
 				<!-- Settings and breeding operations. Grid without column gaps (cells carry the spacing) so the
 				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross. -->
 				<div class="grid grid-cols-[repeat(6,auto)] justify-start items-center gap-y-1 [&>*]:px-2">
@@ -157,7 +167,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref, watch, onMounted, nextTick } from 'vue';
 	import Button from '../toolbar/Button.vue';
 	import Knob from '../common/Knob.vue';
 	import Icon from '../common/Icon.vue';
@@ -180,6 +190,21 @@
 	const { showHint, clearHint } = useStatusHint();
 
 	const s = computed(() => mutator.current);
+	const paneRef = ref<HTMLElement | null>(null);
+
+	// Opening the Mutator hands it the keyboard; the focused box (or else the current variation) is
+	// kept. SidePanel is v-if'd on showRightPane, so opening the panel mounts this pane: check on mount too.
+	const isOpen = computed(() => settings.showRightPane && settings.rightPaneTab === 'mutator' && settings.patchMutatorOpen);
+	function takeFocus() {
+		if (isOpen.value) paneRef.value?.focus();
+	}
+	onMounted(takeFocus);
+	// nextTick: SidePanel's v-show only un-hides this pane after our post-flush watchers have run
+	watch(isOpen, () => nextTick(takeFocus));
+
+	function onFocusout(e: FocusEvent) {
+		if (!paneRef.value?.contains(e.relatedTarget as Node | null)) uiStore.mutatorFocused = false;
+	}
 
 	const familyRow: BoxRef[] = [
 		{ kind: 'mother', index: 0 },
@@ -284,10 +309,10 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		if (e.metaKey || e.ctrlKey || e.altKey) return;
+		e.stopPropagation(); // the pane owns all plain keys: keep them away from the patch editor
 		const action = KEYS[e.key.length === 1 ? e.key.toLowerCase() : e.key];
 		if (!action) return;
 		e.preventDefault();
-		e.stopPropagation();
 		action();
 	}
 </script>

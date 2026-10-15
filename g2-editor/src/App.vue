@@ -56,7 +56,11 @@
 		<ParamDragGhost />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden">
+			<div
+				ref="canvasAreaRef"
+				class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden transition-[filter]"
+				:class="{ 'brightness-60': uiStore.mutatorFocused }"
+			>
 				<template v-if="currentPatch">
 					<div v-show="showVoice" class="relative overflow-hidden min-h-0" :class="{ 'flex-1': !isSplit }" :style="voiceWrapperStyle">
 						<PatchCanvas

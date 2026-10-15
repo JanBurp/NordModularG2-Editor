@@ -23,6 +23,7 @@ const allGlobals = {
   MouseEvent: 'readonly',
   PointerEvent: 'readonly',
   KeyboardEvent: 'readonly',
+  FocusEvent: 'readonly',
   HTMLElement: 'readonly',
   Element: 'readonly',
   TextEncoder: 'readonly',
