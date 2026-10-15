@@ -4,8 +4,17 @@
 		class="switch-control"
 		@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, contextMenuLabelIndex)"
 	>
+		<!-- Output type (Pos/Neg/Bip, LFOs & Envs): green behind the active half (or whole), light strips on both sides -->
+		<svg v-if="param.n === 'levelshift' && hasBitmap" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
+			<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+			<rect x="2.5" y="0.5" :width="width - 5" height="10" fill="#A0A0A0" />
+			<rect v-if="levelShiftHalf !== 'bottom'" x="2.5" y="0.5" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
+			<rect v-if="levelShiftHalf !== 'top'" x="2.5" y="6" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
+			<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(LEVEL_SHIFT_FRAME[activeIndex] * maskh)})`" />
+		</svg>
+
 		<!-- Bitmap-based switch -->
-		<template v-if="hasBitmap">
+		<template v-else-if="hasBitmap">
 			<!-- Single button mode: show active bitmap with highlight -->
 			<svg
 				v-if="singleButtonMode && displayNames.length <= 1"
@@ -117,6 +126,7 @@
 	import type { ModuleParam, ParamLabel } from '../../types';
 	import { useSwitch } from '../../composables/useSwitch';
 	import { morphColorHex } from '../../utils/morphColors';
+	import { GRAPH_COLORS } from './graphFunctions';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -159,6 +169,10 @@
 		(index, value) => emit('change', index, value, true),
 		(info) => emit('paramLabelEdit', info),
 	);
+
+	// OutputMode bitmap frames are Bip, BipInv, Pos, PosInv, Neg, NegInv; values are Pos, PosInv, Neg, NegInv, Bip, BipInv
+	const LEVEL_SHIFT_FRAME = [2, 3, 4, 5, 0, 1];
+	const levelShiftHalf = computed(() => (activeIndex.value < 2 ? 'top' : activeIndex.value < 4 ? 'bottom' : 'whole'));
 
 	const contextMenuLabelIndex = computed(() => {
 		if (singleButtonMode.value) {
