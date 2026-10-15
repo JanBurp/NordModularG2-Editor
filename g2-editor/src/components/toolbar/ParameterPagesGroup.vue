@@ -34,6 +34,7 @@
 					:class="{ 'pointer-events-none': altHeld || !cell.assignment || cell.assignment.isLed }"
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
+					:max="cell.high"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
 				/>
 			</div>
@@ -132,6 +133,7 @@
 		moduleHeader: string; // moduleLabel, or a continuation dash-run when the previous cell is the same module (mirrors the G2's own display)
 		paramLabel: string;
 		value: number;
+		high: number; // knob param's own range (parammap `high`)
 		valueLabel: string;
 		hasButton: boolean;
 		buttonParamIndex: number;
@@ -217,6 +219,7 @@
 		moduleLabel: BLANK,
 		paramLabel: BLANK,
 		value: 0,
+		high: 127,
 		valueLabel: BLANK,
 		hasButton: false,
 		buttonParamIndex: 0,
@@ -296,6 +299,7 @@
 				// A knob paired with a user-labeled button (e.g. Mixer level + mute) is named by that label
 				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,
+				high: knobDisplay.high,
 				valueLabel: knobDisplay.valueLabel,
 				hasButton,
 				buttonParamIndex,

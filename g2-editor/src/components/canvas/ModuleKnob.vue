@@ -23,7 +23,7 @@
 			:class="{ dragging: isDragging }"
 		/>
 
-		<MorphKnobOverlay :radius="radius" :value="value" :color="morphColor" :morph-range="morphRange" />
+		<MorphKnobOverlay :radius="radius" :value="value" :color="morphColor" :morph-range="morphRange" :max="max" />
 
 		<!-- Bottom-left tick mark -->
 		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
@@ -58,6 +58,7 @@
 	import { computed, ref, toRef } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
+	import { getParam } from '../../renderer/parammap';
 	import MorphKnobOverlay from '../common/MorphKnobOverlay.vue';
 
 	const props = defineProps<{
@@ -74,11 +75,13 @@
 	}>();
 
 	const knobCircle = ref<Element | null>(null);
+	const max = computed(() => getParam(props.param.type)?.high ?? 127);
 	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToDefault } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),
 		knobCircle,
+		max,
 	);
 </script>
 <style scoped>
