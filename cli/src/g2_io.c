@@ -187,18 +187,21 @@ int g2_list_devices(void) {
     }
 
     printf("USB Devices:\n");
+    int g2_idx = 0;
     for (ssize_t i = 0; i < count; i++) {
         libusb_device *dev = devices[i];
         struct libusb_device_descriptor desc;
 
         int ret = libusb_get_device_descriptor(dev, &desc);
         if (ret == 0) {
-            const char *g2_label = is_g2_device(&desc) ? " ← Nord G2" : "";
-            printf("  %04x:%04x (bus %d, device %d)%s\n",
+            printf("  %04x:%04x (bus %d, device %d)",
                    desc.idVendor, desc.idProduct,
                    libusb_get_bus_number(dev),
-                   libusb_get_device_address(dev),
-                   g2_label);
+                   libusb_get_device_address(dev));
+            /* Index matches g2_set_target_by_index() (--device <n>). */
+            if (is_g2_device(&desc))
+                printf(" <- Nord G2 --device %d", g2_idx++);
+            printf("\n");
         }
     }
 

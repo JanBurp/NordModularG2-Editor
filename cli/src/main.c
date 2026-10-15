@@ -22,7 +22,9 @@
 #include "g2_io.h"
 
 #define PROGRAM_NAME "g2-cli"
-#define PROGRAM_VERSION "1.0.0"
+#ifndef PROGRAM_VERSION
+#define PROGRAM_VERSION "unknown"  /* set by Makefile from g2-editor/package.json */
+#endif
 
 static void print_version(void) {
     printf("%s version %s\n", PROGRAM_NAME, PROGRAM_VERSION);
