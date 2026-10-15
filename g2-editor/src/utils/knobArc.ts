@@ -1,8 +1,10 @@
 import { clamp } from '@/utils/math';
 
-// Same value→angle mapping as useKnob.ts's `angle` computed (0° = top, range -135°..135°).
-export function knobAngle(value: number): number {
-	return (clamp(value, 0, 127) / 128) * 270 - 135;
+// Knob value→angle (0° = top, range -135°..135°). `max` is the param's own range (parammap `high`):
+// like the original editor (CPnlKnobSliderABC::UpdateGraphics, value*127/max), every rotary knob
+// sweeps its full arc whatever its range — e.g. Compressor RefLevel 0..42.
+export function knobAngle(value: number, max = 127): number {
+	return ((clamp(value, 0, max) * 127) / max / 128) * 270 - 135;
 }
 
 function pointOnKnob(cx: number, cy: number, r: number, angleDeg: number): { x: number; y: number } {
@@ -13,9 +15,9 @@ function pointOnKnob(cx: number, cy: number, r: number, angleDeg: number): { x: 
 // SVG pie-slice path (a <path d="..."/> value, filled) spanning from `fromValue` to `toValue` on a
 // knob of radius `r` centered at (cx, cy) — a "piece of the cake" showing a Morph Group's range,
 // like the original G2 editor's morph-range indicator.
-export function describeMorphSector(cx: number, cy: number, r: number, fromValue: number, toValue: number): string {
-	const a0 = knobAngle(fromValue);
-	const a1 = knobAngle(toValue);
+export function describeMorphSector(cx: number, cy: number, r: number, fromValue: number, toValue: number, max = 127): string {
+	const a0 = knobAngle(fromValue, max);
+	const a1 = knobAngle(toValue, max);
 	const p0 = pointOnKnob(cx, cy, r, a0);
 	const p1 = pointOnKnob(cx, cy, r, a1);
 	const largeArc = Math.abs(a1 - a0) > 180 ? 1 : 0;

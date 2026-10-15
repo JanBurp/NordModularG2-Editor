@@ -48,6 +48,7 @@
 					:class="{ 'pointer-events-none': altHeld || !cell.assignment || cell.assignment.isLed }"
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
+					:max="cell.high"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
 				/>
 			</div>

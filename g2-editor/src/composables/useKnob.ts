@@ -5,6 +5,7 @@ import { computed } from 'vue';
 import { useDragInteraction } from './useDragInteraction';
 import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
+import { knobAngle } from '@/utils/knobArc';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 export const KNOB_RESET_CENTRE = 64; // value KnobReset's centre marker resets to
@@ -21,10 +22,12 @@ export function useKnob(
 	knobType: Ref<string> | ComputedRef<string>,
 	emitChange: (value: number) => void,
 	elementRef?: Ref<Element | null>,
+	max?: Ref<number> | ComputedRef<number>, // param's own range (parammap `high`), default 0..127
 ) {
 	const settings = useSettingsStore();
+	const maxValue = () => max?.value ?? 127;
 	const radius = computed(() => RADII[knobType.value] ?? 10);
-	const angle = computed(() => (value.value / 128) * 270 - 135);
+	const angle = computed(() => knobAngle(value.value, maxValue()));
 	const isReset = computed(() => knobType.value === 'KnobReset');
 	const cursor = computed(() => CURSORS[settings.knobMode] ?? 'ns-resize');
 
@@ -32,11 +35,13 @@ export function useKnob(
 	const circular = { cx: 0, cy: 0, prevAngle: 0, accumulated: 0 };
 
 	const { isDragging, onMouseDown } = useDragInteraction((dx, dy, event) => {
-		const sensitivity = settings.knobSensitivity * (event.shiftKey ? 0.25 : 1);
+		// Scaled by max/127 so the full range takes the same mouse distance whatever the param's range,
+		// like the original editor (CPnlControl::ClickDragIdleHandler: pixels*max/256).
+		const sensitivity = settings.knobSensitivity * (event.shiftKey ? 0.25 : 1) * (maxValue() / 127);
 
 		let newValue: number;
 		if (settings.knobMode === 'horizontal') {
-			newValue = clamp(Math.round(startValue.current + dx * sensitivity), 0, 127);
+			newValue = clamp(Math.round(startValue.current + dx * sensitivity), 0, maxValue());
 		} else if (settings.knobMode === 'circular') {
 			const clientX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
 			const clientY = 'touches' in event ? event.touches[0].clientY : (event as MouseEvent).clientY;
@@ -46,9 +51,9 @@ export function useKnob(
 			if (angleDelta < -180) angleDelta += 360;
 			circular.prevAngle = currentAngle;
 			circular.accumulated += angleDelta;
-			newValue = clamp(Math.round(startValue.current + (circular.accumulated / 270) * 127 * sensitivity), 0, 127);
+			newValue = clamp(Math.round(startValue.current + (circular.accumulated / 270) * 127 * sensitivity), 0, maxValue());
 		} else {
-			newValue = clamp(Math.round(startValue.current + dy * sensitivity), 0, 127);
+			newValue = clamp(Math.round(startValue.current + dy * sensitivity), 0, maxValue());
 		}
 
 		if (newValue !== value.value) emitChange(newValue);
@@ -72,7 +77,7 @@ export function useKnob(
 
 			// Immediately set value based on click angle (absolute mode)
 			const clickAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
-			const clickValue = clamp(Math.round(((clickAngle + 135) / 270) * 127), 0, 127);
+			const clickValue = clamp(Math.round(((clickAngle + 135) / 270) * maxValue()), 0, maxValue());
 			startValue.current = clickValue;
 			emitChange(clickValue);
 
@@ -88,7 +93,7 @@ export function useKnob(
 		emitChange(defaultVal);
 	}
 
-	const { onWheel } = useWheelInteraction(() => value.value, emitChange);
+	const { onWheel } = useWheelInteraction(() => value.value, emitChange, maxValue);
 
 	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToDefault };
 }

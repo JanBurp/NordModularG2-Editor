@@ -46,6 +46,7 @@ export const SETTINGS_LABELS = {
 	cableGravity: 'Curved',
 	cableOpacity: 'Opacity',
 	cableThickness: 'Thickness',
+	cableStyle: 'Style',
 	cableMagneticRadius: 'Snap range',
 	cableConnectMode: 'Connect Mode',
 	autoSuggestCable: 'Auto-suggest Cable (experimental)',
