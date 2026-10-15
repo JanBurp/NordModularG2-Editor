@@ -8,8 +8,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
 - Splash screen stays when update available
+
+### Fixed:
 - Better rendering of modules
+- Some Module Graphs improved
+- Some Knobs did not use full range
 
 ## [0.7.1] - 2026-10-12
 
