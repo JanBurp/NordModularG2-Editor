@@ -67,6 +67,14 @@
 						@update:model-value="settings.setCableThickness(fromPercent($event, CABLE_THICKNESS_MAX))"
 					/>
 				</SettingsRow>
+				<SettingsRow :label="L.cableStyle">
+					<BtnGroup
+						:model-value="settings.cableStyle"
+						variant="variation"
+						:options="CABLE_STYLE_OPTIONS"
+						@update:model-value="settings.setCableStyle($event as CableStyle)"
+					/>
+				</SettingsRow>
 
 				<p class="settings-subheader">Cable connecting:</p>
 				<SettingsRow :label="L.cableMagneticRadius">
@@ -351,7 +359,7 @@
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import { useDeviceStore } from '@/store/device';
-	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection, type CableConnectMode } from '@/store/settings';
+	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection, type CableConnectMode, type CableStyle } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
@@ -514,6 +522,12 @@
 		{ label: 'Vert', value: 'vertical' },
 		{ label: 'Horz', value: 'horizontal' },
 		{ label: 'Circular', value: 'circular' },
+	];
+
+	const CABLE_STYLE_OPTIONS = [
+		{ label: '3D', value: '3d' },
+		{ label: 'Outline', value: 'outline' },
+		{ label: 'Flat', value: 'flat' },
 	];
 
 	const CABLE_CONNECT_MODE_OPTIONS = [

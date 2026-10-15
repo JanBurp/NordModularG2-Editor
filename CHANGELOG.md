@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 - Splash screen stays when update available
 - Searching modules improved (search on short module name first)
+- Added option for cable style
 
 ### Fixed:
 - Better rendering of modules
