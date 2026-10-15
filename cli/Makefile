@@ -55,6 +55,12 @@ $(BIN_DIR)/$(TARGET): $(OBJ_FILES) | $(BIN_DIR)
 $(OBJ_DIR)/%.o: $(SRC_DIR)/%.c $(HEADERS) | $(OBJ_DIR)
 	$(CC) $(CFLAGS) -c $< -o $@
 
+# CLI version = editor version (g2-editor/package.json); main.o rebuilds when it changes.
+EDITOR_PACKAGE = ../g2-editor/package.json
+VERSION := $(shell sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' $(EDITOR_PACKAGE) | head -1)
+$(OBJ_DIR)/main.o: CFLAGS += -DPROGRAM_VERSION='"$(VERSION)"'
+$(OBJ_DIR)/main.o: $(EDITOR_PACKAGE)
+
 $(OBJ_DIR):
 	mkdir -p $(OBJ_DIR)
 
