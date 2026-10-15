@@ -7,7 +7,7 @@ const WHEEL_DELTA_PER_STEP = 10;
 
 // Generic wheel-to-value-step handler shared by knobs and sliders. Independent of
 // KnobMode (vertical/horizontal/circular) since it only reacts to the wheel's deltaY.
-export function useWheelInteraction(getValue: () => number, onChange: (value: number) => void) {
+export function useWheelInteraction(getValue: () => number, onChange: (value: number) => void, getMax: () => number = () => 127) {
 	const settings = useSettingsStore();
 	let accumulated = 0;
 
@@ -18,7 +18,7 @@ export function useWheelInteraction(getValue: () => number, onChange: (value: nu
 		if (steps === 0) return;
 		accumulated -= steps * WHEEL_DELTA_PER_STEP;
 
-		const newValue = clamp(getValue() + steps, 0, 127);
+		const newValue = clamp(getValue() + steps, 0, getMax());
 		if (newValue !== getValue()) onChange(newValue);
 	}
 

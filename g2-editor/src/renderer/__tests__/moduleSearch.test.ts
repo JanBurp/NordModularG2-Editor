@@ -55,4 +55,14 @@ describe('filterCategoryModules', () => {
 	it('returns [] when the group part does not match the category', () => {
 		expect(filterCategoryModules(cat, `zzzz ${first.short}`)).toEqual([]);
 	});
+
+	it('matches short names only when any short name matches ("keyboard" → not MonoKey)', () => {
+		const names = filterCategoryModules('In/Out', 'keyboard').map((m) => m.short);
+		expect(names).toContain('Keyboard');
+		expect(names).not.toContain('MonoKey');
+	});
+
+	it('falls back to long names when no short name matches', () => {
+		expect(filterCategoryModules('In/Out', 'monophonic').map((m) => m.short)).toEqual(['MonoKey']);
+	});
 });

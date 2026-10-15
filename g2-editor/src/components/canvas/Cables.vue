@@ -209,6 +209,16 @@
 		},
 	);
 
+	// Cable style (3D / Outline / Flat): a class on the svg switches the shadow/outline CSS (svgStyles.css).
+	watch(
+		() => [svgRef?.value, settings.cableStyle] as const,
+		([svg, style]) => {
+			svg?.classList.toggle('cables-outline', style === 'outline');
+			svg?.classList.toggle('cables-flat', style === 'flat');
+		},
+		{ immediate: true },
+	);
+
 	// Opacity / thickness: update styles on existing elements — no re-randomization.
 	watch(
 		() => [settings.cableOpacity, settings.cableThickness] as const,

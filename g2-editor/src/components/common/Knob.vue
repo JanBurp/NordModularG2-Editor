@@ -31,7 +31,7 @@
 					:class="{ dragging: isDragging }"
 				/>
 				<!-- Mirrors ModuleKnob.vue's canvas equivalent; shared markup lives in MorphKnobOverlay.vue -->
-				<MorphKnobOverlay :radius="radius" :value="value" :color="colorVariant" :morph-range="morphRange" />
+				<MorphKnobOverlay :radius="radius" :value="value" :color="colorVariant" :morph-range="morphRange" :max="max" />
 				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
 				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
 				<line
@@ -73,6 +73,7 @@
 		type?: string; // 'KnobBig' | 'KnobMedium' | 'KnobSmall' | 'KnobReset'
 		colorVariant?: 'red' | 'blue' | null; // Morph Groups: red = selected group, blue = a different group
 		morphRange?: number; // selected group's morph range, when colorVariant === 'red' (see ModuleKnob.vue)
+		max?: number; // assigned param's own range (parammap `high`), default 0..127
 	}>();
 
 	const emit = defineEmits<{
@@ -91,6 +92,7 @@
 		computed(() => props.type ?? 'KnobMedium'),
 		(value) => emit('change', value),
 		knobCircle,
+		computed(() => props.max ?? 127),
 	);
 
 	const { onMouseDown: onSpinMouseDown } = useSpinnerHoldInteraction(
@@ -116,7 +118,7 @@
 		const el = document.activeElement;
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
 		const delta = (e.key === 'ArrowUp' ? 1 : -1) * (e.altKey ? ALT_STEP : 1);
-		const newValue = clamp(props.value + delta, 0, 127);
+		const newValue = clamp(props.value + delta, 0, props.max ?? 127);
 		if (newValue !== props.value) emit('change', newValue);
 		e.preventDefault();
 		e.stopImmediatePropagation();

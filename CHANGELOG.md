@@ -10,10 +10,18 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### New
 - Parameter Pages Overview sidepanel
-- Better rendering of modules
-- Splash screen stays when update available
 - Patch Adjuster
 - Patch Mutator
+- Added option for cable style
+
+### Changed
+- Splash screen stays when update available
+- Searching modules improved (search on short module name first)
+
+### Fixed
+- Better rendering of modules
+- Some Module Graphs improved
+- Some Knobs did not use full range
 
 ## [0.7.1] - 2026-10-12
 

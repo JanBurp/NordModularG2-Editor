@@ -25,6 +25,7 @@ export interface Cell {
 	moduleHeader: string; // moduleLabel, or a continuation dash-run when the previous cell is the same module (mirrors the G2's own display)
 	paramLabel: string;
 	value: number;
+	high: number; // knob param's own range (parammap `high`)
 	valueLabel: string;
 	hasButton: boolean;
 	buttonParamIndex: number;
@@ -50,6 +51,7 @@ const emptyCell = {
 	moduleLabel: BLANK,
 	paramLabel: BLANK,
 	value: 0,
+	high: 127,
 	valueLabel: BLANK,
 	hasButton: false,
 	buttonParamIndex: 0,
@@ -203,6 +205,7 @@ export function useParamPageCells() {
 				// A knob paired with a user-labeled button (e.g. Mixer level + mute) is named by that label
 				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,
+				high: knobDisplay.high,
 				valueLabel: knobDisplay.valueLabel,
 				hasButton,
 				buttonParamIndex,

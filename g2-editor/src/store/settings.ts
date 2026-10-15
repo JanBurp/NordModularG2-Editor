@@ -7,6 +7,7 @@ export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
 export type CableConnectMode = 'drag' | 'click';
+export type CableStyle = '3d' | 'outline' | 'flat';
 export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
@@ -20,6 +21,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableGravity: 50 as number,
 		cableOpacity: 90 as number,
 		cableThickness: 1.5 as number,
+		cableStyle: '3d' as CableStyle,
 		cableMagneticRadius: 96 as number,
 		cableConnectMode: 'drag' as CableConnectMode,
 		autoSuggestCable: false as boolean,
@@ -107,6 +109,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setCableThickness(value: number) {
 			this.cableThickness = clamp(value, 0, 3);
+		},
+		setCableStyle(value: CableStyle) {
+			this.cableStyle = value;
 		},
 		setCableMagneticRadius(value: number) {
 			this.cableMagneticRadius = clamp(value, 0, 115);

@@ -121,6 +121,17 @@ path.svgcable.cable-emphasized {
 	opacity: 1 !important;
 }
 
+/* Cable style setting (settings.cableStyle, toggled on the svg in Cables.vue): 'outline' drops the
+   shadow, 'flat' also hides the outline except on selected/hover-emphasized cables. */
+svg.cables-outline path[class^='svgcable'],
+svg.cables-flat path[class^='svgcable'] {
+	filter: none;
+}
+
+svg.cables-flat path.svgcableborder:not(.selected):not(.cable-emphasized) {
+	stroke: transparent;
+}
+
 input#shifter,
 input#scaler {
 	display: none;
