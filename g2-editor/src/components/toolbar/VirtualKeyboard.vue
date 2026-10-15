@@ -13,14 +13,14 @@
 			</div>
 		</div>
 
-		<div ref="keysEl" class="relative h-18 flex-1 bg-surface-1 overflow-hidden">
+		<div ref="keysEl" class="relative h-18 flex-1 bg-surface-1 overflow-hidden touch-none">
 			<div
 				v-for="k in keys"
 				:key="k.note"
 				class="absolute top-0 rounded-b-sm cursor-pointer"
 				:class="k.black ? 'bg-black' : 'bg-white border border-neutral-400'"
 				:style="keyStyle(k)"
-				@mousedown.prevent="pressKey(k.note)"
+				@pointerdown.prevent="pressKey(k.note)"
 			>
 				<div v-if="k.note % 12 === 0" class="absolute bottom-4 text-xs leading-none text-neutral-500 pointer-events-none w-full text-center">
 					{{ midiNoteName(k.note) }}
@@ -48,13 +48,21 @@
 		x: number;
 	}
 
-	// Geometry matches the reference Virtual Keyboard implementation (other-approaches/G2-Edit) for
-	// visual fidelity: 22px white keys, black keys 62% of a white key's width/height, centred over
-	// the boundary between the two white keys they sit above.
+	// Proportions and black-key placement follow a real keyboard (Wikimedia Commons PianoKeyboard.svg:
+	// 23-wide white keys, 13×80 black keys on 120-high whites). Black keys aren't centred on the
+	// white-key boundary: C#/D# lean outward within C–E, F#/G#/A# are spread across F–B.
 	const WHITE_W = 22;
 	const WHITE_H = 86;
-	const BLACK_W_FRAC = 0.62;
-	const BLACK_H_FRAC = 0.62;
+	const BLACK_W_FRAC = 13 / 23;
+	const BLACK_H_FRAC = 80 / 120;
+	// Black key's left edge relative to the left edge of the white key just below it, in white-key widths.
+	const BLACK_OFFSET: Record<number, number> = {
+		1: 14.333 / 23,
+		3: 18.667 / 23,
+		6: 13.25 / 23,
+		8: 16.25 / 23,
+		10: 19.75 / 23,
+	};
 	const REPEAT_MS = 500; // A guess: the manual says only "play repeatedly" with no rate given.
 
 	const device = useDeviceStore();
@@ -86,12 +94,11 @@
 
 	const keys = computed<KeyInfo[]>(() => {
 		const result: KeyInfo[] = [];
-		const blackW = WHITE_W * BLACK_W_FRAC;
 		let whiteIdx = 0;
 		let note = renderFirstNote.value;
 		while (whiteIdx < visibleWhiteCount.value && note <= 127) {
 			if (isBlackNote(note)) {
-				result.push({ note, black: true, x: whiteIdx * WHITE_W - blackW / 2 });
+				result.push({ note, black: true, x: (whiteIdx - 1 + BLACK_OFFSET[note % 12]) * WHITE_W });
 			} else {
 				result.push({ note, black: false, x: whiteIdx * WHITE_W });
 				whiteIdx++;
@@ -108,7 +115,6 @@
 
 	const soundingNote = ref<number | null>(null);
 	const dotVisible = ref(true); // only ever false between Repeat strikes
-	const lastNote = ref<number | null>(null);
 	const drone = ref(false);
 	const repeat = ref(false);
 	let repeatTimer: ReturnType<typeof setInterval> | null = null;
@@ -118,14 +124,19 @@
 			device.playNote(soundingNote.value, false);
 			soundingNote.value = null;
 		}
+		dotVisible.value = true;
 	}
 
 	function pressKey(note: number) {
-		if (soundingNote.value === note) return;
+		if (soundingNote.value === note) {
+			// With Drone/Repeat a key latches: clicking the sounding key again turns it off.
+			if (drone.value || repeat.value) silence();
+			return;
+		}
 		if (soundingNote.value !== null) device.playNote(soundingNote.value, false);
 		device.playNote(note, true);
 		soundingNote.value = note;
-		lastNote.value = note;
+		dotVisible.value = true;
 		if (repeat.value) startRepeatTimer(); // fresh press resets the re-strike window, matching the reference
 	}
 
@@ -147,11 +158,10 @@
 	let strikePending = false;
 
 	function strikeRepeat() {
-		if (lastNote.value === null || strikePending) return;
+		if (soundingNote.value === null || strikePending) return;
 		strikePending = true;
-		if (soundingNote.value !== null) device.playNote(soundingNote.value, false);
-		device.playNote(lastNote.value, true).finally(() => (strikePending = false));
-		soundingNote.value = lastNote.value;
+		device.playNote(soundingNote.value, false);
+		device.playNote(soundingNote.value, true).finally(() => (strikePending = false));
 		dotVisible.value = true; // blink: visible for the first half of each repeat period
 		setTimeout(() => {
 			if (repeat.value) dotVisible.value = false;
@@ -170,25 +180,34 @@
 		}
 	}
 
+	// Drone and Repeat are mutually exclusive. Switching from one to the other keeps the latched note
+	// (now held, or now repeated); switching the active one off silences it.
 	function toggleDrone() {
 		drone.value = !drone.value;
-		if (!drone.value && !repeat.value) silence();
+		if (drone.value) {
+			repeat.value = false;
+			stopRepeatTimer();
+			dotVisible.value = true;
+		} else {
+			silence();
+		}
 	}
 
 	function toggleRepeat() {
 		repeat.value = !repeat.value;
 		if (repeat.value) {
-			strikeRepeat();
+			drone.value = false;
+			// No immediate strike: stay silent until a key is clicked (or re-strike the note Drone was holding).
 			startRepeatTimer();
 		} else {
 			stopRepeatTimer();
-			dotVisible.value = true;
-			if (!drone.value) silence();
+			silence();
 		}
 	}
 
 	onMounted(() => {
-		window.addEventListener('mouseup', releaseKey);
+		window.addEventListener('pointerup', releaseKey);
+		window.addEventListener('pointercancel', releaseKey);
 		if (keysEl.value) {
 			resizeObserver = new ResizeObserver((entries) => {
 				containerWidth.value = entries[0].contentRect.width;
@@ -198,7 +217,8 @@
 	});
 
 	onUnmounted(() => {
-		window.removeEventListener('mouseup', releaseKey);
+		window.removeEventListener('pointerup', releaseKey);
+		window.removeEventListener('pointercancel', releaseKey);
 		resizeObserver?.disconnect();
 		stopRepeatTimer();
 		// Drone and Repeat deliberately do not survive a close, and any sounding note is silenced —
