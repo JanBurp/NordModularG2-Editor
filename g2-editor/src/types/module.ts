@@ -18,6 +18,7 @@ export interface VisualElement {
 	moduleId?: number;
 	ref?: number | number[];
 	t?: string;
+	anchor?: 'middle' | 'end';
 	id?: string | number;
 	cnt?: number;
 	[key: string]: unknown;
