@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 - Splash screen stays when update available
 - Searching modules improved (search on short module name first)
+- Improved KeyBoard UX (allways need note, and touchscreen ready)
 
 ### Fixed
 - Better rendering of modules
