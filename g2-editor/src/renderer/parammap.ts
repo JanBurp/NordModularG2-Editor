@@ -170,7 +170,7 @@ const parammap: Record<string, ParamDefinition> = {
 	RoomType: { width: 44, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ Small, 1 ~ Medium, 2 ~ Large, 3 ~ Hall'], comments: 'Determines ranges for [ReverbTime]' },
 	SaturateCurve: { width: 12, names: ['1', '2', '3', '4'], low: 0, high: 3, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4'], comments: '' },
 	ScratchDelay: { width: 35, low: 0, high: 3, def: 2, defin: ['0 ~ 12.5m, 1 ~ 25m, 2 ~ 50m, 3 ~ 100m'], comments: 'mili seconds' },
-	ScratchRatio: { f: 'pitchShuttle', low: 0, high: 127, def: 80, defin: ['0 ~ -x4.00, 64 ~ x0, 80 ~ x1.00, 127 ~ x4.00'], comments: 'negative speeds mean backwards playing' },
+	ScratchRatio: { f: 'pitchShuttle', low: 0, high: 127, def: 80, defin: ['0 ~ - x4.00, 64 ~ x0, 80 ~ x1.00, 127 ~ x4.00'], comments: 'negative speeds mean backwards playing' },
 	SeqCtrlXFade: { width: 24, low: 0, high: 3, def: 0, defin: ['0 ~ Off, 1 ~ 25%, 2 ~ 50%, 3 ~ 100%'], comments: '' },
 	SeqLen: { low: 0, high: 15, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4, 4 ~ 5, 5 ~ 6, 6 ~ 7, 7 ~ 8, 8 ~ 9, 9 ~ 10, 10 ~ 11, 11 ~ 12, 12 ~ 13, 13 ~ 14, 14 ~ 15, 15 ~ 16'], comments: '' },
 	ShpExpCurve: { width: 15, names: ['x2', 'x3', 'x4', 'x5'], low: 0, high: 3, def: 0, defin: ['0 ~ x2, 1 ~ x3, 2 ~ x4, 3 ~ x5'], comments: '' },

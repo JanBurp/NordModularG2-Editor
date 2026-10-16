@@ -23,6 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed:
 - Better rendering of modules
 - Some Module Graphs improved
+- Reset Triangle on Knobs, improved
 - Some Knobs did not use full range
 
 ## [0.7.1] - 2026-10-12

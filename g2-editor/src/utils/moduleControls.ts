@@ -268,7 +268,7 @@ const UX_NUMBER = /^(-?)\s*x?([+\-±]?)(\d*\.?\d+)\s*([a-z%]*)/i;
 export function parseUxNumber(text: string, scaled = true): number | null {
 	const m = text.trim().match(UX_NUMBER);
 	if (!m) return null;
-	const n = parseFloat(m[3]) * ((m[1] || m[2]) === '-' ? -1 : 1);
+	const n = parseFloat(m[3]) * ((m[1] === '-') !== (m[2] === '-') ? -1 : 1);
 	return scaled ? n * (UX_UNIT_SCALE[m[4].toLowerCase()] ?? 1) : n;
 }
 
