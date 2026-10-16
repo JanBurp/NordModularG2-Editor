@@ -1,0 +1,16 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+	<!-- Vertical knob-mode drag cursor (KnobDragCursor.vue, rotated 90° for horizontal): double-headed arrow
+	     styled like knob-rotate.svg, centred on 12,12 -->
+	<g stroke-linejoin="round">
+		<g fill="#fff" stroke="#fff">
+			<path d="M12,7 L12,17" fill="none" stroke-width="4.2" />
+			<path d="M12,2.5 L16,8 L8,8 Z" stroke-width="2" />
+			<path d="M12,21.5 L16,16 L8,16 Z" stroke-width="2" />
+		</g>
+		<g fill="#000" stroke="#000">
+			<path d="M12,7 L12,17" fill="none" stroke-width="2" />
+			<path d="M12,2.5 L16,8 L8,8 Z" stroke-width="0.4" />
+			<path d="M12,21.5 L16,16 L8,16 Z" stroke-width="0.4" />
+		</g>
+	</g>
+</svg>

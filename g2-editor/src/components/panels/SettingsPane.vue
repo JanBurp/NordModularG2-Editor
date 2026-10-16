@@ -23,11 +23,14 @@
 				<SettingsRow label="Sensitivity">
 					<Slider
 						:model-value="settings.knobSensitivity"
-						:min="0.25"
+						:min="0.1"
 						:max="4"
-						:step="0.25"
+						:step="0.01"
 						@update:model-value="settings.setKnobSensitivity($event)"
 					/>
+				</SettingsRow>
+				<SettingsRow label="Return cursor after drag">
+					<CheckBox :model-value="settings.knobReturnCursor" @update:model-value="settings.setKnobReturnCursor($event)" />
 				</SettingsRow>
 				<SettingsRow label="Focus on hover">
 					<CheckBox :model-value="settings.hoverKeyTarget" @update:model-value="settings.setHoverKeyTarget($event)" />

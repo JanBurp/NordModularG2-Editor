@@ -54,6 +54,7 @@
 		/>
 		<ParameterPages v-if="currentPatch && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<ParamDragGhost />
+		<KnobDragCursor />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden">
@@ -459,6 +460,7 @@
 	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import ParameterPages from './components/toolbar/ParameterPages.vue';
 	import ParamDragGhost from './components/common/ParamDragGhost.vue';
+	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
 	import Dialog from './components/common/Dialog.vue';
