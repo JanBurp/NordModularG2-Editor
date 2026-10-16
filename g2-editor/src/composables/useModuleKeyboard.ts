@@ -1,16 +1,16 @@
 import { onMounted, onUnmounted } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
+import { useSettingsStore } from '../store/settings';
 import { DeviceStatus, useDeviceStore } from '../store/device';
-import { getModule, getParamNavOrder } from '../renderer/nmg2mods';
+import { getModule, getParamDefault, getParamNavOrder } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
-import { useParamEditDialog } from './useParamEditDialog';
+import { isValueEditable, useParamEditDialog } from './useParamEditDialog';
 import type { ModuleInstance } from '../types';
 import { clamp } from '@/utils/math';
 import { isGrabModifierPressed } from '@/utils/platform';
 
-function isInputFocused(): boolean {
-	const el = document.activeElement;
+function isInput(el: unknown): boolean {
 	return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
 }
 
@@ -18,7 +18,8 @@ export function useModuleKeyboard() {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
-	const { showDialog } = useParamEditDialog();
+	const settingsStore = useSettingsStore();
+	const { showDialog, openParamEdit } = useParamEditDialog();
 
 	// Mirrors the cursor move to the hardware panel (SUB_COMMAND_SEL_PARAM, 0x2F) so the
 	// G2's own Select LED tracks keyboard navigation. Fire-and-forget: a dropped/failed send
@@ -195,11 +196,24 @@ export function useModuleKeyboard() {
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 
-	async function changeParamValue(delta: number) {
+	// Arrow Up/Down target: the hovered param (settings.hoverKeyTarget; carries its own area,
+	// module ids aren't unique across VA/FX) if any, else the selected param.
+	function findKeyTarget(): { sel: { moduleId: number; paramIndex: number }; found: { module: ModuleInstance; area: 0 | 1 } } | undefined {
+		const hov = settingsStore.hoverKeyTarget ? uiStore.hoveredParam : null;
+		if (hov) {
+			const area: 0 | 1 = hov.area === 'va' ? 1 : 0;
+			const module = getModulesInArea(area).find((m) => m.index === hov.moduleId);
+			return module ? { sel: hov, found: { module, area } } : undefined;
+		}
 		const sel = uiStore.selectedParam;
-		if (!sel) return;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
+		const found = sel && findModuleAnywhere(sel.moduleId);
+		return found ? { sel, found } : undefined;
+	}
+
+	async function changeParamValue(delta: number) {
+		const target = findKeyTarget();
+		if (!target) return;
+		const { sel, found } = target;
 		const moduleDef = getModule(found.module.type);
 		const param = moduleDef?.params?.[sel.paramIndex];
 		if (!param) return;
@@ -211,6 +225,37 @@ export function useModuleKeyboard() {
 		const current = slotsStore.slots[uiStore.slotInFocus]?.variations?.[variation]?.[areaKey]?.[sel.moduleId]?.[sel.paramIndex] ?? paramDef.def;
 		const newValue = clamp(current + delta, paramDef.low, paramDef.high);
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
+	}
+
+	// Clicks in popups (context menu, Set Value) don't count: they're opened from the canvas.
+	let lastPointerOnCanvas = true;
+	function handlePointerDown(e: PointerEvent) {
+		const el = e.target as Element | null;
+		if (el?.closest?.('[role=dialog], [role=menu]')) return;
+		lastPointerOnCanvas = !!el?.closest?.('[data-testid^="canvas-"]');
+	}
+
+	// `=` opens the Set Value popup for the key-target param, below its control (or mid-window if
+	// it's not on screen); Enter resets it to its default, like a double-click.
+	function editKeyTargetParam(reset: boolean): boolean {
+		const target = findKeyTarget();
+		if (!target) return false;
+		const { sel, found } = target;
+		// Without a hovered param: only while the selected param's module is still selected (like the
+		// arrow keys) and the last click was on the canvas — Enter also activates e.g. Patch Browser items
+		if (!(settingsStore.hoverKeyTarget && uiStore.hoveredParam) && (!lastPointerOnCanvas || !uiStore.selectedModules.includes(sel.moduleId))) return false;
+		const param = getModule(found.module.type)?.params?.[sel.paramIndex];
+		if (!param || !isValueEditable(param)) return false;
+		const area = found.area === 1 ? 'va' : 'fx';
+		if (reset) {
+			slotsStore.setParam(sel.moduleId, sel.paramIndex, getParamDefault(param), uiStore.variation, area === 'va' ? 'voice' : 'fx');
+			return true;
+		}
+		const el = document.querySelector?.(`[data-testid="canvas-${area}"] [data-module-idx="${sel.moduleId}"] [data-param-index="${sel.paramIndex}"]`);
+		const rect = el?.getBoundingClientRect();
+		const pos = rect ? { x: rect.left, y: rect.bottom } : { x: window.innerWidth / 2 - 160, y: window.innerHeight / 3 };
+		openParamEdit({ area, moduleIndex: sel.moduleId, paramIndex: sel.paramIndex, ...pos });
+		return true;
 	}
 
 	// Resolves the currently selected param's module/slot/morph-group context, plus its existing
@@ -269,7 +314,9 @@ export function useModuleKeyboard() {
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (uiStore.showQuickAdd) return;
-		if (isInputFocused()) return;
+		// Also the event's own target: a popup that closes on Enter (Set Value, Quick Add) can already
+		// have unmounted its input — and moved focus to <body> — before this window listener runs.
+		if (isInput(document.activeElement) || isInput(e.target)) return;
 		// A focused slider/button group already handled this arrow key itself
 		if (e.defaultPrevented || (document.activeElement as HTMLElement | null)?.closest('[role=slider], [role=menu], [role=listbox]')) return;
 
@@ -288,6 +335,15 @@ export function useModuleKeyboard() {
 			return;
 		}
 
+		// Shift allowed for `=` (Shift+0 on e.g. Dutch/German layouts). Plain Enter is also App.vue's
+		// "confirm cable" key and activates a focused button — leave it alone then.
+		const noMod = !altKey && !isGrabModifierPressed(e);
+		const enterFree = !shiftKey && !uiStore.armedJack && !uiStore.ghostCable && (document.activeElement as HTMLElement | null)?.tagName !== 'BUTTON';
+		if (noMod && (key === '=' || (key === 'Enter' && enterFree))) {
+			if (editKeyTargetParam(key === 'Enter')) e.preventDefault();
+			return;
+		}
+
 		if (key === 'l' && !shiftKey && !altKey && !isGrabModifierPressed(e)) {
 			assignLastCC();
 			e.preventDefault();
@@ -303,10 +359,12 @@ export function useModuleKeyboard() {
 			return;
 		}
 
+		// Up/Down on a hovered param works without a selected module
+		const hoverValueKey = settingsStore.hoverKeyTarget && uiStore.hoveredParam !== null && (key === 'ArrowUp' || key === 'ArrowDown');
 		if (shiftKey && !altKey) {
 			navigateModule(key);
 			e.preventDefault();
-		} else if (!shiftKey && uiStore.selectedModules.length > 0) {
+		} else if (!shiftKey && (uiStore.selectedModules.length > 0 || hoverValueKey)) {
 			if (key === 'ArrowLeft' || key === 'ArrowRight') {
 				navigateParam(key === 'ArrowRight' ? 1 : -1);
 				e.preventDefault();
@@ -318,8 +376,14 @@ export function useModuleKeyboard() {
 		}
 	}
 
-	onMounted(() => window.addEventListener('keydown', handleKeydown));
-	onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+	onMounted(() => {
+		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener('pointerdown', handlePointerDown, true);
+	});
+	onUnmounted(() => {
+		window.removeEventListener('keydown', handleKeydown);
+		window.removeEventListener('pointerdown', handlePointerDown, true);
+	});
 
-	return { handleKeydown };
+	return { handleKeydown, handlePointerDown };
 }

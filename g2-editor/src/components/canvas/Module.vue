@@ -118,8 +118,9 @@
 				:data-module-index="moduleIdx"
 				class="cursor-pointer"
 				@mousedown.capture="onParamMorphMouseDown(index, $event)"
-				@mouseenter="onParamHoverEnter(param.n)"
-				@mouseleave="onParamHoverLeave"
+				@click="onParamShiftClick(param.n, index, $event)"
+				@mouseenter="onParamHoverEnter(param.n, index, $event)"
+				@mouseleave="onParamHoverLeave($event)"
 			>
 				<ModuleKnob
 					v-if="isKnob(param.n)"
@@ -136,7 +137,7 @@
 					:param="param"
 					:value="getParamValue(index)"
 					:param-index="index"
-					:highlight="index === selectedParamIndex"
+					:highlight="index === keyTargetIndex"
 					:morph-color="morphColorFor(index)"
 					:morph-range="morphRangeFor(index)"
 					@change="onParamChange"
@@ -148,7 +149,7 @@
 					:value="getParamValue(index)"
 					:label="getParamLabel(index)"
 					:param-index="index"
-					:highlight="index === selectedParamIndex"
+					:highlight="index === keyTargetIndex"
 					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, labelIndex: 0, ...info })"
@@ -159,7 +160,7 @@
 					:param="param"
 					:value="getParamValue(index)"
 					:param-index="index"
-					:highlight="index === selectedParamIndex"
+					:highlight="index === keyTargetIndex"
 					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
@@ -169,7 +170,7 @@
 					:param="param"
 					:value="getParamValue(index)"
 					:param-index="index"
-					:highlight="index === selectedParamIndex"
+					:highlight="index === keyTargetIndex"
 					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-context-menu="onParamContextMenu"
@@ -184,7 +185,7 @@
 					:strip-height="SEQNOTE_STRIP_HEIGHT"
 					:zoom="seqNotePianoRollView.zoom"
 					:octave-offset="seqNotePianoRollView.octaveOffset"
-					:highlight="index === selectedParamIndex"
+					:highlight="index === keyTargetIndex"
 					:morph-color="morphColorFor(index)"
 					:morph-range="morphRangeFor(index)"
 					@change="onParamChange"
@@ -259,7 +260,7 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, onUnmounted } from 'vue';
 	import { useUiStore } from '../../store/ui';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import ModuleBackground from './ModuleBackground.vue';
@@ -312,6 +313,7 @@
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
+	import { blurFocusedControl } from '../../utils/focus';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -341,7 +343,7 @@
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
-	const { handleParamDblClick } = useParamEditDialog();
+	const { openParamEdit } = useParamEditDialog();
 	const { graphics } = useModuleGraphics();
 
 	function onModuleClick(e: MouseEvent) {
@@ -542,9 +544,9 @@
 	const mutatorOpen = computed(() => settingsStore.showRightPane && settingsStore.rightPaneTab === 'mutator');
 	const deviceStore = useDeviceStore();
 
-	const selectedParamIndex = computed(() => {
-		if (uiStore.selectedModulesArea !== props.areaLabel) return -1;
-		return uiStore.selectedParam?.moduleId === moduleIdx.value ? uiStore.selectedParam.paramIndex : -1;
+	const keyTargetIndex = computed(() => {
+		const t = uiStore.keyTargetParam;
+		return t && t.area === (props.areaLabel ?? 'fx') && t.moduleId === moduleIdx.value ? t.paramIndex : -1;
 	});
 
 	// Morph Group assignment: coloring, ctrl-click assign/deassign, ctrl-drag range editing.
@@ -578,6 +580,7 @@
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
 	// active one for keyboard shortcuts (arrow-key nav, L) right away.
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+		shiftDownPos = e.shiftKey ? { x: e.clientX, y: e.clientY } : null;
 		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
 		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		uiStore.selectedCables = [];
@@ -613,6 +616,17 @@
 		});
 	}
 
+	// Shift+click (without dragging — Shift+drag is fine adjust) on a knob/slider opens the Set Value
+	// popup. Spinners are left out: their click already steps the value.
+	let shiftDownPos: { x: number; y: number } | null = null;
+	function onParamShiftClick(n: string, paramIndex: number, e: MouseEvent) {
+		const down = shiftDownPos;
+		shiftDownPos = null;
+		if (!e.shiftKey || !down || !(isKnob(n) || isSlider(n))) return;
+		if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 3) return;
+		openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: e.clientX, y: e.clientY });
+	}
+
 	// DrumSynth preset selector emits target values for its 15 params directly (it owns the preset
 	// table); applied as one batched store action so a single Ctrl+Z reverts the whole preset switch.
 	function onDrumSynthPresetApply(values: number[]) {
@@ -644,13 +658,25 @@
 		slotsStore.setSeqNotePianoRollView(moduleIdx.value, area, view);
 	}
 
-	function onParamHoverEnter(n: string) {
+	function onParamHoverEnter(n: string, paramIndex: number, e: MouseEvent) {
+		// e.buttons: never retarget the arrow keys while a drag is in progress
+		if (settingsStore.hoverKeyTarget && e.buttons === 0) {
+			uiStore.setHoveredParam(moduleIdx.value, paramIndex, props.areaLabel ?? 'fx');
+			blurFocusedControl();
+		}
 		if (isSwitch(n)) showHint('paramSwitch');
 		else if (isSpinner(n) || isSpinnerH(n)) showHint('paramSpinner');
 		else if (isSlider(n)) showHint('paramSlider');
 		else showHint('paramKnob');
 	}
-	function onParamHoverLeave() {
+	// A module deleted under the mouse never gets its mouseleave.
+	onUnmounted(() => {
+		const hov = uiStore.hoveredParam;
+		if (hov?.moduleId === moduleIdx.value && hov.area === (props.areaLabel ?? 'fx')) uiStore.clearHoveredParam();
+	});
+	function onParamHoverLeave(e: MouseEvent) {
+		// Moving onto the knob's arrows (KnobSpinOverlay) keeps the hover; the overlay clears it on its own leave.
+		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
 		clearHint();
 	}
 
@@ -697,11 +723,7 @@
 		} else {
 			items.push({
 				label: 'Set Value',
-				action: () => {
-					const paramType = param?.type ?? '';
-					const currentValue = getParamValue(paramIndex);
-					handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
-				},
+				action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
 			});
 		}
 

@@ -69,18 +69,12 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 		window.removeEventListener('blur', onMouseUp);
 	}
 
-	function onDoubleClick() {
-		stopRepeat();
-		onChange(paramIndex, 64);
-	}
-
 	onUnmounted(() => {
 		onMouseUp();
 	});
 
 	return {
 		onMouseDown,
-		onDoubleClick,
 		stopRepeat,
 	};
 }

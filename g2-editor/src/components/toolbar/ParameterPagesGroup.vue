@@ -49,6 +49,7 @@
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
 					:max="cell.high"
+					:default-value="cell.defaultValue"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
 				/>
 			</div>

@@ -1,6 +1,13 @@
 <template>
 	<!-- Rendered after all modules so it always paints above them. -->
-	<g v-if="target" class="knob-spin-v" :transform="`translate(${target.x}, ${target.y})`" @mousedown.stop="onMouseDown" @click.stop>
+	<g
+		v-if="target"
+		class="knob-spin-v"
+		:transform="`translate(${target.x}, ${target.y})`"
+		@mousedown.stop="onSpinMouseDown"
+		@click.stop
+		@mouseleave="uiStore.clearHoveredParam()"
+	>
 		<use href="#KnobSpinV" width="20" height="10" />
 	</g>
 </template>
@@ -32,32 +39,35 @@
 	const slotsStore = useSlotsStore();
 
 	const target = computed(() => {
-		const sel = uiStore.selectedParam;
-		if (!sel || uiStore.selectedModulesArea !== props.areaLabel) return null;
+		const sel = uiStore.keyTargetParam;
+		if (!sel || sel.area !== props.areaLabel) return null;
 		const mod = props.modules.find((m) => m.index === sel.moduleId);
 		const param = mod && getModule(mod.type)?.params?.[sel.paramIndex];
 		if (!mod || !param || !isKnob(param.n)) return null;
 		const radius = RADII[param.n] ?? 10;
-		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
-		const value = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[mod.index]?.[sel.paramIndex] ?? 0;
 		return {
 			moduleIndex: mod.index,
 			paramIndex: sel.paramIndex,
-			value,
 			x: (mod.horiz ?? 0) * 256 + param.x + radius - 8,
 			y: (mod.vert ?? 0) * 16 + param.y + radius * 2 + SPIN_OFFSET_Y,
 		};
 	});
 
-	// The hold composable is created once; it reads the current target at call time, so the paramIndex arg is unused.
-	const { onMouseDown } = useSpinnerHoldInteraction(
-		'KnobSpinV',
-		0,
-		() => target.value?.value ?? 0,
-		(_index, value) => {
-			if (target.value) emit('change', target.value.moduleIndex, target.value.paramIndex, value);
-		},
-	);
+	// The target is pinned at mousedown: with settings.hoverKeyTarget it can move to another knob while the
+	// hold repeats (pointer leaves the arrows). The paramIndex arg of the hold composable is unused.
+	let pinned: NonNullable<typeof target.value> | null = null;
+	function pinnedValue(): number {
+		if (!pinned) return 0;
+		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
+		return slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[pinned.moduleIndex]?.[pinned.paramIndex] ?? 0;
+	}
+	const { onMouseDown } = useSpinnerHoldInteraction('KnobSpinV', 0, pinnedValue, (_index, value) => {
+		if (pinned) emit('change', pinned.moduleIndex, pinned.paramIndex, value);
+	});
+	function onSpinMouseDown(e: MouseEvent) {
+		pinned = target.value;
+		onMouseDown(e);
+	}
 </script>
 
 <style scoped>

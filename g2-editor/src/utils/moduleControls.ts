@@ -1,12 +1,13 @@
-import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
+import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, pitchShuttle, rateBPM, rateLo } from '../renderer/parammap';
 
 import type { ModuleDefinition } from '../types';
 
 export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	adsrT,
-	adsrL: adsrL as unknown as (i: number) => string,
-	lfoP: lfoP as unknown as (i: number) => string,
+	adsrL: (i) => String(adsrL(i)),
+	lfoP: (i) => String(lfoP(i)),
 	rateBPM,
+	pitchShuttle,
 	filterFreq,
 	filterFreq1,
 	filterFreq2,
@@ -241,4 +242,62 @@ export function formatCombinedValue(
 	}
 
 	return refIndices.map((idx) => values[idx] ?? 64).join(' ');
+}
+
+// The text a param shows on the module: the combined display it leads (e.g. Osc Freq =
+// [coarse, fine, FreqMode], so the mode param drives the text), else its own formatted value.
+export function formatParamDisplay(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes?: number[]): string {
+	const param = moduleDef.params?.[paramIndex];
+	if (!param) return String(values[paramIndex] ?? '');
+	const combined = moduleDef.ve?.find((e) => e.type === 'valueDisplay' && Array.isArray(e.ref) && e.ref[0] === paramIndex);
+	if (combined) return formatCombinedValue(combined.ref as number[], combined.func, moduleDef.params, values, modes, moduleDef.modes);
+	return formatValue(values[paramIndex] ?? 64, param.type);
+}
+
+export interface ParamValueOption {
+	raw: number;
+	label: string;
+}
+
+// Unit multipliers to a common base (Hz, ms); anything else (dB, BPM, %, …) is taken as-is.
+const UX_UNIT_SCALE: Record<string, number> = { k: 1000, khz: 1000, s: 1000 };
+const UX_NUMBER = /^(-?)\s*x?([+\-±]?)(\d*\.?\d+)\s*([a-z%]*)/i;
+
+// Leading number of a display label or typed query ("440.00Hz", "1.5s", "±32", "-30 dB", "x1.5", "- x1.00").
+// `scaled` normalises the unit; unscaled compares the bare numbers.
+export function parseUxNumber(text: string, scaled = true): number | null {
+	const m = text.trim().match(UX_NUMBER);
+	if (!m) return null;
+	const n = parseFloat(m[3]) * ((m[1] === '-') !== (m[2] === '-') ? -1 : 1);
+	return scaled ? n * (UX_UNIT_SCALE[m[4].toLowerCase()] ?? 1) : n;
+}
+
+// Typed query → matching param values. "#64" picks raw value 64; a plain number (optionally with
+// a unit) lists the nearest values — unit-normalised only when the query has a unit, so "1.3"
+// also finds "1.32kHz"; anything else ("C#3", "Bip", "1/16", "3:1") is a substring match.
+// Identical labels are collapsed to their first raw value.
+export function matchParamValues(options: ParamValueOption[], query: string): ParamValueOption[] {
+	const q = query.trim();
+	const seen = new Set<string>();
+	const firstOfLabel = options.filter((o) => !seen.has(o.label) && !!seen.add(o.label));
+	if (!q) return firstOfLabel;
+
+	const raw = q.match(/^#(\d+)$/);
+	if (raw) return options.filter((o) => o.raw === Number(raw[1]));
+
+	const numeric = q.match(/^-?\s*x?[+\-±]?\d*\.?\d+\s*[a-z%]*$/i);
+	if (numeric) {
+		const scaled = /[a-z%]$/i.test(q);
+		const target = parseUxNumber(q, scaled)!;
+		const nearest = firstOfLabel
+			.map((o) => ({ o, n: parseUxNumber(o.label, scaled) }))
+			.filter((x): x is { o: ParamValueOption; n: number } => x.n !== null)
+			.sort((a, b) => Math.abs(a.n - target) - Math.abs(b.n - target) || a.o.raw - b.o.raw)
+			.map((x) => x.o);
+		// Non-numeric labels (e.g. note names "C#3"): fall through to the substring match
+		if (nearest.length) return nearest;
+	}
+
+	const lower = q.toLowerCase();
+	return firstOfLabel.filter((o) => o.label.toLowerCase().includes(lower));
 }

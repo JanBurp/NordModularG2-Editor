@@ -13,15 +13,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Adjuster
 - Patch Mutator
 - Added option for cable style
+- Added option for module params to have focus on hover, so arrow keys can adjust value.
+- For selected param added '=' to open SetValue, and 'ENTER' to set to default value
 
 ### Changed
 - Splash screen stays when update available
+- Improved SetValue dialog, uses param values, searching etc.
 - Searching modules improved (search on short module name first)
+- Improved param gestures (default, circular mode)
 - Improved KeyBoard UX (allways need note, and touchscreen ready)
 
 ### Fixed
 - Better rendering of modules
 - Some Module Graphs improved
+- Reset Triangle on Knobs, improved
 - Some Knobs did not use full range
 
 ## [0.7.1] - 2026-10-12

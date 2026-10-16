@@ -34,6 +34,8 @@ export const useUiStore = defineStore('ui', {
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
+		hoveredParam: null as { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null, // only set when settings.hoverKeyTarget is on
+		hoveredKnob: null as number | null, // id of the hovered common/Knob.vue (toolbar), same setting
 		selectedMorphGroup: 0 as number, // 0-7, which Morph Group toolbar knob is currently selected
 		selectedParamBank: 0 as number, // 0-2, ambient Bank for right-click "Assign to Page" + which bank's row the toolbar shows
 		displayedParamPage: 0 as number, // 0-4 (A-E), which Parameter Page the toolbar currently displays
@@ -97,6 +99,14 @@ export const useUiStore = defineStore('ui', {
 			return area === 2 ? 1 : (area as 0 | 1);
 		},
 
+		// The canvas param the arrow keys will change (see useModuleKeyboard): with settings.hoverKeyTarget
+		// the hovered one (none while a toolbar knob is hovered), else the selected one.
+		keyTargetParam: (state): { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null => {
+			if (useSettingsStore().hoverKeyTarget && (state.hoveredKnob !== null || state.hoveredParam)) return state.hoveredParam;
+			if (!state.selectedParam || !state.selectedModulesArea) return null;
+			return { ...state.selectedParam, area: state.selectedModulesArea };
+		},
+
 		dividerPos: (state): number => {
 			const patch = useSlotsStore().slots[state.slotInFocus].patch;
 			return fbarToDivider(patch?.description?.height ?? 2000);
@@ -139,6 +149,14 @@ export const useUiStore = defineStore('ui', {
 
 		clearSelectedParam() {
 			this.selectedParam = null;
+		},
+
+		setHoveredParam(moduleId: number, paramIndex: number, area: 'va' | 'fx') {
+			this.hoveredParam = { moduleId, paramIndex, area };
+		},
+
+		clearHoveredParam() {
+			this.hoveredParam = null;
 		},
 
 		setSelectedMorphGroup(i: number) {
