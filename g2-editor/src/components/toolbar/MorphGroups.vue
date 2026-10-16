@@ -24,7 +24,7 @@
 					</div>
 					<Knob
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
-						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
+						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : assignedGroups.has(i) ? 'blue' : null"
 						:default-value="defaultPatchParams().morphDials[i]"
 						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
@@ -72,6 +72,12 @@
 	const activePatch = computed(() => {
 		const slot = uiStore.slotInFocus;
 		return slot ? slotsStore.getPatchForSlot(slot) : null;
+	});
+
+	// Groups with at least one assignment in the current variation (shown as a blue knob).
+	const assignedGroups = computed(() => {
+		const slot = uiStore.slotInFocus;
+		return new Set(slot ? slotsStore.getMorphAssignments(slot, uiStore.variation).map((a) => a.groupIndex) : []);
 	});
 
 	function displayName(i: number): string {
