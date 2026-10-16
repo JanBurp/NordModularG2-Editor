@@ -116,6 +116,30 @@ test.describe('DrumSynth preset selector', () => {
 		await expect(kick1.locator('[data-testid="drumsynth-preset-name"]')).toHaveText('Kick 2');
 	});
 
+	test('Enter resets the selected knob, but not after a click in the Patch Browser', async ({ page, sendMenuAction, mockOpenPatch }) => {
+		await mockOpenPatch('DrumSynthPresets.pch2');
+		await sendMenuAction('open');
+
+		// Kick 2: MasterLevel (param 4) is 105, its default 120 (Kick 1 is all defaults, so no use here)
+		const kick2 = page.locator('[data-testid="canvas-va"] [data-module-short="DrumSynth"]').nth(1);
+		const presetName = kick2.locator('[data-testid="drumsynth-preset-name"]');
+		const knob = kick2.locator('[data-param-index="4"]');
+		await expect(presetName).toHaveText('Kick 2');
+
+		// Right pane opened after startup: its keydown listener is registered after the canvas one
+		await knob.click();
+		await sendMenuAction('toggle-modules');
+		await page.getByRole('button', { name: 'Browser' }).click();
+		await page.getByText(/Connect G2 to browse/i).click();
+		await page.keyboard.press('Enter');
+		await expect(presetName).toHaveText('Kick 2');
+
+		// Control: back on the canvas, Enter does reset the knob (drifting the preset to "none")
+		await knob.click();
+		await page.keyboard.press('Enter');
+		await expect(presetName).toHaveText('none');
+	});
+
 	test('clicking the name opens a dropdown listing all 30 presets for fast selection', async ({ page, sendMenuAction, mockOpenPatch }) => {
 		await mockOpenPatch('DrumSynthPresets.pch2');
 		await sendMenuAction('open');

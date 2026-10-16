@@ -413,6 +413,72 @@ describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () 
 		expect(setParam).not.toHaveBeenCalled();
 	});
 
+	it('Enter leaves a selected param alone once its module was deselected', () => {
+		const { uiStore, slotsStore } = seedSelectedParam();
+		uiStore.toggleModuleSelection(1, 'va'); // Shift-click title: deselects, keeps selectedParam
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('Enter'));
+
+		expect(setParam).not.toHaveBeenCalled();
+	});
+
+	// Fake pointerdown target: `closest` answers for the given selectors only
+	const pointerOn = (...inside: string[]) => ({ target: { closest: (sel: string) => (inside.includes(sel) ? {} : null) } }) as unknown as PointerEvent;
+
+	it('= and Enter leave the param alone after a click outside the canvas (e.g. Patch Browser)', () => {
+		const { slotsStore } = seedSelectedParam();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown, handlePointerDown } = useModuleKeyboard();
+		handlePointerDown(pointerOn());
+		const e = arrowKey('Enter');
+
+		handleKeydown(e);
+		handleKeydown(arrowKey('='));
+
+		expect(setParam).not.toHaveBeenCalled();
+		expect(e.preventDefault).not.toHaveBeenCalled();
+		expect(useParamEditDialog().showDialog.value).toBe(false);
+	});
+
+	it('Enter works again after a click back on the canvas', () => {
+		const { slotsStore } = seedSelectedParam();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown, handlePointerDown } = useModuleKeyboard();
+		handlePointerDown(pointerOn());
+		handlePointerDown(pointerOn('[data-testid^="canvas-"]'));
+
+		handleKeydown(arrowKey('Enter'));
+
+		expect(setParam).toHaveBeenCalledWith(1, 0, 50, 0, 'voice');
+	});
+
+	it('a click inside a popup (context menu, Set Value) keeps the canvas as key target', () => {
+		const { slotsStore } = seedSelectedParam();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown, handlePointerDown } = useModuleKeyboard();
+		handlePointerDown(pointerOn('[data-testid^="canvas-"]'));
+		handlePointerDown(pointerOn('[role=dialog], [role=menu]'));
+
+		handleKeydown(arrowKey('Enter'));
+
+		expect(setParam).toHaveBeenCalled();
+	});
+
+	it('Enter on a hovered param (Focus on hover) works even after a click elsewhere', () => {
+		const { uiStore, slotsStore } = seedSelectedParam();
+		useSettingsStore().setHoverKeyTarget(true);
+		uiStore.setHoveredParam(1, 0, 'va');
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown, handlePointerDown } = useModuleKeyboard();
+		handlePointerDown(pointerOn());
+
+		handleKeydown(arrowKey('Enter'));
+
+		expect(setParam).toHaveBeenCalledWith(1, 0, 50, 0, 'voice');
+	});
+
 	it('= and Enter do nothing without a target param', () => {
 		const slotsStore = useSlotsStore();
 		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
