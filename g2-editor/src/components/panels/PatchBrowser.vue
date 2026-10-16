@@ -165,6 +165,7 @@
 	import ListItem from '../browser/ListItem.vue';
 	import Icon from '../common/Icon.vue';
 	import Dialog from '../common/Dialog.vue';
+	import { createDoubleClickDetector } from '../../utils/doubleClick';
 
 	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {
@@ -479,15 +480,7 @@
 		}
 	}
 
-	// Own double-click detection: in the Electron window MouseEvent.detail stays 1 and native dblclick often doesn't fire.
-	const DOUBLE_CLICK_MS = 400;
-	let lastClick = { key: '', t: 0 };
-	function isDoubleClick(key: string): boolean {
-		const now = performance.now();
-		const isDouble = key === lastClick.key && now - lastClick.t < DOUBLE_CLICK_MS;
-		lastClick = isDouble ? { key: '', t: 0 } : { key, t: now };
-		return isDouble;
-	}
+	const isDoubleClick = createDoubleClickDetector();
 
 	function selectDisk(entry: DiskEntry) {
 		if (entry.isDir) {

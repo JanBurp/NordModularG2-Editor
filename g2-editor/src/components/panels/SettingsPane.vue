@@ -29,6 +29,9 @@
 						@update:model-value="settings.setKnobSensitivity($event)"
 					/>
 				</SettingsRow>
+				<SettingsRow label="Focus on hover">
+					<CheckBox :model-value="settings.hoverKeyTarget" @update:model-value="settings.setHoverKeyTarget($event)" />
+				</SettingsRow>
 				<SettingsRow label="Wheel Sensitivity">
 					<Slider
 						:model-value="settings.wheelSensitivity"

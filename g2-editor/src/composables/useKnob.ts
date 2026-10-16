@@ -6,10 +6,16 @@ import { useDragInteraction } from './useDragInteraction';
 import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 import { knobAngle } from '@/utils/knobArc';
+import knobRotateCursor from '@/assets/cursors/knob-rotate.svg';
+import { createDoubleClickDetector, isPrimaryMouseDown } from '@/utils/doubleClick';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 export const KNOB_RESET_CENTRE = 64; // value KnobReset's centre marker resets to
-const CURSORS: Record<string, string> = { vertical: 'ns-resize', horizontal: 'ew-resize', circular: 'crosshair' };
+const CURSORS: Record<string, string> = {
+	vertical: 'ns-resize',
+	horizontal: 'ew-resize',
+	circular: `url("${knobRotateCursor}") 12 12, crosshair`,
+};
 
 // Converts a mouse position relative to the knob center to a knob angle in degrees.
 // 0° = top (12 o'clock), positive = clockwise, range -180° to 180°.
@@ -23,6 +29,7 @@ export function useKnob(
 	emitChange: (value: number) => void,
 	elementRef?: Ref<Element | null>,
 	max?: Ref<number> | ComputedRef<number>, // param's own range (parammap `high`), default 0..127
+	getDefault: () => number = () => 64,
 ) {
 	const settings = useSettingsStore();
 	const maxValue = () => max?.value ?? 127;
@@ -59,7 +66,14 @@ export function useKnob(
 		if (newValue !== value.value) emitChange(newValue);
 	});
 
+	const isDoubleClick = createDoubleClickDetector();
+
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
+		if (isPrimaryMouseDown(event) && isDoubleClick()) {
+			emitChange(getDefault());
+			return;
+		}
+		startValue.current = value.value;
 		if (settings.knobMode === 'circular') {
 			const clickX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
 			const clickY = 'touches' in event ? event.touches[0].clientY : (event as MouseEvent).clientY;
@@ -75,25 +89,19 @@ export function useKnob(
 				circular.cy = clickY;
 			}
 
-			// Immediately set value based on click angle (absolute mode)
-			const clickAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
-			const clickValue = clamp(Math.round(((clickAngle + 135) / 270) * maxValue()), 0, maxValue());
-			startValue.current = clickValue;
-			emitChange(clickValue);
-
-			circular.prevAngle = clickAngle;
+			// Relative mode: the click itself doesn't change the value, only the rotation while dragging does
+			circular.prevAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
 			circular.accumulated = 0;
-		} else {
-			startValue.current = value.value;
 		}
 		onMouseDown(event);
 	}
 
-	function resetToDefault(defaultVal = KNOB_RESET_CENTRE) {
-		emitChange(defaultVal);
+	// KnobReset triangle (at 12 o'clock): back to the centre, not to the param's default.
+	function resetToCenter() {
+		emitChange(KNOB_RESET_CENTRE);
 	}
 
 	const { onWheel } = useWheelInteraction(() => value.value, emitChange, maxValue);
 
-	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToDefault };
+	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToCenter };
 }

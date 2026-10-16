@@ -1,0 +1,15 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24">
+	<!-- Circular knob-mode cursor: double-headed arc styled like the system ew-resize arrow, centred on hotspot 12,12 -->
+	<g transform="translate(0, 4.4)" stroke-linejoin="round">
+		<g fill="#fff" stroke="#fff">
+			<path d="M6.27,7.98 A7.0,7.0 0 0 1 17.73,7.98" fill="none" stroke-width="4.2" />
+			<path d="M20.03,11.26 L20.36,6.15 L15.11,9.82 Z" stroke-width="2" />
+			<path d="M3.97,11.26 L3.64,6.15 L8.89,9.82 Z" stroke-width="2" />
+		</g>
+		<g fill="#000" stroke="#000">
+			<path d="M6.27,7.98 A7.0,7.0 0 0 1 17.73,7.98" fill="none" stroke-width="2" />
+			<path d="M20.03,11.26 L20.36,6.15 L15.11,9.82 Z" stroke-width="0.4" />
+			<path d="M3.97,11.26 L3.64,6.15 L8.89,9.82 Z" stroke-width="0.4" />
+		</g>
+	</g>
+</svg>

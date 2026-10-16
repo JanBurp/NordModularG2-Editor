@@ -43,7 +43,7 @@
 		/>
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
-		<KnobResetMarker v-if="isReset" :radius="radius" :value="value" @reset="resetToDefault()" />
+		<KnobResetMarker v-if="isReset" :radius="radius" :value="value" @reset="resetToCenter()" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -51,6 +51,7 @@
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
 	import { getParam } from '../../renderer/parammap';
+	import { getParamDefault } from '../../renderer/nmg2mods';
 	import MorphKnobOverlay from '../common/MorphKnobOverlay.vue';
 	import KnobResetMarker from '../common/KnobResetMarker.vue';
 
@@ -69,12 +70,13 @@
 
 	const knobCircle = ref<Element | null>(null);
 	const max = computed(() => getParam(props.param.type)?.high ?? 127);
-	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToDefault } = useKnob(
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToCenter } = useKnob(
 		toRef(props, 'value'),
 		computed(() => props.param.n),
 		(value) => emit('change', props.paramIndex, value),
 		knobCircle,
 		max,
+		() => getParamDefault(props.param),
 	);
 </script>
 <style scoped>
