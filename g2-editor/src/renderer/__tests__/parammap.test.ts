@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getParam } from '../parammap';
+import { getParam, pitchShuttle } from '../parammap';
 import { getAllModules } from '../nmg2mods';
 import type { ParamDefinition } from '../../types';
 
@@ -75,5 +75,20 @@ describe('module parameter types', () => {
 				expect(typeof def.def, `${mod.short}.${p.name} has a numeric default`).toBe('number');
 			}
 		}
+	});
+});
+
+describe('pitchShuttle (Scratch ratio)', () => {
+	it('matches the official ParamText::PitchShuttle text', () => {
+		const cases: [number, string][] = [
+			[0, '- x4.00'],
+			[48, '- x1.00'],
+			[63, '- x0.06'],
+			[64, 'x0'],
+			[80, 'x1.00'],
+			[111, 'x2.94'],
+			[127, 'x4.00'],
+		];
+		for (const [raw, label] of cases) expect(pitchShuttle(raw)).toBe(label);
 	});
 });

@@ -170,7 +170,7 @@ const parammap: Record<string, ParamDefinition> = {
 	RoomType: { width: 44, height: 14, low: 0, high: 3, def: 0, defin: ['0 ~ Small, 1 ~ Medium, 2 ~ Large, 3 ~ Hall'], comments: 'Determines ranges for [ReverbTime]' },
 	SaturateCurve: { width: 12, names: ['1', '2', '3', '4'], low: 0, high: 3, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4'], comments: '' },
 	ScratchDelay: { width: 35, low: 0, high: 3, def: 2, defin: ['0 ~ 12.5m, 1 ~ 25m, 2 ~ 50m, 3 ~ 100m'], comments: 'mili seconds' },
-	ScratchRatio: { low: 0, high: 127, def: 80, defin: ['0 ~ -x4.00, 64 ~ x0, 80 ~ x1.00, 127 ~ x4.00'], comments: 'negative speeds mean backwards playing' },
+	ScratchRatio: { f: 'pitchShuttle', low: 0, high: 127, def: 80, defin: ['0 ~ -x4.00, 64 ~ x0, 80 ~ x1.00, 127 ~ x4.00'], comments: 'negative speeds mean backwards playing' },
 	SeqCtrlXFade: { width: 24, low: 0, high: 3, def: 0, defin: ['0 ~ Off, 1 ~ 25%, 2 ~ 50%, 3 ~ 100%'], comments: '' },
 	SeqLen: { low: 0, high: 15, def: 0, defin: ['0 ~ 1, 1 ~ 2, 2 ~ 3, 3 ~ 4, 4 ~ 5, 5 ~ 6, 6 ~ 7, 7 ~ 8, 8 ~ 9, 9 ~ 10, 10 ~ 11, 11 ~ 12, 12 ~ 13, 13 ~ 14, 14 ~ 15, 15 ~ 16'], comments: '' },
 	ShpExpCurve: { width: 15, names: ['x2', 'x3', 'x4', 'x5'], low: 0, high: 3, def: 0, defin: ['0 ~ x2, 1 ~ x3, 2 ~ x4, 3 ~ x5'], comments: '' },
@@ -224,6 +224,13 @@ export function lfoP(i: number): number {
 export function rateBPM(i: number): string {
 	i = Math.floor(i);
 	return ((i < 32 && 24 + i * 2) || (i > 95 && -40 + i * 2) || 56 + i) + 'BPM';
+}
+
+// Scratch ratio — official ParamText::PitchShuttle: 1/16 per step from centre, top step pinned to x4.00
+export function pitchShuttle(i: number): string {
+	if (i === 64) return 'x0';
+	if (i === 127) return 'x4.00';
+	return (i < 64 ? '- x' : 'x') + (Math.abs(i - 64) / 16).toFixed(2);
 }
 
 const _clk = [

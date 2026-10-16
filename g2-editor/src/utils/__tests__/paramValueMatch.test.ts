@@ -100,6 +100,13 @@ describe('matchParamValues', () => {
 		expect(matchParamValues(opts, 'x2')[0].label).toMatch(/^x2\.0/);
 	});
 
+	it('Scratch ratio: 1 finds x1.00, -1 and -x1 find - x1.00', () => {
+		const opts = optionsFor('ScratchRatio', false);
+		expect(matchParamValues(opts, '1')[0]).toEqual({ raw: 80, label: 'x1.00' });
+		expect(matchParamValues(opts, '-1')[0]).toEqual({ raw: 48, label: '- x1.00' });
+		expect(matchParamValues(opts, '-x1')[0]).toEqual({ raw: 48, label: '- x1.00' });
+	});
+
 	it('envelope time: units are normalised (1.5s, 200m)', () => {
 		const opts = optionsFor('EnvTime', false);
 		expect(parseUxNumber(matchParamValues(opts, '1.5s')[0].label)).toBeCloseTo(1500, -2);

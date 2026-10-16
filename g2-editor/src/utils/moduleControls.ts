@@ -1,4 +1,4 @@
-import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, rateBPM, rateLo } from '../renderer/parammap';
+import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, pitchShuttle, rateBPM, rateLo } from '../renderer/parammap';
 
 import type { ModuleDefinition } from '../types';
 
@@ -7,6 +7,7 @@ export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	adsrL: (i) => String(adsrL(i)),
 	lfoP: (i) => String(lfoP(i)),
 	rateBPM,
+	pitchShuttle,
 	filterFreq,
 	filterFreq1,
 	filterFreq2,
@@ -260,15 +261,15 @@ export interface ParamValueOption {
 
 // Unit multipliers to a common base (Hz, ms); anything else (dB, BPM, %, …) is taken as-is.
 const UX_UNIT_SCALE: Record<string, number> = { k: 1000, khz: 1000, s: 1000 };
-const UX_NUMBER = /^x?([+\-±]?)(\d*\.?\d+)\s*([a-z%]*)/i;
+const UX_NUMBER = /^(-?)\s*x?([+\-±]?)(\d*\.?\d+)\s*([a-z%]*)/i;
 
-// Leading number of a display label or typed query ("440.00Hz", "1.5s", "±32", "-30 dB", "x1.5").
+// Leading number of a display label or typed query ("440.00Hz", "1.5s", "±32", "-30 dB", "x1.5", "- x1.00").
 // `scaled` normalises the unit; unscaled compares the bare numbers.
 export function parseUxNumber(text: string, scaled = true): number | null {
 	const m = text.trim().match(UX_NUMBER);
 	if (!m) return null;
-	const n = parseFloat(m[2]) * (m[1] === '-' ? -1 : 1);
-	return scaled ? n * (UX_UNIT_SCALE[m[3].toLowerCase()] ?? 1) : n;
+	const n = parseFloat(m[3]) * ((m[1] || m[2]) === '-' ? -1 : 1);
+	return scaled ? n * (UX_UNIT_SCALE[m[4].toLowerCase()] ?? 1) : n;
 }
 
 // Typed query → matching param values. "#64" picks raw value 64; a plain number (optionally with
@@ -284,7 +285,7 @@ export function matchParamValues(options: ParamValueOption[], query: string): Pa
 	const raw = q.match(/^#(\d+)$/);
 	if (raw) return options.filter((o) => o.raw === Number(raw[1]));
 
-	const numeric = q.match(/^x?[+\-±]?\d*\.?\d+\s*[a-z%]*$/i);
+	const numeric = q.match(/^-?\s*x?[+\-±]?\d*\.?\d+\s*[a-z%]*$/i);
 	if (numeric) {
 		const scaled = /[a-z%]$/i.test(q);
 		const target = parseUxNumber(q, scaled)!;
