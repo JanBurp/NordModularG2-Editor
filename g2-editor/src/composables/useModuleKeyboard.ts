@@ -227,12 +227,23 @@ export function useModuleKeyboard() {
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 
+	// Clicks in popups (context menu, Set Value) don't count: they're opened from the canvas.
+	let lastPointerOnCanvas = true;
+	function handlePointerDown(e: PointerEvent) {
+		const el = e.target as Element | null;
+		if (el?.closest?.('[role=dialog], [role=menu]')) return;
+		lastPointerOnCanvas = !!el?.closest?.('[data-testid^="canvas-"]');
+	}
+
 	// `=` opens the Set Value popup for the key-target param, below its control (or mid-window if
 	// it's not on screen); Enter resets it to its default, like a double-click.
 	function editKeyTargetParam(reset: boolean): boolean {
 		const target = findKeyTarget();
 		if (!target) return false;
 		const { sel, found } = target;
+		// Without a hovered param: only while the selected param's module is still selected (like the
+		// arrow keys) and the last click was on the canvas — Enter also activates e.g. Patch Browser items
+		if (!(settingsStore.hoverKeyTarget && uiStore.hoveredParam) && (!lastPointerOnCanvas || !uiStore.selectedModules.includes(sel.moduleId))) return false;
 		const param = getModule(found.module.type)?.params?.[sel.paramIndex];
 		if (!param || !isValueEditable(param)) return false;
 		const area = found.area === 1 ? 'va' : 'fx';
@@ -365,8 +376,14 @@ export function useModuleKeyboard() {
 		}
 	}
 
-	onMounted(() => window.addEventListener('keydown', handleKeydown));
-	onUnmounted(() => window.removeEventListener('keydown', handleKeydown));
+	onMounted(() => {
+		window.addEventListener('keydown', handleKeydown);
+		window.addEventListener('pointerdown', handlePointerDown, true);
+	});
+	onUnmounted(() => {
+		window.removeEventListener('keydown', handleKeydown);
+		window.removeEventListener('pointerdown', handlePointerDown, true);
+	});
 
-	return { handleKeydown };
+	return { handleKeydown, handlePointerDown };
 }

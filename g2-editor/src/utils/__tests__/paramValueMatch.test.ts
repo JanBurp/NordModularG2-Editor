@@ -126,4 +126,10 @@ describe('matchParamValues', () => {
 		const match = matchParamValues(optionsFor('MidiNote', false), 'C#3');
 		expect(match[0]).toEqual({ raw: 49, label: 'C#3' });
 	});
+
+	it('MIDI note: a bare number matches note names containing it', () => {
+		const labels = matchParamValues(optionsFor('MidiNote', false), '3').map((o) => o.label);
+		expect(labels).toContain('C3');
+		expect(labels.every((l) => l.includes('3'))).toBe(true);
+	});
 });

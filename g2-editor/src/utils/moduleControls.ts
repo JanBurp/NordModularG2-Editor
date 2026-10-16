@@ -288,11 +288,13 @@ export function matchParamValues(options: ParamValueOption[], query: string): Pa
 	if (numeric) {
 		const scaled = /[a-z%]$/i.test(q);
 		const target = parseUxNumber(q, scaled)!;
-		return firstOfLabel
+		const nearest = firstOfLabel
 			.map((o) => ({ o, n: parseUxNumber(o.label, scaled) }))
 			.filter((x): x is { o: ParamValueOption; n: number } => x.n !== null)
 			.sort((a, b) => Math.abs(a.n - target) - Math.abs(b.n - target) || a.o.raw - b.o.raw)
 			.map((x) => x.o);
+		// Non-numeric labels (e.g. note names "C#3"): fall through to the substring match
+		if (nearest.length) return nearest;
 	}
 
 	const lower = q.toLowerCase();
