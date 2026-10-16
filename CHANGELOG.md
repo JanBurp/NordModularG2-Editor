@@ -19,6 +19,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Searching modules improved (search on short module name first)
 - Improved param gestures (default, circular mode)
 - Improved KeyBoard UX (allways need note, and touchscreen ready)
+- Less clutter/hints when dragging or other edit in progress.
 
 ### Fixed:
 - Better rendering of modules
