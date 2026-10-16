@@ -112,7 +112,7 @@
 	import { getModule, getParamDefault } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { getParam } from '../../renderer/parammap';
-	import { formatValue, formatCombinedValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { formatParamDisplay, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
 	import { resolveSwitchDisplayNames } from '../../composables/useSwitch';
 	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
@@ -185,16 +185,8 @@
 		const moduleValues = slotsStore.slots[slot].variations?.[uiStore.variation]?.[areaKey]?.[a.moduleIndex];
 		const value = moduleValues?.[paramIndex] ?? 64;
 		const paramMeta = paramDef ? getParam(paramDef.type) : undefined;
-		// A param that leads a combined canvas display (e.g. Osc Freq = [coarse, fine, FreqMode]) is
-		// formatted the same way as there, so the mode param (the cell's button) drives the text.
-		const combined = moduleInfo?.moduleDef?.ve?.find((e) => e.type === 'valueDisplay' && Array.isArray(e.ref) && e.ref[0] === paramIndex);
 		let label = paramDef?.name ?? String(paramIndex);
-		let valueLabel =
-			combined && moduleValues
-				? formatCombinedValue(combined.ref as number[], combined.func, moduleInfo?.moduleDef?.params, moduleValues)
-				: paramDef
-					? formatValue(value, paramDef.type)
-					: String(value);
+		let valueLabel = moduleInfo?.moduleDef ? formatParamDisplay(moduleInfo.moduleDef, paramIndex, moduleValues ?? []) : String(value);
 		// User-renamed switch options: show the same text as the canvas switch (useSwitch.ts)
 		const userLabel = moduleInfo?.mod.paramLabels?.find((l) => l.paramIndex === paramIndex);
 		if (userLabel && paramDef && paramMeta) {
