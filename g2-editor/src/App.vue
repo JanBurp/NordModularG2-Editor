@@ -513,7 +513,8 @@
 	import { useConnectedDevicesStore } from './store/connectedDevices';
 	import DeviceSwitcher from './components/toolbar/DeviceSwitcher.vue';
 	import ConnectionDot from './components/common/ConnectionDot.vue';
-	import { useStatusHint } from './composables/useStatusHint';
+	import { useStatusHint, holdHints, releaseHints } from './composables/useStatusHint';
+	import { isMac } from './utils/platform';
 	import { STATUS_HINTS } from './constants/statusHints';
 
 	import { SLOT_LABELS, SLOT_OPTIONS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
@@ -739,14 +740,30 @@
 		}
 	}
 
+	// macOS: ⌘-click (morph assign) and ⌘⌃-click (Ctrl-click = OS right-click) must not pop a context menu.
+	function suppressCmdClickMenu(e: MouseEvent) {
+		if (isMac && e.metaKey) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+	}
+
 	onMounted(() => {
 		window.addEventListener('keydown', onGlobalKeydown);
 		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mousedown', holdHints, true);
+		window.addEventListener('mouseup', releaseHints, true);
+		window.addEventListener('dragend', releaseHints, true); // native drags fire dragend, not mouseup
+		window.addEventListener('contextmenu', suppressCmdClickMenu, true);
 	});
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onGlobalKeydown);
 		window.removeEventListener('keydown', blockKeysWhileResyncing, true);
 		window.removeEventListener('mousemove', onMouseMove);
+		window.removeEventListener('mousedown', holdHints, true);
+		window.removeEventListener('mouseup', releaseHints, true);
+		window.removeEventListener('dragend', releaseHints, true);
+		window.removeEventListener('contextmenu', suppressCmdClickMenu, true);
 		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
 	});
 
