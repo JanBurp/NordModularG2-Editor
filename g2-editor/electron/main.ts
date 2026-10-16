@@ -63,6 +63,7 @@ let startupSplashClaimed = false;
 const isMac = process.platform === 'darwin';
 const platformNames: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
 const platformLabel = `${platformNames[process.platform] ?? process.platform} ${process.getSystemVersion()}`;
+const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6";
 
 const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
 const cliPath = app.isPackaged
@@ -1140,6 +1141,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
 				{ label: "ShowSVG", click: () => sendToFocused("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
+				{ label: "Donate...", click: () => { void shell.openExternal(DONATE_URL); } },
 				{ label: "About G2 Editor...", click: () => sendToFocused("menu:action", "show-about") },
 			],
 		},

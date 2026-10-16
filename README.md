@@ -2,6 +2,10 @@
 
 For user documentation see: https://janburp.github.io/NordModularG2-Editor/
 
+## Support
+
+This editor is free and built in spare time. If it's useful to you, please consider a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6).
+
 What follows is a brief technical overview and how to set up a local development environment.
 
 ## Tech Stack

@@ -11,5 +11,7 @@ heading_anchors: true
 nav_external_links:
   - title: GitHub Repository
     url: https://github.com/JanBurp/NordModularG2-Editor
+  - title: "♥ Donate"
+    url: https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6
 
 footer_content: "Nord Modular G2 Editor — open source, cross-platform."

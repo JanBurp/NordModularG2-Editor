@@ -2,6 +2,7 @@ import type { SlotLabel } from '@/types';
 import type { StatusHintKey } from './statusHints';
 
 export const APP_NAME = 'G2 Editor';
+export const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6';
 
 /** SVG pixel width of one module column. */
 export const MODULE_WIDTH = 256;
