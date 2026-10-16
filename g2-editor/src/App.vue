@@ -736,8 +736,8 @@
 		}
 	}
 
-	// macOS: Ctrl-click is the OS right-click, so a ⌘⌃ gesture would also pop a context menu.
-	function suppressCmdCtrlMenu(e: MouseEvent) {
+	// macOS: ⌘-click (morph assign) and ⌘⌃-click (Ctrl-click = OS right-click) must not pop a context menu.
+	function suppressCmdClickMenu(e: MouseEvent) {
 		if (isMac && e.metaKey) {
 			e.preventDefault();
 			e.stopPropagation();
@@ -749,7 +749,8 @@
 		window.addEventListener('mousemove', onMouseMove);
 		window.addEventListener('mousedown', holdHints, true);
 		window.addEventListener('mouseup', releaseHints, true);
-		window.addEventListener('contextmenu', suppressCmdCtrlMenu, true);
+		window.addEventListener('dragend', releaseHints, true); // native drags fire dragend, not mouseup
+		window.addEventListener('contextmenu', suppressCmdClickMenu, true);
 	});
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onGlobalKeydown);
@@ -757,7 +758,8 @@
 		window.removeEventListener('mousemove', onMouseMove);
 		window.removeEventListener('mousedown', holdHints, true);
 		window.removeEventListener('mouseup', releaseHints, true);
-		window.removeEventListener('contextmenu', suppressCmdCtrlMenu, true);
+		window.removeEventListener('dragend', releaseHints, true);
+		window.removeEventListener('contextmenu', suppressCmdClickMenu, true);
 		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
 	});
 
