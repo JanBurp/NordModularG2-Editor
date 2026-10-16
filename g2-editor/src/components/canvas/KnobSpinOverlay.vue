@@ -15,7 +15,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { ModuleInstance } from '@/types';
-	import { getModule, getParamDefault } from '@/renderer/nmg2mods';
+	import { getModule } from '@/renderer/nmg2mods';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { RADII } from '@/composables/useKnob';
@@ -48,7 +48,6 @@
 		return {
 			moduleIndex: mod.index,
 			paramIndex: sel.paramIndex,
-			param,
 			x: (mod.horiz ?? 0) * 256 + param.x + radius - 8,
 			y: (mod.vert ?? 0) * 16 + param.y + radius * 2 + SPIN_OFFSET_Y,
 		};
@@ -62,15 +61,9 @@
 		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
 		return slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[pinned.moduleIndex]?.[pinned.paramIndex] ?? 0;
 	}
-	const { onMouseDown } = useSpinnerHoldInteraction(
-		'KnobSpinV',
-		0,
-		pinnedValue,
-		(_index, value) => {
-			if (pinned) emit('change', pinned.moduleIndex, pinned.paramIndex, value);
-		},
-		() => (pinned ? getParamDefault(pinned.param) : 0),
-	);
+	const { onMouseDown } = useSpinnerHoldInteraction('KnobSpinV', 0, pinnedValue, (_index, value) => {
+		if (pinned) emit('change', pinned.moduleIndex, pinned.paramIndex, value);
+	});
 	function onSpinMouseDown(e: MouseEvent) {
 		pinned = target.value;
 		onMouseDown(e);

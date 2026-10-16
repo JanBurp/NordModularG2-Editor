@@ -1,15 +1,8 @@
 import { onUnmounted } from 'vue';
-import { createDoubleClickDetector } from '@/utils/doubleClick';
 
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSpinV' | 'KnobSlider';
 
-export function useSpinnerHoldInteraction(
-	type: SpinnerType,
-	paramIndex: number,
-	getValue: () => number,
-	onChange: (index: number, value: number) => void,
-	getDefault: () => number,
-) {
+export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
 	const STEP = 1;
 	const INITIAL_DELAY = 300;
 	const REPEAT_INTERVAL = 50;
@@ -36,14 +29,8 @@ export function useSpinnerHoldInteraction(
 		}, REPEAT_INTERVAL);
 	}
 
-	const isDoubleClick = createDoubleClickDetector();
-
 	function onMouseDown(event: MouseEvent | TouchEvent) {
 		stopRepeat();
-		if (isDoubleClick()) {
-			onChange(paramIndex, getDefault());
-			return;
-		}
 
 		const e = event as MouseEvent;
 		const rect = (e.currentTarget as SVGElement).getBoundingClientRect();

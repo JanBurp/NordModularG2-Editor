@@ -135,14 +135,13 @@
 		if (uiStore.hoveredKnob === knobId && isPointerInside(e)) window.addEventListener('mousemove', onMaskedMouseMove);
 		else releaseHover();
 	}
-	const getDefault = () => props.defaultValue ?? 64;
 	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToCenter } = useKnob(
 		computed(() => props.value),
 		computed(() => props.type ?? 'KnobMedium'),
 		(value) => emit('change', value),
 		knobCircle,
 		computed(() => props.max ?? 127),
-		getDefault,
+		() => props.defaultValue ?? 64,
 	);
 
 	const { onMouseDown: onSpinMouseDown } = useSpinnerHoldInteraction(
@@ -150,7 +149,6 @@
 		0,
 		() => props.value,
 		(_index, value) => emit('change', value),
-		getDefault,
 	);
 
 	function onKnobMouseDown(event: MouseEvent) {

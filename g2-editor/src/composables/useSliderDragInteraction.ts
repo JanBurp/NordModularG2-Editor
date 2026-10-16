@@ -1,6 +1,6 @@
 import { clamp } from '@/utils/math';
 import { useDragInteraction } from './useDragInteraction';
-import { createDoubleClickDetector } from '@/utils/doubleClick';
+import { createDoubleClickDetector, isPrimaryMouseDown } from '@/utils/doubleClick';
 
 const SENSITIVITY = 0.3;
 
@@ -19,7 +19,7 @@ export function useSliderDragInteraction(
 	const isDoubleClick = createDoubleClickDetector();
 
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
-		if (isDoubleClick()) {
+		if (isPrimaryMouseDown(event) && isDoubleClick()) {
 			onChange(paramIndex, getDefault());
 			return;
 		}

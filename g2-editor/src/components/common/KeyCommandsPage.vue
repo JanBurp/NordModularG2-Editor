@@ -172,7 +172,7 @@
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
 				{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1' },
 				{ keys: ['⇧ Drag knob'], action: 'Fine adjust' },
-				{ keys: ['Double-click'], action: 'Set knob / slider / spinner to its default value' },
+				{ keys: ['Double-click'], action: 'Set knob / slider to its default value' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
 				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },

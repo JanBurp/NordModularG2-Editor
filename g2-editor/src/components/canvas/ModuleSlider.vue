@@ -62,7 +62,6 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
-		() => getParamDefault(props.param),
 	);
 
 	const { onMouseDown: onDragMouseDown } = useSliderDragInteraction(

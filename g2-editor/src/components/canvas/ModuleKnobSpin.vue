@@ -15,7 +15,6 @@
 <script setup lang="ts">
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
-	import { getParamDefault } from '../../renderer/nmg2mods';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
 	import { morphColorHex } from '../../utils/morphColors';
 
@@ -37,7 +36,6 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
-		() => getParamDefault(props.param),
 	);
 
 	const { onWheel } = useWheelInteraction(

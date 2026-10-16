@@ -7,7 +7,7 @@ import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 import { knobAngle } from '@/utils/knobArc';
 import knobRotateCursor from '@/assets/cursors/knob-rotate.svg';
-import { createDoubleClickDetector } from '@/utils/doubleClick';
+import { createDoubleClickDetector, isPrimaryMouseDown } from '@/utils/doubleClick';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 const CURSORS: Record<string, string> = {
@@ -68,7 +68,7 @@ export function useKnob(
 	const isDoubleClick = createDoubleClickDetector();
 
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
-		if (isDoubleClick()) {
+		if (isPrimaryMouseDown(event) && isDoubleClick()) {
 			emitChange(getDefault());
 			return;
 		}

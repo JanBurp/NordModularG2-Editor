@@ -112,7 +112,7 @@ Active after clicking in the browser.
 | `↑` / `↓` | Adjust parameter ±1 (the hovered one with **Focus on hover**) |
 | `⌥ ↑` / `⌥ ↓` | Adjust parameter ±16 |
 | `⇧`+drag knob | Fine adjust |
-| Double-click knob / slider / spinner | Set to its default value |
+| Double-click knob / slider | Set to its default value |
 | `L` | Assign last received MIDI CC to selected parameter |
 | `Tab` / `⇧ Tab` | Cycle module category (Module Picker toolbar) |
 | `,` / `.` | Select module (Module Picker toolbar) |
