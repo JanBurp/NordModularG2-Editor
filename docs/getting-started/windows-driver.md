@@ -26,6 +26,19 @@ Windows 11 may block the unsigned WinUSB driver. If Zadig fails to install it, b
 4. Once Windows has booted, run Zadig as Administrator and install the driver as described above.
 5. Reboot normally — the driver persists across reboots.
 
+## Windows Keeps Restoring the Clavia Driver
+
+Windows prefers Clavia's signed driver over Zadig's self-signed WinUSB driver. Whenever it sees a G2 as a "new" device — another G2, the same G2 on a different USB port, or a Windows Update driver pass — it may install the Clavia driver again.
+
+- **Turn off automatic driver installs:** *Settings → System → About → Advanced system settings → Hardware → Device Installation Settings → No*.
+- **Keep each G2 on the same USB port**, so Windows keeps recognising it as the same device.
+- **Permanent fix — remove the Clavia driver from Windows' driver store.** In a Command Prompt opened as Administrator:
+  1. `pnputil /enum-drivers` — find the entry whose provider is Clavia/Nord and note its *Published Name* (e.g. `oem12.inf`).
+  2. `pnputil /delete-driver oem12.inf /uninstall` (use your own number).
+  3. Run Zadig again for each G2 as described above.
+
+  The original Clavia editor won't work until you reinstall the Clavia driver.
+
 
 ## Removing the Zadig/WinUSB Driver on Windows 11
 

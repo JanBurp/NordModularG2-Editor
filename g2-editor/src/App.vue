@@ -697,6 +697,14 @@
 			return;
 		}
 
+		// The menu's Zoom accelerators (CommandOrControl+= / -) don't match the numpad keys
+		if ((e.ctrlKey || e.metaKey) && (e.code === 'NumpadAdd' || e.code === 'NumpadSubtract')) {
+			e.preventDefault();
+			if (e.code === 'NumpadAdd') settingsStore.zoomIn();
+			else settingsStore.zoomOut();
+			return;
+		}
+
 		if (e.key === 'Escape') {
 			jackPatching.clearArmed();
 			clearGhostCable();

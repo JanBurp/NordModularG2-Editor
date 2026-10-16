@@ -183,6 +183,7 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	}
 
 	trackWindowState(window, cascade);
+	if (!isMac) applyWindowMenu(window);
 
 	if (VITE_DEV_SERVER_URL) {
 		window.loadURL(VITE_DEV_SERVER_URL);
@@ -1162,8 +1163,17 @@ function currentMenuState(): MenuState {
 	return lastMenuState;
 }
 
+// Windows/Linux: each window has its own menu bar showing its own session's state. Swapping
+// every window's menu (via setApplicationMenu) on focus change broke all accelerators on Windows
+// after switching windows, while clicking the menu items still worked.
+function applyWindowMenu(window: BrowserWindow): void {
+	const menuState = sessionByWebContentsId.get(window.webContents.id)?.menuState ?? lastMenuState;
+	window.setMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, menuState)));
+}
+
 function refreshMenu(): void {
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
+	if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
+	else for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) applyWindowMenu(window);
 }
 
 ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
@@ -1173,19 +1183,18 @@ ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
 
 ipcMain.on("menu-state:update", (event, state: MenuState) => {
 	const session = resolveSession(event);
-	if (session) {
-		session.menuState = state;
-		if (session.id === activeSessionId) refreshMenu();
-	} else {
-		lastMenuState = state;
-		if (!activeSessionId) refreshMenu();
-	}
+	if (session) session.menuState = state;
+	else lastMenuState = state;
+	if (!isMac) {
+		const window = BrowserWindow.fromWebContents(event.sender);
+		if (window) applyWindowMenu(window);
+	} else if (session ? session.id === activeSessionId : !activeSessionId) refreshMenu();
 });
 
 app.on("browser-window-focus", (_event, window) => {
 	const session = sessionByWebContentsId.get(window.webContents.id);
 	activeSessionId = session ? session.id : null;
-	refreshMenu();
+	if (isMac) refreshMenu();
 });
 
 app.on("child-process-gone", (_e, details) => console.log(`[app] child process gone: ${details.type} ${details.reason} (exit ${details.exitCode})`));
