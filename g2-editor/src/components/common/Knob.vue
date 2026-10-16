@@ -46,15 +46,7 @@
 					stroke-width="2"
 					:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
 				/>
-				<path
-					v-if="isReset"
-					d="M-3,-3 L3,-3 L0,2 Z"
-					fill="green"
-					:transform="`translate(${radius + 2}, 0)`"
-					style="cursor: pointer"
-					@mousedown.stop
-					@click.stop="resetToCenter()"
-				/>
+				<KnobResetMarker v-if="isReset" :radius="radius" :value="value" @reset="resetToCenter()" />
 				<!-- Increment/decrement spinner, also the arrow-key target indicator (selected, or hovered with settings.hoverKeyTarget) -->
 				<!-- pointer-events="all" keeps it clickable when ParameterPagesGroup sets pointer-events-none on the Knob during
 				     Alt (Alt+drag assign); .prevent stops that draggable wrapper from starting a drag from the spinner. -->
@@ -78,6 +70,7 @@
 	import { useKnob } from '../../composables/useKnob';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import MorphKnobOverlay from './MorphKnobOverlay.vue';
+	import KnobResetMarker from './KnobResetMarker.vue';
 	import { useSettingsStore } from '../../store/settings';
 	import { useUiStore } from '../../store/ui';
 

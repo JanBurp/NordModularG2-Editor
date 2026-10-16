@@ -10,6 +10,7 @@ import knobRotateCursor from '@/assets/cursors/knob-rotate.svg';
 import { createDoubleClickDetector, isPrimaryMouseDown } from '@/utils/doubleClick';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
+export const KNOB_RESET_CENTRE = 64; // value KnobReset's centre marker resets to
 const CURSORS: Record<string, string> = {
 	vertical: 'ns-resize',
 	horizontal: 'ew-resize',
@@ -97,7 +98,7 @@ export function useKnob(
 
 	// KnobReset triangle (at 12 o'clock): back to the centre, not to the param's default.
 	function resetToCenter() {
-		emitChange(64);
+		emitChange(KNOB_RESET_CENTRE);
 	}
 
 	const { onWheel } = useWheelInteraction(() => value.value, emitChange, maxValue);

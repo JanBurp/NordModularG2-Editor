@@ -43,15 +43,7 @@
 		/>
 
 		<!-- Reset indicator triangle (only for KnobReset) -->
-		<path
-			v-if="isReset"
-			d="M-3,-3 L3,-3 L0,2 Z"
-			fill="green"
-			:transform="`translate(${radius + 2}, 0)`"
-			style="cursor: pointer"
-			@mousedown.stop
-			@click.stop="resetToCenter()"
-		/>
+		<KnobResetMarker v-if="isReset" :radius="radius" :value="value" @reset="resetToCenter()" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -61,6 +53,7 @@
 	import { getParam } from '../../renderer/parammap';
 	import { getParamDefault } from '../../renderer/nmg2mods';
 	import MorphKnobOverlay from '../common/MorphKnobOverlay.vue';
+	import KnobResetMarker from '../common/KnobResetMarker.vue';
 
 	const props = defineProps<{
 		param: ModuleParam;
