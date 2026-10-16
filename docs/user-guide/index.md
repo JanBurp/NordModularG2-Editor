@@ -95,6 +95,13 @@ Active after clicking in the browser.
 | `→` / `↵` / `Space` | Expand bank / open folder / load item under cursor |
 | `Esc` | Reset cursor |
 
+## Keyboard Pane
+
+| Key | Action |
+|---|---|
+| Hold + glide over keys | Play notes in succession |
+| Click sounding key | Turn off a Drone / Repeat note |
+
 ## Modules & Parameters
 
 | Key | Action |
@@ -102,9 +109,10 @@ Active after clicking in the browser.
 | `M` | Quick add module |
 | `⇧ ←→↑↓` | Navigate between modules |
 | `←` / `→` | Navigate parameters (original editor's order) |
-| `↑` / `↓` | Adjust parameter ±1 |
+| `↑` / `↓` | Adjust parameter ±1 (the hovered one with **Focus on hover**) |
 | `⌥ ↑` / `⌥ ↓` | Adjust parameter ±16 |
 | `⇧`+drag knob | Fine adjust |
+| Double-click knob / slider / spinner | Set to its default value |
 | `L` | Assign last received MIDI CC to selected parameter |
 | `Tab` / `⇧ Tab` | Cycle module category (Module Picker toolbar) |
 | `,` / `.` | Select module (Module Picker toolbar) |

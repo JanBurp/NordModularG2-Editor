@@ -137,6 +137,13 @@
 			],
 		},
 		{
+			title: 'Keyboard Pane',
+			rows: [
+				{ keys: ['Hold + glide'], action: 'Play notes in succession' },
+				{ keys: ['Click sounding key'], action: 'Turn off a Drone / Repeat note' },
+			],
+		},
+		{
 			title: 'Morph Groups',
 			rows: [
 				{ keys: ['⌘/⌃ Click'], action: 'Assign / deassign parameter to selected Morph Group' },
@@ -161,10 +168,11 @@
 				{ keys: ['M'], action: 'Quick add module' },
 				{ keys: ['Shift + ← → ↑ ↓'], action: 'Navigate between modules' },
 				{ keys: ['←', '→'], action: 'Navigate parameters (original editor’s order)' },
-				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1' },
+				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1 (hovered one with Focus on hover)' },
 				{ keys: ['Alt + ↑ / ↓'], action: 'Adjust parameter ±16' },
 				{ keys: ['Click / hold ▲▼'], action: 'Spinner under a selected knob: ±1' },
 				{ keys: ['⇧ Drag knob'], action: 'Fine adjust' },
+				{ keys: ['Double-click'], action: 'Set knob / slider / spinner to its default value' },
 				{ keys: ['L'], action: 'Assign last received MIDI CC to selected parameter' },
 				{ keys: ['Tab', '⇧ Tab'], action: 'Cycle module category (Module Picker toolbar)' },
 				{ keys: [',', '.'], action: 'Select module (Module Picker toolbar)' },

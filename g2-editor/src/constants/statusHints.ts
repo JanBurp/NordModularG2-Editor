@@ -15,13 +15,13 @@ export const STATUS_HINTS = {
 	ghostCable: 'Enter: confirm suggested cable · Space: next suggestion · Escape: dismiss',
 	moduleTitle: 'Drag: move · Shift-click: add to selection · Double-click: rename · Right-click: more options',
 	moduleReplace: 'Click: replace module',
-	paramKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
-	paramSlider: `Drag/Wheel: adjust · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
-	paramSpinner: `Click/Hold/Wheel: step · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
+	paramKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Double-click: default · Right-click: more options`,
+	paramSlider: `Drag/Wheel: adjust · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Double-click: default · Right-click: more options`,
+	paramSpinner: `Click/Hold/Wheel: step · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Double-click: default · Right-click: more options`,
 	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
 	ccRow: 'Click: select · Drag: reassign CC',
-	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Right-click: more options`,
-	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Drop CC here: assign · Right-click: rename, clear, copy',
+	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
+	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · Drop CC here: assign · Right-click: rename, clear, copy',
 
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
