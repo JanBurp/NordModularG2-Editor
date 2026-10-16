@@ -39,6 +39,7 @@ export const useSettingsStore = defineStore('settings', {
 		wheelReverse: false as boolean,
 		wheelSensitivity: 1 as number,
 		wheelPreventScroll: false as boolean,
+		hoverKeyTarget: false as boolean, // arrow keys change the hovered param instead of the selected one
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
@@ -133,6 +134,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setWheelPreventScroll(value: boolean) {
 			this.wheelPreventScroll = value;
+		},
+		setHoverKeyTarget(value: boolean) {
+			this.hoverKeyTarget = value;
 		},
 		setCanvasZoom(value: number) {
 			this.canvasZoom = clamp(value, 0.25, 3);

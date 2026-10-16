@@ -10,6 +10,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### New
 - Added option for cable style
+- Added option for module params to have focus on hover, so arrow keys can adjust value.
 
 ### Changed
 - Splash screen stays when update available

@@ -13,16 +13,17 @@ vi.hoisted(() => {
 	(globalThis as any).window = { electronAPI: { isMac: false }, cli: { run: () => Promise.resolve(undefined) } };
 });
 
-// Real module type 5 (used by moduleStub) has no params — stub a 2-param module def so
+// Real module type 5 (used by moduleStub) has no params — stub a 2-param module def (real param type, so changeParamValue resolves it) so
 // navigateParam's Left/Right cycling has something to cycle through.
 vi.mock('@/renderer/nmg2mods', () => ({
-	getModule: () => ({ params: [{ type: 0 }, { type: 0 }] }),
+	getModule: () => ({ params: [{ type: 'Bipolar_127' }, { type: 'Bipolar_127' }] }),
 	getParamNavOrder: () => [0, 1],
 }));
 
 import { createPinia, setActivePinia } from 'pinia';
 import { useUiStore } from '@/store/ui';
 import { useSlotsStore } from '@/store/slots';
+import { useSettingsStore } from '@/store/settings';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 import { useParamEditDialog } from '../useParamEditDialog';
 import { useModuleKeyboard } from '../useModuleKeyboard';
@@ -311,5 +312,44 @@ describe('useModuleKeyboard — hardware cursor sync (select-param)', () => {
 		handleKeydown(arrowKey('ArrowDown', true));
 
 		expect(run).not.toHaveBeenCalled();
+	});
+});
+
+describe('useModuleKeyboard — arrow keys follow hover (settings.hoverKeyTarget)', () => {
+	// Same module index 1 in both areas: the hovered FX param must not resolve to the VA module.
+	function seedHover(hoverKeyTarget: boolean) {
+		const { uiStore, slotsStore } = seedSelectedParam();
+		slotsStore.slots['A'].patch!.areas[0].modules = [moduleStub(1)];
+		useSettingsStore().setHoverKeyTarget(hoverKeyTarget);
+		uiStore.setHoveredParam(1, 1, 'fx');
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		return { uiStore, setParam };
+	}
+
+	it('ArrowUp changes the hovered param, not the selected one', () => {
+		const { uiStore, setParam } = seedHover(true);
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(setParam).toHaveBeenCalledWith(1, 1, expect.any(Number), 0, 'fx');
+		expect(uiStore.selectedParam).toEqual({ moduleId: 1, paramIndex: 0 });
+	});
+
+	it('works without any selected module', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.clearSelection();
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowDown'));
+		expect(setParam).toHaveBeenCalledWith(1, 1, expect.any(Number), 0, 'fx');
+	});
+
+	it('ignores the hover when the setting is off', () => {
+		const { setParam } = seedHover(false);
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(setParam).toHaveBeenCalledWith(1, 0, expect.any(Number), 0, 'voice');
+	});
+
+	it('Left/Right still navigates the selection', () => {
+		const { uiStore } = seedHover(true);
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowRight'));
+		expect(uiStore.selectedParam).toEqual({ moduleId: 1, paramIndex: 1 });
+		expect(uiStore.hoveredParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'fx' });
 	});
 });

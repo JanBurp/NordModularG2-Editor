@@ -1,6 +1,7 @@
 <template>
-	<div ref="wrapperEl" class="knob-wrapper" :style="{ cursor, position: 'relative', zIndex: selected ? 10 : undefined }">
+	<div ref="wrapperEl" class="knob-wrapper" :style="{ cursor, position: 'relative', zIndex: isKeyTarget ? 10 : undefined }">
 		<svg
+			ref="svgEl"
 			:width="radius + 16"
 			:height="radius + 16"
 			class="knob-svg"
@@ -8,6 +9,8 @@
 			@mousedown="onKnobMouseDown"
 			@touchstart.passive="onMouseDown"
 			@wheel="onWheel"
+			@mouseenter="onMouseEnter"
+			@mouseleave="onMouseLeave"
 		>
 			<defs>
 				<!-- Local copy of the g120 radial gradient (avoids dependency on canvas SVG defs) -->
@@ -52,11 +55,11 @@
 					@mousedown.stop
 					@click.stop="resetToCenter()"
 				/>
-				<!-- Increment/decrement spinner (only while the knob is selected) -->
+				<!-- Increment/decrement spinner, also the arrow-key target indicator (selected, or hovered with settings.hoverKeyTarget) -->
 				<!-- pointer-events="all" keeps it clickable when ParameterPagesGroup sets pointer-events-none on the Knob during
 				     Alt (Alt+drag assign); .prevent stops that draggable wrapper from starting a drag from the spinner. -->
 				<g
-					v-if="selected"
+					v-if="isKeyTarget"
 					class="knob-spin-v"
 					pointer-events="all"
 					:transform="`translate(${radius - 8}, ${radius * 2 + SPIN_OFFSET_Y})`"
@@ -71,9 +74,12 @@
 <script setup lang="ts">
 	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import { clamp } from '@/utils/math';
+	import { blurFocusedControl } from '@/utils/focus';
 	import { useKnob } from '../../composables/useKnob';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import MorphKnobOverlay from './MorphKnobOverlay.vue';
+	import { useSettingsStore } from '../../store/settings';
+	import { useUiStore } from '../../store/ui';
 
 	const props = defineProps<{
 		value: number;
@@ -94,7 +100,41 @@
 
 	const knobCircle = ref<Element | null>(null);
 	const wrapperEl = ref<HTMLElement | null>(null);
+	const svgEl = ref<SVGSVGElement | null>(null);
 	const selected = ref(false);
+	const settings = useSettingsStore();
+	const uiStore = useUiStore();
+	const knobId = nextKnobId++;
+
+	// Arrow keys change this knob when it's hovered (settings.hoverKeyTarget), or when it's
+	// selected and nothing else (toolbar knob or canvas param) is hovered.
+	const isKeyTarget = computed(() => {
+		const hoverMode = settings.hoverKeyTarget && (uiStore.hoveredKnob !== null || uiStore.hoveredParam !== null);
+		return hoverMode ? uiStore.hoveredKnob === knobId : selected.value;
+	});
+
+	function onMouseEnter(e: MouseEvent) {
+		if (!settings.hoverKeyTarget || e.buttons !== 0) return;
+		uiStore.hoveredKnob = knobId;
+		blurFocusedControl();
+	}
+	// ParameterPagesGroup makes the Knob pointer-events-none while Alt is held, which fires a mouseleave
+	// with the pointer still on the knob; keep the hover then and release it once the pointer really leaves.
+	function isPointerInside(e: MouseEvent) {
+		const r = svgEl.value?.getBoundingClientRect();
+		return !!r && e.clientX >= r.left && e.clientX < r.right && e.clientY >= r.top && e.clientY < r.bottom;
+	}
+	function releaseHover() {
+		window.removeEventListener('mousemove', onMaskedMouseMove);
+		if (uiStore.hoveredKnob === knobId) uiStore.hoveredKnob = null;
+	}
+	function onMaskedMouseMove(e: MouseEvent) {
+		if (!isPointerInside(e)) releaseHover();
+	}
+	function onMouseLeave(e: MouseEvent) {
+		if (uiStore.hoveredKnob === knobId && isPointerInside(e)) window.addEventListener('mousemove', onMaskedMouseMove);
+		else releaseHover();
+	}
 	const getDefault = () => props.defaultValue ?? 64;
 	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToCenter } = useKnob(
 		computed(() => props.value),
@@ -125,7 +165,7 @@
 
 	// Capture phase + stopImmediatePropagation so the canvas handler (useModuleKeyboard) doesn't also act on the arrow key.
 	function onWindowKeydown(e: KeyboardEvent) {
-		if (!selected.value || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
+		if (!isKeyTarget.value || (e.key !== 'ArrowUp' && e.key !== 'ArrowDown')) return;
 		const el = document.activeElement;
 		if (el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement) return;
 		const delta = (e.key === 'ArrowUp' ? 1 : -1) * (e.altKey ? ALT_STEP : 1);
@@ -142,7 +182,11 @@
 	onUnmounted(() => {
 		window.removeEventListener('mousedown', onWindowMouseDown);
 		window.removeEventListener('keydown', onWindowKeydown, true);
+		releaseHover();
 	});
+</script>
+<script lang="ts">
+	let nextKnobId = 0;
 </script>
 <style scoped>
 	.knob-wrapper {

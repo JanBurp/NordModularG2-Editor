@@ -1,6 +1,7 @@
 import { onMounted, onUnmounted } from 'vue';
 import { useUiStore } from '../store/ui';
 import { useSlotsStore } from '../store/slots';
+import { useSettingsStore } from '../store/settings';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { getModule, getParamNavOrder } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
@@ -18,6 +19,7 @@ export function useModuleKeyboard() {
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
+	const settingsStore = useSettingsStore();
 	const { showDialog } = useParamEditDialog();
 
 	// Mirrors the cursor move to the hardware panel (SUB_COMMAND_SEL_PARAM, 0x2F) so the
@@ -195,11 +197,24 @@ export function useModuleKeyboard() {
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 
-	async function changeParamValue(delta: number) {
+	// Arrow Up/Down target: the hovered param (settings.hoverKeyTarget; carries its own area,
+	// module ids aren't unique across VA/FX) if any, else the selected param.
+	function findKeyTarget(): { sel: { moduleId: number; paramIndex: number }; found: { module: ModuleInstance; area: 0 | 1 } } | undefined {
+		const hov = settingsStore.hoverKeyTarget ? uiStore.hoveredParam : null;
+		if (hov) {
+			const area: 0 | 1 = hov.area === 'va' ? 1 : 0;
+			const module = getModulesInArea(area).find((m) => m.index === hov.moduleId);
+			return module ? { sel: hov, found: { module, area } } : undefined;
+		}
 		const sel = uiStore.selectedParam;
-		if (!sel) return;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
+		const found = sel && findModuleAnywhere(sel.moduleId);
+		return found ? { sel, found } : undefined;
+	}
+
+	async function changeParamValue(delta: number) {
+		const target = findKeyTarget();
+		if (!target) return;
+		const { sel, found } = target;
 		const moduleDef = getModule(found.module.type);
 		const param = moduleDef?.params?.[sel.paramIndex];
 		if (!param) return;
@@ -303,10 +318,12 @@ export function useModuleKeyboard() {
 			return;
 		}
 
+		// Up/Down on a hovered param works without a selected module
+		const hoverValueKey = settingsStore.hoverKeyTarget && uiStore.hoveredParam !== null && (key === 'ArrowUp' || key === 'ArrowDown');
 		if (shiftKey && !altKey) {
 			navigateModule(key);
 			e.preventDefault();
-		} else if (!shiftKey && uiStore.selectedModules.length > 0) {
+		} else if (!shiftKey && (uiStore.selectedModules.length > 0 || hoverValueKey)) {
 			if (key === 'ArrowLeft' || key === 'ArrowRight') {
 				navigateParam(key === 'ArrowRight' ? 1 : -1);
 				e.preventDefault();
