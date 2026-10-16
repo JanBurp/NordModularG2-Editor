@@ -102,8 +102,11 @@ test.describe('DrumSynth preset selector', () => {
 		// turning that knob — the preset should drift to "none".
 		await openContextMenu(page, kick1.locator('[data-param-index="4"]'));
 		await clickContextMenuItem(page, 'Set Value');
-		const input = page.locator('input[type="number"]');
-		await input.fill('1');
+		const dialog = page.locator('[data-testid="param-edit-dialog"]');
+		const input = dialog.locator('input');
+		await expect(dialog.getByRole('button', { name: 'Set' })).toBeDisabled(); // nothing typed yet
+		await input.fill('#1');
+		await expect(dialog.getByRole('button', { name: 'Set' })).toBeEnabled();
 		await input.press('Enter');
 		await expect(kick1.locator('[data-testid="drumsynth-preset-name"]')).toHaveText('none');
 

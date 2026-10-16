@@ -118,6 +118,7 @@
 				:data-module-index="moduleIdx"
 				class="cursor-pointer"
 				@mousedown.capture="onParamMorphMouseDown(index, $event)"
+				@click="onParamShiftClick(param.n, index, $event)"
 				@mouseenter="onParamHoverEnter(param.n, index, $event)"
 				@mouseleave="onParamHoverLeave($event)"
 			>
@@ -330,7 +331,7 @@
 	}>();
 
 	const { open: openContextMenu } = useContextMenu();
-	const { handleParamDblClick } = useParamEditDialog();
+	const { openParamEdit } = useParamEditDialog();
 	const { graphics } = useModuleGraphics();
 
 	function onModuleClick(e: MouseEvent) {
@@ -558,6 +559,7 @@
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
 	// active one for keyboard shortcuts (arrow-key nav, L) right away.
 	function onParamMorphMouseDown(paramIndex: number, e: MouseEvent) {
+		shiftDownPos = e.shiftKey ? { x: e.clientX, y: e.clientY } : null;
 		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
 		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		uiStore.selectedCables = [];
@@ -591,6 +593,17 @@
 				? undefined
 				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, range),
 		});
+	}
+
+	// Shift+click (without dragging — Shift+drag is fine adjust) on a knob/slider opens the Set Value
+	// popup. Spinners are left out: their click already steps the value.
+	let shiftDownPos: { x: number; y: number } | null = null;
+	function onParamShiftClick(n: string, paramIndex: number, e: MouseEvent) {
+		const down = shiftDownPos;
+		shiftDownPos = null;
+		if (!e.shiftKey || !down || !(isKnob(n) || isSlider(n))) return;
+		if (Math.hypot(e.clientX - down.x, e.clientY - down.y) > 3) return;
+		openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: e.clientX, y: e.clientY });
 	}
 
 	// DrumSynth preset selector emits target values for its 15 params directly (it owns the preset
@@ -689,11 +702,7 @@
 		} else {
 			items.push({
 				label: 'Set Value',
-				action: () => {
-					const paramType = param?.type ?? '';
-					const currentValue = getParamValue(paramIndex);
-					handleParamDblClick({ moduleIndex: moduleIdx.value, paramIndex, paramType, currentValue, area: props.areaLabel ?? 'fx' });
-				},
+				action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
 			});
 		}
 

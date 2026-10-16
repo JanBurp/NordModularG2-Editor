@@ -16,8 +16,9 @@ vi.hoisted(() => {
 // Real module type 5 (used by moduleStub) has no params — stub a 2-param module def (real param type, so changeParamValue resolves it) so
 // navigateParam's Left/Right cycling has something to cycle through.
 vi.mock('@/renderer/nmg2mods', () => ({
-	getModule: () => ({ params: [{ type: 'Bipolar_127' }, { type: 'Bipolar_127' }] }),
+	getModule: () => ({ params: [{ type: 'Bipolar_127', def: 50 }, { type: 'Bipolar_127' }] }),
 	getParamNavOrder: () => [0, 1],
+	getParamDefault: (p: { def?: number }) => p.def ?? 0,
 }));
 
 import { createPinia, setActivePinia } from 'pinia';
@@ -351,5 +352,76 @@ describe('useModuleKeyboard — arrow keys follow hover (settings.hoverKeyTarget
 		useModuleKeyboard().handleKeydown(arrowKey('ArrowRight'));
 		expect(uiStore.selectedParam).toEqual({ moduleId: 1, paramIndex: 1 });
 		expect(uiStore.hoveredParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'fx' });
+	});
+});
+
+describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () => {
+	afterEach(() => {
+		useParamEditDialog().closeParamEdit(); // reset shared singleton state for other tests
+	});
+
+	it('= opens the Set Value popup for the selected param', () => {
+		seedSelectedParam();
+		const { handleKeydown } = useModuleKeyboard();
+		const e = arrowKey('=');
+
+		handleKeydown(e);
+
+		expect(useParamEditDialog().showDialog.value).toBe(true);
+		expect(e.preventDefault).toHaveBeenCalled();
+	});
+
+	it('Shift+= (e.g. Shift+0 on a Dutch/German layout) also opens it', () => {
+		seedSelectedParam();
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('=', true));
+
+		expect(useParamEditDialog().showDialog.value).toBe(true);
+	});
+
+	it('Enter sets the selected param to its default', () => {
+		const { slotsStore } = seedSelectedParam();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('Enter'));
+
+		expect(setParam).toHaveBeenCalledWith(1, 0, 50, 0, 'voice');
+	});
+
+	it('Enter leaves the param alone while a jack is armed (App.vue confirms the cable)', () => {
+		const { uiStore, slotsStore } = seedSelectedParam();
+		uiStore.armedJack = { moduleIndex: 2, connectorIndex: 0, type: 'output', colour: 'red' };
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown } = useModuleKeyboard();
+		const e = arrowKey('Enter');
+
+		handleKeydown(e);
+
+		expect(setParam).not.toHaveBeenCalled();
+		expect(e.preventDefault).not.toHaveBeenCalled();
+	});
+
+	it('Enter from a popup input that already unmounted (focus back on <body>) does not reset the param', () => {
+		const { slotsStore } = seedSelectedParam();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown({ ...arrowKey('Enter'), target: new (globalThis as any).HTMLInputElement() } as KeyboardEvent);
+
+		expect(setParam).not.toHaveBeenCalled();
+	});
+
+	it('= and Enter do nothing without a target param', () => {
+		const slotsStore = useSlotsStore();
+		const setParam = vi.spyOn(slotsStore, 'setParam').mockResolvedValue(undefined as any);
+		const { handleKeydown } = useModuleKeyboard();
+
+		handleKeydown(arrowKey('='));
+		handleKeydown(arrowKey('Enter'));
+
+		expect(useParamEditDialog().showDialog.value).toBe(false);
+		expect(setParam).not.toHaveBeenCalled();
 	});
 });
