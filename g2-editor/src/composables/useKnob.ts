@@ -6,9 +6,14 @@ import { useDragInteraction } from './useDragInteraction';
 import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 import { knobAngle } from '@/utils/knobArc';
+import knobRotateCursor from '@/assets/cursors/knob-rotate.svg';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
-const CURSORS: Record<string, string> = { vertical: 'ns-resize', horizontal: 'ew-resize', circular: 'crosshair' };
+const CURSORS: Record<string, string> = {
+	vertical: 'ns-resize',
+	horizontal: 'ew-resize',
+	circular: `url("${knobRotateCursor}") 12 12, crosshair`,
+};
 
 // Converts a mouse position relative to the knob center to a knob angle in degrees.
 // 0° = top (12 o'clock), positive = clockwise, range -180° to 180°.
@@ -59,6 +64,7 @@ export function useKnob(
 	});
 
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
+		startValue.current = value.value;
 		if (settings.knobMode === 'circular') {
 			const clickX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
 			const clickY = 'touches' in event ? event.touches[0].clientY : (event as MouseEvent).clientY;
@@ -74,16 +80,9 @@ export function useKnob(
 				circular.cy = clickY;
 			}
 
-			// Immediately set value based on click angle (absolute mode)
-			const clickAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
-			const clickValue = clamp(Math.round(((clickAngle + 135) / 270) * maxValue()), 0, maxValue());
-			startValue.current = clickValue;
-			emitChange(clickValue);
-
-			circular.prevAngle = clickAngle;
+			// Relative mode: the click itself doesn't change the value, only the rotation while dragging does
+			circular.prevAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
 			circular.accumulated = 0;
-		} else {
-			startValue.current = value.value;
 		}
 		onMouseDown(event);
 	}
