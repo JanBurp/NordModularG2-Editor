@@ -3,7 +3,7 @@
 		v-if="moduleDef"
 		:transform="`translate(${x}, ${y})`"
 		class="cursor-default"
-		:class="{ selected: isSelected }"
+		:class="{ selected: isSelected, unused: isUnused }"
 		:data-module-idx="moduleIdx"
 		:data-module-short="moduleDef.short"
 		@click.stop="onModuleClick"
@@ -306,6 +306,7 @@
 	const props = defineProps<{
 		instance?: ModuleInstance;
 		isSelected?: boolean;
+		isUnused?: boolean;
 		connectedInputs?: Set<number>;
 		connectedOutputs?: Set<number>;
 		areaLabel?: 'fx' | 'va';

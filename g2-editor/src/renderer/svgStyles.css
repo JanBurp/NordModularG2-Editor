@@ -82,6 +82,11 @@ g.module {
 	width: 256px;
 }
 
+/* No cable attached (what Patch → Delete Unused Modules would remove); full opacity while hovered/selected. */
+g.unused:not(.selected):not(:hover) {
+	opacity: 0.5;
+}
+
 /* Main cable with shadow */
 path[class^='svgcable'] {
 	stroke-width: 3;

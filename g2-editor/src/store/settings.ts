@@ -25,6 +25,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableMagneticRadius: 96 as number,
 		cableConnectMode: 'drag' as CableConnectMode,
 		autoSuggestCable: false as boolean,
+		dimUnusedModules: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		settingsSection: null as SettingsSection | null,
@@ -119,6 +120,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setAutoSuggestCable(value: boolean) {
 			this.autoSuggestCable = value;
+		},
+		setDimUnusedModules(value: boolean) {
+			this.dimUnusedModules = value;
 		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;

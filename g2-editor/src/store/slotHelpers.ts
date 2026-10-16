@@ -10,6 +10,7 @@ import type {
 	VariationState,
 } from '@/types';
 import { NUM_VARIATIONS } from '@/types';
+import { getModule } from '@/renderer/nmg2mods';
 
 export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'va' | 'fx' } {
 	return area === 'voice' ? { areaIdx: 1, location: 'va' } : { areaIdx: 0, location: 'fx' };
@@ -308,4 +309,21 @@ export async function runCliBatchSafe(cmds: string[][], label: string): Promise<
 		console.warn(`${label}: CLI failed (offline?):`, err);
 		if (cmds.length > 0) cliFailureHandler?.(cmds[0], err);
 	}
+}
+
+const NAME_MODULE_TYPE = 126;
+
+// A Name bar has no jacks (always "unused"); only count it as unused if the user never customized it.
+// Default names are "<short><digits>" (see addModule); the digits are no longer the module's
+// index, so match the shape rather than reconstructing the exact value.
+function isUntouchedNameModule(m: ModuleInstance): boolean {
+	if ((m.colour || 0) !== 0) return false;
+	const base = (getModule(m.type)?.short ?? 'Module').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+	return new RegExp(`^${base}\\d+$`).test(m.uname ?? '');
+}
+
+/** True when no cable touches the module — what Patch → Delete Unused Modules removes. */
+export function isUnusedModule(m: ModuleInstance, cables: Cable[]): boolean {
+	if (cables.some((c) => c.smod === m.index || c.dmod === m.index)) return false;
+	return m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m);
 }

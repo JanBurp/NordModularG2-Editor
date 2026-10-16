@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Added option for cable style
 - Added option for module params to have focus on hover, so arrow keys can adjust value
+- Added option for dimming unused modules
 - For selected param added '=' to open SetValue, and 'ENTER' to set to default value
 - Assigned MorphGroups Knobs are blue now
 

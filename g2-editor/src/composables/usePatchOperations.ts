@@ -3,7 +3,15 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useHistoryStore, type HistoryEntry } from '../store/history';
 import type { Cable } from '../renderer/cableRenderer';
-import { AREA_FULL_MESSAGE, areaConfig, buildCloneEntries, buildPasteParamsPairs, resolveSelectionArea, type JackEnd } from '../store/slotHelpers';
+import {
+	AREA_FULL_MESSAGE,
+	areaConfig,
+	buildCloneEntries,
+	buildPasteParamsPairs,
+	isUnusedModule,
+	resolveSelectionArea,
+	type JackEnd,
+} from '../store/slotHelpers';
 import { useSettingsStore } from '../store/settings';
 import { finalizeModuleAdd } from './useAddModule';
 import { useGhostCable } from './useGhostCable';
@@ -76,22 +84,8 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function deleteUnusedModules(): Promise<void> {
-		const { getModule } = await import('../renderer/nmg2mods');
-		const NAME_MODULE_TYPE = 126;
-		// A Name bar has no jacks (always "unused"); only sweep it away if the user never customized it.
-		// Default names are "<short><digits>" (see addModule); the digits are no longer the module's
-		// index, so match the shape rather than reconstructing the exact value.
-		const isUntouchedNameModule = (m: any) => {
-			if (m.type !== NAME_MODULE_TYPE || (m.colour || 0) !== 0) return false;
-			const base = (getModule(m.type)?.short ?? 'Module').replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-			return new RegExp(`^${base}\\d+$`).test(m.uname ?? '');
-		};
-
 		await deleteUnusedInAreas((modules, cables) => ({
-			moduleIds: modules
-				.filter((m: any) => !cables.some((c: any) => c.smod === m.index || c.dmod === m.index))
-				.filter((m: any) => m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m))
-				.map((m: any) => m.index as number),
+			moduleIds: modules.filter((m: any) => isUnusedModule(m, cables)).map((m: any) => m.index as number),
 		}));
 	}
 
