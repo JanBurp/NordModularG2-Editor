@@ -509,7 +509,8 @@
 	import { useConnectedDevicesStore } from './store/connectedDevices';
 	import DeviceSwitcher from './components/toolbar/DeviceSwitcher.vue';
 	import ConnectionDot from './components/common/ConnectionDot.vue';
-	import { useStatusHint } from './composables/useStatusHint';
+	import { useStatusHint, holdHints, releaseHints } from './composables/useStatusHint';
+	import { isMac } from './utils/platform';
 	import { STATUS_HINTS } from './constants/statusHints';
 
 	import { SLOT_LABELS, SLOT_OPTIONS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
@@ -735,14 +736,28 @@
 		}
 	}
 
+	// macOS: Ctrl-click is the OS right-click, so a ⌘⌃ gesture would also pop a context menu.
+	function suppressCmdCtrlMenu(e: MouseEvent) {
+		if (isMac && e.metaKey) {
+			e.preventDefault();
+			e.stopPropagation();
+		}
+	}
+
 	onMounted(() => {
 		window.addEventListener('keydown', onGlobalKeydown);
 		window.addEventListener('mousemove', onMouseMove);
+		window.addEventListener('mousedown', holdHints, true);
+		window.addEventListener('mouseup', releaseHints, true);
+		window.addEventListener('contextmenu', suppressCmdCtrlMenu, true);
 	});
 	onUnmounted(() => {
 		window.removeEventListener('keydown', onGlobalKeydown);
 		window.removeEventListener('keydown', blockKeysWhileResyncing, true);
 		window.removeEventListener('mousemove', onMouseMove);
+		window.removeEventListener('mousedown', holdHints, true);
+		window.removeEventListener('mouseup', releaseHints, true);
+		window.removeEventListener('contextmenu', suppressCmdCtrlMenu, true);
 		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
 	});
 
