@@ -106,8 +106,8 @@
 			rows: [
 				{ keys: ['V'], action: 'Show Voice area (Split if already Voice-only)' },
 				{ keys: ['F'], action: 'Show FX area (Split if already FX-only)' },
-				{ keys: ['Space'], action: 'Show / hide all cables' },
-				{ keys: ['Ctrl+Space'], action: 'Shake cables' },
+				{ keys: ['Space', 'H'], action: 'Show / hide all cables' },
+				{ keys: ['S', '⇧ Space'], action: 'Shake cables' },
 				{ keys: ['⌘ =', '⌘ -', '⌘ 0'], action: 'Zoom in / out / actual size' },
 			],
 		},

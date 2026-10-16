@@ -722,17 +722,21 @@
 					e.preventDefault();
 					device.setClockRunning(!device.clockRunning);
 					return;
+				case 's':
+					e.preventDefault();
+					uiStore.shakeCables();
+					return;
+				case 'h':
+					e.preventDefault();
+					toggleAllCables();
+					return;
 				case ' ':
 					e.preventDefault();
-					if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
+					if (e.shiftKey) uiStore.shakeCables();
+					else if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
 					else toggleAllCables();
 					return;
 			}
-		}
-
-		if (e.key === ' ' && e.ctrlKey && !e.metaKey && !e.altKey) {
-			e.preventDefault();
-			uiStore.shakeCables();
 		}
 	}
 
