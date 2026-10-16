@@ -35,6 +35,7 @@
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
 					:max="cell.high"
+					:default-value="cell.defaultValue"
 					@change="(v) => onKnobChange(cell.assignment!, v)"
 				/>
 			</div>
@@ -108,7 +109,7 @@
 	import { PAGE_LETTERS, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../../renderer/paramPages';
 	import { serializeDragPayload, parseDragPayload } from '../../utils/dragPayload';
 	import { setBadgeDragImage } from '../../utils/badgeLayout';
-	import { getModule } from '../../renderer/nmg2mods';
+	import { getModule, getParamDefault } from '../../renderer/nmg2mods';
 	import { getButtonParamIndex } from '../../renderer/buttonParams';
 	import { getParam } from '../../renderer/parammap';
 	import { formatValue, formatCombinedValue, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
@@ -134,6 +135,7 @@
 		paramLabel: string;
 		value: number;
 		high: number; // knob param's own range (parammap `high`)
+		defaultValue: number; // knob param's default, set by a double-click
 		valueLabel: string;
 		hasButton: boolean;
 		buttonParamIndex: number;
@@ -176,7 +178,7 @@
 		a: ParamPageAssignment | GlobalParamPageAssignment,
 		paramIndex: number,
 		moduleInfo: ReturnType<typeof resolveModule>,
-	): { label: string; userLabel?: string; value: number; valueLabel: string; low: number; high: number; isTrigger: boolean } {
+	): { label: string; userLabel?: string; value: number; valueLabel: string; low: number; high: number; defaultValue: number; isTrigger: boolean } {
 		const paramDef = moduleInfo?.moduleDef?.params?.[paramIndex];
 		const slot = assignmentSlot(a);
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
@@ -207,6 +209,7 @@
 			valueLabel,
 			low: paramMeta?.low ?? 0,
 			high: paramMeta?.high ?? 127,
+			defaultValue: paramDef ? getParamDefault(paramDef) : 64,
 			isTrigger: paramMeta?.trigger === true,
 		};
 	}
@@ -220,6 +223,7 @@
 		paramLabel: BLANK,
 		value: 0,
 		high: 127,
+		defaultValue: 64,
 		valueLabel: BLANK,
 		hasButton: false,
 		buttonParamIndex: 0,
@@ -300,6 +304,7 @@
 				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,
 				high: knobDisplay.high,
+				defaultValue: knobDisplay.defaultValue,
 				valueLabel: knobDisplay.valueLabel,
 				hasButton,
 				buttonParamIndex,

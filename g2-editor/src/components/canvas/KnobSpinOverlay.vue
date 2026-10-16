@@ -8,7 +8,7 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { ModuleInstance } from '@/types';
-	import { getModule } from '@/renderer/nmg2mods';
+	import { getModule, getParamDefault } from '@/renderer/nmg2mods';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { RADII } from '@/composables/useKnob';
@@ -43,6 +43,7 @@
 		return {
 			moduleIndex: mod.index,
 			paramIndex: sel.paramIndex,
+			param,
 			value,
 			x: (mod.horiz ?? 0) * 256 + param.x + radius - 8,
 			y: (mod.vert ?? 0) * 16 + param.y + radius * 2 + SPIN_OFFSET_Y,
@@ -57,6 +58,7 @@
 		(_index, value) => {
 			if (target.value) emit('change', target.value.moduleIndex, target.value.paramIndex, value);
 		},
+		() => (target.value ? getParamDefault(target.value.param) : 0),
 	);
 </script>
 

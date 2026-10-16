@@ -75,7 +75,7 @@ export function isCableSourceEnd(c: Cable, jack: JackEnd): boolean {
 	return (c.dir ?? 1) === 0 && c.smod === jack.moduleIndex && c.scon === jack.connectorIndex;
 }
 
-function defaultPatchParams(): PatchParamVariation {
+export function defaultPatchParams(): PatchParamVariation {
 	return {
 		patchVol: 100,
 		activeMuted: 1,

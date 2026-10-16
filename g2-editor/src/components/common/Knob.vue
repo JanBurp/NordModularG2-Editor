@@ -50,7 +50,7 @@
 					:transform="`translate(${radius + 2}, 0)`"
 					style="cursor: pointer"
 					@mousedown.stop
-					@click.stop="resetToDefault()"
+					@click.stop="resetToCenter()"
 				/>
 				<!-- Increment/decrement spinner (only while the knob is selected) -->
 				<!-- pointer-events="all" keeps it clickable when ParameterPagesGroup sets pointer-events-none on the Knob during
@@ -81,6 +81,7 @@
 		colorVariant?: 'red' | 'blue' | null; // Morph Groups: red = selected group, blue = a different group
 		morphRange?: number; // selected group's morph range, when colorVariant === 'red' (see ModuleKnob.vue)
 		max?: number; // assigned param's own range (parammap `high`), default 0..127
+		defaultValue?: number; // value set by a double-click, default 64
 	}>();
 
 	const emit = defineEmits<{
@@ -94,12 +95,14 @@
 	const knobCircle = ref<Element | null>(null);
 	const wrapperEl = ref<HTMLElement | null>(null);
 	const selected = ref(false);
-	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToDefault } = useKnob(
+	const getDefault = () => props.defaultValue ?? 64;
+	const { radius, angle, isReset, isDragging, cursor, onMouseDown, onWheel, resetToCenter } = useKnob(
 		computed(() => props.value),
 		computed(() => props.type ?? 'KnobMedium'),
 		(value) => emit('change', value),
 		knobCircle,
 		computed(() => props.max ?? 127),
+		getDefault,
 	);
 
 	const { onMouseDown: onSpinMouseDown } = useSpinnerHoldInteraction(
@@ -107,6 +110,7 @@
 		0,
 		() => props.value,
 		(_index, value) => emit('change', value),
+		getDefault,
 	);
 
 	function onKnobMouseDown(event: MouseEvent) {

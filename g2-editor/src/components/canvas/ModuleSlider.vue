@@ -39,6 +39,7 @@
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
+	import { getParamDefault } from '../../renderer/nmg2mods';
 	import { clamp } from '../../utils/math';
 	import { morphColorHex } from '../../utils/morphColors';
 
@@ -61,12 +62,14 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
+		() => getParamDefault(props.param),
 	);
 
 	const { onMouseDown: onDragMouseDown } = useSliderDragInteraction(
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
+		() => getParamDefault(props.param),
 	);
 
 	const { onWheel } = useWheelInteraction(

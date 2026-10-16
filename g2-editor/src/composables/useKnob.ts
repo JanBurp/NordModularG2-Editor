@@ -7,6 +7,7 @@ import { useWheelInteraction } from './useWheelInteraction';
 import { useSettingsStore } from '@/store/settings';
 import { knobAngle } from '@/utils/knobArc';
 import knobRotateCursor from '@/assets/cursors/knob-rotate.svg';
+import { createDoubleClickDetector } from '@/utils/doubleClick';
 
 export const RADII: Record<string, number> = { KnobBig: 11, KnobMedium: 10, KnobSmall: 9, KnobReset: 10 };
 const CURSORS: Record<string, string> = {
@@ -27,6 +28,7 @@ export function useKnob(
 	emitChange: (value: number) => void,
 	elementRef?: Ref<Element | null>,
 	max?: Ref<number> | ComputedRef<number>, // param's own range (parammap `high`), default 0..127
+	getDefault: () => number = () => 64,
 ) {
 	const settings = useSettingsStore();
 	const maxValue = () => max?.value ?? 127;
@@ -63,7 +65,13 @@ export function useKnob(
 		if (newValue !== value.value) emitChange(newValue);
 	});
 
+	const isDoubleClick = createDoubleClickDetector();
+
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
+		if (isDoubleClick()) {
+			emitChange(getDefault());
+			return;
+		}
 		startValue.current = value.value;
 		if (settings.knobMode === 'circular') {
 			const clickX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
@@ -87,11 +95,12 @@ export function useKnob(
 		onMouseDown(event);
 	}
 
-	function resetToDefault(defaultVal = 64) {
-		emitChange(defaultVal);
+	// KnobReset triangle (at 12 o'clock): back to the centre, not to the param's default.
+	function resetToCenter() {
+		emitChange(64);
 	}
 
 	const { onWheel } = useWheelInteraction(() => value.value, emitChange, maxValue);
 
-	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToDefault };
+	return { radius, angle, isReset, isDragging, cursor, onMouseDown: onMouseDownCapture, onWheel, resetToCenter };
 }

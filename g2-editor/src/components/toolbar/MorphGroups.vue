@@ -25,6 +25,7 @@
 					<Knob
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : null"
+						:default-value="defaultPatchParams().morphDials[i]"
 						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
 					/>
@@ -45,6 +46,7 @@
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
 	import { useSlotsStore } from '../../store/slots';
+	import { defaultPatchParams } from '../../store/slotHelpers';
 	import { useUiStore } from '../../store/ui';
 	import { useDeviceStore } from '../../store/device';
 	import { MORPH_NAMES } from '../../types/patch';
