@@ -3,7 +3,6 @@
 import { isMac } from '@/utils/platform';
 
 const MOD = isMac ? '⌘' : 'Ctrl'; // Cmd on Mac, Ctrl elsewhere
-const CTRL = isMac ? '⌃' : 'Ctrl'; // Mac keeps a separate Control key distinct from Cmd
 const ALT = isMac ? '⌥' : 'Alt';
 
 export const STATUS_HINTS = {
@@ -30,7 +29,7 @@ export const STATUS_HINTS = {
 
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
-	areaSplit: `Space: show/hide cables · ${CTRL}-Space: shake cables`,
+	areaSplit: 'Space/H: show/hide cables · S/Shift-Space: shake cables',
 	areaFx: 'F: show FX (again: Split)',
 
 	// StatusBar — side panel tabs
@@ -50,7 +49,8 @@ export const STATUS_HINTS = {
 	renamePatch: 'Click: rename patch',
 	renamePerf: 'Click: rename performance',
 	setBpm: 'Click: set tempo',
-	cableShake: 'Redraw overlapping cables',
+	cableShowHideAll: 'Space/H: show/hide all cables',
+	cableShake: 'S/Shift-Space: redraw overlapping cables',
 } as const;
 
 export type StatusHintKey = keyof typeof STATUS_HINTS;

@@ -31,6 +31,13 @@
 					<button class="text-xs text-blue-400 hover:text-blue-300 underline cursor-pointer bg-transparent border-0 p-0" @click="openSite">
 						janburp.github.io/NordModularG2-Editor
 					</button>
+					<p class="text-xs">Free and open source, built in spare time.<br />If it's useful to you, please consider supporting it.</p>
+					<button
+						class="text-xs text-yellow-500 hover:text-yellow-400 border border-yellow-500/60 hover:border-yellow-400 rounded-full px-3 py-0.5 cursor-pointer bg-transparent"
+						@click="openLink(DONATE_URL)"
+					>
+						♥ Donate
+					</button>
 
 					<div class="w-full border-t border-line-default pt-3 flex flex-col gap-2 text-left">
 						<p class="text-xs italic text-center">Use this editor at your own risk.</p>
@@ -58,14 +65,6 @@
 							, Chris Purusha for sharing tech info, Åke Danielson for mini-module graphics, BlueHell for lending an Engine, and all others who
 							tested or donated to make this work possible.
 						</p>
-						<div class="flex justify-center pt-1">
-							<button
-								class="text-xs text-yellow-500 hover:text-yellow-400 cursor-pointer bg-transparent border-0 p-0"
-								@click="openLink('https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6')"
-							>
-								♥ Donate
-							</button>
-						</div>
 					</div>
 				</div>
 				<div
@@ -96,7 +95,7 @@
 	import { ref, watch, onMounted, onUnmounted } from 'vue';
 	import Button from '@/components/toolbar/Button.vue';
 	import Icon from '@/components/common/Icon.vue';
-	import { APP_NAME } from '@/constants';
+	import { APP_NAME, DONATE_URL } from '@/constants';
 
 	const props = withDefaults(
 		defineProps<{ modelValue: boolean; closable?: boolean; connecting?: boolean; connectingMessage?: string; progress?: number; message?: string }>(),

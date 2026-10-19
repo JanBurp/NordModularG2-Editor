@@ -10,7 +10,8 @@ A cross-platform editor for the Nord Modular G2 synthesizer. The original Clavia
 ![Nord Modular G2 Editor](screenshots/editor-11062026.png)
 
 [Download & Install](getting-started/){: .btn .btn-primary .mr-2 }
-[User Guide](user-guide/){: .btn }
+[User Guide](user-guide/){: .btn .mr-2 }
+[♥ Donate](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6){: .btn }
 
 ---
 
@@ -37,6 +38,6 @@ Protocol knowledge from the Nord G2 community at [electro-music.com](https://ele
 
 ## Donate
 
-Donations help cover coding-agent subscriptions and future test hardware.
+This editor is free and built in spare time. Donations help cover coding-agent subscriptions and test hardware (spare G2).
 
 [![Donate](https://www.paypalobjects.com/en_US/i/btn/btn_donate_LG.gif)](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6)

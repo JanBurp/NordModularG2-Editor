@@ -13,8 +13,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Adjuster
 - Patch Mutator
 - Added option for cable style
-- Added option for module params to have focus on hover, so arrow keys can adjust value.
+- Added option for module params to have focus on hover, so arrow keys can adjust value
+- Added option for dimming unused modules
+- Added option for jumping back mouse after change param
 - For selected param added '=' to open SetValue, and 'ENTER' to set to default value
+- Assigned MorphGroups Knobs are blue now
 
 ### Changed
 - Splash screen stays when update available
@@ -23,12 +26,15 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved param gestures (default, circular mode)
 - Improved KeyBoard UX (allways need note, and touchscreen ready)
 - Less clutter/hints when dragging or other edit in progress.
+- Shake cables is now `S` or `Shift+Space` (was Ctrl+Space, which collided with OS input-source switching); `H` also shows/hides all cables
 
 ### Fixed
 - Better rendering of modules
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved
 - Some Knobs did not use full range
+- Windows: Key commands when switching to window of other G2
+- Windows: Copy/Past when switching to window of other G2
 
 ## [0.7.1] - 2026-10-12
 

@@ -54,6 +54,7 @@
 		/>
 		<ParameterPages v-if="currentPatch && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<ParamDragGhost />
+		<KnobDragCursor />
 
 		<div class="flex-1 flex overflow-hidden">
 			<div
@@ -463,6 +464,7 @@
 	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import ParameterPages from './components/toolbar/ParameterPages.vue';
 	import ParamDragGhost from './components/common/ParamDragGhost.vue';
+	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
 	import Dialog from './components/common/Dialog.vue';
@@ -699,6 +701,14 @@
 			return;
 		}
 
+		// The menu's Zoom accelerators (CommandOrControl+= / -) don't match the numpad keys
+		if ((e.ctrlKey || e.metaKey) && (e.code === 'NumpadAdd' || e.code === 'NumpadSubtract')) {
+			e.preventDefault();
+			if (e.code === 'NumpadAdd') settingsStore.zoomIn();
+			else settingsStore.zoomOut();
+			return;
+		}
+
 		if (e.key === 'Escape') {
 			jackPatching.clearArmed();
 			clearGhostCable();
@@ -726,17 +736,21 @@
 					e.preventDefault();
 					device.setClockRunning(!device.clockRunning);
 					return;
+				case 's':
+					e.preventDefault();
+					uiStore.shakeCables();
+					return;
+				case 'h':
+					e.preventDefault();
+					toggleAllCables();
+					return;
 				case ' ':
 					e.preventDefault();
-					if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
+					if (e.shiftKey) uiStore.shakeCables();
+					else if (uiStore.ghostCable && isGhostJack(uiStore.ghostCable.to)) cycleGhostCable();
 					else toggleAllCables();
 					return;
 			}
-		}
-
-		if (e.key === ' ' && e.ctrlKey && !e.metaKey && !e.altKey) {
-			e.preventDefault();
-			uiStore.shakeCables();
 		}
 	}
 

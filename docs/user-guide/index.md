@@ -65,8 +65,8 @@ nav_order: 3
 |---|---|
 | `V` | Show Voice area (Split if already Voice-only) |
 | `F` | Show FX area (Split if already FX-only) |
-| `Space` | Show / hide all cables |
-| `⌃ Space` | Shake cables |
+| `Space` / `H` | Show / hide all cables |
+| `S` / `⇧ Space` | Shake cables |
 | `⌘ =` / `⌘ -` / `⌘ 0` | Zoom in / out / actual size |
 
 ## Panels

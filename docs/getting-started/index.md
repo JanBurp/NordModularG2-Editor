@@ -27,6 +27,8 @@ has_children: true
 
 > The CLI is optional — most users only need the editor app. See [Technical Reference](../technical/cli-commands) for CLI details.
 
+> The editor is free. If it's useful to you, a [donation](https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6) helps keep it going.
+
 ## Install: macOS
 
 1. Open the `.dmg` and drag **G2 Editor** to your Applications folder.
