@@ -17,6 +17,8 @@
 					class="shrink-0 text-content-secondary hover:text-content-primary px-1 cursor-pointer"
 					:title="allExpanded ? 'Collapse All' : 'Expand All'"
 					@click="toggleAllCategories"
+					@mouseenter="showHint('expandCollapseAll')"
+					@mouseleave="clearHint"
 				>
 					<Icon :name="allExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 				</button>
@@ -29,6 +31,8 @@
 					<div
 						class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
 						@click="toggleCategory(category)"
+						@mouseenter="showHint('expandCollapse')"
+						@mouseleave="clearHint"
 					>
 						<span class="w-3 text-content-muted"><Icon :name="isExpanded(category) ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" /></span>
 						{{ category }}
@@ -48,6 +52,8 @@
 								@dragstart="(e) => handleModuleDragStart(e, module.id)"
 								@dragend="handleModuleDragEnd"
 								@click="handleModuleClick(module.id)"
+								@mouseenter="showHint('moduleItem')"
+								@mouseleave="clearHint"
 							>
 								<svg width="256" :height="getModuleHeight(module)" xmlns="http://www.w3.org/2000/svg" style="pointer-events: none">
 									<Module :instance="getModuleInstance(module.id)" />
@@ -81,6 +87,7 @@
 	import { useListNav } from '../../composables/useListNav';
 	import { useModuleDragSource } from '../../composables/useModuleDragSource';
 	import { useVisibleCategories } from '../../composables/useVisibleCategories';
+	import { useStatusHint } from '../../composables/useStatusHint';
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
@@ -88,6 +95,7 @@
 	const { addModuleAtMousePos } = useAddModule();
 	const { handleDragStart: handleModuleDragStart, handleDragEnd: handleModuleDragEnd } = useModuleDragSource();
 	const { categories } = useVisibleCategories();
+	const { showHint, clearHint } = useStatusHint();
 	const searchRef = ref();
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });

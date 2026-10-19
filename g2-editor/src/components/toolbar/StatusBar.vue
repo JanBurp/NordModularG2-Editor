@@ -15,9 +15,10 @@
 				class="flex gap-4 min-w-0 overflow-hidden whitespace-nowrap cursor-pointer hover:text-content-primary"
 				@click="uiStore.showKeyCommandsPage = true"
 			>
-				<span v-for="(part, i) in hintParts" :key="i">
+				<span v-for="(part, i) in hint.parts" :key="i">
 					<span v-if="part.key" class="text-content-primary">{{ part.key }}:</span> {{ part.text }}
 				</span>
+				<span v-if="hint.mods.length" class="text-content-primary border-l border-line-default pl-4">{{ hint.mods.join(' ') }}</span>
 			</span>
 		</div>
 
@@ -33,23 +34,40 @@
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import { useUiStore } from '../../store/ui';
 	import BtnGroup from './BtnGroup.vue';
 	import { AREA_OPTIONS, PANE_TAB_OPTIONS } from '../../constants';
 	import { useSettingsStore } from '../../store/settings';
 	import type { PaneTab } from '../../store/settings';
 	import { useAreaMode } from '../../composables/useAreaMode';
+	import { groupHint } from '../../composables/useStatusHint';
+	import { MOD, ALT } from '../../constants/statusHints';
+	import { isMac } from '../../utils/platform';
 
 	const uiStore = useUiStore();
 	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
 
-	// 'Key: text · Key: text' → parts; the key (gesture/modifier) is highlighted.
-	const hintParts = computed(() =>
-		(uiStore.statusHint ?? 'Click for keyboard shortcuts').split(' · ').map((part) => {
-			const i = part.indexOf(': ');
-			return i < 0 ? { key: '', text: part } : { key: part.slice(0, i), text: part.slice(i + 2) };
-		}),
-	);
+	// Held modifier switches the hint to that modifier's gestures.
+	const heldMod = ref<string | null>(null);
+	function onModKey(e: KeyboardEvent) {
+		heldMod.value = e.shiftKey ? 'Shift' : (isMac ? e.metaKey : e.ctrlKey) ? MOD : e.altKey ? ALT : null;
+	}
+	function onBlur() {
+		heldMod.value = null;
+	}
+	onMounted(() => {
+		window.addEventListener('keydown', onModKey, true);
+		window.addEventListener('keyup', onModKey, true);
+		window.addEventListener('blur', onBlur);
+	});
+	onUnmounted(() => {
+		window.removeEventListener('keydown', onModKey, true);
+		window.removeEventListener('keyup', onModKey, true);
+		window.removeEventListener('blur', onBlur);
+	});
+
+	// The key (gesture/modifier) is highlighted.
+	const hint = computed(() => groupHint(uiStore.statusHint ?? 'Click for keyboard shortcuts', heldMod.value));
 </script>

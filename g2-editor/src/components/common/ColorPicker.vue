@@ -5,8 +5,16 @@
 			class="border border-line-default rounded w-6 h-6 cursor-pointer"
 			title="Apply color"
 			@click.stop="setColor(uiStore.moduleColor)"
+			@mouseenter="showHint('colorApply')"
+			@mouseleave="clearHint"
 		></div>
-		<div class="cursor-pointer px-0.5 text-content-muted hover:text-content-primary" title="Choose color" @click.stop="togglePicker()">
+		<div
+			class="cursor-pointer px-0.5 text-content-muted hover:text-content-primary"
+			title="Choose color"
+			@click.stop="togglePicker()"
+			@mouseenter="showHint('colorChoose')"
+			@mouseleave="clearHint"
+		>
 			<svg viewBox="0 0 10 10" class="w-2.5 h-2.5" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
 				<polyline points="2,3 5,7 8,3" />
 			</svg>
@@ -25,6 +33,9 @@
 	import { getModuleColor, MODULE_COLORS_ORDER } from '../../constants/moduleColors';
 	import { useUiStore } from '@/store/ui';
 	import { useSlotsStore } from '@/store/slots';
+	import { useStatusHint } from '@/composables/useStatusHint';
+
+	const { showHint, clearHint } = useStatusHint();
 
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();

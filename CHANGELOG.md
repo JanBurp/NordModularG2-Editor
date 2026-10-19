@@ -23,6 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved param gestures (default, circular mode)
 - Improved KeyBoard UX (allways need note, and touchscreen ready)
 - Less clutter/hints when dragging or other edit in progress.
+- Improved and more hints
 - Shake cables is now `S` or `Shift+Space` (was Ctrl+Space, which collided with OS input-source switching); `H` also shows/hides all cables
 
 ### Fixed:
