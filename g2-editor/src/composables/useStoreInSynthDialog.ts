@@ -63,17 +63,19 @@ export function useStoreInSynthDialog() {
 		showDialog.value = false;
 	}
 
-	// Stores the slot's patch back where it was loaded from; opens the dialog when that's unknown.
-	// Returns true only when the patch was stored.
-	async function saveToOrigin(slot: SlotLabel): Promise<boolean> {
-		const origin = device.storedLocation[slot] ?? slotOrigin(slot);
+	// Stores the slot's patch (or the performance, key 'perf') back where it was loaded from; opens
+	// the dialog when that's unknown. Returns true only when it was stored.
+	async function saveToOrigin(key: SlotLabel | 'perf'): Promise<boolean> {
+		const perf = key === 'perf';
+		const origin = device.storedLocation[key] ?? (perf ? performanceOrigin() : slotOrigin(key));
 		if (!origin) {
-			uiStore.setSlotInFocus(slot);
+			if (!perf) uiStore.setSlotInFocus(key);
 			open();
 			return false;
 		}
-		const slotIdx = SLOT_LABELS.indexOf(slot) as 0 | 1 | 2 | 3;
-		return browser.storePatch(slotIdx, origin.bank, origin.location, 'patch', slotsStore.getPatchName(slot) ?? '');
+		if (perf) return browser.storePatch(0, origin.bank, origin.location, 'performance', device.device?.performance?.name ?? slotsStore.performanceName);
+		const slotIdx = SLOT_LABELS.indexOf(key) as 0 | 1 | 2 | 3;
+		return browser.storePatch(slotIdx, origin.bank, origin.location, 'patch', slotsStore.getPatchName(key) ?? '');
 	}
 
 	return { showDialog, bank, location, kind, maxBank, maxLocation, locationLabel, open, confirm, cancel, saveToOrigin };

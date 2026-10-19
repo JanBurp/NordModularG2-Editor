@@ -5,6 +5,7 @@ export interface ToastEntry {
 	message: string;
 	error?: boolean;
 	action?: ToastAction;
+	key?: string;
 }
 
 export interface ToastAction {
@@ -29,8 +30,10 @@ export function showToast(message: string): void {
 }
 
 // Error toasts stay until the user dismisses them (× or OK), or the optional action succeeds.
-export function showErrorToast(message: string, action?: ToastAction): void {
-	toasts.push({ id: nextId++, message, error: true, action });
+// A toast with the same key as one still showing is not added again.
+export function showErrorToast(message: string, action?: ToastAction, key?: string): void {
+	if (key && toasts.some((t) => t.key === key)) return;
+	toasts.push({ id: nextId++, message, error: true, action, key });
 }
 
 export async function runToastAction(t: ToastEntry): Promise<void> {

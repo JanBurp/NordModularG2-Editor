@@ -17,6 +17,12 @@ describe('saveToOrigin', () => {
 		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['store-patch', '1', '3', '17']);
 	});
 
+	it('stores the performance at its origin', async () => {
+		useDeviceStore().setStoredLocation('perf', 2, 5);
+		expect(await useStoreInSynthDialog().saveToOrigin('perf')).toBe(true);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['store-patch', '4', '2', '5']);
+	});
+
 	it('reports failure when the store fails', async () => {
 		(globalThis as any).window.cli.run = vi.fn().mockRejectedValue(new Error('no device'));
 		useDeviceStore().setStoredLocation('B', 3, 17);

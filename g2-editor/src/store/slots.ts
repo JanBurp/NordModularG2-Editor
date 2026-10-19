@@ -621,10 +621,19 @@ export const useSlotsStore = defineStore('slots', {
 				// Skipped for echo reloads: those can race an edit's own uprate push.
 				if (uprateRepairCmds.length > 0) {
 					await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
-					showErrorToast(`Slot ${slot}: patch was stored with wrong signal rates (degraded sound); save the patch to fix`, {
-						label: 'Save',
-						run: async () => (await import('../composables/useStoreInSynthDialog')).useStoreInSynthDialog().saveToOrigin(slot),
-					});
+					// Slots of a loaded performance belong to it: one toast, saving the performance. pendingPerfBank
+					// covers a performance select still loading (performanceName is only set once it completes).
+					const device = useDeviceStore();
+					const key = this.isPerformanceMode || device.isHardwarePerformanceMode || device.pendingPerfBank !== null ? 'perf' : slot;
+					const message =
+						key === 'perf'
+							? 'Performance has patches stored with wrong signal rates (degraded sound); save the performance to fix'
+							: `Slot ${slot}: patch was stored with wrong signal rates (degraded sound); save the patch to fix`;
+					showErrorToast(
+						message,
+						{ label: 'Save', run: async () => (await import('../composables/useStoreInSynthDialog')).useStoreInSynthDialog().saveToOrigin(key) },
+						`uprate-${key}`,
+					);
 				}
 			}
 			return { name, rawHex, patch };

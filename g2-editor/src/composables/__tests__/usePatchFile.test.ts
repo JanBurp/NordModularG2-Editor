@@ -73,3 +73,16 @@ describe('handlePatchSelect — synth patch', () => {
 		expect(device.storedLocation.B).toEqual({ bank: 4, location: 12 });
 	});
 });
+
+describe('handlePerformanceSynthSelect', () => {
+	it('records the selected bank/location as the performance origin', async () => {
+		const { useDeviceStore, DeviceStatus } = await import('@/store/device');
+		const device = useDeviceStore();
+		device.status = DeviceStatus.Connected;
+
+		await usePatchFile().handlePerformanceSynthSelect(3, 7);
+
+		expect((window as any).cli.run).toHaveBeenCalledWith(['select-perf', '3', '7']);
+		expect(device.storedLocation.perf).toEqual({ bank: 3, location: 7 });
+	});
+});

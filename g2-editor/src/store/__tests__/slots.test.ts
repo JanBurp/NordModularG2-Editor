@@ -2257,6 +2257,10 @@ describe('uprate is sent to the G2', () => {
 // Patches stored on the G2 by the old editor keep uprate=0 in G2 memory (the G2 doesn't recompute
 // it on load), so loading one from the G2 must repair the live slot and tell the user to save.
 describe('uprate repair on load from the G2', () => {
+	beforeEach(async () => {
+		(await import('@/composables/useToast')).useToast().toasts.splice(0); // module-level, and keyed toasts dedupe
+	});
+
 	async function degradedFixture(envUprate: number): Promise<{ name: string; rawHex: string }> {
 		const fs = await import('fs');
 		const path = await import('path');
@@ -2288,6 +2292,48 @@ describe('uprate repair on load from the G2', () => {
 		expect(sent.map((c) => c.join())).toEqual([['set-module-uprate', 'A', 'va', '2', '1'].join()]);
 		expect(toasts.length).toBe(before + 1);
 		expect(toasts[toasts.length - 1]).toMatchObject({ error: true, message: expect.stringContaining('Slot A') });
+	});
+
+	it('in Performance mode, several degraded slots give one toast that saves the performance', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		toasts.splice(0);
+		useDeviceStore().device = { mode: 'Performance' } as any;
+		const { name, rawHex } = await degradedFixture(0);
+		const sent = capture();
+		const store = useSlotsStore();
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		await store._applyPatchOutput('B', JSON.stringify({ slot: 'B', name, data: rawHex }));
+		expect(sent.map((c) => c.slice(0, 2).join())).toEqual(['set-module-uprate,A', 'set-module-uprate,B']);
+		expect(toasts).toHaveLength(1);
+		expect(toasts[0]).toMatchObject({ key: 'uprate-perf', message: expect.stringContaining('save the performance') });
+
+		useDeviceStore().setStoredLocation('perf', 2, 5);
+		sent.length = 0;
+		expect(await toasts[0].action!.run()).toBe(true);
+		expect(sent).toEqual([['store-patch', '4', '2', '5']]);
+	});
+
+	it('a performance loaded while the G2 is in Patch mode also gets the performance toast', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Patch' } as any;
+		useDeviceStore().pendingPerfBank = 1; // performance select still loading
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(toasts.map((t) => t.key)).toEqual(['uprate-perf']);
+	});
+
+	it('a loaded performance (editor in performance mode) gets the performance toast', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Patch' } as any;
+		useSlotsStore().performanceName = 'Bank 2 / 5';
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(toasts.map((t) => t.key)).toEqual(['uprate-perf']);
 	});
 
 	it('sends nothing when the stored uprate is already correct', async () => {

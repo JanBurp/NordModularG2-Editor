@@ -151,6 +151,7 @@ export function usePatchFile() {
 		if (device.device?.performance) device.device.performance.name = name;
 		try {
 			await window.cli.run(['select-perf', String(bank), String(location)]);
+			device.setStoredLocation('perf', bank, location);
 			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null });
 			// In Patch mode the G2 loads the performance's patches but reports no perfBank/perfLoc to match
 			// (perfBank=129), so the pending select would only end in the timeout toast. select-perf answers

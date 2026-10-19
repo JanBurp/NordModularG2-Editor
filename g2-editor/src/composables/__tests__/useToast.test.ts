@@ -16,6 +16,15 @@ describe('useToast', () => {
 		expect(toasts).toHaveLength(0);
 	});
 
+	it('an error toast with the key of one still showing is not added again', () => {
+		const { toasts, showErrorToast } = useToast();
+		toasts.splice(0);
+		showErrorToast('first', undefined, 'k');
+		showErrorToast('second', undefined, 'k');
+		showErrorToast('other');
+		expect(toasts.map((t) => t.message)).toEqual(['first', 'other']);
+	});
+
 	it('an error toast action dismisses the toast only when it succeeds', async () => {
 		const { toasts, showErrorToast, runToastAction } = useToast();
 		toasts.splice(0);
