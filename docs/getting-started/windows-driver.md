@@ -30,14 +30,42 @@ Windows 11 may block the unsigned WinUSB driver. If Zadig fails to install it, b
 
 Windows prefers Clavia's signed driver over Zadig's self-signed WinUSB driver. Whenever it sees a G2 as a "new" device — another G2, the same G2 on a different USB port, or a Windows Update driver pass — it may install the Clavia driver again.
 
+This is most likely to happen with **multiple G2s**: each G2 (and each USB port it is plugged into) counts as a separate device, so every new combination is another chance for Windows to pick the Clavia driver.
+
 - **Turn off automatic driver installs:** *Settings → System → About → Advanced system settings → Hardware → Device Installation Settings → No*.
 - **Keep each G2 on the same USB port**, so Windows keeps recognising it as the same device.
-- **Permanent fix — remove the Clavia driver from Windows' driver store.** In a Command Prompt opened as Administrator:
-  1. `pnputil /enum-drivers` — find the entry whose provider is Clavia/Nord and note its *Published Name* (e.g. `oem12.inf`).
-  2. `pnputil /delete-driver oem12.inf /uninstall` (use your own number).
-  3. Run Zadig again for each G2 as described above.
 
-  The original Clavia editor won't work until you reinstall the Clavia driver.
+### Permanent fix: remove the Clavia G2 driver from the driver store
+
+Windows keeps all installed drivers in a system-wide *driver store*; a driver can't be removed for just one G2. Removing Clavia's G2 package once makes every G2 fall back to WinUSB. Open a Command Prompt as Administrator with all G2s connected:
+
+1. **Find the driver each G2 uses:**
+
+   ```
+   pnputil /enum-devices /connected /drivers
+   ```
+
+   Look for the entries containing `VID_0FFC&PID_0002` (Clavia's vendor ID, G2 product ID). The *Driver Name* line shows the package in use, e.g. `oem14.inf`. (Device Manager → G2 → Properties → Driver → Driver Details shows the same: `winusb.sys` means WinUSB, anything else is the Clavia driver.)
+2. **Delete that Clavia package** (use your own number):
+
+   ```
+   pnputil /delete-driver oem14.inf /uninstall
+   ```
+
+   Only delete the package a G2 is actually bound to. You may see several Clavia packages in `pnputil /enum-drivers` (e.g. `claviacd.inf`, `claviawinusb.inf`, `clavia.inf`); the others may belong to other Nord instruments or Nord Sound Manager.
+3. **Unplug and replug each G2** and check Driver Details shows `winusb.sys`. Any Zadig package already in the store fits every G2, so Windows usually picks WinUSB on its own. If not, run Zadig for that G2 as described above.
+
+The original Clavia editor won't work until you reinstall the Clavia driver.
+
+### Optional: clean up duplicate Zadig drivers
+
+Each Zadig run adds a new package to the driver store (shown with provider `libwdi` and names like `nord_modular_g2x.inf` or `nord_modular_g2_engine.inf`). They are harmless, but can pile up. With all G2s connected, run for each libwdi entry:
+
+```
+pnputil /delete-driver oemNN.inf
+```
+
+Without `/force`, Windows refuses to delete a package a device is using, so the ones your G2s need stay. Replug and check again that each G2 shows `winusb.sys`.
 
 
 ## Removing the Zadig/WinUSB Driver on Windows 11
