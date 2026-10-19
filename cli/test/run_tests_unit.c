@@ -91,6 +91,10 @@ extern void test_set_cable_color_invalid_color_high(void);
 extern void test_set_cable_color_invalid_from_con_type(void);
 extern void test_set_cable_color_invalid_to_con_type(void);
 extern void test_set_cable_color_payload_layout(void);
+extern void test_set_module_uprate_invalid_slot(void);
+extern void test_set_module_uprate_invalid_location(void);
+extern void test_set_module_uprate_invalid_value(void);
+extern void test_set_module_uprate_payload_layout(void);
 
 extern void test_set_morph_range_invalid_slot_low(void);
 extern void test_set_morph_range_invalid_slot_high(void);
@@ -305,6 +309,10 @@ int main(void) {
     RUN_TEST(test_set_cable_color_invalid_from_con_type);
     RUN_TEST(test_set_cable_color_invalid_to_con_type);
     RUN_TEST(test_set_cable_color_payload_layout);
+    RUN_TEST(test_set_module_uprate_invalid_slot);
+    RUN_TEST(test_set_module_uprate_invalid_location);
+    RUN_TEST(test_set_module_uprate_invalid_value);
+    RUN_TEST(test_set_module_uprate_payload_layout);
 
     RUN_TEST(test_set_morph_range_invalid_slot_low);
     RUN_TEST(test_set_morph_range_invalid_slot_high);

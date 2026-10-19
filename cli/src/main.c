@@ -73,6 +73,7 @@ static void print_usage(const char *prog) {
     printf("  del-module <slot> <va|fx> <module-id>                                                     Delete a module (delete its cables first)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                        Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
+    printf("  set-module-uprate <slot> <va|fx> <module-id> <0|1>                                        Set a module's audio-rate (uprate) flag\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
     printf("  set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [...]       Set ALL labelled params of a module (group repeats per param)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
@@ -458,6 +459,19 @@ static int cmd_set_module_color(int argc, char **argv, int i) {
     int module_id = atoi(argv[i + 3]);
     int color     = atoi(argv[i + 4]);
     return g2_set_module_color(slot, location, module_id, color);
+}
+
+static int cmd_set_module_uprate(int argc, char **argv, int i) {
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: set-module-uprate <slot> <va|fx> <module-id> <0|1>\n");
+        return 1;
+    }
+    int slot      = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-uprate: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location  = parse_location_str(argv[i + 2]);
+    int module_id = atoi(argv[i + 3]);
+    int uprate    = atoi(argv[i + 4]);
+    return g2_set_module_uprate(slot, location, module_id, uprate);
 }
 
 static int cmd_set_module_name(int argc, char **argv, int i) {
@@ -1064,6 +1078,7 @@ static const cmd_entry_t commands[] = {
     { "move-module",      cmd_move_module      },
     { "add-module",       cmd_add_module       },
     { "set-module-color", cmd_set_module_color },
+    { "set-module-uprate", cmd_set_module_uprate },
     { "set-module-name",  cmd_set_module_name  },
     { "assign-midicc",         cmd_assign_midicc         },
     { "deassign-midicc",       cmd_deassign_midicc       },

@@ -383,7 +383,7 @@ const ALLOWED_CMDS = new Set([
 	"get-global-page", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
 	"list", "move-module", "play-note", "reload-names", "select-global-page", "select-param", "select-param-page",
 	"select-patch", "select-perf", "send-bank", "send-controller-snapshot", "set-cable-color", "set-knob-source",
-	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode",
+	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode", "set-module-uprate",
 	"set-module-name", "set-morph-range", "set-morph-range-batch", "set-param", "set-patch-description",
 	"set-patch-name", "set-perf-mode", "set-perf-name", "set-range-enable", "set-slot-enabled", "set-slot-hold",
 	"set-slot-key", "set-slot-range", "set-synth-settings", "slot", "store-patch", "upload-patch",

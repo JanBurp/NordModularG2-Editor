@@ -1194,6 +1194,15 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
     op->cmd=0x31; op->payload=buf; op->len=3;
 }
 
+/* S_SET_MODULE_UPRATE (0x2A): reference CMModuleABCode::WriteStream, sent by the official editor
+ * whenever a cable change promotes/demotes a module to/from audio rate. add-module always sends
+ * upRate=0, so without this the G2 keeps running the module at control rate (degraded audio). */
+void g2_build_set_module_uprate_op(G2Op *op, uint8_t *buf,
+                                    int loc, int module_id, int uprate) {
+    buf[0]=(uint8_t)loc; buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)(uprate&1);
+    op->cmd=0x2a; op->payload=buf; op->len=3;
+}
+
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
                                    int loc, int module_id, const char *label) {
     size_t nlen = label ? strlen(label) : 0; if (nlen > 16) nlen = 16;
@@ -1384,6 +1393,19 @@ int g2_set_module_color(int slot, int location, int module_id, int color) {
     uint8_t buf[3]; G2Op op;
     g2_build_set_module_color_op(&op, buf, location, module_id, color);
     return send_slot_edit(slot, "set-module-color", &op, 1);
+}
+
+int g2_set_module_uprate(int slot, int location, int module_id, int uprate) {
+
+    if (slot < 0 || slot > 3)          { g2_err("set-module-uprate: invalid slot\n");   return G2_ERR_INVALID_PARAM; }
+    if (location < 0 || location > 1)  { g2_err("set-module-uprate: location must be 0(fx) or 1(va)\n"); return G2_ERR_INVALID_PARAM; }
+    if (uprate < 0 || uprate > 1)      { g2_err("set-module-uprate: uprate must be 0 or 1\n"); return G2_ERR_INVALID_PARAM; }
+
+    if (ensure_connected(0) < 0) { g2_err("set-module-uprate: failed to connect\n"); return G2_ERR_CONNECT; }
+
+    uint8_t buf[3]; G2Op op;
+    g2_build_set_module_uprate_op(&op, buf, location, module_id, uprate);
+    return send_slot_edit(slot, "set-module-uprate", &op, 1);
 }
 
 int g2_set_module_label(int slot, int location, int module_id, const char *label) {

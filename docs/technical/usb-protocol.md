@@ -371,7 +371,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x21` | SET_PATCH_DESCRIPTION (aka C_PATCH_DESCR) | `[size_hi][size_lo][data]` (data max 62 bytes, see §9's PatchDescription body layout) | Embedded ACK |
 | `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
-| `0x2A` | SET_UPRATE_MODE *(not implemented yet)* | `loc mod uprate` | Embedded ACK |
+| `0x2A` | SET_MODULE_UPRATE | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
 | `0x2E` | GET_SELECTED_PARAM *(not implemented yet)* | — | Embedded; area/module/param at `[5..7]` |
 | `0x2F` | SEL_PARAM *(not implemented yet)* | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
@@ -419,6 +419,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 ```
 set-patch-name          <slot> <name>                              (0x27)
 get-patch               <slot>                                     (0x28 name, 0x35 version, 0x3C binary, 0x6E notes)
+set-module-uprate       <slot> <loc> <mod> <0|1>                   (0x2A)
 set-module-mode         <slot> <loc> <mod> <param> <val>            (0x2B)
 add-module               <slot> <loc> ...                          (0x30)
 set-module-color        <slot> <loc> <mod> <color>                 (0x31)

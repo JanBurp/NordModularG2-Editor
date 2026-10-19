@@ -153,6 +153,21 @@ function addCableCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable): string[]
 	return ['add-cable', slot, location, String(c.colour), String(c.smod), (c.dir ?? 1) === 0 ? '0' : '1', String(c.scon), String(c.dmod), '0', String(c.dcon)];
 }
 
+function setCableColorCmd(slot: SlotLabel, location: 'va' | 'fx', c: Cable, colour = c.colour): string[] {
+	return [
+		'set-cable-color',
+		slot,
+		location,
+		String(colour),
+		String(c.smod),
+		(c.dir ?? 1) === 0 ? '0' : '1',
+		String(c.scon),
+		String(c.dmod),
+		'0',
+		String(c.dcon),
+	];
+}
+
 function assignMidiCCBatchCmd(slot: SlotLabel, ccs: MidiCCAssignment[]): string[] {
 	return ['assign-midicc-batch', slot, ...ccs.flatMap((a) => [ccLocationStr(a.location), String(a.moduleIndex), String(a.paramIndex), String(a.cc)])];
 }
@@ -367,6 +382,7 @@ function buildModuleAddition(
 		index: newId,
 		horiz: col,
 		vert: row,
+		uprate: 0, // add-module always creates the module at control rate; _syncUprateAndColors promotes it
 		lv: [...src.lv],
 		modes: [...src.modes],
 		paramLabels: src.paramLabels ? src.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
@@ -598,10 +614,15 @@ export const useSlotsStore = defineStore('slots', {
 				area: 1,
 				variation: patch.description?.variation ?? 0,
 			};
-			this._autoRecolorOnLoad(patch);
+			const uprateRepairCmds = this._autoRecolorOnLoad(slot, patch);
 			if (!preserveHistory) {
 				this.slots[slot].edited = false;
 				useHistoryStore().clearHistory(slot);
+				// Skipped for echo reloads: those can race an edit's own uprate push.
+				if (uprateRepairCmds.length > 0) {
+					await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
+					showToast(`Slot ${slot}: patch was stored with wrong signal rates (degraded sound) — fixed live; save the patch to keep the fix`);
+				}
 			}
 			return { name, rawHex, patch };
 		},
@@ -909,7 +930,7 @@ export const useSlotsStore = defineStore('slots', {
 						undo: async () => {
 							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the delete
 							if (!patch) return;
-							mutAddModule(patch, areaIdx, { ...modSnap, lv: [...modSnap.lv], modes: [...modSnap.modes] });
+							mutAddModule(patch, areaIdx, { ...modSnap, uprate: 0, lv: [...modSnap.lv], modes: [...modSnap.modes] });
 							const slotE = this.slots[slot];
 							if (slotE.variations) {
 								for (let v = 0; v < slotE.variations.length; v++) {
@@ -918,7 +939,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnap) mutAddCable(patch, areaIdx, c);
-							this._syncUprateAndColors(patch, areaIdx);
+							const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
 							if (removedCCSnap.length > 0) slotE.controllers = [...slotE.controllers, ...removedCCSnap];
 							if (removedPagesSnap.length > 0) slotE.paramPages = [...slotE.paramPages, ...removedPagesSnap];
 							if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
@@ -941,6 +962,8 @@ export const useSlotsStore = defineStore('slots', {
 							if (allCmds.length > 0) {
 								await runCliBatchSafe(allCmds, 'deleteModule undo');
 							}
+							// Separate frame: the firmware can't reference a just-added module in the same frame (see paste).
+							if (uprateCmds.length > 0) await runCliBatchSafe(uprateCmds, 'deleteModule undo uprate');
 							await this._restoreModuleMorph(slot, morphSnap);
 						},
 						redo: async () => {
@@ -954,7 +977,7 @@ export const useSlotsStore = defineStore('slots', {
 			const connectedCables = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId);
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
-			this._syncUprateAndColors(patch, areaIdx);
+			const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
 			this._dropModuleMorph(slot, morphSnap);
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
@@ -964,7 +987,11 @@ export const useSlotsStore = defineStore('slots', {
 				this.globalParamPages = this.globalParamPages.filter((k) => !(k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
-			const deleteCmds: string[][] = [...connectedCables.map((c) => delCableCmd(slot, location, c)), ['del-module', slot, location, String(moduleId)]];
+			const deleteCmds: string[][] = [
+				...connectedCables.map((c) => delCableCmd(slot, location, c)),
+				['del-module', slot, location, String(moduleId)],
+				...uprateCmds,
+			];
 			for (const p of removedPagesSnap) deleteCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 			for (const p of removedGlobalPagesSnap) deleteCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 			await this._clearModuleMorphOnDevice(slot, morphSnap);
@@ -1074,7 +1101,7 @@ export const useSlotsStore = defineStore('slots', {
 				for (const c of remappedCables) mutAddCable(patch, areaIdx, c);
 
 				this._markSlotDirty(slot);
-				this._syncUprateAndColors(patch, areaIdx);
+				const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
 
 				const cliCmds: string[][] = [
 					...pushDowns.map((d) => ['move-module', slot, location, String(d.index), String(oldModSnap.horiz), String(d.newRow)]),
@@ -1089,6 +1116,7 @@ export const useSlotsStore = defineStore('slots', {
 						remappedCables.map((c) => addCableCmd(slot, location, c)),
 						'replaceModule cables',
 					);
+				if (uprateCmds.length > 0) await runCliBatchSafe(uprateCmds, 'replaceModule uprate');
 			} finally {
 				if (shouldRecord) hist.unlock(slot);
 			}
@@ -1112,7 +1140,7 @@ export const useSlotsStore = defineStore('slots', {
 						if (removedPagesSnap.length > 0) slotEntry.paramPages = [...slotEntry.paramPages, ...removedPagesSnap];
 						if (removedGlobalPagesSnap.length > 0) this.globalParamPages = [...this.globalParamPages, ...removedGlobalPagesSnap];
 						this._markSlotDirty(slot);
-						this._syncUprateAndColors(patch, areaIdx);
+						const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
 
 						const undoCmds: string[][] = pushDowns.map((d) => [
 							'move-module',
@@ -1123,6 +1151,7 @@ export const useSlotsStore = defineStore('slots', {
 							String(d.fromRow),
 						]);
 						for (const c of cableSnap) undoCmds.push(addCableCmd(slot, location, c));
+						undoCmds.push(...uprateCmds);
 						if (removedCCSnap.length > 0) undoCmds.push(assignMidiCCBatchCmd(slot, removedCCSnap));
 						for (const p of removedPagesSnap) undoCmds.push(assignKnobCmd(slot, p));
 						for (const p of removedGlobalPagesSnap) undoCmds.push(assignGlobalKnobCmd(slot, p));
@@ -1364,6 +1393,7 @@ export const useSlotsStore = defineStore('slots', {
 				const cableCmds = allCmds.filter((c) => c[0] === 'add-cable');
 				for (let i = 0; i < moduleCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(moduleCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
 				for (let i = 0; i < cableCmds.length; i += BATCH_CHUNK) await runCliBatchSafe(cableCmds.slice(i, i + BATCH_CHUNK), 'paste batch');
+				await this._pushUprateAndColors(slot, patch, areaIdx);
 
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
@@ -1426,27 +1456,50 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Recomputes uprate flags on all modules in the area and recolors auto-colored cables.
-		// Called after any cable topology change so the editor stays in sync without hardware confirmation.
-		_syncUprateAndColors(patch: Patch, areaIdx: 0 | 1): void {
+		// Called after any cable topology change. Returns the commands that bring the G2 in line
+		// (set-module-uprate per flipped module, set-cable-color per recolored cable), as the reference
+		// editor does after every topology change (CPatchData::GenerateBandwidthChangeMolecules) —
+		// without them the G2 runs e.g. an Env fed by an osc at control rate (degraded audio).
+		// Edit paths send them after their own cable/module commands.
+		_syncUprateAndColors(slot: SlotLabel, patch: Patch, areaIdx: 0 | 1): string[][] {
 			const area = patch.areas[areaIdx];
+			const location = areaIdx === 0 ? 'fx' : 'va';
 			const { uprateSet, modDefMap } = this._uprateContext(patch, areaIdx);
+			const cmds: string[][] = [];
 			for (const m of area.modules ?? []) {
-				m.uprate = uprateSet.has(m.index) ? 1 : 0;
+				const uprate = uprateSet.has(m.index) ? 1 : 0;
+				if (m.uprate !== uprate) cmds.push(['set-module-uprate', slot, location, String(m.index), String(uprate)]);
+				m.uprate = uprate;
 			}
-			patch.areas[areaIdx].cableList = autoRecolorCables(area.cableList ?? [], uprateSet, modDefMap) as unknown as (typeof patch.areas)[0]['cableList'];
+			const cables = area.cableList ?? [];
+			const recolored = autoRecolorCables(cables, uprateSet, modDefMap);
+			recolored.forEach((c, i) => {
+				if (c.colour !== cables[i].colour) cmds.push(setCableColorCmd(slot, location, c));
+			});
+			patch.areas[areaIdx].cableList = recolored as unknown as (typeof patch.areas)[0]['cableList'];
+			return cmds;
+		},
+
+		async _pushUprateAndColors(slot: SlotLabel, patch: Patch, areaIdx: 0 | 1): Promise<void> {
+			const cmds = this._syncUprateAndColors(slot, patch, areaIdx);
+			if (cmds.length > 0) await runCliBatchSafe(cmds, 'uprate sync');
 		},
 
 		// On load: infer user-overridden colours from the freshly-parsed cables (the wire format has
 		// no bit to persist userColour, so it's reconstructed by diffing stored vs computed colour),
 		// then recompute uprate + auto-recolor everything that wasn't inferred as an override.
-		_autoRecolorOnLoad(patch: Patch): void {
+		// Returns set-module-uprate commands for modules whose stored uprate is wrong: older editor
+		// versions never sent uprate, so patches stored on the G2 from them play degraded.
+		_autoRecolorOnLoad(slot: SlotLabel, patch: Patch): string[][] {
+			const cmds: string[][] = [];
 			for (const areaIdx of [0, 1] as const) {
 				const cables = patch.areas[areaIdx]?.cableList ?? [];
 				if (cables.length === 0) continue;
 				const { uprateSet, modDefMap } = this._uprateContext(patch, areaIdx);
 				patch.areas[areaIdx].cableList = inferUserColours(cables, uprateSet, modDefMap) as unknown as (typeof patch.areas)[0]['cableList'];
-				this._syncUprateAndColors(patch, areaIdx);
+				cmds.push(...this._syncUprateAndColors(slot, patch, areaIdx).filter((c) => c[0] === 'set-module-uprate'));
 			}
+			return cmds;
 		},
 
 		async addCable(
@@ -1548,8 +1601,8 @@ export const useSlotsStore = defineStore('slots', {
 				await runCliSafe(mainCmd, 'addCable');
 			}
 
-			// Recompute signal-rate uprate and recolor cables that changed rate (local display only).
-			this._syncUprateAndColors(patch, areaIdx);
+			// Recompute signal-rate uprate and recolor cables that changed rate, locally and on the G2.
+			await this._pushUprateAndColors(slot, patch, areaIdx);
 
 			if (shouldRecord) {
 				const postCableList = patch.areas[areaIdx].cableList ?? [];
@@ -1618,8 +1671,8 @@ export const useSlotsStore = defineStore('slots', {
 							}
 							await runCliBatchSafe(restoreCmds, 'addCable undo (recolor restore)');
 						}
-						// Re-sync uprate after undo so module flags and display are correct.
-						this._syncUprateAndColors(patch, areaIdx);
+						// Re-sync uprate after undo so module flags, display and the G2 are correct.
+						await this._pushUprateAndColors(slot, patch, areaIdx);
 					},
 					redo: async () => {
 						await this.addCable(fromMod, fromConType, fromCon, toMod, toConType, toCon, area, color);
@@ -1900,7 +1953,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[slot].templateRawHex = rawHex;
 			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
-			this._autoRecolorOnLoad(patch);
+			this._autoRecolorOnLoad(slot, patch);
 			this.slots[slot].edited = false;
 			useHistoryStore().clearHistory(slot);
 		},
@@ -1928,7 +1981,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].templateRawHex = null;
 				this.slots[labels[i]].edited = false;
 				this.slotFilePaths[labels[i]] = '';
-				this._autoRecolorOnLoad(patches[i]);
+				this._autoRecolorOnLoad(labels[i], patches[i]);
 				hist.clearHistory(labels[i]);
 			}
 			this.performanceName = name;
@@ -2987,18 +3040,7 @@ export const useSlotsStore = defineStore('slots', {
 						});
 						this._markSlotDirty(slot);
 						await runCliBatchSafe(
-							prevColorMap.map((b) => [
-								'set-cable-color',
-								slot,
-								location,
-								String(b.colour),
-								String(b.smod),
-								(b.dir ?? 1) === 0 ? '0' : '1',
-								String(b.scon),
-								String(b.dmod),
-								'0',
-								String(b.dcon),
-							]),
+							prevColorMap.map((b) => setCableColorCmd(slot, location, b)),
 							'setCableColor undo',
 						);
 					},
@@ -3012,18 +3054,7 @@ export const useSlotsStore = defineStore('slots', {
 			patch.areas[areaIdx].cableList = cableList.map((c) => (matching.includes(c) ? { ...c, colour: color, userColour: color } : c));
 			this._markSlotDirty(slot);
 			await runCliBatchSafe(
-				matching.map((c) => [
-					'set-cable-color',
-					slot,
-					location,
-					String(color),
-					String(c.smod),
-					(c.dir ?? 1) === 0 ? '0' : '1',
-					String(c.scon),
-					String(c.dmod),
-					'0',
-					String(c.dcon),
-				]),
+				matching.map((c) => setCableColorCmd(slot, location, c, color)),
 				'setCableColor',
 			);
 		},
@@ -3050,6 +3081,7 @@ export const useSlotsStore = defineStore('slots', {
 							deletedCables.map((c) => addCableCmd(slot, location, c)),
 							'deleteConnectedCables undo',
 						);
+						await this._pushUprateAndColors(slot, patch, areaIdx);
 					},
 					redo: async () => {
 						await this.deleteConnectedCables(moduleIndex, connectorIndex, type, area);
@@ -3063,7 +3095,7 @@ export const useSlotsStore = defineStore('slots', {
 				matching.map((c) => delCableCmd(slot, location, c)),
 				'deleteConnectedCables',
 			);
-			this._syncUprateAndColors(patch, areaIdx);
+			await this._pushUprateAndColors(slot, patch, areaIdx);
 		},
 
 		// Shared by breakJackConnection/moveCableGroup: replaces oldCables with newCables as one undoable step.
@@ -3091,7 +3123,7 @@ export const useSlotsStore = defineStore('slots', {
 						for (const c of deletedCables) mutAddCable(patch, areaIdx, c);
 						this._markSlotDirty(slot);
 						await runCliBatchSafe([...buildDelCmds(addedCables), ...buildAddCmds(deletedCables)], '_swapCables undo');
-						this._syncUprateAndColors(patch, areaIdx);
+						await this._pushUprateAndColors(slot, patch, areaIdx);
 					},
 					redo,
 				});
@@ -3103,7 +3135,7 @@ export const useSlotsStore = defineStore('slots', {
 
 			await runCliBatchSafe([...buildDelCmds(oldCables), ...buildAddCmds(newCables)], '_swapCables');
 
-			this._syncUprateAndColors(patch, areaIdx);
+			await this._pushUprateAndColors(slot, patch, areaIdx);
 		},
 
 		// Removes a jack from a multi-cable connection, splicing its remaining neighbors together
@@ -3306,7 +3338,7 @@ export const useSlotsStore = defineStore('slots', {
 					}
 				}
 
-				this._syncUprateAndColors(patch, areaIdx);
+				await this._pushUprateAndColors(slot, patch, areaIdx);
 
 				if (shouldRecord) {
 					const areaKey = areaIdx === 0 ? 'fx' : 'voice';
@@ -3315,7 +3347,7 @@ export const useSlotsStore = defineStore('slots', {
 							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the delete
 							if (!patch) return;
 							for (const mod of modSnaps) {
-								mutAddModule(patch, areaIdx, { ...mod, lv: [...mod.lv], modes: [...mod.modes] });
+								mutAddModule(patch, areaIdx, { ...mod, uprate: 0, lv: [...mod.lv], modes: [...mod.modes] });
 								const slotE = this.slots[slot];
 								if (slotE.variations) {
 									for (let v = 0; v < slotE.variations.length; v++) {
@@ -3325,7 +3357,7 @@ export const useSlotsStore = defineStore('slots', {
 								}
 							}
 							for (const c of cableSnaps) mutAddCable(patch, areaIdx, { ...c, dir: c.dir ?? 1 });
-							this._syncUprateAndColors(patch, areaIdx);
+							const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
 							if (ccSnaps.length > 0) this.slots[slot].controllers = [...this.slots[slot].controllers, ...ccSnaps];
 							if (pagesSnaps.length > 0) this.slots[slot].paramPages = [...this.slots[slot].paramPages, ...pagesSnaps];
 							if (globalPagesSnaps.length > 0) this.globalParamPages = [...this.globalParamPages, ...globalPagesSnaps];
@@ -3370,6 +3402,8 @@ export const useSlotsStore = defineStore('slots', {
 							} catch (err) {
 								console.warn('deleteSelection undo: CLI failed (offline?):', err);
 							}
+							// Separate frame: the firmware can't reference a just-added module in the same frame (see paste).
+							if (uprateCmds.length > 0) await runCliBatchSafe(uprateCmds, 'deleteSelection undo uprate');
 							await this._restoreModuleMorph(slot, morphSnap);
 						},
 						redo: async () => {
