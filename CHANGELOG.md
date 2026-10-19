@@ -30,6 +30,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved
 - Some Knobs did not use full range
+- Windows: Key commands when switching to window of other G2
+- Windows: Copy/Past when switching to window of other G2
 
 ## [0.7.1] - 2026-10-12
 
