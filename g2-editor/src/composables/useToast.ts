@@ -36,6 +36,11 @@ export function showErrorToast(message: string, action?: ToastAction, key?: stri
 	toasts.push({ id: nextId++, message, error: true, action, key });
 }
 
+export function dismissToastByKey(key: string): void {
+	const t = toasts.find((t) => t.key === key);
+	if (t) dismissToast(t.id);
+}
+
 export async function runToastAction(t: ToastEntry): Promise<void> {
 	if (await t.action?.run()) dismissToast(t.id);
 }

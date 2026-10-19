@@ -34,7 +34,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { SLOT_LABELS } from '@/constants';
 import { defineStore } from 'pinia';
-import { showToast, showErrorToast } from '../composables/useToast';
+import { showToast, showErrorToast, dismissToastByKey } from '../composables/useToast';
 import {
 	AREA_FULL_MESSAGE,
 	areaConfig,
@@ -574,7 +574,13 @@ export const useSlotsStore = defineStore('slots', {
 		// or the dirty flag for the edit it's merely confirming). False (default) for a genuine fresh
 		// load — explicit slot activation, bank-patch selection, startup, reconnect — where resetting
 		// both is correct.
-		async _applyPatchOutput(slot: SlotLabel, output: string, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch }> {
+		// editSeqAtFetch: editSeq[slot] when the get-patch was sent (see the uprate repair below).
+		async _applyPatchOutput(
+			slot: SlotLabel,
+			output: string,
+			preserveHistory = false,
+			editSeqAtFetch?: number,
+		): Promise<{ name: string; rawHex: string; patch: Patch }> {
 			const result = JSON.parse(output);
 			const name: string = result.name;
 			const rawHex: string = result.data;
@@ -618,7 +624,9 @@ export const useSlotsStore = defineStore('slots', {
 			if (!preserveHistory) {
 				this.slots[slot].edited = false;
 				useHistoryStore().clearHistory(slot);
-				// Skipped for echo reloads: those can race an edit's own uprate push.
+				// A warning about the slot's previous patch: its Save would store this one.
+				dismissToastByKey(`uprate-${slot}`);
+				// Repair + toast on a fresh load; a reload (below) only repairs: it isn't about the stored patch.
 				if (uprateRepairCmds.length > 0) {
 					await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 					// Slots of a loaded performance belong to it: one toast, saving the performance. pendingPerfBank
@@ -636,6 +644,12 @@ export const useSlotsStore = defineStore('slots', {
 						`uprate-${key}`,
 					);
 				}
+			} else if (uprateRepairCmds.length > 0 && editSeqAtFetch === this.editSeq[slot]) {
+				// The G2 can be off after a reload too (e.g. a NACKed uprate push), and the editor's copy now says
+				// it's right, so no later sync would fix it. Skipped if the slot was edited during the fetch: the
+				// repair would then be computed from an older topology. Not runCliBatchSafe: its failure reload
+				// would come back here and loop.
+				await window.cli.runBatch(uprateRepairCmds).catch((err: unknown) => console.warn('uprate repair after reload failed:', err));
 			}
 			return { name, rawHex, patch };
 		},
@@ -907,7 +921,8 @@ export const useSlotsStore = defineStore('slots', {
 			this._markSlotDirty(slot);
 		},
 
-		async deleteModule(moduleId: number, area: 'voice' | 'fx'): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
+		// syncUprate false: the caller (replaceModule) syncs uprate/colours itself once its own edit is done.
+		async deleteModule(moduleId: number, area: 'voice' | 'fx', syncUprate = true): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return null;
 			const { slot, patch } = ctx;
@@ -990,7 +1005,7 @@ export const useSlotsStore = defineStore('slots', {
 			const connectedCables = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId);
 			mutDeleteModule(patch, areaIdx, moduleId);
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
-			const uprateCmds = this._syncUprateAndColors(slot, patch, areaIdx);
+			const uprateCmds = syncUprate ? this._syncUprateAndColors(slot, patch, areaIdx) : [];
 			this._dropModuleMorph(slot, morphSnap);
 			if (removedCCSnap.length > 0)
 				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
@@ -1064,7 +1079,7 @@ export const useSlotsStore = defineStore('slots', {
 			let remappedCables: ReturnType<typeof remapCablesForModule> = [];
 
 			try {
-				await this.deleteModule(moduleId, area);
+				await this.deleteModule(moduleId, area, false);
 
 				const newHeight = newDef.height ?? 2;
 				const colMods = patch.areas[areaIdx].modules
@@ -1941,8 +1956,9 @@ export const useSlotsStore = defineStore('slots', {
 			this.slots[slot].loading = true;
 			this.slots[slot].error = null;
 			try {
+				const editSeqAtFetch = this.editSeq[slot];
 				const output = await window.cli.run(['get-patch', slot]);
-				return await this._applyPatchOutput(slot, output, preserveHistory);
+				return await this._applyPatchOutput(slot, output, preserveHistory, editSeqAtFetch);
 			} catch (e: any) {
 				if (!this.slots[slot].patch) {
 					this.slots[slot].error = e.message;
@@ -1955,7 +1971,9 @@ export const useSlotsStore = defineStore('slots', {
 			}
 		},
 
-		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): void {
+		// Returns the uprate-repair commands (see _autoRecolorOnLoad): a raw file upload carries the file's own
+		// stored bits, so the caller sends them after uploading.
+		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): string[][] {
 			useDeviceStore().markOriginStale(slot);
 			this.slots[slot].patch = patch;
 			this.slots[slot].variations = extractVariations(patch);
@@ -1967,9 +1985,10 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[slot].templateRawHex = rawHex;
 			}
 			if (filepath) this.slotFilePaths[slot] = filepath;
-			this._autoRecolorOnLoad(slot, patch);
+			const uprateRepairCmds = this._autoRecolorOnLoad(slot, patch);
 			this.slots[slot].edited = false;
 			useHistoryStore().clearHistory(slot);
+			return uprateRepairCmds;
 		},
 
 		loadPerformanceFile(
@@ -1979,9 +1998,10 @@ export const useSlotsStore = defineStore('slots', {
 			rawHex: string,
 			filepath?: string,
 			globalParamPages?: GlobalParamPageAssignment[],
-		): void {
+		): string[][] {
 			const labels: SlotLabel[] = ['A', 'B', 'C', 'D'];
 			const hist = useHistoryStore();
+			const uprateRepairCmds: string[][] = [];
 			delete useDeviceStore().storedLocation.perf;
 			for (let i = 0; i < 4; i++) {
 				const slotName = slotNames[i] || name;
@@ -1995,13 +2015,14 @@ export const useSlotsStore = defineStore('slots', {
 				this.slots[labels[i]].templateRawHex = null;
 				this.slots[labels[i]].edited = false;
 				this.slotFilePaths[labels[i]] = '';
-				this._autoRecolorOnLoad(labels[i], patches[i]);
+				uprateRepairCmds.push(...this._autoRecolorOnLoad(labels[i], patches[i]));
 				hist.clearHistory(labels[i]);
 			}
 			this.performanceName = name;
 			this.performanceRawHex = rawHex;
 			this.performanceFilePath = filepath ?? '';
 			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
+			return uprateRepairCmds;
 		},
 
 		// g2_get_perf_file-buf captures the G2's *live USB* form in memory and returns it as a hex

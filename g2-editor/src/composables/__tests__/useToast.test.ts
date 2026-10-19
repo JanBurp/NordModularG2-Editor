@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { useToast } from '@/composables/useToast';
+import { dismissToastByKey, useToast } from '@/composables/useToast';
 
 afterEach(() => vi.useRealTimers());
 
@@ -23,6 +23,15 @@ describe('useToast', () => {
 		showErrorToast('second', undefined, 'k');
 		showErrorToast('other');
 		expect(toasts.map((t) => t.message)).toEqual(['first', 'other']);
+	});
+
+	it('dismissToastByKey removes only the toast with that key', () => {
+		const { toasts, showErrorToast } = useToast();
+		toasts.splice(0);
+		showErrorToast('first', undefined, 'k');
+		showErrorToast('other');
+		dismissToastByKey('k');
+		expect(toasts.map((t) => t.message)).toEqual(['other']);
 	});
 
 	it('an error toast action dismisses the toast only when it succeeds', async () => {
