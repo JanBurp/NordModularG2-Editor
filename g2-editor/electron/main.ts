@@ -1234,7 +1234,9 @@ app.whenReady().then(async () => {
 	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
 	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
 	// hardware-agnostic window — see isOffline in preload.ts).
-	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
+	// G2_SKIP_STARTUP_SCAN: set by e2e specs so startup never binds to real attached hardware.
+	const skipScan = process.env.VITE_DEV_OFFLINE === 'true' || process.env.G2_SKIP_STARTUP_SCAN === '1';
+	const devices = skipScan ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
 	if (unclaimed.length === 0) {
 		createAppWindow();
