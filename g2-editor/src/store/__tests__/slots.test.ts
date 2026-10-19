@@ -2252,6 +2252,19 @@ describe('uprate is sent to the G2', () => {
 		await store.undo();
 		expect(idx(envUprate(1))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'add-module'));
 	});
+
+	it('paste undo de-rates a module the pasted cable fed', async () => {
+		const { store, sent, idx } = setup();
+		await store.paste(
+			[{ src: mod(9, OSC_A) as any, newId: 4, col: 1, row: 0 }],
+			[{ newSmod: 4, scon: 0, dir: 1, newDmod: 2, dcon: 0, colour: RED }],
+			'voice',
+		);
+		expect(idx(envUprate(1))).toBeGreaterThanOrEqual(0);
+		sent.length = 0;
+		await store.undo();
+		expect(idx(envUprate(0))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'del-module'));
+	});
 });
 
 // Patches stored on the G2 by the old editor keep uprate=0 in G2 memory (the G2 doesn't recompute
@@ -2312,6 +2325,17 @@ describe('uprate repair on load from the G2', () => {
 		sent.length = 0;
 		expect(await toasts[0].action!.run()).toBe(true);
 		expect(sent).toEqual([['store-patch', '4', '2', '5']]);
+	});
+
+	it('a single patch loaded in Performance mode names the slot, but still saves the performance', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Performance' } as any;
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('C', JSON.stringify({ slot: 'C', name, data: rawHex }));
+		expect(toasts).toHaveLength(1);
+		expect(toasts[0]).toMatchObject({ key: 'uprate-perf', message: expect.stringMatching(/^Slot C: .*save the performance/) });
 	});
 
 	it('a performance loaded while the G2 is in Patch mode also gets the performance toast', async () => {

@@ -281,6 +281,7 @@ export function rateLo(i: number, con: unknown, tw: unknown): string | undefined
 	if (!c0 || !c1) return;
 	i = c0.l;
 	const bf = [{ b: 0.09259, f: 1.06733 }, { b: 0.64, f: 1.05946309436 }, { b: 10.3, f: 1.05946309436 }, 0, 1][c1.l];
+	if (bf === undefined) return;
 	if (bf == 0) return rateBPM(i).slice(0, -3);
 	if (bf == 1) return _clk[i >> 2];
 	const r = (bf as { b: number; f: number }).b / Math.pow((bf as { b: number; f: number }).f, 64 - Math.floor(i));

@@ -26,6 +26,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Shake cables is now `S` or `Shift+Space` (was Ctrl+Space, which collided with OS input-source switching); `H` also shows/hides all cables
 
 ### Fixed:
+- #17 Modules did not uprate in G2 during patching, so patches could sound degraded.
 - Better rendering of modules
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved

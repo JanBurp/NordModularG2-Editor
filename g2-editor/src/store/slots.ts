@@ -624,11 +624,12 @@ export const useSlotsStore = defineStore('slots', {
 					// Slots of a loaded performance belong to it: one toast, saving the performance. pendingPerfBank
 					// covers a performance select still loading (performanceName is only set once it completes).
 					const device = useDeviceStore();
-					const key = this.isPerformanceMode || device.isHardwarePerformanceMode || device.pendingPerfBank !== null ? 'perf' : slot;
-					const message =
-						key === 'perf'
-							? 'Performance has patches stored with wrong signal rates (degraded sound); save the performance to fix'
-							: `Slot ${slot}: patch was stored with wrong signal rates (degraded sound); save the patch to fix`;
+					const loadingPerf = device.pendingPerfBank !== null;
+					const key = loadingPerf || this.isPerformanceMode || device.isHardwarePerformanceMode ? 'perf' : slot;
+					// A single patch loaded in performance mode is still saved with the performance, but named as the slot.
+					const message = loadingPerf
+						? 'Performance has patches stored with wrong signal rates (degraded sound); save the performance to fix'
+						: `Slot ${slot}: patch was stored with wrong signal rates (degraded sound); save the ${key === 'perf' ? 'performance' : 'patch'} to fix`;
 					showErrorToast(
 						message,
 						{ label: 'Save', run: async () => (await import('../composables/useStoreInSynthDialog')).useStoreInSynthDialog().saveToOrigin(key) },
@@ -1440,6 +1441,7 @@ export const useSlotsStore = defineStore('slots', {
 							if (allUndoCmds.length > 0) {
 								await runCliBatchSafe(allUndoCmds, 'paste undo');
 							}
+							await this._pushUprateAndColors(slot, patch, areaIdx);
 						},
 						redo: async () => {
 							const currentCtx = this._getActivePatch();
