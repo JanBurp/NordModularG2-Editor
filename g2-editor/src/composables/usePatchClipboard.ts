@@ -36,7 +36,9 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 	// Covers "copy in window A, click into window B, then try to paste" — the realistic
 	// cross-window usage pattern — without needing an OS clipboard-changed watcher.
+	// Also read once now: a freshly opened window already has focus, so no focus event follows.
 	if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
+		void refreshHasClipboard();
 		window.addEventListener('focus', refreshHasClipboard);
 		if (getCurrentInstance()) {
 			onUnmounted(() => window.removeEventListener('focus', refreshHasClipboard));
