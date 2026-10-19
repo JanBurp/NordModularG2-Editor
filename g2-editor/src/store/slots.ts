@@ -34,7 +34,7 @@ import type { Cable } from '@/renderer/cableRenderer';
 import type { SlotLabel } from '@/types';
 import { SLOT_LABELS } from '@/constants';
 import { defineStore } from 'pinia';
-import { showToast } from '../composables/useToast';
+import { showToast, showErrorToast } from '../composables/useToast';
 import {
 	AREA_FULL_MESSAGE,
 	areaConfig,
@@ -621,7 +621,10 @@ export const useSlotsStore = defineStore('slots', {
 				// Skipped for echo reloads: those can race an edit's own uprate push.
 				if (uprateRepairCmds.length > 0) {
 					await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
-					showToast(`Slot ${slot}: patch was stored with wrong signal rates (degraded sound) — fixed live; save the patch to keep the fix`);
+					showErrorToast(`Slot ${slot}: patch was stored with wrong signal rates (degraded sound); save the patch to fix`, {
+						label: 'Save',
+						run: async () => (await import('../composables/useStoreInSynthDialog')).useStoreInSynthDialog().saveToOrigin(slot),
+					});
 				}
 			}
 			return { name, rawHex, patch };

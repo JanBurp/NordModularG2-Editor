@@ -6,6 +6,8 @@ import { useUiStore } from '@/store/ui';
 import { bankSizeFor, locationSizeFor, defaultBankKind } from '@/constants/ui';
 import { slotOrigin, performanceOrigin } from './useSlotOrigin';
 import { showToast } from './useToast';
+import { SLOT_LABELS } from '@/constants';
+import type { SlotLabel } from '@/types';
 
 // Singleton state shared between the menu-action opener and the dialog component
 const showDialog = ref(false);
@@ -61,5 +63,18 @@ export function useStoreInSynthDialog() {
 		showDialog.value = false;
 	}
 
-	return { showDialog, bank, location, kind, maxBank, maxLocation, locationLabel, open, confirm, cancel };
+	// Stores the slot's patch back where it was loaded from; opens the dialog when that's unknown.
+	// Returns true only when the patch was stored.
+	async function saveToOrigin(slot: SlotLabel): Promise<boolean> {
+		const origin = device.storedLocation[slot] ?? slotOrigin(slot);
+		if (!origin) {
+			uiStore.setSlotInFocus(slot);
+			open();
+			return false;
+		}
+		const slotIdx = SLOT_LABELS.indexOf(slot) as 0 | 1 | 2 | 3;
+		return browser.storePatch(slotIdx, origin.bank, origin.location, 'patch', slotsStore.getPatchName(slot) ?? '');
+	}
+
+	return { showDialog, bank, location, kind, maxBank, maxLocation, locationLabel, open, confirm, cancel, saveToOrigin };
 }

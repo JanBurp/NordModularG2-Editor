@@ -2287,7 +2287,7 @@ describe('uprate repair on load from the G2', () => {
 		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
 		expect(sent.map((c) => c.join())).toEqual([['set-module-uprate', 'A', 'va', '2', '1'].join()]);
 		expect(toasts.length).toBe(before + 1);
-		expect(toasts[toasts.length - 1].message).toContain('Slot A');
+		expect(toasts[toasts.length - 1]).toMatchObject({ error: true, message: expect.stringContaining('Slot A') });
 	});
 
 	it('sends nothing when the stored uprate is already correct', async () => {

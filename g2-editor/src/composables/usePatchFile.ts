@@ -213,6 +213,7 @@ export function usePatchFile() {
 				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(targetSlot);
 				device.clearOriginStale(targetSlot);
+				device.setStoredLocation(targetSlot, item.bank, item.location);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
 				showToast('Failed to select synth patch — check device connection.');
