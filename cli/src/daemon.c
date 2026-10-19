@@ -1093,7 +1093,8 @@ int g2_daemon_run(output_format_t format, int debug) {
 			if (conn_err == G2_ERR_CLAIM_INTERFACE) {
 				cJSON *ev = cJSON_CreateObject();
 				cJSON_AddStringToObject(ev, "type", "usb_driver_error");
-				cJSON_AddStringToObject(ev, "code", libusb_error_name(g2_get_last_claim_error()));
+				cJSON_AddStringToObject(ev, "code", libusb_error_name(g2_get_last_usb_error()));
+				cJSON_AddStringToObject(ev, "backend", g2_backend_name());
 				emit(ev);
 				cJSON_Delete(ev);
 				return 1;

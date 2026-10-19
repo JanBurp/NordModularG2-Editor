@@ -90,8 +90,8 @@ volatile int g2_pending_disconnect = 0;
 volatile unsigned long g2_msg_drops = 0;
 volatile int g2_stream_locked = 0;
 
-static int g2_last_claim_error = 0;
-int g2_get_last_claim_error(void) { return g2_last_claim_error; }
+static int g2_last_usb_error = 0;
+int g2_get_last_usb_error(void) { return g2_last_usb_error; }
 
 /* Frame trace: ring of the most recent frames in both directions (LED/volume
  * stream excluded), dumped on disconnect so a wedge can be correlated with what
@@ -158,7 +158,21 @@ static void debug_recv(const uint8_t *hdr) {
     debug_hex("recv", "listener", hdr, 16);
 }
 
+static const char *g2_backend = "native";
+const char *g2_backend_name(void) { return g2_backend; }
+
 int g2_init(void) {
+#ifdef _WIN32
+    /* Prefer the UsbDk filter driver: it can take over the G2 whatever function
+     * driver is bound (Clavia's or WinUSB), so no per-device driver swap is needed.
+     * Not installed -> fall back to the default WinUSB backend (Zadig setups). */
+    const struct libusb_init_option usbdk[] = {{ .option = LIBUSB_OPTION_USE_USBDK }};
+    if (libusb_init_context(&g2.ctx, usbdk, 1) == 0) {
+        g2_backend = "usbdk";
+        return G2_OK;
+    }
+    g2_backend = "winusb";
+#endif
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
         fprintf(stderr, "Failed to initialize libusb: %s\n", libusb_error_name(ret));
@@ -257,14 +271,13 @@ cJSON *g2_list_devices_json(void) {
 
 /* Opens the G2 handle, honoring g2_target_bus/g2_target_device when set (both
  * nonzero); falls back to the original "first G2 found" behavior otherwise, so
- * every existing single-device caller is unaffected. When targeting a specific
- * bus/address, libusb_open() takes its own reference on the device, so freeing
- * the list right after (unref_devices=1) is safe — same pattern
- * libusb_open_device_with_vid_pid() itself uses internally. */
+ * every existing single-device caller is unaffected. libusb_open() takes its own
+ * reference on the device, so freeing the list right after (unref_devices=1) is
+ * safe — same pattern libusb_open_device_with_vid_pid() uses internally, which
+ * isn't used here because it discards the open error (a wrong Windows driver
+ * fails at open, not claim — see g2_open_failed()). */
 static libusb_device_handle *g2_open_target(void) {
-    if (g2_target_bus == 0 && g2_target_device == 0) {
-        return libusb_open_device_with_vid_pid(g2.ctx, VENDOR_ID, PRODUCT_ID);
-    }
+    int any = (g2_target_bus == 0 && g2_target_device == 0);
 
     /* This enumeration pass is independent of g2_set_target_by_index()'s (if
      * that was how the target was chosen) — unavoidable given libusb has no
@@ -282,14 +295,16 @@ static libusb_device_handle *g2_open_target(void) {
 
     libusb_device_handle *handle = NULL;
     g2_target_last_seen = 0;
+    g2_last_usb_error = 0;
     for (ssize_t idx = 0; idx < count; idx++) {
         struct libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
         if (!is_g2_device(&desc)) continue;
-        if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
-        if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
+        if (!any && libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
+        if (!any && libusb_get_device_address(devices[idx]) != g2_target_device) continue;
         g2_target_last_seen = 1;
-        if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
+        g2_last_usb_error = libusb_open(devices[idx], &handle);
+        if (g2_last_usb_error != 0) handle = NULL;
         break;
     }
 
@@ -297,11 +312,22 @@ static libusb_device_handle *g2_open_target(void) {
     return handle;
 }
 
+/* G2 present but libusb_open() refused it (e.g. NOT_SUPPORTED: Windows device
+ * bound to a driver libusb can't use; ACCESS: no permission). Reported like a
+ * claim failure — retrying won't help. NO_DEVICE = unplugged mid-connect. */
+static int g2_open_failed(void) {
+    return g2_target_last_seen && g2_last_usb_error != 0 && g2_last_usb_error != LIBUSB_ERROR_NO_DEVICE;
+}
+
 int g2_connect(void) {
     int ret;
 
     g2.handle = g2_open_target();
     if (!g2.handle) {
+        if (g2_open_failed()) {
+            fprintf(stderr, "Failed to open G2: %s\n", libusb_error_name(g2_last_usb_error));
+            return G2_ERR_CLAIM_INTERFACE;
+        }
         if (g2_target_bus || g2_target_device) {
             fprintf(stderr, "G2 not found at bus %d device %d (%s)\n",
                     g2_target_bus, g2_target_device,
@@ -333,12 +359,13 @@ int g2_connect_silent(void) {
 
     g2.handle = g2_open_target();
     if (!g2.handle) {
+        if (g2_open_failed()) return G2_ERR_CLAIM_INTERFACE;
         return (g2_target_bus || g2_target_device) ? G2_ERR_TARGET_NOT_FOUND : G2_ERR_NOT_FOUND;
     }
 
     ret = libusb_claim_interface(g2.handle, 0);
     if (ret < 0) {
-        g2_last_claim_error = ret;
+        g2_last_usb_error = ret;
         libusb_close(g2.handle);
         g2.handle = NULL;
         return G2_ERR_CLAIM_INTERFACE;
