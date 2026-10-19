@@ -26,6 +26,7 @@ export { SOUND_CATEGORIES, CATEGORY_COUNT, DEFAULT_CATEGORY_ID, getCategoryName,
 // UI option arrays, slot labels, and module grid dimensions
 export {
 	APP_NAME,
+	DONATE_URL,
 	SLOT_LABELS,
 	SLOT_OPTIONS,
 	PANE_TAB_OPTIONS,

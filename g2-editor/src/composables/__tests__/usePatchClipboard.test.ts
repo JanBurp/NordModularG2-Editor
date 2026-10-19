@@ -71,6 +71,7 @@ describe('usePatchClipboard — pasteClipboard/pasteParams prefer the OS clipboa
 		const pasteSpy = vi.spyOn(slotsStore, 'paste').mockResolvedValue(undefined as any);
 
 		const { pasteClipboard } = usePatchClipboard();
+		(window.electronAPI.clipboard.read as any).mockClear(); // drop the on-creation refresh read
 		await pasteClipboard();
 
 		expect(window.electronAPI.clipboard.read).toHaveBeenCalledTimes(1);
@@ -146,6 +147,18 @@ describe('usePatchClipboard — hasClipboard', () => {
 		await focusHandler();
 
 		expect(hasClipboard.value).toBe(true);
+	});
+
+	it('refreshes from clipboard.read() on creation, without a focus event (freshly opened window)', async () => {
+		(window.electronAPI.clipboard.read as any).mockResolvedValue({
+			modules: [makeModule(0)],
+			cables: [],
+			area: 'va',
+			copiedVariation: 0,
+		});
+
+		const { hasClipboard } = usePatchClipboard();
+		await vi.waitFor(() => expect(hasClipboard.value).toBe(true));
 	});
 
 	// hasClipboard is backed by uiStore.hasClipboard (a Pinia field), not a per-call local ref —

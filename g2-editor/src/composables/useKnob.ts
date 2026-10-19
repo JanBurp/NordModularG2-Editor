@@ -1,4 +1,5 @@
 import type { ComputedRef, Ref } from 'vue';
+import type { KnobMode } from '@/store/settings';
 
 import { clamp } from '@/utils/math';
 import { computed } from 'vue';
@@ -23,6 +24,27 @@ function posToAngle(dx: number, dy: number): number {
 	return (Math.atan2(dx, -dy) * 180) / Math.PI;
 }
 
+type Point = { x: number; y: number };
+
+// Linear modes fine-tune by distance perpendicular to the drag axis: at FINE_DISTANCE px beyond the knob's
+// edge the same movement does a quarter as much, at 3x that 1/16 (circular gets this from its geometry).
+export const FINE_DISTANCE = 100;
+export function fineFactor(distance: number, radius: number): number {
+	return 1 / (1 + Math.max(0, distance - radius) / FINE_DISTANCE) ** 2;
+}
+
+// Value change (in 0..127 units, before sensitivity) for a pointer move from `from` to `to`.
+export function knobDragStep(mode: KnobMode, from: Point, to: Point, centre: Point, radius: number): number {
+	if (mode === 'circular') {
+		let angleDelta = posToAngle(to.x - centre.x, to.y - centre.y) - posToAngle(from.x - centre.x, from.y - centre.y);
+		if (angleDelta > 180) angleDelta -= 360;
+		if (angleDelta < -180) angleDelta += 360;
+		return (angleDelta / 270) * 127;
+	}
+	if (mode === 'horizontal') return (to.x - from.x) * fineFactor(Math.abs(to.y - centre.y), radius);
+	return (from.y - to.y) * fineFactor(Math.abs(to.x - centre.x), radius);
+}
+
 export function useKnob(
 	value: Ref<number> | ComputedRef<number>,
 	knobType: Ref<string> | ComputedRef<string>,
@@ -38,33 +60,22 @@ export function useKnob(
 	const isReset = computed(() => knobType.value === 'KnobReset');
 	const cursor = computed(() => CURSORS[settings.knobMode] ?? 'ns-resize');
 
-	const startValue = { current: 0 };
-	const circular = { cx: 0, cy: 0, prevAngle: 0, accumulated: 0 };
+	// Incremental: each move adds its step to `acc`, so changing Shift or the distance mid-drag never jumps.
+	const drag = { acc: 0, centre: { x: 0, y: 0 }, radius: 0, prev: { x: 0, y: 0 } }; // centre/radius in screen px
 
-	const { isDragging, onMouseDown } = useDragInteraction((dx, dy, event) => {
-		// Scaled by max/127 so the full range takes the same mouse distance whatever the param's range,
-		// like the original editor (CPnlControl::ClickDragIdleHandler: pixels*max/256).
-		const sensitivity = settings.knobSensitivity * (event.shiftKey ? 0.25 : 1) * (maxValue() / 127);
-
-		let newValue: number;
-		if (settings.knobMode === 'horizontal') {
-			newValue = clamp(Math.round(startValue.current + dx * sensitivity), 0, maxValue());
-		} else if (settings.knobMode === 'circular') {
-			const clientX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
-			const clientY = 'touches' in event ? event.touches[0].clientY : (event as MouseEvent).clientY;
-			const currentAngle = posToAngle(clientX - circular.cx, clientY - circular.cy);
-			let angleDelta = currentAngle - circular.prevAngle;
-			if (angleDelta > 180) angleDelta -= 360;
-			if (angleDelta < -180) angleDelta += 360;
-			circular.prevAngle = currentAngle;
-			circular.accumulated += angleDelta;
-			newValue = clamp(Math.round(startValue.current + (circular.accumulated / 270) * 127 * sensitivity), 0, maxValue());
-		} else {
-			newValue = clamp(Math.round(startValue.current + dy * sensitivity), 0, maxValue());
-		}
-
-		if (newValue !== value.value) emitChange(newValue);
-	});
+	const { isDragging, onMouseDown } = useDragInteraction(
+		(_dx, _dy, event, x, y) => {
+			// Scaled by max/127 so the full range takes the same mouse distance whatever the param's range,
+			// like the original editor (CPnlControl::ClickDragIdleHandler: pixels*max/256).
+			const sensitivity = settings.knobSensitivity * (event.shiftKey ? 0.25 : 1) * (maxValue() / 127);
+			const to = { x, y };
+			drag.acc = clamp(drag.acc + knobDragStep(settings.knobMode, drag.prev, to, drag.centre, drag.radius) * sensitivity, 0, maxValue());
+			drag.prev = to;
+			const newValue = Math.round(drag.acc);
+			if (newValue !== value.value) emitChange(newValue);
+		},
+		{ pointerLock: () => settings.knobReturnCursor },
+	);
 
 	const isDoubleClick = createDoubleClickDetector();
 
@@ -73,25 +84,20 @@ export function useKnob(
 			emitChange(getDefault());
 			return;
 		}
-		startValue.current = value.value;
-		if (settings.knobMode === 'circular') {
-			const clickX = 'touches' in event ? event.touches[0].clientX : (event as MouseEvent).clientX;
-			const clickY = 'touches' in event ? event.touches[0].clientY : (event as MouseEvent).clientY;
+		drag.acc = value.value;
+		const clickX = 'touches' in event ? event.touches[0].clientX : event.clientX;
+		const clickY = 'touches' in event ? event.touches[0].clientY : event.clientY;
+		drag.prev = { x: clickX, y: clickY };
 
-			// Use the knob circle's bounding rect for the center; fall back to click position
-			const el = elementRef?.value;
-			if (el) {
-				const rect = el.getBoundingClientRect();
-				circular.cx = rect.left + rect.width / 2;
-				circular.cy = rect.top + rect.height / 2;
-			} else {
-				circular.cx = clickX;
-				circular.cy = clickY;
-			}
-
-			// Relative mode: the click itself doesn't change the value, only the rotation while dragging does
-			circular.prevAngle = posToAngle(clickX - circular.cx, clickY - circular.cy);
-			circular.accumulated = 0;
+		// Use the knob circle's bounding rect for the center; fall back to click position
+		const el = elementRef?.value;
+		if (el) {
+			const rect = el.getBoundingClientRect();
+			drag.centre = { x: rect.left + rect.width / 2, y: rect.top + rect.height / 2 };
+			drag.radius = rect.width / 2;
+		} else {
+			drag.centre = { x: clickX, y: clickY };
+			drag.radius = 0;
 		}
 		onMouseDown(event);
 	}

@@ -34,6 +34,7 @@
 				:key="mod.index"
 				:instance="mod"
 				:is-selected="props.selectedModuleIndices.includes(mod.index)"
+				:is-unused="unusedModules.has(mod.index)"
 				:connected-inputs="connectedJacksMap.get(mod.index)?.inputs"
 				:connected-outputs="connectedJacksMap.get(mod.index)?.outputs"
 				:area-label="props.area as 'fx' | 'va'"
@@ -81,7 +82,7 @@
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, computed, provide } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
-	import { sameJack, matchesCableJack } from '../../store/slotHelpers';
+	import { sameJack, matchesCableJack, isUnusedModule } from '../../store/slotHelpers';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import type { JackEnd } from '../../store/slotHelpers';
 	import type { ModuleInstance } from '../../types';
@@ -261,6 +262,13 @@
 		}
 		return map;
 	});
+
+	// Same rule as Patch → Delete Unused Modules, so the dimmed modules are exactly what it would remove.
+	const unusedModules = computed(() =>
+		settingsStore.dimUnusedModules
+			? new Set((props.modules as ModuleInstance[]).filter((m) => isUnusedModule(m, props.cables as Cable[])).map((m) => m.index))
+			: new Set<number>(),
+	);
 
 	function svgClientToGrid(clientX: number, clientY: number): { col: number; row: number } | null {
 		const svgPt = clientToSvgPoint(svgRef.value, clientX, clientY);

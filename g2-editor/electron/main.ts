@@ -63,6 +63,7 @@ let startupSplashClaimed = false;
 const isMac = process.platform === 'darwin';
 const platformNames: Record<string, string> = { darwin: 'macOS', win32: 'Windows', linux: 'Linux' };
 const platformLabel = `${platformNames[process.platform] ?? process.platform} ${process.getSystemVersion()}`;
+const DONATE_URL = "https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S6";
 
 const cliName = process.platform === "win32" ? "g2-cli.exe" : "g2-cli";
 const cliPath = app.isPackaged
@@ -182,6 +183,7 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	}
 
 	trackWindowState(window, cascade);
+	if (!isMac) applyWindowMenu(window);
 
 	if (VITE_DEV_SERVER_URL) {
 		window.loadURL(VITE_DEV_SERVER_URL);
@@ -1143,6 +1145,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Toggle DevTools", role: "toggleDevTools" as const, accelerator: "CommandOrControl+Option+I" },
 				{ label: "ShowSVG", click: () => sendToFocused("menu:action", "toggle-svg-viewer") },
 				{ type: "separator" as const },
+				{ label: "Donate...", click: () => { void shell.openExternal(DONATE_URL); } },
 				{ label: "About G2 Editor...", click: () => sendToFocused("menu:action", "show-about") },
 			],
 		},
@@ -1163,8 +1166,17 @@ function currentMenuState(): MenuState {
 	return lastMenuState;
 }
 
+// Windows/Linux: each window has its own menu bar showing its own session's state. Swapping
+// every window's menu (via setApplicationMenu) on focus change broke all accelerators on Windows
+// after switching windows, while clicking the menu items still worked.
+function applyWindowMenu(window: BrowserWindow): void {
+	const menuState = sessionByWebContentsId.get(window.webContents.id)?.menuState ?? lastMenuState;
+	window.setMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, menuState)));
+}
+
 function refreshMenu(): void {
-	Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
+	if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
+	else for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) applyWindowMenu(window);
 }
 
 ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
@@ -1174,19 +1186,18 @@ ipcMain.on("recent-files:update", (_, files: RecentFileEntry[]) => {
 
 ipcMain.on("menu-state:update", (event, state: MenuState) => {
 	const session = resolveSession(event);
-	if (session) {
-		session.menuState = state;
-		if (session.id === activeSessionId) refreshMenu();
-	} else {
-		lastMenuState = state;
-		if (!activeSessionId) refreshMenu();
-	}
+	if (session) session.menuState = state;
+	else lastMenuState = state;
+	if (!isMac) {
+		const window = BrowserWindow.fromWebContents(event.sender);
+		if (window) applyWindowMenu(window);
+	} else if (session ? session.id === activeSessionId : !activeSessionId) refreshMenu();
 });
 
 app.on("browser-window-focus", (_event, window) => {
 	const session = sessionByWebContentsId.get(window.webContents.id);
 	activeSessionId = session ? session.id : null;
-	refreshMenu();
+	if (isMac) refreshMenu();
 });
 
 app.on("child-process-gone", (_e, details) => console.log(`[app] child process gone: ${details.type} ${details.reason} (exit ${details.exitCode})`));

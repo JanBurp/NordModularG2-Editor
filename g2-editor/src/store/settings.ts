@@ -25,6 +25,7 @@ export const useSettingsStore = defineStore('settings', {
 		cableMagneticRadius: 96 as number,
 		cableConnectMode: 'drag' as CableConnectMode,
 		autoSuggestCable: false as boolean,
+		dimUnusedModules: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
 		settingsSection: null as SettingsSection | null,
@@ -39,6 +40,7 @@ export const useSettingsStore = defineStore('settings', {
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,
 		knobSensitivity: 1 as number,
+		knobReturnCursor: false as boolean, // knob drag hides the cursor (Pointer Lock); it reappears where the drag started
 		wheelReverse: false as boolean,
 		wheelSensitivity: 1 as number,
 		wheelPreventScroll: false as boolean,
@@ -123,11 +125,17 @@ export const useSettingsStore = defineStore('settings', {
 		setAutoSuggestCable(value: boolean) {
 			this.autoSuggestCable = value;
 		},
+		setDimUnusedModules(value: boolean) {
+			this.dimUnusedModules = value;
+		},
 		setKnobMode(value: KnobMode) {
 			this.knobMode = value;
 		},
 		setKnobSensitivity(value: number) {
-			this.knobSensitivity = clamp(value, 0.1, 10);
+			this.knobSensitivity = clamp(value, 0.1, 4);
+		},
+		setKnobReturnCursor(value: boolean) {
+			this.knobReturnCursor = value;
 		},
 		setWheelReverse(value: boolean) {
 			this.wheelReverse = value;
@@ -159,6 +167,7 @@ export const useSettingsStore = defineStore('settings', {
 		afterRestore: ({ store }) => {
 			store.setCableGravity(store.cableGravity);
 			store.setCableThickness(store.cableThickness);
+			store.setKnobSensitivity(store.knobSensitivity);
 		},
 	},
 });

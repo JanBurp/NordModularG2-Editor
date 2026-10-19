@@ -4,6 +4,7 @@ import {
 	buildPasteParamsPairs,
 	freeModuleIds,
 	isCableSourceEnd,
+	isUnusedModule,
 	MAX_MODULE_INDEX,
 	resolveColumnCollisions,
 	resolvePasteRowOffset,
@@ -162,5 +163,25 @@ describe('isCableSourceEnd', () => {
 		const chain = cable(1, 0, 0, 2, 1);
 		expect(isCableSourceEnd(chain, { moduleIndex: 1, connectorIndex: 0, type: 'input' })).toBe(true);
 		expect(isCableSourceEnd(chain, { moduleIndex: 2, connectorIndex: 1, type: 'input' })).toBe(false);
+	});
+});
+
+describe('isUnusedModule', () => {
+	const cables: any[] = [{ smod: 1, scon: 0, dmod: 2, dcon: 0, dir: 1 }];
+	const name = (uname: string, colour = 0): any => ({ ...mod(3, 126, 0, [], []), uname, colour });
+
+	it('is false for a module on either end of a cable', () => {
+		expect(isUnusedModule(mod(1, 7, 0, [], []), cables)).toBe(false);
+		expect(isUnusedModule(mod(2, 7, 0, [], []), cables)).toBe(false);
+	});
+
+	it('is true for a module without cables', () => {
+		expect(isUnusedModule(mod(4, 7, 0, [], []), cables)).toBe(true);
+	});
+
+	it('only counts a Name module with its default name and colour', () => {
+		expect(isUnusedModule(name('Name1'), cables)).toBe(true);
+		expect(isUnusedModule(name('Lead'), cables)).toBe(false);
+		expect(isUnusedModule(name('Name1', 3), cables)).toBe(false);
 	});
 });

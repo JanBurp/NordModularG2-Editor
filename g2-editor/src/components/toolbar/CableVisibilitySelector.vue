@@ -21,6 +21,8 @@
 			data-testid="cable-toggle-all"
 			:title="allCablesVisible ? 'Hide all cables' : 'Show all cables'"
 			@click="toggleShowHideAll"
+			@mouseenter="showHint('cableShowHideAll')"
+			@mouseleave="clearHint"
 		>
 			H
 		</button>
