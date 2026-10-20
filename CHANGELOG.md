@@ -15,6 +15,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Added option for jumping back mouse after change param
 - For selected param added '=' to open SetValue, and 'ENTER' to set to default value
 - Assigned MorphGroups Knobs are blue now
+- Added more tests
 
 ### Changed
 - Splash screen stays when update available
@@ -28,6 +29,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed:
 - #17 Modules did not uprate in G2 during patching, so patches could sound degraded.
+- A handfull of cli/daemon bugs
 - Better rendering of modules
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved
