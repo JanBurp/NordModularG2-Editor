@@ -11,6 +11,8 @@
 		]"
 		:disabled="disabled"
 		@click="handleClick"
+		@mouseenter="hint && showHint(hint)"
+		@mouseleave="hint && clearHint()"
 	>
 		<span v-if="topIndicator" class="indicator-strip indicator-top" :class="topIndicatorValue ? 'indicator-bright' : 'indicator-dimmed'" />
 		<slot />
@@ -20,6 +22,8 @@
 
 <script setup lang="ts">
 	import { computed } from 'vue';
+	import type { StatusHintKey } from '@/constants/statusHints';
+	import { useStatusHint } from '@/composables/useStatusHint';
 
 	interface Props {
 		variant: 'default' | 'toggle' | 'variation' | 'tab';
@@ -30,6 +34,7 @@
 		topIndicatorValue?: boolean;
 		bottomIndicator?: boolean;
 		bottomIndicatorValue?: boolean;
+		hint?: StatusHintKey;
 	}
 
 	const props = withDefaults(defineProps<Props>(), {
@@ -41,6 +46,8 @@
 		bottomIndicator: false,
 		bottomIndicatorValue: false,
 	});
+
+	const { showHint, clearHint } = useStatusHint();
 
 	const sizeClass = computed(() => {
 		if (props.size === 'xs') return 'btn-xs';

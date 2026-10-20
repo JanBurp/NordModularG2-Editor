@@ -619,15 +619,15 @@ void test_daemon_seq_set_module_mode(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
 }
 
-/* Reads the four slots' key flags from get-perf-settings; 0 = ok, -1 = no/odd answer. */
-static int read_slot_keys(daemon_ctx_t *d, int keys[4]) {
+/* Reads the four slots' `flag` ("key", "active", ...) from get-perf-settings; 0 = ok, -1 = no/odd answer. */
+static int read_slot_flags(daemon_ctx_t *d, const char *flag, int keys[4]) {
     int id = g_cmd_id++;
     char cmd[64];
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
     cJSON *resp = send_and_capture_response(d, cmd, id);
     cJSON *slots = resp ? cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), "slots") : NULL;
     int ok = cJSON_GetArraySize(slots) == 4 ? 0 : -1;
-    for (int i = 0; ok == 0 && i < 4; i++) keys[i] = cJSON_IsTrue(cJSON_GetObjectItem(cJSON_GetArrayItem(slots, i), "key"));
+    for (int i = 0; ok == 0 && i < 4; i++) keys[i] = cJSON_IsTrue(cJSON_GetObjectItem(cJSON_GetArrayItem(slots, i), flag));
     cJSON_Delete(resp);
     return ok;
 }
@@ -641,7 +641,7 @@ void test_daemon_set_slot_key_burst(void) {
     if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
 
     int orig[4], after[4];
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, read_slot_keys(&g_daemon, orig), "setup: read key flags");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, read_slot_flags(&g_daemon, "key", orig), "setup: read key flags");
 
     char cmd[128];
     int failures = 0;
@@ -658,7 +658,7 @@ void test_daemon_set_slot_key_burst(void) {
         snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"set-slot-key\",\"args\":[\"%c\",\"%d\"]}", id, "ABCD"[slot], want[slot]);
         if (send_and_expect_ok(&g_daemon, cmd, id) != 0) failures++;
     }
-    int read_ok = read_slot_keys(&g_daemon, after);
+    int read_ok = read_slot_flags(&g_daemon, "key", after);
 
     for (int i = 0; i < 4; i++) {
         if (want[i] == orig[i]) continue;
@@ -725,6 +725,54 @@ void test_daemon_send_controller_snapshot_cmd(void) {
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"send-controller-snapshot\",\"args\":[]}", id);
     int r = send_and_expect_ok(&g_daemon, cmd, id);
     TEST_ASSERT_EQUAL_INT(0, r);
+}
+
+/* Sends set-perf-mode <mode> and drains the rearm's START_COMM ack, which follows the ok:true. */
+static int set_perf_mode(daemon_ctx_t *d, const char *mode) {
+    char cmd[80];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"set-perf-mode\",\"args\":[\"%s\"]}", id, mode);
+    int r = send_and_expect_ok(d, cmd, id);
+    cJSON *rearm_ok = read_event_of_type(d, "ok", 10, 3);
+    if (rearm_ok) cJSON_Delete(rearm_ok);
+    return r;
+}
+
+/* Toggles `cmd` (set-slot-enabled/set-slot-key) on slot D and back, reading `flag` after each write.
+ * Returns the number of failed writes or read-backs. */
+static int toggle_slot_flag_and_back(const char *cmd_name, const char *flag) {
+    int orig[4], now[4];
+    if (read_slot_flags(&g_daemon, flag, orig) != 0) return 1;
+    int failures = 0;
+    for (int step = 0; step < 2; step++) {
+        int want = step == 0 ? !orig[3] : orig[3];
+        char cmd[128];
+        int id = g_cmd_id++;
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[\"D\",\"%d\"]}", id, cmd_name, want);
+        if (send_and_expect_ok(&g_daemon, cmd, id) != 0) failures++;
+        if (read_slot_flags(&g_daemon, flag, now) != 0 || now[3] != want) failures++;
+    }
+    return failures;
+}
+
+/* Test: Patch mode -> Performance mode -> toggle slot D's active and key flag and back, what the
+ * duration test's togglePerfMode + slotActiveKey do when coverage switches modes to reach a
+ * Performance-only action (2026-10-20). Each write must answer ok and read back; ends in Patch mode. */
+void test_daemon_slot_flags_after_patch_to_perf(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    int r_patch = set_perf_mode(&g_daemon, "patch");
+    int r_perf = set_perf_mode(&g_daemon, "performance");
+    int f_active = toggle_slot_flag_and_back("set-slot-enabled", "active");
+    int f_key = toggle_slot_flag_and_back("set-slot-key", "key");
+    int r_back = set_perf_mode(&g_daemon, "patch");
+    daemon_wait_ready(&g_daemon);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_patch, "set-perf-mode patch");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_perf, "set-perf-mode performance");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, f_active, "set-slot-enabled D toggle and back must answer ok and read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, f_key, "set-slot-key D toggle and back must answer ok and read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_back, "set-perf-mode patch (teardown)");
 }
 
 /* Test 6: set-perf-mode cycle — performance then patch — verifies Delphi approach:

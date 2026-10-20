@@ -173,8 +173,15 @@ export const useDeviceStore = defineStore('device', {
 			if (!this.device) return;
 			this.device.synthName = ev.synthName;
 			this.device.mode = ev.mode;
-			this.device.perfBank = ev.perfBank ?? 0;
-			this.device.perfLoc = ev.perfLoc ?? 0;
+			const perfBank = ev.perfBank ?? 0;
+			const perfLoc = ev.perfLoc ?? 0;
+			// Another performance selected (e.g. on the G2 itself): forget the remembered origin, or Save
+			// would overwrite it with this one. The echo of our own select/store keeps it (as updatePerfSettings).
+			const stored = this.storedLocation.perf;
+			if ((perfBank !== this.device.perfBank || perfLoc !== this.device.perfLoc) && !(stored?.bank === perfBank + 1 && stored.location === perfLoc + 1))
+				delete this.storedLocation.perf;
+			this.device.perfBank = perfBank;
+			this.device.perfLoc = perfLoc;
 			this.device.memProtect = ev.memProtect ?? false;
 			this.device.globalOctaveShiftActive = ev.globalOctaveShiftActive ?? false;
 			this.device.globalOctaveShift = ev.globalOctaveShift ?? 0;

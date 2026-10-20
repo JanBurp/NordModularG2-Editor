@@ -117,16 +117,14 @@ export const PARAM_ACTIONS: ActionDef[] = [
 				await openMenu(c.page, p.el);
 				if (!(await menuLabels(c.page)).includes('Set Value')) return `skipped: param #${index} of ${m.short} offers no Set Value`;
 				await clickItem(c.page, 'Set Value');
-				const dialog = c.page.getByRole('dialog', { name: 'Set Value' });
-				const select = dialog.locator('select');
-				if ((await select.count()) > 0) {
-					await select.selectOption({ index: int(c, await select.locator('option').count()) }, { timeout: UI_TIMEOUT_MS });
-				} else {
-					const input = dialog.locator('input.settings-input');
-					// Number inputs take a raw value; MIDI-note text inputs take a note name.
-					await input.fill((await input.getAttribute('type')) === 'number' ? String(int(c, 128)) : `C${1 + int(c, 6)}`, { timeout: UI_TIMEOUT_MS });
-				}
-				await dialog.getByRole('button', { name: 'OK' }).click({ timeout: UI_TIMEOUT_MS });
+				const dialog = c.page.getByTestId('param-edit-dialog');
+				const input = dialog.locator('input');
+				// "#<raw>" picks an exact raw value; a range smaller than 128 may not have it, raw 0 always exists.
+				await input.fill(`#${int(c, 128)}`, { timeout: UI_TIMEOUT_MS });
+				const noMatch = dialog.getByText('No matching value');
+				await dialog.getByRole('option').first().or(noMatch).waitFor({ timeout: UI_TIMEOUT_MS });
+				if (await noMatch.isVisible()) await input.fill('#0', { timeout: UI_TIMEOUT_MS });
+				await dialog.getByRole('button', { name: 'Set' }).click({ timeout: UI_TIMEOUT_MS });
 				await dialog.waitFor({ state: 'hidden', timeout: UI_TIMEOUT_MS });
 				return `Set Value on param #${p.index} of ${m.short}#${m.idx}`;
 			}),

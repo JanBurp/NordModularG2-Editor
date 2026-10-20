@@ -75,6 +75,7 @@ static void print_usage(const char *prog) {
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                  Set a module color\n");
     printf("  set-mutation-lock <slot> <va|fx> <module-id> <0|1>                                        Exclude a module from Patch Mutator changes\n");
     printf("  send-sections <slot> <hex>                                                                Send whole patch sections ([type][len16][data]...) as one edit\n");
+    printf("  set-module-uprate <slot> <va|fx> <module-id> <0|1>                                        Set a module's audio-rate (uprate) flag\n");
     printf("  set-module-name <slot> <va|fx> <module-id> <name>                                         Set a module label\n");
     printf("  set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [...]       Set ALL labelled params of a module (group repeats per param)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                            Set a module mode parameter\n");
@@ -491,6 +492,19 @@ static int cmd_set_mutation_lock(int argc, char **argv, int i) {
     return g2_set_mutation_lock(slot, location, module_id, locked);
 }
 
+static int cmd_set_module_uprate(int argc, char **argv, int i) {
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: set-module-uprate <slot> <va|fx> <module-id> <0|1>\n");
+        return 1;
+    }
+    int slot      = parse_slot(argv[i + 1]);
+    if (slot == SLOT_INVALID) { fprintf(stderr, "set-module-uprate: invalid slot '%s', expected A-D\n", argv[i + 1]); return 1; }
+    int location  = parse_location_str(argv[i + 2]);
+    int module_id = atoi(argv[i + 3]);
+    int uprate    = atoi(argv[i + 4]);
+    return g2_set_module_uprate(slot, location, module_id, uprate);
+}
+
 static int cmd_set_module_name(int argc, char **argv, int i) {
     if (i + 4 >= argc) {
         fprintf(stderr, "Usage: set-module-name <slot> <va|fx> <module-id> <name>\n");
@@ -774,14 +788,7 @@ static int cmd_set_morph_range_batch(int argc, char **argv, int i) {
 
 static int cmd_get_perf_settings(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
-    cJSON *synth = query_synth_settings(NULL);
-    int mode = 0;
-    if (synth) {
-        cJSON *m = cJSON_GetObjectItem(synth, "mode");
-        mode = (m && cJSON_IsString(m) && strcmp(m->valuestring, "Performance") == 0);
-        cJSON_Delete(synth);
-    }
-    cJSON *result = query_perf_settings(mode, NULL);
+    cJSON *result = g2_get_perf_settings();
     if (!result) {
         if (output_format == OUTPUT_JSON)
             output_error_json("Failed to get performance settings", output_format);
@@ -1097,6 +1104,7 @@ static const cmd_entry_t commands[] = {
     { "set-module-color", cmd_set_module_color },
     { "set-mutation-lock", cmd_set_mutation_lock },
     { "send-sections",    cmd_send_sections    },
+    { "set-module-uprate", cmd_set_module_uprate },
     { "set-module-name",  cmd_set_module_name  },
     { "assign-midicc",         cmd_assign_midicc         },
     { "deassign-midicc",       cmd_deassign_midicc       },

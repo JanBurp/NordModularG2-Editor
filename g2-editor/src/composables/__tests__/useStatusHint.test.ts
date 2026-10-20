@@ -7,8 +7,8 @@ vi.hoisted(() => {
 });
 
 import { useUiStore } from '@/store/ui';
-import { STATUS_HINTS } from '@/constants/statusHints';
-import { useStatusHint, holdHints, releaseHints } from '@/composables/useStatusHint';
+import { STATUS_HINTS, MOD, ALT } from '@/constants/statusHints';
+import { useStatusHint, holdHints, releaseHints, groupHint } from '@/composables/useStatusHint';
 
 beforeEach(() => {
 	setActivePinia(createPinia());
@@ -46,5 +46,42 @@ describe('useStatusHint — hold during drag', () => {
 		holdHints();
 		releaseHints();
 		expect(useUiStore().statusHint).toBe(STATUS_HINTS.paramKnob);
+	});
+});
+
+describe('groupHint — per-modifier hint parts', () => {
+	const knob = `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign · ${MOD}-drag: range · Shift-click/=: set value · Right-click: more`;
+
+	it('shows only plain gestures and lists modifiers with actions', () => {
+		expect(groupHint(knob, null)).toEqual({
+			parts: [
+				{ key: 'Drag/Wheel', text: 'adjust' },
+				{ key: '=', text: 'set value' },
+				{ key: 'Right-click', text: 'more' },
+			],
+			mods: ['Shift', MOD],
+		});
+	});
+
+	it('shows the held modifier gestures', () => {
+		expect(groupHint(knob, 'Shift')).toEqual({
+			parts: [
+				{ key: 'Shift-drag', text: 'fine' },
+				{ key: 'Shift-click', text: 'set value' },
+			],
+			mods: [MOD],
+		});
+	});
+
+	it('falls back to plain gestures when the held modifier has no actions', () => {
+		expect(groupHint(knob, ALT)).toEqual(groupHint(knob, null));
+	});
+
+	it('does not treat shortcuts without a dash as modifier gestures', () => {
+		expect(groupHint(`${MOD}B: browse`, null)).toEqual({ parts: [{ key: `${MOD}B`, text: 'browse' }], mods: [] });
+	});
+
+	it('keeps parts without a key', () => {
+		expect(groupHint('Click for keyboard shortcuts', null).parts).toEqual([{ key: '', text: 'Click for keyboard shortcuts' }]);
 	});
 });

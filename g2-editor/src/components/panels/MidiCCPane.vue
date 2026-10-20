@@ -26,6 +26,8 @@
 				class="px-2 py-0.5 rounded bg-surface-2 hover:bg-surface-3 disabled:opacity-40 disabled:cursor-not-allowed"
 				:disabled="autoAssignDisabled"
 				@click="autoAssign"
+				@mouseenter="showHint('ccAutoAssign')"
+				@mouseleave="clearHint"
 			>
 				Auto Assign
 			</button>
