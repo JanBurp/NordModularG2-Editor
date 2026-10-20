@@ -1010,7 +1010,12 @@ void g2_rearm(void) {
     send_system_data(0x41, arm, 2);
     if (!g2_listener_active) {
         uint8_t arm_ack[16];
-        recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS);
+        /* START_COMM has no ack of its own (see g2_stop_comm), so this is whatever arrives next - e.g. a one-shot
+         * set-perf-mode's late 0x0C/0x1F reply. Its bulk must be read too: an orphaned payload wedges the G2. */
+        if (recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS) > 0 && (arm_ack[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t sz = ((uint16_t)arm_ack[1] << 8) | arm_ack[2];
+            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
+        }
     }
 }
 
