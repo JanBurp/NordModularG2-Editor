@@ -9,6 +9,7 @@ import { ModuleQueue } from './lib/actions/moduleQueue';
 import { EventLog } from './lib/eventLog';
 import { launchReal } from './lib/launch';
 import { buildReport, type RunMeta } from './lib/report';
+import { rng } from './lib/actions/pick';
 import { Runner } from './lib/runner';
 import { powerCycle, shellyPreflight } from './lib/shelly';
 
@@ -28,18 +29,6 @@ const BURST_P = Number(process.env.BURST_P ?? 1 / 6);
 const BURST_MAX = Number(process.env.BURST_MAX ?? 15);
 const COVERAGE_MIN = Number(process.env.COVERAGE_MIN ?? 30);
 const SEED = Number(process.env.SEED ?? Date.now() % 2 ** 31);
-
-// mulberry32: small deterministic PRNG so a run can be replayed with SEED=<n>
-function rng(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
 
 function gitCommit(): string {
 	try {

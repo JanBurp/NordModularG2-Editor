@@ -32,7 +32,7 @@ export class Runner {
 	private incidents = 0;
 	private poller?: NodeJS.Timeout;
 	/** Actions that really ran (ok, not skipped) at least once, and attempts per action (coverage-first picking). */
-	private readonly covered = new Set<string>();
+	readonly covered = new Set<string>();
 	private readonly tries = new Map<string, number>();
 
 	constructor(
@@ -173,7 +173,7 @@ export class Runner {
 		if (!healthy) throw new Error(`G2 did not recover after ${cycles} power cycles (incident #${id})`);
 	}
 
-	private async runOne(action: ActionDef, fast = false): Promise<void> {
+	async runOne(action: ActionDef, fast = false): Promise<void> {
 		const t0 = Date.now();
 		this.tries.set(action.name, (this.tries.get(action.name) ?? 0) + 1);
 		try {
@@ -210,6 +210,20 @@ export class Runner {
 		return stuck && enabled.find((a) => a.name === stuck.enabledBy);
 	}
 
+	private enabled(): ActionDef[] {
+		return ACTIONS.filter((a) => a.enabled?.(this.ctx) ?? true);
+	}
+
+	/** One coverage-driven (non-burst) action: modules behind schedule, then an unlocker, then coverage-first random. Returns the action that ran. */
+	async step(coverage: { from: number; until: number }): Promise<ActionDef> {
+		const enabled = this.enabled();
+		const addModules = this.modulesBehind(coverage) && enabled.find((a) => a.name === 'addModules');
+		const unlocker = Date.now() < coverage.until && this.unlocker(enabled);
+		const action = addModules || unlocker || pickAction(enabled, this.ctx.rnd, this.covered, this.tries);
+		await this.runOne(action);
+		return action;
+	}
+
 	/** Runs until `deadline`; resolves normally, or throws when a recovery fails. */
 	async run(deadline: number, intervalMs: number, coverage: { from: number; until: number }): Promise<void> {
 		let lastProbe = Date.now();
@@ -228,21 +242,16 @@ export class Runner {
 				await this.checkConsistency();
 			}
 
-			const enabled = ACTIONS.filter((a) => a.enabled?.(this.ctx) ?? true);
 			const gaps = planBurst(this.ctx.rnd, this.burst.p, this.burst.max);
 			if (gaps) {
 				this.log.log('main', { line: `[duration-test] burst of ${gaps.length} fast actions` });
-				const pool = enabled.filter((a) => a.burst);
+				const pool = this.enabled().filter((a) => a.burst);
 				for (const gap of gaps) {
 					await this.runOne(weighted(pool, this.ctx.rnd), true);
 					if (this.lossAt !== null || !this.log.events.at(-1)?.ok) break;
 					await sleep(gap);
 				}
-			} else {
-				const addModules = this.modulesBehind(coverage) && enabled.find((a) => a.name === 'addModules');
-				const unlocker = Date.now() < coverage.until && this.unlocker(enabled);
-				await this.runOne(addModules || unlocker || pickAction(enabled, this.ctx.rnd, this.covered, this.tries));
-			}
+			} else await this.step(coverage);
 
 			// An action that fails or hangs while the status still says "connected" is a silent-hang candidate.
 			if (this.status === 'connected' && this.lossAt === null && !this.log.events.at(-1)?.ok && !(await this.probe())) await this.recover('probe');

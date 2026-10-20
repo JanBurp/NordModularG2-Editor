@@ -1,17 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BURST_GAP_MS, BURST_MIN, MAX_TRIES, pickAction, planBurst } from './pick';
-
-// mulberry32, same PRNG as duration.spec.ts
-function rng(seed: number): () => number {
-	let a = seed >>> 0;
-	return () => {
-		a = (a + 0x6d2b79f5) >>> 0;
-		let t = a;
-		t = Math.imul(t ^ (t >>> 15), t | 1);
-		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
-		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
-	};
-}
+import { BURST_GAP_MS, BURST_MIN, MAX_TRIES, pickAction, planBurst, rng } from './pick';
 
 describe('pickAction', () => {
 	const pool = Array.from({ length: 12 }, (_, i) => ({ name: `a${i}`, weight: i === 0 ? 1000 : 1 }));
