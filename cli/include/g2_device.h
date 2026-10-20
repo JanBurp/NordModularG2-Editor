@@ -124,6 +124,8 @@ cJSON *g2_device_info(int debug);
 /* mode=1 → performance JSON, mode=0 → patch JSON */
 cJSON *query_synth_settings(const char *type);
 cJSON *query_perf_settings(int mode, const char *type);
+/* Connects if needed, queries the current mode, adds "mode": "performance"|"patch" */
+cJSON *g2_get_perf_settings(void);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
 /* When return_bytes is set, filename may be NULL: the .prf2 is assembled in memory

@@ -876,15 +876,7 @@ static void execute_cmd(const char *line) {
 		else { ret = g2_set_voice_count(slot, arg_i(args, 1)); }
 
 	} else if (strcmp(cmd, "get-perf-settings") == 0) {
-		cJSON *synth = query_synth_settings(NULL);
-		int mode = 0;
-		if (synth) {
-			cJSON *m = cJSON_GetObjectItem(synth, "mode");
-			mode = m && strcmp(m->valuestring, "Performance") == 0;
-			cJSON_Delete(synth);
-		}
-		data = query_perf_settings(mode, NULL);
-		if (data) cJSON_AddStringToObject(data, "mode", mode ? "performance" : "patch");
+		data = g2_get_perf_settings();
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-slot-enabled") == 0 && n >= 2) {

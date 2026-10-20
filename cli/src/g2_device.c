@@ -396,6 +396,20 @@ cJSON *query_perf_settings(int mode, const char *type) {
     return root;
 }
 
+cJSON *g2_get_perf_settings(void) {
+    if (ensure_connected(1) < 0) return NULL;
+    cJSON *synth = query_synth_settings(NULL);
+    int mode = 0;
+    if (synth) {
+        cJSON *m = cJSON_GetObjectItem(synth, "mode");
+        mode = m && cJSON_IsString(m) && strcmp(m->valuestring, "Performance") == 0;
+        cJSON_Delete(synth);
+    }
+    cJSON *data = query_perf_settings(mode, NULL);
+    if (data) cJSON_AddStringToObject(data, "mode", mode ? "performance" : "patch");
+    return data;
+}
+
 cJSON *g2_device_info(int debug) {
     uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;

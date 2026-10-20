@@ -757,14 +757,7 @@ static int cmd_set_morph_range_batch(int argc, char **argv, int i) {
 
 static int cmd_get_perf_settings(int argc, char **argv, int i) {
     (void)argc; (void)argv; (void)i;
-    cJSON *synth = query_synth_settings(NULL);
-    int mode = 0;
-    if (synth) {
-        cJSON *m = cJSON_GetObjectItem(synth, "mode");
-        mode = (m && cJSON_IsString(m) && strcmp(m->valuestring, "Performance") == 0);
-        cJSON_Delete(synth);
-    }
-    cJSON *result = query_perf_settings(mode, NULL);
+    cJSON *result = g2_get_perf_settings();
     if (!result) {
         if (output_format == OUTPUT_JSON)
             output_error_json("Failed to get performance settings", output_format);
