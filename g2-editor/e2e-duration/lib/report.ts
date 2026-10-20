@@ -88,6 +88,8 @@ export interface RunMeta {
 	actionNames?: string[];
 	/** Short names of every user-addable module type. */
 	moduleTypes?: string[];
+	/** Window (from startedAt) in which every action and module type should have run once. */
+	coverageMs?: number;
 	final?: { ok: boolean; mode?: string; error?: string };
 	aborted?: string;
 }
@@ -199,6 +201,12 @@ export function findAnomalies(events: LogEvent[], meta: RunMeta): Anomaly[] {
 	return [...found.values()].sort((a, b) => b.count - a.count);
 }
 
+/** When (ms after `from`) every name had first occurred, if within `windowMs`, and the names that hadn't by then. */
+function coverage(names: string[], first: Map<string, number>, from: number, windowMs: number): { at: number | null; missing: string[] } {
+	const missing = names.filter((n) => !(first.get(n)! - from <= windowMs));
+	return { at: missing.length ? null : Math.max(0, ...names.map((n) => first.get(n)! - from)), missing };
+}
+
 export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: string; json: Record<string, unknown>; verdict: Verdict } {
 	const incidents = events.filter((e) => e.kind === 'incident') as unknown as Incident[];
 	const sessions = buildSessions(events, meta.endedAt);
@@ -223,6 +231,15 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 	}
 	const usedTypes = new Set(events.filter((e) => e.kind === 'module').map((e) => String(e.short)));
 	const unusedTypes = (meta.moduleTypes ?? []).filter((t) => !usedTypes.has(t));
+	const firstOk = new Map<string, number>();
+	for (const a of actions) if (a.ok && !String(a.note ?? '').startsWith('skipped') && !firstOk.has(String(a.name))) firstOk.set(String(a.name), a.t);
+	const firstModule = new Map<string, number>();
+	for (const e of events) if (e.kind === 'module' && !firstModule.has(String(e.short))) firstModule.set(String(e.short), e.t);
+	const windowMs = meta.coverageMs ?? 30 * 60_000;
+	const cov = {
+		actions: coverage(meta.actionNames ?? [], firstOk, meta.startedAt, windowMs),
+		modules: coverage(meta.moduleTypes ?? [], firstModule, meta.startedAt, windowMs),
+	};
 	const bursts = events.filter((e) => e.kind === 'main' && String(e.line).startsWith('[duration-test] burst')).length;
 
 	const L: string[] = [];
@@ -242,6 +259,12 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 	L.push(`- Recovered by itself: ${incidents.filter((i) => i.level === 'self').length}, by editor reconnect: ${incidents.filter((i) => i.level === 'editor-reconnect').length}, by app relaunch: ${incidents.filter((i) => i.level === 'app-relaunch').length}, **needed G2 power cycle: ${powerCyclesNeeded}** (${resets.length} power cycles executed in total)`);
 	L.push(`- Actions: ${actions.length} (${actions.filter((a) => !a.ok).length} failed); health probes: ${probes.length} (${probes.filter((p) => !p.ok).length} failed)`);
 	L.push(`- Editor/G2 consistency checks: ${checks.length} (${checks.filter((c) => (c.diffs as string[] | undefined)?.length).length} differed, ${checks.filter((c) => c.error).length} errors); anomalies: ${anomalies.length}`, '');
+
+	L.push(`## Coverage (first ${fmtDur(windowMs)})`, '');
+	for (const [what, names, c] of [['actions', meta.actionNames ?? [], cov.actions], ['module types', meta.moduleTypes ?? [], cov.modules]] as const) {
+		L.push(c.at !== null ? `- All ${names.length} ${what} covered after ${fmtDur(c.at)}` : `- **${names.length - c.missing.length} of ${names.length} ${what} covered**; missing: ${c.missing.join(', ')}`);
+	}
+	L.push('');
 
 	L.push('## Sessions', '', '| # | Start | Duration | Ended by | Probable cause | Recovery |', '|---|---|---|---|---|---|');
 	sessions.forEach((s, i) => {
@@ -275,5 +298,5 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 	if (unusedTypes.length) L.push('', `Not used: ${unusedTypes.join(', ')}`);
 	L.push('');
 
-	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, anomalies, actions: Object.fromEntries(byType), moduleTypesUsed: [...usedTypes], moduleTypesUnused: unusedTypes, bursts } };
+	return { markdown: L.join('\n'), verdict, json: { verdict, meta, sessions, incidents, anomalies, actions: Object.fromEntries(byType), moduleTypesUsed: [...usedTypes], moduleTypesUnused: unusedTypes, coverage: cov, bursts } };
 }

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { BURST_GAP_MS, BURST_MIN, pickAction, planBurst } from './pick';
+import { BURST_GAP_MS, BURST_MIN, MAX_TRIES, pickAction, planBurst } from './pick';
 
 // mulberry32, same PRNG as duration.spec.ts
 function rng(seed: number): () => number {
@@ -17,17 +17,30 @@ describe('pickAction', () => {
 	const pool = Array.from({ length: 12 }, (_, i) => ({ name: `a${i}`, weight: i === 0 ? 1000 : 1 }));
 
 	it('runs every action once before repeating any, despite skewed weights', () => {
-		const ran = new Set<string>();
+		const covered = new Set<string>();
 		const rnd = rng(1);
-		const first = pool.map(() => pickAction(pool, rnd, ran).name);
+		const first = pool.map(() => {
+			const name = pickAction(pool, rnd, covered, new Map()).name;
+			covered.add(name);
+			return name;
+		});
 		expect(new Set(first).size).toBe(pool.length);
 	});
 
 	it('falls back to weights once everything has run', () => {
-		const ran = new Set(pool.map((a) => a.name));
+		const covered = new Set(pool.map((a) => a.name));
 		const rnd = rng(2);
-		const picks = Array.from({ length: 200 }, () => pickAction(pool, rnd, ran).name);
+		const picks = Array.from({ length: 200 }, () => pickAction(pool, rnd, covered, new Map()).name);
 		expect(picks.filter((n) => n === 'a0').length).toBeGreaterThan(180);
+	});
+
+	it('stops preferring an uncovered action after MAX_TRIES attempts', () => {
+		const covered = new Set(pool.slice(1).map((a) => a.name));
+		const rnd = rng(4);
+		expect(pickAction(pool.slice(0, 2).reverse(), rnd, new Set(['a1']), new Map([['a0', MAX_TRIES - 1]])).name).toBe('a0');
+		const lowA0 = pool.map((a) => (a.name === 'a0' ? { ...a, weight: 0 } : a));
+		const picks = Array.from({ length: 50 }, () => pickAction(lowA0, rnd, covered, new Map([['a0', MAX_TRIES]])).name);
+		expect(picks).not.toContain('a0');
 	});
 });
 

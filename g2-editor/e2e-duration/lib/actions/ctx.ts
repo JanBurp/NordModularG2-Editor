@@ -34,6 +34,8 @@ export interface ActionDef {
 	weight: number;
 	/** Cheap precondition on ctx state only (no DOM reads). */
 	enabled?: (c: ActionCtx) => boolean;
+	/** Action that can make `enabled` true (coverage runs it when this one is still uncovered). */
+	enabledBy?: string;
 	/** May run inside a fast burst (short, no dialogs, no loads). */
 	burst?: boolean;
 	/** Returns a short note for the log ("skipped: …" when a precondition is missing); throws on failure. */

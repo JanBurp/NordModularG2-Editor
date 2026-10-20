@@ -18,6 +18,7 @@ import { powerCycle, shellyPreflight } from './lib/shelly';
  *   ACTION_INTERVAL_S  mean pause between actions, jittered 0.5-1.5x (default 6)
  *   BURST_P            chance per step of a burst of fast actions (default 1/6)
  *   BURST_MAX          most actions in one burst (default 15, at least 5)
+ *   COVERAGE_MIN       minutes in which every action and module type must have run once (default 30)
  *   SEED               replay a run's random sequence (printed in the report)
  *   DURATION_HEADED=1  show the editor window so you can watch; don't click or type in it while it runs
  */
@@ -25,6 +26,7 @@ const HOURS = Number(process.env.DURATION_HOURS ?? 4);
 const INTERVAL_S = Number(process.env.ACTION_INTERVAL_S ?? 6);
 const BURST_P = Number(process.env.BURST_P ?? 1 / 6);
 const BURST_MAX = Number(process.env.BURST_MAX ?? 15);
+const COVERAGE_MIN = Number(process.env.COVERAGE_MIN ?? 30);
 const SEED = Number(process.env.SEED ?? Date.now() % 2 ** 31);
 
 // mulberry32: small deterministic PRNG so a run can be replayed with SEED=<n>
@@ -57,7 +59,7 @@ test('G2 duration test', async () => {
 	const startedAt = Date.now();
 	const runDir = path.join(__dirname, '..', 'duration-report', new Date(startedAt).toISOString().replace(/[:.]/g, '-'));
 	const log = new EventLog(runDir);
-	const meta: RunMeta = { startedAt, endedAt: startedAt, plannedMs: HOURS * 3600_000, seed: SEED, commit: gitCommit() };
+	const meta: RunMeta = { startedAt, endedAt: startedAt, plannedMs: HOURS * 3600_000, seed: SEED, commit: gitCommit(), coverageMs: COVERAGE_MIN * 60_000 };
 	if (process.platform === 'darwin') spawn('caffeinate', ['-i', '-w', String(process.pid)], { stdio: 'ignore' }).unref();
 
 	let runner: Runner | undefined;
@@ -114,7 +116,7 @@ test('G2 duration test', async () => {
 		}
 		await new Promise((r) => setTimeout(r, 5000));
 
-		await runner.run(startedAt + meta.plannedMs, INTERVAL_S * 1000);
+		await runner.run(startedAt + meta.plannedMs, INTERVAL_S * 1000, { from: startedAt, until: startedAt + meta.coverageMs! });
 	} catch (e) {
 		meta.aborted = String(e);
 		log.log('error', { line: meta.aborted });
