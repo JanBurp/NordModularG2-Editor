@@ -72,15 +72,19 @@ export function useKnob(
 			drag.acc = clamp(drag.acc + knobDragStep(settings.knobMode, drag.prev, to, drag.centre, drag.radius) * sensitivity, 0, maxValue());
 			drag.prev = to;
 			const newValue = Math.round(drag.acc);
-			if (newValue !== value.value) emitChange(newValue);
+			if (newValue !== value.value) {
+				emitChange(newValue);
+				dragChanges++;
+			}
 		},
 		{ pointerLock: () => settings.knobReturnCursor },
 	);
 
 	const isDoubleClick = createDoubleClickDetector();
+	let dragChanges = 0; // detector key: a press after a drag that changed the value starts a new click pair
 
 	function onMouseDownCapture(event: MouseEvent | TouchEvent) {
-		if (isPrimaryMouseDown(event) && isDoubleClick()) {
+		if (isPrimaryMouseDown(event) && isDoubleClick(String(dragChanges))) {
 			emitChange(getDefault());
 			return;
 		}

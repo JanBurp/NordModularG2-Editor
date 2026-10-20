@@ -7,6 +7,7 @@
 			variant="toggle"
 			size="small"
 			:title="`Switch to ${d.name ?? 'this device'}`"
+			hint="deviceSwitch"
 			class="flex items-center gap-1.5"
 			@click="switchTo(d)"
 		>

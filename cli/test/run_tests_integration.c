@@ -40,6 +40,7 @@ extern void test_daemon_set_slot_key_burst(void);
 extern void test_oneshot_queries_with_stream_left_on(void);
 extern void test_patch_workflow_full_cycle(void);
 extern void test_patch_workflow_replace_module(void);
+extern void test_daemon_slot_flags_after_patch_to_perf(void);
 extern void test_daemon_perf_mode_cycle(void);
 
 extern void test_daemon_multi_starts(void);
@@ -238,6 +239,7 @@ int main(void) {
     run_test_silently("test_daemon_set_slot_key_burst",     test_daemon_set_slot_key_burst);
     run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_patch_workflow_replace_module",  test_patch_workflow_replace_module);
+    run_test_silently("test_daemon_slot_flags_after_patch_to_perf", test_daemon_slot_flags_after_patch_to_perf);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
     run_test_silently("test_oneshot_queries_with_stream_left_on", test_oneshot_queries_with_stream_left_on);
 

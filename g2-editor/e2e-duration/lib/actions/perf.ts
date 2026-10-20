@@ -29,6 +29,7 @@ export const PERF_ACTIONS: ActionDef[] = [
 		name: 'slotActiveKey',
 		weight: 1,
 		enabled: isPerf,
+		enabledBy: 'togglePerfMode',
 		run: async (c) => {
 			const i = int(c, 4);
 			const shift = c.rnd() < 0.5;

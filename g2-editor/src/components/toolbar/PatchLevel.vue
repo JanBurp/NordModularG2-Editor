@@ -5,10 +5,14 @@
 			:value="patchParams?.[uiStore.variation]?.patchVol ?? 100"
 			:default-value="defaultPatchParams().patchVol"
 			@change="(val) => slotsStore.setPatchParam(uiStore.variation, 'patchVol', val)"
+			@mouseenter="showHint('patchLevel')"
+			@mouseleave="clearHint"
 		/>
 		<CheckBox
 			:model-value="(patchParams?.[uiStore.variation]?.activeMuted ?? 1) === 1"
 			@update:model-value="(val) => slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val ? 1 : 0)"
+			@mouseenter="showHint('patchActive')"
+			@mouseleave="clearHint"
 		/>
 	</div>
 </template>
@@ -21,6 +25,9 @@
 	import { defaultPatchParams } from '../../store/slotHelpers';
 	import { useUiStore } from '../../store/ui';
 	import { usePatchParams } from '../../composables/usePatchParams';
+	import { useStatusHint } from '../../composables/useStatusHint';
+
+	const { showHint, clearHint } = useStatusHint();
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();

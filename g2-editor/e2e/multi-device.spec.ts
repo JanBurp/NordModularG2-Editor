@@ -35,7 +35,7 @@ async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice
 async function launchApp(testUserData: string): Promise<ElectronApplication> {
 	return electron.launch({
 		args: [APP_ROOT],
-		env: { ...process.env, NODE_ENV: 'test', HEADLESS: '1', TEST_USER_DATA: testUserData },
+		env: { ...process.env, NODE_ENV: 'test', HEADLESS: '1', TEST_USER_DATA: testUserData, G2_SKIP_STARTUP_SCAN: '1' },
 	});
 }
 

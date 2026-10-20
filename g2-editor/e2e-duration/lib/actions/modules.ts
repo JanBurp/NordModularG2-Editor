@@ -28,6 +28,7 @@ import {
 	teardown,
 	UI_TIMEOUT_MS,
 } from './ctx';
+import { initSlot } from './patch';
 
 // Own modules go far right of the patch (cols 12-15) so collision push-down doesn't rearrange the user's modules.
 const OWN_COL0 = 12;
@@ -57,6 +58,7 @@ export async function addOwnModule(c: ActionCtx, def: ModuleDefinition, area: Ar
 	if (fresh.length === 0) throw new Error(`added module not on canvas: ${diag}`);
 	const own: OwnModule = { idx: fresh[0], area, type: def.id, short: def.short };
 	c.own.set(slot, [...(c.own.get(slot) ?? []), own]);
+	c.modules.added(def);
 	c.log.log('module', { type: def.id, short: def.short, area, slot });
 	return own;
 }
@@ -87,13 +89,18 @@ export const MODULE_ACTIONS: ActionDef[] = [
 			// Real bank patches often use 75-100 % of the voice area's DSP: add where there is headroom.
 			const peaks = await resourcePeaks(c.page);
 			const room = (['va', 'fx'] as const).filter((a) => !peaks || peaks[a] < RESOURCE_LIMIT);
-			if (room.length === 0) return own > 0 ? `${await teardown(c)} (resources at ${peaks!.va}% / ${peaks!.fx}%)` : `skipped: slot ${slot} at ${peaks!.va}% VA / ${peaks!.fx}% FX`;
+			if (room.length === 0) {
+				if (own > 0) return `${await teardown(c)} (resources at ${peaks!.va}% / ${peaks!.fx}%)`;
+				// Coverage can't wait for a full bank patch to be replaced by chance.
+				if (c.modules.remaining > 0) return `${await initSlot(c, 'New')} (slot was at ${peaks!.va}% VA / ${peaks!.fx}% FX)`;
+				return `skipped: slot ${slot} at ${peaks!.va}% VA / ${peaks!.fx}% FX`;
+			}
 			const area: Area = room.length === 1 ? room[0] : c.rnd() < 0.7 ? 'va' : 'fx';
 			await showArea(c, area);
 			const added: string[] = [];
 			for (let k = 1 + int(c, 3); k > 0; k--) {
-				const def = c.modules.next();
-				if (!isValidInArea(def.id, area === 'va' ? 'voice' : 'fx')) continue; // the editor refuses it (Fx-In in VA)
+				const def = c.modules.next((d) => isValidInArea(d.id, area === 'va' ? 'voice' : 'fx')); // the editor refuses Fx-In in VA
+				if (!def) break;
 				const own = await addOwnModule(c, def, area);
 				if (typeof own === 'string') return own;
 				added.push(def.short);
@@ -151,6 +158,7 @@ export const MODULE_ACTIONS: ActionDef[] = [
 				if (def) {
 					m.type = def.id;
 					m.short = def.short;
+					c.modules.added(def);
 					c.log.log('module', { type: def.id, short: def.short, area: m.area, via: 'replace' });
 				}
 				return `replaced #${m.idx} with "${label}" (${short})`;

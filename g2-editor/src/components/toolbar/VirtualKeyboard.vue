@@ -2,14 +2,14 @@
 	<div class="flex bg-surface-1 border-t border-line-subtle select-none" data-testid="virtual-keyboard">
 		<div class="flex flex-col gap-2 px-2 py-2 border-line-subtle shrink-0 justify-between">
 			<div class="flex gap-2 justify-between">
-				<Button class="w-6" variant="default" size="small" @click="scrollBy(-12)">&lt;&lt;</Button>
-				<Button class="w-6" variant="default" size="small" @click="scrollBy(-1)">&lt;</Button>
-				<Button class="w-6" variant="default" size="small" @click="scrollBy(1)">&gt;</Button>
-				<Button class="w-6" variant="default" size="small" @click="scrollBy(12)">&gt;&gt;</Button>
+				<Button class="w-6" variant="default" size="small" hint="keyboardScroll" @click="scrollBy(-12)">&lt;&lt;</Button>
+				<Button class="w-6" variant="default" size="small" hint="keyboardScroll" @click="scrollBy(-1)">&lt;</Button>
+				<Button class="w-6" variant="default" size="small" hint="keyboardScroll" @click="scrollBy(1)">&gt;</Button>
+				<Button class="w-6" variant="default" size="small" hint="keyboardScroll" @click="scrollBy(12)">&gt;&gt;</Button>
 			</div>
 			<div class="flex gap-1 justify-between">
-				<Button variant="toggle" :active="drone" @click="toggleDrone">Drone</Button>
-				<Button variant="toggle" :active="repeat" @click="toggleRepeat">Repeat</Button>
+				<Button variant="toggle" :active="drone" hint="keyboardDrone" @click="toggleDrone">Drone</Button>
+				<Button variant="toggle" :active="repeat" hint="keyboardRepeat" @click="toggleRepeat">Repeat</Button>
 			</div>
 		</div>
 
@@ -22,6 +22,8 @@
 				:style="keyStyle(k)"
 				@pointerdown.prevent="pointerDown($event, k.note)"
 				@pointerenter="glideTo(k.note)"
+				@mouseenter="showHint('keyboardKeys')"
+				@mouseleave="clearHint"
 			>
 				<div v-if="k.note % 12 === 0" class="absolute bottom-4 text-xs leading-none text-neutral-500 pointer-events-none w-full text-center">
 					{{ midiNoteName(k.note) }}
@@ -42,6 +44,9 @@
 	import { useDeviceStore } from '../../store/device';
 	import { MidiNote as midiNoteName } from '../../renderer/parammap';
 	import { isBlackNote } from '../../renderer/pianoRoll';
+	import { useStatusHint } from '../../composables/useStatusHint';
+
+	const { showHint, clearHint } = useStatusHint();
 
 	interface KeyInfo {
 		note: number;

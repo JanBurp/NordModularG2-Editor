@@ -76,6 +76,20 @@ describe('buildSessions / buildReport', () => {
 		expect(markdown).toContain('Used 1 of 3 types.');
 		expect(json.moduleTypesUnused).toEqual(['LfoA', 'Mix4-1A']);
 	});
+	it('reports coverage within the window: skips and late firsts do not count', () => {
+		const meta = { startedAt: T0, endedAt: T0 + 3_600_000, plannedMs: 3_600_000, seed: 1, commit: 'abc', coverageMs: 600_000, actionNames: ['addModules', 'setMode'], moduleTypes: ['OscA', 'LfoA'] };
+		const evs: LogEvent[] = [
+			{ t: T0 + 60_000, kind: 'action', name: 'addModules', ok: true, note: 'added OscA+LfoA' },
+			{ t: T0 + 60_000, kind: 'module', short: 'OscA' },
+			{ t: T0 + 90_000, kind: 'module', short: 'LfoA' },
+			{ t: T0 + 120_000, kind: 'action', name: 'setMode', ok: true, note: 'skipped: no mode param' },
+			{ t: T0 + 700_000, kind: 'action', name: 'setMode', ok: true, note: 'mode 1' },
+		];
+		const { markdown } = buildReport(evs, meta);
+		expect(markdown).toContain('## Coverage (first 10m00s)');
+		expect(markdown).toContain('**1 of 2 actions covered**; missing: setMode');
+		expect(markdown).toContain('All 2 module types covered after 1m30s');
+	});
 });
 
 describe('anomalies', () => {

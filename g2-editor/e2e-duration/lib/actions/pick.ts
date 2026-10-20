@@ -6,12 +6,15 @@ export interface Pickable {
 	burst?: boolean;
 }
 
-/** Coverage first: an action that hasn't run yet wins; after that, weighted random. Marks the pick as run. */
-export function pickAction<T extends Pickable>(pool: T[], rnd: () => number, ran: Set<string>): T {
-	const fresh = pool.filter((a) => !ran.has(a.name));
-	const a = fresh.length ? fresh[Math.floor(rnd() * fresh.length)] : weighted(pool, rnd);
-	ran.add(a.name);
-	return a;
+/** Attempts after which an action that never really ran (only skips/failures) stops being preferred. */
+export const MAX_TRIES = 3;
+
+export const isFresh = (a: Pickable, covered: Set<string>, tries: Map<string, number>) => !covered.has(a.name) && (tries.get(a.name) ?? 0) < MAX_TRIES;
+
+/** Coverage first: an action not yet `covered` (and tried < MAX_TRIES times) wins; after that, weighted random. */
+export function pickAction<T extends Pickable>(pool: T[], rnd: () => number, covered: Set<string>, tries: Map<string, number>): T {
+	const fresh = pool.filter((a) => isFresh(a, covered, tries));
+	return fresh.length ? fresh[Math.floor(rnd() * fresh.length)] : weighted(pool, rnd);
 }
 
 export function weighted<T extends Pickable>(pool: T[], rnd: () => number): T {
@@ -28,4 +31,16 @@ export function planBurst(rnd: () => number, p: number, max: number): number[] |
 	if (rnd() >= p) return null;
 	const n = BURST_MIN + Math.floor(rnd() * (Math.max(max, BURST_MIN) - BURST_MIN + 1));
 	return Array.from({ length: n }, () => BURST_GAP_MS[0] + Math.floor(rnd() * (BURST_GAP_MS[1] - BURST_GAP_MS[0] + 1)));
+}
+
+/** mulberry32: small deterministic PRNG so a run can be replayed with SEED=<n>. */
+export function rng(seed: number): () => number {
+	let a = seed >>> 0;
+	return () => {
+		a = (a + 0x6d2b79f5) >>> 0;
+		let t = a;
+		t = Math.imul(t ^ (t >>> 15), t | 1);
+		t ^= t + Math.imul(t ^ (t >>> 7), t | 61);
+		return ((t ^ (t >>> 14)) >>> 0) / 4294967296;
+	};
 }

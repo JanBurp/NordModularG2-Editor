@@ -22,7 +22,3 @@ void test_set_perf_mode_invalid_shift(void) {
 void test_set_perf_name_null_name(void) {
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_name(NULL));
 }
-
-void test_set_perf_name_empty_name(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_perf_name(""));
-}

@@ -107,7 +107,8 @@ export const useBrowserStore = defineStore('browser', {
 			await this.loadDiskList(parent);
 		},
 
-		async storePatch(slotIndex: 0 | 1 | 2 | 3, bank: number, location: number, kind: 'patch' | 'performance', name?: string): Promise<void> {
+		// Returns false when the store failed (already reported with a toast).
+		async storePatch(slotIndex: 0 | 1 | 2 | 3, bank: number, location: number, kind: 'patch' | 'performance', name?: string): Promise<boolean> {
 			const slot = kind === 'performance' ? 4 : slotIndex;
 			try {
 				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
@@ -116,8 +117,10 @@ export const useBrowserStore = defineStore('browser', {
 				this.upsertPatch(bank, location, kind, name ?? '', category);
 				useDeviceStore().setStoredLocation(kind === 'performance' ? 'perf' : SLOT_LABELS[slotIndex], bank, location);
 				showToast(`Saved ${kind} at ${bank}-${location}`);
+				return true;
 			} catch (e: any) {
 				showToast(e.message);
+				return false;
 			}
 		},
 

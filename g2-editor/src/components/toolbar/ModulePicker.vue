@@ -18,6 +18,8 @@
 						width: categoryCellWidthPx + 'px',
 					}"
 					@click="selectedCategory = cat"
+					@mouseenter="showHint('modulePickerCategory')"
+					@mouseleave="clearHint"
 				>
 					{{ cat }}
 				</button>
@@ -33,6 +35,8 @@
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
+					@mouseenter="showHint('modulePickerModule')"
+					@mouseleave="clearHint"
 					:alt="m.long || m.short"
 				/>
 				<div
@@ -45,6 +49,8 @@
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
+					@mouseenter="showHint('modulePickerModule')"
+					@mouseleave="clearHint"
 				>
 					{{ m.short }}
 				</div>
@@ -61,8 +67,11 @@
 	import { useVisibleCategories } from '../../composables/useVisibleCategories';
 	import { useListNav } from '../../composables/useListNav';
 	import { useAddModule } from '../../composables/useAddModule';
+	import { useStatusHint } from '../../composables/useStatusHint';
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import ToolBarGroup from './ToolBarGroup.vue';
+
+	const { showHint, clearHint } = useStatusHint();
 
 	const { graphics } = useModuleGraphics();
 	const { handleDragStart, handleDragEnd } = useModuleDragSource();

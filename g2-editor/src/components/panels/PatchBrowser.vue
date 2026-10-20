@@ -12,6 +12,8 @@
 					class="text-content-secondary hover:text-content-primary px-1 shrink-0 cursor-pointer"
 					:title="`Up to ${diskParentName}`"
 					@click="browser.navigateUp()"
+					@mouseenter="showHint('browserUp')"
+					@mouseleave="clearHint"
 				>
 					<Icon name="arrowUp" class="w-2.5 h-2.5" />
 				</button>
@@ -22,6 +24,8 @@
 					class="text-content-secondary hover:text-content-primary px-1 shrink-0 cursor-pointer"
 					title="Choose folder"
 					@click="browser.chooseDiskFolder()"
+					@mouseenter="showHint('browserChooseFolder')"
+					@mouseleave="clearHint"
 				>
 					<Icon name="folder" class="w-3 h-3" />
 				</button>
@@ -49,6 +53,8 @@
 						:data-nav-idx="i"
 						:selected="i === selectedNavIndex"
 						@click="selectDisk(entry)"
+						@mouseenter="showHint('browserFolder')"
+						@mouseleave="clearHint"
 					>
 						<template #icon><Icon name="folder" class="w-3 h-3 text-content-secondary" /></template>
 						<template #label>{{ entry.name }}</template>
@@ -59,6 +65,8 @@
 						:data-nav-idx="filteredDiskDirs.length + i"
 						:selected="filteredDiskDirs.length + i === selectedNavIndex"
 						@click="isDoubleClick(entry.path) && selectDisk(entry)"
+						@mouseenter="showHint('browserFile')"
+						@mouseleave="clearHint"
 					>
 						<template #icon><span /></template>
 						<template #label>{{ formatFileName(entry) }}</template>
@@ -93,6 +101,8 @@
 						class="shrink-0 text-content-secondary hover:text-content-primary px-1 cursor-pointer"
 						:title="allBanksExpanded ? 'Collapse All' : 'Expand All'"
 						@click="toggleAllBanks"
+						@mouseenter="showHint('expandCollapseAll')"
+						@mouseleave="clearHint"
 					>
 						<Icon :name="allBanksExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 					</button>
@@ -112,6 +122,8 @@
 							:data-nav-idx="bankNavIndex.get(group.bank)"
 							@click="browser.toggleBank(group.bank)"
 							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
+							@mouseenter="showHint('browserBank')"
+							@mouseleave="clearHint"
 						>
 							<span class="text-content-muted w-3">
 								<Icon :name="browser.isBankCollapsed(group.bank) ? 'chevronRight' : 'chevronDown'" class="w-2.5 h-2.5" />
@@ -128,6 +140,8 @@
 								:selected="flatNavIndex.get(p) === selectedNavIndex"
 								@click="isDoubleClick(`${p.bank}-${p.location}`) && selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
 								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
+								@mouseenter="showHint('browserPatch')"
+								@mouseleave="clearHint"
 							>
 								<template #icon>{{ p.bank }}-{{ p.location }}</template>
 								<template #label>{{ p.name }}</template>
@@ -166,6 +180,7 @@
 	import Icon from '../common/Icon.vue';
 	import Dialog from '../common/Dialog.vue';
 	import { createDoubleClickDetector } from '../../utils/doubleClick';
+	import { useStatusHint } from '../../composables/useStatusHint';
 
 	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
 	function formatCategory(cat?: string): string {
@@ -193,6 +208,7 @@
 	const { open: openCtx } = useContextMenu();
 	const bankDownloadDialog = useBankDownloadDialog();
 	const bankUploadDialog = useBankUploadDialog();
+	const { showHint, clearHint } = useStatusHint();
 
 	const rootRef = ref<HTMLElement>();
 	const searchRef = ref();
@@ -203,9 +219,9 @@
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
 	const viewOptions = [
-		{ label: 'Disk', value: 'disk' },
-		{ label: 'Patches', value: 'patches' },
-		{ label: 'Performances', value: 'performances' },
+		{ label: 'Disk', value: 'disk', hint: 'browserView' as const },
+		{ label: 'Patches', value: 'patches', hint: 'browserView' as const },
+		{ label: 'Performances', value: 'performances', hint: 'browserView' as const },
 	];
 
 	function cycleView(dir: 1 | -1) {

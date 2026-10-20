@@ -2,8 +2,8 @@
 // Edit the strings here — nothing else needs to change to update what a hint says.
 import { isMac } from '@/utils/platform';
 
-const MOD = isMac ? '⌘' : 'Ctrl'; // Cmd on Mac, Ctrl elsewhere
-const ALT = isMac ? '⌥' : 'Alt';
+export const MOD = isMac ? '⌘' : 'Ctrl'; // Cmd on Mac, Ctrl elsewhere
+export const ALT = isMac ? '⌥' : 'Alt';
 
 export const STATUS_HINTS = {
 	// Canvas — hidden gestures
@@ -18,9 +18,18 @@ export const STATUS_HINTS = {
 	paramSlider: `Drag/Wheel: adjust · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Double-click/Enter: default · Shift-click/=: set value · Right-click: more options`,
 	paramSpinner: `Click/Hold/Wheel: step · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · =: set value · Enter: default · Right-click: more options`,
 	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
-	ccRow: 'Click: select · Drag: reassign CC',
+	ccRow: `Click: select · Shift-click: select range · ${MOD}-click: add/remove from selection · Drag: reassign CC`,
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
 	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · Drop CC here: assign · Right-click: rename, clear, copy',
+
+	morphSource: 'Click: cycle morph source',
+	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter to assign · Right-click: deassign, morph`,
+	paramPageButton: 'Click: change button value',
+	globalPages: 'Click: switch between Patch and Global parameter pages',
+	paramBank: 'Click: select parameter bank',
+	paramPage: 'Click: select parameter page',
+	patchLevel: 'Drag/Wheel: adjust · Shift-drag: fine · Double-click: default',
+	patchActive: 'Click: mute / unmute patch',
 
 	// StatusBar — area switch
 	areaVoice: 'V: show Voice (again: Split)',
@@ -34,6 +43,19 @@ export const STATUS_HINTS = {
 	paneText: `${MOD}J: patch notes`,
 	paneSettings: `${MOD}, : editor, device, and patch settings`,
 
+	// Side panel — browser, modules, MIDI CC
+	browserView: 'Click: switch between Disk, Patches and Performances',
+	browserUp: 'Click: up one folder',
+	browserChooseFolder: 'Click: choose folder',
+	browserFolder: 'Click/Enter: open folder · ←: parent folder · ↑↓: navigate',
+	browserFile: 'Double-click/Enter: load · ←: parent folder · ↑↓: navigate',
+	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
+	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort',
+	expandCollapseAll: 'Click: expand/collapse all',
+	expandCollapse: 'Click: expand/collapse',
+	moduleItem: 'Drag: add to canvas · Click: show/hide help',
+	ccAutoAssign: 'Click: assign free CCs to the parameters of the selected modules',
+
 	// Toolbars
 	variationCopy: 'Drag or right-click: copy to another variation',
 	variationInit: 'Click: reset current variation to INIT',
@@ -44,6 +66,22 @@ export const STATUS_HINTS = {
 	setBpm: 'Click: set tempo',
 	cableShowHideAll: 'Space/H: show/hide all cables',
 	cableShake: 'S/Shift-Space: redraw overlapping cables',
+	cableColorToggle: 'Click: show/hide cables of this color',
+	colorApply: 'Click: apply color to selected modules',
+	colorChoose: 'Click: choose color',
+	clockRun: 'Click: start/stop master clock',
+	perfMode: 'Click: switch Patch/Performance mode · Shift-click: create performance/get patches from performance',
+	deviceSwitch: 'Click: switch to this device',
+	undo: `Click/${MOD}Z: undo`,
+	redo: `Click/Shift-${MOD}Z: redo`,
+	newPatch: 'Click: new empty patch',
+	initPatch: 'Click: load init patch',
+	modulePickerCategory: 'Click: show category · Tab/Shift-Tab: next/previous category',
+	modulePickerModule: 'Drag: add to canvas · ,/.: select module · Enter: add selected module',
+	keyboardScroll: 'Click: scroll keyboard by an octave (<< >>) or a semitone (< >)',
+	keyboardDrone: 'Click: hold played note until clicked again',
+	keyboardRepeat: 'Click: repeatedly re-strike played note',
+	keyboardKeys: 'Click: play note · Drag: glide across keys',
 } as const;
 
 export type StatusHintKey = keyof typeof STATUS_HINTS;

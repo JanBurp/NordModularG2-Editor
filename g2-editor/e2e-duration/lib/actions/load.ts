@@ -45,6 +45,7 @@ export const LOAD_ACTIONS: ActionDef[] = [
 		name: 'loadPerformance',
 		weight: 1,
 		enabled: (c) => c.mode === 'Performance',
+		enabledBy: 'togglePerfMode',
 		run: async (c) =>
 			orSkip('patch browser', async () => {
 				const label = await loadFromBrowser(c, 'Performances');

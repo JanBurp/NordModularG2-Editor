@@ -13,6 +13,8 @@
 			@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			@dragover.prevent
 			@drop.prevent="onKnobDrop(cell, $event)"
+			@mouseenter="showHint('paramPageCell')"
+			@mouseleave="clearHint"
 		>
 			<span class="text-xs w-full truncate text-center font-bold">{{ cell.moduleHeader }}</span>
 
@@ -25,7 +27,12 @@
 			     target (data-cell-slot, @drop above); style.css's .alt-assign rules give it the grab cursor.
 			     The Knob inside goes pointer-events-none under Alt, so the gesture never races useKnob.ts's
 			     value-drag. Empty slots drag too: dropping one on a canvas param assigns that param here. -->
-			<div @mousedown.capture="onKnobMorphMouseDown(cell, $event)" @mouseenter="showHint('paramPageKnob')" @mouseleave="clearHint" class="-mb-1">
+			<div
+				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
+				@mouseenter="showHint('paramPageKnob')"
+				@mouseleave="showHint('paramPageCell')"
+				class="-mb-1"
+			>
 				<!-- Unassigned slots render the same Knob, just at value 0 and inert (the cell-level
 				     opacity above dims it). The wrapper keeps its own pointer events, so the assign
 				     drag/drop still works on empty cells. -->
@@ -50,6 +57,8 @@
 					:class="{ 'opacity-40': cell.assignment && !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
 					@mousedown="onButtonMouseDown(cell)"
 					@click="onButtonClick(cell)"
+					@mouseenter="showHint('paramPageButton')"
+					@mouseleave="showHint('paramPageCell')"
 				>
 					{{ cell.buttonValueLabel }}
 				</div>
@@ -58,7 +67,9 @@
 	</div>
 
 	<div class="self-stretch flex flex-col justify-between py-0.5">
-		<Button variant="toggle" :active="uiStore.globalPagesActive" @click="onToggleGlobalPages()" data-testid="global-pages-toggle"> Global </Button>
+		<Button variant="toggle" :active="uiStore.globalPagesActive" hint="globalPages" @click="onToggleGlobalPages()" data-testid="global-pages-toggle">
+			Global
+		</Button>
 
 		<BtnGroup
 			:model-value="(uiStore.globalPagesActive ? uiStore.selectedGlobalParamBank : uiStore.selectedParamBank) + 1"
@@ -124,8 +135,8 @@
 	const { startDrag: startMorphRangeDrag } = useMorphRangeDrag();
 	const { showHint, clearHint } = useStatusHint();
 
-	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value }));
-	const bankOptions = [1, 2, 3];
+	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value, hint: 'paramPage' as const }));
+	const bankOptions = [1, 2, 3].map((value) => ({ label: String(value), value, hint: 'paramBank' as const }));
 
 	interface Cell {
 		slotIndex: number;

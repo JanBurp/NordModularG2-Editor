@@ -1,7 +1,7 @@
 import { execFile } from 'child_process';
 import { g2Count, SHELLY_PATH, sleep, waitFor } from './cli';
 
-function shelly(cmd: 'on' | 'off'): Promise<void> {
+export function shelly(cmd: 'on' | 'off'): Promise<void> {
 	return new Promise((resolve, reject) => {
 		execFile(SHELLY_PATH, [cmd], { timeout: 15_000 }, (err, _out, stderr) => (err ? reject(new Error(`shelly ${cmd}: ${err.message} ${stderr}`)) : resolve()));
 	});

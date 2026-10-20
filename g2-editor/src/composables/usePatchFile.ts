@@ -2,9 +2,10 @@ import type { Patch, GlobalParamPageAssignment, SlotLabel } from '@/types';
 import { SLOT_LABELS } from '../constants';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { useSettingsStore } from '../store/settings';
+import { runCliBatchSafe } from '../store/slotHelpers';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { showToast } from './useToast';
+import { showToast, dismissToastByKey } from './useToast';
 const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
@@ -34,6 +35,21 @@ export function usePatchFile() {
 		}
 	}
 
+	// Uploads a loaded .pch2 file into the slot, then repairs the file's wrong uprate bits (see loadPatchFile).
+	async function uploadPatchFile(slot: SlotLabel, filepath: string, uprateRepairCmds: string[][]): Promise<void> {
+		if (device.status !== DeviceStatus.Connected) return;
+		slotsStore.uploadingFromFile = true;
+		try {
+			await window.cli.run(['upload-patch', slot, filepath]);
+			if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
+		} catch (err) {
+			console.error('Upload to G2 failed:', err);
+			showToast('Patch upload to G2 failed — check device connection.');
+		} finally {
+			slotsStore.uploadingFromFile = false;
+		}
+	}
+
 	async function loadSlotPatch(index: number): Promise<{ name: string; patch: any } | null> {
 		return slotsStore.loadSlot(SLOT_LABELS[index]);
 	}
@@ -44,11 +60,14 @@ export function usePatchFile() {
 			if (slotsStore.uploadingFromFile) return;
 			slotsStore.uploadingFromFile = true;
 		}
-		slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
+		dismissToastByKey('uprate-perf'); // about the previous performance
+		const uprateRepairCmds = slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
 		await device.setPerformanceMode(name);
 		if (connected) {
 			try {
 				await window.cli.run(['upload-perf', filepath]);
+				// The raw file carries its own (possibly wrong) uprate bits; the G2 never recomputes them.
+				if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 			} catch (err) {
 				console.error('Upload perf to G2 failed:', err);
 				showToast('Performance upload to G2 failed — check device connection.');
@@ -100,6 +119,7 @@ export function usePatchFile() {
 		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		const rawHex = stripFileHeader(result.data as number[]);
 		let targetSlot: SlotLabel | undefined;
+		let uprateRepairCmds: string[][] = [];
 		try {
 			const parser = new PatchParser(buffer);
 			const prf2 = parser.parsePrf2();
@@ -111,30 +131,21 @@ export function usePatchFile() {
 			useSettingsStore().addRecentFile(result.filepath!, 'patch');
 			targetSlot = uiStore.slotInFocus;
 			const parsedPatch = parser.parse() as any;
-			slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
+			uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
 			showToast('Failed to load patch file — the file may be corrupt.');
 			return;
 		}
-		if (device.status === DeviceStatus.Connected) {
-			slotsStore.uploadingFromFile = true;
-			try {
-				await window.cli.run(['upload-patch', targetSlot, result.filepath!]);
-			} catch (err) {
-				console.error('Upload to G2 failed:', err);
-				showToast('Patch upload to G2 failed — check device connection.');
-			} finally {
-				slotsStore.uploadingFromFile = false;
-			}
-		}
+		await uploadPatchFile(targetSlot, result.filepath!, uprateRepairCmds);
 	}
 
 	async function handlePerformanceSynthSelect(bank: number, location: number): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
 		device.modeChanging = true;
 		delete device.storedLocation.perf;
+		dismissToastByKey('uprate-perf'); // about the previous performance
 		device.pendingPerfBank = bank - 1;
 		device.pendingPerfLoc = location - 1;
 		clearTimeout(perfSelectTimer);
@@ -151,6 +162,7 @@ export function usePatchFile() {
 		if (device.device?.performance) device.device.performance.name = name;
 		try {
 			await window.cli.run(['select-perf', String(bank), String(location)]);
+			device.setStoredLocation('perf', bank, location);
 			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null });
 			// In Patch mode the G2 loads the performance's patches but reports no perfBank/perfLoc to match
 			// (perfBank=129), so the pending select would only end in the timeout toast. select-perf answers
@@ -185,19 +197,9 @@ export function usePatchFile() {
 				}
 				const targetSlot = uiStore.slotInFocus;
 				const parsedPatch = new PatchParser(buffer).parse() as any;
-				slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
+				const uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
 				applyVariation(parsedPatch);
-				if (device.status === DeviceStatus.Connected) {
-					slotsStore.uploadingFromFile = true;
-					try {
-						await window.cli.run(['upload-patch', targetSlot, item.filepath]);
-					} catch (err) {
-						console.error('Upload to G2 failed:', err);
-						showToast('Patch upload to G2 failed — check device connection.');
-					} finally {
-						slotsStore.uploadingFromFile = false;
-					}
-				}
+				await uploadPatchFile(targetSlot, item.filepath, uprateRepairCmds);
 			} catch (err) {
 				console.error('Failed to load patch:', err);
 				showToast('Failed to load patch file — the file may be corrupt.');
@@ -213,6 +215,7 @@ export function usePatchFile() {
 				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(targetSlot);
 				device.clearOriginStale(targetSlot);
+				device.setStoredLocation(targetSlot, item.bank, item.location);
 			} catch (err) {
 				console.error('Failed to select synth patch:', err);
 				showToast('Failed to select synth patch — check device connection.');
