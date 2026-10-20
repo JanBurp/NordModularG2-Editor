@@ -1580,7 +1580,8 @@ int g2_set_perf_mode(int mode, int shift) {
 }
 
 int g2_set_perf_name(const char *name) {
-    if (!name || !*name) { g2_err("set-perf-name: name must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    /* "" is valid: the official editor sends it too (CPerformance::SetPerformanceName has no empty check). */
+    if (!name) { g2_err("set-perf-name: missing name\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-perf-name: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
 
@@ -1619,7 +1620,8 @@ int g2_set_perf_name(const char *name) {
 
 int g2_set_patch_name(int slot, const char *name) {
     if (slot < 0 || slot > 3)  { g2_err("set-patch-name: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
-    if (!name || !*name)       { g2_err("set-patch-name: name must be non-empty\n"); return G2_ERR_INVALID_PARAM; }
+    /* "" is valid: the official editor sends it too (CPatchView::OpenPatchNameDlg has no empty check). */
+    if (!name)                 { g2_err("set-patch-name: missing name\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-patch-name: failed to connect\n"); return G2_ERR_CONNECT; }
     size_t nlen = strlen(name);
     if (nlen > 16) nlen = 16;
