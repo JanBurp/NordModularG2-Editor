@@ -23,6 +23,7 @@
     "generate:button-params": "node scripts/generate-button-params.js",
     "generate:param-type-ids": "node scripts/generate-param-type-ids.js",
     "test": "vitest run",
+    "test:g2": "electron-vite build && vitest run -c vitest.g2.config.ts",
     "test:e2e": "electron-vite build && playwright test",
     "test:e2e:headless": "electron-vite build && HEADLESS=1 playwright test",
     "test:e2e:nobuild": "playwright test",

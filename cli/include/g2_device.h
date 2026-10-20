@@ -124,6 +124,8 @@ cJSON *g2_device_info(int debug);
 /* mode=1 → performance JSON, mode=0 → patch JSON */
 cJSON *query_synth_settings(const char *type);
 cJSON *query_perf_settings(int mode, const char *type);
+/* Connects if needed, queries the current mode, adds "mode": "performance"|"patch" */
+cJSON *g2_get_perf_settings(void);
 cJSON *g2_get_patch(const char *slot_str);
 cJSON *g2_get_patch_file(const char *slot_str, const char *filename);
 /* When return_bytes is set, filename may be NULL: the .prf2 is assembled in memory
@@ -168,6 +170,8 @@ int g2_send_sections(int slot, const uint8_t *buf, size_t len);
 
 /* Patch Mutator "Exclude From Mutation": slot 0-3, location 0=fx/1=va, locked 0/1 */
 int g2_set_mutation_lock(int slot, int location, int module_id, int locked);
+/* Set module uprate (audio-rate promotion): slot 0-3, location 0=fx/1=va, uprate 0-1 */
+int g2_set_module_uprate(int slot, int location, int module_id, int uprate);
 
 /* Set module label: slot 0-3, location 0=fx/1=va, label max 16 chars */
 int g2_set_module_label(int slot, int location, int module_id, const char *label);
@@ -204,6 +208,8 @@ void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int color);
 void g2_build_set_mutation_lock_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int locked);
+void g2_build_set_module_uprate_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int uprate);
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, const char *label);
 

@@ -70,3 +70,28 @@ describe('toggleSlotActive — keyboard hand-off', () => {
 		expect(store.device!.slots.map((s) => s.key)).toEqual([true, false]);
 	});
 });
+
+describe('updateSynthSettings — remembered performance origin', () => {
+	const ev = (perfBank: number, perfLoc: number) => ({ synthName: 'G2', mode: 'Performance', perfBank, perfLoc, midi: {}, tuning: {}, pedal: {} }) as any;
+
+	it('forgets the origin when another performance is selected on the G2', () => {
+		const store = useDeviceStore();
+		store.device = { perfBank: 2, perfLoc: 6 } as any;
+		store.setStoredLocation('perf', 3, 7);
+
+		store.updateSynthSettings(ev(4, 1));
+
+		expect(store.storedLocation.perf).toBeUndefined();
+	});
+
+	it('keeps the origin for the echo of our own select, and when the location is unchanged', () => {
+		const store = useDeviceStore();
+		store.device = { perfBank: 0, perfLoc: 0 } as any;
+		store.setStoredLocation('perf', 3, 7);
+
+		store.updateSynthSettings(ev(2, 6));
+		store.updateSynthSettings(ev(2, 6));
+
+		expect(store.storedLocation.perf).toEqual({ bank: 3, location: 7 });
+	});
+});

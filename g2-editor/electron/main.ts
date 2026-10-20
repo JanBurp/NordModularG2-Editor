@@ -383,7 +383,7 @@ const ALLOWED_CMDS = new Set([
 	"get-global-page", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
 	"list", "move-module", "play-note", "reload-names", "select-global-page", "select-param", "select-param-page",
 	"select-patch", "select-perf", "send-bank", "send-controller-snapshot", "set-cable-color", "set-knob-source",
-	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode",
+	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode", "set-module-uprate",
 	"send-sections", "set-module-name", "set-morph-range", "set-mutation-lock", "set-morph-range-batch", "set-param", "set-patch-description",
 	"set-patch-name", "set-perf-mode", "set-perf-name", "set-range-enable", "set-slot-enabled", "set-slot-hold",
 	"set-slot-key", "set-slot-range", "set-synth-settings", "slot", "store-patch", "upload-patch",
@@ -1237,7 +1237,9 @@ app.whenReady().then(async () => {
 	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
 	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
 	// hardware-agnostic window — see isOffline in preload.ts).
-	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
+	// G2_SKIP_STARTUP_SCAN: set by e2e specs so startup never binds to real attached hardware.
+	const skipScan = process.env.VITE_DEV_OFFLINE === 'true' || process.env.G2_SKIP_STARTUP_SCAN === '1';
+	const devices = skipScan ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
 	if (unclaimed.length === 0) {
 		createAppWindow();

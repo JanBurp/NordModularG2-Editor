@@ -18,6 +18,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Added option for jumping back mouse after change param
 - For selected param added '=' to open SetValue, and 'ENTER' to set to default value
 - Assigned MorphGroups Knobs are blue now
+- Added more tests
 
 ### Changed
 - Splash screen stays when update available
@@ -26,9 +27,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved param gestures (default, circular mode)
 - Improved KeyBoard UX (allways need note, and touchscreen ready)
 - Less clutter/hints when dragging or other edit in progress.
+- Improved and more hints
 - Shake cables is now `S` or `Shift+Space` (was Ctrl+Space, which collided with OS input-source switching); `H` also shows/hides all cables
 
 ### Fixed
+- #17 Modules did not uprate in G2 during patching, so patches could sound degraded.
+- A handful of cli/daemon bugs
 - Better rendering of modules
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved

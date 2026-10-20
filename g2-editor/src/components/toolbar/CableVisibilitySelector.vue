@@ -8,6 +8,8 @@
 			:data-testid="`cable-toggle-${color.name}`"
 			:title="color.label + (getVisibility(color.name) ? ' (visible)' : ' (hidden)')"
 			@click="toggle(color.name)"
+			@mouseenter="showHint('cableColorToggle')"
+			@mouseleave="clearHint"
 		>
 			<span
 				class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"

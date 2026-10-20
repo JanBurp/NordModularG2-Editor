@@ -13,6 +13,8 @@
 			@contextmenu.prevent="onCellContextMenu(cell, $event)"
 			@dragover.prevent
 			@drop.prevent="onKnobDrop(cell, $event)"
+			@mouseenter="showHint('paramPageCell')"
+			@mouseleave="clearHint"
 		>
 			<span class="text-xs w-full truncate text-center font-bold">{{ cell.moduleHeader }}</span>
 
@@ -23,7 +25,7 @@
 				:class="{ 'param-display-empty': !cell.assignment }"
 				draggable="true"
 				@mouseenter="showHint('paramPageDisplay')"
-				@mouseleave="clearHint"
+				@mouseleave="showHint('paramPageCell')"
 			>
 				<div class="text-xs truncate">{{ cell.paramLabel }}</div>
 				<div class="text-xs truncate">{{ cell.valueLabel }}</div>
@@ -36,7 +38,7 @@
 			<div
 				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
 				@mouseenter="showHint('paramPageKnob')"
-				@mouseleave="clearHint"
+				@mouseleave="showHint('paramPageCell')"
 				class="-mb-1"
 				:class="{ 'opacity-40': !cell.assignment }"
 			>
@@ -63,6 +65,8 @@
 					:class="{ 'opacity-40': !cell.hasButton, 'pointer-events-none': altHeld || !cell.hasButton }"
 					@mousedown="onButtonMouseDown(cell)"
 					@click="onButtonClick(cell)"
+					@mouseenter="showHint('paramPageButton')"
+					@mouseleave="showHint('paramPageCell')"
 				>
 					{{ cell.buttonValueLabel }}
 				</div>
@@ -71,7 +75,9 @@
 	</div>
 
 	<div class="self-stretch flex flex-col justify-between py-0.5">
-		<Button variant="toggle" :active="uiStore.globalPagesActive" @click="onToggleGlobalPages()" data-testid="global-pages-toggle"> Global </Button>
+		<Button variant="toggle" :active="uiStore.globalPagesActive" hint="globalPages" @click="onToggleGlobalPages()" data-testid="global-pages-toggle">
+			Global
+		</Button>
 
 		<BtnGroup
 			:model-value="(uiStore.globalPagesActive ? uiStore.selectedGlobalParamBank : uiStore.selectedParamBank) + 1"
@@ -132,8 +138,8 @@
 		onKnobDrop,
 	} = useParamPageCells();
 
-	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value }));
-	const bankOptions = [1, 2, 3];
+	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value, hint: 'paramPage' as const }));
+	const bankOptions = [1, 2, 3].map((value) => ({ label: String(value), value, hint: 'paramBank' as const }));
 
 	const cells = computed<Cell[]>(() =>
 		uiStore.globalPagesActive

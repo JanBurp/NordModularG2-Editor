@@ -302,6 +302,8 @@ static int execute_seq(cJSON *args) {
 
         } else if (strcmp(scmd, "set-mutation-lock") == 0 && sn >= 5) {
             g2_build_set_mutation_lock_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
+        } else if (strcmp(scmd, "set-module-uprate") == 0 && sn >= 5) {
+            g2_build_set_module_uprate_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
             n_ops++;
 
         } else if (strcmp(scmd, "set-module-name") == 0 && sn >= 5) {
@@ -526,6 +528,11 @@ static void execute_cmd(const char *line) {
 		int loc  = parse_location(args, 1);
 		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
 		else ret = g2_set_mutation_lock(slot, loc, arg_i(args, 2), arg_i(args, 3));
+	} else if (strcmp(cmd, "set-module-uprate") == 0 && n >= 4) {
+		int slot = parse_slot(arg_s(args, 0));
+		int loc  = parse_location(args, 1);
+		if (slot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
+		else ret = g2_set_module_uprate(slot, loc, arg_i(args, 2), arg_i(args, 3));
 
 	} else if (strcmp(cmd, "set-module-name") == 0 && n >= 4) {
 		int slot = parse_slot(arg_s(args, 0));
@@ -886,15 +893,7 @@ static void execute_cmd(const char *line) {
 		else { ret = g2_set_voice_count(slot, arg_i(args, 1)); }
 
 	} else if (strcmp(cmd, "get-perf-settings") == 0) {
-		cJSON *synth = query_synth_settings(NULL);
-		int mode = 0;
-		if (synth) {
-			cJSON *m = cJSON_GetObjectItem(synth, "mode");
-			mode = m && strcmp(m->valuestring, "Performance") == 0;
-			cJSON_Delete(synth);
-		}
-		data = query_perf_settings(mode, NULL);
-		if (data) cJSON_AddStringToObject(data, "mode", mode ? "performance" : "patch");
+		data = g2_get_perf_settings();
 		ret = data ? G2_OK : G2_ERR;
 
 	} else if (strcmp(cmd, "set-slot-enabled") == 0 && n >= 2) {

@@ -2,9 +2,9 @@
 	<ToolBar>
 		<div class="flex flex-col gap-1 -ml-1">
 			<UndoRedo />
-			<Button variant="default" size="xs" @click="patchFile.newPatch()">New</Button>
-			<Button variant="default" size="xs" @click="patchFile.loadInitPatch(1)">Init 1</Button>
-			<Button variant="default" size="xs" @click="patchFile.loadInitPatch(2)">Init 2</Button>
+			<Button variant="default" size="xs" hint="newPatch" @click="patchFile.newPatch()">New</Button>
+			<Button variant="default" size="xs" hint="initPatch" @click="patchFile.loadInitPatch(1)">Init 1</Button>
+			<Button variant="default" size="xs" hint="initPatch" @click="patchFile.loadInitPatch(2)">Init 2</Button>
 		</div>
 
 		<template v-if="mode === 'classic'">

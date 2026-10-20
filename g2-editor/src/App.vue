@@ -9,7 +9,7 @@
 				<ToolBarText class="w-36 cursor-pointer" hint="renamePerf" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
 				<ToolBarLabel>Clk:</ToolBarLabel>
 				<ToolBarText class="w-13 cursor-pointer hover:text-input" hint="setBpm" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
-				<Button variant="toggle" :active="device.clockRunning" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
+				<Button variant="toggle" :active="device.clockRunning" hint="clockRun" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
 				<ToolBarDivider />
 				<BtnGroup
 					:model-value="uiStore.selectedSlotIndex"
@@ -23,7 +23,7 @@
 				/>
 				<ToolBarDivider />
 				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
-				<Button variant="toggle" :active="device.device?.mode === 'Performance'" @click="handlePerfModeToggle($event)">Perf</Button>
+				<Button variant="toggle" :active="device.device?.mode === 'Performance'" hint="perfMode" @click="handlePerfModeToggle($event)">Perf</Button>
 				<DeviceSwitcher v-if="!isOfflineMode" />
 			</template>
 

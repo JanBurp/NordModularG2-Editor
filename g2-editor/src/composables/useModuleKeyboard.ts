@@ -196,18 +196,13 @@ export function useModuleKeyboard() {
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 
-	// Arrow Up/Down target: the hovered param (settings.hoverKeyTarget; carries its own area,
-	// module ids aren't unique across VA/FX) if any, else the selected param.
+	// Arrow Up/Down target: uiStore.keyTargetParam (none while a toolbar knob is hovered, that knob takes the keys).
 	function findKeyTarget(): { sel: { moduleId: number; paramIndex: number }; found: { module: ModuleInstance; area: 0 | 1 } } | undefined {
-		const hov = settingsStore.hoverKeyTarget ? uiStore.hoveredParam : null;
-		if (hov) {
-			const area: 0 | 1 = hov.area === 'va' ? 1 : 0;
-			const module = getModulesInArea(area).find((m) => m.index === hov.moduleId);
-			return module ? { sel: hov, found: { module, area } } : undefined;
-		}
-		const sel = uiStore.selectedParam;
-		const found = sel && findModuleAnywhere(sel.moduleId);
-		return found ? { sel, found } : undefined;
+		const sel = uiStore.keyTargetParam;
+		if (!sel) return undefined;
+		const area: 0 | 1 = sel.area === 'va' ? 1 : 0;
+		const module = getModulesInArea(area).find((m) => m.index === sel.moduleId);
+		return module ? { sel, found: { module, area } } : undefined;
 	}
 
 	async function changeParamValue(delta: number) {

@@ -347,6 +347,16 @@ describe('useModuleKeyboard — arrow keys follow hover (settings.hoverKeyTarget
 		expect(setParam).toHaveBeenCalledWith(1, 0, expect.any(Number), 0, 'voice');
 	});
 
+	it('a hovered toolbar knob takes the keys: the selected canvas param is left alone', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.hoveredParam = null;
+		uiStore.hoveredKnob = 1;
+		const { handleKeydown } = useModuleKeyboard();
+		handleKeydown(arrowKey('ArrowUp'));
+		handleKeydown(arrowKey('Enter'));
+		expect(setParam).not.toHaveBeenCalled();
+	});
+
 	it('Left/Right still navigates the selection', () => {
 		const { uiStore } = seedHover(true);
 		useModuleKeyboard().handleKeydown(arrowKey('ArrowRight'));

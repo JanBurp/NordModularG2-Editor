@@ -84,6 +84,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `del-module` | `<slot> <va\|fx> <module-id>` | Delete module (delete cables first; zero its morph ranges first, or the G2 is corrupted until power-off) |
 | `move-module` | `<slot> <va\|fx> <module-id> <col> <row>` | Move module to grid position |
 | `set-module-color` | `<slot> <va\|fx> <module-id> <color:0–24>` | Set module color |
+| `set-module-uprate` | `<slot> <va\|fx> <module-id> <0\|1>` | Set module audio-rate (uprate) flag; the editor sends it after every cable change, as the official editor does |
 | `set-module-name` | `<slot> <va\|fx> <module-id> <name>` | Set module label |
 | `set-module-mode` | `<slot> <va\|fx> <module-id> <param-idx> <value>` | Set module mode parameter |
 

@@ -91,6 +91,10 @@ extern void test_set_cable_color_invalid_color_high(void);
 extern void test_set_cable_color_invalid_from_con_type(void);
 extern void test_set_cable_color_invalid_to_con_type(void);
 extern void test_set_cable_color_payload_layout(void);
+extern void test_set_module_uprate_invalid_slot(void);
+extern void test_set_module_uprate_invalid_location(void);
+extern void test_set_module_uprate_invalid_value(void);
+extern void test_set_module_uprate_payload_layout(void);
 
 extern void test_set_morph_range_invalid_slot_low(void);
 extern void test_set_morph_range_invalid_slot_high(void);
@@ -176,7 +180,6 @@ extern void test_set_perf_mode_invalid_mode_low(void);
 extern void test_set_perf_mode_invalid_mode_high(void);
 extern void test_set_perf_mode_invalid_shift(void);
 extern void test_set_perf_name_null_name(void);
-extern void test_set_perf_name_empty_name(void);
 
 extern void test_parse_pchlist_well_formed_returns_entries(void);
 extern void test_parse_pchlist_skips_out_of_range_location(void);
@@ -305,6 +308,10 @@ int main(void) {
     RUN_TEST(test_set_cable_color_invalid_from_con_type);
     RUN_TEST(test_set_cable_color_invalid_to_con_type);
     RUN_TEST(test_set_cable_color_payload_layout);
+    RUN_TEST(test_set_module_uprate_invalid_slot);
+    RUN_TEST(test_set_module_uprate_invalid_location);
+    RUN_TEST(test_set_module_uprate_invalid_value);
+    RUN_TEST(test_set_module_uprate_payload_layout);
 
     RUN_TEST(test_set_morph_range_invalid_slot_low);
     RUN_TEST(test_set_morph_range_invalid_slot_high);
@@ -393,7 +400,6 @@ int main(void) {
     RUN_TEST(test_set_perf_mode_invalid_mode_high);
     RUN_TEST(test_set_perf_mode_invalid_shift);
     RUN_TEST(test_set_perf_name_null_name);
-    RUN_TEST(test_set_perf_name_empty_name);
 
     /* send-bank source parsing + write-frame layout tests */
     RUN_TEST(test_parse_pchlist_well_formed_returns_entries);

@@ -120,16 +120,18 @@ export const PATCH_ACTIONS: ActionDef[] = [
 		// New / Init 1 / Init 2 replace the focused slot's patch (upload-patch).
 		name: 'newOrInitPatch',
 		weight: 1,
-		run: async (c) =>
-			orSkip('extended toolbar', async () => {
-				if (!(await ensureExtendedToolbar(c))) return 'skipped: extended toolbar not shown';
-				const slot = await focusedSlot(c.page);
-				const label = pick(c, ['New', 'Init 1', 'Init 2']);
-				await c.page.locator(`button.btn-default:text-is("${label}")`).click({ timeout: UI_TIMEOUT_MS });
-				c.own.delete(slot);
-				await waitIdle(c.page);
-				await sleep(2000);
-				return `${label} into slot ${slot}`;
-			}),
+		run: (c) => initSlot(c, pick(c, ['New', 'Init 1', 'Init 2'])),
 	},
 ];
+
+/** Replaces the focused slot's patch via a New/Init toolbar button. */
+export const initSlot = (c: ActionCtx, label: 'New' | 'Init 1' | 'Init 2') =>
+	orSkip('extended toolbar', async () => {
+		if (!(await ensureExtendedToolbar(c))) return 'skipped: extended toolbar not shown';
+		const slot = await focusedSlot(c.page);
+		await c.page.locator(`button.btn-default:text-is("${label}")`).click({ timeout: UI_TIMEOUT_MS });
+		c.own.delete(slot);
+		await waitIdle(c.page);
+		await sleep(2000);
+		return `${label} into slot ${slot}`;
+	});

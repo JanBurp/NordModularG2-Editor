@@ -943,7 +943,7 @@ describe('delete undo restores colours of remaining cables', () => {
 			{ colour: RED, smod: 2, scon: 0, dir: 1, dmod: 3, dcon: 0 },
 		];
 		store.slots['A'].patch = patch;
-		store._syncUprateAndColors(patch, 1);
+		store._syncUprateAndColors('A', patch, 1);
 		const remaining = () => patch.areas[1].cableList.find((c: any) => c.smod === 2 && c.dmod === 3);
 		return { store, patch, remaining };
 	}
@@ -2205,5 +2205,248 @@ describe('failed edit push', () => {
 		await runCliSafe(['add-module', 'A', 'va', '61'], 'test');
 
 		expect(load).not.toHaveBeenCalled();
+	});
+});
+
+// Osc → EnvADSR → Out in a new patch sounded degraded: the editor computed uprate only for display,
+// so the G2 kept the Env at control rate. The reference editor sends S_SET_MODULE_UPRATE (0x2A) and
+// recolours the module's output cables after every topology change; a reload fixed it only because
+// the full upload carries the uprate bits (test-patches/new/degraded.pch2).
+describe('uprate is sent to the G2', () => {
+	const OSC_A = 97; // red out
+	const ENV_ADSR = 20; // purple in 0, purple out 1
+	const OUT2 = 4;
+	const RED = 0,
+		BLUE = 1;
+	const envUprate = (v: number) => ['set-module-uprate', 'A', 'va', '2', String(v)].join();
+	const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index * 3, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+
+	function setup() {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [mod(1, OSC_A), mod(2, ENV_ADSR), mod(3, OUT2)];
+		patch.areas[1].cableList = [{ colour: BLUE, smod: 2, scon: 1, dir: 1, dmod: 3, dcon: 0 }];
+		store.slots['A'].patch = patch;
+		const sent: string[][] = [];
+		(globalThis as any).window.cli.run = vi.fn(async (cmd: string[]) => void sent.push(cmd));
+		(globalThis as any).window.cli.runBatch = vi.fn(async (cmds: string[][]) => (sent.push(...cmds), []));
+		const idx = (c: string) => sent.findIndex((s) => s.join() === c);
+		return { store, patch, sent, idx };
+	}
+
+	it('addCable osc → env uprates the env after the add-cable and recolours its output cable', async () => {
+		const { store, patch, sent, idx } = setup();
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', RED);
+		expect(idx(envUprate(1))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'add-cable'));
+		expect(idx(['set-cable-color', 'A', 'va', String(RED), '2', '1', '1', '3', '0', '0'].join())).toBeGreaterThanOrEqual(0);
+		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
+	});
+
+	it('deleting the cable and undoing the add both de-rate the env', async () => {
+		const { store, sent, idx } = setup();
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', RED);
+		sent.length = 0;
+		await store.deleteConnectedCables(2, 0, 'input', 'voice');
+		expect(idx(envUprate(0))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'del-cable'));
+
+		await store.undo(); // re-adds the cable
+		expect(idx(envUprate(1))).toBeGreaterThanOrEqual(0);
+		sent.length = 0;
+		await store.undo(); // undoes the original add
+		expect(idx(envUprate(0))).toBeGreaterThanOrEqual(0);
+	});
+
+	it('deleteModule undo re-uprates the re-created module (add-module creates it at control rate)', async () => {
+		const { store, sent, idx } = setup();
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', RED);
+		await store.deleteModule(2, 'voice');
+		sent.length = 0;
+		await store.undo();
+		expect(idx(envUprate(1))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'add-module'));
+	});
+
+	it("replaceModule of the env's osc sends no uprate flip for the env (no intermediate sync from deleteModule)", async () => {
+		const { store, patch, sent } = setup();
+		await store.addCable(1, 1, 0, 2, 0, 0, 'voice', RED);
+		sent.length = 0;
+		await store.replaceModule(1, 7 /* OscB */, 'voice');
+		expect(sent.filter((c) => c[0] === 'set-module-uprate' && c[3] === '2')).toEqual([]);
+		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
+	});
+
+	it('paste undo de-rates a module the pasted cable fed', async () => {
+		const { store, sent, idx } = setup();
+		await store.paste(
+			[{ src: mod(9, OSC_A) as any, newId: 4, col: 1, row: 0 }],
+			[{ newSmod: 4, scon: 0, dir: 1, newDmod: 2, dcon: 0, colour: RED }],
+			'voice',
+		);
+		expect(idx(envUprate(1))).toBeGreaterThanOrEqual(0);
+		sent.length = 0;
+		await store.undo();
+		expect(idx(envUprate(0))).toBeGreaterThan(sent.findIndex((c) => c[0] === 'del-module'));
+	});
+});
+
+// Patches stored on the G2 by the old editor keep uprate=0 in G2 memory (the G2 doesn't recompute
+// it on load), so loading one from the G2 must repair the live slot and tell the user to save.
+describe('uprate repair on load from the G2', () => {
+	beforeEach(async () => {
+		(await import('@/composables/useToast')).useToast().toasts.splice(0); // module-level, and keyed toasts dedupe
+	});
+
+	async function degradedFixture(envUprate: number): Promise<{ name: string; rawHex: string }> {
+		const fs = await import('fs');
+		const path = await import('path');
+		const { fileURLToPath } = await import('url');
+		const { PatchParser, stripFileHeader } = await import('@/parser/nmg2PatchParser');
+		const { serializePatch } = await import('@/parser/nmg2PatchSerializer');
+		const { extractVariations } = await import('@/store/slotHelpers');
+		const buf = fs.readFileSync(path.join(fileURLToPath(new URL('.', import.meta.url)), '../../../../test-patches/new/degraded.pch2'));
+		const bytes = new Uint8Array(buf);
+		const patch: any = new PatchParser(bytes.buffer.slice(bytes.byteOffset, bytes.byteOffset + bytes.length)).parse();
+		patch.areas[1].modules.find((m: any) => m.uname === 'EnvADSR1').uprate = envUprate;
+		return { name: 'degraded', rawHex: serializePatch('degraded', patch, stripFileHeader(bytes), extractVariations(patch)) };
+	}
+
+	function capture() {
+		const sent: string[][] = [];
+		(globalThis as any).window.cli.run = vi.fn(async (cmd: string[]) => void sent.push(cmd));
+		(globalThis as any).window.cli.runBatch = vi.fn(async (cmds: string[][]) => (sent.push(...cmds), []));
+		return sent;
+	}
+
+	it('sends set-module-uprate and shows a toast when the G2 has the env at control rate', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		const before = toasts.length;
+		const { name, rawHex } = await degradedFixture(0);
+		const sent = capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(sent.map((c) => c.join())).toEqual([['set-module-uprate', 'A', 'va', '2', '1'].join()]);
+		expect(toasts.length).toBe(before + 1);
+		expect(toasts[toasts.length - 1]).toMatchObject({ error: true, message: expect.stringContaining('Slot A') });
+	});
+
+	it('in Performance mode, several degraded slots give one toast that saves the performance', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		toasts.splice(0);
+		useDeviceStore().device = { mode: 'Performance' } as any;
+		const { name, rawHex } = await degradedFixture(0);
+		const sent = capture();
+		const store = useSlotsStore();
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		await store._applyPatchOutput('B', JSON.stringify({ slot: 'B', name, data: rawHex }));
+		expect(sent.map((c) => c.slice(0, 2).join())).toEqual(['set-module-uprate,A', 'set-module-uprate,B']);
+		expect(toasts).toHaveLength(1);
+		expect(toasts[0]).toMatchObject({ key: 'uprate-perf', message: expect.stringContaining('save the performance') });
+
+		useDeviceStore().setStoredLocation('perf', 2, 5);
+		sent.length = 0;
+		expect(await toasts[0].action!.run()).toBe(true);
+		expect(sent).toEqual([['store-patch', '4', '2', '5']]);
+	});
+
+	it('a single patch loaded in Performance mode names the slot, but still saves the performance', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Performance' } as any;
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('C', JSON.stringify({ slot: 'C', name, data: rawHex }));
+		expect(toasts).toHaveLength(1);
+		expect(toasts[0]).toMatchObject({ key: 'uprate-perf', message: expect.stringMatching(/^Slot C: .*save the performance/) });
+	});
+
+	it('a performance loaded while the G2 is in Patch mode also gets the performance toast', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Patch' } as any;
+		useDeviceStore().pendingPerfBank = 1; // performance select still loading
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(toasts.map((t) => t.key)).toEqual(['uprate-perf']);
+	});
+
+	it('a loaded performance (editor in performance mode) gets the performance toast', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		useDeviceStore().device = { mode: 'Patch' } as any;
+		useSlotsStore().performanceName = 'Bank 2 / 5';
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(toasts.map((t) => t.key)).toEqual(['uprate-perf']);
+	});
+
+	it('sends nothing when the stored uprate is already correct', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		const before = toasts.length;
+		const { name, rawHex } = await degradedFixture(1);
+		const sent = capture();
+		await useSlotsStore()._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
+		expect(sent).toEqual([]);
+		expect(toasts.length).toBe(before);
+	});
+
+	it('a reload (preserveHistory) repairs a wrong uprate too, without a toast', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { name, rawHex } = await degradedFixture(0);
+		const sent = capture();
+		const store = useSlotsStore();
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }), true, store.editSeq.A);
+		expect(sent.map((c) => c.join())).toEqual([['set-module-uprate', 'A', 'va', '2', '1'].join()]);
+		expect(useToast().toasts).toEqual([]);
+	});
+
+	it('a reload that raced an edit sends no repair (computed from an older topology)', async () => {
+		const { name, rawHex } = await degradedFixture(0);
+		const sent = capture();
+		const store = useSlotsStore();
+		const seq = store.editSeq.A;
+		store._markSlotDirty('A');
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }), true, seq);
+		expect(sent).toEqual([]);
+	});
+
+	it('a NACKed repair after a reload does not trigger another reload', async () => {
+		const { name, rawHex } = await degradedFixture(0);
+		capture();
+		(globalThis as any).window.cli.runBatch = vi.fn().mockRejectedValue(new Error('REJECTED'));
+		useDeviceStore().status = DeviceStatus.Connected;
+		const store = useSlotsStore();
+		const load = vi.spyOn(store, 'loadSlot');
+		vi.spyOn(console, 'warn').mockImplementation(() => {});
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }), true, store.editSeq.A);
+		await new Promise((r) => setTimeout(r, 0));
+		expect(load).not.toHaveBeenCalled();
+	});
+
+	it('a fresh load of the slot dismisses the warning about its previous patch', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		capture();
+		const store = useSlotsStore();
+		const bad = await degradedFixture(0);
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: bad.name, data: bad.rawHex }));
+		expect(toasts.map((t) => t.key)).toEqual(['uprate-A']);
+		const good = await degradedFixture(1);
+		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name: 'good', data: good.rawHex }));
+		expect(toasts).toEqual([]);
+	});
+
+	it('loading a file returns the repair for the caller to send after its raw upload (which carries the wrong bits)', async () => {
+		const { PatchParser } = await import('@/parser/nmg2PatchParser');
+		const { name, rawHex } = await degradedFixture(0);
+		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		const pch2 = new Uint8Array([...new TextEncoder().encode(name), 0x00, 0x17, 0x00, ...bytes]);
+		const patch: any = new PatchParser(pch2.buffer).parse();
+		const sent = capture();
+		expect(useSlotsStore().loadPatchFile('A', patch, name, rawHex)).toEqual([['set-module-uprate', 'A', 'va', '2', '1']]);
+		expect(sent).toEqual([]);
+		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
 	});
 });

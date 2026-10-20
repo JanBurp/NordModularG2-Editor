@@ -32,6 +32,8 @@
 					<MorphSourceSelect
 						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
 						:morph-idx="i"
+						@mouseenter="showHint('morphSource')"
+						@mouseleave="showHint('morphKnob')"
 						@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
 					/>
 				</div>
