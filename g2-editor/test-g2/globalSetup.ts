@@ -15,7 +15,8 @@ declare module 'vitest' {
 	}
 }
 
-const ENUMERATE_TIMEOUT_MS = 120_000;
+// A powered-on G2 enumerated after ~6 s in every run (2026-10-20); 120 s (shelly.ts) is for a spontaneous reboot.
+const ENUMERATE_TIMEOUT_MS = 30_000;
 // Memory note: the G2 needs ~25 s after a power reset before it answers reliably.
 const SETTLE_MS = 25_000;
 

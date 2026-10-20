@@ -72,7 +72,6 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 		await g!.close();
 		await setMode(origMode);
 		expect(await g2Mode()).toBe(origMode);
-		// Slot flags only mean something in Performance mode (in Patch mode they vary between reads).
-		if (origMode === 'Performance') expect(await perfFlags()).toEqual(origFlags);
+		expect(await perfFlags()).toEqual(origFlags);
 	});
 });

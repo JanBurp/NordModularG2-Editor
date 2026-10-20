@@ -26,7 +26,8 @@ export async function evaluateWithRetry<R, Arg = void>(
 	const deadline = Date.now() + EVALUATE_RETRY_TIMEOUT_MS;
 	for (let attempt = 1; ; attempt++) {
 		try {
-			return await app.evaluate(fn, arg as Arg);
+			// Playwright types the argument as Unboxed<Arg>, which TS can't relate to a free Arg; it is the same value at runtime.
+			return await app.evaluate(fn as (electron: typeof import('electron'), arg: any) => R, arg as Arg);
 		} catch (e) {
 			if (attempt >= 5 || Date.now() > deadline || !(e instanceof Error) || !TRANSIENT_EVALUATE_ERRORS.some((m) => e.message.includes(m))) throw e;
 			await new Promise((r) => setTimeout(r, 100));

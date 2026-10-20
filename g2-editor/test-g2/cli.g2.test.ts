@@ -24,7 +24,6 @@ describe.skipIf(!inject('g2'))('G2 via one-shot CLI', () => {
 		expect(await g2Mode()).not.toBe(mode);
 		await setMode(mode);
 		expect(await g2Mode()).toBe(mode);
-		// In Patch mode get-perf-settings' slot flags vary between reads (seen 2026-10-20), so only compare in Performance mode.
-		if (mode === 'Performance') expect(await perfFlags()).toEqual(flags);
+		expect(await perfFlags()).toEqual(flags);
 	});
 });
