@@ -930,6 +930,12 @@ int recv_bulk(uint8_t *data, uint16_t size) {
     return received;
 }
 
+void discard_bulk(uint16_t sz) {
+    if (g2_listener_active || !sz) return;
+    uint8_t *b = malloc(sz);
+    if (b) { recv_bulk(b, sz); free(b); }
+}
+
 /* Send one bulk-OUT message, resuming after a short write - the write-side
  * mirror of recv_bulk's loop above.
  * The G2 reads a message as a single byte stream prefixed with its own length,
@@ -1012,10 +1018,8 @@ void g2_rearm(void) {
         uint8_t arm_ack[16];
         /* START_COMM has no ack of its own (see g2_stop_comm), so this is whatever arrives next - e.g. a one-shot
          * set-perf-mode's late 0x0C/0x1F reply. Its bulk must be read too: an orphaned payload wedges the G2. */
-        if (recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS) > 0 && (arm_ack[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)arm_ack[1] << 8) | arm_ack[2];
-            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-        }
+        if (recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS) > 0 && (arm_ack[0] & 0x0f) == RESPONSE_TYPE_EXTENDED)
+            discard_bulk(((uint16_t)arm_ack[1] << 8) | arm_ack[2]);
     }
 }
 
@@ -1033,10 +1037,7 @@ void g2_stop_comm(void) {
     for (int tries = 0; tries < 200; tries++) {
         int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STALE_MS);
         if (ret <= 0) break;
-        if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t sz = ((uint16_t)buf[1] << 8) | buf[2];
-            if (sz) { uint8_t *b = malloc(sz); if (b) { recv_bulk(b, sz); free(b); } }
-        }
+        if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) discard_bulk(((uint16_t)buf[1] << 8) | buf[2]);
     }
 }
 

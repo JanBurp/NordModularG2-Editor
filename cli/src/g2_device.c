@@ -82,12 +82,6 @@ const char *g2_error_string(int code) {
 /* Read and discard the bulk payload an EXTENDED interrupt header announced. Only needed
  * in direct mode: with the listener active the bulk was already read and queued, and the
  * next recv_interrupt() frees it. Leaving it unread would be taken as the next reply. */
-static void discard_bulk(uint16_t sz) {
-    if (g2_listener_active || !sz) return;
-    uint8_t *b = malloc(sz);
-    if (b) { recv_bulk(b, sz); free(b); }
-}
-
 static void drain_stale_extended(void) {
     uint8_t stale[16]; int n;
     while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
@@ -335,64 +329,45 @@ int g2_send_init(void) {
     return G2_ERR_RECV;
 }
 
+static int is_synth_settings(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)arg;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 3 && bulk[3] == SUB_RESPONSE_SYNTH_SETTINGS;
+}
+
+/* Tagged (await_reply): taking the first extended message as the reply could parse a stray as the settings. */
 cJSON *query_synth_settings(const char *type) {
-    uint8_t intr[16] = {0}, bulk[512] = {0};
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) return NULL;
     usleep(USB_SEND_DELAY_US);
-    int ret = recv_interrupt(intr, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (intr[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) return NULL;
-    uint16_t size = ((uint16_t)intr[1] << 8) | intr[2];
-    if (size == 0 || size > sizeof(bulk)) return NULL;
-    if (recv_bulk(bulk, size) <= 0) return NULL;
-    return build_synth_bulk_json(bulk, type);
+    g2_msg_t r;
+    if (await_reply(is_synth_settings, 0, 0, &r) != G2_OK) return NULL;
+    cJSON *json = build_synth_bulk_json(r.bulk, type);
+    g2_msg_free(&r);
+    return json;
+}
+
+/* The GET_PERF_SETTINGS reply (perf name 0x29 + the 0x11 chunk; caller frees), or NULL. Tagged read
+ * (perf_settings_read): the old untagged read took whatever arrived first, its version from the 0x81
+ * reply (CMMidiLearnRequest in the reference editor), and then reported all slots inactive and
+ * unkeyed (seen 2026-10-20). */
+static uint8_t *perf_settings_bytes(size_t *size) {
+    perf_settings_t ps;
+    *size = 0;
+    if (perf_settings_read(&ps) != G2_OK) { g2_err("perf settings: no valid reply from G2\n"); return NULL; }
+    uint8_t *bytes = ps.msg.bulk;
+    *size = ps.msg.bulk_size;
+    ps.msg.bulk = NULL;
+    g2_msg_free(&ps.msg);
+    return bytes;
 }
 
 cJSON *query_perf_settings(int mode, const char *type) {
-    uint8_t selsData[1024] = {0}, selsInterrupt[16] = {0};
-    uint8_t perfData[1024] = {0}, perfInterrupt[16] = {0};
-    size_t perfSize = 0;
-    int ret;
-    uint16_t size;
-
-    /* The G2 tags this reply baCmd==0x04 in steady state, but baCmd==0x0C while
-     * finalizing a mode/perf switch (see g2_events.c's aCmd==0x0C handling) — both
-     * are genuine, perf_parse_and_add()-compatible payloads; byte[2] (perf_version)
-     * is in the same place either way, so no validation is needed here. */
-    if (send_system(0x41, 0x81) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-        }
-    }
-
-    /* This reply's payload (name + settings) is only valid when bsubCmd is 0x11
-     * (steady state) or 0x29 (sent while finalizing a mode/perf switch, baCmd may
-     * be 0x04 or 0x0C either way) — both shapes perf_parse_and_add() understands.
-     * Anything else (e.g. the 0x81 selections-shaped reply above, mis-ordered)
-     * is a stray message: relay it via g2_emit_event() so it isn't lost, then
-     * keep waiting instead of treating it as our answer. */
-    if (send_system(selsData[2], 0x10) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        for (int attempt = 0; attempt < 5; attempt++) {
-            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-            if (ret <= 0 || (perfInterrupt[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
-            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
-            if (size < 4 || size > sizeof(perfData)) break;
-            recv_bulk(perfData, size);
-            if (perfData[3] == 0x11 || perfData[3] == 0x29) { perfSize = size; break; }
-            g2_msg_t relay = {0};
-            memcpy(relay.interrupt, perfInterrupt, 16);
-            relay.bulk = perfData;
-            relay.bulk_size = size;
-            g2_emit_event(&relay);
-        }
-    }
-
+    size_t size;
+    uint8_t *bytes = perf_settings_bytes(&size);
+    if (!bytes) return NULL;
     cJSON *root = cJSON_CreateObject();
     if (type) cJSON_AddStringToObject(root, "type", type);
-    perf_parse_and_add(perfData, perfSize, mode, root);
+    perf_parse_and_add(bytes, size, mode, root);
+    free(bytes);
     return root;
 }
 
@@ -493,46 +468,9 @@ cJSON *g2_device_info(int debug) {
         fprintf(stderr, "\n");
     }
 
-    /* Step 2: Get performance data with 0x81 and 0x10 commands */
-    uint8_t selsData[1024] = {0};
-    uint8_t selsInterrupt[16] = {0};
-
-    if (send_system(0x41, 0x81) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-
-        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            size = (selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-        }
-    }
-
-    perfData = malloc(1024);
-    if (!perfData) {
-        g2_err("Memory allocation failed\n");
-        goto cleanup;
-    }
-
-    /* Same lockstep discipline as query_perf_settings(): a stray message can arrive
-     * before our own reply - skip anything not tagged 0x11/0x29, relaying it via the
-     * normal event dispatcher so it isn't lost. */
-    uint8_t perfInterrupt[16] = {0};
-    if (send_system(selsData[2], 0x10) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        for (int attempt = 0; attempt < 5; attempt++) {
-            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-            if (ret <= 0 || (perfInterrupt[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) break;
-            size = (perfInterrupt[1] << 8) | perfInterrupt[2];
-            if (size > 1024) size = 1024;
-            recv_bulk(perfData, size);
-            if (perfData[3] == 0x11 || perfData[3] == 0x29) { perfSize = size; break; }
-            g2_msg_t relay = {0};
-            memcpy(relay.interrupt, perfInterrupt, 16);
-            relay.bulk = perfData;
-            relay.bulk_size = size;
-            g2_emit_event(&relay);
-        }
-    }
+    /* Step 2: performance settings */
+    perfData = perf_settings_bytes(&perfSize);
+    if (!perfData) goto cleanup;
 
     if (debug) {
         fprintf(stderr, "PERF:%zu:", perfSize);
@@ -2057,10 +1995,6 @@ int g2_upload_perf_buf(const uint8_t *data, size_t len) {
 }
 
 cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
-    uint8_t interruptResp[16] = {0};
-    uint8_t selsInterrupt[16] = {0};
-    uint8_t selsData[1024] = {0};
-    uint8_t perfInterrupt[16] = {0};
     uint8_t *perfData = NULL;
     size_t perfSize = 0;
     uint8_t *pch2Data[4] = {NULL, NULL, NULL, NULL};
@@ -2078,31 +2012,8 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     /* Drain stale data (same pattern as g2_get_patch_file) */
     if (!g2_listener_active) drain_stale_extended();
 
-    /* Step 1: Get performance settings raw bytes (same sequence as query_perf_settings) */
-    if (send_system(0x41, 0x81) == 0) {
-        usleep(USB_SEND_DELAY_US);
-        int ret = recv_interrupt(selsInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret > 0 && (selsInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t size = ((uint16_t)selsInterrupt[1] << 8) | selsInterrupt[2];
-            recv_bulk(selsData, size < sizeof(selsData) ? size : sizeof(selsData));
-        }
-    }
-
-    {
-        int ret;
-        uint16_t size;
-        if (send_system(selsData[2], 0x10) == 0) {
-            usleep(USB_SEND_DELAY_US);
-            ret = recv_interrupt(perfInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-            if (ret > 0 && (perfInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-                size = ((uint16_t)perfInterrupt[1] << 8) | perfInterrupt[2];
-                perfData = malloc(size);
-                if (!perfData) { g2_err("Memory allocation failed\n"); goto cleanup; }
-                perfSize = size;
-                recv_bulk(perfData, size);
-            }
-        }
-    }
+    /* Step 1: performance settings raw bytes */
+    perfData = perf_settings_bytes(&perfSize);
 
     if (perfSize < 8) {
         g2_err("Failed to get performance settings\n");
@@ -2117,34 +2028,13 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     for (int slot = 0; slot < 4; slot++) {
         g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
+        /* Tagged reply (fetch_patch, like get-patch): the first extended message can be e.g. a resources_used
+         * message instead, which failed the conversion below (2026-10-20, intermittent). */
         uint8_t version;
-        int ret = query_version(slot, &version);
-        if (ret == G2_ERR_SEND) {
-            g2_err("Failed to get patch version for slot %c\n", "ABCD"[slot]);
-            goto cleanup;
-        }
-        if (ret != G2_OK) { g2_err("No version response for slot %c\n", "ABCD"[slot]); goto cleanup; }
-
-        if (send_slot(slot, version, SUB_COMMAND_GET_PATCH_SLOT, NULL, 0) < 0) {
-            g2_err("Failed to request patch for slot %c\n", "ABCD"[slot]);
-            goto cleanup;
-        }
-        usleep(USB_SEND_DELAY_US);
-        ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0 || (interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
-            g2_err("Unexpected response for slot %c patch data\n", "ABCD"[slot]);
-            goto cleanup;
-        }
-
-        uint16_t patchSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-        uint8_t *patchData = malloc(patchSize);
-        if (!patchData) { g2_err("Memory allocation failed\n"); goto cleanup; }
-        ret = recv_bulk(patchData, patchSize);
-        if (ret <= 0) {
-            free(patchData);
-            g2_err("Failed to read patch bulk for slot %c\n", "ABCD"[slot]);
-            goto cleanup;
-        }
+        uint8_t *patchData;
+        uint16_t patchSize;
+        char patchName[32];
+        if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
 
         pch2Data[slot] = malloc(patchSize);
         if (!pch2Data[slot]) { free(patchData); g2_err("Memory allocation failed\n"); goto cleanup; }

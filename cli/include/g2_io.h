@@ -133,6 +133,9 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms);
 int recv_interrupt_acks(uint8_t *response, int size, int timeout_ms);
 int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries);
 int recv_bulk(uint8_t *data, uint16_t size);
+/* Reads and drops an extended message's bulk payload (direct mode; no-op with the listener running or sz 0):
+ * an unread payload wedges the G2. */
+void discard_bulk(uint16_t sz);
 
 /* Drain all pending interrupt+bulk messages.
  * No-op when listener is active (listener drains continuously). */
