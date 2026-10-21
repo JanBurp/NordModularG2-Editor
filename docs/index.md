@@ -35,7 +35,7 @@ See the [Changelog](https://github.com/JanBurp/NordModularG2-Editor/blob/main/CH
 ### Editor and terminal
 
 - **Editor:** the desktop app for creating and editing patches and performances. Everything for normal use.
-- **CLI / daemon (`g2-cli`):** the same USB layer that the ediotor uses, without a GUI. Use it for scripting and automation (bank backup/restore, batch uploads, getting and setting patches), for headless control, and for protocol research and debugging. The editor itself talks to the G2 through this daemon. See [CLI Commands](technical/cli-commands).
+- **CLI / daemon (`g2-cli`):** the same USB layer that the editor uses, without a GUI. Use it for scripting and automation (bank backup/restore, batch uploads, getting and setting patches), for headless control, and for protocol research and debugging. The editor itself talks to the G2 through this daemon. See [CLI Commands](technical/cli-commands).
 
 ## Acknowledgements
 
