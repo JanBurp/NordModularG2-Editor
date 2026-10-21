@@ -15,27 +15,29 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Added option for jumping back mouse after change param
 - For selected param added '=' to open SetValue, and 'ENTER' to set to default value
 - Assigned MorphGroups Knobs are blue now
-- Added more tests
 
 ### Changed
 - Splash screen stays when update available
 - Improved SetValue dialog, uses param values, searching etc.
 - Searching modules improved (search on short module name first)
 - Improved param gestures (default, circular mode)
-- Improved KeyBoard UX (allways need note, and touchscreen ready)
+- Improved keyboard UX
 - Less clutter/hints when dragging or other edit in progress.
 - Improved and more hints
 - Shake cables is now `S` or `Shift+Space` (was Ctrl+Space, which collided with OS input-source switching); `H` also shows/hides all cables
+- Updated documentation and removed userguide (help is already in the app itself); added docs for multiple devices on Windows
 
-### Fixed:
+### Fixed
 - #17 Modules did not uprate in G2 during patching, so patches could sound degraded.
-- A handfull of cli/daemon bugs
+- A handful of cli/daemon bugs (get-perf-settings slot flags, get-perf-file failing, set-perf-mode)
+- Empty patch/performance names are now allowed
 - Better rendering of modules
 - Some Module Graphs improved
 - Reset Triangle on Knobs, improved
-- Some Knobs did not use full range
+- Some Knobs did not use full range (e.g. EQ gain could not go below 0 dB)
+- SetValue on Scratch modules used wrong params
 - Windows: Key commands when switching to window of other G2
-- Windows: Copy/Past when switching to window of other G2
+- Windows: Copy/Paste when switching to window of other G2
 
 ## [0.7.1] - 2026-10-12
 
