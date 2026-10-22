@@ -37,7 +37,7 @@ export function knobMapParams<A extends ParamPageAssignment | GlobalParamPageAss
 	assignments: A[],
 	slotOf: (a: A) => S,
 	buttonParamOf: (a: A) => number,
-): { slot: S; location: 0 | 1; moduleIndex: number; paramIndex: number }[] {
+): { slot: S; location: 0 | 1 | 2; moduleIndex: number; paramIndex: number }[] {
 	const knobs = assignments.filter((a) => !a.isLed).sort((a, b) => a.slotIndex - b.slotIndex);
 	const onKnob = (a: A, paramIndex: number) =>
 		knobs.some((k) => slotOf(k) === slotOf(a) && k.location === a.location && k.moduleIndex === a.moduleIndex && k.paramIndex === paramIndex);

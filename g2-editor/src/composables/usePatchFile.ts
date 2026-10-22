@@ -14,6 +14,7 @@ type Prf2Data = {
 	slotNames: string[];
 	patches: Patch[];
 	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
+	settings: { focus: number; knobSourceGlobal: boolean; rangeEnable: boolean; bpm: number; clockRunning: boolean };
 	globalParamPages: GlobalParamPageAssignment[];
 };
 
@@ -86,10 +87,11 @@ export function usePatchFile() {
 				patch: m.patch,
 				range: { lower: m.rangeLow, upper: m.rangeHigh },
 			}));
-			const focusIdx = prf2.slotMeta.findIndex((m) => m.key);
-			const focusLabel = SLOT_LABELS[focusIdx >= 0 ? focusIdx : 0];
-			device.updatePerfSettings({ performance: { name, focus: focusLabel, rangeEnable: false, bpm: 0, clockRunning: false }, slots });
+			const { focus, knobSourceGlobal, rangeEnable, bpm, clockRunning } = prf2.settings;
+			const focusLabel = SLOT_LABELS[focus];
+			device.updatePerfSettings({ performance: { name, focus: focusLabel, knobSourceGlobal, rangeEnable, bpm, clockRunning }, slots });
 			uiStore.setSlotInFocus(focusLabel);
+			uiStore.setGlobalPagesActive(knobSourceGlobal);
 		}
 	}
 

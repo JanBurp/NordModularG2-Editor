@@ -175,6 +175,8 @@ body {
    ModuleKnob.vue/Knob.vue put on the widget under the pointer. */
 .alt-assign [data-param-index],
 .alt-assign [data-param-index] *,
+.alt-assign [data-morph-group],
+.alt-assign [data-morph-group] *,
 .alt-assign [data-cell-slot],
 .alt-assign [data-cell-slot] * {
 	cursor: grab !important;

@@ -276,7 +276,7 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x09 ss` | SELECT_SLOT | `ss`=slot (0-3) | Embedded ACK |
 | `0x10` | GET_PERF_SETTINGS | — | Extended bulk (performance settings) |
 | `0x11` | SET_PERF_SETTINGS | `[0x11][sizeHi][sizeLo][80 bytes settings]` | Embedded ACK |
-| `0x29` | SET_PERF_NAME | perf_name (null-terminated) | Embedded ACK |
+| `0x29` | SET_PERF_NAME | perf_name (null-terminated; empty `""` is accepted) | Embedded ACK |
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
 | `0x3F FF 02 global` | SET_KNOB_SOURCE (`g2_set_knob_source`) | `FF` unknown, `02`=knob-source mode, `global`=1(Global)/0(Patch) | None (confirmed 2026-08-28 via 4 consecutive real SHIFT+GLOBAL front-panel presses, echoing `ff0201`/`ff0200` in lockstep on the same channel as the two rows above — this is the actual Patch/Global Parameter Pages source toggle, not the page-select opcodes `0x2D`/`0x1E`, which only choose a page *within* whichever source this sets) |
@@ -369,7 +369,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | Sub-cmd | Name | Extra bytes | Response |
 |---------|------|-------------|----------|
 | `0x21` | SET_PATCH_DESCRIPTION (aka C_PATCH_DESCR) | `[size_hi][size_lo][data]` (data max 62 bytes, see §9's PatchDescription body layout) | Embedded ACK |
-| `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars) | Embedded ACK |
+| `0x27` | SET_PATCH_NAME | `name\0` (null-terminated, max 16 chars; empty `""` is accepted) | Embedded ACK |
 | `0x28` | GET_PATCH_NAME | — | Embedded; name at `response[5+]` or bulk at `bulkData[4+]` |
 | `0x2A` | SET_MODULE_UPRATE | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
@@ -385,7 +385,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
 | `0x42` | SET_PARAM_LABEL | `loc mod_id module_len (is_string param_len param_idx labels...)*` | Embedded ACK |
-| `0x43` | SET_MORPH_RANGE *(not implemented yet)* | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
+| `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
 | `0x44` | COPY_VARIATION | `from to` | Embedded ACK (also broadcast as `copy_variation` watch event to all listeners) |
 | `0x4C` | GET_PARAMS *(not implemented yet)* | `location` | Extended bulk |
 | `0x4F` | GET_PARAM_NAMES *(not implemented yet)* | `location` | Extended bulk |
@@ -393,12 +393,14 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con` — 5 bytes, colour is inside `flags` (§8) | Embedded ACK |
 | `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
-| `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Embedded; note/velocity at `[5..6]` |
-| `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-7) | Embedded ACK |
+| `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Extended bulk `0x69` voice table, see Current note below |
+| `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-8, 9 = Patch Mutator audition, see below) | Embedded ACK |
 | `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text); sent as step 4 of `g2_get_patch()`, result reported as `text` alongside `name` |
 | `0x6F` | *(no live SET exists — see note below)* | — | — |
 | `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
 | `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
+| `0x90` | SET_MUTATION_LOCK | `loc mod locked` | Embedded ACK |
+| `0x4D`… | *(section dump, `send-sections`)* | whole `.pch2` sections `[type][len16][data]…` as one edit | Embedded ACK |
 
 > **Patch notes (`0x6E`/`0x6F`) — there is no live SET.** `0x6F` is the chunk ID for the text-pad
 > section *inside the full patch file/bulk format* (used by `set-patch-description`-style whole-
@@ -431,6 +433,9 @@ upload-perf              <file>                                    (0x37, system
 set-param                <slot> <loc> <mod> <param> <val> <var>    (0x40)
 set-module-labels        <slot> <loc> <mod> <param> <n> <label>... (0x42, all params of the module)
 copy-variation           <slot> <from> <to>                        (0x44)
+set-morph-range          <slot> <loc> <mod> <param> <range> <group> <var>  (0x43)
+set-mutation-lock        <slot> <loc> <mod> <0|1>                  (0x90)
+send-sections            <slot> <hex>                              (first section type is the sub-cmd)
 add-cable                <slot> <loc> ...                          (0x50)
 del-cable                <slot> <loc> ...                          (0x51)
 set-cable-color          <slot> <loc> ... <color>                  (0x54)
@@ -470,6 +475,27 @@ These rules are enforced by both the CLI and the editor. Breaking any of them ha
 - **ADD_MODULE parameter values are ignored.** The G2 sets a new module's params to its own defaults. These defaults were measured on hardware for all 166 addable types (`src/renderer/__tests__/g2ModuleDefaults.json`). Delphi `ModuleDef.xml` agrees on 793 of 794 params; the exception is Fx-In Pad (G2 = 1).
 - **Zero a module's morph ranges before DEL_MODULE.** If a module that still has a morph assignment is deleted, the G2 stays corrupted until power-off. From then on, every add of types 58–61 (DrumSynth, CompLev, Mux8-1X, Clip) gets NACK code 3 and the slot is renamed "Error". The official editor zeroes morphs (and deassigns knobs/controllers) before `CMModuleDelete` (`CMorphMap::GetDeleteModuleMolecules`). Dangling knob or MIDI-CC assignments alone do not trigger it. Editor: `_clearModuleMorphOnDevice` in `slots.ts`.
 - A slot named **"Error"** after an edit means the G2 NACKed it (code 3, "Error in synth.") and wiped the slot. The name persists through re-uploads until another patch is loaded over it.
+
+### Patch Mutator: variation 9, section dump, mutation lock
+
+Hardware-verified 2026-10-12. Implemented on the `feat/mutator` branch.
+
+- **Variation 9 is a live, hidden audition variation.** `SELECT_VARIATION 9` (`variation 10 <slot>` in the CLI) and `SET_PARAM` / `SET_MORPH_RANGE` with variation 9 all work. `get-patch` then dumps 10 variations, and the patch description reports variation 9. The official editor auditions mutator results exactly this way. The claim in G2-Edit that the firmware only understands 0-7 is wrong.
+- **Bursts of `SET_PARAM` lose values.** `SET_PARAM` is never acked. A burst of 100+ through `seq` silently dropped 14 of 173 values on the G2. Whole-variation writes therefore use the official `CMMutaParamDump`: one slot edit carrying `.pch2`-style sections `[0x4D patch-ctx][0x4D VA][0x4D FX][0x65 morph]` with `numvar = 1` and the variation index set to the target (`send-sections`, `serializeVariationDump`). It is acked, exact and fast (158 params ≈ 0.2 s). A dump **replaces** that variation's morph list and leaves the other variations alone.
+- **`0x90` SET_MUTATION_LOCK** (`CMMutaLock`, `loc mod locked`) flips the module-record bit after `uprate` ("Exclude From Mutation", see patch-format §6.3).
+
+### Current note (`0x68` / `0x69`)
+
+Hardware-verified 2026-10-15. Not implemented in the CLI yet.
+
+`0x69` (`CMCurrentNotesDump`) is **only** sent as the reply to a `0x68` request. The G2 never pushes it when keys are played (160 replies, 0 unsolicited). Payload: a 16-bit byte count (46), then bits MSB-first:
+
+```
+note:7 attack:7 release:7 count:5          most recent key event
+(count+1 = 16) × { note:7 attack:7 release:7 }   one entry per voice
+```
+
+Voices are assigned round-robin. A key press overwrites `note` + `attack` (note-on velocity), and a key release overwrites `release` (note-off velocity). There is no held/gate flag, so "held" can only be inferred by diffing polls (~300 ms works). A release with an unchanged value is invisible.
 
 ### Knob & MIDI Assignment Sub-Commands
 
@@ -909,10 +935,13 @@ A reliable desync detector: every bulk payload ends in a CRC-16, so `calc_crc16`
 |---------|-----------|-------|
 | GET_PATCH data | `is_patch_data_reply` | `bulk[1] == 0x08\|slot`, `bulk[3] == 0x21` (C_PATCH_DESCR), and the module list (`0x4A`) at the second chunk. A bare `0x21` change notification does not match |
 | LIST_PATCHES | `is_list_reply` | `bulk[1] == 0x0C`, `bulk[3] == 0x13` (R_LIST_NAMES) |
+| GET_SYNTH_SETTINGS | — | `bulk[3] == 0x03` (`SUB_RESPONSE_SYNTH_SETTINGS`) |
 | GET_PERF_SETTINGS | — | tagged `0x29` reply (`perf_settings_read`, §6b) |
 | slot edits | `is_edit_ack` | §7, Edit acknowledgement |
 
 Before 2026-10-07 the patch-data step and `g2_list` took the first extended message as the reply. In a 4 h duration run, 44 of 704 get-patch replies were really `resources_used` (`0x72`) or other payloads, and one stray LED/VU message taken as a list reply shifted every later list request by one answer. **Deterministic repro:** start a daemon, let it idle ~8 s (stream armed), then SIGKILL it so no STOP_COMM is sent. The G2 keeps streaming, and a one-shot `get-patch` / `list` then sees LED/VU data first. Test: `test_oneshot_queries_with_stream_left_on` (`cli/test/test_daemon.c`).
+
+The perf-settings readers followed on 2026-10-20. `startup` (`g2_device_info`), `get-perf-settings` and `get-perf-file` now all read through `perf_settings_bytes()` → `perf_settings_read()` and fail with an error instead of parsing zeros. Before that, they now and then reported every slot inactive/unkeyed. `get-perf-file` fetches each slot with `fetch_patch()` (same tagged read as `get-patch`); before that it sometimes failed with "Failed to convert patch for slot X".
 
 ---
 
@@ -1004,7 +1033,7 @@ When `version != 0x40`:
 | `0x43` | `morph_change` | `slot`, `area` ("fx"/"va"), `module`=r[6], `param`=r[7], `morph`=r[8], `value`=r[9], `negative`=r[10], `variation`=r[11] |
 | `0x44` | `copy_variation` | `slot`, `from`=r[5], `to`=r[6] |
 | `0x59` or `0x70` or `0x7F` | `ok` | `slot` |
-| `0x69` | `current_note` | `slot`, `note`=r[5], `velocity`=r[6] |
+| `0x69` | `current_note` | `slot`, `note`=r[5], `velocity`=r[6]. **This decoding is a wrong guess:** `0x69` is a bit-packed voice table and only ever arrives as the reply to `0x68` (§7, Current note) |
 | `0x6A` | `variation_change` | `slot`, `variation`=r[5] |
 | `0x72` | `resources_used` | `slot`, `location`=r[5] |
 | `0x74` | `knob_map_changed` | `slot` — no other fields (CMBarbMapChangeNotify, zero payload bytes; not reproducible on demand, see §7 note above) |
@@ -1314,6 +1343,8 @@ Electron       Main thread                    G2
 ```
 
 The key difference: hardware path receives 0x04/0x40/0x1F (sentinel=2, G2 already stopped streaming); editor path receives 0x0C/0x1F (sentinel=0, G2 still streaming → requires explicit `g2_stop_comm()`).
+
+> **One-shot `set-perf-mode` (no daemon):** the `0x0C/0x1F` mode-change reply arrives ~650 ms after `0x3E`, which is after the 200 ms sleep and the STOP_COMM drain. Before 2026-10-20, `g2_rearm()` in `g2_disconnect()` read that header as its START_COMM ack and left the 19-byte bulk unread. The orphaned payload wedged the G2 ("No response from G2" until a power cycle), the same family as the timeout header drop in §12. `g2_rearm()` now reads the bulk of any extended header (`discard_bulk()`, exported from `g2_io.c`). Found by the hardware suite `npm run test:g2`.
 
 ### `seq` — Batch slot mutations in one USB frame
 

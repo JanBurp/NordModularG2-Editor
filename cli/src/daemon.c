@@ -173,12 +173,6 @@ static void debug_status(const char *msg) {
 	fflush(stdout);
 }
 
-/* Elapsed milliseconds since an arbitrary monotonic epoch (process start). */
-long long now_ms(void) {
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
 
 /* Disconnect diagnostic: command timestamps (ring) so a drop can be correlated
  * with a burst of commands. Logged to stderr only. */
@@ -318,7 +312,7 @@ static int execute_seq(cJSON *args) {
             if (ret == G2_OK) n_ops++;
 
         } else if (strcmp(scmd, "assign-knob") == 0 && sn >= 6) {
-            if (s_loc < 0 || s_loc > 1 || arg_i(sub,5) < 0 || arg_i(sub,5) > 119 || (sn >= 7 && (arg_i(sub,6) < 0 || arg_i(sub,6) > 1))) { ret = G2_ERR_INVALID_PARAM; break; }
+            if (s_loc < 0 || s_loc > 2 || arg_i(sub,5) < 0 || arg_i(sub,5) > 119 || (sn >= 7 && (arg_i(sub,6) < 0 || arg_i(sub,6) > 1))) { ret = G2_ERR_INVALID_PARAM; break; }
             g2_build_assign_knob_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4), arg_i(sub,5), sn >= 7 ? arg_i(sub,6) : 0);
             n_ops++;
 
@@ -331,7 +325,7 @@ static int execute_seq(cJSON *args) {
         } else if (strcmp(scmd, "assign-global-knob") == 0 && sn >= 7) {
             /* [cmd, transportSlot, targetSlot, loc, mod, param, knob] — sub[2] is the target slot, not a location */
             int target = parse_slot(arg_s(sub, 2)), gloc = parse_location_str(arg_s(sub, 3));
-            if (target == SLOT_INVALID || gloc < 0 || gloc > 1 || arg_i(sub,6) < 0 || arg_i(sub,6) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
+            if (target == SLOT_INVALID || gloc < 0 || gloc > 2 || arg_i(sub,6) < 0 || arg_i(sub,6) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
             g2_build_assign_global_knob_op(op, p, target, gloc, arg_i(sub,4), arg_i(sub,5), arg_i(sub,6));
             n_ops++;
 
@@ -1072,6 +1066,10 @@ static void do_reconnect(void) {
 	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
 		g2_msg_free(&ack);
 
+	if (g2_target_moved) {
+		g2_target_moved = 0;
+		printf("{\"type\":\"device_retargeted\",\"bus\":%d,\"device\":%d}\n", g2_target_bus, g2_target_device);
+	}
 	printf("{\"type\":\"device_reconnected\"}\n");
 	fflush(stdout);
 }

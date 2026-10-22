@@ -35,10 +35,17 @@ g2_device_t g2 = {
 int g2_target_bus = 0;
 int g2_target_device = 0;
 int g2_target_last_seen = 0;
+int g2_target_moved = 0;
+
+/* Physical port path of the target, recorded on every successful open: survives the
+ * address change of a re-enumeration (G2 reboot, same-port replug). */
+static uint8_t g2_target_ports[7];
+static int     g2_target_nports = 0;
 
 void g2_set_target(int bus, int device) {
     g2_target_bus = bus;
     g2_target_device = device;
+    g2_target_nports = 0;
 }
 
 static int is_g2_device(const struct libusb_device_descriptor *desc) {
@@ -104,16 +111,10 @@ static g2_trace_ent    g2_trace_ring[G2_TRACE_N];
 static unsigned        g2_trace_count;
 static pthread_mutex_t g2_trace_mu = PTHREAD_MUTEX_INITIALIZER;
 
-static long long trace_now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
-
 void g2_trace(char dir, const uint8_t *buf, int len) {
     pthread_mutex_lock(&g2_trace_mu);
     g2_trace_ent *e = &g2_trace_ring[g2_trace_count++ % G2_TRACE_N];
-    e->ms = trace_now_ms();
+    e->ms = now_ms();
     e->dir = dir;
     e->len = len;
     memcpy(e->b, buf, (size_t)(len < G2_TRACE_BYTES ? len : G2_TRACE_BYTES));
@@ -121,7 +122,7 @@ void g2_trace(char dir, const uint8_t *buf, int len) {
 }
 
 void g2_trace_dump(void) {
-    long long now = trace_now_ms();
+    long long now = now_ms();
     pthread_mutex_lock(&g2_trace_mu);
     unsigned total = g2_trace_count < G2_TRACE_N ? g2_trace_count : G2_TRACE_N;
     fprintf(stderr, "[trace] last %u frames (> sent, < received), oldest first:\n", total);
@@ -281,16 +282,32 @@ static libusb_device_handle *g2_open_target(void) {
     if (count < 0) return NULL;
 
     libusb_device_handle *handle = NULL;
+    libusb_device *moved = NULL;  /* a G2 on the target's port path, at another address */
     g2_target_last_seen = 0;
     for (ssize_t idx = 0; idx < count; idx++) {
         struct libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
         if (!is_g2_device(&desc)) continue;
         if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
-        if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
+        if (libusb_get_device_address(devices[idx]) != g2_target_device) {
+            uint8_t ports[7];
+            int n = libusb_get_port_numbers(devices[idx], ports, sizeof(ports));
+            if (g2_target_nports > 0 && n == g2_target_nports && memcmp(ports, g2_target_ports, (size_t)n) == 0)
+                moved = devices[idx];
+            continue;
+        }
         g2_target_last_seen = 1;
         if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
+        else if ((g2_target_nports = libusb_get_port_numbers(devices[idx], g2_target_ports, sizeof(g2_target_ports))) < 0)
+            g2_target_nports = 0;
         break;
+    }
+    /* After a G2 self-reboot macOS re-enumerates it at a new address (duration run 2026-10-22: 0:4 -> 0:5)
+     * while a slow manual replug gets the old one back: follow it on the same port path, like the official
+     * editor, which keys its USB devices by IOKit locationID. */
+    if (!g2_target_last_seen && moved && libusb_open(moved, &handle) == 0) {
+        g2_target_device = libusb_get_device_address(moved);
+        g2_target_moved = 1;
     }
 
     libusb_free_device_list(devices, 1);
@@ -349,12 +366,14 @@ int g2_connect_silent(void) {
 }
 
 int g2_disconnect(void) {
-    /* A one-shot CLI command that locked the stream (set-perf-mode) has no other cleanup point before the process exits -
-     * without this, the G2 is left not reporting LED/VU/param notifications
-     * until something else sends START_COMM (e.g. the daemon's own startup
-     * lock/unlock cycle). do_reconnect() already zeroes g2_stream_locked
-     * before calling this, so this is a no-op on that path. */
-    if (g2_stream_locked && g2.handle) g2_unlock_stream();
+    /* One-shot: leave the G2 quiet. Nobody reads its stream once we exit, and a G2 left
+     * streaming made the next one-shot's drain spin until killed, and a kill mid-bulk wedges
+     * the G2 (test:g2 2026-10-22). The daemon re-arms at startup anyway (lock/unlock cycle).
+     * Daemon: unlock, i.e. the official editor's idle state (stream on; CSynth::CleanDirtyData
+     * ends with START_COMM and nothing is sent on quit). do_reconnect() already zeroes
+     * g2_stream_locked before calling this, so this is a no-op on that path. */
+    if (g2.handle && !g2_daemon_mode) g2_stop_comm();
+    else if (g2_stream_locked && g2.handle) g2_unlock_stream();
     if (g2.interface_claimed && g2.handle) {
         libusb_release_interface(g2.handle, 0);
         g2.interface_claimed = 0;
@@ -1027,18 +1046,12 @@ void g2_rearm(void) {
  * reference editor's CMSynthUnlockEditorSync, which has no ReadStream/
  * UseOnSynth anywhere: it's fire-and-forget. So there is no "the STOP_COMM
  * ack" message to identify; this just drains whatever was already in flight
- * (same short-timeout-until-quiet idiom as drain_stale_extended() in
- * g2_device.c) until nothing more arrives, bounded defensively against a
- * runaway stream. */
+ * until nothing more arrives. Also runs with the listener active (g2_events.c,
+ * on the mode-change reply): then it drains the listener's queue. */
 void g2_stop_comm(void) {
     uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop, 2);
-    uint8_t buf[16];
-    for (int tries = 0; tries < 200; tries++) {
-        int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STALE_MS);
-        if (ret <= 0) break;
-        if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) discard_bulk(((uint16_t)buf[1] << 8) | buf[2]);
-    }
+    g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 }
 
 /* Idempotent lock/unlock over g2_stop_comm()/g2_rearm(), tracked by
@@ -1062,28 +1075,29 @@ static int bulk_needs_rearm(const uint8_t *bulk, int size) {
     return size > 3 && bulk[1] == 0x04 && bulk[2] == 0x40 && bulk[3] == 0x1F;
 }
 
+int g2_drain_quiet(int quiet_ms, int *needs_rearm) {
+    uint8_t response[16];
+    int count = 0;
+    long long deadline = now_ms() + USB_DRAIN_MAX_MS;
+    while (now_ms() < deadline && recv_interrupt(response, sizeof(response), quiet_ms) > 0) {
+        count++;
+        if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
+        uint16_t size = ((uint16_t)response[1] << 8) | response[2];
+        uint8_t *bulk = size ? malloc(size) : NULL;
+        if (!bulk) continue;
+        int bret = recv_bulk(bulk, size);
+        if (needs_rearm && bulk_needs_rearm(bulk, bret)) *needs_rearm = 1;
+        free(bulk);
+    }
+    return count;
+}
+
 /* No-op when listener is active (listener drains EP 0x81 continuously).
- * When inactive: drain all pending interrupt+bulk messages. */
+ * When inactive: drain pending interrupt+bulk messages. */
 int g2_drain_pending(void) {
     if (g2_listener_active) return 0;
-
-    uint8_t response[16];
-    int ret, count = 0, needs_rearm = 0;
-    while ((ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_DRAIN_MS)) > 0) {
-        count++;
-        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t size = ((uint16_t)response[1] << 8) | response[2];
-            if (size > 0) {
-                uint8_t *bulk = malloc(size);
-                if (bulk) {
-                    int bret = recv_bulk(bulk, size);
-                    if (bulk_needs_rearm(bulk, bret)) needs_rearm = 1;
-                    free(bulk);
-                }
-            }
-        }
-    }
+    int needs_rearm = 0;
+    int count = g2_drain_quiet(USB_TIMEOUT_DRAIN_MS, &needs_rearm);
     if (needs_rearm) g2_rearm();
-    (void)count;
     return count;
 }

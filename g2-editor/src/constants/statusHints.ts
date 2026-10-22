@@ -4,6 +4,7 @@ import { isMac } from '@/utils/platform';
 
 export const MOD = isMac ? '⌘' : 'Ctrl'; // Cmd on Mac, Ctrl elsewhere
 export const ALT = isMac ? '⌥' : 'Alt';
+export const SHIFT = isMac ? '⇧' : 'Shift';
 
 export const STATUS_HINTS = {
 	// Canvas — hidden gestures
@@ -21,13 +22,15 @@ export const STATUS_HINTS = {
 	ccRow: `Click: select · Shift-click: select range · ${MOD}-click: add/remove from selection · Drag: reassign CC`,
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
 	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
-	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · Drop CC here: assign · Right-click: rename, clear, copy',
+	// A Morph Group's dial on a Parameter Page knob: no morph-assign (a dial can't be morphed), no button.
+	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
+	morphKnob: `Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
 	// Patch Mutator — sound boxes
 	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,
 	mutaStorage: `Click: audition · Double-click: mutate from this sound · Drag: move/copy · Shift-drop: interpolate · ${ALT}-drop: cross · Right-click: delete`,
 	morphSource: 'Click: cycle morph source',
-	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter to assign · Right-click: deassign, morph`,
+	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter or Morph knob to assign · Right-click: deassign, morph`,
 	paramPageButton: 'Click: change button value',
 	globalPages: 'Click: switch between Patch and Global parameter pages',
 	paramBank: 'Click: select parameter bank',

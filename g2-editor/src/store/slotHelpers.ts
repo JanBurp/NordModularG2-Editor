@@ -10,7 +10,13 @@ import type {
 	VariationState,
 } from '@/types';
 import { NUM_VARIATIONS } from '@/types';
+import { MORPH_NAMES } from '@/types/patch';
 import { getModule } from '@/renderer/nmg2mods';
+
+// Morph Group i's display name: its custom label (PATCH_MORPH param 8+i), else the default name.
+export function morphGroupName(patch: Patch | null | undefined, i: number): string {
+	return patch?.morphParamLabels?.find((pl) => pl.paramIndex === 8 + i)?.labels?.[0] || MORPH_NAMES[i];
+}
 
 export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'va' | 'fx' } {
 	return area === 'voice' ? { areaIdx: 1, location: 'va' } : { areaIdx: 0, location: 'fx' };
@@ -190,18 +196,24 @@ export function computeSwap<T extends ParamPageAssignment>(prev: T[], sourceSlot
 	return next;
 }
 
-// Builds one assign/deassign CLI command per touched slot from the final list — shared by
-// _applyParamPages/_applyGlobalParamPages, replacing their former sequential-await loops.
+// Builds the CLI commands re-syncing the touched knob slots to the final list — shared by
+// _applyParamPages/_applyGlobalParamPages. Same order as the official editor's
+// CKnobMap::GetAssignKnobToTargetMolecules: every touched slot is deassigned BEFORE anything is
+// assigned (so a swap never has the same target on two knobs mid-way), and the page of the last
+// assigned knob is then focused (CMParameterPageFocus(knob >> 3)), which makes the front panel
+// show the new assignment. focusPageId is null when nothing was assigned.
 export function buildTouchedCmds<T extends ParamPageAssignment>(
 	list: T[],
 	touched: number[],
 	assignCmd: (entry: T) => string[],
 	deassignCmd: (slotIndex: number) => string[],
-): string[][] {
-	return touched.map((slotIndex) => {
-		const entry = list.find((k) => k.slotIndex === slotIndex);
-		return entry ? assignCmd(entry) : deassignCmd(slotIndex);
-	});
+): { cmds: string[][]; focusPageId: number | null } {
+	const entries = touched.map((slotIndex) => list.find((k) => k.slotIndex === slotIndex)).filter((e): e is T => !!e);
+	const last = entries[entries.length - 1];
+	return {
+		cmds: [...touched.map(deassignCmd), ...entries.map(assignCmd)],
+		focusPageId: last ? last.slotIndex >> 3 : null,
+	};
 }
 
 export function resolveColumnCollisions(

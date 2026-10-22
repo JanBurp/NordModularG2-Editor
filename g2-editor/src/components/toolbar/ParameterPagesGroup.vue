@@ -37,7 +37,7 @@
 			     value-drag. Empty slots drag too: dropping one on a canvas param assigns that param here. -->
 			<div
 				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
-				@mouseenter="showHint('paramPageKnob')"
+				@mouseenter="showHint(cell.assignment?.location === 2 ? 'paramPageMorphKnob' : 'paramPageKnob')"
 				@mouseleave="showHint('paramPageCell')"
 				class="-mb-1"
 				:class="{ 'opacity-40': !cell.assignment }"
@@ -173,6 +173,7 @@
 	}
 
 	function onKnobChange(a: PageAssignment, value: number) {
+		if (a.location === 2) return slotsStore.setMorphParam(uiStore.variation, a.paramIndex, 'dial', value, assignmentSlot(a));
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
 		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey, false, assignmentSlot(a));
 	}
@@ -183,8 +184,9 @@
 	// Captured on the wrapper (not the Knob itself) so it fires before useKnob.ts's own value-drag —
 	// startMorphRangeDrag no-ops (and doesn't stopPropagation) unless the grab modifier is actually held.
 	function onKnobMorphMouseDown(cell: Cell, e: MouseEvent) {
-		if (!cell.assignment || !isGrabModifierPressed(e)) return;
 		const a = cell.assignment;
+		if (!a || a.location === 2 || !isGrabModifierPressed(e)) return;
+		const location = a.location; // narrowed to 0 | 1 for the closures below
 		const slot = assignmentSlot(a);
 		const groupIndex = uiStore.selectedMorphGroup;
 		const variation = uiStore.variation;
@@ -197,11 +199,11 @@
 			getRange: () => cell.morphRange ?? 0,
 			// Freshly assigned params start at the full parameter range (matches the real editor); the
 			// user then Cmd/Ctrl-drags to narrow it.
-			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, 127),
-			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex),
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex, 127),
+			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex),
 			onRangeChange: isFixedRange
 				? undefined
-				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, range),
+				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex, range),
 		});
 	}
 
