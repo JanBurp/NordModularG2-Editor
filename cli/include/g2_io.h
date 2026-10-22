@@ -145,10 +145,12 @@ void discard_bulk(uint16_t sz);
  * a streaming G2 is never quiet, and the unbounded loop this replaces hung one-shot commands forever
  * (one-shot set-perf-mode after a one-shot mode change, test:g2 2026-10-22). Sets *needs_rearm (may be
  * NULL) when the all-slots version update that stops the stream went by. Returns the message count.
- * No-op when listener is active (listener drains continuously). */
+ * With the listener active it drains the listener's queue (g2_stop_comm needs that); direct-mode-only
+ * callers check g2_listener_active themselves. */
 int g2_drain_quiet(int quiet_ms, int *needs_rearm);
 
-/* g2_drain_quiet(USB_TIMEOUT_DRAIN_MS), then g2_rearm() if the stream stopped meanwhile. */
+/* g2_drain_quiet(USB_TIMEOUT_DRAIN_MS), then g2_rearm() if the stream stopped meanwhile.
+ * No-op when listener is active (listener drains continuously). */
 int g2_drain_pending(void);
 
 /* libusb error code from the last failed libusb_claim_interface() call. */

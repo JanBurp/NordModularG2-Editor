@@ -276,9 +276,10 @@ int g2_send_init(void) {
 
     if (ensure_connected(1) < 0) return G2_ERR_CONNECT;
 
-    /* Send CMD_INIT without draining first. Draining with a finite timeout
-     * loops forever when the G2 is streaming (~17 ms intervals). CMD_INIT
-     * itself stops streaming; stale events are consumed in the read loop. */
+    /* Send CMD_INIT without draining first, so a streaming G2 can't delay it.
+     * CMD_INIT does NOT stop the stream (hardware, 2026-10-22: a G2 left streaming
+     * kept streaming after it); the read loop below skips stream messages until
+     * the init reply. */
     if (send_init_msg() < 0) {
         g2_err("Failed to send init message\n");
         return G2_ERR_SEND;

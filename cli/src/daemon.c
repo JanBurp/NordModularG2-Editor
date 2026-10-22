@@ -173,12 +173,6 @@ static void debug_status(const char *msg) {
 	fflush(stdout);
 }
 
-/* Elapsed milliseconds since an arbitrary monotonic epoch (process start). */
-long long now_ms(void) {
-	struct timespec ts;
-	clock_gettime(CLOCK_MONOTONIC, &ts);
-	return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
 
 /* Disconnect diagnostic: command timestamps (ring) so a drop can be correlated
  * with a burst of commands. Logged to stderr only. */

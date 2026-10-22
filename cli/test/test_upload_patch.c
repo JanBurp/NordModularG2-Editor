@@ -8,6 +8,7 @@
 
 #include "unity.h"
 #include "../include/g2_device.h"
+#include "../include/g2_io.h"
 #include "../include/utils.h"
 #include <stdio.h>
 #include <stdlib.h>

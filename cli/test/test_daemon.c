@@ -851,26 +851,25 @@ static int locations_unique(cJSON *names, const char *group) {
     return 1;
 }
 
-/* Test: one-shot get-patch and list while the G2 is still streaming (a daemon killed without
- * STOP_COMM leaves it so). Both used to take the first extended message as their reply: get-patch
+/* Test: one-shot get-patch and list while the G2 is still streaming (a daemon that quit leaves it
+ * so, like the official editor). Both used to take the first extended message as their reply: get-patch
  * returned LED/VU payloads as patch data (8 of 8 calls), list read every page one request late -
  * pages listed twice, performances under patch banks. Seen in the duration test of 2026-10-06
- * (44 of 704 get-patch replies, 3 of 4 bank snapshots) and reproduced exactly this way. Runs after
- * the shared daemon is gone; leaves the G2 streaming, which a daemon start handles. */
+ * (44 of 704 get-patch replies, 3 of 4 bank snapshots) and reproduced exactly this way. Runs before
+ * the shared daemon starts (one-shot group); the last one-shot leaves the G2 quiet (STOP_COMM at exit). */
 void test_oneshot_queries_with_stream_left_on(void) {
-    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
-
+    /* No g_daemon_ok guard: this runs before the shared daemon exists; the runner already
+     * stops before any test when no G2 is detected. */
     daemon_ctx_t d = daemon_spawn();
     TEST_ASSERT_TRUE_MESSAGE(d.pid > 0, "setup: spawn daemon");
-    /* Kill it idle, after startup has armed the stream: killing it mid-transfer leaves a payload
-     * unread and wedges the G2. Its output is drained meanwhile - a full pipe blocks the daemon
-     * mid-operation, which wedged the G2 too. */
+    /* Let startup arm the stream (output drained meanwhile: a full pipe blocks the daemon
+     * mid-operation, which wedged the G2), then quit it the way the editor does, leaving the
+     * G2 streaming. Not SIGKILL: a streaming G2 is never idle, so a kill can cut a USB
+     * transfer and the G2 then stays silent until a power cycle (4 of 10 runs, 2026-10-22;
+     * a graceful exit: 0 of 8). */
     char line[4096];
     for (time_t end = time(NULL) + 8; time(NULL) < end; ) read_line_timeout(d.out_fd, line, sizeof(line), 1);
-    kill(d.pid, SIGKILL);
-    waitpid(d.pid, NULL, 0);
-    close(d.in_fd);
-    close(d.out_fd);
+    daemon_shutdown(&d);
 
     char args[32], msg[64];
     for (int i = 0; i < 4; i++) {

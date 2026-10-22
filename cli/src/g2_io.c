@@ -111,16 +111,10 @@ static g2_trace_ent    g2_trace_ring[G2_TRACE_N];
 static unsigned        g2_trace_count;
 static pthread_mutex_t g2_trace_mu = PTHREAD_MUTEX_INITIALIZER;
 
-static long long trace_now_ms(void) {
-    struct timespec ts;
-    clock_gettime(CLOCK_MONOTONIC, &ts);
-    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
-}
-
 void g2_trace(char dir, const uint8_t *buf, int len) {
     pthread_mutex_lock(&g2_trace_mu);
     g2_trace_ent *e = &g2_trace_ring[g2_trace_count++ % G2_TRACE_N];
-    e->ms = trace_now_ms();
+    e->ms = now_ms();
     e->dir = dir;
     e->len = len;
     memcpy(e->b, buf, (size_t)(len < G2_TRACE_BYTES ? len : G2_TRACE_BYTES));
@@ -128,7 +122,7 @@ void g2_trace(char dir, const uint8_t *buf, int len) {
 }
 
 void g2_trace_dump(void) {
-    long long now = trace_now_ms();
+    long long now = now_ms();
     pthread_mutex_lock(&g2_trace_mu);
     unsigned total = g2_trace_count < G2_TRACE_N ? g2_trace_count : G2_TRACE_N;
     fprintf(stderr, "[trace] last %u frames (> sent, < received), oldest first:\n", total);
@@ -1052,19 +1046,12 @@ void g2_rearm(void) {
  * reference editor's CMSynthUnlockEditorSync, which has no ReadStream/
  * UseOnSynth anywhere: it's fire-and-forget. So there is no "the STOP_COMM
  * ack" message to identify; this just drains whatever was already in flight
- * (same short-timeout-until-quiet idiom as g2_drain_quiet()) until nothing
- * more arrives, bounded defensively against a runaway stream. Not built on
- * g2_drain_quiet(): this one also runs with the listener active, draining
- * its queue. */
+ * until nothing more arrives. Also runs with the listener active (g2_events.c,
+ * on the mode-change reply): then it drains the listener's queue. */
 void g2_stop_comm(void) {
     uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop, 2);
-    uint8_t buf[16];
-    for (int tries = 0; tries < 200; tries++) {
-        int ret = recv_interrupt(buf, sizeof(buf), USB_TIMEOUT_STALE_MS);
-        if (ret <= 0) break;
-        if ((buf[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) discard_bulk(((uint16_t)buf[1] << 8) | buf[2]);
-    }
+    g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 }
 
 /* Idempotent lock/unlock over g2_stop_comm()/g2_rearm(), tracked by
@@ -1089,12 +1076,10 @@ static int bulk_needs_rearm(const uint8_t *bulk, int size) {
 }
 
 int g2_drain_quiet(int quiet_ms, int *needs_rearm) {
-    if (g2_listener_active) return 0;
-
     uint8_t response[16];
     int count = 0;
-    long long deadline = trace_now_ms() + USB_DRAIN_MAX_MS;
-    while (trace_now_ms() < deadline && recv_interrupt(response, sizeof(response), quiet_ms) > 0) {
+    long long deadline = now_ms() + USB_DRAIN_MAX_MS;
+    while (now_ms() < deadline && recv_interrupt(response, sizeof(response), quiet_ms) > 0) {
         count++;
         if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
         uint16_t size = ((uint16_t)response[1] << 8) | response[2];
@@ -1110,6 +1095,7 @@ int g2_drain_quiet(int quiet_ms, int *needs_rearm) {
 /* No-op when listener is active (listener drains EP 0x81 continuously).
  * When inactive: drain pending interrupt+bulk messages. */
 int g2_drain_pending(void) {
+    if (g2_listener_active) return 0;
     int needs_rearm = 0;
     int count = g2_drain_quiet(USB_TIMEOUT_DRAIN_MS, &needs_rearm);
     if (needs_rearm) g2_rearm();
