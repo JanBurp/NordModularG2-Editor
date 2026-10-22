@@ -15,7 +15,7 @@ has_children: true
 
 ## Latest version
 
-**v0.7.1** — released 2026-10-12
+**v0.7.2** — released 2026-10-22
 
 ## Download
 

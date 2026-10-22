@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.7.2] - 2026-10-22
+
 ### New
 - Added option for cable style
 - Added option for module params to have focus on hover, so arrow keys can adjust value
@@ -39,6 +41,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Windows: Key commands when switching to window of other G2
 - Windows: Copy/Paste when switching to window of other G2
 - Windows: Keyboard Shortcuts page showed Mac key symbols (⌘ ⌥ ⇧) instead of Ctrl/Alt/Shift
+- Opening a performance file offline lost its performance settings (focus, BPM, range, clock)
+- After connecting, the editor now focuses the G2's focused slot instead of the first keyed slot
+- Improved reconnect when the G2 re-enumerates / reboots
+- CLI commands left the G2 streaming after exit
 
 ## [0.7.1] - 2026-10-12
 
