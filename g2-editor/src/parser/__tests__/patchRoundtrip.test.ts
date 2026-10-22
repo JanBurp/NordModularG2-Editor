@@ -1162,6 +1162,25 @@ describe('prf2 0x11 section preservation', () => {
 		expect(orig11).not.toBeNull();
 		expect(new11).toBe(orig11);
 	});
+
+	it('header knob source, range enable, bpm and clock run are parsed', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'MorphingDrumDemo.prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true });
+	});
+
+	it('header knob source Global is parsed', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/New Performance.prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true });
+	});
+
+	it('focus comes from the header, not the first keyed slot (A and D keyed, D focused)', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/OT Template 7.5..prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.slotMeta.map((m) => m.key)).toEqual([true, false, false, true]);
+		expect(prf2.settings.focus).toBe(3);
+	});
 });
 
 describe('prf2 per-slot mutation round-trip', () => {

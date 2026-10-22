@@ -133,6 +133,7 @@ class G2Parser {
 	private areas: G2Area[] = [new G2Area('fx'), new G2Area('voice')];
 	private slots: string[] = [];
 	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
+	private perfSettings = { focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 0, clockRunning: false };
 	private aof = 0;
 	private textpad: string[] = [];
 	private reader = new BitReader();
@@ -570,6 +571,14 @@ class G2Parser {
 	private parsePrfData(data: Uint8Array): void {
 		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
 		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, 3×padding
+		// Header as writePerfSettings writes it: [unknown, focus<<2 | knobSource, rangeEnable, bpm, unknown, clockRun, 0, 0]
+		this.perfSettings = {
+			focus: (data[1] >> 2) & 0x3,
+			knobSourceGlobal: (data[1] & 0x3) !== 0,
+			rangeEnable: data[2] !== 0,
+			bpm: data[3],
+			clockRunning: (data[5] & 1) !== 0,
+		};
 		let ofs = 8;
 		const slotNames: string[] = [];
 		this.slotMeta.length = 0;
@@ -597,6 +606,10 @@ class G2Parser {
 
 	getSlotMeta() {
 		return this.slotMeta;
+	}
+
+	getPerfSettings() {
+		return this.perfSettings;
 	}
 
 	getControllers(slot = 0): MidiCCAssignment[] {
@@ -702,6 +715,7 @@ export class PatchParser {
 		slotNames: string[];
 		patches: Patch[];
 		slotMeta: ReturnType<G2Parser['getSlotMeta']>;
+		settings: ReturnType<G2Parser['getPerfSettings']>;
 		globalParamPages: GlobalParamPageAssignment[];
 	} | null {
 		const slotNames = this.patcher.isPrf2();
@@ -710,6 +724,7 @@ export class PatchParser {
 			slotNames,
 			patches: [0, 1, 2, 3].map((slot) => this.buildPatchForSlot(slot, this.patcher.getControllers(slot))),
 			slotMeta: this.patcher.getSlotMeta(),
+			settings: this.patcher.getPerfSettings(),
 			globalParamPages: this.patcher.getGlobalKnobs(),
 		};
 	}
