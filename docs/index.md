@@ -39,7 +39,7 @@ See the [Changelog](https://github.com/JanBurp/NordModularG2-Editor/blob/main/CH
 
 ## Acknowledgements
 
-Protocol knowledge from the Nord G2 community at [electro-music.com](https://electro-music.com): the [Delphi Editor by bverhue](https://www.bverhue.nl/g2dev/), [patchviewer by ian-s](https://electro-music.com/patchviewer/), and [g2ools by qfingers](https://electro-music.com/forum/viewtopic.php?t=15405). Also thanks to Chris Purusha for technical discussions and a copy of the reverse enigineered editor. Åka Danielson for graphics of the mini modules, BlueHell for lending an Engine and all who tested and or donated to this project.
+Protocol knowledge from the Nord G2 community at [electro-music.com](https://electro-music.com): the [Delphi Editor by bverhue](https://www.bverhue.nl/g2dev/), [patchviewer by ian-s](https://electro-music.com/patchviewer/), and [g2ools by qfingers](https://electro-music.com/forum/viewtopic.php?t=15405). Also thanks to Chris Purusha for technical discussions and a copy of the reverse enigineered editor. Åke Danielson for graphics of the mini modules, BlueHell for lending an Engine and all who tested and or donated to this project.
 
 ## Donate
 
