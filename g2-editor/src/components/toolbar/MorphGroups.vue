@@ -4,9 +4,11 @@
 			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
 					class="relative flex flex-col items-center min-w-14 gap-1"
+					:data-morph-group="i"
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
+					@mousedown.capture="onMorphMouseDown(i, $event)"
 					@dragover.prevent
-					@drop="onMorphCCDrop(i, $event)"
+					@drop="onMorphDrop(i, $event)"
 					@mouseenter="showHint('morphKnob')"
 					@mouseleave="clearHint"
 				>
@@ -48,7 +50,7 @@
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
 	import { useSlotsStore } from '../../store/slots';
-	import { defaultPatchParams } from '../../store/slotHelpers';
+	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
 	import { useUiStore } from '../../store/ui';
 	import { useDeviceStore } from '../../store/device';
 	import { MORPH_NAMES } from '../../types/patch';
@@ -56,6 +58,9 @@
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
+	import { buildGlobalParamPageMenuItems, buildParamPageMenuItems } from '../../composables/useParamPageAssign';
+	import { startParamPageDrag } from '../../composables/useParamPageDrag';
+	import { PATCH_MORPH_MODULE_ID } from '../../parser/constants';
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import ToolBarGroup from './ToolBarGroup.vue';
@@ -83,7 +88,7 @@
 	});
 
 	function displayName(i: number): string {
-		return activePatch.value?.morphParamLabels?.find((pl) => pl.paramIndex === 8 + i)?.labels?.[0] || MORPH_NAMES[i];
+		return morphGroupName(activePatch.value, i);
 	}
 
 	function getMorphCC(morphIdx: number): number | null {
@@ -121,14 +126,38 @@
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 			}),
 		);
+
+		// Parameter Pages / Global Parameter Pages knob assign/deassign, same menus as a canvas param
+		// (Module.vue). A Morph Group is param `groupIndex` of the PATCH_MORPH pseudo-module (location 2).
+		const isThisGroup = (k: { location: number; moduleIndex: number; paramIndex: number }) =>
+			k.location === 2 && k.moduleIndex === PATCH_MORPH_MODULE_ID && k.paramIndex === groupIndex;
+		const target = { slot, location: 2 as const, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: groupIndex };
+		items.push({ type: 'separator' });
+		items.push(...buildParamPageMenuItems({ ...target, existing: slot ? slotsStore.slots[slot].paramPages.find(isThisGroup) : undefined }));
+		items.push(
+			...buildGlobalParamPageMenuItems({
+				...target,
+				existing: slot ? slotsStore.globalParamPages.find((k) => k.slot === slot && isThisGroup(k)) : undefined,
+			}),
+		);
 		openContextMenu(event, items);
 	}
 
-	function onMorphCCDrop(morphIdx: number, event: DragEvent) {
+	// Alt+drag a Morph knob onto a Parameter Pages toolbar knob to assign it — the same gesture (and
+	// useParamPageDrag.ts drag) as a canvas param. Captured so the Knob's own value-drag never starts.
+	function onMorphMouseDown(morphIdx: number, e: MouseEvent) {
+		if (!e.altKey) return;
+		startParamPageDrag(e, { location: 2, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: morphIdx, label: displayName(morphIdx) });
+	}
+
+	// Drop target for a dragged MIDI CC row (assign a CC) and a dragged Parameter Pages knob (assign
+	// this Morph Group to that knob slot), mirroring Module.vue's onParamDrop.
+	function onMorphDrop(morphIdx: number, event: DragEvent) {
 		const data = parseDragPayload(event);
-		if (data?.type !== 'cc') return;
 		const slot = uiStore.slotInFocus;
-		if (!slot) return;
-		slotsStore.assignMidiCC(slot, 2, 1, morphIdx, data.cc);
+		if (!data || !slot) return;
+		if (data.type === 'cc') slotsStore.assignMidiCC(slot, 2, PATCH_MORPH_MODULE_ID, morphIdx, data.cc);
+		else if (data.global) slotsStore.assignParamToGlobalPage(slot, data.slotIndex, 2, PATCH_MORPH_MODULE_ID, morphIdx);
+		else slotsStore.assignParamToPage(slot, data.slotIndex, 2, PATCH_MORPH_MODULE_ID, morphIdx);
 	}
 </script>

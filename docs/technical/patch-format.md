@@ -163,7 +163,7 @@ Bit-packed. One section per area (areaIdx 0 = FX, 1 = Voice).
 | +23–29 | `vert` | 7 | Row position |
 | +30–37 | `colour` | 8 | Module colour |
 | +38 | `uprate` | 1 | High-rate processing flag |
-| +39 | `leds` | 1 | Has LED outputs |
+| +39 | `mutaLock` | 1 | Exclude From Mutation (Patch Mutator). Set with `set-mutation-lock` (`0x90`). Fixtures from the official editor have it set on default-locked types (CompLev, NoteRcv, LevConv…). The parser used to call this field `leds` |
 | +40–45 | *(padding)* | 6 | Discarded |
 | +46–49 | `nmodes` | 4 | Number of mode values |
 | +50… | `modes[i]` | 6×nmodes | Mode values |
@@ -379,6 +379,7 @@ Section order within each slot is not strictly mandated; the parser dispatches b
 - Module parameter storage: `lv[variation × pcnt + paramIdx]` (`ModuleInstance.lv`)
 - Global patch parameter storage: `patchParams[variation]` (array of `PatchParamVariation`)
 - Constant `NUM_VARIATIONS = 9` defined in `patch.ts`
+- The G2 also has a hidden 10th variation, **index 9**. The Patch Mutator uses it to audition results live. After it has been written, `get-patch` dumps 10 variations (see usb-protocol §7, Patch Mutator)
 
 ---
 

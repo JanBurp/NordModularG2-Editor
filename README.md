@@ -34,7 +34,7 @@ The Electron app can run in offline mode (editing files only, no G2 connected) o
 
 ## Documentation
 
-- [GitHub Pages](https://janburp.github.io/NordModularG2-Editor/) — user guide, getting started, alternatives
+- [GitHub Pages](https://janburp.github.io/NordModularG2-Editor/) — getting started, alternatives, technical reference
 - [USB Protocol](docs/technical/usb-protocol.md) — USB framing, commands, watch events, daemon architecture
 - [Patch File Format](docs/technical/patch-format.md) — PCH2/PRF2 binary format, sections, bit encoding
 - [CLI Commands](docs/technical/cli-commands.md) — full `g2-cli` command reference

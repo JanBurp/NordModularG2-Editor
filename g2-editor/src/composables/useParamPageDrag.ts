@@ -3,7 +3,7 @@ import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 
 export interface ParamDragPayload {
-	location: 0 | 1;
+	location: 0 | 1 | 2; // 2 = Morph Group knob (MorphGroups.vue)
 	moduleIndex: number;
 	paramIndex: number;
 	label: string;

@@ -81,7 +81,7 @@
 	// pages[page][bank] = the 8 cells of that page/bank row
 	const pages = computed(() => PAGE_LETTERS.map((_, page) => Array.from({ length: BANK_COUNT }, (_, bank) => buildPageCells(bank, page))));
 
-	type ParamTarget = { slot: SlotLabel; location: 0 | 1; moduleIndex: number; paramIndex: number };
+	type ParamTarget = { slot: SlotLabel; location: 0 | 1 | 2; moduleIndex: number; paramIndex: number };
 
 	function ccFor(t: ParamTarget): number | undefined {
 		return slotsStore.slots[t.slot].controllers.find((c) => c.location === t.location && c.moduleIndex === t.moduleIndex && c.paramIndex === t.paramIndex)

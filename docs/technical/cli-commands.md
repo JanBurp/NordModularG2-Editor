@@ -36,8 +36,8 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank) |
 | `get-perf-settings` | | Get current performance settings |
 | `set-perf-mode` | `<patch\|performance> [shift]` | Switch between patch and performance mode. With `shift` it acts as SHIFT+PERF: patch→performance creates a new performance ("New Performance") from the current slot patches (key/active kept); performance→patch keeps the performance's patches in the slots |
-| `set-perf-name` | `<name>` | Set performance name |
-| `set-patch-name` | `<slot> <name>` | Set patch name |
+| `set-perf-name` | `<name>` | Set performance name (may be empty) |
+| `set-patch-name` | `<slot> <name>` | Set patch name (may be empty) |
 | `set-patch-description` | `<slot> <hexdata>` | Set patch description (hex-encoded) |
 | `set-synth-settings` | `<json>` | Set all synth settings from JSON |
 
@@ -46,7 +46,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | Command | Arguments | Description |
 |---|---|---|
 | `slot` | `<A\|B\|C\|D>` | Change active slot |
-| `variation` | `<1–8> [slot]` | Select variation for slot |
+| `variation` | `<1–10> [slot]` | Select variation for slot. 10 (index 9) is the Patch Mutator audition variation |
 | `set-slot-enabled` | `<slot> <0\|1>` | Enable/disable a slot |
 | `set-slot-key` | `<slot> <0\|1>` | Assign/unassign keyboard to slot |
 | `set-slot-hold` | `<slot> <0\|1>` | Set slot hold mode |
@@ -85,6 +85,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `move-module` | `<slot> <va\|fx> <module-id> <col> <row>` | Move module to grid position |
 | `set-module-color` | `<slot> <va\|fx> <module-id> <color:0–24>` | Set module color |
 | `set-module-uprate` | `<slot> <va\|fx> <module-id> <0\|1>` | Set module audio-rate (uprate) flag; the editor sends it after every cable change, as the official editor does |
+| `set-mutation-lock` | `<slot> <va\|fx> <module-id> <0\|1>` | Exclude a module from Patch Mutator changes (`0x90`) |
 | `set-module-name` | `<slot> <va\|fx> <module-id> <name>` | Set module label |
 | `set-module-mode` | `<slot> <va\|fx> <module-id> <param-idx> <value>` | Set module mode parameter |
 
@@ -100,7 +101,9 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 
 | Command | Arguments | Description |
 |---|---|---|
-| `set-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <value> <variation>` | Set module parameter value |
+| `set-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <value> <variation>` | Set module parameter value (variation 0–9; never acked, so a large burst can lose values on the G2) |
+| `set-morph-range` | `<slot> <va\|fx> <module-id> <param-idx> <range> <group> <variation>` | Set a parameter's morph range (range 0 removes the assignment) |
+| `send-sections` | `<slot> <hex>` | Send whole patch sections (`[type][len16][data]...`, as in a `.pch2`) as one acked edit. The Patch Mutator uses it to write a complete variation |
 | `set-module-labels` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <count> <label>... [<param-idx> <count> <label>...]` | Set the labels of all labelled params of a module (replaces the module's whole list; always pass every label param, the block size is fixed per module type) |
 | `copy-variation` | `<slot> <from> <to>` | Copy all parameter values from one variation to another (0-based indices) |
 

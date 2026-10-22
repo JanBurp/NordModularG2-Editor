@@ -107,8 +107,7 @@ function ccLocationStr(location: number): 'va' | 'patch' | 'fx' {
 	return location === 1 ? 'va' : location === 2 ? 'patch' : 'fx';
 }
 
-// Maps a 0/1-style location code (fx/va) to its CLI location string. Originally morph-only, now
-// also used for Parameter Page / Global Parameter Page location strings (assignKnobCmd/assignGlobalKnobCmd).
+// Maps a 0/1-style location code (fx/va) to its CLI location string (morph assignments).
 function locationStr01(location: 0 | 1): 'fx' | 'va' {
 	return location === 0 ? 'fx' : 'va';
 }
@@ -173,12 +172,23 @@ function assignMidiCCBatchCmd(slot: SlotLabel, ccs: MidiCCAssignment[]): string[
 	return ['assign-midicc-batch', slot, ...ccs.flatMap((a) => [ccLocationStr(a.location), String(a.moduleIndex), String(a.paramIndex), String(a.cc)])];
 }
 
+// Sends buildTouchedCmds' knob commands in seq-sized chunks (the daemon caps a seq at 128 ops),
+// then focuses the page (select-param-page / select-global-page) of the last assigned knob.
+async function sendTouchedCmds(
+	{ cmds, focusPageId }: ReturnType<typeof buildTouchedCmds>,
+	focusCmd: (pageId: number) => string[],
+	label: string,
+): Promise<void> {
+	for (let i = 0; i < cmds.length; i += BATCH_CHUNK) await runCliBatchSafe(cmds.slice(i, i + BATCH_CHUNK), label);
+	if (focusPageId !== null) await runCliSafe(focusCmd(focusPageId), label);
+}
+
 // Builds the CLI assign-knob command tuple for a single Parameter Page slot.
 function assignKnobCmd(slot: SlotLabel, entry: ParamPageAssignment): string[] {
 	return [
 		'assign-knob',
 		slot,
-		locationStr01(entry.location),
+		ccLocationStr(entry.location),
 		String(entry.moduleIndex),
 		String(entry.paramIndex),
 		String(entry.slotIndex),
@@ -192,7 +202,7 @@ function assignGlobalKnobCmd(active: SlotLabel, entry: GlobalParamPageAssignment
 		'assign-global-knob',
 		active,
 		entry.slot,
-		locationStr01(entry.location),
+		ccLocationStr(entry.location),
 		String(entry.moduleIndex),
 		String(entry.paramIndex),
 		String(entry.slotIndex),
@@ -2773,8 +2783,7 @@ export const useSlotsStore = defineStore('slots', {
 			entry.textDirty = true;
 		},
 
-		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number): void {
-			const slot = useUiStore().slotInFocus;
+		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number, slot: SlotLabel = useUiStore().slotInFocus): void {
 			const entry = this.slots[slot];
 			if (!entry?.variations?.[variation]) return;
 
@@ -2789,11 +2798,11 @@ export const useSlotsStore = defineStore('slots', {
 					slot,
 					{
 						undo: () => {
-							this.setMorphParam(variation, morphIdx, field, box.initial);
+							this.setMorphParam(variation, morphIdx, field, box.initial, slot);
 							return Promise.resolve();
 						},
 						redo: () => {
-							this.setMorphParam(variation, morphIdx, field, box.latest);
+							this.setMorphParam(variation, morphIdx, field, box.latest, slot);
 							return Promise.resolve();
 						},
 					},
@@ -3654,7 +3663,14 @@ export const useSlotsStore = defineStore('slots', {
 		// occupant is evicted; if this param already occupies a different slot, that old slot is
 		// cleared too. Both changes land in one undo entry. With isLed=1 the target is a level meter
 		// and paramIndex is its LED number; a meter and a param with the same index are distinct.
-		async assignParamToPage(slot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number, isLed: 0 | 1 = 0): Promise<void> {
+		async assignParamToPage(
+			slot: SlotLabel,
+			slotIndex: number,
+			location: 0 | 1 | 2,
+			moduleIndex: number,
+			paramIndex: number,
+			isLed: 0 | 1 = 0,
+		): Promise<void> {
 			const prev = [...this.slots[slot].paramPages];
 			const entry: ParamPageAssignment = { slotIndex, location, moduleIndex, paramIndex, isLed };
 			const { next, oldKeySlot } = computeAssignOne(
@@ -3717,8 +3733,8 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`
-		// (one assign-knob or deassign-knob each, matching what the hardware expects per slot), as a
-		// single batched CLI call. Undo/redo of a multi-slot edit is just this applied to the
+		// (deassign each, then assign the occupied ones, then focus the page — see buildTouchedCmds),
+		// batched. Undo/redo of a multi-slot edit is just this applied to the
 		// before/after list.
 		async _applyParamPages(slot: SlotLabel, list: ParamPageAssignment[], touched: number[]): Promise<void> {
 			this.slots[slot].paramPages = [...list];
@@ -3726,13 +3742,16 @@ export const useSlotsStore = defineStore('slots', {
 			if (this.slots[slot].patch) this.slots[slot].patch!.paramPages = [...list];
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return;
-			const cmds = buildTouchedCmds(
-				list,
-				touched,
-				(entry) => assignKnobCmd(slot, entry),
-				(slotIndex) => ['deassign-knob', slot, String(slotIndex)],
+			await sendTouchedCmds(
+				buildTouchedCmds(
+					list,
+					touched,
+					(entry) => assignKnobCmd(slot, entry),
+					(slotIndex) => ['deassign-knob', slot, String(slotIndex)],
+				),
+				(pageId) => ['select-param-page', slot, String(pageId)],
+				'_applyParamPages',
 			);
-			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyParamPages');
 		},
 
 		// Moves a knob slot's assignment onto another slot, exchanging with that slot's occupant when
@@ -3786,22 +3805,19 @@ export const useSlotsStore = defineStore('slots', {
 		// matching selectGlobalParamPage. Each mutation still marks the affected patch slot(s) dirty
 		// via the existing per-slot _markSlotDirty, even though globalParamPages itself lives outside
 		// any one slot's patch — that's the only "unsaved edits" signal the app has.
-		async assignParamToGlobalPage(targetSlot: SlotLabel, slotIndex: number, location: 0 | 1, moduleIndex: number, paramIndex: number): Promise<void> {
+		async assignParamToGlobalPage(targetSlot: SlotLabel, slotIndex: number, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number): Promise<void> {
 			const prev = this.globalParamPages;
 			const entry: GlobalParamPageAssignment = { slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 };
-			const { next, oldAtSlot, oldKeySlot } = computeAssignOne(
+			const { next, oldKeySlot } = computeAssignOne(
 				prev,
 				slotIndex,
 				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
 				entry,
 			);
-			this.globalParamPages = next;
-			this._markSlotDirty(targetSlot);
-			if (oldAtSlot) this._markSlotDirty(oldAtSlot.slot);
-			if (oldKeySlot) this._markSlotDirty(oldKeySlot.slot);
-			const active = useUiStore().slotInFocus;
-			const deviceStore = useDeviceStore();
-			if (active && deviceStore.status === DeviceStatus.Connected) await runCliSafe(assignGlobalKnobCmd(active, entry), 'assignParamToGlobalPage');
+			// Same as assignParamToPage: the param's old knob is part of the deassign-then-assign
+			// re-sync (_applyGlobalParamPages also marks every affected patch slot dirty).
+			const vacated = oldKeySlot && oldKeySlot.slotIndex !== slotIndex ? [oldKeySlot.slotIndex] : [];
+			await this._applyGlobalParamPages(next, [...vacated, slotIndex]);
 		},
 
 		// Global Parameter Pages sibling of assignModuleToPage above — no undo/redo, matching the rest
@@ -3844,13 +3860,16 @@ export const useSlotsStore = defineStore('slots', {
 			const active = useUiStore().slotInFocus;
 			const deviceStore = useDeviceStore();
 			if (!active || deviceStore.status !== DeviceStatus.Connected) return;
-			const cmds = buildTouchedCmds(
-				list,
-				touched,
-				(entry) => assignGlobalKnobCmd(active, entry),
-				(slotIndex) => ['deassign-global-knob', active, String(slotIndex)],
+			await sendTouchedCmds(
+				buildTouchedCmds(
+					list,
+					touched,
+					(entry) => assignGlobalKnobCmd(active, entry),
+					(slotIndex) => ['deassign-global-knob', active, String(slotIndex)],
+				),
+				(pageId) => ['select-global-page', active, String(pageId)],
+				'_applyGlobalParamPages',
 			);
-			if (cmds.length > 0) await runCliBatchSafe(cmds, '_applyGlobalParamPages');
 		},
 
 		async swapGlobalParamPageSlots(sourceSlotIndex: number, targetSlotIndex: number): Promise<void> {

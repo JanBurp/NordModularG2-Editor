@@ -6,6 +6,7 @@ import { useLedStore } from '../store/led';
 import { useContextMenu } from './useContextMenu';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
+import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
 import { KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
 import { serializeDragPayload, parseDragPayload } from '../utils/dragPayload';
 import { setBadgeDragImage } from '../utils/badgeLayout';
@@ -86,7 +87,7 @@ export function useParamPageCells() {
 	function resolveModule(a: PageAssignment) {
 		const slot = assignmentSlot(a);
 		const patch = slotsStore.slots[slot].patch;
-		const mod = patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
+		const mod = a.location === 2 ? undefined : patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
 		if (!mod) return null;
 		return { mod, moduleDef: getModule(mod.type) };
 	}
@@ -163,6 +164,22 @@ export function useParamPageCells() {
 			const slotIndex = slotIndexFor(bank, page, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
 			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
+			// location=2 = the PATCH_MORPH pseudo-module: paramIndex is a Morph Group, the knob is its dial.
+			// No button and no morph colouring (a morph dial can't itself be morph-assigned).
+			if (assignment.location === 2) {
+				const target = slotsStore.slots[assignmentSlot(assignment)];
+				const value = target.variations?.[uiStore.variation]?.patch.morphDials[assignment.paramIndex] ?? 0;
+				return {
+					slotIndex,
+					assignment,
+					...emptyCell,
+					moduleLabel: 'Morph',
+					paramLabel: morphGroupName(target.patch, assignment.paramIndex),
+					value,
+					valueLabel: String(value),
+					defaultValue: defaultPatchParams().morphDials[assignment.paramIndex],
+				};
+			}
 			const moduleInfo = resolveModule(assignment);
 			const moduleLabel = moduleInfo
 				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
@@ -251,6 +268,7 @@ export function useParamPageCells() {
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
+		if (a.location === 2) return openContextMenu(event, items);
 		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
 		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against
 		// the assignment's own target slot (assignmentSlot), not uiStore.slotInFocus, since a Global

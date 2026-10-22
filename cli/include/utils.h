@@ -16,6 +16,9 @@ slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);
 int hex_to_bytes(const char *hex, uint8_t **out);
 
+/* Milliseconds on the monotonic clock (arbitrary epoch): for deadlines and elapsed times. */
+long long now_ms(void);
+
 /* Base64 encode/decode, used for byte-array command args and file buffers passed
  * over the daemon's JSON stdin/stdout protocol (much smaller on the wire than a
  * JSON array of decimal numbers). decode returns the decoded length or -1 on a

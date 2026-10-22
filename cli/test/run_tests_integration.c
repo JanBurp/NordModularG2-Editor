@@ -221,6 +221,10 @@ int main(void) {
     // run_test_silently("test_interleaved_slot_variation", test_interleaved_slot_variation);
     // run_test_silently("test_drain_count_logged", test_drain_count_logged);
 
+    /* One-shot CLI: before the shared daemon starts, so no daemon holds the USB interface.
+     * (The disabled one-shot tests above belong here too.) */
+    run_test_silently("test_oneshot_queries_with_stream_left_on", test_oneshot_queries_with_stream_left_on);
+
     /* Daemon: shared-daemon tests — slot/variation before perf mode so mode-change
      * residual USB state cannot affect slot commands. Perf mode is last and owns shutdown. */
     run_test_silently("test_daemon_starts",                  test_daemon_starts);
@@ -241,7 +245,6 @@ int main(void) {
     run_test_silently("test_patch_workflow_replace_module",  test_patch_workflow_replace_module);
     run_test_silently("test_daemon_slot_flags_after_patch_to_perf", test_daemon_slot_flags_after_patch_to_perf);
     run_test_silently("test_daemon_perf_mode_cycle",         test_daemon_perf_mode_cycle);
-    run_test_silently("test_oneshot_queries_with_stream_left_on", test_oneshot_queries_with_stream_left_on);
 
     /* Multi-device: needs 2 real G2 units attached, self-skips otherwise. Runs after
      * the single-daemon shared-daemon suite above releases its own USB connection. */
