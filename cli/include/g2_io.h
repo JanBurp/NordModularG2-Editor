@@ -141,8 +141,14 @@ int recv_bulk(uint8_t *data, uint16_t size);
  * an unread payload wedges the G2. */
 void discard_bulk(uint16_t sz);
 
-/* Drain all pending interrupt+bulk messages.
+/* Read and drop interrupt+bulk messages until none arrives for quiet_ms, for at most USB_DRAIN_MAX_MS:
+ * a streaming G2 is never quiet, and the unbounded loop this replaces hung one-shot commands forever
+ * (one-shot set-perf-mode after a one-shot mode change, test:g2 2026-10-22). Sets *needs_rearm (may be
+ * NULL) when the all-slots version update that stops the stream went by. Returns the message count.
  * No-op when listener is active (listener drains continuously). */
+int g2_drain_quiet(int quiet_ms, int *needs_rearm);
+
+/* g2_drain_quiet(USB_TIMEOUT_DRAIN_MS), then g2_rearm() if the stream stopped meanwhile. */
 int g2_drain_pending(void);
 
 /* libusb error code from the last failed libusb_claim_interface() call. */

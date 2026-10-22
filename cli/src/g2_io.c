@@ -372,12 +372,14 @@ int g2_connect_silent(void) {
 }
 
 int g2_disconnect(void) {
-    /* A one-shot CLI command that locked the stream (set-perf-mode) has no other cleanup point before the process exits -
-     * without this, the G2 is left not reporting LED/VU/param notifications
-     * until something else sends START_COMM (e.g. the daemon's own startup
-     * lock/unlock cycle). do_reconnect() already zeroes g2_stream_locked
-     * before calling this, so this is a no-op on that path. */
-    if (g2_stream_locked && g2.handle) g2_unlock_stream();
+    /* One-shot: leave the G2 quiet. Nobody reads its stream once we exit, and a G2 left
+     * streaming made the next one-shot's drain spin until killed, and a kill mid-bulk wedges
+     * the G2 (test:g2 2026-10-22). The daemon re-arms at startup anyway (lock/unlock cycle).
+     * Daemon: unlock, i.e. the official editor's idle state (stream on; CSynth::CleanDirtyData
+     * ends with START_COMM and nothing is sent on quit). do_reconnect() already zeroes
+     * g2_stream_locked before calling this, so this is a no-op on that path. */
+    if (g2.handle && !g2_daemon_mode) g2_stop_comm();
+    else if (g2_stream_locked && g2.handle) g2_unlock_stream();
     if (g2.interface_claimed && g2.handle) {
         libusb_release_interface(g2.handle, 0);
         g2.interface_claimed = 0;
@@ -1050,9 +1052,10 @@ void g2_rearm(void) {
  * reference editor's CMSynthUnlockEditorSync, which has no ReadStream/
  * UseOnSynth anywhere: it's fire-and-forget. So there is no "the STOP_COMM
  * ack" message to identify; this just drains whatever was already in flight
- * (same short-timeout-until-quiet idiom as drain_stale_extended() in
- * g2_device.c) until nothing more arrives, bounded defensively against a
- * runaway stream. */
+ * (same short-timeout-until-quiet idiom as g2_drain_quiet()) until nothing
+ * more arrives, bounded defensively against a runaway stream. Not built on
+ * g2_drain_quiet(): this one also runs with the listener active, draining
+ * its queue. */
 void g2_stop_comm(void) {
     uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop, 2);
@@ -1085,28 +1088,30 @@ static int bulk_needs_rearm(const uint8_t *bulk, int size) {
     return size > 3 && bulk[1] == 0x04 && bulk[2] == 0x40 && bulk[3] == 0x1F;
 }
 
-/* No-op when listener is active (listener drains EP 0x81 continuously).
- * When inactive: drain all pending interrupt+bulk messages. */
-int g2_drain_pending(void) {
+int g2_drain_quiet(int quiet_ms, int *needs_rearm) {
     if (g2_listener_active) return 0;
 
     uint8_t response[16];
-    int ret, count = 0, needs_rearm = 0;
-    while ((ret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_DRAIN_MS)) > 0) {
+    int count = 0;
+    long long deadline = trace_now_ms() + USB_DRAIN_MAX_MS;
+    while (trace_now_ms() < deadline && recv_interrupt(response, sizeof(response), quiet_ms) > 0) {
         count++;
-        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t size = ((uint16_t)response[1] << 8) | response[2];
-            if (size > 0) {
-                uint8_t *bulk = malloc(size);
-                if (bulk) {
-                    int bret = recv_bulk(bulk, size);
-                    if (bulk_needs_rearm(bulk, bret)) needs_rearm = 1;
-                    free(bulk);
-                }
-            }
-        }
+        if ((response[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) continue;
+        uint16_t size = ((uint16_t)response[1] << 8) | response[2];
+        uint8_t *bulk = size ? malloc(size) : NULL;
+        if (!bulk) continue;
+        int bret = recv_bulk(bulk, size);
+        if (needs_rearm && bulk_needs_rearm(bulk, bret)) *needs_rearm = 1;
+        free(bulk);
     }
+    return count;
+}
+
+/* No-op when listener is active (listener drains EP 0x81 continuously).
+ * When inactive: drain pending interrupt+bulk messages. */
+int g2_drain_pending(void) {
+    int needs_rearm = 0;
+    int count = g2_drain_quiet(USB_TIMEOUT_DRAIN_MS, &needs_rearm);
     if (needs_rearm) g2_rearm();
-    (void)count;
     return count;
 }

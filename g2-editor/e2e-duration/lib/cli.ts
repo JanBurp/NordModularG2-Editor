@@ -9,7 +9,7 @@ export const SHELLY_PATH = path.join(REPO_ROOT, 'scripts', 'shelly');
 export function runCli(args: string[], timeoutMs = 300_000): Promise<any> {
 	return new Promise((resolve, reject) => {
 		execFile(CLI_PATH, ['--json', ...args], { timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
-			if (err) return reject(new Error(`g2-cli ${args.join(' ')} failed: ${err.message}\n${stderr}`.trim()));
+			if (err) return reject(new Error(`g2-cli ${args.join(' ')} failed: ${err.message}\n${stdout}${stderr}`.trim()));
 			try {
 				resolve(JSON.parse(stdout));
 			} catch {

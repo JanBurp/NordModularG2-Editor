@@ -74,22 +74,6 @@ const char *g2_error_string(int code) {
     }
 }
 
-/* Flush stale data before a direct-mode query (used before g2_get_patch, g2_list,
- * g2_get_bank, etc.). Avoids g2_drain_pending() which can accidentally call
- * g2_rearm() and start streaming without a listener, contaminating subsequent
- * query responses. recv_interrupt always reads one fixed 16-byte USB interrupt
- * packet regardless of buffer size, so a 16-byte buffer is always sufficient. */
-/* Read and discard the bulk payload an EXTENDED interrupt header announced. Only needed
- * in direct mode: with the listener active the bulk was already read and queued, and the
- * next recv_interrupt() frees it. Leaving it unread would be taken as the next reply. */
-static void drain_stale_extended(void) {
-    uint8_t stale[16]; int n;
-    while ((n = recv_interrupt(stale, sizeof(stale), USB_TIMEOUT_STALE_MS)) > 0) {
-        if ((stale[0] & 0x0f) == RESPONSE_TYPE_EXTENDED)
-            discard_bulk(((uint16_t)stale[1] << 8) | stale[2]);
-    }
-}
-
 static int ensure_connected(int silent) {
     if (g2_is_connected()) {
         return 0;
@@ -181,7 +165,7 @@ static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *siz
 
     /* Flush stale G2 data from a previous command (direct mode only;
      * listener thread drains EP 0x81 continuously, so no flush needed). */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     debug_timing("get_patch_version_start");
     int ret = query_version(slot, version);
@@ -386,14 +370,10 @@ cJSON *g2_get_perf_settings(void) {
 }
 
 cJSON *g2_device_info(int debug) {
-    uint8_t response[8192] = {0};
     uint8_t *bulkData = NULL;
     uint8_t *perfData = NULL;
     size_t bulkSize = 0;
     size_t perfSize = 0;
-    int ret;
-    uint8_t msgType;
-    uint16_t size;
     cJSON *root = NULL;
 
     if (ensure_connected(1) < 0) {
@@ -404,7 +384,7 @@ cJSON *g2_device_info(int debug) {
     /* Flush stale data before querying (direct mode only; same pattern as g2_get_patch).
      * Avoids g2_drain_pending() which can accidentally call g2_rearm() and start
      * streaming without a listener, contaminating subsequent query responses. */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     /* Step 1: Send GET_SYNTH_SETTINGS (0x02) */
     if (send_system(0x41, SUB_COMMAND_GET_SYNTH_SETTINGS) < 0) {
@@ -414,51 +394,15 @@ cJSON *g2_device_info(int debug) {
 
     usleep(USB_SEND_DELAY_US);
 
-    /* Same lockstep discipline as the performance-settings step below: skip anything
-     * not tagged as the synth-settings response, relaying it via the normal event
-     * dispatcher so it isn't lost. */
-    for (int attempt = 0; attempt < 5; attempt++) {
-        ret = recv_interrupt(response, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret <= 0) {
-            g2_err("No response from G2\n");
-            goto cleanup;
-        }
-
-        msgType = response[0] & 0x0f;
-        if (msgType != RESPONSE_TYPE_EXTENDED) {
-            g2_err("Unexpected response type %d\n", msgType);
-            goto cleanup;
-        }
-
-        size = (response[1] << 8) | response[2];
-        if (size == 0 || size > EXTENDED_MESSAGE_SIZE) {
-            g2_err("Unexpected synth settings size: %u\n", size);
-            discard_bulk(size);
-            goto cleanup;
-        }
-        uint8_t *buf = malloc(size);
-        if (!buf) {
-            g2_err("Memory allocation failed\n");
-            goto cleanup;
-        }
-        if (recv_bulk(buf, size) <= 0) {
-            g2_err("Failed to read bulk data\n");
-            free(buf);
-            goto cleanup;
-        }
-        if (size > 3 && buf[3] == SUB_RESPONSE_SYNTH_SETTINGS) {
-            bulkData = buf;
-            bulkSize = size;
-            break;
-        }
-        g2_msg_t relay = {0};
-        memcpy(relay.interrupt, response, 16);
-        relay.bulk = buf;
-        relay.bulk_size = size;
-        g2_emit_event(&relay);
-        free(buf);
+    /* Tagged like query_synth_settings: a stray (e.g. a late reply to the previous one-shot) is
+     * relayed instead of failing the read with "Unexpected response type" (test:g2 2026-10-22). */
+    g2_msg_t ss;
+    if (await_reply(is_synth_settings, 0, 0, &ss) != G2_OK) {
+        g2_err("No response from G2\n");
+        goto cleanup;
     }
-    if (!bulkData) goto cleanup;
+    bulkData = ss.bulk;
+    bulkSize = ss.bulk_size;
 
     if (debug) {
         fprintf(stderr, "SYNTH:%zu:", bulkSize);
@@ -831,7 +775,7 @@ cJSON *g2_list(int filter, int bank_filter) {
      * misaligning the state machine's byte offsets. Confirmed on hardware
      * (2026-09-17): a maximal 16-char name has no NUL to resync on, so it's the
      * one most likely to show a corrupted trailing character. */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     if (filter == LIST_FILTER_ALL) {
         root = cJSON_CreateObject();
@@ -1513,6 +1457,12 @@ int g2_set_synth_settings(cJSON *params) {
     return G2_OK;
 }
 
+/* The G2's reply to a 0x3E mode change: bulk [1]=0x0C [3]=0x1F (version update, see g2_events.c). */
+static int is_mode_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    (void)arg;
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 3 && bulk[1] == 0x0C && bulk[3] == 0x1F;
+}
+
 int g2_set_perf_mode(int mode, int shift) {
     if (mode < 0 || mode > 1) { g2_err("set-perf-mode: mode must be 0(patch) or 1(performance)\n"); return G2_ERR_INVALID_PARAM; }
     if (shift < 0 || shift > 1) { g2_err("set-perf-mode: shift must be 0 or 1\n"); return G2_ERR_INVALID_PARAM; }
@@ -1522,10 +1472,13 @@ int g2_set_perf_mode(int mode, int shift) {
     if (send_system_data(0x41, cmd, 3) < 0) return G2_ERR_SEND;
     /* In daemon mode: listener handles the response (aCmd=0x0C, sub=0x1F mode/slot data)
      * and sets g2_pending_rearm for the main loop.
-     * In CLI mode: drain and stop streaming to prevent the all-slots version update
-     * from triggering g2_rearm() and leaving the G2 in an unread streaming state. */
+     * In CLI mode: wait for that reply (~650 ms after 0x3E; a fixed 200 ms sleep left it for the
+     * next one-shot, test:g2 2026-10-22), then stop streaming so the all-slots version update
+     * doesn't trigger g2_rearm() and leave the G2 in an unread streaming state. Best effort: no
+     * reply within USB_TIMEOUT_LONG_MS doesn't fail the command. */
     if (!g2_listener_active) {
-        usleep(200000);
+        g2_msg_t r;
+        if (await_reply(is_mode_reply, 0, 0, &r) == G2_OK) g2_msg_free(&r);
         g2_lock_stream();
     }
     return G2_OK;
@@ -2010,7 +1963,7 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
     }
 
     /* Drain stale data (same pattern as g2_get_patch_file) */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     /* Step 1: performance settings raw bytes */
     perfData = perf_settings_bytes(&perfSize);
@@ -2547,7 +2500,7 @@ static int get_global_knobs_payload(uint8_t **out, uint16_t *out_len) {
 
     /* Flush stale G2 data left over from a previous command (direct mode only — the listener
      * thread drains EP 0x81 continuously, so no flush needed then). Mirrors g2_get_patch. */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     if (send_system(0x41, SUB_COMMAND_GET_GLOBAL_KNOBS) < 0) {
         g2_err("Failed to send get-global-knobs command\n");
@@ -2898,7 +2851,7 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     if (ensure_connected(1) < 0) { g2_err("get-bank: not connected\n"); return NULL; }
 
     /* Drain stale data (same pattern as g2_get_patch_file/g2_get_perf_file). */
-    if (!g2_listener_active) drain_stale_extended();
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
 
     /* .pchList index: header line + one "<bank>:<location>: <name>" line per
      * written patch (format matches the reference CFlashDumper::WriteDumpList). */
