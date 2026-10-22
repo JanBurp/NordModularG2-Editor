@@ -16,7 +16,7 @@ void test_assign_knob_invalid_slot_high(void) {
 }
 
 void test_assign_knob_invalid_location(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 2, 1, 1, 0, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_knob(0, 3, 1, 1, 0, 0));
 }
 
 void test_assign_knob_invalid_module_id_low(void) {
@@ -54,6 +54,22 @@ void test_assign_knob_op_led_bit(void) {
     g2_build_assign_knob_op(&op, buf, 1, 7, 3, 9, 1);
     TEST_ASSERT_EQUAL_UINT8(0x50, buf[2]);
     TEST_ASSERT_EQUAL_UINT8(7, buf[0]); TEST_ASSERT_EQUAL_UINT8(3, buf[1]); TEST_ASSERT_EQUAL_UINT8(9, buf[4]);
+}
+
+/* location 2 = patch (Morph Group dial on PATCH_MORPH module 1), same 2-bit field: 2<<6 */
+void test_assign_knob_op_morph_location(void) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_assign_knob_op(&op, buf, 2, 1, 4, 7, 0);
+    TEST_ASSERT_EQUAL_UINT8(1, buf[0]); TEST_ASSERT_EQUAL_UINT8(4, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(0x80, buf[2]); TEST_ASSERT_EQUAL_UINT8(7, buf[4]);
+}
+
+/* target slot D (3) in bits 7-4, location 2 in bits 3-2 */
+void test_assign_global_knob_op_morph_location(void) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_assign_global_knob_op(&op, buf, 3, 2, 1, 4, 7);
+    TEST_ASSERT_EQUAL_UINT8(0x38, buf[0]); TEST_ASSERT_EQUAL_UINT8(1, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(4, buf[2]); TEST_ASSERT_EQUAL_UINT8(7, buf[4]);
 }
 
 void test_deassign_knob_invalid_slot_low(void) {
@@ -111,7 +127,7 @@ void test_assign_global_knob_invalid_target_slot_high(void) {
 }
 
 void test_assign_global_knob_invalid_location(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 2, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 3, 1, 1, 0));
 }
 
 void test_assign_global_knob_invalid_module_id_low(void) {

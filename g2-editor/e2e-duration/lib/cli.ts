@@ -9,7 +9,7 @@ export const SHELLY_PATH = path.join(REPO_ROOT, 'scripts', 'shelly');
 export function runCli(args: string[], timeoutMs = 300_000): Promise<any> {
 	return new Promise((resolve, reject) => {
 		execFile(CLI_PATH, ['--json', ...args], { timeout: timeoutMs, maxBuffer: 64 * 1024 * 1024 }, (err, stdout, stderr) => {
-			if (err) return reject(new Error(`g2-cli ${args.join(' ')} failed: ${err.message}\n${stderr}`.trim()));
+			if (err) return reject(new Error(`g2-cli ${args.join(' ')} failed: ${err.message}\n${stdout}${stderr}`.trim()));
 			try {
 				resolve(JSON.parse(stdout));
 			} catch {
@@ -19,12 +19,18 @@ export function runCli(args: string[], timeoutMs = 300_000): Promise<any> {
 	});
 }
 
-export async function g2Count(): Promise<number> {
+/** `bus:device` of every G2 on USB (empty when there is none or list-devices failed). */
+export async function g2Addresses(): Promise<string[]> {
 	try {
-		return (await runCli(['list-devices'], 20_000)).g2_count ?? 0;
+		const all: { bus: number; device: number; isG2: boolean }[] = (await runCli(['list-devices'], 20_000)).all ?? [];
+		return all.filter((d) => d.isG2).map((d) => `${d.bus}:${d.device}`);
 	} catch {
-		return 0;
+		return [];
 	}
+}
+
+export async function g2Count(): Promise<number> {
+	return (await g2Addresses()).length;
 }
 
 /** Another daemon (e.g. a dev editor) would fight the test for the USB interface. */

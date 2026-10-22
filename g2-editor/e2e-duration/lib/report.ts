@@ -11,9 +11,13 @@ export interface Classification {
 
 /**
  * Heuristic "probable cause" from the daemon/main/console lines around an incident.
- * `enumerated` is the `list-devices` result taken right after the loss (null = not checked).
+ * `enumerated` is the `list-devices` result taken right after the loss (null = not checked); `addresses` the
+ * `bus:device` of each G2 it found.
  */
-export function classify(lines: string[], ctx: { enumerated: boolean | null; trigger: 'status' | 'probe' | 'action' }): Classification {
+export function classify(
+	lines: string[],
+	ctx: { enumerated: boolean | null; addresses?: string[]; trigger: 'status' | 'probe' | 'action' },
+): Classification {
 	const find = (re: RegExp) => lines.find((l) => re.test(l));
 	const driver = find(/usb_driver_error/);
 	if (driver) return { cause: 'USB interface claim problem (usb_driver_error): another process holds the G2?', evidence: driver };
@@ -31,6 +35,10 @@ export function classify(lines: string[], ctx: { enumerated: boolean | null; tri
 		const burst = diag.match(/(\d+) cmds in last 1s/)?.[1];
 		const suffix = burst && Number(burst) > 3 ? ` (command burst: ${burst} cmds in the last second)` : '';
 		if (why.includes('listener/no device')) {
+			// The daemon only reconnects to its own bus:device, so a G2 back at another address is never picked up.
+			const target = diag.match(/\[daemon-error:(\d+:\d+)\]/)?.[1];
+			if (target && ctx.addresses?.length && !ctx.addresses.includes(target))
+				return { cause: `G2 re-enumerated at a new USB address (${ctx.addresses.join(', ')}; daemon pinned to ${target})` + suffix, evidence: diag };
 			return {
 				cause:
 					(ctx.enumerated === false
@@ -67,6 +75,7 @@ export interface Incident {
 	cause: string;
 	evidence?: string;
 	enumerated: boolean | null;
+	addresses?: string[];
 }
 
 export interface Session {
@@ -279,7 +288,7 @@ export function buildReport(events: LogEvent[], meta: RunMeta): { markdown: stri
 		L.push(`### #${i.id} at ${fmtTime(i.start)} — down ${fmtDur(i.end - i.start)}, recovery: ${i.level}${i.powerCycles ? ` (${i.powerCycles} power cycle${i.powerCycles > 1 ? 's' : ''})` : ''}`);
 		L.push(`- Detected via: ${i.trigger}; last action: ${i.lastAction || '-'}`);
 		L.push(`- Probable cause: ${i.cause}`);
-		L.push(`- G2 still on USB after loss: ${i.enumerated === null ? 'not checked' : i.enumerated ? 'yes' : 'no'}`);
+		L.push(`- G2 still on USB after loss: ${i.enumerated === null ? 'not checked' : i.enumerated ? `yes${i.addresses?.length ? ` (${i.addresses.join(', ')})` : ''}` : 'no'}`);
 		if (i.evidence) L.push(`- Evidence: \`${i.evidence.slice(0, 300)}\``);
 		L.push('');
 	}

@@ -252,6 +252,19 @@ function startDaemon(session: DeviceSession) {
 					// forward as an event below
 				}
 			}
+			// The daemon followed the G2 to a new address on the same port (G2 self-reboot): keep the claim map in
+			// step, otherwise "Add Device" offers the same G2 again as unclaimed.
+			if (trimmed.startsWith('{"type":"device_retargeted"')) {
+				try {
+					const { bus, device } = JSON.parse(trimmed);
+					if (sessions.get(session.id) === session) sessions.delete(session.id);
+					rekeySession(session, bus, device);
+					if (!sessions.has(session.id)) sessions.set(session.id, session);
+					broadcastDevicesChanged();
+				} catch {
+					// malformed: leave the session as it was
+				}
+			}
 			if (msg?.id !== undefined) {
 				const pending = session.pendingCmds.get(msg.id);
 				if (pending) {
@@ -497,6 +510,13 @@ function newSession(id: string, bus: number, device: number, window: BrowserWind
 	};
 }
 
+// Moves a session to a new bus:device id. Callers drop the old id from `sessions` first when needed.
+function rekeySession(session: DeviceSession, bus: number, device: number): void {
+	session.id = `${bus}:${device}`;
+	session.bus = bus;
+	session.device = device;
+}
+
 ipcMain.handle("devices:connect", async (event, bus: number, device: number) => {
 	const window = BrowserWindow.fromWebContents(event.sender);
 	if (!window) throw new Error("No window for this call");
@@ -514,9 +534,7 @@ ipcMain.handle("devices:connect", async (event, bus: number, device: number) => 
 			await stopDaemon(session);
 			sessions.delete(session.id);
 		}
-		session.id = id;
-		session.bus = bus;
-		session.device = device;
+		rekeySession(session, bus, device);
 		session.name = null;
 		session.status = "connecting" as DeviceStatus;
 	} else {

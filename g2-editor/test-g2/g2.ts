@@ -16,13 +16,16 @@ export type SlotFlags = { active: boolean; key: boolean }[];
 // The daemon wraps the reply in `data`, one-shot doesn't (same fallback as useDeviceEvents.ts).
 const flagsOf = (reply: any): SlotFlags => ((reply.data ?? reply).slots ?? []).map((s: any) => ({ active: s.active, key: s.key }));
 
+// Well below the 300 s testTimeout, so a hung one-shot fails naming its command instead of as a test timeout.
+const ONE_SHOT_TIMEOUT_MS = 60_000;
+
 /** Slot active/key flags; through the editor's daemon while it runs, one-shot otherwise (two daemons would fight over USB). */
 export const perfFlags = async (page?: ActionCtx['page']): Promise<SlotFlags> =>
-	flagsOf(page ? JSON.parse(await cliRun(page, ['get-perf-settings'])) : await runCli(['get-perf-settings']));
+	flagsOf(page ? JSON.parse(await cliRun(page, ['get-perf-settings'])) : await runCli(['get-perf-settings'], ONE_SHOT_TIMEOUT_MS));
 
-export const g2Mode = async (): Promise<Mode> => (await runCli(['startup'])).device?.mode;
+export const g2Mode = async (): Promise<Mode> => (await runCli(['startup'], ONE_SHOT_TIMEOUT_MS)).device?.mode;
 
-export const setMode = (mode: Mode) => runCli(['set-perf-mode', mode.toLowerCase()]);
+export const setMode = (mode: Mode) => runCli(['set-perf-mode', mode.toLowerCase()], ONE_SHOT_TIMEOUT_MS);
 
 export const action = (name: string): ActionDef => {
 	const a = ACTIONS.find((x) => x.name === name);

@@ -8,6 +8,7 @@
 #include "utils.h"
 #include "defs.h"
 #include <string.h>
+#include <time.h>
 #include <stdlib.h>
 
 /* CRC-16/CCITT one-byte step: polynomial 0x1021, MSB-first. */
@@ -387,4 +388,10 @@ int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
     
     *usb_len = required;
     return 0;
+}
+
+long long now_ms(void) {
+    struct timespec ts;
+    clock_gettime(CLOCK_MONOTONIC, &ts);
+    return (long long)ts.tv_sec * 1000 + ts.tv_nsec / 1000000;
 }

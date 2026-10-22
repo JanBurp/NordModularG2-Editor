@@ -50,7 +50,7 @@ function buildParamPageMenuItemsImpl(
 // and useMorphAssign.ts's buildMorphMenuItems shape.
 export function buildParamPageMenuItems(opts: {
 	slot: SlotLabel | null;
-	location: 0 | 1;
+	location: 0 | 1 | 2; // 2 = Morph Group (PATCH_MORPH module 1, paramIndex = group)
 	moduleIndex: number;
 	paramIndex: number; // LED number when isLed
 	existing: ParamPageAssignment | undefined;
@@ -79,7 +79,7 @@ export function buildParamPageMenuItems(opts: {
 // `slot` field, since a Global Page slot can target any of the 4 patches.
 export function buildGlobalParamPageMenuItems(opts: {
 	slot: SlotLabel | null;
-	location: 0 | 1;
+	location: 0 | 1 | 2;
 	moduleIndex: number;
 	paramIndex: number;
 	existing: GlobalParamPageAssignment | undefined;

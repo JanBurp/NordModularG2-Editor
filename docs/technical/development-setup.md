@@ -36,6 +36,9 @@ npm run postinstall                     # copies CLI binary into app resources
 npm run dev                             # development server
 npm run build                           # production build + package
 npm test                                # Vitest unit tests
+npm run typecheck                       # vue-tsc type check
+npm run test:e2e:headless               # Playwright E2E tests (builds first)
+npm run test:g2                         # hardware suite (test-g2/): needs a connected G2, drives the CLI and the real editor
 ```
 
 ## Development Environment

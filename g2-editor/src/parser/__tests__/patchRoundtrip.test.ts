@@ -1162,6 +1162,25 @@ describe('prf2 0x11 section preservation', () => {
 		expect(orig11).not.toBeNull();
 		expect(new11).toBe(orig11);
 	});
+
+	it('header knob source, range enable, bpm and clock run are parsed', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'MorphingDrumDemo.prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true });
+	});
+
+	it('header knob source Global is parsed', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/New Performance.prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true });
+	});
+
+	it('focus comes from the header, not the first keyed slot (A and D keyed, D focused)', () => {
+		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/OT Template 7.5..prf2'));
+		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
+		expect(prf2.slotMeta.map((m) => m.key)).toEqual([true, false, false, true]);
+		expect(prf2.settings.focus).toBe(3);
+	});
 });
 
 describe('prf2 per-slot mutation round-trip', () => {
@@ -1332,6 +1351,18 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 });
 
 describe('Parameter Pages round-trip: assign → serialize → parse', () => {
+	it('parses a Morph Group knob as location=2 on the PATCH_MORPH pseudo-module', () => {
+		// RndKit.pch2: Morph Group 5 on Page A1 Knob 8, Morph Group 8 on slot 50
+		const { name, rawHex, patch } = loadFixture('eigen/RndKit.pch2');
+		const morphKnobs = patch.paramPages?.filter((a) => a.location === 2);
+		expect(morphKnobs).toEqual([
+			{ slotIndex: 7, location: 2, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: 4, isLed: 0 },
+			{ slotIndex: 50, location: 2, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: 7, isLed: 0 },
+		]);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		expect(parsePatchFromRawHex(name, newHex).paramPages).toEqual(patch.paramPages);
+	});
+
 	it('paramPages survive serialize → parse', () => {
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const assignments = [

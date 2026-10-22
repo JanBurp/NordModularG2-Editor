@@ -59,6 +59,7 @@ npm test                    # Vitest unit tests
 npm run typecheck           # vue-tsc type check
 npm run lint                # ESLint
 npm run test:e2e:headless   # Playwright E2E tests (builds first)
+npm run test:g2             # hardware suite (test-g2/): needs a connected G2
 ```
 `@/` resolves to `g2-editor/src/`.
 
@@ -111,3 +112,4 @@ Tailwind CSS v4 (`@tailwindcss/vite`). Global styles in `src/style.css`. No sepa
 ### Testing
 Vitest (`npm test`) — unit tests in `src/{parser,store,renderer,composables}/__tests__/`.
 Playwright (`npm run test:e2e`) — end-to-end specs in `g2-editor/e2e/`.
+Hardware (`npm run test:g2`) — Vitest suite in `g2-editor/test-g2/` that drives the CLI and the real editor against a connected G2.

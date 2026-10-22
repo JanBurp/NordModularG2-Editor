@@ -29,7 +29,7 @@
 			     value-drag. Empty slots drag too: dropping one on a canvas param assigns that param here. -->
 			<div
 				@mousedown.capture="onKnobMorphMouseDown(cell, $event)"
-				@mouseenter="showHint('paramPageKnob')"
+				@mouseenter="showHint(cell.assignment?.location === 2 ? 'paramPageMorphKnob' : 'paramPageKnob')"
 				@mouseleave="showHint('paramPageCell')"
 				class="-mb-1"
 			>
@@ -125,6 +125,7 @@
 	import { getParam } from '../../renderer/parammap';
 	import { formatParamDisplay, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { clamp } from '../../utils/math';
+	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
 	import { resolveSwitchDisplayNames } from '../../composables/useSwitch';
 	import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../../types';
 
@@ -176,7 +177,7 @@
 	function resolveModule(a: ParamPageAssignment | GlobalParamPageAssignment) {
 		const slot = assignmentSlot(a);
 		const patch = slotsStore.slots[slot].patch;
-		const mod = patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
+		const mod = a.location === 2 ? undefined : patch?.areas[a.location]?.modules.find((m) => m.index === a.moduleIndex);
 		if (!mod) return null;
 		return { mod, moduleDef: getModule(mod.type) };
 	}
@@ -262,6 +263,22 @@
 			const slotIndex = slotIndexFor(bank, page, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
 			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
+			// location=2 = the PATCH_MORPH pseudo-module: paramIndex is a Morph Group, the knob is its dial.
+			// No button and no morph colouring (a morph dial can't itself be morph-assigned).
+			if (assignment.location === 2) {
+				const target = slotsStore.slots[assignmentSlot(assignment)];
+				const value = target.variations?.[uiStore.variation]?.patch.morphDials[assignment.paramIndex] ?? 0;
+				return {
+					slotIndex,
+					assignment,
+					...emptyCell,
+					moduleLabel: 'Morph',
+					paramLabel: morphGroupName(target.patch, assignment.paramIndex),
+					value,
+					valueLabel: String(value),
+					defaultValue: defaultPatchParams().morphDials[assignment.paramIndex],
+				};
+			}
 			const moduleInfo = resolveModule(assignment);
 			const moduleLabel = moduleInfo
 				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
@@ -373,6 +390,7 @@
 	}
 
 	function onKnobChange(a: ParamPageAssignment | GlobalParamPageAssignment, value: number) {
+		if (a.location === 2) return slotsStore.setMorphParam(uiStore.variation, a.paramIndex, 'dial', value, assignmentSlot(a));
 		const areaKey = a.location === 1 ? 'voice' : 'fx';
 		slotsStore.setParam(a.moduleIndex, a.paramIndex, value, uiStore.variation, areaKey, false, assignmentSlot(a));
 	}
@@ -383,8 +401,9 @@
 	// Captured on the wrapper (not the Knob itself) so it fires before useKnob.ts's own value-drag —
 	// startMorphRangeDrag no-ops (and doesn't stopPropagation) unless the grab modifier is actually held.
 	function onKnobMorphMouseDown(cell: Cell, e: MouseEvent) {
-		if (!cell.assignment || !isGrabModifierPressed(e)) return;
 		const a = cell.assignment;
+		if (!a || a.location === 2 || !isGrabModifierPressed(e)) return;
+		const location = a.location; // narrowed to 0 | 1 for the closures below
 		const slot = assignmentSlot(a);
 		const groupIndex = uiStore.selectedMorphGroup;
 		const variation = uiStore.variation;
@@ -397,11 +416,11 @@
 			getRange: () => cell.morphRange ?? 0,
 			// Freshly assigned params start at the full parameter range (matches the real editor); the
 			// user then Cmd/Ctrl-drags to narrow it.
-			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, 127),
-			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex),
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex, 127),
+			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex),
 			onRangeChange: isFixedRange
 				? undefined
-				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, a.location, a.moduleIndex, a.paramIndex, range),
+				: (range) => slotsStore.setMorphAssignmentRange(slot, variation, groupIndex, location, a.moduleIndex, a.paramIndex, range),
 		});
 	}
 
@@ -445,6 +464,7 @@
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
+		if (a.location === 2) return openContextMenu(event, items);
 		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
 		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against
 		// the assignment's own target slot (assignmentSlot), not uiStore.slotInFocus, since a Global

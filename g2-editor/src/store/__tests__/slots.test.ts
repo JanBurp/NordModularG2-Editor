@@ -1633,7 +1633,12 @@ describe('assignParamToPage / deassignParamPage', () => {
 		expect(patch.paramPages).toEqual(store.slots['A'].paramPages);
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
-		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([['assign-knob', 'A', 'va', '2', '0', '5', '0']]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['deassign-knob', 'A', '5'],
+			['assign-knob', 'A', 'va', '2', '0', '5', '0'],
+		]);
+		// then the knob's page is focused so the front panel shows it (slot 5 → page id 0)
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-param-page', 'A', '0']);
 	});
 
 	it('a level meter and a param with the same index are distinct assignments, and the meter carries isLed to the CLI', async () => {
@@ -1646,7 +1651,26 @@ describe('assignParamToPage / deassignParamPage', () => {
 			{ slotIndex: 5, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 0 },
 			{ slotIndex: 6, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 1 },
 		]);
-		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([['assign-knob', 'A', 'va', '2', '0', '6', '1']]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-knob', 'A', '6'],
+			['assign-knob', 'A', 'va', '2', '0', '6', '1'],
+		]);
+	});
+
+	it('a Morph Group (location 2, PATCH_MORPH module 1) is sent as location "patch", distinct from FX module 1', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 5, 0, 1, 4);
+		await store.assignParamToPage('A', 7, 2, 1, 4);
+
+		expect(store.slots['A'].paramPages).toEqual([
+			{ slotIndex: 5, location: 0, moduleIndex: 1, paramIndex: 4, isLed: 0 },
+			{ slotIndex: 7, location: 2, moduleIndex: 1, paramIndex: 4, isLed: 0 },
+		]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-knob', 'A', '7'],
+			['assign-knob', 'A', 'patch', '1', '4', '7', '0'],
+		]);
 	});
 
 	it('assigning into an occupied slot evicts the old occupant', async () => {
@@ -1670,6 +1694,7 @@ describe('assignParamToPage / deassignParamPage', () => {
 		// The hardware doesn't auto-evict: the old knob is deassigned first, then the new one assigned.
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
 			['deassign-knob', 'A', '5'],
+			['deassign-knob', 'A', '9'],
 			['assign-knob', 'A', 'fx', '1', '0', '9', '0'],
 		]);
 	});
@@ -1734,8 +1759,28 @@ describe('swapParamPageSlots', () => {
 		expect(at(9)).toMatchObject({ location: 1, moduleIndex: 2, paramIndex: 5 });
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
 			['deassign-knob', 'A', '3'],
+			['deassign-knob', 'A', '9'],
 			['assign-knob', 'A', 'va', '2', '5', '9', '0'],
 		]);
+	});
+
+	// Swapping two occupied knobs (e.g. two Morph Groups): both are deassigned before either is
+	// reassigned, then the page of the last assigned knob is focused — the official editor's order.
+	it('exchanges two occupied knobs as deassign both → assign both → focus page', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 3, 2, 1, 0);
+		await store.assignParamToPage('A', 30, 2, 1, 1);
+
+		await store.swapParamPageSlots('A', 3, 30);
+
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-knob', 'A', '3'],
+			['deassign-knob', 'A', '30'],
+			['assign-knob', 'A', 'patch', '1', '1', '3', '0'],
+			['assign-knob', 'A', 'patch', '1', '0', '30', '0'],
+		]);
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-param-page', 'A', '3']);
 	});
 
 	it('exchanges both assignments when the target slot is occupied', async () => {
@@ -1808,6 +1853,9 @@ describe('assignModuleToPage', () => {
 		expect(store.isSlotEdited('A')).toBe(true);
 		expect(useHistoryStore().canUndo('A')).toBe(true);
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['deassign-knob', 'A', '8'],
+			['deassign-knob', 'A', '9'],
+			['deassign-knob', 'A', '10'],
 			['assign-knob', 'A', 'va', '2', '0', '8', '0'],
 			['assign-knob', 'A', 'va', '2', '1', '9', '0'],
 			['assign-knob', 'A', 'va', '2', '2', '10', '0'],
@@ -1859,6 +1907,28 @@ describe('assignModuleToPage', () => {
 	});
 });
 
+describe('assignParamToGlobalPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	it('moving an assigned Morph Group: deassign old + target knob → assign → focus the global page', async () => {
+		const store = useSlotsStore();
+		await store.assignParamToGlobalPage('B', 5, 2, 1, 4);
+
+		await store.assignParamToGlobalPage('B', 50, 2, 1, 4);
+
+		expect(store.globalParamPages).toEqual([{ slotIndex: 50, slot: 'B', location: 2, moduleIndex: 1, paramIndex: 4, isLed: 0 }]);
+		expect(store.isSlotEdited('B')).toBe(true);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-global-knob', 'A', '5'],
+			['deassign-global-knob', 'A', '50'],
+			['assign-global-knob', 'A', 'B', 'patch', '1', '4', '50'],
+		]);
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-global-page', 'A', '6']);
+	});
+});
+
 describe('assignModuleToGlobalPage', () => {
 	beforeEach(() => {
 		useDeviceStore().status = DeviceStatus.Connected;
@@ -1879,9 +1949,12 @@ describe('assignModuleToGlobalPage', () => {
 		]);
 		expect(useHistoryStore().canUndo('A')).toBe(false);
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
+			['deassign-global-knob', 'A', '16'],
+			['deassign-global-knob', 'A', '17'],
 			['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16'],
 			['assign-global-knob', 'A', 'B', 'fx', '7', '1', '17'],
 		]);
+		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-global-page', 'A', '2']);
 	});
 
 	it("evicts occupants and this module's other assignments for the target patch slot", async () => {

@@ -15,6 +15,11 @@ describe('classify', () => {
 	it('listener NO_DEVICE while still enumerated', () => {
 		expect(classify(['[diag] disconnect (listener/no device, ret=0): 0 cmds'], { enumerated: true, trigger: 'status' }).cause).toMatch(/still enumerates/);
 	});
+	it('listener NO_DEVICE with the G2 back at another address', () => {
+		const lines = ['[daemon-error:0:4] [diag] disconnect (listener/no device, ret=0): 0 cmds'];
+		expect(classify(lines, { enumerated: true, addresses: ['0:5'], trigger: 'status' }).cause).toMatch(/new USB address \(0:5; daemon pinned to 0:4\)/);
+		expect(classify(lines, { enumerated: true, addresses: ['0:4'], trigger: 'status' }).cause).toMatch(/still enumerates/);
+	});
 	it('no answer + burst', () => {
 		const c = classify(['[diag] disconnect (command error, ret=-8): 9 cmds in last 1s, last cmd x'], { enumerated: true, trigger: 'status' });
 		expect(c.cause).toMatch(/TIMEOUT/);
