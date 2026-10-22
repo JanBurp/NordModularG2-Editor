@@ -799,8 +799,8 @@
 
 	async function afterConnectRestoreFocus(): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
-		const focusedEntry = device.device?.slots?.find((s) => s.key);
-		const focusLabel = (focusedEntry?.slot ?? 'A') as SlotLabel;
+		// The G2's focused slot, not the first keyed one: several slots can be keyed at once.
+		const focusLabel = (device.device?.performance?.focus || 'A') as SlotLabel;
 		const idx = SLOT_LABELS.indexOf(focusLabel);
 		if (idx >= 0) {
 			const slot = SLOT_LABELS[idx];
