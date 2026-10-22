@@ -4,6 +4,7 @@ import { isMac } from '@/utils/platform';
 
 export const MOD = isMac ? '⌘' : 'Ctrl'; // Cmd on Mac, Ctrl elsewhere
 export const ALT = isMac ? '⌥' : 'Alt';
+export const SHIFT = isMac ? '⇧' : 'Shift';
 
 export const STATUS_HINTS = {
 	// Canvas — hidden gestures

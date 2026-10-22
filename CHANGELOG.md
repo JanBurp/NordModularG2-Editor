@@ -38,6 +38,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - SetValue on Scratch modules used wrong params
 - Windows: Key commands when switching to window of other G2
 - Windows: Copy/Paste when switching to window of other G2
+- Windows: Keyboard Shortcuts page showed Mac key symbols (⌘ ⌥ ⇧) instead of Ctrl/Alt/Shift
 
 ## [0.7.1] - 2026-10-12
 
