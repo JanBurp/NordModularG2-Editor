@@ -4,7 +4,7 @@ import path from 'path';
 import { ACTIONS } from './actions/index';
 import { cliRun, closeMenus, type ActionCtx, type ActionDef } from './actions/ctx';
 import { isFresh, pickAction, planBurst, weighted } from './actions/pick';
-import { g2Count, sleep, waitFor } from './cli';
+import { g2Addresses, g2Count, sleep, waitFor } from './cli';
 import type { EventLog } from './eventLog';
 import { checkConsistency } from './consistency';
 import { classify, DOWN_STATUSES, type Incident, type RecoveryLevel, UI_TIMEOUT_NOTE } from './report';
@@ -124,8 +124,9 @@ export class Runner {
 		const lastAction = this.lastAction;
 		this.log.log('main', { line: `[duration-test] incident #${id} (${trigger}), status="${this.status}"` });
 
-		// Taken right away, before the ladder changes anything: is the G2 still on USB?
-		const enumerated = (await g2Count()) > 0;
+		// Taken right away, before the ladder changes anything: is the G2 still on USB, and at which address?
+		const addresses = await g2Addresses();
+		const enumerated = addresses.length > 0;
 		let level: RecoveryLevel = 'self';
 		let cycles = 0;
 		let healthy = false;
@@ -155,6 +156,7 @@ export class Runner {
 		while (!healthy && cycles < MAX_POWER_CYCLES) {
 			level = 'power-cycle';
 			cycles++;
+			this.log.log('main', { line: `[duration-test] G2 on USB before power cycle: ${(await g2Addresses()).join(', ') || 'none'}` });
 			const t0 = Date.now();
 			const back = await powerCycle();
 			this.log.log('reset', { reason: `incident #${id}`, ok: back, ms: Date.now() - t0 });
@@ -166,8 +168,8 @@ export class Runner {
 		}
 		if (!healthy) level = 'failed';
 
-		const { cause, evidence } = classify(this.log.recentLines(Date.now() - start + 45_000), { enumerated, trigger });
-		const incident: Omit<Incident, never> = { id, start, end: Date.now(), trigger, lastAction, level, powerCycles: cycles, cause, evidence, enumerated };
+		const { cause, evidence } = classify(this.log.recentLines(Date.now() - start + 45_000), { enumerated, addresses, trigger });
+		const incident: Omit<Incident, never> = { id, start, end: Date.now(), trigger, lastAction, level, powerCycles: cycles, cause, evidence, enumerated, addresses };
 		this.log.log('incident', incident as unknown as Record<string, unknown>);
 		this.lossAt = null;
 		if (!healthy) throw new Error(`G2 did not recover after ${cycles} power cycles (incident #${id})`);

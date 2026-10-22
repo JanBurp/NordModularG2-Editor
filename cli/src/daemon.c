@@ -1055,6 +1055,10 @@ static void do_reconnect(void) {
 	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
 		g2_msg_free(&ack);
 
+	if (g2_target_moved) {
+		g2_target_moved = 0;
+		printf("{\"type\":\"device_retargeted\",\"bus\":%d,\"device\":%d}\n", g2_target_bus, g2_target_device);
+	}
 	printf("{\"type\":\"device_reconnected\"}\n");
 	fflush(stdout);
 }

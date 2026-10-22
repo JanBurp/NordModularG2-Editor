@@ -31,10 +31,9 @@ extern g2_device_t g2;
  * why collapsing them wouldn't actually close the window that matters. The
  * chosen mitigation is g2_target_last_seen below plus G2_ERR_TARGET_NOT_FOUND
  * (g2_device.h): narrow what's narrowable, make the rest loud instead of a
- * silent generic "not found". A future, more robust option would be
- * targeting by USB serial number instead of bus/device — not pursued here
- * since it's unverified whether the G2 exposes a usable serial descriptor at
- * all (see g2_open_target() in g2_io.c). */
+ * silent generic "not found". Once the target has been opened, g2_open_target()
+ * also follows it to a new address on the same bus + port path (G2 self-reboot)
+ * and sets g2_target_moved; see below. */
 extern int g2_target_bus;
 extern int g2_target_device;
 void g2_set_target(int bus, int device);
@@ -52,6 +51,11 @@ int g2_set_target_by_index(int index);
  * G2 was never there" apart from "it was there and vanished between
  * enumeration and open" — the TOCTOU instant actually firing. */
 extern int g2_target_last_seen;
+
+/* Set to 1 by g2_open_target() when it opened the target at a new address on the
+ * same port path (g2_target_device then holds the new address). The caller clears it
+ * after reporting the move (daemon: "device_retargeted" event). */
+extern int g2_target_moved;
 
 /* ── Listener message type ─────────────────────────────────────────────── */
 

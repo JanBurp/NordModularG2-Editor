@@ -35,10 +35,17 @@ g2_device_t g2 = {
 int g2_target_bus = 0;
 int g2_target_device = 0;
 int g2_target_last_seen = 0;
+int g2_target_moved = 0;
+
+/* Physical port path of the target, recorded on every successful open: survives the
+ * address change of a re-enumeration (G2 reboot, same-port replug). */
+static uint8_t g2_target_ports[7];
+static int     g2_target_nports = 0;
 
 void g2_set_target(int bus, int device) {
     g2_target_bus = bus;
     g2_target_device = device;
+    g2_target_nports = 0;
 }
 
 static int is_g2_device(const struct libusb_device_descriptor *desc) {
@@ -281,16 +288,32 @@ static libusb_device_handle *g2_open_target(void) {
     if (count < 0) return NULL;
 
     libusb_device_handle *handle = NULL;
+    libusb_device *moved = NULL;  /* a G2 on the target's port path, at another address */
     g2_target_last_seen = 0;
     for (ssize_t idx = 0; idx < count; idx++) {
         struct libusb_device_descriptor desc;
         if (libusb_get_device_descriptor(devices[idx], &desc) != 0) continue;
         if (!is_g2_device(&desc)) continue;
         if (libusb_get_bus_number(devices[idx]) != g2_target_bus) continue;
-        if (libusb_get_device_address(devices[idx]) != g2_target_device) continue;
+        if (libusb_get_device_address(devices[idx]) != g2_target_device) {
+            uint8_t ports[7];
+            int n = libusb_get_port_numbers(devices[idx], ports, sizeof(ports));
+            if (g2_target_nports > 0 && n == g2_target_nports && memcmp(ports, g2_target_ports, (size_t)n) == 0)
+                moved = devices[idx];
+            continue;
+        }
         g2_target_last_seen = 1;
         if (libusb_open(devices[idx], &handle) != 0) handle = NULL;
+        else if ((g2_target_nports = libusb_get_port_numbers(devices[idx], g2_target_ports, sizeof(g2_target_ports))) < 0)
+            g2_target_nports = 0;
         break;
+    }
+    /* After a G2 self-reboot macOS re-enumerates it at a new address (duration run 2026-10-22: 0:4 -> 0:5)
+     * while a slow manual replug gets the old one back: follow it on the same port path, like the official
+     * editor, which keys its USB devices by IOKit locationID. */
+    if (!g2_target_last_seen && moved && libusb_open(moved, &handle) == 0) {
+        g2_target_device = libusb_get_device_address(moved);
+        g2_target_moved = 1;
     }
 
     libusb_free_device_list(devices, 1);
