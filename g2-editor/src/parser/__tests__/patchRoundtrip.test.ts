@@ -1332,6 +1332,18 @@ describe('MidiCC round-trip: assign → serialize → parse', () => {
 });
 
 describe('Parameter Pages round-trip: assign → serialize → parse', () => {
+	it('parses a Morph Group knob as location=2 on the PATCH_MORPH pseudo-module', () => {
+		// RndKit.pch2: Morph Group 5 on Page A1 Knob 8, Morph Group 8 on slot 50
+		const { name, rawHex, patch } = loadFixture('eigen/RndKit.pch2');
+		const morphKnobs = patch.paramPages?.filter((a) => a.location === 2);
+		expect(morphKnobs).toEqual([
+			{ slotIndex: 7, location: 2, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: 4, isLed: 0 },
+			{ slotIndex: 50, location: 2, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: 7, isLed: 0 },
+		]);
+		const newHex = serializePatch(name, patch, rawHex, extractVariations(patch));
+		expect(parsePatchFromRawHex(name, newHex).paramPages).toEqual(patch.paramPages);
+	});
+
 	it('paramPages survive serialize → parse', () => {
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const assignments = [

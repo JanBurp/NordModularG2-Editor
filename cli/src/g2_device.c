@@ -2336,7 +2336,7 @@ void g2_build_deassign_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
  * (see assignParamToPage) but does not explicitly clear an occupied target knob. */
 int g2_assign_knob(int slot, int location, int module_id, int param_idx, int slot_index, int is_led) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
-    if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 2)       return G2_ERR_INVALID_PARAM; /* 2 = patch: Morph Group dials (PATCH_MORPH module 1) */
     if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
     if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
     if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
@@ -2428,7 +2428,7 @@ void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
 int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (target_slot < 0 || target_slot > 3) return G2_ERR_INVALID_PARAM;
-    if (location < 0 || location > 1)       return G2_ERR_INVALID_PARAM;
+    if (location < 0 || location > 2)       return G2_ERR_INVALID_PARAM; /* 2 = patch: Morph Group dials (PATCH_MORPH module 1) */
     if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
     if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
     if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;

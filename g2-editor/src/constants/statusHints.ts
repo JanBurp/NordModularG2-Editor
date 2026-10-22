@@ -21,10 +21,12 @@ export const STATUS_HINTS = {
 	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
 	ccRow: `Click: select · Shift-click: select range · ${MOD}-click: add/remove from selection · Drag: reassign CC`,
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
-	morphKnob: 'Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · Drop CC here: assign · Right-click: rename, clear, copy',
+	// A Morph Group's dial on a Parameter Page knob: no morph-assign (a dial can't be morphed), no button.
+	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
+	morphKnob: `Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
 	morphSource: 'Click: cycle morph source',
-	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter to assign · Right-click: deassign, morph`,
+	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter or Morph knob to assign · Right-click: deassign, morph`,
 	paramPageButton: 'Click: change button value',
 	globalPages: 'Click: switch between Patch and Global parameter pages',
 	paramBank: 'Click: select parameter bank',

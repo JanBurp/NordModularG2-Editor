@@ -78,10 +78,10 @@ function readKnobSlotRecord(
 	reader: BitReader,
 	hasSlotField: boolean,
 	label: string,
-): { location: 0 | 1; moduleIndex: number; isLed: number; paramIndex: number; slotBits: number } | null {
+): { location: 0 | 1 | 2; moduleIndex: number; isLed: number; paramIndex: number; slotBits: number } | null {
 	const assigned = reader.read(1, label);
 	if (!assigned) return null;
-	const location = reader.read(2, label) as 0 | 1;
+	const location = reader.read(2, label) as 0 | 1 | 2;
 	const moduleIndex = reader.read(8, label);
 	const isLed = reader.read(2, label);
 	const paramIndex = reader.read(7, label);

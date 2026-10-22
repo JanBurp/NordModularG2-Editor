@@ -125,7 +125,7 @@ export interface MidiCCAssignment {
 // (like MidiCCAssignment/controllers), NOT per-variation (unlike MorphAssignment).
 export interface ParamPageAssignment {
 	slotIndex: number; // 0-119
-	location: 0 | 1; // 0=FX, 1=Voice
+	location: 0 | 1 | 2; // 0=FX, 1=Voice, 2=Patch (PATCH_MORPH pseudo-module: Morph Group dials)
 	moduleIndex: number;
 	paramIndex: number;
 	isLed: number; // 0=param, 1=level meter (paramIndex is then its LED number); 2-bit field, EDeviceAssignType in G2Editor.c
@@ -139,7 +139,7 @@ export interface ParamPageAssignment {
 export interface GlobalParamPageAssignment {
 	slotIndex: number; // 0-119
 	slot: 'A' | 'B' | 'C' | 'D'; // which patch slot's module this targets (SlotLabel, inlined — types/index.ts's SlotLabel re-exports from this file, so importing it here would be circular)
-	location: 0 | 1; // 0=FX, 1=Voice
+	location: 0 | 1 | 2; // 0=FX, 1=Voice, 2=Patch (PATCH_MORPH pseudo-module: Morph Group dials)
 	moduleIndex: number;
 	paramIndex: number;
 	isLed: number; // 0-3, semantics unconfirmed — preserved verbatim, not exposed in UI
