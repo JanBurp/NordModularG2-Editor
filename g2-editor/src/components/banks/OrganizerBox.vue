@@ -7,7 +7,12 @@
 				: empty
 					? 'border-dashed border-line-subtle'
 					: 'border-line-default bg-surface-2',
-			{ 'opacity-40': dimmed, 'outline-2 outline-input -outline-offset-2': highlighted, 'ring-2 ring-inset ring-input': selected },
+			{
+				'opacity-40': dimmed,
+				'outline-2 outline-input -outline-offset-2': highlighted,
+				'ring-2 ring-inset ring-input': selected,
+				'outline-1 outline-dashed outline-input -outline-offset-2': cursor && !highlighted,
+			},
 		]"
 		:style="tint ? { backgroundColor: tint } : undefined"
 	>
@@ -27,6 +32,7 @@
 		dimmed?: boolean;
 		highlighted?: boolean;
 		selected?: boolean;
+		cursor?: boolean; // arrow-key position
 		tint?: string;
 	}>();
 </script>

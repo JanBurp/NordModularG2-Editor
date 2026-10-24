@@ -280,26 +280,17 @@
 					placeholder="(optional)"
 				/>
 			</div>
-			<div v-if="bankUpload.inProgress.value" class="space-y-1">
-				<div class="text-orange-400 text-sm">
-					{{
-						bankUpload.progress.value
-							? `Uploading… location ${bankUpload.progress.value.location}/${bankUpload.progress.value.total} (${bankUpload.progress.value.written} written, ${bankUpload.progress.value.empty} empty)`
-							: 'Uploading bank from G2...'
-					}}
-				</div>
-				<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
-					<div
-						class="h-full bg-orange-400 transition-all"
-						:style="{
-							width: bankUpload.progress.value ? `${(bankUpload.progress.value.location / bankUpload.progress.value.total) * 100}%` : '0%',
-						}"
-					></div>
-				</div>
-				<div v-if="bankUpload.progress.value" class="text-xs text-content-secondary truncate">
-					{{ `${bankUpload.progress.value.location}: ${bankUpload.progress.value.name || '(empty)'}` }}
-				</div>
-			</div>
+			<ProgressBar
+				v-if="bankUpload.inProgress.value"
+				:text="
+					bankUpload.progress.value
+						? `Uploading… location ${bankUpload.progress.value.location}/${bankUpload.progress.value.total} (${bankUpload.progress.value.written} written, ${bankUpload.progress.value.empty} empty)`
+						: 'Uploading bank from G2...'
+				"
+				:value="bankUpload.progress.value?.location ?? 0"
+				:max="bankUpload.progress.value?.total ?? 0"
+				:detail="bankUpload.progress.value ? `${bankUpload.progress.value.location}: ${bankUpload.progress.value.name || '(empty)'}` : undefined"
+			/>
 			<div class="text-xs text-content-secondary">
 				Save complete {{ bankUpload.type.value }} bank from synth memory to disk.<br />Creates individual sound files + .pchList file.
 			</div>
@@ -372,28 +363,19 @@
 			</div>
 			<div v-if="bankDownload.inProgress.value" class="space-y-1">
 				<div v-if="bankDownload.reloadingNames.value" class="text-orange-400 text-sm">Reloading patch/performance names from G2…</div>
-				<template v-else>
-					<div class="text-orange-400 text-sm">
-						{{
-							bankDownload.progress.value
-								? `Downloading… location ${bankDownload.progress.value.location}/${bankDownload.progress.value.total} (${bankDownload.progress.value.written} written, ${bankDownload.progress.value.cleared} cleared${bankDownload.progress.value.failed ? `, ${bankDownload.progress.value.failed} failed` : ''})`
-								: 'Downloading bank to G2...'
-						}}
-					</div>
-					<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
-						<div
-							class="h-full bg-orange-400 transition-all"
-							:style="{
-								width: bankDownload.progress.value
-									? `${(bankDownload.progress.value.location / bankDownload.progress.value.total) * 100}%`
-									: '0%',
-							}"
-						></div>
-					</div>
-					<div v-if="bankDownload.progress.value" class="text-xs text-content-secondary truncate">
-						{{ `${bankDownload.progress.value.location}: ${bankDownload.progress.value.name || '(empty)'}` }}
-					</div>
-				</template>
+				<ProgressBar
+					v-else
+					:text="
+						bankDownload.progress.value
+							? `Downloading… location ${bankDownload.progress.value.location}/${bankDownload.progress.value.total} (${bankDownload.progress.value.written} written, ${bankDownload.progress.value.cleared} cleared${bankDownload.progress.value.failed ? `, ${bankDownload.progress.value.failed} failed` : ''})`
+							: 'Downloading bank to G2...'
+					"
+					:value="bankDownload.progress.value?.location ?? 0"
+					:max="bankDownload.progress.value?.total ?? 0"
+					:detail="
+						bankDownload.progress.value ? `${bankDownload.progress.value.location}: ${bankDownload.progress.value.name || '(empty)'}` : undefined
+					"
+				/>
 			</div>
 			<div class="text-xs text-content-secondary">
 				Download bank to synth memory.<br />Source can be a .pchList file or a folder patch files (max 128).
@@ -456,6 +438,7 @@
 	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
 	import BankOrganizer from './components/banks/BankOrganizer.vue';
+	import ProgressBar from './components/common/ProgressBar.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';

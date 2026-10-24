@@ -51,6 +51,7 @@ describe('browser store — Bank Organizer', () => {
 
 	const key = (kind: string, bank: string | number, loc: string | number) => `${kind}-${bank}-${loc}`;
 	const P = (bank: number, location: number) => ({ kind: 'patch' as const, bank, location });
+	const cells = (...locs: ReturnType<typeof P>[]) => locs.map((loc) => ({ type: 'cell' as const, loc }));
 
 	beforeEach(async () => {
 		flash = new Map();
@@ -146,7 +147,7 @@ describe('browser store — Bank Organizer', () => {
 			[3, 7, 'Bass'],
 		]);
 
-		await browser.toStorage(P(1, 1));
+		await browser.toStorage([P(1, 1)]);
 		expect(flash.get('patch-1-1')).toBe('Lead');
 		expect(browser.storage.map((h) => h.name)).toEqual(['Lead']);
 
@@ -161,8 +162,8 @@ describe('browser store — Bank Organizer', () => {
 			[1, 2, '.dot'],
 		]);
 
-		await browser.toStorage(P(1, 1));
-		await browser.toStorage(P(1, 2));
+		await browser.toStorage([P(1, 1)]);
+		await browser.toStorage([P(1, 2)]);
 
 		expect(browser.storage.map((h) => h.name)).toEqual(['A/B__C %d', '.dot']);
 	});
@@ -178,6 +179,99 @@ describe('browser store — Bank Organizer', () => {
 
 		expect(flash).toEqual(new Map([['patch-1-2', 'Pad']]));
 		expect(browser.synthPatches.map((p) => p.name)).toEqual(['Pad']);
+	});
+
+	it('freeFrom lists the empty locations from a start up to 128', () => {
+		const browser = seed([
+			[2, 120, 'A'],
+			[2, 122, 'B'],
+		]);
+
+		expect(browser.freeFrom('patch', 2, 119).map((l) => l.location)).toEqual([119, 121, 123, 124, 125, 126, 127, 128]);
+	});
+
+	it('placeMany moves into free locations, writing every copy before clearing any source', async () => {
+		const browser = seed([
+			[1, 1, 'Lead'],
+			[1, 2, 'Pad'],
+			[2, 5, 'Bass'],
+		]);
+		const dsts = browser.freeFrom('patch', 2, 5).slice(0, 2); // skips occupied 2-5
+
+		expect(await browser.placeMany(cells(P(1, 1), P(1, 2)), dsts, true)).toBe(true);
+
+		expect(flash).toEqual(
+			new Map([
+				['patch-2-5', 'Bass'],
+				['patch-2-6', 'Lead'],
+				['patch-2-7', 'Pad'],
+			]),
+		);
+		const order = calls.map((c) => c[0]);
+		expect(order.lastIndexOf('put-location')).toBeLessThan(order.indexOf('clear-patch'));
+		expect(browser.storage).toEqual([]); // temp copies cleaned up
+		expect(browser.organizerProgress).toBeNull();
+	});
+
+	it('placeMany copy keeps the sources; storage items are copied and stay in storage', async () => {
+		const browser = seed([[1, 1, 'Lead']]);
+		await browser.toStorage([P(1, 1)]);
+		const item = browser.storage[0];
+
+		await browser.placeMany(
+			[
+				{ type: 'cell', loc: P(1, 1) },
+				{ type: 'storage', item },
+			],
+			[P(3, 1), P(3, 2)],
+			false,
+		);
+
+		expect(flash.get('patch-1-1')).toBe('Lead');
+		expect(flash.get('patch-3-1')).toBe('Lead');
+		expect(flash.get('patch-3-2')).toBe('Lead');
+		expect(browser.storage.map((h) => h.name)).toEqual(['Lead']);
+	});
+
+	it('placeMany failing halfway clears no source at all', async () => {
+		const browser = seed([
+			[1, 1, 'Lead'],
+			[1, 2, 'Pad'],
+		]);
+		const run = (window as any).cli.run;
+		const original = run.getMockImplementation();
+		let puts = 0;
+		run.mockImplementation(async (args: string[]) => {
+			if (args[0] === 'put-location' && ++puts === 2) throw new Error('no reply from device');
+			return original(args);
+		});
+
+		expect(await browser.placeMany(cells(P(1, 1), P(1, 2)), [P(4, 1), P(4, 2)], true)).toBe(false);
+
+		expect(flash.get('patch-1-1')).toBe('Lead');
+		expect(flash.get('patch-1-2')).toBe('Pad');
+		expect(calls.some((c) => c[0] === 'clear-patch')).toBe(false);
+		expect(browser.organizerProgress).toBeNull();
+	});
+
+	it('reports progress per step while placing several patches', async () => {
+		const browser = seed([
+			[1, 1, 'Lead'],
+			[1, 2, 'Pad'],
+		]);
+		const seen: string[] = [];
+		const run = (window as any).cli.run;
+		const original = run.getMockImplementation();
+		run.mockImplementation(async (args: string[]) => {
+			const p = browser.organizerProgress;
+			if (p) seen.push(`${p.verb} ${p.done}/${p.total} ${p.name}`);
+			return original(args);
+		});
+
+		await browser.placeMany(cells(P(1, 1), P(1, 2)), [P(2, 1), P(2, 2)], true);
+
+		expect([...new Set(seen)]).toEqual(['Moving 0/4 Lead', 'Moving 1/4 Pad', 'Moving 2/4 Lead', 'Moving 3/4 Pad']);
+		expect(browser.organizerProgress).toBeNull();
 	});
 
 	it('does nothing without a connected G2', async () => {

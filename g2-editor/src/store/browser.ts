@@ -31,6 +31,11 @@ export interface StorageItem {
 	category?: string;
 }
 
+/* What a multi-drop places into a bank: a bank location or a Temporary Storage item. */
+export type PlaceSource = { type: 'cell'; loc: BankLoc } | { type: 'storage'; item: StorageItem };
+
+const LOCATIONS = 128; // per bank, patches and performances alike
+
 export interface DiskEntry {
 	name: string;
 	path: string;
@@ -83,6 +88,8 @@ export const useBrowserStore = defineStore('browser', {
 		storage: [] as StorageItem[],
 		storageDir: '' as string,
 		organizerBusy: [] as string[], // `${kind}-${bank}-${location}` keys of cells being changed
+		// Running organizer operation, for the Bank Organizer's progress dialog; null when idle.
+		organizerProgress: null as { verb: string; done: number; total: number; name: string } | null,
 	}),
 
 	actions: {
@@ -197,6 +204,20 @@ export const useBrowserStore = defineStore('browser', {
 			return list.find((p) => p.bank === loc.bank && p.location === loc.location);
 		},
 
+		/* The empty locations of a bank from `start` up to 128, in order. */
+		freeFrom(kind: BankKind, bank: number, start: number): BankLoc[] {
+			const free: BankLoc[] = [];
+			for (let location = start; location <= LOCATIONS; location++) {
+				const loc = { kind, bank, location };
+				if (!this.entryAt(loc)) free.push(loc);
+			}
+			return free;
+		},
+
+		_step(verb: string, done: number, total: number, name: string): void {
+			this.organizerProgress = { verb, done, total, name };
+		},
+
 		async loadStorage(): Promise<void> {
 			if (!window.electronAPI) return;
 			const { useSettingsStore } = await import('./settings');
@@ -260,6 +281,7 @@ export const useBrowserStore = defineStore('browser', {
 					return false;
 				} finally {
 					this.organizerBusy = this.organizerBusy.filter((k) => !keys.includes(k));
+					this.organizerProgress = null;
 					await this.loadStorage();
 				}
 			};
@@ -271,9 +293,12 @@ export const useBrowserStore = defineStore('browser', {
 		/* A displaced patch never gets lost: everything below parks an occupied target in
 		 * storage before overwriting it, and only clears a source after its copy landed.
 		 * Storage <-> bank always copies: the source stays where it was. */
-		toStorage(src: BankLoc): Promise<boolean> {
-			return this._organize([src], async () => {
-				await this._readLocation(src);
+		toStorage(locs: BankLoc[]): Promise<boolean> {
+			return this._organize(locs, async () => {
+				for (const [i, loc] of locs.entries()) {
+					this._step('Copying', i, locs.length, this.entryAt(loc)?.name ?? '');
+					await this._readLocation(loc);
+				}
 			});
 		},
 
@@ -310,7 +335,42 @@ export const useBrowserStore = defineStore('browser', {
 		/* Clears bank locations (the Bank Organizer confirms first). */
 		clearLocations(locs: BankLoc[]): Promise<boolean> {
 			return this._organize(locs, async () => {
-				for (const loc of locs) await this._clearLocation(loc);
+				for (const [i, loc] of locs.entries()) {
+					this._step('Deleting', i, locs.length, this.entryAt(loc)?.name ?? '');
+					await this._clearLocation(loc);
+				}
+			});
+		},
+
+		/* Multi-drop: puts each source into the matching (empty) location of `dsts`. Bank sources are
+		 * copied, or moved when `move`: they are cleared only after every copy has landed, so a
+		 * failure halfway leaves all sources intact. Storage items are always copied. */
+		placeMany(sources: PlaceSource[], dsts: BankLoc[], move: boolean): Promise<boolean> {
+			const cells = sources.flatMap((s) => (s.type === 'cell' ? [s.loc] : []));
+			const clears = move ? cells : [];
+			const total = sources.length + clears.length;
+			const verb = move && cells.length ? 'Moving' : 'Copying';
+			return this._organize([...cells, ...dsts], async () => {
+				for (const [i, src] of sources.entries()) {
+					const dst = dsts[i];
+					if (src.type === 'storage') {
+						this._step(verb, i, total, src.item.name);
+						await this._writeLocation(dst, src.item.file, src.item.name, src.item.category);
+						continue;
+					}
+					this._step(verb, i, total, this.entryAt(src.loc)?.name ?? '');
+					const copy = await this._readLocation(src.loc, true);
+					if (!copy) continue; // emptied in the meantime
+					try {
+						await this._writeLocation(dst, copy.file, copy.name, copy.category);
+					} finally {
+						await window.electronAPI.patches.storageRemove(copy.file);
+					}
+				}
+				for (const [i, loc] of clears.entries()) {
+					this._step(verb, sources.length + i, total, this.entryAt(loc)?.name ?? '');
+					await this._clearLocation(loc);
+				}
 			});
 		},
 

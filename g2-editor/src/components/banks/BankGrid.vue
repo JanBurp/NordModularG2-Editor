@@ -23,15 +23,16 @@
 						'animate-pulse': isBusy(cell.location),
 						'outline-2 outline-input -outline-offset-2': dropTarget === cell.location,
 						'ring-2 ring-inset ring-input': org.isSelected(asCell(loc(cell.location))),
+						'outline-1 outline-dashed outline-input -outline-offset-2': dropTarget !== cell.location && org.isCursor(asCell(loc(cell.location))),
 					},
 				]"
 				:style="cell.patch ? { backgroundColor: categoryTint(cell.patch.category) } : undefined"
 				:draggable="!!cell.patch"
 				:data-testid="`bank-cell-${cell.location}`"
 				:title="cell.patch ? `${bank}-${cell.location} ${cell.patch.name}` : `${bank}-${cell.location} (empty)`"
-				@click="(e: MouseEvent) => org.select(asCell(loc(cell.location)), e.shiftKey || e.metaKey || e.ctrlKey)"
+				@click="(e: MouseEvent) => org.select(asCell(loc(cell.location)), clickMode(e), areaId)"
 				@contextmenu.prevent="(e: MouseEvent) => cell.patch && onContextMenu(e, cell.location)"
-				@dragstart="org.start($event, { type: 'cell', loc: loc(cell.location) })"
+				@dragstart="org.startItem($event, asCell(loc(cell.location)), areaId)"
 				@dragend="org.end()"
 				@dragover="onDragOver($event, cell.location)"
 				@dragleave="dropTarget = null"
@@ -47,14 +48,14 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref } from 'vue';
+	import { computed, onUnmounted, ref } from 'vue';
 	import Select from '../common/Select.vue';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import { useBrowserStore, type BankKind, type BankLoc, type SynthPatch } from '@/store/browser';
 	import { sortPatches, type PatchSortMode } from '@/utils/sortPatches';
 	import { categoryTint } from './categoryTint';
 	import { useStatusHint } from '@/composables/useStatusHint';
-	import { asCell, useOrganizer, type OrganizerDragSource } from './useOrganizer';
+	import { asCell, clickMode, useOrganizer, type OrganizerDragSource } from './useOrganizer';
 	import { useContextMenu } from '@/composables/useContextMenu';
 	import { SLOT_LABELS } from '@/constants';
 	import type { ContextMenuItem } from '@/types';
@@ -108,14 +109,21 @@
 	});
 
 	const loc = (location: number): BankLoc => ({ kind: props.kind, bank: props.bank, location });
+
+	// This grid as a selection area, in display order (sorted modes included), 8 per row.
+	const areaId = `grid-${props.side}`;
+	onUnmounted(org.registerArea({ id: areaId, items: () => cells.value.map((c) => asCell(loc(c.location))), cols: () => 8 }));
 	const isBusy = (location: number) => browser.organizerBusy.includes(`${props.kind}-${props.bank}-${location}`);
 
-	// Same kind only (Perf slot ↔ performance banks), and never a cell onto itself.
+	// Same kind only (Perf slot ↔ performance banks), and never onto a cell that is itself being dragged.
 	function accepts(location: number) {
+		const onItself = (l: BankLoc) => l.bank === props.bank && l.location === location;
 		return (src: OrganizerDragSource) => {
 			if (src.type === 'slot') return (src.slot === 4) === (props.kind === 'performance');
 			if (src.type === 'storage') return src.item.kind === props.kind;
-			return src.loc.kind === props.kind && !(src.loc.bank === props.bank && src.loc.location === location);
+			if (src.type === 'many')
+				return src.items.every((s) => (s.type === 'cell' ? s.loc.kind === props.kind && !onItself(s.loc) : s.item.kind === props.kind));
+			return src.loc.kind === props.kind && !onItself(src.loc);
 		};
 	}
 
@@ -132,14 +140,14 @@
 	// Acts on the whole selection when the cell is part of it (else selects just this cell).
 	function onContextMenu(e: MouseEvent, location: number) {
 		const here = loc(location);
-		if (!org.isSelected(asCell(here))) org.select(asCell(here), false);
+		if (!org.isSelected(asCell(here))) org.select(asCell(here), 'single', areaId);
 		const targets = org.targetsFor(asCell(here));
-		const locs = targets.flatMap((t) => (t.type === 'cell' ? [t.loc] : []));
+		const locs = targets.flatMap((t) => (t.type === 'cell' && browser.entryAt(t.loc) ? [t.loc] : []));
 		const slots = props.kind === 'performance' ? [{ slot: 4, label: 'Perf' }] : SLOT_LABELS.map((label, slot) => ({ slot, label }));
 		const items: ContextMenuItem[] = [
 			{
 				label: locs.length > 1 ? `Copy ${locs.length} to Temporary Storage` : 'Copy to Temporary Storage',
-				action: () => locs.forEach((l) => browser.toStorage(l)),
+				action: () => browser.toStorage(locs),
 			},
 			{
 				label: 'Load into slot',

@@ -36,6 +36,16 @@ async function runRemaining(g: Editor, done: Set<string>): Promise<string[]> {
 	return problems;
 }
 
+// The menu action toggles: open only when closed. Close = Escape until gone (the first one may only
+// clear the selection, which dragging also sets).
+async function openOrganizer(ctx: Editor['ctx']) {
+	if (!(await ctx.page.locator('[data-testid="bank-organizer"]').isVisible())) await menuAction(ctx, 'toggle-bank-organizer');
+	await ctx.page.locator('[data-testid="bank-organizer"]').waitFor();
+}
+async function closeOrganizer(page: Editor['ctx']['page']) {
+	for (let i = 0; i < 3 && (await page.locator('[data-testid="bank-organizer"]').isVisible()); i++) await page.keyboard.press('Escape');
+}
+
 const structure = (s: SlotState) => ({ va: [s.va.modules, s.va.cables], fx: [s.fx.modules, s.fx.cables] });
 
 describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
@@ -88,7 +98,7 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 			await cliRun(page, ['clear-patch', 'patch', BANK, '3']);
 			await cliRun(page, ['reload-names']);
 
-			await menuAction(ctx, 'toggle-bank-organizer');
+			await openOrganizer(ctx);
 			const left = page.locator('[data-testid="bank-grid-left"]');
 			await left.locator('select').selectOption(BANK);
 			const cell = (loc: number) => left.locator(`[data-testid="bank-cell-${loc}"]`);
@@ -106,11 +116,67 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 			await until(async () => (await nameAt(3)) === 'OrgB');
 			expect(await chip.count()).toBe(1); // a copy: the storage item stays
 		} finally {
+			await closeOrganizer(page); // first: a failing clear below must not leave it covering the canvas
 			for (const loc of ['1', '2', '3']) await cliRun(page, ['clear-patch', 'patch', BANK, loc]);
 			// Remove what this test put in Temporary Storage, so its folder is left as it was.
 			const storageDir = path.join(await ctx.app.evaluate(({ app }) => app.getPath('userData')), 'bank-storage');
 			for (const f of fs.existsSync(storageDir) ? fs.readdirSync(storageDir) : []) if (f.startsWith('OrgB__')) fs.rmSync(path.join(storageDir, f));
-			await page.keyboard.press('Escape');
+		}
+	});
+
+	// Scratch bank 32 again: a selection of two is moved onto an occupied location and fills the
+	// free spots after it; a drop near the end that does not fit warns and changes nothing.
+	it('Bank Organizer: moves a multi-selection into free spots, warns when it does not fit', async () => {
+		const { ctx } = g!;
+		const page = ctx.page;
+		const BANK = '32';
+		const fixture = path.resolve(__dirname, '../../test-patches/EmptyPatch.pch2');
+		const used = [1, 2, 10, 11, 12, 127];
+		const nameAt = async (loc: number) => {
+			const r = JSON.parse(await cliRun(page, ['get-location', 'patch', BANK, String(loc), path.join(os.tmpdir(), 'g2-organizer-check.pch2')]));
+			return r.empty ? null : r.name;
+		};
+		const until = async (check: () => Promise<boolean>) => {
+			for (let i = 0; i < 60 && !(await check()); i++) await page.waitForTimeout(500);
+			expect(await check()).toBe(true);
+		};
+		try {
+			for (const loc of used) await cliRun(page, ['clear-patch', 'patch', BANK, String(loc)]);
+			await cliRun(page, ['put-location', 'patch', BANK, '1', fixture, 'OrgA']);
+			await cliRun(page, ['put-location', 'patch', BANK, '2', fixture, 'OrgB']);
+			await cliRun(page, ['put-location', 'patch', BANK, '10', fixture, 'OrgX']);
+			await cliRun(page, ['reload-names']);
+
+			await openOrganizer(ctx);
+			const left = page.locator('[data-testid="bank-grid-left"]');
+			await left.locator('select').selectOption(BANK);
+			const cell = (loc: number) => left.locator(`[data-testid="bank-cell-${loc}"]`);
+			await until(async () => (await cell(10).textContent())?.includes('OrgX') ?? false);
+
+			await cell(1).click();
+			await cell(2).click({ modifiers: ['ControlOrMeta'] });
+			await cell(1).dragTo(cell(10));
+			await until(async () => (await nameAt(11)) === 'OrgA' && (await nameAt(12)) === 'OrgB');
+			expect(await nameAt(10)).toBe('OrgX'); // occupied: skipped, not overwritten
+			expect(await nameAt(1)).toBeNull(); // moved
+			expect(await nameAt(2)).toBeNull();
+
+			// 11 and 12 onto 128: only 128 is free from there (127 is filled first).
+			await cliRun(page, ['put-location', 'patch', BANK, '127', fixture, 'OrgY']);
+			await cliRun(page, ['reload-names']);
+			await until(async () => (await cell(127).textContent())?.includes('OrgY') ?? false);
+			await cell(11).click();
+			await cell(12).click({ modifiers: ['ControlOrMeta'] });
+			await cell(11).dragTo(cell(128));
+			const dialog = page.getByRole('dialog');
+			await until(async () => (await dialog.count()) > 0 && ((await dialog.textContent()) ?? '').includes('Not enough room'));
+			await page.getByRole('button', { name: 'OK' }).click();
+			expect(await nameAt(11)).toBe('OrgA');
+			expect(await nameAt(12)).toBe('OrgB');
+			expect(await nameAt(128)).toBeNull();
+		} finally {
+			await closeOrganizer(page); // first: a failing clear below must not leave it covering the canvas
+			for (const loc of [...used, 128]) await cliRun(page, ['clear-patch', 'patch', BANK, String(loc)]);
 		}
 	});
 
