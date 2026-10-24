@@ -29,17 +29,15 @@ OBJ_FILES = $(SRC_FILES:$(SRC_DIR)/%.c=$(OBJ_DIR)/%.o)
 
 # Test source files
 TEST_SRC = $(wildcard $(TEST_DIR)/*.c)
-TEST_SRC := $(filter-out $(TEST_DIR)/run_tests.c, $(TEST_SRC))
-TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_unit.c, $(TEST_SRC))
-TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_integration.c, $(TEST_SRC))
-TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_integration_slow.c, $(TEST_SRC))
+# Runner mains (run_tests_*.c) and the hardware runners' shared helpers are linked per runner
+TEST_SRC := $(filter-out $(TEST_DIR)/run_tests_%.c $(TEST_DIR)/runner_common.c, $(TEST_SRC))
 # Exclude mocks directory
 TEST_SRC := $(filter-out $(TEST_DIR)/mocks/%, $(TEST_SRC))
 
 # Headers
 HEADERS = $(wildcard $(INCLUDE_DIR)/*.h)
 
-.PHONY: all clean depend info test test-unit test-integration test-integration-slow clean-tests
+.PHONY: all clean depend info test test-unit test-cli test-e2e test-e2e-slow clean-tests
 
 all: info $(BIN_DIR)/$(TARGET)
 
@@ -79,64 +77,37 @@ depend:
 -include .depend
 
 # Test rules
-test: test-unit test-integration
+# unit, then cli + e2e; without a G2 the hardware suites print NOT RUN and are skipped
+test: test-unit
+	@G2_ALLOW_NO_DEVICE=1 $(MAKE) --no-print-directory test-cli test-e2e
 
 test-unit: $(TEST_BUILD_DIR)/g2-unit-tests
-	@echo "Running unit tests..."
-	./$(TEST_BUILD_DIR)/g2-unit-tests
+	./$<
 
-# Needs a G2 on USB: with none detected the runner exits 1 ("NOT RUN") unless G2_ALLOW_NO_DEVICE=1 is set.
-test-integration: $(TEST_BUILD_DIR)/g2-integration-tests
-	@echo "Running integration tests..."
-	./$(TEST_BUILD_DIR)/g2-integration-tests
+# Hardware suites: with no G2 detected the runner exits 1 ("NOT RUN") unless G2_ALLOW_NO_DEVICE=1 is set.
+# CLI: one-shot commands and in-process g2_* calls, no daemon.
+test-cli: $(TEST_BUILD_DIR)/g2-cli-tests
+	./$<
 
-# Separate from test-integration: bank transfer tests scan whole hardware banks
-# (up to 128 round trips per bank touched) and can run well past 2 seconds - see
-# run_tests_integration_slow.c. Run this on its own when you want that coverage.
-test-integration-slow: $(TEST_BUILD_DIR)/g2-integration-tests-slow
-	@echo "Running slow integration tests (bank transfer)..."
-	./$(TEST_BUILD_DIR)/g2-integration-tests-slow
+# Daemon: shared-daemon and multi-daemon tests.
+test-e2e: $(TEST_BUILD_DIR)/g2-e2e-tests
+	./$<
 
-$(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
-	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_unit.c \
-		$(TEST_SRC) \
-		$(OBJ_DIR)/daemon.o \
-		$(OBJ_DIR)/g2_device.o \
-		$(OBJ_DIR)/g2_io.o \
-		$(OBJ_DIR)/g2_protocol.o \
-		$(OBJ_DIR)/g2_events.o \
-		$(OBJ_DIR)/utils.o \
-		$(OBJ_DIR)/cjson.o \
-		$(OBJ_DIR)/output.o \
-		$(LDFLAGS) -o $@
-	@echo "Built: $@"
+# Not part of `make test`: bank transfer tests scan whole hardware banks
+# (up to 128 round trips per bank touched) and run for minutes - see run_tests_e2e_slow.c.
+test-e2e-slow: $(TEST_BUILD_DIR)/g2-e2e-slow-tests
+	./$<
 
-$(TEST_BUILD_DIR)/g2-integration-tests: $(TEST_DIR)/run_tests_integration.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
-	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration.c \
-		$(TEST_SRC) \
-		$(OBJ_DIR)/daemon.o \
-		$(OBJ_DIR)/g2_device.o \
-		$(OBJ_DIR)/g2_io.o \
-		$(OBJ_DIR)/g2_protocol.o \
-		$(OBJ_DIR)/g2_events.o \
-		$(OBJ_DIR)/utils.o \
-		$(OBJ_DIR)/cjson.o \
-		$(OBJ_DIR)/output.o \
-		$(LDFLAGS) -o $@
-	@echo "Built: $@"
+TEST_LINK_OBJS = $(filter-out $(OBJ_DIR)/main.o, $(OBJ_FILES))
+HW_RUNNER_SRC = $(TEST_DIR)/runner_common.c
 
-$(TEST_BUILD_DIR)/g2-integration-tests-slow: $(TEST_DIR)/run_tests_integration_slow.c $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
-	$(CC) $(CFLAGS) $(TEST_DIR)/run_tests_integration_slow.c \
-		$(TEST_SRC) \
-		$(OBJ_DIR)/daemon.o \
-		$(OBJ_DIR)/g2_device.o \
-		$(OBJ_DIR)/g2_io.o \
-		$(OBJ_DIR)/g2_protocol.o \
-		$(OBJ_DIR)/g2_events.o \
-		$(OBJ_DIR)/utils.o \
-		$(OBJ_DIR)/cjson.o \
-		$(OBJ_DIR)/output.o \
-		$(LDFLAGS) -o $@
+$(TEST_BUILD_DIR)/g2-unit-tests: $(TEST_DIR)/run_tests_unit.c
+$(TEST_BUILD_DIR)/g2-cli-tests: $(TEST_DIR)/run_tests_cli.c $(HW_RUNNER_SRC)
+$(TEST_BUILD_DIR)/g2-e2e-tests: $(TEST_DIR)/run_tests_e2e.c $(HW_RUNNER_SRC)
+$(TEST_BUILD_DIR)/g2-e2e-slow-tests: $(TEST_DIR)/run_tests_e2e_slow.c $(HW_RUNNER_SRC)
+
+$(TEST_BUILD_DIR)/g2-%-tests: $(TEST_SRC) $(OBJ_FILES) | $(TEST_BUILD_DIR)
+	$(CC) $(CFLAGS) $(filter %.c, $^) $(TEST_LINK_OBJS) $(LDFLAGS) -o $@
 	@echo "Built: $@"
 
 $(TEST_BUILD_DIR):

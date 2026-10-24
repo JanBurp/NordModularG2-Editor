@@ -56,4 +56,8 @@ int send_and_expect_ok_save_event(daemon_ctx_t *d, const char *json,
 /* Poll (get-patch A) until the G2 answers again after an upload/edit; 0 = ready, -1 = gave up. */
 int daemon_wait_ready(daemon_ctx_t *d);
 
+/* Run `build/bin/g2-cli --json <args>` (one-shot, via the shell: quote args yourself) and parse its
+ * stdout. NULL if it printed no JSON. Caller cJSON_Delete()s the result. */
+cJSON *run_oneshot(const char *args);
+
 #endif

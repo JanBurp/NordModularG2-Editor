@@ -14,7 +14,7 @@ import { Runner } from './lib/runner';
 import { powerCycle, shellyPreflight } from './lib/shelly';
 
 /*
- * Options (environment variables):
+ * Options (environment variables; `npm run test:duration -- --help` lists the matching flags):
  *   DURATION_HOURS     run length (default 4)
  *   ACTION_INTERVAL_S  mean pause between actions, jittered 0.5-1.5x (default 6)
  *   BURST_P            chance per step of a burst of fast actions (default 1/6)

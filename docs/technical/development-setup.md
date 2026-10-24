@@ -21,9 +21,11 @@ nav_order: 1
 ```bash
 cd cli
 make                    # build
-make test               # run all tests
+make test               # unit + cli + e2e (hardware suites are skipped without a G2)
 make test-unit          # unit tests (no G2 needed)
-make test-integration   # integration tests (needs connected G2)
+make test-cli           # one-shot CLI tests (needs connected G2)
+make test-e2e           # daemon tests (needs connected G2)
+make test-e2e-slow      # bank-transfer daemon tests, takes minutes (needs connected G2)
 ```
 
 ## Building the Electron App
@@ -35,10 +37,12 @@ cd ../cli && make && cd ../g2-editor   # rebuild CLI first
 npm run postinstall                     # copies CLI binary into app resources
 npm run dev                             # development server
 npm run build                           # production build + package
-npm test                                # Vitest unit tests
+npm test                                # unit + e2e + g2 (g2 is skipped without a G2)
+npm run test:unit                       # Vitest unit tests
 npm run typecheck                       # vue-tsc type check
-npm run test:e2e:headless               # Playwright E2E tests (builds first)
+npm run test:e2e                        # Playwright E2E tests, headless (builds first)
 npm run test:g2                         # hardware suite (test-g2/): needs a connected G2, drives the CLI and the real editor
+npm run test:duration -- --hours 1      # hours-long hardware duration test; --help lists all options
 ```
 
 ## Development Environment

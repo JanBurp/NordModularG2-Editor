@@ -5,7 +5,7 @@
  * Note: Tests run sequentially with delay between each.
  *       Only 3-4 tests to stay within G2 hardware timing limits (~10 commands).
  *
- * Usage: make test-integration
+ * Usage: make test-cli
  */
 
 #include "unity.h"

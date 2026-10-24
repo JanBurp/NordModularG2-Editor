@@ -468,6 +468,8 @@ ipcMain.on("cli:watch-stop", (event) => {
 // --- Device discovery / multi-window management ---
 
 async function listAttachedDevices(): Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]> {
+	// Set by e2e specs so neither startup nor the renderer ever binds to real attached hardware.
+	if (process.env.G2_HIDE_DEVICES === '1') return [];
 	const out = await runCliOneShot(["--json", "list-devices"]);
 	const parsed = JSON.parse(out);
 	const all: any[] = parsed.all ?? [];
@@ -795,6 +797,8 @@ ipcMain.handle("app:info", () => ({
 }));
 
 ipcMain.handle("app:latestVersion", async (): Promise<string | null> => {
+	// Tests never reach GitHub.
+	if (process.env.NODE_ENV === "test") return null;
 	try {
 		const res = await fetch("https://api.github.com/repos/JanBurp/NordModularG2-Editor/releases/latest", { signal: AbortSignal.timeout(5000) });
 		if (!res.ok) return null;
@@ -1255,9 +1259,7 @@ app.whenReady().then(async () => {
 	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
 	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
 	// hardware-agnostic window — see isOffline in preload.ts).
-	// G2_SKIP_STARTUP_SCAN: set by e2e specs so startup never binds to real attached hardware.
-	const skipScan = process.env.VITE_DEV_OFFLINE === 'true' || process.env.G2_SKIP_STARTUP_SCAN === '1';
-	const devices = skipScan ? [] : await listAttachedDevices().catch(() => []);
+	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
 	if (unclaimed.length === 0) {
 		createAppWindow();

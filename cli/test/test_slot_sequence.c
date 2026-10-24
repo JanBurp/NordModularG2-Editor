@@ -3,7 +3,7 @@
  * Reproduces the "G2 becomes unresponsive after repeated slot/variation switches" failure.
  * NO delays between operations — timing must be tight to expose the stale-FIFO bug.
  *
- * Usage: make test-integration
+ * Usage: make test-cli
  */
 
 #include "unity.h"

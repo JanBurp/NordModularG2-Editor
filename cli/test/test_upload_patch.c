@@ -3,7 +3,7 @@
  * Tests load each file from test-patches/, upload to slot A,
  * then download back and compare section structure.
  *
- * Usage: make test-integration
+ * Usage: make test-cli
  */
 
 #include "unity.h"

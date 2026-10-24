@@ -27,6 +27,17 @@ export const g2Mode = async (): Promise<Mode> => (await runCli(['startup'], ONE_
 
 export const setMode = (mode: Mode) => runCli(['set-perf-mode', mode.toLowerCase()], ONE_SHOT_TIMEOUT_MS);
 
+const BACKUP_PATH = path.join(os.tmpdir(), 'g2-vitest-backup.prf2');
+
+/** Saves the G2's edit buffer (all four slots) as a performance, one-shot; returns its name. */
+export const backupPerf = async (): Promise<string> => (await runCli(['get-perf-file', BACKUP_PATH], ONE_SHOT_TIMEOUT_MS)).name;
+
+/** Uploads what backupPerf saved. upload-perf names the performance after the file, so the name is set again. */
+export async function restorePerf(name: string): Promise<void> {
+	await runCli(['upload-perf', BACKUP_PATH], ONE_SHOT_TIMEOUT_MS);
+	await runCli(['set-perf-name', name], ONE_SHOT_TIMEOUT_MS);
+}
+
 export const action = (name: string): ActionDef => {
 	const a = ACTIONS.find((x) => x.name === name);
 	if (!a) throw new Error(`no action ${name}`);

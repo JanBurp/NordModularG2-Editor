@@ -818,24 +818,217 @@ void test_daemon_perf_mode_cycle(void) {
     daemon_shutdown(&g_daemon);
 }
 
-/* Runs a one-shot `g2-cli --json <args>` and returns its parsed stdout (caller deletes), or NULL. */
-static cJSON *run_oneshot(const char *args) {
-    char cmd[128];
-    snprintf(cmd, sizeof(cmd), "build/bin/g2-cli --json %s 2>/dev/null", args);
-    FILE *f = popen(cmd, "r");
-    if (!f) return NULL;
-    size_t cap = 1 << 16, len = 0;
-    char *buf = malloc(cap);
-    for (size_t n; buf && (n = fread(buf + len, 1, cap - len - 1, f)) > 0; ) {
-        len += n;
-        if (len + 1 == cap) buf = realloc(buf, cap *= 2);
+/* Sends {"cmd":name,"args":[args]} on the shared daemon (args = JSON array body); 0 = ok. */
+static int daemon_cmd(const char *name, const char *args) {
+    char cmd[512];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[%s]}", id, name, args);
+    return send_and_expect_ok(&g_daemon, cmd, id);
+}
+
+/* Field `key` ("data" = section bytes as hex, "name", ...) of get-patch A; malloc'd, or NULL. */
+static char *slot_a_field(const char *key) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *v = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), key);
+    char *s = cJSON_IsString(v) ? strdup(v->valuestring) : NULL;
+    cJSON_Delete(resp);
+    return s;
+}
+
+/* All sections with id `sec` of a get-patch hex string, concatenated as hex (malloc'd), or NULL. */
+static char *sections_hex(const char *hex, int sec) {
+    uint8_t *b = NULL;
+    int len = hex ? hex_to_bytes(hex, &b) : -1;
+    char *out = len > 0 ? calloc((size_t)len * 2 + 1, 1) : NULL;
+    for (int o = 0, w = 0; out && o + 3 <= len; ) {
+        int n = (b[o + 1] << 8) | b[o + 2];
+        if (b[o] == sec && o + 3 + n <= len)
+            for (int i = 0; i < 3 + n; i++, w += 2) snprintf(out + w, 3, "%02x", b[o + i]);
+        o += 3 + n;
     }
-    pclose(f);
-    if (!buf) return NULL;
-    buf[len] = '\0';
-    cJSON *json = cJSON_Parse(buf);
-    free(buf);
-    return json;
+    free(b);
+    return out;
+}
+
+/* Sends one edit and reports whether slot A's section(s) `sec` changed: 1 = changed, 0 = same,
+ * -1 = not ok. Only the edited section is compared: the G2 leaves stale bits in the padding of
+ * bit-packed sections (last byte, 0x5a's location byte), which differ between two reads of an
+ * unchanged patch (seen 2026-10-24), so whole-patch byte compares are not meaningful. */
+static int edit_changes_section(const char *name, const char *args, int sec) {
+    char *before = slot_a_field("data");
+    int r = daemon_cmd(name, args);
+    char *after = slot_a_field("data");
+    char *sb = sections_hex(before, sec), *sa = sections_hex(after, sec);
+    int changed = sb && sa && strcmp(sb, sa) != 0;
+    free(before); free(after); free(sb); free(sa);
+    return r != 0 ? -1 : changed;
+}
+
+/* Hex length of slot A's MIDI controller section (0x60): grows by one 3-byte entry per assigned CC. */
+static int controllers_len(void) {
+    char *hex = slot_a_field("data");
+    char *sec = sections_hex(hex, 0x60);
+    int n = sec ? (int)strlen(sec) : -1;
+    free(hex);
+    free(sec);
+    return n;
+}
+
+/* Test: patch edits that had no hardware test change slot A's patch as read back by get-patch (ok alone
+ * only means the G2 did not NACK). Uses the DXBass FM4 fixture, whose VA module 1 has param 0; restores
+ * slot A afterwards. */
+void test_daemon_patch_edits_read_back(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    uint8_t *saved_buf = NULL;
+    size_t saved_len = 0;
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, capture_slot_a_patch(&g_daemon, &saved_buf, &saved_len),
+                                  "setup: capture slot A before overwrite");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, upload_fixture_to_slot_a(&g_daemon), "setup: upload fixture to slot A");
+    daemon_wait_ready(&g_daemon);
+
+    int name_r = daemon_cmd("set-module-name", "\"A\",\"va\",\"1\",\"CliTst\"");
+    char *hex = slot_a_field("data");
+    char *names = sections_hex(hex, 0x5a);
+    int name_ok = name_r == 0 && names && strstr(names, "436c6954737400") != NULL; /* "CliTst\0" */
+    free(hex);
+    free(names);
+
+    int move_r     = edit_changes_section("move-module", "\"A\",\"va\",\"1\",\"3\",\"50\"", 0x4a);
+    int morph_r    = edit_changes_section("set-morph-range", "\"A\",\"va\",\"1\",\"0\",\"77\",\"0\",\"0\"", 0x65);
+    int morph_b_r  = edit_changes_section("set-morph-range-batch", "\"A\",\"va\",\"1\",\"0\",\"-50\",\"0\",\"0\"", 0x65);
+    int param_r    = edit_changes_section("set-param", "\"A\",\"va\",\"1\",\"0\",\"13\",\"0\"", 0x4d);
+    int copy_var_r = edit_changes_section("copy-variation", "\"A\",\"0\",\"7\"", 0x4d);
+    /* uprate: set both states rather than guess the fixture's current one; at least one must change 0x4a */
+    int up1 = edit_changes_section("set-module-uprate", "\"A\",\"va\",\"1\",\"1\"", 0x4a);
+    int up0 = edit_changes_section("set-module-uprate", "\"A\",\"va\",\"1\",\"0\"", 0x4a);
+    int uprate_ok = up1 >= 0 && up0 >= 0 && (up1 || up0);
+
+    /* MIDI CC 100 on module 1 param 0 adds one controller entry; deassigning removes it again */
+    int cc_before = controllers_len();
+    int cc_r = daemon_cmd("assign-midicc", "\"A\",\"va\",\"1\",\"0\",\"100\"");
+    int cc_assigned = controllers_len();
+    int uncc_r = daemon_cmd("deassign-midicc", "\"A\",\"100\"");
+    int cc_after = controllers_len();
+
+    int pname_r = daemon_cmd("set-patch-name", "\"A\",\"CliPatch\"");
+    char *pname = slot_a_field("name");
+    int pname_ok = pname_r == 0 && pname && strcmp(pname, "CliPatch") == 0;
+    free(pname);
+
+    int restore_r = restore_slot_a_patch(&g_daemon, saved_buf, saved_len);
+    free(saved_buf);
+    daemon_wait_ready(&g_daemon);
+
+    TEST_ASSERT_TRUE_MESSAGE(name_ok, "set-module-name must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, move_r, "move-module must change the module list");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, morph_r, "set-morph-range must change the morph parameters");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, morph_b_r, "set-morph-range-batch must change the morph parameters");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, param_r, "set-param must change the parameters");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(1, copy_var_r, "copy-variation must change the parameters");
+    TEST_ASSERT_TRUE_MESSAGE(uprate_ok, "set-module-uprate must change the module list");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, cc_r, "assign-midicc must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(cc_before + 6, cc_assigned, "assign-midicc must add one controller entry");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, uncc_r, "deassign-midicc must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(cc_before, cc_after, "deassign-midicc must remove the entry again");
+    TEST_ASSERT_TRUE_MESSAGE(pname_ok, "set-patch-name must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
+}
+
+/* get-perf-settings' "data" (caller deletes), or NULL. */
+static cJSON *perf_settings(void) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *data = resp ? cJSON_DetachItemFromObject(resp, "data") : NULL;
+    cJSON_Delete(resp);
+    return data;
+}
+
+static int perf_int(cJSON *ps, int slot, const char *key, const char *sub) {
+    cJSON *o = slot < 0 ? cJSON_GetObjectItem(ps, "performance") : cJSON_GetArrayItem(cJSON_GetObjectItem(ps, "slots"), slot);
+    cJSON *v = cJSON_GetObjectItem(o, key);
+    if (sub) v = cJSON_GetObjectItem(v, sub);
+    return cJSON_IsBool(v) ? cJSON_IsTrue(v) : cJSON_IsNumber(v) ? v->valueint : -1;
+}
+
+/* Test: slot hold, keyboard range and master clock BPM read back via get-perf-settings, then restored. */
+void test_daemon_perf_edits_read_back(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    cJSON *orig = perf_settings();
+    TEST_ASSERT_NOT_NULL_MESSAGE(orig, "setup: get-perf-settings");
+    int hold = perf_int(orig, 0, "hold", NULL);
+    int lower = perf_int(orig, 0, "range", "lower"), upper = perf_int(orig, 0, "range", "upper");
+    int bpm = perf_int(orig, -1, "bpm", NULL);
+    cJSON_Delete(orig);
+    int new_bpm = bpm == 133 ? 134 : 133;
+
+    char args[64];
+    snprintf(args, sizeof(args), "\"A\",\"%d\"", !hold);
+    int r_hold = daemon_cmd("set-slot-hold", args);
+    int r_range = daemon_cmd("set-slot-range", "\"A\",\"10\",\"100\"");
+    snprintf(args, sizeof(args), "\"%d\"", new_bpm);
+    int r_bpm = daemon_cmd("set-master-clock-bpm", args);
+
+    cJSON *got = perf_settings();
+    int got_hold = perf_int(got, 0, "hold", NULL);
+    int got_lower = perf_int(got, 0, "range", "lower"), got_upper = perf_int(got, 0, "range", "upper");
+    int got_bpm = perf_int(got, -1, "bpm", NULL);
+    cJSON_Delete(got);
+
+    snprintf(args, sizeof(args), "\"A\",\"%d\"", hold);
+    int restore = daemon_cmd("set-slot-hold", args);
+    snprintf(args, sizeof(args), "\"A\",\"%d\",\"%d\"", lower, upper);
+    restore |= daemon_cmd("set-slot-range", args);
+    snprintf(args, sizeof(args), "\"%d\"", bpm);
+    restore |= daemon_cmd("set-master-clock-bpm", args);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_hold, "set-slot-hold must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_range, "set-slot-range must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_bpm, "set-master-clock-bpm must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(!hold, got_hold, "slot A hold must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(10, got_lower, "slot A range lower must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(100, got_upper, "slot A range upper must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(new_bpm, got_bpm, "BPM must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore, "teardown: restore hold, range and BPM");
+}
+
+/* get-param-page A, then the slot-tagged param_page_change reply; page byte or -1. */
+static int read_param_page(void) {
+    cJSON *ev = NULL;
+    int id = g_cmd_id++;
+    char cmd[80];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-param-page\",\"args\":[\"A\"]}", id);
+    if (send_and_expect_ok_save_event(&g_daemon, cmd, id, "param_page_change", &ev) != 0) return -1;
+    if (!ev) ev = read_event_of_type(&g_daemon, "param_page_change", 3, 1);
+    cJSON *page = cJSON_GetObjectItem(ev, "page");
+    int p = cJSON_IsNumber(page) ? page->valueint : -1;
+    cJSON_Delete(ev);
+    return p;
+}
+
+/* Test: select-param-page reads back via get-param-page (page = page*3 + bank, 0..14); restored. */
+void test_daemon_select_param_page_read_back(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+
+    int orig = read_param_page();
+    TEST_ASSERT_TRUE_MESSAGE(orig >= 0, "setup: get-param-page A");
+    int want = orig == 7 ? 8 : 7;
+    char args[32];
+    snprintf(args, sizeof(args), "\"A\",\"%d\"", want);
+    int r = daemon_cmd("select-param-page", args);
+    int got = read_param_page();
+    snprintf(args, sizeof(args), "\"A\",\"%d\"", orig);
+    int restore = daemon_cmd("select-param-page", args);
+
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r, "select-param-page must answer ok");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(want, got, "the selected page must read back");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore, "teardown: restore the param page");
 }
 
 /* 1 if every bank of `group` ("patches"/"performances") lists each location once. */

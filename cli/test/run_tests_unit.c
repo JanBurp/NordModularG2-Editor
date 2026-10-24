@@ -208,18 +208,33 @@ extern void test_g2_set_target_updates_globals(void);
 extern void test_g2_set_target_by_index_out_of_range(void);
 extern void test_g2_connect_target_set_not_found_is_distinguishable(void);
 
-/* Daemon is tested via integration tests (test_daemon.c), not unit tests */
-// extern void test_daemon_parse_valid_json(void);
-// extern void test_daemon_parse_bad_json(void);
-// extern void test_daemon_parse_null_input(void);
-// extern void test_daemon_parse_missing_cmd(void);
-// extern void test_daemon_parse_missing_id(void);
-// extern void test_daemon_make_ok_with_id(void);
-// extern void test_daemon_make_ok_without_id(void);
-// extern void test_daemon_make_error_with_id(void);
-// extern void test_daemon_make_error_without_id(void);
-// extern void test_daemon_queue_empty(void);
-// extern void test_daemon_queue_enqueue_dequeue(void);
+/* payload builders */
+extern void test_build_del_cable_payload(void);
+extern void test_build_del_cable_swaps_input_first(void);
+extern void test_build_add_cable_payload(void);
+extern void test_build_add_cable_in_to_in_keeps_order(void);
+extern void test_build_del_module_payload(void);
+extern void test_build_move_module_payload(void);
+extern void test_build_set_module_color_payload(void);
+extern void test_build_set_mutation_lock_payload(void);
+extern void test_build_set_module_label_payload(void);
+extern void test_build_set_module_label_truncates_at_16(void);
+extern void test_build_set_module_label_empty(void);
+extern void test_build_deassign_knob_payload(void);
+extern void test_build_deassign_global_knob_payload(void);
+
+/* daemon JSON helpers, utils parsers */
+extern void test_daemon_parse_valid_json(void);
+extern void test_daemon_parse_bad_json(void);
+extern void test_daemon_parse_null_input(void);
+extern void test_daemon_make_ok_with_id(void);
+extern void test_daemon_make_ok_without_id(void);
+extern void test_daemon_make_error_with_id(void);
+extern void test_daemon_make_error_without_id(void);
+extern void test_parse_location_str(void);
+extern void test_base64_roundtrip(void);
+extern void test_base64_known_value(void);
+extern void test_base64_decode_rejects_bad_input(void);
 
 int main(void) {
     UNITY_BEGIN();
@@ -433,19 +448,33 @@ int main(void) {
     RUN_TEST(test_g2_set_target_by_index_out_of_range);
     RUN_TEST(test_g2_connect_target_set_not_found_is_distinguishable);
 
-    /* daemon JSON/queue tests — commented out, tested via integration tests instead
+    /* payload builders */
+    RUN_TEST(test_build_del_cable_payload);
+    RUN_TEST(test_build_del_cable_swaps_input_first);
+    RUN_TEST(test_build_add_cable_payload);
+    RUN_TEST(test_build_add_cable_in_to_in_keeps_order);
+    RUN_TEST(test_build_del_module_payload);
+    RUN_TEST(test_build_move_module_payload);
+    RUN_TEST(test_build_set_module_color_payload);
+    RUN_TEST(test_build_set_mutation_lock_payload);
+    RUN_TEST(test_build_set_module_label_payload);
+    RUN_TEST(test_build_set_module_label_truncates_at_16);
+    RUN_TEST(test_build_set_module_label_empty);
+    RUN_TEST(test_build_deassign_knob_payload);
+    RUN_TEST(test_build_deassign_global_knob_payload);
+
+    /* daemon JSON helpers, utils parsers */
     RUN_TEST(test_daemon_parse_valid_json);
     RUN_TEST(test_daemon_parse_bad_json);
     RUN_TEST(test_daemon_parse_null_input);
-    RUN_TEST(test_daemon_parse_missing_cmd);
-    RUN_TEST(test_daemon_parse_missing_id);
     RUN_TEST(test_daemon_make_ok_with_id);
     RUN_TEST(test_daemon_make_ok_without_id);
     RUN_TEST(test_daemon_make_error_with_id);
     RUN_TEST(test_daemon_make_error_without_id);
-    RUN_TEST(test_daemon_queue_empty);
-    RUN_TEST(test_daemon_queue_enqueue_dequeue);
-    */
+    RUN_TEST(test_parse_location_str);
+    RUN_TEST(test_base64_roundtrip);
+    RUN_TEST(test_base64_known_value);
+    RUN_TEST(test_base64_decode_rejects_bad_input);
 
     return UNITY_END();
 }

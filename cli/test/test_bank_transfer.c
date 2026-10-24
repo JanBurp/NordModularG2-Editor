@@ -1,11 +1,11 @@
 /*
  * Integration tests for get-bank / send-bank (Bank Upload / Bank Download).
  *
- * These are deliberately NOT part of test-integration: every get-bank/send-bank
+ * These are deliberately NOT part of test-e2e: every get-bank/send-bank
  * call walks all 128 locations of a bank with one request/response round trip
  * each (there is no cheaper "give me a summary" command - see g2_get_bank's own
  * comment), so even a single call is much louder than anything else this CLI
- * does. Run via make test-integration-slow.
+ * does. Run via make test-e2e-slow.
  *
  * Bank numbers are fixed config below instead of scanned for, so the traffic
  * cost per run is fixed and known: 1 bank operation for the fetch test, 5 for
@@ -53,7 +53,7 @@
 #define PERF_FETCH_TEST_BANK  1 /* known-existing performance bank, 2026-09-21 */
 #define PERF_WRITE_TEST_BANK  8 /* scratch bank: overwritten and cleared by the test */
 
-/* Injected by run_tests_integration_slow.c's main() via test_bank_transfer_set_daemon,
+/* Injected by run_tests_e2e_slow.c's main() via test_bank_transfer_set_daemon,
  * which owns spawn/shutdown (see that file for why: it has early-return points on
  * mid-run disconnect, so the daemon lifecycle can't be tied to a single Unity test
  * the way test_daemon.c's test_daemon_starts/test_daemon_perf_mode_cycle do it). */
