@@ -17,6 +17,32 @@ test.describe('Bank Organizer – offline', () => {
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
 	});
 
+	test('hides the patch toolbars and has its own Undo/Redo; boxes show their full name on hover', async ({ page, sendMenuAction }) => {
+		const organizer = page.locator('[data-testid="bank-organizer"]');
+		await expect(page.getByRole('button', { name: 'Init 1' })).toBeHidden();
+		await expect(organizer.locator('button[title^="Undo"]')).toBeVisible();
+		await expect(page.locator('[data-testid="storage-item"]', { hasText: 'Lead Saw' })).toHaveAttribute('title', 'Lead Saw');
+
+		await sendMenuAction('toggle-bank-organizer');
+		await expect(page.getByRole('button', { name: 'Init 1' })).toBeVisible();
+	});
+
+	test('the link button makes both columns use the same sort', async ({ page }) => {
+		const sortBtn = (side: string, name: string) => page.getByTestId(`bank-grid-${side}`).getByRole('button', { name, exact: true });
+		await sortBtn('left', 'A–Z').click();
+		await expect(sortBtn('right', 'Loc')).toHaveClass(/btn-active/);
+
+		// Linking takes the sort of the side it is clicked on; then either side sets both.
+		await page.getByTestId('sort-link-left').click();
+		await expect(sortBtn('right', 'A–Z')).toHaveClass(/btn-active/);
+		await sortBtn('right', 'Cat').click();
+		await expect(sortBtn('left', 'Cat')).toHaveClass(/btn-active/);
+
+		await page.getByTestId('sort-link-right').click();
+		await sortBtn('right', 'Loc').click();
+		await expect(sortBtn('left', 'Cat')).toHaveClass(/btn-active/);
+	});
+
 	test('Escape in the delete dialog closes only the dialog, not the organizer', async ({ page }) => {
 		await page.locator('[data-testid="storage-item"]').first().dragTo(page.locator('[data-testid="organizer-trash"]'));
 		const dialog = page.getByRole('dialog');

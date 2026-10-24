@@ -4,13 +4,18 @@
 			<span class="text-xs text-content-secondary">Bank</span>
 			<Select :model-value="bank" :options="bankOptions" title="Bank" @update:model-value="(v) => emit('update:bank', Number(v))" />
 			<span v-if="sameBank" class="text-xs text-content-muted">(also shown on the other side)</span>
-			<BtnGroup
-				class="ml-auto"
-				:model-value="sort"
-				:options="sortOptions"
+			<Button
 				variant="toggle"
-				@update:model-value="(v) => emit('update:sort', v as PatchSortMode)"
-			/>
+				class="ml-auto w-6 px-0!"
+				:active="sortLinked"
+				title="Same sort for both columns"
+				hint="organizerSortLink"
+				:data-testid="`sort-link-${side}`"
+				@click="emit('update:sortLinked', !sortLinked)"
+			>
+				<Icon name="link" class="w-3.5 h-3.5" />
+			</Button>
+			<BtnGroup :model-value="sort" :options="sortOptions" variant="toggle" @update:model-value="(v) => emit('update:sort', v as PatchSortMode)" />
 		</div>
 		<div class="grid grid-cols-8 auto-rows-fr flex-1 min-h-0 overflow-y-auto">
 			<div
@@ -18,7 +23,7 @@
 				:key="cell.location"
 				class="flex items-center gap-1 px-1 min-w-0 text-xs select-none border-r border-b border-line-subtle/60 nth-[8n]:border-r-0"
 				:class="[
-					cell.patch ? 'bg-surface-2' : '',
+					cell.patch ? 'bg-surface-cell cursor-grab active:cursor-grabbing' : '',
 					{
 						'animate-pulse': isBusy(cell.location),
 						'outline-2 outline-input -outline-offset-2': dropTarget === cell.location,
@@ -51,6 +56,8 @@
 	import { computed, onUnmounted, ref } from 'vue';
 	import Select from '../common/Select.vue';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
+	import Button from '../toolbar/Button.vue';
+	import Icon from '../common/Icon.vue';
 	import { useBrowserStore, type BankKind, type BankLoc, type SynthPatch } from '@/store/browser';
 	import { sortPatches, type PatchSortMode } from '@/utils/sortPatches';
 	import { categoryTint } from './categoryTint';
@@ -65,12 +72,14 @@
 		kind: BankKind;
 		bank: number;
 		sort: PatchSortMode;
+		sortLinked: boolean;
 		sameBank: boolean;
 	}>();
 
 	const emit = defineEmits<{
 		'update:bank': [bank: number];
 		'update:sort': [sort: PatchSortMode];
+		'update:sortLinked': [linked: boolean];
 	}>();
 
 	const browser = useBrowserStore();

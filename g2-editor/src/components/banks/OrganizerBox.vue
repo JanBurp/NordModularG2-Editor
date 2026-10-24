@@ -6,15 +6,19 @@
 				? 'border-dashed border-red-500/60 text-red-500 items-center'
 				: empty
 					? 'border-dashed border-line-subtle'
-					: 'border-line-default bg-surface-2',
+					: focused
+						? 'border-line-default bg-input-dimmed'
+						: 'border-line-default bg-surface-cell',
 			{
-				'opacity-40': dimmed,
+				'opacity-40 cursor-not-allowed': dimmed,
+				'cursor-grab active:cursor-grabbing': $attrs.draggable === true || $attrs.draggable === 'true',
 				'outline-2 outline-input -outline-offset-2': highlighted,
 				'ring-2 ring-inset ring-input': selected,
 				'outline-1 outline-dashed outline-input -outline-offset-2': cursor && !highlighted,
 			},
 		]"
 		:style="tint ? { backgroundColor: tint } : undefined"
+		:title="empty || danger ? undefined : name"
 	>
 		<span class="truncate text-content-muted">{{ label }}</span>
 		<span class="truncate" :class="danger ? '' : empty ? 'text-content-muted' : 'text-content-primary'">{{ name }}</span>
@@ -30,6 +34,7 @@
 		empty?: boolean;
 		danger?: boolean; // the Trash drop target
 		dimmed?: boolean;
+		focused?: boolean; // the slot in focus
 		highlighted?: boolean;
 		selected?: boolean;
 		cursor?: boolean; // arrow-key position

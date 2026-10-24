@@ -1,7 +1,13 @@
 <template>
 	<div class="flex flex-col flex-1 min-h-0 bg-surface-1" data-testid="bank-organizer">
-		<!-- Slots left · Patches/Performances centred · Trash and close right -->
+		<!-- Undo/Redo and Patches/Performances left · Slots centred · Trash and close right -->
 		<div class="relative flex items-end gap-3 px-3 py-2 border-b border-line-subtle text-xs text-content-primary">
+			<!-- h-10: centred on the slot boxes, not on the whole row -->
+			<div class="flex-1 flex items-center gap-3 h-10">
+				<UndoRedo />
+				<BtnGroup :model-value="uiStore.organizerKind" :options="kindOptions" variant="toggle" @update:model-value="(v) => setKind(v as BankKind)" />
+			</div>
+
 			<div class="flex flex-col gap-1.5 shrink-0">
 				<!-- bracket from the centre of the first box to the centre of the last (half a box = 56 px) -->
 				<BracketLabel title="Slots" class="px-14" />
@@ -12,6 +18,7 @@
 						:label="slot === 4 ? 'Perf' : SLOT_LABELS[slot]"
 						:name="org.slotName(slot) || '—'"
 						:dimmed="!slotEnabled(slot)"
+						:focused="slotFocused(slot)"
 						:highlighted="dropSlot === slot"
 						:draggable="slotDraggable(slot)"
 						:data-testid="`organizer-slot-${slot}`"
@@ -27,10 +34,6 @@
 				</div>
 			</div>
 
-			<div class="flex-1 flex justify-center self-center">
-				<BtnGroup :model-value="uiStore.organizerKind" :options="kindOptions" variant="toggle" @update:model-value="(v) => setKind(v as BankKind)" />
-			</div>
-
 			<!-- close pinned to the top-right corner; Trash under it, in line with the slot boxes -->
 			<Button
 				variant="default"
@@ -43,20 +46,22 @@
 				<Icon name="close" class="w-2.5 h-2.5" />
 			</Button>
 			<!-- Trash: drop a location or storage item (or the selection it belongs to) here; asks for confirmation -->
-			<OrganizerBox
-				label=""
-				name=""
-				danger
-				:highlighted="dropTrash"
-				data-testid="organizer-trash"
-				@dragover="onTrashDragOver"
-				@dragleave="dropTrash = false"
-				@drop.prevent="onTrashDrop"
-				@mouseenter="showHint('organizerTrash')"
-				@mouseleave="clearHint()"
-			>
-				<span class="flex items-center gap-1.5"><Icon name="trash" class="w-3.5 h-3.5" />Trash</span>
-			</OrganizerBox>
+			<div class="flex-1 flex justify-end">
+				<OrganizerBox
+					label=""
+					name=""
+					danger
+					:highlighted="dropTrash"
+					data-testid="organizer-trash"
+					@dragover="onTrashDragOver"
+					@dragleave="dropTrash = false"
+					@drop.prevent="onTrashDrop"
+					@mouseenter="showHint('organizerTrash')"
+					@mouseleave="clearHint()"
+				>
+					<span class="flex items-center gap-1.5"><Icon name="trash" class="w-3.5 h-3.5" />Trash</span>
+				</OrganizerBox>
+			</div>
 		</div>
 
 		<!-- Temporary Storage: full width, one row of places; a new row appears once all are used. -->
@@ -101,9 +106,11 @@
 				:kind="uiStore.organizerKind"
 				:bank="uiStore.organizerBanks[i]"
 				:sort="settings.organizerSortModes[i]"
+				:sort-linked="settings.organizerSortLinked"
 				:same-bank="uiStore.organizerBanks[0] === uiStore.organizerBanks[1]"
 				@update:bank="(b) => (uiStore.organizerBanks[i] = b)"
-				@update:sort="(s) => (settings.organizerSortModes[i] = s)"
+				@update:sort="(s) => setSort(i, s)"
+				@update:sort-linked="(linked) => linkSort(i, linked)"
 			/>
 		</div>
 
@@ -139,6 +146,7 @@
 	import BankGrid from './BankGrid.vue';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import Button from '../toolbar/Button.vue';
+	import UndoRedo from '../toolbar/UndoRedo.vue';
 	import Icon from '../common/Icon.vue';
 	import OrganizerBox from './OrganizerBox.vue';
 	import BracketLabel from '../panels/BracketLabel.vue';
@@ -154,6 +162,7 @@
 	import { asStorage, clickMode, useOrganizer } from './useOrganizer';
 	import { getCategoryNameFromSlug } from '@/constants/categories';
 	import { categoryTint } from './categoryTint';
+	import type { PatchSortMode } from '@/utils/sortPatches';
 	import type { ContextMenuItem } from '@/types';
 	import { useOrganizerHistoryStore } from '@/store/organizerHistory';
 	import { MOD } from '@/constants/statusHints';
@@ -257,8 +266,20 @@
 		if (kind === 'performance') uiStore.organizerBanks = uiStore.organizerBanks.map((b) => Math.min(b, 8)) as [number, number];
 	}
 
+	// Linked: a sort chosen on either side applies to both; linking takes the sort of the side it was clicked on.
+	function setSort(side: number, sort: PatchSortMode) {
+		if (settings.organizerSortLinked) settings.organizerSortModes = [sort, sort];
+		else settings.organizerSortModes[side] = sort;
+	}
+	function linkSort(side: number, linked: boolean) {
+		settings.organizerSortLinked = linked;
+		if (linked) setSort(side, settings.organizerSortModes[side]);
+	}
+
 	// Patch slots A-D for patch banks, the Perf slot for performance banks.
 	const slotEnabled = (slot: number) => (slot === 4) === (uiStore.organizerKind === 'performance');
+	// The focused slot A-D for patch banks; the Perf slot (there is only one) for performance banks.
+	const slotFocused = (slot: number) => (uiStore.organizerKind === 'performance' ? slot === 4 : SLOT_LABELS[slot] === uiStore.slotInFocus);
 	// Storing a performance needs Performance mode, same rule as the Patch Browser's Store.
 	const slotDraggable = (slot: number) =>
 		slotEnabled(slot) && device.status === DeviceStatus.Connected && (slot < 4 || device.device?.mode === 'Performance');
@@ -302,7 +323,7 @@
 	}
 
 	function onSlotDragOver(e: DragEvent, slot: number) {
-		org.over(e, (src) => src.type === 'cell' && slotEnabled(slot));
+		org.over(e, (src) => src.type === 'cell' && slotEnabled(slot), 'copy');
 		if (e.defaultPrevented) dropSlot.value = slot;
 	}
 
@@ -312,7 +333,7 @@
 	}
 
 	function onStorageDragOver(e: DragEvent) {
-		org.over(e, (src) => src.type === 'cell' || (src.type === 'many' && src.items[0].type === 'cell'));
+		org.over(e, (src) => src.type === 'cell' || (src.type === 'many' && src.items[0].type === 'cell'), 'copy');
 		if (e.defaultPrevented) dropStorage.value = true;
 	}
 
@@ -322,7 +343,7 @@
 	}
 
 	function onTrashDragOver(e: DragEvent) {
-		org.over(e, (src) => src.type !== 'slot');
+		org.over(e, (src) => src.type !== 'slot', 'move');
 		if (e.defaultPrevented) dropTrash.value = true;
 	}
 

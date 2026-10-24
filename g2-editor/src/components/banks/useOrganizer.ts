@@ -136,11 +136,14 @@ export function useOrganizer() {
 		source.value = null;
 	}
 
-	// Option/Alt while dragging = copy.
-	function over(e: DragEvent, accepts: (src: OrganizerDragSource) => boolean) {
-		if (!source.value || !accepts(source.value)) return;
+	// The drop cursor: `effect` for targets that always copy (storage, slots) or delete (Trash); onto a
+	// bank cell, bank locations move (Option/Alt = copy) and storage items and slots are copied.
+	function over(e: DragEvent, accepts: (src: OrganizerDragSource) => boolean, effect?: 'copy' | 'move') {
+		const src = source.value;
+		if (!src || !accepts(src)) return;
 		e.preventDefault();
-		if (e.dataTransfer) e.dataTransfer.dropEffect = e.altKey ? 'copy' : 'move';
+		const moves = !e.altKey && (src.type === 'cell' || (src.type === 'many' && src.items[0].type === 'cell'));
+		if (e.dataTransfer) e.dataTransfer.dropEffect = effect ?? (moves ? 'move' : 'copy');
 	}
 
 	function slotName(slot: number): string {

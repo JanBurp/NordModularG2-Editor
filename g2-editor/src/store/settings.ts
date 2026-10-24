@@ -38,6 +38,7 @@ export const useSettingsStore = defineStore('settings', {
 		patchMutatorKeysOpen: true as boolean,
 		browserSortMode: 'location' as PatchSortMode,
 		organizerSortModes: ['location', 'location'] as [PatchSortMode, PatchSortMode], // Bank Organizer left/right column
+		organizerSortLinked: false as boolean, // both columns use the same sort
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,

@@ -41,18 +41,18 @@
 		</ToolBar>
 
 		<ExtendedToolBar
-			v-if="settingsStore.toolbarMode !== 'hidden'"
+			v-if="settingsStore.toolbarMode !== 'hidden' && !uiStore.showBankOrganizer"
 			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@morph-group-label-edit="(info) => openMorphLabelDialog(info.groupIndex, info.currentLabel)"
 		/>
 		<PatchToolBar
-			v-if="currentPatch"
+			v-if="currentPatch && !uiStore.showBankOrganizer"
 			:patch-name="patchName"
 			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@variation-click="handleVariationClick"
 			@patch-name-click="() => openPatchNameDialog(patchName)"
 		/>
-		<ParameterPages v-if="currentPatch && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
+		<ParameterPages v-if="currentPatch && !uiStore.showBankOrganizer && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<ParamDragGhost />
 		<KnobDragCursor />
 

@@ -14,6 +14,7 @@
 	--color-surface-1: #e6e2da;
 	--color-surface-2: #f2efe7;
 	--color-surface-3: #cac5ba;
+	--color-surface-cell: #f2efe7; /* filled Bank Organizer cell without a category tint */
 	--color-line-subtle: #cac5ba;
 	--color-line-default: #b0aa9c;
 	--color-content-primary: #1d1d1d;
@@ -29,6 +30,7 @@
 		--color-surface-1: var(--color-neutral-800);
 		--color-surface-2: var(--color-neutral-700);
 		--color-surface-3: var(--color-neutral-600);
+		--color-surface-cell: color-mix(in oklab, var(--color-neutral-700) 50%, var(--color-neutral-800));
 		--color-line-subtle: var(--color-neutral-700);
 		--color-line-default: var(--color-neutral-500);
 		--color-content-primary: var(--color-neutral-100);
