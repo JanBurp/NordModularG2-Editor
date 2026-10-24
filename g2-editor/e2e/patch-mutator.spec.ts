@@ -11,11 +11,11 @@ test.describe('Patch Mutator', () => {
 		await sendMenuAction('toggle-patch-mutator');
 		const pane = page.locator('[data-mutator-pane]');
 		await expect(pane).toBeVisible();
-		// A filled MutaBox draws its chromosome as an svg; the children are the 6-column grid
-		const children = pane.locator('.grid-cols-6 svg');
+		// Only a filled MutaBox draws its chromosome
+		const children = pane.getByTestId('mutator-children').getByTestId('muta-chromosome');
 		const mutate = pane.getByRole('button', { name: 'Mutate', exact: true });
-		const mother = pane.getByText('Mother', { exact: true }).locator('xpath=following-sibling::*[1]').locator('svg');
-		const childPaths = () => pane.locator('.grid-cols-6 polyline').evaluateAll((els) => els.map((e) => e.getAttribute('points')));
+		const mother = pane.getByTestId('mutator-mother').getByTestId('muta-chromosome');
+		const childPaths = () => children.evaluateAll((els) => els.map((e) => e.getAttribute('points')));
 		await expect(children).toHaveCount(0);
 		await expect(mother).toHaveCount(0);
 		await expect(mutate).toBeDisabled();

@@ -71,14 +71,14 @@
 				<!-- Mother · Children · Father across the full width, boxes as wide as the storage boxes below.
 			     --box = one storage box: (row - x/v column w-6.5 - its gap-1.5 - 7 × gap-1.5) / 8 = (100% - 74px) / 8 -->
 				<div class="flex justify-between" style="--box: calc((100% - 74px) / 8)">
-					<div class="flex flex-col gap-1.5 w-(--box)">
+					<div class="flex flex-col gap-1.5 w-(--box)" data-testid="mutator-mother">
 						<span class="font-bold">Mother</span>
 						<MutaBox :genome="mutator.genomeAt(familyRow[0])" family :focused="isFocused(familyRow[0])" v-bind="boxEvents(familyRow[0])" />
 					</div>
 					<div class="flex flex-col gap-1.5 w-[calc(var(--box)*6+30px)]">
 						<!-- bracket from the centre of the first child to the centre of the last: half a box = (column - 5 gaps) / 12 -->
 						<BracketLabel title="Children" class="px-[calc((100%-30px)/12)]" />
-						<div class="grid grid-cols-6 gap-1.5">
+						<div class="grid grid-cols-6 gap-1.5" data-testid="mutator-children">
 							<MutaBox
 								v-for="ref in familyRow.slice(1, -1)"
 								:key="key(ref)"

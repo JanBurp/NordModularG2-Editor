@@ -10,7 +10,7 @@ async function openEditorOptions(page: Page, sendMenuAction: (a: string) => Prom
 	await expect(settingsRow(page, 'Theme')).toBeVisible();
 }
 
-const settingsRow = (page: Page, label: string) => page.locator('.settings-row').filter({ has: page.getByText(label, { exact: true }) });
+const settingsRow = (page: Page, label: string) => page.getByTestId('settings-row').filter({ has: page.getByText(label, { exact: true }) });
 
 /** The persisted settings store (pinia-plugin-persistedstate, localStorage key "settings"). */
 const persisted = (page: Page) => page.evaluate(() => JSON.parse(localStorage.getItem('settings') ?? '{}'));

@@ -1,5 +1,5 @@
 <template>
-	<div class="settings-row">
+	<div class="settings-row" data-testid="settings-row">
 		<span>{{ label }}</span>
 		<div class="grid grid-cols-2 flex-1 gap-2">
 			<div class="flex items-center gap-1">

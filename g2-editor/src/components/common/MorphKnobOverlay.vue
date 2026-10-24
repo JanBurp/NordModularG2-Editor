@@ -2,6 +2,8 @@
 	<!-- Assigned to a morph group: whole knob tinted red (selected group) or blue (another group) -->
 	<circle
 		v-if="color"
+		data-testid="morph-tint"
+		:data-morph-color="color"
 		:r="radius"
 		:cx="radius + 2"
 		:cy="radius + 2"

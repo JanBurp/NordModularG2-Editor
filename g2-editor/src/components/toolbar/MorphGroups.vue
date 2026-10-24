@@ -25,6 +25,7 @@
 						<span class="text-xs text-black truncate">{{ displayName(i) }}</span>
 					</div>
 					<Knob
+						data-testid="morph-group-knob"
 						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : assignedGroups.has(i) ? 'blue' : null"
 						:default-value="defaultPatchParams().morphDials[i]"
