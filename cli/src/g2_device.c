@@ -2877,6 +2877,147 @@ void sanitize_filename(const char *name, char *out, size_t outSize) {
     out[i] = '\0';
 }
 
+/* flash_read_location results. */
+enum { FLASH_READ_DATA = 0, FLASH_READ_EMPTY, FLASH_READ_CORRUPT, FLASH_READ_ABORT };
+
+/* Reads flash location `location0` (0-based) of `bank` (1-based). Shared by
+ * get-bank and get-location. On FLASH_READ_DATA, *bulkOut holds the raw message
+ * (caller frees it) and body/bodyLen point into it; `name` receives the entry's
+ * name. On FLASH_READ_ABORT, `reason` says why. */
+static int flash_read_location(int type, int bank, int location0, uint8_t **bulkOut,
+                               const uint8_t **body, size_t *bodyLen, char *name, size_t nameLen,
+                               char *reason, size_t reasonLen) {
+    *bulkOut = NULL;
+    uint8_t req[4] = { 0x17, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)location0 };
+    if (send_system_data(0x41, req, sizeof(req)) < 0) {
+        snprintf(reason, reasonLen, "failed to send request for location %d", location0 + 1);
+        return FLASH_READ_ABORT;
+    }
+    usleep(USB_SEND_DELAY_US);
+
+    /* Lockstep on (bank, location): the G2 can answer a location later than
+     * the request that asked for it, and a blind single read then stores
+     * location N-1's patch under location N's name - confirmed on hardware
+     * (2026-09-14), every file in a 23-patch dump was shifted by one.
+     * Accept only a CMFlashDumpMarker (0x18) or CMFlashDumpRawData (0x19)
+     * tagged with the bank/location just requested; relay anything else. */
+    int got = 0;                 /* 1 = marker, 2 = raw data */
+    uint8_t status = 0;
+    uint8_t *bulk = NULL;
+    uint16_t size = 0;
+    for (int attempt = 0; attempt < 20 && !got; attempt++) {
+        uint8_t interruptResp[16] = {0};
+        int ret = recv_interrupt(interruptResp, sizeof(interruptResp), USB_TIMEOUT_LONG_MS);
+        if (ret <= 0) break;
+        uint8_t msgType = interruptResp[0] & 0x0f;
+        if (msgType == RESPONSE_TYPE_EMBEDDED) {
+            /* [..][aCmd][version][0x18][status][fileType][bank][location] */
+            if (interruptResp[4] != 0x18 || interruptResp[7] != (uint8_t)(bank - 1)
+                || interruptResp[8] != (uint8_t)location0) {
+                /* Someone else's message - relay it so the watch stream keeps it,
+                 * same as the RESPONSE_TYPE_EXTENDED case below. */
+                g2_msg_t relay = {0};
+                memcpy(relay.interrupt, interruptResp, 16);
+                g2_emit_event(&relay);
+                continue;
+            }
+            status = interruptResp[5];
+            got = 1;
+        } else if (msgType == RESPONSE_TYPE_EXTENDED) {
+            size = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
+            if (size < 8) { discard_bulk(size); continue; }
+            bulk = malloc(size);
+            if (!bulk) {
+                snprintf(reason, reasonLen, "out of memory at location %d", location0 + 1);
+                return FLASH_READ_ABORT;
+            }
+            if (recv_bulk(bulk, size) <= 0) {
+                free(bulk);
+                snprintf(reason, reasonLen, "failed to read bulk data at location %d", location0 + 1);
+                return FLASH_READ_ABORT;
+            }
+            if (bulk[1] == 0x0C && bulk[3] == 0x18
+                && bulk[6] == (uint8_t)(bank - 1) && bulk[7] == (uint8_t)location0) {
+                status = bulk[4];
+                free(bulk); bulk = NULL;
+                got = 1;
+            } else if (bulk[1] == 0x0C && bulk[3] == 0x19
+                       && bulk[5] == (uint8_t)(bank - 1) && bulk[6] == (uint8_t)location0) {
+                got = 2;     /* bulk kept, handed to the caller */
+            } else {
+                /* Someone else's message - relay it so the watch stream keeps it. */
+                g2_msg_t relay = {0};
+                memcpy(relay.interrupt, interruptResp, 16);
+                relay.bulk = bulk;
+                relay.bulk_size = size;
+                g2_emit_event(&relay);
+                free(bulk); bulk = NULL;
+            }
+        }
+    }
+    if (!got) {
+        snprintf(reason, reasonLen, "no response for location %d", location0 + 1);
+        return FLASH_READ_ABORT;
+    }
+
+    if (got == 1) {
+        /* Wire status codes per CMFlashDumpMarker::ReadStream: 4 = entry empty,
+         * 5 = entry corrupt (skip both, keep going), anything else here is an
+         * abort condition (1 = memory protected, 3 = memory full). */
+        if (status == 4) return FLASH_READ_EMPTY;
+        if (status == 5) return FLASH_READ_CORRUPT;
+        snprintf(reason, reasonLen, "device reported status %u at location %d (memory protected/full?)", status, location0 + 1);
+        return FLASH_READ_ABORT;
+    }
+
+    /* CMFlashDumpRawData payload, mirroring build_flash_dump_raw_frame:
+     * [fileType][bank][location][name..NUL][size_hi][size_lo][version][body].
+     * The body is already the whole file from its name-terminating NUL
+     * onward ([0x00][version][type][sections][CRC]), so the file on disk is
+     * simply the official text header followed by it - what the original
+     * editor's CFlashDumper writes (CPatchFilePort::SaveFromDump goes
+     * through the same WriteDataFile as a normal save), and the layout the
+     * editor's Save writes. No patch_usb_to_pch2/perf_sections_to_prf2
+     * conversion is involved, and patches and performances are identical
+     * here apart from the type byte the body already carries and the
+     * header's Type= line. */
+    uint8_t *payload = bulk + 4;
+    size_t payloadSize = size - 4;
+    /* parse_name returns the FIELD length: name + terminator, or just the name
+     * when it fills all 16 bytes (utils.c, same convention as
+     * perf_settings_normalize_slots). Scanning for a NUL instead swallows the
+     * first size byte of a 16-character name. */
+    uint8_t nameBuf[16] = {0};   /* zero-padded copy: parse_name must not read past the payload */
+    memcpy(nameBuf, payload + 3, payloadSize - 3 < sizeof(nameBuf) ? payloadSize - 3 : sizeof(nameBuf));
+    size_t nameField = (size_t)parse_name(nameBuf, name, nameLen);
+    size_t bodyOfs = 3 + nameField + 3;
+    if (bodyOfs > payloadSize) {
+        free(bulk);
+        snprintf(reason, reasonLen, "truncated response at location %d", location0 + 1);
+        return FLASH_READ_ABORT;
+    }
+    *bodyLen = ((size_t)payload[3 + nameField] << 8) | payload[3 + nameField + 1];
+    if (*bodyLen == 0 || bodyOfs + *bodyLen > payloadSize) {
+        free(bulk);
+        snprintf(reason, reasonLen, "bad payload length at location %d", location0 + 1);
+        return FLASH_READ_ABORT;
+    }
+    *body = payload + bodyOfs;
+    *bulkOut = bulk;
+    return FLASH_READ_DATA;
+}
+
+/* Writes a flash-dump body as a .pch2/.prf2 file: the official text header
+ * followed by the body verbatim. Returns 0 on success. */
+static int write_dump_file(const char *filename, int type, const uint8_t *body, size_t bodyLen) {
+    const char *textHeader = type == 0 ? PCH2_TEXT_HEADER : PRF2_TEXT_HEADER;
+    FILE *f = fopen(filename, "wb");
+    if (!f) return -1;
+    int ok = fwrite(textHeader, 1, strlen(textHeader), f) == strlen(textHeader)
+          && fwrite(body, 1, bodyLen, f) == bodyLen;
+    return (fclose(f) == 0 && ok) ? 0 : -1;
+}
+
 cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     if (type < 0 || type > 1) { g2_err("get-bank: invalid type\n"); return NULL; }
     if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
@@ -2910,129 +3051,20 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
     char writtenNames[128][40] = {{0}};
 
     for (int location = 0; location < 128; location++) {
-        uint8_t req[4] = { 0x17, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)location };
-        if (send_system_data(0x41, req, sizeof(req)) < 0) {
-            snprintf(abortReason, sizeof(abortReason), "failed to send request for location %d", location + 1);
-            aborted = 1;
-            break;
-        }
-        usleep(USB_SEND_DELAY_US);
-
-        /* Lockstep on (bank, location): the G2 can answer a location later than
-         * the request that asked for it, and a blind single read then stores
-         * location N-1's patch under location N's name - confirmed on hardware
-         * (2026-09-14), every file in a 23-patch dump was shifted by one.
-         * Accept only a CMFlashDumpMarker (0x18) or CMFlashDumpRawData (0x19)
-         * tagged with the bank/location just requested; relay anything else. */
-        int got = 0;                 /* 1 = marker, 2 = raw data */
-        uint8_t status = 0;
         uint8_t *bulk = NULL;
-        uint16_t size = 0;
-        for (int attempt = 0; attempt < 20 && !got; attempt++) {
-            uint8_t interruptResp[16] = {0};
-            int ret = recv_interrupt(interruptResp, sizeof(interruptResp), USB_TIMEOUT_LONG_MS);
-            if (ret <= 0) break;
-            uint8_t msgType = interruptResp[0] & 0x0f;
-            if (msgType == RESPONSE_TYPE_EMBEDDED) {
-                /* [..][aCmd][version][0x18][status][fileType][bank][location] */
-                if (interruptResp[4] != 0x18 || interruptResp[7] != (uint8_t)(bank - 1)
-                    || interruptResp[8] != (uint8_t)location) {
-                    /* Someone else's message - relay it so the watch stream keeps it,
-                     * same as the RESPONSE_TYPE_EXTENDED case below. */
-                    g2_msg_t relay = {0};
-                    memcpy(relay.interrupt, interruptResp, 16);
-                    g2_emit_event(&relay);
-                    continue;
-                }
-                status = interruptResp[5];
-                got = 1;
-            } else if (msgType == RESPONSE_TYPE_EXTENDED) {
-                size = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-                if (size < 8) { discard_bulk(size); continue; }
-                bulk = malloc(size);
-                if (!bulk) { snprintf(abortReason, sizeof(abortReason), "out of memory at location %d", location + 1); aborted = 1; break; }
-                if (recv_bulk(bulk, size) <= 0) {
-                    snprintf(abortReason, sizeof(abortReason), "failed to read bulk data at location %d", location + 1);
-                    free(bulk); bulk = NULL; aborted = 1; break;
-                }
-                if (bulk[1] == 0x0C && bulk[3] == 0x18
-                    && bulk[6] == (uint8_t)(bank - 1) && bulk[7] == (uint8_t)location) {
-                    status = bulk[4];
-                    free(bulk); bulk = NULL;
-                    got = 1;
-                } else if (bulk[1] == 0x0C && bulk[3] == 0x19
-                           && bulk[5] == (uint8_t)(bank - 1) && bulk[6] == (uint8_t)location) {
-                    got = 2;     /* bulk kept, freed below */
-                } else {
-                    /* Someone else's message - relay it so the watch stream keeps it. */
-                    g2_msg_t relay = {0};
-                    memcpy(relay.interrupt, interruptResp, 16);
-                    relay.bulk = bulk;
-                    relay.bulk_size = size;
-                    g2_emit_event(&relay);
-                    free(bulk); bulk = NULL;
-                }
-            }
-        }
-        if (aborted) break;
-        if (!got) {
-            snprintf(abortReason, sizeof(abortReason), "no response for location %d", location + 1);
-            aborted = 1;
-            break;
-        }
-
-        if (got == 1) {
-            /* Wire status codes per CMFlashDumpMarker::ReadStream: 4 = entry empty,
-             * 5 = entry corrupt (skip both, keep going), anything else here is an
-             * abort condition (1 = memory protected, 3 = memory full). */
-            if (status == 4) { emptyCount++; emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, ""); continue; }
-            if (status == 5) {
-                corruptCount++;
-                g2_err("get-bank: location %d is corrupt, skipping\n", location + 1);
-                emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, "");
-                continue;
-            }
-            snprintf(abortReason, sizeof(abortReason), "device reported status %u at location %d (memory protected/full?)", status, location + 1);
-            aborted = 1;
-            break;
-        }
-
-        /* CMFlashDumpRawData payload, mirroring build_flash_dump_raw_frame:
-         * [fileType][bank][location][name..NUL][size_hi][size_lo][version][body].
-         * The body is already the whole file from its name-terminating NUL
-         * onward ([0x00][version][type][sections][CRC]), so the file on disk is
-         * simply the official text header followed by it - what the original
-         * editor's CFlashDumper writes (CPatchFilePort::SaveFromDump goes
-         * through the same WriteDataFile as a normal save), and the layout the
-         * editor's Save writes. No patch_usb_to_pch2/perf_sections_to_prf2
-         * conversion is involved, and patches and performances are identical
-         * here apart from the type byte the body already carries and the
-         * header's Type= line. */
-        uint8_t *payload = bulk + 4;
-        size_t payloadSize = size - 4;
+        const uint8_t *body = NULL;
+        size_t bodyLen = 0;
         char patchName[32] = {0};
-        /* parse_name returns the FIELD length: name + terminator, or just the name
-         * when it fills all 16 bytes (utils.c, same convention as
-         * perf_settings_normalize_slots). Scanning for a NUL instead swallows the
-         * first size byte of a 16-character name. */
-        uint8_t nameBuf[16] = {0};   /* zero-padded copy: parse_name must not read past the payload */
-        memcpy(nameBuf, payload + 3, payloadSize - 3 < sizeof(nameBuf) ? payloadSize - 3 : sizeof(nameBuf));
-        size_t nameField = (size_t)parse_name(nameBuf, patchName, sizeof(patchName));
-        size_t bodyOfs = 3 + nameField + 3;
-        if (bodyOfs > payloadSize) {
-            free(bulk);
-            snprintf(abortReason, sizeof(abortReason), "truncated response at location %d", location + 1);
-            aborted = 1;
-            break;
+        int rd = flash_read_location(type, bank, location, &bulk, &body, &bodyLen,
+                                     patchName, sizeof(patchName), abortReason, sizeof(abortReason));
+        if (rd == FLASH_READ_ABORT) { aborted = 1; break; }
+        if (rd == FLASH_READ_EMPTY) { emptyCount++; emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, ""); continue; }
+        if (rd == FLASH_READ_CORRUPT) {
+            corruptCount++;
+            g2_err("get-bank: location %d is corrupt, skipping\n", location + 1);
+            emit_bank_upload_progress(location + 1, 128, writtenCount, emptyCount, corruptCount, "");
+            continue;
         }
-        size_t bodyLen = ((size_t)payload[3 + nameField] << 8) | payload[3 + nameField + 1];
-        if (bodyLen == 0 || bodyOfs + bodyLen > payloadSize) {
-            free(bulk);
-            snprintf(abortReason, sizeof(abortReason), "bad payload length at location %d", location + 1);
-            aborted = 1;
-            break;
-        }
-        uint8_t *body = payload + bodyOfs;
 
         const char *baseName = strlen(patchName) ? patchName : "Untitled";
         char fileBase[32];   /* baseName made safe as a file name - the name lives only in the file name */
@@ -3047,17 +3079,12 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name) {
 
         char filename[1024];
         snprintf(filename, sizeof(filename), "%s/%s.%s", folder, dispName, type == 0 ? "pch2" : "prf2");
-        const char *textHeader = type == 0 ? PCH2_TEXT_HEADER : PRF2_TEXT_HEADER;
-        FILE *f = fopen(filename, "wb");
-        if (!f || fwrite(textHeader, 1, strlen(textHeader), f) != strlen(textHeader)
-               || fwrite(body, 1, bodyLen, f) != bodyLen) {
-            if (f) fclose(f);
+        if (write_dump_file(filename, type, body, bodyLen) < 0) {
             free(bulk);
             snprintf(abortReason, sizeof(abortReason), "failed to write file for location %d", location + 1);
             aborted = 1;
             break;
         }
-        fclose(f);
         free(bulk);
 
         if (listLen + 64 > listCap) {
@@ -3376,6 +3403,77 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
     return G2_ERR;
 }
 
+/* flash_write_file results: written / skipped / skipped and the location must be
+ * cleared (the bank must not keep stale data there) / lockstep broken, stop. */
+enum { FLASH_WRITE_OK = 0, FLASH_WRITE_SKIP, FLASH_WRITE_SKIP_CLEAR, FLASH_WRITE_ABORT };
+
+/* Writes one .pch2/.prf2 file to flash location `location0` (0-based) of `bank`
+ * (1-based) under the wire name `name`. Shared by send-bank and put-location.
+ * On anything but FLASH_WRITE_OK, `reason` says why. */
+static int flash_write_file(int type, int bank, int location0, const char *filepath, const char *name,
+                            char *reason, size_t reasonLen) {
+    FILE *f = fopen(filepath, "rb");
+    if (!f) { snprintf(reason, reasonLen, "cannot open source file"); return FLASH_WRITE_SKIP; }
+    long fsize;
+    uint8_t *fileData = read_whole_file(f, &fsize);
+    fclose(f);
+    if (!fileData) { snprintf(reason, reasonLen, "cannot read source file"); return FLASH_WRITE_SKIP; }
+
+    /* The G2 stores the file body verbatim: everything from the name-
+     * terminating NUL to EOF, i.e. [0x00][version][type][sections][file
+     * CRC] - confirmed byte-for-byte against what the device sends back
+     * for the same location (see build_flash_dump_raw_frame). Identical
+     * for patches and performances, so neither locate_section_data nor
+     * perf_prf2_to_sections is involved here; locate_section_data is only
+     * used to find the name terminator and reject a truncated file. */
+    int name_end, data_offset, data_len;
+    if (locate_section_data(fileData, fsize, &name_end, &data_offset, &data_len) < 0) {
+        free(fileData);
+        snprintf(reason, reasonLen, "failed to parse patch file");
+        return FLASH_WRITE_SKIP;
+    }
+
+    /* Third header byte: 0x00 = patch, 0x01 = performance (FILE_TYPE_PATCH/
+     * FILE_TYPE_PERFORMANCE, nmg2PatchSerializer.ts) - reject a source file
+     * that doesn't match the bank's own type rather than write it into a
+     * slot the device will never read back correctly. */
+    if (fileData[name_end + 2] != (uint8_t)type) {
+        free(fileData);
+        snprintf(reason, reasonLen, "wrong file type for this bank");
+        return FLASH_WRITE_SKIP_CLEAR;
+    }
+
+    int status = -1;
+    int ret = send_flash_dump_raw(type, bank - 1, location0, name,
+                                  fileData + name_end, (size_t)fsize - (size_t)name_end, &status);
+    free(fileData);
+
+    if (ret == G2_ERR_TOO_LARGE) {
+        /* Nothing was sent - the device cannot take a message this big and
+         * sending it anyway wedges it (see G2_MAX_MESSAGE_LEN). The official
+         * editor fails on the same file too, so the entry is simply not
+         * transferable over USB. */
+        snprintf(reason, reasonLen, "too large for device (%ld bytes)", fsize);
+        return FLASH_WRITE_SKIP_CLEAR;
+    }
+    if (ret == G2_ERR_SEND || ret == G2_ERR_NO_MEMORY) {
+        snprintf(reason, reasonLen, "failed to send location %d", location0 + 1);
+        return FLASH_WRITE_ABORT;
+    }
+    if (ret != G2_OK && status < 0) {
+        /* No marker came back at all: the request/response lockstep is broken,
+         * so every later write would be sent blind. */
+        snprintf(reason, reasonLen, "no reply from device for location %d", location0 + 1);
+        return FLASH_WRITE_ABORT;
+    }
+    if (ret != G2_OK) {
+        /* Device answered but refused this entry (memory protected/full). */
+        snprintf(reason, reasonLen, "device refused write (status %d)", status);
+        return FLASH_WRITE_SKIP;
+    }
+    return FLASH_WRITE_OK;
+}
+
 static void emit_bank_download_progress(int location, int total, int written, int cleared, int failed, const char *name) {
     printf("{\"type\":\"bank_download_progress\",\"location\":%d,\"total\":%d,\"written\":%d,\"cleared\":%d,\"failed\":%d,\"name\":\"",
            location, total, written, cleared, failed);
@@ -3479,105 +3577,24 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
             base += 4;
         }
 
-        FILE *f = fopen(e->filepath, "rb");
-        if (!f) {
-            g2_err("send-bank: cannot open %s, skipping location %d\n", e->filepath, location + 1);
-            add_bank_failure(failures, location + 1, e->filepath, "cannot open source file");
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
-            continue;
-        }
-        long fsize;
-        uint8_t *fileData = read_whole_file(f, &fsize);
-        fclose(f);
-        if (!fileData) {
-            g2_err("send-bank: cannot read %s, skipping location %d\n", e->filepath, location + 1);
-            add_bank_failure(failures, location + 1, e->filepath, "cannot read source file");
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, base);
-            continue;
-        }
-
         char name[17] = {0};
         name_from_filepath(base, name, 16);
 
-        /* The G2 stores the file body verbatim: everything from the name-
-         * terminating NUL to EOF, i.e. [0x00][version][type][sections][file
-         * CRC] - confirmed byte-for-byte against what the device sends back
-         * for the same location (see build_flash_dump_raw_frame). Identical
-         * for patches and performances, so neither locate_section_data nor
-         * perf_prf2_to_sections is involved here; locate_section_data is only
-         * used to find the name terminator and reject a truncated file. */
-        int name_end, data_offset, data_len;
-        if (locate_section_data(fileData, fsize, &name_end, &data_offset, &data_len) < 0) {
-            g2_err("send-bank: failed to parse %s\n", e->filepath);
-            add_bank_failure(failures, location + 1, e->filepath, "failed to parse patch file");
-            free(fileData);
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
-            continue;
+        char reason[128];
+        int wr = flash_write_file(type, bank, location, e->filepath, name, reason, sizeof(reason));
+        if (wr == FLASH_WRITE_ABORT) {
+            snprintf(abortReason, sizeof(abortReason), "%s", reason);
+            aborted = 1;
+            break;
         }
-
-        /* Third header byte: 0x00 = patch, 0x01 = performance (FILE_TYPE_PATCH/
-         * FILE_TYPE_PERFORMANCE, nmg2PatchSerializer.ts) - reject a source file
-         * that doesn't match the bank's own type rather than write it into a
-         * slot the device will never read back correctly. */
-        if (fileData[name_end + 2] != (uint8_t)type) {
-            g2_err("send-bank: %s is the wrong file type for location %d, skipping\n",
-                   e->filepath, location + 1);
-            add_bank_failure(failures, location + 1, e->filepath, "wrong file type for this bank");
-            free(fileData);
-            if (nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
-            continue;
-        }
-
-        int status = -1;
-        int ret = send_flash_dump_raw(type, bank - 1, location, name,
-                                      fileData + name_end, (size_t)fsize - (size_t)name_end, &status);
-        free(fileData);
-
-        if (ret == G2_ERR_TOO_LARGE) {
-            /* Nothing was sent - the device cannot take a message this big and
-             * sending it anyway wedges it (see G2_MAX_MESSAGE_LEN). The official
-             * editor fails on the same file too, so the entry is simply not
-             * transferable over USB; skip it and keep the rest of the bank. */
-            g2_err("send-bank: %s is too large for the device (%ld bytes), skipped\n",
-                   e->filepath, fsize);
+        if (wr != FLASH_WRITE_OK) {
+            g2_err("send-bank: %s: %s, location %d skipped\n", e->filepath, reason, location + 1);
             /* Clear it, but not from here: g2_clear_patch blind-reads one
              * message without matching it, and doing that between two writes
              * puts a stray read in the middle of the per-location lockstep.
              * Defer to the second pass after the loop, where it cannot affect
              * any write. */
-            if (nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
-            char reason[80];
-            snprintf(reason, sizeof(reason), "too large for device (%ld bytes)", fsize);
-            add_bank_failure(failures, location + 1, e->filepath, reason);
-            failedCount++;
-            emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
-            continue;
-        }
-        if (ret == G2_ERR_SEND || ret == G2_ERR_NO_MEMORY) {
-            snprintf(abortReason, sizeof(abortReason), "failed to send location %d", location + 1);
-            aborted = 1;
-            break;
-        }
-        if (ret != G2_OK && status < 0) {
-            /* No marker came back at all: the request/response lockstep is broken,
-             * so every later write would be sent blind. Stop rather than keep
-             * hammering a device that has stopped answering. */
-            snprintf(abortReason, sizeof(abortReason), "no reply from device for location %d", location + 1);
-            aborted = 1;
-            break;
-        }
-        if (ret != G2_OK) {
-            /* Device answered but refused this entry (memory protected/full).
-             * Non-fatal, same as an unreadable source file. */
-            g2_err("send-bank: device refused location %d, status %d (%s)\n",
-                   location + 1, status, e->filepath);
-            char reason[64];
-            snprintf(reason, sizeof(reason), "device refused write (status %d)", status);
+            if (wr == FLASH_WRITE_SKIP_CLEAR && nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
             add_bank_failure(failures, location + 1, e->filepath, reason);
             failedCount++;
             emit_bank_download_progress(location + 1, 128, writtenCount, clearedCount, failedCount, name);
@@ -3618,6 +3635,58 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         g2_err("send-bank: listener queue dropped %lu message(s) during this bank - "
                "a marker may have been evicted\n", drops);
     }
+    return result;
+}
+
+static int flash_location_valid(const char *cmd, int type, int bank, int location, const char *file) {
+    if (type < 0 || type > 1) { g2_err("%s: invalid type\n", cmd); return 0; }
+    if (bank < 1 || (type == 0 && bank > 32) || (type == 1 && bank > 8)) {
+        g2_err("%s: invalid bank number for type\n", cmd);
+        return 0;
+    }
+    if (location < 1 || location > 128) { g2_err("%s: invalid location\n", cmd); return 0; }
+    if (file == NULL) { g2_err("%s: file required\n", cmd); return 0; }
+    if (ensure_connected(1) < 0) { g2_err("%s: not connected\n", cmd); return 0; }
+    return 1;
+}
+
+cJSON *g2_get_location(int type, int bank, int location, const char *file) {
+    if (!flash_location_valid("get-location", type, bank, location, file)) return NULL;
+    if (!g2_listener_active) g2_drain_quiet(USB_TIMEOUT_STALE_MS, NULL);
+
+    uint8_t *bulk = NULL;
+    const uint8_t *body = NULL;
+    size_t bodyLen = 0;
+    char name[32] = {0};
+    char reason[128] = {0};
+    int rd = flash_read_location(type, bank, location - 1, &bulk, &body, &bodyLen,
+                                 name, sizeof(name), reason, sizeof(reason));
+    if (rd == FLASH_READ_ABORT) { g2_err("get-location: %s\n", reason); return NULL; }
+    if (rd == FLASH_READ_DATA) {
+        int wret = write_dump_file(file, type, body, bodyLen);
+        free(bulk);
+        if (wret < 0) { g2_err("get-location: failed to write %s\n", file); return NULL; }
+    }
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "name", name);
+    cJSON_AddBoolToObject(result, "empty", rd == FLASH_READ_EMPTY);
+    cJSON_AddBoolToObject(result, "corrupt", rd == FLASH_READ_CORRUPT);
+    return result;
+}
+
+cJSON *g2_put_location(int type, int bank, int location, const char *file, const char *name) {
+    if (!flash_location_valid("put-location", type, bank, location, file)) return NULL;
+    char wireName[17] = {0};
+    if (name) snprintf(wireName, sizeof(wireName), "%s", name);
+    else name_from_filepath(file, wireName, 16);
+
+    char reason[128] = {0};
+    if (flash_write_file(type, bank, location - 1, file, wireName, reason, sizeof(reason)) != FLASH_WRITE_OK) {
+        g2_err("put-location: %s: %s\n", file, reason);
+        return NULL;
+    }
+    cJSON *result = cJSON_CreateObject();
+    cJSON_AddStringToObject(result, "name", wireName);
     return result;
 }
 

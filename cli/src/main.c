@@ -99,6 +99,8 @@ static void print_usage(const char *prog) {
     printf("  dump-patch <slot>                                                                                 Dump patch as MIDI SYSEX (slot A-D)\n");
     printf("  get-bank <type> <bank> <folder> [<name>]                                                          Get bank from device (type: patch|performance, bank: 1-32 or 1-8)\n");
     printf("  send-bank <type> <source-type> <source-path> <bank>                                               Send bank to device (type: patch|performance, source-type: pchList|folder, bank: 1-32 or 1-8)\n");
+    printf("  get-location <type> <bank> <location> <file>                                                      Read one bank location to a file (location: 1-128)\n");
+    printf("  put-location <type> <bank> <location> <file> [<name>]                                             Write a file to one bank location (name defaults to the file name)\n");
     printf("  daemon [<bus> <device>]                                                                           Persistent connection: watch + accept JSON commands on stdin (optional bus/device pins one specific G2)\n");
     printf("  seq \"<cmd1>\" \"<cmd2>\" ...                                                                         Run multiple commands sequentially, sharing the USB connection\n");
 }
@@ -1064,6 +1066,40 @@ static int cmd_send_bank(int argc, char **argv, int i) {
     return 0;
 }
 
+static int output_location_result(cJSON *result, const char *what) {
+    if (!result) {
+        if (output_format == OUTPUT_JSON)
+            output_error_json(what, output_format);
+        else
+            fprintf(stderr, "%s\n", what);
+        return 1;
+    }
+    output_json(result, output_format);
+    cJSON_Delete(result);
+    return 0;
+}
+
+static int cmd_get_location(int argc, char **argv, int i) {
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: get-location <type> <bank> <location> <file>\n");
+        return 1;
+    }
+    int type = (strcmp(argv[i + 1], "performance") == 0) ? 1 : 0;
+    return output_location_result(g2_get_location(type, atoi(argv[i + 2]), atoi(argv[i + 3]), argv[i + 4]),
+                                  "Failed to get location");
+}
+
+static int cmd_put_location(int argc, char **argv, int i) {
+    if (i + 4 >= argc) {
+        fprintf(stderr, "Usage: put-location <type> <bank> <location> <file> [<name>]\n");
+        return 1;
+    }
+    int type = (strcmp(argv[i + 1], "performance") == 0) ? 1 : 0;
+    const char *name = (i + 5 < argc) ? argv[i + 5] : NULL;
+    return output_location_result(g2_put_location(type, atoi(argv[i + 2]), atoi(argv[i + 3]), argv[i + 4], name),
+                                  "Failed to put location");
+}
+
 static int cmd_seq(int argc, char **argv, int i) {
     for (int j = i + 1; j < argc; j++) {
         char buf[1024];
@@ -1151,6 +1187,8 @@ static const cmd_entry_t commands[] = {
     { "dump-patch",        cmd_dump_patch        },
     { "get-bank",          cmd_get_bank          },
     { "send-bank",        cmd_send_bank        },
+    { "get-location",     cmd_get_location     },
+    { "put-location",     cmd_put_location     },
     { "seq",              cmd_seq              },
     { NULL, NULL }
 };

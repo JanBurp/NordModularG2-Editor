@@ -122,7 +122,12 @@
 
 	function onKeydown(e: KeyboardEvent) {
 		if (!props.modelValue) return;
-		if (e.key === 'Escape') onCancel();
+		if (e.key === 'Escape') {
+			// The Escape is the dialog's: stop it reaching window-level handlers that would act on it
+			// too (e.g. the Bank Organizer closing itself), since the dialog is already gone by then.
+			e.stopPropagation();
+			onCancel();
+		}
 		if (e.key === 'Tab') trapTab(e);
 		// A focused button (e.g. Cancel) handles Enter itself via its click
 		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm && document.activeElement?.tagName !== 'BUTTON') {

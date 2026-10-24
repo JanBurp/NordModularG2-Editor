@@ -59,7 +59,17 @@ export const STATUS_HINTS = {
 	browserFolder: 'Click/Enter: open folder · ←: parent folder · ↑↓: navigate',
 	browserFile: 'Double-click/Enter: load · ←: parent folder · ↑↓: navigate',
 	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
-	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort',
+	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort, organizer',
+
+	// Bank Organizer
+	organizerCell: `Drag: move (onto a patch: swap) · ${ALT}-drag: copy (displaced patch goes to Temporary Storage) · Drop on a slot: load · Drop on Temporary Storage: copy there · Click/Shift-click: select · Delete: delete · Right-click: more options`,
+	organizerStorage:
+		'Drag onto a location: copy to the G2 (a patch already there goes to Temporary Storage) · Click/Shift-click: select · Delete: delete · Right-click: more options',
+	organizerSlot:
+		'Drop a location: load it into this slot · Drag onto a location: store this slot there (a patch already there goes to Temporary Storage) · Right-click: store in a bank',
+	organizerTrash: 'Drop a location or Temporary Storage item here to delete it (the whole selection when it is selected) · Delete: delete the selection',
+	organizerSort: 'Click: sort this column by location, name or category',
+	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,
 	expandCollapseAll: 'Click: expand/collapse all',
 	expandCollapse: 'Click: expand/collapse',
 	moduleItem: 'Drag: add to canvas · Click: show/hide help',

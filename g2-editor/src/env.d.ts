@@ -25,6 +25,10 @@ declare global {
 				builtinPath: (name: string) => Promise<string>;
 				initLoadPath: (slot: number) => Promise<string>;
 				initSavePath: (slot: number) => Promise<string>;
+				storageDir: (custom?: string) => Promise<string>;
+				storageRemove: (filepath: string) => Promise<void>;
+				onStorageChanged: (cb: () => void) => void;
+				offStorageChanged: () => void;
 			};
 			loadHelp: (shortName: string) => Promise<string | null>;
 			loadModuleGraphics: () => Promise<Record<number, string>>;

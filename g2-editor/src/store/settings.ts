@@ -1,5 +1,6 @@
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
+import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
@@ -35,7 +36,8 @@ export const useSettingsStore = defineStore('settings', {
 		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
 		patchMutatorOpen: true as boolean,
 		patchMutatorKeysOpen: true as boolean,
-		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
+		browserSortMode: 'location' as PatchSortMode,
+		organizerSortModes: ['location', 'location'] as [PatchSortMode, PatchSortMode], // Bank Organizer left/right column
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,
@@ -48,6 +50,7 @@ export const useSettingsStore = defineStore('settings', {
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
+		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
@@ -93,6 +96,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setBankFolder(value: string) {
 			this.bankFolder = value;
+		},
+		setStorageFolder(value: string) {
+			this.storageFolder = value;
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;

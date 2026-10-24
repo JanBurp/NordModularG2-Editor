@@ -13,6 +13,7 @@
 		arrowUp: ['M8 13V3', 'M4 7l4-4 4 4'],
 		folder: ['M1.5 4.5h4.5l1 1.5H14a.5.5 0 0 1 .5.5V12a1 1 0 0 1-1 1H2a1 1 0 0 1-1-1V5a.5.5 0 0 1 .5-.5Z'],
 		close: ['M4 4l8 8', 'M12 4l-8 8'],
+		trash: ['M2.5 4h11', 'M6 4V2.5h4V4', 'M4 4l.7 9.5h6.6L12 4', 'M6.5 6.5v4.5', 'M9.5 6.5v4.5'],
 	} as const;
 
 	defineProps<{ name: keyof typeof icons }>();

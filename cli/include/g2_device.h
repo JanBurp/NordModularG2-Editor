@@ -370,6 +370,15 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name);
  * Returns a summary object (written/cleared/failed counts) on success, NULL on failure. */
 cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *source_path, int bank);
 
+/* Single flash locations, same flash-dump protocol as get-bank/send-bank.
+ * type: 0 = patch (banks 1-32), 1 = performance (banks 1-8); location: 1-128.
+ * get-location writes the entry to `file` (.pch2/.prf2) and returns
+ * {name, empty, corrupt} - no file is written for an empty/corrupt entry.
+ * put-location writes `file` to the location under `name` (NULL = derived from
+ * the file name) and returns {name}. Both return NULL on failure. */
+cJSON *g2_get_location(int type, int bank, int location, const char *file);
+cJSON *g2_put_location(int type, int bank, int location, const char *file, const char *name);
+
 /* send-bank internals, exposed only so unit tests can exercise them directly
  * (see test_bank_source.c) - not part of the day-to-day CLI surface. */
 typedef struct {

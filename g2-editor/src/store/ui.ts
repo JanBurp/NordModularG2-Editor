@@ -46,6 +46,9 @@ export const useUiStore = defineStore('ui', {
 		showKeyCommandsPage: false as boolean,
 		showQuickAdd: false as boolean,
 		mutatorFocused: false as boolean, // keyboard focus is in the Patch Mutator pane (dims the canvas)
+		showBankOrganizer: false as boolean, // Bank Organizer replaces the canvas while open
+		organizerKind: 'patch' as 'patch' | 'performance',
+		organizerBanks: [1, 2] as [number, number], // left/right column bank
 		cableShakeCount: 0 as number,
 		cableSeed: newCableSeed() as number,
 		draggedModuleId: null as number | null,
@@ -185,6 +188,16 @@ export const useUiStore = defineStore('ui', {
 
 		setDisplayedGlobalParamPage(i: number) {
 			this.displayedGlobalParamPage = clamp(i, 0, 4);
+		},
+
+		toggleBankOrganizer() {
+			this.showBankOrganizer = !this.showBankOrganizer;
+		},
+
+		openBankOrganizer(kind: 'patch' | 'performance', bank: number) {
+			this.organizerKind = kind;
+			this.organizerBanks[0] = bank;
+			this.showBankOrganizer = true;
 		},
 
 		toggleSvgViewer() {

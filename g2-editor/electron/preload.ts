@@ -30,6 +30,7 @@ const devicesChanged = listenerGroup("devices:changed");
 const watchEvent = listenerGroup("cli:watch-event");
 const watchDone = listenerGroup("cli:watch-done");
 const deviceDisconnected = listenerGroup("cli:device-disconnected");
+const storageChanged = listenerGroup("storage:changed");
 
 contextBridge.exposeInMainWorld("electronAPI", {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
@@ -41,6 +42,10 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		builtinPath: (name: string) => ipcRenderer.invoke("patches:builtin-path", name),
 		initLoadPath: (slot: number) => ipcRenderer.invoke("patches:init-load-path", slot),
 		initSavePath: (slot: number) => ipcRenderer.invoke("patches:init-save-path", slot),
+		storageDir: (custom?: string) => ipcRenderer.invoke("patches:storage-dir", custom),
+		storageRemove: (filepath: string) => ipcRenderer.invoke("patches:storage-remove", filepath),
+		onStorageChanged: (cb: () => void) => storageChanged.on(cb),
+		offStorageChanged: () => storageChanged.off(),
 	},
 
 	loadHelp: (shortName: string) => ipcRenderer.invoke("help:load", shortName),

@@ -62,7 +62,9 @@
 				class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden transition-[filter]"
 				:class="{ 'brightness-60': uiStore.mutatorFocused }"
 			>
-				<template v-if="currentPatch">
+				<BankOrganizer v-if="uiStore.showBankOrganizer" />
+				<!-- display:contents keeps the canvas layout; v-show (not v-if) keeps its zoom/scroll while the organizer is open -->
+				<div v-if="currentPatch" v-show="!uiStore.showBankOrganizer" class="contents">
 					<div v-show="showVoice" class="relative overflow-hidden min-h-0" :class="{ 'flex-1': !isSplit }" :style="voiceWrapperStyle">
 						<PatchCanvas
 							:key="patchName + '-voice'"
@@ -120,7 +122,7 @@
 							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'fx' })"
 						/>
 					</div>
-				</template>
+				</div>
 
 				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
@@ -453,6 +455,7 @@
 <script setup lang="ts">
 	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
+	import BankOrganizer from './components/banks/BankOrganizer.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';

@@ -57,6 +57,16 @@ export function categorySlugFromName(name: string): string {
 	return name.toLowerCase().replace(/ /g, '_');
 }
 
+const nameBySlug = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
+
+/**
+ * Display name for a device slug (e.g. "audio_in" -> "Audio In"); unknown slugs are returned as-is
+ */
+export function getCategoryNameFromSlug(slug?: string): string {
+	if (!slug) return '';
+	return nameBySlug.get(slug) ?? slug;
+}
+
 /**
  * Get the device slug for a category ID (used to populate SynthPatch.category)
  */

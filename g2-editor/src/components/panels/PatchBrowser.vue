@@ -145,7 +145,7 @@
 							>
 								<template #icon>{{ p.bank }}-{{ p.location }}</template>
 								<template #label>{{ p.name }}</template>
-								<template v-if="p.category" #meta>{{ formatCategory(p.category) }}</template>
+								<template v-if="p.category" #meta>{{ getCategoryNameFromSlug(p.category) }}</template>
 							</ListItem>
 						</template>
 					</template>
@@ -171,7 +171,7 @@
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
 	import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
-	import { SOUND_CATEGORIES, categorySlugFromName } from '@/constants/categories';
+	import { getCategoryNameFromSlug } from '@/constants/categories';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
@@ -181,12 +181,7 @@
 	import Dialog from '../common/Dialog.vue';
 	import { createDoubleClickDetector } from '../../utils/doubleClick';
 	import { useStatusHint } from '../../composables/useStatusHint';
-
-	const categoryByKey = new Map(SOUND_CATEGORIES.map((c) => [categorySlugFromName(c.name), c.name]));
-	function formatCategory(cat?: string): string {
-		if (!cat) return '';
-		return categoryByKey.get(cat) ?? cat;
-	}
+	import { sortPatches } from '../../utils/sortPatches';
 
 	const props = defineProps<{
 		isActive: boolean;
@@ -289,13 +284,7 @@
 		return Array.from(map.entries()).map(([bank, patches]) => ({ bank, patches }));
 	}
 
-	function applySort(list: SynthPatch[]): SynthPatch[] {
-		const mode = settings.browserSortMode;
-		if (mode === 'name') return [...list].sort((a, b) => a.name.localeCompare(b.name));
-		if (mode === 'name-desc') return [...list].sort((a, b) => b.name.localeCompare(a.name));
-		if (mode === 'category') return [...list].sort((a, b) => (a.category ?? '').localeCompare(b.category ?? '') || a.name.localeCompare(b.name));
-		return [...list].sort((a, b) => a.bank - b.bank || a.location - b.location);
-	}
+	const applySort = (list: SynthPatch[]) => sortPatches(list, settings.browserSortMode);
 
 	const filteredPatches = computed(() => {
 		const q = searchQuery.value.toLowerCase();
@@ -347,9 +336,9 @@
 
 		const list = kind === 'performance' ? browser.synthPerformances : browser.synthPatches;
 		const byLoc = new Map(list.filter((p) => p.bank === bank).map((p) => [p.location, p]));
-		const maxLoc = kind === 'performance' ? 32 : 128;
 		const storeChildren: ContextMenuItem[] = [];
-		for (let loc = 1; loc <= maxLoc; loc++) {
+		// 128 locations per bank for patches and performances alike (official editor's flash dumper).
+		for (let loc = 1; loc <= 128; loc++) {
 			const existing = byLoc.get(loc);
 			storeChildren.push({
 				label: `${bank}-${loc}  ${existing ? existing.name : '(empty)'}`,
@@ -381,6 +370,7 @@
 			},
 		});
 		items.push({ type: 'separator' });
+		items.push({ label: 'Open in Bank Organizer', action: () => uiStore.openBankOrganizer(kind, bank) });
 		items.push({ label: 'Sort', children: sortItems });
 		openCtx(e, items);
 	}

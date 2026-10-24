@@ -118,6 +118,7 @@
 				{ keys: [key(MOD, 'F')], action: 'Toggle Parameter Pages' },
 				{ keys: [key(SHIFT_MOD, 'F')], action: 'Toggle Parameter Overview' },
 				{ keys: [key(MOD, '2')], action: 'Toggle Patch Mutator' },
+				{ keys: [key(MOD, '3')], action: 'Toggle Bank Organizer' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
 			],
 		},

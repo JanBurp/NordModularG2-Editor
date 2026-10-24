@@ -289,6 +289,9 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-patch-mutator':
 					useSettingsStore().toggleSidebar('mutator');
 					break;
+				case 'toggle-bank-organizer':
+					uiStore.toggleBankOrganizer();
+					break;
 				case 'toggle-text-panel':
 					useSettingsStore().toggleSidebar('text');
 					break;

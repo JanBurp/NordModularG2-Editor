@@ -393,8 +393,8 @@ const ALLOWED_CMDS = new Set([
 	"add-cable", "add-module", "assign-global-knob", "assign-knob", "assign-midicc", "assign-midicc-batch",
 	"clear-bank", "clear-patch", "copy-variation", "deassign-global-knob", "deassign-knob", "deassign-midicc",
 	"deassign-midicc-batch", "del-cable", "del-module", "disconnect", "dump-patch", "get-bank", "get-global-knobs",
-	"get-global-page", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
-	"list", "move-module", "play-note", "reload-names", "select-global-page", "select-param", "select-param-page",
+	"get-global-page", "get-location", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
+	"list", "move-module", "play-note", "put-location", "reload-names", "select-global-page", "select-param", "select-param-page",
 	"select-patch", "select-perf", "send-bank", "send-controller-snapshot", "set-cable-color", "set-knob-source",
 	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode", "set-module-uprate",
 	"send-sections", "set-module-name", "set-morph-range", "set-mutation-lock", "set-morph-range-batch", "set-param", "set-patch-description",
@@ -647,6 +647,39 @@ ipcMain.handle("patches:init-save-path", (_, slot: number) => {
 	const dir = path.join(app.getPath("userData"), "patches");
 	fs.mkdirSync(dir, { recursive: true });
 	return path.join(dir, `init-${slot}.pch2`);
+});
+
+// Bank Organizer storage area: userData/bank-storage, or the folder chosen in Editor Options.
+// Shared by every device window, so a patch parked from one G2 can be put on another. A single
+// watcher tells all windows when it changes (also catches the files the CLI writes there directly).
+let storageWatcher: fs.FSWatcher | null = null;
+let storageTimer: NodeJS.Timeout | null = null;
+let watchedStorageDir = "";
+
+function storageDir(custom?: string): string {
+	const dir = custom || path.join(app.getPath("userData"), "bank-storage");
+	fs.mkdirSync(dir, { recursive: true });
+	if (dir !== watchedStorageDir) {
+		storageWatcher?.close();
+		watchedStorageDir = dir;
+		storageWatcher = fs.watch(dir, () => {
+			if (storageTimer) clearTimeout(storageTimer);
+			storageTimer = setTimeout(() => {
+				for (const window of BrowserWindow.getAllWindows()) {
+					if (!window.isDestroyed()) window.webContents.send("storage:changed");
+				}
+			}, 200);
+		});
+	}
+	return dir;
+}
+
+ipcMain.handle("patches:storage-dir", (_, custom?: string) => storageDir(custom));
+
+ipcMain.handle("patches:storage-remove", (_, filepath: string) => {
+	const resolved = path.resolve(filepath);
+	if (!watchedStorageDir || path.dirname(resolved) !== path.resolve(watchedStorageDir)) throw new Error("Not a storage file");
+	fs.rmSync(resolved, { force: true });
 });
 
 ipcMain.handle("patches:set-folder", async (event) => {
@@ -1133,6 +1166,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Midi CC Panel", click: () => sendToFocused("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
 				{ label: "Patch Adjuster & Mutator", click: () => sendToFocused("menu:action", "toggle-patch-mutator"), accelerator: "CommandOrControl+2" },
+				{ label: "Bank Organizer", click: () => sendToFocused("menu:action", "toggle-bank-organizer"), accelerator: "CommandOrControl+3" },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => sendToFocused("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
 			],

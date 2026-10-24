@@ -941,6 +941,13 @@ static void execute_cmd(const char *line) {
 		data = g2_send_bank(type_str, source_type, source_path, bank);
 		ret = data ? G2_OK : G2_ERR;
 
+	} else if ((strcmp(cmd, "get-location") == 0 || strcmp(cmd, "put-location") == 0) && n >= 4) {
+		const char *type_str = arg_s(args, 0);
+		int type = (type_str && strcmp(type_str, "performance") == 0) ? 1 : 0;
+		if (cmd[0] == 'g') data = g2_get_location(type, arg_i(args, 1), arg_i(args, 2), arg_s(args, 3));
+		else data = g2_put_location(type, arg_i(args, 1), arg_i(args, 2), arg_s(args, 3), (n >= 5) ? arg_s(args, 4) : NULL);
+		ret = data ? G2_OK : G2_ERR;
+
 	}
 
 	if (ret == G2_ERR_SEND || ret == G2_ERR_RECV || ret == G2_ERR_TIMEOUT ||

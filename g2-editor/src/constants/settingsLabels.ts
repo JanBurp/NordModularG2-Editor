@@ -42,6 +42,7 @@ export const SETTINGS_LABELS = {
 	patchOctaves: 'Octaves',
 	editorPath: 'Browser Path',
 	editorHiddenModules: 'Hidden Modules',
+	editorStorageFolder: 'Storage Folder',
 	editorDimUnusedModules: 'Dim unused modules',
 	editorTheme: 'Theme',
 	cableGravity: 'Curved',

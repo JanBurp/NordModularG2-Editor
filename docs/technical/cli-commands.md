@@ -68,6 +68,8 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `dump-patch` | `<slot>` | Dump patch from slot as MIDI SYSEX (A-D) |
 | `get-bank` | `<type> <bank> <folder> [<name>]` | Get bank from device: saves each occupied location as a `.pch2`/`.prf2` plus a `.pchList` index (type: patch|performance, bank: 1-32 or 1-8) |
 | `send-bank` | `<type> <source-type> <source-path> <bank>` | Send bank to device — OVERWRITES the target bank, clearing any location with no matching source entry (type: patch|performance, source-type: pchList|folder, bank: 1-32 or 1-8) |
+| `get-location` | `<type> <bank> <location> <file>` | Read one bank location to a `.pch2`/`.prf2` file (location: 1-128). Returns `{name, empty, corrupt}`; no file is written for an empty or corrupt entry |
+| `put-location` | `<type> <bank> <location> <file> [<name>]` | Write a `.pch2`/`.prf2` file to one bank location, overwriting it (name defaults to the file name) |
 
 ## Clock
 

@@ -1,6 +1,9 @@
+import fs from 'fs';
+import os from 'os';
+import path from 'path';
 import { afterAll, beforeAll, describe, expect, inject, it } from 'vitest';
 import { ACTIONS } from '../e2e-duration/lib/actions/index';
-import { cliRun, focusedSlot, teardown } from '../e2e-duration/lib/actions/ctx';
+import { cliRun, focusedSlot, menuAction, teardown } from '../e2e-duration/lib/actions/ctx';
 import { snapshotG2 } from '../e2e-duration/lib/cli';
 import { checkConsistency, deviceState, type SlotState } from '../e2e-duration/lib/consistency';
 import { action, backupPerf, type Editor, g2Mode, lastAction, type Mode, perfFlags, restorePerf, setMode, type SlotFlags, startEditor } from './g2';
@@ -63,6 +66,52 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 
 	it('connects and answers a probe', async () => {
 		expect(await g!.runner.probe()).toBe(true);
+	});
+
+	// Scratch bank, the same one the CLI's slow bank tests overwrite; cleared again afterwards.
+	it('Bank Organizer: swap, copy to storage and back by dragging, on the G2 itself', async () => {
+		const { ctx } = g!;
+		const page = ctx.page;
+		const BANK = '32';
+		const fixture = path.resolve(__dirname, '../../test-patches/EmptyPatch.pch2');
+		const nameAt = async (loc: number) => {
+			const r = JSON.parse(await cliRun(page, ['get-location', 'patch', BANK, String(loc), path.join(os.tmpdir(), 'g2-organizer-check.pch2')]));
+			return r.empty ? null : r.name;
+		};
+		const until = async (check: () => Promise<boolean>) => {
+			for (let i = 0; i < 60 && !(await check()); i++) await page.waitForTimeout(500);
+			expect(await check()).toBe(true);
+		};
+		try {
+			await cliRun(page, ['put-location', 'patch', BANK, '1', fixture, 'OrgA']);
+			await cliRun(page, ['put-location', 'patch', BANK, '2', fixture, 'OrgB']);
+			await cliRun(page, ['clear-patch', 'patch', BANK, '3']);
+			await cliRun(page, ['reload-names']);
+
+			await menuAction(ctx, 'toggle-bank-organizer');
+			const left = page.locator('[data-testid="bank-grid-left"]');
+			await left.locator('select').selectOption(BANK);
+			const cell = (loc: number) => left.locator(`[data-testid="bank-cell-${loc}"]`);
+			await until(async () => (await cell(1).textContent())?.includes('OrgA') ?? false);
+
+			await cell(1).dragTo(cell(2));
+			await until(async () => (await nameAt(1)) === 'OrgB' && (await nameAt(2)) === 'OrgA');
+
+			await cell(1).dragTo(page.locator('[data-testid="organizer-storage"]'));
+			const chip = page.locator('[data-testid="storage-item"]', { hasText: 'OrgB' });
+			await until(async () => (await chip.count()) === 1);
+			expect(await nameAt(1)).toBe('OrgB'); // a copy: the source stays
+
+			await chip.dragTo(cell(3));
+			await until(async () => (await nameAt(3)) === 'OrgB');
+			expect(await chip.count()).toBe(1); // a copy: the storage item stays
+		} finally {
+			for (const loc of ['1', '2', '3']) await cliRun(page, ['clear-patch', 'patch', BANK, loc]);
+			// Remove what this test put in Temporary Storage, so its folder is left as it was.
+			const storageDir = path.join(await ctx.app.evaluate(({ app }) => app.getPath('userData')), 'bank-storage');
+			for (const f of fs.existsSync(storageDir) ? fs.readdirSync(storageDir) : []) if (f.startsWith('OrgB__')) fs.rmSync(path.join(storageDir, f));
+			await page.keyboard.press('Escape');
+		}
 	});
 
 	it('adds modules and a cable, tweaks and moves, stays consistent and tears down cleanly', async () => {
