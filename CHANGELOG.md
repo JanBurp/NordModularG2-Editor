@@ -8,12 +8,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Patch Adjuster
+- Patch Mutator
+- Parameter Pages Overview sidepanel
+
+### Changed
+- Tests better organized
+- New tests added
+
+### Fixed
+
 ## [0.7.2] - 2026-10-22
 
 ### New
-- Parameter Pages Overview sidepanel
-- Patch Adjuster
-- Patch Mutator
 - Added option for cable style
 - Added option for module params to have focus on hover, so arrow keys can adjust value
 - Added option for dimming unused modules
