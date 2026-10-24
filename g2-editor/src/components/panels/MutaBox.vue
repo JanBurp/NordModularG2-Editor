@@ -5,7 +5,7 @@
 		:draggable="genome !== null"
 	>
 		<svg v-if="genome" :viewBox="`0 0 ${SIZE} ${SIZE}`" class="w-full h-full block">
-			<polyline :points="points" fill="none" :stroke="colors.line" stroke-width="1" stroke-linejoin="round" />
+			<polyline data-testid="muta-chromosome" :points="points" fill="none" :stroke="colors.line" stroke-width="1" stroke-linejoin="round" />
 		</svg>
 	</div>
 </template>

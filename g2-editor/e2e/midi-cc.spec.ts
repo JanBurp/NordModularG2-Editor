@@ -17,8 +17,8 @@ test.describe('MIDI CC pane', () => {
 		await sendMenuAction('toggle-midi-cc-panel');
 		const removeAll = page.getByRole('button', { name: 'Remove All', exact: true });
 		await expect(removeAll).toBeEnabled();
-		// CC rows are draggable; the assigned one shows the CC's short name and the param name
-		const row = page.locator('[draggable="true"]').filter({ hasText: 'FreqCoarse' });
+		// The assigned CC's row shows the CC's short name and the param name
+		const row = page.getByTestId('cc-row').filter({ hasText: 'FreqCoarse' });
 		await expect(row).toHaveCount(1);
 		await expect(row).toContainText('Breath');
 

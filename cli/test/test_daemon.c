@@ -170,6 +170,23 @@ void test_daemon_stdin_burst_forwards_events_promptly(void) {
         printf("[test_daemon_stdin_burst_forwards_events_promptly] no param_change observed (module 250/param 250 likely doesn't exist on the loaded patch) — command-ack correctness still verified\n");
 }
 
+/* Uploads a pch2 buffer to slot A via upload-patch-data. */
+static int upload_slot_a(daemon_ctx_t *d, const uint8_t *buf, size_t len) {
+    char *b64 = base64_encode(buf, len);
+    if (!b64) return -1;
+
+    size_t cmdCap = strlen(b64) + 128;
+    char *cmd = malloc(cmdCap);
+    if (!cmd) { free(b64); return -1; }
+    int id = g_cmd_id++;
+    snprintf(cmd, cmdCap, "{\"id\":%d,\"cmd\":\"upload-patch-data\",\"args\":[\"A\",\"%s\"]}", id, b64);
+    free(b64);
+
+    int r = send_and_expect_ok(d, cmd, id);
+    free(cmd);
+    return r;
+}
+
 /* g2_dump_patch treats slot A's cached cable version being 0 ("empty/uninitialized")
  * as a hard error, unlike g2_send_controller_snapshot which just skips a version-0
  * slot (confirmed on real hardware: dump-patch failed here while send-controller-
@@ -189,21 +206,40 @@ static int upload_fixture_to_slot_a(daemon_ctx_t *d) {
     if (fread(data, 1, (size_t)fsize, f) != (size_t)fsize) { fclose(f); free(data); return -1; }
     fclose(f);
 
-    char *b64 = base64_encode(data, (size_t)fsize);
+    int r = upload_slot_a(d, data, (size_t)fsize);
     free(data);
-    if (!b64) return -1;
-
-    size_t cmdCap = strlen(b64) + 128;
-    char *cmd = malloc(cmdCap);
-    if (!cmd) { free(b64); return -1; }
-    int id = g_cmd_id++;
-    snprintf(cmd, cmdCap, "{\"id\":%d,\"cmd\":\"upload-patch-data\",\"args\":[\"A\",\"%s\"]}", id, b64);
-    free(b64);
-
-    int r = send_and_expect_ok(d, cmd, id);
-    free(cmd);
     return r;
 }
+
+/* Field `key` ("data" = section bytes as hex, "name", ...) of get-patch A; malloc'd, or NULL. */
+static char *slot_a_field(const char *key) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *v = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), key);
+    char *s = cJSON_IsString(v) ? strdup(v->valuestring) : NULL;
+    cJSON_Delete(resp);
+    return s;
+}
+
+/* All sections with id `sec` of a get-patch hex string, concatenated as hex (malloc'd), or NULL. */
+static char *sections_hex(const char *hex, int sec) {
+    uint8_t *b = NULL;
+    int len = hex ? hex_to_bytes(hex, &b) : -1;
+    char *out = len > 0 ? calloc((size_t)len * 2 + 1, 1) : NULL;
+    for (int o = 0, w = 0; out && o + 3 <= len; ) {
+        int n = (b[o + 1] << 8) | b[o + 2];
+        if (b[o] == sec && o + 3 + n <= len)
+            for (int i = 0; i < 3 + n; i++, w += 2) snprintf(out + w, 3, "%02x", b[o + i]);
+        o += 3 + n;
+    }
+    free(b);
+    return out;
+}
+
+/* Cable sections (0x52, hex) of slot A at the last capture_slot_a_patch; restore_slot_a_patch checks them. */
+static char *g_captured_cables = NULL;
 
 /* Captures slot A's current patch as a fully-framed, re-uploadable pch2 buffer, so
  * a test that must overwrite slot A (see upload_fixture_to_slot_a above) can restore
@@ -252,26 +288,36 @@ static int capture_slot_a_patch(daemon_ctx_t *d, uint8_t **out_buf, size_t *out_
     buf[pos++] = (uint8_t)((crc >> 8) & 0xff);
     buf[pos++] = (uint8_t)(crc & 0xff);
 
+    free(g_captured_cables);
+    g_captured_cables = sections_hex(hex, 0x52);
     cJSON_Delete(resp);
     *out_buf = buf;
     *out_len = pos;
     return 0;
 }
 
-/* Uploads a buffer captured by capture_slot_a_patch back to slot A. */
+/* Uploads a buffer captured by capture_slot_a_patch back to slot A. After an upload the G2 returns
+ * the cable lists (0x52) in a different order and the next upload flips them back (2026-10-24), so
+ * this uploads, captures what the G2 made of it and uploads that. Non-zero unless the cables then
+ * read back exactly as captured. */
 static int restore_slot_a_patch(daemon_ctx_t *d, const uint8_t *buf, size_t len) {
-    char *b64 = base64_encode(buf, len);
-    if (!b64) return -1;
-
-    size_t cmdCap = strlen(b64) + 128;
-    char *cmd = malloc(cmdCap);
-    if (!cmd) { free(b64); return -1; }
-    int id = g_cmd_id++;
-    snprintf(cmd, cmdCap, "{\"id\":%d,\"cmd\":\"upload-patch-data\",\"args\":[\"A\",\"%s\"]}", id, b64);
-    free(b64);
-
-    int r = send_and_expect_ok(d, cmd, id);
-    free(cmd);
+    char *want = g_captured_cables;
+    g_captured_cables = NULL;
+    uint8_t *again = NULL;
+    size_t again_len = 0;
+    int r = upload_slot_a(d, buf, len);
+    if (r == 0) { daemon_wait_ready(d); r = capture_slot_a_patch(d, &again, &again_len); }
+    if (r == 0) r = upload_slot_a(d, again, again_len);
+    free(again);
+    if (r == 0) {
+        daemon_wait_ready(d);
+        char *hex = slot_a_field("data");
+        char *got = sections_hex(hex, 0x52);
+        if (!want || !got || strcmp(want, got) != 0) r = -1;
+        free(hex);
+        free(got);
+    }
+    free(want);
     return r;
 }
 
@@ -727,6 +773,26 @@ void test_daemon_send_controller_snapshot_cmd(void) {
     TEST_ASSERT_EQUAL_INT(0, r);
 }
 
+/* get-perf-settings' "data" (caller deletes), or NULL. */
+static cJSON *perf_settings(void) {
+    int id = g_cmd_id++;
+    char cmd[64];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *data = resp ? cJSON_DetachItemFromObject(resp, "data") : NULL;
+    cJSON_Delete(resp);
+    return data;
+}
+
+/* The G2's mode as set-perf-mode takes it ("patch"/"performance"), or NULL if get-perf-settings failed. */
+static const char *g2_mode(void) {
+    cJSON *ps = perf_settings();
+    cJSON *m = cJSON_GetObjectItem(ps, "mode");
+    const char *mode = !cJSON_IsString(m) ? NULL : strcmp(m->valuestring, "performance") == 0 ? "performance" : "patch";
+    cJSON_Delete(ps);
+    return mode;
+}
+
 /* Sends set-perf-mode <mode> and drains the rearm's START_COMM ack, which follows the ok:true. */
 static int set_perf_mode(daemon_ctx_t *d, const char *mode) {
     char cmd[80];
@@ -757,32 +823,36 @@ static int toggle_slot_flag_and_back(const char *cmd_name, const char *flag) {
 
 /* Test: Patch mode -> Performance mode -> toggle slot D's active and key flag and back, what the
  * duration test's togglePerfMode + slotActiveKey do when coverage switches modes to reach a
- * Performance-only action (2026-10-20). Each write must answer ok and read back; ends in Patch mode. */
+ * Performance-only action (2026-10-20). Each write must answer ok and read back; ends in the mode the G2 was in. */
 void test_daemon_slot_flags_after_patch_to_perf(void) {
     if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    const char *orig = g2_mode();
+    TEST_ASSERT_NOT_NULL_MESSAGE(orig, "setup: read the G2's mode");
 
     int r_patch = set_perf_mode(&g_daemon, "patch");
     int r_perf = set_perf_mode(&g_daemon, "performance");
     int f_active = toggle_slot_flag_and_back("set-slot-enabled", "active");
     int f_key = toggle_slot_flag_and_back("set-slot-key", "key");
-    int r_back = set_perf_mode(&g_daemon, "patch");
+    int r_back = set_perf_mode(&g_daemon, orig);
     daemon_wait_ready(&g_daemon);
 
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_patch, "set-perf-mode patch");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_perf, "set-perf-mode performance");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, f_active, "set-slot-enabled D toggle and back must answer ok and read back");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, f_key, "set-slot-key D toggle and back must answer ok and read back");
-    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_back, "set-perf-mode patch (teardown)");
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_back, "teardown: set-perf-mode back to the original mode");
 }
 
 /* Test 6: set-perf-mode cycle — performance then patch — verifies Delphi approach:
  * synth_settings_update must contain a "patches" array with 4 entries.
- * This is the last shared-daemon test; it calls daemon_shutdown. */
+ * Ends in the mode the G2 was in. This is the last shared-daemon test; it calls daemon_shutdown. */
 void test_daemon_perf_mode_cycle(void) {
     if (g_daemon_ok != 0) {
         daemon_shutdown(&g_daemon);
         TEST_IGNORE_MESSAGE("G2 device not connected");
     }
+    const char *orig = g2_mode();
+    TEST_ASSERT_NOT_NULL_MESSAGE(orig, "setup: read the G2's mode");
     char cmd[80];
     cJSON *synth_ev = NULL;
 
@@ -815,7 +885,9 @@ void test_daemon_perf_mode_cycle(void) {
     cJSON *rearm_ok = read_event_of_type(&g_daemon, "ok", 10, 3);
     if (rearm_ok) cJSON_Delete(rearm_ok);
 
+    int r_back = strcmp(orig, "performance") == 0 ? set_perf_mode(&g_daemon, orig) : 0;
     daemon_shutdown(&g_daemon);
+    TEST_ASSERT_EQUAL_INT_MESSAGE(0, r_back, "teardown: set-perf-mode back to performance");
 }
 
 /* Sends {"cmd":name,"args":[args]} on the shared daemon (args = JSON array body); 0 = ok. */
@@ -824,33 +896,6 @@ static int daemon_cmd(const char *name, const char *args) {
     int id = g_cmd_id++;
     snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[%s]}", id, name, args);
     return send_and_expect_ok(&g_daemon, cmd, id);
-}
-
-/* Field `key` ("data" = section bytes as hex, "name", ...) of get-patch A; malloc'd, or NULL. */
-static char *slot_a_field(const char *key) {
-    int id = g_cmd_id++;
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-patch\",\"args\":[\"A\"]}", id);
-    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
-    cJSON *v = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), key);
-    char *s = cJSON_IsString(v) ? strdup(v->valuestring) : NULL;
-    cJSON_Delete(resp);
-    return s;
-}
-
-/* All sections with id `sec` of a get-patch hex string, concatenated as hex (malloc'd), or NULL. */
-static char *sections_hex(const char *hex, int sec) {
-    uint8_t *b = NULL;
-    int len = hex ? hex_to_bytes(hex, &b) : -1;
-    char *out = len > 0 ? calloc((size_t)len * 2 + 1, 1) : NULL;
-    for (int o = 0, w = 0; out && o + 3 <= len; ) {
-        int n = (b[o + 1] << 8) | b[o + 2];
-        if (b[o] == sec && o + 3 + n <= len)
-            for (int i = 0; i < 3 + n; i++, w += 2) snprintf(out + w, 3, "%02x", b[o + i]);
-        o += 3 + n;
-    }
-    free(b);
-    return out;
 }
 
 /* Sends one edit and reports whether slot A's section(s) `sec` changed: 1 = changed, 0 = same,
@@ -936,17 +981,6 @@ void test_daemon_patch_edits_read_back(void) {
     TEST_ASSERT_EQUAL_INT_MESSAGE(cc_before, cc_after, "deassign-midicc must remove the entry again");
     TEST_ASSERT_TRUE_MESSAGE(pname_ok, "set-patch-name must read back");
     TEST_ASSERT_EQUAL_INT_MESSAGE(0, restore_r, "teardown: restore slot A to its original patch");
-}
-
-/* get-perf-settings' "data" (caller deletes), or NULL. */
-static cJSON *perf_settings(void) {
-    int id = g_cmd_id++;
-    char cmd[64];
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
-    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
-    cJSON *data = resp ? cJSON_DetachItemFromObject(resp, "data") : NULL;
-    cJSON_Delete(resp);
-    return data;
 }
 
 static int perf_int(cJSON *ps, int slot, const char *key, const char *sub) {
