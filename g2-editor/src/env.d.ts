@@ -27,6 +27,7 @@ declare global {
 				initSavePath: (slot: number) => Promise<string>;
 				storageDir: (custom?: string) => Promise<string>;
 				storageRemove: (filepath: string) => Promise<void>;
+				storageCopy: (from: string, to: string) => Promise<void>;
 				onStorageChanged: (cb: () => void) => void;
 				offStorageChanged: () => void;
 			};

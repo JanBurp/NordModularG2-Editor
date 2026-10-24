@@ -7,8 +7,8 @@ import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
-import { useHistoryStore } from '@/store/history';
 import { useMutatorStore } from '@/store/mutator';
+import { useUndoTarget } from './useUndoTarget';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
@@ -44,14 +44,14 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const { deleteSelection, deleteUnusedModules, deleteUnusedCables } = usePatchOperations();
 	const { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
-	const historyStore = useHistoryStore();
+	const undoTarget = useUndoTarget();
 	const bankUploadDialog = useBankUploadDialog();
 	const bankDownloadDialog = useBankDownloadDialog();
 
 	const menuState = computed(() => ({
 		connected: deviceStore.connected,
-		canUndo: historyStore.canUndo(uiStore.slotInFocus),
-		canRedo: historyStore.canRedo(uiStore.slotInFocus),
+		canUndo: undoTarget.canUndo.value,
+		canRedo: undoTarget.canRedo.value,
 		hasSelection: uiStore.selectedModules.length > 0,
 		hasClipboard: hasClipboard.value,
 		hasCurrentPatch: !!currentPatch.value,
@@ -317,10 +317,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().resetCanvasZoom();
 					break;
 				case 'undo':
-					await slotsStore.undo();
+					await undoTarget.undo();
 					break;
 				case 'redo':
-					await slotsStore.redo();
+					await undoTarget.redo();
 					break;
 				case 'show-about':
 					options.showAbout?.();

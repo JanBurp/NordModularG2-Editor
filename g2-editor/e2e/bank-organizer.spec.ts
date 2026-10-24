@@ -80,4 +80,18 @@ test.describe('Bank Organizer – offline', () => {
 		await page.getByRole('button', { name: 'OK' }).click();
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
 	});
+
+	test('Undo (menu, as Cmd/Ctrl-Z) brings a deleted storage item back; Redo deletes it again', async ({ page, sendMenuAction }) => {
+		await page.locator('[data-testid="storage-item"]', { hasText: 'Kick' }).click({ button: 'right' });
+		await page.getByRole('menuitem', { name: 'Delete…' }).click();
+		await page.getByRole('button', { name: 'Delete' }).click();
+		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(3);
+
+		await sendMenuAction('undo');
+		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
+		await expect(page.locator('[data-testid="storage-item"]', { hasText: 'Kick' })).toHaveCount(1);
+
+		await sendMenuAction('redo');
+		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(3);
+	});
 });

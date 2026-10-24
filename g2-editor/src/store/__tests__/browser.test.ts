@@ -80,12 +80,16 @@ describe('browser store — Bank Organizer', () => {
 			electronAPI: {
 				patches: {
 					storageDir: vi.fn(async () => '/hold'),
-					list: vi.fn(async () => ({
+					// Like the real one: only the folder itself (not .history below it).
+					list: vi.fn(async (dir: string) => ({
 						success: true,
-						entries: [...files.keys()].map((p) => ({ name: p.split('/').pop()!, path: p, isDir: false })),
+						entries: [...files.keys()]
+							.filter((p) => p.slice(0, p.lastIndexOf('/')) === dir)
+							.map((p) => ({ name: p.split('/').pop()!, path: p, isDir: false })),
 					})),
 					load: vi.fn(async () => ({ success: false })),
 					storageRemove: vi.fn(async (p: string) => void files.delete(p)),
+					storageCopy: vi.fn(async (from: string, to: string) => void files.set(to, files.get(from)!)),
 				},
 			},
 		};
@@ -124,7 +128,7 @@ describe('browser store — Bank Organizer', () => {
 
 		expect(flash.get('patch-1-1')).toBe('Pad');
 		expect(flash.get('patch-1-2')).toBe('Lead');
-		expect(files.size).toBe(0);
+		expect([...files.keys()].filter((f) => !f.includes('/.history/'))).toEqual([]); // only undo copies left
 		expect(browser.storage).toEqual([]);
 	});
 
@@ -301,5 +305,108 @@ describe('browser store — Bank Organizer', () => {
 		expect(flash.get('patch-1-1')).toBe('Lead');
 		expect(flash.get('patch-1-2')).toBe('Lead');
 		expect(browser.storage.map((h) => h.name)).toEqual(['Pad']);
+	});
+
+	describe('undo/redo', () => {
+		const history = async () => (await import('@/store/organizerHistory')).useOrganizerHistoryStore();
+
+		it('undoes and redoes a move', async () => {
+			const browser = seed([[1, 1, 'Lead']]);
+			await browser.moveLocation(P(1, 1), P(2, 5), false);
+			expect((await history()).undoLabel).toBe('Move "Lead" to 2-5');
+
+			await browser.stepOrganizerHistory('undo');
+			expect(flash).toEqual(new Map([['patch-1-1', 'Lead']]));
+			expect(browser.synthPatches).toEqual([{ bank: 1, location: 1, name: 'Lead' }]);
+
+			await browser.stepOrganizerHistory('redo');
+			expect(flash).toEqual(new Map([['patch-2-5', 'Lead']]));
+		});
+
+		it('undoes a swap', async () => {
+			const browser = seed([
+				[1, 1, 'Lead'],
+				[1, 2, 'Pad'],
+			]);
+			await browser.moveLocation(P(1, 1), P(1, 2), false);
+			await browser.stepOrganizerHistory('undo');
+			expect(flash.get('patch-1-1')).toBe('Lead');
+			expect(flash.get('patch-1-2')).toBe('Pad');
+			expect(browser.storage).toEqual([]);
+		});
+
+		it('undoes a delete: the patch was read into the history first', async () => {
+			const browser = seed([
+				[1, 1, 'Lead'],
+				[1, 2, 'Pad'],
+			]);
+			await browser.clearLocations([P(1, 1), P(1, 2)]);
+			expect(flash.size).toBe(0);
+
+			await browser.stepOrganizerHistory('undo');
+			expect(flash.get('patch-1-1')).toBe('Lead');
+			expect(flash.get('patch-1-2')).toBe('Pad');
+		});
+
+		it('undoes a multi-move as one step', async () => {
+			const browser = seed([
+				[1, 1, 'Lead'],
+				[1, 2, 'Pad'],
+			]);
+			await browser.placeMany(cells(P(1, 1), P(1, 2)), [P(3, 1), P(3, 2)], true);
+			expect((await history()).undoStack).toHaveLength(1);
+
+			await browser.stepOrganizerHistory('undo');
+			expect(flash).toEqual(
+				new Map([
+					['patch-1-1', 'Lead'],
+					['patch-1-2', 'Pad'],
+				]),
+			);
+		});
+
+		it('undoes copying to storage and deleting from storage', async () => {
+			const browser = seed([[1, 1, 'Lead']]);
+			await browser.toStorage([P(1, 1)]);
+			expect(browser.storage.map((h) => h.name)).toEqual(['Lead']);
+
+			await browser.stepOrganizerHistory('undo');
+			expect(browser.storage).toEqual([]);
+			await browser.stepOrganizerHistory('redo');
+			expect(browser.storage.map((h) => h.name)).toEqual(['Lead']);
+
+			await browser.removeStorage([browser.storage[0]]);
+			expect(browser.storage).toEqual([]);
+			await browser.stepOrganizerHistory('undo');
+			expect(browser.storage.map((h) => h.name)).toEqual(['Lead']);
+		});
+
+		it('refuses to undo when a location changed outside the organizer, changing nothing', async () => {
+			const browser = seed([[1, 1, 'Lead']]);
+			await browser.moveLocation(P(1, 1), P(2, 5), false);
+			// Someone else stores another patch at 2-5 (hardware panel, Patch Browser, other window).
+			flash.set('patch-2-5', 'Other');
+			browser.upsertPatch(2, 5, 'patch', 'Other');
+
+			await browser.stepOrganizerHistory('undo');
+
+			expect((await history()).conflict).toMatch(/2-5 has changed/);
+			expect(flash).toEqual(new Map([['patch-2-5', 'Other']]));
+			expect((await history()).undoStack).toHaveLength(1); // still there
+		});
+
+		it('a new action empties the redo stack; at most 50 steps are kept', async () => {
+			const h = await history();
+			const browser = seed([[1, 1, 'Lead']]);
+			await browser.moveLocation(P(1, 1), P(1, 2), false);
+			await browser.stepOrganizerHistory('undo');
+			expect(h.canRedo).toBe(true);
+			await browser.moveLocation(P(1, 1), P(1, 3), false);
+			expect(h.canRedo).toBe(false);
+
+			for (let i = 0; i < 60; i++) h.push({ label: `step ${i}`, changes: [] });
+			expect(h.undoStack).toHaveLength(50);
+			expect(h.undoLabel).toBe('step 59');
+		});
 	});
 });

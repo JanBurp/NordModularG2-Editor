@@ -44,6 +44,7 @@ contextBridge.exposeInMainWorld("electronAPI", {
 		initSavePath: (slot: number) => ipcRenderer.invoke("patches:init-save-path", slot),
 		storageDir: (custom?: string) => ipcRenderer.invoke("patches:storage-dir", custom),
 		storageRemove: (filepath: string) => ipcRenderer.invoke("patches:storage-remove", filepath),
+		storageCopy: (from: string, to: string) => ipcRenderer.invoke("patches:storage-copy", from, to),
 		onStorageChanged: (cb: () => void) => storageChanged.on(cb),
 		offStorageChanged: () => storageChanged.off(),
 	},

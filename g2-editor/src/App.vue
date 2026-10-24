@@ -492,6 +492,7 @@
 	import KeyCommandsPage from './components/common/KeyCommandsPage.vue';
 	import Toast from './components/common/Toast.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
+	import { useOrganizerHistoryStore } from './store/organizerHistory';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -521,6 +522,14 @@
 	watch(
 		() => device.status,
 		(status) => (showDisconnected.value = status === DeviceStatus.Lost),
+	);
+	// The Bank Organizer's undo steps describe this G2's banks: forget them once it is gone.
+	const organizerHistory = useOrganizerHistoryStore();
+	watch(
+		() => device.status,
+		(status) => {
+			if (status === DeviceStatus.Lost || status === DeviceStatus.Disconnected) organizerHistory.clear();
+		},
 	);
 	// Swallow every key while the performance is re-sent after a reconnect. Capture phase on window, registered before
 	// any component's own listener, so no shortcut can edit a patch underneath the overlay.

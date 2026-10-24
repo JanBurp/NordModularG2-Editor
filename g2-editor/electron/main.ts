@@ -655,10 +655,17 @@ ipcMain.handle("patches:init-save-path", (_, slot: number) => {
 let storageWatcher: fs.FSWatcher | null = null;
 let storageTimer: NodeJS.Timeout | null = null;
 let watchedStorageDir = "";
+// The organizer's undo history keeps its patch copies in <storage>/.history; it lives until the
+// app quits, so whatever an earlier run left there is removed the first time a folder is used.
+const historyCleaned = new Set<string>();
 
 function storageDir(custom?: string): string {
 	const dir = custom || path.join(app.getPath("userData"), "bank-storage");
 	fs.mkdirSync(dir, { recursive: true });
+	if (!historyCleaned.has(dir)) {
+		historyCleaned.add(dir);
+		fs.rmSync(path.join(dir, ".history"), { recursive: true, force: true });
+	}
 	if (dir !== watchedStorageDir) {
 		storageWatcher?.close();
 		watchedStorageDir = dir;
@@ -676,10 +683,22 @@ function storageDir(custom?: string): string {
 
 ipcMain.handle("patches:storage-dir", (_, custom?: string) => storageDir(custom));
 
-ipcMain.handle("patches:storage-remove", (_, filepath: string) => {
+// Only files inside the current storage folder (its .history included) may be removed or copied.
+function assertInStorage(filepath: string): string {
 	const resolved = path.resolve(filepath);
-	if (!watchedStorageDir || path.dirname(resolved) !== path.resolve(watchedStorageDir)) throw new Error("Not a storage file");
-	fs.rmSync(resolved, { force: true });
+	const rel = watchedStorageDir ? path.relative(path.resolve(watchedStorageDir), resolved) : "";
+	if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("Not a storage file");
+	return resolved;
+}
+
+ipcMain.handle("patches:storage-remove", (_, filepath: string) => {
+	fs.rmSync(assertInStorage(filepath), { force: true });
+});
+
+ipcMain.handle("patches:storage-copy", (_, from: string, to: string) => {
+	const dst = assertInStorage(to);
+	fs.mkdirSync(path.dirname(dst), { recursive: true });
+	fs.copyFileSync(assertInStorage(from), dst);
 });
 
 ipcMain.handle("patches:set-folder", async (event) => {

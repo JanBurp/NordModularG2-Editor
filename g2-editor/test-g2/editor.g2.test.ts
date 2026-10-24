@@ -161,6 +161,13 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 			expect(await nameAt(1)).toBeNull(); // moved
 			expect(await nameAt(2)).toBeNull();
 
+			// Undo (menu = Cmd-Z) puts both back and empties the targets; Redo moves them again.
+			await menuAction(ctx, 'undo');
+			await until(async () => (await nameAt(1)) === 'OrgA' && (await nameAt(2)) === 'OrgB' && (await nameAt(11)) === null);
+			expect(await nameAt(12)).toBeNull();
+			await menuAction(ctx, 'redo');
+			await until(async () => (await nameAt(11)) === 'OrgA' && (await nameAt(12)) === 'OrgB' && (await nameAt(1)) === null);
+
 			// 11 and 12 onto 128: only 128 is free from there (127 is filled first).
 			await cliRun(page, ['put-location', 'patch', BANK, '127', fixture, 'OrgY']);
 			await cliRun(page, ['reload-names']);

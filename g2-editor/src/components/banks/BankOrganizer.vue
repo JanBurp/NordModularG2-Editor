@@ -107,6 +107,10 @@
 			/>
 		</div>
 
+		<Dialog v-model="conflictOpen" title="Can't undo" :show-cancel="false">
+			<p class="text-sm text-content-primary">{{ history.conflict }}</p>
+		</Dialog>
+
 		<Dialog v-model="roomOpen" title="Not enough room" :show-cancel="false">
 			<p class="text-sm text-content-primary">{{ roomText }}</p>
 		</Dialog>
@@ -151,6 +155,8 @@
 	import { getCategoryNameFromSlug } from '@/constants/categories';
 	import { categoryTint } from './categoryTint';
 	import type { ContextMenuItem } from '@/types';
+	import { useOrganizerHistoryStore } from '@/store/organizerHistory';
+	import { MOD } from '@/constants/statusHints';
 
 	const SIDES = ['left', 'right'] as const;
 	const STORAGE_AREA = 'storage';
@@ -192,13 +198,25 @@
 		return storage
 			? {
 					title: n === 1 ? 'Delete from Temporary Storage' : `Delete ${n} from Temporary Storage`,
-					body: 'This deletes the copies on this computer and cannot be undone:',
+					body: `This deletes the copies on this computer (${MOD}Z undoes it while the Bank Organizer is open):`,
 					lines,
 				}
-			: { title: n === 1 ? 'Delete location' : `Delete ${n} locations`, body: "This deletes from the G2's memory and cannot be undone:", lines };
+			: {
+					title: n === 1 ? 'Delete location' : `Delete ${n} locations`,
+					body: `This deletes from the G2's memory (${MOD}Z undoes it while the Bank Organizer is open):`,
+					lines,
+				};
 	});
 
 	const storageItems = computed(() => browser.storage.filter((h) => h.kind === uiStore.organizerKind));
+
+	const history = useOrganizerHistoryStore();
+	const conflictOpen = computed({
+		get: () => history.conflict !== null,
+		set: (open) => {
+			if (!open) history.conflict = null;
+		},
+	});
 
 	const roomOpen = computed({
 		get: () => org.roomWarning.value !== null,
