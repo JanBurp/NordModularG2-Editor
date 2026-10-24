@@ -304,6 +304,7 @@ export const useBrowserStore = defineStore('browser', {
 
 		fromStorage(item: StorageItem, dst: BankLoc): Promise<boolean> {
 			return this._organize([dst], async () => {
+				this._step('Copying', 0, 1, item.name);
 				if (item.kind !== dst.kind) throw new Error(`Cannot put a ${item.kind} into a ${dst.kind} bank`);
 				if (this.entryAt(dst)) await this._readLocation(dst);
 				await this._writeLocation(dst, item.file, item.name, item.category);
@@ -315,6 +316,7 @@ export const useBrowserStore = defineStore('browser', {
 			return this._organize([src, dst], async () => {
 				if (src.kind !== dst.kind || (src.bank === dst.bank && src.location === dst.location)) return;
 				const occupied = !!this.entryAt(dst);
+				this._step(copy ? 'Copying' : occupied ? 'Swapping' : 'Moving', 0, 1, this.entryAt(src)?.name ?? '');
 				const parked = occupied ? await this._readLocation(dst) : null;
 				const source = await this._readLocation(src, true);
 				if (!source) return;
@@ -378,6 +380,7 @@ export const useBrowserStore = defineStore('browser', {
 		 * `dst`, parking an occupied target first. */
 		storeSlotAt(slotIndex: 0 | 1 | 2 | 3, dst: BankLoc, name: string): Promise<boolean> {
 			return this._organize([dst], async () => {
+				this._step('Storing', 0, 1, name);
 				if (this.entryAt(dst)) await this._readLocation(dst);
 				await this.storePatch(slotIndex, dst.bank, dst.location, dst.kind, name); // reports its own failure
 			});

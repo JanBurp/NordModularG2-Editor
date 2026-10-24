@@ -1441,6 +1441,79 @@ int g2_store_patch(int slot, int bank, int location) {
     return G2_OK;
 }
 
+/* Waits for the G2's answer to a flash operation on (bank0, location0), 0-based: a
+ * CMFlashDumpMarker (0x18, status 0 = written) or a CMFlashCommandResult (0x0D,
+ * [flag][bank][location][fileType][result]). The result comes on its own as an embedded
+ * message, or inside a bulk one - a clear is answered with one bulk holding a delete
+ * notification (0x15) followed by the 0x0D result (hardware-captured 2026-10-24):
+ *   01 0c 00 | 15 00 1f 04 13 4e 01 | 0d 00 1f 04 00 05 | crc
+ * Anything else is relayed so the watch stream keeps it. Like the official editor
+ * (CFlashData marks itself busy until HandleFlashCommandResult), the next flash command
+ * must not go out before this answer: a blind single read took other commands' replies.
+ * Returns 1 for a marker, 2 for a command result (status in *status), 0 when none came,
+ * negative for a USB/memory error. */
+static int await_flash_result(int bank0, int location0, int *status) {
+    for (int attempt = 0; attempt < 20; attempt++) {
+        uint8_t response[64] = {0};
+        int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
+        /* Through the listener queue a bare timeout is 0, so anything negative is a real USB
+         * error: stop now. The direct libusb path (recv_interrupt_with_retry, g2_io.c) reports
+         * a plain timeout as -1 as well, so there we can only keep waiting - otherwise the
+         * one-shot CLI aborts on the first write that takes over 2 s. */
+        if (rret < 0) {
+            if (g2_listener_active) {
+                g2_err("flash location %d: USB error waiting for the result: %s\n", location0 + 1, libusb_error_name(rret));
+                return rret;
+            }
+            continue;
+        }
+        if (rret == 0) continue;
+        if ((response[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
+            if (response[4] == 0x18 && response[7] == (uint8_t)bank0 && response[8] == (uint8_t)location0) {
+                *status = response[5];
+                return 1;
+            }
+            if (response[4] == 0x0D && response[6] == (uint8_t)bank0 && response[7] == (uint8_t)location0) {
+                *status = response[9];
+                return 2;
+            }
+            continue;   /* somebody else's embedded message - keep waiting */
+        }
+        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
+            uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
+            if (bulkSize == 0) continue;
+            uint8_t *bulk = malloc(bulkSize);
+            if (!bulk) return G2_ERR_NO_MEMORY;
+            int bret = recv_bulk(bulk, bulkSize);
+            int found = 0;
+            if (bret > 7 && bulk[1] == 0x0C) {
+                /* Marker layout: [0x01][0x0C][ver][0x18][status][fileType][bank][location]. */
+                if (bulk[3] == 0x18 && bulk[6] == (uint8_t)bank0 && bulk[7] == (uint8_t)location0) {
+                    *status = bulk[4];
+                    found = 1;
+                }
+                /* A 0x0D result anywhere in the system message, tagged with our location. */
+                for (int i = 3; !found && i + 5 < bret; i++) {
+                    if (bulk[i] == 0x0D && bulk[i + 2] == (uint8_t)bank0 && bulk[i + 3] == (uint8_t)location0) {
+                        *status = bulk[i + 5];
+                        found = 2;
+                    }
+                }
+            }
+            if (!found && bret > 0) {
+                g2_msg_t relay = {0};
+                memcpy(relay.interrupt, response, 16);
+                relay.bulk = bulk;
+                relay.bulk_size = (uint16_t)bret;
+                g2_emit_event(&relay);
+            }
+            free(bulk);
+            if (found) return found;
+        }
+    }
+    return 0;
+}
+
 int g2_clear_patch(int type, int bank, int location) {
     if (type < 0 || type > 1)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
@@ -1451,9 +1524,20 @@ int g2_clear_patch(int type, int bank, int location) {
     uint8_t cmd[5] = { 0x0c, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)(location - 1), 0x00 };
     if (send_system_data(0x41, cmd, 5) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
+    int status = -1;
+    int got = await_flash_result(bank - 1, location - 1, &status);
+    if (got < 0) return got == G2_ERR_NO_MEMORY ? G2_ERR_NO_MEMORY : G2_ERR_RECV;
+    if (got == 0) {
+        /* G2_ERR, not G2_ERR_TIMEOUT: the daemon treats that as a lost device. */
+        g2_err("clear-patch: no reply from device for %d-%d\n", bank, location);
+        return G2_ERR;
+    }
+    /* Result codes per CFlashData::HandleFlashCommandResult: 0, 2, 5 = done (a clear answers 5),
+     * 1 = can't load, 3 = memory full, 4 = memory protect on. */
+    if (got == 2 && status != 0 && status != 2 && status != 5) {
+        g2_err("clear-patch: device refused %d-%d (%s)\n", bank, location, status == 4 ? "memory protect on" : "flash error");
+        return G2_ERR;
+    }
     return G2_OK;
 }
 
@@ -3328,78 +3412,17 @@ static int send_flash_dump_raw(int type, int bank0, int location0, const char *n
      * system/perf notifications also land here and each consumes one - and so
      * does a bare timeout, so one slow write or one burst of unrelated traffic
      * can't sink the whole location; only a real recv error ends it early. */
-    for (int attempt = 0; attempt < 20; attempt++) {
-        uint8_t response[64] = {0};
-        int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-        /* Through the listener queue a bare timeout is 0, so anything negative
-         * is a real USB error: stop now rather than spend the whole 40 s budget
-         * pretending the device might still answer, and name it so an
-         * intermittent failure is diagnosable from the log. The direct libusb
-         * path (recv_interrupt_with_retry, g2_io.c) reports a plain timeout as
-         * -1 as well, so there we can only keep waiting - otherwise the
-         * one-shot CLI aborts on the first write that takes over 2 s. */
-        if (rret < 0) {
-            if (g2_listener_active) {
-                g2_err("send-bank: USB error waiting for location %d marker: %s\n",
-                       location0 + 1, libusb_error_name(rret));
-                break;
-            }
-            continue;
-        }
-        if (rret == 0) continue;
-        if ((response[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
-            /* Two different messages acknowledge a write, and which one the G2
-             * picks depends on what was already at the location (an overwrite of
-             * an occupied entry answers with the second kind, an empty one with
-             * the first) - the reference editor advances its own per-location
-             * loop off either (CFlashDumper::HandleDumpDownOK and
-             * ::HandleFlashCommandResult both call HandleDowndumpEvent). */
-            if (response[4] == 0x18 && response[7] == (uint8_t)bank0
-                && response[8] == (uint8_t)location0) {
-                /* CMFlashDumpMarker. Wire status codes from its ReadStream switch:
-                 * 0 = DumpDownOK (written), 1 = MemoryProtected, 3 = MemoryFull,
-                 * 4 = EntryEmpty, 5 = EntryCorrupt. Only 0 means this entry landed. */
-                *status = response[5];
-                return *status == 0 ? G2_OK : G2_ERR;
-            }
-            if (response[4] == 0x0D && response[6] == (uint8_t)bank0
-                && response[7] == (uint8_t)location0) {
-                /* CMFlashCommandResult (id 0x0D): [flag][bank][location][fileType][result].
-                 * HandleFlashCommandResult treats result 4 as MemoryProtected and
-                 * advances the loop on anything else it acts on. */
-                *status = response[9];
-                return *status == 4 ? G2_ERR : G2_OK;
-            }
-            continue;   /* somebody else's embedded message - keep waiting */
-        }
-        if ((response[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t bulkSize = ((uint16_t)response[1] << 8) | response[2];
-            if (bulkSize == 0) continue;
-            uint8_t *bulk = malloc(bulkSize);
-            if (!bulk) return G2_ERR_NO_MEMORY;
-            int bret = recv_bulk(bulk, bulkSize);
-            /* Marker layout: [0x01][0x0C][ver][0x18][status][fileType][bank][location].
-             * Match bank/location too, so a marker left over from an earlier
-             * location can never be mistaken for this write's answer. */
-            int isMarker = (bret > 7 && bulk[1] == 0x0C && bulk[3] == 0x18
-                            && bulk[6] == (uint8_t)bank0 && bulk[7] == (uint8_t)location0);
-            if (isMarker) {
-                *status = bulk[4];
-                free(bulk);
-                return *status == 0 ? G2_OK : G2_ERR;
-            }
-            /* Somebody else's bulk - relay it so the watch stream keeps it,
-             * same as query_perf_settings does while waiting for its own reply. */
-            if (bret > 0) {
-                g2_msg_t relay = {0};
-                memcpy(relay.interrupt, response, 16);
-                relay.bulk = bulk;
-                relay.bulk_size = (uint16_t)bret;
-                g2_emit_event(&relay);
-            }
-            free(bulk);
-        }
-    }
+    /* CMFlashDumpMarker: 0 = DumpDownOK (written), 1 = MemoryProtected, 3 = MemoryFull,
+     * 4 = EntryEmpty, 5 = EntryCorrupt - only 0 means this entry landed. Which of the two
+     * acknowledgements the G2 sends depends on what was already at the location (an
+     * overwrite answers with a command result); the reference editor advances its loop off
+     * either (CFlashDumper::HandleDumpDownOK / ::HandleFlashCommandResult), and treats
+     * command result 4 as MemoryProtected. */
+    int got = await_flash_result(bank0, location0, status);
+    if (got == G2_ERR_NO_MEMORY) return G2_ERR_NO_MEMORY;
+    if (got == 1) return *status == 0 ? G2_OK : G2_ERR;
+    if (got == 2) return *status == 4 ? G2_ERR : G2_OK;
+    *status = -1;   /* no answer at all (or a USB error): the caller treats this as "no reply" */
     return G2_ERR;
 }
 

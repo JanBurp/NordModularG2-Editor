@@ -111,7 +111,8 @@
 			<p class="text-sm text-content-primary">{{ roomText }}</p>
 		</Dialog>
 
-		<!-- Several patches take a while (two flash operations each): show how far it is -->
+		<!-- Shown for every organizer operation: several patches take a while (two flash operations
+		     each), and even a quick single one keeps the rest of the UI blocked until it's done -->
 		<Dialog :model-value="progressOpen" :title="progressTitle" :show-confirm="false" :show-cancel="false" prevent-close>
 			<ProgressBar
 				v-if="browser.organizerProgress"
@@ -212,11 +213,11 @@
 		return `${w.needed} patches don't fit: ${where} has ${w.free} free location${w.free === 1 ? '' : 's'}. Nothing was moved or copied.`;
 	});
 
-	// Only for operations on more than one patch; single ones are quick enough to show as busy cells.
-	const progressOpen = computed(() => (browser.organizerProgress?.total ?? 0) > 1);
+	const progressOpen = computed(() => browser.organizerProgress !== null);
 	const progressTitle = computed(() => {
 		const p = browser.organizerProgress;
-		return p ? `${p.verb} ${p.total} patches…` : '';
+		if (!p) return '';
+		return p.total === 1 ? `${p.verb} ${p.name ? `"${p.name}"` : 'patch'}…` : `${p.verb} ${p.total} patches…`;
 	});
 
 	// Places per row, from the storage area's width (box w-28 = 112 px + gap-1 = 4 px).
