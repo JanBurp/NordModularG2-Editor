@@ -7,6 +7,7 @@ import { useDeviceStore, DeviceStatus } from '@/store/device';
 import { useUiStore } from '@/store/ui';
 import { MUTATOR_VARIATION } from '@/types/patch';
 import { usePatchAdjusterStore } from '@/store/patchAdjuster';
+import * as M from '@/renderer/mutator';
 
 beforeEach(() => {
 	setActivePinia(createPinia());
@@ -61,6 +62,29 @@ describe('mutator store', () => {
 		expect(run).not.toHaveBeenCalledWith(expect.arrayContaining(['copy-variation']));
 		expect(run).toHaveBeenCalledWith(['send-sections', 'A', expect.any(Array)]);
 		expect(slots.slots.A.variations![MUTATOR_VARIATION]).toEqual(slots.slots.A.variations![8]);
+	});
+
+	it('"Selected" limits Randomize to the selected modules', async () => {
+		await loadAnalogue();
+		const m = useMutatorStore();
+		const { patch, variations } = useSlotsStore().slots.A;
+		const src = variations![0];
+		// a voice module with a mutable param
+		const mod = patch!.areas[1].modules.find((mod) =>
+			src.voice[mod.index]?.some((_, p) => M.isEnabled(mod.type, mod.mutaLock === 1, p, m.current.lockMask, m.current.soloMask)),
+		)!;
+		const id = String(mod.index);
+		m.toggleSelectedOnly();
+		await m.randomize(); // nothing selected: blocked
+		expect(m.current.children.every((c) => c === null)).toBe(true);
+		useUiStore().selectModules([Number(id)], 'va');
+		await m.randomize();
+		const floored = m.current.children.map((c) => c && M.variationFromGenome(c));
+		for (const child of floored) {
+			expect(child!.fx).toEqual(src.fx);
+			for (const [other, vals] of Object.entries(src.voice)) if (other !== id) expect(child!.voice[Number(other)]).toEqual(vals);
+		}
+		expect(floored.some((c) => JSON.stringify(c!.voice[Number(id)]) !== JSON.stringify(src.voice[Number(id)]))).toBe(true);
 	});
 
 	it('undo restores the boxes', async () => {

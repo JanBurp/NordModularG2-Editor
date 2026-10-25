@@ -45,8 +45,8 @@
 					<span />
 					<span class="param-display w-14 text-center justify-self-center">+/-{{ Math.round(s.range * 100) }}%</span>
 					<div class="flex gap-1 pl-6!">
-						<Button variant="default" size="small" :disabled="!s.mother" @click="mutator.mutate()">Mutate</Button>
-						<Button variant="default" size="small" @click="mutator.randomize()">Randomize</Button>
+						<Button variant="default" size="small" :disabled="!s.mother || mutator.noSelection" @click="mutator.mutate()">Mutate</Button>
+						<Button variant="default" size="small" :disabled="mutator.noSelection" @click="mutator.randomize()">Randomize</Button>
 					</div>
 					<div class="flex gap-1 pl-6!">
 						<Button variant="default" size="small" :disabled="!s.mother || !s.father" @click="mutator.breed('interpolate')">Interpolate</Button>
@@ -138,9 +138,10 @@
 
 				<!-- Quick Locks: a lit button = that category is locked -->
 				<div class="self-center flex flex-col gap-4">
-					<!-- label stretches to the button row; bracket from the centre of the first lock to the centre of the last: half a column = (row - 6 gaps) / 14 -->
-					<BracketLabel title="Quick Locks during One Parent operations" class="px-[calc((100%-120px)/14)]" />
-					<div class="grid grid-cols-7 gap-5">
+					<!-- label stretches to the button row; bracket from the centre of the first lock to the centre of Selected (2 columns wide):
+					     column = (row - 8 gaps) / 9, left pad = half a column, right pad = a column + half a gap -->
+					<BracketLabel title="Quick Locks during One Parent operations" class="pl-[calc((100%-96px)/18)] pr-[calc((100%-96px)/9+6px)]" />
+					<div class="grid grid-cols-9 gap-3">
 						<div v-for="q in QUICK_LOCKS" :key="q.label" class="flex flex-col items-center gap-1">
 							<Button
 								variant="toggle"
@@ -152,6 +153,20 @@
 								{{ q.label }}
 							</Button>
 							<Button variant="toggle" size="xs" :active="(s.soloMask & q.bit) !== 0" @click="mutator.toggleSolo(q.bit)">Solo</Button>
+						</div>
+						<div class="col-span-2 flex flex-col items-center gap-1">
+							<Button
+								variant="toggle"
+								size="small"
+								class="w-full"
+								:active="s.selectedOnly"
+								title="Mutate/Randomize only the selected modules"
+								data-testid="mutator-selected-only"
+								@click="mutator.toggleSelectedOnly()"
+							>
+								Selected Modules
+							</Button>
+							<span class="text-xs text-content-secondary text-center">only mutate selected</span>
 						</div>
 					</div>
 				</div>

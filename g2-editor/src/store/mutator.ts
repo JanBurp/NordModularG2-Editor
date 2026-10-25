@@ -37,6 +37,7 @@ interface MutatorSlot extends Boxes {
 	link: boolean;
 	lockMask: number;
 	soloMask: number;
+	selectedOnly: boolean; // Mutate/Randomize only the modules selected on the canvas
 }
 
 function emptySlot(): MutatorSlot {
@@ -53,6 +54,7 @@ function emptySlot(): MutatorSlot {
 		link: true,
 		lockMask: M.DEFAULT_LOCK_MASK,
 		soloMask: 0,
+		selectedOnly: false,
 	};
 }
 
@@ -88,6 +90,10 @@ export const useMutatorStore = defineStore('mutator', {
 		focus(): BoxRef | null {
 			return useUiStore().variation === MUTATOR_VARIATION ? this.current.focus : null;
 		},
+		// "Selected" with nothing selected: Mutate/Randomize would only produce copies of the source.
+		noSelection(): boolean {
+			return this.current.selectedOnly && useUiStore().selectedModules.length === 0;
+		},
 	},
 
 	actions: {
@@ -105,8 +111,16 @@ export const useMutatorStore = defineStore('mutator', {
 
 		_modules(): M.MutaModules {
 			const patch = useSlotsStore().slots[this._slot()].patch;
+			const ui = useUiStore();
+			// "Selected": modules left out of the table are never changed
+			const included = (area: 0 | 1, index: number) =>
+				!this.current.selectedOnly || (ui.selectedModulesArea === (area === 0 ? 'fx' : 'va') && ui.selectedModules.includes(index));
 			const table = (area: 0 | 1) =>
-				Object.fromEntries((patch?.areas[area]?.modules ?? []).map((m) => [m.index, { type: m.type, locked: m.mutaLock === 1 }]));
+				Object.fromEntries(
+					(patch?.areas[area]?.modules ?? [])
+						.filter((m) => included(area, m.index))
+						.map((m) => [m.index, { type: m.type, locked: m.mutaLock === 1 }]),
+				);
 			return { fx: table(0), voice: table(1) };
 		},
 
@@ -232,7 +246,7 @@ export const useMutatorStore = defineStore('mutator', {
 		async mutate(from?: BoxRef): Promise<void> {
 			this._syncFocused();
 			const src = from ? this.genomeAt(from) : this.current.mother;
-			if (!src) return;
+			if (!src || this.noSelection) return;
 			const { prob, range, lockMask, soloMask } = this.current;
 			const modules = this._modules();
 			await this._commit(
@@ -248,7 +262,7 @@ export const useMutatorStore = defineStore('mutator', {
 		// Randomize: locked/excluded params are taken from the focused sound.
 		async randomize(): Promise<void> {
 			const src = this._focusedGenome();
-			if (!src) return;
+			if (!src || this.noSelection) return;
 			const { lockMask, soloMask } = this.current;
 			const modules = this._modules();
 			await this._commit(
@@ -363,6 +377,9 @@ export const useMutatorStore = defineStore('mutator', {
 		},
 		toggleSolo(bit: number): void {
 			this.current.soloMask ^= bit;
+		},
+		toggleSelectedOnly(): void {
+			this.current.selectedOnly = !this.current.selectedOnly;
 		},
 	},
 });
