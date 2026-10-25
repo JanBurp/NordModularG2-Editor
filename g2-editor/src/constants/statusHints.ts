@@ -66,6 +66,7 @@ export const STATUS_HINTS = {
 	organizerStorage: `Drag onto a location: copy to the G2 · Click: select · Delete: delete · Right-click: more options`,
 	organizerSlot: 'Drop: load it into this slot · Drag onto a location: store this slot there · Right-click: store in a bank',
 	organizerTrash: 'Drop to delete · Delete: delete the selection',
+	organizerCategory: 'Click: give the selected patches this category (select patches first)',
 	organizerSort: 'Click: sort this column by location, name or category',
 	organizerSortLink: 'Click: both columns use the same sort (on/off)',
 	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,

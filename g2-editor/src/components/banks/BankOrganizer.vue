@@ -1,9 +1,9 @@
 <template>
 	<div class="flex flex-col flex-1 min-h-0 bg-surface-1" data-testid="bank-organizer">
-		<!-- Undo/Redo and Patches/Performances left · Slots centred · Trash and close right -->
-		<div class="relative flex items-end gap-3 px-3 py-2 border-b border-line-subtle text-xs text-content-primary">
-			<!-- h-10: centred on the slot boxes, not on the whole row -->
-			<div class="flex-1 flex items-center gap-3 h-10">
+		<!-- Undo/Redo over Patches/Performances · Slots · Categories · Trash and close right -->
+		<!-- wraps on narrow windows: Categories and Trash then move to a second line -->
+		<div class="relative flex flex-wrap items-end gap-3 px-3 py-2 border-b border-line-subtle text-xs text-content-primary">
+			<div class="flex flex-col items-start gap-1.5 shrink-0">
 				<UndoRedo />
 				<BtnGroup :model-value="uiStore.organizerKind" :options="kindOptions" variant="toggle" @update:model-value="(v) => setKind(v as BankKind)" />
 			</div>
@@ -15,7 +15,7 @@
 					<OrganizerBox
 						v-for="slot in slotIndices"
 						:key="slot"
-						:label="slot === 4 ? 'Perf' : SLOT_LABELS[slot]"
+						:label="slotLabel(slot)"
 						:name="org.slotName(slot) || '—'"
 						:dimmed="!slotEnabled(slot)"
 						:focused="slotFocused(slot)"
@@ -34,6 +34,30 @@
 				</div>
 			</div>
 
+			<!-- Click: the selected patches get that category (as the context menu's Category does) -->
+			<div class="flex flex-col gap-1.5 min-w-112 flex-1">
+				<BracketLabel title="Categories" class="px-6" />
+				<div
+					class="grid grid-cols-8 grid-rows-2 gap-0.5 h-10"
+					data-testid="organizer-categories"
+					@mouseenter="showHint('organizerCategory')"
+					@mouseleave="clearHint()"
+				>
+					<button
+						v-for="c in SOUND_CATEGORIES"
+						:key="c.id"
+						class="min-w-0 px-1 truncate rounded-xs border border-line-default text-[11px] leading-none"
+						:class="categoryTargets.length ? 'cursor-pointer organizer-hover' : 'opacity-60 cursor-default'"
+						:style="{ backgroundColor: categoryTint(categorySlugFromName(c.name)) ?? 'var(--color-surface-cell)' }"
+						:title="categoryTargets.length ? `Set category of ${categoryTargets.length} to ${c.name}` : c.name"
+						:disabled="!categoryTargets.length"
+						@click="browser.setCategory(categoryTargets, c.id)"
+					>
+						{{ c.name }}
+					</button>
+				</div>
+			</div>
+
 			<!-- close pinned to the top-right corner; Trash under it, in line with the slot boxes -->
 			<Button
 				variant="default"
@@ -46,7 +70,7 @@
 				<Icon name="close" class="w-2.5 h-2.5" />
 			</Button>
 			<!-- Trash: drop a location or storage item (or the selection it belongs to) here; asks for confirmation -->
-			<div class="flex-1 flex justify-end">
+			<div class="ml-auto shrink-0">
 				<OrganizerBox
 					label=""
 					name=""
@@ -157,15 +181,14 @@
 	import { useDeviceStore, DeviceStatus } from '@/store/device';
 	import { useSettingsStore } from '@/store/settings';
 	import { useUiStore } from '@/store/ui';
+	import { useSlotsStore } from '@/store/slots';
 	import { useStatusHint } from '@/composables/useStatusHint';
 	import { useContextMenu } from '@/composables/useContextMenu';
-	import { asStorage, clickMode, useOrganizer } from './useOrganizer';
-	import { getCategoryNameFromSlug } from '@/constants/categories';
+	import { asStorage, categoryMenu, clickMode, useOrganizer } from './useOrganizer';
+	import { SOUND_CATEGORIES, categorySlugFromName, getCategoryName, getCategoryNameFromSlug } from '@/constants/categories';
 	import { categoryTint } from './categoryTint';
 	import type { PatchSortMode } from '@/utils/sortPatches';
-	import type { ContextMenuItem } from '@/types';
 	import { useOrganizerHistoryStore } from '@/store/organizerHistory';
-	import { MOD } from '@/constants/statusHints';
 
 	const SIDES = ['left', 'right'] as const;
 	const STORAGE_AREA = 'storage';
@@ -179,6 +202,7 @@
 	const device = useDeviceStore();
 	const settings = useSettingsStore();
 	const uiStore = useUiStore();
+	const slotsStore = useSlotsStore();
 	const org = useOrganizer();
 	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
@@ -193,29 +217,24 @@
 			if (!open) org.clearRequest.value = null;
 		},
 	});
-	// Bank locations and storage items are never mixed in one request (see useOrganizer's select).
+	// Bank locations and storage items are never mixed in one request (see useOrganizer's select);
+	// only a multi-delete asks (one item is deleted right away).
 	const clearText = computed(() => {
 		const list = org.clearRequest.value ?? [];
 		const n = list.length;
-		const storage = list[0]?.type === 'storage';
 		const names = list.map((s) =>
 			s.type === 'cell' ? `${s.loc.bank}-${s.loc.location}  ${browser.entryAt(s.loc)?.name ?? ''}` : s.item.name || 'Untitled',
 		);
 		// Up to 8 named, then a count of the rest.
 		const lines = names.slice(0, 8);
 		if (n > 8) lines.push(`… and ${n - 8} more`);
-		return storage
-			? {
-					title: n === 1 ? 'Delete from Temporary Storage' : `Delete ${n} from Temporary Storage`,
-					body: `This deletes the copies on this computer (${MOD}Z undoes it while the Bank Organizer is open):`,
-					lines,
-				}
-			: {
-					title: n === 1 ? 'Delete location' : `Delete ${n} locations`,
-					body: `This deletes from the G2's memory (${MOD}Z undoes it while the Bank Organizer is open):`,
-					lines,
-				};
+		return list[0]?.type === 'storage'
+			? { title: `Delete ${n} from Temporary Storage`, body: 'This deletes the copies on this computer:', lines }
+			: { title: `Delete ${n} locations`, body: "This deletes from the G2's memory:", lines };
 	});
+
+	// What a click on a category changes: the selected patches (performances have no category).
+	const categoryTargets = computed(() => (uiStore.organizerKind === 'patch' ? org.selection.value : []));
 
 	const storageItems = computed(() => browser.storage.filter((h) => h.kind === uiStore.organizerKind));
 
@@ -280,6 +299,13 @@
 		if (linked) setSort(side, settings.organizerSortModes[side]);
 	}
 
+	// "A · Bass": the slot and the category of its patch (performances have none).
+	function slotLabel(slot: number): string {
+		if (slot === 4) return 'Perf';
+		const category = slotsStore.getPatchForSlot(SLOT_LABELS[slot])?.description?.category;
+		return category === undefined ? SLOT_LABELS[slot] : `${SLOT_LABELS[slot]} · ${getCategoryName(category)}`;
+	}
+
 	// Patch slots A-D for patch banks, the Perf slot for performance banks.
 	const slotEnabled = (slot: number) => (slot === 4) === (uiStore.organizerKind === 'performance');
 	// The focused slot A-D for patch banks; the Perf slot (there is only one) for performance banks.
@@ -288,24 +314,23 @@
 	const slotDraggable = (slot: number) =>
 		slotEnabled(slot) && device.status === DeviceStatus.Connected && (slot < 4 || device.device?.mode === 'Performance');
 
-	// "… Bank n (at n-17)" entries for the banks shown left and right, into their first empty location.
-	function toBankItems(verb: string, disabled: boolean, act: (dst: NonNullable<ReturnType<typeof org.firstEmpty>>) => void): ContextMenuItem[] {
-		return [...new Set(uiStore.organizerBanks)].map((bank) => {
-			const dst = org.firstEmpty(uiStore.organizerKind, bank);
-			return {
-				label: dst ? `${verb} Bank ${bank} (at ${bank}-${dst.location})` : `${verb} Bank ${bank} (full)`,
-				disabled: disabled || !dst,
-				action: () => dst && act(dst),
-			};
-		});
-	}
-
 	function onSlotContextMenu(e: MouseEvent, slot: number) {
 		if (!slotEnabled(slot)) return;
-		openContextMenu(
-			e,
-			toBankItems('Store in', !slotDraggable(slot), (dst) => browser.storeSlotAt(org.storeSlot(slot), dst, org.slotName(slot))),
-		);
+		const items = org.toBankItems('Store in', !slotDraggable(slot), (dst) => browser.storeSlotAt(org.storeSlot(slot), dst, org.slotName(slot)));
+		// A loaded patch (A-D) gets its category changed like the toolbar's Cat does; performances have none.
+		if (slot < 4 && slotsStore.getPatchForSlot(SLOT_LABELS[slot])?.description)
+			items.push(
+				{ type: 'separator' },
+				categoryMenu('Category', (id) => setSlotCategory(slot, id)),
+			);
+		openContextMenu(e, items);
+	}
+
+	// The description setters work on the slot in focus.
+	function setSlotCategory(slot: number, id: number) {
+		uiStore.setSlotInFocus(SLOT_LABELS[slot]);
+		slotsStore.setPatchDescriptionField('category', id);
+		slotsStore.setPatchDescription();
 	}
 
 	// Acts on the whole selection when the item is part of it (else selects just this item).
@@ -315,14 +340,12 @@
 		const targets = org.targetsFor(self);
 		const multi = targets.length > 1;
 		openContextMenu(e, [
-			...(multi
-				? [...new Set(uiStore.organizerBanks)].map((bank) => ({
-						label: `Copy ${targets.length} to Bank ${bank}`,
-						action: () => org.placeInto(targets, uiStore.organizerKind, bank, 1, false),
-					}))
-				: toBankItems('Copy to', false, (dst) => browser.fromStorage(item, dst))),
+			...org.copyToBankItems(targets, (dst) => browser.fromStorage(item, dst)),
+			...(uiStore.organizerKind === 'patch'
+				? [categoryMenu(multi ? `Category of ${targets.length}` : 'Category', (id) => browser.setCategory(targets, id))]
+				: []),
 			{ type: 'separator' },
-			{ label: targets.length > 1 ? `Delete ${targets.length}…` : 'Delete…', action: () => org.requestClear(targets) },
+			{ label: targets.length > 1 ? `Delete ${targets.length}…` : 'Delete', action: () => org.requestClear(targets) },
 		]);
 	}
 

@@ -7,7 +7,7 @@ import { PATCH_MORPH_MODULE_ID, SectionType } from '../constants';
 import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
-import { buildPerformanceTemplate, serializePatch, serializePerformance, writePerfSettings } from '../nmg2PatchSerializer';
+import { buildPerformanceTemplate, serializePatch, serializePerformance, setFileDescription, writePerfSettings } from '../nmg2PatchSerializer';
 import { extractVariations } from '../../store/slotHelpers';
 import { computeUprateSet, inferUserColours } from '../cableGraph';
 import { getModule } from '../../renderer/nmg2mods';
@@ -1682,5 +1682,29 @@ describe('buildPerformanceTemplate — performance from hardware (get-patch orde
 		expect(extractSection(hex, SectionType.PERF_DATA)).toBe(toHex(perfSettings));
 		const { patches: back } = parsePerfFromRawHex('Rebuilt', hex);
 		for (let s = 0; s < 4; s++) expectPatchEqual(patches[s], back[s]);
+	});
+});
+
+describe('setFileDescription — another category for a patch file', () => {
+	it('changes only the category (and the CRC); the file still parses with every other field intact', () => {
+		const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'Clavia demo.pch2')));
+		const before = new PatchParser(file.slice().buffer).parse().description!;
+		const category = before.category === 3 ? 4 : 3;
+		const out = setFileDescription(file, { ...before, category });
+
+		expect(out.length).toBe(file.length);
+		expect(new PatchParser(out.slice().buffer).parse().description).toEqual({ ...before, category });
+		// Header and everything outside the description section (and the CRC) is byte for byte the same.
+		const differing = [...out.keys()].filter((i) => out[i] !== file[i]);
+		const descStart = file.indexOf(SectionType.PATCH_DESC, file.indexOf(0) + 3) + 3;
+		expect(differing.filter((i) => i < descStart || (i >= descStart + 15 && i < file.length - 2))).toEqual([]);
+	});
+
+	it('leaves every fixture byte-identical when the description is unchanged (also the CRC of version-22 files)', () => {
+		for (const f of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.pch2'))) {
+			const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, f)));
+			const desc = new PatchParser(file.slice().buffer).parse().description!;
+			expect(setFileDescription(file, desc), f).toEqual(file);
+		}
 	});
 });

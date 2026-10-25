@@ -121,6 +121,12 @@ body {
 	@apply bg-transparent;
 }
 
+/* Bank Organizer cell/box hover: darker in the light theme, lighter in the dark one (a filter,
+   as category tints are inline backgrounds). */
+.organizer-hover {
+	@apply hover:brightness-90 dark:hover:brightness-130;
+}
+
 .btn-group-item {
 	@apply rounded-none m-0 first:rounded-l last:rounded-r not-first:border-l-0;
 }

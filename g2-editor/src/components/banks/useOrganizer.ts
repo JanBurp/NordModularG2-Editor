@@ -5,6 +5,9 @@ import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { useDeviceStore } from '@/store/device';
 import { usePatchFile } from '@/composables/usePatchFile';
+import { SOUND_CATEGORIES } from '@/constants/categories';
+import type { ContextMenuItem } from '@/types';
+import { categoryColor } from './categoryTint';
 
 // A selectable thing: a bank cell or a Temporary Storage item. A selection holds one type only.
 // The same shape is what the store places into a bank (PlaceSource).
@@ -41,6 +44,12 @@ const roomWarning = ref<{ needed: number; free: number; bank: number; from: numb
 // Click modifiers → selection mode: Shift = range, Cmd/Ctrl = toggle, plain = single.
 export const clickMode = (e: MouseEvent) => (e.shiftKey ? 'range' : e.metaKey || e.ctrlKey ? 'toggle' : 'single') as 'range' | 'toggle' | 'single';
 
+// A "Category" context-menu entry with a submenu of all categories; `pick` gets the chosen id.
+export const categoryMenu = (label: string, pick: (id: number) => void): ContextMenuItem => ({
+	label,
+	children: SOUND_CATEGORIES.map((c) => ({ label: c.name, bgColor: categoryColor(c.id), action: () => pick(c.id) })),
+});
+
 // Shared state and actions of the Bank Organizer: drag & drop, selection, deleting.
 export function useOrganizer() {
 	const browser = useBrowserStore();
@@ -70,16 +79,18 @@ export function useOrganizer() {
 	}
 
 	// single: just this one · toggle: add/remove it (Cmd-click) · range: anchor..it (Shift-click).
-	// Another type, or another area for a range, starts a new selection.
+	// Another type, or another area for a range, starts a new selection. Empty bank cells are
+	// never selected (the cursor still moves onto them).
 	function select(s: Selectable, mode: 'single' | 'toggle' | 'range', areaId: string) {
 		const area = areas.get(areaId);
 		const sameArea = activeArea.value === areaId;
 		activeArea.value = areaId;
 		cursor.value = s;
-		if (mode === 'range' && area && sameArea) return void (selection.value = rangeIn(area, s));
+		if (mode === 'range' && area && sameArea) return void (selection.value = rangeIn(area, s).filter(filled));
 		if (mode === 'toggle' && selection.value[0]?.type === s.type) {
-			selection.value = isSelected(s) ? selection.value.filter((x) => !same(x, s)) : [...selection.value, s];
-		} else selection.value = [s];
+			if (isSelected(s)) selection.value = selection.value.filter((x) => !same(x, s));
+			else if (filled(s)) selection.value = [...selection.value, s];
+		} else selection.value = filled(s) ? [s] : [];
 		anchor.value = s;
 	}
 
@@ -97,9 +108,9 @@ export function useOrganizer() {
 		const at = cursor.value ? list.findIndex((x) => same(cursor.value, x)) : -1;
 		const next = list[Math.max(0, Math.min(list.length - 1, at < 0 ? 0 : at + dx + dy * area.cols()))];
 		cursor.value = next;
-		if (extend) selection.value = rangeIn(area, next);
+		if (extend) selection.value = rangeIn(area, next).filter(filled);
 		else {
-			selection.value = [next];
+			selection.value = filled(next) ? [next] : [];
 			anchor.value = next;
 		}
 	}
@@ -204,16 +215,44 @@ export function useOrganizer() {
 	// First empty location of a bank, for the "… to Bank n" menu entries; null when the bank is full.
 	const firstEmpty = (kind: BankKind, bank: number): BankLoc | null => browser.freeFrom(kind, bank, 1)[0] ?? null;
 
-	// ── Deleting ────────────────────────────────────────────────────────────
-	// Asks for confirmation (BankOrganizer's dialog); empty bank cells are left out.
-	function requestClear(list: Selectable[]) {
-		const real = list.filter(filled);
-		if (real.length) clearRequest.value = real;
+	// "… Bank n (at n-17)" menu entries for the banks shown left and right, into their first empty location.
+	function toBankItems(verb: string, disabled: boolean, act: (dst: BankLoc) => void): ContextMenuItem[] {
+		return [...new Set(uiStore.organizerBanks)].map((bank) => {
+			const dst = firstEmpty(uiStore.organizerKind, bank);
+			return {
+				label: dst ? `${verb} Bank ${bank} (at ${bank}-${dst.location})` : `${verb} Bank ${bank} (full)`,
+				disabled: disabled || !dst,
+				action: () => dst && act(dst),
+			};
+		});
 	}
 
-	async function confirmClear() {
+	// "Copy to Bank n" entries for bank cells or storage items: one item goes to the first empty
+	// location (`copyOne`), several to the first empty ones from location 1 on.
+	function copyToBankItems(targets: Selectable[], copyOne: (dst: BankLoc) => void): ContextMenuItem[] {
+		if (targets.length === 1) return toBankItems('Copy to', false, copyOne);
+		return [...new Set(uiStore.organizerBanks)].map((bank) => ({
+			label: `Copy ${targets.length} to Bank ${bank}`,
+			action: () => placeInto(targets, uiStore.organizerKind, bank, 1, false),
+		}));
+	}
+
+	// ── Deleting ────────────────────────────────────────────────────────────
+	// One item is deleted right away (undo brings it back); several ask for confirmation first
+	// (BankOrganizer's dialog). Empty bank cells are left out.
+	function requestClear(list: Selectable[]) {
+		const real = list.filter(filled);
+		if (real.length === 1) clear(real);
+		else if (real.length) clearRequest.value = real;
+	}
+
+	function confirmClear() {
 		const list = clearRequest.value ?? [];
 		clearRequest.value = null;
+		return clear(list);
+	}
+
+	async function clear(list: Selectable[]) {
 		const locs = list.flatMap((s) => (s.type === 'cell' ? [s.loc] : []));
 		const items = list.flatMap((s) => (s.type === 'storage' ? [s.item] : []));
 		if (items.length) await browser.removeStorage(items);
@@ -245,6 +284,8 @@ export function useOrganizer() {
 		loadIntoSlot,
 		placeInto,
 		firstEmpty,
+		toBankItems,
+		copyToBankItems,
 		isSelected,
 		isCursor,
 		select,

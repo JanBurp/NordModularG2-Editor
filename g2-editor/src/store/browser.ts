@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia';
 import { SLOT_LABELS } from '@/constants';
-import { getCategorySlug } from '@/constants/categories';
+import { getCategoryName, getCategorySlug } from '@/constants/categories';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useSlotsStore } from './slots';
 import { showToast } from '@/composables/useToast';
@@ -454,6 +454,53 @@ export const useBrowserStore = defineStore('browser', {
 			);
 		},
 
+		/* Rewrites a patch file with another category (nothing else in it changes). */
+		async _recategorize(file: string, category: number): Promise<void> {
+			const result = await window.electronAPI.patches.load(file);
+			if (!result.success || !result.data) throw new Error(result.error ?? `Cannot read ${file}`);
+			const { PatchParser } = await import('../parser/nmg2PatchParser');
+			const { setFileDescription } = await import('../parser/nmg2PatchSerializer');
+			const bytes = new Uint8Array(result.data);
+			const desc = new PatchParser(bytes.buffer).parse().description;
+			if (!desc) throw new Error('Patch has no description');
+			await window.electronAPI.savePatch(file, Array.from(setFileDescription(bytes, { ...desc, category })));
+		},
+
+		/* Another category for bank patches and storage items. The G2 has no command for it, so a
+		 * location is read, its patch description changed and written back (undoable). */
+		setCategory(targets: PlaceSource[], category: number): Promise<boolean> {
+			const slug = getCategorySlug(category);
+			const nameOf = (t: PlaceSource) => (t.type === 'cell' ? (this.entryAt(t.loc)?.name ?? '') : t.item.name);
+			const todo = targets.filter((t) => (t.type === 'cell' ? this.entryAt(t.loc)?.category : t.item.category) !== slug);
+			if (!todo.length) return Promise.resolve(true);
+			const cells = todo.flatMap((t) => (t.type === 'cell' ? [t.loc] : []));
+			const to = getCategoryName(category);
+			const label = todo.length === 1 ? `Set category of "${nameOf(todo[0])}" to ${to}` : `Set category of ${todo.length} to ${to}`;
+			return this._organize(
+				cells,
+				async () => {
+					for (const [i, t] of todo.entries()) {
+						this._step('Changing category of', i, todo.length, nameOf(t));
+						if (t.type === 'storage') {
+							const before = await this._keep(t.item.file, 'patch');
+							await this._recategorize(t.item.file, category);
+							recorder?.storageTouched(t.item.file, before, true, true, await this._keep(t.item.file, 'patch'));
+							continue;
+						}
+						const copy = await this._readLocation(t.loc, true);
+						if (!copy) continue; // emptied in the meantime
+						try {
+							await this._recategorize(copy.file, category);
+							await this._writeLocation(t.loc, copy.file, copy.name, slug);
+						} finally {
+							await window.electronAPI.patches.storageRemove(copy.file);
+						}
+					}
+				},
+				{ label, offline: !cells.length },
+			);
+		},
+
 		/* Multi-drop: puts each source into the matching (empty) location of `dsts`. Bank sources are
 		 * copied, or moved when `move`: they are cleared only after every copy has landed, so a
 		 * failure halfway leaves all sources intact. Storage items are always copied. */
@@ -532,7 +579,8 @@ export const useBrowserStore = defineStore('browser', {
 					for (const [i, c] of changes.entries()) {
 						this._step(verb, i, changes.length, action.label);
 						if (c.type === 'storage') {
-							if (undo ? c.existsBefore : c.existsAfter) await window.electronAPI.patches.storageCopy(c.copy, c.file);
+							if (undo ? c.existsBefore : c.existsAfter)
+								await window.electronAPI.patches.storageCopy(undo ? c.copy : (c.copyAfter ?? c.copy), c.file);
 							else await window.electronAPI.patches.storageRemove(c.file);
 							continue;
 						}

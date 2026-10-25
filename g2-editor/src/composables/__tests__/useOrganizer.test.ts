@@ -56,3 +56,67 @@ describe('useOrganizer — selection', () => {
 		expect(org.selection.value).toEqual([items[1], items[3]]);
 	});
 });
+
+describe('useOrganizer — selection holds occupied cells only', () => {
+	it('leaves empty cells out of clicks, Cmd-clicks, Shift-click ranges and Shift+arrow ranges', () => {
+		const browser = useBrowserStore();
+		for (const loc of [2, 4]) browser.upsertPatch(1, loc, 'patch', `X${loc}`);
+		const org = useOrganizer();
+		const cells = [1, 2, 3, 4, 5].map((l) => asCell(P(1, l)));
+		const unregister = org.registerArea({ id: 'grid-test', items: () => cells, cols: () => 8 });
+		const locs = () => org.selection.value.map((s) => (s.type === 'cell' ? s.loc.location : 0));
+
+		org.select(cells[0], 'single', 'grid-test');
+		expect(locs()).toEqual([]);
+		expect(org.isCursor(cells[0])).toBe(true); // the cursor still moves onto an empty cell
+
+		org.select(cells[4], 'range', 'grid-test');
+		expect(locs()).toEqual([2, 4]);
+
+		org.select(cells[2], 'toggle', 'grid-test');
+		expect(locs()).toEqual([2, 4]);
+
+		org.select(cells[1], 'single', 'grid-test');
+		org.moveCursor(1, 0, true);
+		expect(locs()).toEqual([2]);
+		unregister();
+	});
+});
+
+describe('useOrganizer — "Copy to Bank" entries and deleting', () => {
+	it('copies one item to the first empty location of each shown bank, several via placeInto', async () => {
+		const browser = useBrowserStore();
+		const { useUiStore } = await import('@/store/ui');
+		useUiStore().organizerBanks = [1, 2];
+		browser.upsertPatch(2, 1, 'patch', 'Taken');
+		const org = useOrganizer();
+		const copyOne = vi.fn();
+
+		const single = org.copyToBankItems([asCell(P(1, 5))], copyOne);
+		expect(single.map((i) => i.label)).toEqual(['Copy to Bank 1 (at 1-1)', 'Copy to Bank 2 (at 2-2)']);
+		single[1].action!();
+		expect(copyOne).toHaveBeenCalledWith(P(2, 2));
+
+		const placeMany = vi.spyOn(browser, 'placeMany').mockResolvedValue(true);
+		const multi = org.copyToBankItems([asCell(P(1, 5)), asCell(P(1, 6))], copyOne);
+		expect(multi.map((i) => i.label)).toEqual(['Copy 2 to Bank 1', 'Copy 2 to Bank 2']);
+		await multi[1].action!();
+		expect(placeMany).toHaveBeenCalledWith([asCell(P(1, 5)), asCell(P(1, 6))], [P(2, 2), P(2, 3)], false);
+	});
+
+	it('deletes one item right away, asks before deleting several', () => {
+		const browser = useBrowserStore();
+		for (const loc of [1, 2]) browser.upsertPatch(1, loc, 'patch', `X${loc}`);
+		const clearLocations = vi.spyOn(browser, 'clearLocations').mockResolvedValue(true);
+		const org = useOrganizer();
+
+		org.requestClear([asCell(P(1, 1))]);
+		expect(org.clearRequest.value).toBeNull();
+		expect(clearLocations).toHaveBeenCalledWith([P(1, 1)]);
+
+		org.requestClear([asCell(P(1, 1)), asCell(P(1, 2))]);
+		expect(org.clearRequest.value).toHaveLength(2);
+		expect(clearLocations).toHaveBeenCalledTimes(1);
+		org.clearRequest.value = null;
+	});
+});

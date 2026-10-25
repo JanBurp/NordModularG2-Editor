@@ -17,13 +17,14 @@
 			</Button>
 			<BtnGroup :model-value="sort" :options="sortOptions" variant="toggle" @update:model-value="(v) => emit('update:sort', v as PatchSortMode)" />
 		</div>
-		<div class="grid grid-cols-8 auto-rows-fr flex-1 min-h-0 overflow-y-auto">
+		<div ref="gridRef" class="grid grid-cols-8 auto-rows-fr flex-1 min-h-0 overflow-y-auto">
 			<div
 				v-for="cell in cells"
 				:key="cell.location"
-				class="flex items-center gap-1 px-1 min-w-0 text-xs select-none border-r border-b border-line-subtle/60 nth-[8n]:border-r-0"
+				class="flex px-1 min-w-0 text-xs select-none border-r border-b border-line-subtle/60 nth-[8n]:border-r-0"
 				:class="[
-					cell.patch ? 'bg-surface-cell cursor-grab active:cursor-grabbing' : '',
+					twoLines ? 'flex-col justify-center' : 'items-center gap-1',
+					cell.patch ? 'bg-surface-cell cursor-grab active:cursor-grabbing organizer-hover' : '',
 					{
 						'animate-pulse': isBusy(cell.location),
 						'outline-2 outline-input -outline-offset-2': dropTarget === cell.location,
@@ -45,7 +46,14 @@
 				@mouseenter="showHint('organizerCell')"
 				@mouseleave="clearHint()"
 			>
-				<span class="shrink-0 w-6 text-right text-content-muted tabular-nums">{{ cell.location }}</span>
+				<!-- Tall enough: "17 Bass" over the name, like the storage boxes; else location and name in one line -->
+				<span v-if="twoLines" class="truncate" :class="cell.patch ? 'text-content-primary/60' : 'text-content-muted'">
+					<span class="tabular-nums">{{ cell.location }}</span>
+					<template v-if="cell.patch && kind === 'patch'">&nbsp;{{ getCategoryNameFromSlug(cell.patch.category) || 'No Cat' }}</template>
+				</span>
+				<span v-else class="shrink-0 w-6 text-right tabular-nums" :class="cell.patch ? 'text-content-primary/60' : 'text-content-muted'">{{
+					cell.location
+				}}</span>
 				<span class="truncate" :class="cell.patch ? 'text-content-primary' : 'text-content-muted'">{{ cell.patch?.name ?? '—' }}</span>
 			</div>
 		</div>
@@ -53,7 +61,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, onUnmounted, ref } from 'vue';
+	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import Select from '../common/Select.vue';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
 	import Button from '../toolbar/Button.vue';
@@ -61,8 +69,9 @@
 	import { useBrowserStore, type BankKind, type BankLoc, type SynthPatch } from '@/store/browser';
 	import { sortPatches, type PatchSortMode } from '@/utils/sortPatches';
 	import { categoryTint } from './categoryTint';
+	import { getCategoryNameFromSlug } from '@/constants/categories';
 	import { useStatusHint } from '@/composables/useStatusHint';
-	import { asCell, clickMode, useOrganizer, type OrganizerDragSource } from './useOrganizer';
+	import { asCell, categoryMenu, clickMode, useOrganizer, type OrganizerDragSource } from './useOrganizer';
 	import { useContextMenu } from '@/composables/useContextMenu';
 	import { SLOT_LABELS } from '@/constants';
 	import type { ContextMenuItem } from '@/types';
@@ -89,6 +98,17 @@
 	const dropTarget = ref<number | null>(null);
 
 	const LOCATIONS = 128;
+	const ROWS = LOCATIONS / 8;
+	const TWO_LINE_MIN_HEIGHT = 30; // px per row for the two-line cells
+
+	// Two-line cells only when all 16 rows still fit at that height (small windows keep one line).
+	const gridRef = ref<HTMLElement>();
+	const twoLines = ref(false);
+	const resizeObserver = new ResizeObserver(([entry]) => {
+		twoLines.value = entry.contentRect.height / ROWS >= TWO_LINE_MIN_HEIGHT;
+	});
+	onMounted(() => gridRef.value && resizeObserver.observe(gridRef.value));
+	onUnmounted(() => resizeObserver.disconnect());
 
 	// "3 (12)": bank number and its number of occupied locations, as the Patch Browser's bank headers show.
 	const bankOptions = computed(() => {
@@ -158,13 +178,17 @@
 				label: locs.length > 1 ? `Copy ${locs.length} to Temporary Storage` : 'Copy to Temporary Storage',
 				action: () => browser.toStorage(locs),
 			},
+			...org.copyToBankItems(locs.map(asCell), (dst) => browser.moveLocation(here, dst, true)),
 			{
 				label: 'Load into slot',
 				disabled: locs.length > 1,
 				children: slots.map(({ slot, label }) => ({ label, action: () => org.loadIntoSlot(here, slot) })),
 			},
+			...(props.kind === 'patch'
+				? [categoryMenu(locs.length > 1 ? `Category of ${locs.length}` : 'Category', (id) => browser.setCategory(locs.map(asCell), id))]
+				: []),
 			{ type: 'separator' },
-			{ label: locs.length > 1 ? `Delete ${locs.length} locations…` : 'Delete…', action: () => org.requestClear(targets) },
+			{ label: locs.length > 1 ? `Delete ${locs.length} locations…` : 'Delete', action: () => org.requestClear(targets) },
 		];
 		openContextMenu(e, items);
 	}

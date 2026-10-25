@@ -373,6 +373,32 @@ export function buildPatchDescriptionBytes(templateRawHex: string, desc: PatchDe
 	return null;
 }
 
+/* A whole .pch2 file with its patch description replaced (e.g. another category); the header and
+ * every other section stay byte for byte as they were, only the CRC is recomputed. */
+export function setFileDescription(file: Uint8Array, desc: PatchDescription): Uint8Array {
+	const headerLen = file.indexOf(0) + 3; // [name/text header][0x00][version][file type]
+	const parts: Uint8Array[] = [file.slice(0, headerLen)];
+	let ofs = headerLen;
+	while (ofs < file.length - 2) {
+		const type = file[ofs];
+		const siz = (file[ofs + 1] << 8) | file[ofs + 2];
+		const section = file.slice(ofs, ofs + 3 + siz);
+		parts.push(type === SectionType.PATCH_DESC ? makeSection(type, writePatchDescription(section.slice(3), desc)) : section);
+		ofs += 3 + siz;
+	}
+	const out = new Uint8Array(parts.reduce((n, p) => n + p.length, 0) + 2);
+	let pos = 0;
+	for (const p of parts) {
+		out.set(p, pos);
+		pos += p.length;
+	}
+	// Same range as the file's own CRC: from its version byte (not always 0x17, unlike buildRawHex) on.
+	const crc = calcCrc(out.subarray(headerLen - 2, pos));
+	out[pos] = crc >> 8;
+	out[pos + 1] = crc & 0xff;
+	return out;
+}
+
 function writePatchDescription(secData: Uint8Array, desc: PatchDescription): Uint8Array {
 	const bw = new BitWriter();
 	// Preserve the first 61 bits (unknown header, not stored during parsing)

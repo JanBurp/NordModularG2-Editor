@@ -344,6 +344,25 @@ describe('browser store — Bank Organizer', () => {
 			expect(browser.storage).toEqual([]);
 		});
 
+		it('changes the category of a cell by rewriting it, skips one already in it, and undoes it', async () => {
+			const browser = seed([
+				[1, 1, 'Lead'],
+				[1, 2, 'Pad'],
+			]);
+			browser.upsertPatch(1, 2, 'patch', 'Pad', 'bass');
+			const recategorize = vi.spyOn(browser, '_recategorize').mockResolvedValue();
+
+			expect(await browser.setCategory(cells(P(1, 1), P(1, 2)), 3)).toBe(true);
+
+			expect(recategorize).toHaveBeenCalledTimes(1);
+			expect(calls.filter((c) => c[0] === 'put-location').map((c) => c.slice(1, 4))).toEqual([['patch', '1', '1']]);
+			expect(browser.entryAt(P(1, 1))?.category).toBe('bass');
+			expect((await history()).undoLabel).toBe('Set category of "Lead" to Bass');
+
+			await browser.stepOrganizerHistory('undo');
+			expect(browser.entryAt(P(1, 1))?.category).toBeUndefined();
+		});
+
 		it('undoes a delete: the patch was read into the history first', async () => {
 			const browser = seed([
 				[1, 1, 'Lead'],
@@ -417,5 +436,19 @@ describe('browser store — Bank Organizer', () => {
 			expect(h.undoStack).toHaveLength(50);
 			expect(h.undoLabel).toBe('step 59');
 		});
+	});
+});
+
+describe('ActionRecorder — storage file rewritten in place', () => {
+	it('keeps a rewrite (exists before and after) when it has a copyAfter, and lists both copies', async () => {
+		const { ActionRecorder, actionFiles } = await import('@/store/organizerHistory');
+		const rec = new ActionRecorder('Set category');
+		rec.storageTouched('/s/a.pch2', '/h/before.pch2', true, true, '/h/after.pch2');
+		rec.storageTouched('/s/b.pch2', '/h/b.pch2', true, true); // touched but unchanged
+		const action = rec.toAction()!;
+		expect(action.changes).toEqual([
+			{ type: 'storage', file: '/s/a.pch2', copy: '/h/before.pch2', existsBefore: true, existsAfter: true, copyAfter: '/h/after.pch2' },
+		]);
+		expect(actionFiles(action)).toEqual(['/h/before.pch2', '/h/after.pch2']);
 	});
 });

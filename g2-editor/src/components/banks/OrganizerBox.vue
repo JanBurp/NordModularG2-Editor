@@ -7,10 +7,11 @@
 				: empty
 					? 'border-dashed border-line-subtle'
 					: focused
-						? 'border-line-default bg-input-dimmed'
+						? 'border-input bg-input-dimmed'
 						: 'border-line-default bg-surface-cell',
 			{
 				'opacity-40 cursor-not-allowed': dimmed,
+				'organizer-hover': !empty && !danger && !dimmed,
 				'cursor-grab active:cursor-grabbing': $attrs.draggable === true || $attrs.draggable === 'true',
 				'outline-2 outline-input -outline-offset-2': highlighted,
 				'ring-2 ring-inset ring-input': selected,
@@ -20,7 +21,7 @@
 		:style="tint ? { backgroundColor: tint } : undefined"
 		:title="empty || danger ? undefined : name"
 	>
-		<span class="truncate text-content-muted">{{ label }}</span>
+		<span class="truncate" :class="empty || danger ? 'text-content-muted' : 'text-content-primary/60'">{{ label }}</span>
 		<span class="truncate" :class="danger ? '' : empty ? 'text-content-muted' : 'text-content-primary'">{{ name }}</span>
 		<slot />
 	</div>

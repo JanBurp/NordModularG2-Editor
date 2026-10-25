@@ -12,7 +12,8 @@ test.describe('Bank Organizer – offline', () => {
 		const dir = path.join(userData, 'bank-storage');
 		fs.mkdirSync(dir, { recursive: true });
 		const fixture = path.resolve(__dirname, '../../test-patches/EmptyPatch.pch2');
-		for (const [i, n] of ['Lead Saw', 'Strings3', 'Kick', 'Pad'].entries()) fs.copyFileSync(fixture, path.join(dir, `${encodeURIComponent(n)}__0${i}.pch2`));
+		for (const [i, n] of ['Lead Saw', 'Strings3', 'Kick', 'Pad'].entries())
+			fs.copyFileSync(fixture, path.join(dir, `${encodeURIComponent(n)}__0${i}.pch2`));
 		await sendMenuAction('toggle-bank-organizer');
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
 	});
@@ -44,6 +45,12 @@ test.describe('Bank Organizer – offline', () => {
 	});
 
 	test('Escape in the delete dialog closes only the dialog, not the organizer', async ({ page }) => {
+		// Only a multi-delete asks for confirmation.
+		await page.locator('[data-testid="storage-item"]').first().click();
+		await page
+			.locator('[data-testid="storage-item"]')
+			.nth(1)
+			.click({ modifiers: ['Shift'] });
 		await page.locator('[data-testid="storage-item"]').first().dragTo(page.locator('[data-testid="organizer-trash"]'));
 		const dialog = page.getByRole('dialog');
 		await expect(dialog).toBeVisible();
@@ -55,11 +62,10 @@ test.describe('Bank Organizer – offline', () => {
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
 	});
 
-	test('Delete… from the context menu, confirmed, deletes exactly that storage item', async ({ page }) => {
+	test('Delete from the context menu deletes exactly that storage item, without asking', async ({ page }) => {
 		await page.locator('[data-testid="storage-item"]', { hasText: 'Lead Saw' }).click({ button: 'right' });
-		await page.getByRole('menuitem', { name: 'Delete…' }).click();
-		await expect(page.getByRole('dialog')).toContainText('Lead Saw');
-		await page.getByRole('button', { name: 'Delete' }).click();
+		await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
+		await expect(page.getByRole('dialog')).toHaveCount(0);
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(3);
 		await expect(page.locator('[data-testid="storage-item"]', { hasText: 'Lead Saw' })).toHaveCount(0);
 	});
@@ -83,6 +89,23 @@ test.describe('Bank Organizer – offline', () => {
 		await deleteDialogLists(page, ['Strings3', 'Pad']);
 	});
 
+	test('clicking a category in the top bar sets it on the selected items; Undo brings the old one back', async ({ page, sendMenuAction }) => {
+		const item = (n: string) => page.locator('[data-testid="storage-item"]', { hasText: n });
+		const category = page.locator('[data-testid="organizer-categories"] button', { hasText: 'User 1' });
+		await expect(category).toBeDisabled(); // nothing selected yet
+
+		await item('Strings3').click();
+		await item('Kick').click({ modifiers: ['Shift'] });
+		await category.click();
+		await expect(item('Strings3')).toContainText('User 1');
+		await expect(item('Kick')).toContainText('User 1');
+		await expect(item('Pad')).toContainText('No Cat');
+
+		await sendMenuAction('undo');
+		await expect(item('Strings3')).toContainText('No Cat');
+		await expect(item('Kick')).toContainText('No Cat');
+	});
+
 	test('Cmd/Ctrl-A selects all; Shift+arrows extend from the cursor', async ({ page }) => {
 		await page.locator('[data-testid="storage-item"]', { hasText: 'Lead Saw' }).click();
 		await page.keyboard.press('ControlOrMeta+a');
@@ -102,15 +125,14 @@ test.describe('Bank Organizer – offline', () => {
 		await page.locator('[data-testid="storage-item"]').nth(1).dragTo(page.locator('[data-testid="bank-grid-left"] [data-testid="bank-cell-127"]'));
 		const dialog = page.getByRole('dialog');
 		await expect(dialog).toContainText('Not enough room');
-		await expect(dialog).toContainText('4 patches don\'t fit');
+		await expect(dialog).toContainText("4 patches don't fit");
 		await page.getByRole('button', { name: 'OK' }).click();
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4);
 	});
 
 	test('Undo (menu, as Cmd/Ctrl-Z) brings a deleted storage item back; Redo deletes it again', async ({ page, sendMenuAction }) => {
 		await page.locator('[data-testid="storage-item"]', { hasText: 'Kick' }).click({ button: 'right' });
-		await page.getByRole('menuitem', { name: 'Delete…' }).click();
-		await page.getByRole('button', { name: 'Delete' }).click();
+		await page.getByRole('menuitem', { name: 'Delete', exact: true }).click();
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(3);
 
 		await sendMenuAction('undo');

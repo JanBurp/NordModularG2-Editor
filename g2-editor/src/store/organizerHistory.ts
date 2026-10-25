@@ -20,13 +20,15 @@ export interface BankChange {
 	after: LocContent;
 }
 
-/* A file in the storage folder that was created and/or removed; `copy` keeps its contents. */
+/* A file in the storage folder that was created and/or removed; `copy` keeps its contents.
+ * A file rewritten in place (e.g. another category) has `copy` before and `copyAfter` after. */
 export interface StorageChange {
 	type: 'storage';
 	file: string;
 	copy: string;
 	existsBefore: boolean;
 	existsAfter: boolean;
+	copyAfter?: string;
 }
 
 export type OrganizerChange = BankChange | StorageChange;
@@ -59,10 +61,10 @@ export class ActionRecorder {
 		const c = this.bank.get(locKey(loc));
 		if (c) c.after = after;
 	}
-	storageTouched(file: string, copy: string, existsBefore: boolean, existsAfter: boolean): void {
+	storageTouched(file: string, copy: string, existsBefore: boolean, existsAfter: boolean, copyAfter?: string): void {
 		const c = this.storage.get(file);
-		if (c) c.existsAfter = existsAfter;
-		else this.storage.set(file, { type: 'storage', file, copy, existsBefore, existsAfter });
+		if (c) Object.assign(c, { existsAfter, copyAfter });
+		else this.storage.set(file, { type: 'storage', file, copy, existsBefore, existsAfter, copyAfter });
 	}
 
 	/* Changes that really changed something, in the order they were made. */
@@ -70,7 +72,7 @@ export class ActionRecorder {
 		const sameContent = (a: LocContent, b: LocContent) => (a === null) === (b === null) && (a === null || a.file === b?.file);
 		const changes: OrganizerChange[] = [
 			...[...this.bank.values()].filter((c) => !sameContent(c.before, c.after)),
-			...[...this.storage.values()].filter((c) => c.existsBefore !== c.existsAfter),
+			...[...this.storage.values()].filter((c) => c.existsBefore !== c.existsAfter || c.copyAfter),
 		];
 		return changes.length ? { label: this.label, changes } : null;
 	}
@@ -78,7 +80,7 @@ export class ActionRecorder {
 
 /* All history files of an action (to delete them when the action is dropped). */
 export function actionFiles(a: OrganizerAction): string[] {
-	return a.changes.flatMap((c) => (c.type === 'storage' ? [c.copy] : [c.before?.file, c.after?.file].filter((f): f is string => !!f)));
+	return a.changes.flatMap((c) => (c.type === 'storage' ? [c.copy, c.copyAfter] : [c.before?.file, c.after?.file]).filter((f): f is string => !!f));
 }
 
 export const useOrganizerHistoryStore = defineStore('organizerHistory', {
