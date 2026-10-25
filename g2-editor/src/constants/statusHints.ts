@@ -69,6 +69,7 @@ export const STATUS_HINTS = {
 	organizerCategory: 'Click: give the selected patches this category (select patches first)',
 	organizerSort: 'Click: sort this column by location, name or category',
 	organizerSortLink: 'Click: both columns use the same sort (on/off)',
+	organizerBankTransfer: 'Upload: save this bank from the G2 to disk · Download: overwrite this bank on the G2 from disk',
 	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,
 	expandCollapseAll: 'Click: expand/collapse all',
 	expandCollapse: 'Click: expand/collapse',

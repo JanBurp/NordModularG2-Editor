@@ -12,6 +12,8 @@ export const bankUploadBankNum = ref<number>(1);
 export const bankUploadFolder = ref<string>('');
 export const bankUploadFilename = ref<string>('');
 export const bankUploadInProgress = ref<boolean>(false);
+// Type and bank pre-filled by the caller (Bank Organizer column) and not changeable
+export const bankUploadLocked = ref<boolean>(false);
 export interface BankUploadProgress {
 	location: number;
 	total: number;
@@ -37,7 +39,7 @@ export function useBankUploadDialog() {
 		if (bankUploadBankNum.value > maxBank.value) bankUploadBankNum.value = maxBank.value;
 	});
 
-	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
+	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number; locked?: boolean }): void {
 		// Re-opening mid-transfer must keep the running progress visible, not reset it
 		if (bankUploadInProgress.value) {
 			showBankUploadDialog.value = true;
@@ -45,6 +47,7 @@ export function useBankUploadDialog() {
 		}
 		bankUploadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankUploadBankNum.value = opts?.bankNum ?? 1;
+		bankUploadLocked.value = opts?.locked ?? false;
 		bankUploadFolder.value = settings.bankFolder;
 		bankUploadFilename.value = '';
 		bankUploadProgress.value = null;
@@ -100,6 +103,7 @@ export function useBankUploadDialog() {
 		folder: bankUploadFolder,
 		filename: bankUploadFilename,
 		inProgress: bankUploadInProgress,
+		locked: bankUploadLocked,
 		progress: bankUploadProgress,
 		bankOptions,
 		open,

@@ -1,21 +1,51 @@
 <template>
 	<div class="flex flex-col min-w-0 min-h-0 flex-1 border border-line-default rounded-xs overflow-hidden" :data-testid="`bank-grid-${side}`">
-		<div class="flex items-center gap-2 px-2 py-1.5 border-b border-line-subtle">
-			<span class="text-xs text-content-secondary">Bank</span>
-			<Select :model-value="bank" :options="bankOptions" title="Bank" @update:model-value="(v) => emit('update:bank', Number(v))" />
-			<span v-if="sameBank" class="text-xs text-content-muted">(also shown on the other side)</span>
-			<Button
-				variant="toggle"
-				class="ml-auto w-6 px-0!"
-				:active="sortLinked"
-				title="Same sort for both columns"
-				hint="organizerSortLink"
-				:data-testid="`sort-link-${side}`"
-				@click="emit('update:sortLinked', !sortLinked)"
-			>
-				<Icon name="link" class="w-3.5 h-3.5" />
-			</Button>
-			<BtnGroup :model-value="sort" :options="sortOptions" variant="toggle" @update:model-value="(v) => emit('update:sort', v as PatchSortMode)" />
+		<!-- left · centre · right: equal outer columns keep the Upload/Download group centred -->
+		<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-2 py-1.5 border-b border-line-subtle">
+			<div class="flex items-center gap-1 min-w-0">
+				<span class="text-xs text-content-secondary">Bank</span>
+				<Select :model-value="bank" :options="bankOptions" title="Bank" @update:model-value="(v) => emit('update:bank', Number(v))" />
+				<span v-if="sameBank" class="ml-1 text-xs text-content-muted truncate">(same as other side)</span>
+			</div>
+			<!-- Same dialogs as Synth > Bank Upload/Download, with this column's kind and bank locked -->
+			<div class="flex items-center gap-1">
+				<span class="text-xs text-content-secondary">Bank</span>
+				<Button
+					variant="default"
+					:disabled="!connected"
+					title="Bank Upload (from G2)"
+					hint="organizerBankTransfer"
+					:data-testid="`bank-upload-${side}`"
+					@click="bankUploadDialog.open({ type: kind, bankNum: bank, locked: true })"
+				>
+					Upload
+				</Button>
+				<Button
+					variant="default"
+					:disabled="!connected"
+					title="Bank Download (to G2)"
+					hint="organizerBankTransfer"
+					:data-testid="`bank-download-${side}`"
+					@click="bankDownloadDialog.open({ type: kind, bankNum: bank, locked: true })"
+				>
+					Download
+				</Button>
+			</div>
+			<div class="flex items-center justify-end gap-1">
+				<span class="text-xs text-content-secondary">Sort by</span>
+				<BtnGroup :model-value="sort" :options="sortOptions" variant="toggle" @update:model-value="(v) => emit('update:sort', v as PatchSortMode)" />
+				<Button
+					variant="toggle"
+					class="w-6 px-0!"
+					:active="sortLinked"
+					title="Same sort for both columns"
+					hint="organizerSortLink"
+					:data-testid="`sort-link-${side}`"
+					@click="emit('update:sortLinked', !sortLinked)"
+				>
+					<Icon name="link" class="w-3.5 h-3.5" />
+				</Button>
+			</div>
 		</div>
 		<div ref="gridRef" class="grid grid-cols-8 auto-rows-fr flex-1 min-h-0 overflow-y-auto">
 			<div
@@ -73,6 +103,9 @@
 	import { useStatusHint } from '@/composables/useStatusHint';
 	import { asCell, categoryMenu, clickMode, useOrganizer, type OrganizerDragSource } from './useOrganizer';
 	import { useContextMenu } from '@/composables/useContextMenu';
+	import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
+	import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
+	import { useDeviceStore, DeviceStatus } from '@/store/device';
 	import { SLOT_LABELS } from '@/constants';
 	import type { ContextMenuItem } from '@/types';
 
@@ -92,7 +125,11 @@
 	}>();
 
 	const browser = useBrowserStore();
+	const device = useDeviceStore();
 	const org = useOrganizer();
+	const bankUploadDialog = useBankUploadDialog();
+	const bankDownloadDialog = useBankDownloadDialog();
+	const connected = computed(() => device.status === DeviceStatus.Connected);
 	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
 	const dropTarget = ref<number | null>(null);

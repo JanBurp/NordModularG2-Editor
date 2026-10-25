@@ -232,7 +232,7 @@
 		@cancel="bankUpload.cancel"
 	>
 		<div class="space-y-4">
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankUpload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
 				<BtnGroup
 					:model-value="bankUpload.type.value"
@@ -242,7 +242,7 @@
 					@update:model-value="bankUpload.type.value = $event as 'patch' | 'performance'"
 				/>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankUpload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankUpload.bankNum.value"
@@ -311,7 +311,7 @@
 			<div v-if="bankDownload.showWarning.value" class="p-3 bg-red-500/20 border border-red-400 rounded text-red-400 text-sm text-center">
 				<div><strong>WARNING:</strong> This will OVERWRITE the entire bank.</div>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankDownload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
 				<BtnGroup
 					:model-value="bankDownload.type.value"
@@ -321,7 +321,7 @@
 					@update:model-value="bankDownload.type.value = $event as 'patch' | 'performance'"
 				/>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankDownload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankDownload.bankNum.value"
