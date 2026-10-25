@@ -2523,3 +2523,60 @@ describe('uprate repair on load from the G2', () => {
 		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
 	});
 });
+
+describe('updateResources (official CPatchLoad formulas)', () => {
+	// One 28-byte block: location, then 14-bit words (msb*128+lsb) at the given payload offsets.
+	function block(location: number, words: Record<number, number> = {}, bytes: Record<number, number> = {}): number[] {
+		const d = new Array(28).fill(0);
+		d[0] = location;
+		for (const [i, v] of Object.entries(words)) {
+			d[+i] = v >> 7;
+			d[+i + 1] = v & 0x7f;
+		}
+		for (const [i, v] of Object.entries(bytes)) d[+i] = v;
+		return d;
+	}
+
+	it('cycles = (red + blue/4) * 100 / 1371, so 1371 red or 5484 blue is exactly 100%', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 1: 1371 }));
+		expect(store.slots['A'].resources.va.cycles).toBeCloseTo(100);
+		// The old Delphi formula (blue/5000) read 109.7% here and went red while the patch still ran
+		store.updateResources('A', block(1, { 3: 5484 }));
+		expect(store.slots['A'].resources.va.cycles).toBeCloseTo(100);
+	});
+
+	it.each([
+		['xmem (v1 + v2)', block(1, { 8: 1084, 14: 1084 })],
+		['ymem (v1 + v2)', block(1, { 10: 748, 16: 748 })],
+		['pmem (v1 + v2)', block(1, { 12: 1624, 18: 1625 })],
+		['zpmem', block(1, {}, { 5: 64 })],
+		['ram (/131072, so a 14-bit word tops out at 12.5%)', block(1, { 20: 8192 }), 6.25],
+		['qmem (32-bit, 8-bit bytes)', block(1, {}, { 23: 0x01, 24: 0xfc, 25: 0x00 })],
+		['rmem', block(1, { 26: 128 })],
+	])('memory takes the critical resource: %s', (_name, data, expected = 50) => {
+		const store = useSlotsStore();
+		store.updateResources('A', data);
+		expect(store.slots['A'].resources.va.memory).toBeCloseTo(expected, 1);
+	});
+
+	it('memory is the maximum over all resources', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 8: 2168, 26: 192 }, { 5: 32 }));
+		expect(store.slots['A'].resources.va.memory).toBeCloseTo(75); // rmem 192/256 beats xmem 50% and zpmem 25%
+	});
+
+	it('routes location 1 to va and 0 to fx, including both blocks of a compound packet', () => {
+		const store = useSlotsStore();
+		store.updateResources('B', [...block(1, { 1: 1371 }), 0x72, ...block(0, { 1: 685 })]);
+		expect(store.slots['B'].resources.va.cycles).toBeCloseTo(100);
+		expect(store.slots['B'].resources.fx.cycles).toBeCloseTo(49.96, 2);
+		expect(store.slots['A'].resources).toEqual({ va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } });
+	});
+
+	it('ignores a truncated block', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 1: 1371 }).slice(0, 27));
+		expect(store.slots['A'].resources.va).toEqual({ cycles: 0, memory: 0 });
+	});
+});

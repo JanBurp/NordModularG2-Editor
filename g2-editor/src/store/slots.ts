@@ -85,19 +85,27 @@ function emptySlotResources(): SlotResources {
 	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
 }
 
-// d is the bulk payload. Each block: d[o]=location, d[o+1..o+27]=TPatchLoadData (Delphi indices +1).
+// d is the bulk payload. Each block: d[o]=location, then (official CMPatchLoad::ReadStream) 14-bit words
+// cyclesRed, cyclesBlue, zpMem byte, unknown, xmem1, ymem1, pmem1, xmem2, ymem2, pmem2, ram, 32-bit qmem, rmem.
 // Compound packets pack both areas: block0 at offset 0, 0x72 marker at offset 28, block1 at offset 29.
+// Formulas: official CPatchLoad::GetCycles / FindCriticalResourceType (red only above 100%).
+const word14 = (d: number[], i: number): number => d[i] * 128 + d[i + 1];
+
 function parseResourceCycles(d: number[], o: number): number {
-	const red1 = d[o + 2] + d[o + 1] * 128;
-	const blue1 = d[o + 4] + d[o + 3] * 128;
-	return Math.max((100 * red1) / 1372 + (100 * blue1) / 5000, 0);
+	return ((word14(d, o + 1) + word14(d, o + 3) * 0.25) * 100) / 1371;
 }
 
 function parseResourceMemory(d: number[], o: number): number {
-	const internalMem = d[o + 5];
-	const resource4 = d[o + 9] + d[o + 8] * 128;
-	const ram = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
-	return Math.max(Math.max((100 * internalMem) / 128, (100 * ram) / 260000), (100 * resource4) / 4315);
+	const qmem = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
+	return Math.max(
+		((word14(d, o + 8) + word14(d, o + 14)) * 100) / 4336, // xmem
+		((word14(d, o + 10) + word14(d, o + 16)) * 100) / 2992, // ymem
+		((word14(d, o + 12) + word14(d, o + 18)) * 100) / 6498, // pmem
+		(d[o + 5] * 100) / 128, // zpmem
+		(word14(d, o + 20) * 100) / 131072, // ram
+		(qmem * 100) / 260096, // qmem
+		(word14(d, o + 26) * 100) / 256, // rmem
+	);
 }
 
 export type { SlotLabel };
