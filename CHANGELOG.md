@@ -12,6 +12,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Adjuster
 - Patch Mutator
 - Parameter Pages Overview sidepanel
+- Bank Organizer
 
 ### Changed
 - Tests better organized
