@@ -80,7 +80,7 @@ describe('browser store — Bank Organizer', () => {
 			electronAPI: {
 				patches: {
 					storageDir: vi.fn(async () => '/hold'),
-					// Like the real one: only the folder itself (not .history below it).
+					// Like the real one: only the folder itself (not .g2-organizer-history below it).
 					list: vi.fn(async (dir: string) => ({
 						success: true,
 						entries: [...files.keys()]
@@ -128,7 +128,7 @@ describe('browser store — Bank Organizer', () => {
 
 		expect(flash.get('patch-1-1')).toBe('Pad');
 		expect(flash.get('patch-1-2')).toBe('Lead');
-		expect([...files.keys()].filter((f) => !f.includes('/.history/'))).toEqual([]); // only undo copies left
+		expect([...files.keys()].filter((f) => !f.includes('/.g2-organizer-history/'))).toEqual([]); // only undo copies left
 		expect(browser.storage).toEqual([]);
 	});
 

@@ -4,8 +4,8 @@ import type { BankLoc } from './browser';
 /* Undo/redo for the Bank Organizer, separate from the patch history (history.ts).
  *
  * One entry is one user action ("Move 3 patches"), stored as what each touched place held
- * before and after it. Bank contents are kept as patch-file copies in <storage>/.history/<session>
- * (Electron empties .history the first time a storage folder is used per app run), so undo can
+ * before and after it. Bank contents are kept as patch-file copies in <storage>/.g2-organizer-history/<session>
+ * (Electron empties it the first time a storage folder is used per app run), so undo can
  * write the old patch back with put-location. Storage changes keep a copy of the file, so a
  * deleted storage item can come back. The browser store's _organize records a running operation
  * with an ActionRecorder and pushes the result; stepOrganizerHistory applies an entry. */
@@ -40,7 +40,7 @@ export interface OrganizerAction {
 
 export const MAX_ORGANIZER_HISTORY = 50;
 
-// This window's folder inside .history: each window (G2) has its own history.
+// This window's folder inside .g2-organizer-history: each window (G2) has its own history.
 export const HISTORY_SESSION = Date.now().toString(36) + Math.random().toString(36).slice(2, 6);
 
 const locKey = (l: BankLoc) => `${l.kind}-${l.bank}-${l.location}`;
@@ -108,14 +108,15 @@ export const useOrganizerHistoryStore = defineStore('organizerHistory', {
 		},
 
 		/* Forget everything (G2 disconnected, storage folder changed). */
-		clear(): void {
-			this._drop([...this.undoStack, ...this.redoStack]);
+		clear(): Promise<void> {
+			const dropped = this._drop([...this.undoStack, ...this.redoStack]);
 			this.undoStack = [];
 			this.redoStack = [];
+			return dropped;
 		},
 
-		_drop(actions: OrganizerAction[]): void {
-			for (const f of actions.flatMap(actionFiles)) window.electronAPI?.patches.storageRemove(f).catch(() => {});
+		async _drop(actions: OrganizerAction[]): Promise<void> {
+			await Promise.all(actions.flatMap(actionFiles).map((f) => window.electronAPI?.patches.storageRemove(f).catch(() => {})));
 		},
 	},
 });

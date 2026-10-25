@@ -358,8 +358,10 @@ function runCliOneShot(args: string[]): Promise<string> {
 
 /* A bank is 128 locations of flash writes/clears — minutes, not seconds. The
  * generic 30 s timeout rejects the promise while the daemon is still working,
- * so the UI reports failure over a run that is actually succeeding. */
-const LONG_CMDS = new Set(["send-bank", "get-bank"]);
+ * so the UI reports failure over a run that is actually succeeding. A single
+ * put-location/clear-patch waits up to 20 x 2 s for the G2's flash result
+ * (await_flash_result), also past 30 s. */
+const LONG_CMDS = new Set(["send-bank", "get-bank", "put-location", "clear-patch"]);
 
 // Commands whose byte-array arg carries a whole patch/performance payload - sent
 // base64-encoded instead of a JSON array of decimal numbers, which is ~3-4x larger
@@ -656,7 +658,7 @@ ipcMain.handle("patches:init-save-path", (_, slot: number) => {
 // share one watcher, which tells them when it changes (also catches the files the CLI writes there).
 const storageDirByWc = new Map<number, string>();
 const storageWatchers = new Map<string, fs.FSWatcher>();
-// The organizer's undo history keeps its patch copies in <storage>/.history; it lives until the
+// The organizer's undo history keeps its patch copies in <storage>/.g2-organizer-history; it lives until the
 // app quits, so whatever an earlier run left there is removed the first time a folder is used.
 const historyCleaned = new Set<string>();
 
@@ -675,7 +677,7 @@ function storageDir(wcId: number, custom?: string): string {
 	fs.mkdirSync(dir, { recursive: true });
 	if (!historyCleaned.has(dir)) {
 		historyCleaned.add(dir);
-		fs.rmSync(path.join(dir, ".history"), { recursive: true, force: true });
+		fs.rmSync(path.join(dir, ".g2-organizer-history"), { recursive: true, force: true });
 	}
 	storageDirByWc.set(wcId, dir);
 	if (!storageWatchers.has(dir)) {
@@ -689,6 +691,12 @@ function storageDir(wcId: number, custom?: string): string {
 				}
 			}, 200);
 		});
+		// E.g. the folder was deleted or its drive unmounted: drop the watcher (an unhandled 'error'
+		// would throw in the main process); the next storageDir() call recreates folder and watcher.
+		watcher.on("error", () => {
+			watcher.close();
+			if (storageWatchers.get(dir) === watcher) storageWatchers.delete(dir);
+		});
 		storageWatchers.set(dir, watcher);
 	}
 	pruneStorageWatchers();
@@ -697,7 +705,7 @@ function storageDir(wcId: number, custom?: string): string {
 
 ipcMain.handle("patches:storage-dir", (event, custom?: string) => storageDir(event.sender.id, custom));
 
-// Only files inside the calling window's storage folder (its .history included) may be removed or copied.
+// Only files inside the calling window's storage folder (its .g2-organizer-history included) may be removed or copied.
 function assertInStorage(wcId: number, filepath: string): string {
 	const dir = storageDirByWc.get(wcId);
 	const resolved = path.resolve(filepath);

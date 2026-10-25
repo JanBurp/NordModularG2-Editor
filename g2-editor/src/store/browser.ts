@@ -74,6 +74,8 @@ async function storageItemFromFile(entry: DiskEntry): Promise<StorageItem> {
 // so a second drag never interleaves with a running one.
 let organizerQueue: Promise<unknown> = Promise.resolve();
 let storageSeq = 0;
+// The storageFolder setting storageDir was last asked for, to notice a folder change.
+let storageFolderAsked: string | null = null;
 // Undo recording for the organizer operation that is running (null outside one / during undo),
 // and the patch-file copies of locations this operation already holds, so they aren't read twice.
 let recorder: ActionRecorder | null = null;
@@ -243,10 +245,12 @@ export const useBrowserStore = defineStore('browser', {
 		async loadStorage(): Promise<void> {
 			if (!window.electronAPI) return;
 			const { useSettingsStore } = await import('./settings');
-			const dir = await window.electronAPI.patches.storageDir(useSettingsStore().storageFolder || undefined);
-			// Another storage folder: the history's copies lived in the old one.
-			if (this.storageDir && dir !== this.storageDir) useOrganizerHistoryStore().clear();
-			this.storageDir = dir;
+			const folder = useSettingsStore().storageFolder;
+			// Another storage folder: the history's copies live in the old one. Delete them before
+			// switching, while Electron still allows removing files there.
+			if (this.storageDir && folder !== storageFolderAsked) await useOrganizerHistoryStore().clear();
+			storageFolderAsked = folder;
+			this.storageDir = await window.electronAPI.patches.storageDir(folder || undefined);
 			const result = await window.electronAPI.patches.list(this.storageDir);
 			// Dot files are the organizer's own temporary copies, not parked patches.
 			const files = result.entries.filter((e) => !e.isDir && !e.name.startsWith('.'));
@@ -271,7 +275,7 @@ export const useBrowserStore = defineStore('browser', {
 
 		// ── Undo recording (see organizerHistory.ts) ─────────────────────────────
 		_historyFile(kind: BankKind): string {
-			return `${this.storageDir}/.history/${HISTORY_SESSION}/${fileId()}.${extOf(kind)}`;
+			return `${this.storageDir}/.g2-organizer-history/${HISTORY_SESSION}/${fileId()}.${extOf(kind)}`;
 		},
 
 		/* A copy of a patch file in the history folder. */
