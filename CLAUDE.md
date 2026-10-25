@@ -42,8 +42,12 @@ Editor for the Nord Modular G2 synthesizer. USB layer in C, Electron (Vue 3 + Ty
 ### CLI (C tool)
 ```bash
 cd cli && make          # build
-cd cli && make test     # run tests (unit + integration; with no G2 detected the integration runners exit 1 "NOT RUN" unless G2_ALLOW_NO_DEVICE=1; individual tests still self-skip)
-cd cli && make test-integration-slow  # bank-transfer tests (get-bank/send-bank); not part of `make test` since a full bank scan/roundtrip can take well over 2s
+cd cli && make test      # unit + cli + e2e; without a G2 the hardware suites print NOT RUN and are skipped
+cd cli && make test-unit # unit tests, no G2
+cd cli && make test-cli  # one-shot CLI tests (no daemon), needs a G2
+cd cli && make test-e2e  # daemon tests, needs a G2
+cd cli && make test-e2e-slow  # bank-transfer daemon tests (get-bank/send-bank, minutes); not part of `make test`
+# standalone hardware suites exit 1 "NOT RUN" without a G2 unless G2_ALLOW_NO_DEVICE=1
 ./cli/build/bin/g2-cli --help
 cd cli && ./g2tmux.sh   # tmux split: daemon output + command shell (recommended)
 ```
@@ -55,11 +59,13 @@ cd ../cli && make && cd ../g2-editor   # rebuild CLI first
 npm run postinstall         # copies CLI binary into Electron app
 npm run dev                 # development server
 npm run build               # production build + package
-npm test                    # Vitest unit tests
+npm test                    # unit + e2e + g2; g2 is skipped when no G2 is found
+npm run test:unit           # Vitest unit tests
 npm run typecheck           # vue-tsc type check
 npm run lint                # ESLint
-npm run test:e2e:headless   # Playwright E2E tests (builds first)
-npm run test:g2             # hardware suite (test-g2/): needs a connected G2
+npm run test:e2e            # Playwright E2E tests, headless, no G2 (builds first)
+npm run test:g2             # hardware suite (test-g2/): powers the G2 on via the Shelly plug, off afterwards
+npm run test:duration -- --hours 1  # hours-long hardware duration test; --help lists options
 ```
 `@/` resolves to `g2-editor/src/`.
 
@@ -110,6 +116,6 @@ Many smaller composables exist for drag interactions, dialogs, and event handlin
 Tailwind CSS v4 (`@tailwindcss/vite`). Global styles in `src/style.css`. No separate config file. Use inline classes for unique styles; add shared styles to `src/style.css`.
 
 ### Testing
-Vitest (`npm test`) — unit tests in `src/{parser,store,renderer,composables}/__tests__/`.
+Vitest (`npm run test:unit`) — unit tests in `src/{parser,store,renderer,composables}/__tests__/`.
 Playwright (`npm run test:e2e`) — end-to-end specs in `g2-editor/e2e/`.
 Hardware (`npm run test:g2`) — Vitest suite in `g2-editor/test-g2/` that drives the CLI and the real editor against a connected G2.

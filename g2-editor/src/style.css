@@ -14,6 +14,7 @@
 	--color-surface-1: #e6e2da;
 	--color-surface-2: #f2efe7;
 	--color-surface-3: #cac5ba;
+	--color-surface-cell: #f2efe7; /* filled Bank Organizer cell without a category tint */
 	--color-line-subtle: #cac5ba;
 	--color-line-default: #b0aa9c;
 	--color-content-primary: #1d1d1d;
@@ -29,6 +30,7 @@
 		--color-surface-1: var(--color-neutral-800);
 		--color-surface-2: var(--color-neutral-700);
 		--color-surface-3: var(--color-neutral-600);
+		--color-surface-cell: color-mix(in oklab, var(--color-neutral-700) 50%, var(--color-neutral-800));
 		--color-line-subtle: var(--color-neutral-700);
 		--color-line-default: var(--color-neutral-500);
 		--color-content-primary: var(--color-neutral-100);
@@ -108,6 +110,21 @@ body {
 
 .btn-small {
 	@apply h-5 px-1 text-xs;
+}
+
+/* Parameter Page display box (toolbar + Parameter Overview). Unassigned = black with only a border,
+   so the empty displays stay visible as drop targets. */
+.param-display {
+	@apply rounded-xs px-1 text-center text-black truncate border border-input-dimmed bg-input-dimmed cursor-grab;
+}
+.param-display-empty {
+	@apply bg-transparent;
+}
+
+/* Bank Organizer cell/box hover: darker in the light theme, lighter in the dark one (a filter,
+   as category tints are inline backgrounds). */
+.organizer-hover {
+	@apply hover:brightness-90 dark:hover:brightness-130;
 }
 
 .btn-group-item {

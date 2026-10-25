@@ -21,10 +21,14 @@ export const STATUS_HINTS = {
 	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
 	ccRow: `Click: select · Shift-click: select range · ${MOD}-click: add/remove from selection · Drag: reassign CC`,
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
+	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
 	// A Morph Group's dial on a Parameter Page knob: no morph-assign (a dial can't be morphed), no button.
 	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
 	morphKnob: `Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
+	// Patch Mutator — sound boxes
+	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,
+	mutaStorage: `Click: audition · Double-click: mutate from this sound · Drag: move/copy · Shift-drop: interpolate · ${ALT}-drop: cross · Right-click: delete`,
 	morphSource: 'Click: cycle morph source',
 	paramPageCell: `${ALT}-drag: move/swap, or drop on a canvas parameter or Morph knob to assign · Right-click: deassign, morph`,
 	paramPageButton: 'Click: change button value',
@@ -43,6 +47,8 @@ export const STATUS_HINTS = {
 	paneBrowser: `${MOD}B: browse patches & files`,
 	paneModules: `${MOD}L: drag modules onto the canvas`,
 	paneMidicc: `${MOD}I: MIDI CC assignments`,
+	paneOverview: `⇧${MOD}F: all Parameter Pages at once`,
+	paneMutator: `${MOD}2: Patch Mutator — breed new sounds from this patch`,
 	paneText: `${MOD}J: patch notes`,
 	paneSettings: `${MOD}, : editor, device, and patch settings`,
 
@@ -53,7 +59,18 @@ export const STATUS_HINTS = {
 	browserFolder: 'Click/Enter: open folder · ←: parent folder · ↑↓: navigate',
 	browserFile: 'Double-click/Enter: load · ←: parent folder · ↑↓: navigate',
 	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
-	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort',
+	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort, organizer',
+
+	// Bank Organizer
+	organizerCell: `Drag: · Drop on cell: swap · ${ALT}-drag: copy · Drop on Temporary Storage: copy · Drop on a Slot: load · Click: select · Delete: delete · Right-click: more options`,
+	organizerStorage: `Drag onto a location: copy to the G2 · Click: select · Delete: delete · Right-click: more options`,
+	organizerSlot: 'Drop: load it into this slot · Drag onto a location: store this slot there · Right-click: store in a bank',
+	organizerTrash: 'Drop to delete · Delete: delete the selection',
+	organizerCategory: 'Click: give the selected patches this category (select patches first)',
+	organizerSort: 'Click: sort this column by location, name or category',
+	organizerSortLink: 'Click: both columns use the same sort (on/off)',
+	organizerBankTransfer: 'Upload: save this bank from the G2 to disk · Download: overwrite this bank on the G2 from disk',
+	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,
 	expandCollapseAll: 'Click: expand/collapse all',
 	expandCollapse: 'Click: expand/collapse',
 	moduleItem: 'Drag: add to canvas · Click: show/hide help',

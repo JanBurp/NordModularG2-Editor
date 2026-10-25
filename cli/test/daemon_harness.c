@@ -232,3 +232,22 @@ int daemon_wait_ready(daemon_ctx_t *d) {
     }
     return -1;
 }
+
+cJSON *run_oneshot(const char *args) {
+    char cmd[512];
+    snprintf(cmd, sizeof(cmd), "build/bin/g2-cli --json %s 2>/dev/null", args);
+    FILE *f = popen(cmd, "r");
+    if (!f) return NULL;
+    size_t cap = 1 << 16, len = 0;
+    char *buf = malloc(cap);
+    for (size_t n; buf && (n = fread(buf + len, 1, cap - len - 1, f)) > 0; ) {
+        len += n;
+        if (len + 1 == cap) buf = realloc(buf, cap *= 2);
+    }
+    pclose(f);
+    if (!buf) return NULL;
+    buf[len] = '\0';
+    cJSON *json = cJSON_Parse(buf);
+    free(buf);
+    return json;
+}

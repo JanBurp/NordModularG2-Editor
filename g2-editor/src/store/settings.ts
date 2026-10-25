@@ -1,8 +1,9 @@
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
+import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
@@ -32,7 +33,12 @@ export const useSettingsStore = defineStore('settings', {
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
-		browserSortMode: 'location' as 'location' | 'name' | 'name-desc' | 'category',
+		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
+		patchMutatorOpen: true as boolean,
+		patchMutatorKeysOpen: true as boolean,
+		browserSortMode: 'location' as PatchSortMode,
+		organizerSortModes: ['location', 'location'] as [PatchSortMode, PatchSortMode], // Bank Organizer left/right column
+		organizerSortLinked: false as boolean, // both columns use the same sort
 		browserView: 'patches' as 'disk' | 'patches' | 'performances',
 		browserCollapsedBanks: [] as number[],
 		knobMode: 'vertical' as KnobMode,
@@ -45,6 +51,7 @@ export const useSettingsStore = defineStore('settings', {
 		canvasZoom: 1 as number,
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
+		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
@@ -90,6 +97,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setBankFolder(value: string) {
 			this.bankFolder = value;
+		},
+		setStorageFolder(value: string) {
+			this.storageFolder = value;
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;

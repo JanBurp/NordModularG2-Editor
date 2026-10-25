@@ -1,5 +1,5 @@
 <template>
-	<div class="settings-row">
+	<div class="settings-row" data-testid="settings-row">
 		<span>{{ label }}</span>
 		<slot />
 	</div>

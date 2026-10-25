@@ -150,7 +150,7 @@ int g2_set_cable_color(int slot, int location, int color,
 int g2_del_module(int slot, int location, int module_id);
 int g2_move_module(int slot, int location, int module_id, int col, int row);
 int g2_add_module(int slot, int location, int type_id, int module_id,
-                  int col, int row, int color,
+                  int col, int row, int color, int muta_lock,
                   int num_modes, const int *mode_vals,
                   int num_params, const int *param_vals,
                   const char *name);
@@ -158,6 +158,11 @@ int g2_add_module(int slot, int location, int type_id, int module_id,
 /* Set module color: slot 0-3, location 0=fx/1=va, color 0-6 */
 int g2_set_module_color(int slot, int location, int module_id, int color);
 
+/* Whole .pch2-style sections ([type][len16][data]...) sent as one slot edit (Patch Mutator audition) */
+int g2_send_sections(int slot, const uint8_t *buf, size_t len);
+
+/* Patch Mutator "Exclude From Mutation": slot 0-3, location 0=fx/1=va, locked 0/1 */
+int g2_set_mutation_lock(int slot, int location, int module_id, int locked);
 /* Set module uprate (audio-rate promotion): slot 0-3, location 0=fx/1=va, uprate 0-1 */
 int g2_set_module_uprate(int slot, int location, int module_id, int uprate);
 
@@ -190,10 +195,12 @@ void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index);
 void g2_build_move_module_op(G2Op *op, uint8_t *buf, int loc,
     int module_id, int col, int row);
 int  g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
-    int type_id, int module_id, int col, int row, int color,
+    int type_id, int module_id, int col, int row, int color, int muta_lock,
     int num_modes, const int *mode_vals, const char *name);
 void g2_build_set_module_color_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int color);
+void g2_build_set_mutation_lock_op(G2Op *op, uint8_t *buf,
+    int loc, int module_id, int locked);
 void g2_build_set_module_uprate_op(G2Op *op, uint8_t *buf,
     int loc, int module_id, int uprate);
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
@@ -362,6 +369,15 @@ cJSON *g2_get_bank(int type, int bank, const char *folder, const char *name);
  * bank: target bank number (1-32 for patches, 1-8 for performances)
  * Returns a summary object (written/cleared/failed counts) on success, NULL on failure. */
 cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *source_path, int bank);
+
+/* Single flash locations, same flash-dump protocol as get-bank/send-bank.
+ * type: 0 = patch (banks 1-32), 1 = performance (banks 1-8); location: 1-128.
+ * get-location writes the entry to `file` (.pch2/.prf2) and returns
+ * {name, empty, corrupt} - no file is written for an empty/corrupt entry.
+ * put-location writes `file` to the location under `name` (NULL = derived from
+ * the file name) and returns {name}. Both return NULL on failure. */
+cJSON *g2_get_location(int type, int bank, int location, const char *file);
+cJSON *g2_put_location(int type, int bank, int location, const char *file, const char *name);
 
 /* send-bank internals, exposed only so unit tests can exercise them directly
  * (see test_bank_source.c) - not part of the day-to-day CLI surface. */

@@ -37,6 +37,10 @@
 		<CableVisibilitySelector />
 		<ToolBarDivider />
 		<PatchLevel />
+		<template v-if="settingsStore.toolbarMode === 'hidden'">
+			<ToolBarDivider />
+			<CPU mini />
+		</template>
 	</ToolBar>
 </template>
 
@@ -51,8 +55,10 @@
 	import Select from '../common/Select.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';
 	import PatchLevel from './PatchLevel.vue';
+	import CPU from './CPU.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
+	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICES } from '../../types/patch';
@@ -66,6 +72,7 @@
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const settingsStore = useSettingsStore();
 
 	const currentPatch = computed(() => slotsStore.getPatchForSlot(uiStore.slotInFocus));
 

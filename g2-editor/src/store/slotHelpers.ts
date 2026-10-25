@@ -40,6 +40,13 @@ export interface PasteParamsPair {
 	modeValues: number[];
 }
 
+export interface ParamChange {
+	area: 'voice' | 'fx';
+	moduleId: number;
+	paramIdx: number;
+	value: number;
+}
+
 // Pairs copied modules with target ids by order, keeping only same-type pairs, and slices each
 // source module's `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt).
 export function buildPasteParamsPairs(
@@ -106,7 +113,7 @@ export function defaultPatchParams(): PatchParamVariation {
 }
 
 export function extractVariations(patch: Patch): VariationState[] {
-	return Array.from({ length: NUM_VARIATIONS }, (_, v) => ({
+	return Array.from({ length: NUM_VARIATIONS + 1 }, (_, v) => ({
 		fx: Object.fromEntries(
 			(patch.areas[0]?.modules ?? [])
 				.filter((m) => m.pcnt > 0)
@@ -298,14 +305,14 @@ export function resolvePasteRowOffset(modules: { vert: number; height: number }[
 
 // Told about every failed push (set by the slots store), which re-reads the slot when the G2 was
 // reachable: the local edit is then ahead of the G2.
-let cliFailureHandler: ((cmd: string[], err: unknown) => void) | null = null;
+let cliFailureHandler: ((cmd: (string | number[])[], err: unknown) => void) | null = null;
 export function setCliFailureHandler(fn: typeof cliFailureHandler): void {
 	cliFailureHandler = fn;
 }
 
 // Pushing a mutation to hardware is always best-effort: the offline case (or a mid-command
 // disconnect) must not surface as an error, since the local edit already succeeded.
-export async function runCliSafe(cmd: string[], label: string): Promise<void> {
+export async function runCliSafe(cmd: (string | number[])[], label: string): Promise<void> {
 	try {
 		await window.cli.run(cmd);
 	} catch (err) {
@@ -314,9 +321,12 @@ export async function runCliSafe(cmd: string[], label: string): Promise<void> {
 	}
 }
 
+// The daemon's seq executes at most this many commands and silently drops the rest (SEQ_MAX_OPS, daemon.c).
+export const BATCH_CHUNK = 128;
+
 export async function runCliBatchSafe(cmds: string[][], label: string): Promise<void> {
 	try {
-		await window.cli.runBatch(cmds);
+		for (let i = 0; i < cmds.length; i += BATCH_CHUNK) await window.cli.runBatch(cmds.slice(i, i + BATCH_CHUNK));
 	} catch (err) {
 		console.warn(`${label}: CLI failed (offline?):`, err);
 		if (cmds.length > 0) cliFailureHandler?.(cmds[0], err);

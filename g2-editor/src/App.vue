@@ -41,24 +41,30 @@
 		</ToolBar>
 
 		<ExtendedToolBar
-			v-if="settingsStore.toolbarMode !== 'hidden'"
+			v-if="settingsStore.toolbarMode !== 'hidden' && !uiStore.showBankOrganizer"
 			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@morph-group-label-edit="(info) => openMorphLabelDialog(info.groupIndex, info.currentLabel)"
 		/>
 		<PatchToolBar
-			v-if="currentPatch"
+			v-if="currentPatch && !uiStore.showBankOrganizer"
 			:patch-name="patchName"
 			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
 			@variation-click="handleVariationClick"
 			@patch-name-click="() => openPatchNameDialog(patchName)"
 		/>
-		<ParameterPages v-if="currentPatch && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
+		<ParameterPages v-if="currentPatch && !uiStore.showBankOrganizer && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<ParamDragGhost />
 		<KnobDragCursor />
 
 		<div class="flex-1 flex overflow-hidden">
-			<div ref="canvasAreaRef" class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden">
-				<template v-if="currentPatch">
+			<div
+				ref="canvasAreaRef"
+				class="flex-1 min-w-0 bg-surface-2 flex flex-col overflow-hidden transition-[filter]"
+				:class="{ 'brightness-60': uiStore.mutatorFocused }"
+			>
+				<BankOrganizer v-if="uiStore.showBankOrganizer" />
+				<!-- display:contents keeps the canvas layout; v-show (not v-if) keeps its zoom/scroll while the organizer is open -->
+				<div v-if="currentPatch" v-show="!uiStore.showBankOrganizer" class="contents">
 					<div v-show="showVoice" class="relative overflow-hidden min-h-0" :class="{ 'flex-1': !isSplit }" :style="voiceWrapperStyle">
 						<PatchCanvas
 							:key="patchName + '-voice'"
@@ -116,9 +122,9 @@
 							@param-label-edit="(info) => handleParamLabelEdit({ ...info, area: 'fx' })"
 						/>
 					</div>
-				</template>
+				</div>
 
-				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto" />
+				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
 
 			<SidePanel v-if="settingsStore.showRightPane" />
@@ -226,7 +232,7 @@
 		@cancel="bankUpload.cancel"
 	>
 		<div class="space-y-4">
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankUpload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
 				<BtnGroup
 					:model-value="bankUpload.type.value"
@@ -236,7 +242,7 @@
 					@update:model-value="bankUpload.type.value = $event as 'patch' | 'performance'"
 				/>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankUpload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankUpload.bankNum.value"
@@ -274,26 +280,17 @@
 					placeholder="(optional)"
 				/>
 			</div>
-			<div v-if="bankUpload.inProgress.value" class="space-y-1">
-				<div class="text-orange-400 text-sm">
-					{{
-						bankUpload.progress.value
-							? `Uploading… location ${bankUpload.progress.value.location}/${bankUpload.progress.value.total} (${bankUpload.progress.value.written} written, ${bankUpload.progress.value.empty} empty)`
-							: 'Uploading bank from G2...'
-					}}
-				</div>
-				<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
-					<div
-						class="h-full bg-orange-400 transition-all"
-						:style="{
-							width: bankUpload.progress.value ? `${(bankUpload.progress.value.location / bankUpload.progress.value.total) * 100}%` : '0%',
-						}"
-					></div>
-				</div>
-				<div v-if="bankUpload.progress.value" class="text-xs text-content-secondary truncate">
-					{{ `${bankUpload.progress.value.location}: ${bankUpload.progress.value.name || '(empty)'}` }}
-				</div>
-			</div>
+			<ProgressBar
+				v-if="bankUpload.inProgress.value"
+				:text="
+					bankUpload.progress.value
+						? `Uploading… location ${bankUpload.progress.value.location}/${bankUpload.progress.value.total} (${bankUpload.progress.value.written} written, ${bankUpload.progress.value.empty} empty)`
+						: 'Uploading bank from G2...'
+				"
+				:value="bankUpload.progress.value?.location ?? 0"
+				:max="bankUpload.progress.value?.total ?? 0"
+				:detail="bankUpload.progress.value ? `${bankUpload.progress.value.location}: ${bankUpload.progress.value.name || '(empty)'}` : undefined"
+			/>
 			<div class="text-xs text-content-secondary">
 				Save complete {{ bankUpload.type.value }} bank from synth memory to disk.<br />Creates individual sound files + .pchList file.
 			</div>
@@ -314,7 +311,7 @@
 			<div v-if="bankDownload.showWarning.value" class="p-3 bg-red-500/20 border border-red-400 rounded text-red-400 text-sm text-center">
 				<div><strong>WARNING:</strong> This will OVERWRITE the entire bank.</div>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankDownload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Type:</span>
 				<BtnGroup
 					:model-value="bankDownload.type.value"
@@ -324,7 +321,7 @@
 					@update:model-value="bankDownload.type.value = $event as 'patch' | 'performance'"
 				/>
 			</div>
-			<div class="flex items-center gap-2">
+			<div class="flex items-center gap-2" :class="{ 'opacity-50 pointer-events-none': bankDownload.locked.value }">
 				<span class="text-sm text-content-secondary w-20">Bank:</span>
 				<select
 					v-model="bankDownload.bankNum.value"
@@ -366,28 +363,19 @@
 			</div>
 			<div v-if="bankDownload.inProgress.value" class="space-y-1">
 				<div v-if="bankDownload.reloadingNames.value" class="text-orange-400 text-sm">Reloading patch/performance names from G2…</div>
-				<template v-else>
-					<div class="text-orange-400 text-sm">
-						{{
-							bankDownload.progress.value
-								? `Downloading… location ${bankDownload.progress.value.location}/${bankDownload.progress.value.total} (${bankDownload.progress.value.written} written, ${bankDownload.progress.value.cleared} cleared${bankDownload.progress.value.failed ? `, ${bankDownload.progress.value.failed} failed` : ''})`
-								: 'Downloading bank to G2...'
-						}}
-					</div>
-					<div class="h-1.5 w-full bg-surface-2 rounded overflow-hidden">
-						<div
-							class="h-full bg-orange-400 transition-all"
-							:style="{
-								width: bankDownload.progress.value
-									? `${(bankDownload.progress.value.location / bankDownload.progress.value.total) * 100}%`
-									: '0%',
-							}"
-						></div>
-					</div>
-					<div v-if="bankDownload.progress.value" class="text-xs text-content-secondary truncate">
-						{{ `${bankDownload.progress.value.location}: ${bankDownload.progress.value.name || '(empty)'}` }}
-					</div>
-				</template>
+				<ProgressBar
+					v-else
+					:text="
+						bankDownload.progress.value
+							? `Downloading… location ${bankDownload.progress.value.location}/${bankDownload.progress.value.total} (${bankDownload.progress.value.written} written, ${bankDownload.progress.value.cleared} cleared${bankDownload.progress.value.failed ? `, ${bankDownload.progress.value.failed} failed` : ''})`
+							: 'Downloading bank to G2...'
+					"
+					:value="bankDownload.progress.value?.location ?? 0"
+					:max="bankDownload.progress.value?.total ?? 0"
+					:detail="
+						bankDownload.progress.value ? `${bankDownload.progress.value.location}: ${bankDownload.progress.value.name || '(empty)'}` : undefined
+					"
+				/>
 			</div>
 			<div class="text-xs text-content-secondary">
 				Download bank to synth memory.<br />Source can be a .pchList file or a folder patch files (max 128).
@@ -449,6 +437,8 @@
 <script setup lang="ts">
 	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
 	import PatchCanvas from './components/canvas/PatchCanvas.vue';
+	import BankOrganizer from './components/banks/BankOrganizer.vue';
+	import ProgressBar from './components/common/ProgressBar.vue';
 	import SidePanel from './components/panels/SidePanel.vue';
 	import Button from './components/toolbar/Button.vue';
 	import BtnGroup from './components/toolbar/BtnGroup.vue';
@@ -502,6 +492,7 @@
 	import KeyCommandsPage from './components/common/KeyCommandsPage.vue';
 	import Toast from './components/common/Toast.vue';
 	import { DeviceStatus, useDeviceStore } from './store/device';
+	import { useOrganizerHistoryStore } from './store/organizerHistory';
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
@@ -531,6 +522,14 @@
 	watch(
 		() => device.status,
 		(status) => (showDisconnected.value = status === DeviceStatus.Lost),
+	);
+	// The Bank Organizer's undo steps describe this G2's banks: forget them once it is gone.
+	const organizerHistory = useOrganizerHistoryStore();
+	watch(
+		() => device.status,
+		(status) => {
+			if (status === DeviceStatus.Lost || status === DeviceStatus.Disconnected) organizerHistory.clear();
+		},
 	);
 	// Swallow every key while the performance is re-sent after a reconnect. Capture phase on window, registered before
 	// any component's own listener, so no shortcut can edit a patch underneath the overlay.

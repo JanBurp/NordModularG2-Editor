@@ -15,6 +15,8 @@ export const bankDownloadBankNum = ref<number>(1);
 export const bankDownloadSourceType = ref<SourceType>('pchList');
 export const bankDownloadSourcePath = ref<string>('');
 export const bankDownloadInProgress = ref<boolean>(false);
+// Type and bank pre-filled by the caller (Bank Organizer column) and not changeable
+export const bankDownloadLocked = ref<boolean>(false);
 export const bankDownloadReloadingNames = ref<boolean>(false);
 export const bankDownloadShowWarning = ref<boolean>(true);
 export interface BankDownloadProgress {
@@ -59,7 +61,7 @@ export function useBankDownloadDialog() {
 		if (bankDownloadBankNum.value > maxBank.value) bankDownloadBankNum.value = maxBank.value;
 	});
 
-	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number }): void {
+	function open(opts?: { type?: 'patch' | 'performance'; bankNum?: number; locked?: boolean }): void {
 		// Re-opening mid-transfer must keep the running progress visible, not reset it
 		if (bankDownloadInProgress.value) {
 			showBankDownloadDialog.value = true;
@@ -67,6 +69,7 @@ export function useBankDownloadDialog() {
 		}
 		bankDownloadType.value = opts?.type ?? defaultBankKind(slotsStore.isPerformanceMode, deviceStore.isHardwarePerformanceMode);
 		bankDownloadBankNum.value = opts?.bankNum ?? 1;
+		bankDownloadLocked.value = opts?.locked ?? false;
 		bankDownloadSourceType.value = 'pchList';
 		bankDownloadSourcePath.value = '';
 		bankDownloadShowWarning.value = true;
@@ -148,6 +151,7 @@ export function useBankDownloadDialog() {
 		sourceType: bankDownloadSourceType,
 		sourcePath: bankDownloadSourcePath,
 		inProgress: bankDownloadInProgress,
+		locked: bankDownloadLocked,
 		reloadingNames: bankDownloadReloadingNames,
 		progress: bankDownloadProgress,
 		showWarning: bankDownloadShowWarning,

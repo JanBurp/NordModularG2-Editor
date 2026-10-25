@@ -46,6 +46,7 @@
 			<div
 				v-for="row in allCCRows"
 				:key="row.cc"
+				data-testid="cc-row"
 				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-line-subtle cursor-grab"
 				:class="row.assignment ? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-surface-1') : 'opacity-40'"
 				draggable="true"

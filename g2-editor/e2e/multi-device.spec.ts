@@ -35,7 +35,7 @@ async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice
 async function launchApp(testUserData: string): Promise<ElectronApplication> {
 	return electron.launch({
 		args: [APP_ROOT],
-		env: { ...process.env, NODE_ENV: 'test', HEADLESS: '1', TEST_USER_DATA: testUserData, G2_SKIP_STARTUP_SCAN: '1' },
+		env: { ...process.env, NODE_ENV: 'test', HEADLESS: '1', TEST_USER_DATA: testUserData, G2_HIDE_DEVICES: '1' },
 	});
 }
 
@@ -54,8 +54,8 @@ test.describe('multi-device — one BrowserWindow per connected G2', () => {
 			const page = await app.firstWindow();
 			await page.waitForLoadState('domcontentloaded');
 			await stubDeviceDiscovery(app, [{ bus: 2, device: 1 }]);
-			// The real onMounted flow may have already run against the unstubbed handler before
-			// the stub landed; reload so this run observes it.
+			// The real onMounted flow may have already run before the stub landed (against no
+			// devices: G2_HIDE_DEVICES); reload so this run observes the stubbed ones.
 			await page.reload();
 			await page.waitForLoadState('domcontentloaded');
 			await page.waitForSelector('[data-testid="connection-status"]');

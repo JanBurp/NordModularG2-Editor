@@ -12,6 +12,30 @@ env:
 
 jobs:
   # ─────────────────────────────────────────────
+  # Unit tests (no G2 needed); hardware suites run locally only
+  # ─────────────────────────────────────────────
+  test:
+    runs-on: macos-14
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: CLI unit tests
+        working-directory: cli
+        run: |
+          brew install libusb
+          make test-unit
+
+      - name: Editor unit tests
+        working-directory: g2-editor
+        run: |
+          npm ci --ignore-scripts
+          npm run test:unit
+
+  # ─────────────────────────────────────────────
   # macOS arm64 (native Apple Silicon runner)
   # ─────────────────────────────────────────────
   build-macos-arm64:
@@ -184,7 +208,7 @@ jobs:
   # Publish to GitHub Releases (tag pushes only)
   # ─────────────────────────────────────────────
   publish:
-    needs: [build-macos-arm64, build-macos-x64, build-windows]
+    needs: [test, build-macos-arm64, build-macos-x64, build-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:

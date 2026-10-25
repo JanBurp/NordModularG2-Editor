@@ -77,7 +77,7 @@ function seedSeqNote() {
 	store.slots['A'].patch = {
 		areas: [
 			{ modules: [], cableList: [] },
-			{ modules: [{ index: 1, type: 121, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }], cableList: [] },
+			{ modules: [{ index: 1, type: 121, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }], cableList: [] },
 		],
 	} as any;
 	store.slots['A'].variations = [{ fx: {}, voice: { 1: Array(37).fill(10) }, patch: {} as any }];
@@ -106,7 +106,7 @@ function seedModule() {
 	store.slots['A'].patch = {
 		areas: [
 			{ modules: [], cableList: [] },
-			{ modules: [{ index: 7, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }], cableList: [] },
+			{ modules: [{ index: 7, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] }], cableList: [] },
 		],
 	} as any;
 	return store;

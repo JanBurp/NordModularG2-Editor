@@ -200,6 +200,8 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	window.on("closed", () => {
 		pendingAssignment.delete(wcId);
 		openFileReadyIds.delete(wcId);
+		storageDirByWc.delete(wcId);
+		pruneStorageWatchers();
 		const session = sessionByWebContentsId.get(wcId);
 		if (!session) return;
 		sessionByWebContentsId.delete(wcId);
@@ -356,8 +358,10 @@ function runCliOneShot(args: string[]): Promise<string> {
 
 /* A bank is 128 locations of flash writes/clears — minutes, not seconds. The
  * generic 30 s timeout rejects the promise while the daemon is still working,
- * so the UI reports failure over a run that is actually succeeding. */
-const LONG_CMDS = new Set(["send-bank", "get-bank"]);
+ * so the UI reports failure over a run that is actually succeeding. A single
+ * put-location/clear-patch waits up to 20 x 2 s for the G2's flash result
+ * (await_flash_result), also past 30 s. */
+const LONG_CMDS = new Set(["send-bank", "get-bank", "put-location", "clear-patch"]);
 
 // Commands whose byte-array arg carries a whole patch/performance payload - sent
 // base64-encoded instead of a JSON array of decimal numbers, which is ~3-4x larger
@@ -393,11 +397,11 @@ const ALLOWED_CMDS = new Set([
 	"add-cable", "add-module", "assign-global-knob", "assign-knob", "assign-midicc", "assign-midicc-batch",
 	"clear-bank", "clear-patch", "copy-variation", "deassign-global-knob", "deassign-knob", "deassign-midicc",
 	"deassign-midicc-batch", "del-cable", "del-module", "disconnect", "dump-patch", "get-bank", "get-global-knobs",
-	"get-global-page", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
-	"list", "move-module", "play-note", "reload-names", "select-global-page", "select-param", "select-param-page",
+	"get-global-page", "get-location", "get-param-page", "get-patch", "get-perf-file-buf", "get-perf-settings", "get-resources",
+	"list", "move-module", "play-note", "put-location", "reload-names", "select-global-page", "select-param", "select-param-page",
 	"select-patch", "select-perf", "send-bank", "send-controller-snapshot", "set-cable-color", "set-knob-source",
 	"set-master-clock-bpm", "set-master-clock-run", "set-module-color", "set-module-labels", "set-module-mode", "set-module-uprate",
-	"set-module-name", "set-morph-range", "set-morph-range-batch", "set-param", "set-patch-description",
+	"send-sections", "set-module-name", "set-morph-range", "set-mutation-lock", "set-morph-range-batch", "set-param", "set-patch-description",
 	"set-patch-name", "set-perf-mode", "set-perf-name", "set-range-enable", "set-slot-enabled", "set-slot-hold",
 	"set-slot-key", "set-slot-range", "set-synth-settings", "slot", "store-patch", "upload-patch",
 	"upload-patch-data", "upload-perf", "upload-perf-data", "variation",
@@ -468,6 +472,8 @@ ipcMain.on("cli:watch-stop", (event) => {
 // --- Device discovery / multi-window management ---
 
 async function listAttachedDevices(): Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]> {
+	// Set by e2e specs so neither startup nor the renderer ever binds to real attached hardware.
+	if (process.env.G2_HIDE_DEVICES === '1') return [];
 	const out = await runCliOneShot(["--json", "list-devices"]);
 	const parsed = JSON.parse(out);
 	const all: any[] = parsed.all ?? [];
@@ -647,6 +653,77 @@ ipcMain.handle("patches:init-save-path", (_, slot: number) => {
 	return path.join(dir, `init-${slot}.pch2`);
 });
 
+// Bank Organizer storage area: userData/bank-storage, or the folder chosen in Editor Options.
+// Each window has its own (its settings aren't live-synced to the others); windows sharing a folder
+// share one watcher, which tells them when it changes (also catches the files the CLI writes there).
+const storageDirByWc = new Map<number, string>();
+const storageWatchers = new Map<string, fs.FSWatcher>();
+// The organizer's undo history keeps its patch copies in <storage>/.g2-organizer-history; it lives until the
+// app quits, so whatever an earlier run left there is removed the first time a folder is used.
+const historyCleaned = new Set<string>();
+
+// Closes the watchers of folders no window uses any more.
+function pruneStorageWatchers(): void {
+	const inUse = new Set(storageDirByWc.values());
+	for (const [dir, watcher] of storageWatchers) {
+		if (inUse.has(dir)) continue;
+		watcher.close();
+		storageWatchers.delete(dir);
+	}
+}
+
+function storageDir(wcId: number, custom?: string): string {
+	const dir = custom || path.join(app.getPath("userData"), "bank-storage");
+	fs.mkdirSync(dir, { recursive: true });
+	if (!historyCleaned.has(dir)) {
+		historyCleaned.add(dir);
+		fs.rmSync(path.join(dir, ".g2-organizer-history"), { recursive: true, force: true });
+	}
+	storageDirByWc.set(wcId, dir);
+	if (!storageWatchers.has(dir)) {
+		let timer: NodeJS.Timeout | null = null;
+		const watcher = fs.watch(dir, () => {
+			if (timer) clearTimeout(timer);
+			// Sent only to the windows still using `dir` when it fires (none once it's pruned).
+			timer = setTimeout(() => {
+				for (const window of BrowserWindow.getAllWindows()) {
+					if (!window.isDestroyed() && storageDirByWc.get(window.webContents.id) === dir) window.webContents.send("storage:changed");
+				}
+			}, 200);
+		});
+		// E.g. the folder was deleted or its drive unmounted: drop the watcher (an unhandled 'error'
+		// would throw in the main process); the next storageDir() call recreates folder and watcher.
+		watcher.on("error", () => {
+			watcher.close();
+			if (storageWatchers.get(dir) === watcher) storageWatchers.delete(dir);
+		});
+		storageWatchers.set(dir, watcher);
+	}
+	pruneStorageWatchers();
+	return dir;
+}
+
+ipcMain.handle("patches:storage-dir", (event, custom?: string) => storageDir(event.sender.id, custom));
+
+// Only files inside the calling window's storage folder (its .g2-organizer-history included) may be removed or copied.
+function assertInStorage(wcId: number, filepath: string): string {
+	const dir = storageDirByWc.get(wcId);
+	const resolved = path.resolve(filepath);
+	const rel = dir ? path.relative(path.resolve(dir), resolved) : "";
+	if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("Not a storage file");
+	return resolved;
+}
+
+ipcMain.handle("patches:storage-remove", (event, filepath: string) => {
+	fs.rmSync(assertInStorage(event.sender.id, filepath), { force: true });
+});
+
+ipcMain.handle("patches:storage-copy", (event, from: string, to: string) => {
+	const dst = assertInStorage(event.sender.id, to);
+	fs.mkdirSync(path.dirname(dst), { recursive: true });
+	fs.copyFileSync(assertInStorage(event.sender.id, from), dst);
+});
+
 ipcMain.handle("patches:set-folder", async (event) => {
 	const browserWin = BrowserWindow.fromWebContents(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
@@ -795,6 +872,8 @@ ipcMain.handle("app:info", () => ({
 }));
 
 ipcMain.handle("app:latestVersion", async (): Promise<string | null> => {
+	// Tests never reach GitHub.
+	if (process.env.NODE_ENV === "test") return null;
 	try {
 		const res = await fetch("https://api.github.com/repos/JanBurp/NordModularG2-Editor/releases/latest", { signal: AbortSignal.timeout(5000) });
 		if (!res.ok) return null;
@@ -1125,7 +1204,11 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: "Browser", click: () => sendToFocused("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ type: "separator" as const },
 				{ label: "Modules", click: () => sendToFocused("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
+				{ label: "Parameter Overview", click: () => sendToFocused("menu:action", "toggle-parameter-overview"), accelerator: "Shift+CommandOrControl+F" },
 				{ label: "Midi CC Panel", click: () => sendToFocused("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
+				{ type: "separator" as const },
+				{ label: "Patch Adjuster & Mutator", click: () => sendToFocused("menu:action", "toggle-patch-mutator"), accelerator: "CommandOrControl+2" },
+				{ label: "Bank Organizer", click: () => sendToFocused("menu:action", "toggle-bank-organizer"), accelerator: "CommandOrControl+3" },
 				{ type: "separator" as const },
 				{ label: "Extended Toolbar", click: () => sendToFocused("menu:action", "toggle-extended-toolbar"), accelerator: "CommandOrControl+T" },
 			],
@@ -1252,9 +1335,7 @@ app.whenReady().then(async () => {
 	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
 	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
 	// hardware-agnostic window — see isOffline in preload.ts).
-	// G2_SKIP_STARTUP_SCAN: set by e2e specs so startup never binds to real attached hardware.
-	const skipScan = process.env.VITE_DEV_OFFLINE === 'true' || process.env.G2_SKIP_STARTUP_SCAN === '1';
-	const devices = skipScan ? [] : await listAttachedDevices().catch(() => []);
+	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
 	if (unclaimed.length === 0) {
 		createAppWindow();

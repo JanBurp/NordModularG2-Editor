@@ -7,7 +7,8 @@ import { usePatchClipboard } from '@/composables/usePatchClipboard';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
-import { useHistoryStore } from '@/store/history';
+import { useMutatorStore } from '@/store/mutator';
+import { useUndoTarget } from './useUndoTarget';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
@@ -25,6 +26,11 @@ interface MenuActionOptions {
 	showAbout?: () => void;
 }
 
+// Keyboard focus inside the Patch Mutator pane: keys 1-8 pick a mutator box instead of a variation.
+function isMutatorFocused(): boolean {
+	return document.activeElement?.closest('[data-mutator-pane]') != null;
+}
+
 function isInputFocused(): boolean {
 	const el = document.activeElement;
 	return el instanceof HTMLInputElement || el instanceof HTMLTextAreaElement || el instanceof HTMLSelectElement;
@@ -38,14 +44,14 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 	const { deleteSelection, deleteUnusedModules, deleteUnusedCables } = usePatchOperations();
 	const { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard } = usePatchClipboard();
 	const deviceStore = useDeviceStore();
-	const historyStore = useHistoryStore();
+	const undoTarget = useUndoTarget();
 	const bankUploadDialog = useBankUploadDialog();
 	const bankDownloadDialog = useBankDownloadDialog();
 
 	const menuState = computed(() => ({
 		connected: deviceStore.connected,
-		canUndo: historyStore.canUndo(uiStore.slotInFocus),
-		canRedo: historyStore.canRedo(uiStore.slotInFocus),
+		canUndo: undoTarget.canUndo.value,
+		canRedo: undoTarget.canRedo.value,
 		hasSelection: uiStore.selectedModules.length > 0,
 		hasClipboard: hasClipboard.value,
 		hasCurrentPatch: !!currentPatch.value,
@@ -168,6 +174,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						document.execCommand('delete');
 						break;
 					}
+					if (isMutatorFocused() || uiStore.showBankOrganizer) break; // the organizer handles its own Delete
 					if (uiStore.hoveredJack) {
 						const { moduleIndex, connectorIndex, type, area } = uiStore.hoveredJack;
 						await slotsStore.breakJackConnection(moduleIndex, connectorIndex, type, area === 'va' ? 'voice' : 'fx');
@@ -189,6 +196,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						(document.activeElement as HTMLInputElement).select();
 						break;
 					}
+					if (uiStore.showBankOrganizer) break; // the organizer handles its own Cmd-A
 					uiStore.selectModules(
 						currentModules.value.map((m: any) => m.index as number),
 						uiStore.activeArea === 1 ? 'va' : 'fx',
@@ -266,7 +274,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'variation-8': {
 					if (isInputFocused()) break;
 					const variation = parseInt(action.substring(10, 11));
-					await handleVariationClick(variation - 1);
+					if (isMutatorFocused()) await useMutatorStore().focusNumber(variation);
+					else await handleVariationClick(variation - 1);
 					break;
 				}
 				case 'toggle-svg-viewer':
@@ -274,6 +283,15 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					break;
 				case 'toggle-midi-cc-panel':
 					useSettingsStore().toggleSidebar('midicc');
+					break;
+				case 'toggle-parameter-overview':
+					useSettingsStore().toggleSidebar('overview');
+					break;
+				case 'toggle-patch-mutator':
+					useSettingsStore().toggleSidebar('mutator');
+					break;
+				case 'toggle-bank-organizer':
+					uiStore.toggleBankOrganizer();
 					break;
 				case 'toggle-text-panel':
 					useSettingsStore().toggleSidebar('text');
@@ -300,10 +318,10 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 					useSettingsStore().resetCanvasZoom();
 					break;
 				case 'undo':
-					await slotsStore.undo();
+					await undoTarget.undo();
 					break;
 				case 'redo':
-					await slotsStore.redo();
+					await undoTarget.redo();
 					break;
 				case 'show-about':
 					options.showAbout?.();

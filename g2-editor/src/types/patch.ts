@@ -88,7 +88,10 @@ export const PATCH_PARAM_KEYS: (keyof PatchParamVariation)[] = [
 	'sustain',
 ];
 
-export const NUM_VARIATIONS = 9;
+export const NUM_VARIATIONS = 9; // stored in patch files: 8 variations + INIT
+// Live-only 10th variation: the Patch Mutator's audition slot. Kept in memory (SlotEntry.variations
+// has NUM_VARIATIONS + 1 entries) and on the G2, but never written to a patch file.
+export const MUTATOR_VARIATION = 9;
 export const MORPH_NAMES = ['Wheel', 'Vel', 'Keyb', 'Aft.Tch', 'Sust.Pd', 'Ctrl.Pd', 'P.Stick', 'G.Wh 2'];
 export const MORPH_MODE_OPTIONS: string[][] = [
 	['Knob', 'Wheel'],

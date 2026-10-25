@@ -8,6 +8,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Patch Adjuster
+- Patch Mutator
+- Parameter Pages Overview sidepanel
+- Bank Organizer
+
+### Changed
+- Tests better organized
+- New tests added
+- CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
+
+### Fixed
+- Wrong calculation of CPU
+
 ## [0.7.2] - 2026-10-22
 
 ### New

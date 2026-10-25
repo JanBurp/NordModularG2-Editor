@@ -1,11 +1,11 @@
 /*
  * Integration tests for get-bank / send-bank (Bank Upload / Bank Download).
  *
- * These are deliberately NOT part of test-integration: every get-bank/send-bank
+ * These are deliberately NOT part of test-e2e: every get-bank/send-bank
  * call walks all 128 locations of a bank with one request/response round trip
  * each (there is no cheaper "give me a summary" command - see g2_get_bank's own
  * comment), so even a single call is much louder than anything else this CLI
- * does. Run via make test-integration-slow.
+ * does. Run via make test-e2e-slow.
  *
  * Bank numbers are fixed config below instead of scanned for, so the traffic
  * cost per run is fixed and known: 1 bank operation for the fetch test, 5 for
@@ -53,7 +53,7 @@
 #define PERF_FETCH_TEST_BANK  1 /* known-existing performance bank, 2026-09-21 */
 #define PERF_WRITE_TEST_BANK  8 /* scratch bank: overwritten and cleared by the test */
 
-/* Injected by run_tests_integration_slow.c's main() via test_bank_transfer_set_daemon,
+/* Injected by run_tests_e2e_slow.c's main() via test_bank_transfer_set_daemon,
  * which owns spawn/shutdown (see that file for why: it has early-return points on
  * mid-run disconnect, so the daemon lifecycle can't be tied to a single Unity test
  * the way test_daemon.c's test_daemon_starts/test_daemon_perf_mode_cycle do it). */
@@ -246,6 +246,109 @@ static void do_bank_roundtrip(int type, int bank) {
 
     /* Report cleanup problems first - those mean real leftover data - then the
      * original write/verify outcome. */
+    TEST_ASSERT_NULL_MESSAGE(cleanupFailMsg, cleanupFailMsg);
+    TEST_ASSERT_NULL_MESSAGE(failMsg, failMsg);
+}
+
+static cJSON *do_location_cmd(const char *cmdName, const char *type_str, int bank, int location,
+                              const char *file, const char *name) {
+    char cmd[700];
+    int id = g_cmd_id++;
+    if (name)
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[\"%s\",\"%d\",\"%d\",\"%s\",\"%s\"]}",
+                 id, cmdName, type_str, bank, location, file, name);
+    else
+        snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[\"%s\",\"%d\",\"%d\",\"%s\"]}",
+                 id, cmdName, type_str, bank, location, file);
+    return bank_cmd(cmd, id);
+}
+
+static cJSON *do_clear_patch_cmd(const char *type_str, int bank, int location) {
+    char cmd[200];
+    int id = g_cmd_id++;
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"clear-patch\",\"args\":[\"%s\",\"%d\",\"%d\"]}",
+             id, type_str, bank, location);
+    return bank_cmd(cmd, id);
+}
+
+/* Bytes of a .pch2/.prf2 from the name-terminating NUL on, i.e. what the G2
+ * stores verbatim (the ASCII text header in front differs between writers). */
+static uint8_t *read_file_body(const char *path, size_t *len) {
+    FILE *f = fopen(path, "rb");
+    if (!f) return NULL;
+    fseek(f, 0, SEEK_END);
+    long size = ftell(f);
+    fseek(f, 0, SEEK_SET);
+    uint8_t *buf = malloc((size_t)size);
+    if (!buf || fread(buf, 1, (size_t)size, f) != (size_t)size) { fclose(f); free(buf); return NULL; }
+    fclose(f);
+    uint8_t *nul = memchr(buf, 0, (size_t)size);
+    if (!nul) { free(buf); return NULL; }
+    *len = (size_t)(buf + size - nul);
+    memmove(buf, nul, *len);
+    return buf;
+}
+
+/* get-location/put-location on two locations of the scratch patch bank: write
+ * the fixture under an explicit name, read it back (name + body byte-equal - the
+ * flash stores the body verbatim), and read a cleared location as empty. Same
+ * cleanup discipline as do_bank_roundtrip: no assert before the clears ran. */
+void test_bank_transfer_location_roundtrip(void) {
+    if (!g_daemon || g_device_lost) TEST_IGNORE_MESSAGE("G2 device not connected");
+    daemon_wait_ready(g_daemon);
+    mkdir(TMP_DIR, 0755);
+    mkdir(DUMP_DIR, 0755);
+
+    const int bank = PATCH_WRITE_TEST_BANK;
+    const char *fixture = "../test-patches/EmptyPatch.pch2";
+    const char *readBack = DUMP_DIR "/LocationReadBack.pch2";
+    const char *emptyBack = DUMP_DIR "/LocationEmpty.pch2";
+    unlink(readBack);
+    unlink(emptyBack);
+    const char *failMsg = NULL;
+
+    cJSON *r = do_clear_patch_cmd("patch", bank, 2);
+    if (!r || !cJSON_IsTrue(cJSON_GetObjectItem(r, "ok"))) failMsg = "clear-patch (prepare empty location) failed";
+    if (r) cJSON_Delete(r);
+
+    if (!failMsg) {
+        r = do_location_cmd("put-location", "patch", bank, 1, fixture, "LocTest");
+        if (!r || !cJSON_IsTrue(cJSON_GetObjectItem(r, "ok"))) failMsg = "put-location returned no ok response";
+        if (r) cJSON_Delete(r);
+    }
+    if (!failMsg) {
+        r = do_location_cmd("get-location", "patch", bank, 1, readBack, NULL);
+        cJSON *data = r ? cJSON_GetObjectItem(r, "data") : NULL;
+        cJSON *name = data ? cJSON_GetObjectItem(data, "name") : NULL;
+        if (!r || !cJSON_IsTrue(cJSON_GetObjectItem(r, "ok"))) failMsg = "get-location returned no ok response";
+        else if (cJSON_IsTrue(cJSON_GetObjectItem(data, "empty"))) failMsg = "get-location: written location reads as empty";
+        else if (!cJSON_IsString(name) || strcmp(name->valuestring, "LocTest") != 0) failMsg = "get-location: name is not LocTest";
+        if (r) cJSON_Delete(r);
+    }
+    if (!failMsg) {
+        size_t lenA = 0, lenB = 0;
+        uint8_t *a = read_file_body(fixture, &lenA);
+        uint8_t *b = read_file_body(readBack, &lenB);
+        if (!a || !b) failMsg = "cannot read fixture or read-back file";
+        else if (lenA != lenB || memcmp(a, b, lenA) != 0) failMsg = "read-back body differs from the written fixture";
+        free(a);
+        free(b);
+    }
+    if (!failMsg) {
+        r = do_location_cmd("get-location", "patch", bank, 2, emptyBack, NULL);
+        cJSON *data = r ? cJSON_GetObjectItem(r, "data") : NULL;
+        if (!r || !cJSON_IsTrue(cJSON_GetObjectItem(r, "ok"))) failMsg = "get-location (empty) returned no ok response";
+        else if (!cJSON_IsTrue(cJSON_GetObjectItem(data, "empty"))) failMsg = "get-location: cleared location not reported empty";
+        else if (access(emptyBack, F_OK) == 0) failMsg = "get-location wrote a file for an empty location";
+        if (r) cJSON_Delete(r);
+    }
+
+    const char *cleanupFailMsg = NULL;
+    r = do_clear_patch_cmd("patch", bank, 1);
+    if (!r || !cJSON_IsTrue(cJSON_GetObjectItem(r, "ok")))
+        cleanupFailMsg = "clear-patch (cleanup) failed - location may still hold LocTest, check by hand";
+    if (r) cJSON_Delete(r);
+
     TEST_ASSERT_NULL_MESSAGE(cleanupFailMsg, cleanupFailMsg);
     TEST_ASSERT_NULL_MESSAGE(failMsg, failMsg);
 }

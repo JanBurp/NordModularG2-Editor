@@ -113,7 +113,7 @@ describe('paste', () => {
 		const patch = makePatch();
 		store.slots['A'].patch = patch;
 
-		const modInstance = (index: number) => ({ type: 1, index, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+		const modInstance = (index: number) => ({ type: 1, index, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] });
 		const entries = [
 			{ src: modInstance(1), newId: 1, col: 0, row: 0 },
 			{ src: modInstance(2), newId: 2, col: 3, row: 0 },
@@ -405,7 +405,7 @@ describe('setMorphGroupLabel', () => {
 
 describe('pasteParams', () => {
 	function moduleInstance(index: number, type: number, pcnt: number, modes: number[]): any {
-		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt, lv: [], modes };
+		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt, lv: [], modes };
 	}
 
 	function withVariations(voiceValues: number[]): any[] {
@@ -622,7 +622,7 @@ describe('_applyPatchOutput / loadSlot — preserveHistory', () => {
 // mutation had already happened.
 describe('module add/move/delete record undo even when the CLI/hardware call fails (offline)', () => {
 	function moduleStub(index: number) {
-		return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	beforeEach(() => {
@@ -719,7 +719,7 @@ describe('addModule default name suffix', () => {
 	it('continues from the highest existing suffix, even across areas', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[0].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'LfoA5' }];
+		patch.areas[0].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [], uname: 'LfoA5' }];
 		store.slots['A'].patch = patch;
 
 		await store.addModule(26, 2, 0, 0, 'voice');
@@ -730,7 +730,7 @@ describe('addModule default name suffix', () => {
 	it('starts at 1 when no same-type module has a parseable suffix', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [], uname: 'Bass' }];
+		patch.areas[1].modules = [{ type: 26, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [], uname: 'Bass' }];
 		store.slots['A'].patch = patch;
 
 		await store.addModule(26, 2, 1, 0, 'voice');
@@ -750,7 +750,7 @@ describe('replaceModule', () => {
 	const FLT_LP = 87;
 
 	function fltClassicStub(index: number) {
-		return { index, type: FLT_CLASSIC, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type: FLT_CLASSIC, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	it('changes the module type while keeping the same index, and records one undo entry', async () => {
@@ -827,8 +827,8 @@ describe('replaceModule', () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		patch.areas[1].modules = [
-			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
-			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 1, type: FLT_LP, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] },
+			{ index: 2, type: FLT_LP, horiz: 0, vert: 2, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] },
 		];
 		store.slots['A'].patch = patch;
 
@@ -897,7 +897,7 @@ describe('module delete zeroes its morph ranges on the device first', () => {
 	function setup() {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ index: 1, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ index: 1, type: 5, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = [
 			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
@@ -936,7 +936,7 @@ describe('delete undo restores colours of remaining cables', () => {
 	function setup() {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] });
+		const mod = (index: number, type: number) => ({ index, type, horiz: 0, vert: index, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] });
 		patch.areas[1].modules = [mod(1, NOISE), mod(2, LEV_AMP), mod(3, LEV_AMP)];
 		patch.areas[1].cableList = [
 			{ colour: RED, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 },
@@ -976,7 +976,7 @@ describe('re-created module sends its non-default params for every variation', (
 		const store = useSlotsStore();
 		const patch = makePatch();
 		const lv = [1, 0, 0, 54, 127, 54, 70, 14, 1, 0, 0];
-		patch.areas[1].modules = [{ index: 4, type: ENV_ADDSR, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 11, lv, modes: [] }];
+		patch.areas[1].modules = [{ index: 4, type: ENV_ADDSR, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 11, lv, modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = [
 			{ fx: {}, voice: { 4: [...lv] }, patch: { morphAssignments: [] } },
@@ -999,7 +999,7 @@ describe('undo after an echo reload replaced the patch object', () => {
 	const FLT_LP = 87;
 
 	function stub(index: number, type = 5, vert = 0) {
-		return { index, type, horiz: 0, vert, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+		return { index, type, horiz: 0, vert, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	}
 
 	// Simulates _applyPatchOutput's echo reload: same content, new patch object.
@@ -1989,7 +1989,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it("'clr' resets both the value row and the gate row for all 16 steps, ignoring Length", async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(10);
 		values[LENGTH_IDX] = 3; // Length only affects playback, not which steps Rnd/Clr touch
@@ -2008,7 +2008,19 @@ describe('randomizeOrClearSeqSteps', () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
 		patch.areas[1].modules = [
-			{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [], pianoRollView: { zoom: 1, octaveOffset: 5 } },
+			{
+				type: 121,
+				index: 1,
+				horiz: 0,
+				vert: 0,
+				colour: 0,
+				uprate: 0,
+				mutaLock: 0,
+				pcnt: 37,
+				lv: [],
+				modes: [],
+				pianoRollView: { zoom: 1, octaveOffset: 5 },
+			},
 		];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(0);
@@ -2032,7 +2044,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it("'rnd' on a non-SeqNote sequencer (no piano-roll window) still spans the param's full range", async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = withVariations(Array(37).fill(64), 1);
 
@@ -2049,7 +2061,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('one press is a single undo/redo entry', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		const values = Array(37).fill(10);
 		values[LENGTH_IDX] = 15;
@@ -2068,7 +2080,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('treats all 16 steps as active for a module with no Length param (SeqCtr), resetting both rows', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 37, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 154, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 37, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 		store.slots['A'].variations = withVariations(Array(37).fill(10), 1);
 
@@ -2080,7 +2092,7 @@ describe('randomizeOrClearSeqSteps', () => {
 	it('does nothing for a module without any Seq1Step params', async () => {
 		const store = useSlotsStore();
 		const patch = makePatch();
-		patch.areas[1].modules = [{ type: 5, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] }];
+		patch.areas[1].modules = [{ type: 5, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] }];
 		store.slots['A'].patch = patch;
 
 		await store.randomizeOrClearSeqSteps(1, 0, 'voice', 'clr');
@@ -2509,5 +2521,62 @@ describe('uprate repair on load from the G2', () => {
 		expect(useSlotsStore().loadPatchFile('A', patch, name, rawHex)).toEqual([['set-module-uprate', 'A', 'va', '2', '1']]);
 		expect(sent).toEqual([]);
 		expect(patch.areas[1].modules.find((m: any) => m.index === 2).uprate).toBe(1);
+	});
+});
+
+describe('updateResources (official CPatchLoad formulas)', () => {
+	// One 28-byte block: location, then 14-bit words (msb*128+lsb) at the given payload offsets.
+	function block(location: number, words: Record<number, number> = {}, bytes: Record<number, number> = {}): number[] {
+		const d = new Array(28).fill(0);
+		d[0] = location;
+		for (const [i, v] of Object.entries(words)) {
+			d[+i] = v >> 7;
+			d[+i + 1] = v & 0x7f;
+		}
+		for (const [i, v] of Object.entries(bytes)) d[+i] = v;
+		return d;
+	}
+
+	it('cycles = (red + blue/4) * 100 / 1371, so 1371 red or 5484 blue is exactly 100%', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 1: 1371 }));
+		expect(store.slots['A'].resources.va.cycles).toBeCloseTo(100);
+		// The old Delphi formula (blue/5000) read 109.7% here and went red while the patch still ran
+		store.updateResources('A', block(1, { 3: 5484 }));
+		expect(store.slots['A'].resources.va.cycles).toBeCloseTo(100);
+	});
+
+	it.each([
+		['xmem (v1 + v2)', block(1, { 8: 1084, 14: 1084 })],
+		['ymem (v1 + v2)', block(1, { 10: 748, 16: 748 })],
+		['pmem (v1 + v2)', block(1, { 12: 1624, 18: 1625 })],
+		['zpmem', block(1, {}, { 5: 64 })],
+		['ram (/131072, so a 14-bit word tops out at 12.5%)', block(1, { 20: 8192 }), 6.25],
+		['qmem (32-bit, 8-bit bytes)', block(1, {}, { 23: 0x01, 24: 0xfc, 25: 0x00 })],
+		['rmem', block(1, { 26: 128 })],
+	])('memory takes the critical resource: %s', (_name, data, expected = 50) => {
+		const store = useSlotsStore();
+		store.updateResources('A', data);
+		expect(store.slots['A'].resources.va.memory).toBeCloseTo(expected, 1);
+	});
+
+	it('memory is the maximum over all resources', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 8: 2168, 26: 192 }, { 5: 32 }));
+		expect(store.slots['A'].resources.va.memory).toBeCloseTo(75); // rmem 192/256 beats xmem 50% and zpmem 25%
+	});
+
+	it('routes location 1 to va and 0 to fx, including both blocks of a compound packet', () => {
+		const store = useSlotsStore();
+		store.updateResources('B', [...block(1, { 1: 1371 }), 0x72, ...block(0, { 1: 685 })]);
+		expect(store.slots['B'].resources.va.cycles).toBeCloseTo(100);
+		expect(store.slots['B'].resources.fx.cycles).toBeCloseTo(49.96, 2);
+		expect(store.slots['A'].resources).toEqual({ va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } });
+	});
+
+	it('ignores a truncated block', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 1: 1371 }).slice(0, 27));
+		expect(store.slots['A'].resources.va).toEqual({ cycles: 0, memory: 0 });
 	});
 });

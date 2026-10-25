@@ -43,3 +43,14 @@ describe('addRecentFile', () => {
 		expect(window.electronAPI!.updateRecentFiles).toHaveBeenCalledWith(store.recentFiles);
 	});
 });
+
+describe('toggleVirtualKeyboard', () => {
+	it('shows and hides the keyboard', () => {
+		const store = useSettingsStore();
+		expect(store.showVirtualKeyboard).toBe(false);
+		store.toggleVirtualKeyboard();
+		expect(store.showVirtualKeyboard).toBe(true);
+		store.toggleVirtualKeyboard();
+		expect(store.showVirtualKeyboard).toBe(false);
+	});
+});

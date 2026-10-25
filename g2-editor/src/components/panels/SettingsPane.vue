@@ -112,6 +112,18 @@
 				<SettingsRow :label="L.editorHiddenModules">
 					<CheckBox :model-value="settings.hidden_modules" @update:model-value="settings.setHiddenModules($event)" />
 				</SettingsRow>
+
+				<p class="settings-subheader">Bank Organizer:</p>
+				<!-- Temporary Storage folder: the default lives in the app's data folder -->
+				<SettingsRow :label="L.editorStorageFolder">
+					<div class="flex items-center gap-1 min-w-0">
+						<span class="truncate text-xs text-content-primary" :title="browser.storageDir">{{ storageFolderName }}</span>
+						<Button variant="default" size="xs" title="Choose another folder" @click="chooseStorageFolder">Choose…</Button>
+						<Button v-if="settings.storageFolder" variant="default" size="xs" title="Back to the default folder" @click="setStorageFolder('')">
+							Default
+						</Button>
+					</div>
+				</SettingsRow>
 			</div>
 		</Collapsible>
 		<Collapsible
@@ -357,7 +369,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref, watch } from 'vue';
+	import { computed, onMounted, ref, watch } from 'vue';
 	import { makeOffMemory } from '@/composables/useOffMemory';
 	import Collapsible from '@/components/common/Collapsible.vue';
 	import Slider from '@/components/common/Slider.vue';
@@ -368,6 +380,8 @@
 	import CheckBox from '@/components/common/CheckBox.vue';
 	import Select from '@/components/common/Select.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
+	import Button from '@/components/toolbar/Button.vue';
+	import { useBrowserStore } from '@/store/browser';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection, type CableConnectMode, type CableStyle } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
@@ -386,6 +400,21 @@
 
 	const device = useDeviceStore();
 	const settings = useSettingsStore();
+	const browser = useBrowserStore();
+
+	// Bank Organizer's Temporary Storage folder: the default (app data) or a chosen one.
+	const storageFolderName = computed(() =>
+		settings.storageFolder ? (settings.storageFolder.split(/[/\\]/).pop() ?? settings.storageFolder) : 'Default (app data)',
+	);
+	async function setStorageFolder(folder: string) {
+		settings.setStorageFolder(folder);
+		await browser.loadStorage(); // re-points the folder watcher and reloads the list
+	}
+	async function chooseStorageFolder() {
+		const result = await window.electronAPI.patches.setFolder();
+		if (result.success && result.folder) await setStorageFolder(result.folder);
+	}
+	onMounted(() => browser.loadStorage()); // fills browser.storageDir for the folder's tooltip
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 

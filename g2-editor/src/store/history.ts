@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia';
 import type { SlotLabel } from '@/types';
+import { useMutatorStore } from './mutator';
 
 export interface HistoryEntry {
 	undo: () => Promise<void>;
@@ -111,9 +112,12 @@ export const useHistoryStore = defineStore('history', {
 			h.future = [entry, ...h.future];
 		},
 
+		// Called when the slot gets a different patch; the Patch Mutator's boxes (whose undo entries
+		// live here) belong to the old patch and are dropped with it.
 		clearHistory(slot: SlotLabel): void {
 			this.clearCoalescing(slot);
 			this.slots[slot] = makeSlotHistory();
+			useMutatorStore().reset(slot);
 		},
 
 		canUndo(slot: SlotLabel): boolean {

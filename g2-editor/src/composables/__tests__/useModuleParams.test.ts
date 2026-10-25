@@ -12,7 +12,7 @@ beforeEach(() => {
 // Minimal SeqNote-shaped module def: a Rnd/Clr TrigBtn pair plus an unrelated switch, enough to
 // exercise onParamChange's Rnd/Clr branch without pulling in the real nmg2mods table.
 function setup() {
-	const instance: ModuleInstance = { type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, leds: 0, pcnt: 0, lv: [], modes: [] };
+	const instance: ModuleInstance = { type: 121, index: 1, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
 	const moduleDef: ModuleDefinition = {
 		id: 121,
 		short: 'SeqNote',
