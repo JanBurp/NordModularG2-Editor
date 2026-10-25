@@ -2,6 +2,7 @@ import { computed, effectScope, nextTick, ref, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { showToast } from './useToast';
+import { usePatchOperations } from './usePatchOperations';
 import { buildMatcher, collectItems, computeReplacements, findMatches, itemKey, splitMatches, type SearchItem } from '@/utils/searchReplace';
 
 // Shared Find & Replace state: the toolbar edits it, every canvas Module and the Morph Groups
@@ -112,5 +113,11 @@ function createSearchReplace() {
 		prev: () => step(-1),
 		replaceCurrent: () => replace(current.value ? [current.value] : []),
 		replaceAll: () => replace(matches.value),
+		foundModuleCount: computed(() => matchedModules.value.size),
+		// Modules with a match in their name or labels — the ones left undimmed.
+		deleteFound: () => {
+			const found = new Set(matchedModules.value);
+			return usePatchOperations().deleteModulesWhere((area, m) => found.has(`${area}:${m.index}`));
+		},
 	};
 }

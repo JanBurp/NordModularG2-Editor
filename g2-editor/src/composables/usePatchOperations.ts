@@ -49,11 +49,13 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
-	// Shared by deleteUnusedModules/deleteUnusedCables below: walks both areas, lets the caller
+	// Shared by deleteUnusedModules/deleteUnusedCables/deleteModulesWhere below: walks both areas, lets the caller
 	// compute which modules/cables to drop for that area's data, and skips the store call when
 	// there's nothing to delete. The per-area undo entries are merged into one so a single Undo
 	// restores both areas.
-	async function deleteUnusedInAreas(computeTargets: (modules: any[], cables: any[]) => { moduleIds?: number[]; cableList?: Cable[] }): Promise<void> {
+	async function deleteUnusedInAreas(
+		computeTargets: (modules: any[], cables: any[], area: 'voice' | 'fx') => { moduleIds?: number[]; cableList?: Cable[] },
+	): Promise<void> {
 		const hist = useHistoryStore();
 		const slot = uiStore.slotInFocus;
 		const topEntry = () => hist.slots[slot].past[hist.slots[slot].past.length - 1];
@@ -61,7 +63,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		for (const area of ['voice', 'fx'] as const) {
 			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
 			const cables = slotsStore.getAreaCables(uiStore.slotInFocus, areaConfig(area).areaIdx);
-			const { moduleIds = [], cableList = [] } = computeTargets(modules, cables);
+			const { moduleIds = [], cableList = [] } = computeTargets(modules, cables, area);
 			if (moduleIds.length > 0 || cableList.length > 0) {
 				const before = topEntry();
 				await slotsStore.deleteSelection(moduleIds, cableList, area, modules, cables);
@@ -81,6 +83,11 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 				},
 			});
 		}
+	}
+
+	// Deletes the picked modules of both areas as one undo step (Find & Replace → Delete Found Modules).
+	async function deleteModulesWhere(pick: (area: 'voice' | 'fx', module: any) => boolean): Promise<void> {
+		await deleteUnusedInAreas((modules, _cables, area) => ({ moduleIds: modules.filter((m: any) => pick(area, m)).map((m: any) => m.index as number) }));
 	}
 
 	async function deleteUnusedModules(): Promise<void> {
@@ -252,6 +259,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		currentModules,
 		deleteSelection,
 		deleteUnusedModules,
+		deleteModulesWhere,
 		deleteUnusedCables,
 		handleModuleMove,
 		handleModuleDrop,

@@ -1,7 +1,8 @@
-import { dropModuleOnCanvas } from './helpers';
+import { dropModuleOnCanvas, getStatusCounts } from './helpers';
 import { expect, test } from './fixtures/electron';
 
 const OSC_A = 97;
+const FLT_LP = 87;
 
 test.describe('find & replace', () => {
 	test('finds module names, Replace All renames them as one undo step', async ({ page, sendMenuAction }) => {
@@ -29,5 +30,21 @@ test.describe('find & replace', () => {
 
 		await sendMenuAction('undo');
 		await expect(names.filter({ hasText: /^\s*OscA\d+\s*$/ })).toHaveCount(2);
+	});
+
+	test('Delete Found Modules deletes only the matching modules, as one undo step', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, OSC_A, 0, 0);
+		await dropModuleOnCanvas(page, OSC_A, 1, 0);
+		await dropModuleOnCanvas(page, FLT_LP, 0, 4);
+
+		await sendMenuAction('toggle-search-replace');
+		await page.getByTestId('search-term').fill('osca');
+		await page.getByTestId('search-delete-found').click();
+		await expect.poll(async () => (await getStatusCounts(page)).voiceModules).toBe(1);
+		await expect(page.locator('[data-testid="canvas-va"] [data-module-short="FltLP"]')).toBeVisible();
+
+		await sendMenuAction('undo');
+		await expect.poll(async () => (await getStatusCounts(page)).voiceModules).toBe(3);
 	});
 });

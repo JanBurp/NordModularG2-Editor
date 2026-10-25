@@ -45,6 +45,16 @@
 		<ToolBarDivider />
 		<Button variant="default" title="Replace the current match (Enter)" :disabled="!current" @click="replaceCurrent">Replace</Button>
 		<Button variant="default" :disabled="!matches.length" data-testid="search-replace-all" @click="replaceAll">Replace All</Button>
+		<ToolBarDivider />
+		<Button
+			variant="default"
+			:disabled="!foundModuleCount"
+			:title="`Delete the ${foundModuleCount} modules with a match (Undo restores them)`"
+			data-testid="search-delete-found"
+			@click="deleteFound"
+		>
+			Delete Found Modules
+		</Button>
 
 		<span class="flex-1" />
 		<Button variant="default" size="xs" title="Close (Esc)" @click="uiStore.showSearchReplace = false">×</Button>
@@ -67,8 +77,23 @@
 		param: { label: 'Labels', title: 'Search switch labels' },
 		morph: { label: 'Morph', title: 'Search Morph Group labels' },
 	} as const;
-	const { term, replacement, caseSensitive, regex, include, regexError, matches, current, counts, next, prev, replaceCurrent, replaceAll } =
-		useSearchReplace();
+	const {
+		term,
+		replacement,
+		caseSensitive,
+		regex,
+		include,
+		regexError,
+		matches,
+		current,
+		counts,
+		next,
+		prev,
+		replaceCurrent,
+		replaceAll,
+		foundModuleCount,
+		deleteFound,
+	} = useSearchReplace();
 
 	// Only the kinds being searched: "Voice 2/1   FX 1/2   Morph 1", "Voice 2   FX 1" with Labels and Morph off.
 	const AREA_KINDS = ['module', 'param'] as const;
