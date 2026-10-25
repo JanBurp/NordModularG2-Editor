@@ -82,14 +82,19 @@ g.module {
 	width: 256px;
 }
 
-/* No cable attached (what Patch → Delete Unused Modules would remove); full opacity while hovered/selected. */
-g.unused:not(.selected):not(:hover) {
-	opacity: 0.5;
+/* Dimmed modules get a canvas-coloured veil instead of opacity, so the area name behind them doesn't show through.
+ * :where() keeps both rules at equal specificity, so the stronger Find & Replace dim wins when both apply. */
+.dim-overlay {
+	fill: var(--color-surface-2);
+	fill-opacity: var(--dim, 0);
 }
-
+/* No cable attached (what Patch → Delete Unused Modules would remove); undimmed while hovered/selected. */
+g.unused:where(:not(.selected):not(:hover)) {
+	--dim: 0.5;
+}
 /* Find & Replace: modules without a match are dimmed; the found text gets a marker-pen halo, the current match orange. */
-g.search-dimmed:not(:hover) {
-	opacity: 0.35;
+g.search-dimmed:where(:not(:hover)) {
+	--dim: 0.65;
 }
 .search-frame {
 	fill: none;

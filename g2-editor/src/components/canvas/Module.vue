@@ -255,6 +255,7 @@
 			stroke-width="3"
 			pointer-events="none"
 		/>
+		<rect class="dim-overlay" width="256" :height="height" pointer-events="none" />
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
 		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
