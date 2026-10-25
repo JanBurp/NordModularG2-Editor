@@ -194,8 +194,14 @@ export const useUiStore = defineStore('ui', {
 			this.showBankOrganizer = !this.showBankOrganizer;
 		},
 
-		openBankOrganizer(kind: 'patch' | 'performance', bank: number) {
+		setOrganizerKind(kind: 'patch' | 'performance') {
 			this.organizerKind = kind;
+			// Performance banks only go up to 8.
+			if (kind === 'performance') this.organizerBanks = this.organizerBanks.map((b) => Math.min(b, 8)) as [number, number];
+		},
+
+		openBankOrganizer(kind: 'patch' | 'performance', bank: number) {
+			this.setOrganizerKind(kind);
 			this.organizerBanks[0] = bank;
 			this.showBankOrganizer = true;
 		},

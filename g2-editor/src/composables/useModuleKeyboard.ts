@@ -309,6 +309,8 @@ export function useModuleKeyboard() {
 	function handleKeydown(e: KeyboardEvent) {
 		if (showDialog.value) return;
 		if (uiStore.showQuickAdd) return;
+		// The canvas is only hidden under the Bank Organizer: its keys must not edit the patch
+		if (uiStore.showBankOrganizer) return;
 		// Also the event's own target: a popup that closes on Enter (Set Value, Quick Add) can already
 		// have unmounted its input — and moved focus to <body> — before this window listener runs.
 		if (isInput(document.activeElement) || isInput(e.target)) return;

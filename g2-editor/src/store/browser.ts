@@ -44,11 +44,19 @@ export interface DiskEntry {
 }
 
 const extOf = (kind: BankKind) => (kind === 'performance' ? 'prf2' : 'pch2');
+// The renderer joins storage paths with '/', patches:list with the platform separator (backslash on Windows).
+const baseName = (file: string) => file.split(/[/\\]/).pop() ?? file;
 
 async function storageItemFromFile(entry: DiskEntry): Promise<StorageItem> {
 	const base = entry.name.replace(/\.(pch2|prf2)$/i, '');
 	const sep = base.lastIndexOf('__');
-	const name = decodeURIComponent(sep >= 0 ? base.slice(0, sep) : base);
+	const raw = sep >= 0 ? base.slice(0, sep) : base;
+	let name = raw;
+	try {
+		name = decodeURIComponent(raw);
+	} catch {
+		// not one of ours (e.g. "100% Lead.pch2" in a chosen folder): show the file name as it is
+	}
 	const kind: BankKind = /\.prf2$/i.test(entry.name) ? 'performance' : 'patch';
 	if (kind === 'performance') return { file: entry.path, name, kind };
 	let category: string | undefined;
@@ -513,7 +521,7 @@ export const useBrowserStore = defineStore('browser', {
 				async () => {
 					const verb = undo ? 'Undoing' : 'Redoing';
 					for (const c of changes) {
-						const now = c.type === 'bank' ? (this.entryAt(c.loc)?.name ?? null) : this.storage.some((s) => s.file === c.file);
+						const now = c.type === 'bank' ? (this.entryAt(c.loc)?.name ?? null) : this.storage.some((s) => baseName(s.file) === baseName(c.file));
 						const expected = c.type === 'bank' ? ((undo ? c.after : c.before)?.name ?? null) : undo ? c.existsAfter : c.existsBefore;
 						if (now !== expected) {
 							const where = c.type === 'bank' ? `${c.loc.bank}-${c.loc.location}` : 'Temporary Storage';

@@ -108,7 +108,7 @@
 				:sort="settings.organizerSortModes[i]"
 				:sort-linked="settings.organizerSortLinked"
 				:same-bank="uiStore.organizerBanks[0] === uiStore.organizerBanks[1]"
-				@update:bank="(b) => (uiStore.organizerBanks[i] = b)"
+				@update:bank="(b) => setBank(i, b)"
 				@update:sort="(s) => setSort(i, s)"
 				@update:sort-linked="(linked) => linkSort(i, linked)"
 			/>
@@ -260,10 +260,14 @@
 		return rows * storageCols.value - storageItems.value.length;
 	});
 
+	// Another kind or bank: the selection would point at items that are no longer shown.
 	function setKind(kind: BankKind) {
-		uiStore.organizerKind = kind;
-		// Performance banks only go up to 8.
-		if (kind === 'performance') uiStore.organizerBanks = uiStore.organizerBanks.map((b) => Math.min(b, 8)) as [number, number];
+		uiStore.setOrganizerKind(kind);
+		org.clearSelection();
+	}
+	function setBank(side: number, bank: number) {
+		uiStore.organizerBanks[side] = bank;
+		org.clearSelection();
 	}
 
 	// Linked: a sort chosen on either side applies to both; linking takes the sort of the side it was clicked on.

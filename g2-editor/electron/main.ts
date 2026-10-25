@@ -200,6 +200,8 @@ function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
 	window.on("closed", () => {
 		pendingAssignment.delete(wcId);
 		openFileReadyIds.delete(wcId);
+		storageDirByWc.delete(wcId);
+		pruneStorageWatchers();
 		const session = sessionByWebContentsId.get(wcId);
 		if (!session) return;
 		sessionByWebContentsId.delete(wcId);
@@ -650,55 +652,68 @@ ipcMain.handle("patches:init-save-path", (_, slot: number) => {
 });
 
 // Bank Organizer storage area: userData/bank-storage, or the folder chosen in Editor Options.
-// Shared by every device window, so a patch parked from one G2 can be put on another. A single
-// watcher tells all windows when it changes (also catches the files the CLI writes there directly).
-let storageWatcher: fs.FSWatcher | null = null;
-let storageTimer: NodeJS.Timeout | null = null;
-let watchedStorageDir = "";
+// Each window has its own (its settings aren't live-synced to the others); windows sharing a folder
+// share one watcher, which tells them when it changes (also catches the files the CLI writes there).
+const storageDirByWc = new Map<number, string>();
+const storageWatchers = new Map<string, fs.FSWatcher>();
 // The organizer's undo history keeps its patch copies in <storage>/.history; it lives until the
 // app quits, so whatever an earlier run left there is removed the first time a folder is used.
 const historyCleaned = new Set<string>();
 
-function storageDir(custom?: string): string {
+// Closes the watchers of folders no window uses any more.
+function pruneStorageWatchers(): void {
+	const inUse = new Set(storageDirByWc.values());
+	for (const [dir, watcher] of storageWatchers) {
+		if (inUse.has(dir)) continue;
+		watcher.close();
+		storageWatchers.delete(dir);
+	}
+}
+
+function storageDir(wcId: number, custom?: string): string {
 	const dir = custom || path.join(app.getPath("userData"), "bank-storage");
 	fs.mkdirSync(dir, { recursive: true });
 	if (!historyCleaned.has(dir)) {
 		historyCleaned.add(dir);
 		fs.rmSync(path.join(dir, ".history"), { recursive: true, force: true });
 	}
-	if (dir !== watchedStorageDir) {
-		storageWatcher?.close();
-		watchedStorageDir = dir;
-		storageWatcher = fs.watch(dir, () => {
-			if (storageTimer) clearTimeout(storageTimer);
-			storageTimer = setTimeout(() => {
+	storageDirByWc.set(wcId, dir);
+	if (!storageWatchers.has(dir)) {
+		let timer: NodeJS.Timeout | null = null;
+		const watcher = fs.watch(dir, () => {
+			if (timer) clearTimeout(timer);
+			// Sent only to the windows still using `dir` when it fires (none once it's pruned).
+			timer = setTimeout(() => {
 				for (const window of BrowserWindow.getAllWindows()) {
-					if (!window.isDestroyed()) window.webContents.send("storage:changed");
+					if (!window.isDestroyed() && storageDirByWc.get(window.webContents.id) === dir) window.webContents.send("storage:changed");
 				}
 			}, 200);
 		});
+		storageWatchers.set(dir, watcher);
 	}
+	pruneStorageWatchers();
 	return dir;
 }
 
-ipcMain.handle("patches:storage-dir", (_, custom?: string) => storageDir(custom));
+ipcMain.handle("patches:storage-dir", (event, custom?: string) => storageDir(event.sender.id, custom));
 
-// Only files inside the current storage folder (its .history included) may be removed or copied.
-function assertInStorage(filepath: string): string {
+// Only files inside the calling window's storage folder (its .history included) may be removed or copied.
+function assertInStorage(wcId: number, filepath: string): string {
+	const dir = storageDirByWc.get(wcId);
 	const resolved = path.resolve(filepath);
-	const rel = watchedStorageDir ? path.relative(path.resolve(watchedStorageDir), resolved) : "";
+	const rel = dir ? path.relative(path.resolve(dir), resolved) : "";
 	if (!rel || rel.startsWith("..") || path.isAbsolute(rel)) throw new Error("Not a storage file");
 	return resolved;
 }
 
-ipcMain.handle("patches:storage-remove", (_, filepath: string) => {
-	fs.rmSync(assertInStorage(filepath), { force: true });
+ipcMain.handle("patches:storage-remove", (event, filepath: string) => {
+	fs.rmSync(assertInStorage(event.sender.id, filepath), { force: true });
 });
 
-ipcMain.handle("patches:storage-copy", (_, from: string, to: string) => {
-	const dst = assertInStorage(to);
+ipcMain.handle("patches:storage-copy", (event, from: string, to: string) => {
+	const dst = assertInStorage(event.sender.id, to);
 	fs.mkdirSync(path.dirname(dst), { recursive: true });
-	fs.copyFileSync(assertInStorage(from), dst);
+	fs.copyFileSync(assertInStorage(event.sender.id, from), dst);
 });
 
 ipcMain.handle("patches:set-folder", async (event) => {

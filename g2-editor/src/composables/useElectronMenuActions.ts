@@ -174,7 +174,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						document.execCommand('delete');
 						break;
 					}
-					if (isMutatorFocused()) break;
+					if (isMutatorFocused() || uiStore.showBankOrganizer) break; // the organizer handles its own Delete
 					if (uiStore.hoveredJack) {
 						const { moduleIndex, connectorIndex, type, area } = uiStore.hoveredJack;
 						await slotsStore.breakJackConnection(moduleIndex, connectorIndex, type, area === 'va' ? 'voice' : 'fx');
@@ -196,6 +196,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 						(document.activeElement as HTMLInputElement).select();
 						break;
 					}
+					if (uiStore.showBankOrganizer) break; // the organizer handles its own Cmd-A
 					uiStore.selectModules(
 						currentModules.value.map((m: any) => m.index as number),
 						uiStore.activeArea === 1 ? 'va' : 'fx',

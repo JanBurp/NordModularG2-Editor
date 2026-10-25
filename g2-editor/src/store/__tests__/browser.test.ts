@@ -172,6 +172,15 @@ describe('browser store — Bank Organizer', () => {
 		expect(browser.storage.map((h) => h.name)).toEqual(['A/B__C %d', '.dot']);
 	});
 
+	it('lists a foreign file whose name is not URI-encoded (e.g. "100% Lead") as it is', async () => {
+		files.set('/hold/100% Lead.pch2', 'Lead');
+		const browser = useBrowserStore();
+
+		await browser.loadStorage();
+
+		expect(browser.storage.map((h) => h.name)).toEqual(['100% Lead']);
+	});
+
 	it('clears several locations in one go', async () => {
 		const browser = seed([
 			[1, 1, 'Lead'],

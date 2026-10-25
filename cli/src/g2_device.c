@@ -3612,11 +3612,11 @@ cJSON *g2_send_bank(const char *type_str, const char *source_type, const char *s
         }
         if (wr != FLASH_WRITE_OK) {
             g2_err("send-bank: %s: %s, location %d skipped\n", e->filepath, reason, location + 1);
-            /* Clear it, but not from here: g2_clear_patch blind-reads one
-             * message without matching it, and doing that between two writes
-             * puts a stray read in the middle of the per-location lockstep.
-             * Defer to the second pass after the loop, where it cannot affect
-             * any write. */
+            /* Cleared in the second pass after the loop. Deferred because
+             * g2_clear_patch used to blind-read one unmatched message, which
+             * broke the per-location lockstep between two writes; it now waits
+             * for its own tagged result (await_flash_result), so an inline
+             * clear would no longer do that. */
             if (wr == FLASH_WRITE_SKIP_CLEAR && nDeferredClear < 128) deferredClear[nDeferredClear++] = location + 1;
             add_bank_failure(failures, location + 1, e->filepath, reason);
             failedCount++;

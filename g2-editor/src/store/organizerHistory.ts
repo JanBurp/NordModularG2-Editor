@@ -7,8 +7,8 @@ import type { BankLoc } from './browser';
  * before and after it. Bank contents are kept as patch-file copies in <storage>/.history/<session>
  * (Electron empties .history the first time a storage folder is used per app run), so undo can
  * write the old patch back with put-location. Storage changes keep a copy of the file, so a
- * deleted storage item can come back. The browser store records while an organizer operation
- * runs (begin/commit around _organize) and applies an entry (applyOrganizerHistory). */
+ * deleted storage item can come back. The browser store's _organize records a running operation
+ * with an ActionRecorder and pushes the result; stepOrganizerHistory applies an entry. */
 
 /* What a bank location holds: a patch-file copy, or null for empty. */
 export type LocContent = { file: string; name: string; category?: string } | null;
