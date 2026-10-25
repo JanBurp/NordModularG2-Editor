@@ -6,6 +6,7 @@ import { ACTIONS } from '../e2e-duration/lib/actions/index';
 import { cliRun, focusedSlot, menuAction, teardown } from '../e2e-duration/lib/actions/ctx';
 import { snapshotG2 } from '../e2e-duration/lib/cli';
 import { checkConsistency, deviceState, type SlotState } from '../e2e-duration/lib/consistency';
+import { PatchParser } from '@/parser/nmg2PatchParser';
 import { action, backupPerf, type Editor, g2Mode, lastAction, type Mode, perfFlags, restorePerf, setMode, type SlotFlags, startEditor } from './g2';
 
 // Long enough that the Runner's unlocker stays active.
@@ -184,6 +185,105 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 		} finally {
 			await closeOrganizer(page); // first: a failing clear below must not leave it covering the canvas
 			for (const loc of [...used, 128]) await cliRun(page, ['clear-patch', 'patch', BANK, String(loc)]);
+		}
+	});
+
+	// Scratch bank 32 again: the G2 has no set-category command, so the organizer rewrites the location.
+	// Checked in the patch data read back from flash and in the G2's own bank list. Also Copy to Bank
+	// and a single Delete (no confirmation), all through the context menu and undoable.
+	it('Bank Organizer: changes categories, copies to a bank and deletes one location, on the G2 itself', async () => {
+		const { ctx } = g!;
+		const page = ctx.page;
+		const BANK = '32';
+		const fixture = path.resolve(__dirname, '../../test-patches/EmptyPatch.pch2'); // No Cat
+		const tmp = path.join(os.tmpdir(), 'g2-organizer-check.pch2');
+		const used = [1, 2, 3];
+		const nameAt = async (loc: number) => {
+			const r = JSON.parse(await cliRun(page, ['get-location', 'patch', BANK, String(loc), tmp]));
+			return r.empty ? null : r.name;
+		};
+		// Category id in the patch data stored at `loc` (null when empty).
+		const fileCategoryAt = async (loc: number) => {
+			if ((await nameAt(loc)) === null) return null;
+			return new PatchParser(new Uint8Array(fs.readFileSync(tmp)).buffer).parse().description?.category ?? null;
+		};
+		// Category slug the G2's own bank list reports for `loc`. The daemon has no `list`: reload-names
+		// sends the list as a `names` event, which replaces the editor's entries. The editor's entry is
+		// marked first, so its own (optimistic) category can't pass for the G2's.
+		const listCategoryAt = async (loc: number) => {
+			const entry = (mark: boolean) =>
+				page.evaluate(
+					([bank, location, mark]) => {
+						const browser = (document.querySelector('#app') as any).__vue_app__.config.globalProperties.$pinia._s.get('browser');
+						const e = browser.synthPatches.find((p: any) => p.bank === bank && p.location === location);
+						if (e && mark) e.category = 'not-reloaded';
+						return e?.category as string | undefined;
+					},
+					[Number(BANK), loc, mark] as const,
+				);
+			await entry(true);
+			await cliRun(page, ['reload-names']);
+			for (let i = 0; i < 20 && (await entry(false)) === 'not-reloaded'; i++) await page.waitForTimeout(500);
+			return entry(false);
+		};
+		const until = async (check: () => Promise<boolean>) => {
+			for (let i = 0; i < 60 && !(await check()); i++) await page.waitForTimeout(500);
+			expect(await check()).toBe(true);
+		};
+		const contextMenu = async (loc: number, ...items: (string | RegExp)[]) => {
+			await cell(loc).click({ button: 'right' });
+			for (const [i, name] of items.entries()) {
+				const item = page.getByRole('menuitem', { name, exact: typeof name === 'string' });
+				await (i < items.length - 1 ? item.hover() : item.click());
+			}
+		};
+		const left = page.locator('[data-testid="bank-grid-left"]');
+		const cell = (loc: number) => left.locator(`[data-testid="bank-cell-${loc}"]`);
+		try {
+			for (const loc of used) await cliRun(page, ['clear-patch', 'patch', BANK, String(loc)]);
+			await cliRun(page, ['put-location', 'patch', BANK, '1', fixture, 'OrgC']);
+			await cliRun(page, ['put-location', 'patch', BANK, '2', fixture, 'OrgD']);
+			await cliRun(page, ['reload-names']);
+
+			await openOrganizer(ctx);
+			await left.locator('select').selectOption(BANK);
+			await until(async () => (await cell(2).textContent())?.includes('OrgD') ?? false);
+
+			// One cell via its context menu.
+			await contextMenu(1, 'Category', 'Bass');
+			await until(async () => (await fileCategoryAt(1)) === 3);
+			expect(await listCategoryAt(1)).toBe('bass');
+			expect(await nameAt(1)).toBe('OrgC'); // the name stays
+
+			// A selection of two via the top bar's category buttons.
+			await cell(1).click();
+			await cell(2).click({ modifiers: ['ControlOrMeta'] });
+			await page.locator('[data-testid="organizer-categories"]').getByRole('button', { name: 'User 1' }).click();
+			await until(async () => (await fileCategoryAt(1)) === 14 && (await fileCategoryAt(2)) === 14);
+			expect(await listCategoryAt(2)).toBe('user_1');
+
+			// Undo restores both previous versions.
+			await menuAction(ctx, 'undo');
+			await until(async () => (await fileCategoryAt(1)) === 3 && (await fileCategoryAt(2)) === 0);
+			expect(await listCategoryAt(2)).toBe('no_cat');
+
+			// Copy to Bank: the first empty location of the shown bank, category included. A plain click
+			// first: the menu of a selected cell acts on the whole selection.
+			await cell(1).click();
+			await contextMenu(1, /^Copy to Bank 32 \(at 32-3\)/);
+			await until(async () => (await nameAt(3)) === 'OrgC');
+			expect(await fileCategoryAt(3)).toBe(3);
+			expect(await nameAt(1)).toBe('OrgC'); // a copy: the source stays
+
+			// One location is deleted without asking; Undo brings it back.
+			await contextMenu(2, 'Delete');
+			await until(async () => (await nameAt(2)) === null);
+			expect(await page.getByRole('dialog').count()).toBe(0);
+			await menuAction(ctx, 'undo');
+			await until(async () => (await nameAt(2)) === 'OrgD');
+		} finally {
+			await closeOrganizer(page); // first: a failing clear below must not leave it covering the canvas
+			for (const loc of used) await cliRun(page, ['clear-patch', 'patch', BANK, String(loc)]);
 		}
 	});
 

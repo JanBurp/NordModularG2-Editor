@@ -142,4 +142,54 @@ test.describe('Bank Organizer – offline', () => {
 		await sendMenuAction('redo');
 		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(3);
 	});
+
+	test('Category from the context menu rewrites the storage file; Undo and Redo switch between both versions', async ({ page, sendMenuAction }) => {
+		const kick = page.locator('[data-testid="storage-item"]', { hasText: 'Kick' });
+		await kick.click({ button: 'right' });
+		await page.getByRole('menuitem', { name: 'Category', exact: true }).hover();
+		await page.getByRole('menuitem', { name: 'Bass', exact: true }).click();
+		await expect(kick).toContainText('Bass');
+
+		await sendMenuAction('undo');
+		await expect(kick).toContainText('No Cat');
+		await sendMenuAction('redo');
+		await expect(kick).toContainText('Bass');
+	});
+
+	test('the category buttons show their hint, and are disabled for Performances', async ({ page }) => {
+		const categories = page.locator('[data-testid="organizer-categories"]');
+		await categories.hover();
+		await expect(page.locator('.status-bar')).toContainText('give the selected patches this category');
+
+		await page.locator('[data-testid="storage-item"]', { hasText: 'Kick' }).click();
+		await expect(categories.getByRole('button', { name: 'Bass' })).toBeEnabled();
+		await page.getByRole('button', { name: 'Performances' }).click();
+		await expect(categories.getByRole('button', { name: 'Bass' })).toBeDisabled();
+	});
+
+	test('Delete deletes one selected item right away, asks for several', async ({ page }) => {
+		const items = page.locator('[data-testid="storage-item"]');
+		await items.filter({ hasText: 'Kick' }).click();
+		await page.keyboard.press('Delete');
+		await expect(items).toHaveCount(3);
+		await expect(page.getByRole('dialog')).toHaveCount(0);
+
+		await page.keyboard.press('ControlOrMeta+a');
+		await page.keyboard.press('Delete');
+		await expect(page.getByRole('dialog')).toContainText('Delete 3 from Temporary Storage');
+	});
+
+	test('a slot box shows the category of its patch and changes it from its context menu', async ({ page, sendMenuAction, mockOpenPatch }) => {
+		await sendMenuAction('toggle-bank-organizer');
+		await mockOpenPatch('Clavia demo.pch2');
+		await sendMenuAction('open');
+		await sendMenuAction('toggle-bank-organizer');
+		const slotA = page.locator('[data-testid="organizer-slot-0"]');
+		await expect(slotA).toContainText('A · No Cat');
+
+		await slotA.click({ button: 'right' });
+		await page.getByRole('menuitem', { name: 'Category', exact: true }).hover();
+		await page.getByRole('menuitem', { name: 'Lead', exact: true }).click();
+		await expect(slotA).toContainText('A · Lead');
+	});
 });
