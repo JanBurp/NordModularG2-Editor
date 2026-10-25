@@ -53,6 +53,7 @@
 			@patch-name-click="() => openPatchNameDialog(patchName)"
 		/>
 		<ParameterPages v-if="currentPatch && !uiStore.showBankOrganizer && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
+		<SearchReplaceBar v-if="currentPatch && !uiStore.showBankOrganizer && uiStore.showSearchReplace" />
 		<ParamDragGhost />
 		<KnobDragCursor />
 
@@ -139,7 +140,7 @@
 		<input
 			v-model="editingParamLabel"
 			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
-			maxlength="16"
+			maxlength="7"
 		/>
 	</Dialog>
 
@@ -449,6 +450,7 @@
 	import ExtendedToolBar from './components/toolbar/ExtendedToolBar.vue';
 	import PatchToolBar from './components/toolbar/PatchToolBar.vue';
 	import ParameterPages from './components/toolbar/ParameterPages.vue';
+	import SearchReplaceBar from './components/toolbar/SearchReplaceBar.vue';
 	import ParamDragGhost from './components/common/ParamDragGhost.vue';
 	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';

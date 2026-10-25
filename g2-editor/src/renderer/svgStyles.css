@@ -87,6 +87,29 @@ g.unused:not(.selected):not(:hover) {
 	opacity: 0.5;
 }
 
+/* Find & Replace: modules without a match are dimmed; the found text gets a marker-pen halo, the current match orange. */
+g.search-dimmed:not(:hover) {
+	opacity: 0.35;
+}
+.search-frame {
+	fill: none;
+	stroke: #f59e0b;
+	stroke-width: 2;
+}
+.search-frame.current {
+	stroke: #ea580c;
+	stroke-width: 4;
+}
+tspan.search-hit {
+	stroke: #fcd34d;
+	stroke-width: 4px;
+	stroke-linejoin: round;
+	paint-order: stroke;
+}
+tspan.search-hit.current {
+	stroke: #fb923c;
+}
+
 /* Main cable with shadow */
 path[class^='svgcable'] {
 	stroke-width: 3;

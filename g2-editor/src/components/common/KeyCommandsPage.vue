@@ -62,7 +62,7 @@
 		{
 			title: 'Patch & Performance',
 			rows: [
-				{ keys: [key(MOD, 'P')], action: 'Open Patch Settings' },
+				{ keys: [key(MOD, 'Y')], action: 'Open Patch Settings' },
 				{ keys: [key(MOD, 'D')], action: 'Download to Slot' },
 				{ keys: [key(MOD, 'R')], action: 'Open Performance Settings' },
 				{ keys: [key(SHIFT, 'Click Perf')], action: 'Toggle Performance mode with SHIFT' },
@@ -76,6 +76,7 @@
 				{ keys: [key(MOD, 'V')], action: 'Paste modules' },
 				{ keys: [key(MOD, 'A')], action: 'Select all modules' },
 				{ keys: [key(MOD, 'E')], action: 'Paste Params' },
+				{ keys: [key(MOD, 'F')], action: 'Find & Replace module names / labels' },
 				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: [key(MOD, 'Z')], action: 'Undo' },
 				{ keys: [key(SHIFT_MOD, 'Z')], action: 'Redo' },
@@ -115,8 +116,8 @@
 				{ keys: [key(MOD, 'K')], action: 'Toggle Keyboard pane' },
 				{ keys: [key(MOD, ',')], action: 'Toggle Settings pane' },
 				{ keys: [key(MOD, 'T')], action: 'Toggle Extended Toolbar' },
-				{ keys: [key(MOD, 'F')], action: 'Toggle Parameter Pages' },
-				{ keys: [key(SHIFT_MOD, 'F')], action: 'Toggle Parameter Overview' },
+				{ keys: [key(MOD, 'P')], action: 'Toggle Parameter Pages' },
+				{ keys: [key(SHIFT_MOD, 'P')], action: 'Toggle Parameter Overview' },
 				{ keys: [key(MOD, '2')], action: 'Toggle Patch Mutator' },
 				{ keys: [key(MOD, '3')], action: 'Toggle Bank Organizer' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },

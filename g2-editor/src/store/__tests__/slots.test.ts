@@ -2580,3 +2580,39 @@ describe('updateResources (official CPatchLoad formulas)', () => {
 		expect(store.slots['A'].resources.va).toEqual({ cycles: 0, memory: 0 });
 	});
 });
+
+describe('renameItems — Find & Replace batch rename', () => {
+	it('renames modules, labels and morph groups in one batch and one undo step', async () => {
+		const { getAllModules } = await import('@/renderer/nmg2mods');
+		const mod = getAllModules().find((m) => (m.params ?? []).some((p) => p.label?.length === 4))!;
+		const paramIndex = mod.params!.findIndex((p) => p.label?.length === 4);
+		const names = mod.params![paramIndex].label!;
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules.push({ index: 1, type: mod.id, uname: 'Old' }, { index: 2, type: mod.id, uname: 'Old2' });
+		store.slots['A'].patch = patch;
+		const runBatch = (globalThis as any).window.cli.runBatch;
+
+		await store.renameItems([
+			{ kind: 'module', area: 'voice', moduleIndex: 1, text: 'New' },
+			{ kind: 'module', area: 'voice', moduleIndex: 2, text: 'New2' },
+			{ kind: 'param', area: 'voice', moduleIndex: 1, paramIndex, labelIndex: 1, text: 'Foo' },
+			{ kind: 'morph', groupIndex: 2, text: 'Bar' },
+		]);
+
+		const labels = names.map((n, i) => (i === 1 ? 'Foo' : n));
+		expect(runBatch).toHaveBeenCalledWith([
+			['set-module-name', 'A', 'va', '1', 'New'],
+			['set-module-name', 'A', 'va', '2', 'New2'],
+			['set-module-labels', 'A', 'va', '1', ...[String(paramIndex), String(labels.length), ...labels]],
+			['set-module-labels', 'A', 'patch', '1', ...MORPH_NAMES.flatMap((n, i) => [String(8 + i), '1', i === 2 ? 'Bar' : n])],
+		]);
+		expect(patch.areas[1].modules.map((m: any) => m.uname)).toEqual(['New', 'New2']);
+
+		await store.undo();
+		expect(patch.areas[1].modules.map((m: any) => m.uname)).toEqual(['Old', 'Old2']);
+		expect(patch.areas[1].modules[0].paramLabels.find((pl: any) => pl.paramIndex === paramIndex).labels).toEqual(names);
+		expect(patch.morphParamLabels[2].labels[0]).toBe(MORPH_NAMES[2]);
+		expect(useHistoryStore().canUndo('A')).toBe(false);
+	});
+});

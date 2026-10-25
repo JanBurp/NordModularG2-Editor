@@ -3,7 +3,7 @@
 		v-if="moduleDef"
 		:transform="`translate(${x}, ${y})`"
 		class="cursor-default"
-		:class="{ selected: isSelected, unused: isUnused }"
+		:class="{ selected: isSelected, unused: isUnused, 'search-dimmed': searchState === 'dimmed' }"
 		:data-module-idx="moduleIdx"
 		:data-module-short="moduleDef.short"
 		@click.stop="onModuleClick"
@@ -16,6 +16,7 @@
 			:displayName="displayName"
 			:is-name="instance.type == 126"
 			:selected="isSelected ?? false"
+			:search-match="searchMatchOf(`module:${searchArea}:${moduleIdx}`)"
 			:has-replace-trigger="replaceCandidates.length > 0"
 		></ModuleTitle>
 
@@ -150,6 +151,7 @@
 					:label="getParamLabel(index)"
 					:param-index="index"
 					:highlight="index === keyTargetIndex"
+					:search-matches="searchState && searchLabelMatches(index)"
 					:morph-color="morphColorFor(index)"
 					@change="onParamChange"
 					@param-label-edit="(info) => emit('paramLabelEdit', { moduleIndex: moduleIdx, labelIndex: 0, ...info })"
@@ -314,6 +316,7 @@
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { blurFocusedControl } from '../../utils/focus';
+	import { useSearchReplace } from '../../composables/useSearchReplace';
 
 	const props = defineProps<{
 		instance?: ModuleInstance;
@@ -518,6 +521,22 @@
 
 	const x = computed(() => (instance.value.horiz || 0) * MODULE_WIDTH);
 	const y = computed(() => (instance.value.vert || 0) * MODULE_ROW_HEIGHT);
+
+	const search = useSearchReplace();
+	const searchArea = computed(() => (props.areaLabel === 'va' ? 'voice' : 'fx'));
+	const searchState = computed(() => search.moduleState(searchArea.value, moduleIdx.value));
+	function searchMatchOf(key: string): 'current' | 'match' | null {
+		if (!searchState.value) return null;
+		return search.currentKey.value === key ? 'current' : search.matchKeys.value.has(key) ? 'match' : null;
+	}
+	// Per matching button of a labelled switch: its labelIndex and whether it's the current match.
+	function searchLabelMatches(paramIndex: number): { labelIndex: number; current: boolean }[] {
+		const labels = moduleDef.value?.params?.[paramIndex]?.label ?? [];
+		return labels.flatMap((_, labelIndex) => {
+			const m = searchMatchOf(`param:${searchArea.value}:${moduleIdx.value}:${paramIndex}:${labelIndex}`);
+			return m ? [{ labelIndex, current: m === 'current' }] : [];
+		});
+	}
 
 	const displayName = computed(() => {
 		if (typeof instance.value.uname !== 'undefined') return instance.value.uname;

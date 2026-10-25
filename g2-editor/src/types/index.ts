@@ -65,7 +65,8 @@ export type MenuAction =
 	| 'bank-upload'
 	| 'bank-download'
 	| 'send-controller-snapshot'
-	| 'dump-one';
+	| 'dump-one'
+	| 'toggle-search-replace';
 
 export interface MenuState {
 	connected: boolean;

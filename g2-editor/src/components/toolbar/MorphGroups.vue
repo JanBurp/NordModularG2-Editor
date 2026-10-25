@@ -22,7 +22,7 @@
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
 					<div class="w-full rounded-xs px-1 text-center bg-input-dimmed">
-						<span class="text-xs text-black truncate">{{ displayName(i) }}</span>
+						<span class="text-xs text-black truncate"><SearchHit :text="displayName(i)" :hit="searchMatch(i)" tag="span" /></span>
 					</div>
 					<Knob
 						data-testid="morph-group-knob"
@@ -53,6 +53,8 @@
 	import { useSlotsStore } from '../../store/slots';
 	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
 	import { useUiStore } from '../../store/ui';
+	import { useSearchReplace } from '../../composables/useSearchReplace';
+	import SearchHit from '../common/SearchHit.vue';
 	import { useDeviceStore } from '../../store/device';
 	import { MORPH_NAMES } from '../../types/patch';
 	import type { ContextMenuItem } from '../../types';
@@ -70,6 +72,12 @@
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
+	const search = useSearchReplace();
+	function searchMatch(i: number): 'match' | 'current' | null {
+		if (!search.searching.value) return null;
+		const key = `morph:${i}`;
+		return search.currentKey.value === key ? 'current' : search.matchKeys.value.has(key) ? 'match' : null;
+	}
 	const deviceStore = useDeviceStore();
 	const { open: openContextMenu } = useContextMenu();
 	const { showCCOverlay } = useMidiCCOverlay();

@@ -1088,6 +1088,13 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				},
 				{ type: "separator" as const },
 				{ label: "Select All", click: () => sendToFocused("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
+				{ type: "separator" as const },
+				{
+					label: "Find & Replace...",
+					click: () => sendToFocused("menu:action", "toggle-search-replace"),
+					accelerator: "CommandOrControl+F",
+					enabled: menuState.hasCurrentPatch,
+				},
 			],
 		},
 		{
@@ -1121,7 +1128,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{
 					label: "Patch Settings",
 					click: () => sendToFocused("menu:action", "open-patch-settings"),
-					accelerator: "CommandOrControl+P",
+					accelerator: "CommandOrControl+Y",
 					enabled: menuState.hasCurrentPatch,
 				},
 				{ label: "Text Panel", click: () => sendToFocused("menu:action", "toggle-text-panel"), accelerator: "CommandOrControl+J" },
@@ -1199,12 +1206,12 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 		{
 			label: "Tools",
 			submenu: [
-				{ label: "Parameter Pages", click: () => sendToFocused("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+F" },
+				{ label: "Parameter Pages", click: () => sendToFocused("menu:action", "toggle-parameter-pages"), accelerator: "CommandOrControl+P" },
 				{ label: "Keyboard", click: () => sendToFocused("menu:action", "toggle-keyboard"), accelerator: "CommandOrControl+K" },
 				{ label: "Browser", click: () => sendToFocused("menu:action", "toggle-browser"), accelerator: "CommandOrControl+B" },
 				{ type: "separator" as const },
 				{ label: "Modules", click: () => sendToFocused("menu:action", "toggle-modules"), accelerator: "CommandOrControl+L" },
-				{ label: "Parameter Overview", click: () => sendToFocused("menu:action", "toggle-parameter-overview"), accelerator: "Shift+CommandOrControl+F" },
+				{ label: "Parameter Overview", click: () => sendToFocused("menu:action", "toggle-parameter-overview"), accelerator: "Shift+CommandOrControl+P" },
 				{ label: "Midi CC Panel", click: () => sendToFocused("menu:action", "toggle-midi-cc-panel"), accelerator: "CommandOrControl+I" },
 				{ type: "separator" as const },
 				{ label: "Patch Adjuster & Mutator", click: () => sendToFocused("menu:action", "toggle-patch-mutator"), accelerator: "CommandOrControl+2" },
