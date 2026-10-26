@@ -10,7 +10,7 @@
 		@mousedown.stop
 		@contextmenu.stop.prevent="onContextMenu"
 	>
-		<g @mousedown="onBackgroundMousedown"><ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground></g>
+		<g style="cursor: grab" @mousedown="onBackgroundMousedown"><ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground></g>
 
 		<ModuleTitle
 			:displayName="displayName"
@@ -604,8 +604,11 @@
 	// CPanel::PanelSecondClick → ShowModuleNameHint).
 	const isBackgroundDoubleClick = createDoubleClickDetector();
 	function onBackgroundMousedown(e: MouseEvent) {
-		if (isPrimaryMouseDown(e) && isBackgroundDoubleClick())
-			valueHint.changed({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
+		if (!isPrimaryMouseDown(e)) return;
+		// Empty module body selects/drags like the title row; passive VEs are pointer-events="none".
+		e.preventDefault();
+		onDragHandleMousedown(e);
+		if (isBackgroundDoubleClick()) valueHint.changed({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
 	}
 
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar

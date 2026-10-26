@@ -147,6 +147,31 @@ test.describe('patch editing – offline', () => {
 		expect(counts.voiceModules).toBe(1);
 	});
 
+	test('select and move a module by its body (a passive label below the title row)', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+
+		const modEl = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]').first();
+		const box = (await modEl.boundingBox())!;
+		const labels = modEl.locator('text[pointer-events="none"][font-size="9"]'); // ModuleVeText, not switch labels
+		let label: { x: number; y: number } | null = null;
+		for (let i = 0; i < (await labels.count()) && !label; i++) {
+			const b = await labels.nth(i).boundingBox();
+			if (b && b.y > box.y + 20) label = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+		}
+		if (!label) throw new Error('No passive label below the title row');
+
+		await page.mouse.click(label.x, label.y);
+		await expect(modEl).toHaveClass(/selected/);
+
+		await page.mouse.move(label.x, label.y);
+		await page.mouse.down();
+		await page.mouse.move(label.x + 256, label.y + 48, { steps: 10 });
+		await page.mouse.up();
+		await expect.poll(async () => (await modEl.boundingBox())!.x).toBeGreaterThan(box.x + 100);
+	});
+
 	test('delete a module with the Delete key', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
