@@ -74,7 +74,7 @@
 			:modules="props.modules as any[]"
 			:cables="props.cables as Cable[]"
 			:selected-cables="props.selectedCables"
-			:hovered-jack="hoveredJack"
+			:hovered-jack="hoveredJack ?? menuJack"
 			:area="props.area === 'va' ? 1 : 0"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
@@ -84,7 +84,7 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import { ref, onMounted, onUnmounted, computed, provide } from 'vue';
+	import { ref, onMounted, onUnmounted, computed, provide, watch } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { sameJack, matchesCableJack, isUnusedModule } from '../../store/slotHelpers';
 	import { useStatusHint } from '../../composables/useStatusHint';
@@ -229,7 +229,11 @@
 		if (connected) showHint(settingsStore.cableConnectMode === 'click' ? 'jackConnectedClick' : 'jackConnectedDrag');
 		else if (settingsStore.cableConnectMode === 'click') showHint('jackArm');
 	}
+	// A jack's context menu overlay takes the pointer, so the jack loses hover: keep its cables
+	// highlighted until the menu closes.
+	const menuJack = ref<JackEnd | null>(null);
 	function onJackHoverLeave(info: JackEnd) {
+		if (ctxState.visible) menuJack.value = info;
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
 		if (uiStore.hoveredJack && sameJack(uiStore.hoveredJack, info)) uiStore.hoveredJack = null;
 		clearHint();
@@ -304,7 +308,13 @@
 	const uiStore = useUiStore();
 	const valueHint = useValueHint();
 	const { showHint, clearHint } = useStatusHint();
-	const { open: openContextMenu } = useContextMenu();
+	const { state: ctxState, open: openContextMenu } = useContextMenu();
+	watch(
+		() => ctxState.visible,
+		(visible) => {
+			if (!visible) menuJack.value = null;
+		},
+	);
 	const { addModuleAt } = useAddModule();
 	const { graphics } = useModuleGraphics();
 	const { clearArmed } = useJackPatching();

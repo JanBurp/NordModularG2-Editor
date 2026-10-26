@@ -6,7 +6,7 @@
 		:class="{ selected: isSelected, unused: isUnused, 'search-dimmed': searchState === 'dimmed' }"
 		:data-module-idx="moduleIdx"
 		:data-module-short="moduleDef.short"
-		@click.stop="onModuleClick"
+		@click.stop
 		@mousedown.stop
 		@contextmenu.stop.prevent="onContextMenu"
 	>
@@ -352,10 +352,6 @@
 	const { open: openContextMenu } = useContextMenu();
 	const { openParamEdit } = useParamEditDialog();
 	const { graphics } = useModuleGraphics();
-
-	function onModuleClick(e: MouseEvent) {
-		if (e.altKey) onContextMenu(e);
-	}
 
 	function onContextMenu(e: MouseEvent) {
 		const slot = uiStore.slotInFocus;
