@@ -32,6 +32,22 @@ test.describe('find & replace', () => {
 		await expect(names.filter({ hasText: /^\s*OscA\d+\s*$/ })).toHaveCount(2);
 	});
 
+	test('Replace moves on to the next match, also when the result still matches', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, OSC_A, 0, 0);
+		await dropModuleOnCanvas(page, OSC_A, 1, 0);
+		const names = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] > text');
+
+		await sendMenuAction('toggle-search-replace');
+		await page.getByTestId('search-term').fill('osca');
+		await page.getByTestId('search-term').press('Enter');
+		const replacement = page.getByTestId('search-replacement');
+		await replacement.fill('OscAX');
+		await replacement.press('Enter');
+		await replacement.press('Enter');
+		await expect(names.filter({ hasText: /^\s*OscAX\d+\s*$/ })).toHaveCount(2);
+	});
+
 	test('Delete Found Modules deletes only the matching modules, as one undo step', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, OSC_A, 0, 0);

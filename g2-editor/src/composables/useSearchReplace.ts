@@ -94,6 +94,20 @@ function createSearchReplace() {
 			showToast(`Renamed ${changes.length}, skipped ${skipped.length}: ` + skipped.map((s) => `"${s.newText}" (${s.reason})`).join(', '));
 	}
 
+	// Replaces the current match and moves on to the next one. A replaced item drops out of the
+	// matches, so the next one slides into its place; one that still matches (or was skipped) is stepped past.
+	async function replaceCurrent(): Promise<void> {
+		const item = current.value;
+		if (!item) return;
+		const index = matches.value.indexOf(item);
+		await replace([item]);
+		const n = matches.value.length;
+		if (n === 0) return;
+		currentIndex.value = (matchKeys.value.has(itemKey(item)) ? index + 1 : index) % n;
+		revealed.value = true;
+		void reveal(current.value);
+	}
+
 	return {
 		term,
 		replacement,
@@ -111,7 +125,7 @@ function createSearchReplace() {
 		split: (text: string) => (matcher.value ? splitMatches(text, matcher.value) : [{ text, hit: false }]),
 		next: () => step(1),
 		prev: () => step(-1),
-		replaceCurrent: () => replace(current.value ? [current.value] : []),
+		replaceCurrent,
 		replaceAll: () => replace(matches.value),
 		foundModuleCount: computed(() => matchedModules.value.size),
 		// Modules with a match in their name or labels — the ones left undimmed.
