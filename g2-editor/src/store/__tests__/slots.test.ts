@@ -126,6 +126,58 @@ describe('paste', () => {
 		expect(pasted).toBeDefined();
 		expect(pasted.userColour).toBe(1);
 	});
+
+	it('snapshotModulesForCopy takes live params from variations (not the load-time lv) plus the morphs', () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 2, lv: [0, 0, 0, 0], modes: [3] }];
+		store.slots['A'].patch = patch;
+		const morph = { groupIndex: 2, location: 1, moduleIndex: 4, paramIndex: 1, range: -30 };
+		store.slots['A'].variations = [
+			{ fx: {}, voice: { 4: [10, 20] }, patch: { morphAssignments: [morph] } },
+			{ fx: {}, voice: { 4: [30, 40] }, patch: { morphAssignments: [] } },
+		] as any;
+
+		const { modules, morphs } = store.snapshotModulesForCopy('A', 1, [4]);
+
+		expect(modules[0].lv).toEqual([10, 20, 30, 40]);
+		expect(modules[0].modes).toEqual([3]);
+		expect(morphs).toEqual([[morph], []]);
+	});
+
+	it('pastes morph assignments onto the new module, and undo removes them', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = [
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+		] as any;
+		const src = { type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const morphs = [[], [{ groupIndex: 2, location: 0, moduleIndex: 4, paramIndex: 1, range: -30 }]] as any;
+
+		await store.paste([{ src, newId: 7, col: 0, row: 0 }] as any, [], 'voice', morphs);
+
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+		expect(store.slots['A'].variations![1].patch.morphAssignments).toEqual([{ groupIndex: 2, location: 1, moduleIndex: 7, paramIndex: 1, range: -30 }]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![1].patch.morphAssignments).toEqual([]);
+	});
+
+	it('stops pasting morphs once a variation holds 25 morphed params (official editor limit)', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		const existing = Array.from({ length: 24 }, (_, i) => ({ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: i, range: 1 }));
+		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: existing } }] as any;
+		const src = { type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const morphs = [[0, 1, 2].map((p) => ({ groupIndex: 1, location: 1, moduleIndex: 4, paramIndex: p, range: 9 }))] as any;
+
+		await store.paste([{ src, newId: 7, col: 0, row: 0 }] as any, [], 'voice', morphs);
+
+		const assigned = store.slots['A'].variations![0].patch.morphAssignments;
+		expect(assigned).toHaveLength(25);
+		expect(assigned[24]).toMatchObject({ moduleIndex: 7, paramIndex: 0 });
+	});
 });
 
 describe('edited flag', () => {

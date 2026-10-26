@@ -129,12 +129,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}): Promise<void> {
 		const area = getArea();
 		if (isCopy) {
-			const selected = currentModules.value.filter((m: any) => indices.includes(m.index));
+			const { modules: selected, morphs } = slotsStore.snapshotModulesForCopy(uiStore.slotInFocus, areaConfig(area).areaIdx, indices);
 			const existingIds = currentModules.value.map((m: any) => m.index as number);
 			const clone = buildCloneEntries(selected, currentCables.value, existingIds, dCol, dRow);
 			if (!clone) return showToast(AREA_FULL_MESSAGE);
 			const { entries, remappedCables } = clone;
-			await slotsStore.paste(entries, remappedCables, area);
+			await slotsStore.paste(entries, remappedCables, area, morphs);
 			uiStore.selectModules(
 				entries.map((e) => e.newId),
 				area === 'voice' ? 'va' : 'fx',

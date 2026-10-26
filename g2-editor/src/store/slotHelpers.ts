@@ -133,6 +133,18 @@ export function removeModuleFromVariations(variations: VariationState[] | null, 
 	for (const v of variations) delete v[areaKey][moduleId];
 }
 
+// A module's live per-variation param values: `mod.lv` is only filled at load/add, edits go to `variations`.
+export function liveModuleLv(mod: ModuleInstance, variations: VariationState[] | null | undefined, areaKey: 'fx' | 'voice'): number[] {
+	const pcnt = mod.pcnt;
+	const numVar = variations?.length ?? 1;
+	const lv = Array(pcnt * numVar).fill(0);
+	for (let v = 0; v < numVar; v++) {
+		const varParams = variations?.[v]?.[areaKey]?.[mod.index] ?? [];
+		for (let p = 0; p < pcnt; p++) lv[v * pcnt + p] = varParams[p] ?? 0;
+	}
+	return lv;
+}
+
 // Shared by deleteModule/replaceModule: snapshots a module's MIDI-CC, Parameter Page, and Global
 // Parameter Page assignments before they're removed, so undo can restore them.
 export function snapshotModuleAssignments(

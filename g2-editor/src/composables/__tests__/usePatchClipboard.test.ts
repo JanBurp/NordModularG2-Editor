@@ -6,7 +6,7 @@ import type { SlotLabel } from '@/store/slots';
 import { usePatchClipboard } from '../usePatchClipboard';
 
 function makeModule(index: number, overrides: Record<string, unknown> = {}) {
-	return { index, type: 1, horiz: 0, vert: 0, lv: [0, 0], modes: [0], ...overrides };
+	return { index, type: 1, horiz: 0, vert: 0, pcnt: 2, lv: [0, 0], modes: [0], ...overrides };
 }
 
 // getAreaModules/getAreaCables are Pinia getters (not spy-able directly), so tests seed the
@@ -54,6 +54,21 @@ describe('usePatchClipboard — copy/cut writes through the OS clipboard', () =>
 		expect(written.modules).toHaveLength(2);
 		expect(written.area).toBe('va');
 		expect(uiStore.clipboard).toEqual(written);
+	});
+
+	it('copySelection copies the live (edited) params and the morph assignments', () => {
+		const uiStore = useUiStore();
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(1)]);
+		const morph = { groupIndex: 3, location: 1, moduleIndex: 1, paramIndex: 0, range: 50 };
+		slotsStore.slots['A'].variations = [{ fx: {}, voice: { 1: [70, 80] }, patch: { morphAssignments: [morph] } }] as any;
+		uiStore.selectModules([1], 'va');
+
+		usePatchClipboard().copySelection();
+
+		const written = (window.electronAPI.clipboard.write as any).mock.calls[0][0];
+		expect(written.modules[0].lv).toEqual([70, 80]);
+		expect(written.morphs).toEqual([[morph]]);
 	});
 
 	it('copySelection does nothing when there is no selection', () => {

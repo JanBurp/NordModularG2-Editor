@@ -53,22 +53,14 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const { areaIdx, location: areaKey } = areaConfig(area);
 		const slot = uiStore.slotInFocus;
 
-		const modules = slotsStore
-			.getAreaModules(slot, areaIdx)
-			.filter((m: any) => selectedIds.has(m.index as number))
-			.map((m: any) => ({
-				...m,
-				lv: [...m.lv],
-				modes: [...m.modes],
-				paramLabels: m.paramLabels ? m.paramLabels.map((pl: any) => ({ ...pl, labels: [...pl.labels] })) : undefined,
-			}));
+		const { modules, morphs } = slotsStore.snapshotModulesForCopy(slot, areaIdx, [...selectedIds]);
 
 		const cables = slotsStore
 			.getAreaCables(slot, areaIdx)
 			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
 			.map((c: any) => ({ ...c }));
 
-		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation };
+		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
 		uiStore.clipboard = entry;
 		uiStore.hasClipboard = entry.modules.length > 0;
 		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
@@ -112,7 +104,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		const clone = buildCloneEntries(modules, cables, existingIds, dCol, dRow);
 		if (!clone) return showToast(AREA_FULL_MESSAGE);
 		const { entries, remappedCables } = clone;
-		await slotsStore.paste(entries, remappedCables, area);
+		await slotsStore.paste(entries, remappedCables, area, clipboard.morphs);
 
 		uiStore.selectModules(
 			entries.map((e) => e.newId),

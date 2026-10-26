@@ -47,6 +47,7 @@ import {
 	resolveColumnCollisions,
 	extractVariations,
 	removeModuleFromVariations,
+	liveModuleLv,
 	snapshotModuleAssignments,
 	computeAssignOne,
 	computeAssignModule,
@@ -232,6 +233,8 @@ const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<ty
 // so a burst of sends (e.g. a fast morph-range drag) can delay a legitimate echo past a short
 // timeout. 500ms gives real confirmations more room while still catching a truly dropped command.
 const PARAM_ECHO_TIMEOUT_MS = 500;
+// Morphed-param records per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
+const MAX_MORPHED_PARAMS = 25;
 
 function armParamEcho(key: string, value: number): void {
 	const existing = _paramAwaitingEcho.get(key);
@@ -962,14 +965,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
 				if (mod) {
-					const pcnt = mod.pcnt;
-					const numVar = slotEntry.variations?.length ?? 1;
-					const lvSnap = Array(pcnt * numVar).fill(0);
-					for (let v = 0; v < numVar; v++) {
-						const varParams = slotEntry.variations?.[v]?.[areaKey]?.[moduleId] ?? [];
-						for (let p = 0; p < pcnt; p++) lvSnap[v * pcnt + p] = varParams[p] ?? 0;
-					}
-					const modSnap = { ...mod, lv: lvSnap, modes: [...mod.modes] };
+					const modSnap = { ...mod, lv: liveModuleLv(mod, slotEntry.variations, areaKey), modes: [...mod.modes] };
 					const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
 					hist.record(slot, {
 						undo: async () => {
@@ -1347,12 +1343,14 @@ export const useSlotsStore = defineStore('slots', {
 			entries: { src: ModuleInstance; newId: number; col: number; row: number }[],
 			cables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[],
 			area: 'voice' | 'fx',
+			morphs: MorphAssignment[][] = [], // per variation, source module indices (snapshotModulesForCopy)
 		): Promise<void> {
 			if (entries.length === 0) return;
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 			const { areaIdx, location } = areaConfig(area);
+			const morphLocation = areaIdx === 0 ? 0 : 1;
 			const hist = useHistoryStore();
 			const shouldRecord = !hist.isLocked(slot);
 			if (shouldRecord) hist.lock(slot);
@@ -1441,6 +1439,18 @@ export const useSlotsStore = defineStore('slots', {
 				await runCliBatchSafe(cableCmds, 'paste batch');
 				await this._pushUprateAndColors(slot, patch, areaIdx);
 
+				// Morphs onto the new indices, at most 25 morphed params per variation — as the official editor
+				// (CPatchData::GetNewModulesMolecules) does after the module/cable/param dumps.
+				const newIdOf = new Map(entries.map((e) => [e.src.index, e.newId]));
+				const pastedMorphs = morphs.map((list, v) => {
+					const room = MAX_MORPHED_PARAMS - (slotEntry.variations?.[v]?.patch.morphAssignments.length ?? MAX_MORPHED_PARAMS);
+					return list
+						.filter((a) => newIdOf.has(a.moduleIndex))
+						.map((a) => ({ ...a, location: morphLocation, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment)
+						.slice(0, Math.max(0, room));
+				});
+				await this._restoreModuleMorph(slot, pastedMorphs);
+
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
 					hist.record(slot, {
@@ -1460,6 +1470,10 @@ export const useSlotsStore = defineStore('slots', {
 								String(c.dcon),
 							]);
 							for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
+							// Zero the added modules' morphs before deleting them (see _clearModuleMorphOnDevice)
+							const morphSnap = this._snapshotModuleMorph(slot, morphLocation, addedIds);
+							await this._clearModuleMorphOnDevice(slot, morphSnap);
+							this._dropModuleMorph(slot, morphSnap);
 							// Delete added modules
 							const delModCmds = addedIds.map((id) => ['del-module', slot, location, String(id)]);
 							for (const id of addedIds) {
@@ -1482,7 +1496,7 @@ export const useSlotsStore = defineStore('slots', {
 								const currentMods = currentCtx.patch.areas[areaIdx].modules;
 								const currentIdSet = new Set(currentMods.map((m) => m.index));
 								const reEntries = entries.filter((e) => !currentIdSet.has(e.newId));
-								if (reEntries.length > 0) await this.paste(reEntries, cables, area);
+								if (reEntries.length > 0) await this.paste(reEntries, cables, area, morphs);
 							}
 						},
 					});
@@ -2841,6 +2855,21 @@ export const useSlotsStore = defineStore('slots', {
 			);
 		},
 
+		// Copy/drag-copy source: the modules as they are now (live params, modes, labels) plus their morph assignments.
+		snapshotModulesForCopy(slot: SlotLabel, areaIdx: 0 | 1, moduleIds: number[]): { modules: ModuleInstance[]; morphs: MorphAssignment[][] } {
+			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
+			const variations = this.slots[slot]?.variations;
+			const modules = this.getAreaModules(slot, areaIdx)
+				.filter((m) => moduleIds.includes(m.index))
+				.map((m) => ({
+					...m,
+					lv: liveModuleLv(m, variations, areaKey),
+					modes: [...m.modes],
+					paramLabels: m.paramLabels ? m.paramLabels.map((pl) => ({ ...pl, labels: [...pl.labels] })) : undefined,
+				}));
+			return { modules, morphs: this._snapshotModuleMorph(slot, areaIdx, moduleIds).map((list) => list.map((a) => ({ ...a }))) };
+		},
+
 		_dropModuleMorph(slot: SlotLabel, snap: MorphAssignment[][]): void {
 			snap.forEach((list, v) => {
 				const p = this.slots[slot].variations?.[v]?.patch;
@@ -3384,14 +3413,7 @@ export const useSlotsStore = defineStore('slots', {
 						for (const id of selectedModules) {
 							const mod = findModuleByIndex(patch.areas[areaIdx].modules, id);
 							if (!mod) continue;
-							const pcnt = mod.pcnt;
-							const numVar = this.slots[slot].variations?.length ?? 1;
-							const lvSnap = Array(pcnt * numVar).fill(0);
-							for (let v = 0; v < numVar; v++) {
-								const varParams = this.slots[slot].variations?.[v]?.[areaKey]?.[id] ?? [];
-								for (let p = 0; p < pcnt; p++) lvSnap[v * pcnt + p] = varParams[p] ?? 0;
-							}
-							modSnaps.push({ ...mod, lv: lvSnap, modes: [...mod.modes] } as ModuleInstance);
+							modSnaps.push({ ...mod, lv: liveModuleLv(mod, this.slots[slot].variations, areaKey), modes: [...mod.modes] } as ModuleInstance);
 						}
 						cableSnaps = (patch.areas[areaIdx].cableList ?? [])
 							.filter((c) => selectedModules.includes(c.smod) || selectedModules.includes(c.dmod))
