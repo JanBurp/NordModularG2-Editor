@@ -2,7 +2,15 @@ import type { ClipboardEntry } from '@/types/patch';
 import { computed, getCurrentInstance, onUnmounted } from 'vue';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
-import { AREA_FULL_MESSAGE, areaConfig, buildCloneEntries, buildPasteParamsPairs, resolvePasteRowOffset, resolveSelectionArea } from '../store/slotHelpers';
+import {
+	AREA_FULL_MESSAGE,
+	areaConfig,
+	buildCloneEntries,
+	buildPasteParamsPairs,
+	PASTE_PARAMS_MISMATCH,
+	resolvePasteRowOffset,
+	resolveSelectionArea,
+} from '../store/slotHelpers';
 import { usePatchOperations } from './usePatchOperations';
 import { showToast } from './useToast';
 
@@ -26,12 +34,12 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 	const getSourceArea = areaGetter ?? (() => resolveSelectionArea(uiStore));
 
-	uiStore.hasClipboard = uiStore.clipboard !== null && uiStore.clipboard.modules.length > 0;
+	uiStore.clipboardTypes = uiStore.clipboard?.modules.map((m) => m.type) ?? [];
 	const hasClipboard = computed(() => uiStore.hasClipboard);
 
 	async function refreshHasClipboard(): Promise<void> {
 		const entry = await readClipboardEntry(uiStore);
-		uiStore.hasClipboard = !!entry && entry.modules.length > 0;
+		uiStore.clipboardTypes = entry?.modules.map((m) => m.type) ?? [];
 	}
 
 	// Covers "copy in window A, click into window B, then try to paste" — the realistic
@@ -62,7 +70,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
 		uiStore.clipboard = entry;
-		uiStore.hasClipboard = entry.modules.length > 0;
+		uiStore.clipboardTypes = entry.modules.map((m) => m.type);
 		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
 	}
 
@@ -112,17 +120,15 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		);
 	}
 
-	// Targets: the current live selection if one exists (explicit "paste onto a different module"),
-	// else fall back to pasting each copied module back onto a module with the same id (covers
-	// "copy in one Variation/slot, Paste Params in another" without needing to reselect).
+	// Targets: the current selection, which must match the copied modules' types (official editor).
 	async function pasteParams(): Promise<void> {
 		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
 		const area = getSourceArea();
-		const currentModules = slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(area).areaIdx);
-		const targetIds = uiStore.selectedModules.length > 0 ? uiStore.selectedModules : clipboard.modules.map((m) => m.index);
-		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targetIds, currentModules);
-		if (pairs.length === 0) return;
+		const { areaIdx } = areaConfig(area);
+		const currentModules = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx);
+		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, uiStore.selectedModules, currentModules, clipboard.morphs, areaIdx);
+		if (!pairs) return showToast(PASTE_PARAMS_MISMATCH);
 		await slotsStore.pasteParams(pairs, uiStore.variation, area);
 	}
 

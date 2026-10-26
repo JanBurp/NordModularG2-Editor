@@ -3,6 +3,7 @@ import type {
 	GlobalParamPageAssignment,
 	MidiCCAssignment,
 	ModuleInstance,
+	MorphAssignment,
 	ParamPageAssignment,
 	Patch,
 	PatchParamVariation,
@@ -38,6 +39,7 @@ export interface PasteParamsPair {
 	targetId: number;
 	paramValues: number[];
 	modeValues: number[];
+	morphs?: MorphAssignment[]; // the target's morph assignments after the paste; undefined = leave them (clipboard from an older build)
 }
 
 export interface ParamChange {
@@ -47,24 +49,46 @@ export interface ParamChange {
 	value: number;
 }
 
-// Pairs copied modules with target ids by order, keeping only same-type pairs, and slices each
-// source module's `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt).
+// The official editor's alert text when the selection doesn't fit the copied modules.
+export const PASTE_PARAMS_MISMATCH = 'Selection does not match the original data.';
+
+// Official CClipboard::ValidatePasteParams: as many target modules as copied ones, with the same types.
+export function canPasteParams(clipboardTypes: number[], targetIds: number[], currentModules: ModuleInstance[]): boolean {
+	if (clipboardTypes.length === 0 || clipboardTypes.length !== targetIds.length) return false;
+	const a = [...clipboardTypes].sort((x, y) => x - y);
+	const b = targetIds.map((id) => findModuleByIndex(currentModules, id)?.type ?? -1).sort((x, y) => x - y);
+	return a.every((t, i) => t === b[i]);
+}
+
+// Official CPatchData::GetCopyParamsMolecules: each copied module goes to the first not-yet-used target
+// of its type. Slices the source `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt) and
+// moves its morph assignments of that variation onto the target. null when the selection doesn't match.
 export function buildPasteParamsPairs(
 	sourceModules: ModuleInstance[],
 	copiedVariation: number,
 	targetIds: number[],
 	currentModules: ModuleInstance[],
-): PasteParamsPair[] {
-	const pairs: PasteParamsPair[] = [];
-	const count = Math.min(sourceModules.length, targetIds.length);
-	for (let i = 0; i < count; i++) {
-		const src = sourceModules[i];
-		const target = findModuleByIndex(currentModules, targetIds[i]);
-		if (!target || target.type !== src.type) continue;
+	sourceMorphs: MorphAssignment[][] | undefined,
+	location: 0 | 1,
+): PasteParamsPair[] | null {
+	if (
+		!canPasteParams(
+			sourceModules.map((m) => m.type),
+			targetIds,
+			currentModules,
+		)
+	)
+		return null;
+	const free = targetIds.map((id) => findModuleByIndex(currentModules, id)!);
+	return sourceModules.map((src) => {
+		const target = free.splice(
+			free.findIndex((t) => t.type === src.type),
+			1,
+		)[0];
 		const offset = copiedVariation * src.pcnt;
-		pairs.push({ targetId: target.index, paramValues: src.lv.slice(offset, offset + src.pcnt), modeValues: [...src.modes] });
-	}
-	return pairs;
+		const morphs = sourceMorphs?.[copiedVariation]?.filter((a) => a.moduleIndex === src.index).map((a) => ({ ...a, location, moduleIndex: target.index }));
+		return { targetId: target.index, paramValues: src.lv.slice(offset, offset + src.pcnt), modeValues: [...src.modes], morphs };
+	});
 }
 
 export type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };

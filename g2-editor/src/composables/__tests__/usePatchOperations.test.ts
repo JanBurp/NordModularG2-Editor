@@ -69,6 +69,19 @@ describe('usePatchOperations — handlePasteParams', () => {
 		expect(pasteParamsSpy).toHaveBeenCalledTimes(1);
 	});
 
+	it('does not paste when the target module type differs from the copied one', async () => {
+		const uiStore = useUiStore();
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(9, { type: 2 })]);
+		uiStore.clipboard = { modules: [makeModule(5)], cables: [], area: 'va', copiedVariation: 0 } as any;
+		const pasteParamsSpy = vi.spyOn(slotsStore, 'pasteParams').mockResolvedValue(undefined as any);
+
+		const { handlePasteParams } = usePatchOperations();
+		await handlePasteParams(9);
+
+		expect(pasteParamsSpy).not.toHaveBeenCalled();
+	});
+
 	it('no-ops when neither the OS clipboard nor uiStore.clipboard has an entry', async () => {
 		const slotsStore = useSlotsStore();
 		seedArea(slotsStore, 'A', 1, [makeModule(9)]);

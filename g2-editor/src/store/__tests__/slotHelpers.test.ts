@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildCloneEntries,
 	buildPasteParamsPairs,
+	canPasteParams,
 	freeModuleIds,
 	isCableSourceEnd,
 	isUnusedModule,
@@ -93,27 +94,60 @@ describe('resolvePasteRowOffset', () => {
 });
 
 describe('buildPasteParamsPairs', () => {
-	it('pairs by order and slices lv at the copied variation', () => {
+	it('slices lv at the copied variation and copies modes', () => {
 		const source = [mod(1, 5, 2, [1, 2, 3, 4], [9])];
 		const current = [mod(10, 5, 2, [], [])];
-		expect(buildPasteParamsPairs(source, 1, [10], current)).toEqual([{ targetId: 10, paramValues: [3, 4], modeValues: [9] }]);
+		expect(buildPasteParamsPairs(source, 1, [10], current, undefined, 1)).toEqual([
+			{ targetId: 10, paramValues: [3, 4], modeValues: [9], morphs: undefined },
+		]);
 	});
 
-	it('skips a pair when the target module type differs', () => {
-		const source = [mod(1, 5, 1, [7], [0])];
-		const current = [mod(10, 6, 1, [], [])];
-		expect(buildPasteParamsPairs(source, 0, [10], current)).toEqual([]);
-	});
-
-	it('skips a pair when the target id does not exist', () => {
-		const source = [mod(1, 5, 1, [7], [0])];
-		expect(buildPasteParamsPairs(source, 0, [999], [])).toEqual([]);
-	});
-
-	it('only pairs the overlapping prefix when source and target counts differ', () => {
+	it('pairs by type, not by selection order', () => {
 		const source = [mod(1, 5, 1, [7], []), mod(2, 6, 1, [8], [])];
+		const current = [mod(10, 6, 1, [], []), mod(11, 5, 1, [], [])];
+		expect(buildPasteParamsPairs(source, 0, [10, 11], current, undefined, 1)?.map((p) => [p.targetId, p.paramValues])).toEqual([
+			[11, [7]],
+			[10, [8]],
+		]);
+	});
+
+	it('returns null when the counts differ', () => {
+		const source = [mod(1, 5, 1, [7], []), mod(2, 5, 1, [8], [])];
 		const current = [mod(10, 5, 1, [], [])];
-		expect(buildPasteParamsPairs(source, 0, [10], current)).toEqual([{ targetId: 10, paramValues: [7], modeValues: [] }]);
+		expect(buildPasteParamsPairs(source, 0, [10], current, undefined, 1)).toBeNull();
+		expect(buildPasteParamsPairs([source[0]], 0, [], current, undefined, 1)).toBeNull();
+	});
+
+	it('returns null when a type differs or a target id does not exist', () => {
+		const source = [mod(1, 5, 1, [7], [0])];
+		expect(buildPasteParamsPairs(source, 0, [10], [mod(10, 6, 1, [], [])], undefined, 1)).toBeNull();
+		expect(buildPasteParamsPairs(source, 0, [999], [], undefined, 1)).toBeNull();
+	});
+
+	it("moves the copied variation's morphs onto the target id and location", () => {
+		const source = [mod(1, 5, 1, [7, 7], [])];
+		const morphs: any[][] = [
+			[],
+			[
+				{ groupIndex: 2, location: 0, moduleIndex: 1, paramIndex: 0, range: 40 },
+				{ groupIndex: 0, location: 0, moduleIndex: 3, paramIndex: 0, range: 9 },
+			],
+		];
+		const pairs = buildPasteParamsPairs(source, 1, [10], [mod(10, 5, 1, [], [])], morphs, 1);
+		expect(pairs?.[0].morphs).toEqual([{ groupIndex: 2, location: 1, moduleIndex: 10, paramIndex: 0, range: 40 }]);
+	});
+});
+
+describe('canPasteParams', () => {
+	const current = [mod(10, 5, 1, [], []), mod(11, 6, 1, [], []), mod(12, 5, 1, [], [])];
+	it('accepts the same multiset of types in any order', () => {
+		expect(canPasteParams([6, 5], [10, 11], current)).toBe(true);
+		expect(canPasteParams([5, 5], [12, 10], current)).toBe(true);
+	});
+	it('rejects an empty clipboard, a count mismatch or a type mismatch', () => {
+		expect(canPasteParams([], [], current)).toBe(false);
+		expect(canPasteParams([5], [10, 12], current)).toBe(false);
+		expect(canPasteParams([5, 5], [10, 11], current)).toBe(false);
 	});
 });
 

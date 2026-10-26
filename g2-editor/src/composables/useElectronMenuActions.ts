@@ -12,6 +12,7 @@ import { useUndoTarget } from './useUndoTarget';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
+import { areaConfig, canPasteParams, resolveSelectionArea } from '@/store/slotHelpers';
 import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
 import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
@@ -54,6 +55,11 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		canRedo: undoTarget.canRedo.value,
 		hasSelection: uiStore.selectedModules.length > 0,
 		hasClipboard: hasClipboard.value,
+		canPasteParams: canPasteParams(
+			uiStore.clipboardTypes,
+			uiStore.selectedModules,
+			slotsStore.getAreaModules(uiStore.slotInFocus, areaConfig(resolveSelectionArea(uiStore)).areaIdx),
+		),
 		hasCurrentPatch: !!currentPatch.value,
 		hasPerformanceContext: !!slotsStore.performanceRawHex,
 		isPerformanceMode: slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode,

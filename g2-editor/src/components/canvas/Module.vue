@@ -302,6 +302,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
+	import { canPasteParams } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
@@ -369,10 +370,13 @@
 			{ type: 'separator' },
 			{
 				label: 'Paste Params',
-				// uiStore.hasClipboard covers a copy made in another device's window too (OS
-				// clipboard, see usePatchClipboard.ts) — buildPasteParamsPairs already filters out
-				// any module-type mismatch, so an enabled-but-inapplicable paste is a safe no-op.
-				disabled: !uiStore.hasClipboard,
+				// uiStore.clipboardTypes covers a copy made in another device's window too (OS clipboard,
+				// see usePatchClipboard.ts). Targets as in usePatchOperations.handlePasteParams.
+				disabled: !canPasteParams(
+					uiStore.clipboardTypes,
+					uiStore.selectedModules.includes(moduleIdx.value) ? uiStore.selectedModules : [moduleIdx.value],
+					slotsStore.getAreaModules(slot, location),
+				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
 			{ type: 'separator' },

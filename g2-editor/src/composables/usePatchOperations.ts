@@ -9,6 +9,7 @@ import {
 	buildCloneEntries,
 	buildPasteParamsPairs,
 	isUnusedModule,
+	PASTE_PARAMS_MISMATCH,
 	resolveSelectionArea,
 	type JackEnd,
 } from '../store/slotHelpers';
@@ -195,9 +196,17 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
 		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
-		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targets, currentModules.value);
-		if (pairs.length === 0) return;
-		await slotsStore.pasteParams(pairs, uiStore.variation, getArea());
+		const area = getArea();
+		const pairs = buildPasteParamsPairs(
+			clipboard.modules,
+			clipboard.copiedVariation,
+			targets,
+			currentModules.value,
+			clipboard.morphs,
+			areaConfig(area).areaIdx,
+		);
+		if (!pairs) return showToast(PASTE_PARAMS_MISMATCH);
+		await slotsStore.pasteParams(pairs, uiStore.variation, area);
 	}
 
 	async function handleJackDeleteConnected({

@@ -74,6 +74,7 @@ export interface MenuState {
 	canRedo: boolean;
 	hasSelection: boolean;
 	hasClipboard: boolean;
+	canPasteParams: boolean;
 	hasCurrentPatch: boolean;
 	hasPerformanceContext: boolean;
 	isPerformanceMode: boolean;

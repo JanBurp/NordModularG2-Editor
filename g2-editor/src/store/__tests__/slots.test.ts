@@ -522,6 +522,36 @@ describe('pasteParams', () => {
 		expect(target.modes).toEqual([1]);
 	});
 
+	it('replaces the target morphs (change, remove, add within the 25 limit) and undoes them', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleInstance(2, 5, 3, [])];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations([0, 0, 0]);
+		const m = (groupIndex: number, moduleIndex: number, paramIndex: number, range: number): any => ({
+			groupIndex,
+			location: 1,
+			moduleIndex,
+			paramIndex,
+			range,
+		});
+		// 23 records on other modules + 2 on the target: the variation is at the 25 limit
+		const others = Array.from({ length: 23 }, (_, i) => m(0, 30 + i, 0, 1));
+		const before = [...others, m(0, 2, 0, 10), m(1, 2, 1, 20)];
+		store.slots['A'].variations![0].patch.morphAssignments = before;
+
+		// param 0 group 0 changes, param 1 group 1 is removed, two new ones: only one fits under 25
+		await store.pasteParams(
+			[{ targetId: 2, paramValues: [1, 2, 3], modeValues: [], morphs: [m(0, 2, 0, 50), m(3, 2, 2, 60), m(4, 2, 2, 70)] }],
+			0,
+			'voice',
+		);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 50), m(3, 2, 2, 60)]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 10), m(1, 2, 1, 20)]);
+	});
+
 	it('does nothing when given an empty pairs list', async () => {
 		const store = useSlotsStore();
 		store.slots['A'].patch = makePatch();

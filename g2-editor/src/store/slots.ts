@@ -1999,15 +1999,18 @@ export const useSlotsStore = defineStore('slots', {
 			const { areaIdx, location } = areaConfig(area);
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 			const slotEntry = this.slots[slot];
+			const vPatch = slotEntry.variations?.[variation]?.patch;
+			const isTargetMorph = (a: MorphAssignment, ids: Set<number>) => a.location === areaIdx && ids.has(a.moduleIndex);
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
-				const prevPairs: PasteParamsPair[] = pairs.map(({ targetId }) => {
+				const prevPairs: PasteParamsPair[] = pairs.map(({ targetId, morphs }) => {
 					const mod = findModuleByIndex(patch.areas[areaIdx].modules, targetId);
 					return {
 						targetId,
 						paramValues: slotEntry.variations?.[variation]?.[areaKey]?.[targetId]?.slice() ?? [],
 						modeValues: mod ? [...mod.modes] : [],
+						morphs: morphs && vPatch?.morphAssignments.filter((a) => isTargetMorph(a, new Set([targetId]))),
 					};
 				});
 				hist.record(slot, {
@@ -2037,8 +2040,25 @@ export const useSlotsStore = defineStore('slots', {
 					});
 				}
 			}
+			// Morphs (official GetCopyParamsMolecules): the targets' assignments are replaced by the pasted ones;
+			// a param not morphed in that group before is only added while the variation stays within MAX_MORPHED_PARAMS.
+			const morphPairs = pairs.filter((p) => p.morphs);
+			let prevMorphs: MorphAssignment[] = [];
+			let nextMorphs: MorphAssignment[] = [];
+			if (vPatch && morphPairs.length > 0) {
+				const key = (a: MorphAssignment) => `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
+				prevMorphs = vPatch.morphAssignments;
+				const prevKeys = new Set(prevMorphs.map(key));
+				const replaced = new Set(morphPairs.map((p) => p.targetId));
+				nextMorphs = prevMorphs.filter((a) => !isTargetMorph(a, replaced));
+				for (const a of morphPairs.flatMap((p) => p.morphs!)) {
+					if (prevKeys.has(key(a)) || nextMorphs.length < MAX_MORPHED_PARAMS) nextMorphs.push({ ...a });
+				}
+				vPatch.morphAssignments = nextMorphs;
+			}
 			this._markSlotDirty(slot);
 			if (cmds.length > 0) await runCliBatchSafe(cmds, 'pasteParams');
+			if (vPatch && morphPairs.length > 0) await this._resyncMorphAssignments(slot, variation, prevMorphs, nextMorphs);
 		},
 
 		async loadSlot(slot: SlotLabel, preserveHistory = false): Promise<{ name: string; rawHex: string; patch: Patch } | null> {
