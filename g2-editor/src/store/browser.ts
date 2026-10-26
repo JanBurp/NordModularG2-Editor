@@ -3,7 +3,7 @@ import { SLOT_LABELS } from '@/constants';
 import { getCategoryName, getCategorySlug } from '@/constants/categories';
 import { DeviceStatus, useDeviceStore } from './device';
 import { useSlotsStore } from './slots';
-import { showToast } from '@/composables/useToast';
+import { cliErrorText, showErrorToast, showToast } from '@/composables/useToast';
 import { ActionRecorder, HISTORY_SESSION, useOrganizerHistoryStore, type LocContent, type OrganizerAction } from './organizerHistory';
 
 export interface SynthPatch {
@@ -196,7 +196,7 @@ export const useBrowserStore = defineStore('browser', {
 				showToast(`Saved ${kind} at ${bank}-${location}`);
 				return true;
 			} catch (e: any) {
-				showToast(e.message);
+				showErrorToast(cliErrorText(e, 'Save'));
 				return false;
 			}
 		},
@@ -210,7 +210,7 @@ export const useBrowserStore = defineStore('browser', {
 					this.synthPatches = this.synthPatches.filter((p) => p.bank !== bank);
 				}
 			} catch (e: any) {
-				showToast(e.message);
+				showErrorToast(cliErrorText(e, 'Clear'));
 			}
 		},
 
@@ -219,7 +219,7 @@ export const useBrowserStore = defineStore('browser', {
 				await window.cli.run(['clear-patch', kind, String(bank), String(location)]);
 				this.removePatch(bank, location, kind);
 			} catch (e: any) {
-				showToast(e.message);
+				showErrorToast(cliErrorText(e, 'Clear'));
 			}
 		},
 
@@ -368,7 +368,7 @@ export const useBrowserStore = defineStore('browser', {
 					await op();
 					return true;
 				} catch (e: any) {
-					showToast(e.message);
+					showToast(cliErrorText(e));
 					return false;
 				} finally {
 					const action = recorder?.toAction();

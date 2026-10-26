@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { dismissToastByKey, useToast } from '@/composables/useToast';
+import { cliErrorText, dismissToastByKey, useToast } from '@/composables/useToast';
 
 afterEach(() => vi.useRealTimers());
 
@@ -46,5 +46,15 @@ describe('useToast', () => {
 		await runToastAction(toasts[0]);
 		expect(run).toHaveBeenCalledTimes(2);
 		expect(toasts).toHaveLength(0);
+	});
+
+	it('cliErrorText drops the IPC prefix and words a G2 flash refusal for the action', () => {
+		const ipc = (m: string) => new Error(`Error invoking remote method 'cli:run': Error: ${m}`);
+		expect(cliErrorText(ipc('store-patch: device refused 32-120 (Memory protect on)'), 'Save')).toBe('Save failed at 32-120: Memory protect on');
+		expect(cliErrorText(ipc('clear-patch: device refused 1-7 (Flash memory full)'), 'Clear')).toBe('Clear failed at 1-7: Flash memory full');
+		expect(cliErrorText(ipc('clear-bank: device refused bank 32 (Memory protect on)'), 'Clear')).toBe('Clear failed at bank 32: Memory protect on');
+		expect(cliErrorText(ipc('no response from the G2'), 'Save')).toBe('no response from the G2');
+		expect(cliErrorText(ipc('store-patch: device refused 32-120 (Memory protect on)'))).toBe('store-patch: device refused 32-120 (Memory protect on)');
+		expect(cliErrorText(new Error('plain'))).toBe('plain');
 	});
 });

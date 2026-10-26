@@ -24,6 +24,7 @@
 static daemon_ctx_t g_daemon  = {0};
 static int g_daemon_ok = -1;   /* -1=uninitialized, 0=ok, 1=no device */
 static int g_cmd_id    = 0;
+static cJSON *g_device_info = NULL;   /* startup device_info data: the synth settings */
 
 /* Accessors so other files in this same test binary (e.g. test_patch_workflow.c) can
  * reuse this one shared daemon/USB connection instead of spawning a second one. */
@@ -48,6 +49,9 @@ void test_daemon_starts(void) {
      * names_progress per bank), so this is time-bound rather than attempt-bound: 40s overall
      * gives ~4x headroom above the worst measured startup, and 20s per line still catches a
      * genuine hang on any single line without masking it. */
+    cJSON *info = read_event_of_type(&g_daemon, "device_info", 40, 20);
+    if (info) g_device_info = cJSON_DetachItemFromObject(info, "data");
+    cJSON_Delete(info);
     cJSON *wa = read_event_of_type(&g_daemon, "watch_armed", 40, 20);
     if (!wa) {
         g_daemon_ok = 1;
@@ -1117,4 +1121,89 @@ void test_oneshot_queries_with_stream_left_on(void) {
     cJSON_Delete(b);
     TEST_ASSERT_TRUE_MESSAGE(same, "two listings must be identical");
     TEST_ASSERT_TRUE_MESSAGE(uniq, "no bank may list a location twice");
+}
+
+/* Synth settings from startup with Memory Protect set and the current mode (the settings
+ * message carries the mode bit, so a stale one would switch modes); 0 = ok. */
+static int set_mem_protect(int on) {
+    int id = g_cmd_id++;
+    char cmd[80];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-perf-settings\",\"args\":[]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *mode = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), "mode");
+    int perf = cJSON_IsString(mode) && strcmp(mode->valuestring, "performance") == 0;
+    int known = cJSON_IsString(mode);
+    cJSON_Delete(resp);
+    if (!known || !g_device_info) return -1;
+
+    cJSON *settings = cJSON_Duplicate(g_device_info, 1);
+    cJSON_ReplaceItemInObject(settings, "memProtect", cJSON_CreateBool(on));
+    cJSON_ReplaceItemInObject(settings, "mode", cJSON_CreateString(perf ? "Performance" : "Patch"));
+    char *settings_json = cJSON_PrintUnformatted(settings);
+    cJSON_Delete(settings);
+    cJSON *req = cJSON_CreateObject();
+    id = g_cmd_id++;
+    cJSON_AddNumberToObject(req, "id", id);
+    cJSON_AddStringToObject(req, "cmd", "set-synth-settings");
+    cJSON *args = cJSON_AddArrayToObject(req, "args");
+    cJSON_AddItemToArray(args, cJSON_CreateString(settings_json ? settings_json : ""));
+    free(settings_json);
+    char *req_json = cJSON_PrintUnformatted(req);
+    cJSON_Delete(req);
+    int r = req_json ? send_and_expect_ok(&g_daemon, req_json, id) : -1;
+    free(req_json);
+    return r;
+}
+
+/* 1 when bank 32 location 120 is empty, 0 when used, -1 on error. */
+static int scratch_location_empty(void) {
+    int id = g_cmd_id++;
+    char cmd[160];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-location\",\"args\":[\"patch\",\"32\",\"120\",\"/tmp/g2-cli-store-check.pch2\"]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *e = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), "empty");
+    int empty = cJSON_IsBool(e) ? cJSON_IsTrue(e) : -1;
+    cJSON_Delete(resp);
+    return empty;
+}
+
+/* 1 when `name` answers not ok with "Memory protect on" in its error text. */
+static int refused_for_memory_protect(const char *name, const char *args) {
+    int id = g_cmd_id++;
+    char cmd[160];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"%s\",\"args\":[%s]}", id, name, args);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *err = cJSON_GetObjectItem(resp, "error");
+    int refused = cJSON_IsFalse(cJSON_GetObjectItem(resp, "ok"))
+               && cJSON_IsString(err) && strstr(err->valuestring, "Memory protect on") != NULL;
+    cJSON_Delete(resp);
+    return refused;
+}
+
+/* store-patch and clear-bank must report the G2's answer: with Memory Protect on the G2 refuses the store, and
+ * the CLI used to answer ok anyway (user report: "saved" patch gone after a power cycle). With
+ * protect on, clear-bank 32 is refused too: if that check ever fails, bank 32 (scratch) is cleared. Runs on
+ * the daemon like the editor does: a one-shot store-patch in performance mode wedges the G2, with
+ * or without this fix (2026-10-26, open). Uses the scratch location 32-120 and leaves it empty,
+ * with Memory Protect off. */
+void test_daemon_store_patch_memory_protect(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    if (!g_device_info) TEST_IGNORE_MESSAGE("no device_info from daemon startup");
+    if (scratch_location_empty() != 1) TEST_IGNORE_MESSAGE("bank 32 location 120 is not empty: not overwriting it");
+
+    int stored = daemon_cmd("store-patch", "\"0\",\"32\",\"120\"") == 0 && scratch_location_empty() == 0;
+    int cleared = daemon_cmd("clear-patch", "\"patch\",\"32\",\"120\"") == 0;
+    int protect_on = set_mem_protect(1) == 0;
+    int refused = refused_for_memory_protect("store-patch", "\"0\",\"32\",\"120\"");
+    int stays_empty = scratch_location_empty() == 1;
+    int bank_refused = refused_for_memory_protect("clear-bank", "\"patch\",\"32\"");
+
+    int protect_off = set_mem_protect(0) == 0;
+    if (!stays_empty) daemon_cmd("clear-patch", "\"patch\",\"32\",\"120\"");
+    TEST_ASSERT_TRUE_MESSAGE(stored, "store-patch with Memory Protect off: not stored");
+    TEST_ASSERT_TRUE_MESSAGE(cleared, "clear-patch failed");
+    TEST_ASSERT_TRUE_MESSAGE(protect_on && protect_off, "set-synth-settings memProtect failed");
+    TEST_ASSERT_TRUE_MESSAGE(refused, "store-patch with Memory Protect on: not refused with \"Memory protect on\"");
+    TEST_ASSERT_TRUE_MESSAGE(stays_empty, "store-patch with Memory Protect on wrote the location");
+    TEST_ASSERT_TRUE_MESSAGE(bank_refused, "clear-bank with Memory Protect on: not refused with \"Memory protect on\"");
 }

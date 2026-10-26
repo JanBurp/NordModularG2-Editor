@@ -23,6 +23,15 @@ export function dismissToast(id: number): void {
 	if (idx >= 0) toasts.splice(idx, 1);
 }
 
+// A failed window.cli.run as toast text: without Electron's IPC prefix, and a G2 flash refusal
+// ("store-patch: device refused 32-120 (Memory protect on)", "clear-bank: device refused bank 32 (...)")
+// as "<action> failed at 32-120: Memory protect on".
+export function cliErrorText(e: unknown, action?: string): string {
+	const msg = (e instanceof Error ? e.message : String(e)).replace(/^Error invoking remote method '[^']*': (Error: )?/, '');
+	const refused = action ? /device refused (\d+-\d+|bank \d+) \((.+)\)$/.exec(msg) : null;
+	return refused ? `${action} failed at ${refused[1]}: ${refused[2]}` : msg;
+}
+
 export function showToast(message: string): void {
 	const id = nextId++;
 	toasts.push({ id, message });
