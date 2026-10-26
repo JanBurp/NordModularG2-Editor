@@ -126,19 +126,30 @@
 		</div>
 
 		<div class="flex flex-1 min-h-0 gap-3 p-3">
-			<BankGrid
-				v-for="(side, i) in SIDES"
-				:key="side"
-				:side="side"
-				:kind="uiStore.organizerKind"
-				:bank="uiStore.organizerBanks[i]"
-				:sort="settings.organizerSortModes[i]"
-				:sort-linked="settings.organizerSortLinked"
-				:same-bank="uiStore.organizerBanks[0] === uiStore.organizerBanks[1]"
-				@update:bank="(b) => setBank(i, b)"
-				@update:sort="(s) => setSort(i, s)"
-				@update:sort-linked="(linked) => linkSort(i, linked)"
-			/>
+			<template v-for="(side, i) in SIDES" :key="side">
+				<BankGrid
+					:side="side"
+					:kind="uiStore.organizerKind"
+					:bank="uiStore.organizerBanks[i]"
+					:sort="settings.organizerSortModes[i]"
+					:sort-linked="settings.organizerSortLinked"
+					:same-bank="uiStore.organizerBanks[0] === uiStore.organizerBanks[1]"
+					@update:bank="(b) => setBank(i, b)"
+					@update:sort="(s) => setSort(i, s)"
+					@update:sort-linked="(linked) => linkSort(i, linked)"
+				/>
+				<Button
+					v-if="i === 0"
+					variant="default"
+					class="self-start mt-1 w-6 px-0!"
+					title="Swap banks"
+					hint="organizerSwapBanks"
+					data-testid="organizer-swap-banks"
+					@click="swapBanks"
+				>
+					<Icon name="swap" class="w-3.5 h-3.5" />
+				</Button>
+			</template>
 		</div>
 
 		<Dialog v-model="conflictOpen" title="Can't undo" :show-cancel="false">
@@ -290,6 +301,11 @@
 	}
 	function setBank(side: number, bank: number) {
 		uiStore.organizerBanks[side] = bank;
+		org.clearSelection();
+	}
+	function swapBanks() {
+		const [left, right] = uiStore.organizerBanks;
+		uiStore.organizerBanks = [right, left];
 		org.clearSelection();
 	}
 
