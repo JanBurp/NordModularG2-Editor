@@ -1088,6 +1088,12 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				},
 				{ type: "separator" as const },
 				{ label: "Select All", click: () => sendToFocused("menu:action", "select-all"), accelerator: "CommandOrControl+A" },
+				{ type: "separator" as const },
+				{
+					label: "Find & Replace...",
+					click: () => sendToFocused("menu:action", "toggle-search-replace"),
+					enabled: menuState.hasCurrentPatch,
+				},
 			],
 		},
 		{

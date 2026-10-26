@@ -148,6 +148,12 @@ export interface GlobalParamPageAssignment {
 	isLed: number; // 0-3, semantics unconfirmed — preserved verbatim, not exposed in UI
 }
 
+// One rename for slots.renameItems: a module name, a switch-param button label, or a Morph Group label.
+export type RenameChange =
+	| { kind: 'module'; area: 'voice' | 'fx'; moduleIndex: number; text: string }
+	| { kind: 'param'; area: 'voice' | 'fx'; moduleIndex: number; paramIndex: number; labelIndex: number; text: string }
+	| { kind: 'morph'; groupIndex: number; text: string };
+
 export interface Patch {
 	areas: [Area, Area];
 	description?: PatchDescription;

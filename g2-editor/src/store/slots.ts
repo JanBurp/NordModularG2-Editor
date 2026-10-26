@@ -10,7 +10,7 @@ import type {
 	PatchParamVariation,
 	VariationState,
 } from '@/types';
-import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES, MUTATOR_VARIATION } from '@/types/patch';
+import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
@@ -39,6 +39,7 @@ import { showToast, showErrorToast, dismissToastByKey } from '../composables/use
 import {
 	AREA_FULL_MESSAGE,
 	areaConfig,
+	morphGroupName,
 	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
@@ -2633,28 +2634,7 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setModuleLabel(moduleId: number, label: string, area: 'voice' | 'fx'): Promise<void> {
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot, patch } = ctx;
-			const { areaIdx, location } = areaConfig(area);
-
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
-				const prevLabel = mod?.uname ?? '';
-				hist.record(slot, {
-					undo: async () => {
-						await this.setModuleLabel(moduleId, prevLabel, area);
-					},
-					redo: async () => {
-						await this.setModuleLabel(moduleId, label, area);
-					},
-				});
-			}
-
-			mutSetModuleLabel(patch, areaIdx, moduleId, label);
-			this._markSlotDirty(slot);
-			await runCliSafe(['set-module-name', slot, location, String(moduleId), label], 'setModuleLabel');
+			await this.renameItems([{ kind: 'module', area, moduleIndex: moduleId, text: label }]);
 		},
 
 		// SeqNote's piano-roll Magnifier/Octave view — host-editor-only UI state with no wire-protocol
@@ -3075,84 +3055,98 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		async setParamLabel(moduleIndex: number, paramIndex: number, label: string, area: 'voice' | 'fx', labelIndex = 0): Promise<void> {
-			const ctx = this._getActivePatch();
-			if (!ctx) return;
-			const { slot, patch } = ctx;
-			const { areaIdx, location } = areaConfig(area);
-
-			const mod = findModuleByIndex(patch.areas[areaIdx]?.modules ?? [], moduleIndex);
-			if (!mod) return;
-			const hist = useHistoryStore();
-			if (!hist.isLocked(slot)) {
-				const existingLabel = mod?.paramLabels?.find((pl) => pl.paramIndex === paramIndex);
-				const prevLabel = existingLabel?.labels?.[labelIndex] || paramDefaultNames(mod?.type, paramIndex)?.[labelIndex] || '';
-				hist.record(slot, {
-					undo: async () => {
-						await this.setParamLabel(moduleIndex, paramIndex, prevLabel, area, labelIndex);
-					},
-					redo: async () => {
-						await this.setParamLabel(moduleIndex, paramIndex, label, area, labelIndex);
-					},
-				});
-			}
-
-			if (!mod.paramLabels) mod.paramLabels = [];
-			let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
-			// Positions other than labelIndex have never been customized, so pad with the
-			// param's default names instead of '' — an explicit '' renders as a blank button
-			// (see useSwitch.ts's displayNames, which only falls back to the default for
-			// undefined entries, not empty strings).
-			const defaultNames = paramDefaultNames(mod.type, paramIndex);
-			if (!entry) {
-				const labels = Array.from({ length: Math.max(labelIndex + 1, defaultNames?.length ?? 0) }, (_, i) =>
-					i === labelIndex ? label : (defaultNames?.[i] ?? ''),
-				);
-				entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };
-				mod.paramLabels.push(entry);
-			} else {
-				while (entry.labels.length <= labelIndex || entry.labels.length < (defaultNames?.length ?? 0))
-					entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
-				entry.labels[labelIndex] = label;
-			}
-			mod.paramLabels = fullLabelBlock(mod.type, mod.paramLabels);
-			this._markSlotDirty(slot);
-			await runCliSafe(setModuleLabelsCmd(slot, location, moduleIndex, mod.paramLabels), 'setParamLabel');
+			await this.renameItems([{ kind: 'param', area, moduleIndex, paramIndex, labelIndex, text: label }]);
 		},
 
-		// Morph Group knob labels: on real hardware these are just parameter labels (8-15) of the
-		// fixed PATCH_MORPH pseudo-module (location=2/"patch") — same $PARAM_NAMES/set-module-labels
-		// mechanism as setParamLabel above, decoupled from morph modulation assignments.
 		async setMorphGroupLabel(groupIndex: number, label: string): Promise<void> {
+			await this.renameItems([{ kind: 'morph', groupIndex, text: label }]);
+		},
+
+		// Renames any mix of module names, param labels and Morph Group labels as ONE undo step
+		// (Find & Replace's Replace All), sending one command per module and one morph block.
+		async renameItems(changes: RenameChange[]): Promise<void> {
 			const ctx = this._getActivePatch();
 			if (!ctx) return;
 			const { slot, patch } = ctx;
-			const paramIndex = 8 + groupIndex;
+			const modOf = (c: { area: 'voice' | 'fx'; moduleIndex: number }) =>
+				findModuleByIndex(patch.areas[areaConfig(c.area).areaIdx]?.modules ?? [], c.moduleIndex);
+			changes = changes.filter((c) => c.kind !== 'param' || modOf(c));
+			if (changes.length === 0) return;
 
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
-				const prevLabel = patch.morphParamLabels?.find((pl) => pl.paramIndex === paramIndex)?.labels?.[0] || MORPH_NAMES[groupIndex];
+				const prev = changes.map((c): RenameChange => {
+					if (c.kind === 'morph') return { ...c, text: morphGroupName(patch, c.groupIndex) };
+					if (c.kind === 'module') return { ...c, text: modOf(c)?.uname ?? '' };
+					const mod = modOf(c)!;
+					const existing = mod.paramLabels?.find((pl) => pl.paramIndex === c.paramIndex)?.labels?.[c.labelIndex];
+					return { ...c, text: existing || paramDefaultNames(mod.type, c.paramIndex)?.[c.labelIndex] || '' };
+				});
 				hist.record(slot, {
 					undo: async () => {
-						await this.setMorphGroupLabel(groupIndex, prevLabel);
+						await this.renameItems(prev);
 					},
 					redo: async () => {
-						await this.setMorphGroupLabel(groupIndex, label);
+						await this.renameItems(changes);
 					},
 				});
 			}
 
-			// Like fullLabelBlock: the device's block is fixed-size, so always all 8 groups (params 8-15).
-			// isString: true matches how the real hardware encodes morph group labels
-			// (confirmed from a shipped .pch2's own $PARAM_NAMES(areaIdx=2) section).
-			const prev = patch.morphParamLabels ?? [];
-			patch.morphParamLabels = MORPH_NAMES.map((name, i) => ({
-				paramIndex: 8 + i,
-				isString: true,
-				paramLen: 8,
-				labels: [i === groupIndex ? label : (prev.find((pl) => pl.paramIndex === 8 + i)?.labels[0] ?? name)],
-			}));
+			const cmds: string[][] = [];
+			const labelled = new Map<string, RenameChange & { kind: 'param' }>(); // one per module
+			for (const c of changes) {
+				if (c.kind === 'morph') continue;
+				const { areaIdx, location } = areaConfig(c.area);
+				if (c.kind === 'module') {
+					mutSetModuleLabel(patch, areaIdx, c.moduleIndex, c.text);
+					cmds.push(['set-module-name', slot, location, String(c.moduleIndex), c.text]);
+					continue;
+				}
+				const mod = modOf(c)!;
+				const { paramIndex, labelIndex, text } = c;
+				if (!mod.paramLabels) mod.paramLabels = [];
+				let entry = mod.paramLabels.find((pl) => pl.paramIndex === paramIndex);
+				// Positions other than labelIndex have never been customized, so pad with the
+				// param's default names instead of '' — an explicit '' renders as a blank button
+				// (see useSwitch.ts's displayNames, which only falls back to the default for
+				// undefined entries, not empty strings).
+				const defaultNames = paramDefaultNames(mod.type, paramIndex);
+				if (!entry) {
+					const labels = Array.from({ length: Math.max(labelIndex + 1, defaultNames?.length ?? 0) }, (_, i) =>
+						i === labelIndex ? text : (defaultNames?.[i] ?? ''),
+					);
+					entry = { paramIndex, isString: false, paramLen: 1 + labels.length * 7, labels };
+					mod.paramLabels.push(entry);
+				} else {
+					while (entry.labels.length <= labelIndex || entry.labels.length < (defaultNames?.length ?? 0))
+						entry.labels.push(defaultNames?.[entry.labels.length] ?? '');
+					entry.labels[labelIndex] = text;
+				}
+				labelled.set(`${c.area}:${c.moduleIndex}`, c);
+			}
+			// Looked up again: a module rename in the same batch replaces the module object.
+			for (const c of labelled.values()) {
+				const mod = modOf(c)!;
+				mod.paramLabels = fullLabelBlock(mod.type, mod.paramLabels!);
+				cmds.push(setModuleLabelsCmd(slot, areaConfig(c.area).location, mod.index, mod.paramLabels));
+			}
+
+			const morphs = changes.filter((c) => c.kind === 'morph');
+			if (morphs.length > 0) {
+				// Like fullLabelBlock: the device's block is fixed-size, so always all 8 groups (params 8-15).
+				// isString: true matches how the real hardware encodes morph group labels
+				// (confirmed from a shipped .pch2's own $PARAM_NAMES(areaIdx=2) section).
+				const prev = patch.morphParamLabels ?? [];
+				const names = MORPH_NAMES.map(
+					(name, i) => [...morphs].reverse().find((c) => c.groupIndex === i)?.text ?? prev.find((pl) => pl.paramIndex === 8 + i)?.labels[0] ?? name,
+				);
+				patch.morphParamLabels = names.map((name, i) => ({ paramIndex: 8 + i, isString: true, paramLen: 8, labels: [name] }));
+				cmds.push(setModuleLabelsCmd(slot, 'patch', PATCH_MORPH_MODULE_ID, patch.morphParamLabels));
+			}
+
 			this._markSlotDirty(slot);
-			await runCliSafe(setModuleLabelsCmd(slot, 'patch', PATCH_MORPH_MODULE_ID, patch.morphParamLabels), 'setMorphGroupLabel');
+			if (cmds.length === 1) await runCliSafe(cmds[0], 'renameItems');
+			else await runCliBatchSafe(cmds, 'renameItems');
 		},
 
 		async setCableColor(moduleIndex: number, connectorIndex: number, type: 'input' | 'output', color: number, area: 'voice' | 'fx'): Promise<void> {

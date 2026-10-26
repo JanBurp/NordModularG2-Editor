@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Mutator
 - Parameter Pages Overview sidepanel
 - Bank Organizer
+- Find & Replace (module names, param labels)
 
 ### Changed
 - Tests better organized

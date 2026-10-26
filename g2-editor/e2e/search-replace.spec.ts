@@ -1,0 +1,66 @@
+import { dropModuleOnCanvas, getStatusCounts } from './helpers';
+import { expect, test } from './fixtures/electron';
+
+const OSC_A = 97;
+const FLT_LP = 87;
+
+test.describe('find & replace', () => {
+	test('finds module names, Replace All renames them as one undo step', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, OSC_A, 0, 0);
+		await dropModuleOnCanvas(page, OSC_A, 1, 0);
+		const canvas = page.locator('[data-testid="canvas-va"]');
+		const names = canvas.locator('[data-module-short="OscA"] > text');
+
+		await sendMenuAction('toggle-search-replace');
+		await page.getByTestId('search-term').fill('osca');
+		await expect(page.getByTestId('search-count')).toHaveText(/Voice 2\/0\s+FX 0\/0\s+Morph 0/);
+		await expect(canvas.locator('tspan.search-hit')).toHaveText(['OscA', 'OscA']); // only the found part
+
+		// Module names only: unticking Modules leaves nothing to find
+		await page.getByTitle('Search module names').click();
+		await expect(page.getByTestId('search-count')).toHaveText(/^Voice 0\s+FX 0\s+Morph 0$/); // module counts hidden
+		await page.getByTitle('Search module names').click();
+		await expect(page.getByTestId('search-count')).toHaveText(/Voice 2\/0\s+FX 0\/0\s+Morph 0/);
+
+		await page.getByTestId('search-replacement').fill('Vco');
+		await page.getByTestId('search-replace-all').click();
+		await expect(names.filter({ hasText: /^\s*Vco\d+\s*$/ })).toHaveCount(2);
+		await expect(page.getByTestId('search-count')).toHaveText(/Voice 0\/0\s+FX 0\/0\s+Morph 0/);
+
+		await sendMenuAction('undo');
+		await expect(names.filter({ hasText: /^\s*OscA\d+\s*$/ })).toHaveCount(2);
+	});
+
+	test('Replace moves on to the next match, also when the result still matches', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, OSC_A, 0, 0);
+		await dropModuleOnCanvas(page, OSC_A, 1, 0);
+		const names = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] > text');
+
+		await sendMenuAction('toggle-search-replace');
+		await page.getByTestId('search-term').fill('osca');
+		await page.getByTestId('search-term').press('Enter');
+		const replacement = page.getByTestId('search-replacement');
+		await replacement.fill('OscAX');
+		await replacement.press('Enter');
+		await replacement.press('Enter');
+		await expect(names.filter({ hasText: /^\s*OscAX\d+\s*$/ })).toHaveCount(2);
+	});
+
+	test('Delete Found Modules deletes only the matching modules, as one undo step', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, OSC_A, 0, 0);
+		await dropModuleOnCanvas(page, OSC_A, 1, 0);
+		await dropModuleOnCanvas(page, FLT_LP, 0, 4);
+
+		await sendMenuAction('toggle-search-replace');
+		await page.getByTestId('search-term').fill('osca');
+		await page.getByTestId('search-delete-found').click();
+		await expect.poll(async () => (await getStatusCounts(page)).voiceModules).toBe(1);
+		await expect(page.locator('[data-testid="canvas-va"] [data-module-short="FltLP"]')).toBeVisible();
+
+		await sendMenuAction('undo');
+		await expect.poll(async () => (await getStatusCounts(page)).voiceModules).toBe(3);
+	});
+});

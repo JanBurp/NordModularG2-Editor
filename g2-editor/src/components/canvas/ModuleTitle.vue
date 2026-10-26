@@ -1,10 +1,10 @@
 <template>
 	<rect v-if="selected" :x="nameX" :width="nameWidth" :height="nameHeight" fill="#FFF" pointer-events="none" />
 	<text v-if="isName" x="128" y="12" fill="#000" font-size="11" font-weight="800" font-family="'Inter'" text-anchor="middle">
-		{{ displayName }}
+		<SearchHit :text="displayName" :hit="searchMatch" />
 	</text>
 	<text v-else :x="nameX + 2" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
-		{{ shownName }}
+		<SearchHit :text="shownName" :hit="searchMatch" />
 		<title v-if="shownName !== displayName">{{ displayName }}</title>
 	</text>
 </template>
@@ -19,11 +19,13 @@
 </script>
 <script setup lang="ts">
 	import { computed, ref } from 'vue';
+	import SearchHit from '../common/SearchHit.vue';
 
 	const props = defineProps<{
 		isName: boolean;
 		displayName: string;
 		selected: boolean;
+		searchMatch?: 'match' | 'current' | null;
 		hasReplaceTrigger?: boolean;
 	}>();
 

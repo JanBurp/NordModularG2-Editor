@@ -296,6 +296,8 @@ static int execute_seq(cJSON *args) {
 
         } else if (strcmp(scmd, "set-mutation-lock") == 0 && sn >= 5) {
             g2_build_set_mutation_lock_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
+            n_ops++;
+
         } else if (strcmp(scmd, "set-module-uprate") == 0 && sn >= 5) {
             g2_build_set_module_uprate_op(op, p, s_loc, arg_i(sub,3), arg_i(sub,4));
             n_ops++;

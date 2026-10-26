@@ -109,13 +109,26 @@
 					stroke="#333"
 				/>
 				<text :x="getButtonX(index) + width / 2" :y="getButtonY(index) + 9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
-					{{ name }}
+					<SearchHit :text="name" :hit="searchHitOf(index)" />
 				</text>
 			</g>
 		</template>
 
 		<!-- Morph Group assignment indicator: red = assigned to the selected group, blue = another group -->
 		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
+
+		<!-- Find & Replace: frame matching labels where their text isn't drawn (one button at a time, or bitmaps) -->
+		<rect
+			v-for="m in singleButtonMode || hasBitmap ? (searchMatches ?? []) : []"
+			:key="`search-${m.labelIndex}`"
+			:x="singleButtonMode ? 0 : getButtonX(m.labelIndex)"
+			:y="singleButtonMode ? 0 : getButtonY(m.labelIndex)"
+			:width="width"
+			height="11"
+			class="search-frame"
+			:class="{ current: m.current }"
+			pointer-events="none"
+		/>
 
 		<!-- Selected param underline -->
 		<rect v-if="highlight" x="0" :y="height + 1" :width="width" height="2" fill="white" pointer-events="none" />
@@ -125,6 +138,7 @@
 	import { computed, toRef } from 'vue';
 	import type { ModuleParam, ParamLabel } from '../../types';
 	import { useSwitch } from '../../composables/useSwitch';
+	import SearchHit from '../common/SearchHit.vue';
 	import { morphColorHex } from '../../utils/morphColors';
 	import { GRAPH_COLORS } from './graphFunctions';
 
@@ -134,6 +148,7 @@
 		paramIndex: number;
 		label?: ParamLabel;
 		highlight?: boolean;
+		searchMatches?: { labelIndex: number; current: boolean }[] | null;
 		morphColor?: 'red' | 'blue' | null;
 	}>();
 
@@ -169,6 +184,11 @@
 		(index, value) => emit('change', index, value, true),
 		(info) => emit('paramLabelEdit', info),
 	);
+
+	function searchHitOf(labelIndex: number): 'match' | 'current' | null {
+		const m = props.searchMatches?.find((x) => x.labelIndex === labelIndex);
+		return m ? (m.current ? 'current' : 'match') : null;
+	}
 
 	// OutputMode bitmap frames are Bip, BipInv, Pos, PosInv, Neg, NegInv; values are Pos, PosInv, Neg, NegInv, Bip, BipInv
 	const LEVEL_SHIFT_FRAME = [2, 3, 4, 5, 0, 1];

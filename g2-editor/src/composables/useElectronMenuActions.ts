@@ -302,6 +302,13 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				case 'toggle-keyboard':
 					useSettingsStore().toggleVirtualKeyboard();
 					break;
+				case 'toggle-search-replace': {
+					// Open but not focused: focus it instead of closing.
+					const input = document.querySelector<HTMLInputElement>('[data-search-replace] input');
+					if (input && !input.closest('[data-search-replace]')!.contains(document.activeElement)) input.focus();
+					else uiStore.toggleSearchReplace();
+					break;
+				}
 				case 'toggle-parameter-pages':
 					useSettingsStore().toggleParamPages();
 					break;
