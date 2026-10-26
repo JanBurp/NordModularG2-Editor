@@ -10,6 +10,7 @@
 	>
 		<svg
 			ref="svgRef"
+			class="block"
 			font-size="9"
 			:width="canvasWidth * zoom"
 			:height="canvasHeight * zoom"
@@ -27,7 +28,7 @@
 				handleCanvasClick();
 			"
 		>
-			<text :font-size="160" x="50%" y="50%" width="100%" height="100%" text-anchor="middle" fill="#666">{{ getAreaByShort(area) }}</text>
+			<text :font-size="160" :x="labelCenter.x / zoom" :y="labelCenter.y / zoom" width="100%" height="100%" text-anchor="middle" fill="#666">{{ getAreaByShort(area) }}</text>
 
 			<Module
 				v-for="mod in props.modules as any[]"
@@ -201,11 +202,17 @@
 
 	const wrapperEl = ref<HTMLDivElement | null>(null);
 	const containerWidth = ref(0);
+	const containerHeight = ref(0);
+	// Uses the outer size (incl. scrollbars) so the area label doesn't shift when a scrollbar appears.
+	const labelCenter = ref({ x: 0, y: 0 });
 	let resizeObserver: ResizeObserver | null = null;
 	onMounted(() => {
 		if (wrapperEl.value) {
 			resizeObserver = new ResizeObserver((entries) => {
 				containerWidth.value = entries[0].contentRect.width;
+				containerHeight.value = entries[0].contentRect.height;
+				const el = entries[0].target as HTMLElement;
+				labelCenter.value = { x: el.offsetWidth / 2, y: el.offsetHeight / 2 };
 			});
 			resizeObserver.observe(wrapperEl.value);
 		}
@@ -246,7 +253,6 @@
 	});
 
 	const canvasHeight = computed(() => {
-		if (props.modules.length === 0) return 600;
 		let maxY = 0;
 		(props.modules as any[]).forEach((m: any) => {
 			const modDef = getModule(m.type);
@@ -254,7 +260,7 @@
 			const my = (m.vert + modHeight) * MODULE_ROW_HEIGHT;
 			if (my > maxY) maxY = my;
 		});
-		return Math.max(maxY + 100, 600);
+		return Math.max(maxY + 2 * MODULE_ROW_HEIGHT, containerHeight.value / zoom.value);
 	});
 
 	const connectedJacksMap = computed(() => {
