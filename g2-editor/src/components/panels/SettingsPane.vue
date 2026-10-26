@@ -1,5 +1,5 @@
 <template>
-	<div class="flex flex-col gap-1">
+	<div class="flex flex-col gap-1" data-hint-bounds>
 		<Collapsible title="Editor Options" :model-value="isOpen('Editor Settings')" @update:model-value="onToggle('Editor Settings', $event)">
 			<div class="flex flex-col gap-1">
 				<SettingsRow :label="L.editorTheme">
@@ -347,7 +347,8 @@
 							class="ml-px"
 							v-if="group.toggleKey"
 							:model-value="!!patchParam(group.toggleKey)"
-							@update:model-value="slotsStore.setPatchParam(uiStore.variation, group.toggleKey!, $event ? 1 : 0)"
+							v-on="patchHints[group.toggleKey].on"
+							@update:model-value="setPatchParam(group.toggleKey!, $event ? 1 : 0)"
 						/>
 					</div>
 					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
@@ -356,13 +357,15 @@
 							:model-value="patchParam(param.key)"
 							variant="variation"
 							:options="param.btnOptions"
-							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, Number($event))"
+							v-on="patchHints[param.key].on"
+							@update:model-value="setPatchParam(param.key, Number($event))"
 						/>
 						<NumberInput
 							v-else
 							:model-value="patchParam(param.key)"
 							class="w-16"
-							@update:model-value="slotsStore.setPatchParam(uiStore.variation, param.key, $event)"
+							v-on="patchHints[param.key].on"
+							@update:model-value="setPatchParam(param.key, $event)"
 						/>
 					</SettingsRow>
 				</template>
@@ -392,7 +395,8 @@
 	import { useUiStore } from '@/store/ui';
 	import { SLOT_LABELS, SETTINGS_LABELS, SOUND_CATEGORIES as soundCategories } from '@/constants';
 	import type { SlotLabel } from '@/types';
-	import type { PatchParamVariation } from '@/types/patch';
+	import { PATCH_PARAM_KEYS, type PatchParamVariation } from '@/types/patch';
+	import { TOOLBAR_HINT, useToolbarValueHint } from '@/composables/useValueHint';
 
 	const L = SETTINGS_LABELS;
 
@@ -630,5 +634,24 @@
 	function patchParam(key: keyof PatchParamVariation): number {
 		const val = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.patch?.[key];
 		return typeof val === 'number' ? val : 0;
+	}
+
+	// Value hints, as on the official Patch Settings window's controls: the selected option, On/Off
+	// for a section toggle, else the number.
+	const toolbarHint = useToolbarValueHint();
+	type HintedParam = { key: keyof PatchParamVariation; btnOptions?: BtnOpt[]; toggle?: boolean };
+	const patchHints = Object.fromEntries(
+		PATCH_PARAM_GROUPS.flatMap((g): HintedParam[] => [...(g.toggleKey ? [{ key: g.toggleKey, toggle: true }] : []), ...g.params]).map((p) => [
+			p.key,
+			toolbarHint(TOOLBAR_HINT.patchSettings, PATCH_PARAM_KEYS.indexOf(p.key), () => {
+				const v = patchParam(p.key);
+				if (p.toggle) return v ? 'On' : 'Off';
+				return p.btnOptions?.find((o) => o.value === v)?.label ?? String(v);
+			}),
+		]),
+	) as Record<keyof PatchParamVariation, ReturnType<typeof toolbarHint>>;
+	function setPatchParam(key: keyof PatchParamVariation, value: number) {
+		slotsStore.setPatchParam(uiStore.variation, key, value);
+		patchHints[key].changed();
 	}
 </script>

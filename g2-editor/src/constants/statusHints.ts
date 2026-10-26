@@ -24,7 +24,7 @@ export const STATUS_HINTS = {
 	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
 	// A Morph Group's dial on a Parameter Page knob: no morph-assign (a dial can't be morphed), no button.
 	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
-	morphKnob: `Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
+	morphKnob: `Click: select group · Hold: show its morph ranges · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
 	// Patch Mutator — sound boxes
 	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,

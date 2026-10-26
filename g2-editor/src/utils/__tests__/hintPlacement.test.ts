@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { paramHintCenter } from '@/utils/hintPlacement';
+import { morphHintCenter, paramHintCenter } from '@/utils/hintPlacement';
 import { layoutBadges } from '@/utils/badgeLayout';
 
 // 20x20 control at (100,100): centre (110,110), offsets sx = (20+40)/2 = 30, sy = trunc((20+15)/2) = 17.
@@ -32,5 +32,18 @@ describe('layoutBadges (CHintViewList::AdjustHintPosition)', () => {
 
 	it('leaves overlapping badges of different groups alone', () => {
 		expect(layoutBadges([box(0, 1), box(5, 2)]).map((b) => b.y)).toEqual([0, 5]);
+	});
+});
+
+describe('morphHintCenter (CMorphContainer::GetParamHintCenter)', () => {
+	it('puts a knob hint 35 px right, or left when that does not fit', () => {
+		expect(morphHintCenter(ctrl, view(0, 0, 1000, 1000), 'morph', 3)).toEqual({ x: 145, y: 110 });
+		expect(morphHintCenter(ctrl, view(0, 0, 150, 1000), 'morph', 3)).toEqual({ x: 75, y: 110 });
+	});
+
+	it('puts a mode button hint 18 px up, nudged for the first and last group', () => {
+		expect(morphHintCenter(ctrl, null, 'morphMode', 3)).toEqual({ x: 110, y: 92 });
+		expect(morphHintCenter(ctrl, null, 'morphMode', 0)).toEqual({ x: 111, y: 92 });
+		expect(morphHintCenter(ctrl, null, 'morphMode', 7)).toEqual({ x: 105, y: 92 });
 	});
 });

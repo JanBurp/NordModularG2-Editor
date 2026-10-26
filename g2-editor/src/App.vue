@@ -55,6 +55,7 @@
 		<ParameterPages v-if="currentPatch && !uiStore.showBankOrganizer && settingsStore.showParamPages && settingsStore.toolbarMode !== 'compact'" />
 		<SearchReplaceBar v-if="currentPatch && !uiStore.showBankOrganizer && uiStore.showSearchReplace" />
 		<ParamDragGhost />
+		<ToolbarValueHint />
 		<KnobDragCursor />
 
 		<div class="flex-1 flex overflow-hidden">
@@ -452,6 +453,7 @@
 	import ParameterPages from './components/toolbar/ParameterPages.vue';
 	import SearchReplaceBar from './components/toolbar/SearchReplaceBar.vue';
 	import ParamDragGhost from './components/common/ParamDragGhost.vue';
+	import ToolbarValueHint from './components/common/ToolbarValueHint.vue';
 	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';

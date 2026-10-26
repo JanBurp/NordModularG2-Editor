@@ -255,25 +255,46 @@ export function formatParamDisplay(moduleDef: ModuleDefinition, paramIndex: numb
 	return formatValue(values[paramIndex] ?? 64, param.type);
 }
 
-// Value hint text (F5 and the hover/change hint), as the official editor's GetHintTextWithMorph:
-// the display text, a "(raw)" second line for 0..127 params, and "value -- morph end" when the
-// param is morphed in the focused group.
-export function formatParamHint(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes?: number[], morphRange?: number): string {
+// A param's display text at `value` (the other params of a combined display from `values`).
+// Combined displays pad between values (e.g. Osc Freq's three nbsp); one space keeps hints compact.
+function hintDisplay(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes: number[] | undefined, value: number): string {
+	const v = [...values];
+	v[paramIndex] = value;
+	return formatParamDisplay(moduleDef, paramIndex, v, modes).replace(/\s+/g, ' ');
+}
+
+// Morph start and end as the official editor shows them: a 0..127 param's value and value + range
+// (clamped); a discrete param (selector) its whole range.
+function morphEnds(moduleDef: ModuleDefinition, paramIndex: number, values: number[], range: number): [number, number] {
 	const param = moduleDef.params?.[paramIndex];
 	const p = param && getParam(param.type);
 	const value = values[paramIndex] ?? 64;
-	// Combined displays pad between values (e.g. Osc Freq's three nbsp); one space keeps the hint compact.
-	const display = (v: number[]) => formatParamDisplay(moduleDef, paramIndex, v, modes).replace(/\s+/g, ' ');
-	let text = display(values);
+	if (!p) return [value, value];
+	return p.high === 127 ? [value, clamp(value + range, p.low, p.high)] : [p.low, p.high];
+}
+
+// Value hint text (F5 and the hover/change hint), as the official editor's GetHintTextWithMorph:
+// the display text, a "(raw)" second line for 0..127 params, and "start -- end" when the param is
+// morphed in the focused group.
+export function formatParamHint(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes?: number[], morphRange?: number): string {
+	const param = moduleDef.params?.[paramIndex];
+	const p = param && getParam(param.type);
+	const display = (v: number) => hintDisplay(moduleDef, paramIndex, values, modes, v);
+	const value = values[paramIndex] ?? 64;
+	let text = display(value);
 	let raw = String(value);
-	if (p && morphRange) {
-		const end = clamp(value + morphRange, p.low, p.high);
-		const endValues = [...values];
-		endValues[paramIndex] = end;
-		text += ` -- ${display(endValues)}`;
-		raw += ` -- ${end}`;
+	if (morphRange) {
+		const [a, b] = morphEnds(moduleDef, paramIndex, values, morphRange);
+		text = `${display(a)} -- ${display(b)}`;
+		raw = `${a} -- ${b}`;
 	}
 	return p?.low === 0 && p.high === 127 ? `${text}\n(${raw})` : text;
+}
+
+// Morph values hint (official HintViewParamMorphValues, shown while a morph knob is held).
+export function formatMorphValues(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes: number[] | undefined, range: number): string {
+	const [a, b] = morphEnds(moduleDef, paramIndex, values, range);
+	return `${hintDisplay(moduleDef, paramIndex, values, modes, a)} -- ${hintDisplay(moduleDef, paramIndex, values, modes, b)}`;
 }
 
 export interface ParamValueOption {

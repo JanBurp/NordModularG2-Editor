@@ -31,14 +31,9 @@ export function buildMorphMenuItems(opts: {
 	];
 }
 
-// Hold-to-show canvas overlays: F6 = morph ranges of assigned params, F7 = which group(s) a
-// param is assigned to. Mirrors useMidiCC.ts's useMidiCCOverlay (F8).
-export function useMorphRangeOverlay() {
-	const { isVisible } = useKeyHoldOverlay('F6');
-	return { showMorphRangeOverlay: isVisible };
-}
-
+// Hold-to-show canvas overlay, as the official editor's F6: which group(s) a param is assigned to.
+// Morph ranges show while a toolbar morph knob is held (MorphRangeBadgesOverlay).
 export function useMorphAssignOverlay() {
-	const { isVisible } = useKeyHoldOverlay('F7');
+	const { isVisible } = useKeyHoldOverlay('F6');
 	return { showMorphAssignOverlay: isVisible };
 }

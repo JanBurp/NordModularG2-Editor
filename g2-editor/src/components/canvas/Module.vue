@@ -10,7 +10,7 @@
 		@mousedown.stop
 		@contextmenu.stop.prevent="onContextMenu"
 	>
-		<ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground>
+		<g @mousedown="onBackgroundMousedown"><ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground></g>
 
 		<ModuleTitle
 			:displayName="displayName"
@@ -316,6 +316,7 @@
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { useValueHint } from '../../composables/useValueHint';
+	import { createDoubleClickDetector, isPrimaryMouseDown } from '../../utils/doubleClick';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { blurFocusedControl } from '../../utils/focus';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
@@ -598,6 +599,14 @@
 	// module) instead of locally, so the badge always stays above other modules on the canvas.
 	const { startDrag } = useMorphRangeDrag();
 	const valueHint = useValueHint();
+
+	// Double-click on an empty part of the module briefly shows its full name (official
+	// CPanel::PanelSecondClick → ShowModuleNameHint).
+	const isBackgroundDoubleClick = createDoubleClickDetector();
+	function onBackgroundMousedown(e: MouseEvent) {
+		if (isPrimaryMouseDown(e) && isBackgroundDoubleClick())
+			valueHint.changed({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
+	}
 
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the

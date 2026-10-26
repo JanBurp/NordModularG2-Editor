@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { getModule } from '@/renderer/nmg2mods';
-import { formatParamDisplay, formatParamHint } from '@/utils/moduleControls';
+import { formatMorphValues, formatParamDisplay, formatParamHint } from '@/utils/moduleControls';
 
 // OscB: 0 FreqCoarse (combined display with 1 FreqFine, 4 FreqMode), 6 Shape (0..127), 8 Waveform (0..4)
 const oscB = getModule(7)!;
@@ -28,5 +28,21 @@ describe('formatParamHint', () => {
 		const end = [...values];
 		end[6] = 127;
 		expect(formatParamHint(oscB, 6, v, undefined, 20)).toBe(`${display(6, v)} -- ${display(6, end)}\n(120 -- 127)`);
+	});
+
+	it('shows a morphed selector as its whole range', () => {
+		const lo = [...values];
+		lo[8] = 0;
+		const hi = [...values];
+		hi[8] = 4;
+		expect(formatParamHint(oscB, 8, values, undefined, 1)).toBe(`${display(8, lo)} -- ${display(8, hi)}`);
+	});
+});
+
+describe('formatMorphValues', () => {
+	it('shows start -- end without the raw line', () => {
+		const end = [...values];
+		end[6] = 74;
+		expect(formatMorphValues(oscB, 6, values, undefined, 10)).toBe(`${display(6)} -- ${display(6, end)}`);
 	});
 });

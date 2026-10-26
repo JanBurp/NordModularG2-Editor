@@ -21,7 +21,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Tests better organized
 - New tests added
 - CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
-- All param popups (F5..F7, and when focus) have same color.
+- All param popups (F5..F*, and when focus) have same color and work as original editor.
 - Param popups use user friendly values
 
 ### Fixed

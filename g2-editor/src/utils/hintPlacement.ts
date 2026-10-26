@@ -42,6 +42,9 @@ export function canvasViewport(svg: SVGSVGElement | null | undefined): Rect | nu
 	return a && b ? { x: a.x, y: a.y, w: b.x - a.x, h: b.y - a.y } : null;
 }
 
+// Whether a nominal 40x15 hint box centred on p fits completely inside b (no bounds = always).
+const inside = (p: Point, b: Rect | null) => !b || (p.x - 20 >= b.x && p.y - 7.5 >= b.y && p.x + 20 <= b.x + b.w && p.y + 7.5 <= b.y + b.h);
+
 // CPanel::GetParamHintCenter: centre of a hover/press/change hint. A nominal 40x15 box is tried
 // diagonally below-right of the control, then above-left, then (3 px further out) left, above,
 // right and below; the first that fits completely inside the viewport wins, else the control centre.
@@ -59,8 +62,17 @@ export function paramHintCenter(ctrl: Rect, viewport: Rect | null): Point {
 	];
 	for (const [dx, dy] of offsets) {
 		const p = { x: c.x + dx, y: c.y + dy };
-		if (!viewport) return p;
-		if (p.x - 20 >= viewport.x && p.y - 7.5 >= viewport.y && p.x + 20 <= viewport.x + viewport.w && p.y + 7.5 <= viewport.y + viewport.h) return p;
+		if (inside(p, viewport)) return p;
 	}
 	return c;
+}
+
+// CMorphContainer::GetParamHintCenter: a morph group knob's hint sits 35 px right of the knob
+// centre, or 35 px left when that doesn't fit in the morph container; a mode button's sits 18 px
+// above it (group 1's 1 px right, group 8's 5 px left).
+export function morphHintCenter(ctrl: Rect, bounds: Rect | null, place: 'morph' | 'morphMode', group: number): Point {
+	const c = rectCenter(ctrl);
+	if (place === 'morphMode') return { x: c.x + (group === 0 ? 1 : group === 7 ? -5 : 0), y: c.y - 18 };
+	const right = { x: c.x + 35, y: c.y };
+	return inside(right, bounds) ? right : { x: c.x - 35, y: c.y };
 }

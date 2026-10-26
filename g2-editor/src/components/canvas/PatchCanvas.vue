@@ -60,6 +60,8 @@
 			<ParamValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphRangeBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<KnobAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<CtrlValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphDragHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<ValueHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<KnobSpinOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" @change="onParamChange" />
@@ -101,6 +103,8 @@
 	import MorphAssignBadgesOverlay from './MorphAssignBadgesOverlay.vue';
 	import MorphRangeBadgesOverlay from './MorphRangeBadgesOverlay.vue';
 	import MorphDragHintOverlay from './MorphDragHintOverlay.vue';
+	import KnobAssignBadgesOverlay from './KnobAssignBadgesOverlay.vue';
+	import CtrlValuesOverlay from './CtrlValuesOverlay.vue';
 	import ValueHintOverlay from './ValueHintOverlay.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';

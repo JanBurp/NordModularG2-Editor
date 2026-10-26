@@ -1,5 +1,5 @@
 <template>
-	<ToolBarGroup class="flex flex-col items-center pt-1">
+	<ToolBarGroup class="flex flex-col items-center pt-1" data-hint-bounds>
 		<div class="flex items-center gap-2">
 			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
@@ -26,18 +26,21 @@
 					</div>
 					<Knob
 						data-testid="morph-group-knob"
-						:value="patchParams?.[uiStore.variation]?.morphDials?.[i] ?? 0"
+						:value="morphDial(i)"
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : assignedGroups.has(i) ? 'blue' : null"
 						:default-value="defaultPatchParams().morphDials[i]"
-						@change="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'dial', val)"
+						v-on="dialHints[i].on"
+						@mousedown="showMorphValues(i)"
+						@change="(val) => onDialChange(i, val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
 					/>
 					<MorphSourceSelect
-						:model-value="patchParams?.[uiStore.variation]?.morphModes?.[i] ?? 0"
+						:model-value="morphMode(i)"
 						:morph-idx="i"
+						v-on="modeHints[i].on"
 						@mouseenter="showHint('morphSource')"
 						@mouseleave="showHint('morphKnob')"
-						@update:model-value="(val) => slotsStore.setMorphParam(uiStore.variation, i, 'mode', val)"
+						@update:model-value="(val) => onModeChange(i, val)"
 					/>
 				</div>
 			</template>
@@ -56,7 +59,7 @@
 	import { useSearchReplace } from '../../composables/useSearchReplace';
 	import SearchHit from '../common/SearchHit.vue';
 	import { useDeviceStore } from '../../store/device';
-	import { MORPH_NAMES } from '../../types/patch';
+	import { MORPH_MODE_OPTIONS, MORPH_NAMES } from '../../types/patch';
 	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
@@ -66,6 +69,7 @@
 	import { PATCH_MORPH_MODULE_ID } from '../../parser/constants';
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import { useStatusHint } from '../../composables/useStatusHint';
+	import { TOOLBAR_HINT, useToolbarValueHint } from '../../composables/useValueHint';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
@@ -95,6 +99,28 @@
 		const slot = uiStore.slotInFocus;
 		return new Set(slot ? slotsStore.getMorphAssignments(slot, uiStore.variation).map((a) => a.groupIndex) : []);
 	});
+
+	const morphDial = (i: number) => patchParams.value?.[uiStore.variation]?.morphDials?.[i] ?? 0;
+	const morphMode = (i: number) => patchParams.value?.[uiStore.variation]?.morphModes?.[i] ?? 0;
+
+	// Value hints (official CMorphContainer): knob i = morph param i, mode button i = param 8 + i.
+	const toolbarHint = useToolbarValueHint();
+	const dialHints = MORPH_NAMES.map((_, i) => toolbarHint(TOOLBAR_HINT.morph, i, () => String(morphDial(i)), 'morph'));
+	const modeHints = MORPH_NAMES.map((_, i) => toolbarHint(TOOLBAR_HINT.morph, 8 + i, () => MORPH_MODE_OPTIONS[i][morphMode(i)] ?? '', 'morphMode'));
+	function onDialChange(i: number, val: number) {
+		slotsStore.setMorphParam(uiStore.variation, i, 'dial', val);
+		dialHints[i].changed();
+	}
+	function onModeChange(i: number, val: number) {
+		slotsStore.setMorphParam(uiStore.variation, i, 'mode', val);
+		modeHints[i].changed();
+	}
+
+	// Holding a morph knob shows its group's morph start -- end values on the canvas until release.
+	function showMorphValues(i: number) {
+		uiStore.morphValuesGroup = i;
+		window.addEventListener('mouseup', () => (uiStore.morphValuesGroup = null), { once: true });
+	}
 
 	function displayName(i: number): string {
 		return morphGroupName(activePatch.value, i);

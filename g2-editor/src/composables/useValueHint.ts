@@ -7,7 +7,22 @@ import { formatParamHint } from '@/utils/moduleControls';
 // Official editor (CHintViewList::Idle): hover delay and hide timeout are both 50 ticks of 1/60 s.
 export const VALUE_HINT_MS = 833;
 
-type HintTarget = { moduleIndex: number; paramIndex: number; area: 'va' | 'fx' };
+// 'toolbar' = an HTML control outside the canvas (morph group knobs, patch level, patch settings),
+// rendered by ToolbarValueHint from its registered anchor. paramIndex -1 on a canvas area = the
+// module's name hint (double-click on an empty part of the module).
+export type HintArea = 'va' | 'fx' | 'toolbar';
+type HintTarget = { moduleIndex: number; paramIndex: number; area: HintArea };
+
+// Where a toolbar hint goes and what it says. 'morph' = CMorphContainer::GetParamHintCenter, else
+// CPanel's. Placement is kept inside the nearest [data-hint-bounds] ancestor (the window if none).
+export interface HintAnchor {
+	el: Element;
+	text: () => string;
+	place: 'morph' | 'morphMode' | 'panel';
+}
+const anchors = new Map<string, HintAnchor>();
+const anchorKey = (t: { moduleIndex: number; paramIndex: number }) => `${t.moduleIndex}:${t.paramIndex}`;
+export const toolbarHintAnchor = (t: { moduleIndex: number; paramIndex: number }) => anchors.get(anchorKey(t));
 
 // Module-level: one hint for the whole app, like ui.valueHint.
 let hoverTimer: ReturnType<typeof setTimeout> | undefined;
@@ -54,6 +69,34 @@ export function useValueHint() {
 		hide: () => set(null),
 	};
 }
+
+// Hint event handlers for a toolbar control: bind `on` with v-on on the control's element and call
+// `changed()` from its change handler. moduleIndex groups controls (see TOOLBAR_HINT).
+export function useToolbarValueHint() {
+	const hint = useValueHint();
+	return (moduleIndex: number, paramIndex: number, text: () => string, place: HintAnchor['place'] = 'panel') => {
+		const target = { moduleIndex, paramIndex, area: 'toolbar' as const };
+		const anchor = (e: Event) => anchors.set(anchorKey(target), { el: e.currentTarget as Element, text, place });
+		return {
+			on: {
+				mouseenter(e: MouseEvent) {
+					if (e.buttons !== 0) return;
+					anchor(e);
+					hint.hoverEnter(target);
+				},
+				mousedown(e: MouseEvent) {
+					anchor(e);
+					hint.press(target);
+				},
+				mouseleave: (e: MouseEvent) => hint.leave(e),
+			},
+			changed: () => hint.changed(target),
+		};
+	};
+}
+
+// moduleIndex values for toolbar hint targets.
+export const TOOLBAR_HINT = { morph: 0, patchLevel: 1, patchSettings: 2 } as const;
 
 // Hint text for a param in the focused slot/variation, with its range in the selected morph group.
 export function paramHintText(mod: ModuleInstance, paramIndex: number, area: 'va' | 'fx'): string {

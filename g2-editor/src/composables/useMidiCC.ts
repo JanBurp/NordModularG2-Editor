@@ -1,4 +1,5 @@
 import type { ContextMenuItem, MidiCCAssignment } from '@/types';
+import { computed, ref } from 'vue';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 
 const RESERVED_CC = new Set([0, 1, 7, 11, 17, 18, 32, 64, 70, 96, 97, 120, 121, 122, 123, 124, 125, 126, 127]);
@@ -100,7 +101,21 @@ export function buildCCMenuItems(opts: {
 	];
 }
 
+// Official editor: F8 shows the MIDI CC assignments, Ctrl+F8 each param's controller value
+// (CPatchView::KeyHintViewParamCtrlValues); the modifier counts at the moment F8 goes down.
+const f8WithCtrl = ref(false);
+let f8Listening = false;
+
 export function useMidiCCOverlay() {
 	const { isVisible } = useKeyHoldOverlay('F8');
-	return { showCCOverlay: isVisible };
+	if (!f8Listening) {
+		f8Listening = true;
+		window.addEventListener('keydown', (e) => {
+			if (e.key === 'F8' && !e.repeat) f8WithCtrl.value = e.ctrlKey;
+		});
+	}
+	return {
+		showCCOverlay: computed(() => isVisible.value && !f8WithCtrl.value),
+		showCtrlValuesOverlay: computed(() => isVisible.value && f8WithCtrl.value),
+	};
 }

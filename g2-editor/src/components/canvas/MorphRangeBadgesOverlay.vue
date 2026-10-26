@@ -1,5 +1,5 @@
 <template>
-	<ParamOverlay v-if="showMorphRangeOverlay" :items="badges" />
+	<ParamOverlay v-if="uiStore.morphValuesGroup !== null" :items="badges" />
 </template>
 
 <script setup lang="ts">
@@ -8,7 +8,7 @@
 	import { getModule } from '@/renderer/nmg2mods';
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
-	import { useMorphRangeOverlay } from '@/composables/useMorphAssign';
+	import { formatMorphValues } from '@/utils/moduleControls';
 	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
@@ -17,26 +17,27 @@
 		areaLabel: 'fx' | 'va';
 	}>();
 
-	const { showMorphRangeOverlay } = useMorphRangeOverlay();
 	const uiStore = useUiStore();
 	const slotsStore = useSlotsStore();
 
-	// Only the currently selected group's range is shown, to avoid clutter from a param assigned
-	// to several groups at once.
+	// Official HintViewParamMorphValues: while a toolbar morph knob is held, every param morphed in
+	// that group (focused variation) shows its morph start -- end.
 	const badges = computed(() => {
 		const slot = uiStore.slotInFocus;
 		if (!slot) return [];
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		const groupIndex = uiStore.selectedMorphGroup;
+		const groupIndex = uiStore.morphValuesGroup;
+		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
 		const result: { text: string; x: number; y: number; group: number }[] = [];
 		for (const a of slotsStore.getMorphAssignments(slot, uiStore.variation)) {
 			if (a.location !== location || a.groupIndex !== groupIndex) continue;
 			const mod = props.modules.find((m) => m.index === a.moduleIndex);
 			if (!mod) continue;
-			const param = getModule(mod.type)?.params?.[a.paramIndex];
-			if (!param) continue;
+			const moduleDef = getModule(mod.type);
+			if (!moduleDef?.params?.[a.paramIndex]) continue;
+			const values = slotsStore.slots[slot]?.variations?.[uiStore.variation]?.[areaKey]?.[mod.index] ?? [];
 			result.push({
-				text: a.range >= 0 ? `+${a.range}` : `${a.range}`,
+				text: formatMorphValues(moduleDef, a.paramIndex, values, mod.modes, a.range),
 				...rectCenter(paramControlRect(mod, a.paramIndex, props.areaLabel)),
 				group: mod.index,
 			});
