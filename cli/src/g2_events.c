@@ -45,6 +45,64 @@ static void emit_version_update_json(const uint8_t *bulk, int dataEnd, int updat
     fflush(stdout);
 }
 
+/* R_CLEAR (0x15) at m: type(0=patch,1=perf)/bank/location (0-indexed); flash_usage < 0 = unknown. */
+static void emit_patch_cleared(const uint8_t *m, int flash_usage) {
+    printf("{\"type\":\"patch_cleared\",\"kind\":\"%s\",\"bank\":%u,\"location\":%u",
+           m[0] == 1 ? "performance" : "patch", (unsigned)(m[1] + 1), (unsigned)(m[2] + 1));
+    if (flash_usage >= 0) printf(",\"flashUsage\":%d", flash_usage);
+    printf("}\n");
+    fflush(stdout);
+}
+
+/* A names update (0x13 molecule first): R_LIST_NAMES, or a store's ack (aCmd 0x0C). */
+static void emit_names_update(const uint8_t *bulk, int dataEnd) {
+    /* R_LIST_NAMES embeds R_ADD_NAMES (0x16) with bank/location/name.
+     * bulk offsets: [4]/[5]=flash usage lo/hi (G2_FLASH_USAGE), [6]=0x16, [7]=unk, [8]=pft, [9..]=sub-cmds+name */
+    int bank = -1, loc = -1, pft = -1, cat = -1;
+    char name[17] = {0};
+    int ni = 0;
+    if (dataEnd >= 10 && bulk[6] == 0x16) {
+        pft = bulk[8];
+        int i = 9;
+        while (i < dataEnd) {
+            uint8_t b = bulk[i++];
+            if (b == 0x03 && i + 1 < dataEnd) {
+                bank = bulk[i++] + 1; loc = bulk[i++] + 1;
+            } else if (b == 0x01 && i < dataEnd) {
+                loc = bulk[i++] + 1;
+            } else if (b == 0x00) {
+                if (i < dataEnd) cat = bulk[i++];
+                break;
+            } else if (b == 0x02 || b == 0x04 || b == 0x05) {
+                break;
+            } else if (b >= 0x20 && ni < 16) {
+                name[ni++] = (char)b;
+                if (ni == 16) { if (i < dataEnd) cat = bulk[i++]; break; }
+            }
+        }
+    }
+    static const char *g2cats[16] = {
+        "no_cat","acoustic","sequencer","bass","classic","drum",
+        "fantasy","fx","lead","organ","pad","piano","synth",
+        "audio_in","user_1","user_2"
+    };
+    if (bank >= 0 && loc >= 0 && pft >= 0) {
+        printf("{\"type\":\"patch_names_updated\",\"kind\":\"%s\",\"bank\":%d,\"location\":%d,\"name\":\"",
+               pft == 0 ? "patch" : "performance", bank, loc);
+        for (int j = 0; j < ni; j++) {
+            if (name[j] == '"' || name[j] == '\\') fputc('\\', stdout);
+            fputc(name[j], stdout);
+        }
+        printf("\"");
+        if (cat >= 0 && cat < 16) printf(",\"category\":\"%s\"", g2cats[cat]);
+    } else {
+        printf("{\"type\":\"patch_names_updated\""); /* fallback if parse fails */
+    }
+    if (dataEnd >= 6) printf(",\"flashUsage\":%d", G2_FLASH_USAGE(bulk));
+    printf("}\n");
+    fflush(stdout);
+}
+
 /* Handle extended (bulk) messages: synth settings, all-slots version updates,
  * and performance events. Returns BULK_REARM if the caller must re-arm streaming. */
 static int emit_bulk_event(const uint8_t *bulk, int bret) {
@@ -105,51 +163,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             if (s) { printf("%s\n", s); fflush(stdout); free(s); }
             cJSON_Delete(root);
         } else if (bsubCmd == 0x13) {
-            /* R_LIST_NAMES embeds R_ADD_NAMES (0x16) with bank/location/name.
-             * bulk offsets: [4]/[5]=flash usage lo/hi (G2_FLASH_USAGE), [6]=0x16, [7]=unk, [8]=pft, [9..]=sub-cmds+name */
-            int bank = -1, loc = -1, pft = -1, cat = -1;
-            char name[17] = {0};
-            int ni = 0;
-            if (dataEnd >= 10 && bulk[6] == 0x16) {
-                pft = bulk[8];
-                int i = 9;
-                while (i < dataEnd) {
-                    uint8_t b = bulk[i++];
-                    if (b == 0x03 && i + 1 < dataEnd) {
-                        bank = bulk[i++] + 1; loc = bulk[i++] + 1;
-                    } else if (b == 0x01 && i < dataEnd) {
-                        loc = bulk[i++] + 1;
-                    } else if (b == 0x00) {
-                        if (i < dataEnd) cat = bulk[i++];
-                        break;
-                    } else if (b == 0x02 || b == 0x04 || b == 0x05) {
-                        break;
-                    } else if (b >= 0x20 && ni < 16) {
-                        name[ni++] = (char)b;
-                        if (ni == 16) { if (i < dataEnd) cat = bulk[i++]; break; }
-                    }
-                }
-            }
-            static const char *g2cats[16] = {
-                "no_cat","acoustic","sequencer","bass","classic","drum",
-                "fantasy","fx","lead","organ","pad","piano","synth",
-                "audio_in","user_1","user_2"
-            };
-            if (bank >= 0 && loc >= 0 && pft >= 0) {
-                printf("{\"type\":\"patch_names_updated\",\"kind\":\"%s\",\"bank\":%d,\"location\":%d,\"name\":\"",
-                       pft == 0 ? "patch" : "performance", bank, loc);
-                for (int j = 0; j < ni; j++) {
-                    if (name[j] == '"' || name[j] == '\\') fputc('\\', stdout);
-                    fputc(name[j], stdout);
-                }
-                printf("\"");
-                if (cat >= 0 && cat < 16) printf(",\"category\":\"%s\"", g2cats[cat]);
-            } else {
-                printf("{\"type\":\"patch_names_updated\""); /* fallback if parse fails */
-            }
-            if (dataEnd >= 6) printf(",\"flashUsage\":%d", G2_FLASH_USAGE(bulk));
-            printf("}\n");
-            fflush(stdout);
+            emit_names_update(bulk, dataEnd);
         } else {
             printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
             for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
@@ -207,6 +221,12 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
         emit_version_update_json(bulk, dataEnd, 1);
         g2_lock_stream();
         g2_pending_rearm = 1;
+    } else if (baCmd == 0x0C && bsubCmd == 0x13 && dataEnd >= 6) {
+        /* Store ack: [13 lo hi][16 names entry][0D result] (hardware-captured 2026-10-26). */
+        emit_names_update(bulk, dataEnd);
+    } else if (baCmd == 0x0C && bsubCmd == 0x15 && dataEnd >= 7) {
+        /* Clear ack: [15 type bank loc][13 lo hi][0D result] (hardware-captured 2026-10-26). */
+        emit_patch_cleared(bulk + 4, dataEnd >= 10 && bulk[7] == 0x13 ? G2_FLASH_USAGE(bulk + 4) : -1);
     } else {
         printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
         for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }
@@ -236,11 +256,7 @@ static void emit_embedded_event(const uint8_t *response) {
             return;
         }
         if (subCmd == 0x15) {
-            printf("{\"type\":\"patch_cleared\",\"kind\":\"%s\",\"bank\":%u,\"location\":%u}\n",
-                   response[5] == 1 ? "performance" : "patch",
-                   (unsigned)(response[6] + 1),
-                   (unsigned)(response[7] + 1));
-            fflush(stdout);
+            emit_patch_cleared(response + 5, -1);
             return;
         }
         if (version == 0x40) {

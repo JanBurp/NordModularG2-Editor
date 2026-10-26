@@ -1488,7 +1488,9 @@ static int await_flash_result(int bank0, int location0, int *status) {
                     }
                 }
             }
-            if (!found && bret > 0) {
+            /* Relayed even when it holds our result: a store/clear ack also carries the
+             * names entry or cleared location and the flash usage the editor shows. */
+            if (bret > 0) {
                 g2_msg_t relay = {0};
                 memcpy(relay.interrupt, response, 16);
                 relay.bulk = bulk;

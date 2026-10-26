@@ -38,6 +38,7 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'patch_cleared') {
+			if (ev.flashUsage !== undefined) browserStore.flashUsage = ev.flashUsage;
 			browserStore.removePatch(ev.bank, ev.location, ev.kind);
 			log('←', 'Watch', `patch_cleared ${ev.kind} ${ev.bank}-${ev.location}`);
 			return true;
