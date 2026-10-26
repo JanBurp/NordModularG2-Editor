@@ -9,7 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMorphAssignOverlay } from '@/composables/useMorphAssign';
-	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
+	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -26,18 +26,17 @@
 		if (!slot) return [];
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
 		const assignments = slotsStore.getMorphAssignments(slot, uiStore.variation).filter((a) => a.location === location);
-		const result: { text: string; x: number; y: number }[] = [];
+		const result: { text: string; x: number; y: number; group: number }[] = [];
 		for (const mod of props.modules) {
 			const moduleDef = getModule(mod.type);
 			if (!moduleDef?.params?.length) continue;
 			for (let i = 0; i < moduleDef.params.length; i++) {
 				const groups = assignments.filter((a) => a.moduleIndex === mod.index && a.paramIndex === i).map((a) => a.groupIndex + 1);
 				if (groups.length === 0) continue;
-				const param = moduleDef.params[i];
 				result.push({
 					text: `M${groups.join(',')}`,
-					x: (mod.horiz ?? 0) * MODULE_WIDTH + param.x,
-					y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + param.y,
+					...rectCenter(paramControlRect(mod, i, props.areaLabel)),
+					group: mod.index,
 				});
 			}
 		}

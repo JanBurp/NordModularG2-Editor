@@ -315,6 +315,7 @@
 	} from '../../composables/useParamPageAssign';
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
+	import { useValueHint } from '../../composables/useValueHint';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { blurFocusedControl } from '../../utils/focus';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
@@ -596,6 +597,7 @@
 	// Renders its live range badge via MorphDragHintOverlay (canvas-level, painted after every
 	// module) instead of locally, so the badge always stays above other modules on the canvas.
 	const { startDrag } = useMorphRangeDrag();
+	const valueHint = useValueHint();
 
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
@@ -605,6 +607,7 @@
 		uiStore.selectModules([moduleIdx.value], props.areaLabel ?? 'fx');
 		uiStore.setSelectedParam(moduleIdx.value, paramIndex);
 		uiStore.selectedCables = [];
+		valueHint.press({ moduleIndex: moduleIdx.value, paramIndex, area: props.areaLabel ?? 'fx' });
 
 		if (e.altKey) {
 			// Alt+drag this param onto a Parameter Pages toolbar knob to assign it. Uses a custom
@@ -685,6 +688,7 @@
 			uiStore.setHoveredParam(moduleIdx.value, paramIndex, props.areaLabel ?? 'fx');
 			blurFocusedControl();
 		}
+		if (e.buttons === 0) valueHint.hoverEnter({ moduleIndex: moduleIdx.value, paramIndex, area: props.areaLabel ?? 'fx' });
 		if (isSwitch(n)) showHint('paramSwitch');
 		else if (isSpinner(n) || isSpinnerH(n)) showHint('paramSpinner');
 		else if (isSlider(n)) showHint('paramSlider');
@@ -694,10 +698,13 @@
 	onUnmounted(() => {
 		const hov = uiStore.hoveredParam;
 		if (hov?.moduleId === moduleIdx.value && hov.area === (props.areaLabel ?? 'fx')) uiStore.clearHoveredParam();
+		const hint = uiStore.valueHint;
+		if (hint?.moduleIndex === moduleIdx.value && hint.area === (props.areaLabel ?? 'fx')) valueHint.hide();
 	});
 	function onParamHoverLeave(e: MouseEvent) {
 		// Moving onto the knob's arrows (KnobSpinOverlay) keeps the hover; the overlay clears it on its own leave.
 		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
+		valueHint.leave(e);
 		clearHint();
 	}
 

@@ -61,6 +61,7 @@
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphRangeBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphDragHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
+			<ValueHintOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<KnobSpinOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" @change="onParamChange" />
 			<!-- Rendered last so it always paints above every module/overlay, regardless of draw order above. -->
 			<GhostCable :modules="props.modules as any[]" :ghost="ghostCableForArea" @confirm="onGhostConfirm" />
@@ -84,6 +85,7 @@
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { sameJack, matchesCableJack, isUnusedModule } from '../../store/slotHelpers';
 	import { useStatusHint } from '../../composables/useStatusHint';
+	import { useValueHint } from '../../composables/useValueHint';
 	import type { JackEnd } from '../../store/slotHelpers';
 	import type { ModuleInstance } from '../../types';
 	import type { ContextMenuItem } from '../../types';
@@ -99,6 +101,7 @@
 	import MorphAssignBadgesOverlay from './MorphAssignBadgesOverlay.vue';
 	import MorphRangeBadgesOverlay from './MorphRangeBadgesOverlay.vue';
 	import MorphDragHintOverlay from './MorphDragHintOverlay.vue';
+	import ValueHintOverlay from './ValueHintOverlay.vue';
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
@@ -280,6 +283,7 @@
 	}
 
 	function onParamChange(moduleIndex: number, paramIndex: number, value: number, immediate?: boolean) {
+		valueHint.changed({ moduleIndex, paramIndex, area: props.area as 'fx' | 'va' });
 		emit('paramChange', moduleIndex, paramIndex, value, immediate);
 	}
 
@@ -288,6 +292,7 @@
 	}
 
 	const uiStore = useUiStore();
+	const valueHint = useValueHint();
 	const { showHint, clearHint } = useStatusHint();
 	const { open: openContextMenu } = useContextMenu();
 	const { addModuleAt } = useAddModule();

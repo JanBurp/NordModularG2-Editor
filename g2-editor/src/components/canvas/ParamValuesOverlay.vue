@@ -6,10 +6,9 @@
 	import { computed } from 'vue';
 	import type { ModuleInstance } from '@/types';
 	import { getModule } from '@/renderer/nmg2mods';
-	import { useSlotsStore } from '@/store/slots';
-	import { useUiStore } from '@/store/ui';
 	import { useKeyHoldOverlay } from '@/composables/useKeyHoldOverlay';
-	import { isKnob, isSlider } from '@/utils/moduleControls';
+	import { paramHintText } from '@/composables/useValueHint';
+	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -18,29 +17,15 @@
 	}>();
 
 	const { isVisible } = useKeyHoldOverlay('F5');
-	const uiStore = useUiStore();
-	const slotsStore = useSlotsStore();
 
 	const badges = computed(() => {
-		const slot = uiStore.slotInFocus;
-		if (!slot) return [];
-		const areaKey = props.areaLabel === 'va' ? 'voice' : 'fx';
-		const variation = uiStore.variation;
-		const result: { text: string; x: number; y: number }[] = [];
+		const result: { text: string; x: number; y: number; group: number }[] = [];
 		for (const mod of props.modules) {
-			const moduleDef = getModule(mod.type);
-			if (!moduleDef?.params?.length) continue;
-			const values: number[] = slotsStore.slots[slot]?.variations?.[variation]?.[areaKey]?.[mod.index] ?? [];
-			for (let i = 0; i < moduleDef.params.length; i++) {
-				const param = moduleDef.params[i];
-				if (!isKnob(param.n) && !isSlider(param.n)) continue;
-				const value = values[i] ?? 0;
-				result.push({
-					text: String(value),
-					x: (mod.horiz ?? 0) * 256 + param.x,
-					y: (mod.vert ?? 0) * 16 + param.y,
-				});
-			}
+			const params = getModule(mod.type)?.params ?? [];
+			params.forEach((param, i) => {
+				if (!param.n) return;
+				result.push({ text: paramHintText(mod, i, props.areaLabel), ...rectCenter(paramControlRect(mod, i, props.areaLabel)), group: mod.index });
+			});
 		}
 		return result;
 	});

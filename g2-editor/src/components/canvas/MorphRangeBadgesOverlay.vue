@@ -9,7 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMorphRangeOverlay } from '@/composables/useMorphAssign';
-	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
+	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -28,7 +28,7 @@
 		if (!slot) return [];
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
 		const groupIndex = uiStore.selectedMorphGroup;
-		const result: { text: string; x: number; y: number }[] = [];
+		const result: { text: string; x: number; y: number; group: number }[] = [];
 		for (const a of slotsStore.getMorphAssignments(slot, uiStore.variation)) {
 			if (a.location !== location || a.groupIndex !== groupIndex) continue;
 			const mod = props.modules.find((m) => m.index === a.moduleIndex);
@@ -37,8 +37,8 @@
 			if (!param) continue;
 			result.push({
 				text: a.range >= 0 ? `+${a.range}` : `${a.range}`,
-				x: (mod.horiz ?? 0) * MODULE_WIDTH + param.x,
-				y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + param.y,
+				...rectCenter(paramControlRect(mod, a.paramIndex, props.areaLabel)),
+				group: mod.index,
 			});
 		}
 		return result;

@@ -1,6 +1,7 @@
 import { MidiNote, OscFreq, adsrL, adsrT, filterFreq, filterFreq1, filterFreq2, getParam, lfoP, pitchShuttle, rateBPM, rateLo } from '../renderer/parammap';
 
 import type { ModuleDefinition } from '../types';
+import { clamp } from './math';
 
 export const paramFormattingFunctions: Record<string, (i: number) => string> = {
 	adsrT,
@@ -252,6 +253,27 @@ export function formatParamDisplay(moduleDef: ModuleDefinition, paramIndex: numb
 	const combined = moduleDef.ve?.find((e) => e.type === 'valueDisplay' && Array.isArray(e.ref) && e.ref[0] === paramIndex);
 	if (combined) return formatCombinedValue(combined.ref as number[], combined.func, moduleDef.params, values, modes, moduleDef.modes);
 	return formatValue(values[paramIndex] ?? 64, param.type);
+}
+
+// Value hint text (F5 and the hover/change hint), as the official editor's GetHintTextWithMorph:
+// the display text, a "(raw)" second line for 0..127 params, and "value -- morph end" when the
+// param is morphed in the focused group.
+export function formatParamHint(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes?: number[], morphRange?: number): string {
+	const param = moduleDef.params?.[paramIndex];
+	const p = param && getParam(param.type);
+	const value = values[paramIndex] ?? 64;
+	// Combined displays pad between values (e.g. Osc Freq's three nbsp); one space keeps the hint compact.
+	const display = (v: number[]) => formatParamDisplay(moduleDef, paramIndex, v, modes).replace(/\s+/g, ' ');
+	let text = display(values);
+	let raw = String(value);
+	if (p && morphRange) {
+		const end = clamp(value + morphRange, p.low, p.high);
+		const endValues = [...values];
+		endValues[paramIndex] = end;
+		text += ` -- ${display(endValues)}`;
+		raw += ` -- ${end}`;
+	}
+	return p?.low === 0 && p.high === 127 ? `${text}\n(${raw})` : text;
 }
 
 export interface ParamValueOption {

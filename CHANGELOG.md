@@ -15,11 +15,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Bank Organizer
 - Find & Replace (module names, param labels)
 - Warnings of mem-protect/full
+- Param popup shows when param has focus
 
 ### Changed
 - Tests better organized
 - New tests added
 - CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
+- All param popups (F5..F7, and when focus) have same color.
+- Param popups use user friendly values
 
 ### Fixed
 - Wrong calculation of CPU

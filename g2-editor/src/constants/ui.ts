@@ -9,6 +9,10 @@ export const MODULE_WIDTH = 256;
 /** SVG pixel height of one module row unit. */
 export const MODULE_ROW_HEIGHT = 16;
 
+// Fill of every value/assignment hint badge (F5–F8, hover/drag hints) and of the CC# / Parameter
+// Pages drag images. Official editor: CRGBColor::GetMetallicBackground() = 222,222,222.
+export const HINT_FILL = '#FFFFDE';
+
 export const SLOT_LABELS: readonly SlotLabel[] = ['A', 'B', 'C', 'D'] as const;
 
 const slotHint: StatusHintKey = 'slotIndicators';

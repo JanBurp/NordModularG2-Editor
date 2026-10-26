@@ -2,7 +2,7 @@
 	<div
 		v-if="drag.active && drag.payload"
 		class="fixed z-50 pointer-events-none px-1.5 py-0.5 rounded text-xs font-bold font-mono border border-black/40 shadow"
-		:style="{ left: `${drag.x + 10}px`, top: `${drag.y + 10}px`, background: '#8bd3ff', color: '#000' }"
+		:style="{ left: `${drag.x + 10}px`, top: `${drag.y + 10}px`, background: HINT_FILL, color: '#000' }"
 	>
 		{{ drag.payload.label }}
 	</div>
@@ -12,6 +12,7 @@
 	// Floating badge that follows the cursor during a Parameter Pages assign-drag (useParamPageDrag.ts),
 	// in place of a native HTML5 drag image — mounted once in App.vue.
 	import { watch } from 'vue';
+	import { HINT_FILL } from '@/constants/ui';
 	import { useParamPageDragState } from '@/composables/useParamPageDrag';
 	import { useAltHeld } from '@/composables/useParamPageAssign';
 
