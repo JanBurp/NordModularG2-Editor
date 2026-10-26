@@ -317,7 +317,7 @@
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { useValueHint } from '../../composables/useValueHint';
-	import { createDoubleClickDetector, isPrimaryMouseDown } from '../../utils/doubleClick';
+	import { isPrimaryMouseDown } from '../../utils/doubleClick';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { blurFocusedControl } from '../../utils/focus';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
@@ -435,11 +435,14 @@
 		});
 	}
 
-	function onTitleHoverEnter() {
+	// Hovering the title row shows the module's name hint (its label and long name).
+	function onTitleHoverEnter(e: MouseEvent) {
 		showHint('moduleTitle');
+		if (e.buttons === 0) valueHint.hoverEnter({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
 	}
-	function onTitleHoverLeave() {
+	function onTitleHoverLeave(e: MouseEvent) {
 		clearHint();
+		valueHint.leave(e);
 	}
 
 	const instance = computed(() => props.instance as ModuleInstance);
@@ -600,15 +603,11 @@
 	const { startDrag } = useMorphRangeDrag();
 	const valueHint = useValueHint();
 
-	// Double-click on an empty part of the module briefly shows its full name (official
-	// CPanel::PanelSecondClick → ShowModuleNameHint).
-	const isBackgroundDoubleClick = createDoubleClickDetector();
+	// Empty module body selects/drags like the title row; passive VEs are pointer-events="none".
 	function onBackgroundMousedown(e: MouseEvent) {
 		if (!isPrimaryMouseDown(e)) return;
-		// Empty module body selects/drags like the title row; passive VEs are pointer-events="none".
 		e.preventDefault();
 		onDragHandleMousedown(e);
-		if (isBackgroundDoubleClick()) valueHint.changed({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
 	}
 
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar

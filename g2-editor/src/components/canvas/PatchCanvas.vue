@@ -57,6 +57,8 @@
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
+			<!-- Cables.vue draws into this layer: above the modules, below every badge/hint overlay. -->
+			<g ref="cableLayerRef" />
 			<CCBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<ParamValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
@@ -184,6 +186,8 @@
 
 	const svgRef = ref<SVGSVGElement | null>(null);
 	provide('patchCanvasSvg', svgRef);
+	const cableLayerRef = ref<SVGGElement | null>(null);
+	provide('patchCanvasCableLayer', cableLayerRef);
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
 

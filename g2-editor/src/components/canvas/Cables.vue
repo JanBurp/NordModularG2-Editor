@@ -55,6 +55,7 @@
 	}>();
 
 	const svgRef = inject<Ref<SVGSVGElement | null>>('patchCanvasSvg');
+	const cableLayerRef = inject<Ref<SVGGElement | null>>('patchCanvasCableLayer');
 
 	const { cableVisibility } = useCableVisibility();
 	const uiStore = useUiStore();
@@ -73,8 +74,8 @@
 		const svg = svgRef.value;
 		removeAllCables(svg);
 
-		if (props.cables.length > 0) {
-			makePatchCables(props.modules as CableModule[], props.cables as Cable[], svg, {
+		if (props.cables.length > 0 && cableLayerRef?.value) {
+			makePatchCables(props.modules as CableModule[], props.cables as Cable[], cableLayerRef.value, {
 				selectedCables: props.selectedCables as Cable[],
 				gravity: settings.cableGravity,
 				seed: uiStore.cableSeed,
@@ -111,8 +112,9 @@
 		() => props.cables,
 		() => {
 			nextTick(() => {
-				if (!svgRef?.value) return;
+				if (!svgRef?.value || !cableLayerRef?.value) return;
 				const svg = svgRef.value as SVGElement;
+				const layer = cableLayerRef.value;
 
 				const renderedKeys = new Set<string>();
 				svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
@@ -135,13 +137,13 @@
 				};
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
-						makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
+						makePatchCables(props.modules as CableModule[], [cable], layer, cableOptions);
 					} else {
 						// Re-render if colour changed
 						const border = svg.querySelector<SVGPathElement>(`.svgcableborder[data-cable-key="${key}"]`);
 						if (border && border.getAttribute('data-cable-color') !== String(cable.colour)) {
 							removeCableByKey(svg, key);
-							makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
+							makePatchCables(props.modules as CableModule[], [cable], layer, cableOptions);
 						}
 					}
 				}

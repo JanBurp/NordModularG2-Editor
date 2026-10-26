@@ -5,7 +5,6 @@
 	</text>
 	<text v-else :x="nameX + 2" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
 		<SearchHit :text="shownName" :hit="searchMatch" />
-		<title v-if="shownName !== displayName">{{ displayName }}</title>
 	</text>
 </template>
 <script lang="ts">

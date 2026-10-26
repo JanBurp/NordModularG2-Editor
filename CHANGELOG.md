@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Find & Replace (module names, param labels)
 - Warnings of mem-protect/full
 - Param popup shows when param has focus
+- Module popup shows long name and module's long description
 
 ### Changed
 - Tests better organized
@@ -26,6 +27,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Finetune right-click on jack, remove opt+click
 - Improved module move/copy change mode
 - Improved cable(s) moving change mode
+- Whole module canvas is used for selecting module, instead of only the header
 
 ### Fixed
 - Wrong calculation of CPU
