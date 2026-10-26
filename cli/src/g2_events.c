@@ -227,6 +227,13 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
     } else if (baCmd == 0x0C && bsubCmd == 0x15 && dataEnd >= 7) {
         /* Clear ack: [15 type bank loc][13 lo hi][0D result] (hardware-captured 2026-10-26). */
         emit_patch_cleared(bulk + 4, dataEnd >= 10 && bulk[7] == 0x13 ? G2_FLASH_USAGE(bulk + 4) : -1);
+    } else if (baCmd == 0x0C && bsubCmd == 0x12 && dataEnd >= 9) {
+        /* Clear-bank ack: [12 type bank from bank to][13 lo hi][0D result] (hardware-captured 2026-10-26). */
+        printf("{\"type\":\"bank_cleared\",\"kind\":\"%s\",\"bank\":%u,\"from\":%u,\"to\":%u",
+               bulk[4] == 1 ? "performance" : "patch", (unsigned)(bulk[5] + 1), (unsigned)(bulk[6] + 1), (unsigned)(bulk[8] + 1));
+        if (dataEnd >= 12 && bulk[9] == 0x13) printf(",\"flashUsage\":%d", G2_FLASH_USAGE(bulk + 6));
+        printf("}\n");
+        fflush(stdout);
     } else {
         printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);
         for (int i = 4; i < dataEnd; i++) { if (i > 4) printf(","); printf("%u", bulk[i]); }

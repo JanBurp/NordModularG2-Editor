@@ -743,6 +743,9 @@ static const char* g2categories[16] = {
 /* Reply to the 0x14 list request (bulk: [0]0x01 [1]0x0c [2]0x00 [3]R_LIST_NAMES ...). */
 static int is_list_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
     (void)arg;
+    /* The last page (just the end marker) fits an embedded message: c2 | 01 0c 00 13 lo hi 16 01 01 04 | crc
+     * (hardware-captured 2026-10-26). Missing it cost every full list a 2 s timeout. */
+    if ((intr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) return intr[2] == COMMAND_SYS && intr[4] == R_LIST_NAMES;
     return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[1] == COMMAND_SYS && bulk[3] == R_LIST_NAMES;
 }
 
@@ -824,8 +827,13 @@ cJSON *g2_list(int filter, int bank_filter) {
             g2_msg_t r;
             ret = 0;
             if (await_reply(is_list_reply, 0, 0, &r) == G2_OK) {
-                ret = r.bulk_size < sizeof(response) ? r.bulk_size : (int)sizeof(response);
-                memcpy(response, r.bulk, ret);
+                if (r.bulk) {
+                    ret = r.bulk_size < sizeof(response) ? r.bulk_size : (int)sizeof(response);
+                    memcpy(response, r.bulk, ret);
+                } else {   /* embedded: the same layout as a bulk, after the length/type byte */
+                    ret = r.interrupt[0] >> 4;
+                    memcpy(response, r.interrupt + 1, ret);
+                }
                 g2_msg_free(&r);
             }
 
@@ -1570,7 +1578,7 @@ int g2_clear_bank(int type, int bank, int from_loc, int to_loc) {
                        (uint8_t)(bank - 1), (uint8_t)(to_loc - 1), 0x00 };
     if (send_system_data(0x41, cmd, 7) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    /* Done: one bulk with the deleted range (0x12), a names update and a 0x0D result for
+    /* Done: one bulk with the deleted range (0x12), the flash usage (0x13) and a 0x0D result for
      * from_loc, status 5. Memory protect on: only that result, status 4 - a blind read here
      * reported success while the bank stayed (hardware-captured 2026-10-26). */
     return check_flash_result("clear-bank", bank, from_loc, from_loc == 1 && to_loc == 128);

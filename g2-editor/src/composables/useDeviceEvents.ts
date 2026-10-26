@@ -43,6 +43,12 @@ export function useDeviceEvents(log: LogFn) {
 			log('←', 'Watch', `patch_cleared ${ev.kind} ${ev.bank}-${ev.location}`);
 			return true;
 		}
+		if (ev.type === 'bank_cleared') {
+			// browserStore.clearBank already removed the entries; only the flash usage is new.
+			if (ev.flashUsage !== undefined) browserStore.flashUsage = ev.flashUsage;
+			log('←', 'Watch', `bank_cleared ${ev.kind} ${ev.bank} ${ev.from}-${ev.to}`);
+			return true;
+		}
 		if (ev.type === 'patch_names_updated') {
 			if (ev.flashUsage !== undefined) browserStore.flashUsage = ev.flashUsage;
 			if (ev.bank !== undefined && ev.location !== undefined && ev.kind && ev.name !== undefined) {
