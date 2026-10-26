@@ -24,6 +24,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - All param popups (F5..F*, and when focus) have same color and work as original editor.
 - Param popups use user friendly values
 - Finetune right-click on jack, remove opt+click
+- Improved module move/copy change mode
+- Improved cable(s) moving change mode
 
 ### Fixed
 - Wrong calculation of CPU
