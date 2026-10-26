@@ -110,45 +110,49 @@
 				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
 				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
-					<!-- Patches grouped by bank -->
-					<template v-for="group in currentGroups" :key="group.bank">
-						<!-- Bank header (collapsible) -->
-						<li
-							class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
-							:class="[
-								group.patches.length === 0 ? 'opacity-40' : '',
-								bankNavIndex.get(group.bank) === selectedNavIndex ? 'bg-surface-3 ring-1 ring-inset ring-accent-primary' : '',
-							]"
-							:data-nav-idx="bankNavIndex.get(group.bank)"
-							@click="browser.toggleBank(group.bank)"
-							@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
-							@mouseenter="showHint('browserBank')"
-							@mouseleave="clearHint"
-						>
-							<span class="text-content-muted w-3">
-								<Icon :name="browser.isBankCollapsed(group.bank) ? 'chevronRight' : 'chevronDown'" class="w-2.5 h-2.5" />
-							</span>
-							<span class="text-content-secondary font-medium">Bank {{ group.bank }}</span>
-							<span class="text-content-secondary ml-auto">{{ group.patches.length }}</span>
-						</li>
-						<!-- Patch entries -->
-						<template v-if="!browser.isBankCollapsed(group.bank)">
-							<ListItem
-								v-for="p in group.patches"
-								:key="`${p.bank}-${p.location}`"
-								:data-nav-idx="flatNavIndex.get(p)"
-								:selected="flatNavIndex.get(p) === selectedNavIndex"
-								@click="isDoubleClick(`${p.bank}-${p.location}`) && selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')"
-								@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
-								@mouseenter="showHint('browserPatch')"
+					<!-- Patches grouped by bank (own <ul> per bank, so a sticky header only sticks over its own patches) -->
+					<li v-for="group in currentGroups" :key="group.bank">
+						<ul class="list-none m-0 p-0">
+							<!-- Bank header (collapsible) -->
+							<li
+								class="flex items-center gap-2 px-3 py-1 bg-surface-1 cursor-pointer select-none border-b border-line-subtle sticky top-0 z-10"
+								:class="[
+									group.patches.length === 0 ? 'opacity-40' : '',
+									bankNavIndex.get(group.bank) === selectedNavIndex ? 'bg-surface-3 ring-1 ring-inset ring-accent-primary' : '',
+								]"
+								:data-nav-idx="bankNavIndex.get(group.bank)"
+								@click="browser.toggleBank(group.bank)"
+								@contextmenu.prevent="(e: MouseEvent) => onBankCtx(e, group.bank)"
+								@mouseenter="showHint('browserBank')"
 								@mouseleave="clearHint"
 							>
-								<template #icon>{{ p.bank }}-{{ p.location }}</template>
-								<template #label>{{ p.name }}</template>
-								<template v-if="p.category" #meta>{{ getCategoryNameFromSlug(p.category) }}</template>
-							</ListItem>
-						</template>
-					</template>
+								<span class="text-content-muted w-3">
+									<Icon :name="browser.isBankCollapsed(group.bank) ? 'chevronRight' : 'chevronDown'" class="w-2.5 h-2.5" />
+								</span>
+								<span class="text-content-secondary font-medium">Bank {{ group.bank }}</span>
+								<span class="text-content-secondary ml-auto">{{ group.patches.length }}</span>
+							</li>
+							<!-- Patch entries -->
+							<template v-if="!browser.isBankCollapsed(group.bank)">
+								<ListItem
+									v-for="p in group.patches"
+									:key="`${p.bank}-${p.location}`"
+									:data-nav-idx="flatNavIndex.get(p)"
+									:selected="flatNavIndex.get(p) === selectedNavIndex"
+									@click="
+										isDoubleClick(`${p.bank}-${p.location}`) && selectSynth(p, browser.view === 'performances' ? 'performance' : 'patch')
+									"
+									@contextmenu.prevent="(e: MouseEvent) => onPatchCtx(e, p, browser.view === 'performances' ? 'performance' : 'patch')"
+									@mouseenter="showHint('browserPatch')"
+									@mouseleave="clearHint"
+								>
+									<template #icon>{{ p.bank }}-{{ p.location }}</template>
+									<template #label>{{ p.name }}</template>
+									<template v-if="p.category" #meta>{{ getCategoryNameFromSlug(p.category) }}</template>
+								</ListItem>
+							</template>
+						</ul>
+					</li>
 					<StateMessage v-if="currentGroups.length === 0" variant="empty" :message="searchQuery ? 'No patches match' : 'No patches found'" />
 				</ul>
 			</template>

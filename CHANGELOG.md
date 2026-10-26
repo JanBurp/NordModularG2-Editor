@@ -22,6 +22,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - Wrong calculation of CPU
+- Scrolling-over non empty banks in PatchBrowser
 
 ## [0.7.2] - 2026-10-22
 
