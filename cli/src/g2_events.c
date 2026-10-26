@@ -106,7 +106,7 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
             cJSON_Delete(root);
         } else if (bsubCmd == 0x13) {
             /* R_LIST_NAMES embeds R_ADD_NAMES (0x16) with bank/location/name.
-             * bulk offsets: [4]=hdr0, [5]=hdr1, [6]=0x16, [7]=unk, [8]=pft, [9..]=sub-cmds+name */
+             * bulk offsets: [4]/[5]=flash usage lo/hi (G2_FLASH_USAGE), [6]=0x16, [7]=unk, [8]=pft, [9..]=sub-cmds+name */
             int bank = -1, loc = -1, pft = -1, cat = -1;
             char name[17] = {0};
             int ni = 0;
@@ -142,13 +142,13 @@ static int emit_bulk_event(const uint8_t *bulk, int bret) {
                     if (name[j] == '"' || name[j] == '\\') fputc('\\', stdout);
                     fputc(name[j], stdout);
                 }
-                if (cat >= 0 && cat < 16)
-                    printf("\",\"category\":\"%s\"}\n", g2cats[cat]);
-                else
-                    printf("\"}\n");
+                printf("\"");
+                if (cat >= 0 && cat < 16) printf(",\"category\":\"%s\"", g2cats[cat]);
             } else {
-                printf("{\"type\":\"patch_names_updated\"}\n"); /* fallback if parse fails */
+                printf("{\"type\":\"patch_names_updated\""); /* fallback if parse fails */
             }
+            if (dataEnd >= 6) printf(",\"flashUsage\":%d", G2_FLASH_USAGE(bulk));
+            printf("}\n");
             fflush(stdout);
         } else {
             printf("{\"type\":\"unknown\",\"subtype\":\"bulk\",\"aCmd\":%u,\"version\":%u,\"sub\":%u,\"data\":[", baCmd, bversion, bsubCmd);

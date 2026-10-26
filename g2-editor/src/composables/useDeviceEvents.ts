@@ -43,6 +43,7 @@ export function useDeviceEvents(log: LogFn) {
 			return true;
 		}
 		if (ev.type === 'patch_names_updated') {
+			if (ev.flashUsage !== undefined) browserStore.flashUsage = ev.flashUsage;
 			if (ev.bank !== undefined && ev.location !== undefined && ev.kind && ev.name !== undefined) {
 				browserStore.upsertPatch(ev.bank, ev.location, ev.kind, ev.name, ev.category);
 				log('←', 'Watch', `patch_names_updated ${ev.kind} ${ev.bank}-${ev.location} "${ev.name}"`);

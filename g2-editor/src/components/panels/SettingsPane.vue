@@ -140,6 +140,9 @@
 				<SettingsRow label="Memory Protect">
 					<CheckBox :model-value="device.device?.memProtect ?? false" @update:model-value="device.setMemProtect($event)" />
 				</SettingsRow>
+				<SettingsRow label="Memory used">
+					<FlashMemoryMeter :label="false" />
+				</SettingsRow>
 
 				<p class="settings-subheader">MIDI Channels:</p>
 				<SettingsRow v-for="slot in MIDI_SLOTS" :key="slot.key" :label="slot.label">
@@ -379,6 +382,7 @@
 	import NumberInput from '@/components/common/NumberInput.vue';
 	import CheckBox from '@/components/common/CheckBox.vue';
 	import Select from '@/components/common/Select.vue';
+	import FlashMemoryMeter from '@/components/common/FlashMemoryMeter.vue';
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import Button from '@/components/toolbar/Button.vue';
 	import { useBrowserStore } from '@/store/browser';

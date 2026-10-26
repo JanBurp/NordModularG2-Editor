@@ -13,6 +13,20 @@ function setSlotCategory(slot: 'A' | 'B' | 'C' | 'D', category: number) {
 	slots.slots[slot].patch = { description: { category } } as any;
 }
 
+describe('browser store — flash usage', () => {
+	it('takes the per-mille flashUsage from the names data as a used percentage', () => {
+		const browser = useBrowserStore();
+		browser.applyNamesData({ patches: {}, performances: {}, flashUsage: 632 });
+		expect(browser.flashUsedPercent).toBe(63.2);
+	});
+
+	it('is unknown (null) when the names data carries no flashUsage', () => {
+		const browser = useBrowserStore();
+		browser.applyNamesData({ patches: {}, performances: {} });
+		expect(browser.flashUsedPercent).toBeNull();
+	});
+});
+
 describe('browser store — storePatch category propagation', () => {
 	it("carries the stored slot's category into the new list entry, as a device slug", async () => {
 		setSlotCategory('A', 3); // 3 = "Bass" -> "bass"

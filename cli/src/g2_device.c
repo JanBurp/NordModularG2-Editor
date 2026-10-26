@@ -762,6 +762,7 @@ cJSON *g2_list(int filter, int bank_filter) {
     int done = 0;
     int bank_filter_active = (bank_filter > 0);
     int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
+    int flash_usage = -1;
 
     if (ensure_connected(1) < 0) {
             g2_err("Not connected to G2\n");
@@ -827,6 +828,8 @@ cJSON *g2_list(int filter, int bank_filter) {
                 memcpy(response, r.bulk, ret);
                 g2_msg_free(&r);
             }
+
+            if (ret > 5) flash_usage = G2_FLASH_USAGE(response);
 
             if (ret <= 9) {
                 break;
@@ -945,6 +948,7 @@ cJSON *g2_list(int filter, int bank_filter) {
         }
     }
 
+    if (filter == LIST_FILTER_ALL && flash_usage >= 0) cJSON_AddNumberToObject(root, "flashUsage", flash_usage);
     return result;
 }
 

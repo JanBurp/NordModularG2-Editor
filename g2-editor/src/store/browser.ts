@@ -114,7 +114,13 @@ export const useBrowserStore = defineStore('browser', {
 		organizerBusy: [] as string[], // `${kind}-${bank}-${location}` keys of cells being changed
 		// Running organizer operation, for the Bank Organizer's progress dialog; null when idle.
 		organizerProgress: null as { verb: string; done: number; total: number; name: string } | null,
+		// G2 flash memory used, per-mille (from every list reply and store ack); null until known.
+		flashUsage: null as number | null,
 	}),
+
+	getters: {
+		flashUsedPercent: (state): number | null => (state.flashUsage === null ? null : state.flashUsage / 10),
+	},
 
 	actions: {
 		/* Populate from startup JSON `names` field (avoids extra `list` call) */
@@ -123,6 +129,7 @@ export const useBrowserStore = defineStore('browser', {
 				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[], withCategory));
 			this.synthPatches = toEntries(names?.patches, true);
 			this.synthPerformances = toEntries(names?.performances, false);
+			this.flashUsage = names?.flashUsage ?? null;
 		},
 
 		/* Fallback: load list with separate CLI call */

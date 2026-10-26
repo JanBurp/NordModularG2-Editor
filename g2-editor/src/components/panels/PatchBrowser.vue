@@ -155,6 +155,9 @@
 					</li>
 					<StateMessage v-if="currentGroups.length === 0" variant="empty" :message="searchQuery ? 'No patches match' : 'No patches found'" />
 				</ul>
+				<div class="shrink-0 mt-auto flex items-center px-2 py-1 border-t border-line-subtle">
+					<FlashMemoryMeter />
+				</div>
 			</template>
 		</template>
 
@@ -183,6 +186,7 @@
 	import ListItem from '../browser/ListItem.vue';
 	import Icon from '../common/Icon.vue';
 	import Dialog from '../common/Dialog.vue';
+	import FlashMemoryMeter from '../common/FlashMemoryMeter.vue';
 	import { createDoubleClickDetector } from '../../utils/doubleClick';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import { sortPatches } from '../../utils/sortPatches';

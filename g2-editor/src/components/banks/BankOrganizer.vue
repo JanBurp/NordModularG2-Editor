@@ -4,7 +4,10 @@
 		<!-- wraps on narrow windows: Categories and Trash then move to a second line -->
 		<div class="relative flex flex-wrap items-end gap-3 px-3 py-2 border-b border-line-subtle text-xs text-content-primary">
 			<div class="flex flex-col items-start gap-1.5 shrink-0">
-				<UndoRedo />
+				<div class="flex items-center gap-3 self-stretch">
+					<UndoRedo />
+					<FlashMemoryMeter />
+				</div>
 				<BtnGroup :model-value="uiStore.organizerKind" :options="kindOptions" variant="toggle" @update:model-value="(v) => setKind(v as BankKind)" />
 			</div>
 
@@ -172,6 +175,7 @@
 	import Button from '../toolbar/Button.vue';
 	import UndoRedo from '../toolbar/UndoRedo.vue';
 	import Icon from '../common/Icon.vue';
+	import FlashMemoryMeter from '../common/FlashMemoryMeter.vue';
 	import OrganizerBox from './OrganizerBox.vue';
 	import BracketLabel from '../panels/BracketLabel.vue';
 	import Dialog from '../common/Dialog.vue';
