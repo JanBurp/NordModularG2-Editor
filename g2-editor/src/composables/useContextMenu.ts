@@ -17,7 +17,14 @@ export function useContextMenu() {
 		event.stopPropagation();
 		state.x = event.clientX;
 		state.y = event.clientY;
-		state.items = items;
+		// Drop leading, trailing and repeated separators (callers splice in item groups that may be empty).
+		const cleaned: ContextMenuItem[] = [];
+		for (const it of items) {
+			if (it.type === 'separator' && (!cleaned.length || cleaned.at(-1)!.type === 'separator')) continue;
+			cleaned.push(it);
+		}
+		if (cleaned.at(-1)?.type === 'separator') cleaned.pop();
+		state.items = cleaned;
 		state.visible = true;
 	}
 
