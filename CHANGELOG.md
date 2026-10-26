@@ -23,6 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
 - All param popups (F5..F*, and when focus) have same color and work as original editor.
 - Param popups use user friendly values
+- Finetune right-click on jack, remove opt+click
 
 ### Fixed
 - Wrong calculation of CPU
