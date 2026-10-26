@@ -14,6 +14,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Parameter Pages Overview sidepanel
 - Bank Organizer
 - Find & Replace (module names, param labels)
+- Warnings of mem-protect/full
 
 ### Changed
 - Tests better organized
