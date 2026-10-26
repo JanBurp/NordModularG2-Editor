@@ -26,31 +26,37 @@ export function badgeHeight(text: string): number {
 // then). Shared by the MIDI CC row drag and the Parameter Pages knob drag.
 export function setBadgeDragImage(e: DragEvent, text: string): void {
 	const w = estimateBadgeWidth(text);
+	const h = badgeHeight(text);
 	const svg = document.createElementNS('http://www.w3.org/2000/svg', 'svg');
 	svg.setAttribute('width', String(w));
-	svg.setAttribute('height', '15');
+	svg.setAttribute('height', String(h));
 	svg.style.cssText = 'position:fixed;top:-200px;left:-200px;pointer-events:none;';
-	const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-	rect.setAttribute('width', String(w));
-	rect.setAttribute('height', '15');
-	rect.setAttribute('fill', HINT_FILL);
-	rect.setAttribute('stroke', '#000');
-	rect.setAttribute('stroke-width', '0.8');
-	rect.setAttribute('rx', '2');
-	rect.setAttribute('opacity', '0.8');
+	// Same double frame as MidiBadge: black outer and white inner 1 px line.
+	for (const [inset, fill, stroke] of [
+		[0.5, HINT_FILL, '#000'],
+		[1.5, 'none', '#FFF'],
+	] as const) {
+		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
+		rect.setAttribute('x', String(inset));
+		rect.setAttribute('y', String(inset));
+		rect.setAttribute('width', String(w - 2 * inset));
+		rect.setAttribute('height', String(h - 2 * inset));
+		rect.setAttribute('fill', fill);
+		rect.setAttribute('stroke', stroke);
+		svg.appendChild(rect);
+	}
 	const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 	label.setAttribute('x', String(w / 2));
-	label.setAttribute('y', '11');
+	label.setAttribute('y', '10');
 	label.setAttribute('fill', '#000');
-	label.setAttribute('font-size', '11');
+	label.setAttribute('font-size', '10');
 	label.setAttribute('font-weight', 'bold');
 	label.setAttribute('font-family', 'monospace');
 	label.setAttribute('text-anchor', 'middle');
 	label.textContent = text;
-	svg.appendChild(rect);
 	svg.appendChild(label);
 	document.body.appendChild(svg);
-	e.dataTransfer?.setDragImage(svg, w / 2, 7);
+	e.dataTransfer?.setDragImage(svg, w / 2, h / 2);
 	requestAnimationFrame(() => svg.remove());
 }
 

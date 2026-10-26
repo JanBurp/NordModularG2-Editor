@@ -1,6 +1,6 @@
 <template>
 	<g class="midi-badge" pointer-events="auto" @pointerenter="hovered = true" @pointerleave="hovered = false">
-		<!-- Official editor's hint look (CHintView::DrawHint): metallic grey fill, black outer and white inner 1 px frame. -->
+		<!-- Official editor's hint look (CHintView::DrawHint): HINT_FILL, black outer and white inner 1 px frame. -->
 		<rect :x="rectX + 0.5" :y="y + 0.5" :width="width - 1" :height="badgeHeight(text) - 1" :fill="HINT_FILL" stroke="#000" />
 		<rect :x="rectX + 1.5" :y="y + 1.5" :width="width - 3" :height="badgeHeight(text) - 3" fill="none" stroke="#FFF" />
 		<text ref="textRef" :x="rectX + width / 2" :y="y + 10" fill="#000" font-size="10" font-weight="bold" font-family="monospace" text-anchor="middle">

@@ -14,12 +14,26 @@ type Point = { x: number; y: number };
 // A param control's rect in canvas coords, measured from its rendered <g> in Module.vue (control
 // sizes vary per type/bitmap); falls back to the param's origin before it has rendered.
 export function paramControlRect(mod: ModuleInstance, paramIndex: number, area: 'va' | 'fx'): Rect {
+	const el = document.querySelector<SVGGraphicsElement>(
+		`g[data-module-index="${mod.index}"][data-param-location="${area === 'va' ? 1 : 0}"][data-param-index="${paramIndex}"]`,
+	);
+	return controlRect(mod, paramIndex, el);
+}
+
+// paramControlRect for many params (e.g. every param of an F5 overlay): one DOM query per area
+// instead of one per param.
+export function paramControlRects(area: 'va' | 'fx'): (mod: ModuleInstance, paramIndex: number) => Rect {
+	const els = new Map<string, SVGGraphicsElement>();
+	for (const el of document.querySelectorAll<SVGGraphicsElement>(`g[data-module-index][data-param-location="${area === 'va' ? 1 : 0}"][data-param-index]`)) {
+		const key = `${el.dataset.moduleIndex}:${el.dataset.paramIndex}`;
+		if (!els.has(key)) els.set(key, el);
+	}
+	return (mod, paramIndex) => controlRect(mod, paramIndex, els.get(`${mod.index}:${paramIndex}`));
+}
+
+function controlRect(mod: ModuleInstance, paramIndex: number, el: SVGGraphicsElement | null | undefined): Rect {
 	const x = (mod.horiz ?? 0) * MODULE_WIDTH;
 	const y = (mod.vert ?? 0) * MODULE_ROW_HEIGHT;
-	const location = area === 'va' ? 1 : 0;
-	const el = document.querySelector<SVGGraphicsElement>(
-		`g[data-module-index="${mod.index}"][data-param-location="${location}"][data-param-index="${paramIndex}"]`,
-	);
 	const box = el?.getBBox?.();
 	if (box) return { x: x + box.x, y: y + box.y, w: box.width, h: box.height };
 	const param = getModule(mod.type)?.params?.[paramIndex];

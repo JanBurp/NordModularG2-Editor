@@ -8,7 +8,7 @@
 	import { getModule } from '@/renderer/nmg2mods';
 	import { useKeyHoldOverlay } from '@/composables/useKeyHoldOverlay';
 	import { paramHintText } from '@/composables/useValueHint';
-	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
+	import { paramControlRects, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -20,11 +20,12 @@
 
 	const badges = computed(() => {
 		const result: { text: string; x: number; y: number; group: number }[] = [];
+		const controlRect = paramControlRects(props.areaLabel);
 		for (const mod of props.modules) {
 			const params = getModule(mod.type)?.params ?? [];
 			params.forEach((param, i) => {
 				if (!param.n) return;
-				result.push({ text: paramHintText(mod, i, props.areaLabel), ...rectCenter(paramControlRect(mod, i, props.areaLabel)), group: mod.index });
+				result.push({ text: paramHintText(mod, i, props.areaLabel), ...rectCenter(controlRect(mod, i)), group: mod.index });
 			});
 		}
 		return result;

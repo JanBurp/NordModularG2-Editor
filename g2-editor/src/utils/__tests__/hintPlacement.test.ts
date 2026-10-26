@@ -1,5 +1,7 @@
-import { describe, expect, it } from 'vitest';
-import { morphHintCenter, paramHintCenter } from '@/utils/hintPlacement';
+// @vitest-environment happy-dom
+import { afterEach, describe, expect, it } from 'vitest';
+import type { ModuleInstance } from '@/types';
+import { morphHintCenter, paramControlRect, paramControlRects, paramHintCenter } from '@/utils/hintPlacement';
 import { layoutBadges } from '@/utils/badgeLayout';
 
 // 20x20 control at (100,100): centre (110,110), offsets sx = (20+40)/2 = 30, sy = trunc((20+15)/2) = 17.
@@ -45,5 +47,29 @@ describe('morphHintCenter (CMorphContainer::GetParamHintCenter)', () => {
 		expect(morphHintCenter(ctrl, null, 'morphMode', 3)).toEqual({ x: 110, y: 92 });
 		expect(morphHintCenter(ctrl, null, 'morphMode', 0)).toEqual({ x: 111, y: 92 });
 		expect(morphHintCenter(ctrl, null, 'morphMode', 7)).toEqual({ x: 105, y: 92 });
+	});
+});
+
+describe('paramControlRects', () => {
+	// Module 3 at column 1, row 2 = canvas offset (256, 32); type 9999 has no definition, so an
+	// unrendered param falls back to the module origin.
+	const mod = { index: 3, type: 9999, horiz: 1, vert: 2 } as unknown as ModuleInstance;
+	function renderParam(location: number, paramIndex: number, box: { x: number; y: number; width: number; height: number }) {
+		const g = document.createElementNS('http://www.w3.org/2000/svg', 'g') as SVGGraphicsElement;
+		g.setAttribute('data-module-index', '3');
+		g.setAttribute('data-param-location', String(location));
+		g.setAttribute('data-param-index', String(paramIndex));
+		g.getBBox = () => box as ReturnType<SVGGraphicsElement['getBBox']>;
+		document.body.appendChild(g);
+	}
+	afterEach(() => document.body.replaceChildren());
+
+	it('matches paramControlRect for rendered and unrendered params of the area', () => {
+		renderParam(1, 0, { x: 10, y: 20, width: 30, height: 40 });
+		renderParam(0, 1, { x: 5, y: 5, width: 5, height: 5 });
+		const rect = paramControlRects('va');
+		expect(rect(mod, 0)).toEqual({ x: 266, y: 52, w: 30, h: 40 });
+		expect(rect(mod, 1)).toEqual({ x: 256, y: 32, w: 0, h: 0 });
+		for (const i of [0, 1]) expect(rect(mod, i)).toEqual(paramControlRect(mod, i, 'va'));
 	});
 });

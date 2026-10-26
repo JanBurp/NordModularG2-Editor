@@ -84,7 +84,8 @@ export function useToolbarValueHint() {
 					anchor(e);
 					hint.hoverEnter(target);
 				},
-				mousedown(e: MouseEvent) {
+				// Capture phase: a knob's spinner arrows stop the mousedown from bubbling.
+				mousedownCapture(e: MouseEvent) {
 					anchor(e);
 					hint.press(target);
 				},

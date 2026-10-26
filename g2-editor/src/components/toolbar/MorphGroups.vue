@@ -30,7 +30,7 @@
 						:color-variant="uiStore.selectedMorphGroup === i ? 'red' : assignedGroups.has(i) ? 'blue' : null"
 						:default-value="defaultPatchParams().morphDials[i]"
 						v-on="dialHints[i].on"
-						@mousedown="showMorphValues(i)"
+						@mousedown.capture="showMorphValues(i)"
 						@change="(val) => onDialChange(i, val)"
 						@click="uiStore.setSelectedMorphGroup(i)"
 					/>
