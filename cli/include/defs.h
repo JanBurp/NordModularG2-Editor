@@ -85,6 +85,9 @@ typedef enum {
 #define SUB_RESPONSE_PATCH_NOTES              (0x6f)
 #define C_PATCH_DESCR                        (0x21)  /* first section of a patch data reply */
 #define R_LIST_NAMES                         (0x13)  /* reply tag of the 0x14 list request */
+/* 0x13 is really the official editor's CMFlashUsageDump molecule (heads every list reply and the
+ * store ack): bulk [4]lo [5]hi, 7 bits each = flash used in per-mille, clamped to 1000. */
+#define G2_FLASH_USAGE(bulk)                 ((((bulk)[5] << 7) | (bulk)[4]) > 1000 ? 1000 : (((bulk)[5] << 7) | (bulk)[4]))
 
 /* Command types */
 #define COMMAND_REQ                          (0x20)  /* High nibble, expects response */

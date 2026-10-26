@@ -24,7 +24,7 @@ export const STATUS_HINTS = {
 	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',
 	// A Morph Group's dial on a Parameter Page knob: no morph-assign (a dial can't be morphed), no button.
 	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
-	morphKnob: `Click: select group · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
+	morphKnob: `Click: select group · Hold: show its morph ranges · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
 	// Patch Mutator — sound boxes
 	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,
@@ -69,6 +69,7 @@ export const STATUS_HINTS = {
 	organizerCategory: 'Click: give the selected patches this category (select patches first)',
 	organizerSort: 'Click: sort this column by location, name or category',
 	organizerSortLink: 'Click: both columns use the same sort (on/off)',
+	organizerSwapBanks: 'Click: swap the banks of the left and right column',
 	organizerBankTransfer: 'Upload: save this bank from the G2 to disk · Download: overwrite this bank on the G2 from disk',
 	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,
 	expandCollapseAll: 'Click: expand/collapse all',

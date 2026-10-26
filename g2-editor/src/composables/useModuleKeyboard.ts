@@ -6,6 +6,7 @@ import { DeviceStatus, useDeviceStore } from '../store/device';
 import { getModule, getParamDefault, getParamNavOrder } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
 import { isValueEditable, useParamEditDialog } from './useParamEditDialog';
+import { useValueHint } from './useValueHint';
 import type { ModuleInstance } from '../types';
 import { clamp } from '@/utils/math';
 import { isGrabModifierPressed } from '@/utils/platform';
@@ -16,6 +17,7 @@ function isInput(el: unknown): boolean {
 
 export function useModuleKeyboard() {
 	const uiStore = useUiStore();
+	const valueHint = useValueHint();
 	const slotsStore = useSlotsStore();
 	const deviceStore = useDeviceStore();
 	const settingsStore = useSettingsStore();
@@ -219,6 +221,7 @@ export function useModuleKeyboard() {
 		const variation = uiStore.variation;
 		const current = slotsStore.slots[uiStore.slotInFocus]?.variations?.[variation]?.[areaKey]?.[sel.moduleId]?.[sel.paramIndex] ?? paramDef.def;
 		const newValue = clamp(current + delta, paramDef.low, paramDef.high);
+		valueHint.changed({ moduleIndex: sel.moduleId, paramIndex: sel.paramIndex, area: found.area === 1 ? 'va' : 'fx' });
 		await slotsStore.setParam(sel.moduleId, sel.paramIndex, newValue, variation, areaKey as 'voice' | 'fx');
 	}
 

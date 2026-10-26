@@ -154,15 +154,18 @@
 			title: 'Overlays',
 			rows: [
 				{ keys: ['F5'], action: 'Show parameter values (hold)' },
-				{ keys: ['F6'], action: 'Show morph ranges (hold)' },
-				{ keys: ['F7'], action: 'Show morph group assignments (hold)' },
+				{ keys: ['F6'], action: 'Show morph group assignments (hold)' },
+				{ keys: ['F7'], action: 'Show Parameter Pages knob assignments (hold)' },
 				{ keys: ['F8'], action: 'Show Midi CC assignments (hold)' },
+				{ keys: [key(CTRL, 'F8')], action: 'Show parameter values as Midi controller values (hold)' },
+				{ keys: ['Hold morph knob'], action: 'Show morph ranges of that group' },
 			],
 		},
 		{
 			title: 'Modules & Parameters',
 			rows: [
 				{ keys: ['M'], action: 'Quick add module' },
+				{ keys: ['Double-click empty module area'], action: 'Show the module’s full name' },
 				{ keys: [key(SHIFT, '← → ↑ ↓')], action: 'Navigate between modules' },
 				{ keys: ['←', '→'], action: 'Navigate parameters (original editor’s order)' },
 				{ keys: ['↑', '↓'], action: 'Adjust parameter ±1 (hovered one with Focus on hover)' },

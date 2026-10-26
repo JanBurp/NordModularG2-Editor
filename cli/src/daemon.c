@@ -97,8 +97,13 @@ cJSON *daemon_make_error(cJSON *id, int code) {
 	return r;
 }
 
+/* Last g2_err() message of the running command: replaces the generic error text in its
+ * reply, so the editor shows why (e.g. "Memory protect on") instead of "unspecified error". */
+static char cmd_error[256];
+
 static void daemon_error_cb(const char *msg, void *ctx) {
 	(void)ctx;
+	snprintf(cmd_error, sizeof(cmd_error), "%s", msg);
 	printf("{\"type\":\"error\",\"error\":\"%s\"}\n", msg);
 	fflush(stdout);
 }
@@ -394,6 +399,7 @@ static void execute_cmd(const char *line) {
 		return;
 	}
 	diag_record_cmd(cmd_j->valuestring);
+	cmd_error[0] = '\0';
 
 	const char *cmd = cmd_j->valuestring;
 	int n = arg_count(args);
@@ -965,6 +971,7 @@ static void execute_cmd(const char *line) {
 		if (data) cJSON_AddItemToObject(resp, "data", data);
 	} else {
 		resp = daemon_make_error(id, ret);
+		if (cmd_error[0]) cJSON_ReplaceItemInObject(resp, "error", cJSON_CreateString(cmd_error));
 		cJSON_Delete(data);
 	}
 	emit(resp);

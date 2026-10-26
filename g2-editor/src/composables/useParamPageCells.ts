@@ -304,7 +304,7 @@ export function useParamPageCells() {
 		e.dataTransfer.effectAllowed = 'all';
 		e.dataTransfer.setData('text/plain', serializeDragPayload({ type: 'knob-slot', slotIndex: cell.slotIndex, global: uiStore.globalPagesActive }));
 		const label = cell.assignment ? cell.paramLabel : `Knob ${slotIndexToBankPageKnob(cell.slotIndex).knob + 1}`;
-		setBadgeDragImage(e, label, '#8bd3ff');
+		setBadgeDragImage(e, label);
 	}
 
 	async function onKnobDrop(cell: Cell, e: DragEvent) {

@@ -2,6 +2,7 @@ import { SLOT_LABELS } from '@/constants';
 import { DeviceStatus, useDeviceStore } from '@/store/device';
 import type { Device } from '@/types';
 import { useSlotsStore } from '@/store/slots';
+import { useBrowserStore } from '@/store/browser';
 
 import { ref, watch } from 'vue';
 import { bankDownloadProgress } from './useBankDownloadDialog';
@@ -38,6 +39,7 @@ export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
 export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
+	const browserStore = useBrowserStore();
 	const isDaemonRunning = ref(false);
 
 	const log: LogFn = (direction, event, message, category) => {
@@ -194,6 +196,11 @@ export function useG2() {
 		// activityTimer already null'd when watch_armed was handled (or null'd by error paths)
 		isDaemonRunning.value = true;
 		log('•', 'Daemon', 'Ready');
+		// Next to App.vue's version/OS line: the startup queries (device_info, names) are in by now.
+		const used = browserStore.flashUsedPercent;
+		console.log(
+			`[startup] G2 "${store.device?.synthName ?? '?'}" — memory protect ${store.device?.memProtect ? 'on' : 'off'}, flash memory ${used === null ? 'unknown' : `${used.toFixed(1)}% used`}`,
+		);
 	}
 
 	function stopWatch(): void {

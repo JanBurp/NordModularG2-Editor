@@ -44,7 +44,11 @@ interface DeviceSession {
 const MAX_EARLY_EVENTS = 10_000;
 const sessions = new Map<string, DeviceSession>();
 const sessionByWebContentsId = new Map<number, DeviceSession>();
-let activeSessionId: string | null = null;
+// The focused window, not its session id: a session's id changes (G2 re-enumerated at a new address,
+// daemon restart re-claim), which left the menu showing the not-connected default until a refocus.
+let activeWebContentsId: number | null = null;
+const activeSession = (): DeviceSession | undefined =>
+	activeWebContentsId === null ? undefined : sessionByWebContentsId.get(activeWebContentsId);
 
 // Pre-assigns a startup window to a specific physical device (set right after the
 // window is created, before its renderer loads) so parallel startup windows each
@@ -124,7 +128,6 @@ function resolveSession(event: { sender: { id: number } }): DeviceSession | unde
 // session whose daemon just died (see startDaemon's retry-in-place re-claim below).
 function unregisterSession(session: DeviceSession): void {
 	if (sessions.get(session.id) === session) sessions.delete(session.id);
-	if (activeSessionId === session.id) activeSessionId = null;
 }
 
 function broadcastDevicesChanged(): void {
@@ -914,7 +917,7 @@ const defaultMenuState: MenuState = {
 function cycleWindow(direction: 1 | -1): void {
 	const list = Array.from(sessions.values());
 	if (list.length < 2) return;
-	const idx = list.findIndex((s) => s.id === activeSessionId);
+	const idx = list.findIndex((s) => s === activeSession());
 	const nextIdx = idx === -1 ? 0 : (idx + direction + list.length) % list.length;
 	revealWindow(list[nextIdx].window);
 }
@@ -998,7 +1001,7 @@ function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
 	return list.map((s) => ({
 		label: s.name ?? `bus ${s.bus} dev ${s.device}`,
 		type: "checkbox" as const,
-		checked: s.id === activeSessionId,
+		checked: s === activeSession(),
 		click: () => revealWindow(s.window),
 	}));
 }
@@ -1263,11 +1266,7 @@ let lastRecentFiles: RecentFileEntry[] = [];
 let lastMenuState: MenuState = defaultMenuState;
 
 function currentMenuState(): MenuState {
-	if (activeSessionId) {
-		const session = sessions.get(activeSessionId);
-		if (session) return session.menuState;
-	}
-	return lastMenuState;
+	return activeSession()?.menuState ?? lastMenuState;
 }
 
 // Windows/Linux: each window has its own menu bar showing its own session's state. Swapping
@@ -1295,12 +1294,11 @@ ipcMain.on("menu-state:update", (event, state: MenuState) => {
 	if (!isMac) {
 		const window = BrowserWindow.fromWebContents(event.sender);
 		if (window) applyWindowMenu(window);
-	} else if (session ? session.id === activeSessionId : !activeSessionId) refreshMenu();
+	} else if (session ? session === activeSession() : !activeSession()) refreshMenu();
 });
 
 app.on("browser-window-focus", (_event, window) => {
-	const session = sessionByWebContentsId.get(window.webContents.id);
-	activeSessionId = session ? session.id : null;
+	activeWebContentsId = window.webContents.id;
 	if (isMac) refreshMenu();
 });
 

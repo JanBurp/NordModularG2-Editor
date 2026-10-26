@@ -9,6 +9,7 @@
 	import { useSlotsStore } from '@/store/slots';
 	import { useUiStore } from '@/store/ui';
 	import { useMidiCCOverlay } from '@/composables/useMidiCC';
+	import { paramControlRect, rectCenter } from '@/utils/hintPlacement';
 	import ParamOverlay from './ParamOverlay.vue';
 
 	const props = defineProps<{
@@ -24,7 +25,7 @@
 		const slot = uiStore.slotInFocus;
 		if (!slot) return [];
 		const location: 0 | 1 = props.areaLabel === 'va' ? 1 : 0;
-		const result: { text: string; x: number; y: number }[] = [];
+		const result: { text: string; x: number; y: number; group: number }[] = [];
 		for (const c of slotsStore.slots[slot].controllers) {
 			if (c.location !== location) continue;
 			const mod = props.modules.find((m) => m.index === c.moduleIndex);
@@ -33,8 +34,8 @@
 			if (!param) continue;
 			result.push({
 				text: `CC# ${c.cc}`,
-				x: (mod.horiz ?? 0) * 256 + param.x,
-				y: (mod.vert ?? 0) * 16 + param.y,
+				...rectCenter(paramControlRect(mod, c.paramIndex, props.areaLabel)),
+				group: mod.index,
 			});
 		}
 		return result;

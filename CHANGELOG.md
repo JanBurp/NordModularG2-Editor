@@ -14,14 +14,19 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Parameter Pages Overview sidepanel
 - Bank Organizer
 - Find & Replace (module names, param labels)
+- Warnings of mem-protect/full
+- Param popup shows when param has focus
 
 ### Changed
 - Tests better organized
 - New tests added
 - CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
+- All param popups (F5..F*, and when focus) have same color and work as original editor.
+- Param popups use user friendly values
 
 ### Fixed
 - Wrong calculation of CPU
+- Scrolling-over non empty banks in PatchBrowser
 
 ## [0.7.2] - 2026-10-22
 

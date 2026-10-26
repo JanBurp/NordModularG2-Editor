@@ -743,6 +743,9 @@ static const char* g2categories[16] = {
 /* Reply to the 0x14 list request (bulk: [0]0x01 [1]0x0c [2]0x00 [3]R_LIST_NAMES ...). */
 static int is_list_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
     (void)arg;
+    /* The last page (just the end marker) fits an embedded message: c2 | 01 0c 00 13 lo hi 16 01 01 04 | crc
+     * (hardware-captured 2026-10-26). Missing it cost every full list a 2 s timeout. */
+    if ((intr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) return intr[2] == COMMAND_SYS && intr[4] == R_LIST_NAMES;
     return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[1] == COMMAND_SYS && bulk[3] == R_LIST_NAMES;
 }
 
@@ -762,6 +765,7 @@ cJSON *g2_list(int filter, int bank_filter) {
     int done = 0;
     int bank_filter_active = (bank_filter > 0);
     int initial_bank = bank_filter > 0 ? bank_filter - 1 : 0;
+    int flash_usage = -1;
 
     if (ensure_connected(1) < 0) {
             g2_err("Not connected to G2\n");
@@ -823,10 +827,17 @@ cJSON *g2_list(int filter, int bank_filter) {
             g2_msg_t r;
             ret = 0;
             if (await_reply(is_list_reply, 0, 0, &r) == G2_OK) {
-                ret = r.bulk_size < sizeof(response) ? r.bulk_size : (int)sizeof(response);
-                memcpy(response, r.bulk, ret);
+                if (r.bulk) {
+                    ret = r.bulk_size < sizeof(response) ? r.bulk_size : (int)sizeof(response);
+                    memcpy(response, r.bulk, ret);
+                } else {   /* embedded: the same layout as a bulk, after the length/type byte */
+                    ret = r.interrupt[0] >> 4;
+                    memcpy(response, r.interrupt + 1, ret);
+                }
                 g2_msg_free(&r);
             }
+
+            if (ret > 5) flash_usage = G2_FLASH_USAGE(response);
 
             if (ret <= 9) {
                 break;
@@ -945,6 +956,7 @@ cJSON *g2_list(int filter, int bank_filter) {
         }
     }
 
+    if (filter == LIST_FILTER_ALL && flash_usage >= 0) cJSON_AddNumberToObject(root, "flashUsage", flash_usage);
     return result;
 }
 
@@ -1425,22 +1437,6 @@ int g2_select_perf(int bank, int location) {
     return G2_OK;
 }
 
-int g2_store_patch(int slot, int bank, int location) {
-    if (slot < 0 || slot > 4)           return G2_ERR_INVALID_PARAM;
-    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
-    if (location < 1 || location > 128) return G2_ERR_INVALID_PARAM;
-    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
-    g2_drain_pending();
-    /* S_STORE: [0x0B, slot, bank-1, location-1] */
-    uint8_t cmd[4] = { 0x0b, (uint8_t)slot, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
-    if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
-    usleep(USB_SEND_DELAY_US);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
-    return G2_OK;
-}
-
 /* Waits for the G2's answer to a flash operation on (bank0, location0), 0-based: a
  * CMFlashDumpMarker (0x18, status 0 = written) or a CMFlashCommandResult (0x0D,
  * [flag][bank][location][fileType][result]). The result comes on its own as an embedded
@@ -1500,7 +1496,9 @@ static int await_flash_result(int bank0, int location0, int *status) {
                     }
                 }
             }
-            if (!found && bret > 0) {
+            /* Relayed even when it holds our result: a store/clear ack also carries the
+             * names entry or cleared location and the flash usage the editor shows. */
+            if (bret > 0) {
                 g2_msg_t relay = {0};
                 memcpy(relay.interrupt, response, 16);
                 relay.bulk = bulk;
@@ -1514,6 +1512,46 @@ static int await_flash_result(int bank0, int location0, int *status) {
     return 0;
 }
 
+/* Waits for the answer to a store/clear of bank-location (1-based; a range is answered for its
+ * first location) and maps it to a return code. Messages name the location, or the bank when
+ * `whole_bank`. Result codes and texts per CFlashData::HandleFlashCommandResult: 0, 2, 5 = done (a clear
+ * answers 5), 1 = can't load, 3 = memory full, 4 = memory protect on. The official editor shows
+ * no message for other codes; here they are an error. */
+static int check_flash_result(const char *what, int bank, int location, int whole_bank) {
+    char where[16];
+    if (whole_bank) snprintf(where, sizeof(where), "bank %d", bank);
+    else            snprintf(where, sizeof(where), "%d-%d", bank, location);
+    int status = -1;
+    int got = await_flash_result(bank - 1, location - 1, &status);
+    if (got < 0) return got == G2_ERR_NO_MEMORY ? G2_ERR_NO_MEMORY : G2_ERR_RECV;
+    if (got == 0) {
+        /* G2_ERR, not G2_ERR_TIMEOUT: the daemon treats that as a lost device. */
+        g2_err("%s: no reply from device for %s\n", what, where);
+        return G2_ERR;
+    }
+    if (got == 2 && status != 0 && status != 2 && status != 5) {
+        g2_err("%s: device refused %s (%s)\n", what, where,
+               status == 4 ? "Memory protect on" : status == 3 ? "Flash memory full" : status == 1 ? "Can't load from flash" : "flash error");
+        return G2_ERR;
+    }
+    return G2_OK;
+}
+
+int g2_store_patch(int slot, int bank, int location) {
+    if (slot < 0 || slot > 4)           return G2_ERR_INVALID_PARAM;
+    if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 128) return G2_ERR_INVALID_PARAM;
+    if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
+    g2_drain_pending();
+    /* S_STORE: [0x0B, slot, bank-1, location-1] */
+    uint8_t cmd[4] = { 0x0b, (uint8_t)slot, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
+    if (send_system_data(0x41, cmd, 4) < 0) return G2_ERR_SEND;
+    usleep(USB_SEND_DELAY_US);
+    /* The G2 refuses a store (memory protect on, flash full) with a CMFlashCommandResult:
+     * a blind read here reported success while nothing reached the flash. */
+    return check_flash_result("store-patch", bank, location, 0);
+}
+
 int g2_clear_patch(int type, int bank, int location) {
     if (type < 0 || type > 1)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
@@ -1524,21 +1562,7 @@ int g2_clear_patch(int type, int bank, int location) {
     uint8_t cmd[5] = { 0x0c, (uint8_t)type, (uint8_t)(bank - 1), (uint8_t)(location - 1), 0x00 };
     if (send_system_data(0x41, cmd, 5) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    int status = -1;
-    int got = await_flash_result(bank - 1, location - 1, &status);
-    if (got < 0) return got == G2_ERR_NO_MEMORY ? G2_ERR_NO_MEMORY : G2_ERR_RECV;
-    if (got == 0) {
-        /* G2_ERR, not G2_ERR_TIMEOUT: the daemon treats that as a lost device. */
-        g2_err("clear-patch: no reply from device for %d-%d\n", bank, location);
-        return G2_ERR;
-    }
-    /* Result codes per CFlashData::HandleFlashCommandResult: 0, 2, 5 = done (a clear answers 5),
-     * 1 = can't load, 3 = memory full, 4 = memory protect on. */
-    if (got == 2 && status != 0 && status != 2 && status != 5) {
-        g2_err("clear-patch: device refused %d-%d (%s)\n", bank, location, status == 4 ? "memory protect on" : "flash error");
-        return G2_ERR;
-    }
-    return G2_OK;
+    return check_flash_result("clear-patch", bank, location, 0);
 }
 
 int g2_clear_bank(int type, int bank, int from_loc, int to_loc) {
@@ -1554,10 +1578,10 @@ int g2_clear_bank(int type, int bank, int from_loc, int to_loc) {
                        (uint8_t)(bank - 1), (uint8_t)(to_loc - 1), 0x00 };
     if (send_system_data(0x41, cmd, 7) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
-    uint8_t response[64] = {0};
-    recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
-    g2_drain_pending();
-    return G2_OK;
+    /* Done: one bulk with the deleted range (0x12), the flash usage (0x13) and a 0x0D result for
+     * from_loc, status 5. Memory protect on: only that result, status 4 - a blind read here
+     * reported success while the bank stayed (hardware-captured 2026-10-26). */
+    return check_flash_result("clear-bank", bank, from_loc, from_loc == 1 && to_loc == 128);
 }
 
 int g2_set_synth_settings(cJSON *params) {

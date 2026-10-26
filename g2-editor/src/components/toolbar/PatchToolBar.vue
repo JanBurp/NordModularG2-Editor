@@ -1,5 +1,5 @@
 <template>
-	<ToolBar>
+	<ToolBar data-hint-bounds>
 		<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
 		<ToolBarText class="w-36 cursor-pointer hover:text-input" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 
