@@ -180,6 +180,23 @@ describe('paste', () => {
 	});
 });
 
+describe('setMode', () => {
+	it('undo restores and resends the previous mode value', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 1, index: 29, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [0] }];
+		store.slots['A'].patch = patch;
+
+		await store.setMode(29, 0, 2, 0, 'voice');
+		expect(patch.areas[1].modules[0].modes[0]).toBe(2);
+
+		await store.undo();
+		expect(patch.areas[1].modules[0].modes[0]).toBe(0);
+		const run = (globalThis as any).window.cli.run;
+		expect(run.mock.calls.at(-1)[0]).toEqual(['set-module-mode', 'A', 'va', '29', '0', '0']);
+	});
+});
+
 describe('edited flag', () => {
 	it('a mutating action marks the slot edited', async () => {
 		const store = useSlotsStore();

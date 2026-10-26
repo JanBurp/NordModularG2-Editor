@@ -30,6 +30,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed
 - Wrong calculation of CPU
 - Scrolling-over non empty banks in PatchBrowser
+- Copy modules did not copy params & morph assigments
+- Undo module Mode did not work
 
 ## [0.7.2] - 2026-10-22
 

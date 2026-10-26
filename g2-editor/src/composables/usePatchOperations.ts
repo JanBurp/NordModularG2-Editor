@@ -162,17 +162,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
-	let modeChangeTimer: ReturnType<typeof setTimeout> | null = null;
-	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (modeChangeTimer) clearTimeout(modeChangeTimer);
-		modeChangeTimer = setTimeout(async () => {
-			modeChangeTimer = null;
-			try {
-				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
-			} catch {
-				/* G2 may be temporarily busy */
-			}
-		}, 50);
+	async function handleModeChange(moduleIndex: number, index: number, value: number): Promise<void> {
+		try {
+			await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
+		} catch {
+			/* G2 may be temporarily busy */
+		}
 	}
 
 	async function handleModuleDelete(moduleIndex: number): Promise<void> {
