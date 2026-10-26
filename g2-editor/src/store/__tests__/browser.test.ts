@@ -56,6 +56,32 @@ describe('browser store — storePatch category propagation', () => {
 	});
 });
 
+describe('browser store — loadDiskList error message', () => {
+	function failListWith(code: string) {
+		(globalThis as any).window.electronAPI = {
+			patches: { list: vi.fn().mockResolvedValue({ success: false, error: `${code}: raw node message`, code, entries: [] }) },
+		};
+	}
+
+	it('says the folder may have been moved, renamed or deleted when it is missing', async () => {
+		failListWith('ENOENT');
+		const browser = useBrowserStore();
+
+		await browser.loadDiskList('/gone');
+
+		expect(browser.diskError).toBe('Cannot open this folder. It may have been moved, renamed or deleted. Click the folder icon to choose another folder.');
+	});
+
+	it.each(['EACCES', 'EPERM'])('says there is no permission on %s', async (code) => {
+		failListWith(code);
+		const browser = useBrowserStore();
+
+		await browser.loadDiskList('/locked');
+
+		expect(browser.diskError).toBe('No permission to open this folder. Click the folder icon to choose another folder.');
+	});
+});
+
 // A fake G2 flash + storage folder behind window.cli.run / window.electronAPI, so the
 // Bank Organizer actions can be checked end to end: what lands where, nothing lost.
 describe('browser store — Bank Organizer', () => {

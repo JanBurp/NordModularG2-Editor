@@ -609,7 +609,7 @@ ipcMain.handle("patches:list", async (_, folder: string) => {
 		});
 		return { success: true, entries };
 	} catch (e: any) {
-		return { success: false, error: e.message, entries: [] };
+		return { success: false, error: e.message, code: e.code, entries: [] };
 	}
 });
 

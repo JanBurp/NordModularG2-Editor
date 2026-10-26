@@ -107,8 +107,10 @@ export const useBrowserStore = defineStore('browser', {
 		collapsedBanks: [] as number[],
 		diskFolder: '' as string,
 		diskEntries: [] as DiskEntry[],
-		loading: false,
-		error: '' as string,
+		diskLoading: false,
+		synthLoading: false,
+		diskError: '' as string,
+		synthError: '' as string,
 		storage: [] as StorageItem[],
 		storageDir: '' as string,
 		organizerBusy: [] as string[], // `${kind}-${bank}-${location}` keys of cells being changed
@@ -134,15 +136,15 @@ export const useBrowserStore = defineStore('browser', {
 
 		/* Fallback: load list with separate CLI call */
 		async loadSynthList(): Promise<void> {
-			this.loading = true;
-			this.error = '';
+			this.synthLoading = true;
+			this.synthError = '';
 			try {
 				const output = await window.cli.run(['list']);
 				this.applyNamesData(JSON.parse(output));
 			} catch (e: any) {
-				this.error = e.message;
+				this.synthError = e.message;
 			} finally {
-				this.loading = false;
+				this.synthLoading = false;
 			}
 		},
 
@@ -172,16 +174,21 @@ export const useBrowserStore = defineStore('browser', {
 
 		async loadDiskList(folder: string): Promise<void> {
 			this.diskFolder = folder;
-			this.loading = true;
-			this.error = '';
+			this.diskLoading = true;
+			this.diskError = '';
 			try {
 				const result = await window.electronAPI.patches.list(folder);
 				this.diskEntries = result.success ? result.entries : [];
-				if (!result.success) this.error = result.error ?? 'Failed to list files';
+				if (!result.success) {
+					const noAccess = result.code === 'EACCES' || result.code === 'EPERM';
+					this.diskError = noAccess
+						? 'No permission to open this folder. Click the folder icon to choose another folder.'
+						: 'Cannot open this folder. It may have been moved, renamed or deleted. Click the folder icon to choose another folder.';
+				}
 			} catch (e: any) {
-				this.error = e.message;
+				this.diskError = e.message;
 			} finally {
-				this.loading = false;
+				this.diskLoading = false;
 			}
 		},
 

@@ -588,7 +588,7 @@
 		if (device.status === DeviceStatus.Loading) return 'Loading patches...';
 		if (device.modeChanging) return 'Loading performance...';
 		if (slotsStore.uploadingFromFile) return 'Loading file...';
-		if (browserStore.loading) return 'Loading synth state...';
+		if (browserStore.synthLoading) return 'Loading synth state...';
 		return 'Loading patch...';
 	});
 
