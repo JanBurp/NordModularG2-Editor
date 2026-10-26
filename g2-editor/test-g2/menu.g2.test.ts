@@ -41,10 +41,11 @@ describe.skipIf(!inject('g2') || process.platform !== 'darwin')('Synth menu on a
 	it('Synth items are enabled again after the daemon exits and the editor reconnects', async () => {
 		expect(disabled(await synthMenuWhen(g!, true))).toEqual([]);
 
-		execFileSync('pkill', ['-TERM', '-f', 'g2-cli.* daemon']); // graceful exit, no SIGKILL (that can silence the G2)
+		// Only this editor's daemon (a child of Electron main), not one on another G2; graceful exit, no SIGKILL (that can silence the G2)
+		execFileSync('pkill', ['-TERM', '-P', String(g!.ctx.app.process().pid), '-f', 'g2-cli.* daemon']);
 		const status = async () => (await g!.ctx.page.locator('[data-testid="connection-status"]').innerText()).trim().toLowerCase();
 		expect(await waitFor(async () => (await status()) !== 'connected', 30_000, 250)).toBe(true);
-		await synthMenuWhen(g!, false);
+		expect(disabled(await synthMenuWhen(g!, false))).not.toEqual([]);
 
 		await g!.ctx.page.locator('[data-testid="connection-status"]').click();
 		expect(await g!.runner.waitConnected(60_000)).toBe(true);
