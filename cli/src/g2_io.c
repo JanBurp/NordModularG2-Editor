@@ -802,6 +802,7 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
          * message behind, and the G2 stops answering until a power cycle.
          * Hardware-confirmed: the listener hits this several times per test run. */
         if (transferred > 0 && (ret == 0 || ret == LIBUSB_ERROR_TIMEOUT)) {
+            debug_hex("recv", "direct", response, transferred);
             return transferred;
         }
         if (ret == LIBUSB_ERROR_NO_DEVICE) return LIBUSB_ERROR_NO_DEVICE;
@@ -946,6 +947,7 @@ int recv_bulk(uint8_t *data, uint16_t size) {
         received += transferred;   /* bytes that arrived with a timeout are consumed too */
         if (ret != 0 || transferred == 0) retries--;
     }
+    debug_hex("recv", "direct_bulk", data, received);
     return received;
 }
 
