@@ -2,6 +2,7 @@
 	<g
 		:transform="`translate(${param.x}, ${param.y})`"
 		class="knob-control"
+		:data-value="value"
 		:style="{ cursor }"
 		@mousedown="onMouseDown"
 		@touchstart.passive="onMouseDown"
