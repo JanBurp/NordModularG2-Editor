@@ -17,15 +17,19 @@ export function useContextMenu() {
 		event.stopPropagation();
 		state.x = event.clientX;
 		state.y = event.clientY;
-		// Drop leading, trailing and repeated separators (callers splice in item groups that may be empty).
+		state.items = cleanSeparators(items);
+		state.visible = true;
+	}
+
+	// Drop leading, trailing and repeated separators, in submenus too (callers splice in item groups that may be empty).
+	function cleanSeparators(items: ContextMenuItem[]): ContextMenuItem[] {
 		const cleaned: ContextMenuItem[] = [];
 		for (const it of items) {
 			if (it.type === 'separator' && (!cleaned.length || cleaned.at(-1)!.type === 'separator')) continue;
-			cleaned.push(it);
+			cleaned.push(it.children ? { ...it, children: cleanSeparators(it.children) } : it);
 		}
 		if (cleaned.at(-1)?.type === 'separator') cleaned.pop();
-		state.items = cleaned;
-		state.visible = true;
+		return cleaned;
 	}
 
 	function close() {

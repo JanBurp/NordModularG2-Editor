@@ -7,6 +7,7 @@ import {
 	isCableSourceEnd,
 	isUnusedModule,
 	MAX_MODULE_INDEX,
+	moduleActionTargets,
 	resolveColumnCollisions,
 	resolvePasteRowOffset,
 } from '../slotHelpers';
@@ -135,6 +136,20 @@ describe('buildPasteParamsPairs', () => {
 		];
 		const pairs = buildPasteParamsPairs(source, 1, [10], [mod(10, 5, 1, [], [])], morphs, 1);
 		expect(pairs?.[0].morphs).toEqual([{ groupIndex: 2, location: 1, moduleIndex: 10, paramIndex: 0, range: 40 }]);
+	});
+});
+
+describe('moduleActionTargets', () => {
+	it('targets the selection when the module is part of it', () => {
+		expect(moduleActionTargets({ selectedModules: [1, 4], selectedModulesArea: 'va' }, 4, 'va')).toEqual([1, 4]);
+	});
+
+	it('targets only the module when it is not selected', () => {
+		expect(moduleActionTargets({ selectedModules: [1, 4], selectedModulesArea: 'va' }, 2, 'va')).toEqual([2]);
+	});
+
+	it('ignores a selection in the other area with the same module index', () => {
+		expect(moduleActionTargets({ selectedModules: [1, 4], selectedModulesArea: 'fx' }, 1, 'va')).toEqual([1]);
 	});
 });
 

@@ -302,7 +302,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
-	import { canPasteParams } from '../../store/slotHelpers';
+	import { canPasteParams, moduleActionTargets } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
@@ -371,10 +371,10 @@
 			{
 				label: 'Paste Params',
 				// uiStore.clipboardTypes covers a copy made in another device's window too (OS clipboard,
-				// see usePatchClipboard.ts). Targets as in usePatchOperations.handlePasteParams.
+				// see usePatchClipboard.ts). Same targets as usePatchOperations.handlePasteParams.
 				disabled: !canPasteParams(
 					uiStore.clipboardTypes,
-					uiStore.selectedModules.includes(moduleIdx.value) ? uiStore.selectedModules : [moduleIdx.value],
+					moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx'),
 					slotsStore.getAreaModules(slot, location),
 				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
@@ -391,8 +391,7 @@
 
 	// Applies to the whole selection when this module is part of it (manual ch. 7).
 	function toggleMutaLock() {
-		const inSelection = props.isSelected && uiStore.selectedModulesArea === props.areaLabel;
-		const ids = inSelection ? uiStore.selectedModules : [moduleIdx.value];
+		const ids = moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx');
 		slotsStore.setMutationLock(ids, !instance.value.mutaLock, props.areaLabel === 'va' ? 'voice' : 'fx');
 	}
 
@@ -714,10 +713,23 @@
 	});
 	function onParamHoverLeave(e: MouseEvent) {
 		// Moving onto the knob's arrows (KnobSpinOverlay) keeps the hover; the overlay clears it on its own leave.
-		// e.buttons: a drag keeps it too (turning a knob with settings.knobReturnCursor locks the pointer, which fires a leave).
-		if (e.buttons === 0 && !(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
+		// e.buttons: a drag keeps it until the button goes up (turning a knob with settings.knobReturnCursor locks
+		// the pointer, which fires a leave); released outside the param, the hover is gone.
+		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) {
+			if (e.buttons === 0) uiStore.clearHoveredParam();
+			else clearHoverOnReleaseOutside(e.currentTarget as Element);
+		}
 		valueHint.leave(e);
 		clearHint();
+	}
+	function clearHoverOnReleaseOutside(el: Element) {
+		const hov = uiStore.hoveredParam;
+		const onUp = (up: MouseEvent) => {
+			const r = el.getBoundingClientRect();
+			const inside = up.clientX >= r.left && up.clientX < r.right && up.clientY >= r.top && up.clientY < r.bottom;
+			if (!inside && uiStore.hoveredParam === hov) uiStore.clearHoveredParam();
+		};
+		window.addEventListener('mouseup', onUp, { capture: true, once: true });
 	}
 
 	function onParamDragOver(e: DragEvent) {

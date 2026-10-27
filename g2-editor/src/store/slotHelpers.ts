@@ -31,6 +31,21 @@ export function resolveSelectionArea(ui: { selectedModulesArea: 'va' | 'fx' | nu
 	return ui.activeArea === 1 ? 'voice' : 'fx';
 }
 
+// Target of a module context-menu action: the selection when the module is part of it (same area — module
+// indices repeat between VA and FX), else just this module.
+export function moduleActionTargets(
+	ui: { selectedModules: number[]; selectedModulesArea: 'va' | 'fx' | null },
+	moduleIndex: number,
+	area: 'va' | 'fx',
+): number[] {
+	return ui.selectedModulesArea === area && ui.selectedModules.includes(moduleIndex) ? ui.selectedModules : [moduleIndex];
+}
+
+// Identity of a morph assignment (its range aside).
+export function morphKey(a: MorphAssignment): string {
+	return `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
+}
+
 export function findModuleByIndex(modules: ModuleInstance[], id: number): ModuleInstance | undefined {
 	return modules.find((m) => m.index === id);
 }

@@ -92,6 +92,38 @@ describe('usePatchOperations — handlePasteParams', () => {
 
 		expect(pasteParamsSpy).not.toHaveBeenCalled();
 	});
+	it('ignores a selection in the other area that holds the same module index', async () => {
+		const uiStore = useUiStore();
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(1), makeModule(4)]);
+		seedArea(slotsStore, 'A', 0, [makeModule(1), makeModule(4)]);
+		uiStore.selectModules([1, 4], 'fx');
+		uiStore.clipboard = { modules: [makeModule(5)], cables: [], area: 'va', copiedVariation: 0 } as any;
+		const pasteParamsSpy = vi.spyOn(slotsStore, 'pasteParams').mockResolvedValue(undefined as any);
+
+		const { handlePasteParams } = usePatchOperations(() => 'voice');
+		await handlePasteParams(1); // VA module 1, while FX 1 + 4 are selected
+
+		expect(pasteParamsSpy).toHaveBeenCalledWith([expect.objectContaining({ targetId: 1 })], expect.anything(), 'voice');
+	});
+});
+
+describe('usePatchOperations — handleModuleMove (drag copy)', () => {
+	it('copies the morph assignments of the dragged modules along with them', async () => {
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 1, [makeModule(4)]);
+		const morph = { groupIndex: 2, location: 1, moduleIndex: 4, paramIndex: 1, range: -30 };
+		slotsStore.slots['A'].variations = [
+			{ fx: {}, voice: {}, patch: { morphAssignments: [morph] } },
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+		] as any;
+		const pasteSpy = vi.spyOn(slotsStore, 'paste').mockResolvedValue(undefined as any);
+
+		const { handleModuleMove } = usePatchOperations(() => 'voice');
+		await handleModuleMove({ indices: [4], dCol: 0, dRow: 5, anchorIndex: 4, isCopy: true });
+
+		expect(pasteSpy).toHaveBeenCalledWith([expect.objectContaining({ src: expect.objectContaining({ index: 4 }) })], [], 'voice', [[morph], []]);
+	});
 });
 
 describe('usePatchOperations — deleteUnusedCables', () => {

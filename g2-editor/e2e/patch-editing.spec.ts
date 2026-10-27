@@ -172,6 +172,37 @@ test.describe('patch editing – offline', () => {
 		await expect.poll(async () => (await modEl.boundingBox())!.x).toBeGreaterThan(box.x + 100);
 	});
 
+	test('Focus on hover: a knob dragged off and released elsewhere no longer takes the arrow keys', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await sendMenuAction('toggle-settings');
+		const checkbox = page
+			.getByTestId('settings-row')
+			.filter({ has: page.getByText('Focus on hover', { exact: true }) })
+			.getByRole('checkbox');
+		await checkbox.click();
+		await expect(checkbox).toHaveAttribute('aria-checked', 'true');
+
+		const knob = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] [data-param-index="0"] .knob-control');
+		const box = (await knob.boundingBox())!;
+		const value = async () => Number(await knob.getAttribute('data-value'));
+
+		// Hovered, the knob takes the arrow keys
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		const v0 = await value();
+		await page.keyboard.press('ArrowUp');
+		await expect.poll(value).toBe(v0 + 1);
+
+		// Dragged off the knob and released over empty canvas, it doesn't any more
+		await page.mouse.down();
+		await page.mouse.move(box.x + 300, box.y - 20, { steps: 10 });
+		await page.mouse.up();
+		const v1 = await value();
+		await page.keyboard.press('ArrowUp');
+		await page.waitForTimeout(200);
+		expect(await value()).toBe(v1);
+	});
+
 	test('delete a module with the Delete key', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();

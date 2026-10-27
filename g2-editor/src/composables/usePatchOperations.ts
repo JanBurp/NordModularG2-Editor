@@ -9,6 +9,7 @@ import {
 	buildCloneEntries,
 	buildPasteParamsPairs,
 	isUnusedModule,
+	moduleActionTargets,
 	PASTE_PARAMS_MISMATCH,
 	resolveSelectionArea,
 	type JackEnd,
@@ -180,7 +181,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {
-		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
+		const targets = moduleActionTargets(uiStore, moduleIndex, areaConfig(getArea()).location);
 		uiStore.setModuleColor(colorId);
 		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
@@ -189,14 +190,14 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.replaceModule(moduleIndex, newTypeId, getArea());
 	}
 
-	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
+	// Explicit target: see moduleActionTargets.
 	async function handlePasteParams(moduleIndex: number): Promise<void> {
 		// Reads via the OS clipboard first — a copy may have happened in another window's
 		// process (one BrowserWindow per connected G2, see usePatchClipboard.ts).
 		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
-		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
 		const area = getArea();
+		const targets = moduleActionTargets(uiStore, moduleIndex, areaConfig(area).location);
 		const pairs = buildPasteParamsPairs(
 			clipboard.modules,
 			clipboard.copiedVariation,

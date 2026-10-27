@@ -40,6 +40,7 @@ import {
 	AREA_FULL_MESSAGE,
 	areaConfig,
 	morphGroupName,
+	morphKey,
 	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
@@ -951,16 +952,15 @@ export const useSlotsStore = defineStore('slots', {
 			const areaKey = areaIdx === 0 ? 'fx' : 'voice';
 			const slotEntry = this.slots[slot];
 			const hist = useHistoryStore();
-			const ccLocation = areaIdx === 0 ? 0 : 1;
 			const { removedCCSnap, removedPagesSnap, removedGlobalPagesSnap } = snapshotModuleAssignments(
 				slotEntry.controllers,
 				slotEntry.paramPages,
 				this.globalParamPages,
 				slot,
-				ccLocation,
+				areaIdx,
 				moduleId,
 			);
-			const morphSnap = this._snapshotModuleMorph(slot, ccLocation, [moduleId]);
+			const morphSnap = this._snapshotModuleMorph(slot, areaIdx, [moduleId]);
 
 			if (!hist.isLocked(slot)) {
 				const mod = findModuleByIndex(patch.areas[areaIdx].modules, moduleId);
@@ -1020,12 +1020,10 @@ export const useSlotsStore = defineStore('slots', {
 			removeModuleFromVariations(slotEntry.variations, moduleId, areaIdx === 0 ? 'fx' : 'voice');
 			const uprateCmds = syncUprate ? this._syncUprateAndColors(slot, patch, areaIdx) : [];
 			this._dropModuleMorph(slot, morphSnap);
-			if (removedCCSnap.length > 0)
-				slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === ccLocation && c.moduleIndex === moduleId));
-			if (removedPagesSnap.length > 0)
-				slotEntry.paramPages = slotEntry.paramPages.filter((k) => !(k.location === ccLocation && k.moduleIndex === moduleId));
+			if (removedCCSnap.length > 0) slotEntry.controllers = slotEntry.controllers.filter((c) => !(c.location === areaIdx && c.moduleIndex === moduleId));
+			if (removedPagesSnap.length > 0) slotEntry.paramPages = slotEntry.paramPages.filter((k) => !(k.location === areaIdx && k.moduleIndex === moduleId));
 			if (removedGlobalPagesSnap.length > 0)
-				this.globalParamPages = this.globalParamPages.filter((k) => !(k.slot === slot && k.location === ccLocation && k.moduleIndex === moduleId));
+				this.globalParamPages = this.globalParamPages.filter((k) => !(k.slot === slot && k.location === areaIdx && k.moduleIndex === moduleId));
 			this._markSlotDirty(slot);
 
 			const deleteCmds: string[][] = [
@@ -1070,17 +1068,16 @@ export const useSlotsStore = defineStore('slots', {
 			const oldModSnap: ModuleInstance = { ...oldMod, lv: oldLvSnap, modes: [...oldMod.modes] };
 			const cableSnap = (patch.areas[areaIdx].cableList ?? []).filter((c) => c.smod === moduleId || c.dmod === moduleId).map((c) => ({ ...c }));
 
-			const ccLocation = areaIdx === 0 ? 0 : 1;
 			const { removedCCSnap, removedPagesSnap, removedGlobalPagesSnap } = snapshotModuleAssignments(
 				slotEntry.controllers,
 				slotEntry.paramPages,
 				this.globalParamPages,
 				slot,
-				ccLocation,
+				areaIdx,
 				moduleId,
 			);
 
-			const morphSnapPerVar = this._snapshotModuleMorph(slot, ccLocation, [moduleId]);
+			const morphSnapPerVar = this._snapshotModuleMorph(slot, areaIdx, [moduleId]);
 
 			const shouldRecord = !hist.isLocked(slot);
 			if (shouldRecord) hist.lock(slot);
@@ -1350,7 +1347,6 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ctx) return;
 			const { slot, patch } = ctx;
 			const { areaIdx, location } = areaConfig(area);
-			const morphLocation = areaIdx === 0 ? 0 : 1;
 			const hist = useHistoryStore();
 			const shouldRecord = !hist.isLocked(slot);
 			if (shouldRecord) hist.lock(slot);
@@ -1446,7 +1442,7 @@ export const useSlotsStore = defineStore('slots', {
 					const room = MAX_MORPHED_PARAMS - (slotEntry.variations?.[v]?.patch.morphAssignments.length ?? MAX_MORPHED_PARAMS);
 					return list
 						.filter((a) => newIdOf.has(a.moduleIndex))
-						.map((a) => ({ ...a, location: morphLocation, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment)
+						.map((a) => ({ ...a, location: areaIdx, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment)
 						.slice(0, Math.max(0, room));
 				});
 				await this._restoreModuleMorph(slot, pastedMorphs);
@@ -1471,7 +1467,7 @@ export const useSlotsStore = defineStore('slots', {
 							]);
 							for (const c of addedCables) mutDeleteCable(patch, areaIdx, c);
 							// Zero the added modules' morphs before deleting them (see _clearModuleMorphOnDevice)
-							const morphSnap = this._snapshotModuleMorph(slot, morphLocation, addedIds);
+							const morphSnap = this._snapshotModuleMorph(slot, areaIdx, addedIds);
 							await this._clearModuleMorphOnDevice(slot, morphSnap);
 							this._dropModuleMorph(slot, morphSnap);
 							// Delete added modules
@@ -2046,13 +2042,12 @@ export const useSlotsStore = defineStore('slots', {
 			let prevMorphs: MorphAssignment[] = [];
 			let nextMorphs: MorphAssignment[] = [];
 			if (vPatch && morphPairs.length > 0) {
-				const key = (a: MorphAssignment) => `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
 				prevMorphs = vPatch.morphAssignments;
-				const prevKeys = new Set(prevMorphs.map(key));
+				const prevKeys = new Set(prevMorphs.map(morphKey));
 				const replaced = new Set(morphPairs.map((p) => p.targetId));
 				nextMorphs = prevMorphs.filter((a) => !isTargetMorph(a, replaced));
 				for (const a of morphPairs.flatMap((p) => p.morphs!)) {
-					if (prevKeys.has(key(a)) || nextMorphs.length < MAX_MORPHED_PARAMS) nextMorphs.push({ ...a });
+					if (prevKeys.has(morphKey(a)) || nextMorphs.length < MAX_MORPHED_PARAMS) nextMorphs.push({ ...a });
 				}
 				vPatch.morphAssignments = nextMorphs;
 			}
@@ -2851,9 +2846,8 @@ export const useSlotsStore = defineStore('slots', {
 		async _resyncMorphAssignments(slot: SlotLabel, variation: number, from: MorphAssignment[], to: MorphAssignment[]): Promise<void> {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return;
-			const tupleKey = (a: MorphAssignment) => `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
-			const toKeys = new Set(to.map(tupleKey));
-			const removed = from.filter((a) => !toKeys.has(tupleKey(a))).map((a) => ({ ...a, range: 0 }));
+			const toKeys = new Set(to.map(morphKey));
+			const removed = from.filter((a) => !toKeys.has(morphKey(a))).map((a) => ({ ...a, range: 0 }));
 			const ops = [...removed, ...to];
 			if (ops.length === 0) return;
 			const flatArgs = ops.flatMap((a) => [
@@ -3469,25 +3463,24 @@ export const useSlotsStore = defineStore('slots', {
 						removeModuleFromVariations(this.slots[slot].variations, id, areaIdx === 0 ? 'fx' : 'voice');
 						cliCmds.push(['del-module', slot, location, String(id)]);
 					}
-					const pageLocation = areaIdx === 0 ? 0 : 1;
 					// Controllers + morph assignments of the deleted modules go too (same as deleteModule); undo restores them.
-					ccSnaps = this.slots[slot].controllers.filter((c) => c.location === pageLocation && selectedModules.includes(c.moduleIndex));
+					ccSnaps = this.slots[slot].controllers.filter((c) => c.location === areaIdx && selectedModules.includes(c.moduleIndex));
 					this.slots[slot].controllers = this.slots[slot].controllers.filter((c) => !ccSnaps.includes(c));
-					morphSnap = this._snapshotModuleMorph(slot, pageLocation, selectedModules);
+					morphSnap = this._snapshotModuleMorph(slot, areaIdx, selectedModules);
 					this._dropModuleMorph(slot, morphSnap);
-					pagesSnaps = this.slots[slot].paramPages.filter((k) => k.location === pageLocation && selectedModules.includes(k.moduleIndex));
+					pagesSnaps = this.slots[slot].paramPages.filter((k) => k.location === areaIdx && selectedModules.includes(k.moduleIndex));
 					if (pagesSnaps.length > 0) {
 						this.slots[slot].paramPages = this.slots[slot].paramPages.filter(
-							(k) => !(k.location === pageLocation && selectedModules.includes(k.moduleIndex)),
+							(k) => !(k.location === areaIdx && selectedModules.includes(k.moduleIndex)),
 						);
 						for (const p of pagesSnaps) cliCmds.push(['deassign-knob', slot, String(p.slotIndex)]);
 					}
 					globalPagesSnaps = this.globalParamPages.filter(
-						(k) => k.slot === slot && k.location === pageLocation && selectedModules.includes(k.moduleIndex),
+						(k) => k.slot === slot && k.location === areaIdx && selectedModules.includes(k.moduleIndex),
 					);
 					if (globalPagesSnaps.length > 0) {
 						this.globalParamPages = this.globalParamPages.filter(
-							(k) => !(k.slot === slot && k.location === pageLocation && selectedModules.includes(k.moduleIndex)),
+							(k) => !(k.slot === slot && k.location === areaIdx && selectedModules.includes(k.moduleIndex)),
 						);
 						for (const p of globalPagesSnaps) cliCmds.push(['deassign-global-knob', slot, String(p.slotIndex)]);
 					}
