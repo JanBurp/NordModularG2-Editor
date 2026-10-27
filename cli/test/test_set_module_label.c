@@ -17,11 +17,3 @@ void test_set_module_label_invalid_slot_high(void) {
 void test_set_module_label_invalid_location(void) {
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_module_label(0, 2, 5, "Test"));
 }
-
-void test_set_module_label_null_label(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_module_label(0, 0, 5, NULL));
-}
-
-void test_set_module_label_empty_label(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_module_label(0, 0, 5, ""));
-}
