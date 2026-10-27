@@ -1071,6 +1071,15 @@ static void do_reconnect(void) {
 	}
 	if (!daemon_running) return;
 
+	/* Report the new address before the init sequence, so the editor's device scan doesn't take the
+	 * re-enumerated G2 for a new device meanwhile. The official editor likewise claims the port as soon
+	 * as the G2 appears (CPortManager::USBDeviceAddedCallback → CreatePort). */
+	if (g2_target_moved) {
+		g2_target_moved = 0;
+		printf("{\"type\":\"device_retargeted\",\"bus\":%d,\"device\":%d}\n", g2_target_bus, g2_target_device);
+		fflush(stdout);
+	}
+
 	/* Reset G2 firmware state — same as startup init sequence (Delphi InitSeq steps 1-2). */
 	g2_send_init();
 	g2_lock_stream();
@@ -1082,10 +1091,6 @@ static void do_reconnect(void) {
 	if (g2_msg_recv(&ack, USB_TIMEOUT_STANDARD_MS) == 0)
 		g2_msg_free(&ack);
 
-	if (g2_target_moved) {
-		g2_target_moved = 0;
-		printf("{\"type\":\"device_retargeted\",\"bus\":%d,\"device\":%d}\n", g2_target_bus, g2_target_device);
-	}
 	printf("{\"type\":\"device_reconnected\"}\n");
 	fflush(stdout);
 }

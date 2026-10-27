@@ -476,7 +476,7 @@
 	import SvgViewer from './components/canvas/SvgViewer.vue';
 
 	import { useAreaMode } from './composables/useAreaMode';
-	import { useG2, namesLoadProgress } from './composables/useG2';
+	import { useG2, namesLoadProgress, deviceSummary } from './composables/useG2';
 	import { useJackPatching } from './composables/useJackPatching';
 	import { useGhostCable, isGhostJack } from './composables/useGhostCable';
 	import { commitClickModeSnap } from './composables/useJackDragInteraction';
@@ -817,12 +817,7 @@
 		(): ConnectedDeviceInfo => ({
 			viewId: connectedDevices.selfId ?? -1,
 			detached: connectedDevices.list.find((d) => d.viewId === connectedDevices.selfId)?.detached ?? false,
-			name: device.device?.synthName || null,
-			status: device.status,
-			perfMode: device.device?.mode === 'Performance',
-			selectedSlot: uiStore.selectedSlotIndex,
-			slotsActive: device.getSlotsActiveStatus,
-			slotsKeyed: device.getSlotsKeyStatus,
+			...deviceSummary(),
 		}),
 	);
 	// Every device in main's order, which is the same in every window; just this one until that list includes it.
@@ -889,7 +884,13 @@
 	async function bindAndConnect(bus: number, deviceAddr: number): Promise<void> {
 		if (bound) return;
 		bound = true;
-		await window.electronAPI.devices.connect(bus, deviceAddr);
+		try {
+			await window.electronAPI.devices.connect(bus, deviceAddr);
+		} catch (err) {
+			// Not bound after all: a later devices:assigned may still bind this view.
+			bound = false;
+			throw err;
+		}
 		await connectDevice({ silent: showAboutDialog.value });
 	}
 

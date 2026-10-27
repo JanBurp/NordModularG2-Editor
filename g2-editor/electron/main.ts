@@ -57,7 +57,8 @@ interface DeviceView {
 	order: number;
 	summary: DeviceSummary;
 }
-// hosts[0] is the main window; any others hold devices moved to a window of their own.
+// hosts[0] is the main window; any others hold devices moved to a window of their own. When the main
+// window closes (with its devices), the oldest remaining one becomes the main window.
 const hosts: Host[] = [];
 const deviceViews = new Map<number, DeviceView>();
 let nextViewOrder = 0;
@@ -151,14 +152,15 @@ function unregisterSession(session: DeviceSession): void {
 	if (sessions.get(session.id) === session) sessions.delete(session.id);
 }
 
-function broadcastDevicesChanged(): void {
+// menu=false: nothing the Window menu shows (names, order, active view) changed.
+function broadcastDevicesChanged(menu = true): void {
 	const list: ConnectedDeviceInfo[] = sortedViews().map((dv) => ({
 		viewId: dv.view.webContents.id,
 		detached: dv.host !== hosts[0],
 		...dv.summary,
 	}));
 	for (const dv of deviceViews.values()) safeSend(dv.view.webContents, 'devices:changed', list);
-	refreshMenu();
+	if (menu) refreshMenu();
 }
 
 // Shows (maximizing first, matching a freshly-created window's usual state) and focuses a
@@ -722,8 +724,9 @@ ipcMain.handle('devices:self', (event) => event.sender.id);
 ipcMain.handle('devices:report', (event, summary: DeviceSummary) => {
 	const dv = deviceViews.get(event.sender.id);
 	if (!dv) return;
+	const nameChanged = dv.summary.name !== summary.name;
 	dv.summary = summary;
-	broadcastDevicesChanged();
+	broadcastDevicesChanged(nameChanged);
 });
 
 // Switches to a device, then runs the toolbar button clicked in its group there.
@@ -1112,8 +1115,9 @@ function claimForView(contents: WebContents, bus: number, device: number): void 
 	const session = newSession(id, bus, device, contents);
 	sessions.set(id, session);
 	sessionByWebContentsId.set(contents.id, session);
+	// Both: a renderer still loading asks for its assignment, one that already asked (and got none) binds on
+	// the event. The latter leaves the pending entry unused; it is dropped when the view closes.
 	pendingAssignment.set(contents.id, { bus, device, showSplash: false });
-	// A renderer that already asked for its assignment (and got none) binds on this event instead.
 	safeSend(contents, 'devices:assigned', { bus, device });
 }
 
@@ -1132,7 +1136,7 @@ if (process.env.NODE_ENV === 'test') (globalThis as { __g2AddDevice?: typeof add
 // A G2 counts as new once it is seen unclaimed on two scans in a row: a G2 that rebooted itself
 // re-enumerates at a new address, which its own daemon follows (device_retargeted) within a scan.
 const SCAN_INTERVAL_MS = 2000;
-let scanInFlight = false;
+let scanInFlight: Promise<void> | null = null;
 let lastUnclaimed: string[] = [];
 // Devices closed by the user: the background scan leaves them alone until they are unplugged.
 const closedIds = new Set<string>();
@@ -1140,29 +1144,33 @@ const closedIds = new Set<string>();
 // The background scan adds hot-plugged G2s; the Window menu's "Scan for Devices" adds them at once
 // and says so when there are none.
 async function scanForDevices(manual = false): Promise<void> {
-	if (scanInFlight) return;
-	scanInFlight = true;
-	try {
-		const devices = await listAttachedDevices().catch(() => []);
-		for (const id of closedIds) if (manual || !devices.some((d) => d.id === id)) closedIds.delete(id);
-		// A view whose daemon exited still owns its G2 (it reconnects from that view): no second view for it.
-		const owned = new Set(Array.from(sessionByWebContentsId.values(), (s) => s.id));
-		const unclaimed = devices.filter((d) => !d.alreadyConnected && !owned.has(d.id) && !closedIds.has(d.id));
-		const ids = unclaimed.map((d) => d.id);
-		const confirmed = manual ? ids : confirmedNewDevices(lastUnclaimed, ids);
-		lastUnclaimed = ids;
-		if (manual && unclaimed.length === 0) {
-			await dialog.showMessageBox({
-				type: 'info',
-				message: 'No new devices found.',
-				icon: path.join(process.env.APP_ROOT!, 'resources', 'icon.png'),
-			});
-			return;
-		}
-		for (const d of unclaimed) if (confirmed.includes(d.id)) addDevice(d.bus, d.device);
-	} finally {
-		scanInFlight = false;
+	if (scanInFlight) {
+		// A background scan is running: let it finish, then run the menu's own scan instead of ignoring the click.
+		if (manual) await scanInFlight.then(() => scanForDevices(true));
+		return;
 	}
+	scanInFlight = scan(manual).finally(() => (scanInFlight = null));
+	await scanInFlight;
+}
+
+async function scan(manual: boolean): Promise<void> {
+	const devices = await listAttachedDevices().catch(() => []);
+	for (const id of closedIds) if (manual || !devices.some((d) => d.id === id)) closedIds.delete(id);
+	// A view whose daemon exited still owns its G2 (it reconnects from that view): no second view for it.
+	const owned = new Set(Array.from(sessionByWebContentsId.values(), (s) => s.id));
+	const unclaimed = devices.filter((d) => !d.alreadyConnected && !owned.has(d.id) && !closedIds.has(d.id));
+	const ids = unclaimed.map((d) => d.id);
+	const confirmed = manual ? ids : confirmedNewDevices(lastUnclaimed, ids);
+	lastUnclaimed = ids;
+	if (manual && unclaimed.length === 0) {
+		await dialog.showMessageBox({
+			type: 'info',
+			message: 'No new devices found.',
+			icon: path.join(process.env.APP_ROOT!, 'resources', 'icon.png'),
+		});
+		return;
+	}
+	for (const d of unclaimed) if (confirmed.includes(d.id)) addDevice(d.bus, d.device);
 }
 
 function windowMenuItems(): Electron.MenuItemConstructorOptions[] {

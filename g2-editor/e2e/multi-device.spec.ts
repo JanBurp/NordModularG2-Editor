@@ -1,5 +1,5 @@
 import { test as base, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { expect, editorPage, evaluateWithRetry } from './fixtures/electron';
+import { expect, editorPage, evaluateWithRetry, isEditorPage } from './fixtures/electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -69,8 +69,9 @@ async function launchWithOneDevice(userDataDir: string): Promise<{ app: Electron
 // A second G2 found by the hot-plug scan; returns its view's page.
 async function addSecondDevice(app: ElectronApplication, first: Page): Promise<Page> {
 	await app.evaluate(() => (globalThis as any).__g2AddDevice(250, 2));
-	await expect.poll(() => app.windows().filter((p) => p !== first && /index\.html|^https?:/.test(p.url())).length).toBe(1);
-	const second = app.windows().find((p) => p !== first && /index\.html|^https?:/.test(p.url()))!;
+	const others = () => app.windows().filter((p) => p !== first && isEditorPage(p));
+	await expect.poll(() => others().length).toBe(1);
+	const second = others()[0];
 	await second.waitForSelector('[data-testid="connection-status"]');
 	return second;
 }

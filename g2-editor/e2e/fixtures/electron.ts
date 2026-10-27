@@ -37,17 +37,20 @@ export async function evaluateWithRetry<R, Arg = void>(
 
 // The editor's page. The window itself loads nothing: each G2 gets a view with the editor in it
 // (see electron/main.ts), so app.firstWindow() would be the empty window.
+export const isEditorPage = (page: Page): boolean => /index\.html|^https?:/.test(page.url());
+
 export async function editorPage(app: ElectronApplication, timeoutMs = 30_000): Promise<Page> {
 	const deadline = Date.now() + timeoutMs;
 	for (;;) {
-		const page = app.windows().find((p) => /index\.html|^https?:/.test(p.url()));
+		const page = app.windows().find(isEditorPage);
 		if (page) return page;
 		if (Date.now() > deadline) throw new Error('editor page not found');
 		await new Promise((r) => setTimeout(r, 50));
 	}
 }
 
-// Sends a menu action to the first device view, as a menu click in the main window would.
+// Sends a menu action to the main window's first-created device view, which need not be the active one
+// (a real menu click goes to the active view). Enough for single-device specs.
 export async function sendMenuActionTo(app: ElectronApplication, action: string): Promise<void> {
 	await evaluateWithRetry(
 		app,

@@ -38,6 +38,20 @@ export interface NamesLoadProgress {
 }
 export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
 
+// This device's toolbar group, as shown in its own view and reported to the other device views.
+export function deviceSummary(): DeviceSummary {
+	const store = useDeviceStore();
+	const uiStore = useUiStore();
+	return {
+		name: store.device?.synthName || null,
+		status: store.status,
+		perfMode: store.device?.mode === 'Performance',
+		selectedSlot: uiStore.selectedSlotIndex,
+		slotsActive: store.getSlotsActiveStatus,
+		slotsKeyed: store.getSlotsKeyStatus,
+	};
+}
+
 export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -51,17 +65,8 @@ export function useG2() {
 		}
 	};
 
-	// What the other device views show in this device's toolbar group.
-	const uiStore = useUiStore();
 	watch(
-		(): DeviceSummary => ({
-			name: store.device?.synthName || null,
-			status: store.status,
-			perfMode: store.device?.mode === 'Performance',
-			selectedSlot: uiStore.selectedSlotIndex,
-			slotsActive: store.getSlotsActiveStatus,
-			slotsKeyed: store.getSlotsKeyStatus,
-		}),
+		deviceSummary,
 		(summary, previous) => {
 			if (JSON.stringify(summary) !== JSON.stringify(previous)) window.electronAPI?.devices?.report(summary).catch(() => {});
 		},
