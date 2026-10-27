@@ -30,6 +30,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Whole module canvas is used for selecting module, instead of only the header
 - Improved selection logic when hover select is on
 - ContextMenu->SetValue now for all Params
+- Refactured multi-device UX
+- Added auto-connect for new device
 
 ### Fixed
 - Wrong calculation of CPU
