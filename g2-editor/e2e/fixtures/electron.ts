@@ -45,7 +45,7 @@ export type AppFixtures = {
 };
 
 export const test = base.extend<AppFixtures>({
-	app: async ({ }, use) => {
+	app: async ({}, use) => {
 		const testUserData = fs.mkdtempSync(path.join(os.tmpdir(), 'g2-test-'));
 		const app = await electron.launch({
 			args: [APP_ROOT],
@@ -69,7 +69,7 @@ export const test = base.extend<AppFixtures>({
 				ipcMain.handle(ch, async () => '');
 			}
 			ipcMain.removeHandler('cli:watch-start');
-			ipcMain.handle('cli:watch-start', async () => { });
+			ipcMain.handle('cli:watch-start', async () => {});
 		});
 
 		await use(app);
@@ -88,10 +88,14 @@ export const test = base.extend<AppFixtures>({
 	// before any action is sent; otherwise a hook requesting only sendMenuAction races the mount.
 	sendMenuAction: async ({ app, page: _page }, use) => {
 		const fn = async (action: string) => {
-			await evaluateWithRetry(app, ({ BrowserWindow }, act) => {
-				const win = BrowserWindow.getAllWindows()[0];
-				win?.webContents.send('menu:action', act);
-			}, action);
+			await evaluateWithRetry(
+				app,
+				({ BrowserWindow }, act) => {
+					const win = BrowserWindow.getAllWindows()[0];
+					win?.webContents.send('menu:action', act);
+				},
+				action,
+			);
 		};
 		await use(fn);
 	},
@@ -103,14 +107,18 @@ export const test = base.extend<AppFixtures>({
 			const filepath = path.join(userDataDir, filename);
 			fs.copyFileSync(path.join(FIXTURES_DIR, filename), filepath);
 			const data = Array.from(fs.readFileSync(filepath));
-			await evaluateWithRetry(app, ({ ipcMain }, args) => {
-				ipcMain.removeHandler('patch:open-dialog');
-				ipcMain.handle('patch:open-dialog', async () => ({
-					success: true,
-					filepath: args.filepath,
-					data: args.data,
-				}));
-			}, { filepath, data });
+			await evaluateWithRetry(
+				app,
+				({ ipcMain }, args) => {
+					ipcMain.removeHandler('patch:open-dialog');
+					ipcMain.handle('patch:open-dialog', async () => ({
+						success: true,
+						filepath: args.filepath,
+						data: args.data,
+					}));
+				},
+				{ filepath, data },
+			);
 		};
 		await use(fn);
 	},
@@ -119,10 +127,14 @@ export const test = base.extend<AppFixtures>({
 		let savedPath = '';
 		const fn = async () => {
 			savedPath = path.join(os.tmpdir(), `g2-test-${Date.now()}.pch2`);
-			await evaluateWithRetry(app, ({ ipcMain }, sp) => {
-				ipcMain.removeHandler('patch:save-dialog');
-				ipcMain.handle('patch:save-dialog', async () => ({ success: true, filepath: sp }));
-			}, savedPath);
+			await evaluateWithRetry(
+				app,
+				({ ipcMain }, sp) => {
+					ipcMain.removeHandler('patch:save-dialog');
+					ipcMain.handle('patch:save-dialog', async () => ({ success: true, filepath: sp }));
+				},
+				savedPath,
+			);
 			return savedPath;
 		};
 		await use(fn);
@@ -133,10 +145,14 @@ export const test = base.extend<AppFixtures>({
 		let savedPath = '';
 		const fn = async () => {
 			savedPath = path.join(os.tmpdir(), `g2-test-${Date.now()}.prf2`);
-			await evaluateWithRetry(app, ({ ipcMain }, sp) => {
-				ipcMain.removeHandler('perf:save-dialog');
-				ipcMain.handle('perf:save-dialog', async () => ({ success: true, filepath: sp }));
-			}, savedPath);
+			await evaluateWithRetry(
+				app,
+				({ ipcMain }, sp) => {
+					ipcMain.removeHandler('perf:save-dialog');
+					ipcMain.handle('perf:save-dialog', async () => ({ success: true, filepath: sp }));
+				},
+				savedPath,
+			);
 			return savedPath;
 		};
 		await use(fn);

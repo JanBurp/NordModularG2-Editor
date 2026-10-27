@@ -15,21 +15,27 @@ type FakeDevice = { bus: number; device: number };
 // cli:run-batch, cli:watch-start), plus devices:list so App.vue's startup flow sees a
 // controlled set of "connected G2s" instead of the real (hardware-less, in CI) result.
 async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice[]): Promise<void> {
-	await evaluateWithRetry(app, ({ ipcMain }, devs) => {
-		for (const ch of ['cli:run', 'cli:run-batch']) {
-			ipcMain.removeHandler(ch);
-			ipcMain.handle(ch, async () => '');
-		}
-		ipcMain.removeHandler('cli:watch-start');
-		ipcMain.handle('cli:watch-start', async () => {
-			// Deliberately does not emit watch_armed — connectDevice()'s 8s timeout is allowed
-			// to fire in the background; these tests only assert on state that's settled well
-			// before then (window count), not on a reached "Connected" status.
-		});
+	await evaluateWithRetry(
+		app,
+		({ ipcMain }, devs) => {
+			for (const ch of ['cli:run', 'cli:run-batch']) {
+				ipcMain.removeHandler(ch);
+				ipcMain.handle(ch, async () => '');
+			}
+			ipcMain.removeHandler('cli:watch-start');
+			ipcMain.handle('cli:watch-start', async () => {
+				// Deliberately does not emit watch_armed — connectDevice()'s 8s timeout is allowed
+				// to fire in the background; these tests only assert on state that's settled well
+				// before then (window count), not on a reached "Connected" status.
+			});
 
-		ipcMain.removeHandler('devices:list');
-		ipcMain.handle('devices:list', async () => devs.map((d) => ({ bus: d.bus, device: d.device, id: `${d.bus}:${d.device}`, alreadyConnected: false })));
-	}, devices);
+			ipcMain.removeHandler('devices:list');
+			ipcMain.handle('devices:list', async () =>
+				devs.map((d) => ({ bus: d.bus, device: d.device, id: `${d.bus}:${d.device}`, alreadyConnected: false })),
+			);
+		},
+		devices,
+	);
 }
 
 async function launchApp(testUserData: string): Promise<ElectronApplication> {

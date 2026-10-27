@@ -1,27 +1,26 @@
-import { app, screen, type BrowserWindow, type Rectangle } from "electron";
-import fs from "node:fs";
-import path from "node:path";
+import { app, screen, type BrowserWindow, type Rectangle } from 'electron';
+import fs from 'node:fs';
+import path from 'node:path';
 
 interface WindowState extends Rectangle {
 	isMaximized: boolean;
 }
 
 function stateFile(): string {
-	return path.join(app.getPath("userData"), "window-state.json");
+	return path.join(app.getPath('userData'), 'window-state.json');
 }
 
 function isOnScreen(bounds: Rectangle): boolean {
 	return screen.getAllDisplays().some((d) => {
 		const a = d.workArea;
-		return bounds.x < a.x + a.width && bounds.x + bounds.width > a.x
-			&& bounds.y < a.y + a.height && bounds.y + bounds.height > a.y;
+		return bounds.x < a.x + a.width && bounds.x + bounds.width > a.x && bounds.y < a.y + a.height && bounds.y + bounds.height > a.y;
 	});
 }
 
 export function loadWindowState(): WindowState | null {
 	try {
-		const state = JSON.parse(fs.readFileSync(stateFile(), "utf-8")) as WindowState;
-		const valid = [state.width, state.height, state.x, state.y].every((n) => typeof n === "number");
+		const state = JSON.parse(fs.readFileSync(stateFile(), 'utf-8')) as WindowState;
+		const valid = [state.width, state.height, state.x, state.y].every((n) => typeof n === 'number');
 		if (!valid || !isOnScreen(state)) return null;
 		return state;
 	} catch {
@@ -34,7 +33,9 @@ export function loadWindowState(): WindowState | null {
 export function trackWindowState(win: BrowserWindow, cascade = 0) {
 	let timeout: ReturnType<typeof setTimeout> | null = null;
 	let shown = win.isVisible();
-	win.once("show", () => { shown = true; });
+	win.once('show', () => {
+		shown = true;
+	});
 
 	const save = () => {
 		if (!shown || win.isDestroyed()) return;
@@ -43,7 +44,7 @@ export function trackWindowState(win: BrowserWindow, cascade = 0) {
 		try {
 			fs.writeFileSync(stateFile(), JSON.stringify(state));
 		} catch (e) {
-			console.warn("Failed to save window state:", e);
+			console.warn('Failed to save window state:', e);
 		}
 	};
 
@@ -52,9 +53,9 @@ export function trackWindowState(win: BrowserWindow, cascade = 0) {
 		timeout = setTimeout(save, 500);
 	};
 
-	win.on("resize", scheduleSave);
-	win.on("move", scheduleSave);
-	win.on("close", () => {
+	win.on('resize', scheduleSave);
+	win.on('move', scheduleSave);
+	win.on('close', () => {
 		if (timeout) clearTimeout(timeout);
 		save();
 	});

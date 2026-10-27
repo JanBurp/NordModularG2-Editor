@@ -4,13 +4,7 @@ import { expect, type Locator, type Page } from '@playwright/test';
  * Drop a module from the ModulesPane onto the voice canvas by dispatching
  * DragEvent with DataTransfer directly. The moduleId must match nmg2mods id.
  */
-export async function dropModuleOnCanvas(
-	page: Page,
-	moduleId: number,
-	col = 0,
-	row = 0,
-	area: 'va' | 'fx' = 'va',
-): Promise<void> {
+export async function dropModuleOnCanvas(page: Page, moduleId: number, col = 0, row = 0, area: 'va' | 'fx' = 'va'): Promise<void> {
 	const canvas = await page.locator(`[data-testid="canvas-${area}"]`).boundingBox();
 	if (!canvas) throw new Error(`Canvas not found for area=${area}`);
 
@@ -58,7 +52,10 @@ export async function createCable(
 
 			const srcJack = findJack(src.moduleShort, src.occurrence, `output-${src.connectorIdx}`);
 			const dstJack = findJack(dst.moduleShort, dst.occurrence, `input-${dst.connectorIdx}`);
-			if (!srcJack || !dstJack) throw new Error(`Jack not found: ${src.moduleShort}[${src.occurrence}] output-${src.connectorIdx} → ${dst.moduleShort}[${dst.occurrence}] input-${dst.connectorIdx}`);
+			if (!srcJack || !dstJack)
+				throw new Error(
+					`Jack not found: ${src.moduleShort}[${src.occurrence}] output-${src.connectorIdx} → ${dst.moduleShort}[${dst.occurrence}] input-${dst.connectorIdx}`,
+				);
 
 			// Start the drag on the source jack
 			srcJack.dispatchEvent(new MouseEvent('mousedown', { bubbles: false, cancelable: true }));
@@ -75,7 +72,10 @@ export async function createCable(
 			// Window mouseup triggers cable creation via the snapJack mechanism
 			window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, clientX: dstX, clientY: dstY }));
 		},
-		{ src: { moduleShort: src.moduleShort, occurrence: srcOccurrence, connectorIdx: srcConnector }, dst: { moduleShort: dst.moduleShort, occurrence: dstOccurrence, connectorIdx: dstConnector } },
+		{
+			src: { moduleShort: src.moduleShort, occurrence: srcOccurrence, connectorIdx: srcConnector },
+			dst: { moduleShort: dst.moduleShort, occurrence: dstOccurrence, connectorIdx: dstConnector },
+		},
 	);
 	await page.waitForTimeout(300);
 }
@@ -122,15 +122,21 @@ export async function grabAndDropCableEnd(page: Page, cableIndex: number, grabNe
 
 			// Both ctrlKey and metaKey are set so this works regardless of the host OS running the test
 			// (the app only requires whichever one is the platform's primary modifier).
-			hitArea.dispatchEvent(new MouseEvent('mousedown', { bubbles: false, cancelable: true, ctrlKey: true, metaKey: true, clientX: grabX, clientY: grabY }));
-			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, metaKey: true, clientX: (grabX + toX) / 2, clientY: (grabY + toY) / 2 }));
+			hitArea.dispatchEvent(
+				new MouseEvent('mousedown', { bubbles: false, cancelable: true, ctrlKey: true, metaKey: true, clientX: grabX, clientY: grabY }),
+			);
+			window.dispatchEvent(
+				new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, metaKey: true, clientX: (grabX + toX) / 2, clientY: (grabY + toY) / 2 }),
+			);
 			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
 
 			// Dispatch the mouseup directly on the target jack element to match real user behavior (releasing
 			// the mouse precisely over the jack, which calls stopPropagation and never reaches a window
 			// listener) rather than via window, which would bypass that code path entirely.
 			if (targetJackEl) {
-				targetJackEl.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
+				targetJackEl.dispatchEvent(
+					new MouseEvent('mouseup', { bubbles: true, cancelable: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }),
+				);
 			} else {
 				window.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, ctrlKey: true, metaKey: true, clientX: toX, clientY: toY }));
 			}
@@ -177,12 +183,7 @@ export async function hoverContextMenuItem(page: Page, label: string): Promise<v
 /** Select a module on the canvas by clicking its title bar, then delete it.
  *  Pass deleteAction to use sendMenuAction('delete') — required in Electron tests because
  *  page.keyboard.press('Delete') dispatches DOM events that don't trigger menu accelerators. */
-export async function deleteModule(
-	page: Page,
-	moduleShort: string,
-	occurrence = 0,
-	deleteAction?: () => Promise<void>,
-): Promise<void> {
+export async function deleteModule(page: Page, moduleShort: string, occurrence = 0, deleteAction?: () => Promise<void>): Promise<void> {
 	const handle = page.locator(`[data-testid^="canvas-"] [data-module-short="${moduleShort}"] [data-drag-handle]`).nth(occurrence);
 	const box = await handle.boundingBox();
 	if (!box) throw new Error(`Module drag handle not found: ${moduleShort}[${occurrence}]`);

@@ -4,8 +4,7 @@ import { evaluateWithRetry, expect, test } from './fixtures/electron';
 
 const MOD = { OscA: 97, FltClassic: 92 } as const;
 
-const moduleAt = (page: Page, short: string, occurrence: number) =>
-	page.locator(`[data-testid="canvas-va"] [data-module-short="${short}"]`).nth(occurrence);
+const moduleAt = (page: Page, short: string, occurrence: number) => page.locator(`[data-testid="canvas-va"] [data-module-short="${short}"]`).nth(occurrence);
 const knobOf = (page: Page, short: string, occurrence: number, paramIndex = 0) =>
 	moduleAt(page, short, occurrence).locator(`[data-param-index="${paramIndex}"] .knob-control`);
 

@@ -5,8 +5,8 @@ import { expect, test } from './fixtures/electron';
 const MOD = { OscA: 97, FltClassic: 92, EnvADSR: 20, Mix21A: 194, Out2: 4 } as const;
 
 async function addAllSynthModules(page: import('@playwright/test').Page) {
-	await dropModuleOnCanvas(page, MOD.OscA, 0, 0);       // OscA #1
-	await dropModuleOnCanvas(page, MOD.OscA, 0, 3);       // OscA #2
+	await dropModuleOnCanvas(page, MOD.OscA, 0, 0); // OscA #1
+	await dropModuleOnCanvas(page, MOD.OscA, 0, 3); // OscA #2
 	await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 	await dropModuleOnCanvas(page, MOD.EnvADSR, 1, 4);
 	await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
