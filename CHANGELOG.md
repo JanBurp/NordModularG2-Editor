@@ -11,9 +11,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Patch Adjuster
 - Patch Mutator
-- Parameter Pages Overview sidepanel
+- Parameter Pages Overview
 - Bank Organizer
 - Find & Replace (module names, param labels)
+- G2's memory meter
 - Warnings of mem-protect/full
 - Param popup shows when param has focus
 - Module popup shows long name and module's long description
@@ -27,7 +28,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Finetune right-click on jack, remove opt+click
 - Improved module move/copy change mode
 - Improved cable(s) moving change mode
-- Whole module canvas is used for selecting module, instead of only the header
+- Whole module body is used for selecting module, instead of only the header
 - Improved selection logic when hover select is on
 - ContextMenu->SetValue now for all Params
 - Refactured multi-device UX
