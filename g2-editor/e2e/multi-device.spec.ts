@@ -1,5 +1,5 @@
-import { test as base, _electron as electron, type ElectronApplication } from '@playwright/test';
-import { expect, evaluateWithRetry } from './fixtures/electron';
+import { test as base, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
+import { expect, editorPage, evaluateWithRetry } from './fixtures/electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -53,56 +53,108 @@ const test = base.extend<{ userDataDir: string }>({
 	},
 });
 
-test.describe('multi-device — one BrowserWindow per connected G2', () => {
-	test('exactly one unclaimed device auto-binds', async ({ userDataDir }) => {
-		const app = await launchApp(userDataDir);
-		try {
-			const page = await app.firstWindow();
-			await page.waitForLoadState('domcontentloaded');
-			await stubDeviceDiscovery(app, [{ bus: 2, device: 1 }]);
-			// The real onMounted flow may have already run before the stub landed (against no
-			// devices: G2_HIDE_DEVICES); reload so this run observes the stubbed ones.
-			await page.reload();
-			await page.waitForLoadState('domcontentloaded');
-			await page.waitForSelector('[data-testid="connection-status"]');
+// Launches with one stubbed G2 bound to the first device view (reload: the real onMounted flow
+// may have run before the stub landed, against no devices: G2_HIDE_DEVICES).
+async function launchWithOneDevice(userDataDir: string): Promise<{ app: ElectronApplication; page: Page }> {
+	const app = await launchApp(userDataDir);
+	const page = await editorPage(app);
+	await page.waitForLoadState('domcontentloaded');
+	await stubDeviceDiscovery(app, [{ bus: 2, device: 1 }]);
+	await page.reload();
+	await page.waitForLoadState('domcontentloaded');
+	await page.waitForSelector('[data-testid="connection-status"]');
+	return { app, page };
+}
 
-			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+// A second G2 found by the hot-plug scan; returns its view's page.
+async function addSecondDevice(app: ElectronApplication, first: Page): Promise<Page> {
+	await app.evaluate(() => (globalThis as any).__g2AddDevice(250, 2));
+	await expect.poll(() => app.windows().filter((p) => p !== first && /index\.html|^https?:/.test(p.url())).length).toBe(1);
+	const second = app.windows().find((p) => p !== first && /index\.html|^https?:/.test(p.url()))!;
+	await second.waitForSelector('[data-testid="connection-status"]');
+	return second;
+}
+
+// The stubbed daemon never arms: wait out the connect attempt (its loading overlay), then close
+// the "G2 not connected" splash a view may show, so both stop covering the toolbar.
+async function settle(page: Page): Promise<void> {
+	await expect(page.locator('[data-testid="connection-status"]')).not.toContainText('connecting', { timeout: 20_000 });
+	const close = page.getByRole('button', { name: 'Close', exact: true }).last();
+	if (await close.isVisible()) await close.click();
+}
+
+const windowCount = (app: ElectronApplication) => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length);
+const groupStates = (page: Page) => page.locator('[data-testid="device-group"]').evaluateAll((els) => els.map((el) => el.getAttribute('data-active')));
+
+test.describe('multi-device — one window, a device group per connected G2', () => {
+	test('one device: one window with one active device group', async ({ userDataDir }) => {
+		const { app, page } = await launchWithOneDevice(userDataDir);
+		try {
+			await expect.poll(() => windowCount(app)).toBe(1);
+			await expect.poll(() => groupStates(page)).toEqual(['true']);
 		} finally {
 			await app.close();
 		}
 	});
 
-	test('multiple unclaimed devices: auto-binds to the first one (no picker)', async ({ userDataDir }) => {
-		const app = await launchApp(userDataDir);
+	test('a second device joins the same window as an inactive group, in the same order in both views', async ({ userDataDir }) => {
+		const { app, page } = await launchWithOneDevice(userDataDir);
 		try {
-			const page = await app.firstWindow();
-			await page.waitForLoadState('domcontentloaded');
-			await stubDeviceDiscovery(app, [
-				{ bus: 2, device: 1 },
-				{ bus: 0, device: 7 },
-			]);
-			await page.reload();
-			await page.waitForLoadState('domcontentloaded');
-			await page.waitForSelector('[data-testid="connection-status"]');
-
-			// No dialog anywhere — the first candidate is bound automatically.
-			await expect.poll(() => app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows().length)).toBe(1);
+			const second = await addSecondDevice(app, page);
+			expect(await windowCount(app)).toBe(1);
+			await expect.poll(() => groupStates(page)).toEqual(['true', 'false']);
+			await expect.poll(() => groupStates(second)).toEqual(['false', 'true']);
 		} finally {
 			await app.close();
 		}
 	});
 
-	// The explicit ask this fixes: two windows are two independent renderer processes with their
-	// own Pinia state, so a copy in one is invisible to the other unless routed through the real
-	// OS clipboard (see usePatchClipboard.ts / electron/main.ts's clipboard:write/read).
-	test('copy in one window is readable via paste in a second, independent window (real OS clipboard round-trip)', async () => {
+	test("clicking another device's slot switches to it and focuses that slot there", async ({ userDataDir }) => {
+		const { app, page } = await launchWithOneDevice(userDataDir);
+		try {
+			const second = await addSecondDevice(app, page);
+			await expect.poll(() => groupStates(page)).toEqual(['true', 'false']);
+			await settle(page);
+			await page.locator('[data-testid="device-group"][data-active="false"]').getByRole('button', { name: 'C', exact: true }).click();
+			await expect(second.locator('[data-testid="slot-2"]')).toHaveClass(/btn-active/);
+		} finally {
+			await app.close();
+		}
+	});
+
+	test('a device moves to a window of its own and back', async ({ userDataDir }) => {
+		const { app, page } = await launchWithOneDevice(userDataDir);
+		try {
+			const second = await addSecondDevice(app, page);
+			await expect.poll(() => groupStates(page)).toEqual(['true', 'false']);
+			await settle(page);
+			await page.locator('[data-testid="device-group"][data-active="false"] [data-testid="device-name"]').click({ button: 'right' });
+			await page.getByText('Open in Separate Window').click();
+			await expect.poll(() => windowCount(app)).toBe(2);
+			// Same order in both windows.
+			await expect.poll(() => groupStates(page)).toEqual(['true', 'false']);
+			await expect.poll(() => groupStates(second)).toEqual(['false', 'true']);
+
+			await settle(second);
+			await second.locator('[data-testid="device-group"][data-active="true"] [data-testid="device-name"]').click({ button: 'right' });
+			await second.getByText('Move to Main Window').click();
+			await expect.poll(() => windowCount(app)).toBe(1);
+		} finally {
+			await app.close();
+		}
+	});
+
+	// Two views are two independent renderer processes with their own Pinia state, so a copy in
+	// one is invisible to the other unless routed through the real OS clipboard (see
+	// usePatchClipboard.ts / electron/main.ts's clipboard:write/read).
+	test('copy in one app is readable via paste in a second, independent one (real OS clipboard round-trip)', async () => {
 		const dataA = fs.mkdtempSync(path.join(os.tmpdir(), 'g2-test-multi-a-'));
 		const dataB = fs.mkdtempSync(path.join(os.tmpdir(), 'g2-test-multi-b-'));
 		const appA = await launchApp(dataA);
 		const appB = await launchApp(dataB);
 		try {
-			const pageA = await appA.firstWindow();
-			const pageB = await appB.firstWindow();
+			const pageA = await editorPage(appA);
+			const pageB = await editorPage(appB);
 			await pageA.waitForLoadState('domcontentloaded');
 			await pageB.waitForLoadState('domcontentloaded');
 

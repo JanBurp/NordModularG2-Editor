@@ -91,6 +91,7 @@
 				{ keys: [key(CTRL, 'Tab'), key(CTRL, SHIFT, 'Tab')], action: 'Cycle to next / previous slot' },
 				{ keys: [key(SHIFT, 'Click slot')], action: 'Toggle slot Active' },
 				{ keys: [key(CMD_CTRL, 'Click slot')], action: 'Toggle slot Keyboard' },
+				{ keys: [key(CMD_CTRL, '`')], action: 'Switch to next device (G2)' },
 				{ keys: ['1–8'], action: 'Select variation 1–8' },
 				{ keys: ['R'], action: 'Toggle clock run / stop' },
 			],

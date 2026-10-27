@@ -3,6 +3,8 @@ import { DeviceStatus, useDeviceStore } from '@/store/device';
 import type { Device } from '@/types';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
+import { useUiStore } from '@/store/ui';
+import type { DeviceSummary } from '@/types';
 
 import { ref, watch } from 'vue';
 import { bankDownloadProgress } from './useBankDownloadDialog';
@@ -49,10 +51,19 @@ export function useG2() {
 		}
 	};
 
+	// What the other device views show in this device's toolbar group.
+	const uiStore = useUiStore();
 	watch(
-		() => store.status,
-		(status) => {
-			window.electronAPI?.devices?.reportStatus(status).catch(() => {});
+		(): DeviceSummary => ({
+			name: store.device?.synthName || null,
+			status: store.status,
+			perfMode: store.device?.mode === 'Performance',
+			selectedSlot: uiStore.selectedSlotIndex,
+			slotsActive: store.getSlotsActiveStatus,
+			slotsKeyed: store.getSlotsKeyStatus,
+		}),
+		(summary, previous) => {
+			if (JSON.stringify(summary) !== JSON.stringify(previous)) window.electronAPI?.devices?.report(summary).catch(() => {});
 		},
 		{ immediate: true },
 	);

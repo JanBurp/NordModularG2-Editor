@@ -1,4 +1,4 @@
-import { BrowserWindow, app, ipcMain, dialog, Menu, shell, nativeTheme, clipboard } from 'electron';
+import { BrowserWindow, WebContentsView, app, ipcMain, dialog, Menu, shell, nativeTheme, clipboard, type WebContents } from 'electron';
 import installExtension, { VUEJS_DEVTOOLS } from 'electron-devtools-installer';
 
 if (process.env.TEST_USER_DATA) {
@@ -10,8 +10,9 @@ import path from 'node:path';
 import fs from 'node:fs';
 import { spawn, type ChildProcess } from 'child_process';
 import { loadWindowState, trackWindowState } from './windowState';
-import type { MenuState } from '../src/types/index';
+import type { ConnectedDeviceInfo, DeviceAction, DeviceSummary, MenuState } from '../src/types/index';
 import type { DeviceStatus } from '../src/store/device';
+import { confirmedNewDevices } from '../src/utils/deviceScan';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
@@ -21,18 +22,17 @@ export const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
 export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
 export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
 
-/* One BrowserWindow + one daemon subprocess per connected G2, so switching
- * devices is just OS window focus — nothing reloads, both stay live. A window
- * usually gets its DeviceSession once its renderer calls devices:connect, except
- * a device discovered via "Add Device" (see discoverDevices) which is pre-registered
- * with a hidden window right away, so it starts connecting in the background. */
+/* One WebContentsView (a full renderer with its own stores) + one daemon subprocess per connected G2.
+ * A host BrowserWindow holds several views and shows only its active one, so switching devices
+ * reloads nothing and every device stays live. A device can be moved to a host window of its own.
+ * A view usually gets its DeviceSession once its renderer calls devices:connect, except a device
+ * found by the hot-plug scan (see scanForDevices) which is pre-registered right away, so it starts
+ * connecting in the background. */
 interface DeviceSession {
 	id: string;
 	bus: number;
 	device: number;
-	name: string | null;
-	status: DeviceStatus;
-	window: BrowserWindow;
+	contents: WebContents;
 	daemonProcess: ChildProcess | null;
 	cmdId: number;
 	pendingCmds: Map<number, { resolve: (v: string) => void; reject: (e: Error) => void; timeout: ReturnType<typeof setTimeout> }>;
@@ -44,23 +44,44 @@ interface DeviceSession {
 const MAX_EARLY_EVENTS = 10_000;
 const sessions = new Map<string, DeviceSession>();
 const sessionByWebContentsId = new Map<number, DeviceSession>();
-// The focused window, not its session id: a session's id changes (G2 re-enumerated at a new address,
-// daemon restart re-claim), which left the menu showing the not-connected default until a refocus.
+
+interface Host {
+	window: BrowserWindow;
+	views: DeviceView[];
+	active: DeviceView | null;
+}
+interface DeviceView {
+	view: WebContentsView;
+	host: Host;
+	// Fixed at creation: the device order shown in every toolbar and the Window menu.
+	order: number;
+	summary: DeviceSummary;
+}
+// hosts[0] is the main window; any others hold devices moved to a window of their own.
+const hosts: Host[] = [];
+const deviceViews = new Map<number, DeviceView>();
+let nextViewOrder = 0;
+const sortedViews = (): DeviceView[] => Array.from(deviceViews.values()).sort((a, b) => a.order - b.order);
+const hostOf = (window: BrowserWindow | null): Host | undefined => hosts.find((h) => h.window === window);
+// The window a renderer's dialogs belong to.
+const hostWindow = (sender: WebContents): BrowserWindow | undefined => deviceViews.get(sender.id)?.host.window;
+// The active view of the focused host window, not its session id: a session's id changes (G2 re-enumerated at a
+// new address, daemon restart re-claim), which left the menu showing the not-connected default until a refocus.
 let activeWebContentsId: number | null = null;
 const activeSession = (): DeviceSession | undefined => (activeWebContentsId === null ? undefined : sessionByWebContentsId.get(activeWebContentsId));
 
-// Pre-assigns a startup window to a specific physical device (set right after the
-// window is created, before its renderer loads) so parallel startup windows each
+// Pre-assigns a device view to a specific physical device (set right after the
+// view is created, before its renderer loads) so parallel startup views each
 // bind to a distinct device instead of racing on devices:list's "first unclaimed".
 // showSplash is decided here too, synchronously, in creation order — deterministic,
 // unlike leaving it to whichever renderer's onMounted happens to run first (a real
 // race between independent renderer processes, which one lost was effectively random).
 const pendingAssignment = new Map<number, { bus: number; device: number; showSplash: boolean }>();
 
-// Shows the About/credits splash only for the first window of an app launch; every
-// other window just shows its own connecting spinner instead — see devices:get-assignment
-// / claim-startup-splash. Used directly by parallel-launch windows' showSplash above; kept
-// as a fallback IPC for the single-window (no devices found) case, which has no assignment.
+// Shows the About/credits splash only for the first view of an app launch; every
+// other view just shows its own connecting spinner instead — see devices:get-assignment
+// / claim-startup-splash. Used directly by parallel-launch views' showSplash above; kept
+// as a fallback IPC for the single-view (no devices found) case, which has no assignment.
 let startupSplashClaimed = false;
 
 const isMac = process.platform === 'darwin';
@@ -71,13 +92,17 @@ const DONATE_URL = 'https://www.paypal.com/donate/?hosted_button_id=UZE943PYKY5S
 const cliName = process.platform === 'win32' ? 'g2-cli.exe' : 'g2-cli';
 const cliPath = app.isPackaged ? path.join(process.resourcesPath, cliName) : path.join(process.env.APP_ROOT!, 'resources', cliName);
 
-function safeSend(window: BrowserWindow, channel: string, ...args: unknown[]): void {
-	if (!window.isDestroyed()) window.webContents.send(channel, ...args);
+function safeSend(contents: WebContents, channel: string, ...args: unknown[]): void {
+	if (!contents.isDestroyed()) contents.send(channel, ...args);
+}
+
+function focusedView(): WebContents | undefined {
+	return hostOf(BrowserWindow.getFocusedWindow())?.active?.view.webContents;
 }
 
 function sendToFocused(channel: string, ...args: unknown[]): void {
-	const focused = BrowserWindow.getFocusedWindow();
-	if (focused && !focused.isDestroyed()) focused.webContents.send(channel, ...args);
+	const contents = focusedView();
+	if (contents) safeSend(contents, channel, ...args);
 }
 
 // Files handed to us by the OS (open-file / argv). Held until a renderer has registered its
@@ -87,14 +112,14 @@ const openFileReadyIds = new Set<number>();
 
 function openFileInApp(filepath: string): void {
 	if (!/\.(pch2|prf2)$/i.test(filepath)) return;
-	const ready = BrowserWindow.getAllWindows().filter((w) => !w.isDestroyed() && openFileReadyIds.has(w.webContents.id));
-	const target = ready.find((w) => w.isFocused()) ?? ready[0];
+	const ready = sortedViews().filter((dv) => openFileReadyIds.has(dv.view.webContents.id));
+	const target = ready.find((dv) => dv.host.window.isFocused() && dv.host.active === dv) ?? ready[0];
 	if (!target) {
 		pendingOpenFiles.push(filepath);
 		return;
 	}
-	revealWindow(target);
-	target.webContents.send('file:open', filepath);
+	selectView(target);
+	target.view.webContents.send('file:open', filepath);
 }
 
 ipcMain.handle('app:open-file-ready', (event) => {
@@ -119,7 +144,7 @@ function resolveSession(event: { sender: { id: number } }): DeviceSession | unde
 }
 
 // Frees a session's claim on its bus:device id (sessions, the map that gates rediscovery
-// and the Window/DeviceSwitcher lists) without touching sessionByWebContentsId — that map's
+// and the device scan) without touching sessionByWebContentsId — that map's
 // lifetime is tied to the window, not the daemon, so a window can keep routing IPC to a
 // session whose daemon just died (see startDaemon's retry-in-place re-claim below).
 function unregisterSession(session: DeviceSession): void {
@@ -127,24 +152,18 @@ function unregisterSession(session: DeviceSession): void {
 }
 
 function broadcastDevicesChanged(): void {
-	const list = Array.from(sessions.values()).map((s) => ({
-		id: s.id,
-		bus: s.bus,
-		device: s.device,
-		name: s.name,
-		hasDaemon: s.daemonProcess !== null,
-		status: s.status,
+	const list: ConnectedDeviceInfo[] = sortedViews().map((dv) => ({
+		viewId: dv.view.webContents.id,
+		detached: dv.host !== hosts[0],
+		...dv.summary,
 	}));
-	for (const window of BrowserWindow.getAllWindows()) {
-		if (!window.isDestroyed()) window.webContents.send('devices:changed', list);
-	}
+	for (const dv of deviceViews.values()) safeSend(dv.view.webContents, 'devices:changed', list);
 	refreshMenu();
 }
 
 // Shows (maximizing first, matching a freshly-created window's usual state) and focuses a
-// window that may still be hidden — used when a background-connected device (see
-// discoverDevices) is picked from DeviceSwitcher/Window menu. A no-op beyond focus() if
-// the window is already visible, so it never re-maximizes a window the user resized.
+// window that may still be hidden. A no-op beyond focus() if the window is already visible,
+// so it never re-maximizes a window the user resized.
 function revealWindow(window: BrowserWindow): void {
 	if (!window.isVisible()) {
 		if (process.env.HEADLESS !== '1') window.maximize();
@@ -153,65 +172,148 @@ function revealWindow(window: BrowserWindow): void {
 	window.focus();
 }
 
-function createAppWindow(cascadeIndex = 0, visible = true): BrowserWindow {
+function createHost(cascadeIndex = 0): Host {
 	const headless = process.env.HEADLESS === '1';
 	const state = loadWindowState();
 	// All windows share one saved position (window-state.json has no per-window slot), so
-	// opening several at once would otherwise stack them exactly on top of each other —
-	// cascade non-maximized ones so they're visually distinguishable and cycling is legible.
+	// cascade a separate device window so it doesn't open exactly on top of the main one.
 	const cascade = cascadeIndex * 32;
 	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
 		x: state?.x !== undefined ? state.x + cascade : undefined,
 		y: state?.y !== undefined ? state.y + cascade : undefined,
-		show: visible && !headless,
+		show: !headless,
 		icon: path.join(process.env.APP_ROOT!, 'resources', 'icon.png'),
+	});
+	if (!headless) {
+		if (state?.isMaximized ?? true) window.maximize();
+		window.show();
+	}
+	trackWindowState(window, cascade);
+
+	const host: Host = { window, views: [], active: null };
+	hosts.push(host);
+	if (!isMac) applyWindowMenu(window);
+	window.on('resize', () => layoutHost(host));
+	window.on('focus', () => host.active?.view.webContents.focus());
+	window.on('close', () => console.log(`[window] close requested (${host.views.length} device view(s))`));
+	window.on('closed', () => {
+		hosts.splice(hosts.indexOf(host), 1);
+		for (const dv of [...host.views]) dv.view.webContents.close();
+	});
+	return host;
+}
+
+function layoutHost(host: Host): void {
+	if (host.window.isDestroyed()) return;
+	const { width, height } = host.window.getContentBounds();
+	for (const dv of host.views) dv.view.setBounds({ x: 0, y: 0, width, height });
+}
+
+// Shows `dv` in its host and hides the host's other views.
+function setActiveView(dv: DeviceView): void {
+	const host = dv.host;
+	host.active = dv;
+	for (const v of host.views) v.view.setVisible(v === dv);
+	if (!host.window.isDestroyed()) {
+		const title = dv.view.webContents.getTitle();
+		if (title) host.window.setTitle(title);
+		if (host.window.isFocused()) {
+			activeWebContentsId = dv.view.webContents.id;
+			dv.view.webContents.focus();
+		}
+	}
+	broadcastDevicesChanged();
+}
+
+// The single "pick this device" action: toolbar device groups, the Window menu, opened files.
+function selectView(dv: DeviceView): void {
+	activeWebContentsId = dv.view.webContents.id;
+	setActiveView(dv);
+	revealWindow(dv.host.window);
+	dv.view.webContents.focus();
+}
+
+function addToHost(dv: DeviceView, host: Host): void {
+	dv.host = host;
+	host.views.push(dv);
+	host.window.contentView.addChildView(dv.view);
+	layoutHost(host);
+	if (host.active) dv.view.setVisible(false);
+	else setActiveView(dv);
+}
+
+// Takes `dv` out of its host; a host left without views closes.
+function removeFromHost(dv: DeviceView): void {
+	const host = dv.host;
+	const idx = host.views.indexOf(dv);
+	if (idx < 0) return;
+	host.views.splice(idx, 1);
+	if (host.window.isDestroyed()) return;
+	host.window.contentView.removeChildView(dv.view);
+	if (host.views.length === 0) host.window.close();
+	else if (host.active === dv) setActiveView(host.views[0]);
+}
+
+function createDeviceView(host: Host): DeviceView {
+	const view = new WebContentsView({
 		webPreferences: {
 			preload: path.join(__dirname, '../preload/preload.js'),
 			nodeIntegration: false,
 			contextIsolation: true,
 		},
 	});
-
-	// visible=false (see discoverDevices) leaves the window hidden and unmaximized —
-	// it's revealed later via revealWindow, which maximizes at that point instead.
-	if (!headless && visible) {
-		if (state?.isMaximized ?? true) window.maximize();
-		window.show();
-	}
-
-	trackWindowState(window, cascade);
-	if (!isMac) applyWindowMenu(window);
+	const contents = view.webContents;
+	const dv: DeviceView = {
+		view,
+		host,
+		order: nextViewOrder++,
+		summary: {
+			name: null,
+			status: 'disconnected' as DeviceStatus,
+			perfMode: false,
+			selectedSlot: null,
+			slotsActive: [],
+			slotsKeyed: [],
+		},
+	};
+	deviceViews.set(contents.id, dv);
+	addToHost(dv, host);
 
 	if (VITE_DEV_SERVER_URL) {
-		window.loadURL(VITE_DEV_SERVER_URL);
+		contents.loadURL(VITE_DEV_SERVER_URL);
 	} else {
-		window.loadFile(path.join(RENDERER_DIST, 'index.html'));
+		contents.loadFile(path.join(RENDERER_DIST, 'index.html'));
 	}
 
 	// Session (if any) is bound later via devices:connect; look it up by id at
 	// close time rather than capturing it now, since binding is asynchronous.
-	const wcId = window.webContents.id;
+	const wcId = contents.id;
+	contents.on('page-title-updated', (_e, title) => {
+		if (dv.host.active === dv && !dv.host.window.isDestroyed()) dv.host.window.setTitle(title);
+	});
 	// Diagnostics: a duration run (2026-10-09) lost its only window with nothing in the log.
-	window.on('close', () => console.log(`[window] close requested (webContents ${wcId})`));
-	window.webContents.on('render-process-gone', (_e, details) =>
+	contents.on('render-process-gone', (_e, details) =>
 		console.log(`[window] renderer gone (webContents ${wcId}): ${details.reason} (exit ${details.exitCode})`),
 	);
-	window.on('closed', () => {
+	contents.on('destroyed', () => {
+		deviceViews.delete(wcId);
+		removeFromHost(dv);
 		pendingAssignment.delete(wcId);
 		openFileReadyIds.delete(wcId);
 		storageDirByWc.delete(wcId);
 		pruneStorageWatchers();
 		const session = sessionByWebContentsId.get(wcId);
-		if (!session) return;
-		sessionByWebContentsId.delete(wcId);
-		unregisterSession(session);
-		void stopDaemon(session);
+		if (session) {
+			sessionByWebContentsId.delete(wcId);
+			unregisterSession(session);
+			void stopDaemon(session);
+		}
 		broadcastDevicesChanged();
 	});
 
-	return window;
+	return dv;
 }
 
 function startDaemon(session: DeviceSession) {
@@ -222,7 +324,7 @@ function startDaemon(session: DeviceSession) {
 	}
 	// Re-claim the id if a prior crash freed it (see unregisterSession) — but never steal
 	// it from a different session that claimed it in the meantime; that window just stays
-	// local (routes IPC via sessionByWebContentsId only, absent from sessions/DeviceSwitcher).
+	// local (routes IPC via sessionByWebContentsId only, absent from sessions).
 	const owner = sessions.get(session.id);
 	if (!owner) {
 		sessions.set(session.id, session);
@@ -258,7 +360,7 @@ function startDaemon(session: DeviceSession) {
 				}
 			}
 			// The daemon followed the G2 to a new address on the same port (G2 self-reboot): keep the claim map in
-			// step, otherwise "Add Device" offers the same G2 again as unclaimed.
+			// step, otherwise the device scan finds the same G2 again as unclaimed.
 			if (trimmed.startsWith('{"type":"device_retargeted"')) {
 				try {
 					const { bus, device } = JSON.parse(trimmed);
@@ -284,7 +386,7 @@ function startDaemon(session: DeviceSession) {
 			} else if (session.earlyEvents) {
 				if (session.earlyEvents.length < MAX_EARLY_EVENTS) session.earlyEvents.push(trimmed);
 			} else {
-				safeSend(session.window, 'cli:watch-event', trimmed);
+				safeSend(session.contents, 'cli:watch-event', trimmed);
 			}
 		}
 	});
@@ -303,9 +405,9 @@ function startDaemon(session: DeviceSession) {
 		if (!wasActive) return;
 		unregisterSession(session);
 		if (code !== null && code !== 0) {
-			safeSend(session.window, 'cli:device-disconnected');
+			safeSend(session.contents, 'cli:device-disconnected');
 		} else {
-			safeSend(session.window, 'cli:watch-done');
+			safeSend(session.contents, 'cli:watch-done');
 		}
 		broadcastDevicesChanged();
 	};
@@ -526,7 +628,7 @@ ipcMain.handle('cli:watch-start', async (event) => {
 		// Daemon was started ahead of the renderer: the listener is registered now, hand over what it missed.
 		const held = session.earlyEvents;
 		session.earlyEvents = null;
-		for (const line of held) safeSend(session.window, 'cli:watch-event', line);
+		for (const line of held) safeSend(session.contents, 'cli:watch-event', line);
 		return;
 	}
 	session.earlyEvents = null;
@@ -570,14 +672,12 @@ ipcMain.handle('app:claim-startup-splash', () => {
 	return isFirst;
 });
 
-function newSession(id: string, bus: number, device: number, window: BrowserWindow): DeviceSession {
+function newSession(id: string, bus: number, device: number, contents: WebContents): DeviceSession {
 	return {
 		id,
 		bus,
 		device,
-		name: null,
-		status: 'connecting' as DeviceStatus,
-		window,
+		contents,
 		daemonProcess: null,
 		cmdId: 0,
 		pendingCmds: new Map(),
@@ -593,8 +693,6 @@ function rekeySession(session: DeviceSession, bus: number, device: number): void
 }
 
 ipcMain.handle('devices:connect', async (event, bus: number, device: number) => {
-	const window = BrowserWindow.fromWebContents(event.sender);
-	if (!window) throw new Error('No window for this call');
 	const id = `${bus}:${device}`;
 	let session = sessionByWebContentsId.get(event.sender.id);
 	const owner = sessions.get(id);
@@ -603,17 +701,15 @@ ipcMain.handle('devices:connect', async (event, bus: number, device: number) => 
 	}
 	if (session) {
 		if (session.id !== id) {
-			// Rebinding this window to a different device — stop any daemon still bound to
+			// Rebinding this view to a different device — stop any daemon still bound to
 			// the old bus/device first, so it never keeps routing commands to it (main.ts's
 			// startDaemon guard would otherwise treat the daemon as still "this session's").
 			await stopDaemon(session);
 			sessions.delete(session.id);
 		}
 		rekeySession(session, bus, device);
-		session.name = null;
-		session.status = 'connecting' as DeviceStatus;
 	} else {
-		session = newSession(id, bus, device, window);
+		session = newSession(id, bus, device, event.sender);
 		sessionByWebContentsId.set(event.sender.id, session);
 	}
 	sessions.set(id, session);
@@ -621,24 +717,48 @@ ipcMain.handle('devices:connect', async (event, bus: number, device: number) => 
 	return { id };
 });
 
-ipcMain.handle('devices:switch-to', (_, bus: number, device: number) => {
-	openOrFocusDevice(bus, device);
+ipcMain.handle('devices:self', (event) => event.sender.id);
+
+ipcMain.handle('devices:report', (event, summary: DeviceSummary) => {
+	const dv = deviceViews.get(event.sender.id);
+	if (!dv) return;
+	dv.summary = summary;
+	broadcastDevicesChanged();
 });
 
-ipcMain.handle('devices:report-name', (event, name: string) => {
-	const session = resolveSession(event);
-	if (session) {
-		session.name = name;
-		broadcastDevicesChanged();
-	}
+// Switches to a device, then runs the toolbar button clicked in its group there.
+ipcMain.handle('devices:select', (_, viewId: number, action?: DeviceAction) => {
+	const dv = deviceViews.get(viewId);
+	if (!dv) return;
+	selectView(dv);
+	if (action) safeSend(dv.view.webContents, 'devices:action', action);
 });
 
-ipcMain.handle('devices:report-status', (event, status: DeviceStatus) => {
-	const session = resolveSession(event);
-	if (session) {
-		session.status = status;
-		broadcastDevicesChanged();
-	}
+// Moves a device to a window of its own (detach) or back into the main window.
+function moveView(dv: DeviceView, detach: boolean): void {
+	if (detach ? dv.host.views.length < 2 : dv.host === hosts[0]) return;
+	removeFromHost(dv);
+	addToHost(dv, detach ? createHost(hosts.length) : hosts[0]);
+	selectView(dv);
+}
+
+ipcMain.handle('devices:detach', (_, viewId: number) => {
+	const dv = deviceViews.get(viewId);
+	if (dv) moveView(dv, true);
+});
+
+ipcMain.handle('devices:attach', (_, viewId: number) => {
+	const dv = deviceViews.get(viewId);
+	if (dv) moveView(dv, false);
+});
+
+ipcMain.handle('devices:close', (_, viewId: number) => {
+	const dv = deviceViews.get(viewId);
+	// The last view keeps the app open.
+	if (!dv || deviceViews.size < 2) return;
+	const session = sessionByWebContentsId.get(viewId);
+	if (session) closedIds.add(session.id);
+	dv.view.webContents.close();
 });
 
 // --- Clipboard (routed through the OS clipboard, not renderer state, so
@@ -752,8 +872,8 @@ function storageDir(wcId: number, custom?: string): string {
 			if (timer) clearTimeout(timer);
 			// Sent only to the windows still using `dir` when it fires (none once it's pruned).
 			timer = setTimeout(() => {
-				for (const window of BrowserWindow.getAllWindows()) {
-					if (!window.isDestroyed() && storageDirByWc.get(window.webContents.id) === dir) window.webContents.send('storage:changed');
+				for (const [wcId, dv] of deviceViews) {
+					if (storageDirByWc.get(wcId) === dir) safeSend(dv.view.webContents, 'storage:changed');
 				}
 			}, 200);
 		});
@@ -791,7 +911,7 @@ ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {
 });
 
 ipcMain.handle('patches:set-folder', async (event) => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
 		properties: ['openDirectory'],
 	});
@@ -805,7 +925,7 @@ ipcMain.handle('patch:save', async (_, filepath: string, data: number[]) => {
 });
 
 ipcMain.handle('patch:save-dialog', async (event, defaultName?: string, folder?: string) => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const filename = defaultName ? `${defaultName}.pch2` : 'patch.pch2';
 	const result = await dialog.showSaveDialog(browserWin!, {
 		filters: [{ name: 'Patch Files', extensions: ['pch2'] }],
@@ -816,7 +936,7 @@ ipcMain.handle('patch:save-dialog', async (event, defaultName?: string, folder?:
 });
 
 ipcMain.handle('perf:save-dialog', async (event, defaultName?: string, folder?: string) => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const filename = defaultName ? `${defaultName}.prf2` : 'performance.prf2';
 	const result = await dialog.showSaveDialog(browserWin!, {
 		filters: [{ name: 'Performance Files', extensions: ['prf2'] }],
@@ -827,7 +947,7 @@ ipcMain.handle('perf:save-dialog', async (event, defaultName?: string, folder?: 
 });
 
 ipcMain.handle('bank:select-folder', async (event, defaultPath?: string) => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
 		defaultPath: defaultPath || undefined,
 		properties: ['openDirectory'],
@@ -837,7 +957,7 @@ ipcMain.handle('bank:select-folder', async (event, defaultPath?: string) => {
 });
 
 ipcMain.handle('bank:select-pchlist', async (event) => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
 		filters: [{ name: 'Patch List Files', extensions: ['pchList'] }],
 		properties: ['openFile'],
@@ -908,7 +1028,7 @@ ipcMain.handle('modules:load-graphics', () => {
 });
 
 ipcMain.handle('patch:open-dialog', async (event, kind?: 'patch' | 'performance') => {
-	const browserWin = BrowserWindow.fromWebContents(event.sender);
+	const browserWin = hostWindow(event.sender);
 	const filters =
 		kind === 'patch'
 			? [{ name: 'Patch Files', extensions: ['pch2'] }]
@@ -974,75 +1094,64 @@ const defaultMenuState: MenuState = {
 	isPerformanceMode: false,
 };
 
-// Focuses the next (or previous) device window in creation order, wrapping around —
-// the Cmd+` native-app convention for cycling windows of the frontmost application.
-function cycleWindow(direction: 1 | -1): void {
-	const list = Array.from(sessions.values());
+// Selects the next (or previous) device in toolbar order, wrapping around.
+function cycleDevice(direction: 1 | -1): void {
+	const list = sortedViews();
 	if (list.length < 2) return;
-	const idx = list.findIndex((s) => s === activeSession());
+	const idx = list.findIndex((dv) => dv.view.webContents.id === activeWebContentsId);
 	const nextIdx = idx === -1 ? 0 : (idx + direction + list.length) % list.length;
-	revealWindow(list[nextIdx].window);
+	selectView(list[nextIdx]);
 }
 
-// Creates a hidden-or-visible window pre-bound to (bus, device): registers its DeviceSession
-// into both maps synchronously (before the renderer even loads) so the id is claimed
-// immediately, closing the window between "decided to claim this device" and "renderer
-// eventually calls devices:connect" that a caller could otherwise race through twice.
-function registerNewSession(bus: number, device: number, cascadeIndex = 0, visible = false): DeviceSession {
-	const window = createAppWindow(cascadeIndex, visible);
+// Pre-binds a view to (bus, device): registers its DeviceSession into both maps synchronously
+// (before the renderer even loads or asks) so the id is claimed immediately, closing the
+// window between "decided to claim this device" and "renderer eventually calls devices:connect"
+// that a caller could otherwise race through twice.
+function claimForView(contents: WebContents, bus: number, device: number): void {
 	const id = `${bus}:${device}`;
-	const session: DeviceSession = {
-		id,
-		bus,
-		device,
-		name: null,
-		status: 'connecting' as DeviceStatus,
-		window,
-		daemonProcess: null,
-		cmdId: 0,
-		pendingCmds: new Map(),
-		menuState: { ...defaultMenuState },
-	};
+	const session = newSession(id, bus, device, contents);
 	sessions.set(id, session);
-	sessionByWebContentsId.set(window.webContents.id, session);
-	pendingAssignment.set(window.webContents.id, { bus, device, showSplash: false });
-	return session;
+	sessionByWebContentsId.set(contents.id, session);
+	pendingAssignment.set(contents.id, { bus, device, showSplash: false });
+	// A renderer that already asked for its assignment (and got none) binds on this event instead.
+	safeSend(contents, 'devices:assigned', { bus, device });
 }
 
-// Reveals (or opens) the window bound to (bus, device) — the single "pick this device"
-// action shared by DeviceSwitcher and the Window menu. Sessions discovered via
-// discoverDevices already have a (hidden) window and just need revealing; a bus/device
-// with no session yet (not currently reachable from the UI, but kept as a safety fallback)
-// gets a fresh one via registerNewSession, matching the parallel-startup path's pairing.
-function openOrFocusDevice(bus: number, device: number): void {
-	const id = `${bus}:${device}`;
-	const existing = sessions.get(id);
-	if (existing) {
-		revealWindow(existing.window);
-		return;
-	}
-	registerNewSession(bus, device, 0, true);
+// Adds a newly found G2 as a background device: it connects right away but stays hidden (no
+// focus stolen) until picked. A view without a device (no G2 at launch) takes it instead.
+function addDevice(bus: number, device: number): void {
+	const unbound = sortedViews().find((dv) => !sessionByWebContentsId.has(dv.view.webContents.id));
+	const contents = unbound?.view.webContents ?? createDeviceView(hosts[0] ?? createHost()).view.webContents;
+	claimForView(contents, bus, device);
 	broadcastDevicesChanged();
 }
 
-// Guards discoverDevices against overlapping invocations (e.g. two quick "Add Device..."
-// clicks) racing on the same await listAttachedDevices() and both claiming the same
-// not-yet-registered device — a second call while one is in flight is just a no-op.
-let discoveryInFlight = false;
+// e2e: the end of the hot-plug path, without USB (see e2e/multi-device.spec.ts).
+if (process.env.NODE_ENV === 'test') (globalThis as { __g2AddDevice?: typeof addDevice }).__g2AddDevice = addDevice;
 
-// Scans for currently-unclaimed G2s (device turned on after launch) and, for each one,
-// pre-registers a DeviceSession bound to a hidden window right away — so it starts
-// connecting (daemon, device_info/name, status) in the background immediately, the same
-// way the parallel-startup path does, instead of waiting for the user to switch to it.
-// The window stays hidden (no focus stolen from the current one) until openOrFocusDevice
-// reveals it.
-async function discoverDevices(): Promise<void> {
-	if (discoveryInFlight) return;
-	discoveryInFlight = true;
+// A G2 counts as new once it is seen unclaimed on two scans in a row: a G2 that rebooted itself
+// re-enumerates at a new address, which its own daemon follows (device_retargeted) within a scan.
+const SCAN_INTERVAL_MS = 2000;
+let scanInFlight = false;
+let lastUnclaimed: string[] = [];
+// Devices closed by the user: the background scan leaves them alone until they are unplugged.
+const closedIds = new Set<string>();
+
+// The background scan adds hot-plugged G2s; the Window menu's "Scan for Devices" adds them at once
+// and says so when there are none.
+async function scanForDevices(manual = false): Promise<void> {
+	if (scanInFlight) return;
+	scanInFlight = true;
 	try {
 		const devices = await listAttachedDevices().catch(() => []);
-		const unclaimed = devices.filter((d) => !d.alreadyConnected);
-		if (unclaimed.length === 0) {
+		for (const id of closedIds) if (manual || !devices.some((d) => d.id === id)) closedIds.delete(id);
+		// A view whose daemon exited still owns its G2 (it reconnects from that view): no second view for it.
+		const owned = new Set(Array.from(sessionByWebContentsId.values(), (s) => s.id));
+		const unclaimed = devices.filter((d) => !d.alreadyConnected && !owned.has(d.id) && !closedIds.has(d.id));
+		const ids = unclaimed.map((d) => d.id);
+		const confirmed = manual ? ids : confirmedNewDevices(lastUnclaimed, ids);
+		lastUnclaimed = ids;
+		if (manual && unclaimed.length === 0) {
 			await dialog.showMessageBox({
 				type: 'info',
 				message: 'No new devices found.',
@@ -1050,22 +1159,32 @@ async function discoverDevices(): Promise<void> {
 			});
 			return;
 		}
-		unclaimed.forEach((d) => registerNewSession(d.bus, d.device));
-		broadcastDevicesChanged();
+		for (const d of unclaimed) if (confirmed.includes(d.id)) addDevice(d.bus, d.device);
 	} finally {
-		discoveryInFlight = false;
+		scanInFlight = false;
 	}
 }
 
 function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
-	const list = Array.from(sessions.values());
-	if (list.length === 0) return [{ label: 'No Devices Connected', enabled: false }];
-	return list.map((s) => ({
-		label: s.name ?? `bus ${s.bus} dev ${s.device}`,
+	return sortedViews().map((dv) => ({
+		label: dv.summary.name ?? 'No Device',
 		type: 'checkbox' as const,
-		checked: s === activeSession(),
-		click: () => revealWindow(s.window),
+		checked: dv.view.webContents.id === activeWebContentsId,
+		click: () => selectView(dv),
 	}));
+}
+
+// Window-menu twin of the toolbar group's context menu, for the active device.
+function separateWindowMenuItem(): Electron.MenuItemConstructorOptions {
+	const dv = activeWebContentsId === null ? undefined : deviceViews.get(activeWebContentsId);
+	const detached = !!dv && dv.host !== hosts[0];
+	return {
+		label: detached ? 'Move to Main Window' : 'Open in Separate Window',
+		enabled: !!dv && (detached || dv.host.views.length > 1),
+		click: () => {
+			if (dv) moveView(dv, !detached);
+		},
+	};
 }
 
 function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electron.MenuItemConstructorOptions[] {
@@ -1299,22 +1418,18 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				...windowMenuItems(),
 				{ type: 'separator' as const },
 				{
-					// No accelerator: CommandOrControl+` is macOS's own reserved "cycle windows of the
-					// frontmost app" shortcut, which already works for any standard multi-window app
-					// (including this one) without us registering anything — doing so ourselves risked
-					// conflicting with (and breaking) that native behavior instead of complementing it.
-					// (Tried registering it ourselves to also reach a still-hidden discovered device —
-					// didn't work reliably, reverted; a hidden window still won't respond to Cmd+` until
-					// it's been revealed once via DeviceSwitcher/Window menu.)
-					label: 'Cycle to Next Window',
-					enabled: sessions.size > 1,
-					click: () => cycleWindow(1),
+					// Replaces macOS's own Cmd+` window cycling: this also cycles through the devices in one window.
+					label: 'Next Device',
+					accelerator: 'CommandOrControl+`',
+					enabled: deviceViews.size > 1,
+					click: () => cycleDevice(1),
 				},
+				separateWindowMenuItem(),
 				{ type: 'separator' as const },
 				{
-					label: 'Add Device...',
+					label: 'Scan for Devices',
 					click: () => {
-						void discoverDevices();
+						void scanForDevices(true);
 					},
 				},
 			],
@@ -1325,7 +1440,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Module Help', accelerator: 'F1', click: () => sendToFocused('menu:action', 'show-module-help') },
 				{ label: 'Key Commands', click: () => sendToFocused('menu:action', 'show-key-commands') },
 				{ type: 'separator' as const },
-				{ label: 'Toggle DevTools', role: 'toggleDevTools' as const, accelerator: 'CommandOrControl+Option+I' },
+				{ label: 'Toggle DevTools', click: () => focusedView()?.toggleDevTools(), accelerator: 'CommandOrControl+Option+I' },
 				{ label: 'ShowSVG', click: () => sendToFocused('menu:action', 'toggle-svg-viewer') },
 				{ type: 'separator' as const },
 				{
@@ -1354,13 +1469,14 @@ function currentMenuState(): MenuState {
 // every window's menu (via setApplicationMenu) on focus change broke all accelerators on Windows
 // after switching windows, while clicking the menu items still worked.
 function applyWindowMenu(window: BrowserWindow): void {
-	const menuState = sessionByWebContentsId.get(window.webContents.id)?.menuState ?? lastMenuState;
+	const active = hostOf(window)?.active;
+	const menuState = (active && sessionByWebContentsId.get(active.view.webContents.id)?.menuState) ?? lastMenuState;
 	window.setMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, menuState)));
 }
 
 function refreshMenu(): void {
 	if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
-	else for (const window of BrowserWindow.getAllWindows()) if (!window.isDestroyed()) applyWindowMenu(window);
+	else for (const host of hosts) if (!host.window.isDestroyed()) applyWindowMenu(host.window);
 }
 
 ipcMain.on('recent-files:update', (_, files: RecentFileEntry[]) => {
@@ -1373,13 +1489,13 @@ ipcMain.on('menu-state:update', (event, state: MenuState) => {
 	if (session) session.menuState = state;
 	else lastMenuState = state;
 	if (!isMac) {
-		const window = BrowserWindow.fromWebContents(event.sender);
+		const window = hostWindow(event.sender);
 		if (window) applyWindowMenu(window);
 	} else if (session ? session === activeSession() : !activeSession()) refreshMenu();
 });
 
 app.on('browser-window-focus', (_event, window) => {
-	activeWebContentsId = window.webContents.id;
+	activeWebContentsId = hostOf(window)?.active?.view.webContents.id ?? null;
 	if (isMac) refreshMenu();
 });
 
@@ -1414,33 +1530,33 @@ app.whenReady().then(async () => {
 		}
 	}
 
-	// Auto-bind every not-yet-connected G2 found in parallel, one window each — no
+	// Auto-bind every not-yet-connected G2 found, one view each in the main window — no
 	// picker, matching devices:connect's existing single-device "no picker" behavior.
-	// Falls back to one plain window (today's offline/no-device behavior) if
+	// Falls back to one plain view (today's offline/no-device behavior) if
 	// enumeration fails (e.g. CLI binary missing in dev), nothing is attached, or
 	// VITE_DEV_OFFLINE is set (renderer-side offline mode expects exactly one
-	// hardware-agnostic window — see isOffline in preload.ts).
-	const devices = process.env.VITE_DEV_OFFLINE === 'true' ? [] : await listAttachedDevices().catch(() => []);
+	// hardware-agnostic view — see isOffline in preload.ts).
+	const offline = process.env.VITE_DEV_OFFLINE === 'true';
+	const devices = offline ? [] : await listAttachedDevices().catch(() => []);
 	const unclaimed = devices.filter((d) => !d.alreadyConnected);
+	const main = createHost();
 	if (unclaimed.length === 0) {
-		createAppWindow();
+		createDeviceView(main);
 	} else {
-		// Each window's own show()/maximize() call (in createAppWindow) steals focus from
-		// whichever window was shown before it, so the LAST one created ends up frontmost —
-		// that's the one the user actually sees at startup, so it's the one that gets the splash.
-		const frontmostIndex = unclaimed.length - 1;
+		// The first device is the one shown, so it gets the splash.
+		startupSplashClaimed = true;
 		unclaimed.forEach((d, i) => {
-			const window = createAppWindow(i);
-			if (i === frontmostIndex) startupSplashClaimed = true;
-			pendingAssignment.set(window.webContents.id, { bus: d.bus, device: d.device, showSplash: i === frontmostIndex });
+			const contents = createDeviceView(main).view.webContents;
+			pendingAssignment.set(contents.id, { bus: d.bus, device: d.device, showSplash: i === 0 });
 			// Start the daemon now instead of after the renderer has loaded and mounted, so USB init
 			// overlaps renderer boot; its events are held until the renderer calls cli:watch-start.
-			const session = newSession(d.id, d.bus, d.device, window);
+			const session = newSession(d.id, d.bus, d.device, contents);
 			session.earlyEvents = [];
-			sessionByWebContentsId.set(window.webContents.id, session);
+			sessionByWebContentsId.set(contents.id, session);
 			startDaemon(session);
 		});
 	}
+	if (!offline) setInterval(() => void scanForDevices(), SCAN_INTERVAL_MS);
 
 	refreshMenu();
 });

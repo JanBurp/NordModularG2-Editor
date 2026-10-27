@@ -35,6 +35,30 @@ export async function evaluateWithRetry<R, Arg = void>(
 	}
 }
 
+// The editor's page. The window itself loads nothing: each G2 gets a view with the editor in it
+// (see electron/main.ts), so app.firstWindow() would be the empty window.
+export async function editorPage(app: ElectronApplication, timeoutMs = 30_000): Promise<Page> {
+	const deadline = Date.now() + timeoutMs;
+	for (;;) {
+		const page = app.windows().find((p) => /index\.html|^https?:/.test(p.url()));
+		if (page) return page;
+		if (Date.now() > deadline) throw new Error('editor page not found');
+		await new Promise((r) => setTimeout(r, 50));
+	}
+}
+
+// Sends a menu action to the first device view, as a menu click in the main window would.
+export async function sendMenuActionTo(app: ElectronApplication, action: string): Promise<void> {
+	await evaluateWithRetry(
+		app,
+		({ BrowserWindow }, act) => {
+			const view = BrowserWindow.getAllWindows()[0]?.contentView.children[0] as import('electron').WebContentsView | undefined;
+			view?.webContents.send('menu:action', act);
+		},
+		action,
+	);
+}
+
 export type AppFixtures = {
 	app: ElectronApplication;
 	page: Page;
@@ -60,7 +84,7 @@ export const test = base.extend<AppFixtures>({
 
 		// Wait for the window's initial navigation to settle before stubbing handlers,
 		// preventing "Execution context was destroyed" race with page load.
-		await (await app.firstWindow()).waitForLoadState('domcontentloaded');
+		await (await editorPage(app)).waitForLoadState('domcontentloaded');
 
 		// Stub out CLI handlers so no binary is needed
 		await evaluateWithRetry(app, ({ ipcMain }) => {
@@ -78,7 +102,7 @@ export const test = base.extend<AppFixtures>({
 	},
 
 	page: async ({ app }, use) => {
-		const page = await app.firstWindow();
+		const page = await editorPage(app);
 		await page.waitForLoadState('domcontentloaded');
 		await page.waitForSelector('[data-testid="connection-status"]');
 		await use(page);
@@ -87,17 +111,7 @@ export const test = base.extend<AppFixtures>({
 	// Depends on `page` so the renderer has mounted (and registered its menu:action listener)
 	// before any action is sent; otherwise a hook requesting only sendMenuAction races the mount.
 	sendMenuAction: async ({ app, page: _page }, use) => {
-		const fn = async (action: string) => {
-			await evaluateWithRetry(
-				app,
-				({ BrowserWindow }, act) => {
-					const win = BrowserWindow.getAllWindows()[0];
-					win?.webContents.send('menu:action', act);
-				},
-				action,
-			);
-		};
-		await use(fn);
+		await use((action: string) => sendMenuActionTo(app, action));
 	},
 
 	mockOpenPatch: async ({ app }, use) => {

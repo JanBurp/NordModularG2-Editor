@@ -28,7 +28,6 @@ export function useDeviceEvents(log: LogFn) {
 			if (!ev.data) return true;
 			store.applyDeviceInfo(ev.data);
 			log('←', 'Watch', `device_info name=${ev.data?.synthName ?? '?'}`);
-			if (ev.data?.synthName) window.electronAPI?.devices?.reportName(ev.data.synthName).catch(() => {});
 			return true;
 		}
 		if (ev.type === 'names') {

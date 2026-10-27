@@ -92,7 +92,7 @@ export const STATUS_HINTS = {
 	colorChoose: 'Click: choose color',
 	clockRun: 'Click: start/stop master clock',
 	perfMode: 'Click: switch Patch/Performance mode · Shift-click: create performance/get patches from performance',
-	deviceSwitch: 'Click: switch to this device',
+	deviceSelect: 'Click: switch to this device · Right-click: window options',
 	undo: `Click/${MOD}Z: undo`,
 	redo: `Click/Shift-${MOD}Z: redo`,
 	newPatch: 'Click: new empty patch',

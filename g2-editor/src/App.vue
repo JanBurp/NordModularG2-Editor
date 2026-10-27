@@ -3,28 +3,35 @@
 		<SvgGradientDefs />
 	</svg>
 	<div class="flex flex-col h-screen">
-		<ToolBar>
+		<!-- items-start: device groups wrap onto more lines, the items left of them stay on the first -->
+		<ToolBar class="items-start!">
 			<template v-if="device">
-				<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
-				<ToolBarText class="w-36 cursor-pointer" hint="renamePerf" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
-				<ToolBarLabel>Clk:</ToolBarLabel>
-				<ToolBarText class="w-13 cursor-pointer hover:text-input" hint="setBpm" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
-				<Button variant="toggle" :active="device.clockRunning" hint="clockRun" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
+				<div class="flex items-center gap-2 shrink-0">
+					<ToolBarLabel class="w-10">Perf:</ToolBarLabel>
+					<ToolBarText class="w-36 cursor-pointer" hint="renamePerf" @click="openPerfNameDialog">{{ device.perfName }}</ToolBarText>
+					<ToolBarLabel>Clk:</ToolBarLabel>
+					<ToolBarText class="w-13 cursor-pointer hover:text-input" hint="setBpm" @click="openBpmDialog">{{ device.bpm }}</ToolBarText>
+					<Button variant="toggle" :active="device.clockRunning" hint="clockRun" @click="device.setClockRunning(!device.clockRunning)">Run</Button>
+				</div>
 				<ToolBarDivider />
-				<BtnGroup
-					:model-value="uiStore.selectedSlotIndex"
-					:options="SLOT_OPTIONS"
-					:top-indicators="device.getSlotsKeyStatus"
-					:bottom-indicators="device.getSlotsActiveStatus"
-					testIdPrefix="slot"
-					@update:model-value="handleSlotClick"
-					@shift-click="handleSlotShiftClick"
-					@ctrl-click="handleSlotCtrlClick"
-				/>
-				<ToolBarDivider />
-				<ToolBarText class="w-32">{{ device.device?.synthName || '---' }}</ToolBarText>
-				<Button variant="toggle" :active="device.device?.mode === 'Performance'" hint="perfMode" @click="handlePerfModeToggle($event)">Perf</Button>
-				<DeviceSwitcher v-if="!isOfflineMode" />
+				<!-- Wrapped lines start below the first device group -->
+				<div class="flex flex-wrap items-center gap-x-4 gap-y-1 min-w-0 flex-1">
+					<DeviceGroup
+						v-for="d in deviceGroups"
+						:key="d.viewId"
+						:active="d.viewId === ownGroup.viewId"
+						:name="d.name"
+						:status="isOfflineMode ? null : d.status"
+						:perf-mode="d.perfMode"
+						:selected-slot="d.selectedSlot"
+						:slots-active="d.slotsActive"
+						:slots-keyed="d.slotsKeyed"
+						@select="onDeviceGroup(d)"
+						@slot="(slot, mod) => onDeviceGroup(d, { kind: 'slot', slot, mod })"
+						@perf="(shift) => onDeviceGroup(d, { kind: 'perf', shift })"
+						@contextmenu="(e) => openDeviceGroupMenu(e, d)"
+					/>
+				</div>
 			</template>
 
 			<button
@@ -503,16 +510,17 @@
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
-	import { useConnectedDevicesStore } from './store/connectedDevices';
-	import DeviceSwitcher from './components/toolbar/DeviceSwitcher.vue';
+	import { useConnectedDevicesStore, type ConnectedDeviceInfo } from './store/connectedDevices';
+	import DeviceGroup from './components/toolbar/DeviceGroup.vue';
+	import type { DeviceAction } from './types';
 	import ConnectionDot from './components/common/ConnectionDot.vue';
 	import { useStatusHint, holdHints, releaseHints } from './composables/useStatusHint';
 	import { isMac } from './utils/platform';
 	import { STATUS_HINTS } from './constants/statusHints';
 
-	import { SLOT_LABELS, SLOT_OPTIONS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
+	import { SLOT_LABELS, BANK_TYPE_OPTIONS, SOURCE_TYPE_OPTIONS } from './constants';
 
-	const { state: ctxState, close: closeCtxMenu } = useContextMenu();
+	const { state: ctxState, close: closeCtxMenu, open: openCtxMenu } = useContextMenu();
 	const { state: modeDropdownState, close: closeModeDropdown, select: selectMode } = useModeDropdown();
 	const { state: dsPresetDropdownState, close: closeDsPresetDropdown, select: selectDsPreset } = useDrumSynthPresetDropdown();
 	const { toggleShowHideAll: toggleAllCables } = useCableVisibility();
@@ -777,7 +785,11 @@
 		window.removeEventListener('mouseup', releaseHints, true);
 		window.removeEventListener('dragend', releaseHints, true);
 		window.removeEventListener('contextmenu', suppressCmdClickMenu, true);
-		if (!isOfflineMode.value) window.electronAPI?.devices?.offChanged();
+		if (!isOfflineMode.value) {
+			window.electronAPI?.devices?.offChanged();
+			window.electronAPI?.devices?.offAction();
+			window.electronAPI?.devices?.offAssigned();
+		}
 	});
 
 	useElectronMenuActions({
@@ -792,12 +804,59 @@
 	useModuleKeyboard();
 	useWindowTitle();
 
-	async function handlePerfModeToggle(e: MouseEvent): Promise<void> {
+	async function handlePerfModeToggle(shift: boolean): Promise<void> {
 		try {
-			await device.togglePerfMode(e.shiftKey);
+			await device.togglePerfMode(shift);
 		} catch (e: any) {
 			console.error('togglePerfMode failed:', e?.message ?? e);
 		}
+	}
+
+	// This device's group, straight from the local stores.
+	const ownGroup = computed(
+		(): ConnectedDeviceInfo => ({
+			viewId: connectedDevices.selfId ?? -1,
+			detached: connectedDevices.list.find((d) => d.viewId === connectedDevices.selfId)?.detached ?? false,
+			name: device.device?.synthName || null,
+			status: device.status,
+			perfMode: device.device?.mode === 'Performance',
+			selectedSlot: uiStore.selectedSlotIndex,
+			slotsActive: device.getSlotsActiveStatus,
+			slotsKeyed: device.getSlotsKeyStatus,
+		}),
+	);
+	// Every device in main's order, which is the same in every window; just this one until that list includes it.
+	const deviceGroups = computed(() => {
+		const list = connectedDevices.list;
+		if (!list.some((d) => d.viewId === connectedDevices.selfId)) return [ownGroup.value];
+		return list.map((d) => (d.viewId === connectedDevices.selfId ? ownGroup.value : d));
+	});
+
+	async function runDeviceAction(action: DeviceAction): Promise<void> {
+		if (action.kind === 'perf') return handlePerfModeToggle(action.shift);
+		if (action.mod === 'shift') handleSlotShiftClick(action.slot);
+		else if (action.mod === 'ctrl') handleSlotCtrlClick(action.slot);
+		else await handleSlotClick(action.slot);
+	}
+
+	// Another device's group switches to that device, then runs the clicked button there.
+	function onDeviceGroup(d: ConnectedDeviceInfo, action?: DeviceAction): void {
+		if (d.viewId === ownGroup.value.viewId) {
+			if (action) void runDeviceAction(action);
+		} else window.electronAPI.devices.select(d.viewId, action).catch((err: unknown) => console.error('device select failed:', err));
+	}
+
+	function openDeviceGroupMenu(e: MouseEvent, d: ConnectedDeviceInfo): void {
+		if (isOfflineMode.value || d.viewId < 0) return;
+		const inMainWindow = connectedDevices.list.filter((x) => !x.detached).length;
+		const api = window.electronAPI.devices;
+		openCtxMenu(e, [
+			d.detached
+				? { label: 'Move to Main Window', action: () => void api.attach(d.viewId) }
+				: { label: 'Open in Separate Window', disabled: inMainWindow < 2, action: () => void api.detach(d.viewId) },
+			{ type: 'separator' },
+			{ label: 'Close Device', disabled: connectedDevices.list.length < 2, action: () => void api.close(d.viewId) },
+		]);
 	}
 
 	async function afterConnectRestoreFocus(): Promise<void> {
@@ -823,16 +882,23 @@
 		}
 	}
 
-	// Binds this window to a specific physical G2 (one BrowserWindow per device — see the
-	// multi-device plan) before running the existing single-device connect flow unchanged.
+	// Binds this view to a specific physical G2 (one view per device, see electron/main.ts)
+	// before running the existing single-device connect flow unchanged. Only once: main can
+	// assign a device both up front and by event (devices:assigned).
+	let bound = false;
 	async function bindAndConnect(bus: number, deviceAddr: number): Promise<void> {
-		// Set thisId from the already-known bus/device (same "${bus}:${device}" id main.ts
-		// uses) before awaiting connect() — main.ts's devices:changed broadcast for this
-		// window's own session can otherwise arrive first and briefly appear as an "other"
-		// device in DeviceSwitcher while thisId is still null.
-		connectedDevices.setThisId(`${bus}:${deviceAddr}`);
+		if (bound) return;
+		bound = true;
 		await window.electronAPI.devices.connect(bus, deviceAddr);
 		await connectDevice({ silent: showAboutDialog.value });
+	}
+
+	// A G2 switched on while this view had none.
+	async function onAssigned({ bus, device: deviceAddr }: { bus: number; device: number }): Promise<void> {
+		if (bound) return;
+		await bindAndConnect(bus, deviceAddr);
+		await afterConnectRestoreFocus();
+		if (device.status === DeviceStatus.Connected && !updateAvailable.value) showAboutDialog.value = false;
 	}
 
 	onMounted(async () => {
@@ -855,12 +921,15 @@
 
 		const splashStart = Date.now();
 		window.electronAPI.devices.onChanged((list) => connectedDevices.applyList(list));
+		window.electronAPI.devices.onAction((action) => void runDeviceAction(action));
+		window.electronAPI.devices.onAssigned((assignment) => void onAssigned(assignment));
+		connectedDevices.setSelfId(await window.electronAPI.devices.self());
 
-		// A parallel-startup window is pre-assigned a specific device by the main process,
-		// which also decides showSplash there (synchronously, in creation order) — not left to
-		// whichever window's onMounted happens to run first, which would be a real race between
-		// independent renderer processes. A window with no assignment (the single-window
-		// fallback when no devices were found at launch) falls back to claimStartupSplash().
+		// A device view is pre-assigned a specific device by the main process, which also
+		// decides showSplash there (synchronously, in creation order) — not left to whichever
+		// view's onMounted happens to run first, which would be a real race between independent
+		// renderer processes. A view with no assignment (the single-view fallback when no
+		// devices were found at launch) falls back to claimStartupSplash().
 		const assignment = await window.electronAPI.devices.getAssignment();
 		if (assignment) {
 			showAboutDialog.value = assignment.showSplash;

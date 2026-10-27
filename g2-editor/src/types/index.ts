@@ -1,3 +1,5 @@
+import type { DeviceStatus } from '../store/device';
+
 export type SlotLabel = 'A' | 'B' | 'C' | 'D';
 
 export type MenuAction =
@@ -67,6 +69,24 @@ export type MenuAction =
 	| 'send-controller-snapshot'
 	| 'dump-one'
 	| 'toggle-search-replace';
+
+// What a device view reports about itself, for the device groups in every toolbar (see electron/main.ts).
+export interface DeviceSummary {
+	name: string | null;
+	status: DeviceStatus;
+	perfMode: boolean;
+	selectedSlot: number | null;
+	slotsActive: boolean[];
+	slotsKeyed: boolean[];
+}
+
+export interface ConnectedDeviceInfo extends DeviceSummary {
+	viewId: number;
+	detached: boolean;
+}
+
+// A toolbar button clicked in another device's group, run in that device's view.
+export type DeviceAction = { kind: 'slot'; slot: number; mod: 'none' | 'shift' | 'ctrl' } | { kind: 'perf'; shift: boolean };
 
 export interface MenuState {
 	connected: boolean;
