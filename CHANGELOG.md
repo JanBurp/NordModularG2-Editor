@@ -29,6 +29,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved cable(s) moving change mode
 - Whole module canvas is used for selecting module, instead of only the header
 - Improved selection logic when hover select is on
+- ContextMenu->SetValue now for all Params
 
 ### Fixed
 - Wrong calculation of CPU
