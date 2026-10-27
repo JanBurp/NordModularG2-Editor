@@ -93,3 +93,12 @@ describe('useSwitch repeated clicks on the same button', () => {
 		expect(value.value).toBe(2);
 	});
 });
+
+describe('useSwitch button geometry', () => {
+	it('places a single-button switch without names (TimeClk) at x 0, not NaN', () => {
+		const param = ref({ name: 'Time/Clk', type: 'TimeClk', n: 'SwM780a6e3d', x: 0, y: 0 } as any);
+		const sw = useSwitch(param, ref(0), ref(undefined), ref(0), () => {});
+		expect(sw.getButtonX(0)).toBe(0);
+		expect(sw.getButtonY(0)).toBe(0);
+	});
+});
