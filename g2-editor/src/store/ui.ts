@@ -34,6 +34,7 @@ export const useUiStore = defineStore('ui', {
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
+		selectedParamByCursor: false as boolean, // selectedParam came from the G2's buttons or keyboard navigation, not the mouse
 		hoveredParam: null as { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null, // only set when settings.hoverKeyTarget is on
 		hoveredKnob: null as number | null, // id of the hovered common/Knob.vue (toolbar), same setting
 		selectedMorphGroup: 0 as number, // 0-7, which Morph Group toolbar knob is currently selected
@@ -110,9 +111,13 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		// The canvas param the arrow keys will change (see useModuleKeyboard): with settings.hoverKeyTarget
-		// the hovered one (none while a toolbar knob is hovered), else the selected one.
+		// the hovered one (none while a toolbar knob is hovered), else the selected one — then only when it
+		// was set by the G2's buttons or keyboard navigation, so a mouse click never leaves a marker behind.
 		keyTargetParam: (state): { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null => {
-			if (useSettingsStore().hoverKeyTarget && (state.hoveredKnob !== null || state.hoveredParam)) return state.hoveredParam;
+			if (useSettingsStore().hoverKeyTarget) {
+				if (state.hoveredKnob !== null || state.hoveredParam) return state.hoveredParam;
+				if (!state.selectedParamByCursor) return null;
+			}
 			if (!state.selectedParam || !state.selectedModulesArea) return null;
 			return { ...state.selectedParam, area: state.selectedModulesArea };
 		},
@@ -153,8 +158,9 @@ export const useUiStore = defineStore('ui', {
 			this.selectedParam = null;
 		},
 
-		setSelectedParam(moduleId: number, paramIndex: number) {
+		setSelectedParam(moduleId: number, paramIndex: number, byCursor = false) {
 			this.selectedParam = { moduleId, paramIndex };
+			this.selectedParamByCursor = byCursor;
 		},
 
 		clearSelectedParam() {
@@ -163,6 +169,7 @@ export const useUiStore = defineStore('ui', {
 
 		setHoveredParam(moduleId: number, paramIndex: number, area: 'va' | 'fx') {
 			this.hoveredParam = { moduleId, paramIndex, area };
+			this.selectedParamByCursor = false; // the mouse takes over until the next G2/keyboard cursor move
 		},
 
 		clearHoveredParam() {

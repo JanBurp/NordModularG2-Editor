@@ -363,6 +363,33 @@ describe('useModuleKeyboard — arrow keys follow hover (settings.hoverKeyTarget
 		expect(uiStore.selectedParam).toEqual({ moduleId: 1, paramIndex: 1 });
 		expect(uiStore.hoveredParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'fx' });
 	});
+
+	it('without a hover, a mouse-selected param is not a target', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.clearHoveredParam();
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(uiStore.keyTargetParam).toBeNull();
+		expect(setParam).not.toHaveBeenCalled();
+	});
+
+	it('without a hover, a param selected by the G2 or the keyboard is the target, until a param is hovered', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.clearHoveredParam();
+		uiStore.setSelectedParam(1, 0, true);
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(setParam).toHaveBeenCalledWith(1, 0, expect.any(Number), 0, 'voice');
+
+		uiStore.setHoveredParam(1, 1, 'fx');
+		uiStore.clearHoveredParam();
+		expect(uiStore.keyTargetParam).toBeNull();
+	});
+
+	it('Left/Right navigation makes the selected param the target again', () => {
+		const { uiStore } = seedHover(true);
+		uiStore.clearHoveredParam();
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowRight'));
+		expect(uiStore.keyTargetParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'va' });
+	});
 });
 
 describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () => {

@@ -76,7 +76,7 @@ export function useModuleKeyboard() {
 
 	function selectInArea(module: ModuleInstance, area: 0 | 1) {
 		uiStore.selectModules([module.index], area === 1 ? 'va' : 'fx');
-		uiStore.setSelectedParam(module.index, 0);
+		uiStore.setSelectedParam(module.index, 0, true);
 		syncCursorToHardware(module.index, 0, area);
 	}
 
@@ -194,7 +194,7 @@ export function useModuleKeyboard() {
 		const currentParamIndex = uiStore.selectedParam?.moduleId === moduleId ? uiStore.selectedParam.paramIndex : -1;
 		const pos = order.indexOf(currentParamIndex);
 		const newIndex = order[pos < 0 ? 0 : (pos + dir + order.length) % order.length];
-		uiStore.setSelectedParam(moduleId, newIndex);
+		uiStore.setSelectedParam(moduleId, newIndex, true);
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 

@@ -714,7 +714,8 @@
 	});
 	function onParamHoverLeave(e: MouseEvent) {
 		// Moving onto the knob's arrows (KnobSpinOverlay) keeps the hover; the overlay clears it on its own leave.
-		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
+		// e.buttons: a drag keeps it too (turning a knob with settings.knobReturnCursor locks the pointer, which fires a leave).
+		if (e.buttons === 0 && !(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
 		valueHint.leave(e);
 		clearHint();
 	}
