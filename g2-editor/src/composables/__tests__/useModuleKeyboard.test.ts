@@ -14,9 +14,14 @@ vi.hoisted(() => {
 });
 
 // Real module type 5 (used by moduleStub) has no params — stub a 2-param module def (real param type, so changeParamValue resolves it) so
-// navigateParam's Left/Right cycling has something to cycle through.
+// navigateParam's Left/Right cycling has something to cycle through. Param 1 is a switch.
 vi.mock('@/renderer/nmg2mods', () => ({
-	getModule: () => ({ params: [{ type: 'Bipolar_127', def: 50 }, { type: 'Bipolar_127' }] }),
+	getModule: () => ({
+		params: [
+			{ type: 'Bipolar_127', def: 50 },
+			{ type: 'Bipolar_127', n: 'SwM' },
+		],
+	}),
 	getParamNavOrder: () => [0, 1],
 	getParamDefault: (p: { def?: number }) => p.def ?? 0,
 }));
@@ -406,6 +411,15 @@ describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () 
 
 		expect(useParamEditDialog().showDialog.value).toBe(true);
 		expect(e.preventDefault).toHaveBeenCalled();
+	});
+
+	it('= opens the Set Value popup for a switch too', () => {
+		const { uiStore } = seedSelectedParam();
+		uiStore.setSelectedParam(1, 1);
+
+		useModuleKeyboard().handleKeydown(arrowKey('='));
+
+		expect(useParamEditDialog().showDialog.value).toBe(true);
 	});
 
 	it('Shift+= (e.g. Shift+0 on a Dutch/German layout) also opens it', () => {

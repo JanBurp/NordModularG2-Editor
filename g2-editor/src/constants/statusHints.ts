@@ -18,7 +18,7 @@ export const STATUS_HINTS = {
 	paramKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Double-click/Enter: default · Shift-click/=: set value · Right-click: more options`,
 	paramSlider: `Drag/Wheel: adjust · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign to Parameter Page · Double-click/Enter: default · Shift-click/=: set value · Right-click: more options`,
 	paramSpinner: `Click/Hold/Wheel: step · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · =: set value · Enter: default · Right-click: more options`,
-	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · Right-click: more options`,
+	paramSwitch: `Click: change · ${MOD}-click: assign to Morph Group · ${ALT}-drag: assign to Parameter Page · =: set value · Right-click: more options`,
 	ccRow: `Click: select · Shift-click: select range · ${MOD}-click: add/remove from selection · Drag: reassign CC`,
 	paramPageKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${MOD}-click: assign to Morph Group · ${MOD}-drag: set morph range · ${ALT}-drag: assign/swap · Double-click: default · Right-click: more options`,
 	paramPageDisplay: 'Drag: assign to a canvas parameter / move to another box · Right-click: more options',

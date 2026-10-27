@@ -751,19 +751,16 @@
 		const location = props.areaLabel === 'va' ? 1 : 0;
 		const items: any[] = [];
 
-		if (param && isSwitch(param.n)) {
-			if (param.label) {
-				const label = getParamLabel(paramIndex);
-				const currentLabel = label?.labels?.[labelIndex] || param.label[labelIndex] || '';
-				items.push({
-					label: 'Rename label',
-					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel, labelIndex }),
-				});
-			}
-		} else {
+		items.push({
+			label: 'Set Value',
+			action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
+		});
+		if (param && isSwitch(param.n) && param.label) {
+			const label = getParamLabel(paramIndex);
+			const currentLabel = label?.labels?.[labelIndex] || param.label[labelIndex] || '';
 			items.push({
-				label: 'Set Value',
-				action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
+				label: 'Rename label',
+				action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel, labelIndex }),
 			});
 		}
 
