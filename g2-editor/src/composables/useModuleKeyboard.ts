@@ -5,7 +5,7 @@ import { useSettingsStore } from '../store/settings';
 import { DeviceStatus, useDeviceStore } from '../store/device';
 import { getModule, getParamDefault, getParamNavOrder } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
-import { isValueEditable, useParamEditDialog } from './useParamEditDialog';
+import { useParamEditDialog } from './useParamEditDialog';
 import { useValueHint } from './useValueHint';
 import type { ModuleInstance } from '../types';
 import { clamp } from '@/utils/math';
@@ -76,7 +76,7 @@ export function useModuleKeyboard() {
 
 	function selectInArea(module: ModuleInstance, area: 0 | 1) {
 		uiStore.selectModules([module.index], area === 1 ? 'va' : 'fx');
-		uiStore.setSelectedParam(module.index, 0);
+		uiStore.setSelectedParam(module.index, 0, true);
 		syncCursorToHardware(module.index, 0, area);
 	}
 
@@ -194,7 +194,7 @@ export function useModuleKeyboard() {
 		const currentParamIndex = uiStore.selectedParam?.moduleId === moduleId ? uiStore.selectedParam.paramIndex : -1;
 		const pos = order.indexOf(currentParamIndex);
 		const newIndex = order[pos < 0 ? 0 : (pos + dir + order.length) % order.length];
-		uiStore.setSelectedParam(moduleId, newIndex);
+		uiStore.setSelectedParam(moduleId, newIndex, true);
 		syncCursorToHardware(moduleId, newIndex, found.area);
 	}
 
@@ -243,7 +243,7 @@ export function useModuleKeyboard() {
 		// arrow keys) and the last click was on the canvas — Enter also activates e.g. Patch Browser items
 		if (!(settingsStore.hoverKeyTarget && uiStore.hoveredParam) && (!lastPointerOnCanvas || !uiStore.selectedModules.includes(sel.moduleId))) return false;
 		const param = getModule(found.module.type)?.params?.[sel.paramIndex];
-		if (!param || !isValueEditable(param)) return false;
+		if (!param) return false;
 		const area = found.area === 1 ? 'va' : 'fx';
 		if (reset) {
 			slotsStore.setParam(sel.moduleId, sel.paramIndex, getParamDefault(param), uiStore.variation, area === 'va' ? 'voice' : 'fx');

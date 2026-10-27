@@ -9,6 +9,8 @@ import {
 	buildCloneEntries,
 	buildPasteParamsPairs,
 	isUnusedModule,
+	moduleActionTargets,
+	PASTE_PARAMS_MISMATCH,
 	resolveSelectionArea,
 	type JackEnd,
 } from '../store/slotHelpers';
@@ -129,12 +131,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}): Promise<void> {
 		const area = getArea();
 		if (isCopy) {
-			const selected = currentModules.value.filter((m: any) => indices.includes(m.index));
+			const { modules: selected, morphs } = slotsStore.snapshotModulesForCopy(uiStore.slotInFocus, areaConfig(area).areaIdx, indices);
 			const existingIds = currentModules.value.map((m: any) => m.index as number);
 			const clone = buildCloneEntries(selected, currentCables.value, existingIds, dCol, dRow);
 			if (!clone) return showToast(AREA_FULL_MESSAGE);
 			const { entries, remappedCables } = clone;
-			await slotsStore.paste(entries, remappedCables, area);
+			await slotsStore.paste(entries, remappedCables, area, morphs);
 			uiStore.selectModules(
 				entries.map((e) => e.newId),
 				area === 'voice' ? 'va' : 'fx',
@@ -162,17 +164,12 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		}
 	}
 
-	let modeChangeTimer: ReturnType<typeof setTimeout> | null = null;
-	function handleModeChange(moduleIndex: number, index: number, value: number): void {
-		if (modeChangeTimer) clearTimeout(modeChangeTimer);
-		modeChangeTimer = setTimeout(async () => {
-			modeChangeTimer = null;
-			try {
-				await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
-			} catch {
-				/* G2 may be temporarily busy */
-			}
-		}, 50);
+	async function handleModeChange(moduleIndex: number, index: number, value: number): Promise<void> {
+		try {
+			await slotsStore.setMode(moduleIndex, index, value, uiStore.variation, getArea());
+		} catch {
+			/* G2 may be temporarily busy */
+		}
 	}
 
 	async function handleModuleDelete(moduleIndex: number): Promise<void> {
@@ -184,7 +181,7 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function handleModuleColorChange(moduleIndex: number, colorId: number): Promise<void> {
-		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
+		const targets = moduleActionTargets(uiStore, moduleIndex, areaConfig(getArea()).location);
 		uiStore.setModuleColor(colorId);
 		await slotsStore.setModuleColors(targets, colorId, getArea());
 	}
@@ -193,16 +190,24 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.replaceModule(moduleIndex, newTypeId, getArea());
 	}
 
-	// Explicit target: this module, or the current selection if it's part of it (mirrors handleModuleColorChange).
+	// Explicit target: see moduleActionTargets.
 	async function handlePasteParams(moduleIndex: number): Promise<void> {
 		// Reads via the OS clipboard first — a copy may have happened in another window's
 		// process (one BrowserWindow per connected G2, see usePatchClipboard.ts).
 		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
-		const targets = uiStore.selectedModules.includes(moduleIndex) ? uiStore.selectedModules : [moduleIndex];
-		const pairs = buildPasteParamsPairs(clipboard.modules, clipboard.copiedVariation, targets, currentModules.value);
-		if (pairs.length === 0) return;
-		await slotsStore.pasteParams(pairs, uiStore.variation, getArea());
+		const area = getArea();
+		const targets = moduleActionTargets(uiStore, moduleIndex, areaConfig(area).location);
+		const pairs = buildPasteParamsPairs(
+			clipboard.modules,
+			clipboard.copiedVariation,
+			targets,
+			currentModules.value,
+			clipboard.morphs,
+			areaConfig(area).areaIdx,
+		);
+		if (!pairs) return showToast(PASTE_PARAMS_MISMATCH);
+		await slotsStore.pasteParams(pairs, uiStore.variation, area);
 	}
 
 	async function handleJackDeleteConnected({

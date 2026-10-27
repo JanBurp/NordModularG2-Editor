@@ -19,6 +19,7 @@ declare global {
 					success: boolean;
 					entries: { name: string; path: string; isDir: boolean }[];
 					error?: string;
+					code?: string; // Node error code, e.g. ENOENT, EACCES
 				}>;
 				load: (filepath: string) => Promise<{ success: boolean; data?: number[]; error?: string }>;
 				setFolder: () => Promise<{ success: boolean; folder?: string }>;

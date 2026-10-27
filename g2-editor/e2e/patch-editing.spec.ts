@@ -5,8 +5,8 @@ import { expect, test } from './fixtures/electron';
 const MOD = { OscA: 97, FltClassic: 92, EnvADSR: 20, Mix21A: 194, Out2: 4 } as const;
 
 async function addAllSynthModules(page: import('@playwright/test').Page) {
-	await dropModuleOnCanvas(page, MOD.OscA, 0, 0);       // OscA #1
-	await dropModuleOnCanvas(page, MOD.OscA, 0, 3);       // OscA #2
+	await dropModuleOnCanvas(page, MOD.OscA, 0, 0); // OscA #1
+	await dropModuleOnCanvas(page, MOD.OscA, 0, 3); // OscA #2
 	await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 	await dropModuleOnCanvas(page, MOD.EnvADSR, 1, 4);
 	await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
@@ -145,6 +145,62 @@ test.describe('patch editing – offline', () => {
 		await expect(modEl).toBeVisible();
 		const counts = await getStatusCounts(page);
 		expect(counts.voiceModules).toBe(1);
+	});
+
+	test('select and move a module by its body (a passive label below the title row)', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await expect(page.locator('[data-testid="canvas-va"]')).toBeVisible();
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+
+		const modEl = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]').first();
+		const box = (await modEl.boundingBox())!;
+		const labels = modEl.locator('text[pointer-events="none"][font-size="9"]'); // ModuleVeText, not switch labels
+		let label: { x: number; y: number } | null = null;
+		for (let i = 0; i < (await labels.count()) && !label; i++) {
+			const b = await labels.nth(i).boundingBox();
+			if (b && b.y > box.y + 20) label = { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+		}
+		if (!label) throw new Error('No passive label below the title row');
+
+		await page.mouse.click(label.x, label.y);
+		await expect(modEl).toHaveClass(/selected/);
+
+		await page.mouse.move(label.x, label.y);
+		await page.mouse.down();
+		await page.mouse.move(label.x + 256, label.y + 48, { steps: 10 });
+		await page.mouse.up();
+		await expect.poll(async () => (await modEl.boundingBox())!.x).toBeGreaterThan(box.x + 100);
+	});
+
+	test('Focus on hover: a knob dragged off and released elsewhere no longer takes the arrow keys', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await sendMenuAction('toggle-settings');
+		const checkbox = page
+			.getByTestId('settings-row')
+			.filter({ has: page.getByText('Focus on hover', { exact: true }) })
+			.getByRole('checkbox');
+		await checkbox.click();
+		await expect(checkbox).toHaveAttribute('aria-checked', 'true');
+
+		const knob = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] [data-param-index="0"] .knob-control');
+		const box = (await knob.boundingBox())!;
+		const value = async () => Number(await knob.getAttribute('data-value'));
+
+		// Hovered, the knob takes the arrow keys
+		await page.mouse.move(box.x + box.width / 2, box.y + box.height / 2);
+		const v0 = await value();
+		await page.keyboard.press('ArrowUp');
+		await expect.poll(value).toBe(v0 + 1);
+
+		// Dragged off the knob and released over empty canvas, it doesn't any more
+		await page.mouse.down();
+		await page.mouse.move(box.x + 300, box.y - 20, { steps: 10 });
+		await page.mouse.up();
+		const v1 = await value();
+		await page.keyboard.press('ArrowUp');
+		await page.waitForTimeout(200);
+		expect(await value()).toBe(v1);
 	});
 
 	test('delete a module with the Delete key', async ({ page, sendMenuAction }) => {

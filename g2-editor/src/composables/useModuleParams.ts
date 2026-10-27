@@ -72,10 +72,8 @@ export function useModuleParams(
 		return 0;
 	}
 
+	// No local write: `instance` is the store's module, and setMode reads the old value from it for undo.
 	function onModeChange(index: number, value: number) {
-		if (instance.value.modes && instance.value.modes.length > index) {
-			instance.value.modes[index] = value;
-		}
 		emitModeChange(instance.value.index || 0, index, value);
 	}
 

@@ -121,8 +121,8 @@ test.describe('performance – MorphingDrumDemo.prf2', () => {
 			const redAfter = await redBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 			const blueAfter = await blueBtn.evaluate((el) => el.querySelector('span')!.classList.contains('opacity-100'));
 
-			expect(redAfter).toBe(!redInitial);     // red flipped
-			expect(blueAfter).toBe(blueInitial);   // blue unchanged
+			expect(redAfter).toBe(!redInitial); // red flipped
+			expect(blueAfter).toBe(blueInitial); // blue unchanged
 
 			// Restore
 			await redBtn.click();

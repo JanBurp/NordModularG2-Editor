@@ -47,6 +47,7 @@
 	import { JACK_COLORS, getEffectiveJackColor } from '../../constants';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCableColorItems } from '../../utils/colorSwatches';
+	import { isMacCtrlClick } from '../../utils/platform';
 	import { computed } from 'vue';
 
 	const props = defineProps<{
@@ -114,7 +115,7 @@
 	}
 
 	function onMousedown(e: MouseEvent) {
-		if (e.button !== 0) return; // right-click opens the context menu — must not also start/arm a cable
+		if (e.button !== 0 || isMacCtrlClick(e)) return; // right-click opens the context menu — must not also start/arm a cable
 		e.stopPropagation();
 		emit(
 			'jackDragStart',
@@ -137,7 +138,7 @@
 	}
 
 	function onMouseup(e: MouseEvent) {
-		if (e.button !== 0) return;
+		if (e.button !== 0 || isMacCtrlClick(e)) return;
 		e.stopPropagation();
 		emit('jackDragEnd', {
 			moduleIndex: props.moduleIndex,

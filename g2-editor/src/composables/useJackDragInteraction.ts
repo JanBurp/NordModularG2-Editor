@@ -245,5 +245,5 @@ export function useJackDragInteraction(
 		clearDragPreview();
 	});
 
-	return { handleJackDragStart, handleJackDragEnd };
+	return { handleJackDragStart, handleJackDragEnd, cancelJackDrag: clearDragPreview, previewJackDrag: onMouseMovePreview };
 }

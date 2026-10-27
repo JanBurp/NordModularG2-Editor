@@ -209,5 +209,5 @@ export function useCableGrabInteraction(
 
 	onUnmounted(teardown);
 
-	return { handleCableGrabStart, handleJackGrabStart, handleJackMouseUp };
+	return { handleCableGrabStart, handleJackGrabStart, handleJackMouseUp, cancelGrab, moveGrab: onMove };
 }

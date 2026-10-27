@@ -36,7 +36,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 
 		const jack = page.locator('[data-testid="canvas-va"] [data-module-short="FltClassic"] [data-jack="input-0"]');
 		await openContextMenu(page, jack);
@@ -49,7 +53,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 		expect((await getStatusCounts(page)).voiceCables).toBe(1);
 
 		const jack = page.locator('[data-testid="canvas-va"] [data-module-short="FltClassic"] [data-jack="input-0"]');
@@ -66,8 +74,16 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 4);
 		await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
 
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0, occurrence: 0 });
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0, occurrence: 1 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0, occurrence: 0 },
+		);
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0, occurrence: 1 },
+		);
 		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'Mix2-1A', jackType: 'input', connectorIdx: 0 });
 		expect((await getStatusCounts(page)).voiceCables).toBe(3);
 
@@ -89,7 +105,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 
 		const attrs = await soleCableAttrs(page);
 		if (!attrs) throw new Error('Cable not found');
@@ -111,7 +131,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
 		await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 		expect((await getStatusCounts(page)).voiceCables).toBe(1);
 
 		await grabAndDropCableEnd(
@@ -128,11 +152,72 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		expect(attrs?.dcon).toBe('0');
 	});
 
+	// Drags from FltClassic input-0 to Mix2-1A input-0, flipping Ctrl/Cmd halfway through the drag.
+	async function dragTogglingModifier(page: import('@playwright/test').Page, startWithModifier: boolean): Promise<void> {
+		await page.evaluate((startMod) => {
+			const jack = (short: string, data: string) =>
+				document.querySelector(`[data-testid="canvas-va"] [data-module-short="${short}"] [data-jack="${data}"]`)!;
+			const center = (el: Element) => {
+				const r = el.getBoundingClientRect();
+				return { clientX: r.left + r.width / 2, clientY: r.top + r.height / 2 };
+			};
+			const from = jack('FltClassic', 'input-0');
+			const to = jack('Mix2-1A', 'input-0');
+			const a = center(from);
+			const b = center(to);
+			const mid = { clientX: (a.clientX + b.clientX) / 2, clientY: (a.clientY + b.clientY) / 2 };
+			// Both ctrlKey and metaKey, so it works whatever the host OS's primary modifier is.
+			const mods = (on: boolean) => ({ ctrlKey: on, metaKey: on });
+			from.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true, button: 0, ...a, ...mods(startMod) }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ...mid, ...mods(startMod) }));
+			window.dispatchEvent(new KeyboardEvent(startMod ? 'keyup' : 'keydown', { key: 'Meta', ...mods(!startMod) }));
+			window.dispatchEvent(new MouseEvent('mousemove', { bubbles: true, ...b, ...mods(!startMod) }));
+			to.dispatchEvent(new MouseEvent('mouseup', { bubbles: true, cancelable: true, button: 0, ...b, ...mods(!startMod) }));
+		}, startWithModifier);
+	}
+
+	test('pressing Ctrl/Cmd mid-drag from a jack relocates its cable', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
+		await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
+
+		await dragTogglingModifier(page, false);
+
+		await expect.poll(async () => (await soleCableAttrs(page))?.dmod).toBe(await moduleIdx(page, 'Mix2-1A'));
+		expect((await getStatusCounts(page)).voiceCables).toBe(1);
+	});
+
+	test('releasing Ctrl/Cmd mid-drag from a jack creates a new cable instead', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
+		await dropModuleOnCanvas(page, MOD.Mix21A, 2, 0);
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
+
+		await dragTogglingModifier(page, true);
+
+		await expect.poll(async () => (await getStatusCounts(page)).voiceCables).toBe(2);
+	});
+
 	test('Ctrl/Cmd-drag deletes a cable when dropped in empty canvas space', async ({ page, sendMenuAction }) => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 		expect((await getStatusCounts(page)).voiceCables).toBe(1);
 
 		await grabAndDropCableEnd(page, 0, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 }, { empty: true });
@@ -144,7 +229,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 		const before = await soleCableAttrs(page);
 
 		await grabAndDropCableEnd(
@@ -164,7 +253,11 @@ test.describe('cable editing – break / hover / ctrl-drag', () => {
 		await sendMenuAction('new-patch');
 		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
 		await dropModuleOnCanvas(page, MOD.FltClassic, 1, 0);
-		await createCable(page, { moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 }, { moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 });
+		await createCable(
+			page,
+			{ moduleShort: 'OscA', jackType: 'output', connectorIdx: 0 },
+			{ moduleShort: 'FltClassic', jackType: 'input', connectorIdx: 0 },
+		);
 		const before = await soleCableAttrs(page);
 
 		// Grab the input end and release directly on an output jack — a mismatched type, so the

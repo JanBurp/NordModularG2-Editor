@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Find & Replace (module names, param labels)
 - Warnings of mem-protect/full
 - Param popup shows when param has focus
+- Module popup shows long name and module's long description
 
 ### Changed
 - Tests better organized
@@ -23,10 +24,20 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - CPU a bit bigger in ExtendedToolbar, and if no ExtendedToolbar, a small CPU in PatchToolbar
 - All param popups (F5..F*, and when focus) have same color and work as original editor.
 - Param popups use user friendly values
+- Finetune right-click on jack, remove opt+click
+- Improved module move/copy change mode
+- Improved cable(s) moving change mode
+- Whole module canvas is used for selecting module, instead of only the header
+- Improved selection logic when hover select is on
+- ContextMenu->SetValue now for all Params
 
 ### Fixed
 - Wrong calculation of CPU
 - Scrolling-over non empty banks in PatchBrowser
+- Copy modules did not copy params & morph assigments
+- Undo module Mode did not work
+- Paste Params did not work (only on modules with same order instead of id)
+- Module ContextMenu sometimes had double dividers
 
 ## [0.7.2] - 2026-10-22
 

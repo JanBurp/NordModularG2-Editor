@@ -66,6 +66,14 @@ export function useModuleDrag(
 		dragMoved = false;
 		window.addEventListener('mousemove', onModuleDragMove);
 		window.addEventListener('mouseup', onModuleDragEnd);
+		window.addEventListener('keydown', updateCopyCursor);
+		window.addEventListener('keyup', updateCopyCursor);
+	}
+
+	// Copy vs move is decided on mouseup, so the cursor follows the modifier live — also on key
+	// press/release while the mouse stands still.
+	function updateCopyCursor(e: MouseEvent | KeyboardEvent) {
+		if (dragMoved) document.body.style.cursor = isGrabModifierPressed(e) ? 'copy' : '';
 	}
 
 	function onModuleDragMove(e: MouseEvent) {
@@ -86,12 +94,14 @@ export function useModuleDrag(
 			dragMoved = true;
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
-		document.body.style.cursor = isGrabModifierPressed(e) ? 'copy' : '';
+		updateCopyCursor(e);
 	}
 
 	function onModuleDragEnd(e: MouseEvent) {
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
+		window.removeEventListener('keydown', updateCopyCursor);
+		window.removeEventListener('keyup', updateCopyCursor);
 		document.body.style.cursor = '';
 		const moduleIndex = dragModuleIndex;
 		dragModuleIndex = null;
@@ -119,6 +129,8 @@ export function useModuleDrag(
 		document.body.style.cursor = '';
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
+		window.removeEventListener('keydown', updateCopyCursor);
+		window.removeEventListener('keyup', updateCopyCursor);
 	}
 
 	onUnmounted(() => {

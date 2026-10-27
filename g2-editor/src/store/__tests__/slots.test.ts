@@ -126,6 +126,75 @@ describe('paste', () => {
 		expect(pasted).toBeDefined();
 		expect(pasted.userColour).toBe(1);
 	});
+
+	it('snapshotModulesForCopy takes live params from variations (not the load-time lv) plus the morphs', () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 2, lv: [0, 0, 0, 0], modes: [3] }];
+		store.slots['A'].patch = patch;
+		const morph = { groupIndex: 2, location: 1, moduleIndex: 4, paramIndex: 1, range: -30 };
+		store.slots['A'].variations = [
+			{ fx: {}, voice: { 4: [10, 20] }, patch: { morphAssignments: [morph] } },
+			{ fx: {}, voice: { 4: [30, 40] }, patch: { morphAssignments: [] } },
+		] as any;
+
+		const { modules, morphs } = store.snapshotModulesForCopy('A', 1, [4]);
+
+		expect(modules[0].lv).toEqual([10, 20, 30, 40]);
+		expect(modules[0].modes).toEqual([3]);
+		expect(morphs).toEqual([[morph], []]);
+	});
+
+	it('pastes morph assignments onto the new module, and undo removes them', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = [
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+			{ fx: {}, voice: {}, patch: { morphAssignments: [] } },
+		] as any;
+		const src = { type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const morphs = [[], [{ groupIndex: 2, location: 0, moduleIndex: 4, paramIndex: 1, range: -30 }]] as any;
+
+		await store.paste([{ src, newId: 7, col: 0, row: 0 }] as any, [], 'voice', morphs);
+
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+		expect(store.slots['A'].variations![1].patch.morphAssignments).toEqual([{ groupIndex: 2, location: 1, moduleIndex: 7, paramIndex: 1, range: -30 }]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![1].patch.morphAssignments).toEqual([]);
+	});
+
+	it('stops pasting morphs once a variation holds 25 morphed params (official editor limit)', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		const existing = Array.from({ length: 24 }, (_, i) => ({ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: i, range: 1 }));
+		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: existing } }] as any;
+		const src = { type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const morphs = [[0, 1, 2].map((p) => ({ groupIndex: 1, location: 1, moduleIndex: 4, paramIndex: p, range: 9 }))] as any;
+
+		await store.paste([{ src, newId: 7, col: 0, row: 0 }] as any, [], 'voice', morphs);
+
+		const assigned = store.slots['A'].variations![0].patch.morphAssignments;
+		expect(assigned).toHaveLength(25);
+		expect(assigned[24]).toMatchObject({ moduleIndex: 7, paramIndex: 0 });
+	});
+});
+
+describe('setMode', () => {
+	it('undo restores and resends the previous mode value', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [{ type: 1, index: 29, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [0] }];
+		store.slots['A'].patch = patch;
+
+		await store.setMode(29, 0, 2, 0, 'voice');
+		expect(patch.areas[1].modules[0].modes[0]).toBe(2);
+
+		await store.undo();
+		expect(patch.areas[1].modules[0].modes[0]).toBe(0);
+		const run = (globalThis as any).window.cli.run;
+		expect(run.mock.calls.at(-1)[0]).toEqual(['set-module-mode', 'A', 'va', '29', '0', '0']);
+	});
 });
 
 describe('edited flag', () => {
@@ -451,6 +520,36 @@ describe('pasteParams', () => {
 		await store.redo();
 		expect(store.slots['A'].variations![0].voice[2]).toEqual([100]);
 		expect(target.modes).toEqual([1]);
+	});
+
+	it('replaces the target morphs (change, remove, add within the 25 limit) and undoes them', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleInstance(2, 5, 3, [])];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations([0, 0, 0]);
+		const m = (groupIndex: number, moduleIndex: number, paramIndex: number, range: number): any => ({
+			groupIndex,
+			location: 1,
+			moduleIndex,
+			paramIndex,
+			range,
+		});
+		// 23 records on other modules + 2 on the target: the variation is at the 25 limit
+		const others = Array.from({ length: 23 }, (_, i) => m(0, 30 + i, 0, 1));
+		const before = [...others, m(0, 2, 0, 10), m(1, 2, 1, 20)];
+		store.slots['A'].variations![0].patch.morphAssignments = before;
+
+		// param 0 group 0 changes, param 1 group 1 is removed, two new ones: only one fits under 25
+		await store.pasteParams(
+			[{ targetId: 2, paramValues: [1, 2, 3], modeValues: [], morphs: [m(0, 2, 0, 50), m(3, 2, 2, 60), m(4, 2, 2, 70)] }],
+			0,
+			'voice',
+		);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 50), m(3, 2, 2, 60)]);
+
+		await store.undo();
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 10), m(1, 2, 1, 20)]);
 	});
 
 	it('does nothing when given an empty pairs list', async () => {

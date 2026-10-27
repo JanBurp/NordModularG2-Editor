@@ -3,6 +3,7 @@ import type {
 	GlobalParamPageAssignment,
 	MidiCCAssignment,
 	ModuleInstance,
+	MorphAssignment,
 	ParamPageAssignment,
 	Patch,
 	PatchParamVariation,
@@ -30,6 +31,21 @@ export function resolveSelectionArea(ui: { selectedModulesArea: 'va' | 'fx' | nu
 	return ui.activeArea === 1 ? 'voice' : 'fx';
 }
 
+// Target of a module context-menu action: the selection when the module is part of it (same area — module
+// indices repeat between VA and FX), else just this module.
+export function moduleActionTargets(
+	ui: { selectedModules: number[]; selectedModulesArea: 'va' | 'fx' | null },
+	moduleIndex: number,
+	area: 'va' | 'fx',
+): number[] {
+	return ui.selectedModulesArea === area && ui.selectedModules.includes(moduleIndex) ? ui.selectedModules : [moduleIndex];
+}
+
+// Identity of a morph assignment (its range aside).
+export function morphKey(a: MorphAssignment): string {
+	return `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
+}
+
 export function findModuleByIndex(modules: ModuleInstance[], id: number): ModuleInstance | undefined {
 	return modules.find((m) => m.index === id);
 }
@@ -38,6 +54,7 @@ export interface PasteParamsPair {
 	targetId: number;
 	paramValues: number[];
 	modeValues: number[];
+	morphs?: MorphAssignment[]; // the target's morph assignments after the paste; undefined = leave them (clipboard from an older build)
 }
 
 export interface ParamChange {
@@ -47,24 +64,46 @@ export interface ParamChange {
 	value: number;
 }
 
-// Pairs copied modules with target ids by order, keeping only same-type pairs, and slices each
-// source module's `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt).
+// The official editor's alert text when the selection doesn't fit the copied modules.
+export const PASTE_PARAMS_MISMATCH = 'Selection does not match the original data.';
+
+// Official CClipboard::ValidatePasteParams: as many target modules as copied ones, with the same types.
+export function canPasteParams(clipboardTypes: number[], targetIds: number[], currentModules: ModuleInstance[]): boolean {
+	if (clipboardTypes.length === 0 || clipboardTypes.length !== targetIds.length) return false;
+	const a = [...clipboardTypes].sort((x, y) => x - y);
+	const b = targetIds.map((id) => findModuleByIndex(currentModules, id)?.type ?? -1).sort((x, y) => x - y);
+	return a.every((t, i) => t === b[i]);
+}
+
+// Official CPatchData::GetCopyParamsMolecules: each copied module goes to the first not-yet-used target
+// of its type. Slices the source `lv` at `copiedVariation` (lv is flat: NUM_VARIATIONS * pcnt) and
+// moves its morph assignments of that variation onto the target. null when the selection doesn't match.
 export function buildPasteParamsPairs(
 	sourceModules: ModuleInstance[],
 	copiedVariation: number,
 	targetIds: number[],
 	currentModules: ModuleInstance[],
-): PasteParamsPair[] {
-	const pairs: PasteParamsPair[] = [];
-	const count = Math.min(sourceModules.length, targetIds.length);
-	for (let i = 0; i < count; i++) {
-		const src = sourceModules[i];
-		const target = findModuleByIndex(currentModules, targetIds[i]);
-		if (!target || target.type !== src.type) continue;
+	sourceMorphs: MorphAssignment[][] | undefined,
+	location: 0 | 1,
+): PasteParamsPair[] | null {
+	if (
+		!canPasteParams(
+			sourceModules.map((m) => m.type),
+			targetIds,
+			currentModules,
+		)
+	)
+		return null;
+	const free = targetIds.map((id) => findModuleByIndex(currentModules, id)!);
+	return sourceModules.map((src) => {
+		const target = free.splice(
+			free.findIndex((t) => t.type === src.type),
+			1,
+		)[0];
 		const offset = copiedVariation * src.pcnt;
-		pairs.push({ targetId: target.index, paramValues: src.lv.slice(offset, offset + src.pcnt), modeValues: [...src.modes] });
-	}
-	return pairs;
+		const morphs = sourceMorphs?.[copiedVariation]?.filter((a) => a.moduleIndex === src.index).map((a) => ({ ...a, location, moduleIndex: target.index }));
+		return { targetId: target.index, paramValues: src.lv.slice(offset, offset + src.pcnt), modeValues: [...src.modes], morphs };
+	});
 }
 
 export type JackEnd = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output' };
@@ -131,6 +170,18 @@ export function extractVariations(patch: Patch): VariationState[] {
 export function removeModuleFromVariations(variations: VariationState[] | null, moduleId: number, areaKey: 'fx' | 'voice'): void {
 	if (!variations) return;
 	for (const v of variations) delete v[areaKey][moduleId];
+}
+
+// A module's live per-variation param values: `mod.lv` is only filled at load/add, edits go to `variations`.
+export function liveModuleLv(mod: ModuleInstance, variations: VariationState[] | null | undefined, areaKey: 'fx' | 'voice'): number[] {
+	const pcnt = mod.pcnt;
+	const numVar = variations?.length ?? 1;
+	const lv = Array(pcnt * numVar).fill(0);
+	for (let v = 0; v < numVar; v++) {
+		const varParams = variations?.[v]?.[areaKey]?.[mod.index] ?? [];
+		for (let p = 0; p < pcnt; p++) lv[v * pcnt + p] = varParams[p] ?? 0;
+	}
+	return lv;
 }
 
 // Shared by deleteModule/replaceModule: snapshots a module's MIDI-CC, Parameter Page, and Global

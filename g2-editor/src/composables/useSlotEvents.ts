@@ -100,7 +100,7 @@ export function useSlotEvents(log: LogFn) {
 			const moduleId = ev.module as number;
 			if (slotsStore.getAreaModules(sl, area).some((m: any) => m.index === moduleId)) {
 				uiStore.selectModules([moduleId], area === 1 ? 'va' : 'fx');
-				uiStore.setSelectedParam(moduleId, ev.param as number);
+				uiStore.setSelectedParam(moduleId, ev.param as number, true);
 			}
 			return true;
 		}

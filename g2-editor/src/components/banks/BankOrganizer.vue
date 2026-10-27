@@ -431,7 +431,7 @@
 		window.addEventListener('keydown', onKeydown);
 		window.electronAPI?.patches.onStorageChanged(reloadStorage);
 		browser.loadStorage();
-		if (!browser.synthPatches.length && !browser.loading && device.status === DeviceStatus.Connected) browser.loadSynthList();
+		if (!browser.synthPatches.length && !browser.synthLoading && device.status === DeviceStatus.Connected) browser.loadSynthList();
 	});
 
 	onUnmounted(() => {

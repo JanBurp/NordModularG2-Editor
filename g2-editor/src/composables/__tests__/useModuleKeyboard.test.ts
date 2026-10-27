@@ -14,9 +14,14 @@ vi.hoisted(() => {
 });
 
 // Real module type 5 (used by moduleStub) has no params — stub a 2-param module def (real param type, so changeParamValue resolves it) so
-// navigateParam's Left/Right cycling has something to cycle through.
+// navigateParam's Left/Right cycling has something to cycle through. Param 1 is a switch.
 vi.mock('@/renderer/nmg2mods', () => ({
-	getModule: () => ({ params: [{ type: 'Bipolar_127', def: 50 }, { type: 'Bipolar_127' }] }),
+	getModule: () => ({
+		params: [
+			{ type: 'Bipolar_127', def: 50 },
+			{ type: 'Bipolar_127', n: 'SwM' },
+		],
+	}),
 	getParamNavOrder: () => [0, 1],
 	getParamDefault: (p: { def?: number }) => p.def ?? 0,
 }));
@@ -363,6 +368,33 @@ describe('useModuleKeyboard — arrow keys follow hover (settings.hoverKeyTarget
 		expect(uiStore.selectedParam).toEqual({ moduleId: 1, paramIndex: 1 });
 		expect(uiStore.hoveredParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'fx' });
 	});
+
+	it('without a hover, a mouse-selected param is not a target', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.clearHoveredParam();
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(uiStore.keyTargetParam).toBeNull();
+		expect(setParam).not.toHaveBeenCalled();
+	});
+
+	it('without a hover, a param selected by the G2 or the keyboard is the target, until a param is hovered', () => {
+		const { uiStore, setParam } = seedHover(true);
+		uiStore.clearHoveredParam();
+		uiStore.setSelectedParam(1, 0, true);
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowUp'));
+		expect(setParam).toHaveBeenCalledWith(1, 0, expect.any(Number), 0, 'voice');
+
+		uiStore.setHoveredParam(1, 1, 'fx');
+		uiStore.clearHoveredParam();
+		expect(uiStore.keyTargetParam).toBeNull();
+	});
+
+	it('Left/Right navigation makes the selected param the target again', () => {
+		const { uiStore } = seedHover(true);
+		uiStore.clearHoveredParam();
+		useModuleKeyboard().handleKeydown(arrowKey('ArrowRight'));
+		expect(uiStore.keyTargetParam).toEqual({ moduleId: 1, paramIndex: 1, area: 'va' });
+	});
 });
 
 describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () => {
@@ -379,6 +411,15 @@ describe('useModuleKeyboard — = opens Set Value, Enter resets to default', () 
 
 		expect(useParamEditDialog().showDialog.value).toBe(true);
 		expect(e.preventDefault).toHaveBeenCalled();
+	});
+
+	it('= opens the Set Value popup for a switch too', () => {
+		const { uiStore } = seedSelectedParam();
+		uiStore.setSelectedParam(1, 1);
+
+		useModuleKeyboard().handleKeydown(arrowKey('='));
+
+		expect(useParamEditDialog().showDialog.value).toBe(true);
 	});
 
 	it('Shift+= (e.g. Shift+0 on a Dutch/German layout) also opens it', () => {

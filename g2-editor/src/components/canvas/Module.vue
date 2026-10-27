@@ -6,11 +6,11 @@
 		:class="{ selected: isSelected, unused: isUnused, 'search-dimmed': searchState === 'dimmed' }"
 		:data-module-idx="moduleIdx"
 		:data-module-short="moduleDef.short"
-		@click.stop="onModuleClick"
+		@click.stop
 		@mousedown.stop
 		@contextmenu.stop.prevent="onContextMenu"
 	>
-		<g @mousedown="onBackgroundMousedown"><ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground></g>
+		<g style="cursor: grab" @mousedown="onBackgroundMousedown"><ModuleBackground :height="height" :colour="instance.colour || 0"></ModuleBackground></g>
 
 		<ModuleTitle
 			:displayName="displayName"
@@ -302,6 +302,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
+	import { canPasteParams, moduleActionTargets } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
@@ -316,7 +317,7 @@
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { useMorphRangeDrag } from '../../composables/useMorphRangeDrag';
 	import { useValueHint } from '../../composables/useValueHint';
-	import { createDoubleClickDetector, isPrimaryMouseDown } from '../../utils/doubleClick';
+	import { isPrimaryMouseDown } from '../../utils/doubleClick';
 	import { isGrabModifierPressed } from '../../utils/platform';
 	import { blurFocusedControl } from '../../utils/focus';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
@@ -353,10 +354,6 @@
 	const { openParamEdit } = useParamEditDialog();
 	const { graphics } = useModuleGraphics();
 
-	function onModuleClick(e: MouseEvent) {
-		if (e.altKey) onContextMenu(e);
-	}
-
 	function onContextMenu(e: MouseEvent) {
 		const slot = uiStore.slotInFocus;
 		const location = props.areaLabel === 'va' ? 1 : 0;
@@ -373,10 +370,13 @@
 			{ type: 'separator' },
 			{
 				label: 'Paste Params',
-				// uiStore.hasClipboard covers a copy made in another device's window too (OS
-				// clipboard, see usePatchClipboard.ts) — buildPasteParamsPairs already filters out
-				// any module-type mismatch, so an enabled-but-inapplicable paste is a safe no-op.
-				disabled: !uiStore.hasClipboard,
+				// uiStore.clipboardTypes covers a copy made in another device's window too (OS clipboard,
+				// see usePatchClipboard.ts). Same targets as usePatchOperations.handlePasteParams.
+				disabled: !canPasteParams(
+					uiStore.clipboardTypes,
+					moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx'),
+					slotsStore.getAreaModules(slot, location),
+				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
 			{ type: 'separator' },
@@ -391,8 +391,7 @@
 
 	// Applies to the whole selection when this module is part of it (manual ch. 7).
 	function toggleMutaLock() {
-		const inSelection = props.isSelected && uiStore.selectedModulesArea === props.areaLabel;
-		const ids = inSelection ? uiStore.selectedModules : [moduleIdx.value];
+		const ids = moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx');
 		slotsStore.setMutationLock(ids, !instance.value.mutaLock, props.areaLabel === 'va' ? 'voice' : 'fx');
 	}
 
@@ -435,11 +434,14 @@
 		});
 	}
 
-	function onTitleHoverEnter() {
+	// Hovering the title row shows the module's name hint (its label and long name).
+	function onTitleHoverEnter(e: MouseEvent) {
 		showHint('moduleTitle');
+		if (e.buttons === 0) valueHint.hoverEnter({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
 	}
-	function onTitleHoverLeave() {
+	function onTitleHoverLeave(e: MouseEvent) {
 		clearHint();
+		valueHint.leave(e);
 	}
 
 	const instance = computed(() => props.instance as ModuleInstance);
@@ -600,12 +602,11 @@
 	const { startDrag } = useMorphRangeDrag();
 	const valueHint = useValueHint();
 
-	// Double-click on an empty part of the module briefly shows its full name (official
-	// CPanel::PanelSecondClick → ShowModuleNameHint).
-	const isBackgroundDoubleClick = createDoubleClickDetector();
+	// Empty module body selects/drags like the title row; passive VEs are pointer-events="none".
 	function onBackgroundMousedown(e: MouseEvent) {
-		if (isPrimaryMouseDown(e) && isBackgroundDoubleClick())
-			valueHint.changed({ moduleIndex: moduleIdx.value, paramIndex: -1, area: props.areaLabel ?? 'fx' });
+		if (!isPrimaryMouseDown(e)) return;
+		e.preventDefault();
+		onDragHandleMousedown(e);
 	}
 
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
@@ -712,9 +713,23 @@
 	});
 	function onParamHoverLeave(e: MouseEvent) {
 		// Moving onto the knob's arrows (KnobSpinOverlay) keeps the hover; the overlay clears it on its own leave.
-		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) uiStore.clearHoveredParam();
+		// e.buttons: a drag keeps it until the button goes up (turning a knob with settings.knobReturnCursor locks
+		// the pointer, which fires a leave); released outside the param, the hover is gone.
+		if (!(e.relatedTarget instanceof Element && e.relatedTarget.closest('.knob-spin-v'))) {
+			if (e.buttons === 0) uiStore.clearHoveredParam();
+			else clearHoverOnReleaseOutside(e.currentTarget as Element);
+		}
 		valueHint.leave(e);
 		clearHint();
+	}
+	function clearHoverOnReleaseOutside(el: Element) {
+		const hov = uiStore.hoveredParam;
+		const onUp = (up: MouseEvent) => {
+			const r = el.getBoundingClientRect();
+			const inside = up.clientX >= r.left && up.clientX < r.right && up.clientY >= r.top && up.clientY < r.bottom;
+			if (!inside && uiStore.hoveredParam === hov) uiStore.clearHoveredParam();
+		};
+		window.addEventListener('mouseup', onUp, { capture: true, once: true });
 	}
 
 	function onParamDragOver(e: DragEvent) {
@@ -748,19 +763,16 @@
 		const location = props.areaLabel === 'va' ? 1 : 0;
 		const items: any[] = [];
 
-		if (param && isSwitch(param.n)) {
-			if (param.label) {
-				const label = getParamLabel(paramIndex);
-				const currentLabel = label?.labels?.[labelIndex] || param.label[labelIndex] || '';
-				items.push({
-					label: 'Rename label',
-					action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel, labelIndex }),
-				});
-			}
-		} else {
+		items.push({
+			label: 'Set Value',
+			action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
+		});
+		if (param && isSwitch(param.n) && param.label) {
+			const label = getParamLabel(paramIndex);
+			const currentLabel = label?.labels?.[labelIndex] || param.label[labelIndex] || '';
 			items.push({
-				label: 'Set Value',
-				action: () => openParamEdit({ area: props.areaLabel ?? 'fx', moduleIndex: moduleIdx.value, paramIndex, x: event.clientX, y: event.clientY }),
+				label: 'Rename label',
+				action: () => emit('paramLabelEdit', { moduleIndex: moduleIdx.value, paramIndex, currentLabel, labelIndex }),
 			});
 		}
 

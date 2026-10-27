@@ -109,6 +109,7 @@
 	function onMouseEnter(e: MouseEvent) {
 		if (!settings.hoverKeyTarget || e.buttons !== 0) return;
 		uiStore.hoveredKnob = knobId;
+		uiStore.selectedParamByCursor = false; // like a hovered canvas param: the mouse takes over
 		blurFocusedControl();
 	}
 	// ParameterPagesGroup makes the Knob pointer-events-none while Alt is held, which fires a mouseleave

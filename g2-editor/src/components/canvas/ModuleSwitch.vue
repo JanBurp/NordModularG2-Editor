@@ -131,7 +131,7 @@
 		/>
 
 		<!-- Selected param underline -->
-		<rect v-if="highlight" x="0" :y="height + 1" :width="width" height="2" fill="white" pointer-events="none" />
+		<rect v-if="highlight" x="0" :y="underline.y" :width="underline.width" height="1.5" fill="white" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
@@ -201,6 +201,13 @@
 			if (len <= 1) return 0;
 		}
 		return activeIndex.value;
+	});
+
+	// Selected param underline: below the whole control, so under all buttons in VR/HR mode (a column or rows of buttons).
+	const underline = computed(() => {
+		const n = singleButtonMode.value ? 1 : Math.max(1, displayNames.value.length);
+		const xs = Array.from({ length: n }, (_, i) => getButtonX(i));
+		return { width: Math.max(...xs) + width.value, y: getButtonY(n - 1) + (singleButtonMode.value ? height.value : 11) + 1 };
 	});
 </script>
 <style scoped>

@@ -55,6 +55,7 @@
 	}>();
 
 	const svgRef = inject<Ref<SVGSVGElement | null>>('patchCanvasSvg');
+	const cableLayerRef = inject<Ref<SVGGElement | null>>('patchCanvasCableLayer');
 
 	const { cableVisibility } = useCableVisibility();
 	const uiStore = useUiStore();
@@ -73,8 +74,8 @@
 		const svg = svgRef.value;
 		removeAllCables(svg);
 
-		if (props.cables.length > 0) {
-			makePatchCables(props.modules as CableModule[], props.cables as Cable[], svg, {
+		if (props.cables.length > 0 && cableLayerRef?.value) {
+			makePatchCables(props.modules as CableModule[], props.cables as Cable[], cableLayerRef.value, {
 				selectedCables: props.selectedCables as Cable[],
 				gravity: settings.cableGravity,
 				seed: uiStore.cableSeed,
@@ -111,8 +112,9 @@
 		() => props.cables,
 		() => {
 			nextTick(() => {
-				if (!svgRef?.value) return;
+				if (!svgRef?.value || !cableLayerRef?.value) return;
 				const svg = svgRef.value as SVGElement;
+				const layer = cableLayerRef.value;
 
 				const renderedKeys = new Set<string>();
 				svg.querySelectorAll<SVGPathElement>('.svgcableborder[data-cable-key]').forEach((el) => {
@@ -135,13 +137,13 @@
 				};
 				for (const [key, cable] of wantedMap) {
 					if (!renderedKeys.has(key)) {
-						makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
+						makePatchCables(props.modules as CableModule[], [cable], layer, cableOptions);
 					} else {
 						// Re-render if colour changed
 						const border = svg.querySelector<SVGPathElement>(`.svgcableborder[data-cable-key="${key}"]`);
 						if (border && border.getAttribute('data-cable-color') !== String(cable.colour)) {
 							removeCableByKey(svg, key);
-							makePatchCables(props.modules as CableModule[], [cable], svg, cableOptions);
+							makePatchCables(props.modules as CableModule[], [cable], layer, cableOptions);
 						}
 					}
 				}
@@ -246,7 +248,7 @@
 		// so a reference watch suffices — deep traversal would only add spurious re-runs.
 	);
 
-	const { handleJackDragStart, handleJackDragEnd } = useJackDragInteraction(
+	const { handleJackDragStart, handleJackDragEnd, cancelJackDrag, previewJackDrag } = useJackDragInteraction(
 		svgRef,
 		() => props.modules as any[],
 		() => props.cables as any[],
@@ -259,6 +261,8 @@
 		handleCableGrabStart,
 		handleJackGrabStart,
 		handleJackMouseUp: handleCableGrabJackMouseUp,
+		cancelGrab,
+		moveGrab,
 	} = useCableGrabInteraction(
 		svgRef,
 		() => props.modules as any[],
@@ -276,9 +280,57 @@
 	// Cmd/Ctrl-mousedown on a jack that already has a cable grabs it for re-routing (mirrors the
 	// original editor's jack-based gesture) instead of starting a brand-new cable drag.
 	function handleJackDragStartOrGrab(info: JackDragInfo, e: MouseEvent) {
-		if (isGrabModifierPressed(e) && handleJackGrabStart(e, info)) return;
-		handleJackDragStart(info);
+		grabbing = isGrabModifierPressed(e) && handleJackGrabStart(e, info);
+		if (!grabbing) handleJackDragStart(info);
+		if (settings.cableConnectMode !== 'drag') return;
+		switchJack = info;
+		lastMouse = e;
+		window.addEventListener('mousemove', onSwitchMouseMove);
+		window.addEventListener('keydown', onSwitchKey);
+		window.addEventListener('keyup', onSwitchKey);
+		window.addEventListener('mouseup', endSwitch, true); // capture: the jack's own mouseup stops propagation
 	}
+
+	// Pressing/releasing Cmd/Ctrl mid-drag switches between a new cable and re-routing the jack's
+	// cables, so the modifier state at mouseup decides — not the one at mousedown.
+	let switchJack: JackDragInfo | null = null;
+	let grabbing = false;
+	let lastMouse: MouseEvent | null = null;
+
+	function syncDragMode(e: MouseEvent | KeyboardEvent) {
+		if (!switchJack || !lastMouse || isGrabModifierPressed(e) === grabbing) return;
+		if (grabbing) {
+			cancelGrab();
+			handleJackDragStart(switchJack);
+			previewJackDrag(lastMouse);
+			grabbing = false;
+		} else if (handleJackGrabStart(lastMouse, switchJack)) {
+			cancelJackDrag();
+			moveGrab(lastMouse);
+			grabbing = true;
+		}
+	}
+
+	function onSwitchMouseMove(e: MouseEvent) {
+		lastMouse = e;
+		syncDragMode(e);
+	}
+
+	function onSwitchKey(e: KeyboardEvent) {
+		syncDragMode(e);
+	}
+
+	function endSwitch() {
+		switchJack = null;
+		lastMouse = null;
+		grabbing = false;
+		window.removeEventListener('mousemove', onSwitchMouseMove);
+		window.removeEventListener('keydown', onSwitchKey);
+		window.removeEventListener('keyup', onSwitchKey);
+		window.removeEventListener('mouseup', endSwitch, true);
+	}
+
+	onUnmounted(endSwitch);
 
 	defineExpose({ handleJackDragStart: handleJackDragStartOrGrab, handleJackDragEnd: handleJackDragEndOrGrabDrop });
 </script>

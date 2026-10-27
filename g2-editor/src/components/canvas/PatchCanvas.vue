@@ -10,6 +10,7 @@
 	>
 		<svg
 			ref="svgRef"
+			class="block"
 			font-size="9"
 			:width="canvasWidth * zoom"
 			:height="canvasHeight * zoom"
@@ -27,7 +28,9 @@
 				handleCanvasClick();
 			"
 		>
-			<text :font-size="160" x="50%" y="50%" width="100%" height="100%" text-anchor="middle" fill="#666">{{ getAreaByShort(area) }}</text>
+			<text :font-size="160" :x="labelCenter.x / zoom" :y="labelCenter.y / zoom" width="100%" height="100%" text-anchor="middle" fill="#666">
+				{{ getAreaByShort(area) }}
+			</text>
 
 			<Module
 				v-for="mod in props.modules as any[]"
@@ -56,6 +59,8 @@
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
+			<!-- Cables.vue draws into this layer: above the modules, below every badge/hint overlay. -->
+			<g ref="cableLayerRef" />
 			<CCBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<ParamValuesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
 			<MorphAssignBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
@@ -73,7 +78,7 @@
 			:modules="props.modules as any[]"
 			:cables="props.cables as Cable[]"
 			:selected-cables="props.selectedCables"
-			:hovered-jack="hoveredJack"
+			:hovered-jack="hoveredJack ?? menuJack"
 			:area="props.area === 'va' ? 1 : 0"
 			@jack-drag-start="emit('jackDragStart', $event)"
 			@jack-drag-end="emit('jackDragEnd', $event)"
@@ -83,7 +88,7 @@
 	</div>
 </template>
 <script setup lang="ts">
-	import { ref, onMounted, onUnmounted, computed, provide } from 'vue';
+	import { ref, onMounted, onUnmounted, computed, provide, watch } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { sameJack, matchesCableJack, isUnusedModule } from '../../store/slotHelpers';
 	import { useStatusHint } from '../../composables/useStatusHint';
@@ -183,6 +188,8 @@
 
 	const svgRef = ref<SVGSVGElement | null>(null);
 	provide('patchCanvasSvg', svgRef);
+	const cableLayerRef = ref<SVGGElement | null>(null);
+	provide('patchCanvasCableLayer', cableLayerRef);
 	const cablesRef = ref<InstanceType<typeof Cables> | null>(null);
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
@@ -201,11 +208,17 @@
 
 	const wrapperEl = ref<HTMLDivElement | null>(null);
 	const containerWidth = ref(0);
+	const containerHeight = ref(0);
+	// Uses the outer size (incl. scrollbars) so the area label doesn't shift when a scrollbar appears.
+	const labelCenter = ref({ x: 0, y: 0 });
 	let resizeObserver: ResizeObserver | null = null;
 	onMounted(() => {
 		if (wrapperEl.value) {
 			resizeObserver = new ResizeObserver((entries) => {
 				containerWidth.value = entries[0].contentRect.width;
+				containerHeight.value = entries[0].contentRect.height;
+				const el = entries[0].target as HTMLElement;
+				labelCenter.value = { x: el.offsetWidth / 2, y: el.offsetHeight / 2 };
 			});
 			resizeObserver.observe(wrapperEl.value);
 		}
@@ -222,7 +235,11 @@
 		if (connected) showHint(settingsStore.cableConnectMode === 'click' ? 'jackConnectedClick' : 'jackConnectedDrag');
 		else if (settingsStore.cableConnectMode === 'click') showHint('jackArm');
 	}
+	// A jack's context menu overlay takes the pointer, so the jack loses hover: keep its cables
+	// highlighted until the menu closes.
+	const menuJack = ref<JackEnd | null>(null);
 	function onJackHoverLeave(info: JackEnd) {
+		if (ctxState.visible) menuJack.value = info;
 		if (hoveredJack.value && sameJack(hoveredJack.value, info)) hoveredJack.value = null;
 		if (uiStore.hoveredJack && sameJack(uiStore.hoveredJack, info)) uiStore.hoveredJack = null;
 		clearHint();
@@ -246,7 +263,6 @@
 	});
 
 	const canvasHeight = computed(() => {
-		if (props.modules.length === 0) return 600;
 		let maxY = 0;
 		(props.modules as any[]).forEach((m: any) => {
 			const modDef = getModule(m.type);
@@ -254,7 +270,7 @@
 			const my = (m.vert + modHeight) * MODULE_ROW_HEIGHT;
 			if (my > maxY) maxY = my;
 		});
-		return Math.max(maxY + 100, 600);
+		return Math.max(maxY + 2 * MODULE_ROW_HEIGHT, containerHeight.value / zoom.value);
 	});
 
 	const connectedJacksMap = computed(() => {
@@ -298,7 +314,13 @@
 	const uiStore = useUiStore();
 	const valueHint = useValueHint();
 	const { showHint, clearHint } = useStatusHint();
-	const { open: openContextMenu } = useContextMenu();
+	const { state: ctxState, open: openContextMenu } = useContextMenu();
+	watch(
+		() => ctxState.visible,
+		(visible) => {
+			if (!visible) menuJack.value = null;
+		},
+	);
 	const { addModuleAt } = useAddModule();
 	const { graphics } = useModuleGraphics();
 	const { clearArmed } = useJackPatching();

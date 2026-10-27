@@ -9,7 +9,7 @@ export const VALUE_HINT_MS = 833;
 
 // 'toolbar' = an HTML control outside the canvas (morph group knobs, patch level, patch settings),
 // rendered by ToolbarValueHint from its registered anchor. paramIndex -1 on a canvas area = the
-// module's name hint (double-click on an empty part of the module).
+// module's name hint (hover over its title row).
 export type HintArea = 'va' | 'fx' | 'toolbar';
 type HintTarget = { moduleIndex: number; paramIndex: number; area: HintArea };
 

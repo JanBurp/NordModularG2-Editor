@@ -9,6 +9,7 @@
 			height="6.5"
 			:fill="activeStep !== 255 && ((ve as any).exclusive ? i === activeStep : i <= activeStep) ? '#0F0' : '#040'"
 			stroke="#000"
+			pointer-events="none"
 		/>
 	</template>
 	<template v-else-if="ve.type === 'ledArray'">
@@ -21,9 +22,10 @@
 			height="6.5"
 			:fill="activeStep === i - 1 ? '#0F0' : '#040'"
 			stroke="#000"
+			pointer-events="none"
 		/>
 	</template>
-	<rect v-else :x="(ve.x || 0) + 1" :y="ve.y" :width="ve.w" height="6.5" :fill="ledOn ? '#0F0' : '#040'" stroke="#000" />
+	<rect v-else pointer-events="none" :x="(ve.x || 0) + 1" :y="ve.y" :width="ve.w" height="6.5" :fill="ledOn ? '#0F0' : '#040'" stroke="#000" />
 </template>
 <script setup lang="ts">
 	import type { VisualElement } from '../../types';

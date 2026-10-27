@@ -34,6 +34,7 @@ export const useUiStore = defineStore('ui', {
 		selectedModules: [] as number[],
 		selectedModulesArea: null as 'va' | 'fx' | null,
 		selectedParam: null as { moduleId: number; paramIndex: number } | null,
+		selectedParamByCursor: false as boolean, // selectedParam came from the G2's buttons or keyboard navigation, not the mouse
 		hoveredParam: null as { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null, // only set when settings.hoverKeyTarget is on
 		hoveredKnob: null as number | null, // id of the hovered common/Knob.vue (toolbar), same setting
 		selectedMorphGroup: 0 as number, // 0-7, which Morph Group toolbar knob is currently selected
@@ -56,10 +57,10 @@ export const useUiStore = defineStore('ui', {
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
 		clipboard: null as ClipboardEntry | null,
-		// Whether a paste-able entry exists, either locally or (last refreshed) on the OS
+		// Module types of the paste-able entry, either local or (last refreshed) on the OS
 		// clipboard — a Pinia field so every consumer (menu enablement, context menus) shares
 		// one source of truth instead of each usePatchClipboard() call owning its own copy.
-		hasClipboard: false as boolean,
+		clipboardTypes: [] as number[],
 		lastMousePos: null as { col: number; row: number; area: 'va' | 'fx' } | null,
 		// Live morph-range Ctrl/Cmd-drag hint, read by MorphDragHintOverlay (canvas-level, rendered
 		// after every module) so the badge always paints above other modules instead of being hidden
@@ -93,6 +94,7 @@ export const useUiStore = defineStore('ui', {
 	}),
 
 	getters: {
+		hasClipboard: (state) => state.clipboardTypes.length > 0,
 		selectedSlotIndex: (state) => SLOT_LABELS.indexOf(state.slotInFocus),
 
 		// Current slot's area mode (0=FX, 1=Voice, 2=Split), derived from patch.description.height
@@ -109,9 +111,13 @@ export const useUiStore = defineStore('ui', {
 		},
 
 		// The canvas param the arrow keys will change (see useModuleKeyboard): with settings.hoverKeyTarget
-		// the hovered one (none while a toolbar knob is hovered), else the selected one.
+		// the hovered one (none while a toolbar knob is hovered), else the selected one — then only when it
+		// was set by the G2's buttons or keyboard navigation, so a mouse click never leaves a marker behind.
 		keyTargetParam: (state): { moduleId: number; paramIndex: number; area: 'va' | 'fx' } | null => {
-			if (useSettingsStore().hoverKeyTarget && (state.hoveredKnob !== null || state.hoveredParam)) return state.hoveredParam;
+			if (useSettingsStore().hoverKeyTarget) {
+				if (state.hoveredKnob !== null || state.hoveredParam) return state.hoveredParam;
+				if (!state.selectedParamByCursor) return null;
+			}
 			if (!state.selectedParam || !state.selectedModulesArea) return null;
 			return { ...state.selectedParam, area: state.selectedModulesArea };
 		},
@@ -152,8 +158,9 @@ export const useUiStore = defineStore('ui', {
 			this.selectedParam = null;
 		},
 
-		setSelectedParam(moduleId: number, paramIndex: number) {
+		setSelectedParam(moduleId: number, paramIndex: number, byCursor = false) {
 			this.selectedParam = { moduleId, paramIndex };
+			this.selectedParamByCursor = byCursor;
 		},
 
 		clearSelectedParam() {
@@ -162,6 +169,7 @@ export const useUiStore = defineStore('ui', {
 
 		setHoveredParam(moduleId: number, paramIndex: number, area: 'va' | 'fx') {
 			this.hoveredParam = { moduleId, paramIndex, area };
+			this.selectedParamByCursor = false; // the mouse takes over until the next G2/keyboard cursor move
 		},
 
 		clearHoveredParam() {

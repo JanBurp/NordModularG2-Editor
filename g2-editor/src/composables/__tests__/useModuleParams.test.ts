@@ -83,3 +83,23 @@ describe('useModuleParams — Rnd/Clr', () => {
 		expect(emitParamChange).toHaveBeenCalledWith(1, 2, 1, undefined);
 	});
 });
+
+describe('useModuleParams — onModeChange', () => {
+	// `instance` is the store's module: writing it here made setMode record initial == new, so undo resent the new value.
+	it('only emits, leaving the module untouched for setMode to record the old value', () => {
+		const instance = { type: 1, index: 3, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [0] } as ModuleInstance;
+		const emitModeChange = vi.fn();
+		const { onModeChange } = useModuleParams(
+			computed(() => instance),
+			computed(() => null),
+			'va',
+			vi.fn(),
+			emitModeChange,
+		);
+
+		onModeChange(0, 2);
+
+		expect(instance.modes[0]).toBe(0);
+		expect(emitModeChange).toHaveBeenCalledWith(3, 0, 2);
+	});
+});

@@ -175,6 +175,7 @@ export interface ClipboardEntry {
 	cables: Cable[];
 	area: 'va' | 'fx';
 	copiedVariation: number; // uiStore.variation at copy time — which slice of `lv` Paste Params should use
+	morphs?: MorphAssignment[][]; // per variation, the copied modules' morph assignments (source indices); absent from older builds
 }
 
 export const VOICEMODE_OPTIONS = [

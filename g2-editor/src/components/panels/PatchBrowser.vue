@@ -44,8 +44,8 @@
 					/>
 				</div>
 
-				<StateMessage v-if="browser.loading" variant="loading" message="Loading..." />
-				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
+				<StateMessage v-if="browser.diskLoading" variant="loading" message="Loading..." />
+				<StateMessage v-else-if="browser.diskError" variant="error" :message="browser.diskError" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<ListItem
 						v-for="(entry, i) in filteredDiskDirs"
@@ -107,8 +107,8 @@
 						<Icon :name="allBanksExpanded ? 'chevronDown' : 'chevronRight'" class="w-2.5 h-2.5" />
 					</button>
 				</div>
-				<StateMessage v-if="browser.loading" variant="loading" message="Loading from G2..." />
-				<StateMessage v-else-if="browser.error" variant="error" :message="browser.error" />
+				<StateMessage v-if="browser.synthLoading" variant="loading" message="Loading from G2..." />
+				<StateMessage v-else-if="browser.synthError" variant="error" :message="browser.synthError" />
 				<ul v-else class="flex-1 overflow-y-auto list-none m-0 p-0">
 					<!-- Patches grouped by bank (own <ul> per bank, so a sticky header only sticks over its own patches) -->
 					<li v-for="group in currentGroups" :key="group.bank">
@@ -486,7 +486,7 @@
 		settings.browserView = v;
 		searchQuery.value = '';
 		resetNavIndex();
-		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && !browser.loading && device.connected) {
+		if ((v === 'patches' || v === 'performances') && browser.synthPatches.length === 0 && !browser.synthLoading && device.connected) {
 			await browser.loadSynthList();
 		}
 		if (v === 'disk' && !browser.diskFolder && settings.path) {

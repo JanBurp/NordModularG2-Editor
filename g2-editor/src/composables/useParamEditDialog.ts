@@ -1,11 +1,11 @@
 import { ref, computed } from 'vue';
 import { getParam } from '../renderer/parammap';
 import { getModule } from '../renderer/nmg2mods';
-import type { ModuleDefinition, ModuleParam, ParamDefinition } from '../types/index';
+import type { ModuleDefinition, ParamDefinition } from '../types/index';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { clamp } from '@/utils/math';
-import { formatParamDisplay, isSwitch, type ParamValueOption } from '@/utils/moduleControls';
+import { formatParamDisplay, type ParamValueOption } from '@/utils/moduleControls';
 
 interface Editing {
 	moduleIndex: number;
@@ -21,11 +21,6 @@ interface Editing {
 const showDialog = ref(false);
 const editing = ref<Editing | null>(null);
 const position = ref({ x: 0, y: 0 });
-
-// Switches have their own click/label UI; every other param gets the Set Value popup.
-export function isValueEditable(param: ModuleParam | undefined): boolean {
-	return !!param && !isSwitch(param.n);
-}
 
 export function useParamEditDialog() {
 	const slotsStore = useSlotsStore();
@@ -59,7 +54,7 @@ export function useParamEditDialog() {
 		const moduleDef = mod && getModule(mod.type);
 		const param = moduleDef?.params?.[info.paramIndex];
 		const def = param && getParam(param.type);
-		if (!moduleDef || !def || !isValueEditable(param)) return;
+		if (!moduleDef || !def) return;
 		const values = slotsStore.slots[slot]?.variations?.[uiStore.variation]?.[area]?.[info.moduleIndex] ?? [];
 		editing.value = { moduleIndex: info.moduleIndex, paramIndex: info.paramIndex, area, def, moduleDef, values: [...values], modes: mod.modes ?? [] };
 		position.value = { x: info.x, y: info.y };
