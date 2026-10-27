@@ -1,7 +1,6 @@
 /// <reference types="vite/client" />
-import type { MenuAction, MenuState } from './types/index';
+import type { ConnectedDeviceInfo, DeviceAction, DeviceSummary, MenuAction, MenuState } from './types/index';
 import type { CliService } from './types/cli';
-import type { DeviceStatus } from './store/device';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -59,14 +58,19 @@ declare global {
 			devices: {
 				list: () => Promise<{ bus: number; device: number; id: string; alreadyConnected: boolean }[]>;
 				connect: (bus: number, device: number) => Promise<{ id: string }>;
-				switchTo: (bus: number, device: number) => Promise<void>;
-				reportName: (name: string) => Promise<void>;
-				reportStatus: (status: DeviceStatus) => Promise<void>;
+				self: () => Promise<number>;
+				report: (summary: DeviceSummary) => Promise<void>;
+				select: (viewId: number, action?: DeviceAction) => Promise<void>;
+				detach: (viewId: number) => Promise<void>;
+				attach: (viewId: number) => Promise<void>;
+				close: (viewId: number) => Promise<void>;
 				getAssignment: () => Promise<{ bus: number; device: number; showSplash: boolean } | null>;
-				onChanged: (
-					cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean; status: DeviceStatus }[]) => void,
-				) => void;
+				onChanged: (cb: (list: ConnectedDeviceInfo[]) => void) => void;
 				offChanged: () => void;
+				onAction: (cb: (action: DeviceAction) => void) => void;
+				offAction: () => void;
+				onAssigned: (cb: (assignment: { bus: number; device: number }) => void) => void;
+				offAssigned: () => void;
 			};
 			clipboard: {
 				write: (entry: unknown) => Promise<void>;

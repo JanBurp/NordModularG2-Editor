@@ -3,6 +3,8 @@ import { DeviceStatus, useDeviceStore } from '@/store/device';
 import type { Device } from '@/types';
 import { useSlotsStore } from '@/store/slots';
 import { useBrowserStore } from '@/store/browser';
+import { useUiStore } from '@/store/ui';
+import type { DeviceSummary } from '@/types';
 
 import { ref, watch } from 'vue';
 import { bankDownloadProgress } from './useBankDownloadDialog';
@@ -36,6 +38,20 @@ export interface NamesLoadProgress {
 }
 export const namesLoadProgress = ref<NamesLoadProgress | null>(null);
 
+// This device's toolbar group, as shown in its own view and reported to the other device views.
+export function deviceSummary(): DeviceSummary {
+	const store = useDeviceStore();
+	const uiStore = useUiStore();
+	return {
+		name: store.device?.synthName || null,
+		status: store.status,
+		perfMode: store.device?.mode === 'Performance',
+		selectedSlot: uiStore.selectedSlotIndex,
+		slotsActive: store.getSlotsActiveStatus,
+		slotsKeyed: store.getSlotsKeyStatus,
+	};
+}
+
 export function useG2() {
 	const store = useDeviceStore();
 	const slotsStore = useSlotsStore();
@@ -50,9 +66,9 @@ export function useG2() {
 	};
 
 	watch(
-		() => store.status,
-		(status) => {
-			window.electronAPI?.devices?.reportStatus(status).catch(() => {});
+		deviceSummary,
+		(summary, previous) => {
+			if (JSON.stringify(summary) !== JSON.stringify(previous)) window.electronAPI?.devices?.report(summary).catch(() => {});
 		},
 		{ immediate: true },
 	);

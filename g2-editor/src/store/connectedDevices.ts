@@ -1,27 +1,20 @@
 import { defineStore } from 'pinia';
-import { DeviceStatus } from './device';
+import type { ConnectedDeviceInfo } from '@/types';
 
-export interface ConnectedDeviceInfo {
-	id: string;
-	bus: number;
-	device: number;
-	name: string | null;
-	hasDaemon: boolean;
-	status: DeviceStatus;
-}
+export type { ConnectedDeviceInfo };
 
-// Cross-window "who else is connected" list (one Electron BrowserWindow per physical G2 —
-// see the multi-device plan). Populated from window.electronAPI.devices.onChanged, broadcast
-// by the main process whenever any window's session changes.
+// Every device view's summary, in toolbar order (the same in every window), plus which entry is
+// this view. Populated from window.electronAPI.devices.onChanged, broadcast by the main process
+// whenever any view reports a change.
 export const useConnectedDevicesStore = defineStore('connectedDevices', {
 	state: () => ({
 		list: [] as ConnectedDeviceInfo[],
-		thisId: null as string | null,
+		selfId: null as number | null,
 	}),
 
 	actions: {
-		setThisId(id: string | null) {
-			this.thisId = id;
+		setSelfId(id: number | null) {
+			this.selfId = id;
 		},
 
 		applyList(list: ConnectedDeviceInfo[]) {

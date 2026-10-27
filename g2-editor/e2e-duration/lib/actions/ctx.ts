@@ -1,5 +1,5 @@
 import { errors, type ElectronApplication, type Locator, type Page } from '@playwright/test';
-import { evaluateWithRetry } from '../../../e2e/fixtures/electron';
+import { sendMenuActionTo } from '../../../e2e/fixtures/electron';
 import type { G2Snapshot } from '../cli';
 import { sleep } from '../cli';
 import type { EventLog } from '../eventLog';
@@ -48,14 +48,7 @@ export const UI_TIMEOUT_MS = 3000;
 
 export const cliRun = (page: Page, args: string[]) => page.evaluate((a) => (window as any).cli.run(a) as Promise<string>, args);
 
-export const menuAction = (c: ActionCtx, name: string) =>
-	evaluateWithRetry(
-		c.app,
-		({ BrowserWindow }, n) => {
-			BrowserWindow.getAllWindows()[0]?.webContents.send('menu:action', n);
-		},
-		name,
-	);
+export const menuAction = (c: ActionCtx, name: string) => sendMenuActionTo(c.app, name);
 
 export async function focusedSlot(page: Page): Promise<string> {
 	const id = await page.locator('[data-testid^="slot-"].btn-active').first().getAttribute('data-testid');

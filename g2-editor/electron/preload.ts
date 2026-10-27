@@ -1,6 +1,5 @@
 import { contextBridge, ipcRenderer } from 'electron';
-import type { MenuAction, MenuState } from '../src/types/index';
-import type { DeviceStatus } from '../src/store/device';
+import type { ConnectedDeviceInfo, DeviceAction, DeviceSummary, MenuAction, MenuState } from '../src/types/index';
 
 function now(): string {
 	const d = new Date();
@@ -27,6 +26,8 @@ function listenerGroup(channel: string) {
 const menuAction = listenerGroup('menu:action');
 const openFile = listenerGroup('file:open');
 const devicesChanged = listenerGroup('devices:changed');
+const devicesAction = listenerGroup('devices:action');
+const devicesAssigned = listenerGroup('devices:assigned');
 const watchEvent = listenerGroup('cli:watch-event');
 const watchDone = listenerGroup('cli:watch-done');
 const deviceDisconnected = listenerGroup('cli:device-disconnected');
@@ -78,13 +79,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	devices: {
 		list: () => ipcRenderer.invoke('devices:list'),
 		connect: (bus: number, device: number) => ipcRenderer.invoke('devices:connect', bus, device),
-		switchTo: (bus: number, device: number) => ipcRenderer.invoke('devices:switch-to', bus, device),
-		reportName: (name: string) => ipcRenderer.invoke('devices:report-name', name),
-		reportStatus: (status: DeviceStatus) => ipcRenderer.invoke('devices:report-status', status),
+		self: () => ipcRenderer.invoke('devices:self'),
+		report: (summary: DeviceSummary) => ipcRenderer.invoke('devices:report', summary),
+		select: (viewId: number, action?: DeviceAction) => ipcRenderer.invoke('devices:select', viewId, action),
+		detach: (viewId: number) => ipcRenderer.invoke('devices:detach', viewId),
+		attach: (viewId: number) => ipcRenderer.invoke('devices:attach', viewId),
+		close: (viewId: number) => ipcRenderer.invoke('devices:close', viewId),
 		getAssignment: () => ipcRenderer.invoke('devices:get-assignment'),
-		onChanged: (cb: (list: { id: string; bus: number; device: number; name: string | null; hasDaemon: boolean; status: DeviceStatus }[]) => void) =>
-			devicesChanged.on(cb),
+		onChanged: (cb: (list: ConnectedDeviceInfo[]) => void) => devicesChanged.on(cb),
 		offChanged: () => devicesChanged.off(),
+		onAction: (cb: (action: DeviceAction) => void) => devicesAction.on(cb),
+		offAction: () => devicesAction.off(),
+		onAssigned: (cb: (assignment: { bus: number; device: number }) => void) => devicesAssigned.on(cb),
+		offAssigned: () => devicesAssigned.off(),
 	},
 	clipboard: {
 		write: (entry: unknown) => ipcRenderer.invoke('clipboard:write', entry),
