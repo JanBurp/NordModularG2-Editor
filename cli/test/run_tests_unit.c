@@ -175,8 +175,6 @@ extern void test_sanitize_filename_keeps_plain_name_and_truncates(void);
 extern void test_set_module_label_invalid_slot_low(void);
 extern void test_set_module_label_invalid_slot_high(void);
 extern void test_set_module_label_invalid_location(void);
-extern void test_set_module_label_null_label(void);
-extern void test_set_module_label_empty_label(void);
 
 extern void test_set_perf_mode_invalid_mode_low(void);
 extern void test_set_perf_mode_invalid_mode_high(void);
@@ -411,8 +409,6 @@ int main(void) {
     RUN_TEST(test_set_module_label_invalid_slot_low);
     RUN_TEST(test_set_module_label_invalid_slot_high);
     RUN_TEST(test_set_module_label_invalid_location);
-    RUN_TEST(test_set_module_label_null_label);
-    RUN_TEST(test_set_module_label_empty_label);
 
     /* set-perf-mode and set-perf-name parameter validation tests */
     RUN_TEST(test_set_perf_mode_invalid_mode_low);

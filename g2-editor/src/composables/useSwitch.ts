@@ -84,7 +84,8 @@ export function useSwitch(
 	});
 
 	function getButtonX(index: number): number {
-		if (mode.value === 'VR') return 0;
+		// Only HR lays buttons out side by side; single-button defs may have no names (itemsPerRow 0 → NaN).
+		if (mode.value !== 'HR') return 0;
 		return (index % itemsPerRow.value) * width.value;
 	}
 

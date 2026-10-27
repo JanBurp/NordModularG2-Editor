@@ -41,6 +41,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Undo module Mode did not work
 - Paste Params did not work (only on modules with same order instead of id)
 - Module ContextMenu sometimes had double dividers
+- Possible to rename modules with empty names
 
 ## [0.7.2] - 2026-10-22
 

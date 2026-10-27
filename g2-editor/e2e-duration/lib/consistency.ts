@@ -79,14 +79,29 @@ const sameEnds = (key: string) => {
 
 const few = (xs: string[]) => (xs.length > 4 ? `${xs.slice(0, 4).join(', ')} (+${xs.length - 4} more)` : xs.join(', '));
 
-/** Differences as readable lines, empty when both agree. */
-export function diffStates(editor: SlotState, device: SlotState): string[] {
+/** A param line's key ("idx v<n>" / "idx modes"), without its values. */
+const paramKey = (line: string) => line.split('=')[0];
+
+/** Param keys whose editor lines differ between two snapshots: values the G2 is still moving (e.g. by MIDI CC). */
+function movingParams(before: SlotState, after: SlotState): Set<string> {
+	const out = new Set<string>();
+	for (const a of ['va', 'fx'] as const) {
+		const b = new Set(before[a].params);
+		const n = new Set(after[a].params);
+		for (const x of [...b].filter((x) => !n.has(x)).concat([...n].filter((x) => !b.has(x)))) out.add(`${a} ${paramKey(x)}`);
+	}
+	return out;
+}
+
+/** Differences as readable lines, empty when both agree. Params keyed in `ignoreParams` ("area idx v<n>") are skipped. */
+export function diffStates(editor: SlotState, device: SlotState, ignoreParams = new Set<string>()): string[] {
 	const out: string[] = [];
 	for (const a of ['va', 'fx'] as const) {
 		for (const k of ['modules', 'cables', 'params'] as const) {
 			const norm = k === 'cables' ? sameEnds : (x: string) => x;
-			const e = new Set(editor[a][k].map(norm));
-			const d = new Set(device[a][k].map(norm));
+			const keep = (x: string) => k !== 'params' || !ignoreParams.has(`${a} ${paramKey(x)}`);
+			const e = new Set(editor[a][k].filter(keep).map(norm));
+			const d = new Set(device[a][k].filter(keep).map(norm));
 			const onlyEditor = [...e].filter((x) => !d.has(x));
 			const onlyDevice = [...d].filter((x) => !e.has(x));
 			if (onlyEditor.length) out.push(`${a} ${k} only in editor: ${few(onlyEditor)}`);
@@ -99,7 +114,8 @@ export function diffStates(editor: SlotState, device: SlotState): string[] {
 /**
  * Compares the focused slot as the editor shows it with the G2's own copy. A silently dropped or garbled
  * write passes every other check, so this is the only place it shows. A difference is re-checked once
- * after a pause: the editor can lag a reload that is still under way.
+ * after a pause: the editor can lag a reload that is still under way. Params whose editor value changed
+ * while the G2's copy was read are skipped: the G2 itself keeps moving them, so any snapshot races.
  */
 export async function checkConsistency(page: Page): Promise<{ slot: string; diffs: string[] }> {
 	const slot = await focusedSlot(page);
