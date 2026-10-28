@@ -183,11 +183,35 @@
 		@confirm="saveToLibraryDialog.confirm"
 		@cancel="saveToLibraryDialog.cancel"
 	>
-		<input
-			v-model="saveToLibraryDialog.editingValue.value"
-			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
-			data-testid="save-library-name"
-		/>
+		<!-- Group: pick an existing one from the list, or type a new one ('Saved' = the library folder itself) -->
+		<div class="flex flex-col gap-2 text-sm">
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Group</span>
+				<ComboInput
+					v-model="saveToLibraryDialog.editingValue.value.group"
+					:options="libraryGroups"
+					placeholder="Saved"
+					data-testid="save-library-group"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Name</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.name"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-name"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Notes</span>
+				<textarea
+					v-model="saveToLibraryDialog.editingValue.value.notes"
+					rows="4"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default resize-y"
+					data-testid="save-library-notes"
+				/>
+			</label>
+		</div>
 	</Dialog>
 
 	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" confirm-label="Rename" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
@@ -479,6 +503,7 @@
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
 	import Dialog from './components/common/Dialog.vue';
+	import ComboInput from './components/common/ComboInput.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
@@ -658,7 +683,7 @@
 	} = usePerfNameDialog();
 
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
-	const { saveDialog: saveToLibraryDialog } = useLibrary();
+	const { saveDialog: saveToLibraryDialog, groups: libraryGroups } = useLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 

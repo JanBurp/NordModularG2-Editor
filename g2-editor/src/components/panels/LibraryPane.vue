@@ -92,7 +92,7 @@
 	import StateMessage from '../browser/StateMessage.vue';
 	import LibraryPreview from './LibraryPreview.vue';
 	import { useUiStore } from '@/store/ui';
-	import { useLibrary, type LibraryItem } from '../../composables/useLibrary';
+	import { groupLabel, useLibrary, type LibraryItem } from '../../composables/useLibrary';
 	import { insertEntry } from '../../composables/usePatchClipboard';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useListNav } from '../../composables/useListNav';
@@ -118,7 +118,6 @@
 
 	// Same search as the Modules pane: "<group> <term>" picks the groups (folders) first, then filters within them.
 	// The term matches an item's name or notes. Groups: the subfolders, the library folder's own items ('Saved') first.
-	const groupLabel = (group: string) => group || 'Saved';
 	const filtered = computed(() => {
 		const { group, term } = parseGroupQuery(searchQuery.value);
 		return items.value.filter(

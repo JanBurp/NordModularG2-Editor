@@ -923,13 +923,25 @@ ipcMain.handle('patches:library-dir', (event, custom?: string) => {
 	return dir;
 });
 
-// Moves a library item to the Trash; only .pch2 files inside the calling window's library folder.
-ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
-	const dir = libraryDirByWc.get(event.sender.id);
+// Only .pch2 files inside the calling window's library folder may be written or removed.
+function assertInLibrary(wcId: number, filepath: string): string {
+	const dir = libraryDirByWc.get(wcId);
 	const resolved = path.resolve(filepath);
 	const rel = dir ? path.relative(path.resolve(dir), resolved) : '';
 	if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !/\.pch2$/i.test(rel)) throw new Error('Not a library file');
-	await shell.trashItem(resolved);
+	return resolved;
+}
+
+// Saves a library item, creating its group (subfolder) when it's new.
+ipcMain.handle('patches:library-save', (event, filepath: string, data: number[]) => {
+	const file = assertInLibrary(event.sender.id, filepath);
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, Buffer.from(data));
+});
+
+// Moves a library item to the Trash.
+ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
+	await shell.trashItem(assertInLibrary(event.sender.id, filepath));
 });
 
 ipcMain.handle('patches:reveal', (_, filepath: string) => shell.showItemInFolder(filepath));

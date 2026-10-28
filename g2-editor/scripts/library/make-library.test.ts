@@ -142,11 +142,35 @@ function rebuild(entry: Entry): { entry: ClipboardEntry; base: ReturnType<typeof
 	};
 }
 
+// Library layout: no empty columns, and a column holding at most 4 modules (with the biggest column at least twice
+// as full) folds into the biggest one: stacked at its top when they sit in its upper half, else below it.
+function compactLayout(modules: ModuleInstance[]): ModuleInstance[] {
+	const height = (m: ModuleInstance) => getModule(m.type)?.height ?? 2;
+	const byCol = new Map<number, ModuleInstance[]>();
+	for (const m of modules) byCol.set(m.horiz, [...(byCol.get(m.horiz) ?? []), m]);
+	const main = [...byCol.entries()].reduce((a, b) => (b[1].length > a[1].length ? b : a));
+	const minor = [...byCol.entries()].filter(([c, ms]) => c !== main[0] && ms.length <= 4 && main[1].length >= 2 * ms.length);
+	const place = new Map<number, { horiz: number; vert: number }>();
+	const top = Math.min(...main[1].map((m) => m.vert));
+	const bottom = Math.max(...main[1].map((m) => m.vert + height(m)));
+	const toTop = minor.filter(([, ms]) => Math.min(...ms.map((m) => m.vert)) < (top + bottom) / 2).flatMap(([, ms]) => ms.sort((a, b) => a.vert - b.vert));
+	const toBottom = minor.filter(([, ms]) => !toTop.includes(ms[0])).flatMap(([, ms]) => ms.sort((a, b) => a.vert - b.vert));
+	const shift = toTop.reduce((h, m) => h + height(m), 0);
+	let row = top;
+	for (const m of toTop) (place.set(m.index, { horiz: main[0], vert: row }), (row += height(m)));
+	row = bottom + shift;
+	for (const m of toBottom) (place.set(m.index, { horiz: main[0], vert: row }), (row += height(m)));
+	const moved = modules.map((m) => ({ ...m, ...(place.get(m.index) ?? { vert: m.horiz === main[0] ? m.vert + shift : m.vert }) }));
+	const cols = [...new Set(moved.map((m) => m.horiz))].sort((a, b) => a - b);
+	return moved.map((m) => ({ ...m, horiz: cols.indexOf(m.horiz) }));
+}
+
 describe('library items', () => {
 	for (const entry of manifest as Entry[]) {
 		const isExtract = !!entry.source;
 		it.skipIf(isExtract && !SRC)(`${entry.folder}/${entry.name}`, () => {
 			const { entry: item, base } = isExtract ? extract(entry) : rebuild(entry);
+			item.modules = compactLayout(item.modules);
 			const bytes = libraryItemToPch2(entry.name, item, base, entry.credit);
 			const back = pch2ToLibraryItem(bytes);
 			expect(back.modules.length).toBe(item.modules.length);

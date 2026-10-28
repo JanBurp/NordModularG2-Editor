@@ -112,6 +112,32 @@ test.describe('Library', () => {
 		await expect.poll(async () => (await preview.boundingBox())!.height).toBeGreaterThan(8.5 * 16);
 	});
 
+	test('saves into a new group with notes, and offers that group next time', async ({ app, page, sendMenuAction }) => {
+		await sendMenuAction('select-all');
+		await sendMenuAction('save-to-library');
+		await page.locator('[data-testid="save-library-group"]').fill('My Voices');
+		await page.locator('[data-testid="save-library-name"]').fill('Lead');
+		const notes = page.locator('[data-testid="save-library-notes"]');
+		await notes.fill('Line one');
+		await notes.press('Enter'); // a new line, not Save
+		await notes.pressSequentially('Line two');
+		await notes.press('ControlOrMeta+Enter');
+		await expect(itemRow(page, 'Lead')).toBeVisible();
+
+		const userData = await app.evaluate(() => process.env.TEST_USER_DATA as string);
+		expect(fs.existsSync(path.join(userData, 'library', 'My Voices', 'Lead.pch2'))).toBe(true);
+		await expect(page.locator('[data-testid="library-pane"]').getByText('My Voices (1)')).toBeVisible();
+		await itemRow(page, 'Lead').click();
+		await expect(page.locator('[data-testid="library-notes"]')).toHaveText('Line one\nLine two');
+
+		await sendMenuAction('save-to-library');
+		await expect(page.locator('[data-testid="save-library-group"]')).toHaveValue('My Voices'); // the last group used
+		const group = page.locator('[data-testid="save-library-group"]');
+		await group.fill('voi');
+		await page.locator('[data-testid="combo-options"]').getByText('My Voices').click();
+		await expect(group).toHaveValue('My Voices');
+	});
+
 	test('dropping a library item on the canvas puts its top-left module at the drop cell', async ({ page, sendMenuAction }) => {
 		await saveToLibrary(page, sendMenuAction, 'Dropped');
 		const canvas = (await page.locator('[data-testid="canvas-va"]').boundingBox())!;
