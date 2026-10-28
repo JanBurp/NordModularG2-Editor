@@ -48,6 +48,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		storageCopy: (from: string, to: string) => ipcRenderer.invoke('patches:storage-copy', from, to),
 		libraryDir: (custom?: string) => ipcRenderer.invoke('patches:library-dir', custom),
 		librarySave: (filepath: string, data: number[]) => ipcRenderer.invoke('patches:library-save', filepath, data),
+		libraryMove: (from: string, to: string) => ipcRenderer.invoke('patches:library-move', from, to),
 		libraryRemove: (filepath: string) => ipcRenderer.invoke('patches:library-remove', filepath),
 		reveal: (filepath: string) => ipcRenderer.invoke('patches:reveal', filepath),
 		onStorageChanged: (cb: () => void) => storageChanged.on(cb),

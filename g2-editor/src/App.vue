@@ -178,7 +178,7 @@
 
 	<Dialog
 		v-model="saveToLibraryDialog.showDialog.value"
-		title="Save Selection to Library"
+		:title="libraryEditing ? 'Edit Library Item' : 'Save Selection to Library'"
 		confirm-label="Save"
 		@confirm="saveToLibraryDialog.confirm"
 		@cancel="saveToLibraryDialog.cancel"
@@ -683,7 +683,7 @@
 	} = usePerfNameDialog();
 
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
-	const { saveDialog: saveToLibraryDialog, groups: libraryGroups } = useLibrary();
+	const { saveDialog: saveToLibraryDialog, groups: libraryGroups, editing: libraryEditing } = useLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 

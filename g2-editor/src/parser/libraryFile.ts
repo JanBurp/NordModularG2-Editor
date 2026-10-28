@@ -1,6 +1,6 @@
 import type { ClipboardEntry, Patch, VariationState } from '@/types/patch';
 import { extractVariations, liveModuleLv } from '../store/slotHelpers';
-import { PatchParser } from './nmg2PatchParser';
+import { PatchParser, stripFileHeader } from './nmg2PatchParser';
 import { PCH2_TEXT_HEADER, pch2FileBytes, serializePatch } from './nmg2PatchSerializer';
 
 // A library item is a plain .pch2 holding one area's modules, cables and morphs, moved to the top-left
@@ -55,4 +55,11 @@ export function pch2ToLibraryItem(bytes: number[]): LibraryEntry {
 		morphs: variations.map((v) => v.patch.morphAssignments.filter((a) => a.location === areaIdx && ids.has(a.moduleIndex))),
 		text: patch.text ?? '',
 	};
+}
+
+// A library item's file with new patch notes (and name); everything else as it was.
+export function withNotes(bytes: number[], name: string, text: string): number[] {
+	const patch = new PatchParser(new Uint8Array(bytes).buffer).parse() as Patch;
+	patch.text = text;
+	return pch2FileBytes(PCH2_TEXT_HEADER, serializePatch(name, patch, stripFileHeader(bytes), extractVariations(patch)));
 }

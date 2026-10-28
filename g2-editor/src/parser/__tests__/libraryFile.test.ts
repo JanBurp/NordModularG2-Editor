@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
 import { PatchParser, stripFileHeader } from '../nmg2PatchParser';
-import { libraryItemToPch2, pch2ToLibraryItem } from '../libraryFile';
+import { libraryItemToPch2, pch2ToLibraryItem, withNotes } from '../libraryFile';
 import { extractVariations, liveModuleLv } from '../../store/slotHelpers';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -62,5 +62,17 @@ describe('library item .pch2', () => {
 		expect(item.area).toBe('va');
 		expect(item.modules.map((m) => m.index)).toEqual(patch.areas[1].modules.map((m) => m.index));
 		expect(item.cables.length).toBe(patch.areas[1].cableList.length);
+	});
+
+	it('withNotes replaces only the notes', () => {
+		const { bytes } = loadFixture('DXBass FM4.pch2');
+		const before = pch2ToLibraryItem(bytes);
+		const after = pch2ToLibraryItem(withNotes(bytes, 'DXBass', 'New notes\nline 2'));
+		expect(after.text).toBe('New notes\nline 2');
+		expect(after.modules.map((m) => [m.index, m.type, m.horiz, m.vert, ...m.lv])).toEqual(
+			before.modules.map((m) => [m.index, m.type, m.horiz, m.vert, ...m.lv]),
+		);
+		expect(after.cables).toEqual(before.cables);
+		expect(after.morphs).toEqual(before.morphs);
 	});
 });

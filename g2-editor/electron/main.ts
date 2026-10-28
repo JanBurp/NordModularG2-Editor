@@ -939,6 +939,13 @@ ipcMain.handle('patches:library-save', (event, filepath: string, data: number[])
 	fs.writeFileSync(file, Buffer.from(data));
 });
 
+// Renames/moves a library item, creating its new group (subfolder) when it's new.
+ipcMain.handle('patches:library-move', (event, from: string, to: string) => {
+	const dst = assertInLibrary(event.sender.id, to);
+	fs.mkdirSync(path.dirname(dst), { recursive: true });
+	fs.renameSync(assertInLibrary(event.sender.id, from), dst);
+});
+
 // Moves a library item to the Trash.
 ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
 	await shell.trashItem(assertInLibrary(event.sender.id, filepath));

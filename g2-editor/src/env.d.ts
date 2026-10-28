@@ -30,6 +30,7 @@ declare global {
 				storageCopy: (from: string, to: string) => Promise<void>;
 				libraryDir: (custom?: string) => Promise<string>;
 				librarySave: (filepath: string, data: number[]) => Promise<void>;
+				libraryMove: (from: string, to: string) => Promise<void>;
 				libraryRemove: (filepath: string) => Promise<void>;
 				reveal: (filepath: string) => Promise<void>;
 				onStorageChanged: (cb: () => void) => void;

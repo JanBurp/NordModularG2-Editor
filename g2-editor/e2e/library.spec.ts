@@ -17,7 +17,10 @@ async function saveToLibrary(page: Page, sendMenuAction: (a: string) => Promise<
 	const input = page.locator('[data-testid="save-library-name"]');
 	await input.fill(name);
 	await input.press('Enter');
-	await expect(itemRow(page, name)).toBeVisible();
+	// The pane searches for the new item ("Name 2" when the name was taken); cleared again for the tests below.
+	const search = page.locator('[data-testid="library-search"] input');
+	await expect(search).toHaveValue(new RegExp(`^Saved ${name}( \\d+)?$`));
+	await search.fill('');
 }
 
 test.describe('Library', () => {
@@ -154,6 +157,46 @@ test.describe('Library', () => {
 		await name.press('Enter');
 		await expect(itemRow(page, 'Dragged')).toContainText('2 modules'); // the whole selection
 		await expect(osc).toHaveAttribute('transform', before!);
+	});
+
+	test('after saving, the pane searches for the new item so only it is shown', async ({ page, sendMenuAction }) => {
+		await saveToLibrary(page, sendMenuAction, 'Other');
+		await sendMenuAction('select-all');
+		await sendMenuAction('save-to-library');
+		await page.locator('[data-testid="save-library-group"]').fill('My Voices');
+		const name = page.locator('[data-testid="save-library-name"]');
+		await name.fill('Osc Filter');
+		await name.press('Enter');
+		await expect(page.locator('[data-testid="library-search"] input')).toHaveValue('My Osc Filter');
+		await expect(page.locator('[data-testid="library-count"]')).toHaveText('1 items');
+		await expect(itemRow(page, 'Osc Filter')).toBeVisible();
+	});
+
+	test('Edit… changes the notes, and renames/moves the item when name or group change', async ({ app, page, sendMenuAction }) => {
+		await saveToLibrary(page, sendMenuAction, 'Draft');
+		await openContextMenu(page, itemRow(page, 'Draft'));
+		await clickContextMenuItem(page, 'Edit…');
+		await expect(page.locator('[data-testid="save-library-name"]')).toHaveValue('Draft');
+		await page.locator('[data-testid="save-library-group"]').fill('Finished');
+		await page.locator('[data-testid="save-library-name"]').fill('Final');
+		await page.locator('[data-testid="save-library-notes"]').fill('Edited notes');
+		await page.locator('[data-testid="save-library-notes"]').press('ControlOrMeta+Enter');
+
+		const lib = path.join(await app.evaluate(() => process.env.TEST_USER_DATA as string), 'library');
+		await expect.poll(() => fs.existsSync(path.join(lib, 'Finished', 'Final.pch2'))).toBe(true);
+		expect(fs.existsSync(path.join(lib, 'Draft.pch2'))).toBe(false); // moved, not copied
+		await expect(itemRow(page, 'Draft')).toHaveCount(0);
+		await itemRow(page, 'Final').click();
+		await expect(page.locator('[data-testid="library-notes"]')).toHaveText('Edited notes');
+		await expect(itemRow(page, 'Final')).toContainText('2 modules');
+
+		// Notes only, from the notes box: stays where it is
+		await page.locator('[data-testid="library-edit"]').click();
+		await page.locator('[data-testid="save-library-notes"]').fill('Second edit');
+		await page.locator('[data-testid="save-library-notes"]').press('ControlOrMeta+Enter');
+		await itemRow(page, 'Final').click();
+		await expect(page.locator('[data-testid="library-notes"]')).toHaveText('Second edit');
+		expect(fs.readdirSync(path.join(lib, 'Finished'))).toEqual(['Final.pch2']);
 	});
 
 	test('dropping a library item on the canvas puts its top-left module at the drop cell', async ({ page, sendMenuAction }) => {

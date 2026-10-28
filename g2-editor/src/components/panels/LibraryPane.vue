@@ -73,12 +73,17 @@
 								<LibraryPreview :entry="item.entry" />
 							</div>
 						</div>
-						<div
-							v-if="item.path === notesItem?.path"
-							class="w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary whitespace-pre-wrap break-words"
-							data-testid="library-notes"
-						>
-							{{ item.entry?.text || 'No notes.' }}
+						<div v-if="item.path === notesItem?.path" class="relative w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary">
+							<div class="whitespace-pre-wrap break-words pr-3" data-testid="library-notes">{{ item.entry?.text || 'No notes.' }}</div>
+							<button
+								v-if="item.entry"
+								class="absolute top-1.5 right-1.5 p-0.5 text-content-secondary hover:text-content-primary cursor-pointer"
+								title="Edit group, name and notes"
+								data-testid="library-edit"
+								@click="openEditDialog(item)"
+							>
+								<Icon name="pencil" class="w-3 h-3" />
+							</button>
 						</div>
 					</template>
 				</div>
@@ -113,7 +118,7 @@
 	const PREVIEW_MAX_HEIGHT = 8.5 * MODULE_ROW_HEIGHT;
 
 	const ui = useUiStore();
-	const { items, init, refresh, remove } = useLibrary();
+	const { items, lastSaved, init, refresh, remove, openEditDialog } = useLibrary();
 	const { open: openContextMenu } = useContextMenu();
 	const { showHint, clearHint } = useStatusHint();
 	const searchRef = ref();
@@ -158,6 +163,11 @@
 		() => items.value.find((i) => i.path === selectedPath.value) ?? (searchQuery.value && filtered.value.length === 1 ? filtered.value[0] : null),
 	);
 
+	// Show the item just saved: search "<first word of its group> <name>" (a name may contain spaces).
+	watch(lastSaved, (saved) => {
+		if (saved) searchQuery.value = `${groupLabel(saved.group).split(' ')[0]} ${saved.name}`;
+	});
+
 	watch(searchQuery, () => {
 		selectedPath.value = null;
 		resetNavIndex();
@@ -200,6 +210,7 @@
 	function onContextMenu(e: MouseEvent, item: LibraryItem): void {
 		openContextMenu(e, [
 			{ label: 'Add to Patch', disabled: !item.entry, action: () => insert(item) },
+			{ label: 'Edit…', disabled: !item.entry, action: () => openEditDialog(item) },
 			{ label: 'Show in Folder', action: () => window.electronAPI.patches.reveal(item.path) },
 			{ type: 'separator' },
 			{ label: 'Move to Trash', action: () => remove(item).catch(console.error) },

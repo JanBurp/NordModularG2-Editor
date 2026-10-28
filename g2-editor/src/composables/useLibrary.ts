@@ -4,7 +4,7 @@ import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { resolveSelectionArea } from '@/store/slotHelpers';
-import { libraryItemToPch2, pch2ToLibraryItem, type LibraryEntry } from '../parser/libraryFile';
+import { libraryItemToPch2, pch2ToLibraryItem, withNotes, type LibraryEntry } from '../parser/libraryFile';
 import { useEditDialog } from './useEditDialog';
 import { selectionEntry } from './usePatchClipboard';
 import { showToast } from './useToast';
@@ -25,6 +25,8 @@ const groups = computed(() => [...new Set(items.value.map((i) => i.group).filter
 export type SaveForm = { group: string; name: string; notes: string };
 const saveDialog = useEditDialog<SaveForm>({ group: '', name: '', notes: '' }, 'saveToLibrary', saveToLibrary);
 let lastGroup = '';
+// The item just saved, for the Library pane to show it.
+const lastSaved = ref<{ group: string; name: string } | null>(null);
 
 const safeName = (s: string) => s.trim().replace(/[/\\:*?"<>|]/g, '_');
 // "Drums/Kicks" stays a nested group; 'Saved' (any case) is the library folder itself.
@@ -68,24 +70,36 @@ async function init(): Promise<void> {
 	await refresh();
 }
 
-// Saved into the group's folder (created when new), the notes as the patch notes. Never overwrites: "Name", "Name 2", ...
+// The item the dialog edits; null when it saves the selection as a new item.
+const editing = ref<LibraryItem | null>(null);
+
+// Saved into the group's folder (created when new), the notes as the patch notes. Never overwrites another item:
+// "Name", "Name 2", ... An edited item is rewritten in place, then moved when its name or group changed.
 async function saveToLibrary(form: SaveForm): Promise<void> {
-	const entry = pendingEntry;
+	const item = editing.value;
 	const slot = useSlotsStore().slots[useUiStore().slotInFocus];
-	if (!entry || !slot.patch || !slot.templateRawHex) return;
+	const entry = pendingEntry;
+	if (!item && (!entry || !slot.patch || !slot.templateRawHex)) return;
+	const original = item ? (await window.electronAPI.patches.load(item.path)).data : undefined;
+	if (item && !original) return;
 	await init();
 	const group = groupPath(form.group);
-	lastGroup = group;
+	if (!item) lastGroup = group;
 	const name = safeName(form.name) || 'Item';
-	const taken = new Set(items.value.filter((i) => i.group === group).map((i) => i.name.toLowerCase()));
+	const taken = new Set(items.value.filter((i) => i.group === group && i.path !== item?.path).map((i) => i.name.toLowerCase()));
 	let unique = name;
 	for (let n = 2; taken.has(unique.toLowerCase()); n++) unique = `${name} ${n}`;
-	const source = { patch: slot.patch, templateRawHex: slot.templateRawHex, variations: slot.variations ?? [] };
-	const bytes = libraryItemToPch2(unique, entry, source, form.notes.trim());
-	await window.electronAPI.patches.librarySave(`${root.value}/${group ? `${group}/` : ''}${unique}.pch2`, bytes);
+	const notes = form.notes.trim();
+	const bytes = item
+		? withNotes(original!, unique, notes)
+		: libraryItemToPch2(unique, entry!, { patch: slot.patch!, templateRawHex: slot.templateRawHex!, variations: slot.variations ?? [] }, notes);
+	const path = `${root.value}/${group ? `${group}/` : ''}${unique}.pch2`;
+	await window.electronAPI.patches.librarySave(item?.path ?? path, bytes);
+	if (item && item.path !== path) await window.electronAPI.patches.libraryMove(item.path, path);
 	const settings = useSettingsStore();
 	if (settings.rightPaneTab !== 'library' || !settings.showRightPane) settings.toggleSidebar('library');
 	await refresh();
+	lastSaved.value = { group, name: unique };
 }
 
 export function useLibrary() {
@@ -95,6 +109,7 @@ export function useLibrary() {
 		if (!pendingEntry) return;
 		if (!useSlotsStore().slots[ui.slotInFocus].templateRawHex) return showToast('This patch cannot be saved yet — try again once it has loaded.');
 		// Groups to choose from: read the folder first. The group defaults to the last one used.
+		editing.value = null;
 		void init();
 		saveDialog.open({ group: lastGroup, name: pendingEntry.modules[0].uname || 'Item', notes: '' });
 	}
@@ -110,10 +125,17 @@ export function useLibrary() {
 		if (result.success && result.folder) await setFolder(result.folder);
 	}
 
+	// The same dialog, filled in with the item's group, name and notes.
+	function openEditDialog(item: LibraryItem): void {
+		if (!item.entry) return;
+		editing.value = item;
+		saveDialog.open({ group: item.group, name: item.name, notes: item.entry.text });
+	}
+
 	async function remove(item: LibraryItem): Promise<void> {
 		await window.electronAPI.patches.libraryRemove(item.path);
 		await refresh();
 	}
 
-	return { root, items, groups, init, refresh, setFolder, chooseFolder, remove, openSaveDialog, saveDialog };
+	return { root, items, groups, lastSaved, editing, init, refresh, setFolder, chooseFolder, remove, openSaveDialog, openEditDialog, saveDialog };
 }
