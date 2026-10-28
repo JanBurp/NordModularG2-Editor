@@ -33,7 +33,13 @@
 			</div>
 			<div class="flex items-center justify-end gap-1">
 				<span class="text-xs text-content-secondary">Sort by</span>
-				<BtnGroup :model-value="sort" :options="sortOptions" variant="toggle" @update:model-value="(v) => emit('update:sort', v as PatchSortMode)" />
+				<BtnGroup
+					class="whitespace-nowrap"
+					:model-value="sort"
+					:options="sortOptions"
+					variant="toggle"
+					@update:model-value="(v) => emit('update:sort', v as PatchSortMode)"
+				/>
 				<Button
 					variant="toggle"
 					class="w-6 px-0!"
