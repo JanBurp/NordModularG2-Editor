@@ -26,6 +26,8 @@ export function useModuleDrag(
 	onMove: (info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number; isCopy: boolean }) => void,
 	onModuleClick: (index: number, shiftKey: boolean) => void,
 	getZoom: () => number,
+	// Modules dropped on an element marked data-library-drop (the Library pane) instead of on the canvas.
+	onLibraryDrop: (indices: number[]) => void,
 ): {
 	dragState: Ref<DragState | null>;
 	dragGhosts: ComputedRef<DragGhost[]>;
@@ -92,6 +94,7 @@ export function useModuleDrag(
 			if (startPosByIndex.size === 0) return;
 			dragState.value = { indices, startPosByIndex, anchorIndex: dragModuleIndex, dxPx: 0, dyPx: 0 };
 			dragMoved = true;
+			ui.draggingModules = true;
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
 		updateCopyCursor(e);
@@ -107,7 +110,10 @@ export function useModuleDrag(
 		dragModuleIndex = null;
 		const drag = dragState.value;
 		dragState.value = null;
-		if (drag && moduleIndex !== null) {
+		ui.draggingModules = false;
+		if (drag && (e.target as Element | null)?.closest?.('[data-library-drop]')) {
+			onLibraryDrop(drag.indices);
+		} else if (drag && moduleIndex !== null) {
 			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
 			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / MODULE_WIDTH));
 			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / MODULE_ROW_HEIGHT));
@@ -124,6 +130,7 @@ export function useModuleDrag(
 
 	function clearModuleDrag() {
 		dragState.value = null;
+		ui.draggingModules = false;
 		dragModuleIndex = null;
 		dragMoved = false;
 		document.body.style.cursor = '';

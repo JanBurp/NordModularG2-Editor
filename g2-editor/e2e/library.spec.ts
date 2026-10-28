@@ -138,6 +138,24 @@ test.describe('Library', () => {
 		await expect(group).toHaveValue('My Voices');
 	});
 
+	test('dragging canvas modules onto the Library pane opens the save dialog and keeps them in place', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('toggle-library');
+		await sendMenuAction('select-all');
+		const osc = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]');
+		const before = await osc.getAttribute('transform');
+		const handle = (await osc.locator('[data-drag-handle]').boundingBox())!;
+		const pane = (await page.locator('[data-testid="library-pane"]').boundingBox())!;
+		await page.mouse.move(handle.x + 64, handle.y + 8);
+		await page.mouse.down();
+		await page.mouse.move(pane.x + pane.width / 2, pane.y + pane.height / 2, { steps: 10 });
+		await page.mouse.up();
+		const name = page.locator('[data-testid="save-library-name"]');
+		await name.fill('Dragged');
+		await name.press('Enter');
+		await expect(itemRow(page, 'Dragged')).toContainText('2 modules'); // the whole selection
+		await expect(osc).toHaveAttribute('transform', before!);
+	});
+
 	test('dropping a library item on the canvas puts its top-left module at the drop cell', async ({ page, sendMenuAction }) => {
 		await saveToLibrary(page, sendMenuAction, 'Dropped');
 		const canvas = (await page.locator('[data-testid="canvas-va"]').boundingBox())!;

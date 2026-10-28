@@ -115,6 +115,7 @@
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
 	import { insertEntry } from '../../composables/usePatchClipboard';
+	import { useLibrary } from '../../composables/useLibrary';
 	import { useUiStore } from '../../store/ui';
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
@@ -343,6 +344,10 @@
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
 		() => zoom.value,
+		(indices) => {
+			uiStore.selectModules(indices, props.area as 'va' | 'fx');
+			useLibrary().openSaveDialog();
+		},
 	);
 
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(

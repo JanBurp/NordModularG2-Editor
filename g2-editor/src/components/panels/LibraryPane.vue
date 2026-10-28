@@ -1,5 +1,12 @@
 <template>
-	<div class="h-full flex flex-col overflow-hidden bg-surface-0" data-testid="library-pane">
+	<!-- Canvas modules dragged onto the pane are saved to the library (see useModuleDrag's data-library-drop) -->
+	<div
+		:class="['h-full flex flex-col overflow-hidden bg-surface-0', ui.draggingModules && dropHover ? 'ring-2 ring-inset ring-accent-primary' : '']"
+		data-testid="library-pane"
+		data-library-drop
+		@mouseenter="dropHover = true"
+		@mouseleave="dropHover = false"
+	>
 		<div class="px-2 pt-2 pb-1 shrink-0">
 			<div class="flex items-center gap-1 mb-1">
 				<SearchInput
@@ -79,7 +86,7 @@
 			<StateMessage
 				v-if="filtered.length === 0"
 				variant="empty"
-				:message="searchQuery ? 'Nothing matches' : 'Empty — select modules, right-click one and choose Save Selection to Library'"
+				:message="searchQuery ? 'Nothing matches' : 'Empty — drag modules here, or right-click one and choose Save Selection to Library'"
 			/>
 		</div>
 	</div>
@@ -113,6 +120,7 @@
 	const searchQuery = ref('');
 	const collapsedGroups = ref<string[]>([]);
 	const selectedPath = ref<string | null>(null);
+	const dropHover = ref(false);
 
 	defineExpose({ focusSearch: () => searchRef.value?.focus() });
 
