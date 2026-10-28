@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'library' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
@@ -52,6 +52,7 @@ export const useSettingsStore = defineStore('settings', {
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
 		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
+		blocksFolder: '' as string, // Library pane's building blocks; '' = userData/blocks
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {

@@ -11,6 +11,7 @@
 				@select="patchFile.handlePatchSelect"
 			/>
 			<ModulesPane ref="modulesPaneRef" v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
+			<LibraryPane ref="libraryPaneRef" v-show="settingsStore.rightPaneTab === 'library'" :isActive="settingsStore.rightPaneTab === 'library'" />
 			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
 			<ParamOverviewPane v-show="settingsStore.rightPaneTab === 'overview'" />
 			<PatchMutatorPane v-show="settingsStore.rightPaneTab === 'mutator'" />
@@ -24,6 +25,7 @@
 	import { ref, onMounted, onUnmounted } from 'vue';
 	import SettingsPane from './SettingsPane.vue';
 	import ModulesPane from './ModulesPane.vue';
+	import LibraryPane from './LibraryPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
 	import ParamOverviewPane from './ParamOverviewPane.vue';
@@ -37,6 +39,7 @@
 
 	const modulesPaneRef = ref<InstanceType<typeof ModulesPane> | null>(null);
 	const browserRef = ref<InstanceType<typeof PatchBrowser> | null>(null);
+	const libraryPaneRef = ref<InstanceType<typeof LibraryPane> | null>(null);
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key !== '/') return;
@@ -48,6 +51,9 @@
 		} else if (settingsStore.rightPaneTab === 'browser') {
 			e.preventDefault();
 			browserRef.value?.focusSearch();
+		} else if (settingsStore.rightPaneTab === 'library') {
+			e.preventDefault();
+			libraryPaneRef.value?.focusSearch();
 		}
 	}
 

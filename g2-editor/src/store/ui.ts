@@ -54,6 +54,7 @@ export const useUiStore = defineStore('ui', {
 		cableShakeCount: 0 as number,
 		cableSeed: newCableSeed() as number,
 		draggedModuleId: null as number | null,
+		draggedBlock: null as ClipboardEntry | null, // Library pane block being dragged, for the canvas drop ghost
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
 		clipboard: null as ClipboardEntry | null,

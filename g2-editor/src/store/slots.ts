@@ -2248,11 +2248,8 @@ export const useSlotsStore = defineStore('slots', {
 				entry.patch!.paramPages = [...entry.paramPages];
 				entry.rawHex = serializePatch(entry.name, entry.patch!, entry.templateRawHex, entry.variations ?? []);
 			}
-			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			let prefix = entry.name;
-			if (textHeader) prefix = (await import('../parser/nmg2PatchSerializer')).PCH2_TEXT_HEADER;
-			const prefixBytes = Array.from(new TextEncoder().encode(prefix));
-			return [...prefixBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			const { PCH2_TEXT_HEADER, pch2FileBytes } = await import('../parser/nmg2PatchSerializer');
+			return pch2FileBytes(textHeader ? PCH2_TEXT_HEADER : entry.name, entry.rawHex);
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {

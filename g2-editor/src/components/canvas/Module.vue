@@ -299,6 +299,7 @@
 	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem, VisualElement } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
+	import { useBlockLibrary } from '../../composables/useBlockLibrary';
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
@@ -379,6 +380,7 @@
 				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
+			{ label: 'Save Selection as Block…', action: saveAsBlock },
 			{ type: 'separator' },
 			{
 				label: 'Set Color',
@@ -387,6 +389,13 @@
 			{ type: 'separator' },
 			{ label: 'Show Help', action: () => uiStore.showModuleHelp(instance.value.type) },
 		]);
+	}
+
+	// Like the other module actions: the selection when this module is part of it, else just this module.
+	function saveAsBlock() {
+		const area = props.areaLabel ?? 'fx';
+		uiStore.selectModules(moduleActionTargets(uiStore, moduleIdx.value, area), area);
+		useBlockLibrary().openSaveDialog();
 	}
 
 	// Applies to the whole selection when this module is part of it (manual ch. 7).

@@ -28,6 +28,12 @@ const textHeader = (type: string) => `Version=Nord Modular G2 File Format 1\r\nT
 export const PCH2_TEXT_HEADER = textHeader('Patch');
 export const PRF2_TEXT_HEADER = textHeader('Performance');
 
+// .pch2 byte layout: [prefix (patch name or text header)][0x00][0x17][0x00][sections from rawHex].
+export function pch2FileBytes(prefix: string, rawHex: string): number[] {
+	const sectionBytes = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+	return [...new TextEncoder().encode(prefix), 0x00, 0x17, 0x00, ...sectionBytes];
+}
+
 // CRC-16 lookup table (same polynomial as parser)
 const crctab = [
 	0x0000, 0x1021, 0x2042, 0x3063, 0x4084, 0x50a5, 0x60c6, 0x70e7, 0x8108, 0x9129, 0xa14a, 0xb16b, 0xc18c, 0xd1ad, 0xe1ce, 0xf1ef, 0x1231, 0x0210, 0x3273,

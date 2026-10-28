@@ -913,6 +913,27 @@ ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {
 	fs.copyFileSync(assertInStorage(event.sender.id, from), dst);
 });
 
+// Library pane's building blocks (plain .pch2 files): userData/blocks, or the folder chosen in the pane.
+const blocksDirByWc = new Map<number, string>();
+
+ipcMain.handle('patches:blocks-dir', (event, custom?: string) => {
+	const dir = custom || path.join(app.getPath('userData'), 'blocks');
+	fs.mkdirSync(dir, { recursive: true });
+	blocksDirByWc.set(event.sender.id, dir);
+	return dir;
+});
+
+// Moves a block to the Trash; only .pch2 files inside the calling window's blocks folder.
+ipcMain.handle('patches:blocks-remove', async (event, filepath: string) => {
+	const dir = blocksDirByWc.get(event.sender.id);
+	const resolved = path.resolve(filepath);
+	const rel = dir ? path.relative(path.resolve(dir), resolved) : '';
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !/\.pch2$/i.test(rel)) throw new Error('Not a block file');
+	await shell.trashItem(resolved);
+});
+
+ipcMain.handle('patches:reveal', (_, filepath: string) => shell.showItemInFolder(filepath));
+
 ipcMain.handle('patches:set-folder', async (event) => {
 	const browserWin = hostWindow(event.sender);
 	const result = await dialog.showOpenDialog(browserWin!, {
@@ -1281,6 +1302,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: 'CommandOrControl+E',
 					enabled: menuState.canPasteParams,
 				},
+				{ label: 'Save Selection as Block…', click: () => sendToFocused('menu:action', 'save-block'), enabled: menuState.hasSelection },
 				{ type: 'separator' as const },
 				{ label: 'Select All', click: () => sendToFocused('menu:action', 'select-all'), accelerator: 'CommandOrControl+A' },
 			],
@@ -1401,6 +1423,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Browser', click: () => sendToFocused('menu:action', 'toggle-browser'), accelerator: 'CommandOrControl+B' },
 				{ type: 'separator' as const },
 				{ label: 'Modules', click: () => sendToFocused('menu:action', 'toggle-modules'), accelerator: 'CommandOrControl+L' },
+				{ label: 'Library', click: () => sendToFocused('menu:action', 'toggle-library'), accelerator: 'Shift+CommandOrControl+L' },
 				{
 					label: 'Parameter Overview',
 					click: () => sendToFocused('menu:action', 'toggle-parameter-overview'),

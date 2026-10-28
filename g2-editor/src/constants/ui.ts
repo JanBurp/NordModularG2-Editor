@@ -26,6 +26,7 @@ export const SLOT_OPTIONS = [
 export const PANE_TAB_OPTIONS = [
 	{ label: 'Browser', value: 'browser', hint: 'paneBrowser' as StatusHintKey },
 	{ label: 'Modules', value: 'modules', hint: 'paneModules' as StatusHintKey },
+	{ label: 'Library', value: 'library', hint: 'paneLibrary' as StatusHintKey },
 	{ label: 'Midi CC', value: 'midicc', hint: 'paneMidicc' as StatusHintKey },
 	{ label: 'Overview', value: 'overview', hint: 'paneOverview' as StatusHintKey },
 	{ label: 'Mutator', value: 'mutator', hint: 'paneMutator' as StatusHintKey },

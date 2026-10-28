@@ -27,6 +27,70 @@ export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>)
 	return uiStore.clipboard;
 }
 
+// The selected modules of `area` with their cables among themselves and their morphs. Shared by Copy and Save as Block.
+export function selectionEntry(area: 'voice' | 'fx'): ClipboardEntry | null {
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
+	const selectedIds = new Set(uiStore.selectedModules);
+	if (selectedIds.size === 0) return null;
+
+	const { areaIdx, location: areaKey } = areaConfig(area);
+	const slot = uiStore.slotInFocus;
+
+	const { modules, morphs } = slotsStore.snapshotModulesForCopy(slot, areaIdx, [...selectedIds]);
+
+	const cables = slotsStore
+		.getAreaCables(slot, areaIdx)
+		.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
+		.map((c: any) => ({ ...c }));
+
+	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
+}
+
+// Shared by Paste and building-block insert: adds `entry`'s modules with their top-left at `target`, else at
+// the mouse position, else 2 columns/rows from where they were copied.
+export async function insertEntry(entry: ClipboardEntry, target?: { col: number; row: number; area: 'va' | 'fx' }): Promise<void> {
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
+	if (entry.modules.length === 0) return;
+
+	// Destination area: use the target's or mouse position's area if known, else active area
+	const pos = target ?? uiStore.lastMousePos;
+	const destAreaKey: 'va' | 'fx' = pos ? pos.area : uiStore.activeArea === 1 ? 'va' : 'fx';
+	const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
+	const { areaIdx } = areaConfig(area);
+
+	// Leave out modules that can't go in the destination area (Fx-In in the voice area), and their cables
+	const { getModule, isValidInArea } = await import('../renderer/nmg2mods');
+	const modules = entry.modules.filter((m) => isValidInArea(m.type, area));
+	if (modules.length < entry.modules.length) showToast('Fx Input only works in the FX area — left out.');
+	if (modules.length === 0) return;
+	const kept = new Set(modules.map((m) => m.index));
+	const cables = entry.cables.filter((c) => kept.has(c.smod) && kept.has(c.dmod));
+
+	// Compute target top-left from the position or fall back to +2 offset from the entry's origin
+	const minCol = Math.min(...modules.map((m) => m.horiz));
+	const minRow = Math.min(...modules.map((m) => m.vert));
+	const targetCol = pos ? pos.col : minCol + 2;
+	const targetRow = pos ? pos.row : minRow + 2;
+	const dCol = targetCol - minCol;
+
+	const moduleRects = modules.map((m) => ({ vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
+	const dRow = resolvePasteRowOffset(moduleRects, dCol, targetRow - minRow);
+
+	// Generate new IDs against the destination area
+	const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);
+	const clone = buildCloneEntries(modules, cables, existingIds, dCol, dRow);
+	if (!clone) return showToast(AREA_FULL_MESSAGE);
+	const { entries, remappedCables } = clone;
+	await slotsStore.paste(entries, remappedCables, area, entry.morphs);
+
+	uiStore.selectModules(
+		entries.map((e) => e.newId),
+		destAreaKey,
+	);
+}
+
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -54,21 +118,8 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	function copySelection(): void {
-		const selectedIds = new Set(uiStore.selectedModules);
-		if (selectedIds.size === 0) return;
-
-		const area = getSourceArea();
-		const { areaIdx, location: areaKey } = areaConfig(area);
-		const slot = uiStore.slotInFocus;
-
-		const { modules, morphs } = slotsStore.snapshotModulesForCopy(slot, areaIdx, [...selectedIds]);
-
-		const cables = slotsStore
-			.getAreaCables(slot, areaIdx)
-			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
-			.map((c: any) => ({ ...c }));
-
-		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
+		const entry = selectionEntry(getSourceArea());
+		if (!entry) return;
 		uiStore.clipboard = entry;
 		uiStore.clipboardTypes = entry.modules.map((m) => m.type);
 		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
@@ -81,43 +132,7 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 
 	async function pasteClipboard(): Promise<void> {
 		const clipboard = await readClipboardEntry(uiStore);
-		if (!clipboard || clipboard.modules.length === 0) return;
-
-		// Destination area: use mouse position's area if known, else active area
-		const mousePos = uiStore.lastMousePos;
-		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : uiStore.activeArea === 1 ? 'va' : 'fx';
-		const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
-		const { areaIdx } = areaConfig(area);
-
-		// Leave out modules that can't go in the destination area (Fx-In in the voice area), and their cables
-		const { getModule, isValidInArea } = await import('../renderer/nmg2mods');
-		const modules = clipboard.modules.filter((m) => isValidInArea(m.type, area));
-		if (modules.length < clipboard.modules.length) showToast('Fx Input only works in the FX area — not pasted.');
-		if (modules.length === 0) return;
-		const kept = new Set(modules.map((m) => m.index));
-		const cables = clipboard.cables.filter((c) => kept.has(c.smod) && kept.has(c.dmod));
-
-		// Compute target top-left from mouse or fall back to +2 offset from clipboard origin
-		const minCol = Math.min(...modules.map((m) => m.horiz));
-		const minRow = Math.min(...modules.map((m) => m.vert));
-		const targetCol = mousePos ? mousePos.col : minCol + 2;
-		const targetRow = mousePos ? mousePos.row : minRow + 2;
-		const dCol = targetCol - minCol;
-
-		const moduleRects = modules.map((m) => ({ vert: m.vert, height: getModule(m.type)?.height ?? 2 }));
-		const dRow = resolvePasteRowOffset(moduleRects, dCol, targetRow - minRow);
-
-		// Generate new IDs against the destination area
-		const existingIds = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx).map((m: any) => m.index as number);
-		const clone = buildCloneEntries(modules, cables, existingIds, dCol, dRow);
-		if (!clone) return showToast(AREA_FULL_MESSAGE);
-		const { entries, remappedCables } = clone;
-		await slotsStore.paste(entries, remappedCables, area, clipboard.morphs);
-
-		uiStore.selectModules(
-			entries.map((e) => e.newId),
-			destAreaKey,
-		);
+		if (clipboard) await insertEntry(clipboard);
 	}
 
 	// Targets: the current selection, which must match the copied modules' types (official editor).

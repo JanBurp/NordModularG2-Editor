@@ -176,6 +176,20 @@
 		/>
 	</Dialog>
 
+	<Dialog
+		v-model="saveBlockDialog.showDialog.value"
+		title="Save Selection as Block"
+		confirm-label="Save"
+		@confirm="saveBlockDialog.confirm"
+		@cancel="saveBlockDialog.cancel"
+	>
+		<input
+			v-model="saveBlockDialog.editingValue.value"
+			class="w-full px-2 py-1 text-sm border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+			data-testid="save-block-name"
+		/>
+	</Dialog>
+
 	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" confirm-label="Rename" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
 		<input
 			v-model="editingMorphLabel"
@@ -485,6 +499,7 @@
 	import { useMorphLabelDialog } from './composables/useMorphLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
+	import { useBlockLibrary } from './composables/useBlockLibrary';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useBankDownloadDialog } from './composables/useBankDownloadDialog';
@@ -643,6 +658,7 @@
 	} = usePerfNameDialog();
 
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
+	const { saveDialog: saveBlockDialog } = useBlockLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 

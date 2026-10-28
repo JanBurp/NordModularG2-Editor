@@ -28,6 +28,9 @@ declare global {
 				storageDir: (custom?: string) => Promise<string>;
 				storageRemove: (filepath: string) => Promise<void>;
 				storageCopy: (from: string, to: string) => Promise<void>;
+				blocksDir: (custom?: string) => Promise<string>;
+				blocksRemove: (filepath: string) => Promise<void>;
+				reveal: (filepath: string) => Promise<void>;
 				onStorageChanged: (cb: () => void) => void;
 				offStorageChanged: () => void;
 			};

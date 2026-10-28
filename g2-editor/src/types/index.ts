@@ -30,6 +30,8 @@ export type MenuAction =
 	| 'select-all'
 	| 'paste-params'
 	| 'toggle-modules'
+	| 'toggle-library'
+	| 'save-block'
 	| 'toggle-browser'
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'

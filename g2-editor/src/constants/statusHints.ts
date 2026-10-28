@@ -46,6 +46,7 @@ export const STATUS_HINTS = {
 	// StatusBar — side panel tabs
 	paneBrowser: `${MOD}B: browse patches & files`,
 	paneModules: `${MOD}L: drag modules onto the canvas`,
+	paneLibrary: `⇧${MOD}L: building blocks — saved groups of modules`,
 	paneMidicc: `${MOD}I: MIDI CC assignments`,
 	paneOverview: `⇧${MOD}F: all Parameter Pages at once`,
 	paneMutator: `${MOD}2: Patch Mutator — breed new sounds from this patch`,
@@ -61,6 +62,7 @@ export const STATUS_HINTS = {
 	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
 	browserOrganizer: `Click/${MOD}3: open the Bank Organizer`,
 	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort, organizer',
+	libraryBlock: 'Drag: add to canvas · Double-click/Enter: add at the mouse position · Right-click: show in folder, move to Trash',
 
 	// Bank Organizer
 	organizerCell: `Drag: · Drop on cell: swap · ${ALT}-drag: copy · Drop on Temporary Storage: copy · Drop on a Slot: load · Click: select · Delete: delete · Right-click: more options`,

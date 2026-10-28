@@ -111,6 +111,7 @@
 			title: 'Panels',
 			rows: [
 				{ keys: [key(MOD, 'L')], action: 'Toggle Modules pane' },
+				{ keys: [key(SHIFT_MOD, 'L')], action: 'Toggle Library pane (building blocks)' },
 				{ keys: [key(MOD, 'B')], action: 'Toggle Browser pane' },
 				{ keys: [key(MOD, 'I')], action: 'Toggle Midi CC pane' },
 				{ keys: [key(MOD, 'J')], action: 'Toggle Text pane' },

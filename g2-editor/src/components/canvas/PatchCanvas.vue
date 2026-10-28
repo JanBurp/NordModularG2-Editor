@@ -114,6 +114,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
+	import { insertEntry } from '../../composables/usePatchClipboard';
 	import { useUiStore } from '../../store/ui';
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
@@ -344,7 +345,11 @@
 		() => zoom.value,
 	);
 
-	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
+	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
+		svgRef,
+		(info) => emit('moduleDrop', info),
+		({ block, col, row }) => insertEntry(block, { col, row, area: props.area as 'va' | 'fx' }).catch(console.error),
+	);
 
 	function onCanvasContextMenu(e: MouseEvent) {
 		const grid = svgClientToGrid(e.clientX, e.clientY);

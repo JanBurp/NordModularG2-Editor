@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
+import { useBlockLibrary } from '@/composables/useBlockLibrary';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
@@ -211,6 +212,12 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'toggle-modules':
 					useSettingsStore().toggleSidebar('modules');
+					break;
+				case 'toggle-library':
+					useSettingsStore().toggleSidebar('library');
+					break;
+				case 'save-block':
+					useBlockLibrary().openSaveDialog();
 					break;
 				case 'toggle-browser':
 					useSettingsStore().toggleSidebar('browser');
