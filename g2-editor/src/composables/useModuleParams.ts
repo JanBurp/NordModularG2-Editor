@@ -21,6 +21,10 @@ export function useModuleParams(
 	const localLv = computed<number[]>(() => {
 		const params = slotsStore.slots[uiStore.slotInFocus]?.variations?.[uiStore.variation]?.[areaKey]?.[instance.value.index];
 		if (params) return params;
+		// Not in the open patch (e.g. a Library item preview): the instance's own values for this variation.
+		const { lv, pcnt } = instance.value;
+		const start = uiStore.variation * pcnt;
+		if (pcnt && lv?.length >= start + pcnt) return lv.slice(start, start + pcnt);
 		return getDefaultParamValues(instance.value.type);
 	});
 

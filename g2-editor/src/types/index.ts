@@ -31,7 +31,7 @@ export type MenuAction =
 	| 'paste-params'
 	| 'toggle-modules'
 	| 'toggle-library'
-	| 'save-block'
+	| 'save-to-library'
 	| 'toggle-browser'
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'

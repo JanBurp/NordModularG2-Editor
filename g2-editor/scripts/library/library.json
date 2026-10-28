@@ -1,0 +1,1001 @@
+[
+	{
+		"name": "Euclidean Rhythm",
+		"folder": "Clock & Logic",
+		"credit": "Euclidean rhythm E(X,Y) by blue hell (2012). Set X-1 and Y-1 one less than X and Y, X < Y; the variations hold eight presets. electro-music.org/forum/topic-55736.html",
+		"source": "electro-music-blocks/32636-euclidean_rhythm_01_139.pch2",
+		"modules": [8, 10, 13, 14, 16, 17, 18, 19, 20, 7, 11, 5, 42, 3, 9, 12, 4, 40]
+	},
+	{
+		"name": "Clock Multiply",
+		"folder": "Clock & Logic",
+		"credit": "Clock multiplier by iPassenger: ZeroCnt measures the clock period and drives x2/x3/x4 LFOs. Clock into ZeroCnt In; the output is wrong until the second pulse. electro-music.org/forum/topic-53307.html",
+		"source": "electro-music-blocks/30337-clock_multiply_257.pch2",
+		"modules": [14, 15, 16, 17, 4, 8, 6, 13]
+	},
+	{
+		"name": "Clock Shuffle",
+		"folder": "Clock & Logic",
+		"credit": "Clock shuffler by iPassenger: divides the clock by 1-8 and shuffles the divided outputs over eight Mux outputs (after the 4MS RCD). electro-music.org/forum/topic-53308.html",
+		"source": "electro-music-blocks/30338-clock_shuffle_261.pch2",
+		"modules": [2, 3, 4, 5, 6, 7, 8, 9, 31, 32, 15, 47, 14, 16, 17, 18, 19, 20, 21, 22, 38, 40, 41, 42, 43, 44, 45]
+	},
+	{
+		"name": "Decade Counter",
+		"folder": "Clock & Logic",
+		"credit": "1-of-10 decade counter by iPassenger (after the Future Sound Systems DC1). Clock into Clk Input, reset into Rst Input. electro-music.org/forum/topic-49454.html",
+		"source": "electro-music-blocks/27478-10_dec_counter_178.pch2",
+		"modules": [5, 1, 2, 4, 3, 18, 8, 7, 9, 10, 11, 12, 13, 14, 15]
+	},
+	{
+		"name": "Variable Step Length Clock",
+		"folder": "Clock & Logic",
+		"credit": "Programmable rhythmic clock divider by Rob Hordijk (2006): per-step lengths from 1/32 to 3/4 (see the step labels), synced to the bar. electro-music.org/forum/topic-11424.html",
+		"source": "electro-music-blocks/4750-variablesteplengthsequencer_838.pch2",
+		"modules": [
+			47, 1, 32, 29, 21, 22, 9, 31, 43, 30, 12, 42, 2, 3, 7, 44, 23, 46, 45, 6, 50, 49, 48, 4, 33, 11, 13, 24, 25, 26, 27, 28, 34, 35, 36, 37, 38, 39, 40,
+			41
+		]
+	},
+	{
+		"name": "Gated Clock Trigger",
+		"folder": "Clock & Logic",
+		"credit": "Trigger pattern from a level sequencer, Roland Kuit (Prog house techno part I, '6-Trigg1'): SeqLev steps above zero let the 1/16 clock through; the Constant shifts the density. Output: LevMult1.",
+		"source": "RolandKuit/6-Trigg1.pch2",
+		"modules": [1, 2, 5, 3, 4]
+	},
+	{
+		"name": "Probability Trigger",
+		"folder": "Clock & Logic",
+		"credit": "Random-pattern trigger with pattern selector, Roland Kuit ('5-with snare'): RndPattern -> CompLev -> Gate (AND with the clock); Sw4-1 picks one of three pattern Constants. Output: Gate1 Out1.",
+		"source": "RolandKuit/5-with snare.pch2",
+		"modules": [2, 3, 9, 15, 16, 17, 18, 13, 12]
+	},
+	{
+		"name": "Hysteresis Switch",
+		"folder": "Clock & Logic",
+		"credit": "Hysteresis switch by ik: turns a control signal (e.g. the pitch stick, into comp A) into an on/off gate with a +/- 'h window' threshold. electro-music.org/forum/topic-12959.html",
+		"source": "electro-music-blocks/5581-hysteresis_switch_787.pch2",
+		"modules": [5, 9, 13, 14, 15, 16, 17, 18, 19]
+	},
+	{
+		"name": "One-and-Only-One Pulse",
+		"folder": "Clock & Logic",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Sequencing. A trigger into Arm Clk arms it; the clock into Out Clk; Out Q gives exactly one clock-long pulse.",
+		"modules": [
+			{
+				"id": "a",
+				"type": "FlipFlop",
+				"name": "Arm"
+			},
+			{
+				"id": "b",
+				"type": "FlipFlop",
+				"name": "Out"
+			}
+		],
+		"cables": [
+			["a.Q", "b.In"],
+			["b.Q", "a.Rst"]
+		]
+	},
+	{
+		"name": "Circular Pattern Buffer",
+		"folder": "Modulation & CV",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Sequencing (Circular1): an 8-step S&H loop; every 5th clock the LFO value replaces the oldest step. Use an odd divider with an even step count; Hordijk runs LfoA at 2.72 Hz. Output: KeyQuant.",
+		"modules": [
+			{
+				"id": "clk",
+				"type": "ClkGen"
+			},
+			{
+				"id": "div",
+				"type": "ClkDiv",
+				"params": {
+					"Divider": "5"
+				}
+			},
+			{
+				"id": "sw",
+				"type": "ValSw2-1",
+				"name": "Input toggler"
+			},
+			{
+				"id": "sh",
+				"type": "S&H"
+			},
+			{
+				"id": "dly",
+				"type": "DlyClock",
+				"params": {
+					"Delay": "8"
+				}
+			},
+			{
+				"id": "ff",
+				"type": "FlipFlop"
+			},
+			{
+				"id": "lfo",
+				"type": "LfoA",
+				"col": 1
+			},
+			{
+				"id": "kq",
+				"type": "KeyQuant",
+				"col": 1
+			}
+		],
+		"cables": [
+			["clk.1/16", "ff.Clk"],
+			["clk.1/16", "div.Clk"],
+			["div.Out", "sw.Ctrl"],
+			["dly.Out", "sw.In1"],
+			["lfo.Out", "sw.In2"],
+			["sw.Out", "sh.In"],
+			["sh.Out", "dly.In"],
+			["ff.Q", "dly.Clk"],
+			["ff.NotQ", "sh.Ctrl"],
+			["ff.Q", "ff.Rst"],
+			["sh.Out", "kq.In"]
+		]
+	},
+	{
+		"name": "Up-Down Slew",
+		"folder": "Modulation & CV",
+		"credit": "Serge-style up/down slew limiter by Rob Hordijk: separate rise and fall speeds; also a filter/distortion on audio. electro-music.org/forum/topic-11519.html",
+		"source": "electro-music-blocks/4796-up_down_slew_limiter_519.pch2",
+		"modules": [20, 1, 2, 3, 5, 12, 9, 19, 10, 4]
+	},
+	{
+		"name": "Linear Portamento",
+		"folder": "Modulation & CV",
+		"credit": "Constant-time linear portamento with Auto/Normal/Off switch, by Chet (2005). Output: X-Fade1 (to an oscillator Pitch). electro-music.org/forum/topic-7009.html",
+		"source": "electro-music-blocks/2445-linearportamento.pch2",
+		"modules": [19, 2, 18, 14, 15, 16, 13, 5, 8, 3, 4, 6, 7, 9]
+	},
+	{
+		"name": "Random No Repeat",
+		"folder": "Modulation & CV",
+		"credit": "Quantized random LFO that never repeats a note, by Loz with blue hell's revision (2007). electro-music.org/forum/topic-17477.html",
+		"source": "electro-music-blocks/7678-rnd_lfo_alt_163.pch2",
+		"modules": [5, 1, 25, 4, 12, 6, 20, 11, 13, 8, 2, 3, 14, 15]
+	},
+	{
+		"name": "LFSR Random",
+		"folder": "Modulation & CV",
+		"credit": "Self-starting LFSR pseudo-random generator (XNOR) with weighted outputs, by blue hell (2008). Output: Mix4-1B1. electro-music.org/forum/topic-23275.html",
+		"source": "electro-music-blocks/11212-l_f_s_r_192.pch2",
+		"modules": [6, 5, 7, 2, 3, 8, 9, 10]
+	},
+	{
+		"name": "Crossover 2-Band",
+		"folder": "Filters & EQ",
+		"credit": "2-band crossover (bands sum to the exact input), designed by Rob Hordijk, patched by jamos. Input into LP In; outputs LP and HP. electro-music.org/forum/topic-5218.html",
+		"source": "electro-music-blocks/1595-crossovers.pch2",
+		"modules": [3, 1, 2]
+	},
+	{
+		"name": "Crossover 3-Band",
+		"folder": "Filters & EQ",
+		"credit": "3-band crossover, designed by Rob Hordijk, patched by jamos. electro-music.org/forum/topic-5218.html",
+		"source": "electro-music-blocks/1595-crossovers.pch2",
+		"modules": [4, 5, 6, 8, 9]
+	},
+	{
+		"name": "Crossover 4-Band",
+		"folder": "Filters & EQ",
+		"credit": "4-band crossover, designed by Rob Hordijk, patched by jamos. electro-music.org/forum/topic-5218.html",
+		"source": "electro-music-blocks/1595-crossovers.pch2",
+		"modules": [7, 10, 11, 12, 13, 14, 15]
+	},
+	{
+		"name": "Spectrum Tilt",
+		"folder": "Filters & EQ",
+		"credit": "Stereo one-knob spectral tilt filter by Rob Hordijk. electro-music.org/forum/topic-7237.html",
+		"source": "electro-music-blocks/5213-spectrumtiltfilter_299.pch2",
+		"modules": [4, 5, 6, 7, 2, 1, 10, 11, 12, 13, 8, 16, 15]
+	},
+	{
+		"name": "Chamberlin SVF",
+		"folder": "Filters & EQ",
+		"credit": "DIY 12 dB Chamberlin state-variable filter by Tim Kleinert (2015): AUDIO IN, CUTOFF IN, RESO IN; OUTPUT selects LP/BP/HP/BR. electro-music.org/forum/topic-64858.html",
+		"source": "electro-music-blocks/40205-chamberlinfilttk_339.pch2",
+		"modules": [15, 16, 14, 13, 2, 3, 1, 27, 22, 11, 5, 7, 8, 12, 18, 17]
+	},
+	{
+		"name": "Formant Filter",
+		"folder": "Filters & EQ",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Filters (FormantFilter): three band-passes mixed, with a dry/wet crossfade. Input into FltStatic1 In; output X-Fade.",
+		"modules": [
+			{
+				"id": "f1",
+				"type": "FltStatic",
+				"params": {
+					"Freq": "987.8Hz",
+					"Res": "4.30",
+					"FilterType": "BP",
+					"GC": "On"
+				}
+			},
+			{
+				"id": "f2",
+				"type": "FltStatic",
+				"params": {
+					"Freq": "1.32kHz",
+					"Res": "7.23",
+					"FilterType": "BP",
+					"GC": "On"
+				}
+			},
+			{
+				"id": "f3",
+				"type": "FltStatic",
+				"params": {
+					"Freq": "2.64kHz",
+					"Res": "10",
+					"FilterType": "BP",
+					"GC": "On"
+				}
+			},
+			{
+				"id": "mix",
+				"type": "Mix4-1A"
+			},
+			{
+				"id": "xf",
+				"type": "X-Fade",
+				"name": "Dry/Wet",
+				"params": {
+					"LogLin": "Lin"
+				}
+			}
+		],
+		"cables": [
+			["f1.In", "f2.In"],
+			["f2.In", "f3.In"],
+			["f1.In", "xf.In1"],
+			["f1.Out", "mix.In1"],
+			["f2.Out", "mix.In2"],
+			["f3.Out", "mix.In3"],
+			["mix.Out", "xf.In2"]
+		]
+	},
+	{
+		"name": "Ladder 24dB VC Reso",
+		"folder": "Filters & EQ",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Resonant filters (Basic24dB2): four 6 dB poles with an inverted resonance loop, an integrator for warmth and a VC resonance. Input into Input In1; output FltLP4.",
+		"modules": [
+			{
+				"id": "in",
+				"type": "Mix2-1B",
+				"name": "Input",
+				"params": {
+					"Lev1": "100",
+					"Inv2": "Inverted",
+					"Lev2": "100"
+				}
+			},
+			{
+				"id": "p1",
+				"type": "FltLP",
+				"params": {
+					"Freq": "554.40Hz",
+					"Kbt": "50%"
+				},
+				"modes": {
+					"SlopeMode": "6dB"
+				}
+			},
+			{
+				"id": "p2",
+				"type": "FltLP",
+				"params": {
+					"Freq": "554.40Hz",
+					"Kbt": "50%"
+				},
+				"modes": {
+					"SlopeMode": "6dB"
+				}
+			},
+			{
+				"id": "p3",
+				"type": "FltLP",
+				"params": {
+					"Freq": "554.40Hz",
+					"Kbt": "50%"
+				},
+				"modes": {
+					"SlopeMode": "6dB"
+				}
+			},
+			{
+				"id": "p4",
+				"type": "FltLP",
+				"params": {
+					"Freq": "554.40Hz",
+					"Kbt": "50%"
+				},
+				"modes": {
+					"SlopeMode": "6dB"
+				}
+			},
+			{
+				"id": "cut",
+				"type": "ConstSwT",
+				"name": "Cutoff",
+				"col": 1,
+				"params": {
+					"On": "On",
+					"BipUni": "Uni",
+					"Lev": 80
+				}
+			},
+			{
+				"id": "int",
+				"type": "Mix2-1B",
+				"name": "Integrator",
+				"col": 1,
+				"params": {
+					"Inv1": "Inverted",
+					"Lev1": "12.5",
+					"Lev2": "68"
+				}
+			},
+			{
+				"id": "res",
+				"type": "LevMult",
+				"name": "ResLevel",
+				"col": 1
+			},
+			{
+				"id": "rc",
+				"type": "ConstSwT",
+				"name": "ResoCtl",
+				"col": 1,
+				"params": {
+					"On": "On",
+					"BipUni": "Uni",
+					"Lev": 64
+				}
+			}
+		],
+		"cables": [
+			["in.Out", "p1.In"],
+			["p1.Out", "p2.In"],
+			["p2.Out", "p3.In"],
+			["p3.Out", "p4.In"],
+			["cut.Out", "p1.Pitch"],
+			["p1.Pitch", "p2.Pitch"],
+			["p2.Pitch", "p3.Pitch"],
+			["p3.Pitch", "p4.Pitch"],
+			["p4.Out", "int.Chain"],
+			["int.Out", "int.In2"],
+			["in.In1", "int.In1"],
+			["int.Out", "res.In"],
+			["rc.Out", "res.Mod"],
+			["res.Out", "in.In2"]
+		]
+	},
+	{
+		"name": "Integrator 6dB LP",
+		"folder": "Filters & EQ",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Filters: a crossfader fed back into itself is a one-knob 6 dB lowpass (Mix sets the cutoff). Input into In1.",
+		"modules": [
+			{
+				"id": "xf",
+				"type": "X-Fade",
+				"name": "6dB LP",
+				"params": {
+					"LogLin": "Lin"
+				}
+			}
+		],
+		"cables": [["xf.Out", "xf.In2"]]
+	},
+	{
+		"name": "Harmonic Distortion",
+		"folder": "Distortion & Dynamics",
+		"credit": "Odd/even harmonic distorter by Rob Hordijk (2005): a biased VCA fed with x^2. Input into Input In; output Output. electro-music.org/forum/topic-5896.html",
+		"source": "electro-music-blocks/1950-harmonicdistortion.pch2",
+		"modules": [13, 14, 2, 3, 4, 5, 12, 7, 6, 17, 19, 8, 9, 10, 11, 15]
+	},
+	{
+		"name": "Klang Modulator",
+		"folder": "Distortion & Dynamics",
+		"credit": "Versatile ring modulator 'Klanglabor' modelled by Rob Hordijk (2005); the eight variations hold the labelled settings. Inputs A and B; output Output. electro-music.org/forum/topic-5487.html",
+		"source": "electro-music-blocks/1743-klangmodulator.pch2",
+		"modules": [
+			10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 37, 32, 3, 22, 23, 24, 25, 26, 27, 28, 36, 29, 30, 31, 35, 1, 38, 39, 40, 41, 42, 43, 44, 45, 46
+		]
+	},
+	{
+		"name": "Soft Clipper",
+		"folder": "Distortion & Dynamics",
+		"credit": "Soft clipper with drive and tone by Rob Hordijk (2006). Input into SoftClip; output Output. electro-music.org/forum/topic-14506.html",
+		"source": "electro-music-blocks/6307-softclipper_280.pch2",
+		"modules": [14, 10, 2, 3, 4, 5, 6, 13, 17, 18, 19, 7, 22]
+	},
+	{
+		"name": "Compressor Env Choice",
+		"folder": "Distortion & Dynamics",
+		"credit": "DIY compressor with a choice of six envelope followers, by Fozzie (2006). Input via INPUT; output ComprOut. electro-music.org/forum/topic-12318.html",
+		"source": "electro-music-blocks/5226-compressorenvchoice2_209.pch2",
+		"modules": "all"
+	},
+	{
+		"name": "Vactrol LPG",
+		"folder": "Distortion & Dynamics",
+		"credit": "Vactrol low-pass gate after the Doepfer A-101-2, by John W. Thompson (2023): an AD envelope with a vactrol curve on filter cutoff and amplitude. electro-music.org/forum/topic-73754.html",
+		"source": "electro-music-blocks/50724-vactrol_lpg_11_152.pch2",
+		"modules": [6, 17, 2, 9, 7, 1, 15, 10, 8, 11, 16, 12, 4, 13]
+	},
+	{
+		"name": "Noise Kick",
+		"folder": "Drums",
+		"credit": "Old-school kick by Roland Kuit ('1a-Old School Kick'): noise into a fully resonant FltClassic, EnvD sweeps the pitch and is the VCA. Trigger into EnvD1 Trig; output EnvD1 Out.",
+		"source": "RolandKuit/1a-Old School Kick.pch2",
+		"modules": [5, 4, 3]
+	},
+	{
+		"name": "Formant Snare",
+		"folder": "Drums",
+		"credit": "Formant snare by Roland Kuit ('5b-Formant Snare'): noise through three static filters. Trigger into EnvD1 Trig; output EnvD1 Out.",
+		"source": "RolandKuit/5b-Formant Snare.pch2",
+		"modules": [5, 7, 8, 9, 4, 3]
+	},
+	{
+		"name": "FM Hi-Hat",
+		"folder": "Drums",
+		"credit": "Cross-FM hi-hat by Roland Kuit ('3-Kick&Hihats'). Trigger into OscShpB1 Sync (linked to EnvD2 Trig); output EnvD2 Out.",
+		"source": "RolandKuit/3-Kick&Hihats.pch2",
+		"modules": [6, 7, 8, 9]
+	},
+	{
+		"name": "Metal Hi-Hat Random Decay",
+		"folder": "Drums",
+		"credit": "MetNoise hi-hat whose decay and colour follow a random pattern, by Roland Kuit ('4-more Hihat control'). Clock/sync into RndPattern, trigger into ModAHD1 Trig; output ModAHD1.",
+		"source": "RolandKuit/4-more Hihat control.pch2",
+		"modules": [9, 6, 11]
+	},
+	{
+		"name": "Punch Kick",
+		"folder": "Drums",
+		"credit": "Kick with pitch envelope, square sub and saturation, by Roland Kuit ('YezDrumz', 2004). Trigger into P env Trig; output Saturate.",
+		"source": "RolandKuit/YezDrumz.pch2",
+		"modules": [12, 8, 41, 42, 10, 3, 43, 6, 7, 11, 4, 40, 9]
+	},
+	{
+		"name": "Tom 2-Osc",
+		"folder": "Drums",
+		"credit": "Two-sine tom with pitch AHD and sine/saw blend, by Roland Kuit ('YezDrumz', 2004). Trigger into A AHD Trig; output A AHD.",
+		"source": "RolandKuit/YezDrumz.pch2",
+		"modules": [13, 20, 21, 22, 17, 18, 19, 14, 15, 16, 23]
+	},
+	{
+		"name": "Resonant Ping",
+		"folder": "Drums",
+		"credit": "After Jeff Clark, Nord Modular book, fig. 3.3: a short pulse pings a resonant band-pass (tuned drum/tom; key tracked). Trigger into Pulse In; output FltMulti BP. Tune Pulse Time (Clark: 3.7 ms), Freq and Res by ear.",
+		"modules": [
+			{
+				"id": "p",
+				"type": "Pulse"
+			},
+			{
+				"id": "f",
+				"type": "FltMulti",
+				"params": {
+					"Freq": "103.83Hz",
+					"Res": 116,
+					"Kbt": "100%"
+				}
+			}
+		],
+		"cables": [["p.Out", "f.In"]]
+	},
+	{
+		"name": "Pseudo Stereo",
+		"folder": "Effects",
+		"credit": "Pseudo-stereo allpass widener by Tim Kleinert (2005): original and allpassed copy panned hard L/R (not mono compatible). electro-music.org/forum/topic-8487.html",
+		"source": "electro-music-blocks/3220-pseudostereo__tk_100.pch2",
+		"modules": [1, 8, 2, 3, 4]
+	},
+	{
+		"name": "Stereo Feedback Delay",
+		"folder": "Effects",
+		"credit": "Stereo feedback delay from Roland Kuit's 'YezDrumz' (2004), FX area.",
+		"source": "RolandKuit/YezDrumz.pch2",
+		"area": "fx",
+		"modules": [1, 5, 2, 7, 6]
+	},
+	{
+		"name": "Tap Tempo Delay",
+		"folder": "Effects",
+		"credit": "Tap-tempo delay (ZeroCnt + LFO version) by Tim Kleinert (2007). electro-music.org/forum/topic-17580.html",
+		"source": "electro-music-blocks/7747-taptempodelay2tk_120.pch2",
+		"modules": [4, 17, 7, 10, 14, 6, 2, 9, 1, 5]
+	},
+	{
+		"name": "Soft-Capture Looper",
+		"folder": "Effects",
+		"credit": "After Rob Hordijk, G2 Synthesis Workshops - Loopers (MonoLoop): Capture fades the input into a recirculating delay without clicks. Input into X-Fade In2; output X-Fade.",
+		"modules": [
+			{
+				"id": "cap",
+				"type": "SwOnOffT",
+				"name": "Capture"
+			},
+			{
+				"id": "env",
+				"type": "EnvADSR",
+				"params": {
+					"Attack": "12.7m",
+					"Decay": "456m",
+					"Sustain": "64",
+					"Release": "12.7m"
+				}
+			},
+			{
+				"id": "xf",
+				"type": "X-Fade",
+				"params": {
+					"Mix": "-64",
+					"MixMod": "100"
+				}
+			},
+			{
+				"id": "dly",
+				"type": "DelayQuad",
+				"col": 1,
+				"params": {
+					"Time1": 127
+				},
+				"modes": {
+					"DelayRange": "2.7 s"
+				}
+			}
+		],
+		"cables": [
+			["cap.Out", "env.Gate"],
+			["env.Env", "xf.Mod"],
+			["dly.Out1", "xf.In1"],
+			["xf.Out", "dly.In"]
+		]
+	},
+	{
+		"name": "Simple Sampler",
+		"folder": "Sampling & Granular",
+		"credit": "Volatile 2.7 s sampler with scrub and start point (SimpleSample3) by Tim Kleinert. Patch Settings > Audio In to pick the input; SAMPLE captures, PLAYBAK/START set position. Audio is lost on patch change. electro-music.org/forum/topic-18566.html",
+		"source": "electro-music-blocks/18185-simplesample3_tk_143.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Elastic Audio",
+		"folder": "Sampling & Granular",
+		"credit": "Elastic-audio building block by Tim Kleinert (2007): captures 2 s and plays it back with independent time and pitch, Fixed/Intelli grain MODE, GRAIN size. electro-music.org/forum/topic-21547.html",
+		"source": "electro-music-blocks/10206-elastaudio_bb_tk_496.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "16ths Slicer",
+		"folder": "Sampling & Granular",
+		"credit": "16ths slicer by Tim Kleinert (2008): waits for MIDI clock, captures one 4/4 bar and plays any of its 16 slices. Inputs: slice in (0-15), trig in. Monophonic; see the original textpad. electro-music.org/forum/topic-26364.html",
+		"source": "electro-music-blocks/12760-16thsslicerbb_tk_304.pch2",
+		"modules": "coloured",
+		"area": "fx"
+	},
+	{
+		"name": "Sampling Oscillator",
+		"folder": "Sampling & Granular",
+		"credit": "Crude 16-step waveform sampler by Tim Kleinert: a DIY saw writes the input into a SeqNote, giving a sampled single-cycle oscillator. electro-music.org/forum/topic-19156.html",
+		"source": "electro-music-blocks/15911-samplingosc__tk_911.pch2",
+		"modules": [20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 1, 7, 8, 30]
+	},
+	{
+		"name": "Stretch Freezer",
+		"folder": "Sampling & Granular",
+		"credit": "Stretch/freeze FX by Tim Kleinert (2004, v2): an 8-tap delay read out by a saw-swept mux, plus a cloud delay and freeze point. electro-music.org/forum/topic-1913.html",
+		"source": "electro-music-blocks/141-stretchfreezertk_166.pch2",
+		"modules": "coloured",
+		"area": "fx"
+	},
+	{
+		"name": "Audio Freeze",
+		"folder": "Sampling & Granular",
+		"credit": "Audio Freeze by Tim Kleinert (2006): time-stretches live audio to a halt (about 13 s), with T-STRETCH freq/jitter and HP/LP. electro-music.org/forum/topic-13231.html",
+		"source": "electro-music-blocks/5726-audiofreeze_tk_136.pch2",
+		"modules": "all",
+		"area": "fx"
+	},
+	{
+		"name": "Reverse Delay",
+		"folder": "Sampling & Granular",
+		"credit": "Reversed slapback delay by Tim Kleinert (2006); the SENS noise gate detects onsets. electro-music.org/forum/topic-13274.html",
+		"source": "electro-music-blocks/5766-reverse_delay_tk_913.pch2",
+		"modules": "coloured",
+		"exclude": [7]
+	},
+	{
+		"name": "Reversi",
+		"folder": "Sampling & Granular",
+		"credit": "Reversi by Tim Kleinert (2009): clock-synced, chops the input into beats and plays each backwards one beat later. electro-music.org/forum/topic-35212.html",
+		"source": "electro-music-blocks/18197-reversi____tk_197.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Random Reorder",
+		"folder": "Sampling & Granular",
+		"credit": "Random reorder by Tim Kleinert (2009): randomly reorders the 16ths of a clock-synced 4/4 input. Don't go below 92 BPM. electro-music.org/forum/topic-35246.html",
+		"source": "electro-music-blocks/18225-randomreorder_tk_585.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Loop Reorder 16",
+		"folder": "Sampling & Granular",
+		"credit": "LoopReOrder16 by Tim Kleinert (2007): reorders the 16ths of a live 4/4 loop with a slice/mute sequencer (min. 92 BPM). electro-music.org/forum/topic-17372.html",
+		"source": "electro-music-blocks/7622-loopreorder16_tk_742.pch2",
+		"modules": "all"
+	},
+	{
+		"name": "128-Word RAM",
+		"folder": "Sampling & Granular",
+		"credit": "Virtual 128-word RAM built on delays, by Tim Kleinert (bug-fixed by stk/Cedric): address 0..63.5 in 0.5 steps, STORE trigger. Not saved with the patch. electro-music.org/forum/topic-35012.html",
+		"source": "electro-music-blocks/20762-128_word_ram_cs_fixed_167.pch2",
+		"modules": "coloured",
+		"exclude": [6, 54]
+	},
+	{
+		"name": "4-Point Interpolation",
+		"folder": "Sampling & Granular",
+		"credit": "4-point linear interpolation by Tim Kleinert (2010): upsamples a control-rate signal to audio rate, e.g. for clean sample/grain pointers. electro-music.org/forum/topic-41210.html",
+		"source": "electro-music-blocks/22231-4ptlininterpoltk_240.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Mono Elastic Synth",
+		"folder": "Sampling & Granular",
+		"credit": "MonoLasticSynt by Tim Kleinert (2007): mono 'intelligent elastic audio' sampler, zero-crossing based grains (full patch, Voice area). electro-music.org/forum/topic-21432.html",
+		"source": "electro-music-blocks/10128-monolasticsynttk_797.pch2",
+		"modules": "all"
+	},
+	{
+		"name": "Deluxe Looper",
+		"folder": "Sampling & Granular",
+		"credit": "Deluxe Looper by Tim Kleinert (2006): MIDI-synced one-bar loop capture with elastic playback (speed, direction, T-STRETCH, scrub). Don't use below 92 BPM. electro-music.org/forum/topic-13234.html",
+		"source": "electro-music-blocks/5736-deluxelooper_tk_111.pch2",
+		"modules": "all"
+	},
+	{
+		"name": "Clock Gate Pulse Width",
+		"folder": "Clock & Logic",
+		"credit": "Clock gate with tempo-proof duty cycle (Clock Gate PW2c) by Varice J. Mire (2012): set the duty cycle with 'Gate PW'. electro-music.org/forum/topic-53168.html",
+		"source": "electro-music-blocks/30472-clock_gate_pw2c_108.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Up-Down Preset Counter",
+		"folder": "Clock & Logic",
+		"credit": "Up/down counter with preset, step size, direction and limits, by Tim Kleinert and Howard Moscovitz. Output: OUTPUT. electro-music.org/forum/topic-6956.html",
+		"source": "electro-music-blocks/2410-up_dwn_pst_count.pch2",
+		"modules": [12, 26, 8, 19, 27, 11, 18, 9, 28, 24, 25, 5, 23, 6, 17, 1, 2, 10, 7, 21, 22, 20, 14, 30]
+	},
+	{
+		"name": "Up-Down Counter",
+		"folder": "Clock & Logic",
+		"credit": "DSP-cheap up/down counter by Tim Kleinert with 3phase's limits: separate UP/DOWN amounts and a START value. electro-music.org/forum/topic-18505.html",
+		"source": "electro-music-blocks/8241-newcounter_tk1b_162.pch2",
+		"modules": [14, 3, 2, 9, 8, 1, 13, 17, 16, 20, 21]
+	},
+	{
+		"name": "Pattern Rotator",
+		"folder": "Clock & Logic",
+		"credit": "Pattern rotator by Spandex: rotates a SeqNote pattern by N 16ths through a shift register (paste into the input sequence, read the output sequence). electro-music.org/forum/topic-45727.html",
+		"source": "electro-music-blocks/24868-patternrotator_642.pch2",
+		"modules": "all"
+	},
+	{
+		"name": "Zero-Cross Trigger",
+		"folder": "Clock & Logic",
+		"credit": "Zero-crossing trigger by 3phase (VirusLabs). electro-music.org/forum/topic-7278.html",
+		"source": "electro-music-blocks/2589-z-cross_trgbuff.pch2",
+		"modules": [32, 43, 31, 42]
+	},
+	{
+		"name": "Trigger Buffer",
+		"folder": "Clock & Logic",
+		"credit": "Trigger buffer by 3phase (VirusLabs). electro-music.org/forum/topic-7278.html",
+		"source": "electro-music-blocks/2589-z-cross_trgbuff.pch2",
+		"modules": [35, 34, 39, 40, 36, 7]
+	},
+	{
+		"name": "Knob Move Trigger",
+		"folder": "Clock & Logic",
+		"credit": "Gives a trigger whenever a knob (the ConstSwT) moves, by 3phase (after Afro88). electro-music.org/forum/topic-6044.html",
+		"source": "electro-music-blocks/2536-valuechnge_trigg.pch2",
+		"modules": [2, 8, 3, 1, 4]
+	},
+	{
+		"name": "Trigger to CV",
+		"folder": "Clock & Logic",
+		"credit": "Trigger to CV by Babyhead (2012): several triggers each select their own CV level (e.g. 4 tom pitches from one oscillator). electro-music.org/forum/topic-52120.html",
+		"source": "electro-music-blocks/29455-yellowtoblue2_565.pch2",
+		"modules": [10, 14, 15, 17, 18, 29, 11, 12, 20, 22, 23, 24, 21, 25, 16, 36, 13, 35]
+	},
+	{
+		"name": "Pattern Evolver",
+		"folder": "Clock & Logic",
+		"credit": "Random-pattern clock with pattern selector and a slow sequencer that changes the pattern every bar, by Roland Kuit ('MoogThing'). Output: RndPattern.",
+		"source": "RolandKuit/MoogThing.pch2",
+		"modules": [1, 2, 4, 5, 6, 7, 8, 9, 10, 11]
+	},
+	{
+		"name": "Trigger + Accent",
+		"folder": "Clock & Logic",
+		"credit": "Level-sequencer trigger pattern with accent VCA, by Roland Kuit ('7-Trigg1b'). Triggers: LevMult1; audio through LevMult2 gets the accent.",
+		"source": "RolandKuit/7-Trigg1b.pch2",
+		"modules": [1, 2, 5, 3, 11, 10, 4, 9]
+	},
+	{
+		"name": "Quadrature LFO",
+		"folder": "Modulation & CV",
+		"credit": "Quadrature LFO by ian-s: Schmitt-trigger triangle oscillator with four triangles 90 degrees apart. electro-music.org/forum/topic-8576.html",
+		"source": "electro-music-blocks/3257-quadrat_139.pch2",
+		"modules": [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 17, 24, 25, 26]
+	},
+	{
+		"name": "Glissando Gizmo",
+		"folder": "Modulation & CV",
+		"credit": "Glissando generator by Howard Moscovitz: Step Size, Hi and Low Limit. electro-music.org/forum/topic-6174.html",
+		"source": "electro-music-blocks/2046-gliss_gizzmo.pch2",
+		"modules": "coloured",
+		"area": "fx"
+	},
+	{
+		"name": "Random Ramp",
+		"folder": "Modulation & CV",
+		"credit": "Random up/down ramps by Dave Peck: Master rate, Vary slope, Flip rate and probability; output Rand Ramp. electro-music.org/forum/topic-8949.html",
+		"source": "electro-music-blocks/3410-random_ramp_idea_166.pch2",
+		"modules": [15, 13, 1, 2, 3, 4, 14, 5, 6, 7, 8],
+		"area": "fx"
+	},
+	{
+		"name": "Stepped Glide Sequence",
+		"folder": "Modulation & CV",
+		"credit": "Glide on the sequencer steps, then sampled on the 1/16 clock, by Roland Kuit ('13-RMPuseBassSeq'). Output: S&H1.",
+		"source": "RolandKuit/13-RMPuseBassSeq.pch2",
+		"modules": [2, 5, 4, 6]
+	},
+	{
+		"name": "X-Mux Tracking Generator",
+		"folder": "Modulation & CV",
+		"credit": "Matrix-6 style tracking generator with eight Constants on an X-Mux, by Dave Peck. electro-music.org/forum/topic-5184.html",
+		"source": "electro-music-blocks/1577-x-mux_as_tracking_generator.pch2",
+		"modules": [15, 16, 21, 22, 23, 24, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 4]
+	},
+	{
+		"name": "Modulo N",
+		"folder": "Modulation & CV",
+		"credit": "Modulo-n of a note value by blue hell: transpose, NoteQuant n, subtract (see the original notes). electro-music.org/forum/topic-5302.html",
+		"source": "electro-music-blocks/1641-mod_n.pch2",
+		"modules": [9, 2, 3]
+	},
+	{
+		"name": "Octave Switch 8",
+		"folder": "Modulation & CV",
+		"credit": "Minimoog-style 8-position octave switch by jamos. electro-music.org/forum/topic-74991.html",
+		"source": "electro-music-blocks/53301-octave_switches_170.pch2",
+		"modules": [3, 4, 5]
+	},
+	{
+		"name": "Octave Switch 4",
+		"folder": "Modulation & CV",
+		"credit": "Minimoog-style 4-position octave switch by jamos. electro-music.org/forum/topic-74991.html",
+		"source": "electro-music-blocks/53301-octave_switches_170.pch2",
+		"modules": [9, 8]
+	},
+	{
+		"name": "Tap Tempo Delay Control",
+		"folder": "Modulation & CV",
+		"credit": "Non-volatile tap tempo plus smoothed manual delay time (control for a 1 s delay) by Tim Kleinert (2015). Output: OUTPUT (bipolar time). electro-music.org/forum/topic-65027.html",
+		"source": "electro-music-blocks/40345-storetaptemdlytk_362.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Pitch Detector",
+		"folder": "Modulation & CV",
+		"credit": "Improved pitch detector by Tim Kleinert (2012): pitch plus periodic/unperiodic gate and transition outputs. electro-music.org/forum/topic-52784.html",
+		"source": "electro-music-blocks/29894-pitchdetector_tk_106.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Differentiator Z-1",
+		"folder": "Modulation & CV",
+		"credit": "Per-sample differentiator and one-sample (z-1) delay from two mixers, by Tim Kleinert. Keep the lower mixer below the upper one (compile order). electro-music.org/forum/topic-64966.html",
+		"source": "electro-music-blocks/40305-cheapdiff_z_1_tk_114.pch2",
+		"modules": [7, 8]
+	},
+	{
+		"name": "Triangle to Sine",
+		"folder": "Modulation & CV",
+		"credit": "Triangle-to-sine shaper y = x(2-|x|) by ian-s; ShpStatic (mode 2) does the same, per selvmarcus. electro-music.org/forum/topic-11892.html",
+		"source": "electro-music-blocks/4973-tri2sin_builtin_113.pch2",
+		"modules": [3, 5, 7, 8, 4, 2, 11]
+	},
+	{
+		"name": "Mux Mode Filter",
+		"folder": "Filters & EQ",
+		"credit": "Multimode filter with one knob sweeping LP-BP-HP-Notch, by Dave Peck. electro-music.org/forum/topic-8530.html",
+		"source": "electro-music-blocks/3237-muxmodfilter_template_208.pch2",
+		"modules": [4, 7, 6, 8, 9, 11, 10, 12]
+	},
+	{
+		"name": "MorPhilter",
+		"folder": "Filters & EQ",
+		"credit": "Morphing filter by Tim Kleinert: 24 dB LP to 12/12 dB BP to 24 dB HP. electro-music.org/forum/topic-11511.html",
+		"source": "electro-music-blocks/4790-morphilter__tk_209.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Filthy Filter",
+		"folder": "Filters & EQ",
+		"credit": "NordFilter with odd-harmonic distorted resonance via Res Mod, by Tim Kleinert. Keep GC off and LP mode. electro-music.org/forum/topic-11511.html",
+		"source": "electro-music-blocks/4789-filthyfilter_tk_201.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Classic Filter Saturation",
+		"folder": "Filters & EQ",
+		"credit": "Controlled saturation of FltClassic: boost 12 dB before, reduce 6 dB after, by Tim Kleinert (2012). electro-music.org/forum/topic-55007.html",
+		"source": "electro-music-blocks/31873-classicfiltersat_124.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Chamberlin 24dB",
+		"folder": "Filters & EQ",
+		"credit": "Dual-stage 24 dB multimode Chamberlin filter with resonance gain compensation, by Tim Kleinert (2015). electro-music.org/forum/topic-64858.html",
+		"source": "electro-music-blocks/40206-chamberlin24dbtk_708.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Noise Colours",
+		"folder": "Filters & EQ",
+		"credit": "Five noise filters by Rob Hordijk: bell-shaped distribution, classic pink, pink-blue morph, pink/white booster, resonant band. electro-music.org/forum/topic-8238.html",
+		"source": "electro-music-blocks/3113-noises.pch2",
+		"modules": "all",
+		"exclude": [9]
+	},
+	{
+		"name": "Pink Noise",
+		"folder": "Filters & EQ",
+		"credit": "Pink noise approximation (two noise sources + EqPeak) by Varice J. Mire (2012). electro-music.org/forum/topic-8238.html",
+		"source": "electro-music-blocks/29236-pink_noise_2_122.pch2",
+		"modules": [5, 1, 2, 3, 6, 7, 8, 9, 10]
+	},
+	{
+		"name": "Sine Saturation",
+		"folder": "Distortion & Dynamics",
+		"credit": "Saturator using the -90..+90 degree part of a sine (OscPM at 0 Hz), DRIVE/BIAS/MAKEUP, by Tim Kleinert. electro-music.org/forum/topic-17935.html",
+		"source": "electro-music-blocks/7897-sine_saturation_147.pch2",
+		"modules": [4, 3, 11, 1, 2, 12, 15, 16]
+	},
+	{
+		"name": "Audio Up-Down Slew",
+		"folder": "Distortion & Dynamics",
+		"credit": "Audio-rate up/down slew by Tim Kleinert: waveshaping and tone control. electro-music.org/forum/topic-18525.html",
+		"source": "electro-music-blocks/8251-dwnupslewaudiotk_177.pch2",
+		"modules": [4, 2, 5, 3, 14]
+	},
+	{
+		"name": "Transient Shaper",
+		"folder": "Distortion & Dynamics",
+		"credit": "Transient shaper by Afrokid: shapes the attack of stabs and drums (Threshold, Shape, Ratio, PostGain). electro-music.org/forum/topic-6002.html",
+		"source": "electro-music-blocks/1996-transient_shaper.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "X-Mux Waveshaper",
+		"folder": "Distortion & Dynamics",
+		"credit": "Lo-fi waveshaper: audio drives an X-Mux of eight Constants, by Dave Peck. electro-music.org/forum/topic-5184.html",
+		"source": "electro-music-blocks/1576-x-mux_as_waveshaper.pch2",
+		"modules": [15, 16, 21, 22, 23, 24, 5, 6, 7, 8, 9, 10, 11, 12, 17, 18, 19, 4]
+	},
+	{
+		"name": "Phase Distortion FX",
+		"folder": "Distortion & Dynamics",
+		"credit": "Stereo phase-distortion FX by Tim Kleinert (2016): phase-modulates the input with a filtered copy of itself; the dummy delays work around a readout bug. electro-music.org/forum/topic-65736.html",
+		"source": "electro-music-blocks/41129-phasedistfx__tk_386.pch2",
+		"modules": "coloured",
+		"area": "fx"
+	},
+	{
+		"name": "Stereo Drive Dry-Wet",
+		"folder": "Distortion & Dynamics",
+		"credit": "Stereo saturation with Drive and dry/dist crossfade, by Roland Kuit ('Cyclane', FX area).",
+		"source": "RolandKuit/Cyclane.pch2",
+		"modules": [1, 5, 14, 12, 16, 15],
+		"area": "fx"
+	},
+	{
+		"name": "Phaser Pos-Neg Feedback",
+		"folder": "Effects",
+		"credit": "Phaser whose one Feedback knob goes from negative to positive feedback, by Dave Peck. electro-music.org/forum/topic-8952.html",
+		"source": "electro-music-blocks/3413-phaser_pos-neg_idea_132.pch2",
+		"modules": [11, 7, 6, 9, 8, 1, 2, 5, 4, 3],
+		"area": "fx"
+	},
+	{
+		"name": "8-Tap Delay",
+		"folder": "Effects",
+		"credit": "Eight modulatable taps at 48 kHz from one DelayQuad (2.7 s), by Tim Kleinert. electro-music.org/forum/topic-31680.html",
+		"source": "electro-music-blocks/16009-8_tap_delay__tk_122.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Strings Resonator",
+		"folder": "Effects",
+		"credit": "Stereo synthi-strings resonator (MN3011 tap ratios) by Rob Hordijk. electro-music.org/forum/topic-5680.html",
+		"source": "electro-music-blocks/1844-stringsresonator.pch2",
+		"modules": "coloured",
+		"area": "fx"
+	},
+	{
+		"name": "Revox A77 Echo",
+		"folder": "Effects",
+		"credit": "Revox A77 ping-pong tape echo with saturation, head gap, emphasis, optional noise/EQ/distortion, by Rob Hordijk. electro-music.org/forum/topic-7442.html",
+		"source": "electro-music-blocks/2681-revoxa77echoefx.pch2",
+		"modules": "all",
+		"area": "fx",
+		"exclude": [1]
+	},
+	{
+		"name": "Pseudo Stereo 2",
+		"folder": "Effects",
+		"credit": "Comb-filter mono-to-stereo, 100% mono compatible, by Tim Kleinert. electro-music.org/forum/topic-8663.html",
+		"source": "electro-music-blocks/3290-pseudostereo2_tk_144.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Harmonic Disperser",
+		"folder": "Effects",
+		"credit": "Pitch-tracking delay that pans even and odd harmonics left and right (PseudoStereo3), by Tim Kleinert. electro-music.org/forum/topic-8704.html",
+		"source": "electro-music-blocks/3300-harmodispersertk_204.pch2",
+		"modules": "coloured"
+	},
+	{
+		"name": "Swept Band Delay",
+		"folder": "Effects",
+		"credit": "Stereo LP/HP-filtered delays with LFO/random sweep and compressor, by Roland Kuit ('Cyclane', FX area).",
+		"source": "RolandKuit/Cyclane.pch2",
+		"modules": [2, 4, 8, 3, 11, 6, 7, 9, 17],
+		"area": "fx"
+	},
+	{
+		"name": "Plucked String",
+		"folder": "Voices",
+		"credit": "Plucked string with controllable pluck and pickup points, by Chet: three OscStrings tracking one pitch. electro-music.org/forum/topic-11550.html",
+		"source": "electro-music-blocks/4813-pluckpointstring_749.pch2",
+		"modules": "all",
+		"exclude": [9]
+	},
+	{
+		"name": "Folded Sync",
+		"folder": "Voices",
+		"credit": "Smooth 'hard sync' without a second oscillator: a biased wavefolder on a triangle, by jamos. electro-music.org/forum/topic-69374.html",
+		"source": "electro-music-blocks/44603-folded_sync_169.pch2",
+		"modules": [3, 7, 4, 6, 5, 9]
+	},
+	{
+		"name": "Triangle Ring-Mod Bass",
+		"folder": "Voices",
+		"credit": "Three triangle oscillators ring-modulated into a resonant filter, by Roland Kuit ('TriBazz2'). Pitch into Master, trigger into the oscillators' Sync.",
+		"source": "RolandKuit/TriBazz2.pch2",
+		"modules": [2, 1, 3, 4, 5, 6, 7, 10, 9, 23, 22, 11, 17, 20, 21, 24, 15]
+	},
+	{
+		"name": "Closed-Open Hi-Hats",
+		"folder": "Drums",
+		"credit": "Closed and open MetNoise hi-hats with decay and colour controls, by Roland Kuit ('YezDrumz', 2004). Triggers into each ModAHD Trig.",
+		"source": "RolandKuit/YezDrumz.pch2",
+		"modules": [59, 45, 46, 44, 60, 47, 48, 49]
+	}
+]

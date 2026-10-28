@@ -27,7 +27,7 @@ export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>)
 	return uiStore.clipboard;
 }
 
-// The selected modules of `area` with their cables among themselves and their morphs. Shared by Copy and Save as Block.
+// The selected modules of `area` with their cables among themselves and their morphs. Shared by Copy and Save Selection to Library.
 export function selectionEntry(area: 'voice' | 'fx'): ClipboardEntry | null {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -47,7 +47,7 @@ export function selectionEntry(area: 'voice' | 'fx'): ClipboardEntry | null {
 	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
 }
 
-// Shared by Paste and building-block insert: adds `entry`'s modules with their top-left at `target`, else at
+// Shared by Paste and Library insert: adds `entry`'s modules with their top-left at `target`, else at
 // the mouse position, else 2 columns/rows from where they were copied.
 export async function insertEntry(entry: ClipboardEntry, target?: { col: number; row: number; area: 'va' | 'fx' }): Promise<void> {
 	const slotsStore = useSlotsStore();

@@ -52,7 +52,7 @@ export const useSettingsStore = defineStore('settings', {
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
 		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
-		blocksFolder: '' as string, // Library pane's building blocks; '' = userData/blocks
+		libraryFolder: '' as string, // Library pane's folder; '' = userData/library
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
@@ -101,6 +101,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setStorageFolder(value: string) {
 			this.storageFolder = value;
+		},
+		setLibraryFolder(value: string) {
+			this.libraryFolder = value;
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;
@@ -176,6 +179,10 @@ export const useSettingsStore = defineStore('settings', {
 			store.setCableGravity(store.cableGravity);
 			store.setCableThickness(store.cableThickness);
 			store.setKnobSensitivity(store.knobSensitivity);
+			// Renamed from blocksFolder (2026-10-28): keep a folder chosen under the old name.
+			const state = store.$state as { blocksFolder?: string };
+			if (state.blocksFolder && !store.libraryFolder) store.setLibraryFolder(state.blocksFolder);
+			delete state.blocksFolder;
 		},
 	},
 });

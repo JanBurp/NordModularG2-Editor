@@ -124,6 +124,20 @@
 						</Button>
 					</div>
 				</SettingsRow>
+
+				<p class="settings-subheader">Library:</p>
+				<!-- Library folder: the default lives in the app's data folder -->
+				<SettingsRow :label="L.editorLibraryFolder">
+					<div class="flex items-center gap-1 min-w-0">
+						<span class="truncate text-xs text-content-primary" :title="settings.libraryFolder || 'library in the app data folder'">{{
+							libraryFolderName
+						}}</span>
+						<Button variant="default" size="xs" title="Choose another folder" @click="library.chooseFolder">Choose…</Button>
+						<Button v-if="settings.libraryFolder" variant="default" size="xs" title="Back to the default folder" @click="library.setFolder('')">
+							Default
+						</Button>
+					</div>
+				</SettingsRow>
 			</div>
 		</Collapsible>
 		<Collapsible
@@ -389,6 +403,7 @@
 	import BtnGroup from '@/components/toolbar/BtnGroup.vue';
 	import Button from '@/components/toolbar/Button.vue';
 	import { useBrowserStore } from '@/store/browser';
+	import { useLibrary } from '@/composables/useLibrary';
 	import { useDeviceStore } from '@/store/device';
 	import { useSettingsStore, type ThemeMode, type KnobMode, type SettingsSection, type CableConnectMode, type CableStyle } from '@/store/settings';
 	import { useSlotsStore } from '@/store/slots';
@@ -423,6 +438,12 @@
 		if (result.success && result.folder) await setStorageFolder(result.folder);
 	}
 	onMounted(() => browser.loadStorage()); // fills browser.storageDir for the folder's tooltip
+
+	// Library pane's folder: the default (app data) or a chosen one.
+	const library = useLibrary();
+	const libraryFolderName = computed(() =>
+		settings.libraryFolder ? (settings.libraryFolder.split(/[/\\]/).pop() ?? settings.libraryFolder) : 'Default (app data)',
+	);
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 

@@ -348,7 +348,7 @@
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
 		svgRef,
 		(info) => emit('moduleDrop', info),
-		({ block, col, row }) => insertEntry(block, { col, row, area: props.area as 'va' | 'fx' }).catch(console.error),
+		({ entry, col, row }) => insertEntry(entry, { col, row, area: props.area as 'va' | 'fx' }).catch(console.error),
 	);
 
 	function onCanvasContextMenu(e: MouseEvent) {

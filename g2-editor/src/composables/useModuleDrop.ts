@@ -4,11 +4,11 @@ import { getModule } from '../renderer/nmg2mods';
 import { clientToSvgPoint } from '../renderer/svgUtils';
 import { useUiStore } from '../store/ui';
 
-// Drops a module type (Modules pane) or a building block (Library pane) onto the canvas.
+// Drops a module type (Modules pane) or a library item (Library pane) onto the canvas.
 export function useModuleDrop(
 	svgRef: Ref<SVGSVGElement | null>,
 	onDrop: (info: { typeId: number; col: number; row: number }) => void,
-	onBlockDrop: (info: { block: ClipboardEntry; col: number; row: number }) => void,
+	onLibraryDrop: (info: { entry: ClipboardEntry; col: number; row: number }) => void,
 ) {
 	const ui = useUiStore();
 	let dropGhost: SVGGElement | null = null;
@@ -21,7 +21,7 @@ export function useModuleDrop(
 	// One rect per dragged module, relative to the drop cell.
 	function ghostRects(): { col: number; row: number; height: number }[] {
 		if (ui.draggedModuleId) return [{ col: 0, row: 0, height: getModule(ui.draggedModuleId)?.height || 2 }];
-		const modules = ui.draggedBlock?.modules ?? [];
+		const modules = ui.draggedLibraryItem?.modules ?? [];
 		const minCol = Math.min(...modules.map((m) => m.horiz));
 		const minRow = Math.min(...modules.map((m) => m.vert));
 		return modules.map((m) => ({ col: m.horiz - minCol, row: m.vert - minRow, height: getModule(m.type)?.height || 2 }));
@@ -65,10 +65,10 @@ export function useModuleDrop(
 		clearDropGhost();
 		const grid = svgRef.value && toGrid(e);
 		if (!grid) return;
-		// A block drag carries its file path, never a number.
+		// A library drag carries its file path, never a number.
 		const typeId = parseInt(e.dataTransfer?.getData('text/plain') || '0');
 		if (typeId) onDrop({ typeId, ...grid });
-		else if (ui.draggedBlock) onBlockDrop({ block: ui.draggedBlock, ...grid });
+		else if (ui.draggedLibraryItem) onLibraryDrop({ entry: ui.draggedLibraryItem, ...grid });
 	}
 
 	return { handleDragOver, clearDropGhost, handleModuleDropOnWrapper };

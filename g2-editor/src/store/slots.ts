@@ -10,7 +10,7 @@ import type {
 	PatchParamVariation,
 	VariationState,
 } from '@/types';
-import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
+import { PATCH_PARAM_KEYS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
@@ -48,6 +48,7 @@ import {
 	resolveColumnCollisions,
 	extractVariations,
 	removeModuleFromVariations,
+	newModuleInstance,
 	liveModuleLv,
 	snapshotModuleAssignments,
 	computeAssignOne,
@@ -1229,37 +1230,11 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const uiStore = useUiStore();
 
-			const { getModule, getDefaultParamValues } = await import('../renderer/nmg2mods');
-			const modDef = getModule(typeId);
-			const numModes = modDef?.modes?.length ?? 0;
-			const modeVals: number[] = Array(numModes).fill(0);
-			const numParams = modDef?.params?.length ?? 0;
-			const paramVals = getDefaultParamValues(typeId);
-			const base = modDef?.short ?? 'Module';
-			const sameType = [...patch.areas[0].modules, ...patch.areas[1].modules].filter((m) => m.type === typeId);
-			let maxSuffix = 0;
-			for (const m of sameType) {
-				const match = m.uname?.match(/(\d+)$/);
-				if (match) maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
-			}
-			const uname = base + (maxSuffix + 1);
-
-			const lv: number[] = Array(numParams * NUM_VARIATIONS);
-			for (let v = 0; v < NUM_VARIATIONS; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
-
-			const mod: ModuleInstance = {
-				type: typeId,
-				index: moduleId,
-				horiz: col,
-				vert: row,
-				colour: uiStore.moduleColor,
-				uprate: 0,
-				mutaLock: defaultMutaLock(typeId),
-				pcnt: numParams,
-				lv,
-				modes: modeVals,
-				uname,
-			};
+			const mod = newModuleInstance(typeId, moduleId, col, row, uiStore.moduleColor, [...patch.areas[0].modules, ...patch.areas[1].modules]);
+			const { pcnt: numParams, modes: modeVals } = mod;
+			const uname = mod.uname!;
+			const numModes = modeVals.length;
+			const paramVals = mod.lv.slice(0, numParams);
 
 			const { areaIdx, location } = areaConfig(area);
 			mutAddModule(patch, areaIdx, mod);

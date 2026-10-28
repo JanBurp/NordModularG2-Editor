@@ -4,7 +4,7 @@ import { fileURLToPath } from 'url';
 import fs from 'fs';
 import path from 'path';
 import { PatchParser, stripFileHeader } from '../nmg2PatchParser';
-import { blockToPch2, pch2ToBlock } from '../blockFile';
+import { libraryItemToPch2, pch2ToLibraryItem } from '../libraryFile';
 import { extractVariations, liveModuleLv } from '../../store/slotHelpers';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -15,7 +15,7 @@ function loadFixture(filename: string): { bytes: number[]; patch: Patch } {
 	return { bytes, patch: new PatchParser(new Uint8Array(bytes).buffer).parse() as Patch };
 }
 
-describe('building block .pch2', () => {
+describe('library item .pch2', () => {
 	it('round-trips a selection: modules moved to (0,0), internal cables, params and morphs only', () => {
 		const { bytes, patch } = loadFixture('Basics  NL2.pch2');
 		const variations = extractVariations(patch);
@@ -37,14 +37,14 @@ describe('building block .pch2', () => {
 			morphs,
 		};
 
-		const block = pch2ToBlock(blockToPch2('Block', entry, { patch, templateRawHex: stripFileHeader(bytes), variations }));
+		const item = pch2ToLibraryItem(libraryItemToPch2('Item', entry, { patch, templateRawHex: stripFileHeader(bytes), variations }));
 
-		expect(block.area).toBe('va');
+		expect(item.area).toBe('va');
 		const minCol = Math.min(...modules.map((m) => m.horiz));
 		const minRow = Math.min(...modules.map((m) => m.vert));
 		const byIndex = (a: { index: number }, b: { index: number }) => a.index - b.index;
 		expect(
-			block.modules
+			item.modules
 				.map((m) => ({ index: m.index, type: m.type, horiz: m.horiz, vert: m.vert, colour: m.colour, lv: m.lv.slice(0, 9 * m.pcnt) }))
 				.sort(byIndex),
 		).toEqual(
@@ -52,15 +52,15 @@ describe('building block .pch2', () => {
 				.map((m) => ({ index: m.index, type: m.type, horiz: m.horiz - minCol, vert: m.vert - minRow, colour: m.colour, lv: m.lv.slice(0, 9 * m.pcnt) }))
 				.sort(byIndex),
 		);
-		expect(block.cables.map((c) => [c.smod, c.scon, c.dmod, c.dcon])).toEqual(entry.cables.map((c) => [c.smod, c.scon, c.dmod, c.dcon]));
-		expect(block.morphs!.slice(0, 9)).toEqual(morphs.slice(0, 9));
+		expect(item.cables.map((c) => [c.smod, c.scon, c.dmod, c.dcon])).toEqual(entry.cables.map((c) => [c.smod, c.scon, c.dmod, c.dcon]));
+		expect(item.morphs!.slice(0, 9)).toEqual(morphs.slice(0, 9));
 	});
 
-	it('reads a whole patch file as a block of its voice area', () => {
+	it('reads a whole patch file as a library item of its voice area', () => {
 		const { bytes, patch } = loadFixture('DXBass FM4.pch2');
-		const block = pch2ToBlock(bytes);
-		expect(block.area).toBe('va');
-		expect(block.modules.map((m) => m.index)).toEqual(patch.areas[1].modules.map((m) => m.index));
-		expect(block.cables.length).toBe(patch.areas[1].cableList.length);
+		const item = pch2ToLibraryItem(bytes);
+		expect(item.area).toBe('va');
+		expect(item.modules.map((m) => m.index)).toEqual(patch.areas[1].modules.map((m) => m.index));
+		expect(item.cables.length).toBe(patch.areas[1].cableList.length);
 	});
 });

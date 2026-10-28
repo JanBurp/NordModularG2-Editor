@@ -913,22 +913,22 @@ ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {
 	fs.copyFileSync(assertInStorage(event.sender.id, from), dst);
 });
 
-// Library pane's building blocks (plain .pch2 files): userData/blocks, or the folder chosen in the pane.
-const blocksDirByWc = new Map<number, string>();
+// Library pane's items (plain .pch2 files): userData/library, or the folder chosen in the settings.
+const libraryDirByWc = new Map<number, string>();
 
-ipcMain.handle('patches:blocks-dir', (event, custom?: string) => {
-	const dir = custom || path.join(app.getPath('userData'), 'blocks');
+ipcMain.handle('patches:library-dir', (event, custom?: string) => {
+	const dir = custom || path.join(app.getPath('userData'), 'library');
 	fs.mkdirSync(dir, { recursive: true });
-	blocksDirByWc.set(event.sender.id, dir);
+	libraryDirByWc.set(event.sender.id, dir);
 	return dir;
 });
 
-// Moves a block to the Trash; only .pch2 files inside the calling window's blocks folder.
-ipcMain.handle('patches:blocks-remove', async (event, filepath: string) => {
-	const dir = blocksDirByWc.get(event.sender.id);
+// Moves a library item to the Trash; only .pch2 files inside the calling window's library folder.
+ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
+	const dir = libraryDirByWc.get(event.sender.id);
 	const resolved = path.resolve(filepath);
 	const rel = dir ? path.relative(path.resolve(dir), resolved) : '';
-	if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !/\.pch2$/i.test(rel)) throw new Error('Not a block file');
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !/\.pch2$/i.test(rel)) throw new Error('Not a library file');
 	await shell.trashItem(resolved);
 });
 
@@ -1302,7 +1302,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: 'CommandOrControl+E',
 					enabled: menuState.canPasteParams,
 				},
-				{ label: 'Save Selection as Block…', click: () => sendToFocused('menu:action', 'save-block'), enabled: menuState.hasSelection },
+				{ label: 'Save Selection to Library…', click: () => sendToFocused('menu:action', 'save-to-library'), enabled: menuState.hasSelection },
 				{ type: 'separator' as const },
 				{ label: 'Select All', click: () => sendToFocused('menu:action', 'select-all'), accelerator: 'CommandOrControl+A' },
 			],

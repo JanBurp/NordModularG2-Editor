@@ -12,7 +12,8 @@ import type {
 } from '@/types';
 import { NUM_VARIATIONS } from '@/types';
 import { MORPH_NAMES } from '@/types/patch';
-import { getModule } from '@/renderer/nmg2mods';
+import { getDefaultParamValues, getModule } from '@/renderer/nmg2mods';
+import { defaultMutaLock } from '@/renderer/mutator';
 
 // Morph Group i's display name: its custom label (PATCH_MORPH param 8+i), else the default name.
 export function morphGroupName(patch: Patch | null | undefined, i: number): string {
@@ -165,6 +166,31 @@ export function extractVariations(patch: Patch): VariationState[] {
 		),
 		patch: patch.patchParams?.[v] ? { ...patch.patchParams[v] } : defaultPatchParams(),
 	}));
+}
+
+// A new module with the editor's add-module defaults: default params in every variation, all modes 0, and named
+// "<short><n>" with n one above the highest such suffix among `others`.
+export function newModuleInstance(typeId: number, index: number, col: number, row: number, colour: number, others: ModuleInstance[]): ModuleInstance {
+	const modDef = getModule(typeId);
+	const paramVals = getDefaultParamValues(typeId);
+	let maxSuffix = 0;
+	for (const m of others.filter((o) => o.type === typeId)) {
+		const match = m.uname?.match(/(\d+)$/);
+		if (match) maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
+	}
+	return {
+		type: typeId,
+		index,
+		horiz: col,
+		vert: row,
+		colour,
+		uprate: 0,
+		mutaLock: defaultMutaLock(typeId),
+		pcnt: paramVals.length,
+		lv: Array.from({ length: NUM_VARIATIONS }, () => paramVals).flat(),
+		modes: Array(modDef?.modes?.length ?? 0).fill(0),
+		uname: (modDef?.short ?? 'Module') + (maxSuffix + 1),
+	};
 }
 
 export function removeModuleFromVariations(variations: VariationState[] | null, moduleId: number, areaKey: 'fx' | 'voice'): void {

@@ -43,6 +43,7 @@ export const SETTINGS_LABELS = {
 	editorPath: 'Browser Path',
 	editorHiddenModules: 'Hidden Modules',
 	editorStorageFolder: 'Storage Folder',
+	editorLibraryFolder: 'Library Folder',
 	editorDimUnusedModules: 'Dim unused modules',
 	editorTheme: 'Theme',
 	cableGravity: 'Curved',
