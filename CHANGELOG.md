@@ -33,6 +33,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - ContextMenu->SetValue now for all Params
 - Refactured multi-device UX
 - Added auto-connect for new device
+- Menu Window renamed to Device
 
 ### Fixed
 - Wrong calculation of CPU
@@ -42,6 +43,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Paste Params did not work (only on modules with same order instead of id)
 - Module ContextMenu sometimes had double dividers
 - Possible to rename modules with empty names
+- Seq modules: Loop/Once button 1px wider, Once graphic improved
+- Env modules: curve shape button wider (20px), graphics 1px lower
+- Resonator: KBT text was hidden under its button
 
 ## [0.7.2] - 2026-10-22
 

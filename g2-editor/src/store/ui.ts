@@ -48,7 +48,7 @@ export const useUiStore = defineStore('ui', {
 		showQuickAdd: false as boolean,
 		mutatorFocused: false as boolean, // keyboard focus is in the Patch Mutator pane (dims the canvas)
 		showBankOrganizer: false as boolean, // Bank Organizer replaces the canvas while open
-		showSearchReplace: false as boolean, // Search/Replace toolbar (Edit → Find & Replace)
+		showSearchReplace: false as boolean, // Search/Replace toolbar (Tools → Find & Replace)
 		organizerKind: 'patch' as 'patch' | 'performance',
 		organizerBanks: [1, 2] as [number, number], // left/right column bank
 		cableShakeCount: 0 as number,

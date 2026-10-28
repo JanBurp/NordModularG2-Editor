@@ -59,6 +59,7 @@ export const STATUS_HINTS = {
 	browserFolder: 'Click/Enter: open folder · ←: parent folder · ↑↓: navigate',
 	browserFile: 'Double-click/Enter: load · ←: parent folder · ↑↓: navigate',
 	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
+	browserOrganizer: `Click/${MOD}3: open the Bank Organizer`,
 	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort, organizer',
 
 	// Bank Organizer

@@ -1182,7 +1182,7 @@ function windowMenuItems(): Electron.MenuItemConstructorOptions[] {
 	}));
 }
 
-// Window-menu twin of the toolbar group's context menu, for the active device.
+// Device-menu twin of the toolbar group's context menu, for the active device.
 function separateWindowMenuItem(): Electron.MenuItemConstructorOptions {
 	const dv = activeWebContentsId === null ? undefined : deviceViews.get(activeWebContentsId);
 	const detached = !!dv && dv.host !== hosts[0];
@@ -1283,12 +1283,6 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				},
 				{ type: 'separator' as const },
 				{ label: 'Select All', click: () => sendToFocused('menu:action', 'select-all'), accelerator: 'CommandOrControl+A' },
-				{ type: 'separator' as const },
-				{
-					label: 'Find & Replace...',
-					click: () => sendToFocused('menu:action', 'toggle-search-replace'),
-					enabled: menuState.hasCurrentPatch,
-				},
 			],
 		},
 		{
@@ -1416,12 +1410,18 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ type: 'separator' as const },
 				{ label: 'Patch Adjuster & Mutator', click: () => sendToFocused('menu:action', 'toggle-patch-mutator'), accelerator: 'CommandOrControl+2' },
 				{ label: 'Bank Organizer', click: () => sendToFocused('menu:action', 'toggle-bank-organizer'), accelerator: 'CommandOrControl+3' },
+				{
+					label: 'Find & Replace',
+					click: () => sendToFocused('menu:action', 'toggle-search-replace'),
+					accelerator: 'Alt+CommandOrControl+F',
+					enabled: menuState.hasCurrentPatch,
+				},
 				{ type: 'separator' as const },
 				{ label: 'Extended Toolbar', click: () => sendToFocused('menu:action', 'toggle-extended-toolbar'), accelerator: 'CommandOrControl+T' },
 			],
 		},
 		{
-			label: 'Window',
+			label: 'Device',
 			submenu: [
 				...windowMenuItems(),
 				{ type: 'separator' as const },
