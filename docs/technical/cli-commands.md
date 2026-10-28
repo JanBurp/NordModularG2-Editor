@@ -33,7 +33,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `clear-patch` | `<patch\|performance> <bank> <loc>` | Clear a single bank location |
 | `clear-bank` | `<patch\|performance> <bank>` | Clear all entries in a bank (locations 1–128) |
 | `reload-names` | | Re-fetch patch/performance name list from G2: emits a `names_progress` event per bank (daemon only), then the complete `names` event. |
-| `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank) |
+| `list` | `[type] [bank <n>]` | List patches/performances (optionally filter by type or bank). The unfiltered list also reports `flashUsage` (flash used, per mille 0–1000) |
 | `get-perf-settings` | | Get current performance settings |
 | `set-perf-mode` | `<patch\|performance> [shift]` | Switch between patch and performance mode. With `shift` it acts as SHIFT+PERF: patch→performance creates a new performance ("New Performance") from the current slot patches (key/active kept); performance→patch keeps the performance's patches in the slots |
 | `set-perf-name` | `<name>` | Set performance name (may be empty) |
@@ -77,12 +77,13 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 |---|---|---|
 | `set-master-clock-run` | `<0\|1>` | Start/stop master clock |
 | `set-master-clock-bpm` | `<30–240>` | Set master clock BPM |
+| `play-note` | `<note 0–127> <0\|1>` | Virtual Keyboard: sound (1) or release (0) a note |
 
 ## Modules
 
 | Command | Arguments | Description |
 |---|---|---|
-| `add-module` | `<slot> <va\|fx> <type-id> <module-id> <col> <row> <color> <num-modes> [modes] <num-params> [params] <name>` | Add module to patch. `module-id` must be 1–127; Fx-In (type 127) is FX-only. The G2 ignores `params` and uses its own defaults |
+| `add-module` | `<slot> <va\|fx> <type-id> <module-id> <col> <row> <color> <num-modes> [modes] <num-params> [params] <name> [muta-lock:0\|1]` | Add module to patch. `module-id` must be 1–127; Fx-In (type 127) is FX-only. The G2 ignores `params` and uses its own defaults. `muta-lock` sets Exclude From Mutation (default 0) |
 | `del-module` | `<slot> <va\|fx> <module-id>` | Delete module (delete cables first; zero its morph ranges first, or the G2 is corrupted until power-off) |
 | `move-module` | `<slot> <va\|fx> <module-id> <col> <row>` | Move module to grid position |
 | `set-module-color` | `<slot> <va\|fx> <module-id> <color:0–24>` | Set module color |
@@ -105,9 +106,25 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 |---|---|---|
 | `set-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <value> <variation>` | Set module parameter value (variation 0–9; never acked, so a large burst can lose values on the G2) |
 | `set-morph-range` | `<slot> <va\|fx> <module-id> <param-idx> <range> <group> <variation>` | Set a parameter's morph range (range 0 removes the assignment) |
+| `set-morph-range-batch` | `<slot> [<va\|fx> <mod> <param> <range> <group> <variation>]...` | Set multiple morph ranges in one call |
+| `select-param` | `<slot> <va\|fx\|patch> <module-id> <param-idx>` | Move the front-panel cursor to a parameter (`0x2F`) |
 | `send-sections` | `<slot> <hex>` | Send whole patch sections (`[type][len16][data]...`, as in a `.pch2`) as one acked edit. The Patch Mutator uses it to write a complete variation |
 | `set-module-labels` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <count> <label>... [<param-idx> <count> <label>...]` | Set the labels of all labelled params of a module (replaces the module's whole list; always pass every label param, the block size is fixed per module type) |
 | `copy-variation` | `<slot> <from> <to>` | Copy all parameter values from one variation to another (0-based indices) |
+
+## Parameter Pages & Knobs
+
+| Command | Arguments | Description |
+|---|---|---|
+| `assign-knob` | `<slot> <va\|fx\|patch> <module-id> <param-idx> <slot-index> [led]` | Assign a parameter (or, with `led`=1, a level meter by LED number) to a Parameter Page knob (0–119). `patch` = Morph Groups |
+| `deassign-knob` | `<slot> <slot-index>` | Remove a Parameter Page knob assignment |
+| `select-param-page` | `<slot> <page-id>` | Select the front-panel Parameter Page (`page-id` = page*3 + bank, 0–14) |
+| `get-param-page` | `<slot>` | Ask which Parameter Page the G2 shows; the reply arrives as a `param_page_change` event |
+| `assign-global-knob` | `<slot> <target-slot> <va\|fx\|patch> <module-id> <param-idx> <slot-index>` | Assign a parameter to a Global Parameter Page knob (0–119) |
+| `deassign-global-knob` | `<slot> <slot-index>` | Remove a Global Parameter Page knob assignment |
+| `select-global-page` | `<slot> <page-id>` | Select the active Global Parameter Page (`page-id` = page*3 + bank, 0–14) |
+| `get-global-knobs` | | Fetch the Global Parameter Pages assignment list (system-wide, no slot) |
+| `set-knob-source` | `<0\|1>` | Parameter Pages knob-assign source (1=Global, 0=Patch), as SHIFT+GLOBAL |
 
 ## MIDI CC Assignments
 
@@ -123,7 +140,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | Command | Arguments | Description |
 |---|---|---|
 | `get-resources` | `<slot>` | Get CPU/memory resource usage |
-| `daemon` | | Persistent: watch events + accept JSON commands on stdin |
+| `daemon` | `[<bus> <device>]` | Persistent: watch events + accept JSON commands on stdin (optional bus/device pins one specific G2) |
 | `seq` | `"<cmd1>" "<cmd2>" ...` | Run multiple commands sequentially |
 | `debug` | `<on\|off>` | Enable/disable debug timing output (emits JSON `debug` events to stdout) |
 

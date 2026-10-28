@@ -87,7 +87,7 @@ Exception: `MODULE_NAMES` (§6.6) is byte-encoded, not bit-packed.
 Byte-encoded. Appears once at the start of a prf2 file. Mirrors the USB `GET_PERF_SETTINGS` response (see `usb.md §10`).
 
 ```
-[8-byte header — unknown / settings]
+[8-byte header — performance settings]
 [Slot A: name\0 + 10 bytes]
 [Slot B: name\0 + 10 bytes]
 [Slot C: name\0 + 10 bytes]
@@ -107,7 +107,19 @@ Slot block (10 bytes):
 | 6 | `rangeHigh` | MIDI note high |
 | 7–9 | padding | ignored |
 
-Parser: `parsePrfData` (`nmg2PatchParser.ts:382–408`).
+Header (8 bytes), as `writePerfSettings` writes it and `parsePrfData` reads it into `settings`:
+
+| Offset | Field | Notes |
+|--------|-------|-------|
+| 0 | unknown | written as 0 |
+| 1 | `focus << 2 \| knobSource` | `focus` = selected slot 0–3 (bits 2–3); `knobSourceGlobal` = low 2 bits ≠ 0 |
+| 2 | `rangeEnable` | KB Split on/off |
+| 3 | `bpm` | master clock BPM |
+| 4 | unknown | written as 0 |
+| 5 | `clockRunning` | bit 0 |
+| 6–7 | 0 | |
+
+Parser: `parsePrfData` (`nmg2PatchParser.ts`), exposed as `settings` on the parsed performance.
 
 ---
 
@@ -401,6 +413,13 @@ serializePerformance(patches, templateRawHex, variationsArray): string
 `templateRawHex` must be the last valid rawHex from a hardware GET_PATCH or file load — it supplies the preserved sections.
 
 For prf2, `serializePerformance` resets the written-section tracking at each SEPARATOR boundary so all 4 slots' sections are independently updated.
+
+Both drop the Patch Mutator's live-only variation 9 (only `NUM_VARIATIONS` are written), and PATCH_DESC never stores variation 9 as the active variation (it is written as 0).
+
+Other serializer entry points:
+
+- `serializeVariationDump(patch, state, variation)` builds the Patch Mutator audition dump (`CMMutaParamDump`): PARAMETERS for the patch-settings, VA and FX contexts plus MORPH_PARAMS, each holding only `variation` (`numvar = 1`). Sent with `send-sections` (see usb-protocol §7).
+- `setFileDescription(file, desc)` returns a whole `.pch2` with only PATCH_DESC replaced (e.g. a new category). The header and all other sections stay byte for byte; the CRC is recomputed from the file's own version byte on.
 
 ---
 

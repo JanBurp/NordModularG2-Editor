@@ -24,6 +24,7 @@ Reference derived from the CLI source in `cli/src/g2_device.c`, `cli/include/def
 **Timeouts** (`cli/include/defs.h`):
 - Stale interrupt drain: 20 ms (`USB_TIMEOUT_STALE_MS`)
 - Pending-notification drain: 50 ms (`USB_TIMEOUT_DRAIN_MS`)
+- Drain upper bound: 1000 ms (`USB_DRAIN_MAX_MS`). A streaming G2 is never quiet, so a drain stops here (see §19)
 - Standard command/response: 500 ms (`USB_TIMEOUT_STANDARD_MS`). It used to be 100 ms, which was too tight under LED/VU telemetry load.
 - Long (patch name, slow ops): 2000 ms (`USB_TIMEOUT_LONG_MS`)
 - Bulk-OUT write: 5000 ms (`USB_TIMEOUT_SEND_MS`). A whole `.prf2` is ~34 KB. A partial write resumes at the offset already sent.
@@ -240,8 +241,8 @@ set-perf-mode        <mode> [shift]           (0x3E)
 select-patch         <slot> <bank> <loc>      (0x0A)
 select-perf          <bank> <loc>             (0x0A, slot byte=4)
 store-patch          <slot> <bank> <loc>      (0x0B)
-clear-patch          <slot> <bank> <loc>      (0x0C)
-clear-bank           <slot> <bank> <from> <to> (0x0E)
+clear-patch          <type> <bank> <loc>      (0x0C)
+clear-bank           <type> <bank> <from> <to> (0x0E)
 reload-names         <mode> [bank]            (0x14)
 get-bank             <type> <bank> <folder> [name] (0x17, looped over all 128 locations)
 get-perf-settings                              (0x02, then falls through to §6b's 0x10)
@@ -258,6 +259,24 @@ location 128. Confirmed against the official editor's decompiled source
 (`other-approaches/G2-ReverseEngineered/G2Editor.c`, `CFlashDumper` /
 `CMFlashDumpRequest` / `CMFlashDumpMarker` / `CMFlashDumpRawData`) — see
 `g2_get_bank()` in `cli/src/g2_device.c` for the implementation.
+
+**Store / clear result.** `store-patch`, `clear-patch` and `clear-bank` wait for the G2's answer
+(`await_flash_result()` / `check_flash_result()` in `g2_device.c`). The answer is either a
+`CMFlashCommandResult` (`0x0D`: `[flag][bank][location][fileType][result]`) or a `0x18` marker.
+It comes as its own embedded message or inside one bulk message (hardware-captured 2026-10-24/26):
+
+```
+clear:      01 0c 00 | 15 type bank loc | 13 lo hi | 0d .. .. .. .. 05 | crc
+store ack:  [13 lo hi][16 names entry][0d result]
+clear-bank: [12 type bank from bank to][13 lo hi][0d result]
+```
+
+Result codes, as in `CFlashData::HandleFlashCommandResult`: `0`, `2`, `5` = done (a clear answers 5),
+`1` = can't load, `3` = memory full, `4` = memory protect on. With memory protect on, a
+clear-bank gets only the `0x0D` result (status 4). Before 2026-10-26 a blind single read reported
+success while nothing reached the flash. Like the official editor, the next flash command must
+not go out before this answer, or it takes other commands' replies. The `13 lo hi` part is the
+flash usage (§11). The acks are also relayed to the watch stream (§14).
 
 Almost every other command in §6b/§7 also sends `0x35` (GET_PATCH_VERSION) or `0x81` (UNKNOWN_1) first, as an internal version-fetch step — this is noted where relevant rather than repeated for each command.
 
@@ -796,7 +815,7 @@ The bulk data from GET_SYNTH_SETTINGS (`0x02`) starts with the synth name at `bu
 | base+20 | Pedal polarity | Bit 7 (our writer always ORs `0x40` into this byte) |
 | base+21 | Control pedal gain | 0–32 |
 
-> **Name parsing rule (Delphi `ReadClaviaString`):** read bytes up to a NUL or 16 bytes, whichever comes first. Do not stop at non-printable bytes; they are shown as `?`. On 2026-10-06 a G2 Engine had the stored name `"\x01"`. The old `parse_name` stopped at that byte without consuming it, so every following field was read 2 bytes early: Performance mode showed as Patch, and the mode byte `0x81` showed up as perfBank 129. A settings write after such a misread (e.g. a rename) stores the shifted values back. One sanity check is that the pedal byte (base+20) has `0x40` set. If a single unit reports strange synth settings, capture the raw bytes with `g2-cli --debug daemon` (it logs bulk payloads as `listener_bulk`) before touching the parser.
+> **Name parsing rule (Delphi `ReadClaviaString`):** read bytes up to a NUL or 16 bytes, whichever comes first. Do not stop at non-printable bytes; they are shown as `?`. On 2026-10-06 a G2 Engine had the stored name `"\x01"`. The old `parse_name` stopped at that byte without consuming it, so every following field was read 2 bytes early: Performance mode showed as Patch, and the mode byte `0x81` showed up as perfBank 129. A settings write after such a misread (e.g. a rename) stores the shifted values back. One sanity check is that the pedal byte (base+20) has `0x40` set. If a single unit reports strange synth settings, capture the raw bytes with `g2-cli --debug daemon` (it logs bulk payloads as `listener_bulk`; one-shot commands log `direct` / `direct_bulk`) before touching the parser.
 
 ### Performance settings (second query)
 
@@ -866,6 +885,14 @@ This is the ClaviaString encoding used throughout the protocol: name chars, null
 
 Command: system cmd `0x41 0x14 mode bank patch`
 - `mode`: 0=patches, 1=performances
+
+Every list reply (and the store/clear acks) opens with the `0x13` molecule, the official editor's
+`CMFlashUsageDump`: bulk `[4]` lo, `[5]` hi, 7 bits each, gives flash used in per mille (clamped
+to 1000, `G2_FLASH_USAGE` in `defs.h`). `list` reports it as `flashUsage` when unfiltered.
+
+The last page (only the end marker) fits an **embedded** message:
+`c2 | 01 0c 00 13 lo hi 16 01 01 04 | crc` (hardware-captured 2026-10-26). Until that was
+handled, every full list ended with a 2 s timeout.
 
 Response data starting at `response[9]` contains a sequence of control codes:
 
@@ -991,7 +1018,7 @@ bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
 | `version` | `subCmd` | JSON type | Extra fields |
 |-----------|----------|-----------|--------------|
 | any | `0x0D` | `patch_stored` | `slot`=response[5], `bank`=response[6]+1, `location`=response[7]+1 (checked before the `version==0x40` branch) |
-| any | `0x15` | `patch_cleared` | `kind`="performance" if response[5]==1 else "patch"; `bank`=response[6]+1, `location`=response[7]+1 (checked before the `version==0x40` branch) |
+| any | `0x15` | `patch_cleared` | `kind`="performance" if response[5]==1 else "patch"; `bank`=response[6]+1, `location`=response[7]+1 (checked before the `version==0x40` branch). From a bulk clear ack it also carries `flashUsage` |
 | `0x40` | `0x1F` | `version_update` | `perf_version` = response[5] |
 | `0x40` | `0x36` or `0x38` | `patch_version` | `slot`, `version` = response[5], [6] |
 | other | `0x7F` | `ok` | — |
@@ -1090,6 +1117,12 @@ Sent as the response to `SET_PERF_MODE` (editor-initiated) and unsolicited after
 | `0x40` | `0x1F` | `version_update` | `bulk[4]`=`perf_version`; then 4×`[0x36, slot, version]` — one entry per slot |
 | `0x05` | `0x80` | `unknown_bulk` | 4 slot entries: `[slot_idx, 255, 128, ...]` repeated *(not implemented)* |
 | `0x05` | `0x29` | `unknown_bulk` | Patch names + metadata *(not implemented)* |
+| any | `0x13` | `patch_names_updated` | Store ack `[13 lo hi][16 names entry][0D result]`: `kind`, `bank`, `location`, `name`, `category`, `flashUsage` |
+| any | `0x15` | `patch_cleared` | Clear ack `[15 type bank loc][13 lo hi][0D result]`: `kind`, `bank`, `location`, `flashUsage` |
+| any | `0x12` | `bank_cleared` | Clear-bank ack `[12 type bank from bank to][13 lo hi][0D result]`: `kind`, `bank`, `from`, `to`, `flashUsage` |
+
+The store/clear acks are relayed even when they answer the daemon's own command, so the editor
+can update its names list and flash meter.
 
 **Important:** unlike the hardware path (`aCmd 0x04/0x40/0x1F`), when 0x0C/0x1F arrives the G2 is still streaming. The daemon calls `g2_stop_comm()` before querying synth/perf settings and patches, then sets `g2_pending_rearm=1` so the main loop calls `g2_rearm()` after returning.
 
@@ -1109,6 +1142,7 @@ Emitted JSON: `{"type":"version_update","perf_version":N,"slot_versions":[{"slot
 |-----------|---------|
 | `device_disconnected` | `LIBUSB_ERROR_NO_DEVICE` during poll |
 | `device_reconnected` | Successful reconnect after disconnect |
+| `device_retargeted` | `bus`, `device`: the target G2 was opened at a new address on the same port path. A G2 self-reboot re-enumerates it at a new address (seen 0:4 → 0:5, 2026-10-22). The daemon follows it by port path, as the official editor does with the IOKit locationID |
 
 ### Daemon Lifecycle Events
 
@@ -1378,6 +1412,9 @@ Arg layout per sub-command is identical to the individual daemon commands (posit
 
 - No STOP_COMM / START_COMM per command (matches Delphi) — except when explicitly required before direct queries (see editor path above)
 - `g2_listener_active` flag switches `recv_interrupt()` / `recv_bulk()` / `g2_drain_pending()` / `g2_rearm()` between direct libusb and queue-based modes; `g2_stop_comm()` is safe to call from main thread in either mode
+- Drains are bounded: `g2_drain_quiet(quiet_ms, &needs_rearm)` reads until nothing arrives for `quiet_ms`, at most `USB_DRAIN_MAX_MS` (1 s). The unbounded loop it replaced spun forever on a streaming G2. `g2_drain_pending()` is `g2_drain_quiet(USB_TIMEOUT_DRAIN_MS)` plus `g2_rearm()` if the stream stopped meanwhile
+- Exit state: a one-shot command sends STOP_COMM in `g2_disconnect()`, so the G2 is left quiet. Nobody reads its stream after exit, and the next one-shot would have had to drain it. The daemon leaves the stream on (the official editor's idle state) and re-arms at startup. One-shot `set-perf-mode` waits for the `0x0C/0x1F` reply (up to `USB_TIMEOUT_LONG_MS`) instead of a fixed 200 ms sleep
+- Error replies carry the last `g2_err()` message of the command (e.g. "store-patch: device refused 1-3 (Memory protect on)") instead of the generic error text
 - Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)
 - `g2_slot_version[4]` maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips
 - **Startup**: daemon queries all 4 slots before `g2_rearm()` and emits them as `slot_data` events; frontend applies them directly via `_applyPatchOutput` in the `slot_data` watch handler

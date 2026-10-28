@@ -49,6 +49,8 @@ static void print_usage(const char *prog) {
     printf("  get-perf-file [file]                                                                              Save current performance as .prf2 file\n");
     printf("  select-patch <slot> <bank:1-32> <location:1-127>                                                  Load bank patch into slot\n");
     printf("  select-perf <bank:1-32> <location:1-127>                                                          Load bank performance\n");
+    printf("  store-patch <slot:0-4> <bank:1-32> <location:1-127>                                               Store a slot's patch to a bank location (slot 4 = performance)\n");
+    printf("  clear-patch <patch|performance> <bank:1-32> <location:1-127>                                      Clear a single bank location\n");
     printf("  upload-patch <slot> <filepath>                                                                    Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                            Upload .prf2 performance file\n");
     printf("  set-synth-settings <json>                                                                         Set all synth settings from JSON object\n");
@@ -66,6 +68,9 @@ static void print_usage(const char *prog) {
     printf("  variation <1-10> <A-D>                                                                            Select variation for slot (10 = Patch Mutator audition)\n");
     printf("  set-slot-enabled <slot> <0|1>                                                                     Enable or disable a slot\n");
     printf("  set-slot-key <slot> <0|1>                                                                         Assign or unassign keyboard to a slot\n");
+    printf("  set-slot-hold <slot> <0|1>                                                                        Set slot hold mode\n");
+    printf("  set-slot-range <slot> <lower:0-127> <upper:0-127>                                                 Set the keyboard range of a slot\n");
+    printf("  set-range-enable <0|1>                                                                            Enable or disable slot keyboard ranges (KB Split)\n");
     printf("  add-cable <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>          Add cable between two jacks\n");
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>                      Delete a cable\n");
     printf("  set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>    Set color of an existing cable\n");
@@ -80,6 +85,9 @@ static void print_usage(const char *prog) {
     printf("  set-module-labels <slot> <va|fx|patch> <module-id> <param-idx> <count> <label>... [...]           Set ALL labelled params of a module (group repeats per param)\n");
     printf("  set-module-mode <slot> <va|fx> <module-id> <param-idx> <value>                                    Set a module mode parameter\n");
     printf("  set-param <slot> <va|fx> <module-id> <param-idx> <value> <variation>                              Set a module parameter value\n");
+    printf("  set-morph-range <slot> <va|fx> <module-id> <param-idx> <range> <group> <variation>                Set a parameter's morph range (range 0 removes the assignment)\n");
+    printf("  set-morph-range-batch <slot> [<va|fx> <mod> <par> <range> <group> <variation>]...                 Set multiple morph ranges in one call\n");
+    printf("  select-param <slot> <va|fx|patch> <module-id> <param-idx>                                         Move the front-panel cursor to a parameter\n");
     printf("  assign-midicc <slot> <va|fx|patch> <module-id> <param-idx> <cc-num>                               Assign a MIDI CC number to a parameter\n");
     printf("  deassign-midicc <slot> <cc-num>                                                                   Remove a MIDI CC assignment\n");
     printf("  assign-midicc-batch <slot> [<va|fx|patch> <mod> <par> <cc>]...                                    Assign multiple MIDI CCs in one USB frame\n");
@@ -87,6 +95,7 @@ static void print_usage(const char *prog) {
     printf("  assign-knob <slot> <va|fx|patch> <module-id> <param-idx> <slot-index> [led]                       Assign a parameter (or, with led=1, a level meter by LED number) to a Parameter Page knob (0-119)\n");
     printf("  deassign-knob <slot> <slot-index>                                                                 Remove a Parameter Page knob assignment\n");
     printf("  select-param-page <slot> <page-id>                                                                Select the front-panel Parameter Page (page-id = page*3 + bank, 0-14)\n");
+    printf("  get-param-page <slot>                                                                             Ask which Parameter Page the G2 shows (reply arrives as a param_page_change event)\n");
     printf("  assign-global-knob <slot> <target-slot> <va|fx|patch> <module-id> <param-idx> <slot-index>        Assign a parameter to a Global Parameter Page knob (0-119)\n");
     printf("  deassign-global-knob <slot> <slot-index>                                                          Remove a Global Parameter Page knob assignment\n");
     printf("  select-global-page <slot> <page-id>                                                               Select the active Global Parameter Page (page-id = page*3 + bank, 0-14)\n");
