@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Mutator
 - Parameter Pages Overview
 - Bank Organizer
+- Library of building blocks
 - Find & Replace (module names, param labels)
 - G2's memory meter
 - Warnings of mem-protect/full
