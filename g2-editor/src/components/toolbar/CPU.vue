@@ -96,9 +96,9 @@
 		['rmem', 'R mem'],
 	];
 
-	// critical marks the memory type the memory meter shows (the maximum), per area
+	// critical marks what each meter shows, per area: cycles, and the memory type at the maximum
 	const rows = computed(() => [
-		{ label: 'Cycles', values: [va.value.cycles, fx.value.cycles], critical: [false, false] },
+		{ label: 'Cycles', values: [va.value.cycles, fx.value.cycles], critical: [va.value.cycles > 0, fx.value.cycles > 0] },
 		...MEMORY_ROWS.map(([key, label]) => ({
 			label,
 			values: [va.value.mem[key], fx.value.mem[key]],
@@ -108,6 +108,6 @@
 
 	function valueClass(value: number, critical: boolean): string {
 		if (value > 100) return 'text-red-500';
-		return critical ? 'text-content-primary font-bold' : 'text-content-muted';
+		return critical ? 'text-content-secondary' : 'text-content-muted';
 	}
 </script>
