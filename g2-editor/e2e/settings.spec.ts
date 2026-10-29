@@ -1,5 +1,5 @@
 import type { Page } from '@playwright/test';
-import { createCable, dropModuleOnCanvas } from './helpers';
+import { clickContextMenuItem, createCable, dropModuleOnCanvas, hoverContextMenuItem, openContextMenu } from './helpers';
 import { evaluateWithRetry, expect, test } from './fixtures/electron';
 
 const MOD = { OscA: 97, Out2: 4 } as const;
@@ -52,6 +52,35 @@ test.describe('settings pane', () => {
 
 		await checkbox.click();
 		await expect(unused).toHaveCount(0);
+	});
+
+	test('Dim unused modules does not dim a module with a Parameter Page or MIDI CC assignment', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 4);
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 8);
+
+		const canvas = page.locator('[data-testid="canvas-va"]');
+		const unused = canvas.locator('[data-module-short].unused');
+		const oscs = canvas.locator('[data-module-short="OscA"]');
+		await openEditorOptions(page, sendMenuAction);
+		await settingsRow(page, 'Dim unused modules').getByRole('checkbox').click();
+		await expect(unused).toHaveCount(3);
+
+		// OscA param 0 is the FreqCoarse knob (nmg2mods.ts)
+		await openContextMenu(page, oscs.nth(0).locator('[data-param-index="0"]'));
+		await hoverContextMenuItem(page, 'Assign to Page');
+		await hoverContextMenuItem(page, 'Page A1');
+		await clickContextMenuItem(page, 'Knob 1');
+		await expect(unused).toHaveCount(2);
+		await expect(oscs.nth(0)).not.toHaveClass(/\bunused\b/);
+
+		await openContextMenu(page, oscs.nth(1).locator('[data-param-index="0"]'));
+		await hoverContextMenuItem(page, 'Assign CC…');
+		await clickContextMenuItem(page, 'CC 2: Breath');
+		await expect(unused).toHaveCount(1);
+		await expect(oscs.nth(1)).not.toHaveClass(/\bunused\b/);
+		await expect(oscs.nth(2)).toHaveClass(/\bunused\b/);
 	});
 
 	test('Cable Style switches the cable rendering class on the canvas', async ({ page, sendMenuAction }) => {

@@ -6,6 +6,7 @@ import {
 	freeModuleIds,
 	isCableSourceEnd,
 	isUnusedModule,
+	assignedModules,
 	MAX_MODULE_INDEX,
 	moduleActionTargets,
 	resolveColumnCollisions,
@@ -220,17 +221,38 @@ describe('isUnusedModule', () => {
 	const name = (uname: string, colour = 0): any => ({ ...mod(3, 126, 0, [], []), uname, colour });
 
 	it('is false for a module on either end of a cable', () => {
-		expect(isUnusedModule(mod(1, 7, 0, [], []), cables)).toBe(false);
-		expect(isUnusedModule(mod(2, 7, 0, [], []), cables)).toBe(false);
+		expect(isUnusedModule(mod(1, 7, 0, [], []), cables, new Set())).toBe(false);
+		expect(isUnusedModule(mod(2, 7, 0, [], []), cables, new Set())).toBe(false);
 	});
 
 	it('is true for a module without cables', () => {
-		expect(isUnusedModule(mod(4, 7, 0, [], []), cables)).toBe(true);
+		expect(isUnusedModule(mod(4, 7, 0, [], []), cables, new Set())).toBe(true);
 	});
 
 	it('only counts a Name module with its default name and colour', () => {
-		expect(isUnusedModule(name('Name1'), cables)).toBe(true);
-		expect(isUnusedModule(name('Lead'), cables)).toBe(false);
-		expect(isUnusedModule(name('Name1', 3), cables)).toBe(false);
+		expect(isUnusedModule(name('Name1'), cables, new Set())).toBe(true);
+		expect(isUnusedModule(name('Lead'), cables, new Set())).toBe(false);
+		expect(isUnusedModule(name('Name1', 3), cables, new Set())).toBe(false);
+	});
+
+	it('is false for a module with a Parameter Page or MIDI CC assignment', () => {
+		expect(isUnusedModule(mod(4, 7, 0, [], []), cables, new Set([4]))).toBe(false);
+	});
+});
+
+describe('assignedModules', () => {
+	it('collects CC and Parameter Page modules of the given location', () => {
+		const slot: any = {
+			controllers: [
+				{ location: 1, moduleIndex: 1 },
+				{ location: 0, moduleIndex: 2 },
+			],
+			paramPages: [
+				{ location: 1, moduleIndex: 3 },
+				{ location: 0, moduleIndex: 4 },
+			],
+		};
+		expect(assignedModules(slot, 1)).toEqual(new Set([1, 3]));
+		expect(assignedModules(slot, 0)).toEqual(new Set([2, 4]));
 	});
 });

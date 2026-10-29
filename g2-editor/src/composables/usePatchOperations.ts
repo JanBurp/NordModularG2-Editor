@@ -6,6 +6,7 @@ import type { Cable } from '../renderer/cableRenderer';
 import {
 	AREA_FULL_MESSAGE,
 	areaConfig,
+	assignedModules,
 	buildCloneEntries,
 	buildPasteParamsPairs,
 	isUnusedModule,
@@ -93,9 +94,10 @@ export function usePatchOperations(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function deleteUnusedModules(): Promise<void> {
-		await deleteUnusedInAreas((modules, cables) => ({
-			moduleIds: modules.filter((m: any) => isUnusedModule(m, cables)).map((m: any) => m.index as number),
-		}));
+		await deleteUnusedInAreas((modules, cables, area) => {
+			const assigned = assignedModules(slotsStore.slots[uiStore.slotInFocus], area === 'voice' ? 1 : 0);
+			return { moduleIds: modules.filter((m: any) => isUnusedModule(m, cables, assigned)).map((m: any) => m.index as number) };
+		});
 	}
 
 	// Removes cables that no longer do anything useful:
