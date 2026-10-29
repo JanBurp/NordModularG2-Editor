@@ -88,7 +88,12 @@
 				:active-step="ledStateMap[entry.key]?.step ?? 255"
 			></ModuleVeLed>
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
-			<g v-else-if="entry.ve.type === 'vu'" @contextmenu.stop.prevent="onVuContextMenu($event, entry.ve)">
+			<g
+				v-else-if="entry.ve.type === 'vu'"
+				@contextmenu.stop.prevent="onVuContextMenu($event, entry.ve)"
+				@dragover.prevent
+				@drop="onVuDrop($event, entry.ve)"
+			>
 				<LevelMeter :ve="entry.ve" :value="ledStateMap[entry.key]?.step ?? 0" />
 			</g>
 			<ModuleVeLed v-else-if="entry.ve.type === 'ledGroup'" :ve="entry.ve" :led-on="false" :active-step="ledStateMap[entry.key]?.step ?? 255" />
@@ -307,6 +312,7 @@
 	import { useDeviceStore } from '../../store/device';
 	import { buildCCMenuItems } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
+	import { vuMetersByLedNo } from '../../utils/vuLevel';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
 	import {
 		buildParamPageMenuItems,
@@ -401,14 +407,29 @@
 	function onVuContextMenu(e: MouseEvent, ve: VisualElement) {
 		const slot = uiStore.slotInFocus;
 		const location = props.areaLabel === 'va' ? 1 : 0;
-		const ledNo = (moduleDef.value?.ve ?? [])
-			.filter((v) => v.type === 'vu')
-			.sort((a, b) => (a.x as number) - (b.x as number))
-			.indexOf(ve);
-		const existing = slotsStore.slots[slot].paramPages.find(
-			(k) => k.isLed === 1 && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === ledNo,
-		);
-		openContextMenu(e, buildParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing, isLed: 1 }));
+		const ledNo = vuMetersByLedNo(moduleDef.value).indexOf(ve);
+		const isThisMeter = (k: { isLed: number; location: number; moduleIndex: number; paramIndex: number }) =>
+			k.isLed === 1 && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === ledNo;
+		const existing = slotsStore.slots[slot].paramPages.find(isThisMeter);
+		const existingGlobal = slotsStore.globalParamPages.find((k) => k.slot === slot && isThisMeter(k));
+		openContextMenu(e, [
+			...buildParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing, isLed: 1 }),
+			...buildGlobalParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing: existingGlobal, isLed: 1 }),
+		]);
+	}
+
+	// Drop target for a dragged Parameter Pages knob (Alt+drag): assign this meter to that knob slot,
+	// like the context menu above.
+	function onVuDrop(e: DragEvent, ve: VisualElement) {
+		const slot = uiStore.slotInFocus;
+		const data = parseDragPayload(e);
+		if (!slot || data?.type !== 'knob-slot') return;
+		const location = props.areaLabel === 'va' ? 1 : 0;
+		const ledNo = vuMetersByLedNo(moduleDef.value).indexOf(ve);
+		if (data.global) slotsStore.assignParamToGlobalPage(slot, data.slotIndex, location, moduleIdx.value, ledNo, 1);
+		else slotsStore.assignParamToPage(slot, data.slotIndex, location, moduleIdx.value, ledNo, 1);
+		e.preventDefault();
+		e.stopPropagation(); // don't let PatchCanvas.vue's module-palette drop wrapper also react to this drop
 	}
 
 	function onJackDragStart(info: JackDragInfo, e: MouseEvent) {
@@ -811,7 +832,9 @@
 
 		// Parameter Pages knob assign/deassign
 		const existingPage = slot
-			? slotsStore.slots[slot].paramPages.find((k) => k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex)
+			? slotsStore.slots[slot].paramPages.find(
+					(k) => !k.isLed && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex,
+				)
 			: undefined;
 		items.push(
 			...buildParamPageMenuItems({
@@ -826,7 +849,7 @@
 		// Global Parameter Pages knob assign/deassign
 		const existingGlobalPage = slot
 			? slotsStore.globalParamPages.find(
-					(k) => k.slot === slot && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex,
+					(k) => !k.isLed && k.slot === slot && k.location === location && k.moduleIndex === moduleIdx.value && k.paramIndex === paramIndex,
 				)
 			: undefined;
 		items.push(

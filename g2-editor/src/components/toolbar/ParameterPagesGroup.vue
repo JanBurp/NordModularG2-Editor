@@ -28,7 +28,8 @@
 				@mouseleave="showHint('paramPageCell')"
 			>
 				<div class="text-xs truncate">{{ cell.paramLabel }}</div>
-				<div class="text-xs truncate">{{ cell.valueLabel }}</div>
+				<!-- Compact (ExtendedToolBar) has no room below a meter: it takes this line's space instead -->
+				<div v-if="!(compact && cell.assignment?.isLed)" class="text-xs truncate">{{ cell.valueLabel }}</div>
 			</div>
 
 			<!-- The whole cell column is both the Alt+drag source (:draggable/@dragstart above) and the drop
@@ -45,9 +46,11 @@
 				<!-- Unassigned slots render the same Knob, just at value 0, dimmed and inert (the display
 				     box above stays at full strength so the empty slots remain visible). The wrapper keeps its own pointer events, so the assign
 				     drag/drop still works on empty cells. -->
+				<VuMeterRound v-if="cell.assignment?.isLed" :value="cell.value" :label="cell.paramLabel" :extra-height="compact ? TEXT_XS_LINE : 0" />
 				<Knob
+					v-else
 					:value="cell.value"
-					:class="{ 'pointer-events-none': altHeld || !cell.assignment || cell.assignment.isLed }"
+					:class="{ 'pointer-events-none': altHeld || !cell.assignment }"
 					:colorVariant="cell.morphColor"
 					:morphRange="cell.morphRange"
 					:max="cell.high"
@@ -110,6 +113,7 @@
 	import BtnGroup from './BtnGroup.vue';
 	import Button from './Button.vue';
 	import Knob from '../common/Knob.vue';
+	import VuMeterRound from '../common/VuMeterRound.vue';
 
 	const { compact = false } = defineProps<{ compact?: boolean }>();
 	import { useSlotsStore } from '../../store/slots';
@@ -137,6 +141,8 @@
 		onKnobDragStart,
 		onKnobDrop,
 	} = useParamPageCells();
+
+	const TEXT_XS_LINE = 16; // px, line height of the display's dropped text-xs line
 
 	const pageOptions = PAGE_LETTERS.map((label, value) => ({ label, value, hint: 'paramPage' as const }));
 	const bankOptions = [1, 2, 3].map((value) => ({ label: String(value), value, hint: 'paramBank' as const }));

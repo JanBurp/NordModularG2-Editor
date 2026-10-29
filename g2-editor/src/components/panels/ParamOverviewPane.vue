@@ -37,7 +37,8 @@
 									@mouseleave="clearHint"
 								>
 									<div class="truncate font-bold text-center">{{ cell.moduleHeader }}</div>
-									<div class="param-display px-0! text-[11px]" :class="{ 'param-display-empty': !cell.assignment }">
+									<VuMeterBar v-if="cell.assignment?.isLed && !viewMidi && !viewButtons" :value="cell.value" :label="cell.paramLabel" />
+									<div v-else class="param-display px-0! text-[11px]" :class="{ 'param-display-empty': !cell.assignment }">
 										{{ displayText(cell) }}
 									</div>
 								</div>
@@ -53,6 +54,7 @@
 <script setup lang="ts">
 	import { ref, computed } from 'vue';
 	import Button from '../toolbar/Button.vue';
+	import VuMeterBar from '../common/VuMeterBar.vue';
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 	import { useParamPageCells, BLANK, type Cell } from '../../composables/useParamPageCells';

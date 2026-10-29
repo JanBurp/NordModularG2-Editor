@@ -4,10 +4,12 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useLedStore } from '../store/led';
 import { useContextMenu } from './useContextMenu';
+import { showToast } from './useToast';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
 import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
-import { KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
+import { KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
+import { meterRows } from '../renderer/vuAutoAssign';
 import { serializeDragPayload, parseDragPayload } from '../utils/dragPayload';
 import { setBadgeDragImage } from '../utils/badgeLayout';
 import { getModule, getParamDefault } from '../renderer/nmg2mods';
@@ -15,6 +17,7 @@ import { getButtonParamIndex } from '../renderer/buttonParams';
 import { getParam } from '../renderer/parammap';
 import { formatParamDisplay } from '../utils/moduleControls';
 import { clamp } from '../utils/math';
+import { vuMetersByLedNo } from '../utils/vuLevel';
 import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../types';
 
 export type PageAssignment = ParamPageAssignment | GlobalParamPageAssignment;
@@ -141,12 +144,12 @@ export function useParamPageCells() {
 
 	// Live level (0-127) of the level meter a LED-assigned cell points at. LED number = rank of the
 	// module's vu elements by x (see Module.vue's onVuContextMenu); the led store keys them `vu-N` in
-	// element order. Patch-level assignments only, so the led store's focused slot is the right one.
+	// element order. Read from the assignment's own patch: a Global Page meter can target any slot.
 	function meterLevel(a: PageAssignment, moduleInfo: ReturnType<typeof resolveModule>): number {
-		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
-		const target = [...vus].sort((p, q) => (p.x as number) - (q.x as number))[a.paramIndex];
+		const target = vuMetersByLedNo(moduleInfo?.moduleDef)[a.paramIndex];
 		if (!target) return 0;
-		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`);
+		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
+		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`, assignmentSlot(a));
 		return raw === 255 ? 0 : Math.min(raw, 127);
 	}
 
@@ -185,7 +188,7 @@ export function useParamPageCells() {
 				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
 				: String(assignment.moduleIndex);
 			// Level-meter target (isLed=1): paramIndex is a LED number, not a param. The hardware shows
-			// it as a circular VU around the knob; here the knob mirrors the live level, read-only.
+			// it as a circular VU around the knob; the editor shows a live VU meter (VuMeterRound/VuMeterBar).
 			if (assignment.isLed) {
 				return {
 					slotIndex,
@@ -258,8 +261,29 @@ export function useParamPageCells() {
 		await slotsStore.requestVisibleParamPage();
 	}
 
+	// "Assign VU meters": the focused patch's connected level meters, from this cell's row on (see
+	// vuAutoAssign.ts for the order and grouping). Rows past the last page (E3) are dropped, with a toast.
+	function assignMetersItem(cell: Cell): ContextMenuItem {
+		const slot = uiStore.slotInFocus;
+		const patch = slot ? slotsStore.slots[slot].patch : null;
+		const startRow = Math.floor(cell.slotIndex / KNOBS_PER_PAGE);
+		const all = patch ? meterRows(patch) : [];
+		const rows = all.slice(0, TOTAL_KNOB_SLOTS / KNOBS_PER_PAGE - startRow);
+		return {
+			label: 'Assign VU meters',
+			disabled: !slot || rows.length === 0,
+			action: () => {
+				if (!slot) return;
+				if (uiStore.globalPagesActive) slotsStore.assignMetersToGlobalPage(slot, startRow, rows);
+				else slotsStore.assignMetersToPage(slot, startRow, rows);
+				const dropped = all.flat().length - rows.flat().length;
+				if (dropped > 0) showToast(`${dropped} VU meter${dropped === 1 ? '' : 's'} didn't fit below this row`);
+			},
+		};
+	}
+
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
-		if (!cell.assignment) return;
+		if (!cell.assignment) return openContextMenu(event, [assignMetersItem(cell)]);
 		const a = cell.assignment;
 		let items: ContextMenuItem[];
 		if (uiStore.globalPagesActive) {
@@ -268,6 +292,7 @@ export function useParamPageCells() {
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
+		items.push(assignMetersItem(cell));
 		if (a.location === 2) return openContextMenu(event, items);
 		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
 		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against

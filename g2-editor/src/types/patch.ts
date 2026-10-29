@@ -145,7 +145,7 @@ export interface GlobalParamPageAssignment {
 	location: 0 | 1 | 2; // 0=FX, 1=Voice, 2=Patch (PATCH_MORPH pseudo-module: Morph Group dials)
 	moduleIndex: number;
 	paramIndex: number;
-	isLed: number; // 0-3, semantics unconfirmed — preserved verbatim, not exposed in UI
+	isLed: number; // 0=param, 1=level meter (paramIndex is then its LED number); 2-bit field, EDeviceAssignType in G2Editor.c
 }
 
 // One rename for slots.renameItems: a module name, a switch-param button label, or a Morph Group label.

@@ -120,7 +120,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | `deassign-knob` | `<slot> <slot-index>` | Remove a Parameter Page knob assignment |
 | `select-param-page` | `<slot> <page-id>` | Select the front-panel Parameter Page (`page-id` = page*3 + bank, 0–14) |
 | `get-param-page` | `<slot>` | Ask which Parameter Page the G2 shows; the reply arrives as a `param_page_change` event |
-| `assign-global-knob` | `<slot> <target-slot> <va\|fx\|patch> <module-id> <param-idx> <slot-index>` | Assign a parameter to a Global Parameter Page knob (0–119) |
+| `assign-global-knob` | `<slot> <target-slot> <va\|fx\|patch> <module-id> <param-idx> <slot-index> [led]` | Assign a parameter (or, with `led`=1, a level meter by LED number) to a Global Parameter Page knob (0–119) |
 | `deassign-global-knob` | `<slot> <slot-index>` | Remove a Global Parameter Page knob assignment |
 | `select-global-page` | `<slot> <page-id>` | Select the active Global Parameter Page (`page-id` = page*3 + bank, 0–14) |
 | `get-global-knobs` | | Fetch the Global Parameter Pages assignment list (system-wide, no slot) |

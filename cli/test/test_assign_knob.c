@@ -64,12 +64,24 @@ void test_assign_knob_op_morph_location(void) {
     TEST_ASSERT_EQUAL_UINT8(0x80, buf[2]); TEST_ASSERT_EQUAL_UINT8(7, buf[4]);
 }
 
-/* target slot D (3) in bits 7-4, location 2 in bits 3-2 */
+/* target slot D (3) in bits 5-4, location 2 in bits 3-2 */
 void test_assign_global_knob_op_morph_location(void) {
     uint8_t buf[5]; G2Op op;
-    g2_build_assign_global_knob_op(&op, buf, 3, 2, 1, 4, 7);
+    g2_build_assign_global_knob_op(&op, buf, 3, 2, 1, 4, 7, 0);
     TEST_ASSERT_EQUAL_UINT8(0x38, buf[0]); TEST_ASSERT_EQUAL_UINT8(1, buf[1]);
     TEST_ASSERT_EQUAL_UINT8(4, buf[2]); TEST_ASSERT_EQUAL_UINT8(7, buf[4]);
+}
+
+/* assign type 1 (LED/level meter) in bits 7-6, above target slot B (1) and location va (1) */
+void test_assign_global_knob_op_led_bit(void) {
+    uint8_t buf[5]; G2Op op;
+    g2_build_assign_global_knob_op(&op, buf, 1, 1, 7, 3, 9, 1);
+    TEST_ASSERT_EQUAL_UINT8(0x54, buf[0]); TEST_ASSERT_EQUAL_UINT8(7, buf[1]);
+    TEST_ASSERT_EQUAL_UINT8(3, buf[2]); TEST_ASSERT_EQUAL_UINT8(9, buf[4]);
+}
+
+void test_assign_global_knob_invalid_is_led(void) {
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 1, 0, 2));
 }
 
 void test_deassign_knob_invalid_slot_low(void) {
@@ -111,47 +123,47 @@ void test_select_param_page_invalid_page_high(void) {
  */
 
 void test_assign_global_knob_invalid_slot_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(-1, 0, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(-1, 0, 0, 1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_slot_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(4, 0, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(4, 0, 0, 1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_target_slot_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, -1, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, -1, 0, 1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_target_slot_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 4, 0, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 4, 0, 1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_location(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 3, 1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 3, 1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_module_id_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, -1, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, -1, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_module_id_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 256, 1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 256, 1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_param_idx_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, -1, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, -1, 0, 0));
 }
 
 void test_assign_global_knob_invalid_param_idx_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 256, 0));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 256, 0, 0));
 }
 
 void test_assign_global_knob_invalid_slot_index_low(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 1, -1));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 1, -1, 0));
 }
 
 void test_assign_global_knob_invalid_slot_index_high(void) {
-    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 1, 120));
+    TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_assign_global_knob(0, 0, 0, 1, 1, 120, 0));
 }
 
 void test_deassign_global_knob_invalid_slot_low(void) {

@@ -132,8 +132,8 @@ export const useLedStore = defineStore('led', () => {
 		return slotData[uiStore.slotInFocus].ledStates.get(`${area}-${moduleIndex}-${key}`) ?? false;
 	}
 
-	function getStripValue(area: 'fx' | 'va', moduleIndex: number, key: string): number {
-		return slotData[uiStore.slotInFocus].stripValues.get(`${area}-${moduleIndex}-${key}`) ?? 255;
+	function getStripValue(area: 'fx' | 'va', moduleIndex: number, key: string, slot: SlotLabel = uiStore.slotInFocus): number {
+		return slotData[slot].stripValues.get(`${area}-${moduleIndex}-${key}`) ?? 255;
 	}
 
 	for (const slotLabel of ['A', 'B', 'C', 'D'] as SlotLabel[]) {

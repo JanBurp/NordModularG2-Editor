@@ -1927,6 +1927,39 @@ describe('swapParamPageSlots', () => {
 	});
 });
 
+describe('assignMetersToPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	it('replaces the whole target row with the meters (isLed) and undoes as one entry', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 13, 1, 9, 9); // occupant elsewhere in the target row
+		const before = [...store.slots['A'].paramPages];
+
+		await store.assignMetersToPage('A', 1, [
+			[
+				{ location: 1, moduleIndex: 2, ledNo: 0 },
+				{ location: 0, moduleIndex: 3, ledNo: 1 },
+			],
+		]);
+
+		expect(store.slots['A'].paramPages).toEqual([
+			{ slotIndex: 8, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 1 },
+			{ slotIndex: 9, location: 0, moduleIndex: 3, paramIndex: 1, isLed: 1 },
+		]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			...[8, 9, 10, 11, 12, 13, 14, 15].map((k) => ['deassign-knob', 'A', String(k)]),
+			['assign-knob', 'A', 'va', '2', '0', '8', '1'],
+			['assign-knob', 'A', 'fx', '3', '1', '9', '1'],
+		]);
+
+		await store.undo(); // slot A is in focus by default
+		expect(store.slots['A'].paramPages).toEqual(before);
+	});
+});
+
 describe('assignModuleToPage', () => {
 	beforeEach(() => {
 		useDeviceStore().status = DeviceStatus.Connected;
@@ -2022,9 +2055,24 @@ describe('assignParamToGlobalPage', () => {
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
 			['deassign-global-knob', 'A', '5'],
 			['deassign-global-knob', 'A', '50'],
-			['assign-global-knob', 'A', 'B', 'patch', '1', '4', '50'],
+			['assign-global-knob', 'A', 'B', 'patch', '1', '4', '50', '0'],
 		]);
 		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-global-page', 'A', '6']);
+	});
+
+	it('a level meter (isLed) is distinct from the param with the same index and sends the led flag', async () => {
+		const store = useSlotsStore();
+		await store.assignParamToGlobalPage('B', 5, 1, 3, 0);
+		await store.assignParamToGlobalPage('B', 6, 1, 3, 0, 1);
+
+		expect(store.globalParamPages).toEqual([
+			{ slotIndex: 5, slot: 'B', location: 1, moduleIndex: 3, paramIndex: 0, isLed: 0 },
+			{ slotIndex: 6, slot: 'B', location: 1, moduleIndex: 3, paramIndex: 0, isLed: 1 },
+		]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			['deassign-global-knob', 'A', '6'],
+			['assign-global-knob', 'A', 'B', 'va', '3', '0', '6', '1'],
+		]);
 	});
 });
 
@@ -2050,8 +2098,8 @@ describe('assignModuleToGlobalPage', () => {
 		expect((globalThis as any).window.cli.runBatch).toHaveBeenCalledWith([
 			['deassign-global-knob', 'A', '16'],
 			['deassign-global-knob', 'A', '17'],
-			['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16'],
-			['assign-global-knob', 'A', 'B', 'fx', '7', '1', '17'],
+			['assign-global-knob', 'A', 'B', 'fx', '7', '0', '16', '0'],
+			['assign-global-knob', 'A', 'B', 'fx', '7', '1', '17', '0'],
 		]);
 		expect((globalThis as any).window.cli.run).toHaveBeenLastCalledWith(['select-global-page', 'A', '2']);
 	});

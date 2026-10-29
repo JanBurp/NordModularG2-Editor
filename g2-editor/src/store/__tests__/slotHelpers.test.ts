@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
 	buildCloneEntries,
+	computeAssignRows,
 	buildPasteParamsPairs,
 	canPasteParams,
 	freeModuleIds,
@@ -254,5 +255,23 @@ describe('assignedModules', () => {
 		};
 		expect(assignedModules(slot, 1)).toEqual(new Set([1, 3]));
 		expect(assignedModules(slot, 0)).toEqual(new Set([2, 4]));
+	});
+});
+
+describe('computeAssignRows', () => {
+	const meter = (slotIndex: number, moduleIndex: number) => ({ slotIndex, location: 1 as const, moduleIndex, paramIndex: 0, isLed: 1 });
+	const param = (slotIndex: number) => ({ slotIndex, location: 1 as const, moduleIndex: 9, paramIndex: 3, isLed: 0 });
+
+	it('clears the whole target rows, fills them and moves items already assigned elsewhere', () => {
+		const prev = [param(9), param(15), meter(40, 2), param(41)];
+		const { next, touched } = computeAssignRows(
+			prev,
+			1,
+			[[2, 5]],
+			(k) => k.isLed === 1 && [2, 5].includes(k.moduleIndex),
+			(m: number, slotIndex) => meter(slotIndex, m),
+		);
+		expect(next).toEqual([param(41), meter(8, 2), meter(9, 5)]);
+		expect(touched).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 40]);
 	});
 });

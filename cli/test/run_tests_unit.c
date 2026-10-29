@@ -118,6 +118,8 @@ extern void test_assign_knob_invalid_is_led(void);
 extern void test_assign_knob_op_led_bit(void);
 extern void test_assign_knob_op_morph_location(void);
 extern void test_assign_global_knob_op_morph_location(void);
+extern void test_assign_global_knob_op_led_bit(void);
+extern void test_assign_global_knob_invalid_is_led(void);
 extern void test_deassign_knob_invalid_slot_low(void);
 extern void test_deassign_knob_invalid_slot_high(void);
 extern void test_deassign_knob_invalid_slot_index_low(void);
@@ -350,6 +352,8 @@ int main(void) {
     RUN_TEST(test_assign_knob_op_led_bit);
     RUN_TEST(test_assign_knob_op_morph_location);
     RUN_TEST(test_assign_global_knob_op_morph_location);
+    RUN_TEST(test_assign_global_knob_op_led_bit);
+    RUN_TEST(test_assign_global_knob_invalid_is_led);
     RUN_TEST(test_deassign_knob_invalid_slot_low);
     RUN_TEST(test_deassign_knob_invalid_slot_high);
     RUN_TEST(test_deassign_knob_invalid_slot_index_low);

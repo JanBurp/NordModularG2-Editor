@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { knobAngle } from '@/utils/knobArc';
+import { describeArc, knobAngle } from '@/utils/knobArc';
 
 describe('knobAngle', () => {
 	it('keeps the 0..127 mapping unchanged', () => {
@@ -16,5 +16,12 @@ describe('knobAngle', () => {
 
 	it('clamps to the param range', () => {
 		expect(knobAngle(60, 42)).toBeCloseTo(knobAngle(42, 42));
+	});
+});
+
+describe('describeArc', () => {
+	it('draws a clockwise arc, large-arc only beyond 180°', () => {
+		expect(describeArc(0, 0, 10, -90, 0)).toMatch(/^M -10 \S+ A 10 10 0 0 1 0 -10$/);
+		expect(describeArc(0, 0, 10, -135, 135)).toMatch(/A 10 10 0 1 1 /);
 	});
 });
