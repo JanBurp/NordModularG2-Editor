@@ -90,7 +90,7 @@
 <script setup lang="ts">
 	import { ref, onMounted, onUnmounted, computed, provide, watch } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
-	import { sameJack, matchesCableJack, isUnusedModule } from '../../store/slotHelpers';
+	import { sameJack, matchesCableJack, isUnusedModule, assignedModules } from '../../store/slotHelpers';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import { useValueHint } from '../../composables/useValueHint';
 	import type { JackEnd } from '../../store/slotHelpers';
@@ -117,6 +117,7 @@
 	import { insertEntry } from '../../composables/usePatchClipboard';
 	import { useLibrary } from '../../composables/useLibrary';
 	import { useUiStore } from '../../store/ui';
+	import { useSlotsStore } from '../../store/slots';
 	import { useSettingsStore } from '../../store/settings';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useAddModule } from '../../composables/useAddModule';
@@ -196,6 +197,7 @@
 	const selectionRectEl = ref<HTMLDivElement | null>(null);
 
 	const settingsStore = useSettingsStore();
+	const slotsStore = useSlotsStore();
 	const zoom = computed(() => settingsStore.canvasZoom);
 
 	// Chromium heuristic: trackpad wheel events report wheelDeltaY === -3 * deltaY; mouse-wheel notches don't.
@@ -289,11 +291,11 @@
 	});
 
 	// Same rule as Patch → Delete Unused Modules, so the dimmed modules are exactly what it would remove.
-	const unusedModules = computed(() =>
-		settingsStore.dimUnusedModules
-			? new Set((props.modules as ModuleInstance[]).filter((m) => isUnusedModule(m, props.cables as Cable[])).map((m) => m.index))
-			: new Set<number>(),
-	);
+	const unusedModules = computed(() => {
+		if (!settingsStore.dimUnusedModules) return new Set<number>();
+		const assigned = assignedModules(slotsStore.slots[uiStore.slotInFocus], props.area === 'va' ? 1 : 0);
+		return new Set((props.modules as ModuleInstance[]).filter((m) => isUnusedModule(m, props.cables as Cable[], assigned)).map((m) => m.index));
+	});
 
 	function svgClientToGrid(clientX: number, clientY: number): { col: number; row: number } | null {
 		const svgPt = clientToSvgPoint(svgRef.value, clientX, clientY);

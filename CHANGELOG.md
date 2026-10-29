@@ -36,6 +36,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Refactured multi-device UX
 - Added auto-connect for new device
 - Menu Window renamed to Device
+- Improve 'unused modules', modules without cabling, but with midiCC or assigned parameter are now seen as in use
 
 ### Fixed
 - Wrong calculation of CPU

@@ -421,8 +421,14 @@ function isUntouchedNameModule(m: ModuleInstance): boolean {
 	return new RegExp(`^${base}\\d+$`).test(m.uname ?? '');
 }
 
-/** True when no cable touches the module — what Patch → Delete Unused Modules removes. */
-export function isUnusedModule(m: ModuleInstance, cables: Cable[]): boolean {
-	if (cables.some((c) => c.smod === m.index || c.dmod === m.index)) return false;
+/** Module indices in `location` (0=fx, 1=voice) with a Parameter Page or MIDI CC assignment. */
+export function assignedModules(slot: { controllers: MidiCCAssignment[]; paramPages: ParamPageAssignment[] }, location: 0 | 1): Set<number> {
+	return new Set([...slot.controllers, ...slot.paramPages].filter((a) => a.location === location).map((a) => a.moduleIndex));
+}
+
+/** True when no cable touches the module and it has no Parameter Page or MIDI CC assignment
+ *  (`assigned`, see assignedModules) — what Patch → Delete Unused Modules removes. */
+export function isUnusedModule(m: ModuleInstance, cables: Cable[], assigned: ReadonlySet<number>): boolean {
+	if (assigned.has(m.index) || cables.some((c) => c.smod === m.index || c.dmod === m.index)) return false;
 	return m.type !== NAME_MODULE_TYPE || isUntouchedNameModule(m);
 }
