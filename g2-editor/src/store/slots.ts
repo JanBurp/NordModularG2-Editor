@@ -220,6 +220,7 @@ function assignGlobalKnobCmd(active: SlotLabel, entry: GlobalParamPageAssignment
 		String(entry.moduleIndex),
 		String(entry.paramIndex),
 		String(entry.slotIndex),
+		String(entry.isLed),
 	];
 }
 
@@ -3846,13 +3847,21 @@ export const useSlotsStore = defineStore('slots', {
 		// matching selectGlobalParamPage. Each mutation still marks the affected patch slot(s) dirty
 		// via the existing per-slot _markSlotDirty, even though globalParamPages itself lives outside
 		// any one slot's patch — that's the only "unsaved edits" signal the app has.
-		async assignParamToGlobalPage(targetSlot: SlotLabel, slotIndex: number, location: 0 | 1 | 2, moduleIndex: number, paramIndex: number): Promise<void> {
+		// isLed=1: a level meter, paramIndex = its LED number (see assignParamToPage).
+		async assignParamToGlobalPage(
+			targetSlot: SlotLabel,
+			slotIndex: number,
+			location: 0 | 1 | 2,
+			moduleIndex: number,
+			paramIndex: number,
+			isLed: 0 | 1 = 0,
+		): Promise<void> {
 			const prev = this.globalParamPages;
-			const entry: GlobalParamPageAssignment = { slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 };
+			const entry: GlobalParamPageAssignment = { slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed };
 			const { next, oldKeySlot } = computeAssignOne(
 				prev,
 				slotIndex,
-				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex,
+				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && k.paramIndex === paramIndex && k.isLed === isLed,
 				entry,
 			);
 			// Same as assignParamToPage: the param's old knob is part of the deassign-then-assign
@@ -3877,7 +3886,7 @@ export const useSlotsStore = defineStore('slots', {
 				this.globalParamPages,
 				targetSlots,
 				paramIndices,
-				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex,
+				(k) => k.slot === targetSlot && k.location === location && k.moduleIndex === moduleIndex && !k.isLed,
 				(paramIndex, slotIndex) => ({ slotIndex, slot: targetSlot, location, moduleIndex, paramIndex, isLed: 0 }),
 			);
 			await this._applyGlobalParamPages(next, touched);

@@ -19,6 +19,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Param popup shows when param has focus
 - Module popup shows long name and module's long description
 - Click on CPU meter, shows detailed CPU/Mem usage
+- Show assigned VU meters in ParamPages as real VU-meters.
 
 ### Changed
 - Tests better organized

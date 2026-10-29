@@ -15,6 +15,7 @@ import { getButtonParamIndex } from '../renderer/buttonParams';
 import { getParam } from '../renderer/parammap';
 import { formatParamDisplay } from '../utils/moduleControls';
 import { clamp } from '../utils/math';
+import { vuMetersByLedNo } from '../utils/vuLevel';
 import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../types';
 
 export type PageAssignment = ParamPageAssignment | GlobalParamPageAssignment;
@@ -141,12 +142,12 @@ export function useParamPageCells() {
 
 	// Live level (0-127) of the level meter a LED-assigned cell points at. LED number = rank of the
 	// module's vu elements by x (see Module.vue's onVuContextMenu); the led store keys them `vu-N` in
-	// element order. Patch-level assignments only, so the led store's focused slot is the right one.
+	// element order. Read from the assignment's own patch: a Global Page meter can target any slot.
 	function meterLevel(a: PageAssignment, moduleInfo: ReturnType<typeof resolveModule>): number {
-		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
-		const target = [...vus].sort((p, q) => (p.x as number) - (q.x as number))[a.paramIndex];
+		const target = vuMetersByLedNo(moduleInfo?.moduleDef)[a.paramIndex];
 		if (!target) return 0;
-		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`);
+		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
+		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`, assignmentSlot(a));
 		return raw === 255 ? 0 : Math.min(raw, 127);
 	}
 
@@ -185,7 +186,7 @@ export function useParamPageCells() {
 				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
 				: String(assignment.moduleIndex);
 			// Level-meter target (isLed=1): paramIndex is a LED number, not a param. The hardware shows
-			// it as a circular VU around the knob; here the knob mirrors the live level, read-only.
+			// it as a circular VU around the knob; the editor shows a live VU meter (VuMeterRound/VuMeterBar).
 			if (assignment.isLed) {
 				return {
 					slotIndex,

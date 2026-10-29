@@ -81,18 +81,19 @@ export function buildGlobalParamPageMenuItems(opts: {
 	slot: SlotLabel | null;
 	location: 0 | 1 | 2;
 	moduleIndex: number;
-	paramIndex: number;
+	paramIndex: number; // LED number when isLed
 	existing: GlobalParamPageAssignment | undefined;
+	isLed?: 0 | 1; // 1 = level meter target, see ParamPageAssignment.isLed
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
-	const { slot, location, moduleIndex, paramIndex, existing } = opts;
+	const { slot, location, moduleIndex, paramIndex, existing, isLed = 0 } = opts;
 
 	return buildParamPageMenuItemsImpl(slot, existing, {
 		assignLabel: 'Assign to Global Page',
 		deassignPrefix: 'Deassign Global',
 		deassignDisabled: !existing,
 		assign: (slotIndex) => {
-			if (slot) slotsStore.assignParamToGlobalPage(slot, slotIndex, location, moduleIndex, paramIndex);
+			if (slot) slotsStore.assignParamToGlobalPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
 		},
 		deassign: () => {
 			if (existing) slotsStore.deassignGlobalParamPage(existing.slotIndex);

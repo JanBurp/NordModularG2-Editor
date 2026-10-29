@@ -2549,8 +2549,10 @@ int g2_request_global_page(int slot) {
     return send_slot((uint8_t)slot, version, SUB_COMMAND_GET_GLOBAL_PAGE, NULL, 0) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
-void g2_build_assign_global_knob_op(G2Op *op, uint8_t *buf, int target_slot, int loc, int module_id, int param_idx, int slot_index) {
-    buf[0]=(uint8_t)((target_slot << 4) | (loc << 2)); buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)param_idx;
+void g2_build_assign_global_knob_op(G2Op *op, uint8_t *buf, int target_slot, int loc, int module_id, int param_idx, int slot_index, int is_led) {
+    /* Bit fields MSB-first: assign type(2) | target slot(2) | location(2) | pad(2) — G2Editor.c
+     * CMGlobalKnobAssign::WriteStream (EDeviceAssignType, slot, EContext). 1 = LED/level meter. */
+    buf[0]=(uint8_t)((is_led << 6) | (target_slot << 4) | (loc << 2)); buf[1]=(uint8_t)module_id; buf[2]=(uint8_t)param_idx;
     buf[3]=0x00; buf[4]=(uint8_t)slot_index;
     op->cmd=SUB_COMMAND_ASSIGN_GLOBAL_KNOB; op->payload=buf; op->len=5;
 }
@@ -2562,23 +2564,26 @@ void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
 
 /* Global Parameter Pages knob assignment (S_ASS_GLOBAL_KNOB=0x1c / S_DEASS_GLOB_KNOB=0x1d).
  * Mirrors g2_assign_knob/g2_deassign_knob above, with one difference: the payload's first byte
- * folds in a 4-bit target-slot nibble (which patch's module the knob controls) alongside the
- * 2-bit location, per the Delphi reference (BVE.NMG2Mess.pas AddAssignGlobalKnobMessage:
- * slotIndex(4) location(2) unused(2), module(8), param(8), unused(8), knobIndex(8)). `slot` is
+ * folds in the target slot (which patch's module the knob controls) alongside the location and
+ * the assign type, per decompiled G2Editor.c CMGlobalKnobAssign::WriteStream: assign type(2)
+ * slot(2) location(2) pad(2), module(8), param(8), knobIndex(16). The Delphi reference
+ * (BVE.NMG2Mess.pas AddAssignGlobalKnobMessage) has slotIndex(4) there, i.e. without the assign
+ * type; the official editor's layout is what lets a level meter (is_led=1) go on a Global knob. `slot` is
  * only the transport/routing slot the command rides on — any of the 4 works interchangeably.
  * UNVERIFIED against real hardware — worth a spot-check before trusting field-level semantics. */
-int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index) {
+int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index, int is_led) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (target_slot < 0 || target_slot > 3) return G2_ERR_INVALID_PARAM;
     if (location < 0 || location > 2)       return G2_ERR_INVALID_PARAM; /* 2 = patch: Morph Group dials (PATCH_MORPH module 1) */
     if (module_id < 0 || module_id > 255)   return G2_ERR_INVALID_PARAM;
     if (param_idx < 0 || param_idx > 255)   return G2_ERR_INVALID_PARAM;
     if (slot_index < 0 || slot_index > 119) return G2_ERR_INVALID_PARAM;
+    if (is_led < 0 || is_led > 1)           return G2_ERR_INVALID_PARAM;
     if (ensure_connected(0) < 0)            return G2_ERR_CONNECT;
 
     uint8_t version = cable_get_version(slot);
     uint8_t payload[5]; G2Op op;
-    g2_build_assign_global_knob_op(&op, payload, target_slot, location, module_id, param_idx, slot_index);
+    g2_build_assign_global_knob_op(&op, payload, target_slot, location, module_id, param_idx, slot_index, is_led);
     return send_slot((uint8_t)slot, version, op.cmd, op.payload, (size_t)op.len) < 0 ? G2_ERR_SEND : G2_OK;
 }
 
