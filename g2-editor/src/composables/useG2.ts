@@ -195,7 +195,11 @@ export function useG2() {
 					return;
 				}
 				if (ledEvents.handleEvent(ev)) return;
-				if (await deviceEvents.handleEvent(ev)) return;
+				if (await deviceEvents.handleEvent(ev)) {
+					// A rearm (mode switch, performance select) swaps the slot patches without a resources_used push.
+					if (ev.type === 'synth_settings_update' && Array.isArray(ev.patches)) for (const s of SLOT_LABELS) slotEvents.fetchSlotResources(s);
+					return;
+				}
 				if (await slotEvents.handleEvent(ev)) return;
 				// Unrecognised events
 				const category: UsbLogEntry['category'] =

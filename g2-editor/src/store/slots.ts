@@ -68,7 +68,9 @@ import { useHistoryStore } from './history';
 import { isAllowedCC } from '@/composables/useMidiCC';
 import { bankDownloadReloadingNames, waitForNamesReload } from '@/composables/useBankDownloadDialog';
 
-type ResourceMetrics = { cycles: number; memory: number };
+// Per-memory-type load in %, keyed as in the official CPatchLoad getters (GetPmem, GetXmem, ...)
+export type MemoryUsage = { pmem: number; xmem: number; ymem: number; zpmem: number; ram: number; qmem: number; rmem: number };
+type ResourceMetrics = { cycles: number; memory: number; mem: MemoryUsage };
 export type SlotResources = { va: ResourceMetrics; fx: ResourceMetrics };
 
 export interface BankDownloadFailure {
@@ -86,7 +88,8 @@ export interface BankDownloadResult {
 }
 
 function emptySlotResources(): SlotResources {
-	return { va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } };
+	const empty = (): ResourceMetrics => ({ cycles: 0, memory: 0, mem: { pmem: 0, xmem: 0, ymem: 0, zpmem: 0, ram: 0, qmem: 0, rmem: 0 } });
+	return { va: empty(), fx: empty() };
 }
 
 // d is the bulk payload. Each block: d[o]=location, then (official CMPatchLoad::ReadStream) 14-bit words
@@ -99,17 +102,17 @@ function parseResourceCycles(d: number[], o: number): number {
 	return ((word14(d, o + 1) + word14(d, o + 3) * 0.25) * 100) / 1371;
 }
 
-function parseResourceMemory(d: number[], o: number): number {
+function parseResourceMemory(d: number[], o: number): MemoryUsage {
 	const qmem = d[o + 22] * 16777216 + d[o + 23] * 65536 + d[o + 24] * 256 + d[o + 25];
-	return Math.max(
-		((word14(d, o + 8) + word14(d, o + 14)) * 100) / 4336, // xmem
-		((word14(d, o + 10) + word14(d, o + 16)) * 100) / 2992, // ymem
-		((word14(d, o + 12) + word14(d, o + 18)) * 100) / 6498, // pmem
-		(d[o + 5] * 100) / 128, // zpmem
-		(word14(d, o + 20) * 100) / 131072, // ram
-		(qmem * 100) / 260096, // qmem
-		(word14(d, o + 26) * 100) / 256, // rmem
-	);
+	return {
+		pmem: ((word14(d, o + 12) + word14(d, o + 18)) * 100) / 6498,
+		xmem: ((word14(d, o + 8) + word14(d, o + 14)) * 100) / 4336,
+		ymem: ((word14(d, o + 10) + word14(d, o + 16)) * 100) / 2992,
+		zpmem: (d[o + 5] * 100) / 128,
+		ram: (word14(d, o + 20) * 100) / 131072,
+		qmem: (qmem * 100) / 260096,
+		rmem: (word14(d, o + 26) * 100) / 256,
+	};
 }
 
 export type { SlotLabel };
@@ -3359,7 +3362,8 @@ export const useSlotsStore = defineStore('slots', {
 			const applyBlock = (o: number) => {
 				if (data.length < o + 28) return;
 				const loc = data[o];
-				const metrics = { cycles: parseResourceCycles(data, o), memory: parseResourceMemory(data, o) };
+				const mem = parseResourceMemory(data, o);
+				const metrics = { cycles: parseResourceCycles(data, o), memory: Math.max(...Object.values(mem)), mem };
 				if (loc === 1) this.slots[slot].resources.va = metrics;
 				else if (loc === 0) this.slots[slot].resources.fx = metrics;
 			};
