@@ -2624,6 +2624,8 @@ describe('uprate repair on load from the G2', () => {
 });
 
 describe('updateResources (official CPatchLoad formulas)', () => {
+	const ZERO = { cycles: 0, memory: 0, mem: { pmem: 0, xmem: 0, ymem: 0, zpmem: 0, ram: 0, qmem: 0, rmem: 0 } };
+
 	// One 28-byte block: location, then 14-bit words (msb*128+lsb) at the given payload offsets.
 	function block(location: number, words: Record<number, number> = {}, bytes: Record<number, number> = {}): number[] {
 		const d = new Array(28).fill(0);
@@ -2665,18 +2667,24 @@ describe('updateResources (official CPatchLoad formulas)', () => {
 		expect(store.slots['A'].resources.va.memory).toBeCloseTo(75); // rmem 192/256 beats xmem 50% and zpmem 25%
 	});
 
+	it('keeps every memory type for the breakdown popover', () => {
+		const store = useSlotsStore();
+		store.updateResources('A', block(1, { 8: 2168, 26: 192 }, { 5: 32 }));
+		expect(store.slots['A'].resources.va.mem).toEqual({ pmem: 0, xmem: 50, ymem: 0, zpmem: 25, ram: 0, qmem: 0, rmem: 75 });
+	});
+
 	it('routes location 1 to va and 0 to fx, including both blocks of a compound packet', () => {
 		const store = useSlotsStore();
 		store.updateResources('B', [...block(1, { 1: 1371 }), 0x72, ...block(0, { 1: 685 })]);
 		expect(store.slots['B'].resources.va.cycles).toBeCloseTo(100);
 		expect(store.slots['B'].resources.fx.cycles).toBeCloseTo(49.96, 2);
-		expect(store.slots['A'].resources).toEqual({ va: { cycles: 0, memory: 0 }, fx: { cycles: 0, memory: 0 } });
+		expect(store.slots['A'].resources).toEqual({ va: ZERO, fx: ZERO });
 	});
 
 	it('ignores a truncated block', () => {
 		const store = useSlotsStore();
 		store.updateResources('A', block(1, { 1: 1371 }).slice(0, 27));
-		expect(store.slots['A'].resources.va).toEqual({ cycles: 0, memory: 0 });
+		expect(store.slots['A'].resources.va).toEqual(ZERO);
 	});
 });
 

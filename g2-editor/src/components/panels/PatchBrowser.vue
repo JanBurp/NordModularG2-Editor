@@ -157,6 +157,17 @@
 				</ul>
 				<div class="shrink-0 mt-auto flex items-center px-2 py-1 border-t border-line-subtle">
 					<FlashMemoryMeter />
+					<Button
+						variant="default"
+						size="xs"
+						class="ml-auto shrink-0"
+						title="Bank Organizer"
+						hint="browserOrganizer"
+						data-testid="browser-open-organizer"
+						@click="uiStore.openBankOrganizer(browser.view === 'performances' ? 'performance' : 'patch', uiStore.organizerBanks[0])"
+					>
+						<span class="flex items-center gap-1"><Icon name="expand" class="w-3 h-3" />Organizer</span>
+					</Button>
 				</div>
 			</template>
 		</template>
@@ -180,6 +191,7 @@
 	import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 	import { getCategoryNameFromSlug } from '@/constants/categories';
 	import BtnGroup from '../toolbar/BtnGroup.vue';
+	import Button from '../toolbar/Button.vue';
 	import { useListNav } from '../../composables/useListNav';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';

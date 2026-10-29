@@ -37,10 +37,10 @@
 		<CableVisibilitySelector />
 		<ToolBarDivider />
 		<PatchLevel />
-		<template v-if="settingsStore.toolbarMode === 'hidden'">
+		<div v-if="settingsStore.toolbarMode === 'hidden'" class="hidden xl:flex items-center gap-2">
 			<ToolBarDivider />
 			<CPU mini />
-		</template>
+		</div>
 	</ToolBar>
 </template>
 

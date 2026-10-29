@@ -38,6 +38,7 @@
 	const CMD_CTRL = isMac ? '⌘/⌃' : 'Ctrl';
 	const CTRL = isMac ? '⌃' : 'Ctrl';
 	const SHIFT_MOD = isMac ? key(SHIFT, MOD) : key(MOD, SHIFT); // ⇧ ⌘ on Mac, Ctrl+Shift elsewhere
+	const ALT_MOD = isMac ? key(ALT, MOD) : key(MOD, ALT); // ⌥ ⌘ on Mac, Ctrl+Alt elsewhere
 
 	const groups = computed(() => [
 		{
@@ -120,6 +121,7 @@
 				{ keys: [key(SHIFT_MOD, 'F')], action: 'Toggle Parameter Overview' },
 				{ keys: [key(MOD, '2')], action: 'Toggle Patch Mutator' },
 				{ keys: [key(MOD, '3')], action: 'Toggle Bank Organizer' },
+				{ keys: [key(ALT_MOD, 'F')], action: 'Toggle Find & Replace (ESC clears it)' },
 				{ keys: ['/'], action: 'Focus search (Modules / Browser pane)' },
 			],
 		},

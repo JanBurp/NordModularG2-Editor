@@ -40,6 +40,7 @@ npm run build                           # production build + package
 npm test                                # unit + e2e + g2 (g2 is skipped without a G2)
 npm run test:unit                       # Vitest unit tests
 npm run typecheck                       # vue-tsc type check
+npm run lint                            # ESLint
 npm run test:e2e                        # Playwright E2E tests, headless (builds first)
 npm run test:g2                         # hardware suite (test-g2/): needs a connected G2, drives the CLI and the real editor
 npm run test:duration -- --hours 1      # hours-long hardware duration test; --help lists all options

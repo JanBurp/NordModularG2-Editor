@@ -1,5 +1,5 @@
 <template>
-	<ToolBar data-search-replace @keydown.esc.stop="uiStore.showSearchReplace = false">
+	<ToolBar data-search-replace @keydown.esc.stop="clearInputs">
 		<ToolBarLabel class="w-10">Find:</ToolBarLabel>
 		<TextInput
 			ref="findInput"
@@ -55,9 +55,6 @@
 		>
 			Delete Found Modules
 		</Button>
-
-		<span class="flex-1" />
-		<Button variant="default" size="xs" title="Close (Esc)" @click="uiStore.showSearchReplace = false">×</Button>
 	</ToolBar>
 </template>
 
@@ -68,10 +65,8 @@
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import Button from './Button.vue';
 	import TextInput from '../common/TextInput.vue';
-	import { useUiStore } from '@/store/ui';
 	import { useSearchReplace } from '@/composables/useSearchReplace';
 
-	const uiStore = useUiStore();
 	const SCOPES = {
 		module: { label: 'Modules', title: 'Search module names' },
 		param: { label: 'Labels', title: 'Search switch labels' },
@@ -111,6 +106,12 @@
 				.map((k) => (k === 'module' ? 'module names' : 'labels'))
 				.join(' / ')}`,
 	);
+
+	// Esc: empty Find and Replace; the bar stays open (the menu key toggles it).
+	function clearInputs() {
+		term.value = '';
+		replacement.value = '';
+	}
 
 	const findInput = ref<InstanceType<typeof TextInput> | null>(null);
 	onMounted(() => (findInput.value?.$el as HTMLInputElement | undefined)?.focus());

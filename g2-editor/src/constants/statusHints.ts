@@ -59,6 +59,7 @@ export const STATUS_HINTS = {
 	browserFolder: 'Click/Enter: open folder · ←: parent folder · ↑↓: navigate',
 	browserFile: 'Double-click/Enter: load · ←: parent folder · ↑↓: navigate',
 	browserPatch: 'Double-click/Enter: load · ↑↓: navigate · Right-click: store here, delete',
+	browserOrganizer: `Click/${MOD}3: open the Bank Organizer`,
 	browserBank: 'Click: expand/collapse · Right-click: store, bank upload/download, clear, sort, organizer',
 
 	// Bank Organizer
@@ -90,6 +91,7 @@ export const STATUS_HINTS = {
 	cableColorToggle: 'Click: show/hide cables of this color',
 	colorApply: 'Click: apply color to selected modules',
 	colorChoose: 'Click: choose color',
+	loadMeter: 'Click: show DSP resources per memory type',
 	clockRun: 'Click: start/stop master clock',
 	perfMode: 'Click: switch Patch/Performance mode · Shift-click: create performance/get patches from performance',
 	deviceSelect: 'Click: switch to this device · Right-click: window options',
