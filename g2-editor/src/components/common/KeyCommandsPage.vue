@@ -159,7 +159,7 @@
 			rows: [
 				{ keys: ['F5'], action: 'Show parameter values (hold)' },
 				{ keys: ['F6'], action: 'Show morph group assignments (hold)' },
-				{ keys: ['F7'], action: 'Show Parameter Pages knob assignments (hold)' },
+				{ keys: ['F7'], action: 'Show Parameter Pages knob and meter assignments (hold)' },
 				{ keys: ['F8'], action: 'Show Midi CC assignments (hold)' },
 				{ keys: [key(CTRL, 'F8')], action: 'Show parameter values as Midi controller values (hold)' },
 				{ keys: ['Hold morph knob'], action: 'Show morph ranges of that group' },

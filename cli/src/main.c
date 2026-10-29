@@ -96,7 +96,7 @@ static void print_usage(const char *prog) {
     printf("  deassign-knob <slot> <slot-index>                                                                 Remove a Parameter Page knob assignment\n");
     printf("  select-param-page <slot> <page-id>                                                                Select the front-panel Parameter Page (page-id = page*3 + bank, 0-14)\n");
     printf("  get-param-page <slot>                                                                             Ask which Parameter Page the G2 shows (reply arrives as a param_page_change event)\n");
-    printf("  assign-global-knob <slot> <target-slot> <va|fx|patch> <module-id> <param-idx> <slot-index>        Assign a parameter to a Global Parameter Page knob (0-119)\n");
+    printf("  assign-global-knob <slot> <target-slot> <va|fx|patch> <module-id> <param-idx> <slot-index> [led] Assign a parameter (or, with led=1, a level meter by LED number) to a Global Parameter Page knob (0-119)\n");
     printf("  deassign-global-knob <slot> <slot-index>                                                          Remove a Global Parameter Page knob assignment\n");
     printf("  select-global-page <slot> <page-id>                                                               Select the active Global Parameter Page (page-id = page*3 + bank, 0-14)\n");
     printf("  get-global-knobs                                                                                  Fetch the Global Parameter Pages assignment list (system-wide, no slot)\n");
@@ -716,7 +716,7 @@ static int cmd_select_global_page(int argc, char **argv, int i) {
 
 static int cmd_assign_global_knob(int argc, char **argv, int i) {
     if (i + 6 >= argc) {
-        fprintf(stderr, "Usage: assign-global-knob <slot> <target-slot> <va|fx|patch> <module-id> <param-idx> <slot-index>\n");
+        fprintf(stderr, "Usage: assign-global-knob <slot> <target-slot> <va|fx|patch> <module-id> <param-idx> <slot-index> [led]\n");
         return 1;
     }
     int slot        = parse_slot(argv[i + 1]);
@@ -727,7 +727,8 @@ static int cmd_assign_global_knob(int argc, char **argv, int i) {
     int mod_id     = atoi(argv[i + 4]);
     int param      = atoi(argv[i + 5]);
     int slot_index = atoi(argv[i + 6]);
-    return g2_assign_global_knob(slot, target_slot, location, mod_id, param, slot_index);
+    int is_led     = (i + 7 < argc && argv[i + 7][0] >= '0' && argv[i + 7][0] <= '9') ? atoi(argv[i + 7]) : 0;
+    return g2_assign_global_knob(slot, target_slot, location, mod_id, param, slot_index, is_led);
 }
 
 static int cmd_deassign_global_knob(int argc, char **argv, int i) {

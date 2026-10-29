@@ -1,6 +1,7 @@
 import type { ModuleInstance } from '@/types';
 import { getModule } from '@/renderer/nmg2mods';
 import { clientToSvgPoint } from '@/renderer/svgUtils';
+import { vuMetersByLedNo } from '@/utils/vuLevel';
 import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants/ui';
 
 export interface Rect {
@@ -18,6 +19,13 @@ export function paramControlRect(mod: ModuleInstance, paramIndex: number, area: 
 		`g[data-module-index="${mod.index}"][data-param-location="${area === 'va' ? 1 : 0}"][data-param-index="${paramIndex}"]`,
 	);
 	return controlRect(mod, paramIndex, el);
+}
+
+// A level meter's rect in canvas coords, by its LED number (as in a Parameter Page meter assignment).
+export function meterRect(mod: ModuleInstance, ledNo: number): Rect | null {
+	const ve = vuMetersByLedNo(getModule(mod.type))[ledNo];
+	if (!ve) return null;
+	return { x: (mod.horiz ?? 0) * MODULE_WIDTH + (ve.x ?? 0), y: (mod.vert ?? 0) * MODULE_ROW_HEIGHT + (ve.y ?? 0), w: ve.w ?? 0, h: ve.h ?? 0 };
 }
 
 // paramControlRect for many params (e.g. every param of an F5 overlay): one DOM query per area

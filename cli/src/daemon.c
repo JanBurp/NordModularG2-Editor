@@ -332,8 +332,8 @@ static int execute_seq(cJSON *args) {
         } else if (strcmp(scmd, "assign-global-knob") == 0 && sn >= 7) {
             /* [cmd, transportSlot, targetSlot, loc, mod, param, knob] — sub[2] is the target slot, not a location */
             int target = parse_slot(arg_s(sub, 2)), gloc = parse_location_str(arg_s(sub, 3));
-            if (target == SLOT_INVALID || gloc < 0 || gloc > 2 || arg_i(sub,6) < 0 || arg_i(sub,6) > 119) { ret = G2_ERR_INVALID_PARAM; break; }
-            g2_build_assign_global_knob_op(op, p, target, gloc, arg_i(sub,4), arg_i(sub,5), arg_i(sub,6));
+            if (target == SLOT_INVALID || gloc < 0 || gloc > 2 || arg_i(sub,6) < 0 || arg_i(sub,6) > 119 || (sn >= 8 && (arg_i(sub,7) < 0 || arg_i(sub,7) > 1))) { ret = G2_ERR_INVALID_PARAM; break; }
+            g2_build_assign_global_knob_op(op, p, target, gloc, arg_i(sub,4), arg_i(sub,5), arg_i(sub,6), sn >= 8 ? arg_i(sub,7) : 0);
             n_ops++;
 
         } else if (strcmp(scmd, "deassign-global-knob") == 0 && sn >= 3) {
@@ -613,7 +613,7 @@ static void execute_cmd(const char *line) {
 		int targetSlot = parse_slot(arg_s(args, 1));
 		int loc = parse_location(args, 2);
 		if (slot == SLOT_INVALID || targetSlot == SLOT_INVALID) ret = G2_ERR_INVALID_PARAM;
-		else ret = g2_assign_global_knob(slot, targetSlot, loc, arg_i(args, 3), arg_i(args, 4), arg_i(args, 5));
+		else ret = g2_assign_global_knob(slot, targetSlot, loc, arg_i(args, 3), arg_i(args, 4), arg_i(args, 5), n >= 7 ? arg_i(args, 6) : 0);
 
 	} else if (strcmp(cmd, "deassign-global-knob") == 0 && n >= 2) {
 		int slot = parse_slot(arg_s(args, 0));

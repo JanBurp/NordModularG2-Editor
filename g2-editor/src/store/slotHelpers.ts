@@ -14,6 +14,7 @@ import { NUM_VARIATIONS } from '@/types';
 import { MORPH_NAMES } from '@/types/patch';
 import { getDefaultParamValues, getModule } from '@/renderer/nmg2mods';
 import { defaultMutaLock } from '@/renderer/mutator';
+import { KNOBS_PER_PAGE } from '@/renderer/paramPages';
 
 // Morph Group i's display name: its custom label (PATCH_MORPH param 8+i), else the default name.
 export function morphGroupName(patch: Patch | null | undefined, i: number): string {
@@ -259,6 +260,24 @@ export function computeAssignModule<T extends ParamPageAssignment>(
 	targetSlots.forEach((slotIndex, i) => next.push(makeEntry(paramIndices[i], slotIndex)));
 	const evictedElsewhere = prev.filter((k) => sameModule(k) && !targetSet.has(k.slotIndex)).map((k) => k.slotIndex);
 	return { next, touched: [...targetSlots, ...evictedElsewhere] };
+}
+
+// Fills whole knob rows (8 slots each, starting at row `startRow` = page*3+bank) with `rows`,
+// clearing every slot of those rows first. Like computeAssignModule, an item already assigned to
+// a knob elsewhere (`isItem`) is moved, not duplicated.
+export function computeAssignRows<T extends ParamPageAssignment, I>(
+	prev: T[],
+	startRow: number,
+	rows: I[][],
+	isItem: (k: T) => boolean,
+	makeEntry: (item: I, slotIndex: number) => T,
+): { next: T[]; touched: number[] } {
+	const rowSlots = rows.flatMap((_, r) => Array.from({ length: KNOBS_PER_PAGE }, (_, k) => (startRow + r) * KNOBS_PER_PAGE + k));
+	const rowSet = new Set(rowSlots);
+	const next = prev.filter((k) => !rowSet.has(k.slotIndex) && !isItem(k));
+	rows.forEach((row, r) => row.forEach((item, k) => next.push(makeEntry(item, (startRow + r) * KNOBS_PER_PAGE + k))));
+	const evictedElsewhere = prev.filter((k) => isItem(k) && !rowSet.has(k.slotIndex)).map((k) => k.slotIndex);
+	return { next, touched: [...rowSlots, ...evictedElsewhere] };
 }
 
 // Swaps (or moves, if the target is empty) two knob slots' occupants — one computed list so the

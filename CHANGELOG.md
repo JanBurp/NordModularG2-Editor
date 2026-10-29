@@ -16,10 +16,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Library of building blocks
 - Find & Replace (module names, param labels)
 - G2's memory meter
+- Show assigned VU meters in ParamPages as real VU-meters.
+- Click on CPU meter, shows detailed CPU/Mem usage
 - Warnings of mem-protect/full
 - Param popup shows when param has focus
 - Module popup shows long name and module's long description
-- Click on CPU meter, shows detailed CPU/Mem usage
 
 ### Changed
 - Tests better organized

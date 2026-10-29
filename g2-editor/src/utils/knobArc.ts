@@ -24,3 +24,12 @@ export function describeMorphSector(cx: number, cy: number, r: number, fromValue
 	const sweep = a1 >= a0 ? 1 : 0;
 	return `M ${cx} ${cy} L ${p0.x} ${p0.y} A ${r} ${r} 0 ${largeArc} ${sweep} ${p1.x} ${p1.y} Z`;
 }
+
+// SVG arc path (stroked, not filled) of radius `r` around (cx, cy) between two knob angles
+// (0° = top, clockwise), e.g. a VU meter band along the knob's sweep.
+export function describeArc(cx: number, cy: number, r: number, fromAngle: number, toAngle: number): string {
+	const p0 = pointOnKnob(cx, cy, r, fromAngle);
+	const p1 = pointOnKnob(cx, cy, r, toAngle);
+	const largeArc = toAngle - fromAngle > 180 ? 1 : 0;
+	return `M ${p0.x} ${p0.y} A ${r} ${r} 0 ${largeArc} 1 ${p1.x} ${p1.y}`;
+}
