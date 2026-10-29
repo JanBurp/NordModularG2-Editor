@@ -4,6 +4,7 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useLedStore } from '../store/led';
 import { useContextMenu } from './useContextMenu';
+import { showToast } from './useToast';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
 import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
@@ -261,12 +262,13 @@ export function useParamPageCells() {
 	}
 
 	// "Assign VU meters": the focused patch's connected level meters, from this cell's row on (see
-	// vuAutoAssign.ts for the order and grouping). Rows past the last page (E3) are dropped.
+	// vuAutoAssign.ts for the order and grouping). Rows past the last page (E3) are dropped, with a toast.
 	function assignMetersItem(cell: Cell): ContextMenuItem {
 		const slot = uiStore.slotInFocus;
 		const patch = slot ? slotsStore.slots[slot].patch : null;
 		const startRow = Math.floor(cell.slotIndex / KNOBS_PER_PAGE);
-		const rows = patch ? meterRows(patch).slice(0, TOTAL_KNOB_SLOTS / KNOBS_PER_PAGE - startRow) : [];
+		const all = patch ? meterRows(patch) : [];
+		const rows = all.slice(0, TOTAL_KNOB_SLOTS / KNOBS_PER_PAGE - startRow);
 		return {
 			label: 'Assign VU meters',
 			disabled: !slot || rows.length === 0,
@@ -274,6 +276,8 @@ export function useParamPageCells() {
 				if (!slot) return;
 				if (uiStore.globalPagesActive) slotsStore.assignMetersToGlobalPage(slot, startRow, rows);
 				else slotsStore.assignMetersToPage(slot, startRow, rows);
+				const dropped = all.flat().length - rows.flat().length;
+				if (dropped > 0) showToast(`${dropped} VU meter${dropped === 1 ? '' : 's'} didn't fit below this row`);
 			},
 		};
 	}

@@ -2570,7 +2570,8 @@ void g2_build_deassign_global_knob_op(G2Op *op, uint8_t *buf, int slot_index) {
  * (BVE.NMG2Mess.pas AddAssignGlobalKnobMessage) has slotIndex(4) there, i.e. without the assign
  * type; the official editor's layout is what lets a level meter (is_led=1) go on a Global knob. `slot` is
  * only the transport/routing slot the command rides on — any of the 4 works interchangeably.
- * UNVERIFIED against real hardware — worth a spot-check before trusting field-level semantics. */
+ * Hardware-verified 2026-10-29: is_led=1 shows the level meter on the G2, also with a target slot
+ * other than the transport slot. */
 int g2_assign_global_knob(int slot, int target_slot, int location, int module_id, int param_idx, int slot_index, int is_led) {
     if (slot < 0 || slot > 3)               return G2_ERR_INVALID_PARAM;
     if (target_slot < 0 || target_slot > 3) return G2_ERR_INVALID_PARAM;
