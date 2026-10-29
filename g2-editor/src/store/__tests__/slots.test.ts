@@ -1927,6 +1927,39 @@ describe('swapParamPageSlots', () => {
 	});
 });
 
+describe('assignMetersToPage', () => {
+	beforeEach(() => {
+		useDeviceStore().status = DeviceStatus.Connected;
+	});
+
+	it('replaces the whole target row with the meters (isLed) and undoes as one entry', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		await store.assignParamToPage('A', 13, 1, 9, 9); // occupant elsewhere in the target row
+		const before = [...store.slots['A'].paramPages];
+
+		await store.assignMetersToPage('A', 1, [
+			[
+				{ location: 1, moduleIndex: 2, ledNo: 0 },
+				{ location: 0, moduleIndex: 3, ledNo: 1 },
+			],
+		]);
+
+		expect(store.slots['A'].paramPages).toEqual([
+			{ slotIndex: 8, location: 1, moduleIndex: 2, paramIndex: 0, isLed: 1 },
+			{ slotIndex: 9, location: 0, moduleIndex: 3, paramIndex: 1, isLed: 1 },
+		]);
+		expect((globalThis as any).window.cli.runBatch).toHaveBeenLastCalledWith([
+			...[8, 9, 10, 11, 12, 13, 14, 15].map((k) => ['deassign-knob', 'A', String(k)]),
+			['assign-knob', 'A', 'va', '2', '0', '8', '1'],
+			['assign-knob', 'A', 'fx', '3', '1', '9', '1'],
+		]);
+
+		await store.undo(); // slot A is in focus by default
+		expect(store.slots['A'].paramPages).toEqual(before);
+	});
+});
+
 describe('assignModuleToPage', () => {
 	beforeEach(() => {
 		useDeviceStore().status = DeviceStatus.Connected;

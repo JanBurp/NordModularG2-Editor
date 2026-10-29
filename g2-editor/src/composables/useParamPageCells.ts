@@ -7,7 +7,8 @@ import { useContextMenu } from './useContextMenu';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
 import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
-import { KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
+import { KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
+import { meterRows } from '../renderer/vuAutoAssign';
 import { serializeDragPayload, parseDragPayload } from '../utils/dragPayload';
 import { setBadgeDragImage } from '../utils/badgeLayout';
 import { getModule, getParamDefault } from '../renderer/nmg2mods';
@@ -259,8 +260,26 @@ export function useParamPageCells() {
 		await slotsStore.requestVisibleParamPage();
 	}
 
+	// "Assign VU meters": the focused patch's connected level meters, from this cell's row on (see
+	// vuAutoAssign.ts for the order and grouping). Rows past the last page (E3) are dropped.
+	function assignMetersItem(cell: Cell): ContextMenuItem {
+		const slot = uiStore.slotInFocus;
+		const patch = slot ? slotsStore.slots[slot].patch : null;
+		const startRow = Math.floor(cell.slotIndex / KNOBS_PER_PAGE);
+		const rows = patch ? meterRows(patch).slice(0, TOTAL_KNOB_SLOTS / KNOBS_PER_PAGE - startRow) : [];
+		return {
+			label: 'Assign VU meters',
+			disabled: !slot || rows.length === 0,
+			action: () => {
+				if (!slot) return;
+				if (uiStore.globalPagesActive) slotsStore.assignMetersToGlobalPage(slot, startRow, rows);
+				else slotsStore.assignMetersToPage(slot, startRow, rows);
+			},
+		};
+	}
+
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
-		if (!cell.assignment) return;
+		if (!cell.assignment) return openContextMenu(event, [assignMetersItem(cell)]);
 		const a = cell.assignment;
 		let items: ContextMenuItem[];
 		if (uiStore.globalPagesActive) {
@@ -269,6 +288,7 @@ export function useParamPageCells() {
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
+		items.push(assignMetersItem(cell));
 		if (a.location === 2) return openContextMenu(event, items);
 		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
 		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against
