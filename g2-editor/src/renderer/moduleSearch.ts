@@ -9,6 +9,13 @@ function filterByName(modules: ModuleDefinition[], scope: ModuleDefinition[], q:
 	return modules.filter((m) => has(m[field], q));
 }
 
+/** "<group> <term>": the part before the first space selects groups, the rest filters within them. No space: no group part. */
+export function parseGroupQuery(query: string): { group: string | null; term: string } {
+	const q = query.trimStart().toLowerCase();
+	const space = q.indexOf(' ');
+	return space < 0 ? { group: null, term: q } : { group: q.slice(0, space), term: q.slice(space + 1).trim() };
+}
+
 /**
  * Two-part module search. "<group> <module>": the part before the first space selects
  * the category, the rest filters modules within it ("env " = whole Env group). A single
@@ -17,14 +24,8 @@ function filterByName(modules: ModuleDefinition[], scope: ModuleDefinition[], q:
  */
 export function filterCategoryModules(category: string, query: string): ModuleDefinition[] {
 	const modules = getModulesByCategory(category);
-	const q = query.trimStart().toLowerCase();
-	if (!q) return modules;
-
-	const space = q.indexOf(' ');
-	if (space < 0) return filterByName(modules, getAllCategories().flatMap(getModulesByCategory), q);
-
-	const catQuery = q.slice(0, space);
-	const modQuery = q.slice(space + 1).trim();
-	if (!category.toLowerCase().includes(catQuery)) return [];
-	return modQuery ? filterByName(modules, modules, modQuery) : modules;
+	const { group, term } = parseGroupQuery(query);
+	if (group === null) return term ? filterByName(modules, getAllCategories().flatMap(getModulesByCategory), term) : modules;
+	if (!category.toLowerCase().includes(group)) return [];
+	return term ? filterByName(modules, modules, term) : modules;
 }

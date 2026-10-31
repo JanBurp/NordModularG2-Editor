@@ -1,0 +1,278 @@
+import { computed, markRaw, ref, shallowRef } from 'vue';
+import type { ClipboardEntry } from '@/types/patch';
+import { useSettingsStore } from '@/store/settings';
+import { useSlotsStore } from '@/store/slots';
+import { useUiStore } from '@/store/ui';
+import { resolveSelectionArea } from '@/store/slotHelpers';
+import {
+	assignmentLabels,
+	assignmentsLine,
+	formatNotes,
+	libraryItemToPch2,
+	pch2ToLibraryItem,
+	splitTags,
+	withNotes,
+	type LibraryEntry,
+	type LibraryNotes,
+} from '../parser/libraryFile';
+import { useEditDialog } from './useEditDialog';
+import { buildClipboardEntry, insertEntry } from './usePatchClipboard';
+import { showToast } from './useToast';
+
+// `group` is the item's subfolder path in the library folder, '' for the folder itself.
+// `entry` is missing for a file that can't be read: it's listed, but can't be inserted. `mtime`: the file's, when read.
+export type LibraryItem = { name: string; path: string; group: string; mtime: number; entry?: LibraryEntry };
+
+// Singleton state shared by the Library pane and the Save Selection to Library dialog.
+const root = ref(''); // the library folder
+// Shallow, the entries raw: never changed in place, only replaced by refresh().
+const items = shallowRef<LibraryItem[]>([]);
+let pendingEntry: ClipboardEntry | null = null;
+
+// The library folder's own items show as group 'Saved'; the groups are its subfolders.
+export const groupLabel = (group: string) => group || 'Saved';
+const groups = computed(() => [...new Set(items.value.map((i) => i.group).filter(Boolean))].sort());
+
+// `tags` comma-separated; `assignments` only shown (assignmentsLine).
+export type SaveForm = { group: string; name: string; author: string; license: string; source: string; tags: string; notes: string; assignments: string };
+const saveDialog = useEditDialog<SaveForm>(
+	{ group: '', name: '', author: '', license: '', source: '', tags: '', notes: '', assignments: '' },
+	'saveToLibrary',
+	saveToLibrary,
+);
+let lastGroup = '';
+// The item just saved, for the Library pane to show it.
+const lastSaved = ref<{ group: string; name: string; path: string } | null>(null);
+
+const safeName = (s: string) => s.trim().replace(/[/\\:*?"<>|]/g, '_');
+// "Drums/Kicks" stays a nested group; 'Saved' (any case) is the library folder itself.
+const groupPath = (group: string) =>
+	group.trim().toLowerCase() === groupLabel('').toLowerCase()
+		? ''
+		: group
+				.split('/')
+				.map(safeName)
+				.filter((s) => s && s !== '.' && s !== '..')
+				.join('/');
+// Every item is tagged with its group's (innermost) folder name.
+const categoryTag = (group: string) => group.split('/').pop()!.toLowerCase();
+
+// Every .pch2 in `dir` and its subfolders (hidden ones skipped). Files unchanged since `known` keep their item,
+// so they're not read again and the pane doesn't redraw them.
+async function scan(dir: string, group: string, known: Map<string, LibraryItem>): Promise<LibraryItem[]> {
+	const { entries } = await window.electronAPI.patches.list(dir);
+	const lists = await Promise.all(
+		entries
+			.filter((e) => !e.name.startsWith('.'))
+			.map(async (e): Promise<LibraryItem[]> => {
+				if (e.isDir) return scan(e.path, group ? `${group}/${e.name}` : e.name, known);
+				if (!/\.pch2$/i.test(e.name)) return [];
+				const old = known.get(e.path);
+				if (old?.mtime === e.mtime) return [old];
+				const file = await window.electronAPI.patches.load(e.path);
+				let entry: LibraryEntry | undefined;
+				try {
+					entry = file.data ? markRaw(pch2ToLibraryItem(file.data)) : undefined;
+				} catch {
+					entry = undefined;
+				}
+				return [{ name: e.name.replace(/\.pch2$/i, ''), path: e.path, group, mtime: e.mtime, entry }];
+			}),
+	);
+	return lists.flat();
+}
+
+async function refresh(): Promise<void> {
+	if (!root.value) return;
+	const next = await scan(root.value, '', new Map(items.value.map((i) => [i.path, i])));
+	if (next.length !== items.value.length || next.some((item, i) => item !== items.value[i])) items.value = next;
+}
+
+async function init(): Promise<void> {
+	root.value = await window.electronAPI.patches.libraryDir(useSettingsStore().libraryFolder || undefined);
+	await refresh();
+}
+
+// Favorites: kept in the settings by their path relative to the library folder ('/'-separated, also on Windows).
+const relPath = (path: string) => path.slice(root.value.length + 1).replace(/\\/g, '/');
+const favorites = () => useSettingsStore().libraryFavorites;
+export const isFavorite = (item: LibraryItem) => favorites().includes(relPath(item.path));
+function setFavorite(path: string, on: boolean): void {
+	const settings = useSettingsStore();
+	const rest = settings.libraryFavorites.filter((p) => p !== relPath(path));
+	settings.libraryFavorites = on ? [...rest, relPath(path)] : rest;
+}
+
+// The item the dialog edits; null when it saves the selection as a new item.
+const editing = ref<LibraryItem | null>(null);
+
+// Saved into the group's folder (created when new), the notes as the patch notes. Never overwrites another item:
+// "Name", "Name 2", ... An edited item is rewritten in place, then moved when its name or group changed.
+async function saveToLibrary(form: SaveForm): Promise<void> {
+	const item = editing.value;
+	const slot = useSlotsStore().slots[useUiStore().slotInFocus];
+	const entry = pendingEntry;
+	if (!item && (!entry || !slot.patch || !slot.templateRawHex)) return;
+	const original = item ? (await window.electronAPI.patches.load(item.path)).data : undefined;
+	if (item && !original) return;
+	await init();
+	const group = groupPath(form.group);
+	if (!item) lastGroup = group;
+	const name = safeName(form.name) || 'Item';
+	const taken = new Set(items.value.filter((i) => i.group === group && i.path !== item?.path).map((i) => i.name.toLowerCase()));
+	let unique = name;
+	for (let n = 2; taken.has(unique.toLowerCase()); n++) unique = `${name} ${n}`;
+	const tags = splitTags(form.tags).filter((t) => !item || t !== categoryTag(item.group));
+	const notes: LibraryNotes = {
+		author: form.author,
+		license: form.license,
+		source: form.source,
+		tags: group ? [...new Set([categoryTag(group), ...tags])] : tags,
+		body: form.notes,
+	};
+	const bytes = item
+		? withNotes(original!, unique, notes)
+		: libraryItemToPch2(
+				unique,
+				entry!,
+				{ patch: slot.patch!, templateRawHex: slot.templateRawHex!, variations: slot.variations ?? [] },
+				formatNotes(notes, assignmentsLine(entry!)),
+			);
+	const path = `${root.value}/${group ? `${group}/` : ''}${unique}.pch2`;
+	await window.electronAPI.patches.librarySave(item?.path ?? path, bytes);
+	// relPath: `path` is '/'-joined, the scanned item.path uses the platform's separator (backslash on Windows)
+	if (item && relPath(item.path) !== relPath(path)) {
+		await window.electronAPI.patches.libraryMove(item.path, path);
+		if (isFavorite(item)) {
+			setFavorite(item.path, false);
+			setFavorite(path, true);
+		}
+	}
+	const settings = useSettingsStore();
+	if (settings.rightPaneTab !== 'library' || !settings.showRightPane) settings.toggleSidebar('library');
+	await refresh();
+	// The scanned item's own path, for the pane to compare against
+	const saved = items.value.find((i) => relPath(i.path) === relPath(path));
+	lastSaved.value = { group, name: unique, path: saved?.path ?? path };
+}
+
+// The Insert dialog: one row per knob, MIDI CC and morph of the item; a knob slot or CC the patch already uses
+// is "in use" and starts unchecked (kept, it replaces that one). A morph set in several variations is one row.
+// `key` identifies the assignment: labels can repeat (modules with the same name).
+export type AssignmentRow = { kind: 'knobs' | 'morphs' | 'midi'; key: string; label: string; inUse: boolean; keep: boolean };
+const morphKey = (a: { moduleIndex: number; paramIndex: number; groupIndex: number }) => `${a.moduleIndex}.${a.paramIndex}.${a.groupIndex}`;
+type InsertContext = { entry: ClipboardEntry; target: { col: number; row: number; area: 'va' | 'fx' } | null };
+const insertDialog = useEditDialog<AssignmentRow[], InsertContext>([], 'insertFromLibrary', async (rows, ctx) => {
+	const { entry, target } = ctx!;
+	const kept = (kind: AssignmentRow['kind']) => new Set(rows.filter((r) => r.kind === kind && r.keep).map((r) => r.key));
+	const [knobs, morphs, midi] = [kept('knobs'), kept('morphs'), kept('midi')];
+	await insertEntry(
+		{
+			...entry,
+			knobs: entry.knobs?.filter((_, i) => knobs.has(String(i))),
+			morphs: entry.morphs?.map((list) => list.filter((a) => morphs.has(morphKey(a)))),
+			midi: entry.midi?.filter((_, i) => midi.has(String(i))),
+		},
+		target,
+		true,
+	);
+});
+
+// Inserts a library item at `target`, else at the mouse position (insertEntry); asks first which of its assignments to keep.
+async function insertItem(entry: ClipboardEntry, target?: InsertContext['target']): Promise<void> {
+	const ui = useUiStore();
+	const { paramPages, controllers } = useSlotsStore().slots[ui.slotInFocus];
+	const labels = assignmentLabels(entry);
+	const rows: AssignmentRow[] = [
+		...(entry.knobs ?? []).map((k, i) => ({
+			kind: 'knobs' as const,
+			key: String(i),
+			label: labels.knobs[i],
+			inUse: paramPages.some((p) => p.slotIndex === k.slotIndex),
+		})),
+		...new Map(
+			(entry.morphs ?? []).flatMap((list, v) =>
+				list.map((a, i) => [morphKey(a), { kind: 'morphs' as const, key: morphKey(a), label: labels.morphs[v][i], inUse: false }] as const),
+			),
+		).values(),
+		...(entry.midi ?? []).map((c, i) => ({ kind: 'midi' as const, key: String(i), label: labels.midi[i], inUse: controllers.some((x) => x.cc === c.cc) })),
+	].map((r) => ({ ...r, keep: !r.inUse }));
+	if (rows.length === 0) return insertEntry(entry, target, true);
+	// The mouse position now: it's on the dialog by the time that closes.
+	insertDialog.open(rows, { entry, target: target ?? ui.lastMousePos });
+}
+
+export function useLibrary() {
+	function openSaveDialog(): void {
+		const ui = useUiStore();
+		pendingEntry = ui.selectedModules.length ? buildClipboardEntry(ui.selectedModules, resolveSelectionArea(ui)) : null;
+		if (!pendingEntry) return;
+		if (!useSlotsStore().slots[ui.slotInFocus].templateRawHex) return showToast('This patch cannot be saved yet — try again once it has loaded.');
+		// Groups to choose from: read the folder first. The group defaults to the last one used.
+		editing.value = null;
+		void init();
+		saveDialog.open({
+			group: lastGroup,
+			name: pendingEntry.modules[0].uname || 'Item',
+			author: '',
+			license: '',
+			source: '',
+			tags: '',
+			notes: '',
+			assignments: assignmentsLine(pendingEntry),
+		});
+	}
+
+	// '' = back to the default folder (userData/library).
+	async function setFolder(dir: string): Promise<void> {
+		useSettingsStore().setLibraryFolder(dir);
+		await init();
+	}
+
+	async function chooseFolder(): Promise<void> {
+		const result = await window.electronAPI.patches.setFolder();
+		if (result.success && result.folder) await setFolder(result.folder);
+	}
+
+	// The same dialog, filled in with the item's group, name and notes.
+	function openEditDialog(item: LibraryItem): void {
+		if (!item.entry) return;
+		editing.value = item;
+		const { author, license, source, tags, body } = item.entry.notes;
+		saveDialog.open({
+			group: item.group,
+			name: item.name,
+			author,
+			license,
+			source,
+			tags: tags.join(', '),
+			notes: body,
+			assignments: assignmentsLine(item.entry),
+		});
+	}
+
+	async function remove(item: LibraryItem): Promise<void> {
+		await window.electronAPI.patches.libraryRemove(item.path);
+		setFavorite(item.path, false);
+		await refresh();
+	}
+
+	return {
+		root,
+		items,
+		groups,
+		lastSaved,
+		editing,
+		init,
+		refresh,
+		setFolder,
+		chooseFolder,
+		remove,
+		toggleFavorite: (item: LibraryItem) => setFavorite(item.path, !isFavorite(item)),
+		openSaveDialog,
+		openEditDialog,
+		saveDialog,
+		insertItem,
+		insertDialog,
+	};
+}

@@ -1089,10 +1089,10 @@ int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
     if (num_modes > 16) num_modes = 16;  /* bound: caller buffers hold at most this many */
     for (int m=0; m<num_modes; m++)
         buf[pos++]=(uint8_t)(mode_vals ? mode_vals[m] : 0);
-    if (name && *name) {
-        size_t nlen=strlen(name); if (nlen>16) nlen=16;
-        memcpy(buf+pos, name, nlen+1); pos+=(int)nlen+1;
-    } else { buf[pos++]=0x00; }
+    /* NUL-terminated below 16 chars only: a NUL after a full 16-char name shifts the frame (NACK 3) */
+    size_t nlen = name ? strlen(name) : 0; if (nlen > 16) nlen = 16;
+    if (nlen > 0) { memcpy(buf+pos, name, nlen); pos += (int)nlen; }
+    if (nlen < 16) buf[pos++] = 0x00;
     op->cmd=0x30; op->payload=buf; op->len=pos;
     return pos;
 }

@@ -1,3 +1,5 @@
+import { MODULE_ROW_HEIGHT, MODULE_WIDTH } from '@/constants';
+
 const XMLNS = 'http://www.w3.org/2000/svg';
 
 function svgNSGet(tag: string | SVGElement, attrs?: Record<string, any>): SVGElement {
@@ -50,4 +52,14 @@ export function clientToSvgPoint(svg: SVGSVGElement | null, clientX: number, cli
 	pt.x = clientX;
 	pt.y = clientY;
 	return pt.matrixTransform(ctm.inverse());
+}
+
+// Patch-canvas grid cell (module column/row) under a client point.
+export function svgClientToGrid(svg: SVGSVGElement | null, clientX: number, clientY: number): { col: number; row: number } | null {
+	const svgPt = clientToSvgPoint(svg, clientX, clientY);
+	if (!svgPt) return null;
+	return {
+		col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
+		row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),
+	};
 }

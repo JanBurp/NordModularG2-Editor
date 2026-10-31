@@ -29,7 +29,7 @@
     "test:g2": "electron-vite build && vitest run -c vitest.g2.config.ts",
     "test:duration": "node scripts/test-duration.mjs",
     "test:e2e:report": "playwright show-report --host 127.0.0.1",
-    "lint": "eslint src --max-warnings 0",
+    "lint": "eslint src e2e --max-warnings 0",
     "lint:fix": "eslint src --fix",
     "typecheck": "vue-tsc --noEmit",
     "format": "prettier --write src",

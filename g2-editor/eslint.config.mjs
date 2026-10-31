@@ -53,13 +53,16 @@ const allGlobals = {
   DOMPoint: 'readonly',
   SVGPoint: 'readonly',
   ResizeObserver: 'readonly',
+  IntersectionObserver: 'readonly',
   WheelEvent: 'readonly',
+  DataTransfer: 'readonly',
+  localStorage: 'readonly',
 };
 
 export default [
   eslint.configs.recommended,
   {
-    files: ['src/**/*.{ts,vue}'],
+    files: ['src/**/*.{ts,vue}', 'e2e/**/*.ts'],
     languageOptions: {
       parser: vueParser,
       parserOptions: {
@@ -80,6 +83,16 @@ export default [
       '@typescript-eslint/no-unused-vars': ['error', { argsIgnorePattern: '^_', ignoreRestSiblings: true }],
       'no-useless-assignment': 'off',
       'preserve-caught-error': 'off',
+    },
+  },
+  {
+    // Playwright specs run in Node; fixtures need the `({}, use)` empty pattern
+    files: ['e2e/**/*.ts'],
+    languageOptions: {
+      globals: { process: 'readonly', __dirname: 'readonly' },
+    },
+    rules: {
+      'no-empty-pattern': 'off',
     },
   },
   {

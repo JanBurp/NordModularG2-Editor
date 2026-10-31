@@ -49,6 +49,8 @@ interface Host {
 	window: BrowserWindow;
 	views: DeviceView[];
 	active: DeviceView | null;
+	// Last focus time: the front one of overlapping windows under a module drag (dragTargetAt)
+	focusedAt: number;
 }
 interface DeviceView {
 	view: WebContentsView;
@@ -194,11 +196,14 @@ function createHost(cascadeIndex = 0): Host {
 	}
 	trackWindowState(window, cascade);
 
-	const host: Host = { window, views: [], active: null };
+	const host: Host = { window, views: [], active: null, focusedAt: Date.now() };
 	hosts.push(host);
 	if (!isMac) applyWindowMenu(window);
 	window.on('resize', () => layoutHost(host));
-	window.on('focus', () => host.active?.view.webContents.focus());
+	window.on('focus', () => {
+		host.focusedAt = Date.now();
+		host.active?.view.webContents.focus();
+	});
 	window.on('close', () => console.log(`[window] close requested (${host.views.length} device view(s))`));
 	window.on('closed', () => {
 		hosts.splice(hosts.indexOf(host), 1);
@@ -784,14 +789,57 @@ ipcMain.handle('clipboard:read', () => {
 	return null;
 });
 
+// --- Module drag between device windows: the source renderer keeps the mouse while the
+// button is held, so it reports screen positions outside its window here; this forwards them,
+// in client coordinates, to the device view under the cursor (useRemoteModuleDrop.ts).
+// Overlapping windows: the most recently focused one is taken as the front one (there is no
+// z-order API); the source itself is in front, pressing the mouse on it raised it. ---
+
+let dragHoverTarget: WebContents | null = null;
+
+function dragTargetAt(sender: WebContents, screenX: number, screenY: number) {
+	for (const host of [...hosts].sort((a, b) => b.focusedAt - a.focusedAt)) {
+		const view = host.active?.view;
+		if (!view || view.webContents === sender || !host.window.isVisible() || host.window.isMinimized()) continue;
+		const content = host.window.getContentBounds();
+		const bounds = view.getBounds();
+		const clientX = screenX - content.x - bounds.x;
+		const clientY = screenY - content.y - bounds.y;
+		if (clientX >= 0 && clientY >= 0 && clientX < bounds.width && clientY < bounds.height) return { host, contents: view.webContents, clientX, clientY };
+	}
+	return null;
+}
+
+function leaveDragTarget(next: WebContents | null = null): void {
+	if (dragHoverTarget && dragHoverTarget !== next && !dragHoverTarget.isDestroyed()) dragHoverTarget.send('drag:leave');
+	dragHoverTarget = next;
+}
+
+ipcMain.on('drag:move', (e, screenX: number, screenY: number, entry: unknown) => {
+	const target = dragTargetAt(e.sender, screenX, screenY);
+	leaveDragTarget(target?.contents);
+	target?.contents.send('drag:hover', { clientX: target.clientX, clientY: target.clientY, entry });
+});
+
+ipcMain.on('drag:leave', () => leaveDragTarget());
+
+ipcMain.on('drag:drop', (e, screenX: number, screenY: number, entry: unknown) => {
+	const target = dragTargetAt(e.sender, screenX, screenY);
+	leaveDragTarget();
+	if (!target) return;
+	target.host.window.focus();
+	target.contents.send('drag:drop', { clientX: target.clientX, clientY: target.clientY, entry });
+});
+
 ipcMain.handle('patches:list', async (_, folder: string) => {
 	try {
 		const names = fs.readdirSync(folder).sort();
 		const entries = names.flatMap((name) => {
 			const full = path.join(folder, name);
 			try {
-				const isDir = fs.statSync(full).isDirectory();
-				return isDir || /\.(pch2|prf2)$/i.test(name) ? [{ name, path: full, isDir }] : [];
+				const stat = fs.statSync(full);
+				const isDir = stat.isDirectory();
+				return isDir || /\.(pch2|prf2)$/i.test(name) ? [{ name, path: full, isDir, mtime: stat.mtimeMs }] : [];
 			} catch {
 				return []; // broken symlink / unreadable entry
 			}
@@ -912,6 +960,58 @@ ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {
 	fs.mkdirSync(path.dirname(dst), { recursive: true });
 	fs.copyFileSync(assertInStorage(event.sender.id, from), dst);
 });
+
+// Library pane's items (plain .pch2 files): userData/library, or the folder chosen in the settings.
+const libraryDirByWc = new Map<number, string>();
+
+ipcMain.handle('patches:library-dir', (event, custom?: string) => {
+	const dir = custom || path.join(app.getPath('userData'), 'library');
+	fs.mkdirSync(dir, { recursive: true });
+	libraryDirByWc.set(event.sender.id, dir);
+	return dir;
+});
+
+// Only .pch2 files inside the calling window's library folder may be written or removed.
+function assertInLibrary(wcId: number, filepath: string): string {
+	const dir = libraryDirByWc.get(wcId);
+	const resolved = path.resolve(filepath);
+	const rel = dir ? path.relative(path.resolve(dir), resolved) : '';
+	if (!rel || rel.startsWith('..') || path.isAbsolute(rel) || !/\.pch2$/i.test(rel)) throw new Error('Not a library file');
+	return resolved;
+}
+
+// Saves a library item, creating its group (subfolder) when it's new.
+ipcMain.handle('patches:library-save', (event, filepath: string, data: number[]) => {
+	const file = assertInLibrary(event.sender.id, filepath);
+	fs.mkdirSync(path.dirname(file), { recursive: true });
+	fs.writeFileSync(file, Buffer.from(data));
+});
+
+// Removes the folder of a library item that was moved away, and its parents, when they're left empty (up to the library
+// folder). Hidden files (.DS_Store) don't count, as the pane skips them.
+function removeEmptyLibraryDirs(wcId: number, file: string): void {
+	const root = path.resolve(libraryDirByWc.get(wcId)!);
+	for (let dir = path.dirname(file); dir !== root && fs.readdirSync(dir).every((n) => n.startsWith('.')); dir = path.dirname(dir))
+		fs.rmSync(dir, { recursive: true });
+}
+
+// Renames/moves a library item, creating its new group (subfolder) when it's new, removing the old one when left empty.
+ipcMain.handle('patches:library-move', (event, from: string, to: string) => {
+	const src = assertInLibrary(event.sender.id, from);
+	const dst = assertInLibrary(event.sender.id, to);
+	fs.mkdirSync(path.dirname(dst), { recursive: true });
+	fs.renameSync(src, dst);
+	removeEmptyLibraryDirs(event.sender.id, src);
+});
+
+// Moves a library item to the Trash, its group's folder too when left empty.
+ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
+	const file = assertInLibrary(event.sender.id, filepath);
+	await shell.trashItem(file);
+	removeEmptyLibraryDirs(event.sender.id, file);
+});
+
+ipcMain.handle('patches:reveal', (event, filepath: string) => shell.showItemInFolder(assertInLibrary(event.sender.id, filepath)));
 
 ipcMain.handle('patches:set-folder', async (event) => {
 	const browserWin = hostWindow(event.sender);
@@ -1281,6 +1381,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: 'CommandOrControl+E',
 					enabled: menuState.canPasteParams,
 				},
+				{ label: 'Save Selection to Library…', click: () => sendToFocused('menu:action', 'save-to-library'), enabled: menuState.hasSelection },
 				{ type: 'separator' as const },
 				{ label: 'Select All', click: () => sendToFocused('menu:action', 'select-all'), accelerator: 'CommandOrControl+A' },
 			],
@@ -1401,6 +1502,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Browser', click: () => sendToFocused('menu:action', 'toggle-browser'), accelerator: 'CommandOrControl+B' },
 				{ type: 'separator' as const },
 				{ label: 'Modules', click: () => sendToFocused('menu:action', 'toggle-modules'), accelerator: 'CommandOrControl+L' },
+				{ label: 'Library', click: () => sendToFocused('menu:action', 'toggle-library'), accelerator: 'Shift+CommandOrControl+L' },
 				{
 					label: 'Parameter Overview',
 					click: () => sendToFocused('menu:action', 'toggle-parameter-overview'),

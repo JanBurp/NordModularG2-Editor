@@ -129,8 +129,10 @@
 			onCancel();
 		}
 		if (e.key === 'Tab') trapTab(e);
-		// A focused button (e.g. Cancel) handles Enter itself via its click
-		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm && document.activeElement?.tagName !== 'BUTTON') {
+		// A focused button (e.g. Cancel) handles Enter itself via its click; in a textarea Enter is a new line (Cmd/Ctrl+Enter confirms)
+		const tag = document.activeElement?.tagName;
+		const newline = tag === 'TEXTAREA' && !e.metaKey && !e.ctrlKey;
+		if (e.key === 'Enter' && props.showConfirm && !props.disableConfirm && tag !== 'BUTTON' && !newline) {
 			// Capture phase + stop: otherwise global handlers (e.g. PatchBrowser's Enter = activate item) swallow or double-handle it
 			e.preventDefault();
 			e.stopImmediatePropagation();

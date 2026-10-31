@@ -4,6 +4,7 @@ import { computed, onMounted, onUnmounted, watch } from 'vue';
 import { SLOT_LABELS } from '@/constants';
 import type { SlotLabel } from '@/types';
 import { usePatchClipboard } from '@/composables/usePatchClipboard';
+import { useLibrary } from '@/composables/useLibrary';
 import { usePatchFile } from '@/composables/usePatchFile';
 import { usePatchOperations } from '@/composables/usePatchOperations';
 import { useDeviceStore } from '@/store/device';
@@ -65,6 +66,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		isPerformanceMode: slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode,
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
+	watch(hasClipboard, (has) => console.log(`[clipboard] menu state: hasClipboard=${has}`), { immediate: true });
 
 	function syncVariationFromCurrentPatch(): void {
 		if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
@@ -77,6 +79,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		window.electronAPI?.updateRecentFiles(useSettingsStore().recentFiles.map((f) => ({ ...f })));
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
+			if (['copy', 'cut', 'paste', 'paste-params'].includes(action))
+				console.log(`[clipboard] menu action: ${action}, inputFocused=${isInputFocused()}, resyncing=${deviceStore.resyncing}`);
 			if (deviceStore.resyncing) return; // edits would collide with the post-reconnect performance re-send
 			if (action.startsWith('open-recent:')) {
 				const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
@@ -211,6 +215,12 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 				}
 				case 'toggle-modules':
 					useSettingsStore().toggleSidebar('modules');
+					break;
+				case 'toggle-library':
+					useSettingsStore().toggleSidebar('library');
+					break;
+				case 'save-to-library':
+					useLibrary().openSaveDialog();
 					break;
 				case 'toggle-browser':
 					useSettingsStore().toggleSidebar('browser');

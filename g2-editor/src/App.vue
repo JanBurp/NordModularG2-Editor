@@ -176,6 +176,99 @@
 		/>
 	</Dialog>
 
+	<Dialog
+		v-model="saveToLibraryDialog.showDialog.value"
+		:title="libraryEditing ? 'Edit Library Item' : 'Save Selection to Library'"
+		confirm-label="Save"
+		@confirm="saveToLibraryDialog.confirm"
+		@cancel="saveToLibraryDialog.cancel"
+	>
+		<!-- Group: pick an existing one from the list, or type a new one ('Saved' = the library folder itself) -->
+		<div class="flex flex-col gap-2 text-sm">
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Group</span>
+				<ComboInput
+					v-model="saveToLibraryDialog.editingValue.value.group"
+					:options="libraryGroups"
+					placeholder="Saved"
+					data-testid="save-library-group"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Name</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.name"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-name"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Author</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.author"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-author"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">License</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.license"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-license"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Source</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.source"
+					placeholder="URL or patch name"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-source"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Tags</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.tags"
+					placeholder="comma separated — the group is added"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-tags"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Notes</span>
+				<textarea
+					v-model="saveToLibraryDialog.editingValue.value.notes"
+					rows="4"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default resize-y"
+					data-testid="save-library-notes"
+				/>
+			</label>
+			<div class="text-xs text-content-muted break-words" data-testid="save-library-assignments">
+				Assignments: {{ saveToLibraryDialog.editingValue.value.assignments }}
+			</div>
+		</div>
+	</Dialog>
+	<Dialog
+		v-model="libraryInsertDialog.showDialog.value"
+		title="Insert Library Item"
+		confirm-label="Insert"
+		@confirm="libraryInsertDialog.confirm"
+		@cancel="libraryInsertDialog.cancel"
+	>
+		<!-- Which of the item's assignments to keep; "in use" ones replace the patch's own -->
+		<div class="flex flex-col gap-1 text-sm" data-testid="library-assignments">
+			<div class="text-xs text-content-secondary mb-1">Keep these assignments:</div>
+			<label v-for="(row, i) in libraryInsertDialog.editingValue.value" :key="i" class="flex items-center gap-2 cursor-pointer">
+				<CheckBox v-model="row.keep" :data-testid="`library-assignment-${i}`" />
+				<span class="text-xs text-content-muted w-12">{{ { knobs: 'Knob', morphs: 'Morph', midi: 'MIDI' }[row.kind] }}</span>
+				<span class="flex-1">{{ row.label }}</span>
+				<span v-if="row.inUse" class="text-xs text-amber-300">in use</span>
+			</label>
+		</div>
+	</Dialog>
+
 	<Dialog v-model="showMorphLabelDialog" title="Rename Morph Group" confirm-label="Rename" @confirm="confirmMorphLabel" @cancel="cancelMorphLabel">
 		<input
 			v-model="editingMorphLabel"
@@ -465,6 +558,7 @@
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
 	import Dialog from './components/common/Dialog.vue';
+	import ComboInput from './components/common/ComboInput.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
 	import ContextMenu from './components/common/ContextMenu.vue';
 	import { useContextMenu } from './composables/useContextMenu';
@@ -485,6 +579,8 @@
 	import { useMorphLabelDialog } from './composables/useMorphLabelDialog';
 	import { usePatchOperations } from './composables/usePatchOperations';
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
+	import { useLibrary } from './composables/useLibrary';
+	import CheckBox from './components/common/CheckBox.vue';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useBankDownloadDialog } from './composables/useBankDownloadDialog';
@@ -493,6 +589,7 @@
 	import { useStoreInSynthDialog } from './composables/useStoreInSynthDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
+	import { useRemoteModuleDrop } from './composables/useRemoteModuleDrop';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
 	import { useWindowTitle } from './composables/useWindowTitle';
 	import { APP_NAME } from '@/constants';
@@ -643,6 +740,7 @@
 	} = usePerfNameDialog();
 
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
+	const { saveDialog: saveToLibraryDialog, groups: libraryGroups, editing: libraryEditing, insertDialog: libraryInsertDialog } = useLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 
@@ -792,6 +890,7 @@
 		}
 	});
 
+	useRemoteModuleDrop();
 	useElectronMenuActions({
 		currentModules,
 		currentPatch,

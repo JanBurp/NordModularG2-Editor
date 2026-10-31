@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch Mutator
 - Parameter Pages Overview
 - Bank Organizer
+- Library of building blocks
 - Find & Replace (module names, param labels)
 - G2's memory meter
 - Show assigned VU meters in ParamPages as real VU-meters.
@@ -34,7 +35,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Improved selection logic when hover select is on
 - ContextMenu->SetValue now for all Params
 - Refactured multi-device UX
+- Drag'n drop modules between G2 windows
 - Added auto-connect for new device
+- Keep settings (zoom, pane) synced betwee multiple G2's
 - Menu Window renamed to Device
 - Improve 'unused modules', modules without cabling, but with midiCC or assigned parameter are now seen as in use
 
@@ -49,6 +52,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Seq modules: Loop/Once button 1px wider, Once graphic improved
 - Env modules: curve shape button wider (20px), graphics 1px lower
 - Resonator: KBT text was hidden under its button
+
+### Others
+- Added logging to investigate copy/paste between devices (for some Windows users it did not work)
 
 ## [0.7.2] - 2026-10-22
 

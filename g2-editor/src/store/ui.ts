@@ -54,6 +54,8 @@ export const useUiStore = defineStore('ui', {
 		cableShakeCount: 0 as number,
 		cableSeed: newCableSeed() as number,
 		draggedModuleId: null as number | null,
+		draggedLibraryItem: null as ClipboardEntry | null, // Library item being dragged, for the canvas drop ghost
+		draggingModules: false as boolean, // canvas modules being dragged: the Library pane accepts them
 		helpModuleTypeId: null as number | null,
 		helpAllModules: false as boolean,
 		clipboard: null as ClipboardEntry | null,
@@ -62,6 +64,9 @@ export const useUiStore = defineStore('ui', {
 		// one source of truth instead of each usePatchClipboard() call owning its own copy.
 		clipboardTypes: [] as number[],
 		lastMousePos: null as { col: number; row: number; area: 'va' | 'fx' } | null,
+		// Modules being dragged in from another G2's window, hovering at this grid position
+		// (useRemoteModuleDrop.ts); drawn as a drop ghost by the canvas of that area.
+		remoteDrag: null as { col: number; row: number; area: 'va' | 'fx'; entry: ClipboardEntry } | null,
 		// Live morph-range Ctrl/Cmd-drag hint, read by MorphDragHintOverlay (canvas-level, rendered
 		// after every module) so the badge always paints above other modules instead of being hidden
 		// behind whichever one happens to sit below it in the DOM.

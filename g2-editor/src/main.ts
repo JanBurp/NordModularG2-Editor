@@ -14,6 +14,11 @@ const pinia = createPinia();
 pinia.use(piniaPluginPersistedstate);
 app.use(pinia);
 
-window.electronAPI?.setTheme(useSettingsStore().theme);
+const settings = useSettingsStore();
+window.electronAPI?.setTheme(settings.theme);
+// Every device view shares localStorage; follow setting changes made in another view.
+window.addEventListener('storage', (e) => {
+	if (e.key === settings.$id) settings.$hydrate({ runHooks: true });
+});
 
 app.mount('#app');

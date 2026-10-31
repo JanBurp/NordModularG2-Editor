@@ -32,6 +32,9 @@ const watchEvent = listenerGroup('cli:watch-event');
 const watchDone = listenerGroup('cli:watch-done');
 const deviceDisconnected = listenerGroup('cli:device-disconnected');
 const storageChanged = listenerGroup('storage:changed');
+const dragHover = listenerGroup('drag:hover');
+const dragLeave = listenerGroup('drag:leave');
+const dragDrop = listenerGroup('drag:drop');
 
 contextBridge.exposeInMainWorld('electronAPI', {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
@@ -46,6 +49,11 @@ contextBridge.exposeInMainWorld('electronAPI', {
 		storageDir: (custom?: string) => ipcRenderer.invoke('patches:storage-dir', custom),
 		storageRemove: (filepath: string) => ipcRenderer.invoke('patches:storage-remove', filepath),
 		storageCopy: (from: string, to: string) => ipcRenderer.invoke('patches:storage-copy', from, to),
+		libraryDir: (custom?: string) => ipcRenderer.invoke('patches:library-dir', custom),
+		librarySave: (filepath: string, data: number[]) => ipcRenderer.invoke('patches:library-save', filepath, data),
+		libraryMove: (from: string, to: string) => ipcRenderer.invoke('patches:library-move', from, to),
+		libraryRemove: (filepath: string) => ipcRenderer.invoke('patches:library-remove', filepath),
+		reveal: (filepath: string) => ipcRenderer.invoke('patches:reveal', filepath),
 		onStorageChanged: (cb: () => void) => storageChanged.on(cb),
 		offStorageChanged: () => storageChanged.off(),
 	},
@@ -96,6 +104,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	clipboard: {
 		write: (entry: unknown) => ipcRenderer.invoke('clipboard:write', entry),
 		read: () => ipcRenderer.invoke('clipboard:read'),
+	},
+	drag: {
+		move: (screenX: number, screenY: number, entry: unknown) => ipcRenderer.send('drag:move', screenX, screenY, entry),
+		leave: () => ipcRenderer.send('drag:leave'),
+		drop: (screenX: number, screenY: number, entry: unknown) => ipcRenderer.send('drag:drop', screenX, screenY, entry),
+		onHover: (cb: (drag: { clientX: number; clientY: number; entry: unknown }) => void) => dragHover.on(cb),
+		onLeave: (cb: () => void) => dragLeave.on(() => cb()),
+		onDrop: (cb: (drag: { clientX: number; clientY: number; entry: unknown }) => void) => dragDrop.on(cb),
+		off: () => {
+			dragHover.off();
+			dragLeave.off();
+			dragDrop.off();
+		},
 	},
 });
 

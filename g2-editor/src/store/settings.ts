@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'library' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
@@ -52,6 +52,9 @@ export const useSettingsStore = defineStore('settings', {
 		recentFiles: [] as RecentFile[],
 		bankFolder: '' as string,
 		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
+		libraryFolder: '' as string, // Library pane's folder; '' = userData/library
+		libraryFavorites: [] as string[], // Library items' paths relative to the library folder
+		libraryFavoritesOnly: false as boolean,
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
@@ -100,6 +103,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		setStorageFolder(value: string) {
 			this.storageFolder = value;
+		},
+		setLibraryFolder(value: string) {
+			this.libraryFolder = value;
 		},
 		setHiddenModules(value: boolean) {
 			this.hidden_modules = value;
@@ -175,6 +181,10 @@ export const useSettingsStore = defineStore('settings', {
 			store.setCableGravity(store.cableGravity);
 			store.setCableThickness(store.cableThickness);
 			store.setKnobSensitivity(store.knobSensitivity);
+			// Renamed from blocksFolder (2026-10-28): keep a folder chosen under the old name.
+			const state = store.$state as { blocksFolder?: string };
+			if (state.blocksFolder && !store.libraryFolder) store.setLibraryFolder(state.blocksFolder);
+			delete state.blocksFolder;
 		},
 	},
 });

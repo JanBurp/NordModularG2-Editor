@@ -10,7 +10,7 @@ import type {
 	PatchParamVariation,
 	VariationState,
 } from '@/types';
-import { PATCH_PARAM_KEYS, NUM_VARIATIONS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
+import { PATCH_PARAM_KEYS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
@@ -49,6 +49,7 @@ import {
 	resolveColumnCollisions,
 	extractVariations,
 	removeModuleFromVariations,
+	newModuleInstance,
 	liveModuleLv,
 	snapshotModuleAssignments,
 	computeAssignOne,
@@ -1239,37 +1240,11 @@ export const useSlotsStore = defineStore('slots', {
 			const { slot, patch } = ctx;
 			const uiStore = useUiStore();
 
-			const { getModule, getDefaultParamValues } = await import('../renderer/nmg2mods');
-			const modDef = getModule(typeId);
-			const numModes = modDef?.modes?.length ?? 0;
-			const modeVals: number[] = Array(numModes).fill(0);
-			const numParams = modDef?.params?.length ?? 0;
-			const paramVals = getDefaultParamValues(typeId);
-			const base = modDef?.short ?? 'Module';
-			const sameType = [...patch.areas[0].modules, ...patch.areas[1].modules].filter((m) => m.type === typeId);
-			let maxSuffix = 0;
-			for (const m of sameType) {
-				const match = m.uname?.match(/(\d+)$/);
-				if (match) maxSuffix = Math.max(maxSuffix, parseInt(match[1], 10));
-			}
-			const uname = base + (maxSuffix + 1);
-
-			const lv: number[] = Array(numParams * NUM_VARIATIONS);
-			for (let v = 0; v < NUM_VARIATIONS; v++) for (let p = 0; p < numParams; p++) lv[v * numParams + p] = paramVals[p] ?? 64;
-
-			const mod: ModuleInstance = {
-				type: typeId,
-				index: moduleId,
-				horiz: col,
-				vert: row,
-				colour: uiStore.moduleColor,
-				uprate: 0,
-				mutaLock: defaultMutaLock(typeId),
-				pcnt: numParams,
-				lv,
-				modes: modeVals,
-				uname,
-			};
+			const mod = newModuleInstance(typeId, moduleId, col, row, uiStore.moduleColor, [...patch.areas[0].modules, ...patch.areas[1].modules]);
+			const { pcnt: numParams, modes: modeVals } = mod;
+			const uname = mod.uname!;
+			const numModes = modeVals.length;
+			const paramVals = mod.lv.slice(0, numParams);
 
 			const { areaIdx, location } = areaConfig(area);
 			mutAddModule(patch, areaIdx, mod);
@@ -1351,6 +1326,7 @@ export const useSlotsStore = defineStore('slots', {
 			cables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[],
 			area: 'voice' | 'fx',
 			morphs: MorphAssignment[][] = [], // per variation, source module indices (snapshotModulesForCopy)
+			assignments: { knobs: ParamPageAssignment[]; midi: MidiCCAssignment[] } = { knobs: [], midi: [] }, // source module indices; replace occupants
 		): Promise<void> {
 			if (entries.length === 0) return;
 			const ctx = this._getActivePatch();
@@ -1457,12 +1433,29 @@ export const useSlotsStore = defineStore('slots', {
 				});
 				await this._restoreModuleMorph(slot, pastedMorphs);
 
+				// Knobs and MIDI CCs onto the new indices, replacing what holds their knob slot or CC.
+				const onNewId = <T extends { location: number; moduleIndex: number }>(a: T): T => ({
+					...a,
+					location: areaIdx,
+					moduleIndex: newIdOf.get(a.moduleIndex)!,
+				});
+				const knobs = assignments.knobs.filter((k) => newIdOf.has(k.moduleIndex)).map(onNewId);
+				const midi = assignments.midi.filter((c) => newIdOf.has(c.moduleIndex)).map(onNewId);
+				const knobSlots = knobs.map((k) => k.slotIndex);
+				const ccs = midi.map((c) => c.cc);
+				const prevPages = [...slotEntry.paramPages];
+				const prevControllers = [...slotEntry.controllers];
+				if (knobs.length > 0) await this._applyParamPages(slot, [...prevPages.filter((p) => !knobSlots.includes(p.slotIndex)), ...knobs], knobSlots);
+				if (midi.length > 0) await this._applyControllers(slot, [...prevControllers.filter((c) => !ccs.includes(c.cc)), ...midi], ccs);
+
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
 					hist.record(slot, {
 						undo: async () => {
 							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
 							if (!patch) return;
+							if (knobs.length > 0) await this._applyParamPages(slot, prevPages, knobSlots);
+							if (midi.length > 0) await this._applyControllers(slot, prevControllers, ccs);
 							// Delete added cables first
 							const delCableCmds = addedCables.map((c) => [
 								'del-cable',
@@ -1502,7 +1495,7 @@ export const useSlotsStore = defineStore('slots', {
 								const currentMods = currentCtx.patch.areas[areaIdx].modules;
 								const currentIdSet = new Set(currentMods.map((m) => m.index));
 								const reEntries = entries.filter((e) => !currentIdSet.has(e.newId));
-								if (reEntries.length > 0) await this.paste(reEntries, cables, area, morphs);
+								if (reEntries.length > 0) await this.paste(reEntries, cables, area, morphs, assignments);
 							}
 						},
 					});
@@ -2258,11 +2251,8 @@ export const useSlotsStore = defineStore('slots', {
 				entry.patch!.paramPages = [...entry.paramPages];
 				entry.rawHex = serializePatch(entry.name, entry.patch!, entry.templateRawHex, entry.variations ?? []);
 			}
-			const sectionBytes = entry.rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			let prefix = entry.name;
-			if (textHeader) prefix = (await import('../parser/nmg2PatchSerializer')).PCH2_TEXT_HEADER;
-			const prefixBytes = Array.from(new TextEncoder().encode(prefix));
-			return [...prefixBytes, 0x00, 0x17, 0x00, ...sectionBytes];
+			const { PCH2_TEXT_HEADER, pch2FileBytes } = await import('../parser/nmg2PatchSerializer');
+			return pch2FileBytes(textHeader ? PCH2_TEXT_HEADER : entry.name, entry.rawHex);
 		},
 
 		async saveSlot(slot: SlotLabel, filepath?: string): Promise<void> {
@@ -3803,6 +3793,21 @@ export const useSlotsStore = defineStore('slots', {
 					},
 				});
 			}
+		},
+
+		// The MIDI CC sibling of _applyParamPages: replaces the whole list and re-syncs only the CCs in `touched`.
+		async _applyControllers(slot: SlotLabel, list: MidiCCAssignment[], touched: number[]): Promise<void> {
+			this.slots[slot].controllers = [...list];
+			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...list];
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
+			const cmds = touched.map((cc) => {
+				const c = list.find((x) => x.cc === cc);
+				return c
+					? ['assign-midicc', slot, ccLocationStr(c.location), String(c.moduleIndex), String(c.paramIndex), String(cc)]
+					: ['deassign-midicc', slot, String(cc)];
+			});
+			await runCliBatchSafe(cmds, '_applyControllers');
 		},
 
 		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`

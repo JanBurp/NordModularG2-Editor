@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import type { ConnectedDeviceInfo, DeviceAction, DeviceSummary, MenuAction, MenuState } from './types/index';
 import type { CliService } from './types/cli';
+import type { ClipboardEntry } from './types/patch';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -16,7 +17,7 @@ declare global {
 			patches: {
 				list: (folder: string) => Promise<{
 					success: boolean;
-					entries: { name: string; path: string; isDir: boolean }[];
+					entries: { name: string; path: string; isDir: boolean; mtime: number }[];
 					error?: string;
 					code?: string; // Node error code, e.g. ENOENT, EACCES
 				}>;
@@ -28,6 +29,11 @@ declare global {
 				storageDir: (custom?: string) => Promise<string>;
 				storageRemove: (filepath: string) => Promise<void>;
 				storageCopy: (from: string, to: string) => Promise<void>;
+				libraryDir: (custom?: string) => Promise<string>;
+				librarySave: (filepath: string, data: number[]) => Promise<void>;
+				libraryMove: (from: string, to: string) => Promise<void>;
+				libraryRemove: (filepath: string) => Promise<void>;
+				reveal: (filepath: string) => Promise<void>;
 				onStorageChanged: (cb: () => void) => void;
 				offStorageChanged: () => void;
 			};
@@ -75,6 +81,16 @@ declare global {
 			clipboard: {
 				write: (entry: unknown) => Promise<void>;
 				read: () => Promise<unknown | null>;
+			};
+			// Module drag out of this window into another G2's window (routed by the main process).
+			drag: {
+				move: (screenX: number, screenY: number, entry: ClipboardEntry) => void;
+				leave: () => void;
+				drop: (screenX: number, screenY: number, entry: ClipboardEntry) => void;
+				onHover: (cb: (drag: { clientX: number; clientY: number; entry: ClipboardEntry }) => void) => void;
+				onLeave: (cb: () => void) => void;
+				onDrop: (cb: (drag: { clientX: number; clientY: number; entry: ClipboardEntry }) => void) => void;
+				off: () => void;
 			};
 		};
 		cli: CliService;

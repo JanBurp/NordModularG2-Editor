@@ -1,4 +1,5 @@
 import { ref, computed, onUnmounted } from 'vue';
+import type { ClipboardEntry } from '@/types/patch';
 import type { Ref, ComputedRef } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
@@ -26,19 +27,28 @@ export function useModuleDrag(
 	onMove: (info: { indices: number[]; dCol: number; dRow: number; anchorIndex: number; isCopy: boolean }) => void,
 	onModuleClick: (index: number, shiftKey: boolean) => void,
 	getZoom: () => number,
+	// Modules dropped on an element marked data-library-drop (the Library pane) instead of on the canvas.
+	onLibraryDrop: (indices: number[]) => void,
+	// Copy of the dragged modules, for a drag released over another G2's window (useRemoteModuleDrop.ts)
+	getDragEntry: (indices: number[]) => ClipboardEntry,
 ): {
 	dragState: Ref<DragState | null>;
 	dragGhosts: ComputedRef<DragGhost[]>;
+	overLibrary: Ref<boolean>;
 	handleModuleDragStart: (info: ModuleDragInfo) => void;
 	clearModuleDrag: () => void;
 } {
 	const ui = useUiStore();
 	const dragState = ref<DragState | null>(null);
+	// The pointer is over the Library pane: the canvas clips the ghost there, so it's drawn above it (PatchCanvas.vue).
+	const overLibrary = ref(false);
 
 	let dragModuleIndex: number | null = null;
 	let dragStartClientX = 0;
 	let dragStartClientY = 0;
 	let dragMoved = false;
+	// Built on the first exit from the window; while set, the pointer is outside it.
+	let remoteEntry: ClipboardEntry | null = null;
 
 	const dragGhosts = computed<DragGhost[]>(() => {
 		const drag = dragState.value;
@@ -92,9 +102,26 @@ export function useModuleDrag(
 			if (startPosByIndex.size === 0) return;
 			dragState.value = { indices, startPosByIndex, anchorIndex: dragModuleIndex, dxPx: 0, dyPx: 0 };
 			dragMoved = true;
+			ui.draggingModules = true;
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
+		overLibrary.value = isOverLibrary(e);
 		updateCopyCursor(e);
+		if (isOutsideWindow(e)) {
+			remoteEntry ??= getDragEntry(dragState.value.indices);
+			window.electronAPI?.drag?.move(e.screenX, e.screenY, remoteEntry);
+		} else if (remoteEntry) {
+			remoteEntry = null;
+			window.electronAPI?.drag?.leave();
+		}
+	}
+
+	function isOverLibrary(e: MouseEvent) {
+		return !!(e.target as Element | null)?.closest?.('[data-library-drop]');
+	}
+
+	function isOutsideWindow(e: MouseEvent) {
+		return e.clientX < 0 || e.clientY < 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
 	}
 
 	function onModuleDragEnd(e: MouseEvent) {
@@ -107,7 +134,14 @@ export function useModuleDrag(
 		dragModuleIndex = null;
 		const drag = dragState.value;
 		dragState.value = null;
-		if (drag && moduleIndex !== null) {
+		overLibrary.value = false;
+		ui.draggingModules = false;
+		if (drag && isOverLibrary(e)) {
+			onLibraryDrop(drag.indices);
+		} else if (drag && isOutsideWindow(e)) {
+			// Always a copy: the source patch stays untouched.
+			window.electronAPI?.drag?.drop(e.screenX, e.screenY, remoteEntry ?? getDragEntry(drag.indices));
+		} else if (drag && moduleIndex !== null) {
 			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
 			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / MODULE_WIDTH));
 			const anchorTargetRow = Math.max(0, Math.round(anchorStart.vert + drag.dyPx / MODULE_ROW_HEIGHT));
@@ -120,12 +154,17 @@ export function useModuleDrag(
 			onModuleClick(moduleIndex, e.shiftKey);
 		}
 		dragMoved = false;
+		remoteEntry = null;
 	}
 
 	function clearModuleDrag() {
 		dragState.value = null;
+		overLibrary.value = false;
+		ui.draggingModules = false;
 		dragModuleIndex = null;
 		dragMoved = false;
+		if (remoteEntry) window.electronAPI?.drag?.leave();
+		remoteEntry = null;
 		document.body.style.cursor = '';
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
@@ -137,5 +176,5 @@ export function useModuleDrag(
 		clearModuleDrag();
 	});
 
-	return { dragState, dragGhosts, handleModuleDragStart, clearModuleDrag };
+	return { dragState, dragGhosts, overLibrary, handleModuleDragStart, clearModuleDrag };
 }

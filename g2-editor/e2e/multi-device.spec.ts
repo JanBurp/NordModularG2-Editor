@@ -1,5 +1,5 @@
 import { test as base, _electron as electron, type ElectronApplication, type Page } from '@playwright/test';
-import { expect, editorPage, evaluateWithRetry, isEditorPage } from './fixtures/electron';
+import { expect, editorPage, evaluateWithRetry, isEditorPage, sendMenuActionTo } from './fixtures/electron';
 import fs from 'fs';
 import os from 'os';
 import path from 'path';
@@ -140,6 +140,34 @@ test.describe('multi-device — one window, a device group per connected G2', ()
 			await second.locator('[data-testid="device-group"][data-active="true"] [data-testid="device-name"]').click({ button: 'right' });
 			await second.getByText('Move to Main Window').click();
 			await expect.poll(() => windowCount(app)).toBe(1);
+		} finally {
+			await app.close();
+		}
+	});
+
+	test('zoom and the open pane follow from one device view to the other', async ({ userDataDir }) => {
+		const { app, page } = await launchWithOneDevice(userDataDir);
+		try {
+			const second = await addSecondDevice(app, page);
+			await settle(page);
+			await settle(second);
+			// A canvas only exists once a patch is loaded.
+			for (const p of [page, second]) await p.getByRole('button', { name: 'New', exact: true }).click();
+			// The canvas svg is drawn at viewBox size × canvasZoom.
+			const zoom = (p: Page) =>
+				p
+					.locator('[data-canvas-area="va"] svg')
+					.first()
+					.evaluate((svg) => Number(svg.getAttribute('width')) / Number(svg.getAttribute('viewBox')!.split(' ')[2]));
+			await expect.poll(() => zoom(second)).toBeCloseTo(1);
+
+			// sendMenuActionTo drives one of the two views; both must end up the same.
+			await sendMenuActionTo(app, 'zoom-in');
+			await sendMenuActionTo(app, 'toggle-modules');
+			for (const p of [page, second]) {
+				await expect.poll(() => zoom(p)).toBeCloseTo(1.1);
+				await expect(p.getByTestId('modules-search')).toBeVisible();
+			}
 		} finally {
 			await app.close();
 		}
