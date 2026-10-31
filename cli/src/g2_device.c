@@ -3090,7 +3090,7 @@ static int flash_read_location(int type, int bank, int location0, uint8_t **bulk
      * simply the official text header followed by it - what the original
      * editor's CFlashDumper writes (CPatchFilePort::SaveFromDump goes
      * through the same WriteDataFile as a normal save), and the layout the
-     * editor's Save writes. No patch_usb_to_pch2/perf_sections_to_prf2
+     * editor's Save writes. No patch_usb_to_pch2
      * conversion is involved, and patches and performances are identical
      * here apart from the type byte the body already carries and the
      * header's Type= line. */
@@ -3475,8 +3475,8 @@ static int flash_write_file(int type, int bank, int location0, const char *filep
      * terminating NUL to EOF, i.e. [0x00][version][type][sections][file
      * CRC] - confirmed byte-for-byte against what the device sends back
      * for the same location (see build_flash_dump_raw_frame). Identical
-     * for patches and performances, so neither locate_section_data nor
-     * perf_prf2_to_sections is involved here; locate_section_data is only
+     * for patches and performances, so no section extraction is involved
+     * here; locate_section_data is only
      * used to find the name terminator and reject a truncated file. */
     int name_end, data_offset, data_len;
     if (locate_section_data(fileData, fsize, &name_end, &data_offset, &data_len) < 0) {

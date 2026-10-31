@@ -18,9 +18,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.env.APP_ROOT = path.join(__dirname, '..', '..');
 
-export const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
+const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
+const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
 
 /* One WebContentsView (a full renderer with its own stores) + one daemon subprocess per connected G2.
  * A host BrowserWindow holds several views and shows only its active one, so switching devices

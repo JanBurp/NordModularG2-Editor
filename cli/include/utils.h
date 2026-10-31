@@ -45,8 +45,6 @@ void perf_settings_normalize_slots(uint8_t *data, size_t len);
 /* Patch format conversion (USB <-> PCH2) */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
                       uint8_t *pch2_data, size_t *pch2_len);
-int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
-                      uint8_t *usb_data, size_t *usb_len);
 
 /* Wrap section data (as returned by patch_usb_to_pch2) in a .pch2 file as the official editor
  * writes it: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE]. The CRC covers
@@ -55,11 +53,6 @@ int patch_pch2_to_usb(const uint8_t *pch2_data, size_t pch2_len,
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len);
 
-/* Performance format conversion (PRF2 file <-> section data) */
-int perf_prf2_to_sections(const uint8_t *prf2, size_t prf2_len,
-                           uint8_t *sections_out, size_t *sections_len);
-int perf_sections_to_prf2(const char *name, const uint8_t *sections, size_t sections_len,
-                           uint8_t *prf2_out, size_t *prf2_len);
 
 /*
  * Split a whitespace-delimited command string into tokens in-place.

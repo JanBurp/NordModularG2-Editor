@@ -109,25 +109,7 @@ void test_patch_usb_to_pch2_strips_trailer(void) {
     TEST_ASSERT_EQUAL_UINT8(0xa4, pch2_data[22]);
 }
 
-void test_patch_pch2_to_usb_adds_header_and_trailer(void) {
-    uint8_t pch2_data[] = {0x50, 0x69, 0x61, 0x6e, 0x6f, 0x00};  /* "Piano\0" */
-    size_t pch2_len = 6;
-    uint8_t usb_data[16] = {0};
-    size_t usb_len = sizeof(usb_data);
-    
-    int result = patch_pch2_to_usb(pch2_data, pch2_len, usb_data, &usb_len);
-    
-    TEST_ASSERT_EQUAL_INT(0, result);
-    TEST_ASSERT_EQUAL_INT(11, usb_len);  /* 6 + 5 = 11 */
-    TEST_ASSERT_EQUAL_UINT8(0x01, usb_data[0]);  /* Header */
-    TEST_ASSERT_EQUAL_UINT8(0x00, usb_data[1]);  /* Length high */
-    TEST_ASSERT_EQUAL_UINT8(0x06, usb_data[2]);  /* Length low = 6 */
-    TEST_ASSERT_EQUAL_UINT8(0x50, usb_data[3]);  /* Data start */
-    TEST_ASSERT_EQUAL_UINT8(0x69, usb_data[4]);
-    /* Last 2 bytes are CRC */
-}
-
-void test_patch_roundtrip_conversion(void) {
+void test_patch_usb_to_pch2_skips_gap(void) {
     /* Full USB data format for receiving from G2 uses the two-part extraction:
      * data[0x03:0x15] + data[0x17:-2]
      * 
@@ -174,20 +156,6 @@ void test_patch_roundtrip_conversion(void) {
     TEST_ASSERT_EQUAL_UINT8(0xa5, pch2_data[18]);
     TEST_ASSERT_EQUAL_UINT8(0xb6, pch2_data[19]);
     TEST_ASSERT_EQUAL_UINT8(0xc7, pch2_data[20]);
-    
-    /* Convert PCH2 -> USB */
-    uint8_t usb_data[32] = {0};
-    size_t usb_len = sizeof(usb_data);
-    result = patch_pch2_to_usb(pch2_data, pch2_len, usb_data, &usb_len);
-    TEST_ASSERT_EQUAL_INT(0, result);
-    TEST_ASSERT_EQUAL_INT(26, usb_len);  /* 3 + 21 + 2 = 26 */
-    
-    /* Verify USB structure is correct */
-    TEST_ASSERT_EQUAL_UINT8(0x01, usb_data[0]);  /* Header marker */
-    TEST_ASSERT_EQUAL_UINT8(0x00, usb_data[1]);  /* Length high */
-    TEST_ASSERT_EQUAL_UINT8(0x15, usb_data[2]);  /* Length low = 21 */
-    TEST_ASSERT_EQUAL_UINT8(0x50, usb_data[3]);  /* Data start */
-    TEST_ASSERT_EQUAL_UINT8(0x69, usb_data[4]);
 }
 
 void test_patch_usb_to_pch2_buffer_too_small(void) {
@@ -221,18 +189,6 @@ void test_patch_usb_to_pch2_buffer_too_small(void) {
     TEST_ASSERT_EQUAL_INT(21, pch2_len);  /* Should report required size: 18 + 3 */
 }
 
-void test_patch_pch2_to_usb_buffer_too_small(void) {
-    uint8_t pch2_data[] = {0x50, 0x69, 0x61, 0x6e, 0x6f, 0x00};
-    size_t pch2_len = 6;
-    uint8_t usb_data[8] = {0};  /* Need 11 bytes but only 8 */
-    size_t usb_len = sizeof(usb_data);
-    
-    int result = patch_pch2_to_usb(pch2_data, pch2_len, usb_data, &usb_len);
-    
-    TEST_ASSERT_EQUAL_INT(-1, result);
-    TEST_ASSERT_EQUAL_INT(11, usb_len);  /* Should report required size */
-}
-
 void test_patch_usb_to_pch2_null_inputs(void) {
     uint8_t usb_data[28] = {
         0x01, 0x00, 0x10,
@@ -251,16 +207,6 @@ void test_patch_usb_to_pch2_null_inputs(void) {
     TEST_ASSERT_EQUAL_INT(-1, patch_usb_to_pch2(usb_data, 28, pch2_data, NULL));
 }
 
-void test_patch_pch2_to_usb_null_inputs(void) {
-    uint8_t pch2_data[] = {0x50, 0x69, 0x61, 0x6e, 0x6f, 0x00};
-    uint8_t usb_data[16] = {0};
-    size_t usb_len = 16;
-    
-    TEST_ASSERT_EQUAL_INT(-1, patch_pch2_to_usb(NULL, 6, usb_data, &usb_len));
-    TEST_ASSERT_EQUAL_INT(-1, patch_pch2_to_usb(pch2_data, 6, NULL, &usb_len));
-    TEST_ASSERT_EQUAL_INT(-1, patch_pch2_to_usb(pch2_data, 6, usb_data, NULL));
-}
-
 void test_patch_usb_to_pch2_data_too_short(void) {
     uint8_t usb_data[] = {0x01, 0x02};  /* Less than minimum 5 bytes */
     uint8_t pch2_data[16] = {0};
@@ -269,41 +215,6 @@ void test_patch_usb_to_pch2_data_too_short(void) {
     int result = patch_usb_to_pch2(usb_data, sizeof(usb_data), pch2_data, &pch2_len);
     
     TEST_ASSERT_EQUAL_INT(-1, result);  /* Should fail due to usb_len < 5 */
-}
-
-void test_perf_roundtrip_conversion(void) {
-    const char *perf_name = "TestPerf";
-    uint8_t sections[] = { 0x11, 0x00, 0x03, 0xAA, 0xBB, 0xCC };
-    size_t sections_len = sizeof(sections);
-
-    /* Step 1: assemble prf2 */
-    uint8_t prf2_buf[64] = {0};
-    size_t prf2_len = sizeof(prf2_buf);
-    int result = perf_sections_to_prf2(perf_name, sections, sections_len, prf2_buf, &prf2_len);
-    TEST_ASSERT_EQUAL_INT(0, result);
-    /* "TestPerf"(8) + NUL(1) + 0x17(1) + 0x00(1) + 6 sections + 2 CRC = 19 */
-    TEST_ASSERT_EQUAL_INT(19, prf2_len);
-    TEST_ASSERT_EQUAL_UINT8('T',  prf2_buf[0]);
-    TEST_ASSERT_EQUAL_UINT8(0x00, prf2_buf[8]);   /* NUL terminator */
-    TEST_ASSERT_EQUAL_UINT8(0x17, prf2_buf[9]);   /* magic marker */
-    TEST_ASSERT_EQUAL_UINT8(0x00, prf2_buf[10]);  /* padding */
-    TEST_ASSERT_EQUAL_UINT8(0x11, prf2_buf[11]);  /* first section byte */
-
-    /* Step 2: extract sections */
-    uint8_t extracted[32] = {0};
-    size_t extracted_len = sizeof(extracted);
-    result = perf_prf2_to_sections(prf2_buf, prf2_len, extracted, &extracted_len);
-    TEST_ASSERT_EQUAL_INT(0, result);
-    TEST_ASSERT_EQUAL_INT(sections_len, extracted_len);
-    TEST_ASSERT_EQUAL_MEMORY(sections, extracted, sections_len);
-
-    /* Step 3: reassemble and verify exact match with original prf2 */
-    uint8_t reassembled[64] = {0};
-    size_t reassembled_len = sizeof(reassembled);
-    result = perf_sections_to_prf2(perf_name, extracted, extracted_len, reassembled, &reassembled_len);
-    TEST_ASSERT_EQUAL_INT(0, result);
-    TEST_ASSERT_EQUAL_INT(prf2_len, reassembled_len);
-    TEST_ASSERT_EQUAL_MEMORY(prf2_buf, reassembled, prf2_len);
 }
 
 void test_patch_usb_to_pch2_exact_size(void) {
