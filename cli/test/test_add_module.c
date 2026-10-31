@@ -26,3 +26,17 @@ void test_build_add_module_allows_fx_in_only_in_fx(void) {
 void test_add_module_rejects_index_128_without_usb(void) {
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_add_module(0, 1, 97, 128, 0, 0, 0, 0, 0, NULL, 0, NULL, "OscA1"));
 }
+
+/* The name is NUL-terminated below 16 chars only (as CMModuleName); a NUL after a full 16-char
+ * name shifted the frame and the G2 NACKed the whole batch (Name module "of pulse or trig"). */
+void test_build_add_module_name_terminator(void) {
+    uint8_t buf[512]; G2Op op;
+    TEST_ASSERT_EQUAL_INT(8 + 16, g2_build_add_module_op(&op, buf, 1, 126, 1, 0, 0, 0, 0, 0, NULL, "of pulse or trig"));
+    TEST_ASSERT_EQUAL_MEMORY("of pulse or trig", buf + 8, 16);
+    TEST_ASSERT_EQUAL_INT(8 + 16, g2_build_add_module_op(&op, buf, 1, 126, 1, 0, 0, 0, 0, 0, NULL, "ABCDEFGHIJKLMNOPQR"));
+    TEST_ASSERT_EQUAL_MEMORY("ABCDEFGHIJKLMNOP", buf + 8, 16);
+    TEST_ASSERT_EQUAL_INT(8 + 4, g2_build_add_module_op(&op, buf, 1, 97, 1, 0, 0, 0, 0, 0, NULL, "Osc"));
+    TEST_ASSERT_EQUAL_MEMORY("Osc", buf + 8, 4);
+    TEST_ASSERT_EQUAL_INT(8 + 1, g2_build_add_module_op(&op, buf, 1, 97, 1, 0, 0, 0, 0, 0, NULL, ""));
+    TEST_ASSERT_EQUAL_UINT8(0, buf[8]);
+}
