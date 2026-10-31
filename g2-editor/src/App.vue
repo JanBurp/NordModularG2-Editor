@@ -493,6 +493,7 @@
 	import { useStoreInSynthDialog } from './composables/useStoreInSynthDialog';
 	import { useSlotManagement } from './composables/useSlotManagement';
 	import { useElectronMenuActions } from './composables/useElectronMenuActions';
+	import { useRemoteModuleDrop } from './composables/useRemoteModuleDrop';
 	import { useModuleKeyboard } from './composables/useModuleKeyboard';
 	import { useWindowTitle } from './composables/useWindowTitle';
 	import { APP_NAME } from '@/constants';
@@ -792,6 +793,7 @@
 		}
 	});
 
+	useRemoteModuleDrop();
 	useElectronMenuActions({
 		currentModules,
 		currentPatch,

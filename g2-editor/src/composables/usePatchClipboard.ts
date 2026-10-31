@@ -27,6 +27,25 @@ export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>)
 	return uiStore.clipboard;
 }
 
+// The selected modules of the slot in focus plus the cables between them, as copied to the clipboard.
+// Also the payload of a module drag into another G2's window (useModuleDrag.ts).
+export function buildClipboardEntry(indices: number[], area: 'voice' | 'fx'): ClipboardEntry {
+	const slotsStore = useSlotsStore();
+	const uiStore = useUiStore();
+	const selectedIds = new Set(indices);
+	const { areaIdx, location: areaKey } = areaConfig(area);
+	const slot = uiStore.slotInFocus;
+
+	const { modules, morphs } = slotsStore.snapshotModulesForCopy(slot, areaIdx, [...selectedIds]);
+
+	const cables = slotsStore
+		.getAreaCables(slot, areaIdx)
+		.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
+		.map((c: any) => ({ ...c }));
+
+	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
+}
+
 export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -54,21 +73,8 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	function copySelection(): void {
-		const selectedIds = new Set(uiStore.selectedModules);
-		if (selectedIds.size === 0) return;
-
-		const area = getSourceArea();
-		const { areaIdx, location: areaKey } = areaConfig(area);
-		const slot = uiStore.slotInFocus;
-
-		const { modules, morphs } = slotsStore.snapshotModulesForCopy(slot, areaIdx, [...selectedIds]);
-
-		const cables = slotsStore
-			.getAreaCables(slot, areaIdx)
-			.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
-			.map((c: any) => ({ ...c }));
-
-		const entry: ClipboardEntry = { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
+		if (uiStore.selectedModules.length === 0) return;
+		const entry = buildClipboardEntry(uiStore.selectedModules, getSourceArea());
 		uiStore.clipboard = entry;
 		uiStore.clipboardTypes = entry.modules.map((m) => m.type);
 		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
@@ -82,9 +88,13 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	async function pasteClipboard(): Promise<void> {
 		const clipboard = await readClipboardEntry(uiStore);
 		if (!clipboard || clipboard.modules.length === 0) return;
+		await pasteEntry(clipboard, uiStore.lastMousePos);
+	}
 
+	// Pastes at mousePos (top-left of the pasted block), or +2 from the copied position when null.
+	// Also the drop end of a module drag from another G2's window (useRemoteModuleDrop.ts).
+	async function pasteEntry(clipboard: ClipboardEntry, mousePos: { col: number; row: number; area: 'va' | 'fx' } | null): Promise<void> {
 		// Destination area: use mouse position's area if known, else active area
-		const mousePos = uiStore.lastMousePos;
 		const destAreaKey: 'va' | 'fx' = mousePos ? mousePos.area : uiStore.activeArea === 1 ? 'va' : 'fx';
 		const area: 'voice' | 'fx' = destAreaKey === 'va' ? 'voice' : 'fx';
 		const { areaIdx } = areaConfig(area);
@@ -132,5 +142,5 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 		await slotsStore.pasteParams(pairs, uiStore.variation, area);
 	}
 
-	return { copySelection, cutSelection, pasteClipboard, pasteParams, hasClipboard };
+	return { copySelection, cutSelection, pasteClipboard, pasteEntry, pasteParams, hasClipboard };
 }

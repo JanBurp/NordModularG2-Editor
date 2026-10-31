@@ -3,6 +3,7 @@
 		ref="wrapperEl"
 		class="overflow-auto bg-surface-2 relative h-full w-full"
 		:data-testid="`canvas-${area}`"
+		:data-canvas-area="area"
 		@dragover.prevent="handleDragOver"
 		@dragleave="clearDropGhost"
 		@drop.prevent="handleModuleDropOnWrapper"
@@ -59,6 +60,7 @@
 				@param-label-edit="(info) => emit('paramLabelEdit', info)"
 			/>
 			<DragGhost :ghosts="dragGhosts" />
+			<DragGhost :ghosts="remoteGhosts" />
 			<!-- Cables.vue draws into this layer: above the modules, below every badge/hint overlay. -->
 			<g ref="cableLayerRef" />
 			<CCBadgesOverlay :modules="props.modules as ModuleInstance[]" :area-label="props.area as 'fx' | 'va'" />
@@ -114,6 +116,8 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
+	import { remoteDragGhosts } from '../../composables/useRemoteModuleDrop';
+	import { buildClipboardEntry } from '../../composables/usePatchClipboard';
 	import { useUiStore } from '../../store/ui';
 	import { useSlotsStore } from '../../store/slots';
 	import { useSettingsStore } from '../../store/settings';
@@ -123,7 +127,7 @@
 	import { useGhostCable } from '../../composables/useGhostCable';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { getAreaByShort, MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
-	import { clientToSvgPoint } from '../../renderer/svgUtils';
+	import { svgClientToGrid } from '../../renderer/svgUtils';
 	import { createDoubleClickDetector } from '../../utils/doubleClick';
 
 	const props = defineProps({
@@ -295,15 +299,6 @@
 		return new Set((props.modules as ModuleInstance[]).filter((m) => isUnusedModule(m, props.cables as Cable[], assigned)).map((m) => m.index));
 	});
 
-	function svgClientToGrid(clientX: number, clientY: number): { col: number; row: number } | null {
-		const svgPt = clientToSvgPoint(svgRef.value, clientX, clientY);
-		if (!svgPt) return null;
-		return {
-			col: Math.max(0, Math.floor(svgPt.x / MODULE_WIDTH)),
-			row: Math.max(0, Math.floor(svgPt.y / MODULE_ROW_HEIGHT)),
-		};
-	}
-
 	function onParamChange(moduleIndex: number, paramIndex: number, value: number, immediate?: boolean) {
 		valueHint.changed({ moduleIndex, paramIndex, area: props.area as 'fx' | 'va' });
 		emit('paramChange', moduleIndex, paramIndex, value, immediate);
@@ -344,12 +339,14 @@
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
 		() => zoom.value,
+		(indices) => buildClipboardEntry(indices, props.area === 'va' ? 'voice' : 'fx'),
 	);
+	const remoteGhosts = computed(() => remoteDragGhosts(uiStore.remoteDrag, props.area as 'va' | 'fx'));
 
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(svgRef, (info) => emit('moduleDrop', info));
 
 	function onCanvasContextMenu(e: MouseEvent) {
-		const grid = svgClientToGrid(e.clientX, e.clientY);
+		const grid = svgClientToGrid(svgRef.value, e.clientX, e.clientY);
 		if (!grid) return;
 		const { col, row } = grid;
 		const area = props.area as 'va' | 'fx';
@@ -383,7 +380,7 @@
 	}
 
 	function handleSvgMouseMove(e: MouseEvent) {
-		const grid = svgClientToGrid(e.clientX, e.clientY);
+		const grid = svgClientToGrid(svgRef.value, e.clientX, e.clientY);
 		if (!grid) return;
 		uiStore.lastMousePos = { ...grid, area: props.area as 'va' | 'fx' };
 	}

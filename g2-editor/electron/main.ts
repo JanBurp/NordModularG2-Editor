@@ -784,6 +784,46 @@ ipcMain.handle('clipboard:read', () => {
 	return null;
 });
 
+// --- Module drag between device windows: the source renderer keeps the mouse while the
+// button is held, so it reports screen positions outside its window here; this forwards them,
+// in client coordinates, to the device view under the cursor (useRemoteModuleDrop.ts). ---
+
+let dragHoverTarget: WebContents | null = null;
+
+function dragTargetAt(sender: WebContents, screenX: number, screenY: number) {
+	for (const host of hosts) {
+		const view = host.active?.view;
+		if (!view || view.webContents === sender || !host.window.isVisible() || host.window.isMinimized()) continue;
+		const content = host.window.getContentBounds();
+		const bounds = view.getBounds();
+		const clientX = screenX - content.x - bounds.x;
+		const clientY = screenY - content.y - bounds.y;
+		if (clientX >= 0 && clientY >= 0 && clientX < bounds.width && clientY < bounds.height) return { host, contents: view.webContents, clientX, clientY };
+	}
+	return null;
+}
+
+function leaveDragTarget(next: WebContents | null = null): void {
+	if (dragHoverTarget && dragHoverTarget !== next && !dragHoverTarget.isDestroyed()) dragHoverTarget.send('drag:leave');
+	dragHoverTarget = next;
+}
+
+ipcMain.on('drag:move', (e, screenX: number, screenY: number, entry: unknown) => {
+	const target = dragTargetAt(e.sender, screenX, screenY);
+	leaveDragTarget(target?.contents);
+	target?.contents.send('drag:hover', { clientX: target.clientX, clientY: target.clientY, entry });
+});
+
+ipcMain.on('drag:leave', () => leaveDragTarget());
+
+ipcMain.on('drag:drop', (e, screenX: number, screenY: number, entry: unknown) => {
+	const target = dragTargetAt(e.sender, screenX, screenY);
+	leaveDragTarget();
+	if (!target) return;
+	target.host.window.focus();
+	target.contents.send('drag:drop', { clientX: target.clientX, clientY: target.clientY, entry });
+});
+
 ipcMain.handle('patches:list', async (_, folder: string) => {
 	try {
 		const names = fs.readdirSync(folder).sort();
