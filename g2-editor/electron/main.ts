@@ -1011,7 +1011,7 @@ ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
 	removeEmptyLibraryDirs(event.sender.id, file);
 });
 
-ipcMain.handle('patches:reveal', (_, filepath: string) => shell.showItemInFolder(filepath));
+ipcMain.handle('patches:reveal', (event, filepath: string) => shell.showItemInFolder(assertInLibrary(event.sender.id, filepath)));
 
 ipcMain.handle('patches:set-folder', async (event) => {
 	const browserWin = hostWindow(event.sender);

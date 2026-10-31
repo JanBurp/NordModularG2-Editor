@@ -140,7 +140,8 @@ async function saveToLibrary(form: SaveForm): Promise<void> {
 			);
 	const path = `${root.value}/${group ? `${group}/` : ''}${unique}.pch2`;
 	await window.electronAPI.patches.librarySave(item?.path ?? path, bytes);
-	if (item && item.path !== path) {
+	// relPath: `path` is '/'-joined, the scanned item.path uses the platform's separator (backslash on Windows)
+	if (item && relPath(item.path) !== relPath(path)) {
 		await window.electronAPI.patches.libraryMove(item.path, path);
 		if (isFavorite(item)) {
 			setFavorite(item.path, false);
@@ -150,24 +151,27 @@ async function saveToLibrary(form: SaveForm): Promise<void> {
 	const settings = useSettingsStore();
 	if (settings.rightPaneTab !== 'library' || !settings.showRightPane) settings.toggleSidebar('library');
 	await refresh();
-	lastSaved.value = { group, name: unique, path };
+	// The scanned item's own path, for the pane to compare against
+	const saved = items.value.find((i) => relPath(i.path) === relPath(path));
+	lastSaved.value = { group, name: unique, path: saved?.path ?? path };
 }
 
 // The Insert dialog: one row per knob, MIDI CC and morph of the item; a knob slot or CC the patch already uses
 // is "in use" and starts unchecked (kept, it replaces that one). A morph set in several variations is one row.
-export type AssignmentRow = { kind: 'knobs' | 'morphs' | 'midi'; label: string; inUse: boolean; keep: boolean };
+// `key` identifies the assignment: labels can repeat (modules with the same name).
+export type AssignmentRow = { kind: 'knobs' | 'morphs' | 'midi'; key: string; label: string; inUse: boolean; keep: boolean };
+const morphKey = (a: { moduleIndex: number; paramIndex: number; groupIndex: number }) => `${a.moduleIndex}.${a.paramIndex}.${a.groupIndex}`;
 type InsertContext = { entry: ClipboardEntry; target: { col: number; row: number; area: 'va' | 'fx' } | null };
 const insertDialog = useEditDialog<AssignmentRow[], InsertContext>([], 'insertFromLibrary', async (rows, ctx) => {
 	const { entry, target } = ctx!;
-	const labels = assignmentLabels(entry);
-	const kept = (kind: AssignmentRow['kind']) => new Set(rows.filter((r) => r.kind === kind && r.keep).map((r) => r.label));
+	const kept = (kind: AssignmentRow['kind']) => new Set(rows.filter((r) => r.kind === kind && r.keep).map((r) => r.key));
 	const [knobs, morphs, midi] = [kept('knobs'), kept('morphs'), kept('midi')];
 	await insertEntry(
 		{
 			...entry,
-			knobs: entry.knobs?.filter((_, i) => knobs.has(labels.knobs[i])),
-			morphs: entry.morphs?.map((list, v) => list.filter((_, i) => morphs.has(labels.morphs[v][i]))),
-			midi: entry.midi?.filter((_, i) => midi.has(labels.midi[i])),
+			knobs: entry.knobs?.filter((_, i) => knobs.has(String(i))),
+			morphs: entry.morphs?.map((list) => list.filter((a) => morphs.has(morphKey(a)))),
+			midi: entry.midi?.filter((_, i) => midi.has(String(i))),
 		},
 		target,
 		true,
@@ -180,9 +184,18 @@ async function insertItem(entry: ClipboardEntry, target?: InsertContext['target'
 	const { paramPages, controllers } = useSlotsStore().slots[ui.slotInFocus];
 	const labels = assignmentLabels(entry);
 	const rows: AssignmentRow[] = [
-		...(entry.knobs ?? []).map((k, i) => ({ kind: 'knobs' as const, label: labels.knobs[i], inUse: paramPages.some((p) => p.slotIndex === k.slotIndex) })),
-		...[...new Set(labels.morphs.flat())].map((label) => ({ kind: 'morphs' as const, label, inUse: false })),
-		...(entry.midi ?? []).map((c, i) => ({ kind: 'midi' as const, label: labels.midi[i], inUse: controllers.some((x) => x.cc === c.cc) })),
+		...(entry.knobs ?? []).map((k, i) => ({
+			kind: 'knobs' as const,
+			key: String(i),
+			label: labels.knobs[i],
+			inUse: paramPages.some((p) => p.slotIndex === k.slotIndex),
+		})),
+		...new Map(
+			(entry.morphs ?? []).flatMap((list, v) =>
+				list.map((a, i) => [morphKey(a), { kind: 'morphs' as const, key: morphKey(a), label: labels.morphs[v][i], inUse: false }] as const),
+			),
+		).values(),
+		...(entry.midi ?? []).map((c, i) => ({ kind: 'midi' as const, key: String(i), label: labels.midi[i], inUse: controllers.some((x) => x.cc === c.cc) })),
 	].map((r) => ({ ...r, keep: !r.inUse }));
 	if (rows.length === 0) return insertEntry(entry, target, true);
 	// The mouse position now: it's on the dialog by the time that closes.

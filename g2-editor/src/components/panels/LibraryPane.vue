@@ -261,6 +261,9 @@
 	// selected, as the search may match other items too (by their notes). After the search's watcher has unselected.
 	watch(lastSaved, async (saved) => {
 		if (!saved) return;
+		// A new item isn't a favorite: it would be filtered out
+		const item = items.value.find((i) => i.path === saved.path);
+		if (item && !isFavorite(item)) settings.libraryFavoritesOnly = false;
 		searchQuery.value = `${groupLabel(saved.group).split(' ')[0]} ${saved.name}`;
 		await nextTick();
 		selectedPath.value = saved.path;

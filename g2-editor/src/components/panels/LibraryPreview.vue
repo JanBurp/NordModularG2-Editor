@@ -44,7 +44,7 @@
 		});
 	}
 
-	watch([visible, () => props.entry], drawCables);
+	watch([visible, () => props.entry, () => settings.cableGravity, () => settings.cableOpacity, () => settings.cableThickness], drawCables);
 </script>
 
 <style scoped>
