@@ -26,8 +26,12 @@ See the [Changelog](https://github.com/JanBurp/NordModularG2-Editor/blob/main/CH
 | Core USB, Parsing, Basic Editing, etc. | ✅ Done |
 | Undo/Redo, MIDI CC assignment, Browser, Variation copy, Led's in patch, etc. | ✅ Done |
 | Morph Editing, Parameter Pages Assignment | ✅ Done |
-| Patch Adjuster, Mutator, Parameter Overview, new: Bank organizer, Find & Replace, Library of building blocks  | 🗓 Planned |
+| Patch Adjuster, Mutator, Parameter Overview, new: Bank organizer, Find & Replace, Library of building blocks  | ✅ Done |
 | Linux build | 🗓 Planned |
+
+### Video of version v0.8.0 (november 2026)
+
+[![Watch the video](https://img.youtube.com/vi/JfptPZ5R9fo/0.jpg)](https://youtu.be/JfptPZ5R9fo)
 
 ### Video of version v0.7.0 (october 2026)
 

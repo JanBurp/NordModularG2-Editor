@@ -9,13 +9,14 @@ on:
 env:
   LIBUSB_VERSION: '1.0.27'
   NODE_VERSION: '20'
+  MACOSX_DEPLOYMENT_TARGET: '14.0'
 
 jobs:
   # ─────────────────────────────────────────────
   # Unit tests (no G2 needed); hardware suites run locally only
   # ─────────────────────────────────────────────
   test:
-    runs-on: macos-14
+    runs-on: macos-15
     steps:
       - uses: actions/checkout@v4
 
@@ -39,7 +40,7 @@ jobs:
   # macOS arm64 (native Apple Silicon runner)
   # ─────────────────────────────────────────────
   build-macos-arm64:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
@@ -96,7 +97,7 @@ jobs:
   # macOS x64 (cross-compiled from arm64 runner)
   # ─────────────────────────────────────────────
   build-macos-x64:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
