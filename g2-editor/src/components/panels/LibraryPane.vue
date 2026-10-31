@@ -21,6 +21,19 @@
 					@enter="handleEnter"
 				/>
 				<button
+					:class="[
+						'shrink-0 px-1 cursor-pointer',
+						settings.libraryFavoritesOnly ? 'text-amber-300' : 'text-content-secondary hover:text-content-primary',
+					]"
+					:title="settings.libraryFavoritesOnly ? 'Show All Items' : 'Show Favorites Only'"
+					data-testid="library-favorites-only"
+					@click="settings.libraryFavoritesOnly = !settings.libraryFavoritesOnly"
+					@mouseenter="showHint('libraryFavoritesOnly')"
+					@mouseleave="clearHint"
+				>
+					<Icon name="star" :class="['w-3 h-3', settings.libraryFavoritesOnly && 'fill-current']" />
+				</button>
+				<button
 					class="shrink-0 text-content-secondary hover:text-content-primary px-1 cursor-pointer"
 					:title="allExpanded ? 'Collapse All' : 'Expand All'"
 					@click="toggleAllGroups"
@@ -63,8 +76,29 @@
 							@mouseleave="clearHint"
 						>
 							<div class="flex items-center gap-1 px-1 py-0.5 text-xs">
-								<span class="truncate flex-1 font-semibold">{{ item.name }}</span>
-								<span class="text-content-secondary">{{ item.entry ? `${item.entry.modules.length} modules` : 'unreadable' }}</span>
+								<span class="truncate flex-1 font-semibold"
+									>{{ item.name
+									}}<span v-if="item.entry?.notes.author" class="font-normal text-content-secondary">
+										(<span
+											class="cursor-pointer hover:text-accent-primary"
+											title="Search for this author"
+											data-testid="library-item-author"
+											@click.stop="searchQuery = item.entry.notes.author"
+											>{{ item.entry.notes.author }}</span
+										>)</span
+									></span
+								>
+								<span v-if="!item.entry" class="text-content-secondary">unreadable</span>
+								<button
+									:class="['shrink-0 cursor-pointer', isFavorite(item) ? 'text-amber-300' : 'text-content-muted hover:text-content-primary']"
+									:title="isFavorite(item) ? 'Remove from Favorites' : 'Add to Favorites'"
+									data-testid="library-favorite"
+									@click.stop="toggleFavorite(item)"
+									@mouseenter="showHint('libraryFavorite')"
+									@mouseleave="showHint('libraryItem')"
+								>
+									<Icon name="star" :class="['w-3 h-3', isFavorite(item) && 'fill-current']" />
+								</button>
 							</div>
 							<div
 								v-if="item.entry && item.entry.modules.length > 0"
@@ -77,13 +111,38 @@
 						</div>
 						<div v-if="item.path === notesItem?.path" class="relative w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary">
 							<template v-if="item.entry">
-								<div v-for="key in NOTE_FIELDS" v-show="item.entry.notes[key]" :key="key" class="break-words pr-3">
-									<span class="text-content-muted capitalize">{{ key }}:</span> {{ item.entry.notes[key] }}
+								<div class="pr-3" data-testid="library-modules">
+									<span class="text-content-muted">Modules:</span> {{ item.entry.modules.length }}
 								</div>
-								<div v-if="item.entry.notes.tags.length" class="flex flex-wrap gap-1 my-1 pr-3" data-testid="library-tags">
-									<span v-for="tag in item.entry.notes.tags" :key="tag" class="px-1.5 rounded bg-surface-3 text-content-primary">{{
-										tag
-									}}</span>
+								<!-- Not v-show: over the constant NOTE_FIELDS that compiles to a stable fragment, so the rows never updated after an edit -->
+								<div v-for="key in NOTE_FIELDS.filter((k) => item.entry!.notes[k])" :key="key" class="break-words pr-3">
+									<span class="text-content-muted capitalize">{{ key }}:</span>
+									<span
+										v-if="key === 'author'"
+										class="cursor-pointer hover:text-accent-primary"
+										title="Search for this author"
+										@click="searchQuery = item.entry.notes.author"
+										>{{ item.entry.notes.author }}</span
+									>
+									<span
+										v-else-if="key === 'source' && isUrl(item.entry.notes.source)"
+										class="cursor-pointer hover:text-accent-primary"
+										title="Open in browser"
+										data-testid="library-source-link"
+										@click="openExternal(item.entry.notes.source)"
+										>{{ item.entry.notes.source }}</span
+									>
+									<template v-else>{{ item.entry.notes[key] }}</template>
+								</div>
+								<div v-if="item.entry.notes.tags.length" class="flex flex-wrap gap-1 my-2 pr-3" data-testid="library-tags">
+									<span
+										v-for="tag in item.entry.notes.tags"
+										:key="tag"
+										class="px-1.5 rounded bg-surface-3 text-content-primary cursor-pointer hover:text-accent-primary"
+										title="Search for this tag"
+										@click="searchQuery = tag"
+										>{{ tag }}</span
+									>
 								</div>
 							</template>
 							<div class="whitespace-pre-wrap break-words pr-3 mt-1" data-testid="library-notes">{{ item.entry?.notes.body || 'No notes.' }}</div>
@@ -103,20 +162,27 @@
 			<StateMessage
 				v-if="filtered.length === 0"
 				variant="empty"
-				:message="searchQuery ? 'Nothing matches' : 'Empty — drag modules here, or right-click one and choose Save Selection to Library'"
+				:message="
+					settings.libraryFavoritesOnly && !searchQuery
+						? 'No favorites'
+						: searchQuery
+							? 'Nothing matches'
+							: 'Empty — drag modules here, or right-click one and choose Save Selection to Library'
+				"
 			/>
 		</div>
 	</div>
 </template>
 
 <script setup lang="ts">
-	import { computed, onMounted, onUnmounted, ref, watch } from 'vue';
+	import { computed, nextTick, onMounted, onUnmounted, ref, watch } from 'vue';
 	import Icon from '../common/Icon.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import StateMessage from '../browser/StateMessage.vue';
 	import LibraryPreview from './LibraryPreview.vue';
 	import { useUiStore } from '@/store/ui';
-	import { groupLabel, useLibrary, type LibraryItem } from '../../composables/useLibrary';
+	import { useSettingsStore } from '@/store/settings';
+	import { groupLabel, isFavorite, useLibrary, type LibraryItem } from '../../composables/useLibrary';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useListNav } from '../../composables/useListNav';
 	import { useStatusHint } from '../../composables/useStatusHint';
@@ -130,7 +196,8 @@
 	const NOTE_FIELDS = ['author', 'license', 'source'] as const;
 
 	const ui = useUiStore();
-	const { items, lastSaved, init, refresh, remove, openEditDialog, insertItem } = useLibrary();
+	const settings = useSettingsStore();
+	const { items, lastSaved, init, refresh, remove, toggleFavorite, openEditDialog, insertItem } = useLibrary();
 	const { open: openContextMenu } = useContextMenu();
 	const { showHint, clearHint } = useStatusHint();
 	const searchRef = ref();
@@ -143,12 +210,18 @@
 
 	// Same search as the Modules pane: "<group> <term>" picks the groups (folders) first, then filters within them.
 	// The term matches an item's name or notes. Groups: the subfolders, the library folder's own items ('Saved') first.
+	// A query that is exactly an item's author or one of its tags also matches it, so multi-word ones (clicked) work.
+	// With 'favorites only' on, only the favorites are searched.
 	const filtered = computed(() => {
 		const { group, term } = parseGroupQuery(searchQuery.value);
+		const exact = searchQuery.value.trim().toLowerCase();
 		return items.value.filter(
 			(i) =>
-				(group === null || groupLabel(i.group).toLowerCase().includes(group)) &&
-				(!term || i.name.toLowerCase().includes(term) || !!i.entry?.text.toLowerCase().includes(term)),
+				(!settings.libraryFavoritesOnly || isFavorite(i)) &&
+				(!!i.entry?.notes.tags.includes(exact) ||
+					i.entry?.notes.author.toLowerCase() === exact ||
+					((group === null || groupLabel(i.group).toLowerCase().includes(group)) &&
+						(!term || i.name.toLowerCase().includes(term) || !!i.entry?.text.toLowerCase().includes(term)))),
 		);
 	});
 	function byGroup(list: LibraryItem[]): Map<string, LibraryItem[]> {
@@ -184,9 +257,13 @@
 		() => items.value.find((i) => i.path === selectedPath.value) ?? (searchQuery.value && filtered.value.length === 1 ? filtered.value[0] : null),
 	);
 
-	// Show the item just saved: search "<first word of its group> <name>" (a name may contain spaces).
-	watch(lastSaved, (saved) => {
-		if (saved) searchQuery.value = `${groupLabel(saved.group).split(' ')[0]} ${saved.name}`;
+	// Show the item just saved: search "<first word of its group> <name>" (a name may contain spaces), and show its notes:
+	// selected, as the search may match other items too (by their notes). After the search's watcher has unselected.
+	watch(lastSaved, async (saved) => {
+		if (!saved) return;
+		searchQuery.value = `${groupLabel(saved.group).split(' ')[0]} ${saved.name}`;
+		await nextTick();
+		selectedPath.value = saved.path;
 	});
 
 	watch(searchQuery, () => {
@@ -200,6 +277,10 @@
 		(active) => active && init(),
 		{ immediate: true },
 	);
+
+	// A source that's a web address opens in the browser (the main process opens https only).
+	const isUrl = (s: string) => /^https:\/\/\S+$/.test(s.trim());
+	const openExternal = (url: string) => window.electronAPI.openExternal(url.trim());
 
 	function insert(item: LibraryItem | undefined): void {
 		if (item?.entry) insertItem(item.entry).catch(console.error);

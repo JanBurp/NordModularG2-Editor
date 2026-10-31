@@ -53,6 +53,8 @@ export const useSettingsStore = defineStore('settings', {
 		bankFolder: '' as string,
 		storageFolder: '' as string, // Bank Organizer's Temporary Storage; '' = userData/bank-storage
 		libraryFolder: '' as string, // Library pane's folder; '' = userData/library
+		libraryFavorites: [] as string[], // Library items' paths relative to the library folder
+		libraryFavoritesOnly: false as boolean,
 	}),
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {

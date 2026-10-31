@@ -1,4 +1,4 @@
-import { clickContextMenuItem, createCable, deleteModule, dropModuleOnCanvas, getStatusCounts, hoverContextMenuItem, openContextMenu } from './helpers';
+import { clickContextMenuItem, createCable, deleteModule, dropModuleOnCanvas, getStatusCounts, openContextMenu } from './helpers';
 import { expect, test } from './fixtures/electron';
 
 // Module IDs from nmg2mods

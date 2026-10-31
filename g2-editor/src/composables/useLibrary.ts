@@ -42,7 +42,7 @@ const saveDialog = useEditDialog<SaveForm>(
 );
 let lastGroup = '';
 // The item just saved, for the Library pane to show it.
-const lastSaved = ref<{ group: string; name: string } | null>(null);
+const lastSaved = ref<{ group: string; name: string; path: string } | null>(null);
 
 const safeName = (s: string) => s.trim().replace(/[/\\:*?"<>|]/g, '_');
 // "Drums/Kicks" stays a nested group; 'Saved' (any case) is the library folder itself.
@@ -93,6 +93,16 @@ async function init(): Promise<void> {
 	await refresh();
 }
 
+// Favorites: kept in the settings by their path relative to the library folder ('/'-separated, also on Windows).
+const relPath = (path: string) => path.slice(root.value.length + 1).replace(/\\/g, '/');
+const favorites = () => useSettingsStore().libraryFavorites;
+export const isFavorite = (item: LibraryItem) => favorites().includes(relPath(item.path));
+function setFavorite(path: string, on: boolean): void {
+	const settings = useSettingsStore();
+	const rest = settings.libraryFavorites.filter((p) => p !== relPath(path));
+	settings.libraryFavorites = on ? [...rest, relPath(path)] : rest;
+}
+
 // The item the dialog edits; null when it saves the selection as a new item.
 const editing = ref<LibraryItem | null>(null);
 
@@ -130,11 +140,17 @@ async function saveToLibrary(form: SaveForm): Promise<void> {
 			);
 	const path = `${root.value}/${group ? `${group}/` : ''}${unique}.pch2`;
 	await window.electronAPI.patches.librarySave(item?.path ?? path, bytes);
-	if (item && item.path !== path) await window.electronAPI.patches.libraryMove(item.path, path);
+	if (item && item.path !== path) {
+		await window.electronAPI.patches.libraryMove(item.path, path);
+		if (isFavorite(item)) {
+			setFavorite(item.path, false);
+			setFavorite(path, true);
+		}
+	}
 	const settings = useSettingsStore();
 	if (settings.rightPaneTab !== 'library' || !settings.showRightPane) settings.toggleSidebar('library');
 	await refresh();
-	lastSaved.value = { group, name: unique };
+	lastSaved.value = { group, name: unique, path };
 }
 
 // The Insert dialog: one row per knob, MIDI CC and morph of the item; a knob slot or CC the patch already uses
@@ -224,6 +240,7 @@ export function useLibrary() {
 
 	async function remove(item: LibraryItem): Promise<void> {
 		await window.electronAPI.patches.libraryRemove(item.path);
+		setFavorite(item.path, false);
 		await refresh();
 	}
 
@@ -238,6 +255,7 @@ export function useLibrary() {
 		setFolder,
 		chooseFolder,
 		remove,
+		toggleFavorite: (item: LibraryItem) => setFavorite(item.path, !isFavorite(item)),
 		openSaveDialog,
 		openEditDialog,
 		saveDialog,

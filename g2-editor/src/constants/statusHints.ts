@@ -76,6 +76,8 @@ export const STATUS_HINTS = {
 	organizerBankTransfer: 'Upload: save this bank from the G2 to disk · Download: overwrite this bank on the G2 from disk',
 	organizerClose: `${MOD}3/Escape: close the Bank Organizer`,
 	expandCollapseAll: 'Click: expand/collapse all',
+	libraryFavoritesOnly: 'Click: show all items / only the favorites',
+	libraryFavorite: 'Click: mark/unmark as favorite',
 	expandCollapse: 'Click: expand/collapse',
 	moduleItem: 'Drag: add to canvas · Click: show/hide help',
 	ccAutoAssign: 'Click: assign free CCs to the parameters of the selected modules',
