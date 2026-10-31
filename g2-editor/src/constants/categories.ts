@@ -32,16 +32,6 @@ export const SOUND_CATEGORIES: SoundCategory[] = [
 ];
 
 /**
- * Number of sound categories
- */
-export const CATEGORY_COUNT = SOUND_CATEGORIES.length;
-
-/**
- * Default category (No Cat)
- */
-export const DEFAULT_CATEGORY_ID = 0;
-
-/**
  * Get category name by ID
  * Returns 'Unknown' if ID not found
  */
@@ -72,12 +62,4 @@ export function getCategoryNameFromSlug(slug?: string): string {
  */
 export function getCategorySlug(categoryId: number): string {
 	return categorySlugFromName(SOUND_CATEGORIES[categoryId]?.name ?? SOUND_CATEGORIES[0].name);
-}
-
-/**
- * Validate category ID
- * Returns true if the ID is valid (0-15)
- */
-export function isValidCategoryId(categoryId: number): boolean {
-	return categoryId >= 0 && categoryId < CATEGORY_COUNT;
 }
