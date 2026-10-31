@@ -24,10 +24,6 @@ export function slotIndexToBankPageKnob(slotIndex: number): { bank: number; page
 	return { page: Math.floor(slotIndex / 24), bank: Math.floor((slotIndex % 24) / 8), knob: slotIndex % 8 };
 }
 
-export function paramPageFor(assignments: ParamPageAssignment[], location: 0 | 1, moduleIndex: number, paramIndex: number): ParamPageAssignment | undefined {
-	return assignments.find((a) => a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex);
-}
-
 // The module params a Parameter Page knob map drives, in knob order: each (non-LED) knob's own
 // param, plus the param its button targets when that is a different param not itself on a knob.
 // Ported from G2Editor.c's CPatch::InternalAutoAssignMIDICtrlFromKnobMap /

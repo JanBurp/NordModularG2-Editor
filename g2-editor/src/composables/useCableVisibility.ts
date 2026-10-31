@@ -13,8 +13,6 @@ export interface CableVisibility {
 	white: boolean;
 }
 
-// Re-export constants for backward compatibility
-export { CABLE_COLORS as cableColors, CABLE_COLOR_INDEX_MAP as COLOR_INDEX_TO_NAME };
 export type { CableColorName };
 
 export function useCableVisibility() {

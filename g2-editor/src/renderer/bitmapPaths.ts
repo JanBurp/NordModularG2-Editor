@@ -1,6 +1,6 @@
 // SVG path data for all Bitmap* symbols. Keys match parammap `bmp` values and
 // SVG symbol IDs (SVG id = 'Bitmap' + key). Used in SvgGradientDefs.vue (canvas
-// context via <use href="#BitmapXxx">) and Switch.vue (inline SVG outside canvas).
+// context via <use href="#BitmapXxx">).
 export const bitmapPaths: Record<string, string> = {
 	HVCA: 'M0,6 L5,6 M21,6 L16,6 5,11.5 5,0 16,6',
 	VVCA: 'M6,0 L6,5 M6,21 L6,16 11.5,5 0,5 6,16',

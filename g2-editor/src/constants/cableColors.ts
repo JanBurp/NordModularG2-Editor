@@ -51,19 +51,6 @@ export const CABLE_SVG_COLORS: Record<number, string> = {
 };
 
 /**
- * Default visibility state for all cable colors
- */
-export const DEFAULT_CABLE_VISIBILITY: Record<CableColorName, boolean> = {
-	red: true,
-	blue: true,
-	yellow: true,
-	orange: true,
-	green: true,
-	purple: true,
-	white: true,
-};
-
-/**
  * Returns the effective jack colour accounting for module uprate.
  * Module defs encode the original editor's per-connector Bandwidth flag in the colour name:
  * "purple" (Dynamic control) and "orange" (Dynamic logic) follow the module's uprate state,

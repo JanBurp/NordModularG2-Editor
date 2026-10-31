@@ -5,23 +5,13 @@
  */
 
 // Cable colors
-export {
-	CABLE_COLORS,
-	CABLE_COLOR_INDEX_MAP,
-	CABLE_SVG_COLORS,
-	DEFAULT_CABLE_VISIBILITY,
-	JACK_COLORS,
-	getEffectiveJackColor,
-	jackColorNameToIndex,
-	type CableColor,
-	type CableColorName,
-} from './cableColors';
+export { CABLE_COLORS, CABLE_COLOR_INDEX_MAP, CABLE_SVG_COLORS, JACK_COLORS, getEffectiveJackColor, type CableColor, type CableColorName } from './cableColors';
 
 // Module colors
-export { MODULE_COLORS, DEFAULT_MODULE_COLOR, getModuleColor, type ModuleColor } from './moduleColors';
+export { MODULE_COLORS, type ModuleColor } from './moduleColors';
 
 // Sound categories
-export { SOUND_CATEGORIES, CATEGORY_COUNT, DEFAULT_CATEGORY_ID, getCategoryName, isValidCategoryId, type SoundCategory } from './categories';
+export { SOUND_CATEGORIES, type SoundCategory } from './categories';
 
 // UI option arrays, slot labels, and module grid dimensions
 export {

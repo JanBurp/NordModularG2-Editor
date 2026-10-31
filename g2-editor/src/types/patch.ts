@@ -180,12 +180,6 @@ export interface ClipboardEntry {
 	midi?: MidiCCAssignment[]; // the copied modules' MIDI CCs (source indices); inserted only from the Library
 }
 
-export const VOICEMODE_OPTIONS = [
-	{ id: 0, name: 'Poly' },
-	{ id: 1, name: 'Mono' },
-	{ id: 2, name: 'Legato' },
-];
-
 export const VOICES = [
 	{ id: 0, name: '1' },
 	{ id: 1, name: '2' },

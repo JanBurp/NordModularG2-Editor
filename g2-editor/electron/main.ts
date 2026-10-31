@@ -18,9 +18,8 @@ const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 process.env.APP_ROOT = path.join(__dirname, '..', '..');
 
-export const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
-export const MAIN_DIST = path.join(process.env.APP_ROOT, 'dist-electron');
-export const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
+const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
+const RENDERER_DIST = path.join(process.env.APP_ROOT, 'dist');
 
 /* One WebContentsView (a full renderer with its own stores) + one daemon subprocess per connected G2.
  * A host BrowserWindow holds several views and shows only its active one, so switching devices
@@ -1302,22 +1301,22 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 	return [
 		...(isMac
 			? [
-					{
-						label: 'G2 Editor',
-						submenu: [
-							{ label: 'About G2 Editor...', click: () => sendToFocused('menu:action', 'show-about') },
-							{ label: 'Preferences...', click: () => sendToFocused('menu:action', 'toggle-settings'), accelerator: 'CommandOrControl+,' },
-							{ type: 'separator' as const },
-							{ role: 'services' as const },
-							{ type: 'separator' as const },
-							{ role: 'hide' as const },
-							{ role: 'hideOthers' as const },
-							{ role: 'unhide' as const },
-							{ type: 'separator' as const },
-							{ role: 'quit' as const },
-						],
-					},
-				]
+				{
+					label: 'G2 Editor',
+					submenu: [
+						{ label: 'About G2 Editor...', click: () => sendToFocused('menu:action', 'show-about') },
+						{ label: 'Preferences...', click: () => sendToFocused('menu:action', 'toggle-settings'), accelerator: 'CommandOrControl+,' },
+						{ type: 'separator' as const },
+						{ role: 'services' as const },
+						{ type: 'separator' as const },
+						{ role: 'hide' as const },
+						{ role: 'hideOthers' as const },
+						{ role: 'unhide' as const },
+						{ type: 'separator' as const },
+						{ role: 'quit' as const },
+					],
+				},
+			]
 			: []),
 		{
 			label: 'File',
@@ -1551,7 +1550,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Key Commands', click: () => sendToFocused('menu:action', 'show-key-commands') },
 				{ type: 'separator' as const },
 				{ label: 'Toggle DevTools', click: () => focusedView()?.toggleDevTools(), accelerator: 'CommandOrControl+Option+I' },
-				{ label: 'ShowSVG', click: () => sendToFocused('menu:action', 'toggle-svg-viewer') },
+				// { label: 'ShowSVG', click: () => sendToFocused('menu:action', 'toggle-svg-viewer') },
 				{ type: 'separator' as const },
 				{
 					label: 'Donate...',
