@@ -3,7 +3,7 @@ import { createPinia, setActivePinia } from 'pinia';
 import { useUiStore } from '@/store/ui';
 import { useSlotsStore } from '@/store/slots';
 import type { SlotLabel } from '@/store/slots';
-import { usePatchClipboard } from '../usePatchClipboard';
+import { insertEntry, usePatchClipboard } from '../usePatchClipboard';
 
 function makeModule(index: number, overrides: Record<string, unknown> = {}) {
 	return { index, type: 1, horiz: 0, vert: 0, pcnt: 2, lv: [0, 0], modes: [0], ...overrides };
@@ -122,6 +122,33 @@ describe('usePatchClipboard — pasteClipboard/pasteParams prefer the OS clipboa
 		await pasteParams();
 
 		expect(pasteParamsSpy).not.toHaveBeenCalled();
+	});
+});
+
+describe('insertEntry (drop from another G2 window)', () => {
+	it('places the block with its top-left module at the given cell and area, ignoring lastMousePos', async () => {
+		const uiStore = useUiStore();
+		uiStore.lastMousePos = { col: 9, row: 9, area: 'va' };
+		const slotsStore = useSlotsStore();
+		seedArea(slotsStore, 'A', 0, []);
+		const pasteSpy = vi.spyOn(slotsStore, 'paste').mockResolvedValue(undefined as any);
+		const nmg2mods = await import('@/renderer/nmg2mods');
+		vi.spyOn(nmg2mods, 'getModule').mockReturnValue({ height: 2 } as any);
+		const entry = {
+			modules: [makeModule(4, { horiz: 3, vert: 3 }), makeModule(5, { horiz: 4, vert: 6 })],
+			cables: [],
+			area: 'va' as const,
+			copiedVariation: 0,
+		} as any;
+
+		await insertEntry(entry, { col: 1, row: 2, area: 'fx' });
+
+		const [entries, , area] = pasteSpy.mock.calls[0];
+		expect(area).toBe('fx');
+		expect(entries.map((e: any) => [e.col, e.row])).toEqual([
+			[1, 2],
+			[2, 5],
+		]);
 	});
 });
 

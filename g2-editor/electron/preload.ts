@@ -32,6 +32,9 @@ const watchEvent = listenerGroup('cli:watch-event');
 const watchDone = listenerGroup('cli:watch-done');
 const deviceDisconnected = listenerGroup('cli:device-disconnected');
 const storageChanged = listenerGroup('storage:changed');
+const dragHover = listenerGroup('drag:hover');
+const dragLeave = listenerGroup('drag:leave');
+const dragDrop = listenerGroup('drag:drop');
 
 contextBridge.exposeInMainWorld('electronAPI', {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
@@ -101,6 +104,19 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	clipboard: {
 		write: (entry: unknown) => ipcRenderer.invoke('clipboard:write', entry),
 		read: () => ipcRenderer.invoke('clipboard:read'),
+	},
+	drag: {
+		move: (screenX: number, screenY: number, entry: unknown) => ipcRenderer.send('drag:move', screenX, screenY, entry),
+		leave: () => ipcRenderer.send('drag:leave'),
+		drop: (screenX: number, screenY: number, entry: unknown) => ipcRenderer.send('drag:drop', screenX, screenY, entry),
+		onHover: (cb: (drag: { clientX: number; clientY: number; entry: unknown }) => void) => dragHover.on(cb),
+		onLeave: (cb: () => void) => dragLeave.on(() => cb()),
+		onDrop: (cb: (drag: { clientX: number; clientY: number; entry: unknown }) => void) => dragDrop.on(cb),
+		off: () => {
+			dragHover.off();
+			dragLeave.off();
+			dragDrop.off();
+		},
 	},
 });
 

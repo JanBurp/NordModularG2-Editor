@@ -6,7 +6,7 @@ import { useUiStore } from '@/store/ui';
 import { resolveSelectionArea } from '@/store/slotHelpers';
 import { libraryItemToPch2, pch2ToLibraryItem, withNotes, type LibraryEntry } from '../parser/libraryFile';
 import { useEditDialog } from './useEditDialog';
-import { selectionEntry } from './usePatchClipboard';
+import { buildClipboardEntry } from './usePatchClipboard';
 import { showToast } from './useToast';
 
 // `group` is the item's subfolder path in the library folder, '' for the folder itself.
@@ -105,7 +105,7 @@ async function saveToLibrary(form: SaveForm): Promise<void> {
 export function useLibrary() {
 	function openSaveDialog(): void {
 		const ui = useUiStore();
-		pendingEntry = selectionEntry(resolveSelectionArea(ui));
+		pendingEntry = ui.selectedModules.length ? buildClipboardEntry(ui.selectedModules, resolveSelectionArea(ui)) : null;
 		if (!pendingEntry) return;
 		if (!useSlotsStore().slots[ui.slotInFocus].templateRawHex) return showToast('This patch cannot be saved yet — try again once it has loaded.');
 		// Groups to choose from: read the folder first. The group defaults to the last one used.

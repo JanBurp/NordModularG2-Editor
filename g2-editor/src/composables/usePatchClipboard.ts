@@ -20,20 +20,24 @@ import { showToast } from './useToast';
 export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>): Promise<ClipboardEntry | null> {
 	try {
 		const entry = (await window.electronAPI?.clipboard?.read()) as ClipboardEntry | null | undefined;
-		if (entry && Array.isArray(entry.modules)) return entry;
-	} catch {
+		if (entry && Array.isArray(entry.modules)) {
+			console.log(`[clipboard] read: OS clipboard has ${entry.modules.length} module(s)`);
+			return entry;
+		}
+		console.log(`[clipboard] read: no G2 entry on OS clipboard, local fallback has ${uiStore.clipboard?.modules.length ?? 0} module(s)`);
+	} catch (err) {
 		// OS clipboard unavailable (e.g. non-Electron/test environment) — fall back below
+		console.log('[clipboard] read failed, using local fallback:', err);
 	}
 	return uiStore.clipboard;
 }
 
-// The selected modules of `area` with their cables among themselves and their morphs. Shared by Copy and Save Selection to Library.
-export function selectionEntry(area: 'voice' | 'fx'): ClipboardEntry | null {
+// The modules `indices` of `area` with their cables among themselves and their morphs. Shared by Copy,
+// Save Selection to Library and a module drag into another G2's window (useModuleDrag.ts).
+export function buildClipboardEntry(indices: number[], area: 'voice' | 'fx'): ClipboardEntry {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
-	const selectedIds = new Set(uiStore.selectedModules);
-	if (selectedIds.size === 0) return null;
-
+	const selectedIds = new Set(indices);
 	const { areaIdx, location: areaKey } = areaConfig(area);
 	const slot = uiStore.slotInFocus;
 
@@ -47,8 +51,9 @@ export function selectionEntry(area: 'voice' | 'fx'): ClipboardEntry | null {
 	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
 }
 
-// Shared by Paste and Library insert: adds `entry`'s modules with their top-left at `target`, else at
-// the mouse position, else 2 columns/rows from where they were copied.
+// Shared by Paste, Library insert and a module drop from another G2's window (useRemoteModuleDrop.ts):
+// adds `entry`'s modules with their top-left at `target`, else at the mouse position, else 2 columns/rows
+// from where they were copied.
 export async function insertEntry(entry: ClipboardEntry, target?: { col: number; row: number; area: 'va' | 'fx' }): Promise<void> {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -101,28 +106,36 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	uiStore.clipboardTypes = uiStore.clipboard?.modules.map((m) => m.type) ?? [];
 	const hasClipboard = computed(() => uiStore.hasClipboard);
 
-	async function refreshHasClipboard(): Promise<void> {
+	async function refreshHasClipboard(reason: 'init' | 'focus'): Promise<void> {
 		const entry = await readClipboardEntry(uiStore);
 		uiStore.clipboardTypes = entry?.modules.map((m) => m.type) ?? [];
+		console.log(`[clipboard] refresh (${reason}): hasClipboard=${uiStore.hasClipboard}`);
 	}
+	const onFocus = () => refreshHasClipboard('focus');
 
 	// Covers "copy in window A, click into window B, then try to paste" — the realistic
 	// cross-window usage pattern — without needing an OS clipboard-changed watcher.
 	// Also read once now: a freshly opened window already has focus, so no focus event follows.
 	if (typeof window !== 'undefined' && typeof window.addEventListener === 'function') {
-		void refreshHasClipboard();
-		window.addEventListener('focus', refreshHasClipboard);
+		void refreshHasClipboard('init');
+		window.addEventListener('focus', onFocus);
 		if (getCurrentInstance()) {
-			onUnmounted(() => window.removeEventListener('focus', refreshHasClipboard));
+			onUnmounted(() => window.removeEventListener('focus', onFocus));
 		}
 	}
 
 	function copySelection(): void {
-		const entry = selectionEntry(getSourceArea());
-		if (!entry) return;
+		if (uiStore.selectedModules.length === 0) return console.log('[clipboard] copy: no modules selected');
+		const entry = buildClipboardEntry(uiStore.selectedModules, getSourceArea());
 		uiStore.clipboard = entry;
 		uiStore.clipboardTypes = entry.modules.map((m) => m.type);
-		window.electronAPI?.clipboard?.write(entry).catch((err: unknown) => console.error('clipboard write failed:', err));
+		console.log(
+			`[clipboard] copy: ${entry.modules.length} module(s), ${entry.cables.length} cable(s), area ${entry.area}, ${JSON.stringify(entry).length} chars`,
+		);
+		window.electronAPI?.clipboard
+			?.write(entry)
+			.then(() => console.log('[clipboard] write ok'))
+			.catch((err: unknown) => console.log('[clipboard] write failed:', err));
 	}
 
 	async function cutSelection(): Promise<void> {
@@ -131,14 +144,17 @@ export function usePatchClipboard(areaGetter?: () => 'voice' | 'fx') {
 	}
 
 	async function pasteClipboard(): Promise<void> {
+		console.log('[clipboard] paste');
 		const clipboard = await readClipboardEntry(uiStore);
-		if (clipboard) await insertEntry(clipboard);
+		if (!clipboard || clipboard.modules.length === 0) return console.log('[clipboard] paste: nothing to paste');
+		await insertEntry(clipboard);
 	}
 
 	// Targets: the current selection, which must match the copied modules' types (official editor).
 	async function pasteParams(): Promise<void> {
+		console.log('[clipboard] paste params');
 		const clipboard = await readClipboardEntry(uiStore);
-		if (!clipboard || clipboard.modules.length === 0) return;
+		if (!clipboard || clipboard.modules.length === 0) return console.log('[clipboard] paste params: nothing to paste');
 		const area = getSourceArea();
 		const { areaIdx } = areaConfig(area);
 		const currentModules = slotsStore.getAreaModules(uiStore.slotInFocus, areaIdx);

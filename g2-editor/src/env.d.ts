@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 import type { ConnectedDeviceInfo, DeviceAction, DeviceSummary, MenuAction, MenuState } from './types/index';
 import type { CliService } from './types/cli';
+import type { ClipboardEntry } from './types/patch';
 
 declare module '*.vue' {
 	import type { DefineComponent } from 'vue';
@@ -80,6 +81,16 @@ declare global {
 			clipboard: {
 				write: (entry: unknown) => Promise<void>;
 				read: () => Promise<unknown | null>;
+			};
+			// Module drag out of this window into another G2's window (routed by the main process).
+			drag: {
+				move: (screenX: number, screenY: number, entry: ClipboardEntry) => void;
+				leave: () => void;
+				drop: (screenX: number, screenY: number, entry: ClipboardEntry) => void;
+				onHover: (cb: (drag: { clientX: number; clientY: number; entry: ClipboardEntry }) => void) => void;
+				onLeave: (cb: () => void) => void;
+				onDrop: (cb: (drag: { clientX: number; clientY: number; entry: ClipboardEntry }) => void) => void;
+				off: () => void;
 			};
 		};
 		cli: CliService;

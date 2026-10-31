@@ -1,4 +1,5 @@
 import { ref, computed, onUnmounted } from 'vue';
+import type { ClipboardEntry } from '@/types/patch';
 import type { Ref, ComputedRef } from 'vue';
 import { getModule } from '../renderer/nmg2mods';
 import { useUiStore } from '../store/ui';
@@ -28,6 +29,8 @@ export function useModuleDrag(
 	getZoom: () => number,
 	// Modules dropped on an element marked data-library-drop (the Library pane) instead of on the canvas.
 	onLibraryDrop: (indices: number[]) => void,
+	// Copy of the dragged modules, for a drag released over another G2's window (useRemoteModuleDrop.ts)
+	getDragEntry: (indices: number[]) => ClipboardEntry,
 ): {
 	dragState: Ref<DragState | null>;
 	dragGhosts: ComputedRef<DragGhost[]>;
@@ -41,6 +44,8 @@ export function useModuleDrag(
 	let dragStartClientX = 0;
 	let dragStartClientY = 0;
 	let dragMoved = false;
+	// Built on the first exit from the window; while set, the pointer is outside it.
+	let remoteEntry: ClipboardEntry | null = null;
 
 	const dragGhosts = computed<DragGhost[]>(() => {
 		const drag = dragState.value;
@@ -98,6 +103,17 @@ export function useModuleDrag(
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
 		updateCopyCursor(e);
+		if (isOutsideWindow(e)) {
+			remoteEntry ??= getDragEntry(dragState.value.indices);
+			window.electronAPI?.drag?.move(e.screenX, e.screenY, remoteEntry);
+		} else if (remoteEntry) {
+			remoteEntry = null;
+			window.electronAPI?.drag?.leave();
+		}
+	}
+
+	function isOutsideWindow(e: MouseEvent) {
+		return e.clientX < 0 || e.clientY < 0 || e.clientX >= window.innerWidth || e.clientY >= window.innerHeight;
 	}
 
 	function onModuleDragEnd(e: MouseEvent) {
@@ -113,6 +129,9 @@ export function useModuleDrag(
 		ui.draggingModules = false;
 		if (drag && (e.target as Element | null)?.closest?.('[data-library-drop]')) {
 			onLibraryDrop(drag.indices);
+		} else if (drag && isOutsideWindow(e)) {
+			// Always a copy: the source patch stays untouched.
+			window.electronAPI?.drag?.drop(e.screenX, e.screenY, remoteEntry ?? getDragEntry(drag.indices));
 		} else if (drag && moduleIndex !== null) {
 			const anchorStart = drag.startPosByIndex.get(drag.anchorIndex)!;
 			const anchorTargetCol = Math.max(0, Math.round(anchorStart.horiz + drag.dxPx / MODULE_WIDTH));
@@ -126,6 +145,7 @@ export function useModuleDrag(
 			onModuleClick(moduleIndex, e.shiftKey);
 		}
 		dragMoved = false;
+		remoteEntry = null;
 	}
 
 	function clearModuleDrag() {
@@ -133,6 +153,8 @@ export function useModuleDrag(
 		ui.draggingModules = false;
 		dragModuleIndex = null;
 		dragMoved = false;
+		if (remoteEntry) window.electronAPI?.drag?.leave();
+		remoteEntry = null;
 		document.body.style.cursor = '';
 		window.removeEventListener('mousemove', onModuleDragMove);
 		window.removeEventListener('mouseup', onModuleDragEnd);
