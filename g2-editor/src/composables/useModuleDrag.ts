@@ -34,11 +34,14 @@ export function useModuleDrag(
 ): {
 	dragState: Ref<DragState | null>;
 	dragGhosts: ComputedRef<DragGhost[]>;
+	overLibrary: Ref<boolean>;
 	handleModuleDragStart: (info: ModuleDragInfo) => void;
 	clearModuleDrag: () => void;
 } {
 	const ui = useUiStore();
 	const dragState = ref<DragState | null>(null);
+	// The pointer is over the Library pane: the canvas clips the ghost there, so it's drawn above it (PatchCanvas.vue).
+	const overLibrary = ref(false);
 
 	let dragModuleIndex: number | null = null;
 	let dragStartClientX = 0;
@@ -102,6 +105,7 @@ export function useModuleDrag(
 			ui.draggingModules = true;
 		}
 		dragState.value = { ...dragState.value!, dxPx, dyPx };
+		overLibrary.value = isOverLibrary(e);
 		updateCopyCursor(e);
 		if (isOutsideWindow(e)) {
 			remoteEntry ??= getDragEntry(dragState.value.indices);
@@ -110,6 +114,10 @@ export function useModuleDrag(
 			remoteEntry = null;
 			window.electronAPI?.drag?.leave();
 		}
+	}
+
+	function isOverLibrary(e: MouseEvent) {
+		return !!(e.target as Element | null)?.closest?.('[data-library-drop]');
 	}
 
 	function isOutsideWindow(e: MouseEvent) {
@@ -126,8 +134,9 @@ export function useModuleDrag(
 		dragModuleIndex = null;
 		const drag = dragState.value;
 		dragState.value = null;
+		overLibrary.value = false;
 		ui.draggingModules = false;
-		if (drag && (e.target as Element | null)?.closest?.('[data-library-drop]')) {
+		if (drag && isOverLibrary(e)) {
 			onLibraryDrop(drag.indices);
 		} else if (drag && isOutsideWindow(e)) {
 			// Always a copy: the source patch stays untouched.
@@ -150,6 +159,7 @@ export function useModuleDrag(
 
 	function clearModuleDrag() {
 		dragState.value = null;
+		overLibrary.value = false;
 		ui.draggingModules = false;
 		dragModuleIndex = null;
 		dragMoved = false;
@@ -166,5 +176,5 @@ export function useModuleDrag(
 		clearModuleDrag();
 	});
 
-	return { dragState, dragGhosts, handleModuleDragStart, clearModuleDrag };
+	return { dragState, dragGhosts, overLibrary, handleModuleDragStart, clearModuleDrag };
 }

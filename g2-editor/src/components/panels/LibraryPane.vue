@@ -76,7 +76,17 @@
 							</div>
 						</div>
 						<div v-if="item.path === notesItem?.path" class="relative w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary">
-							<div class="whitespace-pre-wrap break-words pr-3" data-testid="library-notes">{{ item.entry?.text || 'No notes.' }}</div>
+							<template v-if="item.entry">
+								<div v-for="key in NOTE_FIELDS" v-show="item.entry.notes[key]" :key="key" class="break-words pr-3">
+									<span class="text-content-muted capitalize">{{ key }}:</span> {{ item.entry.notes[key] }}
+								</div>
+								<div v-if="item.entry.notes.tags.length" class="flex flex-wrap gap-1 my-1 pr-3" data-testid="library-tags">
+									<span v-for="tag in item.entry.notes.tags" :key="tag" class="px-1.5 rounded bg-surface-3 text-content-primary">{{
+										tag
+									}}</span>
+								</div>
+							</template>
+							<div class="whitespace-pre-wrap break-words pr-3 mt-1" data-testid="library-notes">{{ item.entry?.notes.body || 'No notes.' }}</div>
 							<button
 								v-if="item.entry"
 								class="absolute top-1.5 right-1.5 p-0.5 text-content-secondary hover:text-content-primary cursor-pointer"
@@ -107,7 +117,6 @@
 	import LibraryPreview from './LibraryPreview.vue';
 	import { useUiStore } from '@/store/ui';
 	import { groupLabel, useLibrary, type LibraryItem } from '../../composables/useLibrary';
-	import { insertEntry } from '../../composables/usePatchClipboard';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useListNav } from '../../composables/useListNav';
 	import { useStatusHint } from '../../composables/useStatusHint';
@@ -118,9 +127,10 @@
 
 	// Previews show at most 8.5 module rows; the item showing its notes shows all of it.
 	const PREVIEW_MAX_HEIGHT = 8.5 * MODULE_ROW_HEIGHT;
+	const NOTE_FIELDS = ['author', 'license', 'source'] as const;
 
 	const ui = useUiStore();
-	const { items, lastSaved, init, refresh, remove, openEditDialog } = useLibrary();
+	const { items, lastSaved, init, refresh, remove, openEditDialog, insertItem } = useLibrary();
 	const { open: openContextMenu } = useContextMenu();
 	const { showHint, clearHint } = useStatusHint();
 	const searchRef = ref();
@@ -192,7 +202,7 @@
 	);
 
 	function insert(item: LibraryItem | undefined): void {
-		if (item?.entry) insertEntry(item.entry).catch(console.error);
+		if (item?.entry) insertItem(item.entry).catch(console.error);
 	}
 
 	function navigate(direction: 1 | -1) {

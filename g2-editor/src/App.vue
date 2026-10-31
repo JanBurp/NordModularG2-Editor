@@ -203,6 +203,40 @@
 				/>
 			</label>
 			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Author</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.author"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-author"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">License</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.license"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-license"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Source</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.source"
+					placeholder="URL or patch name"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-source"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
+				<span class="text-xs text-content-secondary">Tags</span>
+				<input
+					v-model="saveToLibraryDialog.editingValue.value.tags"
+					placeholder="comma separated — the group is added"
+					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default"
+					data-testid="save-library-tags"
+				/>
+			</label>
+			<label class="flex flex-col gap-1">
 				<span class="text-xs text-content-secondary">Notes</span>
 				<textarea
 					v-model="saveToLibraryDialog.editingValue.value.notes"
@@ -210,6 +244,27 @@
 					class="w-full px-2 py-1 border border-line-default rounded bg-surface-2 text-content-primary focus:outline-none focus:border-line-default resize-y"
 					data-testid="save-library-notes"
 				/>
+			</label>
+			<div class="text-xs text-content-muted break-words" data-testid="save-library-assignments">
+				Assignments: {{ saveToLibraryDialog.editingValue.value.assignments }}
+			</div>
+		</div>
+	</Dialog>
+	<Dialog
+		v-model="libraryInsertDialog.showDialog.value"
+		title="Insert Library Item"
+		confirm-label="Insert"
+		@confirm="libraryInsertDialog.confirm"
+		@cancel="libraryInsertDialog.cancel"
+	>
+		<!-- Which of the item's assignments to keep; "in use" ones replace the patch's own -->
+		<div class="flex flex-col gap-1 text-sm" data-testid="library-assignments">
+			<div class="text-xs text-content-secondary mb-1">Keep these assignments:</div>
+			<label v-for="(row, i) in libraryInsertDialog.editingValue.value" :key="i" class="flex items-center gap-2 cursor-pointer">
+				<CheckBox v-model="row.keep" :data-testid="`library-assignment-${i}`" />
+				<span class="text-xs text-content-muted w-12">{{ { knobs: 'Knob', morphs: 'Morph', midi: 'MIDI' }[row.kind] }}</span>
+				<span class="flex-1">{{ row.label }}</span>
+				<span v-if="row.inUse" class="text-xs text-amber-300">in use</span>
 			</label>
 		</div>
 	</Dialog>
@@ -525,6 +580,7 @@
 	import { usePatchOperations } from './composables/usePatchOperations';
 	import { usePatchNameDialog } from './composables/usePatchNameDialog';
 	import { useLibrary } from './composables/useLibrary';
+	import CheckBox from './components/common/CheckBox.vue';
 	import { usePerfNameDialog } from './composables/usePerfNameDialog';
 	import { useBpmDialog } from './composables/useBpmDialog';
 	import { useBankDownloadDialog } from './composables/useBankDownloadDialog';
@@ -684,7 +740,7 @@
 	} = usePerfNameDialog();
 
 	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
-	const { saveDialog: saveToLibraryDialog, groups: libraryGroups, editing: libraryEditing } = useLibrary();
+	const { saveDialog: saveToLibraryDialog, groups: libraryGroups, editing: libraryEditing, insertDialog: libraryInsertDialog } = useLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();
 

@@ -32,7 +32,7 @@ export async function readClipboardEntry(uiStore: ReturnType<typeof useUiStore>)
 	return uiStore.clipboard;
 }
 
-// The modules `indices` of `area` with their cables among themselves and their morphs. Shared by Copy,
+// The modules `indices` of `area` with their cables among themselves and their morph, knob and MIDI CC assignments. Shared by Copy,
 // Save Selection to Library and a module drag into another G2's window (useModuleDrag.ts).
 export function buildClipboardEntry(indices: number[], area: 'voice' | 'fx'): ClipboardEntry {
 	const slotsStore = useSlotsStore();
@@ -48,13 +48,22 @@ export function buildClipboardEntry(indices: number[], area: 'voice' | 'fx'): Cl
 		.filter((c: any) => selectedIds.has(c.smod as number) && selectedIds.has(c.dmod as number))
 		.map((c: any) => ({ ...c }));
 
-	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs };
+	const slotEntry = slotsStore.slots[slot];
+	const ofSelection = (a: { location: number; moduleIndex: number }) => a.location === areaIdx && selectedIds.has(a.moduleIndex);
+	const knobs = slotEntry.paramPages.filter(ofSelection).map((k) => ({ ...k }));
+	const midi = slotEntry.controllers.filter(ofSelection).map((c) => ({ ...c }));
+
+	return { modules, cables, area: areaKey, copiedVariation: uiStore.variation, morphs, knobs, midi };
 }
 
 // Shared by Paste, Library insert and a module drop from another G2's window (useRemoteModuleDrop.ts):
 // adds `entry`'s modules with their top-left at `target`, else at the mouse position, else 2 columns/rows
-// from where they were copied.
-export async function insertEntry(entry: ClipboardEntry, target?: { col: number; row: number; area: 'va' | 'fx' }): Promise<void> {
+// from where they were copied. Knob and MIDI CC assignments only `withAssignments` (a Library insert); morphs always.
+export async function insertEntry(
+	entry: ClipboardEntry,
+	target?: { col: number; row: number; area: 'va' | 'fx' } | null,
+	withAssignments = false,
+): Promise<void> {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	if (entry.modules.length === 0) return;
@@ -88,7 +97,7 @@ export async function insertEntry(entry: ClipboardEntry, target?: { col: number;
 	const clone = buildCloneEntries(modules, cables, existingIds, dCol, dRow);
 	if (!clone) return showToast(AREA_FULL_MESSAGE);
 	const { entries, remappedCables } = clone;
-	await slotsStore.paste(entries, remappedCables, area, entry.morphs);
+	await slotsStore.paste(entries, remappedCables, area, entry.morphs, withAssignments ? { knobs: entry.knobs ?? [], midi: entry.midi ?? [] } : undefined);
 
 	uiStore.selectModules(
 		entries.map((e) => e.newId),

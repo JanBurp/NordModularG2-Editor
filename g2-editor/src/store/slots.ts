@@ -1326,6 +1326,7 @@ export const useSlotsStore = defineStore('slots', {
 			cables: { newSmod: number; newDmod: number; colour: number; userColour?: number; scon: number; dcon: number; dir: number }[],
 			area: 'voice' | 'fx',
 			morphs: MorphAssignment[][] = [], // per variation, source module indices (snapshotModulesForCopy)
+			assignments: { knobs: ParamPageAssignment[]; midi: MidiCCAssignment[] } = { knobs: [], midi: [] }, // source module indices; replace occupants
 		): Promise<void> {
 			if (entries.length === 0) return;
 			const ctx = this._getActivePatch();
@@ -1432,12 +1433,29 @@ export const useSlotsStore = defineStore('slots', {
 				});
 				await this._restoreModuleMorph(slot, pastedMorphs);
 
+				// Knobs and MIDI CCs onto the new indices, replacing what holds their knob slot or CC.
+				const onNewId = <T extends { location: number; moduleIndex: number }>(a: T): T => ({
+					...a,
+					location: areaIdx,
+					moduleIndex: newIdOf.get(a.moduleIndex)!,
+				});
+				const knobs = assignments.knobs.filter((k) => newIdOf.has(k.moduleIndex)).map(onNewId);
+				const midi = assignments.midi.filter((c) => newIdOf.has(c.moduleIndex)).map(onNewId);
+				const knobSlots = knobs.map((k) => k.slotIndex);
+				const ccs = midi.map((c) => c.cc);
+				const prevPages = [...slotEntry.paramPages];
+				const prevControllers = [...slotEntry.controllers];
+				if (knobs.length > 0) await this._applyParamPages(slot, [...prevPages.filter((p) => !knobSlots.includes(p.slotIndex)), ...knobs], knobSlots);
+				if (midi.length > 0) await this._applyControllers(slot, [...prevControllers.filter((c) => !ccs.includes(c.cc)), ...midi], ccs);
+
 				if (shouldRecord) {
 					const addedIds = entries.map((e) => e.newId);
 					hist.record(slot, {
 						undo: async () => {
 							const patch = this.slots[slot].patch; // re-fetched: an echo reload may have replaced the patch since the edit
 							if (!patch) return;
+							if (knobs.length > 0) await this._applyParamPages(slot, prevPages, knobSlots);
+							if (midi.length > 0) await this._applyControllers(slot, prevControllers, ccs);
 							// Delete added cables first
 							const delCableCmds = addedCables.map((c) => [
 								'del-cable',
@@ -1477,7 +1495,7 @@ export const useSlotsStore = defineStore('slots', {
 								const currentMods = currentCtx.patch.areas[areaIdx].modules;
 								const currentIdSet = new Set(currentMods.map((m) => m.index));
 								const reEntries = entries.filter((e) => !currentIdSet.has(e.newId));
-								if (reEntries.length > 0) await this.paste(reEntries, cables, area, morphs);
+								if (reEntries.length > 0) await this.paste(reEntries, cables, area, morphs, assignments);
 							}
 						},
 					});
@@ -3775,6 +3793,21 @@ export const useSlotsStore = defineStore('slots', {
 					},
 				});
 			}
+		},
+
+		// The MIDI CC sibling of _applyParamPages: replaces the whole list and re-syncs only the CCs in `touched`.
+		async _applyControllers(slot: SlotLabel, list: MidiCCAssignment[], touched: number[]): Promise<void> {
+			this.slots[slot].controllers = [...list];
+			this._markSlotDirty(slot);
+			if (this.slots[slot].patch) this.slots[slot].patch!.controllers = [...list];
+			if (useDeviceStore().status !== DeviceStatus.Connected) return;
+			const cmds = touched.map((cc) => {
+				const c = list.find((x) => x.cc === cc);
+				return c
+					? ['assign-midicc', slot, ccLocationStr(c.location), String(c.moduleIndex), String(c.paramIndex), String(cc)]
+					: ['deassign-midicc', slot, String(cc)];
+			});
+			await runCliBatchSafe(cmds, '_applyControllers');
 		},
 
 		// Replaces the whole Parameter Pages list and re-syncs only the knob slots named in `touched`

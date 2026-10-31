@@ -87,6 +87,12 @@
 			@cable-group-drop="emit('cableGroupDrop', $event)"
 		/>
 		<div ref="selectionRectEl" class="selection-rect" />
+		<!-- Over the Library pane the canvas clips the ghost: drawn above everything, where the canvas would show it -->
+		<Teleport to="body">
+			<svg v-if="libraryGhostOrigin" class="fixed inset-0 w-full h-full pointer-events-none z-50">
+				<g :transform="`translate(${libraryGhostOrigin.left}, ${libraryGhostOrigin.top}) scale(${zoom})`"><DragGhost :ghosts="dragGhosts" /></g>
+			</svg>
+		</Teleport>
 	</div>
 </template>
 <script setup lang="ts">
@@ -116,7 +122,7 @@
 	import { useModuleSelecting } from '../../composables/useModuleSelecting';
 	import { useModuleDrag } from '../../composables/useModuleDrag';
 	import { useModuleDrop } from '../../composables/useModuleDrop';
-	import { buildClipboardEntry, insertEntry } from '../../composables/usePatchClipboard';
+	import { buildClipboardEntry } from '../../composables/usePatchClipboard';
 	import { useLibrary } from '../../composables/useLibrary';
 	import { remoteDragGhosts } from '../../composables/useRemoteModuleDrop';
 	import { useUiStore } from '../../store/ui';
@@ -335,7 +341,7 @@
 		clearArmed();
 	}
 
-	const { dragGhosts, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
+	const { dragGhosts, overLibrary, handleModuleDragStart, clearModuleDrag } = useModuleDrag(
 		() => props.modules as any[],
 		(info) => emit('moduleMove', info),
 		(index, shiftKey) => handleModuleClick(index, shiftKey),
@@ -346,12 +352,16 @@
 		},
 		(indices) => buildClipboardEntry(indices, props.area === 'va' ? 'voice' : 'fx'),
 	);
+	const libraryGhostOrigin = computed(() => (overLibrary.value ? (svgRef.value?.getBoundingClientRect() ?? null) : null));
 	const remoteGhosts = computed(() => remoteDragGhosts(uiStore.remoteDrag, props.area as 'va' | 'fx'));
 
 	const { handleDragOver, clearDropGhost, handleModuleDropOnWrapper } = useModuleDrop(
 		svgRef,
 		(info) => emit('moduleDrop', info),
-		({ entry, col, row }) => insertEntry(entry, { col, row, area: props.area as 'va' | 'fx' }).catch(console.error),
+		({ entry, col, row }) =>
+			useLibrary()
+				.insertItem(entry, { col, row, area: props.area as 'va' | 'fx' })
+				.catch(console.error),
 	);
 
 	function onCanvasContextMenu(e: MouseEvent) {

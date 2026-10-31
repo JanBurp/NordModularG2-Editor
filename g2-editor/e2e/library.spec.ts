@@ -1,7 +1,7 @@
 import type { Page } from '@playwright/test';
 import fs from 'fs';
 import path from 'path';
-import { clickContextMenuItem, createCable, dropModuleOnCanvas, openContextMenu } from './helpers';
+import { clickContextMenuItem, createCable, dropModuleOnCanvas, hoverContextMenuItem, openContextMenu } from './helpers';
 import { expect, test } from './fixtures/electron';
 
 const MOD = { OscA: 97, FltClassic: 92 } as const;
@@ -219,5 +219,37 @@ test.describe('Library', () => {
 		// The copies are selected after the insert; the OscA copy sits at column 2, row 3.
 		const osc = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]').nth(1);
 		await expect(osc).toHaveAttribute('transform', 'translate(512, 48)');
+	});
+
+	test('saves author, tags (plus the group) and the assignments in the notes header', async ({ page, sendMenuAction }) => {
+		// OscA param 0 is FreqCoarse (nmg2mods.ts)
+		await openContextMenu(page, page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] [data-param-index="0"]'));
+		await hoverContextMenuItem(page, 'Assign CC…');
+		await clickContextMenuItem(page, 'CC 2: Breath');
+
+		await sendMenuAction('select-all');
+		await sendMenuAction('save-to-library');
+		await page.locator('[data-testid="save-library-group"]').fill('My Voices');
+		await page.locator('[data-testid="save-library-name"]').fill('Tagged');
+		await page.locator('[data-testid="save-library-author"]').fill('Jan');
+		await page.locator('[data-testid="save-library-tags"]').fill('Lead, mono');
+		await expect(page.locator('[data-testid="save-library-assignments"]')).toContainText(/midi:\[CC2 OscA\d*\.FreqCoarse\]/);
+		await page.locator('[data-testid="save-library-name"]').press('Enter');
+
+		await itemRow(page, 'Tagged').click();
+		await expect(page.locator('[data-testid="library-tags"]')).toHaveText(/my voices\s*lead\s*mono/);
+		await expect(page.locator('[data-testid="library-pane"]').getByText('Jan')).toBeVisible();
+
+		// Inserted: the CC is offered, "in use" (the original OscA holds it), so unchecked
+		await openContextMenu(page, itemRow(page, 'Tagged'));
+		await clickContextMenuItem(page, 'Add to Patch');
+		const dialog = page.locator('[data-testid="library-assignments"]');
+		await expect(dialog).toContainText('in use');
+		await expect(page.locator('[data-testid="library-assignment-0"]')).toHaveAttribute('aria-checked', 'false');
+		await page.getByRole('button', { name: 'Insert', exact: true }).click();
+		await expect(modules(page)).toHaveCount(4);
+
+		await sendMenuAction('undo');
+		await expect(modules(page)).toHaveCount(2);
 	});
 });
