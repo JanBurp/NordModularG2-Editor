@@ -196,6 +196,34 @@ test.describe('Library', () => {
 		await page.locator('[data-testid="save-library-notes"]').press('ControlOrMeta+Enter');
 		await expect(page.locator('[data-testid="library-notes"]')).toHaveText('Second edit');
 		expect(fs.readdirSync(path.join(lib, 'Finished'))).toEqual(['Final.pch2']);
+
+		// Moved out of its group: the folder left empty is removed
+		await page.locator('[data-testid="library-edit"]').click();
+		await page.locator('[data-testid="save-library-group"]').fill('Done');
+		await page.locator('[data-testid="save-library-notes"]').press('ControlOrMeta+Enter');
+		await expect.poll(() => fs.existsSync(path.join(lib, 'Done', 'Final.pch2'))).toBe(true);
+		expect(fs.existsSync(path.join(lib, 'Finished'))).toBe(false);
+	});
+
+	test('Move to Trash of the last item in a group removes its (nested) folders too', async ({ app, page, sendMenuAction }) => {
+		// Deleted instead of trashed, so test runs don't fill the real Trash
+		await app.evaluate(({ shell }) => {
+			shell.trashItem = async (p: string) => process.getBuiltinModule('fs').rmSync(p);
+		});
+		await sendMenuAction('select-all');
+		await sendMenuAction('save-to-library');
+		await page.locator('[data-testid="save-library-group"]').fill('Drums/Kicks');
+		await page.locator('[data-testid="save-library-name"]').fill('Kick');
+		await page.locator('[data-testid="save-library-name"]').press('Enter');
+		const lib = path.join(await app.evaluate(() => process.env.TEST_USER_DATA as string), 'library');
+		await expect.poll(() => fs.existsSync(path.join(lib, 'Drums', 'Kicks', 'Kick.pch2'))).toBe(true);
+		fs.writeFileSync(path.join(lib, 'Drums', 'Kicks', '.DS_Store'), ''); // hidden files don't count
+
+		await openContextMenu(page, itemRow(page, 'Kick'));
+		await clickContextMenuItem(page, 'Move to Trash');
+		await expect(itemRow(page, 'Kick')).toHaveCount(0);
+		expect(fs.existsSync(path.join(lib, 'Drums'))).toBe(false);
+		expect(fs.existsSync(lib)).toBe(true); // never the library folder itself
 	});
 
 	test('edited notes show right away, without clicking the item again', async ({ page, sendMenuAction }) => {

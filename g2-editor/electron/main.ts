@@ -987,16 +987,28 @@ ipcMain.handle('patches:library-save', (event, filepath: string, data: number[])
 	fs.writeFileSync(file, Buffer.from(data));
 });
 
-// Renames/moves a library item, creating its new group (subfolder) when it's new.
+// Removes the folder of a library item that was moved away, and its parents, when they're left empty (up to the library
+// folder). Hidden files (.DS_Store) don't count, as the pane skips them.
+function removeEmptyLibraryDirs(wcId: number, file: string): void {
+	const root = path.resolve(libraryDirByWc.get(wcId)!);
+	for (let dir = path.dirname(file); dir !== root && fs.readdirSync(dir).every((n) => n.startsWith('.')); dir = path.dirname(dir))
+		fs.rmSync(dir, { recursive: true });
+}
+
+// Renames/moves a library item, creating its new group (subfolder) when it's new, removing the old one when left empty.
 ipcMain.handle('patches:library-move', (event, from: string, to: string) => {
+	const src = assertInLibrary(event.sender.id, from);
 	const dst = assertInLibrary(event.sender.id, to);
 	fs.mkdirSync(path.dirname(dst), { recursive: true });
-	fs.renameSync(assertInLibrary(event.sender.id, from), dst);
+	fs.renameSync(src, dst);
+	removeEmptyLibraryDirs(event.sender.id, src);
 });
 
-// Moves a library item to the Trash.
+// Moves a library item to the Trash, its group's folder too when left empty.
 ipcMain.handle('patches:library-remove', async (event, filepath: string) => {
-	await shell.trashItem(assertInLibrary(event.sender.id, filepath));
+	const file = assertInLibrary(event.sender.id, filepath);
+	await shell.trashItem(file);
+	removeEmptyLibraryDirs(event.sender.id, file);
 });
 
 ipcMain.handle('patches:reveal', (_, filepath: string) => shell.showItemInFolder(filepath));
