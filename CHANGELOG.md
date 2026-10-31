@@ -51,6 +51,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Env modules: curve shape button wider (20px), graphics 1px lower
 - Resonator: KBT text was hidden under its button
 
+### Others
+- Added logging to investigate copy/paste between devices (for some Windows users it did not work)
+
 ## [0.7.2] - 2026-10-22
 
 ### New

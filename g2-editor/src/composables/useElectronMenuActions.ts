@@ -65,6 +65,7 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		isPerformanceMode: slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode,
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
+	watch(hasClipboard, (has) => console.log(`[clipboard] menu state: hasClipboard=${has}`), { immediate: true });
 
 	function syncVariationFromCurrentPatch(): void {
 		if (currentPatch.value?.description?.variation !== undefined) uiStore.variation = currentPatch.value.description.variation;
@@ -77,6 +78,8 @@ export function useElectronMenuActions(options: MenuActionOptions): void {
 		window.electronAPI?.updateRecentFiles(useSettingsStore().recentFiles.map((f) => ({ ...f })));
 
 		window.electronAPI?.onMenuAction(async (action: string) => {
+			if (['copy', 'cut', 'paste', 'paste-params'].includes(action))
+				console.log(`[clipboard] menu action: ${action}, inputFocused=${isInputFocused()}, resyncing=${deviceStore.resyncing}`);
 			if (deviceStore.resyncing) return; // edits would collide with the post-reconnect performance re-send
 			if (action.startsWith('open-recent:')) {
 				const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
