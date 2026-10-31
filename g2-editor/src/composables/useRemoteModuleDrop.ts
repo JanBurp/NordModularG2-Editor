@@ -4,6 +4,7 @@ import { MODULE_ROW_HEIGHT, MODULE_WIDTH } from '@/constants';
 import { getModule } from '../renderer/nmg2mods';
 import { svgClientToGrid } from '../renderer/svgUtils';
 import { useUiStore } from '../store/ui';
+import { useDeviceStore } from '../store/device';
 import { usePatchClipboard } from './usePatchClipboard';
 
 // Drop end of a module drag from another G2's window (source: useModuleDrag.ts, routed by the
@@ -11,6 +12,7 @@ import { usePatchClipboard } from './usePatchClipboard';
 // copy there through the regular paste path. Install once per window (App.vue).
 export function useRemoteModuleDrop() {
 	const ui = useUiStore();
+	const device = useDeviceStore();
 	const { pasteEntry } = usePatchClipboard();
 
 	// Canvas grid position under a client point, null outside both canvases.
@@ -23,12 +25,13 @@ export function useRemoteModuleDrop() {
 	onMounted(() => {
 		const api = window.electronAPI?.drag;
 		api?.onHover(({ clientX, clientY, entry }) => {
-			const pos = locate(clientX, clientY);
+			const pos = device.resyncing ? null : locate(clientX, clientY);
 			ui.remoteDrag = pos ? { ...pos, entry } : null;
 		});
 		api?.onLeave(() => (ui.remoteDrag = null));
 		api?.onDrop(({ clientX, clientY, entry }) => {
 			ui.remoteDrag = null;
+			if (device.resyncing) return; // edits would collide with the post-reconnect performance re-send
 			const pos = locate(clientX, clientY);
 			if (pos && entry.modules.length > 0) void pasteEntry(entry, pos);
 		});

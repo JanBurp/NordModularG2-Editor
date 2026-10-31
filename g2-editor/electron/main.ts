@@ -49,6 +49,8 @@ interface Host {
 	window: BrowserWindow;
 	views: DeviceView[];
 	active: DeviceView | null;
+	// Last focus time: the front one of overlapping windows under a module drag (dragTargetAt)
+	focusedAt: number;
 }
 interface DeviceView {
 	view: WebContentsView;
@@ -194,11 +196,14 @@ function createHost(cascadeIndex = 0): Host {
 	}
 	trackWindowState(window, cascade);
 
-	const host: Host = { window, views: [], active: null };
+	const host: Host = { window, views: [], active: null, focusedAt: Date.now() };
 	hosts.push(host);
 	if (!isMac) applyWindowMenu(window);
 	window.on('resize', () => layoutHost(host));
-	window.on('focus', () => host.active?.view.webContents.focus());
+	window.on('focus', () => {
+		host.focusedAt = Date.now();
+		host.active?.view.webContents.focus();
+	});
 	window.on('close', () => console.log(`[window] close requested (${host.views.length} device view(s))`));
 	window.on('closed', () => {
 		hosts.splice(hosts.indexOf(host), 1);
@@ -786,12 +791,14 @@ ipcMain.handle('clipboard:read', () => {
 
 // --- Module drag between device windows: the source renderer keeps the mouse while the
 // button is held, so it reports screen positions outside its window here; this forwards them,
-// in client coordinates, to the device view under the cursor (useRemoteModuleDrop.ts). ---
+// in client coordinates, to the device view under the cursor (useRemoteModuleDrop.ts).
+// Overlapping windows: the most recently focused one is taken as the front one (there is no
+// z-order API); the source itself is in front, pressing the mouse on it raised it. ---
 
 let dragHoverTarget: WebContents | null = null;
 
 function dragTargetAt(sender: WebContents, screenX: number, screenY: number) {
-	for (const host of hosts) {
+	for (const host of [...hosts].sort((a, b) => b.focusedAt - a.focusedAt)) {
 		const view = host.active?.view;
 		if (!view || view.webContents === sender || !host.window.isVisible() || host.window.isMinimized()) continue;
 		const content = host.window.getContentBounds();
