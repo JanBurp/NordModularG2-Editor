@@ -37,6 +37,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Refactured multi-device UX
 - Drag'n drop modules between G2 windows
 - Added auto-connect for new device
+- Keep settings (zoom, pane) synced betwee multiple G2's
 - Menu Window renamed to Device
 - Improve 'unused modules', modules without cabling, but with midiCC or assigned parameter are now seen as in use
 
