@@ -53,6 +53,7 @@ const allGlobals = {
   DOMPoint: 'readonly',
   SVGPoint: 'readonly',
   ResizeObserver: 'readonly',
+  IntersectionObserver: 'readonly',
   WheelEvent: 'readonly',
 };
 

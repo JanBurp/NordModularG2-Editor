@@ -69,7 +69,7 @@ test.describe('Library', () => {
 		await expect(page.locator('[data-testid="library-count"]')).toHaveText('2 items');
 		await page.locator('[data-testid="library-search"] input').fill('alp');
 		await expect(page.locator('[data-testid="library-count"]')).toHaveText('1 items');
-		await expect(itemRow(page, 'Beta')).toHaveCount(0);
+		await expect(itemRow(page, 'Beta')).toBeHidden();
 		await expect(page.locator('[data-testid="library-notes"]')).toBeVisible();
 	});
 

@@ -17,7 +17,7 @@ declare global {
 			patches: {
 				list: (folder: string) => Promise<{
 					success: boolean;
-					entries: { name: string; path: string; isDir: boolean }[];
+					entries: { name: string; path: string; isDir: boolean; mtime: number }[];
 					error?: string;
 					code?: string; // Node error code, e.g. ENOENT, EACCES
 				}>;

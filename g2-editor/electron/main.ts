@@ -837,8 +837,9 @@ ipcMain.handle('patches:list', async (_, folder: string) => {
 		const entries = names.flatMap((name) => {
 			const full = path.join(folder, name);
 			try {
-				const isDir = fs.statSync(full).isDirectory();
-				return isDir || /\.(pch2|prf2)$/i.test(name) ? [{ name, path: full, isDir }] : [];
+				const stat = fs.statSync(full);
+				const isDir = stat.isDirectory();
+				return isDir || /\.(pch2|prf2)$/i.test(name) ? [{ name, path: full, isDir, mtime: stat.mtimeMs }] : [];
 			} catch {
 				return []; // broken symlink / unreadable entry
 			}

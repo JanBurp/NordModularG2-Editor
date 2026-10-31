@@ -1,4 +1,4 @@
-import { computed, ref } from 'vue';
+import { computed, markRaw, ref, shallowRef } from 'vue';
 import type { ClipboardEntry } from '@/types/patch';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
@@ -10,12 +10,13 @@ import { buildClipboardEntry } from './usePatchClipboard';
 import { showToast } from './useToast';
 
 // `group` is the item's subfolder path in the library folder, '' for the folder itself.
-// `entry` is missing for a file that can't be read: it's listed, but can't be inserted.
-export type LibraryItem = { name: string; path: string; group: string; entry?: LibraryEntry };
+// `entry` is missing for a file that can't be read: it's listed, but can't be inserted. `mtime`: the file's, when read.
+export type LibraryItem = { name: string; path: string; group: string; mtime: number; entry?: LibraryEntry };
 
 // Singleton state shared by the Library pane and the Save Selection to Library dialog.
 const root = ref(''); // the library folder
-const items = ref<LibraryItem[]>([]);
+// Shallow, the entries raw: never changed in place, only replaced by refresh().
+const items = shallowRef<LibraryItem[]>([]);
 let pendingEntry: ClipboardEntry | null = null;
 
 // The library folder's own items show as group 'Saved'; the groups are its subfolders.
@@ -39,30 +40,35 @@ const groupPath = (group: string) =>
 				.filter((s) => s && s !== '.' && s !== '..')
 				.join('/');
 
-// Every .pch2 in `dir` and its subfolders (hidden ones skipped).
-async function scan(dir: string, group: string): Promise<LibraryItem[]> {
+// Every .pch2 in `dir` and its subfolders (hidden ones skipped). Files unchanged since `known` keep their item,
+// so they're not read again and the pane doesn't redraw them.
+async function scan(dir: string, group: string, known: Map<string, LibraryItem>): Promise<LibraryItem[]> {
 	const { entries } = await window.electronAPI.patches.list(dir);
 	const lists = await Promise.all(
 		entries
 			.filter((e) => !e.name.startsWith('.'))
 			.map(async (e): Promise<LibraryItem[]> => {
-				if (e.isDir) return scan(e.path, group ? `${group}/${e.name}` : e.name);
+				if (e.isDir) return scan(e.path, group ? `${group}/${e.name}` : e.name, known);
 				if (!/\.pch2$/i.test(e.name)) return [];
+				const old = known.get(e.path);
+				if (old?.mtime === e.mtime) return [old];
 				const file = await window.electronAPI.patches.load(e.path);
 				let entry: LibraryEntry | undefined;
 				try {
-					entry = file.data ? pch2ToLibraryItem(file.data) : undefined;
+					entry = file.data ? markRaw(pch2ToLibraryItem(file.data)) : undefined;
 				} catch {
 					entry = undefined;
 				}
-				return [{ name: e.name.replace(/\.pch2$/i, ''), path: e.path, group, entry }];
+				return [{ name: e.name.replace(/\.pch2$/i, ''), path: e.path, group, mtime: e.mtime, entry }];
 			}),
 	);
 	return lists.flat();
 }
 
 async function refresh(): Promise<void> {
-	if (root.value) items.value = await scan(root.value, '');
+	if (!root.value) return;
+	const next = await scan(root.value, '', new Map(items.value.map((i) => [i.path, i])));
+	if (next.length !== items.value.length || next.some((item, i) => item !== items.value[i])) items.value = next;
 }
 
 async function init(): Promise<void> {

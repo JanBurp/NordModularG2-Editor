@@ -32,8 +32,9 @@
 			</div>
 			<div data-testid="library-count" class="text-content-muted py-0.5 px-1 text-xs">{{ filtered.length }} items</div>
 		</div>
-		<div class="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-			<div v-for="group in groups" :key="group" class="mb-2">
+		<div class="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2" data-library-scroll>
+			<!-- Filtered with v-show: typing in the search mustn't unmount and remount the previews -->
+			<div v-for="group in allGroups" v-show="filteredByGroup.has(group)" :key="group" class="mb-2">
 				<div
 					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
 					@click="toggleGroup(group)"
@@ -46,8 +47,9 @@
 				</div>
 
 				<div v-if="isExpanded(group)" class="flex flex-col gap-2 py-2">
-					<template v-for="item in itemsOf(group)" :key="item.path">
+					<template v-for="item in itemsByGroup.get(group)" :key="item.path">
 						<div
+							v-show="shownPaths.has(item.path)"
 							:class="['w-64 bg-surface-3 shadow', item.path === selectedNavPath ? 'ring-2 ring-amber-300' : '']"
 							:style="{ cursor: item.entry ? 'grab' : 'default' }"
 							:data-testid="`library-item-${item.name}`"
@@ -139,8 +141,17 @@
 				(!term || i.name.toLowerCase().includes(term) || !!i.entry?.text.toLowerCase().includes(term)),
 		);
 	});
-	const groups = computed(() => [...new Set(filtered.value.map((i) => i.group))].sort());
-	const itemsOf = (group: string) => filtered.value.filter((i) => i.group === group);
+	function byGroup(list: LibraryItem[]): Map<string, LibraryItem[]> {
+		const map = new Map<string, LibraryItem[]>();
+		for (const i of list) map.set(i.group, [...(map.get(i.group) ?? []), i]);
+		return map;
+	}
+	const filteredByGroup = computed(() => byGroup(filtered.value));
+	const shownPaths = computed(() => new Set(filtered.value.map((i) => i.path)));
+	const itemsByGroup = computed(() => byGroup(items.value));
+	const allGroups = computed(() => [...itemsByGroup.value.keys()].sort());
+	const groups = computed(() => allGroups.value.filter((g) => filteredByGroup.value.has(g)));
+	const itemsOf = (group: string) => filteredByGroup.value.get(group) ?? [];
 
 	// While searching every matching group is open; the collapsed ones close again afterwards.
 	const isExpanded = (group: string) => !!searchQuery.value || !collapsedGroups.value.includes(group);
