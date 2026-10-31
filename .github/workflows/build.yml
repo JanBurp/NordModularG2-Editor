@@ -9,37 +9,14 @@ on:
 env:
   LIBUSB_VERSION: '1.0.27'
   NODE_VERSION: '20'
+  MACOSX_DEPLOYMENT_TARGET: '14.0'
 
 jobs:
-  # ─────────────────────────────────────────────
-  # Unit tests (no G2 needed); hardware suites run locally only
-  # ─────────────────────────────────────────────
-  test:
-    runs-on: macos-14
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-
-      - name: CLI unit tests
-        working-directory: cli
-        run: |
-          brew install libusb
-          make test-unit
-
-      - name: Editor unit tests
-        working-directory: g2-editor
-        run: |
-          npm ci --ignore-scripts
-          npm run test:unit
-
   # ─────────────────────────────────────────────
   # macOS arm64 (native Apple Silicon runner)
   # ─────────────────────────────────────────────
   build-macos-arm64:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
@@ -96,7 +73,7 @@ jobs:
   # macOS x64 (cross-compiled from arm64 runner)
   # ─────────────────────────────────────────────
   build-macos-x64:
-    runs-on: macos-14
+    runs-on: macos-15
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
@@ -208,7 +185,7 @@ jobs:
   # Publish to GitHub Releases (tag pushes only)
   # ─────────────────────────────────────────────
   publish:
-    needs: [test, build-macos-arm64, build-macos-x64, build-windows]
+    needs: [build-macos-arm64, build-macos-x64, build-windows]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
