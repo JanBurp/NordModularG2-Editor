@@ -74,6 +74,18 @@ class BitReader {
 // paramIndex, plus — for the Global Knobs variant — a trailing 2-bit slot field (0-3 = A-D).
 // Shared by G2Parser.parseKnobs and parseGlobalKnobsChunk, which differ only in that trailing
 // field. Returns null when the slot's presence bit is unset.
+// A G2 name field: up to 16 Latin-1 characters, NUL-terminated only when shorter than 16 (same
+// rule as the CLI's parse_name). Returns the name and the offset just past the field.
+function readName(data: Uint8Array, ofs: number): [string, number] {
+	let str = '';
+	for (let i = 0; i < 16 && ofs < data.length; i++) {
+		const c = data[ofs++];
+		if (c === 0) break;
+		str += String.fromCharCode(c);
+	}
+	return [str, ofs];
+}
+
 function readKnobSlotRecord(
 	reader: BitReader,
 	hasSlotField: boolean,
@@ -176,7 +188,7 @@ class G2Parser {
 			],
 		};
 
-		const hdr = new Uint8Array(data, 0, 320);
+		const hdr = new Uint8Array(data, 0, Math.min(320, data.byteLength));
 		const str = new TextDecoder('latin1').decode(hdr);
 		let ofs = str.indexOf('\0');
 		const textHdrLen = ofs + 3;
@@ -266,7 +278,8 @@ class G2Parser {
 	}
 
 	private setModuleName(areaIdx: number, index: number, name: string): void {
-		this.findModule(this.aof + areaIdx, index)!.uname = name;
+		const m = this.findModule(this.aof + areaIdx, index);
+		if (m) m.uname = name;
 	}
 
 	private parseModuleNames(data: Uint8Array): string {
@@ -276,15 +289,8 @@ class G2Parser {
 		let ofs = 2;
 		for (let i = 0; i < nummod; i++) {
 			const index = data[ofs];
-			let str = '';
-			let charcode: number | undefined;
-			let j: number;
-			for (j = 1; j < 17; j++) {
-				if ((charcode = data[ofs + j])) str += String.fromCharCode(charcode);
-				else break;
-			}
-			ofs += j + 1;
-			if (charcode) ofs--;
+			const [str, next] = readName(data, ofs + 1);
+			ofs = next;
 			this.setModuleName(areaIdx, index, str);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
@@ -365,12 +371,9 @@ class G2Parser {
 		for (let i = 0; i < nummod; i++) {
 			const modtype = this.getBits(8);
 			const modDef = getModule(modtype);
-			if (!modDef) {
-				console.error(`Module type ${modtype} not found in module definitions`);
-				continue;
-			}
-			const mod: ModuleInstance = Object.create(modDef) as ModuleInstance;
-			mod.pcnt = modDef.params?.length || 0;
+			// An unknown type is still read field by field, so the modules after it stay aligned.
+			const mod = (modDef ? Object.create(modDef) : {}) as ModuleInstance;
+			mod.pcnt = modDef?.params?.length || 0;
 			mod.lv = Array(mod.pcnt * 9);
 			mod.index = this.getBits(8);
 			mod.type = modtype;
@@ -383,6 +386,10 @@ class G2Parser {
 			const nmodes = this.getBits(4);
 			mod.modes = [];
 			for (let j = 0; j < nmodes; j++) mod.modes.push(this.getBits(6));
+			if (!modDef) {
+				console.error(`Module type ${modtype} not found in module definitions`);
+				continue;
+			}
 			this.areas[this.aof + areaIdx].modules.push(mod);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
@@ -493,13 +500,13 @@ class G2Parser {
 		this.areas[this.aof + areaIdx].nummod = nummod;
 		for (let i = 0; i < nummod; i++) {
 			const index = this.getBits(8);
+			// A module that's absent (unknown type) is still read through, so the next one stays aligned.
 			const m = this.findModule(this.aof + areaIdx, index);
-			if (!m) continue;
 			const paramcnt = this.getBits(7);
 			for (let v = 0; v < numvar; v++) {
 				const variation = this.getBits(8);
 				for (let p = 0; p < paramcnt; p++) {
-					if (p < m.pcnt) m.lv[variation * m.pcnt + p] = this.getBits(7);
+					if (m && p < m.pcnt) m.lv[variation * m.pcnt + p] = this.getBits(7);
 					else this.getBits(7);
 				}
 			}
@@ -569,7 +576,7 @@ class G2Parser {
 	}
 
 	private parsePrfData(data: Uint8Array): void {
-		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
+		// 0x11 section: 8-byte header, then 4 × (name, see readName, then 10 bytes extra data)
 		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, 3×padding
 		// Header as writePerfSettings writes it: [unknown, focus<<2 | knobSource, rangeEnable, bpm, unknown, clockRun, 0, 0]
 		this.perfSettings = {
@@ -583,9 +590,8 @@ class G2Parser {
 		const slotNames: string[] = [];
 		this.slotMeta.length = 0;
 		for (let i = 0; i < 4; i++) {
-			let str = '';
-			while (ofs < data.length && data[ofs] !== 0) str += String.fromCharCode(data[ofs++]);
-			ofs++; // skip null terminator
+			const [str, next] = readName(data, ofs);
+			ofs = next;
 			if (ofs + 10 <= data.length) {
 				this.slotMeta.push({
 					active: data[ofs] !== 0,
