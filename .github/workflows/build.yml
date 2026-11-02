@@ -232,8 +232,17 @@ jobs:
           name: g2-cli-linux-${{ matrix.arch }}
           path: cli-release/g2-cli-linux-${{ matrix.arch }}
 
+      # electron-builder's bundled fpm (used for the .deb) is x86-only: use a system fpm on arm64.
+      - name: Install fpm (arm64)
+        if: matrix.arch == 'arm64'
+        run: |
+          sudo apt-get install -y ruby ruby-dev build-essential
+          sudo gem install fpm --no-document
+
       - name: Install dependencies & build Electron app
         working-directory: g2-editor
+        env:
+          USE_SYSTEM_FPM: ${{ matrix.arch == 'arm64' }}
         run: |
           npm ci --ignore-scripts
           npx electron-vite build

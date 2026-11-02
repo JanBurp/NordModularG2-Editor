@@ -67,6 +67,9 @@ linux:
     - AppImage
     - deb
   category: Audio
+  # A directory of NxN.png files: from the single resources/icon.png electron-builder can't read
+  # the size and installs it under hicolor/0x0, which desktop menus don't pick up.
+  icon: resources/linux/icons
   maintainer: "Jan den Besten <info@jandenbesten.net>"
   extraResources:
     - from: resources/g2-cli
