@@ -3273,7 +3273,7 @@ export const useSlotsStore = defineStore('slots', {
 			await this._pushUprateAndColors(slot, patch, areaIdx);
 		},
 
-		// Shared by breakJackConnection/moveCableGroup: replaces oldCables with newCables as one undoable step.
+		// Shared by breakJackConnection/moveCableGroup/replaceCables: replaces oldCables with newCables as one undoable step.
 		async _swapCables(
 			slot: SlotLabel,
 			patch: Patch,

@@ -135,6 +135,9 @@ function rewireCandidates(above: any, newMod: any, below: any, cables: Cable[]):
 		const family = colourFamily(aboveU[0].jack.colour);
 		const sameFamily = (j: IndexedJack) => colourFamily(j.jack.colour) === family;
 		const outUnits = toUnits(indexed(def?.outputs).filter(sameFamily));
+		// Prefer units as wide as the rewired one, so a stereo pair isn't collapsed through a mono jack.
+		const keepsWidth = ({ inU, outU }: { inU: IndexedJack[]; outU: IndexedJack[] }) =>
+			Number(inU.length === belowU.length) + Number(outU.length === belowU.length);
 		return toUnits(indexed(def?.inputs).filter(sameFamily))
 			.flatMap((inU) =>
 				outUnits.map((outU) => ({
@@ -143,7 +146,7 @@ function rewireCandidates(above: any, newMod: any, below: any, cables: Cable[]):
 					n: pairCount(above, aboveU[0].idx, newMod, inU[0].idx) + pairCount(newMod, outU[0].idx, below, belowU[0].idx),
 				})),
 			)
-			.sort((a, b) => b.n - a.n || unitY(a.inU) - unitY(b.inU) || unitY(b.outU) - unitY(a.outU))
+			.sort((a, b) => b.n - a.n || keepsWidth(b) - keepsWidth(a) || unitY(a.inU) - unitY(b.inU) || unitY(b.outU) - unitY(a.outU))
 			.map(({ inU, outU }) => toCandidate([...unitPairs(above, aboveU, newMod, inU), ...unitPairs(newMod, outU, below, belowU)], unitCables));
 	});
 }
@@ -235,16 +238,33 @@ export function useGhostCable() {
 		clearGhostCable();
 		const old = ghost.replaces;
 		if (old) {
-			const cable = (p: GhostPair): Cable => ({
-				colour: old[0].colour,
-				userColour: old[0].userColour,
-				smod: p.from.moduleIndex,
-				scon: p.from.connectorIndex,
-				dir: 1,
-				dmod: p.to.moduleIndex,
-				dcon: p.to.connectorIndex,
-			});
-			const newCables = [{ from: ghost.from, to: ghost.to }, ...(ghost.extra ?? [])].map(cable);
+			// The patch may have changed since the suggestion (undo, hardware echo): never send del/add-cable for
+			// cables or modules that are gone.
+			const live = slotsStore.getAreaCables(uiStore.slotInFocus, ghost.area);
+			const modules = slotsStore.getAreaModules(uiStore.slotInFocus, ghost.area);
+			const pairs = [{ from: ghost.from, to: ghost.to }, ...(ghost.extra ?? [])];
+			const sameCable = (a: Cable, b: Cable) => a.smod === b.smod && a.scon === b.scon && a.dmod === b.dmod && a.dcon === b.dcon;
+			const hasModule = (j: GhostJack) => modules.some((m: any) => m.index === j.moduleIndex);
+			if (!old.every((o) => live.some((c) => sameCable(c, o))) || !pairs.every((p) => hasModule(p.from) && hasModule(p.to))) return;
+			// Each new cable keeps the colour of the old cable it takes over: same above output, or same below input.
+			const cable = (p: GhostPair): Cable => {
+				const o =
+					old.find(
+						(c) =>
+							(c.smod === p.from.moduleIndex && c.scon === p.from.connectorIndex) ||
+							(c.dmod === p.to.moduleIndex && c.dcon === p.to.connectorIndex),
+					) ?? old[0];
+				return {
+					colour: o.colour,
+					userColour: o.userColour,
+					smod: p.from.moduleIndex,
+					scon: p.from.connectorIndex,
+					dir: 1,
+					dmod: p.to.moduleIndex,
+					dcon: p.to.connectorIndex,
+				};
+			};
+			const newCables = pairs.map(cable);
 			await slotsStore.replaceCables(old, newCables, ghost.area === 1 ? 'voice' : 'fx');
 			return;
 		}

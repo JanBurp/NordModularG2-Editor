@@ -67,6 +67,18 @@ vi.mock('@/renderer/nmg2mods', () => {
 		},
 		42: { outputs: [{ name: 'Out', colour: 'yellow', x: 240, y: 40 }] },
 		43: { inputs: [{ name: 'X', colour: 'blue', x: 10, y: 5 }] },
+		// Mono input above a stereo in pair, stereo out: a stereo rewire must not pick the mono input.
+		36: {
+			inputs: [
+				{ name: 'Mono', colour: 'red', x: 246, y: 5 },
+				{ name: 'InL', colour: 'red', x: 220, y: 18 },
+				{ name: 'InR', colour: 'red', x: 246, y: 18 },
+			],
+			outputs: [
+				{ name: 'OutL', colour: 'red', x: 220, y: 40 },
+				{ name: 'OutR', colour: 'red', x: 246, y: 40 },
+			],
+		},
 		// Stereo in + out, for a stereo rewire.
 		35: {
 			inputs: [
@@ -328,6 +340,25 @@ describe('useGhostCable — rewire through an inserted module', () => {
 			{ smod: 2, scon: 0, dmod: 3, dcon: 0, dir: 1, colour: 0 },
 		]);
 	});
+
+	it('confirm does nothing when the replaced cable is gone (e.g. undone) since the suggestion', async () => {
+		insert();
+		const slotsStore = useSlotsStore();
+		slotsStore.slots['A'].patch!.areas[1].cableList = [];
+		const replace = vi.spyOn(slotsStore, 'replaceCables').mockResolvedValue();
+		await useGhostCable().confirmGhostCable();
+		expect(replace).not.toHaveBeenCalled();
+	});
+
+	it('confirm does nothing when the inserted module is gone since the suggestion', async () => {
+		insert();
+		const slotsStore = useSlotsStore();
+		const area = slotsStore.slots['A'].patch!.areas[1];
+		area.modules = area.modules.filter((m: any) => m.index !== 2);
+		const replace = vi.spyOn(slotsStore, 'replaceCables').mockResolvedValue();
+		await useGhostCable().confirmGhostCable();
+		expect(replace).not.toHaveBeenCalled();
+	});
 });
 
 describe('useGhostCable — stereo table and rewire suggestions', () => {
@@ -366,5 +397,25 @@ describe('useGhostCable — stereo table and rewire suggestions', () => {
 			{ smod: 2, scon: 0, dmod: 3, dcon: 0 },
 			{ smod: 2, scon: 1, dmod: 3, dcon: 1 },
 		]);
+	});
+
+	it('prefers the stereo inputs over a mono input above them', () => {
+		seed([moduleStub(1, 30, 0, 0), moduleStub(2, 36, 0, 2), moduleStub(3, 31, 0, 6)], [cable(1, 0, 3, 0), cable(1, 1, 3, 1)]);
+		useGhostCable().computeGhostSuggestion(2, 0, 2, 'va');
+		const ghost = useUiStore().ghostCable;
+		expect(ghost?.to).toEqual(jack(2, 1, 'input'));
+		expect(ghost?.extra?.[0]).toEqual({ from: jack(1, 1, 'output'), to: jack(2, 2, 'input') });
+	});
+
+	it('gives each rewired cable the colour of the old cable it takes over', async () => {
+		const old = [
+			{ ...cable(1, 0, 3, 0), colour: 2, userColour: true },
+			{ ...cable(1, 1, 3, 1), colour: 5, userColour: true },
+		];
+		seed([moduleStub(1, 30, 0, 0), moduleStub(2, 35, 0, 2), moduleStub(3, 31, 0, 6)], old);
+		useGhostCable().computeGhostSuggestion(2, 0, 2, 'va');
+		const replace = vi.spyOn(useSlotsStore(), 'replaceCables').mockResolvedValue();
+		await useGhostCable().confirmGhostCable();
+		expect(replace.mock.calls[0][1].map((c) => c.colour)).toEqual([2, 5, 2, 5]);
 	});
 });
