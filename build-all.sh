@@ -153,6 +153,7 @@ if $BUILD_WIN; then
 
   step "Packaging Windows NSIS installer"
   cd "$EDITOR_DIR"
+  node scripts/fetch-usbdk.js
   npx electron-builder --win
 fi
 

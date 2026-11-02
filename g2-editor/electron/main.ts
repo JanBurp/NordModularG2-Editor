@@ -1183,25 +1183,36 @@ ipcMain.on('shell:openExternal', (_, url: string) => {
 	}
 });
 
-/* "Install USB helper" from the driver-error dialog. Linux: install the udev rule that gives the
- * logged-in user access to the G2 (pkexec password prompt), then re-apply rules to a G2 already
- * plugged in. The rule's text is read here and passed as an argument: root often can't read an
- * AppImage's FUSE mount, so it can't copy the file itself. */
+/* "Install USB helper" from the driver-error dialog.
+ * Windows: install UsbDk (normally done by the NSIS installer), a filter driver that lets libusb
+ * open the G2 next to Clavia's driver. msiexec asks for UAC itself.
+ * Linux: install the udev rule that gives the logged-in user access to the G2 (pkexec password
+ * prompt), then re-apply rules to a G2 already plugged in. The rule's text is read here and passed
+ * as an argument: root often can't read an AppImage's FUSE mount, so it can't copy the file itself. */
 const UDEV_RULES = '70-nord-g2.rules';
+const USBDK_MSI = 'UsbDk_x64.msi';
+function runHelper(cmd: string, args: string[]): Promise<{ ok: boolean; error?: string }> {
+	return new Promise((resolve) => {
+		const proc = spawn(cmd, args);
+		let stderr = '';
+		proc.stderr.on('data', (d) => (stderr += d));
+		proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+		// pkexec: 126 = password dialog dismissed, 127 = not authorized; msiexec: 1602 = cancelled
+		proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
+	});
+}
 ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string }> => {
+	const resource = (devDir: string, name: string) =>
+		app.isPackaged ? path.join(process.resourcesPath, name) : path.join(process.env.APP_ROOT!, 'resources', devDir, name);
+	if (process.platform === 'win32') {
+		// Our x64 build runs emulated on Windows on ARM, but UsbDk's x64 driver can't load there.
+		if (app.runningUnderARM64Translation) return { ok: false, error: 'UsbDk does not support Windows on ARM, use WinUSB (Zadig) instead' };
+		return runHelper('msiexec.exe', ['/i', resource('', USBDK_MSI), '/passive', '/norestart']);
+	}
 	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
-	const rulesPath = app.isPackaged ? path.join(process.resourcesPath, UDEV_RULES) : path.join(process.env.APP_ROOT!, 'resources', 'linux', UDEV_RULES);
 	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;
 	try {
-		const rules = fs.readFileSync(rulesPath, 'utf8');
-		return await new Promise((resolve) => {
-			const proc = spawn('pkexec', ['sh', '-c', script, 'sh', rules]);
-			let stderr = '';
-			proc.stderr.on('data', (d) => (stderr += d));
-			proc.on('error', (e) => resolve({ ok: false, error: e.message }));
-			// pkexec: 126 = password dialog dismissed, 127 = not authorized
-			proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
-		});
+		return await runHelper('pkexec', ['sh', '-c', script, 'sh', fs.readFileSync(resource('linux', UDEV_RULES), 'utf8')]);
 	} catch (e) {
 		return { ok: false, error: (e as Error).message };
 	}

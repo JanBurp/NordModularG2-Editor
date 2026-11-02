@@ -12,6 +12,7 @@ g2-editor/release/
 # Binary
 cli/build/bin/g2-cli
 g2-editor/resources/g2-cli
+g2-editor/resources/UsbDk_x64.msi
 
 # Editor files
 *.swp

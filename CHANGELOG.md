@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Linux builds (x64 and Raspberry Pi arm64) as AppImage and .deb
 - "Install USB helper" button on Linux: sets up USB permission for the G2 in one click
+- Windows: no more Zadig/WinUSB. The installer sets up UsbDk once; Clavia's driver stays, so the original editor keeps working and multiple G2s need no extra steps
 
 ### Changed
 - Minor UX changes to Bank Organizer
