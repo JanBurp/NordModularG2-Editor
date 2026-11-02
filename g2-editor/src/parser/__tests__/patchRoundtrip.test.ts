@@ -1535,13 +1535,13 @@ describe('patch text round-trip: parse → serialize → parse', () => {
 		expect(patchB.text).toBe(patch.text);
 	});
 
-	it('adds no text-pad section when the template has none and text is empty', () => {
+	it('closes with an empty 0x6f when the template has none and text is empty (official order ends with it)', () => {
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const templateNoText = removeSection(rawHex, 0x6f);
 		patch.text = '';
 
 		const newHex = serializePatch(name, patch, templateNoText, extractVariations(patch));
-		expect(extractSection(newHex, 0x6f)).toBeNull();
+		expect(extractSection(newHex, 0x6f)).toBe('6f0000');
 	});
 });
 
@@ -1683,21 +1683,61 @@ describe('writePerfSettings keeps what the G2 stored (0x11 category, clock bool,
 	});
 });
 
-describe('buildPerformanceTemplate — performance from hardware (get-patch order) slot templates', () => {
-	// get-patch answers 0x5a before 0x5b, omits 0x69 and has no 0x6f text section (see patch_slot_sections_canonical).
-	function usbOrderTemplate(rawHex: string): string {
-		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-		const secs: Uint8Array[] = [];
-		for (let ofs = 0; ofs < bytes.length - 2; ) {
-			const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
-			if (bytes[ofs] !== 0x69 && bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
-			ofs = end;
-		}
-		const order = (t: number) => (t === 0x5a ? 0 : t === 0x5b ? 1 : -1);
-		secs.sort((a, b) => (order(a[0]) >= 0 && order(b[0]) >= 0 ? order(a[0]) - order(b[0]) : 0));
-		return secs.map(toHex).join('');
+// get-patch answers 0x5a before 0x5b, omits 0x69 and has no 0x6f text section (see patch_slot_sections_canonical).
+function usbOrderTemplate(rawHex: string): string {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const secs: Uint8Array[] = [];
+	for (let ofs = 0; ofs < bytes.length - 2; ) {
+		const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+		if (bytes[ofs] !== 0x69 && bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
+		ofs = end;
+	}
+	const order = (t: number) => (t === 0x5a ? 0 : t === 0x5b ? 1 : -1);
+	secs.sort((a, b) => (order(a[0]) >= 0 && order(b[0]) >= 0 ? order(a[0]) - order(b[0]) : 0));
+	return secs.map(toHex).join('');
+}
+
+// "id:area" of every section of a rawHex (CRC excluded), e.g. '4a:1'.
+function sectionOrder(rawHex: string): string[] {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const out: string[] = [];
+	for (let ofs = 0; ofs + 3 <= bytes.length - 2; ) {
+		const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+		const t = bytes[ofs];
+		out.push(t.toString(16) + ([0x4a, 0x52, 0x4d, 0x5b, 0x5a].includes(t) && siz > 0 ? ':' + (bytes[ofs + 3] >> 6) : ''));
+		ofs += 3 + siz;
+	}
+	return out;
+}
+
+describe('serializePatch writes the official section order (CPatchFile_13::WriteMolecules)', () => {
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+
+	it('EmptyPatch.pch2 itself is in the official order', () => {
+		expect(official).toEqual(['21', '4a:1', '4a:0', '69', '52:1', '52:0', '4d:2', '4d:1', '4d:0', '65', '62', '60', '5b:2', '5b:1', '5b:0', '5a:1', '5a:0', '6f']);
+	});
+
+	for (const file of ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2']) {
+		it(`re-serializes a hardware get-patch template of ${file} in that order`, () => {
+			const { name, rawHex, patch } = loadFixture(file);
+			const template = usbOrderTemplate(rawHex) + '0000'; // + a CRC, as a stored template has
+			expect(sectionOrder(template)).not.toEqual(official);
+			expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(official);
+		});
 	}
 
+	it('puts an appended Morph Group label section (0x5b area 2) before the area 0x5b sections', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+		// A template with no 0x5b at all: the Morph Group labels are appended after everything else.
+		const template = removeSection(usbOrderTemplate(rawHex) + '0000', 0x5b);
+		expect(patch.morphParamLabels?.length).toBeGreaterThan(0);
+		// EmptyPatch has no modules, so no area 0x5b is appended; everything else keeps its place.
+		const expected = official.filter((id) => id !== '5b:1' && id !== '5b:0');
+		expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(expected);
+	});
+});
+
+describe('buildPerformanceTemplate — performance from hardware (get-patch order) slot templates', () => {
 	it('yields the canonical slot trains and uploads the same patches', () => {
 		const slotFiles = ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2'];
 		const fixtures = slotFiles.map(loadFixture);

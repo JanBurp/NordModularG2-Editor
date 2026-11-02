@@ -344,21 +344,25 @@ void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
 }
 
 void test_pch2_file_from_sections_header_and_crc(void) {
-    const uint8_t sections[] = { 0x21, 0x00, 0x03, 1, 2, 3, 0x5b, 0x00, 0x02, 9, 8 };
+    const uint8_t sections[] = { 0x21, 0x00, 0x03, 1, 2, 3, 0x6f, 0x00, 0x01, 'x' };
     uint8_t out[256] = {0};
     size_t out_len = sizeof(out);
     TEST_ASSERT_EQUAL_INT(0, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
 
+    /* 0x69 is filled in after 0x21; the existing 0x6f closes the slot, no second one. */
     size_t hl = strlen(PCH2_TEXT_HEADER);
-    TEST_ASSERT_EQUAL_INT(hl + 3 + sizeof(sections) + 2, out_len);
+    size_t body = sizeof(sections) + PCH2_CANONICAL_GROWTH;
+    TEST_ASSERT_EQUAL_INT(hl + 3 + body + 2, out_len);
     TEST_ASSERT_EQUAL_MEMORY(PCH2_TEXT_HEADER, out, hl);
     TEST_ASSERT_EQUAL_UINT8(0x00, out[hl]);
     TEST_ASSERT_EQUAL_UINT8(0x17, out[hl + 1]);
     TEST_ASSERT_EQUAL_UINT8(0x00, out[hl + 2]);
-    TEST_ASSERT_EQUAL_MEMORY(sections, out + hl + 3, sizeof(sections));
+    TEST_ASSERT_EQUAL_MEMORY(sections, out + hl + 3, 6);
+    TEST_ASSERT_EQUAL_UINT8(0x69, out[hl + 3 + 6]);
+    TEST_ASSERT_EQUAL_MEMORY(sections + 6, out + hl + 3 + 6 + PCH2_CANONICAL_GROWTH, 4);
 
     /* CRC covers [0x17][0x00][sections] and is the last 2 bytes, big-endian. */
-    uint16_t crc = calc_crc16(out + hl + 1, (int)(sizeof(sections) + 2));
+    uint16_t crc = calc_crc16(out + hl + 1, (int)(body + 2));
     TEST_ASSERT_EQUAL_UINT8(crc >> 8,   out[out_len - 2]);
     TEST_ASSERT_EQUAL_UINT8(crc & 0xff, out[out_len - 1]);
 }
@@ -368,6 +372,30 @@ void test_pch2_file_from_sections_buffer_too_small(void) {
     uint8_t out[8] = {0};
     size_t out_len = sizeof(out);
     TEST_ASSERT_EQUAL_INT(-1, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
-    /* On failure out_len reports the required size. */
-    TEST_ASSERT_EQUAL_INT(strlen(PCH2_TEXT_HEADER) + 3 + sizeof(sections) + 2, out_len);
+    /* On failure out_len reports the required size: + the inserted 0x69 and closing 0x6f. */
+    TEST_ASSERT_EQUAL_INT(strlen(PCH2_TEXT_HEADER) + 3 + sizeof(sections) + PCH2_CANONICAL_GROWTH + 3 + 2, out_len);
+}
+
+/* get-patch-file: GET_PATCH order (0x5a before 0x5b, no 0x69, no 0x6f) is written in the official
+ * order 21 4a 4a 69 52 52 4d 4d 4d 65 62 60 5b 5b 5b 5a 5a 6f (CPatchFile_13::WriteMolecules). */
+void test_pch2_file_from_sections_official_order(void) {
+    static const uint8_t ids[] = { 0x21, 0x4a, 0x4a, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65, 0x62, 0x60,
+                                   0x5a, 0x5a, 0x5b, 0x5b, 0x5b };
+    static const uint8_t expected[] = { 0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65,
+                                        0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a, 0x6f };
+    uint8_t sections[sizeof(ids) * 4];
+    for (size_t i = 0; i < sizeof(ids); i++) {
+        sections[i * 4] = ids[i]; sections[i * 4 + 1] = 0; sections[i * 4 + 2] = 1; sections[i * 4 + 3] = (uint8_t)i;
+    }
+    uint8_t out[512] = {0};
+    size_t out_len = sizeof(out);
+    TEST_ASSERT_EQUAL_INT(0, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
+
+    size_t ofs = strlen(PCH2_TEXT_HEADER) + 3;
+    for (size_t k = 0; k < sizeof(expected); k++) {
+        TEST_ASSERT_TRUE(ofs + 3 <= out_len - 2);
+        TEST_ASSERT_EQUAL_HEX8(expected[k], out[ofs]);
+        ofs += 3 + (((size_t)out[ofs + 1] << 8) | out[ofs + 2]);
+    }
+    TEST_ASSERT_EQUAL_INT(out_len - 2, ofs);  /* nothing after the 0x6f but the CRC */
 }

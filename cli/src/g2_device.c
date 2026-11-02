@@ -611,9 +611,9 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         goto cleanup;
     }
 
-    /* patch_usb_to_pch2 yields bare sections; a loadable .pch2 also needs the text header
-     * and the trailing CRC (see pch2_file_from_sections). */
-    size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + 2;
+    /* patch_usb_to_pch2 yields bare sections in GET_PATCH order; a loadable .pch2 also needs the
+     * official section order, the text header and the trailing CRC (see pch2_file_from_sections). */
+    size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + PCH2_CANONICAL_GROWTH + 3 + 2;
     uint8_t *fileData = malloc(fileSize);
     if (!fileData || pch2_file_from_sections(pch2Data, pch2Size, fileData, &fileSize) < 0) {
         g2_err("Failed to build PCH2 file\n");

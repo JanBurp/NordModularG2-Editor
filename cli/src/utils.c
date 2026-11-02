@@ -99,17 +99,34 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 }
 
 /* Wrap section data in a .pch2 file: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE].
- * CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write checksums
- * and every real .pch2 carries); without it a reader (including our own upload-patch)
+ * The sections go in the official order (patch_slot_sections_canonical, which fills in a missing
+ * 0x69) closed by a 0x6f text pad, empty when the input has none: the official reader rejects any
+ * other order (CPatchFile_13::WriteMolecules), and GET_PATCH data has 0x5a before 0x5b, no 0x69
+ * and no 0x6f. CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write
+ * checksums and every real .pch2 carries); without it a reader (including our own upload-patch)
  * takes the last 2 section bytes for the CRC and truncates the patch. */
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len) {
     if (!sections || !out || !out_len) return -1;
 
+    uint8_t *canon = malloc(sections_len + PCH2_CANONICAL_GROWTH + 3);
+    if (!canon) return -1;
+    size_t canon_len = 0;
+    patch_slot_sections_canonical(sections, sections_len, canon, &canon_len);
+    /* patch_slot_sections_canonical keeps a 0x6f (not in its order) at the end; add one if absent. */
+    size_t last = 0;
+    for (size_t ofs = 0; ofs + 3 <= canon_len; ofs += 3 + (((size_t)canon[ofs + 1] << 8) | canon[ofs + 2])) last = ofs;
+    if (canon_len < 3 || canon[last] != 0x6f) {
+        canon[canon_len++] = 0x6f;
+        canon[canon_len++] = 0x00;
+        canon[canon_len++] = 0x00;
+    }
+
     size_t header_len = strlen(PCH2_TEXT_HEADER);
-    size_t total = header_len + 3 + sections_len + 2;
+    size_t total = header_len + 3 + canon_len + 2;
     if (*out_len < total) {
         *out_len = total;
+        free(canon);
         return -1;
     }
 
@@ -117,9 +134,10 @@ int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
     out[header_len]     = 0x00;
     out[header_len + 1] = 0x17;
     out[header_len + 2] = 0x00;
-    memcpy(out + header_len + 3, sections, sections_len);
+    memcpy(out + header_len + 3, canon, canon_len);
+    free(canon);
 
-    uint16_t crc = calc_crc16(out + header_len + 1, (int)(sections_len + 2));
+    uint16_t crc = calc_crc16(out + header_len + 1, (int)(canon_len + 2));
     out[total - 2] = (crc >> 8) & 0xff;
     out[total - 1] = crc & 0xff;
 

@@ -520,7 +520,6 @@ interface WrittenSets {
 	m5a: Set<number>;
 	m5b: Set<number>;
 	m60: boolean;
-	wroteText: boolean;
 	m62: boolean;
 	m65: boolean;
 	m5bMorph: boolean;
@@ -534,7 +533,6 @@ function newWrittenSets(): WrittenSets {
 		m5a: new Set(),
 		m5b: new Set(),
 		m60: false,
-		wroteText: false,
 		m62: false,
 		m65: false,
 		m5bMorph: false,
@@ -655,7 +653,6 @@ function processSection(
 		w.m65 = true;
 	} else if (type === SectionType.SEPARATOR) {
 		out.push(writeTextPad(patch.text ?? ''));
-		w.wroteText = true;
 	} else {
 		// Preserve verbatim: perf data (PERF_DATA), unknown sections
 		out.push(verbatim);
@@ -692,13 +689,6 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
 		out.push(writeKnobs(patch.paramPages));
 	}
-	// The main hardware get-patch response never includes a text-pad section (notes are
-	// fetched separately via GET_PATCH_TEXT and merged only into patch.text) — so for any
-	// patch loaded from hardware, the template never has one to replace. Append it, same
-	// fallback pattern as controllers above.
-	if (!w.wroteText && patch.text) {
-		out.push(writeTextPad(patch.text));
-	}
 	if (!w.m65 && hasMorphAssignments(variations)) {
 		out.push(
 			writeMorphParamSection(
@@ -707,13 +697,17 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 			),
 		);
 	}
-	// Same fallback: the hardware get-patch response never includes a $PARAM_NAMES(areaIdx=2)
-	// section, so any custom Morph Group labels need appending when the template predates them.
+	// Same fallback for a template without a $PARAM_NAMES(areaIdx=2) section (an older file).
+	// A hardware get-patch does carry one (captured 2026-11-02: 5b:2 5b:1 5b:0).
 	if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
 		out.push(writeParamNames(2, morphParamNamesEntries(patch)));
 	}
 	appendMissingAreaParamNames(patch, out, w);
-	return buildRawHex(out);
+	// The official editor writes a fixed section order and its reader rejects any other
+	// (CPatchFile_13::WriteMolecules): a hardware get-patch template has 0x5a before 0x5b and no
+	// 0x69, and the fallbacks above append at the end. The text pad always closes the slot — also
+	// for a hardware template, which never carries one (notes come via GET_PATCH_TEXT).
+	return buildRawHex([...canonicalSlotOrder(out), writeTextPad(patch.text ?? '')]);
 }
 
 /**
@@ -846,24 +840,35 @@ const SLOT_CHUNK_ORDER = [0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 
 // Idle C_CURRENT_NOTE_2 chunk GET_PATCH never returns but a performance upload requires (kCurrentNoteDefault, utils.c).
 const CURRENT_NOTE_DEFAULT = Uint8Array.of(0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00);
 
-// Port of patch_slot_sections_canonical (utils.c): reorders one slot's sections, inserts a missing
-// 0x69, keeps unknown sections at the end and drops a 0x6f (the caller closes each slot with one).
-// Stops at a section that would overrun — the trailing CRC of a serialized template.
+// Port of patch_slot_sections_canonical (utils.c): one slot's sections in SLOT_CHUNK_ORDER, a
+// repeated id by descending area (4a/52/5a: 1,0; 4d/5b: 2,1,0 — every official file), a missing
+// 0x69 filled in, unknown sections kept at the end and a 0x6f dropped (the caller closes the slot).
+function canonicalSlotOrder(sections: Uint8Array[]): Uint8Array[] {
+	const secs = sections.filter((x) => x[0] !== SectionType.SEPARATOR);
+	const area = (x: Uint8Array) => (x.length > 3 ? x[3] >> 6 : 0);
+	const out: Uint8Array[] = [];
+	for (const id of SLOT_CHUNK_ORDER) {
+		let i = -1;
+		secs.forEach((x, j) => {
+			if (x[0] === id && (i < 0 || area(x) > area(secs[i]))) i = j;
+		});
+		if (i >= 0) out.push(...secs.splice(i, 1));
+		else if (id === 0x69) out.push(CURRENT_NOTE_DEFAULT);
+	}
+	return [...out, ...secs];
+}
+
+// canonicalSlotOrder over a slot's raw section bytes. Stops at a section that would overrun — the
+// trailing CRC of a serialized template.
 function canonicalSlotSections(bytes: Uint8Array): Uint8Array[] {
 	const secs: Uint8Array[] = [];
 	for (let ofs = 0; ofs + 3 <= bytes.length; ) {
 		const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
 		if (end > bytes.length) break;
-		if (bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
+		secs.push(bytes.slice(ofs, end));
 		ofs = end;
 	}
-	const out: Uint8Array[] = [];
-	for (const id of SLOT_CHUNK_ORDER) {
-		const i = secs.findIndex((x) => x[0] === id);
-		if (i >= 0) out.push(...secs.splice(i, 1));
-		else if (id === 0x69) out.push(CURRENT_NOTE_DEFAULT);
-	}
-	return [...out, ...secs];
+	return canonicalSlotOrder(secs);
 }
 
 /**
