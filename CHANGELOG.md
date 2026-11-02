@@ -14,6 +14,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Windows: no more Zadig/WinUSB. The installer sets up UsbDk once; Clavia's driver stays, so the original editor keeps working and multiple G2s need no extra steps
 
 ### Changed
+- Improved and more auto-suggesting cables
 - Minor UX changes to Bank Organizer
 - Added close icon to Find & Replace bar
 - Better responsiveness
