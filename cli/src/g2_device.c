@@ -68,7 +68,7 @@ const char *g2_error_string(int code) {
         case G2_ERR_NOT_IMPLEMENTED:  return "not implemented";
         case G2_ERR_TOO_LARGE:        return "too large for the G2 - it cannot receive more than 32 KB in one message";
         case G2_ERR_TARGET_NOT_FOUND: return "the targeted G2 was not found - it may have been unplugged";
-        case G2_ERR_REJECTED:         return "the G2 rejected the edit";
+        case G2_ERR_REJECTED:         return "the G2 rejected the request";
         case G2_ERR:                  return "unspecified error";
         default:                      return "unknown error";
     }
@@ -96,8 +96,14 @@ static int await_reply(reply_match_fn match, int arg, int keep_acks, g2_msg_t *r
     long long left, deadline = now_ms() + USB_TIMEOUT_LONG_MS;
     while ((left = deadline - now_ms()) > 0) {
         g2_msg_t m = {0};
-        int n = keep_acks ? recv_interrupt_acks(m.interrupt, 16, (int)left) : recv_interrupt(m.interrupt, 16, (int)left);
+        int n = keep_acks ? recv_interrupt_acks(m.interrupt, 16, (int)left) : recv_interrupt_sys_nacks(m.interrupt, 16, (int)left);
         if (n <= 0) break;
+        /* A query the G2 refuses gets a system NACK instead of its reply (the reference editor keeps
+         * one message in flight, so a NACK answers it): fail now rather than after the timeout. */
+        if (!keep_acks && (m.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && m.interrupt[2] == COMMAND_SYS && m.interrupt[4] == 0x7E) {
+            ret = G2_ERR_REJECTED;
+            break;
+        }
         if ((m.interrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t sz = ((uint16_t)m.interrupt[1] << 8) | m.interrupt[2];
             m.bulk = sz ? calloc(1, sz) : NULL;
@@ -2731,12 +2737,19 @@ cJSON *g2_get_global_knobs(void) {
     return root;
 }
 
+/* GET_RESOURCES_USED reply for one slot and location (arg = slot | location << 4): bulk [3]=0x72,
+ * [4]=location. Tagged like every other query: the untagged read took whatever came first, e.g.
+ * another slot's streamed 0x72. A streamed 0x72 of this slot and location carries the same data. */
+static int is_resources_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n >= 6 && bulk[3] == 0x72 &&
+           (bulk[1] & 0x07) == (arg & 0x0f) && bulk[4] == (arg >> 4);
+}
+
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
  * plain JSON array matching the "data" field of the resources_used watch event:
  * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).
  * Falls back to FX-only (28 bytes) if the VA query fails. */
 cJSON *g2_get_resources(const char *slot_str) {
-    uint8_t interruptResp[16] = {0};
     uint8_t version;
     int ret;
 
@@ -2755,55 +2768,29 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+    g2_msg_t fx;
+    if (await_reply(is_resources_reply, slot, 0, &fx) != G2_OK) {
         g2_err("Unexpected response for get-resources\n"); return NULL;
     }
-
-    uint16_t fxBulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-    if (fxBulkSize < 6) { g2_err("get-resources: FX bulk too small\n"); return NULL; }
-    uint8_t *fxBulk = malloc(fxBulkSize);
-    if (!fxBulk) { g2_err("Memory allocation failed\n"); return NULL; }
-
-    int fxRet = recv_bulk(fxBulk, fxBulkSize);
-    if (fxRet < 6) { free(fxBulk); g2_err("Failed to read resources FX bulk\n"); return NULL; }
-    int fxDataEnd = fxRet - 2;  /* strip 2-byte CRC */
+    int fxDataEnd = fx.bulk_size - 2;  /* strip 2-byte CRC */
 
     cJSON *arr = cJSON_CreateArray();
+    for (int i = 4; i < fxDataEnd; i++)
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fx.bulk[i]));
+    g2_msg_free(&fx);
 
-    /* Query VA area (loc=1) and build compound packet if successful */
+    /* Query VA area (loc=1) and append it as a compound packet if that succeeds */
     uint8_t loc1 = 1;
+    g2_msg_t va;
     if (send_slot(slot, version, 0x71, &loc1, 1) == 0) {
         usleep(USB_SEND_DELAY_US);
-        uint8_t vaInterrupt[16] = {0};
-        int ret2 = recv_interrupt(vaInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret2 > 0 && (vaInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t vaBulkSize = ((uint16_t)vaInterrupt[1] << 8) | vaInterrupt[2];
-            if (vaBulkSize >= 6) {
-                uint8_t *vaBulk = malloc(vaBulkSize);
-                if (vaBulk) {
-                    int vaRet = recv_bulk(vaBulk, vaBulkSize);
-                    if (vaRet >= 6) {
-                        int vaDataEnd = vaRet - 2;
-                        for (int i = 4; i < fxDataEnd; i++)
-                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
-                        cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
-                        for (int i = 4; i < vaDataEnd; i++)
-                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(vaBulk[i]));
-                        free(vaBulk);
-                        free(fxBulk);
-                        return arr;
-                    }
-                    free(vaBulk);
-                }
-            }
+        if (await_reply(is_resources_reply, slot | 1 << 4, 0, &va) == G2_OK) {
+            cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
+            for (int i = 4; i < va.bulk_size - 2; i++)
+                cJSON_AddItemToArray(arr, cJSON_CreateNumber(va.bulk[i]));
+            g2_msg_free(&va);
         }
     }
-
-    /* Fall back: return FX data only */
-    for (int i = 4; i < fxDataEnd; i++)
-        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
-    free(fxBulk);
     return arr;
 }
 

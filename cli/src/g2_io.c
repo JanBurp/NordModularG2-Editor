@@ -433,6 +433,8 @@ int g2_recv_response(uint8_t *buffer, int size, int timeout_ms) {
     return transferred;
 }
 
+static int send_frame(const char *fn, const uint8_t *buff, int len);
+
 int send_system(uint8_t cmd, uint8_t subcmd) {
     uint8_t buff[256] = {0};
     int pos = COMMAND_OFFSET;
@@ -451,10 +453,7 @@ int send_system(uint8_t cmd, uint8_t subcmd) {
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    if (ret >= 0) debug_send("sys", buff, msgLength);
-    return (ret < 0) ? -1 : 0;
+    return send_frame("sys", buff, msgLength) < 0 ? -1 : 0;
 }
 
 int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
@@ -481,11 +480,7 @@ int send_system_data(uint8_t cmd, const uint8_t *extra, size_t extraLen) {
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    if (ret >= 0) debug_send("sys_data", buff, msgLength);
-    else fprintf(stderr, "send_system_data: write failed: %s\n", libusb_error_name(ret));
-    return (ret < 0) ? -1 : 0;
+    return send_frame("sys_data", buff, msgLength) < 0 ? -1 : 0;
 }
 
 /* Build and send a slot-scoped G2 command.
@@ -517,15 +512,7 @@ int send_slot(uint8_t slot, uint8_t version, uint8_t subcmd,
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    if (ret == LIBUSB_ERROR_PIPE) {
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    }
-    if (ret >= 0) debug_send("slot", buff, msgLength);
-    else fprintf(stderr, "send_slot: write failed: %s\n", libusb_error_name(ret));
-    return (ret < 0) ? -1 : 0;
+    return send_frame("slot", buff, msgLength) < 0 ? -1 : 0;
 }
 
 /* Build and send a slot-scoped compound G2 command containing multiple sub-operations.
@@ -558,15 +545,7 @@ int send_slot_batch(uint8_t slot, uint8_t version, const G2Op *ops, int n_ops) {
     buff[0] = (msgLength >> 8) & 0xff;
     buff[1] = msgLength & 0xff;
 
-    int transferred;
-    int ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    if (ret == LIBUSB_ERROR_PIPE) {
-        libusb_clear_halt(g2.handle, ENDPOINT_BULK_OUT);
-        ret = libusb_bulk_transfer(g2.handle, ENDPOINT_BULK_OUT, buff, msgLength, &transferred, USB_TIMEOUT_STANDARD_MS);
-    }
-    if (ret >= 0) debug_send("slot_batch", buff, msgLength);
-    else fprintf(stderr, "send_slot_batch: write failed: %s\n", libusb_error_name(ret));
-    return (ret < 0) ? -1 : 0;
+    return send_frame("slot_batch", buff, msgLength) < 0 ? -1 : 0;
 }
 
 /* ── Listener thread infrastructure ────────────────────────────────────── */
@@ -601,17 +580,24 @@ static struct {
     .cond  = PTHREAD_COND_INITIALIZER,
 };
 
+static int is_led_or_vu(const g2_msg_t *m) {
+    return m->bulk && m->bulk_size > 3 && (m->bulk[3] == 0x39 || m->bulk[3] == 0x3A);
+}
+
 static void mq_push_locked(g2_msg_t msg) {
     if (mq.count >= MSG_QUEUE_MAX) {
-        /* Drop oldest message — LED/vol dominates, losing one state update is fine.
-         * Counted, because when it is NOT an LED update that gets evicted the
-         * result is a command waiting forever for a reply that was silently
-         * thrown away - the "no reply from device for location N" a bank write
-         * aborts with. g2_send_bank reports any drops over its run. */
+        /* Evict the oldest LED/VU update (the next one replaces its state anyway), or the oldest
+         * message when there is none. Counted, because when it is NOT an LED update that gets
+         * evicted the result is a command waiting forever for a reply that was silently thrown
+         * away - the "no reply from device for location N" a bank write aborts with.
+         * g2_send_bank reports any drops over its run. */
         g2_msg_drops++;
-        msg_node_t *old = mq.head;
-        mq.head = old->next;
-        if (!mq.head) mq.tail = NULL;
+        msg_node_t *prev = NULL, *old = mq.head;
+        for (msg_node_t *p = NULL, *n = mq.head; n; p = n, n = n->next)
+            if (is_led_or_vu(&n->msg)) { prev = p; old = n; break; }
+        if (prev) prev->next = old->next;
+        else mq.head = old->next;
+        if (mq.tail == old) mq.tail = prev;
         mq.count--;
         if (old->msg.bulk) free(old->msg.bulk);
         free(old);
@@ -844,7 +830,9 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
 /* When listener active: pull from queue, skip LED/vol extended msgs.
  * Extended msgs store their bulk in pending_bulk for a subsequent recv_bulk() call.
  * When listener inactive: direct libusb call (original behaviour).
- * keep_acks: hand generic ok/error acks back too, for a caller that waits for its own write's ack. */
+ * keep_acks: hand generic ok/error acks back too, for a caller that waits for its own write's ack.
+ * KEEP_SYS_NACKS: drop ok acks but hand back a system-scope NACK, for a query that fails on one. */
+#define KEEP_SYS_NACKS 2
 static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, int keep_acks) {
     if (!g2_listener_active) {
         int n;
@@ -902,7 +890,8 @@ static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, 
         if ((msg.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED) {
             uint8_t aCmd = msg.interrupt[2];
             uint8_t subCmd = msg.interrupt[4];
-            if (!keep_acks && (aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
+            int sys_nack = keep_acks == KEEP_SYS_NACKS && aCmd == COMMAND_SYS && subCmd == 0x7E;
+            if (keep_acks != 1 && !sys_nack && (aCmd == 0x04 || aCmd == 0x0C) && (subCmd == 0x7F || subCmd == 0x7E)) {
                 g2_msg_free(&msg);
                 continue;
             }
@@ -929,7 +918,7 @@ static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, 
              * g2_slot_version[] with a bogus value that then gets stamped on
              * every subsequent set-param — which the G2 silently rejects.
              * keep_acks: a 0x7F/0x7E here may be the NACK an edit waits for (its slot tag can't be trusted). */
-            if (aCmd <= 0x03 && !(keep_acks && (subCmd == 0x7F || subCmd == 0x7E))) {
+            if (aCmd <= 0x03 && !(keep_acks == 1 && (subCmd == 0x7F || subCmd == 0x7E))) {
                 g2_emit_event(&msg);
                 g2_msg_free(&msg);
                 continue;
@@ -956,6 +945,10 @@ int recv_interrupt(uint8_t *response, int size, int timeout_ms) {
 
 int recv_interrupt_acks(uint8_t *response, int size, int timeout_ms) {
     return recv_interrupt_filtered(response, size, timeout_ms, 1);
+}
+
+int recv_interrupt_sys_nacks(uint8_t *response, int size, int timeout_ms) {
+    return recv_interrupt_filtered(response, size, timeout_ms, KEEP_SYS_NACKS);
 }
 
 /* When listener active: return bulk that recv_interrupt() saved in pending_bulk.
@@ -1006,13 +999,19 @@ void discard_bulk(uint16_t sz) {
  * the stall counter allows.
  * Returns bytes sent, or -1 if the write makes no progress. */
 int send_bulk_msg(const uint8_t *buff, int len) {
+    return send_frame("bulk_msg", buff, len);
+}
+
+/* send_bulk_msg's body, also used by the small-frame senders (send_system*, send_slot*), so every
+ * frame gets the same short-write resume and halt recovery; fn is the --debug label. */
+static int send_frame(const char *fn, const uint8_t *buff, int len) {
     /* Refuse before anything reaches the wire: a message the G2 cannot buffer
      * leaves it parsing the overflow as further molecules, which renames the
      * live slots to "Error" and wedges it until a power cycle. Callers turn
      * this into a skipped entry rather than a corrupted device. */
     if (len > G2_MAX_MESSAGE_LEN) return G2_ERR_TOO_LARGE;
 
-    debug_send("bulk_msg", buff, len);
+    debug_send(fn, buff, len);
 
     int sent = 0, stalls = 0;
     while (sent < len) {
@@ -1022,7 +1021,7 @@ int send_bulk_msg(const uint8_t *buff, int len) {
                                        &transferred, USB_TIMEOUT_SEND_MS);
         if (ret == LIBUSB_ERROR_PIPE) {
             /* Endpoint halted - clear it and retry this chunk, the same
-             * recovery g2_send_command and the send_slot* helpers do. Leaving
+             * recovery g2_send_command does. Leaving
              * a halt in place fails every later transfer on the endpoint, which
              * looks like "no USB connection" in the editor while the G2 itself
              * is perfectly fine. */
@@ -1033,13 +1032,13 @@ int send_bulk_msg(const uint8_t *buff, int len) {
         }
         sent += transferred;
         if (ret < 0 && ret != LIBUSB_ERROR_TIMEOUT) {
-            fprintf(stderr, "send_bulk_msg: write failed at %d/%d: %s\n",
-                    sent, len, libusb_error_name(ret));
+            fprintf(stderr, "%s: write failed at %d/%d: %s\n",
+                    fn, sent, len, libusb_error_name(ret));
             return -1;
         }
         if (transferred > 0) stalls = 0;
         else if (++stalls >= 3) {
-            fprintf(stderr, "send_bulk_msg: no progress at %d/%d\n", sent, len);
+            fprintf(stderr, "%s: no progress at %d/%d\n", fn, sent, len);
             return -1;
         }
     }
@@ -1070,20 +1069,22 @@ void g2_rearm(void) {
     uint8_t arm[2] = {SUB_COMMAND_START_STOP, 0x00};
     send_system_data(0x41, arm, 2);
     if (!g2_listener_active) {
-        uint8_t arm_ack[16];
-        /* START_COMM has no ack of its own (see g2_stop_comm), so this is whatever arrives next - e.g. a one-shot
-         * set-perf-mode's late 0x0C/0x1F reply. Its bulk must be read too: an orphaned payload wedges the G2. */
-        if (recv_interrupt(arm_ack, sizeof(arm_ack), USB_TIMEOUT_STANDARD_MS) > 0 && (arm_ack[0] & 0x0f) == RESPONSE_TYPE_EXTENDED)
-            discard_bulk(((uint16_t)arm_ack[1] << 8) | arm_ack[2]);
+        /* Read up to START_COMM's ack (see g2_stop_comm). Whatever arrives before it - e.g. a one-shot
+         * set-perf-mode's late 0x0C/0x1F reply - is consumed with its bulk: an orphaned payload wedges the G2. */
+        uint8_t m[16];
+        long long deadline = now_ms() + USB_TIMEOUT_STANDARD_MS;
+        while (now_ms() < deadline && recv_interrupt(m, sizeof(m), (int)(deadline - now_ms())) > 0) {
+            if ((m[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) discard_bulk(((uint16_t)m[1] << 8) | m[2]);
+            else if (m[2] == COMMAND_SYS && m[4] == 0x7F) break;
+        }
     }
 }
 
-/* SUB_COMMAND_START_STOP (0x7d) has no protocol ack — confirmed against the
- * reference editor's CMSynthUnlockEditorSync, which has no ReadStream/
- * UseOnSynth anywhere: it's fire-and-forget. So there is no "the STOP_COMM
- * ack" message to identify; this just drains whatever was already in flight
- * until nothing more arrives. Also runs with the listener active (g2_events.c,
- * on the mode-change reply): then it drains the listener's queue. */
+/* The G2 acks SUB_COMMAND_START_STOP (0x7d), STOP and START alike, with an embedded system ack
+ * 62 | 01 0c 00 7f | crc (hardware-captured 2026-11-02; the reference editor sends
+ * CMSynthUnlockEditorSync through SendUserBubble, which waits for a reply). Here the ack is
+ * drained with whatever else was already in flight until nothing more arrives. Also runs with the
+ * listener active (g2_events.c, on the mode-change reply): then it drains the listener's queue. */
 void g2_stop_comm(void) {
     uint8_t stop[2] = {SUB_COMMAND_START_STOP, STOP_COMM};
     send_system_data(0x41, stop, 2);

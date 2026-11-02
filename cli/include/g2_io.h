@@ -139,6 +139,8 @@ int send_bulk_msg(const uint8_t *buff, int len);
 int recv_interrupt(uint8_t *response, int size, int timeout_ms);
 /* Like recv_interrupt, but also returns generic ok/error acks (aCmd 0x04/0x0C, sub 0x7F/0x7E). */
 int recv_interrupt_acks(uint8_t *response, int size, int timeout_ms);
+/* recv_interrupt, but a system-scope NACK (0x0C/0x7E) is handed back instead of dropped. */
+int recv_interrupt_sys_nacks(uint8_t *response, int size, int timeout_ms);
 int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int retries);
 int recv_bulk(uint8_t *data, uint16_t size);
 /* Reads and drops an extended message's bulk payload (direct mode; no-op with the listener running or sz 0):

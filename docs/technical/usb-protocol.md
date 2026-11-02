@@ -1069,7 +1069,6 @@ When `version != 0x40`:
 | `0x43` | `morph_change` | `slot`, `area` ("fx"/"va"), `module`=r[6], `param`=r[7], `morph`=r[8], `value`=r[9], `negative`=r[10], `variation`=r[11] |
 | `0x44` | `copy_variation` | `slot`, `from`=r[5], `to`=r[6] |
 | `0x59` or `0x70` or `0x7F` | `ok` | `slot` |
-| `0x69` | `current_note` | `slot`, `note`=r[5], `velocity`=r[6]. **This decoding is a wrong guess:** `0x69` is a bit-packed voice table and only ever arrives as the reply to `0x68` (§7, Current note) |
 | `0x6A` | `variation_change` | `slot`, `variation`=r[5] |
 | `0x72` | `resources_used` | `slot`, `location`=r[5] |
 | `0x74` | `knob_map_changed` | `slot` — no other fields (CMBarbMapChangeNotify, zero payload bytes; not reproducible on demand, see §7 note above) |
