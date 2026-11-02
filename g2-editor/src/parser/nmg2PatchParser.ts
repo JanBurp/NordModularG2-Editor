@@ -144,8 +144,17 @@ class G2Area implements Area {
 class G2Parser {
 	private areas: G2Area[] = [new G2Area('fx'), new G2Area('voice')];
 	private slots: string[] = [];
-	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
-	private perfSettings = { focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 0, clockRunning: false };
+	private slotMeta: Array<{
+		active: boolean;
+		key: boolean;
+		hold: boolean;
+		bank: number;
+		patch: number;
+		rangeLow: number;
+		rangeHigh: number;
+		midiChannel: number;
+	}> = [];
+	private perfSettings = { focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 0, clockRunning: false, category: 0, clockKbdTrig: false };
 	private aof = 0;
 	private textpad: string[] = [];
 	private reader = new BitReader();
@@ -577,14 +586,16 @@ class G2Parser {
 
 	private parsePrfData(data: Uint8Array): void {
 		// 0x11 section: 8-byte header, then 4 × (name, see readName, then 10 bytes extra data)
-		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, 3×padding
-		// Header as writePerfSettings writes it: [unknown, focus<<2 | knobSource, rangeEnable, bpm, unknown, clockRun, 0, 0]
+		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, midiChannel, 2×padding
+		// Header (official CPerformanceHeader_11): [category, focus<<2 | knobSource, rangeEnable, bpm, clockKbdTrig, clockRun, 0, 0]
 		this.perfSettings = {
 			focus: (data[1] >> 2) & 0x3,
 			knobSourceGlobal: (data[1] & 0x3) !== 0,
 			rangeEnable: data[2] !== 0,
 			bpm: data[3],
 			clockRunning: (data[5] & 1) !== 0,
+			category: data[0],
+			clockKbdTrig: data[4] !== 0,
 		};
 		let ofs = 8;
 		const slotNames: string[] = [];
@@ -601,6 +612,7 @@ class G2Parser {
 					patch: data[ofs + 4],
 					rangeLow: data[ofs + 5],
 					rangeHigh: data[ofs + 6],
+					midiChannel: data[ofs + 7],
 				});
 			}
 			ofs += 10;

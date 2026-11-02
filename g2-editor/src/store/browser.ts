@@ -90,13 +90,8 @@ interface OrganizeOptions {
 	offline?: boolean;
 }
 
-function bankEntries(bankStr: string, entries: any[], withCategory: boolean): SynthPatch[] {
-	return entries.map((e) => ({
-		bank: Number(bankStr),
-		location: e.location,
-		name: e.name,
-		...(withCategory && { category: e.category }),
-	}));
+function bankEntries(bankStr: string, entries: any[]): SynthPatch[] {
+	return entries.map((e) => ({ bank: Number(bankStr), location: e.location, name: e.name, category: e.category }));
 }
 
 export const useBrowserStore = defineStore('browser', {
@@ -127,10 +122,10 @@ export const useBrowserStore = defineStore('browser', {
 	actions: {
 		/* Populate from startup JSON `names` field (avoids extra `list` call) */
 		applyNamesData(names: any): void {
-			const toEntries = (banks: any, withCategory: boolean): SynthPatch[] =>
-				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[], withCategory));
-			this.synthPatches = toEntries(names?.patches, true);
-			this.synthPerformances = toEntries(names?.performances, false);
+			const toEntries = (banks: any): SynthPatch[] =>
+				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[]));
+			this.synthPatches = toEntries(names?.patches);
+			this.synthPerformances = toEntries(names?.performances);
 			this.flashUsage = names?.flashUsage ?? null;
 		},
 

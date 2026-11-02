@@ -13,8 +13,8 @@ type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch'
 type Prf2Data = {
 	slotNames: string[];
 	patches: Patch[];
-	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
-	settings: { focus: number; knobSourceGlobal: boolean; rangeEnable: boolean; bpm: number; clockRunning: boolean };
+	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number; midiChannel: number }>;
+	settings: { focus: number; knobSourceGlobal: boolean; rangeEnable: boolean; bpm: number; clockRunning: boolean; category: number; clockKbdTrig: boolean };
 	globalParamPages: GlobalParamPageAssignment[];
 };
 
@@ -86,12 +86,13 @@ export function usePatchFile() {
 				bank: m.bank,
 				patch: m.patch,
 				range: { lower: m.rangeLow, upper: m.rangeHigh },
+				midiChannel: m.midiChannel,
 			}));
-			const { focus, knobSourceGlobal, rangeEnable, bpm, clockRunning } = prf2.settings;
+			const { focus, ...settings } = prf2.settings;
 			const focusLabel = SLOT_LABELS[focus];
-			device.updatePerfSettings({ performance: { name, focus: focusLabel, knobSourceGlobal, rangeEnable, bpm, clockRunning }, slots });
+			device.updatePerfSettings({ performance: { name, focus: focusLabel, ...settings }, slots });
 			uiStore.setSlotInFocus(focusLabel);
-			uiStore.setGlobalPagesActive(knobSourceGlobal);
+			uiStore.setGlobalPagesActive(settings.knobSourceGlobal);
 		}
 	}
 

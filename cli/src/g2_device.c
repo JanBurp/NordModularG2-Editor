@@ -866,22 +866,16 @@ cJSON *g2_list(int filter, int bank_filter) {
 
                 if (c > LIST_LAST) {
                     char name[32] = {0};
-                    int nameLen = parse_name(data + pos, name, sizeof(name));
-
-                        int extra = (mode == PATCH_MODE) ? 1 : 0; /* patches have category byte, perfs don't */
-                    if (nameLen <= 0 || pos + nameLen + extra > data_len) {
+                    int categoryIdx;
+                    int used = parse_list_entry(data + pos, data_len - pos, name, sizeof(name), &categoryIdx);
+                    if (used < 0) {
                         break;
                     }
 
                     cJSON *item = cJSON_CreateObject();
                     cJSON_AddNumberToObject(item, "location", patch + 1);
                     cJSON_AddStringToObject(item, "name", name);
-
-                    if (mode == PATCH_MODE) {
-                        int categoryIdx = data[pos + nameLen];
-                        if (categoryIdx > 15) categoryIdx = 0;
-                        cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
-                    }
+                    cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
 
                     char bankKey[8];
                     snprintf(bankKey, sizeof(bankKey), "%d", bank + 1);
@@ -912,7 +906,7 @@ cJSON *g2_list(int filter, int bank_filter) {
                     cJSON_AddItemToArray(bankArray, item);
 
                     patch++;
-                    pos += nameLen + extra;
+                    pos += used;
                 } else if (c == LIST_CONTINUE) {
                     pos++;
                 } else if (c == LIST_BANK) {
@@ -2172,10 +2166,11 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
      * and bytes at +4..+10 map to the 8-byte performance settings header fields.
      * The USB response ends with its own 2-byte CRC, which belongs to the transport and not to
      * the section — taking the payload all the way to perfSize left those two bytes inside the
-     * 0x11 chunk (verified against a genuine .prf2 of the same performance: 85 bytes vs 83). */
+     * 0x11 chunk (verified against a genuine .prf2 of the same performance: 85 bytes vs 83).
+     * The 0x11 is copied as the G2 sends it: slot byte 7 is the slot's MIDI channel, which the
+     * official editor saves too (CPerformanceHeader_11::SetMidiChannel). */
     size_t perf_sect_offset = (size_t)(4 + nameLen + 3);
     size_t perf_sect_len = (perf_sect_offset + 2 < perfSize) ? (perfSize - perf_sect_offset - 2) : 0;
-    perf_settings_normalize_slots(perfData + perf_sect_offset, perf_sect_len);
 
     size_t header_len = strlen(PRF2_TEXT_HEADER) + 3;  /* text header + null + 0x17 + file type */
     size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */
@@ -3097,8 +3092,7 @@ static int flash_read_location(int type, int bank, int location0, uint8_t **bulk
     uint8_t *payload = bulk + 4;
     size_t payloadSize = size - 4;
     /* parse_name returns the FIELD length: name + terminator, or just the name
-     * when it fills all 16 bytes (utils.c, same convention as
-     * perf_settings_normalize_slots). Scanning for a NUL instead swallows the
+     * when it fills all 16 bytes (utils.c). Scanning for a NUL instead swallows the
      * first size byte of a 16-character name. */
     uint8_t nameBuf[16] = {0};   /* zero-padded copy: parse_name must not read past the payload */
     memcpy(nameBuf, payload + 3, payloadSize - 3 < sizeof(nameBuf) ? payloadSize - 3 : sizeof(nameBuf));

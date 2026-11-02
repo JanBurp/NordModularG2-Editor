@@ -227,5 +227,12 @@ void test_perf_focus_a(void) {
     TEST_ASSERT_EQUAL_INT(1, get_mode(result));  /* Performance mode */
     TEST_ASSERT_EQUAL_INT(0, get_focus_slot(result));  /* Focus A */
 
+    /* 0x11 slot byte 7 is the slot's MIDI channel (official SetMidiChannel): this unit's
+     * 0a-0d, the same values as its synth-settings MIDI channels A-D in the SYNTH line. */
+    cJSON *slots = cJSON_GetObjectItem(result, "slots");
+    for (int i = 0; i < 4; i++)
+        TEST_ASSERT_EQUAL_INT(0x0a + i, cJSON_GetObjectItem(cJSON_GetArrayItem(slots, i), "midiChannel")->valueint);
+    TEST_ASSERT_EQUAL_INT(0, cJSON_GetObjectItem(cJSON_GetObjectItem(result, "performance"), "category")->valueint);
+
     cJSON_Delete(result);
 }

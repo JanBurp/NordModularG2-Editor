@@ -28,6 +28,8 @@ extern void test_parse_name_truncates_long(void);
 extern void test_parse_name_keeps_non_printable(void);
 extern void test_parse_name_empty(void);
 extern void test_parse_name_only_null(void);
+extern void test_parse_list_entry_perf_category(void);
+extern void test_parse_list_entry_16_chars_and_truncated(void);
 
 extern void test_parse_synth_name(void);
 extern void test_parse_mode_patch(void);
@@ -65,9 +67,6 @@ extern void test_slot_sections_canonical_reorders_hardware_train(void);
 extern void test_slot_sections_canonical_preserves_repeated_id_order(void);
 extern void test_slot_sections_canonical_keeps_existing_current_note(void);
 extern void test_slot_sections_canonical_copies_malformed_train_verbatim(void);
-extern void test_perf_settings_normalize_slots_rewrites_device_numbering(void);
-extern void test_perf_settings_normalize_slots_handles_unterminated_16_char_name(void);
-extern void test_perf_settings_normalize_slots_ignores_truncated_payload(void);
 
 extern void test_parse_name_from_embedded_response_slot_b(void);
 extern void test_parse_name_from_embedded_response_slot_c(void);
@@ -255,6 +254,8 @@ int main(void) {
     RUN_TEST(test_parse_name_keeps_non_printable);
     RUN_TEST(test_parse_name_empty);
     RUN_TEST(test_parse_name_only_null);
+    RUN_TEST(test_parse_list_entry_perf_category);
+    RUN_TEST(test_parse_list_entry_16_chars_and_truncated);
 
     RUN_TEST(test_parse_synth_name);
     RUN_TEST(test_parse_mode_patch);
@@ -294,9 +295,6 @@ int main(void) {
     RUN_TEST(test_slot_sections_canonical_preserves_repeated_id_order);
     RUN_TEST(test_slot_sections_canonical_keeps_existing_current_note);
     RUN_TEST(test_slot_sections_canonical_copies_malformed_train_verbatim);
-    RUN_TEST(test_perf_settings_normalize_slots_rewrites_device_numbering);
-    RUN_TEST(test_perf_settings_normalize_slots_handles_unterminated_16_char_name);
-    RUN_TEST(test_perf_settings_normalize_slots_ignores_truncated_payload);
 
     /* get-patch name parsing tests */
     RUN_TEST(test_parse_name_from_embedded_response_slot_b);

@@ -1166,13 +1166,13 @@ describe('prf2 0x11 section preservation', () => {
 	it('header knob source, range enable, bpm and clock run are parsed', () => {
 		const buf = fs.readFileSync(path.join(FIXTURES, 'MorphingDrumDemo.prf2'));
 		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
-		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true });
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true, category: 0, clockKbdTrig: false });
 	});
 
 	it('header knob source Global is parsed', () => {
 		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/New Performance.prf2'));
 		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
-		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true });
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true, category: 0, clockKbdTrig: false });
 	});
 
 	it('focus comes from the header, not the first keyed slot (A and D keyed, D focused)', () => {
@@ -1637,6 +1637,49 @@ describe('writePerfSettings (C_PERF_SETTINGS 0x11)', () => {
 		const slotB = slotA + 10 + 16; // 16-char name, no terminator
 		expect(new TextDecoder().decode(b.slice(slotA + 10, slotB))).toBe('185stepsequencer');
 		expect(Array.from(b.slice(slotB, slotB + 10))).toEqual([1, 0, 1, 3, 7, 36, 96, 1, 0, 0]);
+	});
+});
+
+describe('writePerfSettings keeps what the G2 stored (0x11 category, clock bool, MIDI channels)', () => {
+	it("rebuilds a real performance's 0x11 byte for byte from its parsed fields, per-slot MIDI channels included", () => {
+		// Slot A on MIDI channel 1, B-D on 12-14: per-performance data, not slot numbering.
+		const file = 'banks-test/OT Template 7.5..prf2';
+		const { rawHex } = loadFixturePrf2(file);
+		const perf = new PatchParser(new Uint8Array(fs.readFileSync(path.join(FIXTURES, file))).buffer).parsePrf2()!;
+		const slots = perf.slotMeta.map((m, i) => ({
+			slot: (['A', 'B', 'C', 'D'] as const)[i],
+			name: perf.slotNames[i],
+			active: m.active,
+			key: m.key,
+			hold: m.hold,
+			bank: m.bank,
+			patch: m.patch,
+			range: { lower: m.rangeLow, upper: m.rangeHigh },
+			midiChannel: m.midiChannel,
+		}));
+		expect(slots.map((s) => s.midiChannel)).toEqual([0, 11, 12, 13]);
+		const { focus, ...settings } = perf.settings;
+		const built = writePerfSettings({ name: '', focus: (['A', 'B', 'C', 'D'] as const)[focus], ...settings }, slots);
+		expect(toHex(built)).toBe(extractSection(rawHex, SectionType.PERF_DATA));
+	});
+
+	it('writes category in header byte 0, the clock bool in byte 4 and Latin-1 slot names', () => {
+		const slots = (['A', 'B', 'C', 'D'] as const).map((slot, i) => ({
+			slot,
+			name: slot === 'A' ? 'Café' : 'x',
+			active: true,
+			key: false,
+			hold: false,
+			bank: 0,
+			patch: 0,
+			range: { lower: 0, upper: 127 },
+			midiChannel: 15 - i,
+		}));
+		const b = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false, category: 9, clockKbdTrig: true }, slots).slice(3);
+		expect(b[0]).toBe(9);
+		expect(b[4]).toBe(1);
+		expect(Array.from(b.slice(8, 13))).toEqual([0x43, 0x61, 0x66, 0xe9, 0]); // one byte per character
+		expect(b[13 + 7]).toBe(15);
 	});
 });
 

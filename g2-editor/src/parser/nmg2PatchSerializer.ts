@@ -828,13 +828,14 @@ export function serializePerformance(
  */
 export function writePerfSettings(perf: PerformanceData, slots: SlotInfo[]): Uint8Array {
 	const focus = Math.max(0, SLOT_LABELS.indexOf(perf.focus as (typeof SLOT_LABELS)[number]));
-	const out = [0, (focus << 2) | (perf.knobSourceGlobal ? 1 : 0), +perf.rangeEnable, perf.bpm, 0, +perf.clockRunning, 0, 0];
+	const out = [perf.category ?? 0, (focus << 2) | (perf.knobSourceGlobal ? 1 : 0), +perf.rangeEnable, perf.bpm, +!!perf.clockKbdTrig, +perf.clockRunning, 0, 0];
 	SLOT_LABELS.forEach((label, i) => {
 		const s = slots.find((x) => x.slot === label);
-		const name = Array.from(new TextEncoder().encode(s?.name ?? '')).slice(0, 16);
+		const name = Array.from(s?.name ?? '', (c) => c.charCodeAt(0) & 0xff).slice(0, 16); // Latin-1, like every other name
 		out.push(...name);
 		if (name.length < 16) out.push(0);
-		out.push(+!!s?.active, +!!s?.key, +!!s?.hold, s?.bank ?? 0, s?.patch ?? 0, s?.range.lower ?? 0, s?.range.upper ?? 127, i, 0, 0);
+		// Without a known MIDI channel: the slot index (channels 1-4), as in EmptyPerf.prf2.
+		out.push(+!!s?.active, +!!s?.key, +!!s?.hold, s?.bank ?? 0, s?.patch ?? 0, s?.range.lower ?? 0, s?.range.upper ?? 127, s?.midiChannel ?? i, 0, 0);
 	});
 	return makeSection(SectionType.PERF_DATA, Uint8Array.from(out));
 }

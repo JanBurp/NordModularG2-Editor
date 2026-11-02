@@ -88,15 +88,17 @@ describe('parser robustness', () => {
 			bank: i + 1,
 			patch: 10 + i,
 			range: { lower: 20 + i, upper: 100 + i },
+			midiChannel: 9 + i,
 		}));
-		const perfData = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: true, bpm: 120, clockRunning: false }, slots);
+		const perfData = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: true, bpm: 120, clockRunning: false, category: 7, clockKbdTrig: true }, slots);
 		const old = sections(file).find((s) => s.type === SectionType.PERF_DATA)!;
 		const bytes = new Uint8Array([...file.slice(0, old.ofs), ...perfData, ...file.slice(old.end)]);
 
 		const perf = new PatchParser(bytes.buffer).parsePrf2()!;
 		expect(perf.slotNames).toEqual(slots.map((s) => s.name));
+		expect(perf.settings).toMatchObject({ category: 7, clockKbdTrig: true, bpm: 120 });
 		expect(perf.slotMeta).toEqual(
-			slots.map((s) => ({ active: true, key: s.key, hold: s.hold, bank: s.bank, patch: s.patch, rangeLow: s.range.lower, rangeHigh: s.range.upper })),
+			slots.map((s) => ({ active: true, key: s.key, hold: s.hold, bank: s.bank, patch: s.patch, rangeLow: s.range.lower, rangeHigh: s.range.upper, midiChannel: s.midiChannel })),
 		);
 	});
 

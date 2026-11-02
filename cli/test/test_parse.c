@@ -82,3 +82,29 @@ void test_parse_name_only_null(void) {
     TEST_ASSERT_EQUAL_STRING("", buf);
     TEST_ASSERT_EQUAL_INT(1, len);
 }
+
+/* 0x16 list reply: performances carry a category byte too (CMFlashDataDump::ReadStream). A perf
+ * with category 1 used to have that byte read as LIST_JUMP, eating the next entry. */
+void test_parse_list_entry_perf_category(void) {
+    uint8_t data[] = {'P', 'e', 'r', 'f', 0, 0x01, 'N', 'e', 'x', 't', 0, 0x00};
+    char buf[32] = {0};
+    int category = -1;
+    int used = parse_list_entry(data, sizeof(data), buf, sizeof(buf), &category);
+    TEST_ASSERT_EQUAL_INT(6, used);
+    TEST_ASSERT_EQUAL_STRING("Perf", buf);
+    TEST_ASSERT_EQUAL_INT(1, category);
+    used = parse_list_entry(data + 6, (int)sizeof(data) - 6, buf, sizeof(buf), &category);
+    TEST_ASSERT_EQUAL_INT(6, used);
+    TEST_ASSERT_EQUAL_STRING("Next", buf);
+    TEST_ASSERT_EQUAL_INT(0, category);
+}
+
+void test_parse_list_entry_16_chars_and_truncated(void) {
+    uint8_t data[] = "185stepsequencer\x0c";
+    char buf[32] = {0};
+    int category = -1;
+    TEST_ASSERT_EQUAL_INT(17, parse_list_entry(data, 17, buf, sizeof(buf), &category));
+    TEST_ASSERT_EQUAL_STRING("185stepsequencer", buf);
+    TEST_ASSERT_EQUAL_INT(12, category);
+    TEST_ASSERT_EQUAL_INT(-1, parse_list_entry(data, 16, buf, sizeof(buf), &category)); /* category byte missing */
+}

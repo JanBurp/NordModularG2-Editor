@@ -50,6 +50,16 @@ int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     return (int)i;
 }
 
+/* One name entry of a 0x16 list reply: a name (parse_name rules) followed by a category byte, for
+ * patches and performances alike (official CMFlashDataDump::ReadStream). A category above 15 is
+ * reported as 0. Returns the bytes used, or -1 when the entry doesn't fit in `avail`. */
+int parse_list_entry(const uint8_t *data, int avail, char *buf, size_t bufsize, int *category) {
+    int n = parse_name(data, buf, bufsize);
+    if (n <= 0 || n + 1 > avail) return -1;
+    *category = data[n] > 15 ? 0 : data[n];
+    return n + 1;
+}
+
 slot_t parse_slot(const char *slot_str) {
     if (slot_str == NULL) {
         return SLOT_CURRENT;
@@ -190,30 +200,6 @@ void patch_slot_sections_canonical(const uint8_t *in, size_t in_len, uint8_t *ou
         }
     }
     *out_len = pos;
-}
-
-/* A C_PERF_SETTINGS (0x11) payload is an 8-byte header followed by four blocks of
- * [name][NUL][10 bytes], the 10 being active, key, hold, bank, patch, rangeLow, rangeHigh,
- * slot, and two unused (same layout the TS parser reads in parsePrfData). The G2 fills that
- * slot byte with its own unit-specific numbering — 0a 0b 0c 0d on the unit this was captured
- * from — where every .prf2 on disk holds 00 01 02 03. Delphi refuses to write the field at all
- * for that reason (BVE.NMG2File.pas:11779, "First G2 gives 1..4, second G2 gives 5..8..?").
- * A payload that runs out before four blocks are seen is left as-is. */
-void perf_settings_normalize_slots(uint8_t *data, size_t len) {
-    size_t ofs = 8;
-    for (uint8_t slot = 0; slot < 4; slot++) {
-        /* The name field holds at most 16 characters and is NUL-terminated only when it is
-         * shorter than that — the same convention parse_name above reads. A 16-character name
-         * (seen on real hardware: "185stepsequencer") is followed immediately by the 10 bytes,
-         * so scanning for a NUL swallows the first of them and shifts the rest of the payload. */
-        size_t n = 0;
-        while (n < 16 && ofs + n < len && data[ofs + n]) n++;
-        ofs += n;
-        if (n < 16) ofs++;  /* skip the terminator */
-        if (ofs + 10 > len) return;
-        data[ofs + 7] = slot;
-        ofs += 10;
-    }
 }
 
 int parse_location_str(const char *s) {

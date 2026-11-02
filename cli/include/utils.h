@@ -12,6 +12,7 @@
 uint16_t crc_iterator(int32_t seed, int32_t val);
 uint16_t calc_crc16(uint8_t *buff, int length);
 int parse_name(const uint8_t *data, char *buf, size_t bufsize);
+int parse_list_entry(const uint8_t *data, int avail, char *buf, size_t bufsize, int *category);
 slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);
 int hex_to_bytes(const char *hex, uint8_t **out);
@@ -37,10 +38,6 @@ char *base64_encode(const uint8_t *data, size_t len);
 void patch_slot_sections_canonical(const uint8_t *in, size_t in_len,
                                    uint8_t *out, size_t *out_len);
 
-/* Rewrites the slot index inside a captured C_PERF_SETTINGS (0x11) payload to the 0-3 a file
- * uses. The device reports its own unit-specific numbering instead, which a .prf2 must not
- * carry. Edits in place. */
-void perf_settings_normalize_slots(uint8_t *data, size_t len);
 
 /* Patch format conversion (USB <-> PCH2) */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,

@@ -222,7 +222,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
     char slotNames[4][17] = {{0}};
     int slotBanks[4] = {0}, slotPatches[4] = {0};
     int slotActive[4] = {0}, slotKey[4] = {0}, slotHold[4] = {0};
-    int slotLow[4] = {0}, slotHigh[4] = {0};
+    int slotLow[4] = {0}, slotHigh[4] = {0}, slotMidiChannel[4] = {0};
     int focusSlot = 0, rangeEnable = 0, bpm = 0, clockRun = 0;
     int nameLen;
 
@@ -258,6 +258,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
         slotPatches[i] = slotPtr[4];
         slotLow[i]     = slotPtr[5];
         slotHigh[i]    = slotPtr[6];
+        if (slotPtr + 8 <= perfEnd) slotMidiChannel[i] = slotPtr[7];  /* official SetMidiChannel */
         slotPtr += 10;
     }
 
@@ -272,6 +273,11 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
      * byte, so it doesn't affect this mask. Hardware-confirmed
      * 2026-09-30: 0x00 in Patch source, 0x01 after pressing SHIFT+GLOBAL. */
     cJSON_AddBoolToObject(perf, "knobSourceGlobal", remaining[4] & 0x3);
+    /* 0x11 header bytes 0 and 4 (official CPerformanceHeader_11::ReadStream): the performance's
+     * category (0-15) and a bool G2Alike calls clock keyboard trig. Passed on so a rebuilt 0x11
+     * (editor Download) keeps them. */
+    cJSON_AddNumberToObject(perf, "category", remaining[3]);
+    cJSON_AddBoolToObject(perf, "clockKbdTrig", remaining[7]);
     cJSON_AddItemToObject(root, "performance", perf);
 
     cJSON *slots = cJSON_CreateArray();
@@ -288,6 +294,7 @@ void perf_parse_and_add(const uint8_t *perfData, size_t perfSize,
         cJSON_AddNumberToObject(range, "lower", slotLow[i]);
         cJSON_AddNumberToObject(range, "upper", slotHigh[i]);
         cJSON_AddItemToObject(slot, "range", range);
+        cJSON_AddNumberToObject(slot, "midiChannel", slotMidiChannel[i]);
         cJSON_AddItemToArray(slots, slot);
     }
     cJSON_AddItemToObject(root, "slots", slots);

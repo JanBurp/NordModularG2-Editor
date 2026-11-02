@@ -181,7 +181,7 @@ void test_build_flash_dump_raw_frame_byte_layout(void) {
 
 /* A 16-char name fills the whole field with NO terminator - captured from real
  * hardware (bank 2 location 12, "MonsterLeads NL2"), and the same convention
- * parse_name/perf_settings_normalize_slots already read. Getting this wrong
+ * parse_name already reads. Getting this wrong
  * shifts every field after the name by one byte. */
 void test_build_flash_dump_raw_frame_16_char_name_has_no_terminator(void) {
     uint8_t file_data[4] = { 0x00, 0x13, 0x00, 0xAA };

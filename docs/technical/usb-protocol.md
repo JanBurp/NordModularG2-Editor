@@ -898,7 +898,7 @@ Response data starting at `response[9]` contains a sequence of control codes:
 
 | Code | Name | Meaning | Following bytes |
 |------|------|---------|-----------------|
-| `> 5` | Name | Patch/perf name | null-terminated string; for patches: next byte is category index (0-15) |
+| `> 5` | Name | Patch/perf name | name (up to 16 characters, NUL only when shorter), then a category index byte (0-15) — for patches **and** performances (official `CMFlashDataDump::ReadStream`; hardware-captured 2026-11-02: `cat1test 00 00 04`) |
 | `0x01` | LIST_JUMP | Jump to patch number | `[1]`=patch location |
 | `0x02` | LIST_SKIP | Skip one slot | — |
 | `0x03` | LIST_BANK | Switch bank | `[1]`=new bank, `[2]`=new patch location |
@@ -908,6 +908,9 @@ Response data starting at `response[9]` contains a sequence of control codes:
 **Categories** (index 0-15):
 
 `no_cat`, `acoustic`, `sequencer`, `bass`, `classic`, `drum`, `fantasy`, `fx`, `lead`, `organ`, `pad`, `piano`, `synth`, `audio_in`, `user_1`, `user_2`
+
+`list` reports `category` for performances too. Its source is not the performance's 0x11 header
+byte 0: a performance stored with that byte set to 1 still lists as `no_cat` (2026-11-02).
 
 ---
 
