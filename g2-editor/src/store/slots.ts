@@ -3362,6 +3362,14 @@ export const useSlotsStore = defineStore('slots', {
 			);
 		},
 
+		// Replaces one cable with others as a single undoable step (auto-suggest rewire through an inserted module).
+		async replaceCable(oldCable: Cable, newCables: Cable[], area: 'voice' | 'fx'): Promise<void> {
+			const ctx = this._getActivePatch();
+			if (!ctx) return;
+			const { areaIdx, location } = areaConfig(area);
+			await this._swapCables(ctx.slot, ctx.patch, areaIdx, location, [oldCable], newCables, () => this.replaceCable(oldCable, newCables, area));
+		},
+
 		// Relocates a group of cables (all sharing the same jack) from one jack to another, as a single undoable step.
 		async moveCableGroup(
 			cables: Cable[],

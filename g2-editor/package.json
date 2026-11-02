@@ -22,6 +22,7 @@
     "create-icons": "node scripts/create-icons.js",
     "generate:button-params": "node scripts/generate-button-params.js",
     "generate:param-type-ids": "node scripts/generate-param-type-ids.js",
+    "generate:cable-pair-stats": "node scripts/generate-cable-pair-stats.js",
     "test": "electron-vite build && vitest run && playwright test && G2_ALLOW_NO_DEVICE=1 vitest run -c vitest.g2.config.ts",
     "test:unit": "vitest run",
     "test:e2e": "electron-vite build && playwright test",
