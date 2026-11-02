@@ -58,6 +58,15 @@ function calcCrc(data: Uint8Array): number {
 	return rv;
 }
 
+// True when a .pch2/.prf2 file's trailing CRC matches: big-endian over [0x17][file type][sections],
+// everything after the text header's NUL (the range buildRawHex writes).
+export function fileCrcOk(file: Uint8Array): boolean {
+	const start = file.indexOf(0) + 1;
+	const end = file.length - 2;
+	if (start <= 0 || end < start + 2) return false;
+	return calcCrc(file.subarray(start, end)) === ((file[end] << 8) | file[end + 1]);
+}
+
 function hexToBytes(hex: string): Uint8Array {
 	const matches = hex.match(/.{2}/g)!;
 	return new Uint8Array(matches.map((b) => parseInt(b, 16)));

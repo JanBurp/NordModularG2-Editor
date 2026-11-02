@@ -7,6 +7,14 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { showToast, dismissToastByKey } from './useToast';
 const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
+const { fileCrcOk } = await import('../parser/nmg2PatchSerializer');
+
+// A file whose CRC doesn't match still loads (the official editor refuses it); only warn.
+function warnOnBadCrc(bytes: Uint8Array, name: string): void {
+	if (fileCrcOk(bytes)) return;
+	console.warn(`${name}: file CRC mismatch`);
+	showToast(`"${name}" has a bad checksum — the file may be damaged.`);
+}
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
@@ -104,6 +112,7 @@ export function usePatchFile() {
 			const buffer = await file.arrayBuffer();
 			const parsedPatch = new PatchParser(buffer).parse() as any;
 			const name = file.name.replace(/\.(pch2|prf2)$/i, '');
+			warnOnBadCrc(new Uint8Array(buffer), name);
 			const rawHex = stripFileHeader(new Uint8Array(buffer));
 			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
 			applyVariation(parsedPatch);
@@ -120,6 +129,7 @@ export function usePatchFile() {
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
 		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		warnOnBadCrc(new Uint8Array(buffer), name);
 		const rawHex = stripFileHeader(result.data as number[]);
 		let targetSlot: SlotLabel | undefined;
 		let uprateRepairCmds: string[][] = [];
@@ -190,6 +200,7 @@ export function usePatchFile() {
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
 				const name = (item.filepath.split(/[/\\]/).pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				warnOnBadCrc(new Uint8Array(buffer), name);
 				const rawHex = stripFileHeader(result.data as number[]);
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
 					const prf2 = new PatchParser(buffer).parsePrf2();

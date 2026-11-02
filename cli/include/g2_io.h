@@ -88,6 +88,10 @@ extern volatile int g2_pending_disconnect;
  * have been thrown away - the cause of an unexplained "no reply" abort. */
 extern volatile unsigned long g2_msg_drops;
 
+/* Count of incoming messages dropped for a CRC mismatch (g2_crc_ok). Each one is also logged,
+ * and appended to the file named by G2_CRC_LOG when that is set. */
+extern volatile unsigned long g2_crc_drops;
+
 /* Frame trace ring: g2_trace() records a sent ('>') or received ('<') frame,
  * g2_trace_dump() prints the recent ones to stderr (called on disconnect). */
 void g2_trace(char dir, const uint8_t *buf, int len);

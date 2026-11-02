@@ -34,6 +34,14 @@ uint16_t calc_crc16(uint8_t *buff, int length) {
     return crc;
 }
 
+/* The check the official editor runs on every message from the G2 (CSynthPortUSB::
+ * InterruptHandleData / IsUSBCheckSumOK): the last 2 of the n bytes are a big-endian CRC16 over
+ * the rest. n is an embedded message's length nibble (data after the type byte) or a bulk's size. */
+int g2_crc_ok(const uint8_t *data, int n) {
+    if (n < 2) return 0;
+    return calc_crc16((uint8_t *)data, n - 2) == (((uint16_t)data[n - 2] << 8) | data[n - 1]);
+}
+
 /* Extract a name from a G2 name field: up to 16 bytes, NUL-terminated only when shorter
  * (Delphi ReadClaviaString). Any other byte is part of the name — a non-printable one is shown
  * as '?'. Stopping at it instead left the rest of the message misaligned: a G2 Engine whose

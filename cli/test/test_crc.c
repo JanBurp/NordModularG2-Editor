@@ -49,3 +49,31 @@ void test_crc_iterator_seed_propagation(void) {
     uint16_t crc2 = crc_iterator(crc1, 0x02);
     TEST_ASSERT_TRUE(crc2 != crc1);
 }
+
+/* Inbound check (g2_crc_ok, official IsUSBCheckSumOK) on messages captured from a G2 2026-11-02:
+ * the embedded patch-name reply 72|01 08 01 27 00|87 d3 (data after the type byte, length nibble 7)
+ * and the 0x16 list and synth-settings bulks. Any flipped bit must fail. */
+static int hex_bytes(const char *hex, uint8_t *out) {
+    int n = 0;
+    for (; hex[0] && hex[1]; hex += 2) { unsigned v; sscanf(hex, "%2x", &v); out[n++] = (uint8_t)v; }
+    return n;
+}
+
+void test_g2_crc_ok_captured_messages(void) {
+    static const char *msgs[] = {
+        "010801270087d3",
+        "010c0313770116010103070063617431746573740000044701",
+        "010c0003426c756520456e67696e650081020000000001020304108002030064000000284020000000000000000000000000000000005488",
+    };
+    uint8_t buf[128];
+    for (size_t m = 0; m < sizeof(msgs) / sizeof(msgs[0]); m++) {
+        int n = hex_bytes(msgs[m], buf);
+        TEST_ASSERT_TRUE_MESSAGE(g2_crc_ok(buf, n), msgs[m]);
+        for (int i = 0; i < n; i++) {
+            buf[i] ^= 0x01;
+            TEST_ASSERT_FALSE(g2_crc_ok(buf, n));
+            buf[i] ^= 0x01;
+        }
+    }
+    TEST_ASSERT_FALSE(g2_crc_ok(buf, 1));
+}

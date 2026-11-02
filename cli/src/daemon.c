@@ -197,8 +197,8 @@ static void diag_log_disconnect(const char *why, int ret) {
 	for (unsigned i = 0; i < total; i++)
 		if (now - diag_ts[i] <= 1000) in_1s++;
 	long long since_last = diag_n ? now - diag_ts[(diag_n - 1) % DIAG_RING] : -1;
-	fprintf(stderr, "[diag] disconnect (%s, ret=%d): %u cmds in last 1s%s, last cmd '%s' %lld ms ago, msg_drops=%lu\n",
-	        why, ret, in_1s, in_1s == DIAG_RING ? "+" : "", diag_last_cmd, since_last, g2_msg_drops);
+	fprintf(stderr, "[diag] disconnect (%s, ret=%d): %u cmds in last 1s%s, last cmd '%s' %lld ms ago, msg_drops=%lu crc_drops=%lu\n",
+	        why, ret, in_1s, in_1s == DIAG_RING ? "+" : "", diag_last_cmd, since_last, g2_msg_drops, g2_crc_drops);
 	g2_trace_dump();
 }
 

@@ -15,6 +15,7 @@ extern void test_crc16_command_format(void);
 extern void test_crc16_empty(void);
 extern void test_crc_iterator_known_value(void);
 extern void test_crc_iterator_seed_propagation(void);
+extern void test_g2_crc_ok_captured_messages(void);
 
 extern void test_parse_slot_A(void);
 extern void test_parse_slot_B(void);
@@ -243,6 +244,7 @@ int main(void) {
     RUN_TEST(test_crc16_empty);
     RUN_TEST(test_crc_iterator_known_value);
     RUN_TEST(test_crc_iterator_seed_propagation);
+    RUN_TEST(test_g2_crc_ok_captured_messages);
 
     RUN_TEST(test_parse_slot_A);
     RUN_TEST(test_parse_slot_B);

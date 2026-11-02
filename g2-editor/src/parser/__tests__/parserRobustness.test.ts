@@ -4,7 +4,7 @@ import fs from 'fs';
 import path from 'path';
 import { PatchParser } from '../nmg2PatchParser';
 import { SectionType } from '../constants';
-import { writePerfSettings } from '../nmg2PatchSerializer';
+import { fileCrcOk, writePerfSettings } from '../nmg2PatchSerializer';
 import { getModule } from '../../renderer/nmg2mods';
 import type { ModuleInstance } from '@/types';
 
@@ -105,5 +105,19 @@ describe('parser robustness', () => {
 	it('does not throw on a file shorter than the 320-byte header window', () => {
 		const short = new Uint8Array([...new TextEncoder().encode('x\r\n'), 0, 0x17, 0x00, 0, 0]);
 		expect(() => new PatchParser(short.buffer).parse()).not.toThrow();
+	});
+
+	it('checks the file CRC: real files pass, one flipped byte fails', () => {
+		for (const file of ['EmptyPatch.pch2', 'Clavia demo.pch2', 'EmptyPerf.prf2', 'MorphingDrumDemo.prf2']) {
+			const bytes = readFixture(file);
+			expect(fileCrcOk(bytes), file).toBe(true);
+			bytes[sectionsStart(bytes) + 5] ^= 0x01;
+			expect(fileCrcOk(bytes), file).toBe(false);
+		}
+		// Saved by an older build with a wrong CRC; it still parses (the load only warns).
+		const damaged = readFixture('eigen/PianoB.pch2');
+		expect(fileCrcOk(damaged)).toBe(false);
+		expect(() => new PatchParser(damaged.buffer).parse()).not.toThrow();
+		expect(fileCrcOk(new Uint8Array([0x78, 0x00, 0x17]))).toBe(false);
 	});
 });

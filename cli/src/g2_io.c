@@ -95,6 +95,7 @@ int g2_debug = 0;
 volatile int g2_pending_rearm = 0;
 volatile int g2_pending_disconnect = 0;
 volatile unsigned long g2_msg_drops = 0;
+volatile unsigned long g2_crc_drops = 0;
 volatile int g2_stream_locked = 0;
 
 static int g2_last_claim_error = 0;
@@ -663,6 +664,30 @@ void g2_msg_free(g2_msg_t *msg) {
     }
 }
 
+/* True (after counting and logging it) when a message fails the CRC check and must be dropped,
+ * like the official editor does (InterruptHandleData). No resync: the next message is read as
+ * usual. */
+static int crc_drop(const char *kind, const uint8_t *data, int n) {
+    if (g2_crc_ok(data, n)) return 0;
+    g2_crc_drops++;
+    fprintf(stderr, "[crc] mismatch on %s message (%d bytes), dropped\n", kind, n);
+    const char *path = getenv("G2_CRC_LOG");
+    FILE *f = path ? fopen(path, "a") : NULL;
+    if (f) {
+        fprintf(f, "pid=%d %s n=%d", (int)getpid(), kind, n);
+        for (int i = 0; i < n && i < 64; i++) fprintf(f, " %02x", data[i]);
+        fputc('\n', f);
+        fclose(f);
+    }
+    return 1;
+}
+
+/* An embedded message whose CRC fails (see crc_drop); hdr is the 16-byte interrupt packet. */
+static int embedded_crc_drop(const uint8_t *hdr, int len) {
+    int n = hdr[0] >> 4;
+    return (hdr[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && 1 + n <= len && crc_drop("embedded", hdr + 1, n);
+}
+
 /* Direct bulk read used only by the listener thread — bypasses recv_bulk shim. */
 static int listener_recv_bulk(uint8_t *data, uint16_t size) {
     int transferred = 0, ret, received = 0, retries = 5;
@@ -695,6 +720,7 @@ static void *listener_thread(void *arg) {
         if (ret <= 0) continue;
 
         debug_recv(hdr);
+        if (embedded_crc_drop(hdr, ret)) continue;
 
         g2_msg_t msg = {0};
         memcpy(msg.interrupt, hdr, sizeof(hdr));
@@ -706,6 +732,10 @@ static void *listener_thread(void *arg) {
                 msg.bulk = malloc(size);
                 if (msg.bulk) {
                     msg.bulk_size = (uint16_t)listener_recv_bulk(msg.bulk, size);
+                    if (msg.bulk_size == size && crc_drop("extended", msg.bulk, size)) {
+                        g2_msg_free(&msg);
+                        continue;
+                    }
                     /* BULK_REARM: all-slots version update — G2 stops streaming after this.
                      * Signal daemon via sentinel=2 so recv_interrupt() skips it, but keep
                      * the bulk payload so emit_bulk_event() can process the full message. */
@@ -816,8 +846,11 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
  * When listener inactive: direct libusb call (original behaviour).
  * keep_acks: hand generic ok/error acks back too, for a caller that waits for its own write's ack. */
 static int recv_interrupt_filtered(uint8_t *response, int size, int timeout_ms, int keep_acks) {
-    if (!g2_listener_active)
-        return recv_interrupt_with_retry(response, size, timeout_ms, 1);
+    if (!g2_listener_active) {
+        int n;
+        while ((n = recv_interrupt_with_retry(response, size, timeout_ms, 1)) > 0 && embedded_crc_drop(response, n)) {}
+        return n;
+    }
 
     struct timespec deadline, now;
     clock_gettime(CLOCK_REALTIME, &deadline);
@@ -948,6 +981,7 @@ int recv_bulk(uint8_t *data, uint16_t size) {
         if (ret != 0 || transferred == 0) retries--;
     }
     debug_hex("recv", "direct_bulk", data, received);
+    if (received == size && crc_drop("extended", data, size)) return 0;
     return received;
 }
 
