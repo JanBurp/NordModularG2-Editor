@@ -797,8 +797,8 @@ The bulk data from GET_SYNTH_SETTINGS (`0x02`) starts with the synth name at `bu
 | Offset | Field | Notes |
 |--------|-------|-------|
 | 4 | Synth name | ClaviaString: up to 16 chars, NUL-terminated only when shorter than 16. `nameLen = parse_name(bulk + 4, …)` = name chars + NUL if present |
-| base+0 | Mode | Bit 7: 0=Patch, 1=Performance |
-| base+1 | `0x00` | — |
+| base+0 | Mode, patch sort mode | Bit 7: 0=Patch, 1=Performance; bits 6..0: patch sort mode (`patchSortMode`) |
+| base+1 | Performance sort mode | Bits 7..1 (`perfSortMode`); bit 0 unused |
 | base+2 | Perf Bank | Cached for the SET message |
 | base+3 | Perf Location | Cached for the SET message |
 | base+4 | Memory protect | Bit 7 |
@@ -807,13 +807,16 @@ The bulk data from GET_SYNTH_SETTINGS (`0x02`) starts with the synth name at `bu
 | base+11 | Local On | Bit 7 |
 | base+12 | Prog Change | Bit 1=recv, bit 0=send |
 | base+13 | Controllers | Bit 1=recv, bit 0=send |
-| base+14 | Clock | Bit 6=send; bit 5=ignore external clock (0 = recv on) |
+| base+14 | MIDI send arp, clock | Bit 7=send arpeggiator notes (`midiSendArp`); bit 6=clock send; bit 5=ignore external clock (0 = recv on) |
 | base+15 | Tune cents | `int8` |
 | base+16 | Global octave shift active | Bit 7 |
 | base+17 | Global octave shift | `int8` |
 | base+18 | Tune semitones | `int8` |
+| base+19 | Vibrato rate | (`vibratoRate`) |
 | base+20 | Pedal polarity | Bit 7 (our writer always ORs `0x40` into this byte) |
 | base+21 | Control pedal gain | 0–32 |
+
+Field layout per the official `CSynthMap::ReadStream` / `WriteStream`. The sort modes, send arp and vibrato rate have no editor UI; `set-synth-settings` keeps them (§10a).
 
 > **Name parsing rule (Delphi `ReadClaviaString`):** read bytes up to a NUL or 16 bytes, whichever comes first. Do not stop at non-printable bytes; they are shown as `?`. On 2026-10-06 a G2 Engine had the stored name `"\x01"`. The old `parse_name` stopped at that byte without consuming it, so every following field was read 2 bytes early: Performance mode showed as Patch, and the mode byte `0x81` showed up as perfBank 129. A settings write after such a misread (e.g. a rename) stores the shifted values back. One sanity check is that the pedal byte (base+20) has `0x40` set. If a single unit reports strange synth settings, capture the raw bytes with `g2-cli --debug daemon` (it logs bulk payloads as `listener_bulk`; one-shot commands log `direct` / `direct_bulk`) before touching the parser.
 
@@ -829,8 +832,8 @@ After GET_SYNTH_SETTINGS the CLI issues two more system commands to get performa
 - `[4..]` null-terminated performance name
 - `[name_end]` = `0x11` (C_PERF_SETTINGS chunk type)
 - `[name_end+1..2]` = inner_size (big-endian, typically `0x00 0x50` = 80)
-- `[name_end+3..10]` = 8 bytes perf settings: [3]=unknown2, [4]=selectedSlot(packed), [5]=rangeEnable (KB Split), [6]=BPM, [7]=unknown5, [8]=clockRun, [9-10]=unknown
-- `[name_end+11..]` = 4 × slot blocks, each: null-terminated name + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, 3 padding)
+- `[name_end+3..10]` = 8 bytes perf settings (official `CPerformanceHeader_11`): [3]=category (0-15), [4]=selectedSlot(packed) + knob source, [5]=rangeEnable (KB Split), [6]=BPM, [7]=a bool (G2Alike: clock keyboard trig), [8]=clockRun, [9-10]=0
+- `[name_end+11..]` = 4 × slot blocks, each: name (16-char rule) + 10 bytes (active, key, hold, bank, patch, rangeLow, rangeHigh, MIDI channel, 2 padding). The MIDI channel mirrors the synth-settings channel of that slot; the G2 ignores it on upload (hardware, 2026-11-02)
 - `[last 2]` 2-byte bulk trailer
 
 For SET_PERF_SETTINGS, send only the chunk: `[0x11][sizeHi][sizeLo][80 bytes]` (83 bytes total). Do **not** include the outer 4-byte header, perf name, or 2-byte trailer.
@@ -849,7 +852,8 @@ Sent as the variable-length payload for system command `0x03` (after the `[01][2
 base = 1 + nameLen + (nameLen < 16 ? 1 : 0)
 
 base+0   bit 7: mode (1=Performance, 0=Patch) — read from current mode, G2 stays in that mode
-base+1   0x00
+         bits 6..0: patchSortMode
+base+1   bits 7..1: perfSortMode
 base+2   PerfBank      (preserved from last GET response)
 base+3   PerfLocation  (preserved from last GET response)
 base+4   MemoryProtect (bit 7)
@@ -862,12 +866,12 @@ base+10  SysEx ID (0-indexed; 1-indexed in JSON)
 base+11  LocalOn (bit 7)
 base+12  PrgChange (bit 0=send, bit 1=recv)
 base+13  Controllers (bit 0=send, bit 1=recv)
-base+14  Clock (bit 6=send; bit 5=NOT recv — 0 means recv-on)
+base+14  bit 7=midiSendArp; Clock (bit 6=send; bit 5=NOT recv — 0 means recv-on)
 base+15  TuneCent (signed int8)
 base+16  GlobalOctaveShiftActive (bit 7)
 base+17  GlobalOctaveShift (signed int8)
 base+18  TuneSemi (signed int8)
-base+19  0x00
+base+19  vibratoRate
 base+20  PedalPolarity (bit 7) | 0x40
 base+21  ControlPedalGain (0–32)
 base+22..37  0x00 (16 trailing zeros)
@@ -876,6 +880,8 @@ Total payload length = base + 38 bytes.
 ```
 
 This is the ClaviaString encoding used throughout the protocol: name chars, null terminator only if the name is shorter than 16 chars.
+
+**Read-modify-write:** the message carries every synth setting, so `g2_set_synth_settings` first reads the current settings (tagged GET) and sends `patchSortMode`, `perfSortMode`, `midiSendArp` and `vibratoRate` back unchanged unless the JSON passes them. Writing 0 there used to reset them on every settings change.
 
 > **Note:** The Delphi editor hardcodes `base+0 = 0x80` (always Performance). The CLI reads the current mode from params so the G2 stays in its current mode.
 

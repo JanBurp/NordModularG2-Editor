@@ -19,8 +19,8 @@
  * parse_name() returns nameLen = (chars + 1) including the null byte.
  * All data fields follow immediately at base = 4 + nameLen:
  *
- * base+0   PerfMode (bit 7)
- * base+1   0x00 constant
+ * base+0   PerfMode (bit 7), PatchSortMode (bits 6..0)
+ * base+1   PerfSortMode (bits 7..1)
  * base+2   PerfBank
  * base+3   PerfLocation
  * base+4   MemoryProtect (bit 7)
@@ -29,14 +29,18 @@
  * base+11  LocalOn (bit 7)
  * base+12  PrgCh: bit1=recv, bit0=send
  * base+13  Controllers: bit1=recv, bit0=send
- * base+14  Clock: bit6=SendClock, bit5=IgnoreExternalClock
+ * base+14  bit7=MIDI SendArp, bit6=SendClock, bit5=IgnoreExternalClock
  * base+15  TuneCent (int8_t)
  * base+16  GlobalOctaveShiftActive (bit 7)
  * base+17  GlobalOctaveShift (int8_t)
  * base+18  TuneSemi (int8_t)
- * base+19  0x00
+ * base+19  VibratoRate
  * base+20  PedalPolarity (bit 7)
  * base+21  ControlPedalGain (0-32)
+ *
+ * Layout per the official CSynthMap::ReadStream/WriteStream (G2Editor.c). The sort modes, SendArp
+ * and VibratoRate have no editor UI; set-synth-settings sends them back unchanged (see
+ * g2_set_synth_settings).
  */
 
 /* Cache of last-received PerfBank/PerfLocation, for preserving in SET messages */
@@ -111,6 +115,11 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
     cJSON_AddNumberToObject(pedal, "gain", pedalGain);
     cJSON_AddItemToObject(root, "pedal", pedal);
 
+    cJSON_AddNumberToObject(root, "patchSortMode", bulkData[base + 0] & 0x7f);
+    cJSON_AddNumberToObject(root, "perfSortMode",  bulkData[base + 1] >> 1);
+    cJSON_AddBoolToObject(root,   "midiSendArp",   (bulkData[base + 14] >> 7) & 1);
+    cJSON_AddNumberToObject(root, "vibratoRate",   bulkData[base + 19]);
+
     return root;
 }
 
@@ -123,8 +132,9 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
  *
  * data[0]        0x03 (S_SYNTH_SETTINGS subcommand)
  * data[1..nLen]  synthName (nameLen = strlen + 1, includes null)
- * base+0         bit7 = mode (1=Performance, 0=Patch); Delphi always $80 but we read from params
- * base+1         0x00
+ * base+0         bit7 = mode (1=Performance, 0=Patch); Delphi always $80 but we read from params;
+ *                bits 6..0 = patchSortMode
+ * base+1         bits 7..1 = perfSortMode
  * base+2         PerfBank (cached from last GET)
  * base+3         PerfLocation (cached from last GET)
  * base+4         MemoryProtect (bit 7)
@@ -133,12 +143,12 @@ cJSON *build_synth_bulk_json(const uint8_t *bulkData, const char *type) {
  * base+11        LocalOn (bit 7)
  * base+12        PrgCh: bit1=recv, bit0=send
  * base+13        Controllers: bit1=recv, bit0=send
- * base+14        Clock: bit6=SendClock, bit5=IgnoreExternalClock (!clkre)
+ * base+14        bit7=midiSendArp, bit6=SendClock, bit5=IgnoreExternalClock (!clkre)
  * base+15        TuneCent (int8_t)
  * base+16        GlobalOctaveShiftActive (bit 7)
  * base+17        GlobalOctaveShift (int8_t)
  * base+18        TuneSemi (int8_t)
- * base+19        0x00
+ * base+19        vibratoRate
  * base+20        PedalPolarity (bit 7) | 0x40
  * base+21        ControlPedalGain (0-32)
  * base+22..37    0x00 x 16
@@ -173,6 +183,11 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
     int gOctShift      = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(params, "globalOctaveShift"));
     int pedalPol       = cJSON_IsTrue(cJSON_GetObjectItem(jPedal, "polarity"));
     int pedalGain      = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(jPedal, "gain"));
+    /* No editor UI for these; g2_set_synth_settings fills them in from the G2 when absent. */
+    int patchSort      = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(params, "patchSortMode"));
+    int perfSort       = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(params, "perfSortMode"));
+    int sendArp        = cJSON_IsTrue(cJSON_GetObjectItem(params, "midiSendArp"));
+    int vibratoRate    = (int)cJSON_GetNumberValue(cJSON_GetObjectItem(params, "vibratoRate"));
 
     int nameLen = (int)strlen(name);
     if (nameLen > 16) nameLen = 16;
@@ -184,8 +199,8 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
     /* out[1+nameLen] = 0x00 from memset */
 
     const char *modeStr = cJSON_GetStringValue(cJSON_GetObjectItem(params, "mode"));
-    out[base +  0] = (modeStr && strcmp(modeStr, "Performance") == 0) ? 0x80 : 0x00;
-    /* out[base + 1] = 0x00 */
+    out[base +  0] = (uint8_t)(((modeStr && strcmp(modeStr, "Performance") == 0) ? 0x80 : 0x00) | (patchSort & 0x7f));
+    out[base +  1] = (uint8_t)((perfSort & 0x7f) << 1);
     cJSON *jPerfBank = cJSON_GetObjectItem(params, "perfBank");
     cJSON *jPerfLoc  = cJSON_GetObjectItem(params, "perfLoc");
     out[base +  2] = jPerfBank ? (uint8_t)cJSON_GetNumberValue(jPerfBank) : g2_synth_perf_bank;
@@ -200,12 +215,12 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
     out[base + 11] = localOn ? 0x80 : 0x00;
     out[base + 12] = (uint8_t)(prgch & 0x03);
     out[base + 13] = (uint8_t)(((ctrlsRecv & 1) << 1) | (ctrlsSend & 1));
-    out[base + 14] = (uint8_t)((clkSend ? (1 << 6) : 0) | (!clkRecv ? (1 << 5) : 0));
+    out[base + 14] = (uint8_t)((sendArp ? 0x80 : 0) | (clkSend ? (1 << 6) : 0) | (!clkRecv ? (1 << 5) : 0));
     out[base + 15] = (uint8_t)(int8_t)tuneCent;
     out[base + 16] = gOctActive ? 0x80 : 0x00;
     out[base + 17] = (uint8_t)(int8_t)gOctShift;
     out[base + 18] = (uint8_t)(int8_t)tuneSemi;
-    /* out[base + 19] = 0x00 */
+    out[base + 19] = (uint8_t)vibratoRate;
     out[base + 20] = (uint8_t)((pedalPol ? 0x80 : 0x00) | 0x40);
     out[base + 21] = (uint8_t)pedalGain;
     /* out[base + 22..37] = 0x00 */

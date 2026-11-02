@@ -53,6 +53,7 @@ extern void test_patch_focus_a(void);
 extern void test_patch_focus_d(void);
 extern void test_factory_patch(void);
 extern void test_perf_focus_a(void);
+extern void test_synth_settings_set_msg_roundtrips_get_payload(void);
 
 extern void test_patch_usb_to_pch2_strips_header(void);
 extern void test_patch_usb_to_pch2_strips_trailer(void);
@@ -281,6 +282,7 @@ int main(void) {
     RUN_TEST(test_patch_focus_d);
     RUN_TEST(test_factory_patch);
     RUN_TEST(test_perf_focus_a);
+    RUN_TEST(test_synth_settings_set_msg_roundtrips_get_payload);
 
     /* Patch format conversion tests */
     RUN_TEST(test_patch_usb_to_pch2_strips_header);

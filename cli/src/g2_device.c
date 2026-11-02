@@ -1581,8 +1581,21 @@ int g2_set_synth_settings(cJSON *params) {
     if (!params) { g2_err("set-synth-settings: NULL params\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-synth-settings: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
+    /* Read-modify-write: the message carries every synth setting (CSynthMap::WriteStream), so the
+     * ones the caller doesn't pass - the editor has no UI for them - are taken from the G2 instead
+     * of being reset to 0. */
+    static const char *kKeep[] = { "patchSortMode", "perfSortMode", "midiSendArp", "vibratoRate" };
+    cJSON *current = query_synth_settings(NULL);
+    if (!current) { g2_err("set-synth-settings: could not read the current settings\n"); return G2_ERR_RECV; }
+    cJSON *merged = cJSON_Duplicate(params, 1);
+    for (size_t i = 0; merged && i < sizeof(kKeep) / sizeof(kKeep[0]); i++)
+        if (!cJSON_GetObjectItem(merged, kKeep[i]))
+            cJSON_AddItemToObject(merged, kKeep[i], cJSON_Duplicate(cJSON_GetObjectItem(current, kKeep[i]), 1));
+    cJSON_Delete(current);
     uint8_t data[56]; size_t len;
-    if (g2_build_synth_set_msg(params, data, &len) < 0) {
+    int built = merged ? g2_build_synth_set_msg(merged, data, &len) : -1;
+    cJSON_Delete(merged);
+    if (built < 0) {
         g2_err("set-synth-settings: failed to build message\n");
         return G2_ERR_INVALID_PARAM;
     }
