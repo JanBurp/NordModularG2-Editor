@@ -13,7 +13,7 @@ The editor runs on 64-bit Linux on PCs (x64) and on the Raspberry Pi (arm64). No
 - A 64-bit Linux with glibc 2.35 or newer, e.g. Ubuntu 22.04+, Debian 12+, Linux Mint 21+, Fedora 36+.
 - **Raspberry Pi:** a Pi 4 or Pi 5 with **Raspberry Pi OS (64-bit)**, Bookworm or newer. Check with `uname -m`: it must say `aarch64`. The 32-bit OS is not supported.
 
-## Install: .deb (Ubuntu, Debian, Mint, Raspberry Pi OS)
+## Install: .deb (recommended for Ubuntu, Debian, Mint, Raspberry Pi OS)
 
 Download the `.deb` for your machine (`amd64` for a PC, `arm64` for a Pi) and install it:
 
@@ -32,7 +32,7 @@ chmod +x G2-Editor-linux-x86_64.AppImage
 ./G2-Editor-linux-x86_64.AppImage
 ```
 
-AppImages need FUSE 2. On Ubuntu 22.04 and Debian install it with `sudo apt install libfuse2`; on Ubuntu 24.04 and newer the package is called `libfuse2t64`.
+AppImages need FUSE 2. On Ubuntu 22.04 and Debian install it with `sudo apt install libfuse2`; on Ubuntu 24.04 and newer the package is called `libfuse2t64`. The arm64 AppImage also needs `sudo apt install zlib1g-dev` (otherwise it stops with *libz.so: cannot open shared object file*).
 
 The first time you connect, the editor shows a **USB Driver Problem** dialog saying you have no permission to open the G2. Click **Install USB helper** and enter your password. The editor installs the permission rule and connects. This is needed only once.
 

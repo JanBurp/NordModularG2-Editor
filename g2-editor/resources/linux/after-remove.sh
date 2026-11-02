@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # electron-builder's default deb after-remove (app-builder-lib/templates/linux/after-remove.tpl),
-# plus removal of the G2 udev rule. Keep in sync with the default on electron-builder upgrades.
+# plus removal of the G2 udev rule and AppArmor profile. Keep in sync with the default on electron-builder upgrades.
 
 # Delete the link to the binary
 if type update-alternatives >/dev/null 2>&1; then
@@ -15,5 +15,9 @@ if [ "$1" = "remove" ] || [ "$1" = "purge" ]; then
     rm -f /etc/udev/rules.d/70-nord-g2.rules
     if hash udevadm 2>/dev/null; then
         udevadm control --reload-rules || true
+    fi
+    if [ -f '/etc/apparmor.d/${executable}' ]; then
+        apparmor_parser -R '/etc/apparmor.d/${executable}' 2>/dev/null || true
+        rm -f '/etc/apparmor.d/${executable}'
     fi
 fi
