@@ -27,10 +27,10 @@
 		return f && t ? previewCurvePath(f.x, f.y, t.x, t.y) : '';
 	}
 
-	// One path per cable: the main ghost, plus the second cable of a stereo suggestion.
+	// One path per cable: the main ghost, plus the other cables of a stereo or rewire suggestion.
 	const pathDs = computed(() => {
 		const g = props.ghost;
 		if (!g) return [];
-		return [curve(g.from, g.to), g.extra ? curve(g.extra.from, g.extra.to) : ''].filter(Boolean);
+		return [curve(g.from, g.to), ...(g.extra ?? []).map((p) => curve(p.from, p.to))].filter(Boolean);
 	});
 </script>

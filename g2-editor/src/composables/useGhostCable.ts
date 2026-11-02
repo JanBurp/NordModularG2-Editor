@@ -10,10 +10,10 @@ import type { Cable } from '../renderer/cableRenderer';
 export type GhostJack = { moduleIndex: number; connectorIndex: number; type: 'input' | 'output'; colour: string };
 export type GhostPoint = { x: number; y: number };
 export type GhostPair = { from: GhostJack; to: GhostJack };
-// `extra` is a second cable: of a stereo suggestion (e.g. R->R, or a mono output feeding both inputs), or
-// the new->below half of a rewire. `replaces` is the existing cable a rewire removes on confirm.
-export type GhostCandidate = GhostPair & { extra?: GhostPair; replaces?: Cable };
-export type GhostCable = { area: 0 | 1; from: GhostJack; to: GhostJack | GhostPoint; extra?: GhostPair; replaces?: Cable };
+// `extra` are the suggestion's other cables: the R side of a stereo pair (R->R, or a mono output feeding
+// both inputs) and/or the new->below half of a rewire. `replaces` are the existing cables a rewire removes on confirm.
+export type GhostCandidate = GhostPair & { extra?: GhostPair[]; replaces?: Cable[] };
+export type GhostCable = { area: 0 | 1; from: GhostJack; to: GhostJack | GhostPoint; extra?: GhostPair[]; replaces?: Cable[] };
 
 export function isGhostJack(to: GhostJack | GhostPoint): to is GhostJack {
 	return 'moduleIndex' in to;
@@ -54,6 +54,9 @@ function toUnits(jacks: IndexedJack[]): IndexedJack[][] {
 	return [...units, ...jacks.filter((j) => !paired.has(j.idx)).map((j) => [j])];
 }
 
+// `j` with its stereo partner among `jacks` ([L, R]), or alone.
+const unitOf = (jacks: IndexedJack[], j: IndexedJack): IndexedJack[] => toUnits(jacks).find((u) => u.some((k) => k.idx === j.idx)) ?? [j];
+
 const unitY = (unit: IndexedJack[]) => Math.min(...unit.map((j) => j.jack.y));
 
 const moduleHeight = (m: any): number => getModule(m.type)?.height ?? 2;
@@ -76,10 +79,20 @@ const ghostPair = (src: any, out: IndexedJack, dst: any, inp: IndexedJack): Ghos
 	to: ghostJack(dst, inp, 'input'),
 });
 
+// Cables from an output unit into an input unit (see toUnits): L->L, plus R->R for a stereo input (a mono
+// output feeds both L and R). A mono input only gets the (left) output.
+const unitPairs = (src: any, outU: IndexedJack[], dst: any, inU: IndexedJack[]): GhostPair[] =>
+	inU.map((inp, i) => ghostPair(src, outU[i] ?? outU[0], dst, inp));
+
+const toCandidate = (pairs: GhostPair[], replaces?: Cable[]): GhostCandidate => ({
+	...pairs[0],
+	...(pairs.length > 1 && { extra: pairs.slice(1) }),
+	...(replaces && { replaces }),
+});
+
 // Audio cable(s) from sourceMod's outputs into targetMod's free inputs, one candidate per (output unit,
-// input unit), see toUnits: inputs top-first, outputs bottom-first (module layouts put the main audio in at
-// top-right and out at bottom-right). A stereo input gets two cables: L->L and R->R from a stereo output,
-// or the single output into both L and R.
+// input unit), see toUnits and unitPairs: inputs top-first, outputs bottom-first (module layouts put the
+// main audio in at top-right and out at bottom-right).
 function audioCandidates(sourceMod: any, targetMod: any, cables: Cable[]): GhostCandidate[] {
 	const outputs = indexed(getModule(sourceMod.type)?.outputs).filter(({ jack }) => isAudioJackOnRight(jack));
 	const freeInputs = indexed(getModule(targetMod.type)?.inputs).filter(
@@ -88,53 +101,55 @@ function audioCandidates(sourceMod: any, targetMod: any, cables: Cable[]): Ghost
 	const outUnits = toUnits(outputs).sort((a, b) => unitY(b) - unitY(a));
 	return toUnits(freeInputs)
 		.sort((a, b) => unitY(a) - unitY(b))
-		.flatMap(([inL, inR]) =>
-			outUnits.map(([outL, outR]) => {
-				const first = ghostPair(sourceMod, outL, targetMod, inL);
-				return inR ? { ...first, extra: ghostPair(sourceMod, outR ?? outL, targetMod, inR) } : first;
-			}),
-		);
+		.flatMap((inU) => outUnits.map((outU) => toCandidate(unitPairs(sourceMod, outU, targetMod, inU))));
 }
 
 // Any-colour cables from src into dst's free inputs that real patches use (see pairCounts), most common first.
+// A pair on a stereo input (both L and R free) becomes the whole stereo unit, see unitPairs.
 function tableCandidates(src: any, dst: any, cables: Cable[]): GhostCandidate[] {
 	const outputs = indexed(getModule(src.type)?.outputs);
-	return indexed(getModule(dst.type)?.inputs)
-		.filter(({ idx }) => !isNestDrivenByOutput(cables, dst.index, idx))
+	const freeInputs = indexed(getModule(dst.type)?.inputs).filter(({ idx }) => !isNestDrivenByOutput(cables, dst.index, idx));
+	return freeInputs
 		.flatMap((inp) => outputs.map((out) => ({ out, inp, n: pairCount(src, out.idx, dst, inp.idx) })))
 		.filter(({ n }) => n > 0)
 		.sort((a, b) => b.n - a.n)
-		.map(({ out, inp }) => ghostPair(src, out, dst, inp));
-}
-
-// The new module dropped between `above` and `below` that are cabled to each other: rewire each such cable
-// through it (above -> new -> below), using the new module's jacks of the cable's colour. Ranked by
-// pairCounts, then position (inputs top-first, outputs bottom-first).
-function rewireCandidates(above: any, newMod: any, below: any, cables: Cable[]): GhostCandidate[] {
-	const aboveDef = getModule(above.type);
-	const belowDef = getModule(below.type);
-	const def = getModule(newMod.type);
-	return cables
-		.filter((c) => (c.dir ?? 1) === 1 && c.smod === above.index && c.dmod === below.index)
-		.flatMap((c) => {
-			const aboveOut = { jack: aboveDef?.outputs?.[c.scon], idx: c.scon };
-			const belowIn = { jack: belowDef?.inputs?.[c.dcon], idx: c.dcon };
-			if (!aboveOut.jack || !belowIn.jack) return [];
-			const family = colourFamily(aboveOut.jack.colour);
-			const sameFamily = (j: IndexedJack) => colourFamily(j.jack.colour) === family;
-			const inputs = indexed(def?.inputs).filter(sameFamily);
-			const outputs = indexed(def?.outputs).filter(sameFamily);
-			return inputs
-				.flatMap((inp) =>
-					outputs.map((out) => ({ inp, out, n: pairCount(above, c.scon, newMod, inp.idx) + pairCount(newMod, out.idx, below, c.dcon) })),
-				)
-				.sort((a, b) => b.n - a.n || a.inp.jack.y - b.inp.jack.y || b.out.jack.y - a.out.jack.y)
-				.map(({ inp, out }) => ({ ...ghostPair(above, aboveOut, newMod, inp), extra: ghostPair(newMod, out, below, belowIn), replaces: c }));
+		.map(({ out, inp }) => {
+			const inU = unitOf(freeInputs, inp);
+			return toCandidate(unitPairs(src, inU.length === 2 ? unitOf(outputs, out) : [out], dst, inU));
 		});
 }
 
+// The new module dropped between `above` and `below` that are cabled to each other: rewire those cables
+// through it (above -> new -> below), using the new module's jacks of the cables' colour. A stereo pair of
+// cables (into below's L and R inputs) is rewired as one unit. Ranked by pairCounts, then position (inputs
+// top-first, outputs bottom-first).
+function rewireCandidates(above: any, newMod: any, below: any, cables: Cable[]): GhostCandidate[] {
+	const aboveOutputs = indexed(getModule(above.type)?.outputs);
+	const def = getModule(newMod.type);
+	const linked = cables.filter((c) => (c.dir ?? 1) === 1 && c.smod === above.index && c.dmod === below.index);
+	const belowInputs = indexed(getModule(below.type)?.inputs).filter(({ idx }) => linked.some((c) => c.dcon === idx));
+	return toUnits(belowInputs).flatMap((belowU) => {
+		const unitCables = belowU.map(({ idx }) => linked.find((c) => c.dcon === idx)!);
+		const aboveU = unitCables.map((c) => aboveOutputs[c.scon]);
+		if (aboveU.some((j) => !j)) return [];
+		const family = colourFamily(aboveU[0].jack.colour);
+		const sameFamily = (j: IndexedJack) => colourFamily(j.jack.colour) === family;
+		const outUnits = toUnits(indexed(def?.outputs).filter(sameFamily));
+		return toUnits(indexed(def?.inputs).filter(sameFamily))
+			.flatMap((inU) =>
+				outUnits.map((outU) => ({
+					inU,
+					outU,
+					n: pairCount(above, aboveU[0].idx, newMod, inU[0].idx) + pairCount(newMod, outU[0].idx, below, belowU[0].idx),
+				})),
+			)
+			.sort((a, b) => b.n - a.n || unitY(a.inU) - unitY(b.inU) || unitY(b.outU) - unitY(a.outU))
+			.map(({ inU, outU }) => toCandidate([...unitPairs(above, aboveU, newMod, inU), ...unitPairs(newMod, outU, below, belowU)], unitCables));
+	});
+}
+
 const candidateKey = (c: GhostCandidate): string =>
-	[c.from, c.to, c.extra?.from, c.extra?.to].map((j) => (j ? `${j.moduleIndex}.${j.type}.${j.connectorIndex}` : '')).join('|');
+	[c.from, c.to, ...(c.extra ?? []).flatMap((p) => [p.from, p.to])].map((j) => `${j.moduleIndex}.${j.type}.${j.connectorIndex}`).join('|');
 
 export function useGhostCable() {
 	const slotsStore = useSlotsStore();
@@ -221,20 +236,20 @@ export function useGhostCable() {
 		const old = ghost.replaces;
 		if (old) {
 			const cable = (p: GhostPair): Cable => ({
-				colour: old.colour,
-				userColour: old.userColour,
+				colour: old[0].colour,
+				userColour: old[0].userColour,
 				smod: p.from.moduleIndex,
 				scon: p.from.connectorIndex,
 				dir: 1,
 				dmod: p.to.moduleIndex,
 				dcon: p.to.connectorIndex,
 			});
-			const newCables = [cable({ from: ghost.from, to: ghost.to }), ...(ghost.extra ? [cable(ghost.extra)] : [])];
-			await slotsStore.replaceCable(old, newCables, ghost.area === 1 ? 'voice' : 'fx');
+			const newCables = [{ from: ghost.from, to: ghost.to }, ...(ghost.extra ?? [])].map(cable);
+			await slotsStore.replaceCables(old, newCables, ghost.area === 1 ? 'voice' : 'fx');
 			return;
 		}
 		await connectJacks({ ...ghost.from, area: ghost.area }, { ...ghost.to, area: ghost.area });
-		if (ghost.extra) await connectJacks({ ...ghost.extra.from, area: ghost.area }, { ...ghost.extra.to, area: ghost.area });
+		for (const p of ghost.extra ?? []) await connectJacks({ ...p.from, area: ghost.area }, { ...p.to, area: ghost.area });
 	}
 
 	return { computeGhostSuggestion, suggestAfterDelete, clearGhostCable, cycleGhostCable, confirmGhostCable };
