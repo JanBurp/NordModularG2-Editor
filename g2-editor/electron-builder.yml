@@ -62,5 +62,18 @@ win:
       to: g2-cli.exe
 
 linux:
+  artifactName: "G2-Editor-linux-${arch}.${ext}"
   target:
-    - dir
+    - AppImage
+    - deb
+  category: Audio
+  maintainer: "Jan den Besten <info@jandenbesten.net>"
+  extraResources:
+    - from: resources/g2-cli
+      to: g2-cli
+    - from: resources/linux/70-nord-g2.rules
+      to: 70-nord-g2.rules
+
+deb:
+  afterInstall: resources/linux/after-install.sh
+  afterRemove: resources/linux/after-remove.sh

@@ -10,15 +10,29 @@
 					<strong class="text-content-primary">WinUSB</strong>, and click <strong class="text-content-primary">Replace Driver</strong>. Then click
 					Retry. NOTE: This will replace Clavia's USB Driver.
 				</p>
+				<p v-else-if="needsUsbHelper" class="text-sm text-content-secondary leading-relaxed">
+					The G2 was found on USB but this user has no permission to open it.<br /><br />
+					Click <strong class="text-content-primary">Install USB helper</strong> to install a udev rule that gives you access (asks for your password
+					once). Then the editor retries automatically.
+					<span v-if="helperError" class="block mt-2 text-red-400">Install failed: {{ helperError }}</span>
+				</p>
 				<div v-else class="text-sm text-content-secondary leading-relaxed">
 					The G2 was found on USB but its interface could not be claimed. Possible solutions:
 					<ul class="list-disc pl-4">
 						<li>G2 is claimed by another application. Quit other app and retry.</li>
 						<li>Try unplugging the G2 and plugging it back in.</li>
-						<li>Restart your Mac to reset the USB subsystem.</li>
+						<li v-if="isMac">Restart your Mac to reset the USB subsystem.</li>
 					</ul>
 				</div>
-				<div class="flex justify-end">
+				<div class="flex justify-end gap-2">
+					<button
+						v-if="needsUsbHelper"
+						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer disabled:opacity-50 disabled:cursor-default"
+						:disabled="installing"
+						@click="installUsbHelper"
+					>
+						{{ installing ? 'Installing…' : 'Install USB helper' }}
+					</button>
 					<button
 						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer"
 						@click="emit('retry')"
@@ -32,14 +46,28 @@
 </template>
 
 <script setup lang="ts">
+	import { computed, ref } from 'vue';
 	import { DeviceStatus, useDeviceStore } from '@/store/device';
+	import { isLinux, isMac, isWindows } from '@/utils/platform';
 
 	const device = useDeviceStore();
-	const isWindows = navigator.platform.startsWith('Win');
+	// Linux needs no driver, only permission: libusb_open fails with ACCESS until the udev rule is in place.
+	const needsUsbHelper = computed(() => isLinux && device.driverErrorCode === 'LIBUSB_ERROR_ACCESS');
+	const installing = ref(false);
+	const helperError = ref('');
 
 	const emit = defineEmits<{ retry: [] }>();
 
 	function openZadig() {
 		window.electronAPI.openExternal('https://zadig.akeo.ie/');
+	}
+
+	async function installUsbHelper() {
+		installing.value = true;
+		helperError.value = '';
+		const res = await window.electronAPI.installUsbHelper();
+		installing.value = false;
+		if (res.ok) emit('retry');
+		else helperError.value = res.error ?? 'unknown error';
 	}
 </script>

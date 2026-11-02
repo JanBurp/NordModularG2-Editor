@@ -1183,6 +1183,30 @@ ipcMain.on('shell:openExternal', (_, url: string) => {
 	}
 });
 
+/* "Install USB helper" from the driver-error dialog. Linux: install the udev rule that gives the
+ * logged-in user access to the G2 (pkexec password prompt), then re-apply rules to a G2 already
+ * plugged in. The rule's text is read here and passed as an argument: root often can't read an
+ * AppImage's FUSE mount, so it can't copy the file itself. */
+const UDEV_RULES = '70-nord-g2.rules';
+ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string }> => {
+	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
+	const rulesPath = app.isPackaged ? path.join(process.resourcesPath, UDEV_RULES) : path.join(process.env.APP_ROOT!, 'resources', 'linux', UDEV_RULES);
+	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;
+	try {
+		const rules = fs.readFileSync(rulesPath, 'utf8');
+		return await new Promise((resolve) => {
+			const proc = spawn('pkexec', ['sh', '-c', script, 'sh', rules]);
+			let stderr = '';
+			proc.stderr.on('data', (d) => (stderr += d));
+			proc.on('error', (e) => resolve({ ok: false, error: e.message }));
+			// pkexec: 126 = password dialog dismissed, 127 = not authorized
+			proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
+		});
+	} catch (e) {
+		return { ok: false, error: (e as Error).message };
+	}
+});
+
 ipcMain.handle('theme:set', (_, mode: 'system' | 'light' | 'dark') => {
 	nativeTheme.themeSource = mode;
 });

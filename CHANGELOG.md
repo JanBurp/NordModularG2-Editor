@@ -9,11 +9,14 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### New
+- Linux builds (x64 and Raspberry Pi arm64) as AppImage and .deb
+- "Install USB helper" button on Linux: sets up USB permission for the G2 in one click
 
 ### Changed
 - Minor UX changes to Bank Organizer
 - Added close icon to Find & Replace bar
 - Better responsiveness
+- A USB driver/permission problem now shows the driver dialog immediately
 
 ### Fixed
 - Some typos in docs

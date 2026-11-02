@@ -162,6 +162,7 @@ export function useG2() {
 				}
 				if (ev.type === 'usb_driver_error') {
 					store.status = DeviceStatus.DriverError;
+					store.driverErrorCode = ev.code ?? null;
 					log('←', 'Connect', `USB driver error: ${ev.code ?? 'unknown'}`);
 					rejectArmed(new Error('usb_driver_error'));
 					return;

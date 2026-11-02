@@ -32,6 +32,8 @@ export function statusDotClass(status: DeviceStatus): string {
 export const useDeviceStore = defineStore('device', {
 	state: () => ({
 		status: DeviceStatus.Disconnected,
+		// libusb error name from the last usb_driver_error event, e.g. LIBUSB_ERROR_ACCESS.
+		driverErrorCode: null as string | null,
 		device: null as Device | null,
 		modeChanging: false,
 		// Re-sending the editor's performance after a reconnect; edits are blocked meanwhile.

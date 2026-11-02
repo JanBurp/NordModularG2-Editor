@@ -12,6 +12,8 @@ has_children: true
 |---|---|
 | macOS (Apple Silicon & Intel) | macOS 11 (Big Sur) |
 | Windows | Windows 10 (64-bit) |
+| Linux (x64) | 64-bit, glibc 2.35+ (e.g. Ubuntu 22.04, Debian 12) |
+| Raspberry Pi (arm64) | Pi 4/5, Raspberry Pi OS 64-bit (Bookworm) |
 
 ## Latest version
 
@@ -24,6 +26,8 @@ has_children: true
 | macOS Apple Silicon (M1/M2/M3/M4) | [G2-Editor-arm64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-arm64.dmg) | [g2-cli-macos-arm64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-arm64) |
 | macOS Intel | [G2-Editor-x64.dmg](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-x64.dmg) | [g2-cli-macos-x64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-macos-x64) |
 | Windows | [G2-Editor-Setup.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-Setup.exe) | [g2-cli-windows-x64.exe](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-windows-x64.exe) |
+| Linux x64 | [.deb](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-linux-amd64.deb) · [AppImage](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-linux-x86_64.AppImage) | [g2-cli-linux-x64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-linux-x64) |
+| Raspberry Pi (arm64) | [.deb](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-linux-arm64.deb) · [AppImage](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/G2-Editor-linux-arm64.AppImage) | [g2-cli-linux-arm64](https://github.com/JanBurp/NordModularG2-Editor/releases/latest/download/g2-cli-linux-arm64) |
 
 > The CLI is optional — most users only need the editor app. See [Technical Reference](../technical/cli-commands) for CLI details.
 
@@ -45,3 +49,7 @@ has_children: true
 Run the `.exe` installer and follow the steps.
 
 Windows requires a USB driver for the G2. If the app reports a USB driver problem, see [Windows USB Driver](windows-driver).
+
+## Install: Linux & Raspberry Pi
+
+Install the `.deb` (Ubuntu, Debian, Mint, Raspberry Pi OS) or run the AppImage (any distribution). No driver is needed, only USB permission, which the `.deb` or the editor sets up for you. See [Linux & Raspberry Pi](linux).

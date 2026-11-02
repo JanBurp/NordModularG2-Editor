@@ -182,10 +182,74 @@ jobs:
             g2-editor/release/*.exe.blockmap
 
   # ─────────────────────────────────────────────
+  # Linux x64 + arm64 (AppImage + deb; arm64 = Raspberry Pi 4/5, 64-bit OS)
+  # ─────────────────────────────────────────────
+  build-linux:
+    strategy:
+      matrix:
+        include:
+          - arch: x64
+            runner: ubuntu-22.04
+          - arch: arm64
+            runner: ubuntu-22.04-arm
+    # Oldest supported runners: binaries built against their glibc also run on older distros.
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+
+      - name: Build libusb (${{ matrix.arch }}, static)
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libudev-dev
+          curl -fsSL "https://github.com/libusb/libusb/releases/download/v${{ env.LIBUSB_VERSION }}/libusb-${{ env.LIBUSB_VERSION }}.tar.bz2" \
+            -o /tmp/libusb.tar.bz2
+          tar -xjf /tmp/libusb.tar.bz2 -C /tmp
+          cd /tmp/libusb-${{ env.LIBUSB_VERSION }}
+          ./configure --prefix=/tmp/libusb-linux --enable-static --disable-shared
+          make -j$(nproc)
+          make install
+
+      - name: Build CLI (Linux ${{ matrix.arch }})
+        working-directory: cli
+        run: |
+          make \
+            LIBUSB_CFLAGS="-I/tmp/libusb-linux/include/libusb-1.0" \
+            LIBUSB_LIBS="-L/tmp/libusb-linux/lib -lusb-1.0 -ludev"
+          cp build/bin/g2-cli ../g2-editor/resources/g2-cli
+
+      - name: Stage CLI binary for release
+        run: |
+          mkdir -p cli-release
+          cp cli/build/bin/g2-cli cli-release/g2-cli-linux-${{ matrix.arch }}
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: g2-cli-linux-${{ matrix.arch }}
+          path: cli-release/g2-cli-linux-${{ matrix.arch }}
+
+      - name: Install dependencies & build Electron app
+        working-directory: g2-editor
+        run: |
+          npm ci --ignore-scripts
+          npx electron-vite build
+          npx electron-builder --linux
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: G2-Editor-Linux-${{ matrix.arch }}
+          path: |
+            g2-editor/release/*.AppImage
+            g2-editor/release/*.deb
+
+  # ─────────────────────────────────────────────
   # Publish to GitHub Releases (tag pushes only)
   # ─────────────────────────────────────────────
   publish:
-    needs: [build-macos-arm64, build-macos-x64, build-windows]
+    needs: [build-macos-arm64, build-macos-x64, build-windows, build-linux]
     if: startsWith(github.ref, 'refs/tags/v')
     runs-on: ubuntu-latest
     permissions:
@@ -199,31 +263,3 @@ jobs:
         with:
           files: dist/**/*
           generate_release_notes: true
-
-  # ─────────────────────────────────────────────
-  # Linux x64 (future target — not yet enabled)
-  # ─────────────────────────────────────────────
-  # build-linux:
-  #   runs-on: ubuntu-latest
-  #   steps:
-  #     - uses: actions/checkout@v4
-  #     - uses: actions/setup-node@v4
-  #       with:
-  #         node-version: ${{ env.NODE_VERSION }}
-  #     - name: Install libusb (static)
-  #       run: sudo apt-get install -y libusb-1.0-0-dev
-  #     - name: Build CLI
-  #       working-directory: cli
-  #       run: |
-  #         make
-  #         cp build/bin/g2-cli ../g2-editor/resources/g2-cli
-  #     - name: Install dependencies & build Electron app
-  #       working-directory: g2-editor
-  #       run: |
-  #         npm ci --ignore-scripts
-  #         npx electron-vite build
-  #         npx electron-builder --linux
-  #     - uses: actions/upload-artifact@v4
-  #       with:
-  #         name: G2-Editor-Linux
-  #         path: g2-editor/release/

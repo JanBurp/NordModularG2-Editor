@@ -1,0 +1,3 @@
+# Nord Modular G2 (Clavia, VID 0ffc / PID 0002): give the logged-in desktop user access,
+# so G2 Editor can open it without root. 70- sorts before 73-seat-late.rules, which applies uaccess.
+SUBSYSTEM=="usb", ATTR{idVendor}=="0ffc", ATTR{idProduct}=="0002", MODE="0660", TAG+="uaccess"

@@ -39,6 +39,7 @@ const dragDrop = listenerGroup('drag:drop');
 contextBridge.exposeInMainWorld('electronAPI', {
 	isOffline: process.env.VITE_DEV_OFFLINE === 'true',
 	isMac: process.platform === 'darwin',
+	platform: process.platform,
 	patches: {
 		list: (folder: string) => ipcRenderer.invoke('patches:list', folder),
 		load: (filepath: string) => ipcRenderer.invoke('patches:load', filepath),
@@ -82,6 +83,7 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	getLatestVersion: () => ipcRenderer.invoke('app:latestVersion'),
 	claimStartupSplash: () => ipcRenderer.invoke('app:claim-startup-splash'),
 	openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
+	installUsbHelper: () => ipcRenderer.invoke('usb:install-helper'),
 	setTheme: (mode: 'system' | 'light' | 'dark') => ipcRenderer.invoke('theme:set', mode),
 
 	devices: {

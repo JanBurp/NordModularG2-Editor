@@ -14,6 +14,7 @@ declare global {
 		electronAPI: {
 			isOffline: boolean;
 			isMac: boolean;
+			platform: string;
 			patches: {
 				list: (folder: string) => Promise<{
 					success: boolean;
@@ -58,6 +59,7 @@ declare global {
 			getLatestVersion: () => Promise<string | null>;
 			claimStartupSplash: () => Promise<boolean>;
 			openExternal: (url: string) => void;
+			installUsbHelper: () => Promise<{ ok: boolean; error?: string }>;
 			setTheme: (mode: 'system' | 'light' | 'dark') => Promise<void>;
 			selectBankFolder: (defaultPath?: string) => Promise<{ success: boolean; folder?: string }>;
 			selectPchListFile: () => Promise<{ success: boolean; filepath?: string }>;

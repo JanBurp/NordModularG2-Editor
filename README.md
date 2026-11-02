@@ -10,7 +10,7 @@ What follows is a brief technical overview and how to set up a local development
 
 ## Tech Stack
 
-- Editor for the Nord Modular G2 for multiple platforms (macOS, Windows, later Linux)
+- Editor for the Nord Modular G2 for multiple platforms (macOS, Windows, Linux incl. Raspberry Pi)
 - Built with Electron, TypeScript, and Vue 3
 - A C CLI/Daemon handles all USB communication with the G2 hardware
 

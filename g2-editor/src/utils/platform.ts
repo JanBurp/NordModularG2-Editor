@@ -1,6 +1,8 @@
 // True on macOS, where Ctrl+click carries an OS-level "right-click" meaning that Cmd+click does not.
 // Falls back to navigator.platform for contexts where window.electronAPI hasn't been injected yet.
 export const isMac: boolean = window.electronAPI?.isMac ?? navigator.platform.toLowerCase().includes('mac');
+export const isWindows: boolean = (window.electronAPI?.platform ?? navigator.platform.toLowerCase()).startsWith('win');
+export const isLinux: boolean = (window.electronAPI?.platform ?? navigator.platform.toLowerCase()).startsWith('linux');
 
 // The single platform-appropriate modifier for "grab and relocate" gestures: Cmd on macOS, Ctrl elsewhere.
 // Intentionally not used by the app's other pre-existing "accept either Ctrl or Cmd" shortcuts.
