@@ -184,6 +184,9 @@ function createHost(cascadeIndex = 0): Host {
 	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
+		// the official 7" Raspberry Pi touchscreen
+		minWidth: 800,
+		minHeight: 480,
 		x: state?.x !== undefined ? state.x + cascade : undefined,
 		y: state?.y !== undefined ? state.y + cascade : undefined,
 		show: !headless,

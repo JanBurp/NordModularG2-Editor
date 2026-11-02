@@ -1,6 +1,11 @@
 <template>
-	<div class="status-bar flex items-center justify-between gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary">
+	<!-- no buttons beside the hint in the organizer: centre it on its own -->
+	<div
+		class="status-bar flex items-center gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary"
+		:class="uiStore.showBankOrganizer ? 'justify-center' : 'justify-between'"
+	>
 		<BtnGroup
+			v-if="!uiStore.showBankOrganizer"
 			:model-value="uiStore.area"
 			:options="AREA_OPTIONS"
 			variant="variation"
@@ -10,7 +15,7 @@
 			@toggle-off="handleAreaToggleOff"
 		/>
 
-		<div class="flex items-center gap-3 min-w-0">
+		<div class="flex items-center gap-3 min-w-0" :class="{ 'px-3 py-1': uiStore.showBankOrganizer }">
 			<span
 				class="flex gap-4 min-w-0 overflow-hidden whitespace-nowrap cursor-pointer hover:text-content-primary"
 				@click="uiStore.showKeyCommandsPage = true"
@@ -23,6 +28,7 @@
 		</div>
 
 		<BtnGroup
+			v-if="!uiStore.showBankOrganizer"
 			:model-value="settingsStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="variation"

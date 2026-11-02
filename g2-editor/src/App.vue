@@ -136,7 +136,7 @@
 				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
 
-			<SidePanel v-if="settingsStore.showRightPane" />
+			<SidePanel v-if="settingsStore.showRightPane && !uiStore.showBankOrganizer" />
 		</div>
 
 		<StatusBar />
