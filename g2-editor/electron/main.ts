@@ -166,10 +166,12 @@ function broadcastDevicesChanged(menu = true): void {
 
 // Shows (maximizing first, matching a freshly-created window's usual state) and focuses a
 // window that may still be hidden. A no-op beyond focus() if the window is already visible,
-// so it never re-maximizes a window the user resized.
+// so it never re-maximizes a window the user resized. A no-op when HEADLESS (E2E tests):
+// show() and, on macOS, focus() would put the hidden window on screen.
 function revealWindow(window: BrowserWindow): void {
+	if (process.env.HEADLESS === '1') return;
 	if (!window.isVisible()) {
-		if (process.env.HEADLESS !== '1') window.maximize();
+		window.maximize();
 		window.show();
 	}
 	window.focus();
@@ -184,6 +186,9 @@ function createHost(cascadeIndex = 0): Host {
 	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
+		// the official 7" Raspberry Pi touchscreen
+		minWidth: 800,
+		minHeight: 480,
 		x: state?.x !== undefined ? state.x + cascade : undefined,
 		y: state?.y !== undefined ? state.y + cascade : undefined,
 		show: !headless,

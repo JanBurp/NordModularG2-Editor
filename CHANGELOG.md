@@ -8,6 +8,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+
+### Changed
+- Minor UX changes to Bank Organizer
+- Added close icon to Find & Replace bar
+- Better responsiveness
+
+### Fixed
+- Some typos in docs
+- Some e2e test where not headless
+
 ## [0.8.0] - 2026-11-1
 
 ### New

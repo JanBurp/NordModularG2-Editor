@@ -1,7 +1,7 @@
 <template>
 	<div class="flex flex-col min-w-0 min-h-0 flex-1 border border-line-default rounded-xs overflow-hidden" :data-testid="`bank-grid-${side}`">
-		<!-- left · centre · right: equal outer columns keep the Upload/Download group centred -->
-		<div class="grid grid-cols-[1fr_auto_1fr] items-center gap-2 px-2 py-1.5 border-b border-line-subtle">
+		<!-- left · centre · right on one line; Sort wraps to a second line when the column is narrow -->
+		<div class="flex flex-wrap items-center justify-between gap-x-2 gap-y-1 px-2 py-1.5 border-b border-line-subtle">
 			<div class="flex items-center gap-1 min-w-0">
 				<span class="text-xs text-content-secondary">Bank</span>
 				<Select :model-value="bank" :options="bankOptions" title="Bank" @update:model-value="(v) => emit('update:bank', Number(v))" />
