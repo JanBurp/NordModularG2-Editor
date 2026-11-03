@@ -2,7 +2,7 @@
 	<!-- Mini Patch Mutator: rewrites the current variation in place (selected modules, or the whole patch) -->
 	<ToolBarLabel>Mutator:</ToolBarLabel>
 	<div class="flex items-center gap-1" data-testid="mini-mutator">
-		<div class="flex items-center gap-1 text-xs" @mouseenter="showHint('miniMutateProb')" @mouseleave="clearHint">
+		<div class="h-6 flex items-center gap-1 text-xs" @mouseenter="showHint('miniMutateProb')" @mouseleave="clearHint">
 			<span class="param-display w-10 text-center">{{ Math.round(mutator.current.prob * 100) }}%</span>
 			<Knob :value="Math.round(mutator.current.prob * 127)" :default-value="Math.round(DEFAULT_PROB * 127)" @change="(v) => mutator.setProb(v / 127)" />
 		</div>

@@ -9,6 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### New
+- Mini Mutator in Patch Toolbar (with keycommands)
 
 ### Changed
 - Improved and more auto-suggesting cables

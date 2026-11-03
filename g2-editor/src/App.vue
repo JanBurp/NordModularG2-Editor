@@ -852,6 +852,7 @@
 					return;
 				case 'u':
 				case 'n':
+					if (settingsStore.patchMutatorVisible) return; // Mini Mutator hidden while the big one is open
 					e.preventDefault();
 					void useMutatorStore().mutateCurrent(e.key === 'u' ? 'mutate' : 'randomize');
 					return;
