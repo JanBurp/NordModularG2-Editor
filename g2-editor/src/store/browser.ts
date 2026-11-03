@@ -122,8 +122,7 @@ export const useBrowserStore = defineStore('browser', {
 	actions: {
 		/* Populate from startup JSON `names` field (avoids extra `list` call) */
 		applyNamesData(names: any): void {
-			const toEntries = (banks: any): SynthPatch[] =>
-				Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[]));
+			const toEntries = (banks: any): SynthPatch[] => Object.entries(banks ?? {}).flatMap(([bankStr, entries]) => bankEntries(bankStr, entries as any[]));
 			this.synthPatches = toEntries(names?.patches);
 			this.synthPerformances = toEntries(names?.performances);
 			this.flashUsage = names?.flashUsage ?? null;

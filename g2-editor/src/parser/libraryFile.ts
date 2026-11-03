@@ -36,7 +36,7 @@ export function libraryItemToPch2(
 	for (const m of modules) {
 		variations.forEach((v, i) => (v[areaKey][m.index] = m.lv.slice(i * m.pcnt, (i + 1) * m.pcnt)));
 	}
-	return pch2FileBytes(PCH2_TEXT_HEADER, serializePatch(name, patch, base.templateRawHex, variations));
+	return pch2FileBytes(PCH2_TEXT_HEADER, serializePatch(name, patch, base.templateRawHex, variations, Infinity));
 }
 
 // A library item as inserted (a clipboard entry) plus its patch notes.
@@ -133,5 +133,5 @@ export function pch2ToLibraryItem(bytes: number[]): LibraryEntry {
 export function withNotes(bytes: number[], name: string, notes: LibraryNotes): number[] {
 	const patch = new PatchParser(new Uint8Array(bytes).buffer).parse() as Patch;
 	patch.text = formatNotes(notes, assignmentsLine(pch2ToLibraryItem(bytes)));
-	return pch2FileBytes(PCH2_TEXT_HEADER, serializePatch(name, patch, stripFileHeader(bytes), extractVariations(patch)));
+	return pch2FileBytes(PCH2_TEXT_HEADER, serializePatch(name, patch, stripFileHeader(bytes), extractVariations(patch), Infinity));
 }

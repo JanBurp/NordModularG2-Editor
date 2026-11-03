@@ -237,20 +237,22 @@ Storage in `ModuleInstance`: `lv[variation × pcnt + paramIdx]`.
 | Bits | Field | Width | Notes |
 |------|-------|-------|-------|
 | 0–1 | `areaIdx` | 2 | = 2 |
-| 2–9 | *(sub-section count)* | 8 | Always 7 |
-| 10–17 | `variationCount` | 8 | Always 9 |
+| 2–9 | *(entry count)* | 8 | 7 in every file seen |
+| 10–17 | `variationCount` | 8 | 9 |
 
-Followed by 7 sub-sections. Each sub-section:
+Then the entries, in the same generic layout as the module areas (official `R_ModuleParamData`
+reads all areas alike). The entry index names the group, and the parser reads the counts from the
+file, so an extra or unknown entry or value can't misalign the rest. Each entry:
 
 | Field | Width | Notes |
 |-------|-------|-------|
-| sub-section ID | 8 | 1–7 |
+| entry index | 8 | 1–7, see below |
 | field count | 7 | fields per variation |
 | 9× variation blocks | — | |
 
 **Per variation block:** 8-bit variation index + fieldCount × 7-bit values.
 
-Sub-sections in order:
+Entries (as written; the parser accepts any order):
 
 | ID | Fields | `PatchParamVariation` keys |
 |----|--------|--------------------------|
@@ -368,7 +370,9 @@ Parser: `parseParamNames`.
 
 ### 6.8 SEPARATOR (`0x6F`)
 
-Raw bytes. Contains the patch notes text for the preceding patch. Length varies; may be 0.
+Raw bytes. Contains the patch notes text for the preceding patch. Length varies; may be 0. The
+official editor writes at most 1024 bytes (`CTextpadData_11::WriteStream`); so do we for slot
+patches, while library files keep their full notes.
 
 In the parser, encountering a `SEPARATOR` increments `aof` (area offset) by 2, so subsequent sections are assigned to the next slot's FX and Voice areas. This is the mechanism that divides a prf2 into 4 independent patches.
 

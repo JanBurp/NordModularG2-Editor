@@ -74,6 +74,17 @@ class BitReader {
 // paramIndex, plus — for the Global Knobs variant — a trailing 2-bit slot field (0-3 = A-D).
 // Shared by G2Parser.parseKnobs and parseGlobalKnobsChunk, which differ only in that trailing
 // field. Returns null when the slot's presence bit is unset.
+// Patch settings (0x4d area 2) entries 2-7 by parameter position; entry 1 (Morph) holds the 8 dials
+// then the 8 modes.
+const PATCH_SETTINGS_FIELDS: Record<number, readonly (keyof Omit<PatchParamVariation, 'morphDials' | 'morphModes' | 'morphAssignments'>)[]> = {
+	2: ['patchVol', 'activeMuted'],
+	3: ['glide', 'glideTime'],
+	4: ['bend', 'semi'],
+	5: ['vibrato', 'cents', 'rate'],
+	6: ['arpeggiator', 'arpTime', 'arpType', 'octaves'],
+	7: ['octaveShift', 'sustain'],
+};
+
 // A G2 name field: up to 16 Latin-1 characters, NUL-terminated only when shorter than 16 (same
 // rule as the CLI's parse_name). Returns the name and the offset just past the field.
 function readName(data: Uint8Array, ofs: number): [string, number] {
@@ -442,64 +453,26 @@ class G2Parser {
 					};
 				return params[v];
 			};
-			// Section 1: Morphs
-			this.getBits(8);
-			this.getBits(7); // sub-section ID + count
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				for (let j = 0; j < 8; j++) vp(v).morphDials[j] = this.getBits(7);
-				for (let j = 0; j < 8; j++) vp(v).morphModes[j] = this.getBits(7);
-			}
-			// Section 2: Volume
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).patchVol = this.getBits(7);
-				vp(v).activeMuted = this.getBits(7);
-			}
-			// Section 3: Glide
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).glide = this.getBits(7);
-				vp(v).glideTime = this.getBits(7);
-			}
-			// Section 4: Bend
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).bend = this.getBits(7);
-				vp(v).semi = this.getBits(7);
-			}
-			// Section 5: Vibrato
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).vibrato = this.getBits(7);
-				vp(v).cents = this.getBits(7);
-				vp(v).rate = this.getBits(7);
-			}
-			// Section 6: Arp
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).arpeggiator = this.getBits(7);
-				vp(v).arpTime = this.getBits(7);
-				vp(v).arpType = this.getBits(7);
-				vp(v).octaves = this.getBits(7);
-			}
-			// Section 7: Octave shift
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).octaveShift = this.getBits(7);
-				vp(v).sustain = this.getBits(7);
+			// The official reader (R_ModuleParamData) has one layout for every area: entries of
+			// [index:8][paramCount:7] then per variation [variation:8][paramCount × 7]. For patch
+			// settings an entry index names the group (1 = Morph … 7 = octave shift/sustain). Reading
+			// the counts from the file keeps an unexpected entry or count from misaligning the rest.
+			for (let i = 0; i < nummod; i++) {
+				const id = this.getBits(8);
+				const paramCount = this.getBits(7);
+				for (let v = 0; v < varCount; v++) {
+					const target = vp(this.getBits(8));
+					for (let p = 0; p < paramCount; p++) {
+						const value = this.getBits(7);
+						if (id === 1) {
+							if (p < 8) target.morphDials[p] = value;
+							else if (p < 16) target.morphModes[p - 8] = value;
+						} else {
+							const key = PATCH_SETTINGS_FIELDS[id]?.[p];
+							if (key) target[key] = value;
+						}
+					}
+				}
 			}
 			this.patchParamsData[slotIdx] = params;
 			return 'Patch settings: varCount=' + varCount;

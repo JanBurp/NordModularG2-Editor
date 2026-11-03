@@ -4,7 +4,9 @@ import fs from 'fs';
 import path from 'path';
 import { PatchParser } from '../nmg2PatchParser';
 import { SectionType } from '../constants';
-import { fileCrcOk, writePerfSettings } from '../nmg2PatchSerializer';
+import { fileCrcOk, serializePatch, TEXT_PAD_MAX, writePerfSettings } from '../nmg2PatchSerializer';
+import { extractVariations } from '../../store/slotHelpers';
+import { stripFileHeader } from '../nmg2PatchParser';
 import { getModule } from '../../renderer/nmg2mods';
 import type { ModuleInstance } from '@/types';
 
@@ -98,7 +100,16 @@ describe('parser robustness', () => {
 		expect(perf.slotNames).toEqual(slots.map((s) => s.name));
 		expect(perf.settings).toMatchObject({ category: 7, clockKbdTrig: true, bpm: 120 });
 		expect(perf.slotMeta).toEqual(
-			slots.map((s) => ({ active: true, key: s.key, hold: s.hold, bank: s.bank, patch: s.patch, rangeLow: s.range.lower, rangeHigh: s.range.upper, midiChannel: s.midiChannel })),
+			slots.map((s) => ({
+				active: true,
+				key: s.key,
+				hold: s.hold,
+				bank: s.bank,
+				patch: s.patch,
+				rangeLow: s.range.lower,
+				rangeHigh: s.range.upper,
+				midiChannel: s.midiChannel,
+			})),
 		);
 	});
 
@@ -119,5 +130,72 @@ describe('parser robustness', () => {
 		expect(fileCrcOk(damaged)).toBe(false);
 		expect(() => new PatchParser(damaged.buffer).parse()).not.toThrow();
 		expect(fileCrcOk(new Uint8Array([0x78, 0x00, 0x17]))).toBe(false);
+	});
+
+	it('reads patch settings (0x4d area 2) by entry index and count, like the official generic reader', () => {
+		const file = 'Clavia demo.pch2';
+		const bytes = readFixture(file);
+		const original = new PatchParser(bytes.buffer).parse();
+		const pp = original.patchParams!;
+		const groups: Record<number, number[][]> = {
+			1: pp.map((v) => [...v.morphDials, ...v.morphModes]),
+			2: pp.map((v) => [v.patchVol, v.activeMuted]),
+			3: pp.map((v) => [v.glide, v.glideTime]),
+			4: pp.map((v) => [v.bend, v.semi]),
+			5: pp.map((v) => [v.vibrato, v.cents, v.rate, 99]), // one value more than known
+			6: pp.map((v) => [v.arpeggiator, v.arpTime, v.arpType, v.octaves]),
+			7: pp.map((v) => [v.octaveShift, v.sustain]),
+			9: pp.map(() => [5, 6]), // an entry index no one knows
+		};
+		const order = [7, 2, 9, 1, 5, 3, 6, 4];
+		const bits: number[] = [];
+		const put = (n: number, v: number) => {
+			for (let i = n - 1; i >= 0; i--) bits.push((v >> i) & 1);
+		};
+		put(2, 2);
+		put(8, order.length);
+		put(8, pp.length);
+		for (const id of order) {
+			put(8, id);
+			put(7, groups[id][0].length);
+			groups[id].forEach((vals, v) => {
+				put(8, v);
+				vals.forEach((x) => put(7, x));
+			});
+		}
+		while (bits.length % 8) bits.push(0);
+		const data = Array.from({ length: bits.length / 8 }, (_, i) => parseInt(bits.slice(i * 8, i * 8 + 8).join(''), 2));
+		const old = sections(bytes).find((x) => x.type === SectionType.PARAMETERS && bytes[x.ofs + 3] >> 6 === 2)!;
+		const patched = new Uint8Array([
+			...bytes.slice(0, old.ofs),
+			SectionType.PARAMETERS,
+			data.length >> 8,
+			data.length & 0xff,
+			...data,
+			...bytes.slice(old.end),
+		]);
+
+		const parsed = new PatchParser(patched.buffer).parse();
+		expect(parsed.patchParams).toEqual(pp);
+		for (const a of [0, 1]) {
+			expect(parsed.areas[a].modules.map(moduleFields)).toEqual(original.areas[a].modules.map(moduleFields));
+			expect(parsed.areas[a].cableList).toEqual(original.areas[a].cableList);
+		}
+	});
+
+	it('caps a slot patch text pad at 1024 bytes like the official writer; a library file keeps it whole', () => {
+		const bytes = readFixture('EmptyPatch.pch2');
+		const patch = new PatchParser(bytes.buffer).parse();
+		patch.text = 'x'.repeat(1500);
+		const textLens = (rawHex: string) => {
+			const out = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+			const file = new Uint8Array([...new TextEncoder().encode('x'), 0, 0x17, 0, ...out]);
+			return sections(file)
+				.filter((x) => x.type === SectionType.SEPARATOR)
+				.map((x) => x.end - x.ofs - 3);
+		};
+		const template = stripFileHeader(bytes);
+		expect(textLens(serializePatch('p', patch, template, extractVariations(patch)))).toEqual([TEXT_PAD_MAX]);
+		expect(textLens(serializePatch('p', patch, template, extractVariations(patch), Infinity))).toEqual([1500]);
 	});
 });

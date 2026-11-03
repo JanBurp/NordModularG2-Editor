@@ -1166,7 +1166,15 @@ describe('prf2 0x11 section preservation', () => {
 	it('header knob source, range enable, bpm and clock run are parsed', () => {
 		const buf = fs.readFileSync(path.join(FIXTURES, 'MorphingDrumDemo.prf2'));
 		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
-		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true, category: 0, clockKbdTrig: false });
+		expect(prf2.settings).toEqual({
+			focus: 0,
+			knobSourceGlobal: false,
+			rangeEnable: false,
+			bpm: 120,
+			clockRunning: true,
+			category: 0,
+			clockKbdTrig: false,
+		});
 	});
 
 	it('header knob source Global is parsed', () => {
@@ -1675,7 +1683,9 @@ describe('writePerfSettings keeps what the G2 stored (0x11 category, clock bool,
 			range: { lower: 0, upper: 127 },
 			midiChannel: 15 - i,
 		}));
-		const b = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false, category: 9, clockKbdTrig: true }, slots).slice(3);
+		const b = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false, category: 9, clockKbdTrig: true }, slots).slice(
+			3,
+		);
 		expect(b[0]).toBe(9);
 		expect(b[4]).toBe(1);
 		expect(Array.from(b.slice(8, 13))).toEqual([0x43, 0x61, 0x66, 0xe9, 0]); // one byte per character
@@ -1714,7 +1724,26 @@ describe('serializePatch writes the official section order (CPatchFile_13::Write
 	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
 
 	it('EmptyPatch.pch2 itself is in the official order', () => {
-		expect(official).toEqual(['21', '4a:1', '4a:0', '69', '52:1', '52:0', '4d:2', '4d:1', '4d:0', '65', '62', '60', '5b:2', '5b:1', '5b:0', '5a:1', '5a:0', '6f']);
+		expect(official).toEqual([
+			'21',
+			'4a:1',
+			'4a:0',
+			'69',
+			'52:1',
+			'52:0',
+			'4d:2',
+			'4d:1',
+			'4d:0',
+			'65',
+			'62',
+			'60',
+			'5b:2',
+			'5b:1',
+			'5b:0',
+			'5a:1',
+			'5a:0',
+			'6f',
+		]);
 	});
 
 	for (const file of ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2']) {

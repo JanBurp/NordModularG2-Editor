@@ -466,9 +466,12 @@ function buildRawHex(sections: Uint8Array[], fileType: number = FILE_TYPE_PATCH)
 	return bytesToHex(result);
 }
 
-function writeTextPad(text: string): Uint8Array {
-	const data = new Uint8Array(text.length);
-	for (let i = 0; i < text.length; i++) {
+// The official editor writes at most this many text-pad bytes (CTextpadData_11::WriteStream).
+export const TEXT_PAD_MAX = 1024;
+
+function writeTextPad(text: string, max = TEXT_PAD_MAX): Uint8Array {
+	const data = new Uint8Array(Math.min(text.length, max));
+	for (let i = 0; i < data.length; i++) {
 		const c = text.charCodeAt(i);
 		data[i] = c > 0xff ? 0x3f : c; // '?' for chars outside Latin-1 instead of masking them into unrelated bytes
 	}
@@ -678,7 +681,9 @@ function processSection(
  * it is used to copy preserved sections (especially the patch description whose
  * first 61 bits are discarded during parsing and cannot be reconstructed).
  */
-export function serializePatch(name: string, patch: Patch, templateRawHex: string, liveVariations: VariationState[]): string {
+// textMax: the text-pad cap; library files pass Infinity, since their notes carry a generated
+// assignments line and are never sent to the G2 as they are.
+export function serializePatch(name: string, patch: Patch, templateRawHex: string, liveVariations: VariationState[], textMax = TEXT_PAD_MAX): string {
 	const variations = liveVariations.slice(0, NUM_VARIATIONS); // drop the Patch Mutator's live-only variation
 	const template = hexToBytes(templateRawHex);
 	const sectionDataLen = template.length - 2; // exclude trailing CRC bytes
@@ -716,7 +721,7 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 	// (CPatchFile_13::WriteMolecules): a hardware get-patch template has 0x5a before 0x5b and no
 	// 0x69, and the fallbacks above append at the end. The text pad always closes the slot — also
 	// for a hardware template, which never carries one (notes come via GET_PATCH_TEXT).
-	return buildRawHex([...canonicalSlotOrder(out), writeTextPad(patch.text ?? '')]);
+	return buildRawHex([...canonicalSlotOrder(out), writeTextPad(patch.text ?? '', textMax)]);
 }
 
 /**
@@ -831,7 +836,16 @@ export function serializePerformance(
  */
 export function writePerfSettings(perf: PerformanceData, slots: SlotInfo[]): Uint8Array {
 	const focus = Math.max(0, SLOT_LABELS.indexOf(perf.focus as (typeof SLOT_LABELS)[number]));
-	const out = [perf.category ?? 0, (focus << 2) | (perf.knobSourceGlobal ? 1 : 0), +perf.rangeEnable, perf.bpm, +!!perf.clockKbdTrig, +perf.clockRunning, 0, 0];
+	const out = [
+		perf.category ?? 0,
+		(focus << 2) | (perf.knobSourceGlobal ? 1 : 0),
+		+perf.rangeEnable,
+		perf.bpm,
+		+!!perf.clockKbdTrig,
+		+perf.clockRunning,
+		0,
+		0,
+	];
 	SLOT_LABELS.forEach((label, i) => {
 		const s = slots.find((x) => x.slot === label);
 		const name = Array.from(s?.name ?? '', (c) => c.charCodeAt(0) & 0xff).slice(0, 16); // Latin-1, like every other name
