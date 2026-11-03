@@ -694,10 +694,19 @@ static pthread_t    listener_tid;
 static void *listener_thread(void *arg) {
     (void)arg;
     uint8_t hdr[16];
+    g2_io_err_streak_t streak = {0};
 
     while (listener_running) {
         int ret = recv_interrupt_with_retry(hdr, sizeof(hdr), 200, 1);
-        if (ret == LIBUSB_ERROR_NO_DEVICE) {
+        int prev = streak.count;
+        long long since = streak.since;
+        int lost = g2_io_err_streak(&streak, ret, now_ms());
+        if (prev > 0 && streak.count == 0)   /* rare on a healthy G2, so worth a line */
+            fprintf(stderr, "[usb] listener: %d IO/PIPE error(s) over %lld ms, then recovered\n", prev, now_ms() - since);
+        if (lost)
+            fprintf(stderr, "[usb] listener: %d IO/PIPE errors over %lld ms with no successful read, treating it as a disconnect\n",
+                    streak.count, now_ms() - streak.since);
+        if (ret == LIBUSB_ERROR_NO_DEVICE || lost) {
             g2_msg_t m = {0};
             m.sentinel = 1;
             mq_push(m);
@@ -824,7 +833,16 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
         if (ret == LIBUSB_ERROR_NO_DEVICE) return LIBUSB_ERROR_NO_DEVICE;
         usleep(USB_SEND_DELAY_US);
     }
-    return -1;
+    return ret < 0 ? ret : -1;   /* the libusb error (TIMEOUT, IO, PIPE…), so the listener can tell them apart */
+}
+
+int g2_io_err_streak(g2_io_err_streak_t *s, int ret, long long now) {
+    if (ret != LIBUSB_ERROR_IO && ret != LIBUSB_ERROR_PIPE) {
+        s->count = 0;
+        return 0;
+    }
+    if (s->count++ == 0) s->since = now;
+    return s->count >= G2_IO_ERR_MIN_COUNT && now - s->since >= G2_IO_ERR_MIN_MS;
 }
 
 /* When listener active: pull from queue, skip LED/vol extended msgs.

@@ -92,6 +92,17 @@ extern volatile unsigned long g2_msg_drops;
  * and appended to the file named by G2_CRC_LOG when that is set. */
 extern volatile unsigned long g2_crc_drops;
 
+/* A run of LIBUSB_ERROR_IO/PIPE reads on the interrupt endpoint with no successful read (or plain
+ * timeout) in between. Only a run of at least G2_IO_ERR_MIN_COUNT errors lasting G2_IO_ERR_MIN_MS
+ * counts as a lost device: reconnecting on a single IO error wedged a G2 mid-traffic (2026-11-02),
+ * while a healthy G2 gave none in a full make test-e2e + test-cli (2026-11-03). A failed read retries
+ * every ~10 ms, so an endpoint that stays broken reaches both limits after about a second. */
+#define G2_IO_ERR_MIN_COUNT 50
+#define G2_IO_ERR_MIN_MS    1000
+typedef struct { int count; long long since; } g2_io_err_streak_t;
+/* Feeds one read result into the run; returns 1 once the run counts as a lost device. */
+int g2_io_err_streak(g2_io_err_streak_t *s, int ret, long long now);
+
 /* Frame trace ring: g2_trace() records a sent ('>') or received ('<') frame,
  * g2_trace_dump() prints the recent ones to stderr (called on disconnect). */
 void g2_trace(char dir, const uint8_t *buf, int len);
