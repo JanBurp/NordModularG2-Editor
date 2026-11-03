@@ -95,3 +95,19 @@ void test_base64_decode_rejects_bad_input(void) {
     TEST_ASSERT_EQUAL_INT(-1, base64_decode("ab!d", &dec));  /* invalid character */
     TEST_ASSERT_EQUAL_INT(-1, base64_decode(NULL, &dec));
 }
+
+/* Numeric args used to come back as NULL, which arg_i turned into a silent 0. */
+void test_daemon_arg_s_accepts_numbers(void) {
+    cJSON *args = cJSON_Parse("[\"A\", 32, 64.0, 0.5, -3, null, true]");
+    TEST_ASSERT_EQUAL_STRING("A", arg_s(args, 0));
+    TEST_ASSERT_EQUAL_STRING("32", arg_s(args, 1));
+    TEST_ASSERT_EQUAL_STRING("32", arg_s(args, 1));   /* converted once, stable */
+    TEST_ASSERT_EQUAL_STRING("64", arg_s(args, 2));
+    TEST_ASSERT_EQUAL_STRING("0.5", arg_s(args, 3));
+    TEST_ASSERT_EQUAL_STRING("-3", arg_s(args, 4));
+    TEST_ASSERT_NULL(arg_s(args, 5));
+    TEST_ASSERT_NULL(arg_s(args, 6));
+    TEST_ASSERT_NULL(arg_s(args, 7));   /* past the end */
+    TEST_ASSERT_NULL(arg_s(NULL, 0));
+    cJSON_Delete(args);
+}

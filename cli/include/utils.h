@@ -13,6 +13,7 @@ uint16_t crc_iterator(int32_t seed, int32_t val);
 uint16_t calc_crc16(uint8_t *buff, int length);
 int g2_crc_ok(const uint8_t *data, int n);
 int parse_name(const uint8_t *data, char *buf, size_t bufsize);
+size_t put_name_field(uint8_t *out, const char *name, size_t len);
 int parse_list_entry(const uint8_t *data, int avail, char *buf, size_t bufsize, int *category);
 slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);

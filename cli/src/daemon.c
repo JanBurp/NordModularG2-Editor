@@ -125,9 +125,22 @@ static void emit_event(const char *type, cJSON *data) {
 
 /* ── argument helpers ──────────────────────────────────────────────────── */
 
-static const char *arg_s(cJSON *args, int idx) {
+/* A positional argument as a string. A JSON number is accepted too: it is replaced in `args` by its
+ * string form ("32", "0.5"), so the result lives as long as the request. Before, a number came
+ * back as NULL and arg_i made it 0 without an error (e.g. set-param … 64 set the value to 0).
+ * Anything else (null, bool, object) is NULL. */
+const char *arg_s(cJSON *args, int idx) {
 	if (!args) return NULL;
 	cJSON *item = cJSON_GetArrayItem(args, idx);
+	if (item && cJSON_IsNumber(item)) {
+		char buf[32];
+		double v = item->valuedouble;
+		if (v == (double)(long long)v) snprintf(buf, sizeof(buf), "%lld", (long long)v);
+		else snprintf(buf, sizeof(buf), "%g", v);
+		cJSON *str = cJSON_CreateString(buf);
+		if (!str || !cJSON_ReplaceItemInArray(args, idx, str)) { cJSON_Delete(str); return NULL; }
+		item = str;
+	}
 	return (item && cJSON_IsString(item)) ? item->valuestring : NULL;
 }
 

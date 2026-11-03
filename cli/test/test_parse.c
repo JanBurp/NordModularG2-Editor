@@ -108,3 +108,21 @@ void test_parse_list_entry_16_chars_and_truncated(void) {
     TEST_ASSERT_EQUAL_INT(12, category);
     TEST_ASSERT_EQUAL_INT(-1, parse_list_entry(data, 16, buf, sizeof(buf), &category)); /* category byte missing */
 }
+
+/* Upload and other name fields: 16 characters go out with no NUL (official PutString, max 16); the
+ * uploads used to cut names to 15 and always add a NUL. parse_name reads the field back. */
+void test_put_name_field_16_char_rule(void) {
+    uint8_t out[20];
+    char back[32];
+    memset(out, 0xAA, sizeof(out));
+    TEST_ASSERT_EQUAL_INT(16, (int)put_name_field(out, "SixteenCharName1", 16));
+    TEST_ASSERT_EQUAL_HEX8(0xAA, out[16]);  /* nothing written after the 16 characters */
+    TEST_ASSERT_EQUAL_INT(16, parse_name(out, back, sizeof(back)));
+    TEST_ASSERT_EQUAL_STRING("SixteenCharName1", back);
+    memset(out, 0xAA, sizeof(out));
+    TEST_ASSERT_EQUAL_INT(6, (int)put_name_field(out, "Short", 5));
+    TEST_ASSERT_EQUAL_HEX8(0x00, out[5]);
+    TEST_ASSERT_EQUAL_INT(6, parse_name(out, back, sizeof(back)));
+    TEST_ASSERT_EQUAL_STRING("Short", back);
+    TEST_ASSERT_EQUAL_INT(16, (int)put_name_field(out, "SeventeenCharName", 17));  /* clamped */
+}

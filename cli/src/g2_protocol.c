@@ -195,8 +195,7 @@ int g2_build_synth_set_msg(cJSON *params, uint8_t *out, size_t *out_len) {
 
     memset(out, 0, 56);
     out[0] = 0x03;
-    memcpy(out + 1, name, nameLen);
-    /* out[1+nameLen] = 0x00 from memset */
+    put_name_field(out + 1, name, (size_t)nameLen);
 
     const char *modeStr = cJSON_GetStringValue(cJSON_GetObjectItem(params, "mode"));
     out[base +  0] = (uint8_t)(((modeStr && strcmp(modeStr, "Performance") == 0) ? 0x80 : 0x00) | (patchSort & 0x7f));

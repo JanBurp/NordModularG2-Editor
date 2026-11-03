@@ -50,7 +50,7 @@ void test_set_module_labels_malformed_groups(void) {
     TEST_ASSERT_EQUAL_INT(G2_ERR_INVALID_PARAM, g2_set_module_labels(0, 1, 1, 3, tok));
 }
 
-/* A non-string JSON arg reaches the builder as NULL (daemon.c arg_s): treated as "", never dereferenced. */
+/* A non-string, non-number JSON arg (null, bool) reaches the builder as NULL (daemon.c arg_s): treated as "", never dereferenced. */
 void test_build_set_module_labels_null_tokens_do_not_crash(void) {
     const char *null_label[] = {"4", "1", NULL};
     const char *null_param[] = {NULL, "1", "Mic"};

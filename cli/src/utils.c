@@ -58,6 +58,15 @@ int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
     return (int)i;
 }
 
+/* Writes a G2 name field: up to 16 characters, NUL-terminated only when shorter (the official
+ * variable PutString, vtable +0x5c with max 16; parse_name reads it). Returns the bytes written. */
+size_t put_name_field(uint8_t *out, const char *name, size_t len) {
+    if (len > 16) len = 16;
+    memcpy(out, name, len);
+    if (len < 16) out[len++] = 0x00;
+    return len;
+}
+
 /* One name entry of a 0x16 list reply: a name (parse_name rules) followed by a category byte, for
  * patches and performances alike (official CMFlashDataDump::ReadStream). A category above 15 is
  * reported as 0. Returns the bytes used, or -1 when the entry doesn't fit in `avail`. */

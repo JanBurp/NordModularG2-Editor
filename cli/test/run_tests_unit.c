@@ -30,6 +30,7 @@ extern void test_parse_name_keeps_non_printable(void);
 extern void test_parse_name_empty(void);
 extern void test_parse_name_only_null(void);
 extern void test_parse_list_entry_perf_category(void);
+extern void test_put_name_field_16_char_rule(void);
 extern void test_parse_list_entry_16_chars_and_truncated(void);
 
 extern void test_parse_synth_name(void);
@@ -230,6 +231,7 @@ extern void test_daemon_make_ok_with_id(void);
 extern void test_daemon_make_ok_without_id(void);
 extern void test_daemon_make_error_with_id(void);
 extern void test_daemon_make_error_without_id(void);
+extern void test_daemon_arg_s_accepts_numbers(void);
 extern void test_parse_location_str(void);
 extern void test_base64_roundtrip(void);
 extern void test_base64_known_value(void);
@@ -259,6 +261,7 @@ int main(void) {
     RUN_TEST(test_parse_name_empty);
     RUN_TEST(test_parse_name_only_null);
     RUN_TEST(test_parse_list_entry_perf_category);
+    RUN_TEST(test_put_name_field_16_char_rule);
     RUN_TEST(test_parse_list_entry_16_chars_and_truncated);
 
     RUN_TEST(test_parse_synth_name);
@@ -469,6 +472,7 @@ int main(void) {
     RUN_TEST(test_daemon_make_ok_without_id);
     RUN_TEST(test_daemon_make_error_with_id);
     RUN_TEST(test_daemon_make_error_without_id);
+    RUN_TEST(test_daemon_arg_s_accepts_numbers);
     RUN_TEST(test_parse_location_str);
     RUN_TEST(test_base64_roundtrip);
     RUN_TEST(test_base64_known_value);
