@@ -18,7 +18,7 @@ import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 import { SLOT_LABELS } from '../constants';
 import { SEQNOTE_MODULE_TYPE, type PianoRollView } from '../renderer/pianoRoll';
-import { convertModulesToCurrent } from './fileVersion';
+import { convertSlotToCurrent, FILE_VERSION_CURRENT, FILE_VERSION_OLDEST } from './fileVersion';
 
 export type {
 	ModuleInstance,
@@ -183,6 +183,10 @@ class G2Parser {
 	private knobsData: ParamPageAssignment[][] = [];
 	// Performance-scoped (not per-slot, unlike knobsData) — see GlobalParamPageAssignment.
 	private globalKnobsData: GlobalParamPageAssignment[] = [];
+	// Per area: the file's param values (module index → [variation] → values) and the modules
+	// skipped for an unknown type. Kept apart from `lv` until an old file version is converted.
+	private values: Map<number, number[][]>[] = [];
+	private unknown: { index: number; type: number }[][] = [];
 	readonly data: ArrayBuffer;
 	ofs = 0;
 
@@ -232,11 +236,39 @@ class G2Parser {
 				}
 			}
 		}
-		// An older file format gets the official conversion steps we have (see fileVersion.ts).
-		// Hardware data is wrapped as version 23, so it never gets here.
-		const version = new Uint8Array(data)[textHdrLen - 2] ?? 0;
-		for (const area of this.areas) convertModulesToCurrent(area.modules, version);
+		// An older file format is converted like the official editor does (see fileVersion.ts).
+		// Hardware data is wrapped as version 23, so it is never converted.
+		this.version = new Uint8Array(data)[textHdrLen - 2] ?? 0;
+		for (let slot = 0; slot < this.areas.length / 2; slot++) {
+			const areas = [slot * 2, slot * 2 + 1].map((i) => ({
+				modules: this.areas[i].modules,
+				cableList: this.areas[i].cableList,
+				values: (this.values[i] ??= new Map()),
+				unknown: this.unknown[i] ?? [],
+			}));
+			const ok = convertSlotToCurrent(
+				{
+					areas,
+					patchParams: this.patchParamsData[slot] ?? [],
+					knobs: (this.knobsData[slot] ??= []),
+					controllers: (this.controllersData[slot] ??= []),
+					globalKnobs: this.globalKnobsData,
+					slot: this.slots.length ? SLOT_LABELS[slot] : undefined,
+				},
+				this.version,
+			);
+			if (!ok) console.error(`File format ${this.version} is older than ${FILE_VERSION_OLDEST} and is read without conversion`);
+		}
+		this.areas.forEach((area, i) => {
+			for (const m of area.modules)
+				this.values[i]?.get(m.index)?.forEach((vals, v) => {
+					for (let p = 0; p < Math.min(vals.length, m.pcnt); p++) m.lv[v * m.pcnt + p] = vals[p];
+				});
+		});
 	}
+
+	// The file format version (the byte after the text header's NUL).
+	version = 0;
 
 	getAllModules(areaIdx: number): ModuleInstance[] {
 		return this.areas[areaIdx].modules;
@@ -413,6 +445,7 @@ class G2Parser {
 			for (let j = 0; j < nmodes; j++) mod.modes.push(this.getBits(6));
 			if (!modDef) {
 				console.error(`Module type ${modtype} not found in module definitions`);
+				(this.unknown[this.aof + areaIdx] ??= []).push({ index: mod.index, type: modtype });
 				continue;
 			}
 			this.areas[this.aof + areaIdx].modules.push(mod);
@@ -485,18 +518,18 @@ class G2Parser {
 		if (areaIdx > 2) return 'Area=' + areaIdx;
 		this.areas[this.aof + areaIdx].paramaterDataOfs = data.byteOffset;
 		this.areas[this.aof + areaIdx].nummod = nummod;
+		const values = (this.values[this.aof + areaIdx] ??= new Map());
 		for (let i = 0; i < nummod; i++) {
 			const index = this.getBits(8);
-			// A module that's absent (unknown type) is still read through, so the next one stays aligned.
-			const m = this.findModule(this.aof + areaIdx, index);
 			const paramcnt = this.getBits(7);
+			const vars: number[][] = [];
 			for (let v = 0; v < numvar; v++) {
-				const variation = this.getBits(8);
-				for (let p = 0; p < paramcnt; p++) {
-					if (m && p < m.pcnt) m.lv[variation * m.pcnt + p] = this.getBits(7);
-					else this.getBits(7);
-				}
+				const vals = (vars[this.getBits(8)] = [] as number[]);
+				for (let p = 0; p < paramcnt; p++) vals.push(this.getBits(7));
 			}
+			// Copied into `lv` after the whole file is read; a module that's absent (unknown type)
+			// is still read through, so the next one stays aligned.
+			values.set(index, vars);
 		}
 		return 'Area=' + areaIdx + ':ModuleCount=' + nummod + ':VariationCount=' + numvar;
 	}
@@ -700,6 +733,12 @@ export class PatchParser {
 			morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
 			morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(slot) ?? undefined,
 		};
+	}
+
+	// The file's format version when it is older than the current one (the parser has converted
+	// it), else null.
+	get oldFileVersion(): number | null {
+		return this.patcher.version < FILE_VERSION_CURRENT ? this.patcher.version : null;
 	}
 
 	parse(): Patch {

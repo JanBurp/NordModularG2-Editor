@@ -8,8 +8,9 @@ import { fileCrcOk, serializePatch, TEXT_PAD_MAX, writePerfSettings } from '../n
 import { extractVariations } from '../../store/slotHelpers';
 import { stripFileHeader } from '../nmg2PatchParser';
 import { getModule } from '../../renderer/nmg2mods';
-import { defaultMutationLock } from '../fileVersion';
-import type { ModuleInstance } from '@/types';
+import { convertSlotToCurrent, type ConvertSlot } from '../fileVersion';
+import { defaultMutaLock } from '../../renderer/mutator';
+import type { Cable, ModuleInstance, PatchParamVariation } from '@/types';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
 const FIXTURES = path.resolve(__dirname, '../../../../test-patches');
@@ -226,12 +227,125 @@ describe('parser robustness', () => {
 		expect(bytes[versionAt]).toBe(22);
 		const converted = new PatchParser(bytes.buffer).parse();
 		const mods = converted.areas.flatMap((a) => a.modules);
-		expect(mods.map((m) => m.mutaLock)).toEqual(mods.map((m) => defaultMutationLock(m.type)));
+		expect(mods.map((m) => m.mutaLock)).toEqual(mods.map((m) => defaultMutaLock(m.type)));
 
 		const asV23 = bytes.slice();
 		asV23[versionAt] = 0x17;
 		const kept = new PatchParser(asV23.buffer).parse().areas.flatMap((a) => a.modules);
 		// The stored flags, read straight from the file: 17 of them differ from the defaults.
 		expect(kept.filter((m, i) => m.mutaLock !== mods[i].mutaLock)).toHaveLength(17);
+	});
+
+	// Golden files: the old fixtures opened in the official editor v1.62 and saved (v23).
+	const clean = (x: unknown) => JSON.parse(JSON.stringify(x, (k, v) => (k === 'paramaterDataOfs' ? undefined : v)));
+	const parseAll = (bytes: Uint8Array<ArrayBuffer>) => {
+		const p = new PatchParser(bytes.buffer);
+		const perf = p.parsePrf2();
+		return clean(perf ? { patches: perf.patches, global: perf.globalParamPages } : new PatchParser(bytes.buffer).parse());
+	};
+	for (const file of fs.readdirSync(path.join(FIXTURES, 'converted'))) {
+		it(`converts the old "${file}" to what the official editor saves`, () => {
+			const old = readFixture(file);
+			expect(old[old.indexOf(0) + 1]).toBeLessThan(23);
+			expect(parseAll(old)).toEqual(parseAll(readFixture(path.join('converted', file))));
+		});
+	}
+});
+
+// Steps the golden files don't exercise, on hand-built slots.
+describe('old file version conversion steps', () => {
+	const mod = (type: number, index: number, modes: number[] = []) => ({ type, index, modes, pcnt: 0, lv: [] }) as unknown as ModuleInstance;
+	const pp = (morphAssignments: PatchParamVariation['morphAssignments'] = []) =>
+		({ morphDials: [0, 1, 2, 3, 4, 5, 6, 7], morphModes: [0, 0, 0, 0, 1, 0, 0, 0], morphAssignments }) as PatchParamVariation;
+	const slot = (modules: ModuleInstance[], values: [number, number[][]][], cableList: Cable[] = [], patchParams = [pp()]): ConvertSlot => ({
+		areas: [
+			{ modules: [], cableList: [], values: new Map(), unknown: [] },
+			{ modules, cableList, values: new Map(values), unknown: [] },
+		],
+		patchParams,
+		knobs: [],
+		controllers: [],
+		globalKnobs: [],
+	});
+
+	it('FreqShift (v20): params 1 and 3 go, a 1 is appended, cables on removed jacks go and the rest renumber', () => {
+		const cables: Cable[] = [
+			{ colour: 0, smod: 1, scon: 0, dir: 1, dmod: 2, dcon: 0 }, // output 0: removed
+			{ colour: 0, smod: 1, scon: 2, dir: 1, dmod: 2, dcon: 1 }, // output 2 → 1
+			{ colour: 0, smod: 2, scon: 0, dir: 1, dmod: 1, dcon: 2 }, // input 2: removed
+			{ colour: 0, smod: 2, scon: 1, dir: 1, dmod: 1, dcon: 3 }, // input 3 → 2
+		];
+		const s = slot([mod(0x62, 1)], [[1, [[10, 11, 12, 13, 14]]]], cables);
+		s.knobs.push(
+			{ slotIndex: 0, location: 1, moduleIndex: 1, paramIndex: 4, isLed: 0 },
+			{ slotIndex: 1, location: 1, moduleIndex: 1, paramIndex: 3, isLed: 0 },
+		);
+		expect(convertSlotToCurrent(s, 20)).toBe(true);
+		expect(s.areas[1].values.get(1)).toEqual([[10, 12, 14, 1]]);
+		expect(s.knobs).toEqual([{ slotIndex: 0, location: 1, moduleIndex: 1, paramIndex: 2, isLed: 0 }]);
+		expect(cables.map((c) => [c.scon, c.dcon])).toEqual([
+			[1, 1],
+			[1, 2],
+		]);
+	});
+
+	it('RndClkB/RandomB (v20): param removals, the Character mode is capped at 1', () => {
+		const rndClk = mod(0xce, 1, [3]);
+		const s = slot(
+			[rndClk, mod(0xca, 2)],
+			[
+				[1, [[0, 1, 2, 3, 4, 5, 6]]],
+				[2, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9]]],
+			],
+		);
+		convertSlotToCurrent(s, 20);
+		expect(s.areas[1].values.get(1)).toEqual([[0, 2, 3, 4, 6]]);
+		expect(s.areas[1].values.get(2)).toEqual([[0, 1, 2, 3, 4, 5, 6, 7, 9]]);
+		expect(rndClk.modes).toEqual([1]);
+	});
+
+	it('KeyQuant (v20): morph-only removals renumber the morphs above them, the values stay', () => {
+		const morphs = [0, 1, 2, 3, 14].map((paramIndex) => ({ groupIndex: 0, location: 1 as const, moduleIndex: 1, paramIndex, range: 10 }));
+		const s = slot([mod(0x98, 1)], [[1, [[0, 1, 2, 3]]]], [], [pp(morphs)]);
+		convertSlotToCurrent(s, 20);
+		// Removing 1, 2, … 13 in turn takes old 1 and 3; old 2 ends at 1, old 14 moves down until the
+		// removals pass it (14 → 13 → 12 → … → 7).
+		expect(s.patchParams[0].morphAssignments.map((m) => m.paramIndex)).toEqual([0, 1, 7]);
+		expect(s.areas[1].values.get(1)).toEqual([[0, 1, 2, 3]]);
+	});
+
+	it('LfoC (v21): Rate rescaled when the waveform mode is 4 or 5; a morph that would vanish keeps ±1', () => {
+		const morphs = [{ groupIndex: 2, location: 1 as const, moduleIndex: 1, paramIndex: 0, range: 5 }];
+		const s = slot(
+			[mod(0x18, 1, [4]), mod(0x18, 2, [0])],
+			[
+				[1, [[120, 0, 0, 1]]], // Range Lo: 120 → 127, morph end 125 → 127 too
+				[2, [[50, 0, 0, 1]]], // waveform 0: untouched
+			],
+			[],
+			[pp(morphs)],
+		);
+		convertSlotToCurrent(s, 21);
+		expect(s.areas[1].values.get(1)![0][0]).toBe(127);
+		expect(s.areas[1].values.get(2)![0][0]).toBe(50);
+		expect(morphs[0].range).toBe(1);
+	});
+
+	it('drops the cables of a removed type-77 module (v21)', () => {
+		const cables: Cable[] = [
+			{ colour: 0, smod: 5, scon: 0, dir: 1, dmod: 2, dcon: 0 },
+			{ colour: 0, smod: 2, scon: 0, dir: 1, dmod: 5, dcon: 1 },
+			{ colour: 0, smod: 2, scon: 0, dir: 1, dmod: 3, dcon: 0 },
+		];
+		const s = slot([], [], cables);
+		s.areas[1].unknown.push({ index: 5, type: 77 });
+		convertSlotToCurrent(s, 21);
+		expect(cables).toEqual([{ colour: 0, smod: 2, scon: 0, dir: 1, dmod: 3, dcon: 0 }]);
+	});
+
+	it('leaves a version older than 19 as it is', () => {
+		const s = slot([mod(0x86, 1)], [[1, [[50]]]]);
+		expect(convertSlotToCurrent(s, 18)).toBe(false);
+		expect(s.areas[1].values.get(1)).toEqual([[50]]);
 	});
 });

@@ -45,11 +45,14 @@ export function usePatchFile() {
 	}
 
 	// Uploads a loaded .pch2 file into the slot, then repairs the file's wrong uprate bits (see loadPatchFile).
+	// A file in an older format goes up as the converted patch: the G2 doesn't convert.
 	async function uploadPatchFile(slot: SlotLabel, filepath: string, uprateRepairCmds: string[][]): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
 		slotsStore.uploadingFromFile = true;
 		try {
-			await window.cli.run(['upload-patch', slot, filepath]);
+			if (slotsStore.slotOldFileVersions[slot] !== null)
+				await window.cli.run(['upload-patch-data', slot, await slotsStore._buildPchBytes(slotsStore.slots[slot], true)]);
+			else await window.cli.run(['upload-patch', slot, filepath]);
 			if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 		} catch (err) {
 			console.error('Upload to G2 failed:', err);
@@ -63,18 +66,20 @@ export function usePatchFile() {
 		return slotsStore.loadSlot(SLOT_LABELS[index]);
 	}
 
-	async function applyPerformanceFile(prf2: Prf2Data, name: string, rawHex: string, filepath: string): Promise<void> {
+	async function applyPerformanceFile(prf2: Prf2Data, name: string, rawHex: string, filepath: string, oldFileVersion: number | null): Promise<void> {
 		const connected = device.status === DeviceStatus.Connected;
 		if (connected) {
 			if (slotsStore.uploadingFromFile) return;
 			slotsStore.uploadingFromFile = true;
 		}
 		dismissToastByKey('uprate-perf'); // about the previous performance
-		const uprateRepairCmds = slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
+		const uprateRepairCmds = slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages, oldFileVersion);
 		await device.setPerformanceMode(name);
 		if (connected) {
 			try {
-				await window.cli.run(['upload-perf', filepath]);
+				// Like a patch file: an older format goes up converted.
+				if (oldFileVersion !== null) await window.cli.run(['upload-perf-data', (await slotsStore._buildPrfBytes(name, rawHex)).data]);
+				else await window.cli.run(['upload-perf', filepath]);
 				// The raw file carries its own (possibly wrong) uprate bits; the G2 never recomputes them.
 				if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 			} catch (err) {
@@ -110,11 +115,12 @@ export function usePatchFile() {
 		if (!file) return;
 		try {
 			const buffer = await file.arrayBuffer();
-			const parsedPatch = new PatchParser(buffer).parse() as any;
+			const parser = new PatchParser(buffer);
+			const parsedPatch = parser.parse() as any;
 			const name = file.name.replace(/\.(pch2|prf2)$/i, '');
 			warnOnBadCrc(new Uint8Array(buffer), name);
 			const rawHex = stripFileHeader(new Uint8Array(buffer));
-			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
+			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, undefined, parser.oldFileVersion);
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
@@ -137,14 +143,14 @@ export function usePatchFile() {
 			const parser = new PatchParser(buffer);
 			const prf2 = parser.parsePrf2();
 			if (prf2) {
-				await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
+				await applyPerformanceFile(prf2, name, rawHex, result.filepath!, parser.oldFileVersion);
 				useSettingsStore().addRecentFile(result.filepath!, 'performance');
 				return;
 			}
 			useSettingsStore().addRecentFile(result.filepath!, 'patch');
 			targetSlot = uiStore.slotInFocus;
 			const parsedPatch = parser.parse() as any;
-			uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
+			uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!, parser.oldFileVersion);
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
@@ -202,16 +208,17 @@ export function usePatchFile() {
 				const name = (item.filepath.split(/[/\\]/).pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				warnOnBadCrc(new Uint8Array(buffer), name);
 				const rawHex = stripFileHeader(result.data as number[]);
+				const parser = new PatchParser(buffer);
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
-					const prf2 = new PatchParser(buffer).parsePrf2();
+					const prf2 = parser.parsePrf2();
 					if (prf2) {
-						await applyPerformanceFile(prf2, name, rawHex, item.filepath);
+						await applyPerformanceFile(prf2, name, rawHex, item.filepath, parser.oldFileVersion);
 						return;
 					}
 				}
 				const targetSlot = uiStore.slotInFocus;
-				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
+				const parsedPatch = parser.parse() as any;
+				const uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath, parser.oldFileVersion);
 				applyVariation(parsedPatch);
 				await uploadPatchFile(targetSlot, item.filepath, uprateRepairCmds);
 			} catch (err) {

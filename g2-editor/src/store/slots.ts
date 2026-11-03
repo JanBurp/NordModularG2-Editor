@@ -466,6 +466,10 @@ export const useSlotsStore = defineStore('slots', {
 			C: '',
 			D: '',
 		} as Record<SlotLabel, string>,
+		// The format version of the file a slot / the performance was loaded from, when it was older
+		// than the current one: the next save writes the current format and says so once.
+		slotOldFileVersions: { A: null, B: null, C: null, D: null } as Record<SlotLabel, number | null>,
+		performanceOldFileVersion: null as number | null,
 		slots: {
 			A: {
 				name: '',
@@ -2080,8 +2084,9 @@ export const useSlotsStore = defineStore('slots', {
 
 		// Returns the uprate-repair commands (see _autoRecolorOnLoad): a raw file upload carries the file's own
 		// stored bits, so the caller sends them after uploading.
-		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string): string[][] {
+		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string, oldFileVersion: number | null = null): string[][] {
 			useDeviceStore().markOriginStale(slot);
+			this.slotOldFileVersions[slot] = oldFileVersion;
 			this.slots[slot].patch = patch;
 			this.slots[slot].variations = extractVariations(patch);
 			this.slots[slot].name = name;
@@ -2105,6 +2110,7 @@ export const useSlotsStore = defineStore('slots', {
 			rawHex: string,
 			filepath?: string,
 			globalParamPages?: GlobalParamPageAssignment[],
+			oldFileVersion: number | null = null,
 		): string[][] {
 			const labels: SlotLabel[] = ['A', 'B', 'C', 'D'];
 			const hist = useHistoryStore();
@@ -2128,6 +2134,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.performanceName = name;
 			this.performanceRawHex = rawHex;
 			this.performanceFilePath = filepath ?? '';
+			this.performanceOldFileVersion = oldFileVersion;
 			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
 			return uprateRepairCmds;
 		},
@@ -2199,8 +2206,28 @@ export const useSlotsStore = defineStore('slots', {
 				if (!result.success || !result.filepath) return;
 				path = result.filepath;
 			}
-			const { serializePerformance, PRF2_TEXT_HEADER } = await import('../parser/nmg2PatchSerializer');
-			const patches = (['A', 'B', 'C', 'D'] as SlotLabel[])
+			if (this._perfPatches().length !== 4) return;
+			const { PRF2_TEXT_HEADER } = await import('../parser/nmg2PatchSerializer');
+			// Official text header, as the original editor writes it (the performance name lives in the
+			// file name, not the header).
+			const { data, rawHex } = await this._buildPrfBytes(PRF2_TEXT_HEADER, this.performanceRawHex);
+			try {
+				await window.electronAPI.savePatch(path, data);
+			} catch (err) {
+				console.error('Failed to save performance:', err);
+				showToast('Failed to save performance.');
+				return;
+			}
+			this.performanceFilePath = path;
+			this.performanceRawHex = rawHex;
+			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
+			this._toastConverted(this.performanceName, this.performanceOldFileVersion);
+			this.performanceOldFileVersion = null;
+		},
+
+		// The four slots' patches with their live MIDI-CC and knob edits synced in (empty slots left out).
+		_perfPatches(): Patch[] {
+			return (['A', 'B', 'C', 'D'] as SlotLabel[])
 				.map((s) => {
 					const e = this.slots[s];
 					if (e.patch) {
@@ -2210,26 +2237,23 @@ export const useSlotsStore = defineStore('slots', {
 					return e.patch!;
 				})
 				.filter(Boolean);
-			if (patches.length !== 4) return;
+		},
+
+		// The performance as .prf2 bytes from the slots' current patches: [header][0x00][0x17][0x01]
+		// [sections]. 0x17 = format version, 0x01 = file type "performance" (0x00 is a patch) — real
+		// .prf2 files carry 0x01 here; our own loader detects a performance by its 0x11 section, but
+		// other editors read this byte. The caller checks that all four slots hold a patch.
+		async _buildPrfBytes(header: string, template: string, perfSettings?: Uint8Array): Promise<{ data: number[]; rawHex: string }> {
+			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
-			const newRawHex = serializePerformance(patches, this.performanceRawHex, variationsArray, this.globalParamPages);
-			const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			// Official text header, as the original editor writes it (the performance name lives in the
-			// file name, not the header). 0x17 = format version, 0x01 = file type "performance" (0x00 is
-			// a patch) — real .prf2 files carry 0x01 here. Our own loader detects a performance by its
-			// 0x11 section, but other editors read this byte.
-			const headerBytes = Array.from(new TextEncoder().encode(PRF2_TEXT_HEADER));
-			const data = [...headerBytes, 0x00, 0x17, 0x01, ...sectionBytes];
-			try {
-				await window.electronAPI.savePatch(path, data);
-			} catch (err) {
-				console.error('Failed to save performance:', err);
-				showToast('Failed to save performance.');
-				return;
-			}
-			this.performanceFilePath = path;
-			this.performanceRawHex = newRawHex;
-			for (const s of ['A', 'B', 'C', 'D'] as SlotLabel[]) this.slots[s].edited = false;
+			const rawHex = serializePerformance(this._perfPatches(), template, variationsArray, this.globalParamPages, perfSettings);
+			const sectionBytes = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
+			return { data: [...new TextEncoder().encode(header), 0x00, 0x17, 0x01, ...sectionBytes], rawHex };
+		},
+
+		// After a save that wrote a file loaded in an older format (the parser converted it on load).
+		_toastConverted(name: string, oldFileVersion: number | null): void {
+			if (oldFileVersion !== null) showToast(`"${name}" was saved in the current file format (it was converted from format ${oldFileVersion}).`);
 		},
 
 		// Shared by saveSlot (via exportSlotToFile)/pushPatchToDevice: builds the .pch2 byte layout
@@ -2269,6 +2293,8 @@ export const useSlotsStore = defineStore('slots', {
 			if (!ok) return;
 			this.slotFilePaths[slot] = path;
 			entry.edited = false;
+			this._toastConverted(entry.name, this.slotOldFileVersions[slot]);
+			this.slotOldFileVersions[slot] = null;
 		},
 
 		// Serializes and writes a slot's current patch to an arbitrary file path, without
@@ -2372,21 +2398,11 @@ export const useSlotsStore = defineStore('slots', {
 			if (device.status !== DeviceStatus.Connected) return false;
 			if (this.uploadingFromFile) return false;
 			const labels = ['A', 'B', 'C', 'D'] as SlotLabel[];
-			const patches = labels
-				.map((s) => {
-					const e = this.slots[s];
-					if (e.patch) {
-						e.patch.controllers = [...e.controllers];
-						e.patch.paramPages = [...e.paramPages];
-					}
-					return e.patch!;
-				})
-				.filter(Boolean);
-			if (patches.length !== 4) {
+			if (this._perfPatches().length !== 4) {
 				toast('Cannot download performance — not all slots contain a patch.');
 				return false;
 			}
-			const { buildPerformanceTemplate, serializePerformance, writePerfSettings } = await import('../parser/nmg2PatchSerializer');
+			const { buildPerformanceTemplate, writePerfSettings } = await import('../parser/nmg2PatchSerializer');
 			const perfSettings = settings?.performance ? writePerfSettings(settings.performance, settings.slots) : undefined;
 			let template = this.performanceRawHex;
 			if (!template) {
@@ -2401,11 +2417,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.uploadingFromFile = true;
 			try {
 				await prepare();
-				const variationsArray = labels.map((s) => this.slots[s].variations ?? []);
-				const newRawHex = serializePerformance(patches, template, variationsArray, this.globalParamPages, perfSettings);
-				const sectionBytes = newRawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-				const nameBytes = Array.from(new TextEncoder().encode(name));
-				const data = [...nameBytes, 0x00, 0x17, 0x01, ...sectionBytes];
+				const { data } = await this._buildPrfBytes(name, template, perfSettings);
 				await window.cli.run(['upload-perf-data', data]);
 				// Same reasoning as downloadToSynthSlot: reload all 4 slots explicitly (with retry —
 				// see _reloadSlotAfterUpload) rather than relying on the watch-event reload chain,

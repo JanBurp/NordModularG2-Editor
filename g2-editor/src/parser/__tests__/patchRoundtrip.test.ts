@@ -803,8 +803,10 @@ describe('morph assignment round-trip', () => {
 		expect(extractSection(newHex, 0x65)).not.toBeNull();
 	});
 
+	// The official v23 save of Analogue NL2: the original is v19, which the parser converts (morph
+	// groups 4/5 swap), so its own 0x65 bytes can't come back unchanged.
 	it('a real fixture with an existing 0x65 section (Analogue NL2.pch2) parses it and round-trips byte-identically', () => {
-		const { name, rawHex, patch } = loadFixture('Analogue NL2.pch2');
+		const { name, rawHex, patch } = loadFixture('converted/Analogue NL2.pch2');
 		expect(extractSection(rawHex, 0x65)).not.toBeNull();
 		expect(patch.patchParams!.some((p) => p.morphAssignments.length > 0)).toBe(true);
 

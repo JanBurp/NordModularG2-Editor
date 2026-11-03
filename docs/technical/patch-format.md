@@ -38,10 +38,20 @@ Both formats use the same section grammar. Each patch ends with a `SEPARATOR` (`
   CRC. It is the same CRC-16/CCITT as the USB protocol (polynomial `0x1021`, seed `0x0000`). So a
   current `.prf2`'s CRC covers `17 01 …`.
 - On load the CRC is checked (`fileCrcOk`); a mismatch only warns, the file still loads.
-- Older format versions exist (19 and 22 in `test-patches/`). The official editor converts them
-  on load, one version at a time. We apply only the last step, 22→23 (every module's mutation
-  lock set to its type's default, `parser/fileVersion.ts`); the earlier steps are not ported yet
-  (see `future-ideas/old-file-version-conversion.md`).
+- Older format versions exist (19 and 22 in `test-patches/`). Like the official editor, the parser
+  converts versions 19–22 on load, one step at a time (`parser/fileVersion.ts`). A version below 19
+  is read without conversion (with a console error).
+  - **19→20:** FltHP frequency rescaled.
+  - **20→21:** Morph groups 5 and 6 swap. Morphs and controllers are removed from parameters that
+    can't have them any more. FreqShift, Mix4-1S, RandomB and RndClkB change their parameters,
+    jacks and modes.
+  - **21→22:** type 77 is dropped with its cables. LfoA, LfoC and Glide rates are rescaled, with
+    their morphs. ClkDiv gets a second mode.
+  - **22→23:** every module's mutation lock is set to its type's default.
+- A converted file is uploaded to the G2 as converted data, not as the file (the G2 doesn't
+  convert). The first save writes version 23 and shows a toast that says so.
+- The result equals what the official editor v1.62 saves for all 9 old fixtures
+  (`test-patches/converted/`, compared after parsing).
 
 ---
 
