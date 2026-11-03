@@ -604,6 +604,7 @@
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
+	import { useMutatorStore } from './store/mutator';
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
@@ -848,6 +849,11 @@
 				case 'h':
 					e.preventDefault();
 					toggleAllCables();
+					return;
+				case 'u':
+				case 'n':
+					e.preventDefault();
+					void useMutatorStore().mutateCurrent(e.key === 'u' ? 'mutate' : 'randomize');
 					return;
 				case ' ':
 					e.preventDefault();
