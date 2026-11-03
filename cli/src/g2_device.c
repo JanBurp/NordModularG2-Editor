@@ -162,10 +162,22 @@ static int is_patch_name_reply(const uint8_t *intr, const uint8_t *bulk, uint16_
     return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[3] == SUB_RESPONSE_PATCH_NAME;
 }
 
-/* Version, patch data (USB format, caller frees *data) and name of `slot`; only tagged replies are
- * accepted (see await_reply). A missing name is not an error: name stays "". */
-static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *size, char *name, size_t name_size) {
+/* Current-note reply (bulk: [0]0x01 [1]0x08|slot [2]version [3]0x69 [4..5]size, then the voice
+ * table): the C_CURRENT_NOTE_2 chunk at bulk+3, byte for byte what a .pch2 stores. */
+static int is_current_note_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int slot) {
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 6 && bulk[1] == (0x08 | slot) &&
+           bulk[3] == SUB_RESPONSE_CURRENT_NOTE && 6u + (((unsigned)bulk[4] << 8) | bulk[5]) <= n;
+}
+
+/* Version, patch data (pch2 sections, caller frees *data) and name of `slot`; only tagged replies
+ * are accepted (see await_reply). A missing name is not an error: name stays "". The sections end
+ * with the G2's current notes (0x69), requested last like the official editor does
+ * (CPatch::CleanDirtyData); the file writers move it to its canonical place. Without a reply
+ * there is no 0x69 and the writers fill in the idle default. */
+static int fetch_patch(int slot, uint8_t *version, uint8_t **data, size_t *size, char *name, size_t name_size) {
     g2_msg_t r;
+    uint8_t *usb;
+    uint16_t usb_size;
     *data = NULL;
     name[0] = '\0';
 
@@ -191,14 +203,13 @@ static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *siz
         return G2_ERR_RECV;
     }
     debug_timing("get_patch_slot_end");
-    *data = r.bulk;
-    *size = r.bulk_size;
+    usb = r.bulk;
+    usb_size = r.bulk_size;
 
     debug_timing("get_patch_name_start");
     if (send_slot(slot, *version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         g2_err("Failed to send get patch name command\n");
-        free(*data);
-        *data = NULL;
+        free(usb);
         return G2_ERR_SEND;
     }
     if (await_reply(is_patch_name_reply, 0, 0, &r) == G2_OK) {
@@ -207,6 +218,29 @@ static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *siz
         g2_msg_free(&r);
     }
     debug_timing("get_patch_name_end");
+
+    debug_timing("get_current_note_start");
+    g2_msg_t note = {0};
+    size_t note_len = 0;
+    if (send_slot(slot, *version, SUB_COMMAND_GET_CURRENT_NOTE, NULL, 0) == 0 &&
+        await_reply(is_current_note_reply, slot, 0, &note) == G2_OK)
+        note_len = 3 + (((size_t)note.bulk[4] << 8) | note.bulk[5]);
+    debug_timing("get_current_note_end");
+
+    *size = usb_size;
+    *data = malloc(*size + note_len);
+    if (!*data || patch_usb_to_pch2(usb, usb_size, *data, size) < 0) {
+        g2_err("Failed to convert patch to PCH2 format\n");
+        free(*data);
+        *data = NULL;
+        free(usb);
+        g2_msg_free(&note);
+        return G2_ERR_PARSE;
+    }
+    if (note_len) memcpy(*data + *size, note.bulk + 3, note_len);
+    *size += note_len;
+    free(usb);
+    g2_msg_free(&note);
     return G2_OK;
 }
 
@@ -449,7 +483,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     uint8_t version;
     uint8_t interruptResp[16] = {0};
     uint8_t *patchData = NULL;
-    uint16_t patchSize = 0;
+    size_t patchSize = 0;
     int ret;
 
     if (ensure_connected(1) < 0) {
@@ -533,23 +567,12 @@ cJSON *g2_get_patch(const char *slot_str) {
         debug_timing("get_patch_text_end");
     }
 
-    /* Convert USB bulk format to pch2 format before returning */
-    uint8_t *pch2Data = malloc(patchSize);
-    size_t pch2Size = patchSize;
-    if (pch2Data && patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) == 0) {
-        free(patchData);
-        patchData = pch2Data;
-        patchSize = (uint16_t)pch2Size;
-    } else {
-        free(pch2Data);
-    }
-
     /* Build JSON output */
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "slot", (char*[]){ "A", "B", "C", "D" }[slot]);
     cJSON_AddStringToObject(root, "name", patchName);
     cJSON_AddStringToObject(root, "text", patchText ? patchText : "");
-    cJSON_AddNumberToObject(root, "size", patchSize);
+    cJSON_AddNumberToObject(root, "size", (double)patchSize);
     free(patchText);
 
     char *hexStr = malloc(patchSize * 2 + 1);
@@ -574,7 +597,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int slot;
     uint8_t version;
     uint8_t *patchData = NULL;
-    uint16_t patchSize = 0;
+    size_t pch2Size = 0;
     if (ensure_connected(1) < 0) {
         g2_err("Failed to connect to G2\n");
         return NULL;
@@ -592,7 +615,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
     char patchName[32];
-    if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
+    if (fetch_patch(slot, &version, &patchData, &pch2Size, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
 
     char defaultFilename[64];
     if (filename == NULL) {
@@ -604,30 +627,15 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         filename = defaultFilename;
     }
 
-    uint8_t *pch2Data = malloc(patchSize);
-    size_t pch2Size = patchSize;
-    if (!pch2Data) {
-        g2_err("Memory allocation failed for PCH2 conversion\n");
-        goto cleanup;
-    }
-
-    if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
-        g2_err("Failed to convert patch to PCH2 format\n");
-        free(pch2Data);
-        goto cleanup;
-    }
-
-    /* patch_usb_to_pch2 yields bare sections in GET_PATCH order; a loadable .pch2 also needs the
+    /* fetch_patch yields bare sections in GET_PATCH order; a loadable .pch2 also needs the
      * official section order, the text header and the trailing CRC (see pch2_file_from_sections). */
     size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + PCH2_CANONICAL_GROWTH + 3 + 2;
     uint8_t *fileData = malloc(fileSize);
-    if (!fileData || pch2_file_from_sections(pch2Data, pch2Size, fileData, &fileSize) < 0) {
+    if (!fileData || pch2_file_from_sections(patchData, pch2Size, fileData, &fileSize) < 0) {
         g2_err("Failed to build PCH2 file\n");
         free(fileData);
-        free(pch2Data);
         goto cleanup;
     }
-    free(pch2Data);
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
@@ -2133,22 +2141,10 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
         g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
         /* Tagged reply (fetch_patch, like get-patch): the first extended message can be e.g. a resources_used
-         * message instead, which failed the conversion below (2026-10-20, intermittent). */
+         * message instead, which failed the pch2 conversion (2026-10-20, intermittent). */
         uint8_t version;
-        uint8_t *patchData;
-        uint16_t patchSize;
         char patchName[32];
-        if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
-
-        pch2Data[slot] = malloc(patchSize);
-        if (!pch2Data[slot]) { free(patchData); g2_err("Memory allocation failed\n"); goto cleanup; }
-        pch2Size[slot] = (size_t)patchSize;
-        if (patch_usb_to_pch2(patchData, (size_t)patchSize, pch2Data[slot], &pch2Size[slot]) < 0) {
-            free(patchData);
-            g2_err("Failed to convert patch for slot %c\n", "ABCD"[slot]);
-            goto cleanup;
-        }
-        free(patchData);
+        if (fetch_patch(slot, &version, &pch2Data[slot], &pch2Size[slot], patchName, sizeof(patchName)) != G2_OK) goto cleanup;
     }
 
     /* Step 3: Determine output filename (not needed for a bytes-only fetch) */

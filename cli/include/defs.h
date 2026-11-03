@@ -41,6 +41,7 @@ typedef enum {
 #define SUB_COMMAND_GET_PATCH_VERSION        (0x35)
 #define SUB_COMMAND_GET_SELECTED_PARAM       (0x2e)
 #define SUB_COMMAND_GET_PATCH_SLOT           (0x3c)
+#define SUB_COMMAND_GET_CURRENT_NOTE         (0x68)  /* Voice/note table (CMCurrentNotesRequest); reply is the 0x69 chunk */
 #define SUB_COMMAND_SELECT_VARIATION         (0x6a)
 #define SUB_COMMAND_GET_PATCH_TEXT           (0x6e)  /* Patch notes ("Text Pad"); read-only — no live SET exists in the real protocol */
 #define SUB_COMMAND_GET_MIDI_CC              (0x81)
@@ -82,6 +83,7 @@ typedef enum {
 #define SUB_RESPONSE_PARAM_LIST              (0x4d)
 #define SUB_RESPONSE_PARAM_CHANGE            (0x40)
 #define SUB_RESPONSE_CABLE_LIST              (0x52)
+#define SUB_RESPONSE_CURRENT_NOTE            (0x69)  /* C_CURRENT_NOTE_2, same bytes as the .pch2 section */
 #define SUB_RESPONSE_PATCH_NOTES              (0x6f)
 #define C_PATCH_DESCR                        (0x21)  /* first section of a patch data reply */
 #define R_LIST_NAMES                         (0x13)  /* reply tag of the 0x14 list request */

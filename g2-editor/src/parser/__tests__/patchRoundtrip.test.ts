@@ -1847,6 +1847,31 @@ describe('buildPerformanceTemplate — performance from hardware (get-patch orde
 	});
 });
 
+describe('current notes (0x69) read from the G2', () => {
+	// get-patch appends the 0x68 reply after the GET_PATCH train: a 46-byte voice table.
+	const liveNote = toHex(Uint8Array.from([0x69, 0x00, 46, ...Array.from({ length: 46 }, (_, i) => i + 1)]));
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+
+	it('serializePatch keeps the live chunk, in its official place, instead of the idle default', () => {
+		const { name, rawHex, patch } = loadFixture('Clavia demo.pch2');
+		const template = usbOrderTemplate(rawHex) + liveNote + '0000';
+		const out = serializePatch(name, patch, template, extractVariations(patch));
+		expect(sectionOrder(out)).toEqual(official);
+		expect(extractSection(out, 0x69)).toBe(liveNote);
+	});
+
+	it('buildPerformanceTemplate keeps each slot’s live chunk', () => {
+		const fixtures = ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2'].map(loadFixture);
+		const template = buildPerformanceTemplate(
+			fixtures.map((f) => usbOrderTemplate(f.rawHex) + liveNote),
+			writePerfSettings({ name: 'Notes', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false }, []),
+		);
+		const blocks = sectionBlocks(template);
+		for (let s = 0; s < 4; s++) expect(s === 0 ? blocks[0].slice(1) : blocks[s]).toEqual(CANONICAL_SLOT);
+		expect(template.split(liveNote).length - 1).toBe(4); // all four, byte for byte; no idle default
+	});
+});
+
 describe('setFileDescription — another category for a patch file', () => {
 	it('changes only the category (and the CRC); the file still parses with every other field intact', () => {
 		const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'Clavia demo.pch2')));

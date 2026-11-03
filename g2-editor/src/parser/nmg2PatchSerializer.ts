@@ -841,7 +841,8 @@ export function writePerfSettings(perf: PerformanceData, slots: SlotInfo[]): Uin
 // Canonical per-slot chunk order of a .prf2 (port of kSlotChunkOrder, cli/src/utils.c). The G2
 // rejects a performance upload whose slots deviate from it.
 const SLOT_CHUNK_ORDER = [0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a];
-// Idle C_CURRENT_NOTE_2 chunk GET_PATCH never returns but a performance upload requires (kCurrentNoteDefault, utils.c).
+// Idle C_CURRENT_NOTE_2 chunk for a slot without one (kCurrentNoteDefault, utils.c); a performance upload requires it.
+// A slot read from the G2 carries the real one (get-patch appends the 0x68 reply).
 const CURRENT_NOTE_DEFAULT = Uint8Array.of(0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00);
 
 // Port of patch_slot_sections_canonical (utils.c): one slot's sections in SLOT_CHUNK_ORDER, a

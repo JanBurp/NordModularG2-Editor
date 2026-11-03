@@ -427,7 +427,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con` — 5 bytes, colour is inside `flags` (§8) | Embedded ACK |
 | `0x55` | CTRL_SNAPSHOT (`send-controller-snapshot`) | — | Embedded ACK |
-| `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Extended bulk `0x69` voice table, see Current note below |
+| `0x68` | GET_CURRENT_NOTE | — | Extended bulk `0x69` voice table; sent as the last step of every patch read (`fetch_patch`), see Current note below |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-8, 9 = Patch Mutator audition, see below) | Embedded ACK |
 | `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text); sent as step 4 of `g2_get_patch()`, result reported as `text` alongside `name` |
 | `0x6F` | *(no live SET exists — see note below)* | — | — |
@@ -520,14 +520,18 @@ Hardware-verified 2026-10-12. Implemented on the `feat/mutator` branch.
 
 ### Current note (`0x68` / `0x69`)
 
-Hardware-verified 2026-10-15. Not implemented in the CLI yet.
+Hardware-verified 2026-10-15 and 2026-11-03.
 
-`0x69` (`CMCurrentNotesDump`) is **only** sent as the reply to a `0x68` request. The G2 never pushes it when keys are played (160 replies, 0 unsolicited). Payload: a 16-bit byte count (46), then bits MSB-first:
+`0x69` (`CMCurrentNotesDump`) is **only** sent as the reply to a `0x68` request. The G2 never pushes it when keys are played (160 replies, 0 unsolicited). Bulk: `[1]` = `0x08|slot`, `[3]` = `0x69`, then a 16-bit byte count and the bits MSB-first. Bytes `[3..]` are exactly the `.pch2` `0x69` section:
 
 ```
 note:7 attack:7 release:7 count:5          most recent key event
-(count+1 = 16) × { note:7 attack:7 release:7 }   one entry per voice
+(count+1) × { note:7 attack:7 release:7 }   one entry per voice (16 voices → 46 bytes)
 ```
+
+The size follows the number of voice entries: 9 bytes for 2 entries, 88 for 32 (both seen on hardware).
+
+**Read with every patch.** Like the official editor (`CPatch::CleanDirtyData`, once per patch read from the G2, never on file loads), `fetch_patch` sends `0x68` after the name request and appends the reply to the section train. get-patch, get-patch-file and get-perf-file therefore carry the real chunk, and the file writers move it to its canonical place after the `0x4a` pair. Without a reply, the idle default (`kCurrentNoteDefault`) is filled in. The G2 applies an uploaded `0x69`: a file with the stored note changed from 63 to 48 read back as 48. So the notes a patch is saved with are restored on upload, which is what lets an arp or sequencer start without a held key.
 
 Voices are assigned round-robin. A key press overwrites `note` + `attack` (note-on velocity), and a key release overwrites `release` (note-off velocity). There is no held/gate flag, so "held" can only be inferred by diffing polls (~300 ms works). A release with an unchanged value is invisible.
 

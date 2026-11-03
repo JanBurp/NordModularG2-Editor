@@ -118,8 +118,8 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 /* Wrap section data in a .pch2 file: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE].
  * The sections go in the official order (patch_slot_sections_canonical, which fills in a missing
  * 0x69) closed by a 0x6f text pad, empty when the input has none: the official reader rejects any
- * other order (CPatchFile_13::WriteMolecules), and GET_PATCH data has 0x5a before 0x5b, no 0x69
- * and no 0x6f. CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write
+ * other order (CPatchFile_13::WriteMolecules), and fetch_patch data has 0x5a before 0x5b, its
+ * 0x69 (if any) at the end and no 0x6f. CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write
  * checksums and every real .pch2 carries); without it a reader (including our own upload-patch)
  * takes the last 2 section bytes for the CRC and truncates the patch. */
 /* The byte after the text header's NUL is the format version. The official editor converts an
@@ -176,7 +176,7 @@ int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
  * fixtures carry it. The G2 rejects a performance upload whose slots deviate from it —
  * confirmed on hardware, where an out-of-order slot comes back as an error event with every
  * patch renamed "Error". GET_PATCH answers in a *different* order (0x5a before 0x5b) and omits
- * 0x69 entirely, so a slot captured from the wire has to be rewritten into this order before it
+ * 0x69 (fetch_patch appends the separate 0x68 reply), so a slot captured from the wire has to be rewritten into this order before it
  * can go into a file that is meant to be uploadable again. */
 static const uint8_t kSlotChunkOrder[] = {
     0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
@@ -185,9 +185,10 @@ static const uint8_t kSlotChunkOrder[] = {
 
 /* A neutral C_CURRENT_NOTE_2 (0x69) chunk: the "nothing playing" value Clavia's own files use
  * for an idle patch — byte-for-byte what both EmptyPerf.prf2 slots and three of the four
- * MorphingDrumDemo.prf2 slots contain. GET_PATCH never returns this chunk, but the G2 requires
- * it on upload (a slot train without it is rejected exactly like an out-of-order one, verified
- * on hardware), and its contents are live voice state that is not worth round-tripping anyway. */
+ * MorphingDrumDemo.prf2 slots contain. The real chunk comes from a separate 0x68 request
+ * (fetch_patch); this only fills in when that reply is missing, because the G2 requires the chunk
+ * on upload (a slot train without it is rejected exactly like an out-of-order one, verified on
+ * hardware). */
 static const uint8_t kCurrentNoteDefault[] = {
     0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00
 };

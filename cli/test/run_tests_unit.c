@@ -73,6 +73,7 @@ extern void test_patch_usb_to_pch2_exact_size(void);
 extern void test_slot_sections_canonical_reorders_hardware_train(void);
 extern void test_slot_sections_canonical_preserves_repeated_id_order(void);
 extern void test_slot_sections_canonical_keeps_existing_current_note(void);
+extern void test_slot_sections_canonical_moves_appended_current_note(void);
 extern void test_slot_sections_canonical_copies_malformed_train_verbatim(void);
 
 extern void test_parse_name_from_embedded_response_slot_b(void);
@@ -309,6 +310,7 @@ int main(void) {
     RUN_TEST(test_slot_sections_canonical_reorders_hardware_train);
     RUN_TEST(test_slot_sections_canonical_preserves_repeated_id_order);
     RUN_TEST(test_slot_sections_canonical_keeps_existing_current_note);
+    RUN_TEST(test_slot_sections_canonical_moves_appended_current_note);
     RUN_TEST(test_slot_sections_canonical_copies_malformed_train_verbatim);
 
     /* get-patch name parsing tests */

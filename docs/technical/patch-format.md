@@ -86,7 +86,7 @@ The parser walks sections sequentially until the end of the section data (exclud
 | `0x60` | `CONTROLLERS` | MIDI CC assignments | per patch |
 | `0x62` | `KNOBS` | Parameter Pages knob assignments | per patch |
 | `0x65` | `MORPH_PARAMS` | Morph Group assignments per parameter | per patch |
-| `0x69` | — | Current note (`C_CURRENT_NOTE_2`), idle default | per patch |
+| `0x69` | — | Current note (`C_CURRENT_NOTE_2`): the G2's voice table read with the patch (usb-protocol §7), idle default when absent | per patch |
 | `0x6F` | `SEPARATOR` | Text pad (patch notes), closes the patch | per patch |
 
 ---

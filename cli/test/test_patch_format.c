@@ -256,8 +256,9 @@ void test_patch_usb_to_pch2_exact_size(void) {
     TEST_ASSERT_EQUAL_UINT8(0xa5, pch2_data[18]);
 }
 /* ---- patch_slot_sections_canonical ---------------------------------------
- * GET_PATCH answers with 0x5a before 0x5b and no 0x69 at all, but a .prf2/.pch2
- * must carry the canonical order or the G2 rejects the performance on upload. */
+ * GET_PATCH answers with 0x5a before 0x5b and no 0x69 (fetch_patch appends the 0x68
+ * reply at the end), but a .prf2/.pch2 must carry the canonical order or the G2
+ * rejects the performance on upload. */
 
 /* Builds a [id][hi][lo][payload...] section into buf, returns bytes written. */
 static size_t put_section(uint8_t *buf, uint8_t id, uint8_t fill, size_t payload_len) {
@@ -339,6 +340,31 @@ void test_slot_sections_canonical_keeps_existing_current_note(void) {
     TEST_ASSERT_EQUAL_INT(n, out_len);            /* nothing inserted */
     TEST_ASSERT_EQUAL_UINT8(0x69, out[5]);
     TEST_ASSERT_EQUAL_UINT8(0x77, out[8]);        /* the original payload survived */
+}
+
+void test_slot_sections_canonical_moves_appended_current_note(void) {
+    /* fetch_patch's shape: the GET_PATCH train with the live 0x69 (46-byte voice table)
+     * appended last. It must land after the 0x4a pair, bytes intact, with no default added. */
+    uint8_t in[256];
+    size_t n = 0;
+    const uint8_t hw[] = {0x21, 0x4a, 0x4a, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                          0x65, 0x62, 0x60, 0x5a, 0x5a, 0x5b, 0x5b, 0x5b};
+    for (size_t i = 0; i < sizeof(hw); i++) n += put_section(in + n, hw[i], (uint8_t)i, 2);
+    size_t note_ofs = n;
+    n += put_section(in + n, 0x69, 0x77, 46);
+
+    uint8_t out[256 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+    patch_slot_sections_canonical(in, n, out, &out_len);
+
+    TEST_ASSERT_EQUAL_INT(n, out_len);            /* nothing inserted */
+    uint8_t ids[64];
+    int count = section_ids(out, out_len, ids, 64);
+    const uint8_t want[] = {0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                            0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a};
+    TEST_ASSERT_EQUAL_INT((int)sizeof(want), count);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(want, ids, (int)sizeof(want));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(in + note_ofs, out + 3 * 5, 3 + 46);  /* after 0x21 + 2x 0x4a */
 }
 
 void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
