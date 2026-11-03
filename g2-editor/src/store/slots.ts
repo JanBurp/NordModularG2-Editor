@@ -2103,6 +2103,13 @@ export const useSlotsStore = defineStore('slots', {
 			return uprateRepairCmds;
 		},
 
+		// The slot now holds a patch from the G2, not the file it was loaded from: a Save asks for a
+		// new file instead of overwriting that one.
+		forgetSlotFile(slot: SlotLabel): void {
+			this.slotFilePaths[slot] = '';
+			this.slotOldFileVersions[slot] = null;
+		},
+
 		loadPerformanceFile(
 			patches: Patch[],
 			slotNames: string[],

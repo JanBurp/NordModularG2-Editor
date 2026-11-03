@@ -1929,6 +1929,14 @@ static int send_patch_upload(int slot, const char *name, int name_len, const uin
     return G2_OK;
 }
 
+/* The CLI sends a file as it is. An older format (the editor converts it on load) reaches the G2
+ * unconverted, so say so. */
+static void warn_old_file_version(const char *cmd, const char *filepath, const uint8_t *data, long fsize) {
+    int v = pch2_old_file_version(data, fsize);
+    if (v) fprintf(stderr, "%s: warning: %s is file format %d (current %d) and is sent unconverted; "
+                           "open and save it in the editor first\n", cmd, filepath, v, G2_FILE_VERSION);
+}
+
 /* Reads an open file in full. Returns a malloc'd buffer (caller frees) and its size, or
  * NULL if the file is empty, unreadable or out of memory. */
 static uint8_t *read_whole_file(FILE *f, long *fsize) {
@@ -1962,6 +1970,7 @@ int g2_upload_patch(int slot, const char *filepath) {
         free(file_data);
         return G2_ERR_PARSE;
     }
+    warn_old_file_version("upload-patch", filepath, file_data, fsize);
 
     int ret = send_patch_upload(slot, name, ni, file_data + data_offset, data_len);
     free(file_data);
@@ -2066,6 +2075,7 @@ int g2_upload_perf(const char *filepath) {
         free(file_data);
         return G2_ERR_PARSE;
     }
+    warn_old_file_version("upload-perf", filepath, file_data, fsize);
 
     int ret = send_perf_upload(name, ni, file_data + data_offset, data_len);
     free(file_data);
@@ -3471,6 +3481,7 @@ static int flash_write_file(int type, int bank, int location0, const char *filep
         snprintf(reason, reasonLen, "wrong file type for this bank");
         return FLASH_WRITE_SKIP_CLEAR;
     }
+    warn_old_file_version("flash write", filepath, fileData, fsize);
 
     int status = -1;
     int ret = send_flash_dump_raw(type, bank - 1, location0, name,

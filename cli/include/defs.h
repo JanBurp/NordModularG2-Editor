@@ -149,6 +149,7 @@ typedef enum {
  * (0x00 patch, 0x01 performance), then the sections follow it. */
 #define G2_TEXT_HEADER(type) "Version=Nord Modular G2 File Format 1\r\nType=" type "\r\nVersion=23\r\nInfo=BUILD 320\r\n"
 #define PCH2_TEXT_HEADER G2_TEXT_HEADER("Patch")
+#define G2_FILE_VERSION 23  /* the format version byte after the header's NUL in current files */
 #define PRF2_TEXT_HEADER G2_TEXT_HEADER("Performance")
 
 #endif /* __G2_DEFS_H__ */

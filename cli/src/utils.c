@@ -122,6 +122,15 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
  * and no 0x6f. CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write
  * checksums and every real .pch2 carries); without it a reader (including our own upload-patch)
  * takes the last 2 section bytes for the CRC and truncates the patch. */
+/* The byte after the text header's NUL is the format version. The official editor converts an
+ * older file on load (CFileConverter); the CLI sends files as they are. */
+int pch2_old_file_version(const uint8_t *data, long len) {
+    long ne = 0;
+    while (ne < len && data[ne]) ne++;
+    if (ne + 1 >= len) return 0;
+    return data[ne + 1] < G2_FILE_VERSION ? data[ne + 1] : 0;
+}
+
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len) {
     if (!sections || !out || !out_len) return -1;

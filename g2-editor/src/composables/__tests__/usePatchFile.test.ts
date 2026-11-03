@@ -128,3 +128,40 @@ describe('old file formats', () => {
 		expect((await toastTexts()).filter((m) => m.includes('converted from format 19'))).toHaveLength(1);
 	});
 });
+
+// A synth select replaces what came from a file: Save must not overwrite that file or toast about it.
+describe('synth select forgets the file a slot came from', () => {
+	it('clears the file path and the old-format marker on a synth patch select', async () => {
+		const { useDeviceStore, DeviceStatus } = await import('@/store/device');
+		const { stripFileHeader } = await import('@/parser/nmg2PatchParser');
+		useDeviceStore().status = DeviceStatus.Connected;
+		(window as any).electronAPI.patches.load.mockResolvedValue({ success: true, data: loadFixtureBytes('Analogue NL2.pch2') });
+		await usePatchFile().handlePatchSelect({ type: 'disk', filepath: '/p/Analogue NL2.pch2' });
+		const store = useSlotsStore();
+		expect(store.slotFilePaths.A).toBe('/p/Analogue NL2.pch2');
+		expect(store.slotOldFileVersions.A).toBe(19);
+
+		const patchJson = JSON.stringify({ slot: 'A', name: 'Pad', data: stripFileHeader(loadFixtureBytes('EmptyPatch.pch2')) });
+		(window as any).cli.run = vi.fn(async (cmd: string[]) => (cmd[0] === 'get-patch' ? patchJson : undefined));
+		await usePatchFile().handlePatchSelect({ type: 'synth', bank: 1, location: 1 });
+
+		expect(store.slotFilePaths.A).toBe('');
+		expect(store.slotOldFileVersions.A).toBeNull();
+	});
+
+	it('clears the performance and slot files on a synth performance select', async () => {
+		const { useDeviceStore, DeviceStatus } = await import('@/store/device');
+		useDeviceStore().status = DeviceStatus.Connected;
+		const store = useSlotsStore();
+		store.$patch({ performanceFilePath: '/p/x.prf2', performanceOldFileVersion: 19 });
+		store.slotFilePaths.B = '/p/b.pch2';
+		store.slotOldFileVersions.B = 22;
+
+		await usePatchFile().handlePerformanceSynthSelect(1, 1);
+
+		expect(store.performanceFilePath).toBe('');
+		expect(store.performanceOldFileVersion).toBeNull();
+		expect(store.slotFilePaths.B).toBe('');
+		expect(store.slotOldFileVersions.B).toBeNull();
+	});
+});

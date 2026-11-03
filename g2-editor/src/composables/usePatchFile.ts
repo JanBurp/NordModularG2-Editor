@@ -182,7 +182,8 @@ export function usePatchFile() {
 		try {
 			await window.cli.run(['select-perf', String(bank), String(location)]);
 			device.setStoredLocation('perf', bank, location);
-			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null });
+			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null, performanceOldFileVersion: null });
+			for (const s of SLOT_LABELS) slotsStore.forgetSlotFile(s);
 			// In Patch mode the G2 loads the performance's patches but reports no perfBank/perfLoc to match
 			// (perfBank=129), so the pending select would only end in the timeout toast. select-perf answers
 			// after the whole load cascade, so it's done here.
@@ -235,6 +236,7 @@ export function usePatchFile() {
 				const targetSlot = uiStore.slotInFocus;
 				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(targetSlot);
+				slotsStore.forgetSlotFile(targetSlot);
 				device.clearOriginStale(targetSlot);
 				device.setStoredLocation(targetSlot, item.bank, item.location);
 			} catch (err) {

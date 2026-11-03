@@ -53,6 +53,10 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len);
 
+/* The format version of a .pch2/.prf2 buffer when it is older than G2_FILE_VERSION, else 0
+ * (also for a buffer too short to hold one). */
+int pch2_old_file_version(const uint8_t *data, long len);
+
 
 /*
  * Split a whitespace-delimited command string into tokens in-place.

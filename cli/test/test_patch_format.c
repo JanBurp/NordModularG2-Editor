@@ -7,6 +7,16 @@
 #include "../include/utils.h"
 #include <string.h>
 
+/* Old .pch2/.prf2 files (v19, v22 in test-patches/) are sent unconverted, with a warning. */
+void test_pch2_old_file_version(void) {
+    const uint8_t v19[] = {'X', 0x00, 19, 0x00, 0x21};
+    const uint8_t v23[] = {'X', 0x00, 0x17, 0x01, 0x21};
+    const uint8_t noVersion[] = {'X', 'Y', 0x00};
+    TEST_ASSERT_EQUAL_INT(19, pch2_old_file_version(v19, sizeof(v19)));
+    TEST_ASSERT_EQUAL_INT(0, pch2_old_file_version(v23, sizeof(v23)));
+    TEST_ASSERT_EQUAL_INT(0, pch2_old_file_version(noVersion, sizeof(noVersion)));
+}
+
 void test_patch_usb_to_pch2_strips_header(void) {
     /* USB frame layout: [3-byte header][payload chunk 1: 0x03..0x15)[2-byte gap][payload chunk 2: 0x17..end-2)[2-byte CRC]
      * patch_usb_to_pch2 extracts: bytes[0x03:0x15) + bytes[0x17:end-2)
