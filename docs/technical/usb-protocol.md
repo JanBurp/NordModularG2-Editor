@@ -43,12 +43,13 @@ Every outgoing packet has the same envelope:
 ```
 Offset  Bytes  Description
 ──────  ─────  ────────────────────────────────────────────────────
-0       2      Length (big-endian uint16).  Covers bytes [2..end].
-                Does NOT include these 2 length bytes themselves.
+0       2      Length (big-endian uint16) of the whole frame, these 2
+                bytes and the CRC included.
 2       1      Message header — always 0x01
                 (Exception: CMD_INIT uses 0x80, no 0x01 header)
-3       1      Scope byte  (see §4)
-4       1      Command ID  (0x41 for most system commands)
+3       1      Scope byte (see §4)
+4       1      Session byte (see §4): 0x41 for most system commands,
+                the slot's patch version for slot commands
 5+      N      Sub-command + payload
 N-2     2      CRC-16/CCITT (big-endian), computed over bytes [2..N-3]
 ```
@@ -65,12 +66,13 @@ full packet: 00 08  01 2C 41 02  CRC_HI CRC_LO
 **Length formula (from code):**
 ```
 msgLength = (number of payload bytes including 0x01 header)
-msgLength += 4   ← always added after CRC is appended (accounts for length field + 2 CRC bytes + padding)
+msgLength += 4   ← the 2 length bytes + the 2 CRC bytes
 buff[0] = (msgLength >> 8) & 0xff
 buff[1] = msgLength & 0xff
 ```
 
-So length = (header + scope + cmd_id + subcmd + extra) + 4.
+So length = (header + scope + session + subcmd + extra) + 4 = the full frame size (official
+`CSynthPortUSB::BuildOutputMessage` writes the same).
 
 ---
 
@@ -106,17 +108,25 @@ CRC bytes are appended big-endian: `[crc >> 8, crc & 0xff]`.
 
 ## 4. Scope Byte
 
-The scope byte at offset 3 encodes request type (high nibble) and target (low nibble):
+Byte 3 and byte 4 as the official `CSynthPortUSB::BuildOutputMessage` builds them:
 
 ```
-Bit 5-4  Request type
-  0x20   COMMAND_REQ          — G2 sends a response
-  0x30   COMMAND_WRITE_NO_RESP — no response (used for SET_PARAM)
+Byte 3 (scope)
+  bits 2-0  target: slot 0-3 (A-D), 4 = system
+  0x08      BubbleEnd    (last message of a bubble)
+  0x10      Realtime     (no reply expected; used for SET_PARAM, SET_MORPH_RANGE, SEL_PARAM)
+  0x20      BubbleBegin  (first message of a bubble)
 
-Bit 3-0  Target
-  0x0C   COMMAND_SYS          — system / global
-  0x08   COMMAND_SLOT         — slot specific (OR with slot 0-3 for A-D)
+Byte 4 (session)
+  a session number (bits 5-0), or for a void session 0x40 | molecule count
 ```
+
+Every message we send is a single-message bubble, so BubbleBegin and BubbleEnd are always both
+set: `0x2C` = `0x20|0x08|4` (system), `0x28`-`0x2B` = `0x20|0x08|slot`, `0x38`-`0x3B` add
+`0x10` (Realtime). Byte 4 `0x41` is a void session with one molecule; slot commands put the slot's
+patch version there, performance commands the performance version (§6b). The defs.h names
+(`COMMAND_REQ` 0x20, `COMMAND_WRITE_NO_RESP` 0x30, `COMMAND_SLOT` 0x08, `COMMAND_SYS` 0x0C) are
+combinations of these bits; the wire bytes are the same.
 
 Combined scope values:
 
@@ -183,19 +193,24 @@ Packet:  00 09  01 2C 41 7D 00  CRC_HI CRC_LO
 
 Response: Embedded ACK.
 
-### Minimal cold-connect (daemon flow)
+### Daemon connect sequence
 
-The full 4-step sequence above mirrors the Delphi editor. The `g2-cli` daemon uses a simpler cold-connect that **skips CMD_INIT entirely**:
+The daemon (and a reconnect) runs the full sequence, as captured with `g2-cli --debug daemon`
+(2026-11-02):
 
 ```
-1. drain pending interrupts (consume any stale stream from a prior session)
-2. send START_NOTIFICATIONS (0x7D 0x00)
-3. read the embedded ACK
+1. CMD_INIT (0x80)                      → extended reply, bulk[0] = 0x80
+2. STOP_NOTIFICATIONS (0x7D 0x01)       → embedded ack 62 | 01 0c 00 7f | crc
+3. GET_SYNTH_SETTINGS, perf settings, the four slots, global knobs, bank name lists
+4. START_NOTIFICATIONS (0x7D 0x00)      → the same embedded ack, then the stream starts
 ```
 
-This works because GET_PATCH_VERSION inside each query syncs the version counter on demand, so the patch-version reset that CMD_INIT performs is not needed. For paths where G2 may still be streaming (e.g. editor-initiated `set-perf-mode`), the daemon calls `g2_stop_comm()` explicitly before issuing queries (see §14).
+The G2 answers STOP and START with the same system ack (the official editor sends
+`CMSynthUnlockEditorSync` through `SendUserBubble`, which waits for a reply). CMD_INIT does not stop
+a G2 that is still streaming; the reads after it skip stream messages until the init reply.
 
-**Critical:** this flow only works if `libusb_clear_halt` is **not** called between attach and START_COMM (see §1 gotcha). The reconnect-after-cable-pull path uses the same minimal sequence.
+**Critical:** this flow only works if `libusb_clear_halt` is **not** called between attach and
+START_COMM (see §1 gotcha).
 
 ---
 
@@ -217,18 +232,16 @@ However, some commands that need to be version-matched use the **performance ver
 | `0x03` | SET_SYNTH_SETTINGS | synth settings payload (§10a) | Embedded ACK |
 | `0x04` | GET_ASSIGNED_VOICES *(not implemented yet)* | — | Embedded; 4 voice counts at `[5..8]` |
 | `0x0A ss bb ll` | RETRIEVE (bank→slot) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
-| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3), bank (0-based), location (0-based) | Embedded ACK |
+| `0x0B ss bb ll` | STORE (slot→bank) | slot (0-3 = patch in slot A-D, 4 = the performance), bank (0-based), location (0-based) | Embedded ACK |
 | `0x0C tt bb ll 00` | CLEAR | file_type (0=patch,1=perf), bank, location, `0x00` | Embedded ACK |
 | `0x0E tt bb ff tt 00` | CLEAR_BANK | file_type, bank, from_loc, bank, to_loc, `0x00` | Embedded ACK |
 | `0x14 mm bb ll` | LIST_PATCHES | mode (0=patches,1=perfs), bank, patch start | Embedded or bulk (§11) |
 | `0x17 tt bb ll` | PATCH_BANK_UPLOAD | file_type (0=patch,1=perf), bank (0-based), location (0-based) | Embedded `0x18` marker (empty/corrupt/protected/full) or extended bulk `0x19` (patch present) |
-| `0x19` | PATCH_BANK_DATA (download) *(not implemented yet — this is only implemented as a response to `0x17` above)* | file_type, bank, location, name\[16\], size (big-endian u16), version, patch_data | Embedded `0x18` marker ack |
+| `0x19` | PATCH_BANK_DATA (download, `send-bank`) | file_type, bank, location, name (up to 16 chars, NUL only when shorter), size (big-endian u16), version, patch_data | Embedded `0x18` marker ack |
 | `0x28 ss` | GET_PATCH_NAME (sys) | `ss`=slot (0-3) | Embedded; name at `response[5+]` |
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot (0-3) | Embedded; version at `response[6]` |
 | `0x3B` | GET_MASTER_CLOCK *(not implemented yet)* | — | Embedded (`R_EXT_MASTER_CLOCK`) |
-| `0x3D` | MIDI_DUMP *(not implemented yet)* | — | None |
 | `0x3E mm ss` | SET_PERF_MODE | `mm`=mode (0=patch, 1=performance), `ss`=SHIFT state (0=plain PERF, 1=SHIFT+PERF: patch→perf creates a new performance from the slot patches, perf→patch keeps its patches in the slots; hardware-verified) | Bulk `0x0C/0x1F` version_update (see §13) |
-| `0x56 oo nn` | PLAY_NOTE *(not implemented yet)* | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x7D 0x00` | START_NOTIFICATIONS | — | Embedded ACK |
 | `0x7D 0x01` | STOP_NOTIFICATIONS | — | Embedded ACK |
 | `0x81` | UNKNOWN_1 (init query) | — | Extended bulk |
@@ -299,6 +312,7 @@ These use the same scope (`0x2C`) but put the **performance version** at the cmd
 | `0x3F FF 01 bpm` | SET_MASTER_CLOCK_BPM | `FF` unknown, `01`=BPM mode, `bpm`=value | None |
 | `0x3F FF 00 run` | SET_MASTER_CLOCK_RUN | `FF` unknown, `00`=run mode, `run`=0/1 | None |
 | `0x3F FF 02 global` | SET_KNOB_SOURCE (`g2_set_knob_source`) | `FF` unknown, `02`=knob-source mode, `global`=1(Global)/0(Patch) | None (confirmed 2026-08-28 via 4 consecutive real SHIFT+GLOBAL front-panel presses, echoing `ff0201`/`ff0200` in lockstep on the same channel as the two rows above — this is the actual Patch/Global Parameter Pages source toggle, not the page-select opcodes `0x2D`/`0x1E`, which only choose a page *within* whichever source this sets) |
+| `0x56 oo nn` | PLAY_NOTE (`play-note`) | `oo`=on/off (0=on,1=off), `nn`=MIDI note | None |
 | `0x59` | UNKNOWN_2 (perf init query) *(not implemented yet)* | — | Embedded ACK |
 | `0x5E` | GET_GLOBAL_KNOBS (`g2_get_global_knobs`) | — | Extended bulk; response chunk `C_KNOBS_GLOBAL` (`0x5F`, see §17) |
 
@@ -393,8 +407,8 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x2A` | SET_MODULE_UPRATE | `loc mod uprate` | Embedded ACK |
 | `0x2B` | SET_MODULE_MODE | `loc mod param val` | Embedded ACK |
 | `0x2E` | GET_SELECTED_PARAM *(not implemented yet)* | — | Embedded; area/module/param at `[5..7]` |
-| `0x2F` | SEL_PARAM *(not implemented yet)* | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
-| `0x30` | ADD_MODULE | `type loc id col row colour uprate isled [modes...] name\0` | Embedded ACK |
+| `0x2F` | SEL_PARAM (`select-param`) | `00 loc mod param` | No response (`WRITE_NO_RESP`) |
+| `0x30` | ADD_MODULE | `type loc id col row colour uprate mutaLock [modes...] name` (name up to 16 chars, NUL only when shorter) | Embedded ACK |
 | `0x31` | SET_MODULE_COLOR | `loc mod color` | Embedded ACK |
 | `0x32` | DEL_MODULE | `loc mod_id` | Embedded ACK |
 | `0x33` | SET_MODULE_LABEL | `loc mod name\0` | Embedded ACK |
@@ -402,6 +416,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x35 ss` | GET_PATCH_VERSION | `ss`=slot | Embedded; version at `response[6]` |
 | `0x37` | SET_PATCH (upload) | see §9 | Embedded ACK |
 | `0x3C` | GET_PATCH | — | Extended bulk (patch binary, §9) |
+| `0x3D` | MIDI_DUMP (`dump-patch`) | — | None. Sent slot-scoped by us; the official editor sends it through the synth-level `SendUserBubble` |
 | `0x40` | SET_PARAM | `loc mod par val var` | No response (`WRITE_NO_RESP`) |
 | `0x42` | SET_PARAM_LABEL | `loc mod_id module_len (is_string param_len param_idx labels...)*` | Embedded ACK |
 | `0x43` | SET_MORPH_RANGE | `loc mod param morph val neg var` | No response (`WRITE_NO_RESP`) |
@@ -411,13 +426,13 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 | `0x50` | ADD_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x51` | DEL_CABLE | `flags from_mod from_con to_mod to_con` | Embedded ACK |
 | `0x54` | SET_CABLE_COLOR | `flags from_mod from_con to_mod to_con` — 5 bytes, colour is inside `flags` (§8) | Embedded ACK |
-| `0x55` | CTRL_SNAPSHOT *(not implemented yet)* | — | Embedded ACK |
+| `0x55` | CTRL_SNAPSHOT (`send-controller-snapshot`) | — | Embedded ACK |
 | `0x68` | GET_CURRENT_NOTE *(not implemented yet)* | — | Extended bulk `0x69` voice table, see Current note below |
 | `0x6A vv` | SELECT_VARIATION | `vv`=variation index (0-8, 9 = Patch Mutator audition, see below) | Embedded ACK |
 | `0x6E` | GET_PATCH_NOTES | — | Extended bulk (patch notes text); sent as step 4 of `g2_get_patch()`, result reported as `text` alongside `name` |
 | `0x6F` | *(no live SET exists — see note below)* | — | — |
-| `0x70` | UNKNOWN_6 *(not implemented yet)* | — | Embedded ACK |
-| `0x71` | GET_RESOURCES_USED | `location` | Extended bulk |
+| `0x70` | FLUSH_BLINK (official `CMFlushBlink`) *(not implemented yet)* | — | Embedded ACK |
+| `0x71` | GET_RESOURCES_USED | `location` | Extended bulk `0x72`, `[4]` = location (tagged read, `get-resources`) |
 | `0x90` | SET_MUTATION_LOCK | `loc mod locked` | Embedded ACK |
 | `0x4D`… | *(section dump, `send-sections`)* | whole `.pch2` sections `[type][len16][data]…` as one edit | Embedded ACK |
 
@@ -431,7 +446,7 @@ The `version` byte is obtained by GET_PATCH_VERSION before each slot command.
 > comms (required a power cycle to recover). Don't reintroduce it; notes only reach the device
 > embedded in a full patch write.
 
-> **SET_PATCH_DESCRIPTION (`0x21`) gotcha:** the daemon's `voice-mode` and `voice-count` commands wrap this in a read-modify-write via `g2_get_patch()` — do not call them from an editor that already has the patch loaded in memory (it will race with the editor's own copy). Use `set-patch-description` directly with the full 14-byte body instead (`cli/src/g2_device.c:1481-1504`).
+> **SET_PATCH_DESCRIPTION (`0x21`) gotcha:** the daemon's `voice-mode` and `voice-count` commands wrap this in a read-modify-write via `g2_get_patch()` — do not call them from an editor that already has the patch loaded in memory (it will race with the editor's own copy). Use `set-patch-description` directly with the full 15-byte body instead.
 
 > **SET_PATCH (`0x37`) scope caveat:** `upload-perf` reuses this same sub-cmd byte but at **system/performance scope** (`COMMAND_REQ|COMMAND_SYS`, fixed version `0x42`) with a different payload shape — it embeds an inline `0x1A 0x29` performance-name header before the section data. This is distinct from the per-slot `upload-patch` usage documented above.
 
@@ -462,7 +477,7 @@ variation                <slot> <variation>                        (0x35 then 0x
 select-param-page        <slot> <page-id>                          (0x2D, page-id = page*3 + bank)
 get-param-page           <slot>                                    (0x58, reply arrives as a 0x2D event)
 get-global-page          <slot>                                    (0x59, reply arrives as a slot-tagged 0x1E event)
-set-patch-description    <slot> <14-byte body>                     (0x21)
+set-patch-description    <slot> <15-byte body>                     (0x21)
 voice-mode / voice-count <slot> <value>                            (0x21, via read-modify-write — see caveat above)
 get-resources            <slot>                                    (0x71, queried for loc 0 and 1)
 ```
@@ -767,7 +782,7 @@ The patch binary (from GET_PATCH / SET_PATCH) is composed of typed sections. Eac
 
 ### PatchDescription (0x21) bit layout
 
-Body is 14 bytes. Relevant fields (bit numbers are 0-based from the start of the body):
+Body is 15 bytes. Relevant fields (bit numbers are 0-based from the start of the body):
 
 | Bit range | Field | Encoding |
 |-----------|-------|----------|
@@ -784,7 +799,7 @@ body[8] bits 7-6 = voices & 0x03 (low 2 bits)
 body[11] bits 5-4 = monopoly & 0x03
 ```
 
-To set via USB, use `SET_PATCH_DESCRIPTION` (subCmd `0x21`) with the full 14-byte body.
+To set via USB, use `SET_PATCH_DESCRIPTION` (subCmd `0x21`) with the full 15-byte body.
 
 **Note on assigned_voices vs description.voices:** The `assigned_voices` watch event carries **1-based** counts (G2 allocates 16 voices → value 16), while `description.voices` is the **0-based** raw bitfield (16 voices → 15). Formula: `description.voices = assigned - 1` when poly. `assigned = 0` means non-poly (Mono/Legato/Slgt) — the exact mode is only in the description bitfield, not derivable from `assigned_voices` alone.
 
@@ -928,8 +943,10 @@ All incoming messages arrive first as a 16-byte interrupt packet on EP `0x81`:
 Byte [0] low nibble = message type:
   0x01  RESPONSE_TYPE_EXTENDED  — bulk data follows on EP 0x82
   0x02  RESPONSE_TYPE_EMBEDDED  — data is inline in the 16-byte packet
-  0x80  RESPONSE_TYPE_INIT      — init response (bulk data follows)
 ```
+
+The init reply is an extended message whose bulk starts with `0x80` (`RESPONSE_TYPE_INIT` is a
+`bulk[0]` value, not an interrupt type).
 
 ### Extended response
 
@@ -963,7 +980,12 @@ The G2 sends notifications (LED/VU, version changes, resources, …) at any time
 - cap interrupt reads at 16 bytes, because a larger request swallows the following headers;
 - count the bytes that came with a timeout in the bulk loops.
 
-A reliable desync detector: every bulk payload ends in a CRC-16, so `calc_crc16` over the whole payload must be 0.
+**CRC check.** Every incoming message ends in a big-endian CRC-16 over the rest of it: an embedded
+message's `len` bytes after byte 0, or the whole bulk. `g2_crc_ok` checks it, as the official
+`InterruptHandleData` / `IsUSBCheckSumOK` do, both in the listener and in direct reads. A mismatch
+is logged (`[crc]` on stderr, and appended to the file in `G2_CRC_LOG` when set), counted in
+`g2_crc_drops` and the message dropped, without resync. A healthy run has zero
+(`make test` + `npm run test:g2`, 2026-11-02).
 
 **2. Match the reply by its tag.** Every request/response read goes through `await_reply()` (`cli/src/g2_device.c`) with a predicate. Anything else that arrives meanwhile is relayed as an event after the wait. Examples:
 
@@ -973,7 +995,12 @@ A reliable desync detector: every bulk payload ends in a CRC-16, so `calc_crc16`
 | LIST_PATCHES | `is_list_reply` | `bulk[1] == 0x0C`, `bulk[3] == 0x13` (R_LIST_NAMES) |
 | GET_SYNTH_SETTINGS | — | `bulk[3] == 0x03` (`SUB_RESPONSE_SYNTH_SETTINGS`) |
 | GET_PERF_SETTINGS | — | tagged `0x29` reply (`perf_settings_read`, §6b) |
+| GET_RESOURCES_USED (`0x71`) | `is_resources_reply` | `bulk[3] == 0x72`, `bulk[1] & 7 == slot`, `bulk[4] == location` |
 | slot edits | `is_edit_ack` | §7, Edit acknowledgement |
+
+A query the G2 refuses gets a system NACK (`aCmd 0x0C`, `subCmd 0x7E`) instead of its reply.
+`await_reply` fails at once with `G2_ERR_REJECTED` then, instead of after its timeout. Ok acks and
+slot NACKs are not handed to a query.
 
 Before 2026-10-07 the patch-data step and `g2_list` took the first extended message as the reply. In a 4 h duration run, 44 of 704 get-patch replies were really `resources_used` (`0x72`) or other payloads, and one stray LED/VU message taken as a list reply shifted every later list request by one answer. **Deterministic repro:** start a daemon, let it idle ~8 s (stream armed), then SIGKILL it so no STOP_COMM is sent. The G2 keeps streaming, and a one-shot `get-patch` / `list` then sees LED/VU data first. Test: `test_oneshot_queries_with_stream_left_on` (`cli/test/test_daemon.c`).
 
@@ -1158,10 +1185,10 @@ Emitted once at daemon startup, before any watch events:
 
 | JSON type | Trigger |
 |-----------|---------|
-| `usb_devices` | List of detected USB devices (`daemon.c:772`) |
-| `device_info` | Details of the connected device (`daemon.c:805`) |
-| `usb_driver_error` | Failed to claim the USB interface / driver error (`daemon.c:781`) |
-| `watch_armed` | START_NOTIFICATIONS succeeded; the daemon is now listening for watch events (`daemon.c:844`) |
+| `usb_devices` | List of detected USB devices |
+| `device_info` | Details of the connected device |
+| `usb_driver_error` | Failed to claim the USB interface / driver error |
+| `watch_armed` | START_NOTIFICATIONS succeeded; the daemon is now listening for watch events |
 
 ### Debug-only events
 
@@ -1174,52 +1201,40 @@ Emitted once at daemon startup, before any watch events:
 
 ## 15. LED Data Parsing (`led_data.data[]`)
 
-Source: Delphi `TG2Patch.ReadLedData` in `BVE.NMG2Patch.pas`
+As `parseLedBytes` in `g2-editor/src/store/led.ts` reads it (G2Alike agrees):
 
 ```
 data[0]      — unknown prefix byte (skip)
-data[1..N]   — 4 LEDs packed per byte, 2 bits each:
-               bits 7-6 = LED 0
-               bits 5-4 = LED 1
-               bits 3-2 = LED 2
-               bits 1-0 = LED 3
+data[1..N]   — 4 LEDs packed per byte, 2 bits each, LSB first:
+               bits 1-0 = LED 0
+               bits 3-2 = LED 1
+               bits 5-4 = LED 2
+               bits 7-6 = LED 3
 
-LED values: 0=off, 1=on, 2=unknown
-Order: FX LedList entries first, then VA LedList entries
+LED values: 1 = on, anything else = off
+Order: area VA before FX, modules by index ascending, then each module's LEDs in visual-element
+order. A sequencer's lone LED (Park) is not in this list; it belongs to its step strip (§16).
 ```
 
-Pseudocode to unpack:
-
 ```js
-for (let i = 1; i < data.length; i++) {
-  const byte = data[i];
-  leds.push((byte >> 6) & 3);
-  leds.push((byte >> 4) & 3);
-  leds.push((byte >> 2) & 3);
-  leds.push( byte       & 3);
-}
+for (let i = 1; i < data.length; i++)
+  for (let bits = 0; bits < 4; bits++) leds.push((data[i] >> (bits * 2)) & 3);
 ```
 
 ---
 
 ## 16. Volume Data Parsing (`volume_data.data[]`)
 
-Source: Delphi `TG2Patch.ReadVolumeData` in `BVE.NMG2Patch.pas`
+As `parseVolumeBytes` in `g2-editor/src/store/led.ts` reads it:
 
 ```
-data comes in 2-byte pairs: (unknown_byte, value_byte) per LedStrip entry
-Order: FX LedStripList entries first, then VA LedStripList entries
-value_byte = level/volume to display on that strip
+data comes in 2-byte pairs: (unknown_byte, value_byte), one per strip entry
+value_byte = level for a VU meter, or the active step (0..cnt-1) for a sequencer
+Order: the same as §15 (VA before FX, modules by index)
 ```
-
-Pseudocode:
 
 ```js
-for (let i = 0; i < data.length; i += 2) {
-  // data[i]     = unknown (skip)
-  // data[i + 1] = volume level for strip (i / 2)
-  strips.push(data[i + 1]);
-}
+for (let i = 0; i + 1 < data.length; i += 2) strips.push(data[i + 1]);
 ```
 
 ---
@@ -1410,7 +1425,7 @@ The daemon `seq` command packs up to 128 slot mutations into a single `g2_batch_
 Arg layout per sub-command is identical to the individual daemon commands (positional args with `slot` and `location` as args 0 and 1 of each sub-array). Max 128 ops per `seq` call.
 
 
-> **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through (`daemon.c:238-239`) — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. The G2 ignores parameter values in ADD_MODULE anyway (§7, Module constraints), so non-default values must always be sent afterwards as `set-param` (e.g. pasting a module with non-default variation values).
+> **`add-module` in `seq` — `param_vals` silently skipped:** `execute_seq()` parses and skips over the `param0...` values without passing them through — the G2 initializes them to defaults. Only `mode_vals` and the structural fields (position, color, name) are actually sent. The G2 ignores parameter values in ADD_MODULE anyway (§7, Module constraints), so non-default values must always be sent afterwards as `set-param` (e.g. pasting a module with non-default variation values).
 
 > **`seq` waits for the edit ack:** the compound frame goes through `send_slot_edit` (§7). A NACK fails the whole `seq` call with `G2_ERR_REJECTED` (-17), and the deferred `set-param` entries are then not sent.
 
@@ -1423,14 +1438,21 @@ Arg layout per sub-command is identical to the individual daemon commands (posit
 - Drains are bounded: `g2_drain_quiet(quiet_ms, &needs_rearm)` reads until nothing arrives for `quiet_ms`, at most `USB_DRAIN_MAX_MS` (1 s). The unbounded loop it replaced spun forever on a streaming G2. `g2_drain_pending()` is `g2_drain_quiet(USB_TIMEOUT_DRAIN_MS)` plus `g2_rearm()` if the stream stopped meanwhile
 - Exit state: a one-shot command sends STOP_COMM in `g2_disconnect()`, so the G2 is left quiet. Nobody reads its stream after exit, and the next one-shot would have had to drain it. The daemon leaves the stream on (the official editor's idle state) and re-arms at startup. One-shot `set-perf-mode` waits for the `0x0C/0x1F` reply (up to `USB_TIMEOUT_LONG_MS`) instead of a fixed 200 ms sleep
 - Error replies carry the last `g2_err()` message of the command (e.g. "store-patch: device refused 1-3 (Memory protect on)") instead of the generic error text
-- Queue cap: 64 entries; oldest dropped when full (LED/vol dominate, losing one frame is imperceptible)
+- Queue cap: 64 entries. When full, the oldest LED/VU message is evicted (the next one replaces its state); only when there is none, the oldest message. Every eviction counts in `g2_msg_drops`: a non-LED eviction can be a reply, and the command waiting for it then aborts
 - `g2_slot_version[4]` maintained by listener; device functions use cached value instead of extra GET_PATCH_VERSION round-trips
 - **Startup**: daemon queries all 4 slots before `g2_rearm()` and emits them as `slot_data` events; frontend applies them directly via `_applyPatchOutput` in the `slot_data` watch handler
 
-### recv_interrupt() skip list and follow-up race
+### recv_interrupt() filtering in listener mode
 
-`recv_interrupt()` in listener mode skips only LED (`0x39`) and volume (`0x3A`) bulk messages; all other types are returned to the caller.
+`recv_interrupt()` (listener mode) does not hand every message to its caller:
+- LED (`0x39`) and volume (`0x3A`) bulk messages are skipped.
+- Generic ok/NACK acks (`aCmd 0x04/0x0C`, `subCmd 0x7F/0x7E`) are dropped, unless the caller waits
+  for its own write's ack (`recv_interrupt_acks`) or for a query's system NACK
+  (`recv_interrupt_sys_nacks`, used by `await_reply`).
+- Unsolicited notifications (performance `0x04` and per-slot `aCmd 0-3` messages) are relayed as
+  watch events instead of returned.
 
-After a voice-count change the G2 emits: `patch_version_change (0x38)` → `assigned_voices (0x05)` → `resources_used (0x72)`. Issuing `get-patch` on `patch_version_change` causes `g2_get_patch()` to pop `0x05`/`0x72` instead of its expected response, crashing the parser.
-
-**Safe pattern:** wait for `resources_used` before issuing `get-patch` (see `useG2.ts`, `pendingSlotReload`).
+After a voice-count change the G2 emits `patch_version_change (0x38)` → `assigned_voices (0x05)` →
+`resources_used (0x72)`. The `get-patch` that follows reads its reply tagged (`await_reply`, §12),
+so the `0x05`/`0x72` messages before it are relayed as events, not parsed as the patch. The editor
+still reloads only after `resources_used` (`pendingSlotReload` in `useSlotEvents.ts`).
