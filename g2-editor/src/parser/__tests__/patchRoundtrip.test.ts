@@ -1760,9 +1760,57 @@ describe('serializePatch writes the official section order (CPatchFile_13::Write
 		// A template with no 0x5b at all: the Morph Group labels are appended after everything else.
 		const template = removeSection(usbOrderTemplate(rawHex) + '0000', 0x5b);
 		expect(patch.morphParamLabels?.length).toBeGreaterThan(0);
-		// EmptyPatch has no modules, so no area 0x5b is appended; everything else keeps its place.
-		const expected = official.filter((id) => id !== '5b:1' && id !== '5b:0');
-		expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(expected);
+		// The missing area 0x5b sections are written too (empty), so the official train is complete.
+		expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(official);
+	});
+});
+
+describe('serializers write every section of the official train, also for an incomplete file', () => {
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+	const content = (p: Patch) => ({
+		areas: p.areas.map((a) => ({
+			modules: a.modules.map((m) => [m.index, m.type, m.horiz, m.vert, m.colour, m.uname ?? '', m.lv]),
+			cables: a.cableList ?? [],
+		})),
+		patchParams: p.patchParams,
+		controllers: p.controllers ?? [],
+		paramPages: p.paramPages ?? [],
+	});
+	// Fixtures that lack 5b:0/5b:1, 5a:0, 62 and/or 65 (saved by older builds); the official reader rejects them.
+	const incomplete = ['bad/Hidden.pch2', 'bad/Midi TEST.pch2', 'bad/Piano&Mic.pch2', 'new/DropDowns.pch2', 'new/Graphics.pch2', 'new/Sequencers.pch2'];
+	for (const file of incomplete) {
+		it(`completes ${file} and keeps its content`, () => {
+			const { name, rawHex, patch } = loadFixture(file);
+			expect(sectionOrder(rawHex)).not.toEqual(official);
+			const out = serializePatch(name, patch, rawHex, extractVariations(patch));
+			expect(sectionOrder(out)).toEqual(official);
+			expect(content(parsePatchFromRawHex(name, out))).toEqual(content(patch));
+		});
+	}
+
+	it('completes every slot of a performance whose template lacks sections, in order', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		// Drop slot B's 0x62 and its FX 0x5a from the template.
+		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		const kept: number[] = [];
+		let slot = 0;
+		for (let ofs = 0; ofs + 3 <= bytes.length - 2; ) {
+			const t = bytes[ofs];
+			const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+			const drop = slot === 1 && (t === 0x62 || (t === 0x5a && bytes[ofs + 3] >> 6 === 0));
+			if (!drop) kept.push(...bytes.slice(ofs, end));
+			if (t === SectionType.SEPARATOR) slot++;
+			ofs = end;
+		}
+		const template = toHex(Uint8Array.from([...kept, 0, 0]));
+		const order = sectionOrder(serializePerformance(patches, template, patches.map(extractVariations)));
+		const slotTrain = official;
+		expect(order).toEqual(['11', ...slotTrain, ...slotTrain, ...slotTrain, ...slotTrain, '5f']);
+		// Same content as from the complete template (serializing fills a module's missing values with 0
+		// either way, so compare against that baseline rather than the raw parse).
+		const back = parsePerfFromRawHex(name, serializePerformance(patches, template, patches.map(extractVariations)));
+		const base = parsePerfFromRawHex(name, serializePerformance(patches, rawHex, patches.map(extractVariations)));
+		expect(back.patches.map(content)).toEqual(base.patches.map(content));
 	});
 });
 

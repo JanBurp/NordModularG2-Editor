@@ -183,6 +183,13 @@ function paramLabelsForModule(m: ModuleInstance): ParamLabel[] {
 // "zero entries" header. The G2 expects the full fixed chunk train per patch
 // (C_PARAM_NAMES ×3, C_MODULE_NAMES ×2) — dropping an empty one desyncs its parser
 // across the 4 concatenated patches of a performance upload.
+// A label entry's length byte: the paramIndex byte plus 7 per label. An entry parsed with
+// paramLen 0 (no paramIndex) is written back the same way: the official reader takes `type`,
+// `len`, then exactly `len` bytes (CModuleCustomData_11), so it is 2 bytes, not 3.
+function entryLen(entry: ParamLabel): number {
+	return entry.paramLen === 0 && entry.labels.length === 0 ? 0 : 1 + entry.labels.length * 7;
+}
+
 function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array {
 	const labeled = entries.filter((e) => e.paramLabels.length > 0);
 
@@ -191,11 +198,13 @@ function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; par
 	bw.write(8, labeled.length);
 	for (const e of labeled) {
 		bw.write(8, e.index);
-		const moduleLen = e.paramLabels.reduce((sum, lbl) => sum + 3 + lbl.labels.length * 7, 0);
+		const moduleLen = e.paramLabels.reduce((sum, lbl) => sum + 2 + entryLen(lbl), 0);
 		bw.write(8, moduleLen);
 		for (const entry of e.paramLabels) {
+			const len = entryLen(entry);
 			bw.write(8, entry.isString ? 1 : 0);
-			bw.write(8, 1 + entry.labels.length * 7);
+			bw.write(8, len);
+			if (len === 0) continue;
 			bw.write(8, entry.paramIndex);
 			for (const label of entry.labels) {
 				for (let i = 0; i < 7; i++) bw.write(8, i < label.length ? label.charCodeAt(i) : 0);
@@ -551,13 +560,6 @@ function newWrittenSets(): WrittenSets {
 	};
 }
 
-// True when any variation actually has morph-group assignment data worth writing. Counts
-// range-0 assignments too, matching writeMorphParamSection — gating on a non-zero range would
-// drop the whole section for a patch whose only assignments happen to sit at zero.
-function hasMorphAssignments(variations: VariationState[]): boolean {
-	return variations.some((v) => v.patch.morphAssignments.length > 0);
-}
-
 // Wraps the patch's custom Morph Group labels (if any) as the single synthetic PATCH_MORPH
 // "module" entry writeParamNames expects, for the areaIdx=2 ($PARAM_NAMES/"patch" scope) section.
 function morphParamNamesEntries(patch: Patch): Array<{ index: number; paramLabels: ParamLabel[] }> {
@@ -568,19 +570,47 @@ function morphParamNamesEntries(patch: Patch): Array<{ index: number; paramLabel
 // at its own position as the template's 0x5b sections are walked, but a template that carries none
 // would otherwise drop the labels entirely. Only appends when there is something to lose, so a
 // template without 0x5b and without labels keeps its exact section train.
-function appendMissingAreaParamNames(patch: Patch, out: Uint8Array[], w: WrittenSets): void {
+// Writes every per-patch section the template lacks, so a slot always has the official chunk train
+// (CPatchFile_13::WriteMolecules) — the official reader rejects a file with one missing. Each writer
+// produces a valid empty section when the patch has nothing for it. Not regenerated: PATCH_DESC
+// (needs the template's undecoded bits) and the patch settings 0x4d area 2 when there are no
+// variations to write them from. A missing 0x69 is added by canonicalSlotOrder, the 0x6f by the caller.
+function appendMissingSections(patch: Patch, out: Uint8Array[], w: WrittenSets, variations: VariationState[]): void {
 	for (const areaIdx of [0, 1] as const) {
-		if (w.m5b.has(areaIdx)) continue;
-		const modules = patch.areas[areaIdx]?.modules ?? [];
-		if (!modules.some((m) => paramLabelsForModule(m).length > 0)) continue;
+		const area = patch.areas[areaIdx];
+		const modules = area?.modules ?? [];
+		if (!w.m4a.has(areaIdx)) out.push(writeModuleList(areaIdx, modules));
+		if (!w.m52.has(areaIdx)) out.push(writeCableList(areaIdx, area?.cableList ?? []));
+		if (!w.m4d.has(areaIdx)) out.push(writeParameters(areaIdx, modules, variations));
+		if (!w.m5b.has(areaIdx))
+			out.push(
+				writeParamNames(
+					areaIdx,
+					modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
+				),
+			);
+		if (!w.m5a.has(areaIdx)) out.push(writeModuleNames(areaIdx, modules));
+		w.m4a.add(areaIdx);
+		w.m52.add(areaIdx);
+		w.m4d.add(areaIdx);
+		w.m5b.add(areaIdx);
+		w.m5a.add(areaIdx);
+	}
+	if (!w.m4d.has(2) && variations.length) {
+		out.push(writePatchParamSection(variations.map((v) => v.patch)));
+		w.m4d.add(2);
+	}
+	if (!w.m65)
 		out.push(
-			writeParamNames(
-				areaIdx,
-				modules.map((m) => ({ index: m.index, paramLabels: paramLabelsForModule(m) })),
+			writeMorphParamSection(
+				variations.map((v) => v.patch),
+				patch.morphKeyboardAssign,
 			),
 		);
-		w.m5b.add(areaIdx);
-	}
+	if (!w.m62) out.push(writeKnobs(patch.paramPages ?? []));
+	if (!w.m60) out.push(writeControllers(patch.controllers ?? []));
+	if (!w.m5bMorph) out.push(writeParamNames(2, morphParamNamesEntries(patch)));
+	w.m65 = w.m62 = w.m60 = w.m5bMorph = true;
 }
 
 /**
@@ -697,29 +727,10 @@ export function serializePatch(name: string, patch: Patch, templateRawHex: strin
 		processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patch, out, w, variations);
 		ofs += 3 + siz;
 	}
-	if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
-		out.push(writeControllers(patch.controllers));
-	}
-	if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
-		out.push(writeKnobs(patch.paramPages));
-	}
-	if (!w.m65 && hasMorphAssignments(variations)) {
-		out.push(
-			writeMorphParamSection(
-				variations.map((v) => v.patch),
-				patch.morphKeyboardAssign,
-			),
-		);
-	}
-	// Same fallback for a template without a $PARAM_NAMES(areaIdx=2) section (an older file).
-	// A hardware get-patch does carry one (captured 2026-11-02: 5b:2 5b:1 5b:0).
-	if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
-		out.push(writeParamNames(2, morphParamNamesEntries(patch)));
-	}
-	appendMissingAreaParamNames(patch, out, w);
+	appendMissingSections(patch, out, w, variations);
 	// The official editor writes a fixed section order and its reader rejects any other
 	// (CPatchFile_13::WriteMolecules): a hardware get-patch template has 0x5a before 0x5b and no
-	// 0x69, and the fallbacks above append at the end. The text pad always closes the slot — also
+	// 0x69, and appendMissingSections appends at the end. The text pad always closes the slot — also
 	// for a hardware template, which never carries one (notes come via GET_PATCH_TEXT).
 	return buildRawHex([...canonicalSlotOrder(out), writeTextPad(patch.text ?? '', textMax)]);
 }
@@ -745,13 +756,25 @@ export function serializePerformance(
 	// File-scope (not per-slot, unlike WrittenSets — never reset at a SEPARATOR): C_KNOBS_GLOBAL
 	// appears once for the whole performance, not once per slot.
 	let wroteGlobalKnobs = false;
+	// Where the current slot's sections start in `out`, and whether a slot is open (not yet closed by
+	// its 0x6f): each slot is completed and put in the official order when it closes.
+	let slotStart = 0;
+	let slotOpen = false;
+	const closeSlot = () => {
+		const patch = patches[slotIdx] ?? patches[0];
+		appendMissingSections(patch, out, w, variationsArray[slotIdx] ?? []);
+		out.push(...canonicalSlotOrder(out.splice(slotStart)), writeTextPad(patch.text ?? ''));
+		slotStart = out.length;
+		slotOpen = false;
+	};
 	let ofs = 0;
 	while (ofs < sectionDataLen) {
 		const type = template[ofs];
 		const siz = (template[ofs + 1] << 8) | template[ofs + 2];
 		const secData = template.slice(ofs + 3, ofs + 3 + siz);
-		if (type === SectionType.PERF_DATA && perfSettings) {
-			out.push(perfSettings);
+		if (type === SectionType.PERF_DATA) {
+			out.push(perfSettings ?? template.slice(ofs, ofs + 3 + siz));
+			slotStart = out.length;
 		} else if (type === SectionType.KNOBS_GLOBAL) {
 			// writeGlobalKnobs([]) already produces a valid fixed-size empty bitmap — call it
 			// unconditionally (like CONTROLLERS/KNOBS/MORPH_PARAMS above) instead of dropping
@@ -759,64 +782,22 @@ export function serializePerformance(
 			if (!wroteGlobalKnobs) out.push(writeGlobalKnobs(globalParamPages));
 			wroteGlobalKnobs = true;
 		} else if (type === SectionType.SEPARATOR) {
-			const patch = patches[slotIdx] ?? patches[0];
-			// Appended in the order hardware/.prf2 files carry them: 0x65, 0x62, 0x60, then the 0x5b names, then 0x6f.
-			if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
-				out.push(
-					writeMorphParamSection(
-						(variationsArray[slotIdx] ?? []).map((v) => v.patch),
-						patch.morphKeyboardAssign,
-					),
-				);
-			}
-			if (!w.m62 && patch.paramPages && patch.paramPages.length > 0) {
-				out.push(writeKnobs(patch.paramPages));
-			}
-			if (!w.m60 && patch.controllers && patch.controllers.length > 0) {
-				out.push(writeControllers(patch.controllers));
-			}
-
-			if (!w.m5bMorph && patch.morphParamLabels && patch.morphParamLabels.length > 0) {
-				out.push(writeParamNames(2, morphParamNamesEntries(patch)));
-			}
-			// Before the 0x6f that closes this slot — every slot of a valid performance reaches
-			// this branch, so the post-loop catch-up below deliberately doesn't repeat it (it runs
-			// after the final separator, where an appended 0x5b would land out of order).
-			appendMissingAreaParamNames(patch, out, w);
-			out.push(writeTextPad(patch.text ?? ''));
+			closeSlot();
 			// Advance to the next slot — but only while there still is one. A performance always
 			// has exactly 4 slots; the trailing C_KNOBS_GLOBAL section after the 4th slot's own
-			// separator is NOT a 5th slot. Advancing/resetting `w` for it was wrong: it made the
-			// post-loop catch-up below treat slot 4's own sections as "never written" and
-			// re-emit them a second time (e.g. a duplicate CONTROLLERS/morph-PARAM_NAMES section).
+			// separator is NOT a 5th slot.
 			if (slotIdx < SLOT_LABELS.length - 1) {
 				slotIdx++;
 				w = newWrittenSets();
 			}
 		} else {
 			processSection(type, siz, secData, template.slice(ofs, ofs + 3 + siz), patches[slotIdx] ?? patches[0], out, w, variationsArray[slotIdx] ?? []);
+			slotOpen = true;
 		}
 		ofs += 3 + siz;
 	}
-	const lastPatch = patches[slotIdx] ?? patches[0];
-	if (!w.m65 && hasMorphAssignments(variationsArray[slotIdx] ?? [])) {
-		out.push(
-			writeMorphParamSection(
-				(variationsArray[slotIdx] ?? []).map((v) => v.patch),
-				lastPatch?.morphKeyboardAssign,
-			),
-		);
-	}
-	if (!w.m62 && lastPatch?.paramPages && lastPatch.paramPages.length > 0) {
-		out.push(writeKnobs(lastPatch.paramPages));
-	}
-	if (!w.m60 && lastPatch?.controllers && lastPatch.controllers.length > 0) {
-		out.push(writeControllers(lastPatch.controllers));
-	}
-
-	if (!w.m5bMorph && lastPatch?.morphParamLabels && lastPatch.morphParamLabels.length > 0) {
-		out.push(writeParamNames(2, morphParamNamesEntries(lastPatch)));
-	}
+	// A template whose last slot has no closing 0x6f.
+	if (slotOpen) closeSlot();
 	// Append-if-missing fallback (same pattern as patch.text in serializePatch): a template that
 	// never carried a C_KNOBS_GLOBAL section (e.g. one built before this feature existed) still
 	// needs its Global Page assignments persisted.

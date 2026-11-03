@@ -8,6 +8,7 @@ import { fileCrcOk, serializePatch, TEXT_PAD_MAX, writePerfSettings } from '../n
 import { extractVariations } from '../../store/slotHelpers';
 import { stripFileHeader } from '../nmg2PatchParser';
 import { getModule } from '../../renderer/nmg2mods';
+import { defaultMutationLock } from '../fileVersion';
 import type { ModuleInstance } from '@/types';
 
 const __dirname = fileURLToPath(new URL('.', import.meta.url));
@@ -197,5 +198,40 @@ describe('parser robustness', () => {
 		const template = stripFileHeader(bytes);
 		expect(textLens(serializePatch('p', patch, template, extractVariations(patch)))).toEqual([TEXT_PAD_MAX]);
 		expect(textLens(serializePatch('p', patch, template, extractVariations(patch), Infinity))).toEqual([1500]);
+	});
+
+	it('writes a paramLen-0 label entry back as 2 bytes, as the official reader walks it', () => {
+		const bytes = readFixture('Clavia demo.pch2');
+		const template = stripFileHeader(bytes);
+		const patch = new PatchParser(bytes.buffer).parse();
+		const mod = patch.areas[1].modules.find((m) => (m.paramLabels?.length ?? 0) > 0)!;
+		expect(mod).toBeDefined();
+		const vaLabelsLen = (rawHex: string) => {
+			const file = new Uint8Array([0x78, 0, 0x17, 0, ...rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16))]);
+			const sec = sections(file).find((x) => x.type === SectionType.PARAM_NAMES && file[x.ofs + 3] >> 6 === 1)!;
+			return sec.end - sec.ofs - 3;
+		};
+		const before = vaLabelsLen(serializePatch('p', patch, template, extractVariations(patch)));
+		mod.paramLabels = [...mod.paramLabels!, { paramIndex: 0, isString: false, paramLen: 0, labels: [] }];
+		const out = serializePatch('p', patch, template, extractVariations(patch));
+		expect(vaLabelsLen(out)).toBe(before + 2);
+		const file = new Uint8Array([0x78, 0, 0x17, 0, ...out.match(/.{2}/g)!.map((b) => parseInt(b, 16))]);
+		const back = new PatchParser(file.buffer).parse().areas[1].modules.find((m) => m.index === mod.index)!;
+		expect(back.paramLabels).toEqual(mod.paramLabels);
+	});
+
+	it('gives an old-format file (v22) the official default mutation locks; a v23 file keeps its own', () => {
+		const bytes = readFixture('Clavia demo.pch2');
+		const versionAt = bytes.indexOf(0) + 1;
+		expect(bytes[versionAt]).toBe(22);
+		const converted = new PatchParser(bytes.buffer).parse();
+		const mods = converted.areas.flatMap((a) => a.modules);
+		expect(mods.map((m) => m.mutaLock)).toEqual(mods.map((m) => defaultMutationLock(m.type)));
+
+		const asV23 = bytes.slice();
+		asV23[versionAt] = 0x17;
+		const kept = new PatchParser(asV23.buffer).parse().areas.flatMap((a) => a.modules);
+		// The stored flags, read straight from the file: 17 of them differ from the defaults.
+		expect(kept.filter((m, i) => m.mutaLock !== mods[i].mutaLock)).toHaveLength(17);
 	});
 });

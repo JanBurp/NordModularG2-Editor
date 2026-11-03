@@ -18,6 +18,7 @@ import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { getModule } from '../renderer/nmg2mods';
 import { SLOT_LABELS } from '../constants';
 import { SEQNOTE_MODULE_TYPE, type PianoRollView } from '../renderer/pianoRoll';
+import { convertModulesToCurrent } from './fileVersion';
 
 export type {
 	ModuleInstance,
@@ -231,6 +232,10 @@ class G2Parser {
 				}
 			}
 		}
+		// An older file format gets the official conversion steps we have (see fileVersion.ts).
+		// Hardware data is wrapped as version 23, so it never gets here.
+		const version = new Uint8Array(data)[textHdrLen - 2] ?? 0;
+		for (const area of this.areas) convertModulesToCurrent(area.modules, version);
 	}
 
 	getAllModules(areaIdx: number): ModuleInstance[] {

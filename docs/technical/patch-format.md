@@ -39,7 +39,9 @@ Both formats use the same section grammar. Each patch ends with a `SEPARATOR` (`
   current `.prf2`'s CRC covers `17 01 …`.
 - On load the CRC is checked (`fileCrcOk`); a mismatch only warns, the file still loads.
 - Older format versions exist (19 and 22 in `test-patches/`). The official editor converts them
-  on load; we read them as 23 (see `future-ideas/old-file-version-conversion.md`).
+  on load, one version at a time. We apply only the last step, 22→23 (every module's mutation
+  lock set to its type's default, `parser/fileVersion.ts`); the earlier steps are not ported yet
+  (see `future-ideas/old-file-version-conversion.md`).
 
 ---
 
