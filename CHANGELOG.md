@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Mini Mutator in Patch Toolbar (with keycommands)
+
 ## [0.8.0] - 2026-11-1
 
 ### New
