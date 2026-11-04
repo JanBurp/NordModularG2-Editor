@@ -1457,8 +1457,8 @@ static int await_flash_result(int bank0, int location0, int *status) {
         int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
         /* Through the listener queue a bare timeout is 0, so anything negative is a real USB
          * error: stop now. The direct libusb path (recv_interrupt_with_retry, g2_io.c) reports
-         * a plain timeout as -1 as well, so there we can only keep waiting - otherwise the
-         * one-shot CLI aborts on the first write that takes over 2 s. */
+         * a plain timeout as LIBUSB_ERROR_TIMEOUT (negative), so there we keep waiting - otherwise
+         * the one-shot CLI aborts on the first write that takes over 2 s. */
         if (rret < 0) {
             if (g2_listener_active) {
                 g2_err("flash location %d: USB error waiting for the result: %s\n", location0 + 1, libusb_error_name(rret));

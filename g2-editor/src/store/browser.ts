@@ -84,6 +84,17 @@ const known = new Map<string, LocContent>();
 // Old-format files the running organizer operation converted before writing them.
 let convertedCount = 0;
 const locKey = (l: BankLoc) => `${l.kind}-${l.bank}-${l.location}`;
+// currentFormatFile for a loaded file; null when it is current, unreadable, or fails to convert (then it is
+// sent as it is, like the CLI does).
+function convertedOrNull(result: { success: boolean; data?: number[] }, file: string): { data: number[]; oldVersion: number } | null {
+	if (!result.success || !result.data) return null;
+	try {
+		return currentFormatFile(new Uint8Array(result.data));
+	} catch (e) {
+		console.error(`${file}: could not convert from its old file format, sent as it is:`, e);
+		return null;
+	}
+}
 const fileId = () => Date.now().toString(36) + String(storageSeq++ % 1000).padStart(3, '0') + Math.random().toString(36).slice(2, 4);
 
 /* Options of one organizer operation: `label` makes it undoable; `offline` lets it run without a G2
@@ -361,7 +372,7 @@ export const useBrowserStore = defineStore('browser', {
 		 * the file is current: the G2 doesn't convert, an old file in its memory plays differently. */
 		async _currentFormatCopy(file: string): Promise<string | null> {
 			const result = await window.electronAPI.patches.load(file);
-			const converted = result.success && result.data ? currentFormatFile(new Uint8Array(result.data)) : null;
+			const converted = convertedOrNull(result, file);
 			if (!converted) return null;
 			const copy = `${this.storageDir}/.tmp-${fileId()}${file.slice(file.lastIndexOf('.'))}`;
 			await window.electronAPI.savePatch(copy, converted.data);
@@ -379,7 +390,7 @@ export const useBrowserStore = defineStore('browser', {
 			for (const e of (await window.electronAPI.patches.list(folder)).entries) {
 				if (e.isDir) continue;
 				const result = await window.electronAPI.patches.load(e.path);
-				const file = result.success && result.data ? currentFormatFile(new Uint8Array(result.data)) : null;
+				const file = convertedOrNull(result, e.path);
 				if (file) converted.set(e.name, file.data);
 			}
 			if (!converted.size) return null;

@@ -227,6 +227,21 @@ describe('browser store — Bank Organizer', () => {
 		expect(toasts.map((t) => t.message)).toContain('1 file was converted from an old file format before writing to the G2.');
 	});
 
+	it('sends an old-format file that fails to convert as it is instead of aborting', async () => {
+		const corrupt = [...new TextEncoder().encode('Version=X'), 0x00, 20, 0x00, 0x4a, 0xff, 0xff];
+		const api = (globalThis as any).window.electronAPI;
+		api.patches.load = vi.fn(async () => ({ success: true, data: corrupt }));
+		api.savePatch = vi.fn();
+		vi.spyOn(console, 'error').mockImplementation(() => {});
+		files.set('/disk/Bad.pch2', 'Bad');
+		const browser = useBrowserStore();
+
+		expect(await browser.fromStorage({ file: '/disk/Bad.pch2', name: 'Bad', kind: 'patch' }, P(1, 1))).toBe(true);
+
+		expect(calls.find((c) => c[0] === 'put-location')![4]).toBe('/disk/Bad.pch2');
+		expect(api.savePatch).not.toHaveBeenCalled();
+	});
+
 	it('keeps names with separators and special characters intact through the file name', async () => {
 		const browser = seed([
 			[1, 1, 'A/B__C %d'],

@@ -833,7 +833,8 @@ int recv_interrupt_with_retry(uint8_t *response, int size, int timeout_ms, int r
         if (ret == LIBUSB_ERROR_NO_DEVICE) return LIBUSB_ERROR_NO_DEVICE;
         usleep(USB_SEND_DELAY_US);
     }
-    return ret < 0 ? ret : -1;   /* the libusb error (TIMEOUT, IO, PIPE…), so the listener can tell them apart */
+    /* the libusb error (TIMEOUT, IO, PIPE…), so the listener can tell them apart; an empty read is a timeout */
+    return ret < 0 ? ret : LIBUSB_ERROR_TIMEOUT;
 }
 
 int g2_io_err_streak(g2_io_err_streak_t *s, int ret, long long now) {
