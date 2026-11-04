@@ -1636,6 +1636,64 @@ describe('downloadBankToDevice — Bank Download (to G2)', () => {
 		return { written: 2, cleared: 126, failed: 0, failures: [], aborted: false, ...overrides };
 	}
 
+	// The source folder's files (path -> bytes); all current-format unless a test adds an old one.
+	let disk: Map<string, number[]>;
+	beforeEach(() => {
+		disk = new Map([['/tmp/src/Lead.pch2', [0x41, 0x00, 0x17, 0x00]]]);
+		const inFolder = (dir: string) => [...disk.keys()].filter((p) => p.slice(0, p.lastIndexOf('/')) === dir);
+		(globalThis as any).window.electronAPI = {
+			patches: {
+				list: vi.fn(async (dir: string) => ({
+					success: true,
+					entries: inFolder(dir).map((p) => ({ name: p.split('/').pop(), path: p, isDir: false })),
+				})),
+				load: vi.fn(async (p: string) => ({ success: disk.has(p), data: disk.get(p) })),
+				storageDir: vi.fn(async () => '/hold'),
+				storageBankCopy: vi.fn(async (folder: string, pchList?: string) => {
+					for (const p of inFolder(folder)) disk.set(`/hold/.tmp-bank-1/${p.split('/').pop()}`, disk.get(p)!);
+					if (pchList) disk.set(`/hold/.tmp-bank-1/${pchList.split('/').pop()}`, []);
+					return '/hold/.tmp-bank-1';
+				}),
+				storageRemove: vi.fn(async (p: string) => {
+					for (const f of disk.keys()) if (f.startsWith(`${p}/`)) disk.delete(f);
+				}),
+			},
+			savePatch: vi.fn(async (p: string, data: number[]) => void disk.set(p, data)),
+		};
+	});
+
+	it('sends an old-format file converted, from a copy of the .pchList folder that is removed afterwards', async () => {
+		const fs = await import('fs');
+		const { fileURLToPath } = await import('url');
+		const old = Array.from(fs.readFileSync(fileURLToPath(new URL('../../../../test-patches/Analogue NL2.pch2', import.meta.url))));
+		disk.set('/tmp/src/001_Analogue NL2.pch2', old);
+		await import('@/store/browser'); // a dynamic import doesn't resolve under fake timers
+		vi.useFakeTimers();
+		try {
+			const store = useSlotsStore();
+			useDeviceStore().status = DeviceStatus.Connected;
+			const runSpy = (globalThis as any).window.cli.run as ReturnType<typeof vi.fn>;
+			const sentFiles: Map<string, number[]> = new Map();
+			runSpy.mockImplementation(async (args: string[]) => {
+				if (args[0] === 'send-bank') for (const [p, d] of disk) if (p.startsWith('/hold/')) sentFiles.set(p, d);
+				return JSON.stringify(bankResult());
+			});
+
+			const resultPromise = store.downloadBankToDevice({ type: 'pchList', filepath: '/tmp/src/Bank1.pchList' }, 1, 'patch');
+			await vi.runAllTimersAsync();
+			await resultPromise;
+
+			expect(runSpy).toHaveBeenCalledWith(['send-bank', 'patch', 'pchList', '/hold/.tmp-bank-1/Bank1.pchList', '1']);
+			const converted = sentFiles.get('/hold/.tmp-bank-1/001_Analogue NL2.pch2')!;
+			expect(converted[converted.indexOf(0) + 1]).toBe(23);
+			expect(sentFiles.get('/hold/.tmp-bank-1/Lead.pch2')).toEqual([0x41, 0x00, 0x17, 0x00]); // current: copied as it is
+			expect(disk.get('/tmp/src/001_Analogue NL2.pch2')).toBe(old); // the source is left alone
+			expect([...disk.keys()].filter((p) => p.startsWith('/hold/'))).toEqual([]);
+		} finally {
+			vi.useRealTimers();
+		}
+	});
+
 	it('sends send-bank with the source path, then waits for names to reload, when connected', async () => {
 		vi.useFakeTimers();
 		try {

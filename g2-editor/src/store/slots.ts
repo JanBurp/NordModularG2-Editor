@@ -69,6 +69,7 @@ import { useUiStore } from './ui';
 import { useHistoryStore } from './history';
 import { isAllowedCC } from '@/composables/useMidiCC';
 import { bankDownloadReloadingNames, waitForNamesReload } from '@/composables/useBankDownloadDialog';
+import { convertedNote } from '@/parser/currentFormatFile';
 
 // Per-memory-type load in %, keyed as in the official CPatchLoad getters (GetPmem, GetXmem, ...)
 export type MemoryUsage = { pmem: number; xmem: number; ymem: number; zpmem: number; ram: number; qmem: number; rmem: number };
@@ -716,12 +717,17 @@ export const useSlotsStore = defineStore('slots', {
 			const deviceStore = useDeviceStore();
 			if (deviceStore.status !== DeviceStatus.Connected) return null;
 
+			let converted: { path: string; copy: string; converted: number } | null = null;
 			try {
 				// Send bank to device
 				// WARNING: This OVERWRITES the entire target bank
 				const path = source.type === 'pchList' ? source.filepath : source.folderPath;
-				const output = await window.cli.run(['send-bank', bankType, source.type, path, String(bankNum)]);
+				// Old-format files are sent converted, from a copy of the source (the G2 doesn't convert).
+				const { useBrowserStore } = await import('./browser');
+				converted = await useBrowserStore().currentFormatBank(path, source.type === 'pchList');
+				const output = await window.cli.run(['send-bank', bankType, source.type, converted?.path ?? path, String(bankNum)]);
 				const result: BankDownloadResult = JSON.parse(output);
+				if (converted) showToast(convertedNote(converted.converted));
 				// A bank download can add/remove/rename many patches at once - too broad for
 				// the single-entry upsertPatch/removePatch bookkeeping storePatch/clearPatch use.
 				// 'list' has no daemon-mode handler (daemon.c has none - only the standalone CLI
@@ -745,6 +751,7 @@ export const useSlotsStore = defineStore('slots', {
 				return null;
 			} finally {
 				bankDownloadReloadingNames.value = false;
+				if (converted) await window.electronAPI.patches.storageRemove(converted.copy);
 			}
 		},
 
@@ -2251,11 +2258,10 @@ export const useSlotsStore = defineStore('slots', {
 		// .prf2 files carry 0x01 here; our own loader detects a performance by its 0x11 section, but
 		// other editors read this byte. The caller checks that all four slots hold a patch.
 		async _buildPrfBytes(header: string, template: string, perfSettings?: Uint8Array): Promise<{ data: number[]; rawHex: string }> {
-			const { serializePerformance } = await import('../parser/nmg2PatchSerializer');
+			const { serializePerformance, prf2FileBytes } = await import('../parser/nmg2PatchSerializer');
 			const variationsArray = (['A', 'B', 'C', 'D'] as SlotLabel[]).map((s) => this.slots[s].variations ?? []);
 			const rawHex = serializePerformance(this._perfPatches(), template, variationsArray, this.globalParamPages, perfSettings);
-			const sectionBytes = rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16));
-			return { data: [...new TextEncoder().encode(header), 0x00, 0x17, 0x01, ...sectionBytes], rawHex };
+			return { data: prf2FileBytes(header, rawHex), rawHex };
 		},
 
 		// After a save that wrote a file loaded in an older format (the parser converted it on load).

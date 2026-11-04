@@ -125,6 +125,54 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 		}
 	});
 
+	// Scratch bank 32: an old-format (19) file dragged from Temporary Storage reaches the G2's memory
+	// converted, the same as the official editor's own save of it; the user's file stays as it was.
+	it('Bank Organizer: an old-format storage file is written to the G2 converted', async () => {
+		const { ctx } = g!;
+		const page = ctx.page;
+		const BANK = '32';
+		const patches = path.resolve(__dirname, '../../test-patches');
+		const storageDir = path.join(await ctx.app.evaluate(({ app }) => app.getPath('userData')), 'bank-storage');
+		const item = path.join(storageDir, 'OrgOld__0.pch2');
+		const readBack = path.join(os.tmpdir(), 'g2-organizer-old.pch2');
+		const until = async (check: () => Promise<boolean>) => {
+			for (let i = 0; i < 60 && !(await check()); i++) await page.waitForTimeout(500);
+			expect(await check()).toBe(true);
+		};
+		const clean = (bytes: Buffer) =>
+			JSON.parse(JSON.stringify(new PatchParser(new Uint8Array(bytes).buffer).parse(), (k, v) => (k === 'paramaterDataOfs' ? undefined : v)));
+		const hiddenCopies = () => fs.readdirSync(storageDir).filter((f) => f.startsWith('.tmp-'));
+		try {
+			await cliRun(page, ['clear-patch', 'patch', BANK, '1']);
+			await cliRun(page, ['reload-names']);
+			fs.mkdirSync(storageDir, { recursive: true });
+			fs.copyFileSync(path.join(patches, 'Analogue NL2.pch2'), item);
+			const original = fs.readFileSync(item);
+			expect(original[original.indexOf(0) + 1]).toBe(19);
+
+			await openOrganizer(ctx);
+			const left = page.locator('[data-testid="bank-grid-left"]');
+			await left.locator('select').selectOption(BANK);
+			const chip = page.locator('[data-testid="storage-item"]', { hasText: 'OrgOld' });
+			await until(async () => (await chip.count()) === 1);
+
+			await chip.dragTo(left.locator('[data-testid="bank-cell-1"]'));
+			// Shown when the write is done, for 5 s: checked before the slower read-back.
+			await until(async () => (await page.getByText('1 file was converted from an old file format before writing to the G2.').count()) > 0);
+			await until(async () => !JSON.parse(await cliRun(page, ['get-location', 'patch', BANK, '1', readBack])).empty);
+
+			const stored = fs.readFileSync(readBack);
+			expect(stored[stored.indexOf(0) + 1]).toBe(23);
+			expect(clean(stored)).toEqual(clean(fs.readFileSync(path.join(patches, 'converted', 'Analogue NL2.pch2'))));
+			expect(hiddenCopies()).toEqual([]);
+			expect(fs.readFileSync(item)).toEqual(original);
+		} finally {
+			await closeOrganizer(page);
+			await cliRun(page, ['clear-patch', 'patch', BANK, '1']);
+			fs.rmSync(item, { force: true });
+		}
+	});
+
 	// Scratch bank 32 again: a selection of two is moved onto an occupied location and fills the
 	// free spots after it; a drop near the end that does not fit warns and changes nothing.
 	it('Bank Organizer: moves a multi-selection into free spots, warns when it does not fit', async () => {

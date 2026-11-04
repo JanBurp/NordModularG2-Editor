@@ -9,6 +9,7 @@ import { extractVariations } from '../../store/slotHelpers';
 import { stripFileHeader } from '../nmg2PatchParser';
 import { getModule } from '../../renderer/nmg2mods';
 import { convertSlotToCurrent, type ConvertSlot } from '../fileVersion';
+import { currentFormatFile } from '../currentFormatFile';
 import { defaultMutaLock } from '../../renderer/mutator';
 import type { Cable, ModuleInstance, PatchParamVariation } from '@/types';
 
@@ -248,6 +249,16 @@ describe('parser robustness', () => {
 			const old = readFixture(file);
 			expect(old[old.indexOf(0) + 1]).toBeLessThan(23);
 			expect(parseAll(old)).toEqual(parseAll(readFixture(path.join('converted', file))));
+		});
+		// The Bank Organizer writes such a file to the G2's memory as currentFormatFile re-writes it.
+		it(`re-writes the old "${file}" as a current-format file equal to the official save`, () => {
+			const golden = readFixture(path.join('converted', file));
+			const file23 = new Uint8Array(currentFormatFile(readFixture(file))!.data);
+			expect(file23[file23.indexOf(0) + 1]).toBe(23);
+			expect(file23[file23.indexOf(0) + 2]).toBe(golden[golden.indexOf(0) + 2]); // patch/performance type byte
+			expect(fileCrcOk(file23)).toBe(true);
+			expect(parseAll(file23)).toEqual(parseAll(golden));
+			expect(currentFormatFile(golden)).toBeNull();
 		});
 	}
 });

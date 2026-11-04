@@ -200,6 +200,33 @@ describe('browser store — Bank Organizer', () => {
 		expect(browser.storage.map((h) => h.name)).toEqual(['Lead', 'Bass']);
 	});
 
+	it('writes an old-format storage file converted (a hidden copy, removed afterwards) and says so', async () => {
+		const fs = await import('fs');
+		const { fileURLToPath } = await import('url');
+		const fixtures = fileURLToPath(new URL('../../../../test-patches/', import.meta.url));
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		toasts.splice(0);
+		const disk = new Map<string, number[]>([['/disk/Analogue NL2.pch2', Array.from(fs.readFileSync(`${fixtures}Analogue NL2.pch2`))]]);
+		const api = (globalThis as any).window.electronAPI;
+		api.patches.load = vi.fn(async (p: string) => (disk.has(p) ? { success: true, data: disk.get(p) } : { success: false }));
+		api.savePatch = vi.fn(async (p: string, data: number[]) => {
+			disk.set(p, data);
+			files.set(p, 'Analogue NL2');
+		});
+		const browser = useBrowserStore();
+
+		expect(await browser.fromStorage({ file: '/disk/Analogue NL2.pch2', name: 'Analogue NL2', kind: 'patch' }, P(1, 1))).toBe(true);
+
+		const sent = calls.find((c) => c[0] === 'put-location')![4];
+		expect(sent).toMatch(/^\/hold\/\.tmp-.*\.pch2$/);
+		const data = disk.get(sent)!;
+		expect(data[data.indexOf(0) + 1]).toBe(23);
+		expect(files.has(sent)).toBe(false); // removed after the write
+		expect(flash.get('patch-1-1')).toBe('Analogue NL2');
+		expect(toasts.map((t) => t.message)).toContain('1 file was converted from an old file format before writing to the G2.');
+	});
+
 	it('keeps names with separators and special characters intact through the file name', async () => {
 		const browser = seed([
 			[1, 1, 'A/B__C %d'],

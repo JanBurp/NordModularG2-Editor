@@ -5,6 +5,7 @@ import { DeviceStatus, useDeviceStore } from './device';
 import { useSlotsStore } from './slots';
 import { cliErrorText, showErrorToast, showToast } from '@/composables/useToast';
 import { ActionRecorder, HISTORY_SESSION, useOrganizerHistoryStore, type LocContent, type OrganizerAction } from './organizerHistory';
+import { convertedNote, currentFormatFile } from '@/parser/currentFormatFile';
 
 export interface SynthPatch {
 	bank: number;
@@ -80,6 +81,8 @@ let storageFolderAsked: string | null = null;
 // and the patch-file copies of locations this operation already holds, so they aren't read twice.
 let recorder: ActionRecorder | null = null;
 const known = new Map<string, LocContent>();
+// Old-format files the running organizer operation converted before writing them.
+let convertedCount = 0;
 const locKey = (l: BankLoc) => `${l.kind}-${l.bank}-${l.location}`;
 const fileId = () => Date.now().toString(36) + String(storageSeq++ % 1000).padStart(3, '0') + Math.random().toString(36).slice(2, 4);
 
@@ -340,13 +343,50 @@ export const useBrowserStore = defineStore('browser', {
 
 		async _writeLocation(loc: BankLoc, file: string, name: string, category?: string): Promise<void> {
 			await this._before(loc);
-			await window.cli.run(['put-location', loc.kind, String(loc.bank), String(loc.location), file, name]);
+			const current = await this._currentFormatCopy(file);
+			try {
+				await window.cli.run(['put-location', loc.kind, String(loc.bank), String(loc.location), current ?? file, name]);
+			} finally {
+				if (current) await window.electronAPI.patches.storageRemove(current);
+			}
 			this.upsertPatch(loc.bank, loc.location, loc.kind, name, category);
 			if (recorder) {
 				const after = { file: await this._keep(file, loc.kind), name, category };
 				recorder.bankAfter(loc, after);
 				known.set(locKey(loc), after);
 			}
+		},
+
+		/* An old-format file's converted copy (a hidden storage file the caller removes), or null when
+		 * the file is current: the G2 doesn't convert, an old file in its memory plays differently. */
+		async _currentFormatCopy(file: string): Promise<string | null> {
+			const result = await window.electronAPI.patches.load(file);
+			const converted = result.success && result.data ? currentFormatFile(new Uint8Array(result.data)) : null;
+			if (!converted) return null;
+			const copy = `${this.storageDir}/.tmp-${fileId()}${file.slice(file.lastIndexOf('.'))}`;
+			await window.electronAPI.savePatch(copy, converted.data);
+			convertedCount++;
+			return copy;
+		},
+
+		/* A send-bank source (a folder, or a .pchList in one) with old-format files in it: a copy of it in a
+		 * hidden storage folder (`copy`, the caller removes it) with those files converted, `path` the source
+		 * to send instead. Null when all files are current. */
+		async currentFormatBank(source: string, isPchList: boolean): Promise<{ path: string; copy: string; converted: number } | null> {
+			const pchList = isPchList ? baseName(source) : '';
+			const folder = isPchList ? source.slice(0, -pchList.length - 1) : source;
+			const converted = new Map<string, number[]>();
+			for (const e of (await window.electronAPI.patches.list(folder)).entries) {
+				if (e.isDir) continue;
+				const result = await window.electronAPI.patches.load(e.path);
+				const file = result.success && result.data ? currentFormatFile(new Uint8Array(result.data)) : null;
+				if (file) converted.set(e.name, file.data);
+			}
+			if (!converted.size) return null;
+			if (!this.storageDir) await this.loadStorage();
+			const copy = await window.electronAPI.patches.storageBankCopy(folder, isPchList ? source : undefined);
+			for (const [name, data] of converted) await window.electronAPI.savePatch(`${copy}/${name}`, data);
+			return { path: isPchList ? `${copy}/${pchList}` : copy, copy, converted: converted.size };
 		},
 
 		async _clearLocation(loc: BankLoc): Promise<void> {
@@ -373,7 +413,9 @@ export const useBrowserStore = defineStore('browser', {
 					if (!this.storageDir) await this.loadStorage();
 					if (opts.label) recorder = new ActionRecorder(opts.label);
 					known.clear();
+					convertedCount = 0;
 					await op();
+					if (convertedCount) showToast(convertedNote(convertedCount));
 					return true;
 				} catch (e: any) {
 					showToast(cliErrorText(e));
