@@ -1075,6 +1075,7 @@ bulk[end-2..end-1] = CRC-16  (already stripped before CLI emits JSON)
 | `0x29` | `perf_name` | `name` (null-terminated from response[5]) |
 | `0x3F` | `master_clock_run` / `master_clock_bpm` / `knob_source_change` | response[6] selects the sub-type: `0x00`=run (`run`=r[7]), `0x01`=bpm (`bpm`=r[7]), `0x02`=knob-assign source toggle confirmed 2026-08-28 via the SHIFT+GLOBAL front-panel combo (`global`=r[7], 1=Global/0=Patch) |
 | `0x5D` | `ext_master_clock` | `value` = (response[6]<<8)\|response[7] |
+| `0x38` | `patch_version_change` | `slot`=r[5], `version`=r[6]. Unsolicited (`82 01 04 40 38 …`): a patch was loaded into the slot on the G2 itself (front panel). Nothing else follows and the G2 stops streaming. The official name is `CMSessionPatchRelease` (slot, session number); the official editor creates a new patch (no file, fresh undo), requests it and sends START. The editor does the same: it reloads the slot, and that get-patch rearms (captured 2026-11-05; our own edits and uploads send no 0x38) |
 | `0x7E` | `error` | `code` = response[5] |
 | `0x7F` | `ok` | — |
 | `0x80` | `midi_cc` | `cc` = response[6] |

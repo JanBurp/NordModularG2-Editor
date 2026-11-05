@@ -24,9 +24,9 @@ async function stubDeviceDiscovery(app: ElectronApplication, devices: FakeDevice
 			}
 			ipcMain.removeHandler('cli:watch-start');
 			ipcMain.handle('cli:watch-start', async () => {
-				// Deliberately does not emit watch_armed — connectDevice()'s 8s timeout is allowed
-				// to fire in the background; these tests only assert on state that's settled well
-				// before then (window count), not on a reached "Connected" status.
+				// No daemon: the connect attempt fails right away (instead of waiting out connectDevice()'s
+				// 8 s timeout); these tests only assert on window/device-group state, not on "Connected".
+				throw new Error('no daemon in this test');
 			});
 
 			ipcMain.removeHandler('devices:list');
@@ -76,8 +76,8 @@ async function addSecondDevice(app: ElectronApplication, first: Page): Promise<P
 	return second;
 }
 
-// The stubbed daemon never arms: wait out the connect attempt (its loading overlay), then close
-// the "G2 not connected" splash a view may show, so both stop covering the toolbar.
+// The stubbed daemon fails to start: wait until the connect attempt (its loading overlay) is over, then
+// close the "G2 not connected" splash a view may show, so both stop covering the toolbar.
 async function settle(page: Page): Promise<void> {
 	await expect(page.locator('[data-testid="connection-status"]')).not.toContainText('connecting', { timeout: 20_000 });
 	const close = page.getByRole('button', { name: 'Close', exact: true }).last();

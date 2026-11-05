@@ -3,7 +3,7 @@ import { serializePatch, serializePerformance, pch2FileBytes, prf2FileBytes, PCH
 import { FILE_VERSION_CURRENT, FILE_VERSION_OLDEST } from './fileVersion';
 import { extractVariations } from '@/store/slotHelpers';
 
-/* A .pch2/.prf2 file in an old format the parser converts (19-22), re-written in the current format
+/* A .pch2/.prf2 file in an old format the parser converts (13-22), re-written in the current format
  * with the official text header; null for a current file, or one too old to convert (sent as it is). */
 export function currentFormatFile(file: Uint8Array): { data: number[]; oldVersion: number } | null {
 	const oldVersion = file[file.indexOf(0) + 1];

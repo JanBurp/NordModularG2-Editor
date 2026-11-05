@@ -162,27 +162,38 @@ describe('useSlotEvents — selected_param (hardware panel cursor) sync', () => 
 	});
 });
 
-describe('useSlotEvents — hardware-echo resync preserves undo/dirty state', () => {
-	it('patch_version_change followed by resources_used reloads with preserveHistory (undo/dirty survive)', async () => {
+describe('useSlotEvents — patch changes made on the G2', () => {
+	// A front-panel load sends only this (0x38, official "session patch release"); the official editor then
+	// creates a new patch (no file, fresh undo) and requests it.
+	it('patch_version_change (another patch loaded on the G2) reloads the slot as a new patch: no file, no undo', async () => {
 		const { name, rawHex } = await loadFixture();
 		const store = useSlotsStore();
 		const hist = useHistoryStore();
 		const { handleEvent } = useSlotEvents(() => {});
 
-		await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }));
-		// Simulate the state left behind right after a real add/move/delete-module action:
-		// dirty, one undo entry recorded, rawHex nulled by that action's own _markSlotDirty.
-		store.slots['A'].edited = true;
+		store.loadPatchFile(
+			'A',
+			(await store._applyPatchOutput('A', JSON.stringify({ slot: 'A', name, data: rawHex }))).patch,
+			name,
+			rawHex,
+			'/disk/Old.pch2',
+			19,
+		);
+		store._markSlotDirty('A'); // an edit in the editor
 		hist.record('A', { undo: async () => {}, redo: async () => {} });
-		store.slots['A'].rawHex = null;
-		(globalThis as any).window = { cli: { run: vi.fn().mockResolvedValue(JSON.stringify({ slot: 'A', name, data: rawHex })) } };
+		const run = vi.fn(async (args: string[]) => (args[0] === 'get-patch' ? JSON.stringify({ slot: 'A', name: 'Front panel', data: rawHex }) : '[]'));
+		(globalThis as any).window = { cli: { run } };
 
 		await handleEvent({ type: 'patch_version_change', slot: 'A', version: 5 });
-		await handleEvent({ type: 'resources_used', slot: 'A', data: Array(29).fill(0) });
 
-		expect(store.isSlotEdited('A')).toBe(true);
-		expect(hist.canUndo('A')).toBe(true);
+		expect(run).toHaveBeenCalledWith(['get-patch', 'A']);
+		expect(store.slots['A'].name).toBe('Front panel');
+		expect(store.slotFilePaths['A']).toBe('');
+		expect(store.slotOldFileVersions['A']).toBeNull();
+		expect(store.isSlotEdited('A')).toBe(false);
+		expect(hist.canUndo('A')).toBe(false);
 	});
+
 	it('hardware patch_description updates voices/mode in place without a reload', async () => {
 		const { name, rawHex } = await loadFixture();
 		const store = useSlotsStore();

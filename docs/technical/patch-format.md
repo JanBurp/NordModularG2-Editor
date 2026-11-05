@@ -38,9 +38,22 @@ Both formats use the same section grammar. Each patch ends with a `SEPARATOR` (`
   CRC. It is the same CRC-16/CCITT as the USB protocol (polynomial `0x1021`, seed `0x0000`). So a
   current `.prf2`'s CRC covers `17 01 …`.
 - On load the CRC is checked (`fileCrcOk`); a mismatch only warns, the file still loads.
-- Older format versions exist (19 and 22 in `test-patches/`). Like the official editor, the parser
-  converts versions 19–22 on load, one step at a time (`parser/fileVersion.ts`). A version below 19
-  is read without conversion (with a console error).
+- Older format versions exist (13, 14, 18, 19 and 22 in `test-patches/`). Like the official editor,
+  the parser converts versions 13–22 on load, one step at a time (`parser/fileVersion.ts`). The file
+  layout is the same from version 13 on. A version below 13 is read without conversion (with a
+  warning). A variation missing from a file (version 13/14 files have 8) gets the module defaults
+  and the default patch settings, as the official editor fills it.
+  - **13→14:** FltPhase params rearranged; Out Pad, Mix4-1C ExpLin and ModAmt InvertMode added.
+  - **14→15:** Mute became Active: that param is inverted in about 50 module types and in the
+    patch's Volume block.
+  - **15→16:** level and frequency params moved to a cubic scale (official `_gConvertTable`, mixer
+    levels only where ExpLin isn't linear), FltLP frequency rescaled, Vocoder and DelayB lose a
+    param, DelayB an input.
+  - **16→17:** Glide loses a param; LFO Range and delay TimeClk values capped; StChorus amount
+    halved; OscC/OscD waveform modes renumbered.
+  - **17→18:** Digitizer and PitchTrack lose params.
+  - **18→19:** Out Pad capped at 1 (with its morphs); delay TimeClk set to 0.
+  - Steps 13→19 never change a performance's global knobs (their RemoveParam has no performance).
   - **19→20:** FltHP frequency rescaled.
   - **20→21:** Morph groups 5 and 6 swap. Morphs and controllers are removed from parameters that
     can't have them any more. FreqShift, Mix4-1S, RandomB and RndClkB change their parameters,

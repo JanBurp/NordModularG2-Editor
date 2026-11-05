@@ -70,6 +70,7 @@ import { useHistoryStore } from './history';
 import { isAllowedCC } from '@/composables/useMidiCC';
 import { bankDownloadReloadingNames, waitForNamesReload } from '@/composables/useBankDownloadDialog';
 import { convertedNote } from '@/parser/currentFormatFile';
+import { FILE_VERSION_OLDEST } from '@/parser/fileVersion';
 
 // Per-memory-type load in %, keyed as in the official CPatchLoad getters (GetPmem, GetXmem, ...)
 export type MemoryUsage = { pmem: number; xmem: number; ymem: number; zpmem: number; ram: number; qmem: number; rmem: number };
@@ -2093,6 +2094,7 @@ export const useSlotsStore = defineStore('slots', {
 		// stored bits, so the caller sends them after uploading.
 		loadPatchFile(slot: SlotLabel, patch: Patch, name: string, rawHex?: string, filepath?: string, oldFileVersion: number | null = null): string[][] {
 			useDeviceStore().markOriginStale(slot);
+			this._warnUnconvertible(name, oldFileVersion);
 			this.slotOldFileVersions[slot] = oldFileVersion;
 			this.slots[slot].patch = patch;
 			this.slots[slot].variations = extractVariations(patch);
@@ -2149,6 +2151,7 @@ export const useSlotsStore = defineStore('slots', {
 			this.performanceRawHex = rawHex;
 			this.performanceFilePath = filepath ?? '';
 			this.performanceOldFileVersion = oldFileVersion;
+			this._warnUnconvertible(name, oldFileVersion);
 			this.globalParamPages = globalParamPages ? [...globalParamPages] : [];
 			return uprateRepairCmds;
 		},
@@ -2266,7 +2269,14 @@ export const useSlotsStore = defineStore('slots', {
 
 		// After a save that wrote a file loaded in an older format (the parser converted it on load).
 		_toastConverted(name: string, oldFileVersion: number | null): void {
-			if (oldFileVersion !== null) showToast(`"${name}" was saved in the current file format (it was converted from format ${oldFileVersion}).`);
+			if (oldFileVersion !== null && oldFileVersion >= FILE_VERSION_OLDEST)
+				showToast(`"${name}" was saved in the current file format (it was converted from format ${oldFileVersion}).`);
+		},
+
+		// On load: a format older than any the parser converts is read as it is.
+		_warnUnconvertible(name: string, oldFileVersion: number | null): void {
+			if (oldFileVersion !== null && oldFileVersion < FILE_VERSION_OLDEST)
+				showErrorToast(`"${name}" is in file format ${oldFileVersion}, too old to convert: it may not sound as it did.`);
 		},
 
 		// Shared by saveSlot (via exportSlotToFile)/pushPatchToDevice: builds the .pch2 byte layout
@@ -2378,9 +2388,8 @@ export const useSlotsStore = defineStore('slots', {
 		},
 
 		// Patch → "Download to Slot": push the current patch of `source` into `target` in the synth.
-		// Reloads `target` from hardware afterward rather than relying on the patch_version_change/
-		// resources_used watch-event pair — that reload trigger is only confirmed for in-app
-		// structural edits (add/move/delete module or cable), not a wholesale slot upload like this.
+		// Reloads `target` from hardware afterward: an upload sends no patch_version_change (only a patch
+		// loaded on the G2 itself does, see useSlotEvents.ts).
 		async downloadToSynthSlot(source: SlotLabel, target: SlotLabel): Promise<boolean> {
 			const ok = await this._uploadSlotToDevice(source, target);
 			if (ok) await this._reloadSlotAfterUpload(target);

@@ -2,7 +2,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import { ACTIONS } from '../e2e-duration/lib/actions/index';
-import { cliRun, type ActionCtx, type ActionDef } from '../e2e-duration/lib/actions/ctx';
+import { cliRun, menuAction, type ActionCtx, type ActionDef } from '../e2e-duration/lib/actions/ctx';
 import { ModuleQueue } from '../e2e-duration/lib/actions/moduleQueue';
 import { rng } from '../e2e-duration/lib/actions/pick';
 import { runCli, snapshotG2 } from '../e2e-duration/lib/cli';
@@ -86,4 +86,14 @@ export async function startEditor(seed = 1): Promise<Editor> {
 		}
 	}
 	return { runner, ctx, log, close };
+}
+
+// The menu action toggles: open only when closed. Close = Escape until gone (the first one may only
+// clear the selection, which dragging also sets).
+export async function openOrganizer(ctx: ActionCtx): Promise<void> {
+	if (!(await ctx.page.locator('[data-testid="bank-organizer"]').isVisible())) await menuAction(ctx, 'toggle-bank-organizer');
+	await ctx.page.locator('[data-testid="bank-organizer"]').waitFor();
+}
+export async function closeOrganizer(page: ActionCtx['page']): Promise<void> {
+	for (let i = 0; i < 3 && (await page.locator('[data-testid="bank-organizer"]').isVisible()); i++) await page.keyboard.press('Escape');
 }

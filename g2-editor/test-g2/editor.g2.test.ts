@@ -7,7 +7,21 @@ import { cliRun, focusedSlot, menuAction, teardown } from '../e2e-duration/lib/a
 import { snapshotG2 } from '../e2e-duration/lib/cli';
 import { checkConsistency, deviceState, type SlotState } from '../e2e-duration/lib/consistency';
 import { PatchParser } from '@/parser/nmg2PatchParser';
-import { action, backupPerf, type Editor, g2Mode, lastAction, type Mode, perfFlags, restorePerf, setMode, type SlotFlags, startEditor } from './g2';
+import {
+	action,
+	backupPerf,
+	closeOrganizer,
+	type Editor,
+	g2Mode,
+	lastAction,
+	type Mode,
+	openOrganizer,
+	perfFlags,
+	restorePerf,
+	setMode,
+	type SlotFlags,
+	startEditor,
+} from './g2';
 
 // Long enough that the Runner's unlocker stays active.
 const coverage = () => ({ from: Date.now(), until: Date.now() + 60 * 60_000 });
@@ -35,16 +49,6 @@ async function runRemaining(g: Editor, done: Set<string>): Promise<string[]> {
 		if (diffs.length) problems.push(`${a.name}: editor and G2 differ: ${diffs.join('; ')}`);
 	}
 	return problems;
-}
-
-// The menu action toggles: open only when closed. Close = Escape until gone (the first one may only
-// clear the selection, which dragging also sets).
-async function openOrganizer(ctx: Editor['ctx']) {
-	if (!(await ctx.page.locator('[data-testid="bank-organizer"]').isVisible())) await menuAction(ctx, 'toggle-bank-organizer');
-	await ctx.page.locator('[data-testid="bank-organizer"]').waitFor();
-}
-async function closeOrganizer(page: Editor['ctx']['page']) {
-	for (let i = 0; i < 3 && (await page.locator('[data-testid="bank-organizer"]').isVisible()); i++) await page.keyboard.press('Escape');
 }
 
 const structure = (s: SlotState) => ({ va: [s.va.modules, s.va.cables], fx: [s.fx.modules, s.fx.cables] });

@@ -244,7 +244,7 @@ describe('parser robustness', () => {
 		const perf = p.parsePrf2();
 		return clean(perf ? { patches: perf.patches, global: perf.globalParamPages } : new PatchParser(bytes.buffer).parse());
 	};
-	for (const file of fs.readdirSync(path.join(FIXTURES, 'converted'))) {
+	for (const file of fs.readdirSync(path.join(FIXTURES, 'converted')).filter((f) => /\.(pch2|prf2)$/.test(f))) {
 		it(`converts the old "${file}" to what the official editor saves`, () => {
 			const old = readFixture(file);
 			expect(old[old.indexOf(0) + 1]).toBeLessThan(23);
@@ -354,9 +354,92 @@ describe('old file version conversion steps', () => {
 		expect(cables).toEqual([{ colour: 0, smod: 2, scon: 0, dir: 1, dmod: 3, dcon: 0 }]);
 	});
 
-	it('leaves a version older than 19 as it is', () => {
+	it('leaves a version older than 13 as it is', () => {
 		const s = slot([mod(0x86, 1)], [[1, [[50]]]]);
-		expect(convertSlotToCurrent(s, 18)).toBe(false);
+		expect(convertSlotToCurrent(s, 12)).toBe(false);
 		expect(s.areas[1].values.get(1)).toEqual([[50]]);
+	});
+
+	it('FltPhase/ModAmt (v13): params removed and added; the 13…19 removals leave global knobs alone', () => {
+		const s = slot(
+			[mod(0x66, 1), mod(0xc3, 2)],
+			[
+				[1, [[0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10]]],
+				[2, [[60, 0, 1]]], // ExpLin 1: not cubified by 15→16
+			],
+		);
+		s.slot = 'A';
+		s.globalKnobs.push({ slot: 'A', location: 1, moduleIndex: 1, paramIndex: 1, isLed: 0 } as never);
+		s.knobs.push({ slotIndex: 0, location: 1, moduleIndex: 1, paramIndex: 1, isLed: 0 });
+		convertSlotToCurrent(s, 13);
+		// 13→14: 9, 1, 0 removed and three 0s added → [2 … 8, 10, 0, 0, 0]. 14→15 inverts Active (index 6):
+		// 8 → 0. 15→16 cubifies index 7: T[10] = 5.
+		expect(s.areas[1].values.get(1)).toEqual([[2, 3, 4, 5, 6, 7, 0, 5, 0, 0, 0]]);
+		expect(s.areas[1].values.get(2)).toEqual([[60, 0, 1, 1]]);
+		expect(s.knobs).toEqual([]);
+		expect(s.globalKnobs).toHaveLength(1);
+	});
+
+	it('cubic scale (v15): a morph range may become 0; mixer levels only where ExpLin is not linear', () => {
+		const morphs = [{ groupIndex: 0, location: 1 as const, moduleIndex: 1, paramIndex: 3, range: 1 }];
+		const s = slot(
+			[mod(0x61, 1), mod(0xc2, 2)],
+			[
+				[1, [[0, 0, 0, 2, 0, 0, 0]]], // OscA FreqFine… param 3 = 2
+				[
+					2,
+					[
+						[100, 0, 100, 0, 1], // Mix2-1A, ExpLin 1 (linear): left alone
+						[100, 0, 100, 0, 0], // ExpLin 0: levels 0 and 2 cubified
+					],
+				],
+			],
+			[],
+			[pp(morphs), pp()],
+		);
+		convertSlotToCurrent(s, 15);
+		expect(s.areas[1].values.get(1)![0][3]).toBe(2);
+		expect(morphs[0].range).toBe(0); // T[3] − T[2] = 0, kept as the official HandleCubifyParam does
+		expect(s.areas[1].values.get(2)).toEqual([
+			[100, 0, 100, 0, 1],
+			[94, 0, 94, 0, 0], // T[100] = 94
+		]);
+	});
+
+	it('v16: StChorus amount and its morphs halved, LFO Range capped, OscC waveform mode renumbered', () => {
+		const morphs = [-3, 2].map((range, groupIndex) => ({ groupIndex, location: 1 as const, moduleIndex: 1, paramIndex: 0, range }));
+		const oscC = mod(0x09, 3, [5]);
+		const s = slot(
+			[mod(0x5e, 1), mod(0x18, 2, [0]), oscC],
+			[
+				[1, [[9, 0, 1]]],
+				[2, [[64, 0, 0, 5, 1]]],
+				[3, [[64, 64, 1, 0, 0, 1, 0, 0]]],
+			],
+			[],
+			[pp(morphs)],
+		);
+		convertSlotToCurrent(s, 16);
+		expect(s.areas[1].values.get(1)![0][0]).toBe(5);
+		expect(morphs.map((m) => m.range)).toEqual([-2, 1]);
+		expect(s.areas[1].values.get(2)![0][3]).toBe(3);
+		expect(oscC.modes).toEqual([2]);
+	});
+
+	it('v18: the Out Pad is capped at 1 with its morphs, DelayB TimeClk set to 0', () => {
+		const morphs = [5, -4].map((range, groupIndex) => ({ groupIndex, location: 1 as const, moduleIndex: 1, paramIndex: 2, range }));
+		const s = slot(
+			[mod(0x04, 1), mod(0xb1, 2)],
+			[
+				[1, [[0, 1, 3]]],
+				[2, [[10, 20, 30, 40, 1, 50]]],
+			],
+			[],
+			[pp(morphs)],
+		);
+		convertSlotToCurrent(s, 18);
+		expect(s.areas[1].values.get(1)).toEqual([[0, 1, 1]]);
+		expect(morphs.map((m) => m.range)).toEqual([1, -1]);
+		expect(s.areas[1].values.get(2)![0][4]).toBe(0);
 	});
 });

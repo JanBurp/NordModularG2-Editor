@@ -1887,11 +1887,22 @@ describe('setFileDescription — another category for a patch file', () => {
 		expect(differing.filter((i) => i < descStart || (i >= descStart + 15 && i < file.length - 2))).toEqual([]);
 	});
 
+	// mogBass (format 13) has leftover bits in the description's padding: see the next test.
 	it('leaves every fixture byte-identical when the description is unchanged (also the CRC of version-22 files)', () => {
-		for (const f of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.pch2'))) {
+		for (const f of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.pch2') && f !== 'mogBass demo.pch2')) {
 			const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, f)));
 			const desc = new PatchParser(file.slice().buffer).parse().description!;
 			expect(setFileDescription(file, desc), f).toEqual(file);
 		}
+	});
+
+	it("clears leftover bits in the description's padding, as the official editor's save does", () => {
+		const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'mogBass demo.pch2')));
+		const golden = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'converted', 'mogBass demo.pch2')));
+		const out = setFileDescription(file, new PatchParser(file.slice().buffer).parse().description!);
+		const descOf = (b: Uint8Array) => b.slice(b.indexOf(0) + 3, b.indexOf(0) + 21);
+		expect(descOf(out)).toEqual(descOf(golden));
+		const differing = [...file.keys()].filter((i) => file[i] !== out[i]);
+		expect(differing).toEqual([file.indexOf(0) + 20, file.length - 2, file.length - 1]); // the padding byte and the CRC
 	});
 });

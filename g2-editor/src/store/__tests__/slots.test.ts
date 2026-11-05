@@ -2829,3 +2829,15 @@ describe('renameItems — Find & Replace batch rename', () => {
 		expect(useHistoryStore().canUndo('A')).toBe(false);
 	});
 });
+
+describe('loading a file format too old to convert', () => {
+	it('warns for a format below 13, not for one the parser converts', async () => {
+		const { useToast } = await import('@/composables/useToast');
+		const { toasts } = useToast();
+		toasts.splice(0);
+		const store = useSlotsStore();
+		store.loadPatchFile('A', makePatch(), 'Old one', undefined, undefined, 12);
+		store.loadPatchFile('B', makePatch(), 'Format 19', undefined, undefined, 19);
+		expect(toasts.map((t) => t.message)).toEqual(['"Old one" is in file format 12, too old to convert: it may not sound as it did.']);
+	});
+});
