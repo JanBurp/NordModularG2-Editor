@@ -422,6 +422,13 @@ order, insert an idle 0x69 and close each patch with a 0x6f (`canonicalSlotOrder
 `patch_slot_sections_canonical`). The G2 rejects a performance upload whose slots deviate from it.
 The parser itself dispatches by type and accepts any order.
 
+Within a section, the module list (0x4a) and the cable list (0x52) keep their own order. Parameters
+(0x4d), parameter labels (0x5b) and module names (0x5a) are written in ascending module index,
+whatever the module list order; the serializer does the same (`byIndex`). The low 6 bits of a 0x5a
+section's first byte (after the 2 location bits) hold leftover buffer content in the official
+editor's files; we write 0. With that one exception, our re-written old-format files equal the
+official saves byte for byte (checked in `parserRobustness.test.ts`).
+
 ---
 
 ## 8. Variation System

@@ -1731,39 +1731,13 @@ static int set_voice_description_field(int slot, int field, int val) {
     }
     cJSON_Delete(patch);
 
-    /* Find null-terminated text header */
-    int text_end = -1;
-    for (int k = 0; k < data_len; k++) {
-        if (data[k] == 0) { text_end = k; break; }
-    }
-    if (text_end < 0 || text_end + 3 > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
-
-    /* Scan sections for type 0x21 (patch description) */
-    int sec_off = text_end + 3;
-    int guard = 0;
-    while (sec_off + 3 <= data_len && guard++ < 64) {
-        uint8_t type = data[sec_off];
-        int body_len = (data[sec_off + 1] << 8) | data[sec_off + 2];
-        if (type == 0x21) {
-            uint8_t *body = data + sec_off + 3;
-            if (body_len < 14 || sec_off + 3 + body_len > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
-            if (field == 0) {
-                /* voices: bits 61-65 (5 bits) */
-                body[7] = (body[7] & 0xF8) | ((val >> 2) & 0x07);
-                body[8] = (body[8] & 0x3F) | ((val & 0x03) << 6);
-            } else {
-                /* monopoly: bits 90-91 (2 bits) */
-                body[11] = (body[11] & 0xCF) | ((val & 0x03) << 4);
-            }
-            int ret = g2_set_patch_description(slot, body, body_len);
-            free(data);
-            return ret;
-        }
-        sec_off += 3 + body_len;
-    }
+    /* get-patch's data holds the sections only (no file header). */
+    int body_len = 0;
+    uint8_t *body = patch_set_voice_field(data, data_len, field, val, &body_len);
+    int ret = body ? g2_set_patch_description(slot, body, body_len) : G2_ERR_INVALID_PARAM;
     free(data);
-    g2_err("voice-field: description section (0x21) not found\n");
-    return G2_ERR_INVALID_PARAM;
+    if (!body) g2_err("voice-field: description section (0x21) not found\n");
+    return ret;
 }
 
 int g2_set_voice_mode(int slot, int mode) {
@@ -1775,7 +1749,7 @@ int g2_set_voice_mode(int slot, int mode) {
 int g2_set_voice_count(int slot, int count) {
     if (slot < 0 || slot > 3) { g2_err("voice-count: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (count < 1 || count > 32) { g2_err("voice-count: count must be 1-32\n"); return G2_ERR_INVALID_PARAM; }
-    return set_voice_description_field(slot, 0, count);
+    return set_voice_description_field(slot, 0, count - 1); /* the field is 0-based: 0 = 1 voice */
 }
 
 static int get_perf_version(uint8_t *out_version) {

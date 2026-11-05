@@ -68,6 +68,7 @@ extern void test_pch2_file_from_sections_header_and_crc(void);
 extern void test_pch2_file_from_sections_buffer_too_small(void);
 extern void test_pch2_file_from_sections_official_order(void);
 extern void test_pch2_old_file_version(void);
+extern void test_patch_set_voice_field(void);
 extern void test_patch_usb_to_pch2_data_too_short(void);
 extern void test_patch_usb_to_pch2_exact_size(void);
 extern void test_slot_sections_canonical_reorders_hardware_train(void);
@@ -305,6 +306,7 @@ int main(void) {
     RUN_TEST(test_pch2_file_from_sections_buffer_too_small);
     RUN_TEST(test_pch2_file_from_sections_official_order);
     RUN_TEST(test_pch2_old_file_version);
+    RUN_TEST(test_patch_set_voice_field);
     RUN_TEST(test_patch_usb_to_pch2_data_too_short);
     RUN_TEST(test_patch_usb_to_pch2_exact_size);
     RUN_TEST(test_slot_sections_canonical_reorders_hardware_train);

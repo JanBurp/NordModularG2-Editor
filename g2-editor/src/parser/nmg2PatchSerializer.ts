@@ -144,11 +144,15 @@ function writeCableList(areaIdx: 0 | 1, cables: Cable[]): Uint8Array {
 	return makeSection(SectionType.CABLE_LIST, bw.flush());
 }
 
+// The official editor writes parameters, parameter labels and module names in module-index order,
+// whatever the order of the module list (its saves in test-patches/converted/).
+const byIndex = <T extends { index: number }>(items: T[]): T[] => [...items].sort((a, b) => a.index - b.index);
+
 // Variation indices written to a patch file; the Patch Mutator's audition dump writes only MUTATOR_VARIATION.
 const FILE_VARIATIONS = Array.from({ length: NUM_VARIATIONS }, (_, v) => v);
 
 function writeParameters(areaIdx: 0 | 1, modules: ModuleInstance[], variations: VariationState[], vars = FILE_VARIATIONS): Uint8Array {
-	const withParams = modules.filter((m) => m.pcnt > 0);
+	const withParams = byIndex(modules.filter((m) => m.pcnt > 0));
 	const aKey = areaIdx === 0 ? 'fx' : 'voice';
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
@@ -193,7 +197,7 @@ function entryLen(entry: ParamLabel): number {
 }
 
 function writeParamNames(areaIdx: 0 | 1 | 2, entries: Array<{ index: number; paramLabels: ParamLabel[] }>): Uint8Array {
-	const labeled = entries.filter((e) => e.paramLabels.length > 0);
+	const labeled = byIndex(entries.filter((e) => e.paramLabels.length > 0));
 
 	const bw = new BitWriter();
 	bw.write(2, areaIdx);
@@ -223,7 +227,7 @@ function writeModuleNames(areaIdx: 0 | 1, modules: ModuleInstance[]): Uint8Array
 	// carried none. Genuine files are full of the former (29 of 80 entries in one slot of
 	// Sample&Loop v61.prf2), and Delphi's TModuleLabelList.Write emits its whole list unfiltered
 	// too. Filtering on a non-empty name dropped those entries and shrank the section.
-	const named = modules.filter((m) => m.uname !== undefined);
+	const named = byIndex(modules.filter((m) => m.uname !== undefined));
 
 	let size = 2; // 1 byte header (areaIdx), 1 byte count
 	for (const m of named) {

@@ -131,6 +131,29 @@ int pch2_old_file_version(const uint8_t *data, long len) {
     return data[ne + 1] < G2_FILE_VERSION ? data[ne + 1] : 0;
 }
 
+uint8_t *patch_set_voice_field(uint8_t *sections, int len, int field, int raw, int *body_len) {
+    for (int off = 0; off + 3 <= len;) {
+        int n = (sections[off + 1] << 8) | sections[off + 2];
+        if (off + 3 + n > len) return NULL;
+        uint8_t *body = sections + off + 3;
+        if (sections[off] == 0x21) {
+            if (n < 12) return NULL;
+            if (field == 0) {
+                /* voices: bits 61-65 */
+                body[7] = (body[7] & 0xF8) | ((raw >> 2) & 0x07);
+                body[8] = (body[8] & 0x3F) | ((raw & 0x03) << 6);
+            } else {
+                /* voice mode (monopoly): bits 90-91 */
+                body[11] = (body[11] & 0xCF) | ((raw & 0x03) << 4);
+            }
+            *body_len = n;
+            return body;
+        }
+        off += 3 + n;
+    }
+    return NULL;
+}
+
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len) {
     if (!sections || !out || !out_len) return -1;

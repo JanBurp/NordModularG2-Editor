@@ -259,6 +259,15 @@ describe('parser robustness', () => {
 			expect(fileCrcOk(file23)).toBe(true);
 			expect(parseAll(file23)).toEqual(parseAll(golden));
 			expect(currentFormatFile(golden)).toBeNull();
+			// Byte for byte too, except the low 6 bits of each 0x5a location byte (the official writer leaves
+			// leftover buffer content there; we write 0) and so the CRC.
+			const junk = new Set(
+				sections(file23)
+					.filter((x) => x.type === SectionType.MODULE_NAMES)
+					.map((x) => x.ofs + 3),
+			);
+			const mask = (b: Uint8Array) => b.slice(0, -2).map((x, i) => (junk.has(i) ? x & 0xc0 : x));
+			expect(mask(file23)).toEqual(mask(golden));
 		});
 	}
 });

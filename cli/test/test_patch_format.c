@@ -17,6 +17,26 @@ void test_pch2_old_file_version(void) {
     TEST_ASSERT_EQUAL_INT(0, pch2_old_file_version(noVersion, sizeof(noVersion)));
 }
 
+/* get-patch data: sections only, starting `21 00 0f` (captured 2026-11-05). voice-count/voice-mode used to
+ * look for a file header's NUL first, found the 00 of that section header and never found the description. */
+void test_patch_set_voice_field(void) {
+    uint8_t sections[] = {
+        0x21, 0x00, 0x0f, 0x00, 0xec, 0x00, 0x00, 0x01, 0x00, 0x00, 0x20, 0x44, 0x01, 0x5f, 0xd0, 0x00, 0x00, 0x00,
+        0x4a, 0x00, 0x01, 0x00,
+    };
+    int body_len = 0;
+    uint8_t *body = patch_set_voice_field(sections, sizeof(sections), 0, 17, &body_len); /* 18 voices */
+    TEST_ASSERT_EQUAL_PTR(sections + 3, body);
+    TEST_ASSERT_EQUAL_INT(15, body_len);
+    TEST_ASSERT_EQUAL_HEX8(0x24, body[7]); /* low 3 bits = 17 >> 2, the rest kept */
+    TEST_ASSERT_EQUAL_HEX8(0x44, body[8]); /* top 2 bits = 17 & 3, the rest kept */
+    patch_set_voice_field(sections, sizeof(sections), 1, 2, &body_len); /* legato */
+    TEST_ASSERT_EQUAL_HEX8(0xe0, body[11]); /* 0xd0: bits 4-5 (was 1, mono) = 2, the rest kept */
+
+    uint8_t no_desc[] = {0x4a, 0x00, 0x01, 0x00};
+    TEST_ASSERT_NULL(patch_set_voice_field(no_desc, sizeof(no_desc), 0, 1, &body_len));
+}
+
 void test_patch_usb_to_pch2_strips_header(void) {
     /* USB frame layout: [3-byte header][payload chunk 1: 0x03..0x15)[2-byte gap][payload chunk 2: 0x17..end-2)[2-byte CRC]
      * patch_usb_to_pch2 extracts: bytes[0x03:0x15) + bytes[0x17:end-2)

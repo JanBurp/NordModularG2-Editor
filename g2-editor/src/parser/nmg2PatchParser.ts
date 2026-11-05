@@ -14,6 +14,7 @@ import type {
 } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
 import { NUM_VARIATIONS } from '../types/patch';
+import { defaultPatchParams } from '../store/slotHelpers';
 
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
 import { getDefaultParamValues, getModule } from '../renderer/nmg2mods';
@@ -86,29 +87,6 @@ const PATCH_SETTINGS_FIELDS: Record<number, readonly (keyof Omit<PatchParamVaria
 	6: ['arpeggiator', 'arpTime', 'arpType', 'octaves'],
 	7: ['octaveShift', 'sustain'],
 };
-
-// The patch settings of a variation the file doesn't hold, as the official editor fills them (its
-// saves of format-13/14 files in test-patches/converted/).
-const defaultPatchSettings = (): PatchParamVariation => ({
-	patchVol: 100,
-	activeMuted: 1,
-	glide: 0,
-	glideTime: 28,
-	bend: 1,
-	semi: 1,
-	vibrato: 0,
-	cents: 50,
-	rate: 64,
-	arpeggiator: 0,
-	arpTime: 3,
-	arpType: 0,
-	octaveShift: 2,
-	sustain: 1,
-	octaves: 0,
-	morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
-	morphModes: [1, 1, 1, 1, 1, 1, 1, 1],
-	morphAssignments: [],
-});
 
 // A G2 name field: up to 16 Latin-1 characters, NUL-terminated only when shorter than 16 (same
 // rule as the CLI's parse_name). Returns the name and the offset just past the field.
@@ -285,7 +263,7 @@ class G2Parser {
 		}
 		// A file can hold fewer variations than 9 (format 13/14 files have 8). The official reader starts
 		// from default values, so a missing variation gets the module's defaults and the default patch settings.
-		for (const params of this.patchParamsData) if (params) for (let v = 0; v < NUM_VARIATIONS; v++) params[v] ??= defaultPatchSettings();
+		for (const params of this.patchParamsData) if (params) for (let v = 0; v < NUM_VARIATIONS; v++) params[v] ??= defaultPatchParams();
 		this.areas.forEach((area, i) => {
 			for (const m of area.modules) {
 				const vars = this.values[i]?.get(m.index);

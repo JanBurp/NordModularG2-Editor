@@ -57,6 +57,11 @@ int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
  * (also for a buffer too short to hold one). */
 int pch2_old_file_version(const uint8_t *data, long len);
 
+/* Sets the voices (field 0, raw value 0-31 = 1-32 voices) or voice mode (field 1, 0-3) in the patch
+ * description (section 0x21) of a slot's section data as g2_get_patch returns it: sections only,
+ * no file header. Returns the description body (and its length in *body_len), or NULL if absent. */
+uint8_t *patch_set_voice_field(uint8_t *sections, int len, int field, int raw, int *body_len);
+
 
 /*
  * Split a whitespace-delimited command string into tokens in-place.
