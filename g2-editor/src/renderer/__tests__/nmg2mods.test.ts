@@ -1,6 +1,15 @@
 import { describe, expect, it } from 'vitest';
 import g2ModuleDefaults from './g2ModuleDefaults.json';
-import { areModulesReplaceCompatible, getDefaultParamValues, getModule, getReplaceCandidates, isValidInArea } from '../nmg2mods';
+import {
+	areModulesReplaceCompatible,
+	getAllCategories,
+	getDefaultParamValues,
+	getModule,
+	getModulesByCategory,
+	getReplaceCandidates,
+	hasToolbarGapBefore,
+	isValidInArea,
+} from '../nmg2mods';
 
 // These lock in areModulesReplaceCompatible's behaviour against real entries in nmg2mods.ts, since
 // the heuristic is an approximation of Clavia's unrecoverable "replace group" table (see the doc
@@ -103,5 +112,41 @@ describe('getDefaultParamValues', () => {
 describe('getDefaultParamValues matches the G2', () => {
 	it.each(Object.entries(g2ModuleDefaults))('type %s', (typeId, values) => {
 		expect(getDefaultParamValues(Number(typeId))).toEqual(values);
+	});
+});
+
+// Order and spacers of the official editor's module toolbar (CModuleFactory::CModuleFactory in G2Editor.c).
+describe('module toolbar order matches the official editor', () => {
+	it('orders categories like the original', () => {
+		expect(getAllCategories()).toEqual([
+			'In/Out',
+			'Note',
+			'Osc',
+			'LFO',
+			'Rnd',
+			'Env',
+			'Filter',
+			'FX',
+			'Delay',
+			'Shaper',
+			'Level',
+			'Mixer',
+			'Switch',
+			'Logic',
+			'Seq',
+			'MIDI',
+			'Hidden',
+		]);
+	});
+
+	it('orders modules and gaps within a category like the original', () => {
+		const layout = (cat: string) => {
+			const mods = getModulesByCategory(cat);
+			return mods.map((m, i) => (hasToolbarGapBefore(mods, i) ? '| ' : '') + m.short).join(' ');
+		};
+		expect(layout('In/Out')).toBe('2-Out 4-Out | 2-In 4-In | Fx-In | Keyboard MonoKey Device | Status | NoteDet | Name');
+		expect(layout('Mixer')).toBe(
+			'Mix1-1A Mix1-1S | Mix2-1A Mix2-1B Mix4-1A Mix4-1B Mix4-1C Mix4-1S | Mix8-1A Mix8-1B MixFader | MixStereo | Pan X-Fade Fade1-2 Fade2-1',
+		);
 	});
 });

@@ -36,6 +36,11 @@
 		<ToolBarDivider />
 		<CableVisibilitySelector />
 		<ToolBarDivider />
+		<!-- hidden (keys too, see App.vue) while the big Patch Mutator is open -->
+		<template v-if="!settingsStore.patchMutatorVisible">
+			<MiniMutator />
+			<ToolBarDivider />
+		</template>
 		<PatchLevel />
 		<div v-if="settingsStore.toolbarMode === 'hidden'" class="hidden xl:flex items-center gap-2">
 			<ToolBarDivider />
@@ -63,6 +68,7 @@
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICES } from '../../types/patch';
 	import ColorPicker from '../common/ColorPicker.vue';
+	import MiniMutator from './MiniMutator.vue';
 
 	withDefaults(defineProps<{ patchName: string; mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
 	const emit = defineEmits<{

@@ -12,6 +12,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Linux builds (x64 and Raspberry Pi arm64) as AppImage and .deb
 - "Install USB helper" button on Linux: sets up USB permission for the G2 in one click
 - Windows: no more Zadig/WinUSB. The installer sets up UsbDk once; Clavia's driver stays, so the original editor keeps working and multiple G2s need no extra steps
+- Mini Mutator in Patch Toolbar (with keycommands)
 
 ### Changed
 - Improved and more auto-suggesting cables
@@ -19,6 +20,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Added close icon to Find & Replace bar
 - Better responsiveness
 - A USB driver/permission problem now shows the driver dialog immediately
+- Order of module categories, and grouping of modules
 
 ### Fixed
 - Some typos in docs

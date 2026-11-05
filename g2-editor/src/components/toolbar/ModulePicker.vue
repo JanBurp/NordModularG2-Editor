@@ -32,6 +32,7 @@
 					:src="graphics[m.id]"
 					:title="m.long || m.short"
 					:class="['w-8 h-8 shrink-0 bg-white cursor-grab', i === focusedIndex ? 'ring-2 ring-amber-300' : '']"
+					:style="{ marginLeft: hasToolbarGapBefore(modules, i) ? TOOLBAR_SPACER + 'px' : undefined }"
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
@@ -46,6 +47,7 @@
 						'w-8 h-8 shrink-0 flex items-center justify-center text-center text-[8px] leading-none bg-surface-2 border border-line-default rounded cursor-grab overflow-hidden px-0.5',
 						i === focusedIndex ? 'ring-2 ring-amber-300' : '',
 					]"
+					:style="{ marginLeft: hasToolbarGapBefore(modules, i) ? TOOLBAR_SPACER + 'px' : undefined }"
 					draggable="true"
 					@dragstart="(e) => handleDragStart(e, m.id)"
 					@dragend="handleDragEnd"
@@ -61,7 +63,7 @@
 
 <script setup lang="ts">
 	import { ref, computed, watch } from 'vue';
-	import { getModulesByCategory } from '../../renderer/nmg2mods';
+	import { getModulesByCategory, hasToolbarGapBefore } from '../../renderer/nmg2mods';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { useModuleDragSource } from '../../composables/useModuleDragSource';
 	import { useVisibleCategories } from '../../composables/useVisibleCategories';
@@ -121,8 +123,13 @@
 	// Fixed to the widest category's icon row so switching categories never resizes the toolbar.
 	const ICON_SIZE = 33;
 	const ICON_GAP = 4; // gap-1
-	const maxModuleCount = computed(() => Math.max(1, ...categories.value.map((c) => getModulesByCategory(c).length)));
-	const pickerWidthPx = computed(() => maxModuleCount.value * ICON_SIZE + (maxModuleCount.value - 1) * ICON_GAP);
+	const TOOLBAR_SPACER = 8; // official editor: 5px spacer view + 1px button spacing
+	function rowWidthPx(category: string) {
+		const mods = getModulesByCategory(category);
+		const gaps = mods.filter((_, i) => hasToolbarGapBefore(mods, i)).length;
+		return mods.length * ICON_SIZE + Math.max(0, mods.length - 1) * ICON_GAP + gaps * TOOLBAR_SPACER;
+	}
+	const pickerWidthPx = computed(() => Math.max(ICON_SIZE, ...categories.value.map(rowWidthPx)));
 
 	// Category cells are sized to fill 8 columns of pickerWidthPx; a 9th (row 2 only, Hidden) extends the toolbar instead of shrinking cells.
 	const CATEGORY_GAP = 1; // gap-px
