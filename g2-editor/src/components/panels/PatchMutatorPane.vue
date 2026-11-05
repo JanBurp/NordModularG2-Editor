@@ -209,15 +209,13 @@
 
 	// Opening the Mutator hands it the keyboard; the focused box (or else the current variation) is
 	// kept. SidePanel is v-if'd on showRightPane, so opening the panel mounts this pane: check on mount too.
+	const isOpen = computed(() => settings.showRightPane && settings.rightPaneTab === 'mutator' && settings.patchMutatorOpen);
 	function takeFocus() {
-		if (settings.patchMutatorVisible) paneRef.value?.focus();
+		if (isOpen.value) paneRef.value?.focus();
 	}
 	onMounted(takeFocus);
 	// nextTick: SidePanel's v-show only un-hides this pane after our post-flush watchers have run
-	watch(
-		() => settings.patchMutatorVisible,
-		() => nextTick(takeFocus),
-	);
+	watch(isOpen, () => nextTick(takeFocus));
 
 	function onFocusout(e: FocusEvent) {
 		if (!paneRef.value?.contains(e.relatedTarget as Node | null)) uiStore.mutatorFocused = false;

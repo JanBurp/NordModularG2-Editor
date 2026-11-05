@@ -109,12 +109,12 @@ export const useMutatorStore = defineStore('mutator', {
 			return useSlotsStore().slots[this._slot()].variations?.[index];
 		},
 
-		_modules(selectedOnly?: boolean): M.MutaModules {
+		_modules(): M.MutaModules {
 			const patch = useSlotsStore().slots[this._slot()].patch;
 			const ui = useUiStore();
 			// "Selected": modules left out of the table are never changed
 			const included = (area: 0 | 1, index: number) =>
-				!(selectedOnly ?? this.current.selectedOnly) || (ui.selectedModulesArea === (area === 0 ? 'fx' : 'va') && ui.selectedModules.includes(index));
+				!this.current.selectedOnly || (ui.selectedModulesArea === (area === 0 ? 'fx' : 'va') && ui.selectedModules.includes(index));
 			const table = (area: 0 | 1) =>
 				Object.fromEntries(
 					(patch?.areas[area]?.modules ?? [])
@@ -272,21 +272,6 @@ export const useMutatorStore = defineStore('mutator', {
 				},
 				{ kind: 'child', index: 0 },
 			);
-		},
-
-		// Mini Mutate/Randomize (Extended Toolbar): rewrites the current variation in place, as one undo step.
-		// Works on the selected modules, or the whole patch when none are selected; follows the Quick Locks.
-		async mutateCurrent(op: 'mutate' | 'randomize'): Promise<void> {
-			const src = this._focusedGenome();
-			if (!src) return;
-			const ui = useUiStore();
-			const { prob, range, lockMask, soloMask } = this.current;
-			const modules = this._modules(ui.selectedModules.length > 0);
-			const g =
-				op === 'mutate'
-					? M.mutate(src, modules, prob, range, lockMask, soloMask, Math.random)
-					: M.randomize(src, modules, lockMask, soloMask, Math.random);
-			await useSlotsStore().applyVariationState(this._slot(), ui.variation, M.variationFromGenome(g));
 		},
 
 		// Interpolate / Cross: `a`/`b` (if given) first become Mother and Father.
