@@ -10,16 +10,32 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### New
 - Mini Mutator in Patch Toolbar (with keycommands)
+- Old patch and performance files are converted to new version
 
 ### Changed
 - Improved and more auto-suggesting cables
 - Minor UX changes to Bank Organizer
 - Added close icon to Find & Replace bar
 - Better responsiveness
+- Patch and performance files are written in exactly the original editor's layout (section and module order)
+- A variation missing from a file gets the original editor's default patch settings
 
 ### Fixed
 - Some typos in docs
 - Some e2e test where not headless
+- A patch loaded on the G2's front panel now shows up in the editor as a new patch (no file name, no undo history)
+- Patches with an unknown module, and performances with 16-character slot names, now load
+- Changing a synth setting no longer resets others (sort modes, vibrato rate)
+- Performance categories are shown in the Patch Browser
+- Performance files keep their category, keyboard clock trigger and slot MIDI channels
+- Damaged USB messages are detected and ignored; a file with a bad checksum gives a warning
+- More robust USB communication (short writes, USB errors, message queue)
+- Patch notes are capped at 1024 characters, as on the G2
+- Patches saved from the G2 include its current-note data, as the original editor's do
+
+### Others
+- CLI warns when it uploads an old-format file unconverted
+- Test patches in file formats 13–18, with the original editor's saves of all old-format test files
 
 ## [0.8.0] - 2026-11-1
 
