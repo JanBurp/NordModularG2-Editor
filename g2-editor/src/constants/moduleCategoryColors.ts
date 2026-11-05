@@ -1,23 +1,23 @@
-// Per-category accent colors for the module picker, approximating the category-tab
-// underline colors used in the original Clavia G2 editor. Keys match ModuleDefinition.page.name.
+// Per-category accent colors, taken from the original Clavia G2 editor's RegisterCategory calls
+// (CModuleFactory::CModuleFactory in G2Editor.c). Keys match ModuleDefinition.page.name.
 export const MODULE_CATEGORY_COLORS: Record<string, string> = {
-	'In/Out': '#535156',
-	Osc: '#d32f2f',
-	Rnd: '#2979ff',
-	Filter: '#00695c',
-	Delay: '#7b1fa2',
-	Level: '#388e3c',
-	Switch: '#4fc3f7',
-	Seq: '#ffb300',
-	Note: '#8e24aa',
-	LFO: '#1a237e',
-	Env: '#26c6da',
-	FX: '#e91e8c',
-	Shaper: '#ad4a4a',
-	Mixer: '#f57c00',
-	Logic: '#fdd835',
-	MIDI: '#795548',
-	Hidden: '#9e9e9e',
+	'In/Out': '#909090',
+	Note: '#8c02fd',
+	Osc: '#ca0000',
+	LFO: '#0000ca',
+	Rnd: '#0096e6',
+	Env: '#00bbbb',
+	Filter: '#008284',
+	FX: '#ea64b0',
+	Delay: '#8359ff',
+	Shaper: '#ce7173',
+	Level: '#40a000',
+	Mixer: '#ff8040',
+	Switch: '#66d9ff',
+	Logic: '#f5ea01',
+	Seq: '#fecf41',
+	MIDI: '#c08000',
+	Hidden: '#9e9e9e', // not an original category
 };
 
 export function getCategoryColor(category: string): string {
