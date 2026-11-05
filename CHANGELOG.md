@@ -16,6 +16,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Minor UX changes to Bank Organizer
 - Added close icon to Find & Replace bar
 - Better responsiveness
+- Order of module categories, and grouping of modules
 
 ### Fixed
 - Some typos in docs
