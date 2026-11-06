@@ -36,6 +36,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - More robust USB communication (short writes, USB errors, message queue)
 - Patch notes are capped at 1024 characters, as on the G2
 - Patches saved from the G2 include its current-note data, as the original editor's do
+- Possible fix for copy/paste key commands in Windows & Linux
 
 ### Others
 - CLI warns when it uploads an old-format file unconverted
