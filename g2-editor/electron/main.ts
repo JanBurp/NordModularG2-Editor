@@ -1594,6 +1594,7 @@ function currentMenuState(): MenuState {
 // every window's menu (via setApplicationMenu) on focus change broke all accelerators on Windows
 // after switching windows, while clicking the menu items still worked.
 function applyWindowMenu(window: BrowserWindow): void {
+	if (window.isDestroyed()) return;
 	const active = hostOf(window)?.active;
 	const menuState = (active && sessionByWebContentsId.get(active.view.webContents.id)?.menuState) ?? lastMenuState;
 	window.setMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, menuState)));
@@ -1601,7 +1602,7 @@ function applyWindowMenu(window: BrowserWindow): void {
 
 function refreshMenu(): void {
 	if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
-	else for (const host of hosts) if (!host.window.isDestroyed()) applyWindowMenu(host.window);
+	else for (const host of hosts) applyWindowMenu(host.window);
 }
 
 ipcMain.on('recent-files:update', (_, files: RecentFileEntry[]) => {

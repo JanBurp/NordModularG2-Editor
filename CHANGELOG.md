@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed
+- Windows: with multiple devices in seperate windows, closing one would show an error popup
+
 ## [0.8.1] - 2026-11-06
 
 ### New
