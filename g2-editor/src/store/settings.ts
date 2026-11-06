@@ -57,7 +57,7 @@ export const useSettingsStore = defineStore('settings', {
 		libraryFavoritesOnly: false as boolean,
 	}),
 	getters: {
-		// The big Patch Mutator section is on screen (the Mini Mutator hides meanwhile)
+		// The big Patch Mutator section is on screen
 		patchMutatorVisible: (s) => s.showRightPane && s.rightPaneTab === 'mutator' && s.patchMutatorOpen,
 	},
 	actions: {
