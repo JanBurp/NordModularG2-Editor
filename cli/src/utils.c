@@ -34,6 +34,14 @@ uint16_t calc_crc16(uint8_t *buff, int length) {
     return crc;
 }
 
+/* The check the official editor runs on every message from the G2 (CSynthPortUSB::
+ * InterruptHandleData / IsUSBCheckSumOK): the last 2 of the n bytes are a big-endian CRC16 over
+ * the rest. n is an embedded message's length nibble (data after the type byte) or a bulk's size. */
+int g2_crc_ok(const uint8_t *data, int n) {
+    if (n < 2) return 0;
+    return calc_crc16((uint8_t *)data, n - 2) == (((uint16_t)data[n - 2] << 8) | data[n - 1]);
+}
+
 /* Extract a name from a G2 name field: up to 16 bytes, NUL-terminated only when shorter
  * (Delphi ReadClaviaString). Any other byte is part of the name — a non-printable one is shown
  * as '?'. Stopping at it instead left the rest of the message misaligned: a G2 Engine whose
@@ -48,6 +56,25 @@ int parse_name(const uint8_t *data, char *buf, size_t bufsize) {
         return (int)(i + 1);
     }
     return (int)i;
+}
+
+/* Writes a G2 name field: up to 16 characters, NUL-terminated only when shorter (the official
+ * variable PutString, vtable +0x5c with max 16; parse_name reads it). Returns the bytes written. */
+size_t put_name_field(uint8_t *out, const char *name, size_t len) {
+    if (len > 16) len = 16;
+    memcpy(out, name, len);
+    if (len < 16) out[len++] = 0x00;
+    return len;
+}
+
+/* One name entry of a 0x16 list reply: a name (parse_name rules) followed by a category byte, for
+ * patches and performances alike (official CMFlashDataDump::ReadStream). A category above 15 is
+ * reported as 0. Returns the bytes used, or -1 when the entry doesn't fit in `avail`. */
+int parse_list_entry(const uint8_t *data, int avail, char *buf, size_t bufsize, int *category) {
+    int n = parse_name(data, buf, bufsize);
+    if (n <= 0 || n + 1 > avail) return -1;
+    *category = data[n] > 15 ? 0 : data[n];
+    return n + 1;
 }
 
 slot_t parse_slot(const char *slot_str) {
@@ -89,17 +116,66 @@ int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
 }
 
 /* Wrap section data in a .pch2 file: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE].
- * CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write checksums
- * and every real .pch2 carries); without it a reader (including our own upload-patch)
+ * The sections go in the official order (patch_slot_sections_canonical, which fills in a missing
+ * 0x69) closed by a 0x6f text pad, empty when the input has none: the official reader rejects any
+ * other order (CPatchFile_13::WriteMolecules), and fetch_patch data has 0x5a before 0x5b, its
+ * 0x69 (if any) at the end and no 0x6f. CRC covers [0x17][0x00][sections] (the range G2Editor.c's CPatchFile_*::Write
+ * checksums and every real .pch2 carries); without it a reader (including our own upload-patch)
  * takes the last 2 section bytes for the CRC and truncates the patch. */
+/* The byte after the text header's NUL is the format version. The official editor converts an
+ * older file on load (CFileConverter); the CLI sends files as they are. */
+int pch2_old_file_version(const uint8_t *data, long len) {
+    long ne = 0;
+    while (ne < len && data[ne]) ne++;
+    if (ne + 1 >= len) return 0;
+    return data[ne + 1] < G2_FILE_VERSION ? data[ne + 1] : 0;
+}
+
+uint8_t *patch_set_voice_field(uint8_t *sections, int len, int field, int raw, int *body_len) {
+    for (int off = 0; off + 3 <= len;) {
+        int n = (sections[off + 1] << 8) | sections[off + 2];
+        if (off + 3 + n > len) return NULL;
+        uint8_t *body = sections + off + 3;
+        if (sections[off] == 0x21) {
+            if (n < 12) return NULL;
+            if (field == 0) {
+                /* voices: bits 61-65 */
+                body[7] = (body[7] & 0xF8) | ((raw >> 2) & 0x07);
+                body[8] = (body[8] & 0x3F) | ((raw & 0x03) << 6);
+            } else {
+                /* voice mode (monopoly): bits 90-91 */
+                body[11] = (body[11] & 0xCF) | ((raw & 0x03) << 4);
+            }
+            *body_len = n;
+            return body;
+        }
+        off += 3 + n;
+    }
+    return NULL;
+}
+
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len) {
     if (!sections || !out || !out_len) return -1;
 
+    uint8_t *canon = malloc(sections_len + PCH2_CANONICAL_GROWTH + 3);
+    if (!canon) return -1;
+    size_t canon_len = 0;
+    patch_slot_sections_canonical(sections, sections_len, canon, &canon_len);
+    /* patch_slot_sections_canonical keeps a 0x6f (not in its order) at the end; add one if absent. */
+    size_t last = 0;
+    for (size_t ofs = 0; ofs + 3 <= canon_len; ofs += 3 + (((size_t)canon[ofs + 1] << 8) | canon[ofs + 2])) last = ofs;
+    if (canon_len < 3 || canon[last] != 0x6f) {
+        canon[canon_len++] = 0x6f;
+        canon[canon_len++] = 0x00;
+        canon[canon_len++] = 0x00;
+    }
+
     size_t header_len = strlen(PCH2_TEXT_HEADER);
-    size_t total = header_len + 3 + sections_len + 2;
+    size_t total = header_len + 3 + canon_len + 2;
     if (*out_len < total) {
         *out_len = total;
+        free(canon);
         return -1;
     }
 
@@ -107,9 +183,10 @@ int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
     out[header_len]     = 0x00;
     out[header_len + 1] = 0x17;
     out[header_len + 2] = 0x00;
-    memcpy(out + header_len + 3, sections, sections_len);
+    memcpy(out + header_len + 3, canon, canon_len);
+    free(canon);
 
-    uint16_t crc = calc_crc16(out + header_len + 1, (int)(sections_len + 2));
+    uint16_t crc = calc_crc16(out + header_len + 1, (int)(canon_len + 2));
     out[total - 2] = (crc >> 8) & 0xff;
     out[total - 1] = crc & 0xff;
 
@@ -122,7 +199,7 @@ int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
  * fixtures carry it. The G2 rejects a performance upload whose slots deviate from it —
  * confirmed on hardware, where an out-of-order slot comes back as an error event with every
  * patch renamed "Error". GET_PATCH answers in a *different* order (0x5a before 0x5b) and omits
- * 0x69 entirely, so a slot captured from the wire has to be rewritten into this order before it
+ * 0x69 (fetch_patch appends the separate 0x68 reply), so a slot captured from the wire has to be rewritten into this order before it
  * can go into a file that is meant to be uploadable again. */
 static const uint8_t kSlotChunkOrder[] = {
     0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
@@ -131,9 +208,10 @@ static const uint8_t kSlotChunkOrder[] = {
 
 /* A neutral C_CURRENT_NOTE_2 (0x69) chunk: the "nothing playing" value Clavia's own files use
  * for an idle patch — byte-for-byte what both EmptyPerf.prf2 slots and three of the four
- * MorphingDrumDemo.prf2 slots contain. GET_PATCH never returns this chunk, but the G2 requires
- * it on upload (a slot train without it is rejected exactly like an out-of-order one, verified
- * on hardware), and its contents are live voice state that is not worth round-tripping anyway. */
+ * MorphingDrumDemo.prf2 slots contain. The real chunk comes from a separate 0x68 request
+ * (fetch_patch); this only fills in when that reply is missing, because the G2 requires the chunk
+ * on upload (a slot train without it is rejected exactly like an out-of-order one, verified on
+ * hardware). */
 static const uint8_t kCurrentNoteDefault[] = {
     0x69, 0x00, 0x09, 0x80, 0x00, 0x00, 0x60, 0x00, 0x01, 0x00, 0x00, 0x00
 };
@@ -190,30 +268,6 @@ void patch_slot_sections_canonical(const uint8_t *in, size_t in_len, uint8_t *ou
         }
     }
     *out_len = pos;
-}
-
-/* A C_PERF_SETTINGS (0x11) payload is an 8-byte header followed by four blocks of
- * [name][NUL][10 bytes], the 10 being active, key, hold, bank, patch, rangeLow, rangeHigh,
- * slot, and two unused (same layout the TS parser reads in parsePrfData). The G2 fills that
- * slot byte with its own unit-specific numbering — 0a 0b 0c 0d on the unit this was captured
- * from — where every .prf2 on disk holds 00 01 02 03. Delphi refuses to write the field at all
- * for that reason (BVE.NMG2File.pas:11779, "First G2 gives 1..4, second G2 gives 5..8..?").
- * A payload that runs out before four blocks are seen is left as-is. */
-void perf_settings_normalize_slots(uint8_t *data, size_t len) {
-    size_t ofs = 8;
-    for (uint8_t slot = 0; slot < 4; slot++) {
-        /* The name field holds at most 16 characters and is NUL-terminated only when it is
-         * shorter than that — the same convention parse_name above reads. A 16-character name
-         * (seen on real hardware: "185stepsequencer") is followed immediately by the 10 bytes,
-         * so scanning for a NUL swallows the first of them and shifts the rest of the payload. */
-        size_t n = 0;
-        while (n < 16 && ofs + n < len && data[ofs + n]) n++;
-        ofs += n;
-        if (n < 16) ofs++;  /* skip the terminator */
-        if (ofs + 10 > len) return;
-        data[ofs + 7] = slot;
-        ofs += 10;
-    }
 }
 
 int parse_location_str(const char *s) {

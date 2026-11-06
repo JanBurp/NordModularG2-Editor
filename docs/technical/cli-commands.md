@@ -84,7 +84,7 @@ The `g2-cli` tool handles all USB communication with the G2 hardware. All G2 res
 | Command | Arguments | Description |
 |---|---|---|
 | `add-module` | `<slot> <va\|fx> <type-id> <module-id> <col> <row> <color> <num-modes> [modes] <num-params> [params] <name> [muta-lock:0\|1]` | Add module to patch. `module-id` must be 1–127; Fx-In (type 127) is FX-only. The G2 ignores `params` and uses its own defaults. `muta-lock` sets Exclude From Mutation (default 0) |
-| `del-module` | `<slot> <va\|fx> <module-id>` | Delete module (delete cables first; zero its morph ranges first, or the G2 is corrupted until power-off) |
+| `del-module` | `<slot> <va\|fx> <module-id>` | Delete module. Delete its cables first (`del-cable`): the G2 keeps them otherwise, pointing at the deleted module (seen 2026-11-05); the official editor also sends a cable delete for each first. Zero its morph ranges first too, or the G2 is corrupted until power-off |
 | `move-module` | `<slot> <va\|fx> <module-id> <col> <row>` | Move module to grid position |
 | `set-module-color` | `<slot> <va\|fx> <module-id> <color:0–24>` | Set module color |
 | `set-module-uprate` | `<slot> <va\|fx> <module-id> <0\|1>` | Set module audio-rate (uprate) flag; the editor sends it after every cable change, as the official editor does |

@@ -242,6 +242,18 @@ static char *sections_hex(const char *hex, int sec) {
     return out;
 }
 
+/* get-patch A carries the G2's current notes: fetch_patch appends the 0x68 reply as a 0x69
+ * section (count+1 voice entries, so at least the 26-bit header + one 21-bit entry = 6 bytes). */
+void test_daemon_get_patch_has_current_note(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    char *data = slot_a_field("data");
+    char *note = sections_hex(data, 0x69);
+    TEST_ASSERT_NOT_NULL_MESSAGE(note, "get-patch A returned no data");
+    TEST_ASSERT_TRUE_MESSAGE(strlen(note) >= 2 * (3 + 6), "no 0x69 current-note section in get-patch A");
+    free(note);
+    free(data);
+}
+
 /* Cable sections (0x52, hex) of slot A at the last capture_slot_a_patch; restore_slot_a_patch checks them. */
 static char *g_captured_cables = NULL;
 

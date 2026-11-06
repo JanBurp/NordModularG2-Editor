@@ -130,25 +130,27 @@ export function isCableSourceEnd(c: Cable, jack: JackEnd): boolean {
 	return (c.dir ?? 1) === 0 && c.smod === jack.moduleIndex && c.scon === jack.connectorIndex;
 }
 
+// The patch settings of a variation the patch doesn't hold, as the official editor fills them (its
+// saves of format-13/14 files in test-patches/converted/, which hold 8 of the 9 variations).
 export function defaultPatchParams(): PatchParamVariation {
 	return {
 		patchVol: 100,
 		activeMuted: 1,
 		glide: 0,
-		glideTime: 0,
-		bend: 0,
-		semi: 0,
+		glideTime: 28,
+		bend: 1,
+		semi: 1,
 		vibrato: 0,
-		cents: 0,
-		rate: 0,
+		cents: 50,
+		rate: 64,
 		arpeggiator: 0,
-		arpTime: 0,
+		arpTime: 3,
 		arpType: 0,
-		octaveShift: 0,
-		sustain: 0,
+		octaveShift: 2,
+		sustain: 1,
 		octaves: 0,
 		morphDials: [0, 0, 0, 0, 0, 0, 0, 0],
-		morphModes: [0, 0, 0, 0, 0, 0, 0, 0],
+		morphModes: [1, 1, 1, 1, 1, 1, 1, 1],
 		morphAssignments: [],
 	};
 }

@@ -803,8 +803,10 @@ describe('morph assignment round-trip', () => {
 		expect(extractSection(newHex, 0x65)).not.toBeNull();
 	});
 
+	// The official v23 save of Analogue NL2: the original is v19, which the parser converts (morph
+	// groups 4/5 swap), so its own 0x65 bytes can't come back unchanged.
 	it('a real fixture with an existing 0x65 section (Analogue NL2.pch2) parses it and round-trips byte-identically', () => {
-		const { name, rawHex, patch } = loadFixture('Analogue NL2.pch2');
+		const { name, rawHex, patch } = loadFixture('converted/Analogue NL2.pch2');
 		expect(extractSection(rawHex, 0x65)).not.toBeNull();
 		expect(patch.patchParams!.some((p) => p.morphAssignments.length > 0)).toBe(true);
 
@@ -1166,13 +1168,21 @@ describe('prf2 0x11 section preservation', () => {
 	it('header knob source, range enable, bpm and clock run are parsed', () => {
 		const buf = fs.readFileSync(path.join(FIXTURES, 'MorphingDrumDemo.prf2'));
 		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
-		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 120, clockRunning: true });
+		expect(prf2.settings).toEqual({
+			focus: 0,
+			knobSourceGlobal: false,
+			rangeEnable: false,
+			bpm: 120,
+			clockRunning: true,
+			category: 0,
+			clockKbdTrig: false,
+		});
 	});
 
 	it('header knob source Global is parsed', () => {
 		const buf = fs.readFileSync(path.join(FIXTURES, 'banks-test/New Performance.prf2'));
 		const prf2 = new PatchParser(new Uint8Array(buf).buffer).parsePrf2()!;
-		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true });
+		expect(prf2.settings).toEqual({ focus: 0, knobSourceGlobal: true, rangeEnable: false, bpm: 152, clockRunning: true, category: 0, clockKbdTrig: false });
 	});
 
 	it('focus comes from the header, not the first keyed slot (A and D keyed, D focused)', () => {
@@ -1535,13 +1545,13 @@ describe('patch text round-trip: parse → serialize → parse', () => {
 		expect(patchB.text).toBe(patch.text);
 	});
 
-	it('adds no text-pad section when the template has none and text is empty', () => {
+	it('closes with an empty 0x6f when the template has none and text is empty (official order ends with it)', () => {
 		const { name, rawHex, patch } = loadFixture('Basics  NL2.pch2');
 		const templateNoText = removeSection(rawHex, 0x6f);
 		patch.text = '';
 
 		const newHex = serializePatch(name, patch, templateNoText, extractVariations(patch));
-		expect(extractSection(newHex, 0x6f)).toBeNull();
+		expect(extractSection(newHex, 0x6f)).toBe('6f0000');
 	});
 });
 
@@ -1640,21 +1650,173 @@ describe('writePerfSettings (C_PERF_SETTINGS 0x11)', () => {
 	});
 });
 
-describe('buildPerformanceTemplate — performance from hardware (get-patch order) slot templates', () => {
-	// get-patch answers 0x5a before 0x5b, omits 0x69 and has no 0x6f text section (see patch_slot_sections_canonical).
-	function usbOrderTemplate(rawHex: string): string {
-		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
-		const secs: Uint8Array[] = [];
-		for (let ofs = 0; ofs < bytes.length - 2; ) {
-			const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
-			if (bytes[ofs] !== 0x69 && bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
-			ofs = end;
-		}
-		const order = (t: number) => (t === 0x5a ? 0 : t === 0x5b ? 1 : -1);
-		secs.sort((a, b) => (order(a[0]) >= 0 && order(b[0]) >= 0 ? order(a[0]) - order(b[0]) : 0));
-		return secs.map(toHex).join('');
+describe('writePerfSettings keeps what the G2 stored (0x11 category, clock bool, MIDI channels)', () => {
+	it("rebuilds a real performance's 0x11 byte for byte from its parsed fields, per-slot MIDI channels included", () => {
+		// Slot A on MIDI channel 1, B-D on 12-14: per-performance data, not slot numbering.
+		const file = 'banks-test/OT Template 7.5..prf2';
+		const { rawHex } = loadFixturePrf2(file);
+		const perf = new PatchParser(new Uint8Array(fs.readFileSync(path.join(FIXTURES, file))).buffer).parsePrf2()!;
+		const slots = perf.slotMeta.map((m, i) => ({
+			slot: (['A', 'B', 'C', 'D'] as const)[i],
+			name: perf.slotNames[i],
+			active: m.active,
+			key: m.key,
+			hold: m.hold,
+			bank: m.bank,
+			patch: m.patch,
+			range: { lower: m.rangeLow, upper: m.rangeHigh },
+			midiChannel: m.midiChannel,
+		}));
+		expect(slots.map((s) => s.midiChannel)).toEqual([0, 11, 12, 13]);
+		const { focus, ...settings } = perf.settings;
+		const built = writePerfSettings({ name: '', focus: (['A', 'B', 'C', 'D'] as const)[focus], ...settings }, slots);
+		expect(toHex(built)).toBe(extractSection(rawHex, SectionType.PERF_DATA));
+	});
+
+	it('writes category in header byte 0, the clock bool in byte 4 and Latin-1 slot names', () => {
+		const slots = (['A', 'B', 'C', 'D'] as const).map((slot, i) => ({
+			slot,
+			name: slot === 'A' ? 'Café' : 'x',
+			active: true,
+			key: false,
+			hold: false,
+			bank: 0,
+			patch: 0,
+			range: { lower: 0, upper: 127 },
+			midiChannel: 15 - i,
+		}));
+		const b = writePerfSettings({ name: 'p', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false, category: 9, clockKbdTrig: true }, slots).slice(
+			3,
+		);
+		expect(b[0]).toBe(9);
+		expect(b[4]).toBe(1);
+		expect(Array.from(b.slice(8, 13))).toEqual([0x43, 0x61, 0x66, 0xe9, 0]); // one byte per character
+		expect(b[13 + 7]).toBe(15);
+	});
+});
+
+// get-patch answers 0x5a before 0x5b, omits 0x69 and has no 0x6f text section (see patch_slot_sections_canonical).
+function usbOrderTemplate(rawHex: string): string {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const secs: Uint8Array[] = [];
+	for (let ofs = 0; ofs < bytes.length - 2; ) {
+		const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+		if (bytes[ofs] !== 0x69 && bytes[ofs] !== SectionType.SEPARATOR) secs.push(bytes.slice(ofs, end));
+		ofs = end;
+	}
+	const order = (t: number) => (t === 0x5a ? 0 : t === 0x5b ? 1 : -1);
+	secs.sort((a, b) => (order(a[0]) >= 0 && order(b[0]) >= 0 ? order(a[0]) - order(b[0]) : 0));
+	return secs.map(toHex).join('');
+}
+
+// "id:area" of every section of a rawHex (CRC excluded), e.g. '4a:1'.
+function sectionOrder(rawHex: string): string[] {
+	const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+	const out: string[] = [];
+	for (let ofs = 0; ofs + 3 <= bytes.length - 2; ) {
+		const siz = (bytes[ofs + 1] << 8) | bytes[ofs + 2];
+		const t = bytes[ofs];
+		out.push(t.toString(16) + ([0x4a, 0x52, 0x4d, 0x5b, 0x5a].includes(t) && siz > 0 ? ':' + (bytes[ofs + 3] >> 6) : ''));
+		ofs += 3 + siz;
+	}
+	return out;
+}
+
+describe('serializePatch writes the official section order (CPatchFile_13::WriteMolecules)', () => {
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+
+	it('EmptyPatch.pch2 itself is in the official order', () => {
+		expect(official).toEqual([
+			'21',
+			'4a:1',
+			'4a:0',
+			'69',
+			'52:1',
+			'52:0',
+			'4d:2',
+			'4d:1',
+			'4d:0',
+			'65',
+			'62',
+			'60',
+			'5b:2',
+			'5b:1',
+			'5b:0',
+			'5a:1',
+			'5a:0',
+			'6f',
+		]);
+	});
+
+	for (const file of ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2']) {
+		it(`re-serializes a hardware get-patch template of ${file} in that order`, () => {
+			const { name, rawHex, patch } = loadFixture(file);
+			const template = usbOrderTemplate(rawHex) + '0000'; // + a CRC, as a stored template has
+			expect(sectionOrder(template)).not.toEqual(official);
+			expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(official);
+		});
 	}
 
+	it('puts an appended Morph Group label section (0x5b area 2) before the area 0x5b sections', () => {
+		const { name, rawHex, patch } = loadFixture('EmptyPatch.pch2');
+		// A template with no 0x5b at all: the Morph Group labels are appended after everything else.
+		const template = removeSection(usbOrderTemplate(rawHex) + '0000', 0x5b);
+		expect(patch.morphParamLabels?.length).toBeGreaterThan(0);
+		// The missing area 0x5b sections are written too (empty), so the official train is complete.
+		expect(sectionOrder(serializePatch(name, patch, template, extractVariations(patch)))).toEqual(official);
+	});
+});
+
+describe('serializers write every section of the official train, also for an incomplete file', () => {
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+	const content = (p: Patch) => ({
+		areas: p.areas.map((a) => ({
+			modules: a.modules.map((m) => [m.index, m.type, m.horiz, m.vert, m.colour, m.uname ?? '', m.lv]),
+			cables: a.cableList ?? [],
+		})),
+		patchParams: p.patchParams,
+		controllers: p.controllers ?? [],
+		paramPages: p.paramPages ?? [],
+	});
+	// Fixtures that lack 5b:0/5b:1, 5a:0, 62 and/or 65 (saved by older builds); the official reader rejects them.
+	const incomplete = ['bad/Hidden.pch2', 'bad/Midi TEST.pch2', 'bad/Piano&Mic.pch2', 'new/DropDowns.pch2', 'new/Graphics.pch2', 'new/Sequencers.pch2'];
+	for (const file of incomplete) {
+		it(`completes ${file} and keeps its content`, () => {
+			const { name, rawHex, patch } = loadFixture(file);
+			expect(sectionOrder(rawHex)).not.toEqual(official);
+			const out = serializePatch(name, patch, rawHex, extractVariations(patch));
+			expect(sectionOrder(out)).toEqual(official);
+			expect(content(parsePatchFromRawHex(name, out))).toEqual(content(patch));
+		});
+	}
+
+	it('completes every slot of a performance whose template lacks sections, in order', () => {
+		const { name, rawHex, patches } = loadFixturePrf2('MorphingDrumDemo.prf2');
+		// Drop slot B's 0x62 and its FX 0x5a from the template.
+		const bytes = new Uint8Array(rawHex.match(/.{2}/g)!.map((b) => parseInt(b, 16)));
+		const kept: number[] = [];
+		let slot = 0;
+		for (let ofs = 0; ofs + 3 <= bytes.length - 2; ) {
+			const t = bytes[ofs];
+			const end = ofs + 3 + ((bytes[ofs + 1] << 8) | bytes[ofs + 2]);
+			const drop = slot === 1 && (t === 0x62 || (t === 0x5a && bytes[ofs + 3] >> 6 === 0));
+			if (!drop) kept.push(...bytes.slice(ofs, end));
+			if (t === SectionType.SEPARATOR) slot++;
+			ofs = end;
+		}
+		const template = toHex(Uint8Array.from([...kept, 0, 0]));
+		const order = sectionOrder(serializePerformance(patches, template, patches.map(extractVariations)));
+		const slotTrain = official;
+		expect(order).toEqual(['11', ...slotTrain, ...slotTrain, ...slotTrain, ...slotTrain, '5f']);
+		// Same content as from the complete template (serializing fills a module's missing values with 0
+		// either way, so compare against that baseline rather than the raw parse).
+		const back = parsePerfFromRawHex(name, serializePerformance(patches, template, patches.map(extractVariations)));
+		const base = parsePerfFromRawHex(name, serializePerformance(patches, rawHex, patches.map(extractVariations)));
+		expect(back.patches.map(content)).toEqual(base.patches.map(content));
+	});
+});
+
+describe('buildPerformanceTemplate — performance from hardware (get-patch order) slot templates', () => {
 	it('yields the canonical slot trains and uploads the same patches', () => {
 		const slotFiles = ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2'];
 		const fixtures = slotFiles.map(loadFixture);
@@ -1685,6 +1847,31 @@ describe('buildPerformanceTemplate — performance from hardware (get-patch orde
 	});
 });
 
+describe('current notes (0x69) read from the G2', () => {
+	// get-patch appends the 0x68 reply after the GET_PATCH train: a 46-byte voice table.
+	const liveNote = toHex(Uint8Array.from([0x69, 0x00, 46, ...Array.from({ length: 46 }, (_, i) => i + 1)]));
+	const official = sectionOrder(loadFixture('EmptyPatch.pch2').rawHex);
+
+	it('serializePatch keeps the live chunk, in its official place, instead of the idle default', () => {
+		const { name, rawHex, patch } = loadFixture('Clavia demo.pch2');
+		const template = usbOrderTemplate(rawHex) + liveNote + '0000';
+		const out = serializePatch(name, patch, template, extractVariations(patch));
+		expect(sectionOrder(out)).toEqual(official);
+		expect(extractSection(out, 0x69)).toBe(liveNote);
+	});
+
+	it('buildPerformanceTemplate keeps each slot’s live chunk', () => {
+		const fixtures = ['EmptyPatch.pch2', 'Clavia demo.pch2', 'Analogue NL2.pch2', 'Basics  NL2.pch2'].map(loadFixture);
+		const template = buildPerformanceTemplate(
+			fixtures.map((f) => usbOrderTemplate(f.rawHex) + liveNote),
+			writePerfSettings({ name: 'Notes', focus: 'A', rangeEnable: false, bpm: 120, clockRunning: false }, []),
+		);
+		const blocks = sectionBlocks(template);
+		for (let s = 0; s < 4; s++) expect(s === 0 ? blocks[0].slice(1) : blocks[s]).toEqual(CANONICAL_SLOT);
+		expect(template.split(liveNote).length - 1).toBe(4); // all four, byte for byte; no idle default
+	});
+});
+
 describe('setFileDescription — another category for a patch file', () => {
 	it('changes only the category (and the CRC); the file still parses with every other field intact', () => {
 		const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'Clavia demo.pch2')));
@@ -1700,11 +1887,22 @@ describe('setFileDescription — another category for a patch file', () => {
 		expect(differing.filter((i) => i < descStart || (i >= descStart + 15 && i < file.length - 2))).toEqual([]);
 	});
 
+	// mogBass (format 13) has leftover bits in the description's padding: see the next test.
 	it('leaves every fixture byte-identical when the description is unchanged (also the CRC of version-22 files)', () => {
-		for (const f of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.pch2'))) {
+		for (const f of fs.readdirSync(FIXTURES).filter((f) => f.endsWith('.pch2') && f !== 'mogBass demo.pch2')) {
 			const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, f)));
 			const desc = new PatchParser(file.slice().buffer).parse().description!;
 			expect(setFileDescription(file, desc), f).toEqual(file);
 		}
+	});
+
+	it("clears leftover bits in the description's padding, as the official editor's save does", () => {
+		const file = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'mogBass demo.pch2')));
+		const golden = new Uint8Array(fs.readFileSync(path.join(FIXTURES, 'converted', 'mogBass demo.pch2')));
+		const out = setFileDescription(file, new PatchParser(file.slice().buffer).parse().description!);
+		const descOf = (b: Uint8Array) => b.slice(b.indexOf(0) + 3, b.indexOf(0) + 21);
+		expect(descOf(out)).toEqual(descOf(golden));
+		const differing = [...file.keys()].filter((i) => file[i] !== out[i]);
+		expect(differing).toEqual([file.indexOf(0) + 20, file.length - 2, file.length - 1]); // the padding byte and the CRC
 	});
 });

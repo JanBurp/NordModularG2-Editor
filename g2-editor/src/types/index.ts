@@ -111,6 +111,7 @@ export interface SlotInfo {
 	key: boolean;
 	hold: boolean;
 	range: { lower: number; upper: number };
+	midiChannel?: number; // 0x11 slot byte 7 (official SetMidiChannel), 0-based; 16 = off
 }
 
 export interface Slots {
@@ -127,6 +128,8 @@ export interface PerformanceData {
 	bpm: number;
 	clockRunning: boolean;
 	knobSourceGlobal?: boolean; // Parameter Pages source: false = Patch, true = Global (SHIFT+GLOBAL)
+	category?: number; // 0x11 header byte 0, patch category table (0-15)
+	clockKbdTrig?: boolean; // 0x11 header byte 4 (a bool in the official reader; name from G2Alike)
 }
 
 export interface Device {

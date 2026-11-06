@@ -13,11 +13,14 @@ import type {
 	GlobalParamPageAssignment,
 } from '../types/patch';
 import type { ModuleInstance, ParamLabel } from '../types/module';
+import { NUM_VARIATIONS } from '../types/patch';
+import { defaultPatchParams } from '../store/slotHelpers';
 
 import { SectionType, PATCH_MORPH_MODULE_ID } from './constants';
-import { getModule } from '../renderer/nmg2mods';
+import { getDefaultParamValues, getModule } from '../renderer/nmg2mods';
 import { SLOT_LABELS } from '../constants';
 import { SEQNOTE_MODULE_TYPE, type PianoRollView } from '../renderer/pianoRoll';
+import { convertSlotToCurrent, FILE_VERSION_CURRENT, FILE_VERSION_OLDEST } from './fileVersion';
 
 export type {
 	ModuleInstance,
@@ -74,6 +77,29 @@ class BitReader {
 // paramIndex, plus — for the Global Knobs variant — a trailing 2-bit slot field (0-3 = A-D).
 // Shared by G2Parser.parseKnobs and parseGlobalKnobsChunk, which differ only in that trailing
 // field. Returns null when the slot's presence bit is unset.
+// Patch settings (0x4d area 2) entries 2-7 by parameter position; entry 1 (Morph) holds the 8 dials
+// then the 8 modes.
+const PATCH_SETTINGS_FIELDS: Record<number, readonly (keyof Omit<PatchParamVariation, 'morphDials' | 'morphModes' | 'morphAssignments'>)[]> = {
+	2: ['patchVol', 'activeMuted'],
+	3: ['glide', 'glideTime'],
+	4: ['bend', 'semi'],
+	5: ['vibrato', 'cents', 'rate'],
+	6: ['arpeggiator', 'arpTime', 'arpType', 'octaves'],
+	7: ['octaveShift', 'sustain'],
+};
+
+// A G2 name field: up to 16 Latin-1 characters, NUL-terminated only when shorter than 16 (same
+// rule as the CLI's parse_name). Returns the name and the offset just past the field.
+function readName(data: Uint8Array, ofs: number): [string, number] {
+	let str = '';
+	for (let i = 0; i < 16 && ofs < data.length; i++) {
+		const c = data[ofs++];
+		if (c === 0) break;
+		str += String.fromCharCode(c);
+	}
+	return [str, ofs];
+}
+
 function readKnobSlotRecord(
 	reader: BitReader,
 	hasSlotField: boolean,
@@ -132,8 +158,17 @@ class G2Area implements Area {
 class G2Parser {
 	private areas: G2Area[] = [new G2Area('fx'), new G2Area('voice')];
 	private slots: string[] = [];
-	private slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }> = [];
-	private perfSettings = { focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 0, clockRunning: false };
+	private slotMeta: Array<{
+		active: boolean;
+		key: boolean;
+		hold: boolean;
+		bank: number;
+		patch: number;
+		rangeLow: number;
+		rangeHigh: number;
+		midiChannel: number;
+	}> = [];
+	private perfSettings = { focus: 0, knobSourceGlobal: false, rangeEnable: false, bpm: 0, clockRunning: false, category: 0, clockKbdTrig: false };
 	private aof = 0;
 	private textpad: string[] = [];
 	private reader = new BitReader();
@@ -150,6 +185,10 @@ class G2Parser {
 	private knobsData: ParamPageAssignment[][] = [];
 	// Performance-scoped (not per-slot, unlike knobsData) — see GlobalParamPageAssignment.
 	private globalKnobsData: GlobalParamPageAssignment[] = [];
+	// Per area: the file's param values (module index → [variation] → values) and the modules
+	// skipped for an unknown type. Kept apart from `lv` until an old file version is converted.
+	private values: Map<number, number[][]>[] = [];
+	private unknown: { index: number; type: number }[][] = [];
 	readonly data: ArrayBuffer;
 	ofs = 0;
 
@@ -176,7 +215,7 @@ class G2Parser {
 			],
 		};
 
-		const hdr = new Uint8Array(data, 0, 320);
+		const hdr = new Uint8Array(data, 0, Math.min(320, data.byteLength));
 		const str = new TextDecoder('latin1').decode(hdr);
 		let ofs = str.indexOf('\0');
 		const textHdrLen = ofs + 3;
@@ -199,7 +238,46 @@ class G2Parser {
 				}
 			}
 		}
+		// An older file format is converted like the official editor does (see fileVersion.ts).
+		// Hardware data is wrapped as version 23, so it is never converted.
+		this.version = new Uint8Array(data)[textHdrLen - 2] ?? 0;
+		for (let slot = 0; slot < this.areas.length / 2; slot++) {
+			const areas = [slot * 2, slot * 2 + 1].map((i) => ({
+				modules: this.areas[i].modules,
+				cableList: this.areas[i].cableList,
+				values: (this.values[i] ??= new Map()),
+				unknown: this.unknown[i] ?? [],
+			}));
+			const ok = convertSlotToCurrent(
+				{
+					areas,
+					patchParams: this.patchParamsData[slot] ?? [],
+					knobs: (this.knobsData[slot] ??= []),
+					controllers: (this.controllersData[slot] ??= []),
+					globalKnobs: this.globalKnobsData,
+					slot: this.slots.length ? SLOT_LABELS[slot] : undefined,
+				},
+				this.version,
+			);
+			if (!ok) console.error(`File format ${this.version} is older than ${FILE_VERSION_OLDEST} and is read without conversion`);
+		}
+		// A file can hold fewer variations than 9 (format 13/14 files have 8). The official reader starts
+		// from default values, so a missing variation gets the module's defaults and the default patch settings.
+		for (const params of this.patchParamsData) if (params) for (let v = 0; v < NUM_VARIATIONS; v++) params[v] ??= defaultPatchParams();
+		this.areas.forEach((area, i) => {
+			for (const m of area.modules) {
+				const vars = this.values[i]?.get(m.index);
+				if (vars && m.pcnt) for (let v = 0; v < NUM_VARIATIONS; v++) vars[v] ??= getDefaultParamValues(m.type);
+			}
+			for (const m of area.modules)
+				this.values[i]?.get(m.index)?.forEach((vals, v) => {
+					for (let p = 0; p < Math.min(vals.length, m.pcnt); p++) m.lv[v * m.pcnt + p] = vals[p];
+				});
+		});
 	}
+
+	// The file format version (the byte after the text header's NUL).
+	version = 0;
 
 	getAllModules(areaIdx: number): ModuleInstance[] {
 		return this.areas[areaIdx].modules;
@@ -266,7 +344,8 @@ class G2Parser {
 	}
 
 	private setModuleName(areaIdx: number, index: number, name: string): void {
-		this.findModule(this.aof + areaIdx, index)!.uname = name;
+		const m = this.findModule(this.aof + areaIdx, index);
+		if (m) m.uname = name;
 	}
 
 	private parseModuleNames(data: Uint8Array): string {
@@ -276,15 +355,8 @@ class G2Parser {
 		let ofs = 2;
 		for (let i = 0; i < nummod; i++) {
 			const index = data[ofs];
-			let str = '';
-			let charcode: number | undefined;
-			let j: number;
-			for (j = 1; j < 17; j++) {
-				if ((charcode = data[ofs + j])) str += String.fromCharCode(charcode);
-				else break;
-			}
-			ofs += j + 1;
-			if (charcode) ofs--;
+			const [str, next] = readName(data, ofs + 1);
+			ofs = next;
 			this.setModuleName(areaIdx, index, str);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
@@ -365,12 +437,9 @@ class G2Parser {
 		for (let i = 0; i < nummod; i++) {
 			const modtype = this.getBits(8);
 			const modDef = getModule(modtype);
-			if (!modDef) {
-				console.error(`Module type ${modtype} not found in module definitions`);
-				continue;
-			}
-			const mod: ModuleInstance = Object.create(modDef) as ModuleInstance;
-			mod.pcnt = modDef.params?.length || 0;
+			// An unknown type is still read field by field, so the modules after it stay aligned.
+			const mod = (modDef ? Object.create(modDef) : {}) as ModuleInstance;
+			mod.pcnt = modDef?.params?.length || 0;
 			mod.lv = Array(mod.pcnt * 9);
 			mod.index = this.getBits(8);
 			mod.type = modtype;
@@ -383,6 +452,11 @@ class G2Parser {
 			const nmodes = this.getBits(4);
 			mod.modes = [];
 			for (let j = 0; j < nmodes; j++) mod.modes.push(this.getBits(6));
+			if (!modDef) {
+				console.error(`Module type ${modtype} not found in module definitions`);
+				(this.unknown[this.aof + areaIdx] ??= []).push({ index: mod.index, type: modtype });
+				continue;
+			}
 			this.areas[this.aof + areaIdx].modules.push(mod);
 		}
 		return 'Area=' + areaIdx + ':Count=' + nummod;
@@ -426,64 +500,26 @@ class G2Parser {
 					};
 				return params[v];
 			};
-			// Section 1: Morphs
-			this.getBits(8);
-			this.getBits(7); // sub-section ID + count
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				for (let j = 0; j < 8; j++) vp(v).morphDials[j] = this.getBits(7);
-				for (let j = 0; j < 8; j++) vp(v).morphModes[j] = this.getBits(7);
-			}
-			// Section 2: Volume
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).patchVol = this.getBits(7);
-				vp(v).activeMuted = this.getBits(7);
-			}
-			// Section 3: Glide
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).glide = this.getBits(7);
-				vp(v).glideTime = this.getBits(7);
-			}
-			// Section 4: Bend
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).bend = this.getBits(7);
-				vp(v).semi = this.getBits(7);
-			}
-			// Section 5: Vibrato
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).vibrato = this.getBits(7);
-				vp(v).cents = this.getBits(7);
-				vp(v).rate = this.getBits(7);
-			}
-			// Section 6: Arp
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).arpeggiator = this.getBits(7);
-				vp(v).arpTime = this.getBits(7);
-				vp(v).arpType = this.getBits(7);
-				vp(v).octaves = this.getBits(7);
-			}
-			// Section 7: Octave shift
-			this.getBits(8);
-			this.getBits(7);
-			for (let i = 0; i < varCount; i++) {
-				const v = this.getBits(8);
-				vp(v).octaveShift = this.getBits(7);
-				vp(v).sustain = this.getBits(7);
+			// The official reader (R_ModuleParamData) has one layout for every area: entries of
+			// [index:8][paramCount:7] then per variation [variation:8][paramCount × 7]. For patch
+			// settings an entry index names the group (1 = Morph … 7 = octave shift/sustain). Reading
+			// the counts from the file keeps an unexpected entry or count from misaligning the rest.
+			for (let i = 0; i < nummod; i++) {
+				const id = this.getBits(8);
+				const paramCount = this.getBits(7);
+				for (let v = 0; v < varCount; v++) {
+					const target = vp(this.getBits(8));
+					for (let p = 0; p < paramCount; p++) {
+						const value = this.getBits(7);
+						if (id === 1) {
+							if (p < 8) target.morphDials[p] = value;
+							else if (p < 16) target.morphModes[p - 8] = value;
+						} else {
+							const key = PATCH_SETTINGS_FIELDS[id]?.[p];
+							if (key) target[key] = value;
+						}
+					}
+				}
 			}
 			this.patchParamsData[slotIdx] = params;
 			return 'Patch settings: varCount=' + varCount;
@@ -491,18 +527,18 @@ class G2Parser {
 		if (areaIdx > 2) return 'Area=' + areaIdx;
 		this.areas[this.aof + areaIdx].paramaterDataOfs = data.byteOffset;
 		this.areas[this.aof + areaIdx].nummod = nummod;
+		const values = (this.values[this.aof + areaIdx] ??= new Map());
 		for (let i = 0; i < nummod; i++) {
 			const index = this.getBits(8);
-			const m = this.findModule(this.aof + areaIdx, index);
-			if (!m) continue;
 			const paramcnt = this.getBits(7);
+			const vars: number[][] = [];
 			for (let v = 0; v < numvar; v++) {
-				const variation = this.getBits(8);
-				for (let p = 0; p < paramcnt; p++) {
-					if (p < m.pcnt) m.lv[variation * m.pcnt + p] = this.getBits(7);
-					else this.getBits(7);
-				}
+				const vals = (vars[this.getBits(8)] = [] as number[]);
+				for (let p = 0; p < paramcnt; p++) vals.push(this.getBits(7));
 			}
+			// Copied into `lv` after the whole file is read; a module that's absent (unknown type)
+			// is still read through, so the next one stays aligned.
+			values.set(index, vars);
 		}
 		return 'Area=' + areaIdx + ':ModuleCount=' + nummod + ':VariationCount=' + numvar;
 	}
@@ -569,23 +605,24 @@ class G2Parser {
 	}
 
 	private parsePrfData(data: Uint8Array): void {
-		// 0x11 section: 8-byte header, then 4 × (null-terminated name + 10 bytes extra data)
-		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, 3×padding
-		// Header as writePerfSettings writes it: [unknown, focus<<2 | knobSource, rangeEnable, bpm, unknown, clockRun, 0, 0]
+		// 0x11 section: 8-byte header, then 4 × (name, see readName, then 10 bytes extra data)
+		// 10 bytes: active, key, hold, bank, patch, rangeLow, rangeHigh, midiChannel, 2×padding
+		// Header (official CPerformanceHeader_11): [category, focus<<2 | knobSource, rangeEnable, bpm, clockKbdTrig, clockRun, 0, 0]
 		this.perfSettings = {
 			focus: (data[1] >> 2) & 0x3,
 			knobSourceGlobal: (data[1] & 0x3) !== 0,
 			rangeEnable: data[2] !== 0,
 			bpm: data[3],
 			clockRunning: (data[5] & 1) !== 0,
+			category: data[0],
+			clockKbdTrig: data[4] !== 0,
 		};
 		let ofs = 8;
 		const slotNames: string[] = [];
 		this.slotMeta.length = 0;
 		for (let i = 0; i < 4; i++) {
-			let str = '';
-			while (ofs < data.length && data[ofs] !== 0) str += String.fromCharCode(data[ofs++]);
-			ofs++; // skip null terminator
+			const [str, next] = readName(data, ofs);
+			ofs = next;
 			if (ofs + 10 <= data.length) {
 				this.slotMeta.push({
 					active: data[ofs] !== 0,
@@ -595,6 +632,7 @@ class G2Parser {
 					patch: data[ofs + 4],
 					rangeLow: data[ofs + 5],
 					rangeHigh: data[ofs + 6],
+					midiChannel: data[ofs + 7],
 				});
 			}
 			ofs += 10;
@@ -704,6 +742,12 @@ export class PatchParser {
 			morphParamLabels: this.patcher.getMorphParamLabels(slot) ?? undefined,
 			morphKeyboardAssign: this.patcher.getMorphKeyboardAssign(slot) ?? undefined,
 		};
+	}
+
+	// The file's format version when it is older than the current one (the parser has converted
+	// it), else null.
+	get oldFileVersion(): number | null {
+		return this.patcher.version < FILE_VERSION_CURRENT ? this.patcher.version : null;
 	}
 
 	parse(): Patch {

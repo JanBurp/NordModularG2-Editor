@@ -29,6 +29,7 @@
     "test:e2e": "electron-vite build && playwright test",
     "test:e2e:nobuild": "playwright test",
     "test:g2": "electron-vite build && vitest run -c vitest.g2.config.ts",
+    "test:g2:slow": "electron-vite build && G2_SLOW=1 vitest run -c vitest.g2.config.ts",
     "test:duration": "node scripts/test-duration.mjs",
     "test:e2e:report": "playwright show-report --host 127.0.0.1",
     "lint": "eslint src e2e --max-warnings 0",

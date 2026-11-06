@@ -1,6 +1,6 @@
+import type { PatchSortMode } from '@/utils/sortPatches';
 import { clamp } from '@/utils/math';
 import { defineStore } from 'pinia';
-import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
 export type PaneTab = 'browser' | 'modules' | 'library' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';

@@ -475,10 +475,6 @@ static void emit_embedded_event(const uint8_t *response) {
         case 0x3C:
             printf("{\"type\":\"patch_update\",\"slot\":\"%s\"}\n", SLOT_LETTER(slot));
             break;
-        case 0x69:
-            printf("{\"type\":\"current_note\",\"slot\":\"%s\",\"note\":%u,\"velocity\":%u}\n",
-                   SLOT_LETTER(slot), response[5], response[6]);
-            break;
         case 0x72:
             printf("{\"type\":\"resources_used\",\"slot\":\"%s\",\"location\":%u}\n",
                    SLOT_LETTER(slot), response[5]);

@@ -956,7 +956,18 @@ function assertInStorage(wcId: number, filepath: string): string {
 }
 
 ipcMain.handle('patches:storage-remove', (event, filepath: string) => {
-	fs.rmSync(assertInStorage(event.sender.id, filepath), { force: true });
+	fs.rmSync(assertInStorage(event.sender.id, filepath), { recursive: true, force: true });
+});
+
+// A send-bank source holding old-format files is sent from a copy in a hidden storage folder, where the
+// renderer writes their converted versions: the folder's patch files, and the .pchList when given.
+ipcMain.handle('patches:storage-bank-copy', (event, folder: string, pchList?: string) => {
+	const dir = storageDirByWc.get(event.sender.id);
+	if (!dir) throw new Error('No storage folder');
+	const tmp = fs.mkdtempSync(path.join(dir, '.tmp-bank-'));
+	for (const name of fs.readdirSync(folder)) if (/\.(pch2|prf2)$/i.test(name)) fs.copyFileSync(path.join(folder, name), path.join(tmp, name));
+	if (pchList) fs.copyFileSync(pchList, path.join(tmp, path.basename(pchList)));
+	return tmp;
 });
 
 ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {

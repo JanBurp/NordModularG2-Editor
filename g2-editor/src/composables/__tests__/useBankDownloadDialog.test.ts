@@ -21,7 +21,8 @@ beforeEach(() => {
 	setActivePinia(createPinia());
 	(globalThis as any).window = {
 		cli: { run: vi.fn().mockResolvedValue(undefined) },
-		electronAPI: { selectBankFolder: vi.fn(), selectPchListFile: vi.fn() },
+		// The source folder lists no files, so nothing needs converting.
+		electronAPI: { selectBankFolder: vi.fn(), selectPchListFile: vi.fn(), patches: { list: vi.fn().mockResolvedValue({ success: true, entries: [] }) } },
 	};
 	showBankDownloadDialog.value = false;
 	bankDownloadType.value = 'patch';

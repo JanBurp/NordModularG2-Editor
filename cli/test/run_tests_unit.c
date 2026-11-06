@@ -15,6 +15,9 @@ extern void test_crc16_command_format(void);
 extern void test_crc16_empty(void);
 extern void test_crc_iterator_known_value(void);
 extern void test_crc_iterator_seed_propagation(void);
+extern void test_g2_crc_ok_captured_messages(void);
+extern void test_io_err_streak_needs_count_and_time(void);
+extern void test_io_err_streak_reset_by_read_or_timeout(void);
 
 extern void test_parse_slot_A(void);
 extern void test_parse_slot_B(void);
@@ -28,6 +31,9 @@ extern void test_parse_name_truncates_long(void);
 extern void test_parse_name_keeps_non_printable(void);
 extern void test_parse_name_empty(void);
 extern void test_parse_name_only_null(void);
+extern void test_parse_list_entry_perf_category(void);
+extern void test_put_name_field_16_char_rule(void);
+extern void test_parse_list_entry_16_chars_and_truncated(void);
 
 extern void test_parse_synth_name(void);
 extern void test_parse_mode_patch(void);
@@ -51,6 +57,7 @@ extern void test_patch_focus_a(void);
 extern void test_patch_focus_d(void);
 extern void test_factory_patch(void);
 extern void test_perf_focus_a(void);
+extern void test_synth_settings_set_msg_roundtrips_get_payload(void);
 
 extern void test_patch_usb_to_pch2_strips_header(void);
 extern void test_patch_usb_to_pch2_strips_trailer(void);
@@ -59,15 +66,16 @@ extern void test_patch_usb_to_pch2_buffer_too_small(void);
 extern void test_patch_usb_to_pch2_null_inputs(void);
 extern void test_pch2_file_from_sections_header_and_crc(void);
 extern void test_pch2_file_from_sections_buffer_too_small(void);
+extern void test_pch2_file_from_sections_official_order(void);
+extern void test_pch2_old_file_version(void);
+extern void test_patch_set_voice_field(void);
 extern void test_patch_usb_to_pch2_data_too_short(void);
 extern void test_patch_usb_to_pch2_exact_size(void);
 extern void test_slot_sections_canonical_reorders_hardware_train(void);
 extern void test_slot_sections_canonical_preserves_repeated_id_order(void);
 extern void test_slot_sections_canonical_keeps_existing_current_note(void);
+extern void test_slot_sections_canonical_moves_appended_current_note(void);
 extern void test_slot_sections_canonical_copies_malformed_train_verbatim(void);
-extern void test_perf_settings_normalize_slots_rewrites_device_numbering(void);
-extern void test_perf_settings_normalize_slots_handles_unterminated_16_char_name(void);
-extern void test_perf_settings_normalize_slots_ignores_truncated_payload(void);
 
 extern void test_parse_name_from_embedded_response_slot_b(void);
 extern void test_parse_name_from_embedded_response_slot_c(void);
@@ -228,6 +236,7 @@ extern void test_daemon_make_ok_with_id(void);
 extern void test_daemon_make_ok_without_id(void);
 extern void test_daemon_make_error_with_id(void);
 extern void test_daemon_make_error_without_id(void);
+extern void test_daemon_arg_s_accepts_numbers(void);
 extern void test_parse_location_str(void);
 extern void test_base64_roundtrip(void);
 extern void test_base64_known_value(void);
@@ -242,6 +251,9 @@ int main(void) {
     RUN_TEST(test_crc16_empty);
     RUN_TEST(test_crc_iterator_known_value);
     RUN_TEST(test_crc_iterator_seed_propagation);
+    RUN_TEST(test_g2_crc_ok_captured_messages);
+    RUN_TEST(test_io_err_streak_needs_count_and_time);
+    RUN_TEST(test_io_err_streak_reset_by_read_or_timeout);
 
     RUN_TEST(test_parse_slot_A);
     RUN_TEST(test_parse_slot_B);
@@ -255,6 +267,9 @@ int main(void) {
     RUN_TEST(test_parse_name_keeps_non_printable);
     RUN_TEST(test_parse_name_empty);
     RUN_TEST(test_parse_name_only_null);
+    RUN_TEST(test_parse_list_entry_perf_category);
+    RUN_TEST(test_put_name_field_16_char_rule);
+    RUN_TEST(test_parse_list_entry_16_chars_and_truncated);
 
     RUN_TEST(test_parse_synth_name);
     RUN_TEST(test_parse_mode_patch);
@@ -279,6 +294,7 @@ int main(void) {
     RUN_TEST(test_patch_focus_d);
     RUN_TEST(test_factory_patch);
     RUN_TEST(test_perf_focus_a);
+    RUN_TEST(test_synth_settings_set_msg_roundtrips_get_payload);
 
     /* Patch format conversion tests */
     RUN_TEST(test_patch_usb_to_pch2_strips_header);
@@ -288,15 +304,16 @@ int main(void) {
     RUN_TEST(test_patch_usb_to_pch2_null_inputs);
     RUN_TEST(test_pch2_file_from_sections_header_and_crc);
     RUN_TEST(test_pch2_file_from_sections_buffer_too_small);
+    RUN_TEST(test_pch2_file_from_sections_official_order);
+    RUN_TEST(test_pch2_old_file_version);
+    RUN_TEST(test_patch_set_voice_field);
     RUN_TEST(test_patch_usb_to_pch2_data_too_short);
     RUN_TEST(test_patch_usb_to_pch2_exact_size);
     RUN_TEST(test_slot_sections_canonical_reorders_hardware_train);
     RUN_TEST(test_slot_sections_canonical_preserves_repeated_id_order);
     RUN_TEST(test_slot_sections_canonical_keeps_existing_current_note);
+    RUN_TEST(test_slot_sections_canonical_moves_appended_current_note);
     RUN_TEST(test_slot_sections_canonical_copies_malformed_train_verbatim);
-    RUN_TEST(test_perf_settings_normalize_slots_rewrites_device_numbering);
-    RUN_TEST(test_perf_settings_normalize_slots_handles_unterminated_16_char_name);
-    RUN_TEST(test_perf_settings_normalize_slots_ignores_truncated_payload);
 
     /* get-patch name parsing tests */
     RUN_TEST(test_parse_name_from_embedded_response_slot_b);
@@ -465,6 +482,7 @@ int main(void) {
     RUN_TEST(test_daemon_make_ok_without_id);
     RUN_TEST(test_daemon_make_error_with_id);
     RUN_TEST(test_daemon_make_error_without_id);
+    RUN_TEST(test_daemon_arg_s_accepts_numbers);
     RUN_TEST(test_parse_location_str);
     RUN_TEST(test_base64_roundtrip);
     RUN_TEST(test_base64_known_value);
