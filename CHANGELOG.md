@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.1] - 2026-11-06
+
 ### New
 - Linux builds (x64 and Raspberry Pi arm64) as AppImage and .deb
 - "Install USB helper" button on Linux: sets up USB permission for the G2 in one click
