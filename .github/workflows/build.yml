@@ -8,7 +8,7 @@ on:
 
 env:
   LIBUSB_VERSION: '1.0.27'
-  NODE_VERSION: '20'
+  NODE_VERSION: '24'
   MACOSX_DEPLOYMENT_TARGET: '14.0'
 
 jobs:
@@ -20,9 +20,9 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -50,7 +50,7 @@ jobs:
           mkdir -p cli-release
           cp cli/build/bin/g2-cli cli-release/g2-cli-macos-arm64
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: g2-cli-macos-arm64
           path: cli-release/g2-cli-macos-arm64
@@ -62,7 +62,7 @@ jobs:
           npx electron-vite build
           npx electron-builder --mac --arm64
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: G2-Editor-macOS-arm64
           path: |
@@ -77,9 +77,9 @@ jobs:
     env:
       CSC_IDENTITY_AUTO_DISCOVERY: false
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -107,7 +107,7 @@ jobs:
           mkdir -p cli-release
           cp cli/build/bin/g2-cli cli-release/g2-cli-macos-x64
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: g2-cli-macos-x64
           path: cli-release/g2-cli-macos-x64
@@ -119,7 +119,7 @@ jobs:
           npx electron-vite build
           npx electron-builder --mac --x64
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: G2-Editor-macOS-x64
           path: |
@@ -132,9 +132,9 @@ jobs:
   build-windows:
     runs-on: windows-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -162,7 +162,7 @@ jobs:
           New-Item -ItemType Directory -Force -Path cli-release
           Copy-Item cli\build\bin\g2-cli.exe cli-release\g2-cli-windows-x64.exe
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: g2-cli-windows-x64
           path: cli-release/g2-cli-windows-x64.exe
@@ -175,7 +175,7 @@ jobs:
           npx electron-vite build
           npx electron-builder --win
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: G2-Editor-Windows
           path: |
@@ -197,9 +197,9 @@ jobs:
     # Oldest supported runners: binaries built against their glibc also run on older distros.
     runs-on: ${{ matrix.runner }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: ${{ env.NODE_VERSION }}
 
@@ -228,7 +228,7 @@ jobs:
           mkdir -p cli-release
           cp cli/build/bin/g2-cli cli-release/g2-cli-linux-${{ matrix.arch }}
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: g2-cli-linux-${{ matrix.arch }}
           path: cli-release/g2-cli-linux-${{ matrix.arch }}
@@ -249,7 +249,7 @@ jobs:
           npx electron-vite build
           npx electron-builder --linux
 
-      - uses: actions/upload-artifact@v4
+      - uses: actions/upload-artifact@v7
         with:
           name: G2-Editor-Linux-${{ matrix.arch }}
           path: |
@@ -266,11 +266,11 @@ jobs:
     permissions:
       contents: write
     steps:
-      - uses: actions/download-artifact@v4
+      - uses: actions/download-artifact@v8
         with:
           path: dist/
 
-      - uses: softprops/action-gh-release@v2
+      - uses: softprops/action-gh-release@v3
         with:
           files: dist/**/*
           generate_release_notes: true

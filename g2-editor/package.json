@@ -1,6 +1,7 @@
 {
   "name": "g2-editor",
   "version": "0.8.1",
+  "desktopName": "g2-editor.desktop",
   "author": {
     "name": "Jan den Besten",
     "url": "https://janburp.github.io/NordModularG2-Editor/"
@@ -52,7 +53,7 @@
     "@typescript-eslint/parser": "^8.59.1",
     "@vitejs/plugin-vue": "^5.0.4",
     "electron": "^33.4.11",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.18.0",
     "electron-devtools-installer": "^3.2.1",
     "electron-vite": "^5.0.0",
     "eslint": "^10.14.0",

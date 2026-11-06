@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# electron-builder's default deb after-install (app-builder-lib/templates/linux/after-install.tpl),
-# plus the G2 udev rule and the AppArmor profile at the end. A custom afterInstall replaces the default, so keep both in sync.
+# electron-builder's default deb after-install (app-builder-lib/templates/linux/after-install.tpl, electron-builder 26),
+# plus the G2 udev rule at the end. A custom afterInstall replaces the default, so keep both in sync.
 
-if type update-alternatives 2>/dev/null >&1; then
+if type update-alternatives >/dev/null 2>&1; then
     # Remove previous link if it doesn't use update-alternatives
     if [ -L '/usr/bin/${executable}' -a -e '/usr/bin/${executable}' -a "`readlink '/usr/bin/${executable}'`" != '/etc/alternatives/${executable}' ]; then
         rm -f '/usr/bin/${executable}'
@@ -13,8 +13,13 @@ else
     ln -sf '/opt/${sanitizedProductName}/${executable}' '/usr/bin/${executable}'
 fi
 
-# SUID chrome-sandbox for Electron 5+
-chmod 4755 '/opt/${sanitizedProductName}/chrome-sandbox' || true
+# Check if user namespaces are supported by the kernel and working with a quick test:
+if ! { [[ -L /proc/self/ns/user ]] && unshare --user true; }; then
+    # Use SUID chrome-sandbox only on systems without user namespaces:
+    chmod 4755 '/opt/${sanitizedProductName}/chrome-sandbox' || true
+else
+    chmod 0755 '/opt/${sanitizedProductName}/chrome-sandbox' || true
+fi
 
 if hash update-mime-database 2>/dev/null; then
     update-mime-database /usr/share/mime || true
@@ -24,25 +29,39 @@ if hash update-desktop-database 2>/dev/null; then
     update-desktop-database /usr/share/applications || true
 fi
 
+# Install apparmor profile. (Ubuntu 24+)
+# First check if the version of AppArmor running on the device supports our profile.
+# This is in order to keep backwards compatibility with Ubuntu 22.04 which does not support abi/4.0.
+# In that case, we just skip installing the profile since the app runs fine without it on 22.04.
+#
+# Those apparmor_parser flags are akin to performing a dry run of loading a profile.
+# https://wiki.debian.org/AppArmor/HowToUse#Dumping_profiles
+#
+# Unfortunately, at the moment AppArmor doesn't have a good story for backwards compatibility.
+# https://askubuntu.com/questions/1517272/writing-a-backwards-compatible-apparmor-profile
+if apparmor_status --enabled > /dev/null 2>&1; then
+  APPARMOR_PROFILE_SOURCE='/opt/${sanitizedProductName}/resources/apparmor-profile'
+  APPARMOR_PROFILE_TARGET='/etc/apparmor.d/${executable}'
+  if apparmor_parser --skip-kernel-load --debug "$APPARMOR_PROFILE_SOURCE" > /dev/null 2>&1; then
+    cp -f "$APPARMOR_PROFILE_SOURCE" "$APPARMOR_PROFILE_TARGET"
+
+    # Updating the current AppArmor profile is not possible and probably not meaningful in a chroot'ed environment.
+    # Use cases are for example environments where images for clients are maintained.
+    # There, AppArmor might correctly be installed, but live updating makes no sense.
+    if ! { [ -x '/usr/bin/ischroot' ] && /usr/bin/ischroot; } && hash apparmor_parser 2>/dev/null; then
+      # Extra flags taken from dh_apparmor:
+      # > By using '-W -T' we ensure that any abstraction updates are also pulled in.
+      # https://wiki.debian.org/AppArmor/Contribute/FirstTimeProfileImport
+      apparmor_parser --replace --write-cache --skip-read-cache "$APPARMOR_PROFILE_TARGET"
+    fi
+  else
+    echo "Skipping the installation of the AppArmor profile as this version of AppArmor does not seem to support the bundled profile"
+  fi
+fi
+
 # USB access to the G2 for the logged-in user (no driver needed on Linux, only permission)
 install -m 644 '/opt/${sanitizedProductName}/resources/70-nord-g2.rules' /etc/udev/rules.d/70-nord-g2.rules || true
 if hash udevadm 2>/dev/null; then
     udevadm control --reload-rules || true
     udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc || true
-fi
-
-# Ubuntu 24.04+ restricts user namespaces, so Electron's sandbox falls back to the SUID chrome-sandbox,
-# which fails on the space in "/opt/G2 Editor" (execvp "/opt/G2"). This AppArmor profile allows the
-# normal namespace sandbox. Only where AppArmor knows abi 4.0: older systems don't restrict namespaces.
-if hash apparmor_parser 2>/dev/null && [ -f /etc/apparmor.d/abi/4.0 ]; then
-    cat > '/etc/apparmor.d/${executable}' <<'EOF'
-abi <abi/4.0>,
-include <tunables/global>
-
-profile ${executable} "/opt/${sanitizedProductName}/${executable}" flags=(unconfined) {
-  userns,
-  include if exists <local/${executable}>
-}
-EOF
-    apparmor_parser -r '/etc/apparmor.d/${executable}' || true
 fi

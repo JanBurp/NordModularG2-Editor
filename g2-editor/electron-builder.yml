@@ -70,6 +70,8 @@ nsis:
 
 linux:
   artifactName: "G2-Editor-linux-${arch}.${ext}"
+  # Electron uses package.json desktopName as Wayland app_id / WM_CLASS; keep the .desktop filename and StartupWMClass in sync with it
+  syncDesktopName: true
   target:
     - AppImage
     - deb
