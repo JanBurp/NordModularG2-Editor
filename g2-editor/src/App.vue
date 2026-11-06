@@ -787,6 +787,8 @@
 		quickAddPos.value = { x: e.clientX, y: e.clientY };
 	}
 
+	const CLIPBOARD_KEYS: Record<string, string> = { c: 'copy', x: 'cut', v: 'paste' };
+
 	function onGlobalKeydown(e: KeyboardEvent) {
 		if (uiStore.showKeyCommandsPage) {
 			if (e.key === 'Escape') uiStore.showKeyCommandsPage = false;
@@ -803,6 +805,14 @@
 		if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
 			e.preventDefault();
 			cycleSlot(e.shiftKey ? -1 : 1);
+			return;
+		}
+
+		// Windows/Linux: Chromium can take Ctrl+C/X/V as its own copy/cut/paste, so the menu accelerators never fire
+		const clipboardAction = !isMac && e.ctrlKey && !e.altKey && !e.shiftKey ? CLIPBOARD_KEYS[e.key.toLowerCase()] : undefined;
+		if (clipboardAction) {
+			e.preventDefault();
+			void runMenuAction(clipboardAction);
 			return;
 		}
 
@@ -891,7 +901,7 @@
 	});
 
 	useRemoteModuleDrop();
-	useElectronMenuActions({
+	const { runMenuAction } = useElectronMenuActions({
 		currentModules,
 		currentPatch,
 		handleSlotClick,
