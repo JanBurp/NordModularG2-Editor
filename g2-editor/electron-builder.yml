@@ -54,6 +54,13 @@ mac:
         UTTypeTagSpecification:
           public.filename-extension: [prf2]
 
+dmg:
+  window: { width: 540, height: 440 }
+  contents:
+    - { x: 130, y: 190 }
+    - { x: 410, y: 190, type: link, path: /Applications }
+    - { x: 270, y: 330, type: file, path: install/README-macOS.txt, name: README.txt }
+
 win:
   artifactName: "G2-Editor-Setup.${ext}"
   target:
@@ -71,6 +78,9 @@ nsis:
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
+
+nsis:
+  license: install/README-Windows.txt
 
 linux:
   artifactName: "G2-Editor-linux-${arch}.${ext}"
