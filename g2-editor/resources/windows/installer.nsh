@@ -4,11 +4,12 @@
 ; Skipped on Windows on ARM: UsbDk has no ARM64 driver (x64 drivers can't load there), so those
 ; users need WinUSB via Zadig. The native architecture is read from the registry because this
 ; 32-bit installer's own environment reports x86.
+; msiexec's verbose log goes to %TEMP%\usbdk-install.log for troubleshooting.
 !macro customInstall
   ReadRegStr $1 HKLM "SYSTEM\CurrentControlSet\Control\Session Manager\Environment" "PROCESSOR_ARCHITECTURE"
   ReadRegStr $0 HKLM "SYSTEM\CurrentControlSet\Services\UsbDk" "ImagePath"
   ${If} $1 != "ARM64"
   ${AndIf} $0 == ""
-    ExecShellWait "runas" "msiexec.exe" '/i "$INSTDIR\resources\UsbDk_x64.msi" /passive /norestart'
+    ExecShellWait "runas" "msiexec.exe" '/i "$INSTDIR\resources\UsbDk_x64.msi" /passive /norestart /l*v "$TEMP\usbdk-install.log"'
   ${EndIf}
 !macroend

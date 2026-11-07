@@ -67,6 +67,10 @@ win:
 
 nsis:
   include: resources/windows/installer.nsh
+  # Assisted installer: the user picks the folder, default Program Files. Admin rights are needed for UsbDk anyway.
+  oneClick: false
+  perMachine: true
+  allowToChangeInstallationDirectory: true
 
 linux:
   artifactName: "G2-Editor-linux-${arch}.${ext}"

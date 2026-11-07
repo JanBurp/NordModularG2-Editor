@@ -12,6 +12,26 @@ UsbDk works *next to* Clavia's own G2 driver, so the original Clavia editor keep
 
 If UsbDk is missing (for example because the administrator prompt was declined), the editor shows a **USB Driver Problem** dialog. Click **Install USB helper**, allow the administrator prompt, and the editor connects.
 
+If the dialog says UsbDk is installed but not active yet, restart Windows.
+
+## Memory Integrity (Core Isolation)
+
+Windows 11 may warn that Clavia's G2 driver is incompatible with **Memory Integrity** (*Windows Security → Device security → Core isolation*). This is a problem of Clavia's driver itself, there is no updated version. As long as that driver is installed, Windows won't let you turn Memory Integrity on.
+
+We're still testing whether the editor works with Memory Integrity on and Clavia's driver removed. Until then: think twice before turning Memory Integrity off just for the G2, since turning it back on later means removing Clavia's driver.
+
+## Log files
+
+If something doesn't work, please send us the log files: **Help → Open Log Folder** opens the folder with `main.log` (the editor) and `usbdk-install.log` (the USB helper install started from the editor). The installer writes its own UsbDk log to `%TEMP%\usbdk-install.log`.
+
+To install UsbDk by hand with a log, open a Command Prompt as Administrator and run (adjust the path to where you installed the editor):
+
+```
+msiexec /i "C:\Program Files\G2 Editor\resources\UsbDk_x64.msi" /l*v "%TEMP%\usbdk-install.log"
+```
+
+Then check whether it runs with `sc.exe query UsbDk` (expected: `STATE : 4 RUNNING`).
+
 ## Windows on ARM
 
 On Windows on ARM (Snapdragon laptops, Windows in a VM on an Apple Silicon Mac) neither UsbDk nor Clavia's driver can run, and the installer skips UsbDk. Use the WinUSB driver instead, see [Troubleshooting: WinUSB driver (Zadig)](#troubleshooting-winusb-driver-zadig).

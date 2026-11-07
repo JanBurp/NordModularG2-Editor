@@ -16,6 +16,40 @@ import { confirmedNewDevices } from '../src/utils/deviceScan';
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
+/* Main-process log file (userData/logs/main.log), so users can send us one: a packaged Windows app
+ * has no console. Mirrors console.log/warn/error. Every daemon event is logged (LEDs: many per
+ * second), so the file is rotated to main.old.log at startup and whenever it passes LOG_MAX_BYTES. */
+const LOG_DIR = path.join(app.getPath('userData'), 'logs');
+const LOG_MAX_BYTES = 10_000_000;
+try {
+	fs.mkdirSync(LOG_DIR, { recursive: true });
+	const logFile = path.join(LOG_DIR, 'main.log');
+	const openLog = () => {
+		if (fs.existsSync(logFile)) fs.renameSync(logFile, path.join(LOG_DIR, 'main.old.log'));
+		return fs.createWriteStream(logFile, { flags: 'a' });
+	};
+	let logStream = openLog();
+	for (const level of ['log', 'warn', 'error'] as const) {
+		const orig = console[level].bind(console);
+		console[level] = (...args: unknown[]) => {
+			orig(...args);
+			const text = args.map((a) => (typeof a === 'string' ? a : a instanceof Error ? (a.stack ?? a.message) : JSON.stringify(a))).join(' ');
+			logStream.write(`${new Date().toISOString()} ${level === 'log' ? '' : level.toUpperCase() + ' '}${text}\n`);
+			if (logStream.bytesWritten + logStream.writableLength > LOG_MAX_BYTES) {
+				logStream.end();
+				try {
+					logStream = openLog();
+				} catch {
+					// rename refused: truncate instead
+					logStream = fs.createWriteStream(logFile, { flags: 'w' });
+				}
+			}
+		};
+	}
+} catch (e) {
+	console.error('[app] log file unavailable:', e);
+}
+
 process.env.APP_ROOT = path.join(__dirname, '..', '..');
 
 const VITE_DEV_SERVER_URL = process.env.ELECTRON_RENDERER_URL;
@@ -1212,13 +1246,36 @@ function runHelper(cmd: string, args: string[]): Promise<{ ok: boolean; error?: 
 		proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
 	});
 }
-ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string }> => {
+/* UsbDk service state from `sc query UsbDk`: missing (not installed), running, or stopped
+ * (installed but not loaded, usually until Windows restarts). null off Windows. */
+type UsbHelperState = 'missing' | 'running' | 'stopped' | null;
+function usbDkState(): Promise<UsbHelperState> {
+	if (process.platform !== 'win32') return Promise.resolve(null);
+	return new Promise((resolve) => {
+		const proc = spawn('sc.exe', ['query', 'UsbDk']);
+		let out = '';
+		proc.stdout.on('data', (d) => (out += d));
+		proc.on('error', () => resolve(null));
+		// 1060 = ERROR_SERVICE_DOES_NOT_EXIST
+		proc.on('close', (code) => resolve(code === 1060 ? 'missing' : /STATE\s*:\s*4\b/.test(out) ? 'running' : code === 0 ? 'stopped' : null));
+	});
+}
+ipcMain.handle('usb:helper-state', () => usbDkState());
+
+ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string; restart?: boolean }> => {
 	const resource = (devDir: string, name: string) =>
 		app.isPackaged ? path.join(process.resourcesPath, name) : path.join(process.env.APP_ROOT!, 'resources', devDir, name);
 	if (process.platform === 'win32') {
 		// Our x64 build runs emulated on Windows on ARM, but UsbDk's x64 driver can't load there.
 		if (app.runningUnderARM64Translation) return { ok: false, error: 'UsbDk does not support Windows on ARM, use WinUSB (Zadig) instead' };
-		return runHelper('msiexec.exe', ['/i', resource('', USBDK_MSI), '/passive', '/norestart']);
+		const msiLog = path.join(LOG_DIR, 'usbdk-install.log');
+		const res = await runHelper('msiexec.exe', ['/i', resource('', USBDK_MSI), '/passive', '/norestart', '/l*v', msiLog]);
+		const state = await usbDkState();
+		console.log(`[usb-helper] msiexec: ${res.ok ? 'ok' : res.error}, UsbDk service: ${state}`);
+		// msiexec 3010 = installed, restart required; an installed but stopped service needs a restart as well
+		if (res.error === 'exit code 3010' || (res.ok && state === 'stopped')) return { ok: false, restart: true };
+		if (res.ok && state === 'running') return { ok: true };
+		return { ok: false, error: `${res.ok ? 'UsbDk is still not installed' : res.error}. Details: ${msiLog}` };
 	}
 	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
 	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;
@@ -1601,6 +1658,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Key Commands', click: () => sendToFocused('menu:action', 'show-key-commands') },
 				{ type: 'separator' as const },
 				{ label: 'Toggle DevTools', click: () => focusedView()?.toggleDevTools(), accelerator: 'CommandOrControl+Option+I' },
+				{ label: 'Open Log Folder', click: () => void shell.openPath(LOG_DIR) },
 				// { label: 'ShowSVG', click: () => sendToFocused('menu:action', 'toggle-svg-viewer') },
 				{ type: 'separator' as const },
 				{

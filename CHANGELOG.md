@@ -8,7 +8,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Windows: installer asks for the install folder (default Program Files) instead of installing silently in AppData
+- Help → Open Log Folder: the editor now writes a log file (main.log) you can send along with a bug report
+
 ### Fixed
+- Windows: the "USB Driver Problem" dialog can be closed, no longer offers "Install USB helper" again when UsbDk is installed but needs a Windows restart, and shows the UsbDk install log path when the install fails
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup
 - Update node versions on build scripts

@@ -1,9 +1,18 @@
 <template>
 	<Teleport to="body">
-		<div v-if="device.status === DeviceStatus.DriverError" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
+		<div v-if="device.status === DeviceStatus.DriverError && !dismissed" class="fixed inset-0 z-50 flex items-center justify-center bg-black/60">
 			<div class="bg-surface-1 border border-line-default rounded shadow-xl max-w-md w-full mx-4 p-5 flex flex-col gap-4">
 				<div class="text-sm font-semibold text-red-400">USB Driver Problem</div>
-				<p v-if="needsUsbHelper" class="text-sm text-content-secondary leading-relaxed">
+				<p v-if="isWindows && needsRestart" class="text-sm text-content-secondary leading-relaxed">
+					The USB helper (UsbDk) is installed but not active yet. <strong class="text-content-primary">Restart Windows</strong>, then start the editor
+					again.
+				</p>
+				<p v-else-if="isWindows && helperState === 'running' && needsUsbHelper" class="text-sm text-content-secondary leading-relaxed">
+					The USB helper (UsbDk) is installed and running, but the editor could not use it. Please send us the log files (Help → Open Log Folder), see
+					also
+					<a href="#" class="underline text-blue-400 hover:text-blue-300" @click.prevent="openDriverDocs">Windows USB driver</a>.
+				</p>
+				<p v-else-if="needsUsbHelper" class="text-sm text-content-secondary leading-relaxed">
 					<template v-if="isWindows">
 						The G2 was found on USB but the USB helper (UsbDk) the editor needs is not installed.<br /><br />
 						Click <strong class="text-content-primary">Install USB helper</strong> to install it (asks for administrator permission once). Clavia's
@@ -33,7 +42,7 @@
 				</div>
 				<div class="flex justify-end gap-2">
 					<button
-						v-if="needsUsbHelper"
+						v-if="canInstall"
 						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer disabled:opacity-50 disabled:cursor-default"
 						:disabled="installing"
 						@click="installUsbHelper"
@@ -46,6 +55,12 @@
 					>
 						Retry
 					</button>
+					<button
+						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer"
+						@click="dismissed = true"
+					>
+						Close
+					</button>
 				</div>
 			</div>
 		</div>
@@ -53,7 +68,7 @@
 </template>
 
 <script setup lang="ts">
-	import { computed, ref } from 'vue';
+	import { computed, ref, watch } from 'vue';
 	import { DeviceStatus, useDeviceStore } from '@/store/device';
 	import { isLinux, isMac, isWindows } from '@/utils/platform';
 
@@ -65,6 +80,25 @@
 	);
 	const installing = ref(false);
 	const helperError = ref('');
+	// Closed by the user: stays closed until the next driver error.
+	const dismissed = ref(false);
+	// Windows: UsbDk service state, so an installed-but-inactive UsbDk isn't offered for install again.
+	const helperState = ref<'missing' | 'running' | 'stopped' | null>(null);
+	const restartNeeded = ref(false);
+	const needsRestart = computed(() => restartNeeded.value || helperState.value === 'stopped');
+	// Windows: after a failed install the error (with the msiexec log path) is shown instead of the same button again.
+	// Linux keeps the button: a failure there is usually the dismissed password prompt.
+	const canInstall = computed(() => needsUsbHelper.value && !needsRestart.value && helperState.value !== 'running' && !(isWindows && helperError.value));
+
+	watch(
+		() => device.status,
+		async (status) => {
+			if (status !== DeviceStatus.DriverError) return;
+			dismissed.value = false;
+			if (isWindows) helperState.value = await window.electronAPI.usbHelperState();
+		},
+		{ immediate: true },
+	);
 
 	const emit = defineEmits<{ retry: [] }>();
 
@@ -78,6 +112,7 @@
 		const res = await window.electronAPI.installUsbHelper();
 		installing.value = false;
 		if (res.ok) emit('retry');
+		else if (res.restart) restartNeeded.value = true;
 		else helperError.value = res.error ?? 'unknown error';
 	}
 </script>
