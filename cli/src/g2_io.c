@@ -164,22 +164,20 @@ static const char *g2_backend = "native";
 const char *g2_backend_name(void) { return g2_backend; }
 
 int g2_init(void) {
-#ifdef _WIN32
-    /* Prefer the UsbDk filter driver: it can take over the G2 whatever function
-     * driver is bound (Clavia's or WinUSB), so no per-device driver swap is needed.
-     * Not installed -> fall back to the default WinUSB backend (Zadig setups). */
-    const struct libusb_init_option usbdk[] = {{ .option = LIBUSB_OPTION_USE_USBDK }};
-    if (libusb_init_context(&g2.ctx, usbdk, 1) == 0) {
-        g2_backend = "usbdk";
-        return G2_OK;
-    }
-    g2_backend = "winusb";
-#endif
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
         fprintf(stderr, "Failed to initialize libusb: %s\n", libusb_error_name(ret));
         return G2_ERR_NO_MEMORY;
     }
+#ifdef _WIN32
+    /* Prefer the UsbDk filter driver: it can take over the G2 whatever function
+     * driver is bound (Clavia's or WinUSB), so no per-device driver swap is needed.
+     * Not installed -> stay on the default WinUSB backend (Zadig setups).
+     * Must be set after init: passed to libusb_init_context() (libusb 1.0.27-1.0.29)
+     * the option is applied before the Windows backend has probed UsbDk, so it always
+     * fails with NOT_FOUND, and that backend init would reset the context to WinUSB anyway. */
+    g2_backend = libusb_set_option(g2.ctx, LIBUSB_OPTION_USE_USBDK) == LIBUSB_SUCCESS ? "usbdk" : "winusb";
+#endif
     return G2_OK;
 }
 

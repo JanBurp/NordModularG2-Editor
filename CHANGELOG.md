@@ -13,7 +13,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Help → Open Log Folder: the editor now writes a log file (main.log) you can send along with a bug report
 
 ### Fixed
-- Windows: the "USB Driver Problem" dialog can be closed, no longer offers "Install USB helper" again when UsbDk is installed but needs a Windows restart, and shows the UsbDk install log path when the install fails
+- Windows: the editor never actually used UsbDk, so a G2 bound to Clavia's driver could not be opened and the "Install USB helper" dialog kept coming back
+- Windows: the "USB Driver Problem" dialog can be closed, no longer offers "Install USB helper" again
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup
 - Update node versions on build scripts
