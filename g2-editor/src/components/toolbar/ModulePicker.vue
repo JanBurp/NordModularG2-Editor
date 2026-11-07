@@ -81,9 +81,13 @@
 	const { addModuleAtMousePos } = useAddModule();
 
 	const selectedCategory = ref(categories.value[0]);
-	// Always exactly 2 rows of (up to) 8: row 1 never changes size/width when Hidden is toggled;
-	// a 9th category (Hidden) only extends row 2, keeping every cell's width identical.
-	const categoryRows = computed(() => [categories.value.slice(0, 8), categories.value.slice(8)]);
+	// Always exactly 2 rows of (up to) 8, filled column by column like the official toolbar (In/Out above Note, Osc above LFO, …);
+	// a 17th category (Hidden) only extends row 2, keeping every cell's width identical.
+	const categoryRows = computed(() => {
+		const rows: string[][] = [[], []];
+		categories.value.forEach((c, i) => rows[i < 16 ? i % 2 : 1].push(c));
+		return rows;
+	});
 
 	const modules = computed(() => getModulesByCategory(selectedCategory.value));
 
@@ -131,7 +135,7 @@
 	}
 	const pickerWidthPx = computed(() => Math.max(ICON_SIZE, ...categories.value.map(rowWidthPx)));
 
-	// Category cells are sized to fill 8 columns of pickerWidthPx; a 9th (row 2 only, Hidden) extends the toolbar instead of shrinking cells.
+	// Category cells are sized to fill 8 columns of pickerWidthPx; a 9th in row 2 (Hidden) extends the toolbar instead of shrinking cells.
 	const CATEGORY_GAP = 1; // gap-px
 	const categoryCellWidthPx = computed(() => (pickerWidthPx.value - 7 * CATEGORY_GAP) / 8);
 	const toolbarWidthPx = computed(() =>
