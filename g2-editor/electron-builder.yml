@@ -78,8 +78,6 @@ nsis:
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true
-
-nsis:
   license: install/README-Windows.txt
 
 linux:

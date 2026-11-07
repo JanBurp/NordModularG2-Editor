@@ -266,11 +266,19 @@ jobs:
     permissions:
       contents: write
     steps:
+      # Only the Linux install README: AppImage/deb have no place for it inside the download
+      - uses: actions/checkout@v7
+        with:
+          sparse-checkout: g2-editor/install/README-Linux.txt
+          sparse-checkout-cone-mode: false
+
       - uses: actions/download-artifact@v8
         with:
           path: dist/
 
       - uses: softprops/action-gh-release@v3
         with:
-          files: dist/**/*
+          files: |
+            dist/**/*
+            g2-editor/install/README-Linux.txt
           generate_release_notes: true
