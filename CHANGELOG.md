@@ -9,7 +9,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Fixed
+- fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup
+- Update node versions on build scripts
 
 ## [0.8.1] - 2026-11-06
 
