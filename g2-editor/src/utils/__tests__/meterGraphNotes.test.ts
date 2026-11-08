@@ -53,10 +53,10 @@ describe('withMeterLine never changes the user text', () => {
 		expect(withMeterLine(user, '').text).toBe(user);
 	});
 
-	it('drops the tag rather than letting the cap cut user text', () => {
+	it('leaves the notes, old tag included, unchanged rather than letting the cap cut user text', () => {
 		const full = 'x'.repeat(1000);
 		expect(withMeterLine(full, LINE)).toEqual({ text: full, fits: false });
-		expect(withMeterLine(`[metergraph: V1.1]\n${full}`, LINE)).toEqual({ text: full, fits: false });
+		expect(withMeterLine(`[metergraph: V1.1]\n${full}`, LINE)).toEqual({ text: `[metergraph: V1.1]\n${full}`, fits: false });
 		expect(withMeterLine('short', LINE, 20)).toEqual({ text: 'short', fits: false });
 	});
 });

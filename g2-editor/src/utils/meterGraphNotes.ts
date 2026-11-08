@@ -41,11 +41,11 @@ export function parseMeterLine(text: string): NotesMeter[] | null {
 }
 
 // Puts `line` on top of the user's text (replacing only our own old tag), or removes our tag when
-// `line` is ''. If the tag doesn't fit the text pad, the user's text is returned without a tag and
-// fits = false: the serializer cuts at `max`, and that cut must never fall on the user's text.
+// `line` is ''. If the new tag doesn't fit the text pad, the notes are returned unchanged (an old tag
+// stays) and fits = false: the serializer cuts at `max`, and that cut must never fall on the user's text.
 export function withMeterLine(text: string, line: string, max = TEXT_PAD_MAX): { text: string; fits: boolean } {
 	const { rest } = splitTag(text);
 	if (!line) return { text: rest, fits: true };
 	const result = rest ? `${line}\n${rest}` : line;
-	return result.length > max ? { text: rest, fits: false } : { text: result, fits: true };
+	return result.length > max ? { text, fits: false } : { text: result, fits: true };
 }

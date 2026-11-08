@@ -11,6 +11,7 @@ import { formatMeterLine, parseMeterLine, withMeterLine } from '@/utils/meterGra
 import { showToast } from '@/composables/useToast';
 import { SLOT_LABELS } from '@/constants';
 import type { ContextMenuItem, SlotLabel } from '@/types';
+import type { Patch } from '@/types/patch';
 
 // Same tuple a Parameter Page meter assignment uses (isLed=1, paramIndex = ledNo).
 export interface MeterId {
@@ -153,15 +154,18 @@ export const useMeterGraphStore = defineStore('meterGraph', () => {
 
 	// Notes -> graph, when a slot gets a new patch object (file, G2, performance, reload).
 	const loadedNames: Partial<Record<SlotLabel, string>> = {};
-	function onPatchLoaded(slot: SlotLabel, prevText: string | undefined) {
+	const layout = (p: Patch) => p.areas.map((a) => a.modules.map((m) => `${m.index}:${m.type}`).join()).join('|');
+	function onPatchLoaded(slot: SlotLabel, prev: Patch | null | undefined) {
 		const entry = slotsStore.slots[slot];
 		const text = entry.patch?.text ?? '';
 		const sameName = loadedNames[slot] === entry.name;
 		loadedNames[slot] = entry.name;
 		const saved = parseMeterLine(text);
 		// The same patch back from the G2 without our tag (its notes weren't uploaded yet): keep the
-		// meters and put the tag back. Anything else is another patch: its own tag, or no meters.
-		if (!saved && prevText !== undefined && sameName && withMeterLine(prevText, '').text === text) {
+		// meters and put the tag back. Same name, notes and modules; anything else is another patch:
+		// its own tag, or no meters.
+		const samePatch = !!prev && sameName && withMeterLine(prev.text ?? '', '').text === text && layout(prev) === layout(entry.patch!);
+		if (!saved && samePatch) {
 			writeLine(slot);
 			return;
 		}
@@ -173,7 +177,7 @@ export const useMeterGraphStore = defineStore('meterGraph', () => {
 		() => SLOT_LABELS.map((s) => slotsStore.slots[s].patch),
 		(patches, prev) =>
 			SLOT_LABELS.forEach((s, i) => {
-				if (patches[i] && patches[i] !== prev?.[i]) onPatchLoaded(s, prev?.[i]?.text ?? (prev?.[i] ? '' : undefined));
+				if (patches[i] && patches[i] !== prev?.[i]) onPatchLoaded(s, prev?.[i]);
 			}),
 		{ immediate: true },
 	);

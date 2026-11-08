@@ -17,13 +17,13 @@ const meter = (ledNo: number, moduleIndex = 1): MeterId => ({ slot: 'A', locatio
 beforeEach(() => setActivePinia(createPinia()));
 
 // Slot A, voice area: module 1 = 2-Out. Returns the stores after the led store built its strip list.
-const patchWith = (text = '') =>
+const patchWith = (text = '', type = OUT_2) =>
 	({
 		description: {},
 		text,
 		areas: [
 			{ modules: [], cableList: [] },
-			{ modules: [{ index: 1, type: OUT_2 }], cableList: [] },
+			{ modules: [{ index: 1, type }], cableList: [] },
 		],
 	}) as any;
 
@@ -181,6 +181,17 @@ describe('meterGraph <-> patch notes', () => {
 		expect(slots.slots.A.patch!.text).toBe('other notes');
 	});
 
+	it('drops the meters when another patch with the same name and notes is loaded', async () => {
+		const { slots, store } = await setup();
+		store.add(meter(0));
+		await nextTick();
+		slots.slots.A.patch = patchWith('', IN_4); // same name, no notes, meter 1 of module 1 still exists
+		await nextTick();
+		expect(store.traces).toHaveLength(0);
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe('');
+	});
+
 	it('leaves full notes untouched instead of cutting them', async () => {
 		const full = 'x'.repeat(1020);
 		const { slots, store } = await setup(full);
@@ -188,5 +199,16 @@ describe('meterGraph <-> patch notes', () => {
 		await nextTick();
 		expect(slots.slots.A.patch!.text).toBe(full);
 		expect(store.traces).toHaveLength(1);
+	});
+
+	it('keeps the saved tag when one more meter no longer fits', async () => {
+		const notes = `[metergraph: V1.1]\n${'x'.repeat(1004)}`; // 1023 chars; with V1.2 the tag would make 1028
+		const { slots, store } = await setup(notes);
+		expect(store.traces).toHaveLength(1);
+		store.add(meter(1));
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe(notes);
+		expect(slots.slots.A.edited).toBe(false);
+		expect(store.traces).toHaveLength(2);
 	});
 });

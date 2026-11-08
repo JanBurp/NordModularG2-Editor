@@ -2853,7 +2853,7 @@ export const useSlotsStore = defineStore('slots', {
 		// The Meter Graph's generated first line of the notes (meterGraphNotes.ts). Only our own tag line
 		// is replaced; the user's text is shifted down, never changed or cut. No undo record: graphing
 		// a meter is not a patch edit. Reaches the G2 like typed notes do (textDirty, see setPatchText).
-		// Returns false when the tag didn't fit the text pad and was left out.
+		// Returns false when the new tag didn't fit the text pad (the notes, old tag included, stay as they were).
 		setMeterGraphLine(slot: SlotLabel, line: string): boolean {
 			const entry = this.slots[slot];
 			const patch = entry?.patch;
