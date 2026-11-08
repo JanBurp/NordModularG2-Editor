@@ -5,6 +5,8 @@ import { useHistoryStore } from '@/store/history';
 import { useDeviceStore, DeviceStatus } from '@/store/device';
 import { MORPH_NAMES } from '@/types/patch';
 import { runCliBatchSafe, runCliSafe } from '@/store/slotHelpers';
+import { useBrowserStore } from '@/store/browser';
+import * as nmg2PatchSerializer from '@/parser/nmg2PatchSerializer';
 
 afterEach(() => vi.useRealTimers());
 
@@ -1340,6 +1342,45 @@ describe('pushPatchToDevice', () => {
 
 		expect(result).toBe(false);
 		expect(store.slots['A'].textDirty).toBe(true);
+	});
+});
+
+describe('pushPendingText (notes not yet uploaded go to the G2 on every save)', () => {
+	function seedDirty() {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].templateRawHex = '00'.repeat(20);
+		store.slots['A'].textDirty = true;
+		useDeviceStore().status = DeviceStatus.Connected;
+		vi.spyOn(nmg2PatchSerializer, 'serializePatch').mockReturnValue('ab'.repeat(20) + 'cdef');
+		return store;
+	}
+	const cliCommands = () => ((globalThis as any).window.cli.run as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0][0]);
+
+	it('uploads only dirty slots, and only when connected', async () => {
+		const store = seedDirty();
+		expect(await store.pushPendingText(['A', 'B'])).toBe(true);
+		expect(cliCommands().filter((c) => c === 'upload-patch-data')).toHaveLength(1);
+		expect(store.slots['A'].textDirty).toBe(false);
+
+		store.slots['A'].textDirty = true;
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		expect(await store.pushPendingText(['A'])).toBe(true);
+		expect(store.slots['A'].textDirty).toBe(true);
+	});
+
+	it('store in synth uploads the notes before store-patch, and stops if that upload fails', async () => {
+		seedDirty();
+		const browser = useBrowserStore();
+		expect(await browser.storePatch(0, 1, 1, 'patch', 'Lead')).toBe(true);
+		const order = cliCommands();
+		expect(order.indexOf('upload-patch-data')).toBeLessThan(order.indexOf('store-patch'));
+
+		useSlotsStore().slots['A'].textDirty = true;
+		useSlotsStore().uploadingFromFile = true; // upload refused
+		((globalThis as any).window.cli.run as ReturnType<typeof vi.fn>).mockClear();
+		expect(await browser.storePatch(0, 1, 1, 'patch', 'Lead')).toBe(false);
+		expect(cliCommands()).not.toContain('store-patch');
 	});
 });
 

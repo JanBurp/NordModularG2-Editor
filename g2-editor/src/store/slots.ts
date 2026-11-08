@@ -71,6 +71,7 @@ import { isAllowedCC } from '@/composables/useMidiCC';
 import { bankDownloadReloadingNames, waitForNamesReload } from '@/composables/useBankDownloadDialog';
 import { convertedNote } from '@/parser/currentFormatFile';
 import { FILE_VERSION_OLDEST } from '@/parser/fileVersion';
+import { withMeterLine } from '@/utils/meterGraphNotes';
 
 // Per-memory-type load in %, keyed as in the official CPatchLoad getters (GetPmem, GetXmem, ...)
 export type MemoryUsage = { pmem: number; xmem: number; ymem: number; zpmem: number; ram: number; qmem: number; rmem: number };
@@ -2205,6 +2206,7 @@ export const useSlotsStore = defineStore('slots', {
 					if (!result.success || !result.filepath) return;
 					hwPath = result.filepath;
 				}
+				if (!(await this.pushPendingText(SLOT_LABELS))) return; // the file is read back from the G2
 				try {
 					const output = await window.cli.run(['get-perf-file-buf']);
 					await this._saveCapturedPerfBytes(hwPath, output);
@@ -2228,6 +2230,7 @@ export const useSlotsStore = defineStore('slots', {
 			// Official text header, as the original editor writes it (the performance name lives in the
 			// file name, not the header).
 			const { data, rawHex } = await this._buildPrfBytes(PRF2_TEXT_HEADER, this.performanceRawHex);
+			await this.pushPendingText(SLOT_LABELS);
 			try {
 				await window.electronAPI.savePatch(path, data);
 			} catch (err) {
@@ -2314,6 +2317,7 @@ export const useSlotsStore = defineStore('slots', {
 			}
 			const ok = await this.exportSlotToFile(slot, path);
 			if (!ok) return;
+			await this.pushPendingText([slot]);
 			this.slotFilePaths[slot] = path;
 			entry.edited = false;
 			this._toastConverted(entry.name, this.slotOldFileVersions[slot]);
@@ -2351,6 +2355,18 @@ export const useSlotsStore = defineStore('slots', {
 			const ok = await this._uploadSlotToDevice(slot, slot);
 			if (ok) entry.textDirty = false;
 			return ok;
+		},
+
+		// Notes edited locally (typed, or the Meter Graph tag) reach the G2 only with a full re-upload.
+		// Every save pushes them first, so the G2 has them too, and a save that reads the patch back
+		// from the G2 (store in synth, hardware performance) doesn't lose them. False if a needed
+		// upload failed (already reported with a toast).
+		async pushPendingText(slots: readonly SlotLabel[]): Promise<boolean> {
+			if (useDeviceStore().status !== DeviceStatus.Connected) return true;
+			for (const s of slots) {
+				if (this.slots[s]?.patch && this.slots[s].textDirty && !(await this.pushPatchToDevice(s))) return false;
+			}
+			return true;
 		},
 
 		// Shared by pushPatchToDevice and "Download to Slot": serializes the source slot's current
@@ -2832,6 +2848,23 @@ export const useSlotsStore = defineStore('slots', {
 			patch.text = text;
 			this._markSlotDirty(slot);
 			entry.textDirty = true;
+		},
+
+		// The Meter Graph's generated first line of the notes (meterGraphNotes.ts). Only our own tag line
+		// is replaced; the user's text is shifted down, never changed or cut. No undo record: graphing
+		// a meter is not a patch edit. Reaches the G2 like typed notes do (textDirty, see setPatchText).
+		// Returns false when the tag didn't fit the text pad and was left out.
+		setMeterGraphLine(slot: SlotLabel, line: string): boolean {
+			const entry = this.slots[slot];
+			const patch = entry?.patch;
+			if (!patch) return true;
+			const { text, fits } = withMeterLine(patch.text ?? '', line);
+			if (text !== (patch.text ?? '')) {
+				patch.text = text;
+				this._markSlotDirty(slot);
+				entry.textDirty = true;
+			}
+			return fits;
 		},
 
 		setMorphParam(variation: number, morphIdx: number, field: 'dial' | 'mode', value: number, slot: SlotLabel = useUiStore().slotInFocus): void {

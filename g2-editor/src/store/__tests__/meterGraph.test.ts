@@ -7,6 +7,7 @@ import { useLedStore } from '@/store/led';
 import { useSettingsStore } from '@/store/settings';
 import { getModule } from '@/renderer/nmg2mods';
 import { vuStripKey } from '@/utils/vuLevel';
+import { useHistoryStore } from '@/store/history';
 
 const OUT_2 = 4; // 2-Out: vu elements at x 205, 231 (element order = LED order)
 const IN_4 = 171; // 4-In: vu elements listed right to left (x 231, 205, 179, 153)
@@ -16,17 +17,22 @@ const meter = (ledNo: number, moduleIndex = 1): MeterId => ({ slot: 'A', locatio
 beforeEach(() => setActivePinia(createPinia()));
 
 // Slot A, voice area: module 1 = 2-Out. Returns the stores after the led store built its strip list.
-async function setup() {
-	const slots = useSlotsStore();
-	const led = useLedStore();
-	const store = useMeterGraphStore();
-	slots.slots.A.patch = {
+const patchWith = (text = '') =>
+	({
 		description: {},
+		text,
 		areas: [
 			{ modules: [], cableList: [] },
 			{ modules: [{ index: 1, type: OUT_2 }], cableList: [] },
 		],
-	} as any;
+	}) as any;
+
+async function setup(text = '') {
+	const slots = useSlotsStore();
+	const led = useLedStore();
+	const store = useMeterGraphStore();
+	slots.slots.A.name = 'Lead';
+	slots.slots.A.patch = patchWith(text);
 	await nextTick();
 	return { slots, led, store };
 }
@@ -120,5 +126,67 @@ describe('meterGraph store', () => {
 		expect(store.menuItem(meter(0)).label).toBe('Show in Meter Graph');
 		store.menuItem(meter(0)).action!();
 		expect(store.menuItem(meter(0)).label).toBe('Remove from Meter Graph');
+	});
+});
+
+describe('meterGraph <-> patch notes', () => {
+	it('writes the tag above the user text, marks the slot edited, records no undo step', async () => {
+		const { slots, store } = await setup('my notes');
+		store.add(meter(0));
+		store.add(meter(1));
+		store.toggleHidden(meter(1));
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe('[metergraph: V1.1 V1.2-]\nmy notes');
+		expect(slots.slots.A.edited).toBe(true);
+		expect(slots.slots.A.textDirty).toBe(true);
+		expect(useHistoryStore().slots.A.past).toHaveLength(0);
+		store.remove(meter(0));
+		store.remove(meter(1));
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe('my notes');
+	});
+
+	it('restores meters from a loaded patch without opening the panel', async () => {
+		const { slots, store } = await setup();
+		slots.slots.A.patch = patchWith('[metergraph: V1.2 V1.1-]\nnotes');
+		await nextTick();
+		expect(store.traces.map((t) => [t.ledNo, t.hidden])).toEqual([
+			[1, false],
+			[0, true],
+		]);
+		expect(useSettingsStore().showMeterGraph).toBe(false);
+		expect(slots.slots.A.patch!.text).toBe('[metergraph: V1.2 V1.1-]\nnotes');
+	});
+
+	it('keeps the meters when the same patch comes back from the G2 without the tag', async () => {
+		const { slots, store } = await setup('notes');
+		store.add(meter(0));
+		await nextTick();
+		slots.slots.A.patch = patchWith('notes'); // G2 copy: same name and notes, tag not uploaded yet
+		await nextTick();
+		expect(store.traces).toHaveLength(1);
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe('[metergraph: V1.1]\nnotes');
+	});
+
+	it('drops the meters when another patch without a tag is loaded', async () => {
+		const { slots, store } = await setup('notes');
+		store.add(meter(0));
+		await nextTick();
+		slots.slots.A.name = 'Bass';
+		slots.slots.A.patch = patchWith('other notes');
+		await nextTick();
+		expect(store.traces).toHaveLength(0);
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe('other notes');
+	});
+
+	it('leaves full notes untouched instead of cutting them', async () => {
+		const full = 'x'.repeat(1020);
+		const { slots, store } = await setup(full);
+		store.add(meter(0));
+		await nextTick();
+		expect(slots.slots.A.patch!.text).toBe(full);
+		expect(store.traces).toHaveLength(1);
 	});
 });

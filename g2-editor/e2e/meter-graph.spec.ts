@@ -1,5 +1,6 @@
 import { clickContextMenuItem, dropModuleOnCanvas, openContextMenu } from './helpers';
-import { expect, test } from './fixtures/electron';
+import fs from 'fs';
+import { evaluateWithRetry, expect, test } from './fixtures/electron';
 
 const MOD = { Out2: 4 } as const; // 2-Out: two level meters
 
@@ -39,5 +40,50 @@ test.describe('Meter Graph', () => {
 		await expect(graph).toHaveCount(0);
 		await sendMenuAction('toggle-meter-graph');
 		await expect(traces).toHaveCount(1);
+	});
+
+	test('the graphed meters are saved in the patch notes and restored on load', async ({ app, page, sendMenuAction, mockSaveDialog }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.Out2, 0, 0);
+		await sendMenuAction('toggle-text-panel');
+		const notes = page.getByPlaceholder('Patch notes…');
+		await notes.fill('my notes');
+
+		const meters = page.locator('[data-testid="canvas-va"] [data-module-short="2-Out"] [data-testid="vu-meter"]');
+		for (const i of [0, 1]) {
+			await openContextMenu(page, meters.nth(i));
+			await clickContextMenuItem(page, 'Show in Meter Graph');
+		}
+		const traces = page.getByTestId('meter-graph-trace');
+		await traces.nth(1).click(); // hide meter 2
+
+		// The tag goes on top; the user's notes are kept below it
+		await expect(notes).toHaveValue(/^\[metergraph: V\d+\.1 V\d+\.2-\]\nmy notes$/);
+
+		const savedPath = await mockSaveDialog();
+		await sendMenuAction('save-as');
+		await expect.poll(() => fs.existsSync(savedPath) && fs.statSync(savedPath).size).toBeGreaterThan(0);
+
+		// Another patch: no meters. Close the panel, then open the saved file.
+		await sendMenuAction('new-patch');
+		await expect(traces).toHaveCount(0);
+		await page.getByTestId('meter-graph').getByRole('button', { name: '×', exact: true }).click();
+		const data = Array.from(fs.readFileSync(savedPath));
+		await evaluateWithRetry(
+			app,
+			({ ipcMain }, args) => {
+				ipcMain.removeHandler('patch:open-dialog');
+				ipcMain.handle('patch:open-dialog', async () => ({ success: true, filepath: args.savedPath, data: args.data }));
+			},
+			{ savedPath, data },
+		);
+		await sendMenuAction('open');
+		await expect(notes).toHaveValue(/^\[metergraph: V\d+\.1 V\d+\.2-\]\nmy notes$/);
+
+		// Restored, but the panel stays closed until shown
+		await expect(page.getByTestId('meter-graph')).toHaveCount(0);
+		await sendMenuAction('toggle-meter-graph');
+		await expect(traces).toHaveCount(2);
+		await expect(traces.nth(1)).toHaveClass(/opacity-40/);
 	});
 });

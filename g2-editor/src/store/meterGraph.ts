@@ -7,6 +7,9 @@ import { useLedStore } from '@/store/led';
 import { useSettingsStore } from '@/store/settings';
 import { getModule } from '@/renderer/nmg2mods';
 import { vuStripKey } from '@/utils/vuLevel';
+import { formatMeterLine, parseMeterLine, withMeterLine } from '@/utils/meterGraphNotes';
+import { showToast } from '@/composables/useToast';
+import { SLOT_LABELS } from '@/constants';
 import type { ContextMenuItem, SlotLabel } from '@/types';
 
 // Same tuple a Parameter Page meter assignment uses (isLed=1, paramIndex = ledNo).
@@ -76,14 +79,15 @@ export const useMeterGraphStore = defineStore('meterGraph', () => {
 		buffers.delete(id);
 	}
 
-	function add(m: MeterId) {
+	// open: show the panel (a user action); a restore from the patch notes leaves it as it is
+	function add(m: MeterId, open = true, hidden = false) {
 		const id = meterKey(m);
 		if (has(m)) return;
 		const used = new Set(traces.value.map((t) => t.color));
 		const color = COLORS.find((c) => !used.has(c)) ?? COLORS[traces.value.length % COLORS.length];
-		traces.value = [...traces.value, { ...m, id, color, hidden: false }];
+		traces.value = [...traces.value, { slot: m.slot, location: m.location, moduleIndex: m.moduleIndex, ledNo: m.ledNo, id, color, hidden }];
 		buffers.set(id, { t: new Float64Array(BUFFER_CAPACITY), v: new Uint8Array(BUFFER_CAPACITY), head: 0, count: 0 });
-		settingsStore.showMeterGraph = true;
+		if (open) settingsStore.showMeterGraph = true;
 	}
 
 	function toggle(m: MeterId) {
@@ -92,7 +96,7 @@ export const useMeterGraphStore = defineStore('meterGraph', () => {
 	}
 
 	function addAll(meters: MeterId[]) {
-		meters.forEach(add);
+		meters.forEach((m) => add(m));
 	}
 
 	function toggleHidden(m: MeterId) {
@@ -126,6 +130,52 @@ export const useMeterGraphStore = defineStore('meterGraph', () => {
 	watch(
 		() => traces.value.filter((t) => !stripKey(t)),
 		(gone) => gone.forEach(remove),
+	);
+
+	// Patch notes sync: each slot's meters are kept as a tag line in that patch's notes
+	// (meterGraphNotes.ts), so they are saved with the patch, in files and on the G2.
+	const lineOf = (slot: SlotLabel) => formatMeterLine(traces.value.filter((t) => t.slot === slot));
+	const warnedFull = new Set<SlotLabel>();
+
+	function writeLine(slot: SlotLabel) {
+		if (slotsStore.setMeterGraphLine(slot, lineOf(slot))) warnedFull.delete(slot);
+		else if (!warnedFull.has(slot)) {
+			warnedFull.add(slot);
+			showToast(`Slot ${slot}: Meter Graph not saved in patch notes: notes are full`);
+		}
+	}
+
+	// Graph -> notes, whenever a slot's meters change (no-op when the tag is already right)
+	watch(
+		() => SLOT_LABELS.map(lineOf),
+		(lines, prev) => SLOT_LABELS.forEach((s, i) => lines[i] !== prev[i] && writeLine(s)),
+	);
+
+	// Notes -> graph, when a slot gets a new patch object (file, G2, performance, reload).
+	const loadedNames: Partial<Record<SlotLabel, string>> = {};
+	function onPatchLoaded(slot: SlotLabel, prevText: string | undefined) {
+		const entry = slotsStore.slots[slot];
+		const text = entry.patch?.text ?? '';
+		const sameName = loadedNames[slot] === entry.name;
+		loadedNames[slot] = entry.name;
+		const saved = parseMeterLine(text);
+		// The same patch back from the G2 without our tag (its notes weren't uploaded yet): keep the
+		// meters and put the tag back. Anything else is another patch: its own tag, or no meters.
+		if (!saved && prevText !== undefined && sameName && withMeterLine(prevText, '').text === text) {
+			writeLine(slot);
+			return;
+		}
+		traces.value.filter((t) => t.slot === slot).forEach(remove);
+		for (const m of saved ?? []) add({ slot, location: m.location, moduleIndex: m.moduleIndex, ledNo: m.ledNo }, false, m.hidden);
+	}
+
+	watch(
+		() => SLOT_LABELS.map((s) => slotsStore.slots[s].patch),
+		(patches, prev) =>
+			SLOT_LABELS.forEach((s, i) => {
+				if (patches[i] && patches[i] !== prev?.[i]) onPatchLoaded(s, prev?.[i]?.text ?? (prev?.[i] ? '' : undefined));
+			}),
+		{ immediate: true },
 	);
 
 	function menuItem(m: MeterId): ContextMenuItem {

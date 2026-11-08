@@ -17,6 +17,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### New
 - Old patch and performance files are converted to new version
+- Graph: You can add a graph for each VU meter in patch to analyse signal in time. Meters are stored with patch notes.
 
 ### Changed
 - Improved and more auto-suggesting cables
@@ -40,6 +41,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch notes are capped at 1024 characters, as on the G2
 - Patches saved from the G2 include its current-note data, as the original editor's do
 - Fix for copy/paste key commands in Windows & Linux
+- Edited patch notes did not save implicitly (saving patch)
 
 ### Others
 - CLI warns when it uploads an old-format file unconverted
