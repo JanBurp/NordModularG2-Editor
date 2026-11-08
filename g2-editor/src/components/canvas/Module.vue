@@ -90,6 +90,7 @@
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 			<g
 				v-else-if="entry.ve.type === 'vu'"
+				data-testid="vu-meter"
 				@contextmenu.stop.prevent="onVuContextMenu($event, entry.ve)"
 				@dragover.prevent
 				@drop="onVuDrop($event, entry.ve)"
@@ -308,6 +309,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
+	import { useMeterGraphStore } from '../../store/meterGraph';
 	import { canPasteParams, moduleActionTargets } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
@@ -424,6 +426,8 @@
 		openContextMenu(e, [
 			...buildParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing, isLed: 1 }),
 			...buildGlobalParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing: existingGlobal, isLed: 1 }),
+			{ type: 'separator' },
+			meterGraph.menuItem({ slot, location, moduleIndex: moduleIdx.value, ledNo }),
 		]);
 	}
 
@@ -595,6 +599,7 @@
 	const uiStore = useUiStore();
 	const { showHint, clearHint } = useStatusHint();
 	const slotsStore = useSlotsStore();
+	const meterGraph = useMeterGraphStore();
 	const settingsStore = useSettingsStore();
 	const mutatorOpen = computed(() => settingsStore.showRightPane && settingsStore.rightPaneTab === 'mutator');
 	const deviceStore = useDeviceStore();

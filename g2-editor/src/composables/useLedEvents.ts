@@ -1,9 +1,11 @@
 import type { SlotLabel } from '@/types';
 import { useLedStore } from '@/store/led';
+import { useMeterGraphStore } from '@/store/meterGraph';
 import type { LogFn } from './useG2';
 
 export function useLedEvents(log: LogFn) {
 	const ledStore = useLedStore();
+	const meterGraph = useMeterGraphStore();
 
 	function handleEvent(ev: any): boolean {
 		if (ev.type === 'led_data') {
@@ -14,7 +16,10 @@ export function useLedEvents(log: LogFn) {
 		}
 		if (ev.type === 'volume_data') {
 			const sl = ev.slot as SlotLabel;
-			if (sl) ledStore.parseVolumeData(sl, ev.data);
+			if (sl) {
+				ledStore.parseVolumeData(sl, ev.data);
+				meterGraph.record(sl, performance.now());
+			}
 			log('←', 'Watch', `vol slot=${ev.slot}`, 'volume');
 			return true;
 		}

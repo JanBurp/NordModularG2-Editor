@@ -133,6 +133,7 @@
 					</div>
 				</div>
 
+				<MeterGraph v-if="settingsStore.showMeterGraph && !uiStore.showBankOrganizer" class="mt-auto" />
 				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
 
@@ -557,6 +558,7 @@
 	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
+	import MeterGraph from './components/canvas/MeterGraph.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import ComboInput from './components/common/ComboInput.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';

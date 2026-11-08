@@ -312,6 +312,9 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 			case 'toggle-keyboard':
 				useSettingsStore().toggleVirtualKeyboard();
 				break;
+			case 'toggle-meter-graph':
+				useSettingsStore().toggleMeterGraph();
+				break;
 			case 'toggle-search-replace': {
 				// Open but not focused: focus it instead of closing.
 				const input = document.querySelector<HTMLInputElement>('[data-search-replace] input');

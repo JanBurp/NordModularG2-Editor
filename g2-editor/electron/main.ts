@@ -1514,6 +1514,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			submenu: [
 				{ label: 'Parameter Pages', click: () => sendToFocused('menu:action', 'toggle-parameter-pages'), accelerator: 'CommandOrControl+F' },
 				{ label: 'Keyboard', click: () => sendToFocused('menu:action', 'toggle-keyboard'), accelerator: 'CommandOrControl+K' },
+				{ label: 'Meter Graph', click: () => sendToFocused('menu:action', 'toggle-meter-graph') },
 				{ label: 'Browser', click: () => sendToFocused('menu:action', 'toggle-browser'), accelerator: 'CommandOrControl+B' },
 				{ type: 'separator' as const },
 				{ label: 'Modules', click: () => sendToFocused('menu:action', 'toggle-modules'), accelerator: 'CommandOrControl+L' },

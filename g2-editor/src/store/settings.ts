@@ -32,6 +32,8 @@ export const useSettingsStore = defineStore('settings', {
 		settingsSection: null as SettingsSection | null,
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
+		showMeterGraph: false as boolean,
+		meterGraphHeight: 180 as number, // px
 		showParamPages: false as boolean,
 		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
 		patchMutatorOpen: true as boolean,
@@ -68,6 +70,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		toggleVirtualKeyboard() {
 			this.showVirtualKeyboard = !this.showVirtualKeyboard;
+		},
+		toggleMeterGraph() {
+			this.showMeterGraph = !this.showMeterGraph;
 		},
 		toggleParamPages() {
 			this.showParamPages = !this.showParamPages;

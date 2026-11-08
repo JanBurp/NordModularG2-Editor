@@ -49,6 +49,7 @@ const allGlobals = {
   cancelAnimationFrame: 'readonly',
   HTMLTextAreaElement: 'readonly',
   HTMLSelectElement: 'readonly',
+  HTMLCanvasElement: 'readonly',
   DOMMatrix: 'readonly',
   DOMPoint: 'readonly',
   SVGPoint: 'readonly',

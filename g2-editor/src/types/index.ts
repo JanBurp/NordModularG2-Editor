@@ -36,6 +36,7 @@ export type MenuAction =
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'
 	| 'toggle-keyboard'
+	| 'toggle-meter-graph'
 	| 'toggle-patch-mutator'
 	| 'toggle-bank-organizer'
 	| 'area-voice'
