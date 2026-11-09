@@ -8,10 +8,17 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Statusbar can be hidden (option in View menu)
+
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup
 - Update node versions on build scripts
+- Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
+
+### Changed
+- Added split view to View menu
 
 ## [0.8.1] - 2026-11-06
 

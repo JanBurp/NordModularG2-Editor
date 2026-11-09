@@ -195,7 +195,8 @@
 				}
 			});
 		},
-		{ flush: 'post' },
+		// immediate: Show Help can open the pane, mounting it with the id already set
+		{ flush: 'post', immediate: true },
 	);
 
 	const helpCache = ref(new Map<number, string>());

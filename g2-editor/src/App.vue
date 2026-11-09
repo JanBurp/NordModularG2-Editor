@@ -139,7 +139,7 @@
 			<SidePanel v-if="settingsStore.showRightPane && !uiStore.showBankOrganizer" />
 		</div>
 
-		<StatusBar />
+		<StatusBar v-if="settingsStore.showStatusBar" />
 
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>

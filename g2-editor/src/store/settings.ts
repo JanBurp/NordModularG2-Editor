@@ -33,6 +33,7 @@ export const useSettingsStore = defineStore('settings', {
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
+		showStatusBar: true as boolean,
 		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
 		patchMutatorOpen: true as boolean,
 		patchMutatorKeysOpen: true as boolean,
@@ -71,6 +72,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		toggleParamPages() {
 			this.showParamPages = !this.showParamPages;
+		},
+		setShowStatusBar(value: boolean) {
+			this.showStatusBar = value;
 		},
 		toggleSidebar(tab: PaneTab) {
 			this.settingsSection = null;

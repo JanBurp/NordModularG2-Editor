@@ -3,6 +3,7 @@
 	<div
 		class="status-bar flex items-center gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary"
 		:class="uiStore.showBankOrganizer ? 'justify-center' : 'justify-between'"
+		@contextmenu.prevent="onContextMenu"
 	>
 		<BtnGroup
 			v-if="!uiStore.showBankOrganizer"
@@ -47,6 +48,7 @@
 	import { useSettingsStore } from '../../store/settings';
 	import type { PaneTab } from '../../store/settings';
 	import { useAreaMode } from '../../composables/useAreaMode';
+	import { useContextMenu } from '../../composables/useContextMenu';
 	import { groupHint } from '../../composables/useStatusHint';
 	import { MOD, ALT } from '../../constants/statusHints';
 	import { isMac } from '../../utils/platform';
@@ -54,6 +56,12 @@
 	const uiStore = useUiStore();
 	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
+	const { open: openContextMenu } = useContextMenu();
+
+	// Brought back via View > Show Status Bar or Editor Options.
+	function onContextMenu(e: MouseEvent) {
+		openContextMenu(e, [{ label: 'Hide Status Bar', action: () => settingsStore.setShowStatusBar(false) }]);
+	}
 
 	// Held modifier switches the hint to that modifier's gestures.
 	const heldMod = ref<string | null>(null);
