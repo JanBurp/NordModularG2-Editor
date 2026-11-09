@@ -1,5 +1,6 @@
 <template>
-	<ToolBarGroup class="flex flex-col items-center pt-1" data-hint-bounds>
+	<!-- short window (useShortWindow): no source buttons (they move to the right-click menu), only as high as label + knob -->
+	<ToolBarGroup class="flex flex-col items-center pt-1" :class="{ 'h-auto!': short }" data-hint-bounds>
 		<div class="flex items-center gap-2">
 			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
@@ -35,6 +36,7 @@
 						@click="uiStore.setSelectedMorphGroup(i)"
 					/>
 					<MorphSourceSelect
+						v-if="!short"
 						:model-value="morphMode(i)"
 						:morph-idx="i"
 						v-on="modeHints[i].on"
@@ -70,6 +72,7 @@
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import { TOOLBAR_HINT, useToolbarValueHint } from '../../composables/useValueHint';
+	import { useShortWindow } from '../../composables/useShortWindow';
 	import ToolBarGroup from './ToolBarGroup.vue';
 
 	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
@@ -86,6 +89,7 @@
 	const { open: openContextMenu } = useContextMenu();
 	const { showCCOverlay } = useMidiCCOverlay();
 	const { showHint, clearHint } = useStatusHint();
+	const short = useShortWindow();
 
 	const { patchParams } = usePatchParams();
 
@@ -138,6 +142,20 @@
 		const items: ContextMenuItem[] = [
 			{ label: 'Rename…', disabled: !slot, action: () => emit('morphGroupLabelEdit', { groupIndex, currentLabel: displayName(groupIndex) }) },
 			{ label: 'Clear', disabled: !slot, action: () => slot && slotsStore.clearMorphGroup(slot, variation, groupIndex) },
+			// the source buttons are hidden on short windows: choose the source here instead (current one disabled)
+			...(short.value
+				? [
+						{
+							label: `Source: ${MORPH_MODE_OPTIONS[groupIndex][morphMode(groupIndex)]}`,
+							disabled: !slot,
+							children: MORPH_MODE_OPTIONS[groupIndex].map((name, mode) => ({
+								label: name,
+								disabled: mode === morphMode(groupIndex),
+								action: () => onModeChange(groupIndex, mode),
+							})),
+						},
+					]
+				: []),
 			{
 				label: 'Copy To',
 				disabled: !slot,

@@ -1,5 +1,5 @@
 <template>
-	<ToolBar data-search-replace @keydown.esc.stop="clearInputs">
+	<ToolBar class="flex-wrap" data-search-replace @keydown.esc.stop="clearInputs">
 		<ToolBarLabel class="w-10">Find:</ToolBarLabel>
 		<TextInput
 			ref="findInput"
@@ -55,6 +55,9 @@
 		>
 			Delete Found Modules
 		</Button>
+		<Button variant="default" size="xs" class="ml-auto w-5 h-5! px-0!" title="Close" data-testid="search-close" @click="uiStore.toggleSearchReplace()">
+			<Icon name="close" class="w-2.5 h-2.5" />
+		</Button>
 	</ToolBar>
 </template>
 
@@ -65,7 +68,9 @@
 	import ToolBarDivider from './ToolBarDivider.vue';
 	import Button from './Button.vue';
 	import TextInput from '../common/TextInput.vue';
+	import Icon from '../common/Icon.vue';
 	import { useSearchReplace } from '@/composables/useSearchReplace';
+	import { useUiStore } from '@/store/ui';
 
 	const SCOPES = {
 		module: { label: 'Modules', title: 'Search module names' },
@@ -89,6 +94,7 @@
 		foundModuleCount,
 		deleteFound,
 	} = useSearchReplace();
+	const uiStore = useUiStore();
 
 	// Only the kinds being searched: "Voice 2/1   FX 1/2   Morph 1", "Voice 2   FX 1" with Labels and Morph off.
 	const AREA_KINDS = ['module', 'param'] as const;

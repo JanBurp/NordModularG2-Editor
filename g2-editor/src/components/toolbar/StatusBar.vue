@@ -1,6 +1,12 @@
 <template>
-	<div class="status-bar flex items-center justify-between gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary">
+	<!-- no buttons beside the hint in the organizer: centre it on its own -->
+	<div
+		class="status-bar flex items-center gap-3 bg-surface-1 border-t border-line-subtle text-xs text-content-secondary"
+		:class="uiStore.showBankOrganizer ? 'justify-center' : 'justify-between'"
+		@contextmenu.prevent="onContextMenu"
+	>
 		<BtnGroup
+			v-if="!uiStore.showBankOrganizer"
 			:model-value="uiStore.area"
 			:options="AREA_OPTIONS"
 			variant="variation"
@@ -10,7 +16,7 @@
 			@toggle-off="handleAreaToggleOff"
 		/>
 
-		<div class="flex items-center gap-3 min-w-0">
+		<div class="flex items-center gap-3 min-w-0" :class="{ 'px-3 py-1': uiStore.showBankOrganizer }">
 			<span
 				class="flex gap-4 min-w-0 overflow-hidden whitespace-nowrap cursor-pointer hover:text-content-primary"
 				@click="uiStore.showKeyCommandsPage = true"
@@ -23,6 +29,7 @@
 		</div>
 
 		<BtnGroup
+			v-if="!uiStore.showBankOrganizer"
 			:model-value="settingsStore.rightPaneTab"
 			:options="PANE_TAB_OPTIONS"
 			variant="variation"
@@ -41,6 +48,7 @@
 	import { useSettingsStore } from '../../store/settings';
 	import type { PaneTab } from '../../store/settings';
 	import { useAreaMode } from '../../composables/useAreaMode';
+	import { useContextMenu } from '../../composables/useContextMenu';
 	import { groupHint } from '../../composables/useStatusHint';
 	import { MOD, ALT } from '../../constants/statusHints';
 	import { isMac } from '../../utils/platform';
@@ -48,6 +56,12 @@
 	const uiStore = useUiStore();
 	const settingsStore = useSettingsStore();
 	const { handleAreaChange, handleAreaToggleOff } = useAreaMode();
+	const { open: openContextMenu } = useContextMenu();
+
+	// Brought back via View > Show Status Bar or Editor Options.
+	function onContextMenu(e: MouseEvent) {
+		openContextMenu(e, [{ label: 'Hide Status Bar', action: () => settingsStore.setShowStatusBar(false) }]);
+	}
 
 	// Held modifier switches the hint to that modifier's gestures.
 	const heldMod = ref<string | null>(null);

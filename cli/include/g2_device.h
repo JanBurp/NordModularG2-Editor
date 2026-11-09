@@ -39,7 +39,7 @@ typedef enum {
      * target set, nothing at all attached), so a multi-device daemon can
      * tell "my targeted unit vanished" apart from "nothing here". */
     G2_ERR_TARGET_NOT_FOUND = -16,
-    /* The G2 answered an edit with a NACK (0x7E): the edit was not applied. */
+    /* The G2 answered an edit or query with a NACK (0x7E): the edit was not applied / no reply. */
     G2_ERR_REJECTED = -17,
 } g2_error_t;
 

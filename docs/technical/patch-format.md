@@ -17,22 +17,54 @@ Reference derived from `g2-editor/src/parser/nmg2PatchParser.ts`, `nmg2PatchSeri
 | `.pch2` | Patch | One patch: FX area + Voice area |
 | `.prf2` | Performance | Four slots (A–D), each a patch (FX + Voice), plus a performance header |
 
-Both formats use the same section grammar. The prf2 adds a leading `PERF_DATA` section and three `SEPARATOR` sections to delimit slots.
+Both formats use the same section grammar. Each patch ends with a `SEPARATOR` (`0x6f`) section. A prf2 has a leading `PERF_DATA` section, four patches (so four `SEPARATOR`s, one closing each slot) and a trailing `KNOBS_GLOBAL` (`0x5f`) section.
 
 ---
 
 ## 2. File Wrapper
 
 ```
-[Patch name — variable length, null-terminated]
-[0x17 0x00   — magic bytes]
+[Text header — "Version=Nord Modular G2 File Format 1\r\nType=Patch\r\n…", then 0x00]
+[Format version — 1 byte, 0x17 = 23 for current files]
+[File type — 1 byte, 0x00 = patch, 0x01 = performance]
 [Section data]
 [CRC-16/CCITT — 2 bytes, big-endian]
 ```
 
-The name header is stripped on load and re-prepended on save. CRC is computed over `[0x17, 0x00, section data]` — the same CRC-16/CCITT algorithm as the USB protocol (polynomial `0x1021`, seed `0x0000`). The 2-byte CRC itself is excluded from the CRC input.
-
-Parser: `nmg2PatchParser.ts:56–84`.
+- The prefix is the official text header, not the patch name: our saved files carry
+  `PCH2_TEXT_HEADER` / `PRF2_TEXT_HEADER`, and the patch name is the file name. (The in-memory
+  upload buffer leads with the patch name instead; `upload-patch-data` takes the wire name from it.)
+- The CRC covers `[version][file type][section data]`, everything after the header's NUL up to the
+  CRC. It is the same CRC-16/CCITT as the USB protocol (polynomial `0x1021`, seed `0x0000`). So a
+  current `.prf2`'s CRC covers `17 01 …`.
+- On load the CRC is checked (`fileCrcOk`); a mismatch only warns, the file still loads.
+- Older format versions exist (13, 14, 18, 19 and 22 in `test-patches/`). Like the official editor,
+  the parser converts versions 13–22 on load, one step at a time (`parser/fileVersion.ts`). The file
+  layout is the same from version 13 on. A version below 13 is read without conversion (with a
+  warning). A variation missing from a file (version 13/14 files have 8) gets the module defaults
+  and the default patch settings, as the official editor fills it.
+  - **13→14:** FltPhase params rearranged; Out Pad, Mix4-1C ExpLin and ModAmt InvertMode added.
+  - **14→15:** Mute became Active: that param is inverted in about 50 module types and in the
+    patch's Volume block.
+  - **15→16:** level and frequency params moved to a cubic scale (official `_gConvertTable`, mixer
+    levels only where ExpLin isn't linear), FltLP frequency rescaled, Vocoder and DelayB lose a
+    param, DelayB an input.
+  - **16→17:** Glide loses a param; LFO Range and delay TimeClk values capped; StChorus amount
+    halved; OscC/OscD waveform modes renumbered.
+  - **17→18:** Digitizer and PitchTrack lose params.
+  - **18→19:** Out Pad capped at 1 (with its morphs); delay TimeClk set to 0.
+  - Steps 13→19 never change a performance's global knobs (their RemoveParam has no performance).
+  - **19→20:** FltHP frequency rescaled.
+  - **20→21:** Morph groups 5 and 6 swap. Morphs and controllers are removed from parameters that
+    can't have them any more. FreqShift, Mix4-1S, RandomB and RndClkB change their parameters,
+    jacks and modes.
+  - **21→22:** type 77 is dropped with its cables. LfoA, LfoC and Glide rates are rescaled, with
+    their morphs. ClkDiv gets a second mode.
+  - **22→23:** every module's mutation lock is set to its type's default.
+- A converted file is uploaded to the G2 as converted data, not as the file (the G2 doesn't
+  convert). The first save writes version 23 and shows a toast that says so.
+- The result equals what the official editor v1.62 saves for all 9 old fixtures
+  (`test-patches/converted/`, compared after parsing).
 
 ---
 
@@ -63,7 +95,12 @@ The parser walks sections sequentially until the end of the section data (exclud
 | `0x52` | `CABLE_LIST` | Cable list | per area |
 | `0x5A` | `MODULE_NAMES` | Module labels | per area |
 | `0x5B` | `PARAM_NAMES` | Parameter value labels | per area |
-| `0x6F` | `SEPARATOR` | Text pad (patch notes) | per patch |
+| `0x5F` | `KNOBS_GLOBAL` | Global Parameter Pages assignments | prf2 only, last section |
+| `0x60` | `CONTROLLERS` | MIDI CC assignments | per patch |
+| `0x62` | `KNOBS` | Parameter Pages knob assignments | per patch |
+| `0x65` | `MORPH_PARAMS` | Morph Group assignments per parameter | per patch |
+| `0x69` | — | Current note (`C_CURRENT_NOTE_2`): the G2's voice table read with the patch (usb-protocol §7), idle default when absent | per patch |
+| `0x6F` | `SEPARATOR` | Text pad (patch notes), closes the patch | per patch |
 
 ---
 
@@ -84,15 +121,17 @@ Exception: `MODULE_NAMES` (§6.6) is byte-encoded, not bit-packed.
 
 ### 6.1 PERF_DATA (`0x11`) — prf2 only
 
-Byte-encoded. Appears once at the start of a prf2 file. Mirrors the USB `GET_PERF_SETTINGS` response (see `usb.md §10`).
+Byte-encoded. Appears once at the start of a prf2 file. Mirrors the USB `GET_PERF_SETTINGS` response (see usb-protocol §10). Layout per the official `CPerformanceHeader_11`.
 
 ```
 [8-byte header — performance settings]
-[Slot A: name\0 + 10 bytes]
-[Slot B: name\0 + 10 bytes]
-[Slot C: name\0 + 10 bytes]
-[Slot D: name\0 + 10 bytes]
+[Slot A: name + 10 bytes]
+[Slot B: name + 10 bytes]
+[Slot C: name + 10 bytes]
+[Slot D: name + 10 bytes]
 ```
+
+A slot name is up to 16 characters, NUL-terminated only when shorter than 16.
 
 Slot block (10 bytes):
 
@@ -105,17 +144,18 @@ Slot block (10 bytes):
 | 4 | `patch` | patch location |
 | 5 | `rangeLow` | MIDI note low |
 | 6 | `rangeHigh` | MIDI note high |
-| 7–9 | padding | ignored |
+| 7 | `midiChannel` | the slot's MIDI channel (official `SetMidiChannel`), 0-based, 16 = off. The G2 reports its synth-settings channel here and ignores the byte on upload (hardware, 2026-11-02) |
+| 8–9 | padding | 0 |
 
 Header (8 bytes), as `writePerfSettings` writes it and `parsePrfData` reads it into `settings`:
 
 | Offset | Field | Notes |
 |--------|-------|-------|
-| 0 | unknown | written as 0 |
+| 0 | `category` | 0–15, same table as patch categories |
 | 1 | `focus << 2 \| knobSource` | `focus` = selected slot 0–3 (bits 2–3); `knobSourceGlobal` = low 2 bits ≠ 0 |
 | 2 | `rangeEnable` | KB Split on/off |
 | 3 | `bpm` | master clock BPM |
-| 4 | unknown | written as 0 |
+| 4 | `clockKbdTrig` | a bool in the official reader; the name is G2Alike's |
 | 5 | `clockRunning` | bit 0 |
 | 6–7 | 0 | |
 
@@ -125,7 +165,7 @@ Parser: `parsePrfData` (`nmg2PatchParser.ts`), exposed as `settings` on the pars
 
 ### 6.2 PATCH_DESC (`0x21`)
 
-Bit-packed. Section data is 14 bytes (112 bits; bits 108–111 are trailing zeros).
+Bit-packed. Section data is 15 bytes (120 bits; bits 108–119 are trailing zeros). Field layout per the official `CPatchHeaderData_11::ReadStream`.
 
 The first **61 bits** are unknown/reserved and are preserved verbatim during serialization — they are never decoded.
 
@@ -135,8 +175,8 @@ Decoded fields (bit positions 0-based from start of section data):
 |------|-------|-------|-------|
 | 0–60 | *(reserved)* | 61 | Preserved as-is |
 | 61–65 | `voices` | 5 | **0-based**: 0 = 1 voice, 31 = 32 voices |
-| 66–79 | `height` | 14 | — |
-| 80–82 | `unk2` | 3 | Unknown |
+| 66–79 | `height` | 14 | Splitter position (official `SetSplitterPos`) |
+| 80–82 | `octaveShift` | 3 | Patch octave shift + 2 (stored 0–4 = −2..+2; above 4 reads as 0) |
 | 83 | `red` | 1 | Cable colour visibility |
 | 84 | `blue` | 1 | |
 | 85 | `yellow` | 1 | |
@@ -144,13 +184,13 @@ Decoded fields (bit positions 0-based from start of section data):
 | 87 | `green` | 1 | |
 | 88 | `purple` | 1 | |
 | 89 | `white` | 1 | |
-| 90–91 | `monopoly` | 2 | 0=Poly, 1=Mono, 2=Legato |
+| 90–91 | `monopoly` | 2 | 0=Poly, 1=Mono, 2=Legato, 3=Slgt |
 | 92–99 | `variation` | 8 | Active variation (0–8) |
 | 100–107 | `category` | 8 | Category index (0–15) |
 
-> **Note on voices:** `description.voices` is 0-based; the USB `assigned_voices` event is 1-based. Formula: `description.voices = assigned − 1` when poly. See `usb.md §9`.
+> **Note on voices:** `description.voices` is 0-based; the USB `assigned_voices` event is 1-based. Formula: `description.voices = assigned − 1` when poly. See usb-protocol §9.
 
-Parser: `parsePatchDesc` (`nmg2PatchParser.ts:412–431`).
+Parser: `parsePatchDesc`.
 
 ---
 
@@ -180,7 +220,7 @@ Bit-packed. One section per area (areaIdx 0 = FX, 1 = Voice).
 | +46–49 | `nmodes` | 4 | Number of mode values |
 | +50… | `modes[i]` | 6×nmodes | Mode values |
 
-Parser: `parseModuleList` (`nmg2PatchParser.ts:267–294`).
+Parser: `parseModuleList`.
 
 ---
 
@@ -196,7 +236,7 @@ Two distinct layouts depending on `areaIdx`.
 |------|-------|-------|-------|
 | 0–1 | `areaIdx` | 2 | 0=FX, 1=Voice |
 | 2–9 | `moduleCount` | 8 | |
-| 10–17 | `variationCount` | 8 | Always 9 |
+| 10–17 | `variationCount` | 8 | 9, or 0 for an area with no modules (EmptyPatch.pch2) |
 
 **Per module:**
 
@@ -222,20 +262,22 @@ Storage in `ModuleInstance`: `lv[variation × pcnt + paramIdx]`.
 | Bits | Field | Width | Notes |
 |------|-------|-------|-------|
 | 0–1 | `areaIdx` | 2 | = 2 |
-| 2–9 | *(sub-section count)* | 8 | Always 7 |
-| 10–17 | `variationCount` | 8 | Always 9 |
+| 2–9 | *(entry count)* | 8 | 7 in every file seen |
+| 10–17 | `variationCount` | 8 | 9 |
 
-Followed by 7 sub-sections. Each sub-section:
+Then the entries, in the same generic layout as the module areas (official `R_ModuleParamData`
+reads all areas alike). The entry index names the group, and the parser reads the counts from the
+file, so an extra or unknown entry or value can't misalign the rest. Each entry:
 
 | Field | Width | Notes |
 |-------|-------|-------|
-| sub-section ID | 8 | 1–7 |
+| entry index | 8 | 1–7, see below |
 | field count | 7 | fields per variation |
 | 9× variation blocks | — | |
 
 **Per variation block:** 8-bit variation index + fieldCount × 7-bit values.
 
-Sub-sections in order:
+Entries (as written; the parser accepts any order):
 
 | ID | Fields | `PatchParamVariation` keys |
 |----|--------|--------------------------|
@@ -249,7 +291,7 @@ Sub-sections in order:
 
 The 8 morph names are: `Wheel`, `Vel`, `Keyb`, `Aft.Tch`, `Sust.Pd`, `Ctrl.Pd`, `P.Stick`, `G.Wh 2` (defined in `MORPH_NAMES` in `patch.ts`).
 
-Parser: `parseModuleParameters` (`nmg2PatchParser.ts:301–358`).
+Parser: `parseModuleParameters`.
 
 ---
 
@@ -276,7 +318,7 @@ Bit-packed. One section per area.
 | `dmod` | 8 | Destination module index |
 | `dcon` | 6 | Destination connector index |
 
-Parser: `parseCableList` (`nmg2PatchParser.ts:360–379`).
+Parser: `parseCableList`.
 
 ---
 
@@ -299,7 +341,7 @@ Byte-encoded (not bit-packed). One section per area.
 | Name bytes | Max 16 characters |
 | `0x00` null terminator | Omitted when name is exactly 16 chars |
 
-Parser: `parseModuleNames` (`nmg2PatchParser.ts:204–223`).
+Parser: `parseModuleNames`.
 
 ---
 
@@ -335,51 +377,57 @@ Each label slot is 7 characters, null-padded. `paramLen − 1` must be a multipl
 
 A module's block holds one entry for **every** label param of its type, so the block size is fixed per module type. A block with fewer entries corrupts the device copy; see [USB protocol §8b](usb-protocol.md#8b-set_param_label-wire-format).
 
+**areaIdx 2 — Morph Group labels.** One module entry, module index 1 (`PATCH_MORPH_MODULE_ID`),
+with `isString = 1` entries on params 8–15: the label of Morph Group i is param 8+i. A hardware
+get-patch carries this section too (5b:2 5b:1 5b:0, captured 2026-11-02).
+
+**SeqNote view entries.** SeqNote stores its Magnifier (zoom) and octave-offset widgets as two
+entries with `isString = 0`, `paramLen = 1`: zoom first, then octave offset, in `paramIndex`.
+
+An entry with `paramLen = 0` is 2 bytes (no `paramIndex`): the official reader takes `type`,
+`len`, then exactly `len` more bytes (`CModuleCustomData_11`). Our writer always writes 3.
+
 > This mirrors the USB `SET_PARAM_LABEL` wire format described in [USB protocol §8b](usb-protocol.md#8b-set_param_label-wire-format).
 
-Parser: `parseParamNames` (`nmg2PatchParser.ts:225–265`).
+Parser: `parseParamNames`.
 
 ---
 
 ### 6.8 SEPARATOR (`0x6F`)
 
-Raw bytes. Contains the patch notes text for the preceding patch. Length varies; may be 0.
+Raw bytes. Contains the patch notes text for the preceding patch. Length varies; may be 0. The
+official editor writes at most 1024 bytes (`CTextpadData_11::WriteStream`); so do we for slot
+patches, while library files keep their full notes.
 
 In the parser, encountering a `SEPARATOR` increments `aof` (area offset) by 2, so subsequent sections are assigned to the next slot's FX and Voice areas. This is the mechanism that divides a prf2 into 4 independent patches.
 
 ---
 
-## 7. PRF2 Full Layout
+## 7. Section Order
+
+The official editor writes one fixed order per patch, and its reader rejects any other
+(`CPatchFile_13::WriteMolecules`):
 
 ```
-[PERF_DATA (0x11)]        ← performance header: slot names & settings
-[PATCH_DESC (0x21)]       ← slot 0 description
-[MODULE_LIST (0x4A) FX]   ┐
-[MODULE_LIST (0x4A) VA]   │
-[PARAMETERS (0x4D) FX]    │ slot 0
-[PARAMETERS (0x4D) VA]    │
-[PARAMETERS (0x4D) global]│
-[CABLE_LIST (0x52) FX]    │
-[CABLE_LIST (0x52) VA]    │
-[MODULE_NAMES (0x5A) ...]  │ (optional)
-[PARAM_NAMES (0x5B) ...]   ┘ (optional)
-[SEPARATOR (0x6F)]         ← text pad + slot boundary: aof += 2
-
-[PATCH_DESC (0x21)]        ← slot 1
-...
-[SEPARATOR (0x6F)]
-
-[PATCH_DESC (0x21)]        ← slot 2
-...
-[SEPARATOR (0x6F)]
-
-[PATCH_DESC (0x21)]        ← slot 3
-...
-
-[CRC-16 (2 bytes)]
+21  4a:1 4a:0  69  52:1 52:0  4d:2 4d:1 4d:0  65  62  60  5b:2 5b:1 5b:0  5a:1 5a:0  6f
 ```
 
-Section order within each slot is not strictly mandated; the parser dispatches by type. The above order matches the Delphi reference editor's write order and is what the serializer produces.
+`:n` is the area: 0 = FX, 1 = VA, 2 = patch settings. A repeated id goes by descending area.
+
+A `.pch2` is one such patch. A `.prf2` is `11`, four such patches, then `5f`.
+
+A hardware GET_PATCH answers in another order (0x5a before 0x5b) and has no 0x69 and no 0x6f.
+`serializePatch` and the CLI's `get-patch-file`/`get-perf-file` rewrite it into the official
+order, insert an idle 0x69 and close each patch with a 0x6f (`canonicalSlotOrder` /
+`patch_slot_sections_canonical`). The G2 rejects a performance upload whose slots deviate from it.
+The parser itself dispatches by type and accepts any order.
+
+Within a section, the module list (0x4a) and the cable list (0x52) keep their own order. Parameters
+(0x4d), parameter labels (0x5b) and module names (0x5a) are written in ascending module index,
+whatever the module list order; the serializer does the same (`byIndex`). The low 6 bits of a 0x5a
+section's first byte (after the 2 location bits) hold leftover buffer content in the official
+editor's files; we write 0. With that one exception, our re-written old-format files equal the
+official saves byte for byte (checked in `parserRobustness.test.ts`).
 
 ---
 
@@ -399,9 +447,10 @@ Section order within each slot is not strictly mandated; the parser dispatches b
 
 `serializePatch` and `serializePerformance` (in `nmg2PatchSerializer.ts`) use **section replacement**, not full reconstruction:
 
-- **Mutable sections** (MODULE_LIST, CABLE_LIST, PARAMETERS, MODULE_NAMES, PARAM_NAMES, PATCH_DESC) are regenerated from the in-memory `Patch` object.
-- **Immutable sections** (SEPARATOR text, PERF_DATA) are copied verbatim from the template.
+- **Regenerated** from the in-memory `Patch` object: MODULE_LIST, CABLE_LIST, PARAMETERS, MODULE_NAMES, PARAM_NAMES, CONTROLLERS, KNOBS, MORPH_PARAMS, SEPARATOR (from `patch.text`) and PATCH_DESC (decoded fields only).
+- **Copied verbatim** from the template: unknown sections, and PERF_DATA unless new perf settings are passed (`writePerfSettings` rebuilds it then).
 - The first 61 bits of PATCH_DESC are also preserved verbatim (they are never decoded during parsing).
+- **Append if missing:** a section the template lacks is still written when the patch has content for it (controllers, knobs, morph assignments, Morph Group labels, area labels). `serializePatch` then puts everything in the official order (§7).
 
 This ensures unknown bits survive round-trips without data loss.
 
@@ -432,4 +481,4 @@ pch2 = usb[0x03..0x14]   (18 bytes)
      + usb[0x17..end-2]  (remaining, excluding 2-byte USB CRC)
 ```
 
-See `usb.md §9` for the exact formula and the upload (`SET_PATCH`) wire format.
+See usb-protocol §9 for the exact formula and the upload (`SET_PATCH`) wire format.

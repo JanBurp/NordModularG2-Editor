@@ -10,6 +10,7 @@
 
 extern void test_daemon_starts(void);
 extern void test_daemon_get_patch_cmd(void);
+extern void test_daemon_get_patch_has_current_note(void);
 extern void test_daemon_slot_cmd(void);
 extern void test_daemon_variation_cmd(void);
 extern void test_daemon_select_param_cmd(void);
@@ -48,6 +49,7 @@ int main(void) {
      * USB state cannot affect slot commands. Perf mode is last and owns shutdown. */
     run_test_silently("test_daemon_starts",                  test_daemon_starts);
     run_test_silently("test_daemon_get_patch_cmd",           test_daemon_get_patch_cmd);
+    run_test_silently("test_daemon_get_patch_has_current_note", test_daemon_get_patch_has_current_note);
     run_test_silently("test_daemon_slot_cmd",                test_daemon_slot_cmd);
     run_test_silently("test_daemon_variation_cmd",           test_daemon_variation_cmd);
     run_test_silently("test_daemon_select_param_cmd",        test_daemon_select_param_cmd);

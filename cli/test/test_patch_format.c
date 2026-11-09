@@ -7,6 +7,36 @@
 #include "../include/utils.h"
 #include <string.h>
 
+/* Old .pch2/.prf2 files (v19, v22 in test-patches/) are sent unconverted, with a warning. */
+void test_pch2_old_file_version(void) {
+    const uint8_t v19[] = {'X', 0x00, 19, 0x00, 0x21};
+    const uint8_t v23[] = {'X', 0x00, 0x17, 0x01, 0x21};
+    const uint8_t noVersion[] = {'X', 'Y', 0x00};
+    TEST_ASSERT_EQUAL_INT(19, pch2_old_file_version(v19, sizeof(v19)));
+    TEST_ASSERT_EQUAL_INT(0, pch2_old_file_version(v23, sizeof(v23)));
+    TEST_ASSERT_EQUAL_INT(0, pch2_old_file_version(noVersion, sizeof(noVersion)));
+}
+
+/* get-patch data: sections only, starting `21 00 0f` (captured 2026-11-05). voice-count/voice-mode used to
+ * look for a file header's NUL first, found the 00 of that section header and never found the description. */
+void test_patch_set_voice_field(void) {
+    uint8_t sections[] = {
+        0x21, 0x00, 0x0f, 0x00, 0xec, 0x00, 0x00, 0x01, 0x00, 0x00, 0x20, 0x44, 0x01, 0x5f, 0xd0, 0x00, 0x00, 0x00,
+        0x4a, 0x00, 0x01, 0x00,
+    };
+    int body_len = 0;
+    uint8_t *body = patch_set_voice_field(sections, sizeof(sections), 0, 17, &body_len); /* 18 voices */
+    TEST_ASSERT_EQUAL_PTR(sections + 3, body);
+    TEST_ASSERT_EQUAL_INT(15, body_len);
+    TEST_ASSERT_EQUAL_HEX8(0x24, body[7]); /* low 3 bits = 17 >> 2, the rest kept */
+    TEST_ASSERT_EQUAL_HEX8(0x44, body[8]); /* top 2 bits = 17 & 3, the rest kept */
+    patch_set_voice_field(sections, sizeof(sections), 1, 2, &body_len); /* legato */
+    TEST_ASSERT_EQUAL_HEX8(0xe0, body[11]); /* 0xd0: bits 4-5 (was 1, mono) = 2, the rest kept */
+
+    uint8_t no_desc[] = {0x4a, 0x00, 0x01, 0x00};
+    TEST_ASSERT_NULL(patch_set_voice_field(no_desc, sizeof(no_desc), 0, 1, &body_len));
+}
+
 void test_patch_usb_to_pch2_strips_header(void) {
     /* USB frame layout: [3-byte header][payload chunk 1: 0x03..0x15)[2-byte gap][payload chunk 2: 0x17..end-2)[2-byte CRC]
      * patch_usb_to_pch2 extracts: bytes[0x03:0x15) + bytes[0x17:end-2)
@@ -246,8 +276,9 @@ void test_patch_usb_to_pch2_exact_size(void) {
     TEST_ASSERT_EQUAL_UINT8(0xa5, pch2_data[18]);
 }
 /* ---- patch_slot_sections_canonical ---------------------------------------
- * GET_PATCH answers with 0x5a before 0x5b and no 0x69 at all, but a .prf2/.pch2
- * must carry the canonical order or the G2 rejects the performance on upload. */
+ * GET_PATCH answers with 0x5a before 0x5b and no 0x69 (fetch_patch appends the 0x68
+ * reply at the end), but a .prf2/.pch2 must carry the canonical order or the G2
+ * rejects the performance on upload. */
 
 /* Builds a [id][hi][lo][payload...] section into buf, returns bytes written. */
 static size_t put_section(uint8_t *buf, uint8_t id, uint8_t fill, size_t payload_len) {
@@ -331,88 +362,29 @@ void test_slot_sections_canonical_keeps_existing_current_note(void) {
     TEST_ASSERT_EQUAL_UINT8(0x77, out[8]);        /* the original payload survived */
 }
 
-/* ---- perf_settings_normalize_slots ---------------------------------------
- * The 0x11 payload the G2 answers with is byte-identical to a genuine .prf2's except for the
- * per-slot index, which the device numbers its own way. */
+void test_slot_sections_canonical_moves_appended_current_note(void) {
+    /* fetch_patch's shape: the GET_PATCH train with the live 0x69 (46-byte voice table)
+     * appended last. It must land after the 0x4a pair, bytes intact, with no default added. */
+    uint8_t in[256];
+    size_t n = 0;
+    const uint8_t hw[] = {0x21, 0x4a, 0x4a, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                          0x65, 0x62, 0x60, 0x5a, 0x5a, 0x5b, 0x5b, 0x5b};
+    for (size_t i = 0; i < sizeof(hw); i++) n += put_section(in + n, hw[i], (uint8_t)i, 2);
+    size_t note_ofs = n;
+    n += put_section(in + n, 0x69, 0x77, 46);
 
-/* The first 0x11 payload bytes captured from hardware for MorphingDrumDemo: the 8-byte header
- * plus the four [name][NUL][10] blocks, slot indexes 0a 0b 0c 0d. */
-static const uint8_t kCapturedPerfSettings[] = {
-    0x00, 0x00, 0x00, 0x78, 0x00, 0x01, 0x00, 0x00,
-    'E','x','t','A','u','d','i','o','F','M', 0x00,
-    0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x0a, 0x00, 0x00,
-    'R','o','c','k','1','9','0', 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x3b, 0x0b, 0x00, 0x00,
-    'H','o','p','1','0','7', 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x7f, 0x0c, 0x00, 0x00,
-    'H','o','u','s','e','1','4','4', 0x00,
-    0x01, 0x00, 0x00, 0x00, 0x00, 0x3c, 0x7f, 0x0d, 0x00, 0x00
-};
+    uint8_t out[256 + PCH2_CANONICAL_GROWTH] = {0};
+    size_t out_len = 0;
+    patch_slot_sections_canonical(in, n, out, &out_len);
 
-void test_perf_settings_normalize_slots_rewrites_device_numbering(void) {
-    uint8_t data[sizeof(kCapturedPerfSettings)];
-    memcpy(data, kCapturedPerfSettings, sizeof(data));
-
-    perf_settings_normalize_slots(data, sizeof(data));
-
-    /* The slot byte is the 8th of each block's 10 trailing bytes. */
-    TEST_ASSERT_EQUAL_UINT8(0x00, data[8 + 11 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x01, data[8 + 11 + 10 + 8 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x02, data[8 + 11 + 10 + 8 + 10 + 7 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x03, data[8 + 11 + 10 + 8 + 10 + 7 + 10 + 9 + 7]);
-
-    /* Nothing else may move: only those four bytes differ from the capture. */
-    int diffs = 0;
-    for (size_t i = 0; i < sizeof(data); i++)
-        if (data[i] != kCapturedPerfSettings[i]) diffs++;
-    TEST_ASSERT_EQUAL_INT(4, diffs);
-}
-
-/* Captured from hardware: slot C's name is exactly 16 characters, so it carries NO terminator
- * and the 10 trailing bytes start immediately after it. Slot indexes here are 00 01 0c 03 — the
- * first two already normalised by an earlier run, the third still the device's own value. */
-static const uint8_t kPerfSettings16CharName[] = {
-    0x00, 0x05, 0x00, 0x95, 0x00, 0x01, 0x00, 0x00,
-    'E','t','h','n','i','c','D','r','u','m','s','1',' ','D','X', 0x00,
-    0x00, 0x00, 0x00, 0x06, 0x0e, 0x00, 0x7f, 0x0a, 0x00, 0x00,
-    'R','n','d','K','i','t',' ','1','b', 0x00,
-    0x01, 0x01, 0x00, 0x09, 0x15, 0x00, 0x7f, 0x0b, 0x00, 0x00,
-    '1','8','5','s','t','e','p','s','e','q','u','e','n','c','e','r',   /* 16 chars, no NUL */
-    0x00, 0x00, 0x00, 0x00, 0x04, 0x00, 0x7f, 0x0c, 0x00, 0x00,
-    'B','u','r','p',' ',' ','N','L','-','X',' ','v','7','.','0', 0x00,
-    0x01, 0x00, 0x01, 0x09, 0x14, 0x00, 0x7f, 0x0d, 0x00, 0x00
-};
-
-void test_perf_settings_normalize_slots_handles_unterminated_16_char_name(void) {
-    uint8_t data[sizeof(kPerfSettings16CharName)];
-    memcpy(data, kPerfSettings16CharName, sizeof(data));
-
-    perf_settings_normalize_slots(data, sizeof(data));
-
-    /* Slot byte offsets, counting the 16-char name as unterminated. */
-    TEST_ASSERT_EQUAL_UINT8(0x00, data[8 + 16 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x01, data[8 + 16 + 10 + 10 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x02, data[8 + 16 + 10 + 10 + 10 + 16 + 7]);
-    TEST_ASSERT_EQUAL_UINT8(0x03, data[8 + 16 + 10 + 10 + 10 + 16 + 10 + 16 + 7]);
-
-    /* The name that follows the unterminated one must not have been walked into: only the four
-     * slot bytes may differ from the capture. */
-    int diffs = 0;
-    for (size_t i = 0; i < sizeof(data); i++)
-        if (data[i] != kPerfSettings16CharName[i]) diffs++;
-    TEST_ASSERT_EQUAL_INT(4, diffs);
-}
-
-void test_perf_settings_normalize_slots_ignores_truncated_payload(void) {
-    /* A payload that ends mid-block must be left exactly as it was. */
-    uint8_t data[20];
-    memcpy(data, kCapturedPerfSettings, sizeof(data));
-    uint8_t before[20];
-    memcpy(before, data, sizeof(before));
-
-    perf_settings_normalize_slots(data, sizeof(data));
-
-    TEST_ASSERT_EQUAL_UINT8_ARRAY(before, data, sizeof(before));
+    TEST_ASSERT_EQUAL_INT(n, out_len);            /* nothing inserted */
+    uint8_t ids[64];
+    int count = section_ids(out, out_len, ids, 64);
+    const uint8_t want[] = {0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d,
+                            0x65, 0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a};
+    TEST_ASSERT_EQUAL_INT((int)sizeof(want), count);
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(want, ids, (int)sizeof(want));
+    TEST_ASSERT_EQUAL_UINT8_ARRAY(in + note_ofs, out + 3 * 5, 3 + 46);  /* after 0x21 + 2x 0x4a */
 }
 
 void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
@@ -428,21 +400,25 @@ void test_slot_sections_canonical_copies_malformed_train_verbatim(void) {
 }
 
 void test_pch2_file_from_sections_header_and_crc(void) {
-    const uint8_t sections[] = { 0x21, 0x00, 0x03, 1, 2, 3, 0x5b, 0x00, 0x02, 9, 8 };
+    const uint8_t sections[] = { 0x21, 0x00, 0x03, 1, 2, 3, 0x6f, 0x00, 0x01, 'x' };
     uint8_t out[256] = {0};
     size_t out_len = sizeof(out);
     TEST_ASSERT_EQUAL_INT(0, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
 
+    /* 0x69 is filled in after 0x21; the existing 0x6f closes the slot, no second one. */
     size_t hl = strlen(PCH2_TEXT_HEADER);
-    TEST_ASSERT_EQUAL_INT(hl + 3 + sizeof(sections) + 2, out_len);
+    size_t body = sizeof(sections) + PCH2_CANONICAL_GROWTH;
+    TEST_ASSERT_EQUAL_INT(hl + 3 + body + 2, out_len);
     TEST_ASSERT_EQUAL_MEMORY(PCH2_TEXT_HEADER, out, hl);
     TEST_ASSERT_EQUAL_UINT8(0x00, out[hl]);
     TEST_ASSERT_EQUAL_UINT8(0x17, out[hl + 1]);
     TEST_ASSERT_EQUAL_UINT8(0x00, out[hl + 2]);
-    TEST_ASSERT_EQUAL_MEMORY(sections, out + hl + 3, sizeof(sections));
+    TEST_ASSERT_EQUAL_MEMORY(sections, out + hl + 3, 6);
+    TEST_ASSERT_EQUAL_UINT8(0x69, out[hl + 3 + 6]);
+    TEST_ASSERT_EQUAL_MEMORY(sections + 6, out + hl + 3 + 6 + PCH2_CANONICAL_GROWTH, 4);
 
     /* CRC covers [0x17][0x00][sections] and is the last 2 bytes, big-endian. */
-    uint16_t crc = calc_crc16(out + hl + 1, (int)(sizeof(sections) + 2));
+    uint16_t crc = calc_crc16(out + hl + 1, (int)(body + 2));
     TEST_ASSERT_EQUAL_UINT8(crc >> 8,   out[out_len - 2]);
     TEST_ASSERT_EQUAL_UINT8(crc & 0xff, out[out_len - 1]);
 }
@@ -452,6 +428,30 @@ void test_pch2_file_from_sections_buffer_too_small(void) {
     uint8_t out[8] = {0};
     size_t out_len = sizeof(out);
     TEST_ASSERT_EQUAL_INT(-1, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
-    /* On failure out_len reports the required size. */
-    TEST_ASSERT_EQUAL_INT(strlen(PCH2_TEXT_HEADER) + 3 + sizeof(sections) + 2, out_len);
+    /* On failure out_len reports the required size: + the inserted 0x69 and closing 0x6f. */
+    TEST_ASSERT_EQUAL_INT(strlen(PCH2_TEXT_HEADER) + 3 + sizeof(sections) + PCH2_CANONICAL_GROWTH + 3 + 2, out_len);
+}
+
+/* get-patch-file: GET_PATCH order (0x5a before 0x5b, no 0x69, no 0x6f) is written in the official
+ * order 21 4a 4a 69 52 52 4d 4d 4d 65 62 60 5b 5b 5b 5a 5a 6f (CPatchFile_13::WriteMolecules). */
+void test_pch2_file_from_sections_official_order(void) {
+    static const uint8_t ids[] = { 0x21, 0x4a, 0x4a, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65, 0x62, 0x60,
+                                   0x5a, 0x5a, 0x5b, 0x5b, 0x5b };
+    static const uint8_t expected[] = { 0x21, 0x4a, 0x4a, 0x69, 0x52, 0x52, 0x4d, 0x4d, 0x4d, 0x65,
+                                        0x62, 0x60, 0x5b, 0x5b, 0x5b, 0x5a, 0x5a, 0x6f };
+    uint8_t sections[sizeof(ids) * 4];
+    for (size_t i = 0; i < sizeof(ids); i++) {
+        sections[i * 4] = ids[i]; sections[i * 4 + 1] = 0; sections[i * 4 + 2] = 1; sections[i * 4 + 3] = (uint8_t)i;
+    }
+    uint8_t out[512] = {0};
+    size_t out_len = sizeof(out);
+    TEST_ASSERT_EQUAL_INT(0, pch2_file_from_sections(sections, sizeof(sections), out, &out_len));
+
+    size_t ofs = strlen(PCH2_TEXT_HEADER) + 3;
+    for (size_t k = 0; k < sizeof(expected); k++) {
+        TEST_ASSERT_TRUE(ofs + 3 <= out_len - 2);
+        TEST_ASSERT_EQUAL_HEX8(expected[k], out[ofs]);
+        ofs += 3 + (((size_t)out[ofs + 1] << 8) | out[ofs + 2]);
+    }
+    TEST_ASSERT_EQUAL_INT(out_len - 2, ofs);  /* nothing after the 0x6f but the CRC */
 }

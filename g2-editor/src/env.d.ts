@@ -29,6 +29,7 @@ declare global {
 				storageDir: (custom?: string) => Promise<string>;
 				storageRemove: (filepath: string) => Promise<void>;
 				storageCopy: (from: string, to: string) => Promise<void>;
+				storageBankCopy: (folder: string, pchList?: string) => Promise<string>;
 				libraryDir: (custom?: string) => Promise<string>;
 				librarySave: (filepath: string, data: number[]) => Promise<void>;
 				libraryMove: (from: string, to: string) => Promise<void>;

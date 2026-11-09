@@ -179,6 +179,34 @@ test.describe('Bank Organizer – offline', () => {
 		await expect(page.getByRole('dialog')).toContainText('Delete 3 from Temporary Storage');
 	});
 
+	// Bank Download sends a source with old-format files from this copy (see currentFormatBank); the send itself needs a G2.
+	test('a send-bank source is copied into a hidden storage folder, and that folder is removed again', async ({ app, page }) => {
+		const userData = await app.evaluate(() => process.env.TEST_USER_DATA as string);
+		const storage = fs.realpathSync(path.join(userData, 'bank-storage'));
+		const src = path.join(userData, 'bank-src');
+		fs.mkdirSync(src, { recursive: true });
+		fs.copyFileSync(path.resolve(__dirname, '../../test-patches/Analogue NL2.pch2'), path.join(src, '001_Analogue NL2.pch2'));
+		fs.writeFileSync(path.join(src, 'Bank1.pchList'), 'Version=Nord Modular G2 Bank Dump\r\n1:1: Analogue NL2\r\n');
+		fs.writeFileSync(path.join(src, 'notes.txt'), 'not a patch');
+
+		const copy = await page.evaluate((a) => (window as any).electronAPI.patches.storageBankCopy(a.src, a.list), {
+			src,
+			list: path.join(src, 'Bank1.pchList'),
+		});
+
+		expect(path.dirname(fs.realpathSync(copy))).toBe(storage);
+		expect(path.basename(copy)).toMatch(/^\.tmp-bank-/);
+		expect(fs.readdirSync(copy).sort()).toEqual(['001_Analogue NL2.pch2', 'Bank1.pchList']);
+		expect(fs.readFileSync(path.join(copy, '001_Analogue NL2.pch2'))).toEqual(fs.readFileSync(path.join(src, '001_Analogue NL2.pch2')));
+		await expect(page.locator('[data-testid="storage-item"]')).toHaveCount(4); // hidden: not a storage item
+
+		await page.evaluate((c) => (window as any).electronAPI.patches.storageRemove(c), copy);
+		expect(fs.existsSync(copy)).toBe(false);
+		// A folder outside the storage folder is refused, and the source is left alone.
+		await expect(page.evaluate((d) => (window as any).electronAPI.patches.storageRemove(d), src)).rejects.toThrow(/Not a storage file/);
+		expect(fs.readdirSync(src).sort()).toEqual(['001_Analogue NL2.pch2', 'Bank1.pchList', 'notes.txt']);
+	});
+
 	test('a slot box shows the category of its patch and changes it from its context menu', async ({ page, sendMenuAction, mockOpenPatch }) => {
 		await sendMenuAction('toggle-bank-organizer');
 		await mockOpenPatch('Clavia demo.pch2');

@@ -64,7 +64,8 @@ npm run test:unit           # Vitest unit tests
 npm run typecheck           # vue-tsc type check
 npm run lint                # ESLint
 npm run test:e2e            # Playwright E2E tests, headless, no G2 (builds first)
-npm run test:g2             # hardware suite (test-g2/): powers the G2 on via the Shelly plug, off afterwards
+npm run test:g2             # hardware suite (test-g2/): needs a switched-on G2 (never switches the Shelly plug)
+npm run test:g2:slow        # slow hardware tests (test-g2/*.g2-slow.test.ts, bank transfers, minutes)
 npm run test:duration -- --hours 1  # hours-long hardware duration test; --help lists options
 ```
 `@/` resolves to `g2-editor/src/`.

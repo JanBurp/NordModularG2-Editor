@@ -7,7 +7,21 @@ import { cliRun, focusedSlot, menuAction, teardown } from '../e2e-duration/lib/a
 import { snapshotG2 } from '../e2e-duration/lib/cli';
 import { checkConsistency, deviceState, type SlotState } from '../e2e-duration/lib/consistency';
 import { PatchParser } from '@/parser/nmg2PatchParser';
-import { action, backupPerf, type Editor, g2Mode, lastAction, type Mode, perfFlags, restorePerf, setMode, type SlotFlags, startEditor } from './g2';
+import {
+	action,
+	backupPerf,
+	closeOrganizer,
+	type Editor,
+	g2Mode,
+	lastAction,
+	type Mode,
+	openOrganizer,
+	perfFlags,
+	restorePerf,
+	setMode,
+	type SlotFlags,
+	startEditor,
+} from './g2';
 
 // Long enough that the Runner's unlocker stays active.
 const coverage = () => ({ from: Date.now(), until: Date.now() + 60 * 60_000 });
@@ -35,16 +49,6 @@ async function runRemaining(g: Editor, done: Set<string>): Promise<string[]> {
 		if (diffs.length) problems.push(`${a.name}: editor and G2 differ: ${diffs.join('; ')}`);
 	}
 	return problems;
-}
-
-// The menu action toggles: open only when closed. Close = Escape until gone (the first one may only
-// clear the selection, which dragging also sets).
-async function openOrganizer(ctx: Editor['ctx']) {
-	if (!(await ctx.page.locator('[data-testid="bank-organizer"]').isVisible())) await menuAction(ctx, 'toggle-bank-organizer');
-	await ctx.page.locator('[data-testid="bank-organizer"]').waitFor();
-}
-async function closeOrganizer(page: Editor['ctx']['page']) {
-	for (let i = 0; i < 3 && (await page.locator('[data-testid="bank-organizer"]').isVisible()); i++) await page.keyboard.press('Escape');
 }
 
 const structure = (s: SlotState) => ({ va: [s.va.modules, s.va.cables], fx: [s.fx.modules, s.fx.cables] });
@@ -122,6 +126,54 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 			// Remove what this test put in Temporary Storage, so its folder is left as it was.
 			const storageDir = path.join(await ctx.app.evaluate(({ app }) => app.getPath('userData')), 'bank-storage');
 			for (const f of fs.existsSync(storageDir) ? fs.readdirSync(storageDir) : []) if (f.startsWith('OrgB__')) fs.rmSync(path.join(storageDir, f));
+		}
+	});
+
+	// Scratch bank 32: an old-format (19) file dragged from Temporary Storage reaches the G2's memory
+	// converted, the same as the official editor's own save of it; the user's file stays as it was.
+	it('Bank Organizer: an old-format storage file is written to the G2 converted', async () => {
+		const { ctx } = g!;
+		const page = ctx.page;
+		const BANK = '32';
+		const patches = path.resolve(__dirname, '../../test-patches');
+		const storageDir = path.join(await ctx.app.evaluate(({ app }) => app.getPath('userData')), 'bank-storage');
+		const item = path.join(storageDir, 'OrgOld__0.pch2');
+		const readBack = path.join(os.tmpdir(), 'g2-organizer-old.pch2');
+		const until = async (check: () => Promise<boolean>) => {
+			for (let i = 0; i < 60 && !(await check()); i++) await page.waitForTimeout(500);
+			expect(await check()).toBe(true);
+		};
+		const clean = (bytes: Buffer) =>
+			JSON.parse(JSON.stringify(new PatchParser(new Uint8Array(bytes).buffer).parse(), (k, v) => (k === 'paramaterDataOfs' ? undefined : v)));
+		const hiddenCopies = () => fs.readdirSync(storageDir).filter((f) => f.startsWith('.tmp-'));
+		try {
+			await cliRun(page, ['clear-patch', 'patch', BANK, '1']);
+			await cliRun(page, ['reload-names']);
+			fs.mkdirSync(storageDir, { recursive: true });
+			fs.copyFileSync(path.join(patches, 'Analogue NL2.pch2'), item);
+			const original = fs.readFileSync(item);
+			expect(original[original.indexOf(0) + 1]).toBe(19);
+
+			await openOrganizer(ctx);
+			const left = page.locator('[data-testid="bank-grid-left"]');
+			await left.locator('select').selectOption(BANK);
+			const chip = page.locator('[data-testid="storage-item"]', { hasText: 'OrgOld' });
+			await until(async () => (await chip.count()) === 1);
+
+			await chip.dragTo(left.locator('[data-testid="bank-cell-1"]'));
+			// Shown when the write is done, for 5 s: checked before the slower read-back.
+			await until(async () => (await page.getByText('1 file was converted from an old file format before writing to the G2.').count()) > 0);
+			await until(async () => !JSON.parse(await cliRun(page, ['get-location', 'patch', BANK, '1', readBack])).empty);
+
+			const stored = fs.readFileSync(readBack);
+			expect(stored[stored.indexOf(0) + 1]).toBe(23);
+			expect(clean(stored)).toEqual(clean(fs.readFileSync(path.join(patches, 'converted', 'Analogue NL2.pch2'))));
+			expect(hiddenCopies()).toEqual([]);
+			expect(fs.readFileSync(item)).toEqual(original);
+		} finally {
+			await closeOrganizer(page);
+			await cliRun(page, ['clear-patch', 'patch', BANK, '1']);
+			fs.rmSync(item, { force: true });
 		}
 	});
 

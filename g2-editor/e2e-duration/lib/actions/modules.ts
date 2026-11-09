@@ -203,29 +203,51 @@ export const MODULE_ACTIONS: ActionDef[] = [
 		run: async (c) => {
 			const m = await pickOwn(c);
 			if (!m) return 'skipped: no own module in this slot';
-			const dCol = int(c, 3) - 1;
-			const dRow = int(c, 9) - 4;
-			await dragTitle(c, m, dCol, dRow);
+			const from = await gridPos(c, m);
+			const { dCol, dRow } = await dragTitle(c, m, int(c, 3) - 1, int(c, 9) - 4);
+			// The editor clamps the target to col/row 0 and puts the dragged module there, pushing others down.
+			const to = { col: Math.max(0, from.col + dCol), row: Math.max(0, from.row + dRow) };
+			if (to.col === from.col && to.row === from.row) return `skipped: ${m.short}#${m.idx} drag ${dCol},${dRow} is no move`;
+			let at = from;
+			if (!(await waitFor(async () => ((at = await gridPos(c, m)), at.col === to.col && at.row === to.row), ADD_TIMEOUT_MS, 200)))
+				throw new Error(`move of ${m.short}#${m.idx} by ${dCol},${dRow}: expected ${to.col},${to.row}, at ${at.col},${at.row}`);
 			return `moved ${m.short}#${m.idx} by ${dCol},${dRow}`;
 		},
 	},
 ];
 
-/** Drags a module by its title bar by whole grid cells (256 x 16 px at zoom 1). */
-export async function dragTitle(c: ActionCtx, m: OwnModule, dCol: number, dRow: number, modifier?: 'Meta'): Promise<void> {
+/** Grid cell of a module, from its canvas transform (Module.vue: translate(horiz * 256, vert * 16)). */
+async function gridPos(c: ActionCtx, m: OwnModule): Promise<{ col: number; row: number }> {
+	const t = (await moduleLocator(c.page, m).getAttribute('transform', { timeout: UI_TIMEOUT_MS })) ?? '';
+	const [x, y] = (t.match(/-?[\d.]+/g) ?? []).map(Number);
+	if (x === undefined || y === undefined) throw new Error(`no transform on ${m.short}#${m.idx}: "${t}"`);
+	return { col: Math.round(x / 256), row: Math.round(y / 16) };
+}
+
+/**
+ * Drags a module by its title bar by whole grid cells (256 x 16 px at zoom 1), clamped to the visible canvas:
+ * a release outside the window is a cross-window drop (useModuleDrag.ts), which does nothing without a second G2 window.
+ * Returns the cells actually dragged after clamping.
+ */
+export async function dragTitle(c: ActionCtx, m: OwnModule, dCol: number, dRow: number, modifier?: 'Meta'): Promise<{ dCol: number; dRow: number }> {
 	const handle = moduleLocator(c.page, m).locator('[data-drag-handle]');
-	await handle.scrollIntoViewIfNeeded({ timeout: UI_TIMEOUT_MS });
+	await handle.evaluate((el) => el.scrollIntoView({ block: 'center', inline: 'nearest' }), undefined, { timeout: UI_TIMEOUT_MS });
 	const box = await handle.boundingBox({ timeout: UI_TIMEOUT_MS });
-	if (!box) throw new Error(`no drag handle for ${m.short}#${m.idx}`);
+	const view = await c.page.locator(`[data-testid="canvas-${m.area}"]`).boundingBox({ timeout: UI_TIMEOUT_MS });
+	if (!box || !view) throw new Error(`no drag handle for ${m.short}#${m.idx}`);
 	const x = box.x + Math.min(64, box.width / 2);
 	const y = box.y + box.height / 2;
+	const margin = 20; // clear of the scrollbars
+	const toX = Math.min(Math.max(x + dCol * 256, view.x + margin), view.x + view.width - margin);
+	const toY = Math.min(Math.max(y + dRow * 16, view.y + margin), view.y + view.height - margin);
 	await c.page.mouse.move(x, y);
 	await c.page.mouse.down();
-	await c.page.mouse.move(x + dCol * 128, y + dRow * 8, { steps: 4 });
-	await c.page.mouse.move(x + dCol * 256, y + dRow * 16, { steps: 4 });
+	await c.page.mouse.move((x + toX) / 2, (y + toY) / 2, { steps: 4 });
+	await c.page.mouse.move(toX, toY, { steps: 4 });
 	// Duplicate reads the modifier from the mouseup.
 	if (modifier) await c.page.keyboard.down(modifier);
 	await c.page.mouse.up();
 	if (modifier) await c.page.keyboard.up(modifier);
 	await sleep(300);
+	return { dCol: Math.round((toX - x) / 256), dRow: Math.round((toY - y) / 16) };
 }

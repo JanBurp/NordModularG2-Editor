@@ -1,6 +1,6 @@
 {
   "name": "g2-editor",
-  "version": "0.8.0",
+  "version": "0.8.1",
   "author": {
     "name": "Jan den Besten",
     "url": "https://janburp.github.io/NordModularG2-Editor/"
@@ -22,11 +22,13 @@
     "create-icons": "node scripts/create-icons.js",
     "generate:button-params": "node scripts/generate-button-params.js",
     "generate:param-type-ids": "node scripts/generate-param-type-ids.js",
+    "generate:cable-pair-stats": "node scripts/generate-cable-pair-stats.js",
     "test": "electron-vite build && vitest run && playwright test && G2_ALLOW_NO_DEVICE=1 vitest run -c vitest.g2.config.ts",
     "test:unit": "vitest run",
     "test:e2e": "electron-vite build && playwright test",
     "test:e2e:nobuild": "playwright test",
     "test:g2": "electron-vite build && vitest run -c vitest.g2.config.ts",
+    "test:g2:slow": "electron-vite build && G2_SLOW=1 vitest run -c vitest.g2.config.ts",
     "test:duration": "node scripts/test-duration.mjs",
     "test:e2e:report": "playwright show-report --host 127.0.0.1",
     "lint": "eslint src e2e --max-warnings 0",
@@ -36,7 +38,6 @@
     "format:check": "prettier --check src"
   },
   "dependencies": {
-    "marked": "^18.0.5",
     "pinia": "^2.1.7",
     "pinia-plugin-persistedstate": "^3.2.3",
     "vue": "^3.4.21"
@@ -49,7 +50,7 @@
     "@typescript-eslint/parser": "^8.59.1",
     "@vitejs/plugin-vue": "^5.0.4",
     "electron": "^33.4.11",
-    "electron-builder": "^24.13.3",
+    "electron-builder": "^26.18.0",
     "electron-devtools-installer": "^3.2.1",
     "electron-vite": "^5.0.0",
     "eslint": "^10.14.0",

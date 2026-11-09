@@ -20,7 +20,6 @@ export function useSlotEvents(log: LogFn) {
 
 	const hardwareVariationChange = ref<{ slot: SlotLabel; variation: number } | null>(null);
 	const hardwareSlotChange = ref<SlotLabel | null>(null);
-	const pendingSlotReload = new Set<SlotLabel>();
 	const pendingResourceFetch = new Set<SlotLabel>();
 	async function fetchSlotResources(slot: SlotLabel): Promise<void> {
 		if (store.status !== DeviceStatus.Connected) return;
@@ -244,7 +243,16 @@ export function useSlotEvents(log: LogFn) {
 			log('←', 'Watch', `patch_version_change slot=${ev.slot} ver=${ev.version}`);
 			const sl = ev.slot as SlotLabel;
 			// version 0 = bulk C_PATCH_DESCR (description only): applied in place by 'patch_description'.
-			if (sl && ev.version !== 0) pendingSlotReload.add(sl);
+			// Any other version: another patch was loaded into the slot on the G2 itself (front panel). The G2
+			// sends only this and stops streaming; the reload's get-patch restarts it (rearm_after_get_patch
+			// in daemon.c). Our own edits and uploads send no such message (captured 2026-11-05). Like a synth
+			// select in the editor: the new patch has no file and no undo history.
+			if (sl && ev.version !== 0) {
+				await slotsStore.loadSlot(sl);
+				slotsStore.forgetSlotFile(sl);
+				store.clearOriginStale(sl);
+				fetchSlotResources(sl);
+			}
 			return true;
 		}
 		if (ev.type === 'patch_description' && Array.isArray(ev.data)) {
@@ -268,16 +276,7 @@ export function useSlotEvents(log: LogFn) {
 		}
 		if (ev.type === 'resources_used' && Array.isArray(ev.data)) {
 			const sl = ev.slot as SlotLabel;
-			if (sl) {
-				slotsStore.updateResources(sl, ev.data);
-				if (pendingSlotReload.has(sl)) {
-					pendingSlotReload.delete(sl);
-					// This reload is triggered by our own structural edit bumping the G2's patch
-					// version (add/move/delete module, cable changes, etc.) — preserve undo history
-					// and the dirty flag, which the edit that caused this already set correctly.
-					slotsStore.loadSlot(sl, true);
-				}
-			}
+			if (sl) slotsStore.updateResources(sl, ev.data);
 			log('←', 'Watch', `resources slot=${ev.slot} loc=${ev.location ?? (ev.data?.[0] === 1 ? 'va' : 'fx')}`);
 			return true;
 		}

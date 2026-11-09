@@ -1,0 +1,35 @@
+<h3 class="pHeading2"><span id="NMG2_REF_3258_1058389"></span><span id="NMG2_REF_3258_10972"></span><span id="Operator"></span><span id="NMG2_REF_3258_1068382"></span>Operator</h3>
+<p class="pBody">The Operator module consists of a sinewave oscillator in combination with a Level & Rate amplitude envelope generator and a keyboard level scaler. The Operator module has the same functionality as an ‘operator’ in the well-known DX7 FM synthesizer. Note that as this is a replica of the classic DX7 synth, all the parameters and controls behave like on the DX7. Which means that they behave completely different to how all the normal G2 controls behave. The reason is of course that it should be easy for you to copy an original DX7 sound by setting the controls in this module to the same values as the DX7 sound. This way the copied sound will be a very close approximation. Several Operator modules can be used together with the DXRouter module to form a six operator FM synthesis engine. See <a class="link_Cross_Reference" data-help="DXRouter" data-anchor="NMG2_REF_3258_19919">DXRouter</a> for example.</p>
+<p class="pFet_ord">Ratio/Fixed</p>
+<p class="pBody">Select Ratio to set the frequency as a multiple relative to the input value on the Pitch input. Select Fixed to set the frequency as a fixed number of Hz relative to the Pitch input value. If the KBT button is on, the value is relative to the note played on the keyboard (or received via MIDI). If KBT is not active and no Pitch modulation is present, the value is relative to the note E4.</p>
+<p class="pFet_ord">Detune</p>
+<p class="pBody">Here you can fine adjust the pitch in even smaller steps than with the Fine knob. Range -7 to 7.</p>
+<p class="pFet_ord">FM input</p>
+<p class="pBody">A modulator connected to the FM input will modulate the operator frequency in a linear fashion.</p>
+<p class="pFet_ord">Pitch input</p>
+<p class="pBody">Input for pitch modulation. An input value of +32 units will generate zero modulation. An input value of 0 units will generate 0 Hz pitch output from the Operator and an input value of +64 units will generate a pitch twice as high as the Operator pitch. If left unconnected, the modulation will be zero.</p>
+<p class="pFet_ord">Vel</p>
+<p class="pBody">Select velocity sensitivity with the arrow buttons for the velocity signal received at the Vel input. Range 0-7 where 7 is the highest sensitivity.</p>
+<p class="pFet_ord">RateScale</p>
+<p class="pBody">Select the envelope rate scaling with the arrow buttons for the note signals received at the Note input. Range 0-7. The higher the RateScale value, the faster the envelope rates at higher notes.</p>
+<p class="pFet_ord">Gate input</p>
+<p class="pBody">A signal at the Gate input will gate the envelope.</p>
+<p class="pFet_ord">Note input</p>
+<p class="pBody">A signal present at the Note input will affect all the rates of the envelope if the RateScale value is higher than 0 (see above). It will also affect the Keyboard Level Scaler (see below).</p>
+<p class="pFet_ord">R1-R4 & L1-L4</p>
+<p class="pBody">Here you set the rates (R) and Levels (L) of the envelope. The lower the Rate values, the longer it will take for the envelope to reach the next Level. L3 is the level at which the envelope will sustain.</p>
+<p class="pBody"><span class="c_Override" style="font-style:italic">Note that the Level settings also affect the Rates.</span> The greater the difference between two adjacent Level settings, the longer it will take to "travel" between the Levels. If two adjacent Level settings are the same, the Rate value between these levels is of no importance.</p>
+<p class="pFet_ord">AMod</p>
+<p class="pBody">This is the function for modulating the amplitude with a bipolar control signal. Patch a control signal to the AMod input and set the sensitivity with the arrow buttons. Range 0-7 where 7 is the highest sensitivity.</p>
+<p class="pFet_ord">Vel input</p>
+<p class="pBody">Here you control the levels of the level & rate envelope generator. The velocity sensitivity is set with the Vel arrow buttons as described above. Note that lower envelope levels means that the entire envelope cycle becomes faster!</p>
+<p class="pFet_ord">BrPoint</p>
+<p class="pBody">Set the break point note number for the Keyboard Level Scaler. The value is displayed in the corresponding display box. Range: A-1 to C8.</p>
+<p class="pFet_ord">-Lin/-Exp/+Exp/+Lin</p>
+<p class="pBody">Click to select Linear or Exponential attenuation or amplification characteristics of the level scaling.</p>
+<p class="pFet_ord">L-Depth</p>
+<p class="pBody">Set the amplification/attenuation slope for the lower key section with the arrow buttons. The value is displayed in the corresponding display box.</p>
+<p class="pFet_ord">R-Depth</p>
+<p class="pBody">Set the amplification/attenuation slope for the upper key section with the arrow buttons. The value is displayed in the corresponding display box.</p>
+<p class="pFet_ord">graph</p>
+<p class="pBody">Displays the two gain slopes and the break point graphically. The Y-axis represents the output level and the X-axis the entire note range (A-1 to C8). the horizontal line represents the 0 dB output level.</p>

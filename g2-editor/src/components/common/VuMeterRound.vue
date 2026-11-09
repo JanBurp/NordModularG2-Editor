@@ -5,10 +5,7 @@
 		     the free space where a knob has its button (meters have none). -->
 		<svg :width="SIZE" :height="SIZE" class="block" :style="{ margin: `${marginTop}px ${-OVERHANG / 2}px ${marginBottom}px` }">
 			<circle :r="SIZE / 2" :cx="SIZE / 2" :cy="SIZE / 2" fill="#111" />
-			<path v-for="z in VU_ZONES" :key="`dim-${z.from}`" :d="arc(z.from, z.to)" :stroke="z.dim" stroke-width="5" fill="none" />
-			<template v-for="z in VU_ZONES" :key="`lit-${z.from}`">
-				<path v-if="fraction > z.from" :d="arc(z.from, Math.min(fraction, z.to))" :stroke="z.lit" stroke-width="5" fill="none" />
-			</template>
+			<path v-for="(seg, i) in segments" :key="i" :d="arc(seg.from, seg.to)" :stroke="seg.color" stroke-width="5" fill="none" />
 		</svg>
 		<MeterNamePopup :text="label" :visible="hovered || f7Held" />
 	</div>
@@ -16,12 +13,12 @@
 
 <script setup lang="ts">
 	// Parameter Page level meter (isLed assignment) in place of the toolbar Knob: the canvas
-	// LevelMeter's zones bent along the knob's 270° sweep, like the G2's own LED ring.
+	// LevelMeter's segments bent along the knob's 270° sweep, like the G2's own LED ring.
 	import { computed, ref } from 'vue';
 	import { RADII } from '../../composables/useKnob';
 	import { useKeyHoldOverlay } from '../../composables/useKeyHoldOverlay';
 	import { describeArc } from '../../utils/knobArc';
-	import { VU_ZONES, vuFraction } from '../../utils/vuLevel';
+	import { vuSegments } from '../../utils/vuLevel';
 	import MeterNamePopup from './MeterNamePopup.vue';
 
 	// extraHeight: px of layout space the cell freed up for the meter (centred in it, when it fits)
@@ -35,7 +32,7 @@
 	const marginBottom = computed(() => (spare.value >= 0 ? spare.value / 2 : spare.value));
 	const hovered = ref(false);
 	const { isVisible: f7Held } = useKeyHoldOverlay('F7');
-	const fraction = computed(() => vuFraction(props.value));
+	const segments = computed(() => vuSegments(props.value));
 
 	const arc = (from: number, to: number) => describeArc(SIZE / 2, SIZE / 2, SIZE / 2 - 4, -135 + 270 * from, -135 + 270 * to);
 </script>

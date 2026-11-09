@@ -1,2 +1,4 @@
 # Ignore subdirectories
 */
+# except the official editor's saves of the old-format fixtures (golden files for the conversion tests)
+!converted/

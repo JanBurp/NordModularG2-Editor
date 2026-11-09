@@ -68,7 +68,7 @@ const char *g2_error_string(int code) {
         case G2_ERR_NOT_IMPLEMENTED:  return "not implemented";
         case G2_ERR_TOO_LARGE:        return "too large for the G2 - it cannot receive more than 32 KB in one message";
         case G2_ERR_TARGET_NOT_FOUND: return "the targeted G2 was not found - it may have been unplugged";
-        case G2_ERR_REJECTED:         return "the G2 rejected the edit";
+        case G2_ERR_REJECTED:         return "the G2 rejected the request";
         case G2_ERR:                  return "unspecified error";
         default:                      return "unknown error";
     }
@@ -96,8 +96,14 @@ static int await_reply(reply_match_fn match, int arg, int keep_acks, g2_msg_t *r
     long long left, deadline = now_ms() + USB_TIMEOUT_LONG_MS;
     while ((left = deadline - now_ms()) > 0) {
         g2_msg_t m = {0};
-        int n = keep_acks ? recv_interrupt_acks(m.interrupt, 16, (int)left) : recv_interrupt(m.interrupt, 16, (int)left);
+        int n = keep_acks ? recv_interrupt_acks(m.interrupt, 16, (int)left) : recv_interrupt_sys_nacks(m.interrupt, 16, (int)left);
         if (n <= 0) break;
+        /* A query the G2 refuses gets a system NACK instead of its reply (the reference editor keeps
+         * one message in flight, so a NACK answers it): fail now rather than after the timeout. */
+        if (!keep_acks && (m.interrupt[0] & 0x0f) == RESPONSE_TYPE_EMBEDDED && m.interrupt[2] == COMMAND_SYS && m.interrupt[4] == 0x7E) {
+            ret = G2_ERR_REJECTED;
+            break;
+        }
         if ((m.interrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
             uint16_t sz = ((uint16_t)m.interrupt[1] << 8) | m.interrupt[2];
             m.bulk = sz ? calloc(1, sz) : NULL;
@@ -156,10 +162,22 @@ static int is_patch_name_reply(const uint8_t *intr, const uint8_t *bulk, uint16_
     return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 4 && bulk[3] == SUB_RESPONSE_PATCH_NAME;
 }
 
-/* Version, patch data (USB format, caller frees *data) and name of `slot`; only tagged replies are
- * accepted (see await_reply). A missing name is not an error: name stays "". */
-static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *size, char *name, size_t name_size) {
+/* Current-note reply (bulk: [0]0x01 [1]0x08|slot [2]version [3]0x69 [4..5]size, then the voice
+ * table): the C_CURRENT_NOTE_2 chunk at bulk+3, byte for byte what a .pch2 stores. */
+static int is_current_note_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int slot) {
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n > 6 && bulk[1] == (0x08 | slot) &&
+           bulk[3] == SUB_RESPONSE_CURRENT_NOTE && 6u + (((unsigned)bulk[4] << 8) | bulk[5]) <= n;
+}
+
+/* Version, patch data (pch2 sections, caller frees *data) and name of `slot`; only tagged replies
+ * are accepted (see await_reply). A missing name is not an error: name stays "". The sections end
+ * with the G2's current notes (0x69), requested last like the official editor does
+ * (CPatch::CleanDirtyData); the file writers move it to its canonical place. Without a reply
+ * there is no 0x69 and the writers fill in the idle default. */
+static int fetch_patch(int slot, uint8_t *version, uint8_t **data, size_t *size, char *name, size_t name_size) {
     g2_msg_t r;
+    uint8_t *usb;
+    uint16_t usb_size;
     *data = NULL;
     name[0] = '\0';
 
@@ -185,14 +203,13 @@ static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *siz
         return G2_ERR_RECV;
     }
     debug_timing("get_patch_slot_end");
-    *data = r.bulk;
-    *size = r.bulk_size;
+    usb = r.bulk;
+    usb_size = r.bulk_size;
 
     debug_timing("get_patch_name_start");
     if (send_slot(slot, *version, SUB_COMMAND_GET_PATCH_NAME, NULL, 0) < 0) {
         g2_err("Failed to send get patch name command\n");
-        free(*data);
-        *data = NULL;
+        free(usb);
         return G2_ERR_SEND;
     }
     if (await_reply(is_patch_name_reply, 0, 0, &r) == G2_OK) {
@@ -201,6 +218,29 @@ static int fetch_patch(int slot, uint8_t *version, uint8_t **data, uint16_t *siz
         g2_msg_free(&r);
     }
     debug_timing("get_patch_name_end");
+
+    debug_timing("get_current_note_start");
+    g2_msg_t note = {0};
+    size_t note_len = 0;
+    if (send_slot(slot, *version, SUB_COMMAND_GET_CURRENT_NOTE, NULL, 0) == 0 &&
+        await_reply(is_current_note_reply, slot, 0, &note) == G2_OK)
+        note_len = 3 + (((size_t)note.bulk[4] << 8) | note.bulk[5]);
+    debug_timing("get_current_note_end");
+
+    *size = usb_size;
+    *data = malloc(*size + note_len);
+    if (!*data || patch_usb_to_pch2(usb, usb_size, *data, size) < 0) {
+        g2_err("Failed to convert patch to PCH2 format\n");
+        free(*data);
+        *data = NULL;
+        free(usb);
+        g2_msg_free(&note);
+        return G2_ERR_PARSE;
+    }
+    if (note_len) memcpy(*data + *size, note.bulk + 3, note_len);
+    *size += note_len;
+    free(usb);
+    g2_msg_free(&note);
     return G2_OK;
 }
 
@@ -443,7 +483,7 @@ cJSON *g2_get_patch(const char *slot_str) {
     uint8_t version;
     uint8_t interruptResp[16] = {0};
     uint8_t *patchData = NULL;
-    uint16_t patchSize = 0;
+    size_t patchSize = 0;
     int ret;
 
     if (ensure_connected(1) < 0) {
@@ -527,23 +567,12 @@ cJSON *g2_get_patch(const char *slot_str) {
         debug_timing("get_patch_text_end");
     }
 
-    /* Convert USB bulk format to pch2 format before returning */
-    uint8_t *pch2Data = malloc(patchSize);
-    size_t pch2Size = patchSize;
-    if (pch2Data && patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) == 0) {
-        free(patchData);
-        patchData = pch2Data;
-        patchSize = (uint16_t)pch2Size;
-    } else {
-        free(pch2Data);
-    }
-
     /* Build JSON output */
     cJSON *root = cJSON_CreateObject();
     cJSON_AddStringToObject(root, "slot", (char*[]){ "A", "B", "C", "D" }[slot]);
     cJSON_AddStringToObject(root, "name", patchName);
     cJSON_AddStringToObject(root, "text", patchText ? patchText : "");
-    cJSON_AddNumberToObject(root, "size", patchSize);
+    cJSON_AddNumberToObject(root, "size", (double)patchSize);
     free(patchText);
 
     char *hexStr = malloc(patchSize * 2 + 1);
@@ -568,7 +597,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     int slot;
     uint8_t version;
     uint8_t *patchData = NULL;
-    uint16_t patchSize = 0;
+    size_t pch2Size = 0;
     if (ensure_connected(1) < 0) {
         g2_err("Failed to connect to G2\n");
         return NULL;
@@ -586,7 +615,7 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
     g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
     char patchName[32];
-    if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
+    if (fetch_patch(slot, &version, &patchData, &pch2Size, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
 
     char defaultFilename[64];
     if (filename == NULL) {
@@ -598,30 +627,15 @@ cJSON *g2_get_patch_file(const char *slot_str, const char *filename) {
         filename = defaultFilename;
     }
 
-    uint8_t *pch2Data = malloc(patchSize);
-    size_t pch2Size = patchSize;
-    if (!pch2Data) {
-        g2_err("Memory allocation failed for PCH2 conversion\n");
-        goto cleanup;
-    }
-
-    if (patch_usb_to_pch2(patchData, patchSize, pch2Data, &pch2Size) < 0) {
-        g2_err("Failed to convert patch to PCH2 format\n");
-        free(pch2Data);
-        goto cleanup;
-    }
-
-    /* patch_usb_to_pch2 yields bare sections; a loadable .pch2 also needs the text header
-     * and the trailing CRC (see pch2_file_from_sections). */
-    size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + 2;
+    /* fetch_patch yields bare sections in GET_PATCH order; a loadable .pch2 also needs the
+     * official section order, the text header and the trailing CRC (see pch2_file_from_sections). */
+    size_t fileSize = strlen(PCH2_TEXT_HEADER) + 3 + pch2Size + PCH2_CANONICAL_GROWTH + 3 + 2;
     uint8_t *fileData = malloc(fileSize);
-    if (!fileData || pch2_file_from_sections(pch2Data, pch2Size, fileData, &fileSize) < 0) {
+    if (!fileData || pch2_file_from_sections(patchData, pch2Size, fileData, &fileSize) < 0) {
         g2_err("Failed to build PCH2 file\n");
         free(fileData);
-        free(pch2Data);
         goto cleanup;
     }
-    free(pch2Data);
 
     FILE *f = fopen(filename, "wb");
     if (!f) {
@@ -866,22 +880,16 @@ cJSON *g2_list(int filter, int bank_filter) {
 
                 if (c > LIST_LAST) {
                     char name[32] = {0};
-                    int nameLen = parse_name(data + pos, name, sizeof(name));
-
-                        int extra = (mode == PATCH_MODE) ? 1 : 0; /* patches have category byte, perfs don't */
-                    if (nameLen <= 0 || pos + nameLen + extra > data_len) {
+                    int categoryIdx;
+                    int used = parse_list_entry(data + pos, data_len - pos, name, sizeof(name), &categoryIdx);
+                    if (used < 0) {
                         break;
                     }
 
                     cJSON *item = cJSON_CreateObject();
                     cJSON_AddNumberToObject(item, "location", patch + 1);
                     cJSON_AddStringToObject(item, "name", name);
-
-                    if (mode == PATCH_MODE) {
-                        int categoryIdx = data[pos + nameLen];
-                        if (categoryIdx > 15) categoryIdx = 0;
-                        cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
-                    }
+                    cJSON_AddStringToObject(item, "category", g2categories[categoryIdx]);
 
                     char bankKey[8];
                     snprintf(bankKey, sizeof(bankKey), "%d", bank + 1);
@@ -912,7 +920,7 @@ cJSON *g2_list(int filter, int bank_filter) {
                     cJSON_AddItemToArray(bankArray, item);
 
                     patch++;
-                    pos += nameLen + extra;
+                    pos += used;
                 } else if (c == LIST_CONTINUE) {
                     pos++;
                 } else if (c == LIST_BANK) {
@@ -1090,9 +1098,7 @@ int g2_build_add_module_op(G2Op *op, uint8_t *buf, int loc,
     for (int m=0; m<num_modes; m++)
         buf[pos++]=(uint8_t)(mode_vals ? mode_vals[m] : 0);
     /* NUL-terminated below 16 chars only: a NUL after a full 16-char name shifts the frame (NACK 3) */
-    size_t nlen = name ? strlen(name) : 0; if (nlen > 16) nlen = 16;
-    if (nlen > 0) { memcpy(buf+pos, name, nlen); pos += (int)nlen; }
-    if (nlen < 16) buf[pos++] = 0x00;
+    pos += (int)put_name_field(buf + pos, name ? name : "", name ? strlen(name) : 0);
     op->cmd=0x30; op->payload=buf; op->len=pos;
     return pos;
 }
@@ -1122,11 +1128,9 @@ void g2_build_set_module_uprate_op(G2Op *op, uint8_t *buf,
 
 void g2_build_set_module_label_op(G2Op *op, uint8_t *buf,
                                    int loc, int module_id, const char *label) {
-    size_t nlen = label ? strlen(label) : 0; if (nlen > 16) nlen = 16;
     buf[0] = (uint8_t)loc; buf[1] = (uint8_t)module_id;
-    if (label && nlen > 0) memcpy(buf+2, label, nlen);
-    if (nlen < 16) buf[2+nlen] = 0x00;
-    op->cmd = 0x33; op->payload = buf; op->len = (int)(2 + nlen + (nlen < 16 ? 1 : 0));
+    op->cmd = 0x33; op->payload = buf;
+    op->len = 2 + (int)put_name_field(buf + 2, label ? label : "", label ? strlen(label) : 0);
 }
 
 /* SET_PARAM_LABEL (0x42) replaces the module's WHOLE label list (the original editor's
@@ -1453,8 +1457,8 @@ static int await_flash_result(int bank0, int location0, int *status) {
         int rret = recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
         /* Through the listener queue a bare timeout is 0, so anything negative is a real USB
          * error: stop now. The direct libusb path (recv_interrupt_with_retry, g2_io.c) reports
-         * a plain timeout as -1 as well, so there we can only keep waiting - otherwise the
-         * one-shot CLI aborts on the first write that takes over 2 s. */
+         * a plain timeout as LIBUSB_ERROR_TIMEOUT (negative), so there we keep waiting - otherwise
+         * the one-shot CLI aborts on the first write that takes over 2 s. */
         if (rret < 0) {
             if (g2_listener_active) {
                 g2_err("flash location %d: USB error waiting for the result: %s\n", location0 + 1, libusb_error_name(rret));
@@ -1587,8 +1591,21 @@ int g2_set_synth_settings(cJSON *params) {
     if (!params) { g2_err("set-synth-settings: NULL params\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-synth-settings: failed to connect\n"); return G2_ERR_CONNECT; }
     g2_drain_pending();
+    /* Read-modify-write: the message carries every synth setting (CSynthMap::WriteStream), so the
+     * ones the caller doesn't pass - the editor has no UI for them - are taken from the G2 instead
+     * of being reset to 0. */
+    static const char *kKeep[] = { "patchSortMode", "perfSortMode", "midiSendArp", "vibratoRate" };
+    cJSON *current = query_synth_settings(NULL);
+    if (!current) { g2_err("set-synth-settings: could not read the current settings\n"); return G2_ERR_RECV; }
+    cJSON *merged = cJSON_Duplicate(params, 1);
+    for (size_t i = 0; merged && i < sizeof(kKeep) / sizeof(kKeep[0]); i++)
+        if (!cJSON_GetObjectItem(merged, kKeep[i]))
+            cJSON_AddItemToObject(merged, kKeep[i], cJSON_Duplicate(cJSON_GetObjectItem(current, kKeep[i]), 1));
+    cJSON_Delete(current);
     uint8_t data[56]; size_t len;
-    if (g2_build_synth_set_msg(params, data, &len) < 0) {
+    int built = merged ? g2_build_synth_set_msg(merged, data, &len) : -1;
+    cJSON_Delete(merged);
+    if (built < 0) {
         g2_err("set-synth-settings: failed to build message\n");
         return G2_ERR_INVALID_PARAM;
     }
@@ -1636,14 +1653,10 @@ int g2_set_perf_name(const char *name) {
     uint8_t version;
     if (query_version(4, &version) != G2_OK) { g2_err("No response from G2 for perf version\n"); return G2_ERR; }
 
-    size_t nlen = strlen(name);
-    if (nlen > 16) nlen = 16;
     uint8_t cmd[19];
     int pos = 0;
     cmd[pos++] = 0x29;
-    memcpy(cmd + pos, name, nlen);
-    pos += (int)nlen;
-    if (nlen < 16) cmd[pos++] = 0;
+    pos += (int)put_name_field(cmd + pos, name, strlen(name));
 
     if (send_system_data(version, cmd, (size_t)pos) < 0) return G2_ERR_SEND;
     usleep(USB_SEND_DELAY_US);
@@ -1671,12 +1684,8 @@ int g2_set_patch_name(int slot, const char *name) {
     /* "" is valid: the official editor sends it too (CPatchView::OpenPatchNameDlg has no empty check). */
     if (!name)                 { g2_err("set-patch-name: missing name\n"); return G2_ERR_INVALID_PARAM; }
     if (ensure_connected(0) < 0) { g2_err("set-patch-name: failed to connect\n"); return G2_ERR_CONNECT; }
-    size_t nlen = strlen(name);
-    if (nlen > 16) nlen = 16;
     uint8_t payload[16];
-    memcpy(payload, name, nlen);
-    if (nlen < 16) payload[nlen] = 0x00;
-    G2Op op = { .cmd = 0x27, .payload = payload, .len = (int)(nlen + (nlen < 16 ? 1 : 0)) };
+    G2Op op = { .cmd = 0x27, .payload = payload, .len = (int)put_name_field(payload, name, strlen(name)) };
     return send_slot_edit(slot, "set-patch-name", &op, 1);
 }
 
@@ -1722,39 +1731,13 @@ static int set_voice_description_field(int slot, int field, int val) {
     }
     cJSON_Delete(patch);
 
-    /* Find null-terminated text header */
-    int text_end = -1;
-    for (int k = 0; k < data_len; k++) {
-        if (data[k] == 0) { text_end = k; break; }
-    }
-    if (text_end < 0 || text_end + 3 > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
-
-    /* Scan sections for type 0x21 (patch description) */
-    int sec_off = text_end + 3;
-    int guard = 0;
-    while (sec_off + 3 <= data_len && guard++ < 64) {
-        uint8_t type = data[sec_off];
-        int body_len = (data[sec_off + 1] << 8) | data[sec_off + 2];
-        if (type == 0x21) {
-            uint8_t *body = data + sec_off + 3;
-            if (body_len < 14 || sec_off + 3 + body_len > data_len) { free(data); return G2_ERR_INVALID_PARAM; }
-            if (field == 0) {
-                /* voices: bits 61-65 (5 bits) */
-                body[7] = (body[7] & 0xF8) | ((val >> 2) & 0x07);
-                body[8] = (body[8] & 0x3F) | ((val & 0x03) << 6);
-            } else {
-                /* monopoly: bits 90-91 (2 bits) */
-                body[11] = (body[11] & 0xCF) | ((val & 0x03) << 4);
-            }
-            int ret = g2_set_patch_description(slot, body, body_len);
-            free(data);
-            return ret;
-        }
-        sec_off += 3 + body_len;
-    }
+    /* get-patch's data holds the sections only (no file header). */
+    int body_len = 0;
+    uint8_t *body = patch_set_voice_field(data, data_len, field, val, &body_len);
+    int ret = body ? g2_set_patch_description(slot, body, body_len) : G2_ERR_INVALID_PARAM;
     free(data);
-    g2_err("voice-field: description section (0x21) not found\n");
-    return G2_ERR_INVALID_PARAM;
+    if (!body) g2_err("voice-field: description section (0x21) not found\n");
+    return ret;
 }
 
 int g2_set_voice_mode(int slot, int mode) {
@@ -1766,7 +1749,7 @@ int g2_set_voice_mode(int slot, int mode) {
 int g2_set_voice_count(int slot, int count) {
     if (slot < 0 || slot > 3) { g2_err("voice-count: invalid slot\n"); return G2_ERR_INVALID_PARAM; }
     if (count < 1 || count > 32) { g2_err("voice-count: count must be 1-32\n"); return G2_ERR_INVALID_PARAM; }
-    return set_voice_description_field(slot, 0, count);
+    return set_voice_description_field(slot, 0, count - 1); /* the field is 0-based: 0 = 1 voice */
 }
 
 static int get_perf_version(uint8_t *out_version) {
@@ -1868,9 +1851,8 @@ static int locate_section_data(const uint8_t *data, long fsize, int *name_end, i
 
 /* Derives a wire name from a filename's basename, up to the first '.', clamped to
  * `max` characters. `name` must point at a zeroed buffer of at least max+1 bytes.
- * The flash-dump protocol allows a full 16 (the field is NUL-terminated only when
- * shorter - see parse_name); the slot-upload messages keep their 15. Returns the
- * name length. */
+ * Every name field allows a full 16 (NUL-terminated only when shorter - see
+ * parse_name), the slot and performance uploads included. Returns the name length. */
 static int name_from_filepath(const char *filepath, char *name, int max) {
     const char *base = strrchr(filepath, '/');
     base = base ? base + 1 : filepath;
@@ -1888,10 +1870,11 @@ static int name_from_filepath(const char *filepath, char *name, int max) {
 /* Builds and sends the S_SET_PATCH USB packet for a single slot.
  * Packet: [len_hi][len_lo][0x01][cmd][0x53][0x37][0x00 x3][name+\0][section_data][crc_hi][crc_lo]
  * Version byte 0x53 is hardcoded for S_SET_PATCH (confirmed by the Delphi editor).
- * Name field is variable length: name characters followed by a null byte. */
+ * Name field: up to 16 characters, NUL-terminated only when shorter (official
+ * CMDumpBubbleDestination::WriteStream, the same string write as add-module). */
 static int send_patch_upload(int slot, const char *name, int name_len, const uint8_t *section_data, int data_len) {
     /* Dynamic allocation — patch files exceed send_slot's 2048-byte stack buffer. */
-    int name_write_len = name_len + 1;  /* name chars + terminating null */
+    int name_write_len = name_len + (name_len < 16 ? 1 : 0);  /* what put_name_field writes */
     size_t extraLen = 3 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
@@ -1903,8 +1886,7 @@ static int send_patch_upload(int slot, const char *name, int name_len, const uin
     buff[pos++] = 0x53;  /* fixed version for S_SET_PATCH — not the dynamic patch version */
     buff[pos++] = SUB_COMMAND_SET;  /* 0x37 */
     pos += 3;  /* three zero bytes (calloc) */
-    memcpy(buff + pos, name, (size_t)name_write_len);
-    pos += name_write_len;
+    pos += (int)put_name_field(buff + pos, name, (size_t)name_len);
     memcpy(buff + pos, section_data, (size_t)data_len);
     pos += data_len;
 
@@ -1927,6 +1909,14 @@ static int send_patch_upload(int slot, const char *name, int name_len, const uin
     recv_interrupt(response, sizeof(response), USB_TIMEOUT_LONG_MS);
     g2_drain_pending();
     return G2_OK;
+}
+
+/* The CLI sends a file as it is. An older format (the editor converts it on load) reaches the G2
+ * unconverted, so say so. */
+static void warn_old_file_version(const char *cmd, const char *filepath, const uint8_t *data, long fsize) {
+    int v = pch2_old_file_version(data, fsize);
+    if (v) fprintf(stderr, "%s: warning: %s is file format %d (current %d) and is sent unconverted; "
+                           "open and save it in the editor first\n", cmd, filepath, v, G2_FILE_VERSION);
 }
 
 /* Reads an open file in full. Returns a malloc'd buffer (caller frees) and its size, or
@@ -1954,14 +1944,15 @@ int g2_upload_patch(int slot, const char *filepath) {
 
     /* pch2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
      * Use filename (without extension) as the patch name. */
-    char name[16] = {0};
-    int ni = name_from_filepath(filepath, name, 15);
+    char name[17] = {0};
+    int ni = name_from_filepath(filepath, name, 16);
 
     int name_end, data_offset, data_len;
     if (locate_section_data(file_data, fsize, &name_end, &data_offset, &data_len) < 0) {
         free(file_data);
         return G2_ERR_PARSE;
     }
+    warn_old_file_version("upload-patch", filepath, file_data, fsize);
 
     int ret = send_patch_upload(slot, name, ni, file_data + data_offset, data_len);
     free(file_data);
@@ -1981,8 +1972,8 @@ int g2_upload_patch_buf(int slot, const uint8_t *data, size_t len) {
     if (locate_section_data(data, (long)len, &name_end, &data_offset, &data_len) < 0)
         return G2_ERR_PARSE;
 
-    int ni = name_end < 15 ? name_end : 15;
-    char name[16] = {0};
+    int ni = name_end < 16 ? name_end : 16;
+    char name[17] = {0};
     memcpy(name, data, (size_t)ni);
 
     return send_patch_upload(slot, name, ni, data + data_offset, data_len);
@@ -1994,7 +1985,7 @@ int g2_upload_patch_buf(int slot, const uint8_t *data, size_t len) {
  * (confirmed by Delphi AddMsgSetPerformance in BVE.NMG2Synth.pas). Without it
  * the parser finds 0x11 (C_PERF_SETTINGS) where it expects 0x1A, hanging the G2. */
 static int send_perf_upload(const char *name, int name_len, const uint8_t *section_data, int data_len) {
-    int name_write_len = name_len + 1;
+    int name_write_len = name_len + (name_len < 16 ? 1 : 0);  /* what put_name_field writes */
     size_t extraLen = 3 + (size_t)name_write_len + 2 + (size_t)name_write_len + (size_t)data_len;
     size_t totalLen = COMMAND_OFFSET + 4 + extraLen + 2;
     uint8_t *buff = (uint8_t *)calloc(1, totalLen);
@@ -2006,12 +1997,10 @@ static int send_perf_upload(const char *name, int name_len, const uint8_t *secti
     buff[pos++] = 0x42;                        /* fixed version for full performance upload */
     buff[pos++] = SUB_COMMAND_SET;             /* 0x37 */
     pos += 3;  /* three zero bytes (calloc) */
-    memcpy(buff + pos, name, (size_t)name_write_len);
-    pos += name_write_len;
+    pos += (int)put_name_field(buff + pos, name, (size_t)name_len);
     buff[pos++] = 0x1A;
     buff[pos++] = 0x29;  /* C_PERF_NAME inline header required by G2 parser */
-    memcpy(buff + pos, name, (size_t)name_write_len);
-    pos += name_write_len;
+    pos += (int)put_name_field(buff + pos, name, (size_t)name_len);
     memcpy(buff + pos, section_data, (size_t)data_len);
     pos += data_len;
 
@@ -2060,14 +2049,15 @@ int g2_upload_perf(const char *filepath) {
 
     /* prf2 format: [text header][0x00][0x17][0x00][section bytes][2 byte CRC]
      * Use filename (without extension) as the performance name. */
-    char name[16] = {0};
-    int ni = name_from_filepath(filepath, name, 15);
+    char name[17] = {0};
+    int ni = name_from_filepath(filepath, name, 16);
 
     int name_end, data_offset, data_len;
     if (locate_section_data(file_data, fsize, &name_end, &data_offset, &data_len) < 0) {
         free(file_data);
         return G2_ERR_PARSE;
     }
+    warn_old_file_version("upload-perf", filepath, file_data, fsize);
 
     int ret = send_perf_upload(name, ni, file_data + data_offset, data_len);
     free(file_data);
@@ -2083,8 +2073,8 @@ int g2_upload_perf_buf(const uint8_t *data, size_t len) {
     if (locate_section_data(data, (long)len, &name_end, &data_offset, &data_len) < 0)
         return G2_ERR_PARSE;
 
-    int ni = name_end < 15 ? name_end : 15;
-    char name[16] = {0};
+    int ni = name_end < 16 ? name_end : 16;
+    char name[17] = {0};
     memcpy(name, data, (size_t)ni);
 
     return send_perf_upload(name, ni, data + data_offset, data_len);
@@ -2125,22 +2115,10 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
         g2_err("Fetching patch from slot %c...\n", "ABCD"[slot]);
 
         /* Tagged reply (fetch_patch, like get-patch): the first extended message can be e.g. a resources_used
-         * message instead, which failed the conversion below (2026-10-20, intermittent). */
+         * message instead, which failed the pch2 conversion (2026-10-20, intermittent). */
         uint8_t version;
-        uint8_t *patchData;
-        uint16_t patchSize;
         char patchName[32];
-        if (fetch_patch(slot, &version, &patchData, &patchSize, patchName, sizeof(patchName)) != G2_OK) goto cleanup;
-
-        pch2Data[slot] = malloc(patchSize);
-        if (!pch2Data[slot]) { free(patchData); g2_err("Memory allocation failed\n"); goto cleanup; }
-        pch2Size[slot] = (size_t)patchSize;
-        if (patch_usb_to_pch2(patchData, (size_t)patchSize, pch2Data[slot], &pch2Size[slot]) < 0) {
-            free(patchData);
-            g2_err("Failed to convert patch for slot %c\n", "ABCD"[slot]);
-            goto cleanup;
-        }
-        free(patchData);
+        if (fetch_patch(slot, &version, &pch2Data[slot], &pch2Size[slot], patchName, sizeof(patchName)) != G2_OK) goto cleanup;
     }
 
     /* Step 3: Determine output filename (not needed for a bytes-only fetch) */
@@ -2172,10 +2150,11 @@ cJSON *g2_get_perf_file(const char *filename, int return_bytes) {
      * and bytes at +4..+10 map to the 8-byte performance settings header fields.
      * The USB response ends with its own 2-byte CRC, which belongs to the transport and not to
      * the section — taking the payload all the way to perfSize left those two bytes inside the
-     * 0x11 chunk (verified against a genuine .prf2 of the same performance: 85 bytes vs 83). */
+     * 0x11 chunk (verified against a genuine .prf2 of the same performance: 85 bytes vs 83).
+     * The 0x11 is copied as the G2 sends it: slot byte 7 is the slot's MIDI channel, which the
+     * official editor saves too (CPerformanceHeader_11::SetMidiChannel). */
     size_t perf_sect_offset = (size_t)(4 + nameLen + 3);
     size_t perf_sect_len = (perf_sect_offset + 2 < perfSize) ? (perfSize - perf_sect_offset - 2) : 0;
-    perf_settings_normalize_slots(perfData + perf_sect_offset, perf_sect_len);
 
     size_t header_len = strlen(PRF2_TEXT_HEADER) + 3;  /* text header + null + 0x17 + file type */
     size_t sect11_total = 3 + perf_sect_len;   /* [0x11][hi][lo] + data */
@@ -2723,12 +2702,19 @@ cJSON *g2_get_global_knobs(void) {
     return root;
 }
 
+/* GET_RESOURCES_USED reply for one slot and location (arg = slot | location << 4): bulk [3]=0x72,
+ * [4]=location. Tagged like every other query: the untagged read took whatever came first, e.g.
+ * another slot's streamed 0x72. A streamed 0x72 of this slot and location carries the same data. */
+static int is_resources_reply(const uint8_t *intr, const uint8_t *bulk, uint16_t n, int arg) {
+    return (intr[0] & 0x0f) == RESPONSE_TYPE_EXTENDED && bulk && n >= 6 && bulk[3] == 0x72 &&
+           (bulk[1] & 0x07) == (arg & 0x0f) && bulk[4] == (arg >> 4);
+}
+
 /* GET_RESOURCES_USED (0x71): query FX (loc=0) then VA (loc=1) and return a
  * plain JSON array matching the "data" field of the resources_used watch event:
  * [loc][27 bytes][0x72 sub-cmd][loc][27 bytes] (57 bytes compound packet).
  * Falls back to FX-only (28 bytes) if the VA query fails. */
 cJSON *g2_get_resources(const char *slot_str) {
-    uint8_t interruptResp[16] = {0};
     uint8_t version;
     int ret;
 
@@ -2747,55 +2733,29 @@ cJSON *g2_get_resources(const char *slot_str) {
     if (send_slot(slot, version, 0x71, &loc, 1) < 0) { g2_err("Failed to send get-resources\n"); return NULL; }
     usleep(USB_SEND_DELAY_US);
 
-    ret = recv_interrupt(interruptResp, 16, USB_TIMEOUT_STANDARD_MS);
-    if (ret <= 0 || (interruptResp[0] & 0x0f) != RESPONSE_TYPE_EXTENDED) {
+    g2_msg_t fx;
+    if (await_reply(is_resources_reply, slot, 0, &fx) != G2_OK) {
         g2_err("Unexpected response for get-resources\n"); return NULL;
     }
-
-    uint16_t fxBulkSize = ((uint16_t)interruptResp[1] << 8) | interruptResp[2];
-    if (fxBulkSize < 6) { g2_err("get-resources: FX bulk too small\n"); return NULL; }
-    uint8_t *fxBulk = malloc(fxBulkSize);
-    if (!fxBulk) { g2_err("Memory allocation failed\n"); return NULL; }
-
-    int fxRet = recv_bulk(fxBulk, fxBulkSize);
-    if (fxRet < 6) { free(fxBulk); g2_err("Failed to read resources FX bulk\n"); return NULL; }
-    int fxDataEnd = fxRet - 2;  /* strip 2-byte CRC */
+    int fxDataEnd = fx.bulk_size - 2;  /* strip 2-byte CRC */
 
     cJSON *arr = cJSON_CreateArray();
+    for (int i = 4; i < fxDataEnd; i++)
+        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fx.bulk[i]));
+    g2_msg_free(&fx);
 
-    /* Query VA area (loc=1) and build compound packet if successful */
+    /* Query VA area (loc=1) and append it as a compound packet if that succeeds */
     uint8_t loc1 = 1;
+    g2_msg_t va;
     if (send_slot(slot, version, 0x71, &loc1, 1) == 0) {
         usleep(USB_SEND_DELAY_US);
-        uint8_t vaInterrupt[16] = {0};
-        int ret2 = recv_interrupt(vaInterrupt, 16, USB_TIMEOUT_STANDARD_MS);
-        if (ret2 > 0 && (vaInterrupt[0] & 0x0f) == RESPONSE_TYPE_EXTENDED) {
-            uint16_t vaBulkSize = ((uint16_t)vaInterrupt[1] << 8) | vaInterrupt[2];
-            if (vaBulkSize >= 6) {
-                uint8_t *vaBulk = malloc(vaBulkSize);
-                if (vaBulk) {
-                    int vaRet = recv_bulk(vaBulk, vaBulkSize);
-                    if (vaRet >= 6) {
-                        int vaDataEnd = vaRet - 2;
-                        for (int i = 4; i < fxDataEnd; i++)
-                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
-                        cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
-                        for (int i = 4; i < vaDataEnd; i++)
-                            cJSON_AddItemToArray(arr, cJSON_CreateNumber(vaBulk[i]));
-                        free(vaBulk);
-                        free(fxBulk);
-                        return arr;
-                    }
-                    free(vaBulk);
-                }
-            }
+        if (await_reply(is_resources_reply, slot | 1 << 4, 0, &va) == G2_OK) {
+            cJSON_AddItemToArray(arr, cJSON_CreateNumber(0x72));
+            for (int i = 4; i < va.bulk_size - 2; i++)
+                cJSON_AddItemToArray(arr, cJSON_CreateNumber(va.bulk[i]));
+            g2_msg_free(&va);
         }
     }
-
-    /* Fall back: return FX data only */
-    for (int i = 4; i < fxDataEnd; i++)
-        cJSON_AddItemToArray(arr, cJSON_CreateNumber(fxBulk[i]));
-    free(fxBulk);
     return arr;
 }
 
@@ -3097,8 +3057,7 @@ static int flash_read_location(int type, int bank, int location0, uint8_t **bulk
     uint8_t *payload = bulk + 4;
     size_t payloadSize = size - 4;
     /* parse_name returns the FIELD length: name + terminator, or just the name
-     * when it fills all 16 bytes (utils.c, same convention as
-     * perf_settings_normalize_slots). Scanning for a NUL instead swallows the
+     * when it fills all 16 bytes (utils.c). Scanning for a NUL instead swallows the
      * first size byte of a 16-character name. */
     uint8_t nameBuf[16] = {0};   /* zero-padded copy: parse_name must not read past the payload */
     memcpy(nameBuf, payload + 3, payloadSize - 3 < sizeof(nameBuf) ? payloadSize - 3 : sizeof(nameBuf));
@@ -3379,9 +3338,7 @@ int build_flash_dump_raw_frame(int type, int bank0, int location0, const char *n
     out[pos++] = (uint8_t)type;
     out[pos++] = (uint8_t)bank0;
     out[pos++] = (uint8_t)location0;
-    memcpy(out + pos, name, nameLen);
-    pos += (int)nameLen;
-    if (nameLen < 16) out[pos++] = 0x00;   /* 16 chars fill the field, unterminated */
+    pos += (int)put_name_field(out + pos, name, nameLen);   /* 16 chars fill the field, unterminated */
     out[pos++] = (uint8_t)((file_len >> 8) & 0xff);
     out[pos++] = (uint8_t)(file_len & 0xff);
     out[pos++] = file_data[1];
@@ -3494,6 +3451,7 @@ static int flash_write_file(int type, int bank, int location0, const char *filep
         snprintf(reason, reasonLen, "wrong file type for this bank");
         return FLASH_WRITE_SKIP_CLEAR;
     }
+    warn_old_file_version("flash write", filepath, fileData, fsize);
 
     int status = -1;
     int ret = send_flash_dump_raw(type, bank - 1, location0, name,

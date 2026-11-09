@@ -11,7 +11,10 @@
 
 uint16_t crc_iterator(int32_t seed, int32_t val);
 uint16_t calc_crc16(uint8_t *buff, int length);
+int g2_crc_ok(const uint8_t *data, int n);
 int parse_name(const uint8_t *data, char *buf, size_t bufsize);
+size_t put_name_field(uint8_t *out, const char *name, size_t len);
+int parse_list_entry(const uint8_t *data, int avail, char *buf, size_t bufsize, int *category);
 slot_t parse_slot(const char *slot_str);
 int parse_location_str(const char *s);
 int hex_to_bytes(const char *hex, uint8_t **out);
@@ -37,21 +40,27 @@ char *base64_encode(const uint8_t *data, size_t len);
 void patch_slot_sections_canonical(const uint8_t *in, size_t in_len,
                                    uint8_t *out, size_t *out_len);
 
-/* Rewrites the slot index inside a captured C_PERF_SETTINGS (0x11) payload to the 0-3 a file
- * uses. The device reports its own unit-specific numbering instead, which a .prf2 must not
- * carry. Edits in place. */
-void perf_settings_normalize_slots(uint8_t *data, size_t len);
 
 /* Patch format conversion (USB <-> PCH2) */
 int patch_usb_to_pch2(const uint8_t *usb_data, size_t usb_len,
                       uint8_t *pch2_data, size_t *pch2_len);
 
 /* Wrap section data (as returned by patch_usb_to_pch2) in a .pch2 file as the official editor
- * writes it: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections][CRC16 BE]. The CRC covers
+ * writes it: [PCH2_TEXT_HEADER][NUL][0x17][0x00][sections in canonical order + 0x6f][CRC16 BE]
+ * (up to PCH2_CANONICAL_GROWTH + 3 bytes more than the input). The CRC covers
  * [0x17][0x00][sections]. *out_len is the capacity on entry and the file size on return
  * (or the required size on -1). */
 int pch2_file_from_sections(const uint8_t *sections, size_t sections_len,
                             uint8_t *out, size_t *out_len);
+
+/* The format version of a .pch2/.prf2 buffer when it is older than G2_FILE_VERSION, else 0
+ * (also for a buffer too short to hold one). */
+int pch2_old_file_version(const uint8_t *data, long len);
+
+/* Sets the voices (field 0, raw value 0-31 = 1-32 voices) or voice mode (field 1, 0-3) in the patch
+ * description (section 0x21) of a slot's section data as g2_get_patch returns it: sections only,
+ * no file header. Returns the description body (and its length in *body_len), or NULL if absent. */
+uint8_t *patch_set_voice_field(uint8_t *sections, int len, int field, int raw, int *body_len);
 
 
 /*

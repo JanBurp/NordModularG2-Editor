@@ -75,7 +75,7 @@ static void print_usage(const char *prog) {
     printf("  del-cable <slot> <va|fx> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>                      Delete a cable\n");
     printf("  set-cable-color <slot> <va|fx> <color:0-6> <from-mod> <0|1> <from-con> <to-mod> <0|1> <to-con>    Set color of an existing cable\n");
     printf("  add-module <slot> <va|fx> <type-id> <module-id> <col> <row> <color:0-6>                           Add a module to the patch\n");
-    printf("  del-module <slot> <va|fx> <module-id>                                                             Delete a module (delete its cables first)\n");
+    printf("  del-module <slot> <va|fx> <module-id>                                                             Delete a module (delete its cables first: the G2 keeps them)\n");
     printf("  move-module <slot> <va|fx> <module-id> <col> <row>                                                Move a module to a new grid position\n");
     printf("  set-module-color <slot> <va|fx> <module-id> <color:0-24>                                          Set a module color\n");
     printf("  set-mutation-lock <slot> <va|fx> <module-id> <0|1>                                                Exclude a module from Patch Mutator changes\n");

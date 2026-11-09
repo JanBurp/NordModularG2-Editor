@@ -13,3 +13,4 @@ char  *daemon_dequeue(void);
 cJSON *daemon_parse_request(const char *line);
 cJSON *daemon_make_ok(cJSON *id);
 cJSON *daemon_make_error(cJSON *id, int code);
+const char *arg_s(cJSON *args, int idx);

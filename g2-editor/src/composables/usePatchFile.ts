@@ -7,14 +7,22 @@ import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { showToast, dismissToastByKey } from './useToast';
 const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
+const { fileCrcOk } = await import('../parser/nmg2PatchSerializer');
+
+// A file whose CRC doesn't match still loads (the official editor refuses it); only warn.
+function warnOnBadCrc(bytes: Uint8Array, name: string): void {
+	if (fileCrcOk(bytes)) return;
+	console.warn(`${name}: file CRC mismatch`);
+	showToast(`"${name}" has a bad checksum — the file may be damaged.`);
+}
 
 type DiskItem = { type: 'disk'; filepath: string; kind?: 'patch' | 'performance' };
 type SynthItem = { type: 'synth'; bank: number; location: number; kind?: 'patch' | 'performance' };
 type Prf2Data = {
 	slotNames: string[];
 	patches: Patch[];
-	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number }>;
-	settings: { focus: number; knobSourceGlobal: boolean; rangeEnable: boolean; bpm: number; clockRunning: boolean };
+	slotMeta: Array<{ active: boolean; key: boolean; hold: boolean; bank: number; patch: number; rangeLow: number; rangeHigh: number; midiChannel: number }>;
+	settings: { focus: number; knobSourceGlobal: boolean; rangeEnable: boolean; bpm: number; clockRunning: boolean; category: number; clockKbdTrig: boolean };
 	globalParamPages: GlobalParamPageAssignment[];
 };
 
@@ -37,11 +45,14 @@ export function usePatchFile() {
 	}
 
 	// Uploads a loaded .pch2 file into the slot, then repairs the file's wrong uprate bits (see loadPatchFile).
+	// A file in an older format goes up as the converted patch: the G2 doesn't convert.
 	async function uploadPatchFile(slot: SlotLabel, filepath: string, uprateRepairCmds: string[][]): Promise<void> {
 		if (device.status !== DeviceStatus.Connected) return;
 		slotsStore.uploadingFromFile = true;
 		try {
-			await window.cli.run(['upload-patch', slot, filepath]);
+			if (slotsStore.slotOldFileVersions[slot] !== null)
+				await window.cli.run(['upload-patch-data', slot, await slotsStore._buildPchBytes(slotsStore.slots[slot], true)]);
+			else await window.cli.run(['upload-patch', slot, filepath]);
 			if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 		} catch (err) {
 			console.error('Upload to G2 failed:', err);
@@ -55,18 +66,20 @@ export function usePatchFile() {
 		return slotsStore.loadSlot(SLOT_LABELS[index]);
 	}
 
-	async function applyPerformanceFile(prf2: Prf2Data, name: string, rawHex: string, filepath: string): Promise<void> {
+	async function applyPerformanceFile(prf2: Prf2Data, name: string, rawHex: string, filepath: string, oldFileVersion: number | null): Promise<void> {
 		const connected = device.status === DeviceStatus.Connected;
 		if (connected) {
 			if (slotsStore.uploadingFromFile) return;
 			slotsStore.uploadingFromFile = true;
 		}
 		dismissToastByKey('uprate-perf'); // about the previous performance
-		const uprateRepairCmds = slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages);
+		const uprateRepairCmds = slotsStore.loadPerformanceFile(prf2.patches, prf2.slotNames, name, rawHex, filepath, prf2.globalParamPages, oldFileVersion);
 		await device.setPerformanceMode(name);
 		if (connected) {
 			try {
-				await window.cli.run(['upload-perf', filepath]);
+				// Like a patch file: an older format goes up converted.
+				if (oldFileVersion !== null) await window.cli.run(['upload-perf-data', (await slotsStore._buildPrfBytes(name, rawHex)).data]);
+				else await window.cli.run(['upload-perf', filepath]);
 				// The raw file carries its own (possibly wrong) uprate bits; the G2 never recomputes them.
 				if (uprateRepairCmds.length > 0) await runCliBatchSafe(uprateRepairCmds, 'uprate repair');
 			} catch (err) {
@@ -86,12 +99,13 @@ export function usePatchFile() {
 				bank: m.bank,
 				patch: m.patch,
 				range: { lower: m.rangeLow, upper: m.rangeHigh },
+				midiChannel: m.midiChannel,
 			}));
-			const { focus, knobSourceGlobal, rangeEnable, bpm, clockRunning } = prf2.settings;
+			const { focus, ...settings } = prf2.settings;
 			const focusLabel = SLOT_LABELS[focus];
-			device.updatePerfSettings({ performance: { name, focus: focusLabel, knobSourceGlobal, rangeEnable, bpm, clockRunning }, slots });
+			device.updatePerfSettings({ performance: { name, focus: focusLabel, ...settings }, slots });
 			uiStore.setSlotInFocus(focusLabel);
-			uiStore.setGlobalPagesActive(knobSourceGlobal);
+			uiStore.setGlobalPagesActive(settings.knobSourceGlobal);
 		}
 	}
 
@@ -101,10 +115,12 @@ export function usePatchFile() {
 		if (!file) return;
 		try {
 			const buffer = await file.arrayBuffer();
-			const parsedPatch = new PatchParser(buffer).parse() as any;
+			const parser = new PatchParser(buffer);
+			const parsedPatch = parser.parse() as any;
 			const name = file.name.replace(/\.(pch2|prf2)$/i, '');
+			warnOnBadCrc(new Uint8Array(buffer), name);
 			const rawHex = stripFileHeader(new Uint8Array(buffer));
-			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex);
+			slotsStore.loadPatchFile(uiStore.slotInFocus, parsedPatch, name, rawHex, undefined, parser.oldFileVersion);
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
@@ -119,6 +135,7 @@ export function usePatchFile() {
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
 		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		warnOnBadCrc(new Uint8Array(buffer), name);
 		const rawHex = stripFileHeader(result.data as number[]);
 		let targetSlot: SlotLabel | undefined;
 		let uprateRepairCmds: string[][] = [];
@@ -126,14 +143,14 @@ export function usePatchFile() {
 			const parser = new PatchParser(buffer);
 			const prf2 = parser.parsePrf2();
 			if (prf2) {
-				await applyPerformanceFile(prf2, name, rawHex, result.filepath!);
+				await applyPerformanceFile(prf2, name, rawHex, result.filepath!, parser.oldFileVersion);
 				useSettingsStore().addRecentFile(result.filepath!, 'performance');
 				return;
 			}
 			useSettingsStore().addRecentFile(result.filepath!, 'patch');
 			targetSlot = uiStore.slotInFocus;
 			const parsedPatch = parser.parse() as any;
-			uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!);
+			uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, result.filepath!, parser.oldFileVersion);
 			applyVariation(parsedPatch);
 		} catch (err) {
 			console.error('Failed to load patch file:', err);
@@ -165,7 +182,8 @@ export function usePatchFile() {
 		try {
 			await window.cli.run(['select-perf', String(bank), String(location)]);
 			device.setStoredLocation('perf', bank, location);
-			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null });
+			slotsStore.$patch({ performanceName: name, performanceFilePath: '', performanceRawHex: null, performanceOldFileVersion: null });
+			for (const s of SLOT_LABELS) slotsStore.forgetSlotFile(s);
 			// In Patch mode the G2 loads the performance's patches but reports no perfBank/perfLoc to match
 			// (perfBank=129), so the pending select would only end in the timeout toast. select-perf answers
 			// after the whole load cascade, so it's done here.
@@ -189,17 +207,19 @@ export function usePatchFile() {
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
 				const name = (item.filepath.split(/[/\\]/).pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				warnOnBadCrc(new Uint8Array(buffer), name);
 				const rawHex = stripFileHeader(result.data as number[]);
+				const parser = new PatchParser(buffer);
 				if (item.kind === 'performance' || item.filepath.toLowerCase().endsWith('.prf2')) {
-					const prf2 = new PatchParser(buffer).parsePrf2();
+					const prf2 = parser.parsePrf2();
 					if (prf2) {
-						await applyPerformanceFile(prf2, name, rawHex, item.filepath);
+						await applyPerformanceFile(prf2, name, rawHex, item.filepath, parser.oldFileVersion);
 						return;
 					}
 				}
 				const targetSlot = uiStore.slotInFocus;
-				const parsedPatch = new PatchParser(buffer).parse() as any;
-				const uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath);
+				const parsedPatch = parser.parse() as any;
+				const uprateRepairCmds = slotsStore.loadPatchFile(targetSlot, parsedPatch, name, rawHex, item.filepath, parser.oldFileVersion);
 				applyVariation(parsedPatch);
 				await uploadPatchFile(targetSlot, item.filepath, uprateRepairCmds);
 			} catch (err) {
@@ -216,6 +236,7 @@ export function usePatchFile() {
 				const targetSlot = uiStore.slotInFocus;
 				await window.cli.run(['select-patch', targetSlot, String(item.bank), String(item.location)]);
 				await slotsStore.loadSlot(targetSlot);
+				slotsStore.forgetSlotFile(targetSlot);
 				device.clearOriginStale(targetSlot);
 				device.setStoredLocation(targetSlot, item.bank, item.location);
 			} catch (err) {

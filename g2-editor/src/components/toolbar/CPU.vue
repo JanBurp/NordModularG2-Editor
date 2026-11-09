@@ -14,7 +14,10 @@
 			<span class="w-4 text-xs text-content-secondary">VA</span>
 			<CPUpart :value="va.cycles" :large="!mini" />
 			<CPUpart :value="va.memory" :large="!mini" />
-			<span v-if="!compact && !mini" class="text-[10px] text-content-muted ml-1 whitespace-nowrap" data-testid="area-counts-va"
+			<span
+				v-if="!compact && !mini"
+				class="text-[10px] text-content-muted ml-1 whitespace-nowrap @max-[1414px]/toolbar:hidden"
+				data-testid="area-counts-va"
 				>{{ va.modules }}m/{{ va.cables }}c</span
 			>
 		</div>
@@ -22,7 +25,10 @@
 			<span class="w-4 text-xs text-content-secondary">FX</span>
 			<CPUpart :value="fx.cycles" :large="!mini" />
 			<CPUpart :value="fx.memory" :large="!mini" />
-			<span v-if="!compact && !mini" class="text-[10px] text-content-muted ml-1 whitespace-nowrap" data-testid="area-counts-fx"
+			<span
+				v-if="!compact && !mini"
+				class="text-[10px] text-content-muted ml-1 whitespace-nowrap @max-[1414px]/toolbar:hidden"
+				data-testid="area-counts-fx"
 				>{{ fx.modules }}m/{{ fx.cables }}c</span
 			>
 		</div>

@@ -36,7 +36,7 @@
 		<!-- List -->
 		<div class="flex-1 overflow-y-auto select-none">
 			<!-- Header -->
-			<div class="grid grid-cols-[2.5rem_4rem_5rem_1fr] sticky top-0 bg-surface-1 text-content-secondary border-b border-line-default py-1">
+			<div class="grid grid-cols-[2.5rem_4rem_5rem_minmax(0,1fr)] sticky top-0 bg-surface-1 text-content-secondary border-b border-line-default py-1">
 				<span class="px-2">CC</span>
 				<span class="px-2">Name</span>
 				<span class="px-2">Module</span>
@@ -47,7 +47,7 @@
 				v-for="row in allCCRows"
 				:key="row.cc"
 				data-testid="cc-row"
-				class="grid grid-cols-[2.5rem_4rem_5rem_1fr] border-b border-line-subtle cursor-grab"
+				class="grid grid-cols-[2.5rem_4rem_5rem_minmax(0,1fr)] border-b border-line-subtle cursor-grab"
 				:class="row.assignment ? (selectedRows.has(row.cc) ? 'bg-blue-900/50' : 'hover:bg-surface-1') : 'opacity-40'"
 				draggable="true"
 				@click.exact="row.assignment && selectRow(row.cc)"
@@ -60,10 +60,10 @@
 				@mouseenter="row.assignment && showHint('ccRow')"
 				@mouseleave="clearHint"
 			>
-				<span class="px-2 py-0.5">{{ row.cc }}</span>
-				<span class="px-2 py-0.5 text-content-secondary">{{ ccShortName(row.cc) }}</span>
-				<span class="px-2 py-0.5">{{ row.assignment ? getModuleName(row.assignment) : '' }}</span>
-				<span class="px-2 py-0.5">{{ row.assignment ? getParamName(row.assignment) : '' }}</span>
+				<span class="px-2 py-0.5 truncate">{{ row.cc }}</span>
+				<span class="px-2 py-0.5 truncate text-content-secondary">{{ ccShortName(row.cc) }}</span>
+				<span class="px-2 py-0.5 truncate">{{ row.assignment ? getModuleName(row.assignment) : '' }}</span>
+				<span class="px-2 py-0.5 truncate">{{ row.assignment ? getParamName(row.assignment) : '' }}</span>
 			</div>
 		</div>
 

@@ -102,7 +102,7 @@
 						/>
 					</div>
 
-					<div v-if="isSplit" class="divider-handle" @mousedown="startDividerDrag" />
+					<AreaSplitBar @drag-start="startDividerDrag" />
 
 					<div v-show="showFx" class="relative overflow-hidden min-h-0 flex-1">
 						<PatchCanvas
@@ -133,13 +133,14 @@
 					</div>
 				</div>
 
+				<MeterGraph v-if="settingsStore.showMeterGraph && !uiStore.showBankOrganizer" class="mt-auto" />
 				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
 
-			<SidePanel v-if="settingsStore.showRightPane" />
+			<SidePanel v-if="settingsStore.showRightPane && !uiStore.showBankOrganizer" />
 		</div>
 
-		<StatusBar />
+		<StatusBar v-if="settingsStore.showStatusBar" />
 
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
@@ -556,7 +557,9 @@
 	import ToolbarValueHint from './components/common/ToolbarValueHint.vue';
 	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
+	import AreaSplitBar from './components/canvas/AreaSplitBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
+	import MeterGraph from './components/canvas/MeterGraph.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import ComboInput from './components/common/ComboInput.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
@@ -788,6 +791,8 @@
 		quickAddPos.value = { x: e.clientX, y: e.clientY };
 	}
 
+	const CLIPBOARD_KEYS: Record<string, string> = { c: 'copy', x: 'cut', v: 'paste' };
+
 	function onGlobalKeydown(e: KeyboardEvent) {
 		if (uiStore.showKeyCommandsPage) {
 			if (e.key === 'Escape') uiStore.showKeyCommandsPage = false;
@@ -804,6 +809,14 @@
 		if (e.ctrlKey && !e.metaKey && !e.altKey && e.key === 'Tab') {
 			e.preventDefault();
 			cycleSlot(e.shiftKey ? -1 : 1);
+			return;
+		}
+
+		// Windows/Linux: Chromium can take Ctrl+C/X/V as its own copy/cut/paste, so the menu accelerators never fire
+		const clipboardAction = !isMac && e.ctrlKey && !e.altKey && !e.shiftKey ? CLIPBOARD_KEYS[e.key.toLowerCase()] : undefined;
+		if (clipboardAction) {
+			e.preventDefault();
+			void runMenuAction(clipboardAction);
 			return;
 		}
 
@@ -898,7 +911,7 @@
 	});
 
 	useRemoteModuleDrop();
-	useElectronMenuActions({
+	const { runMenuAction } = useElectronMenuActions({
 		currentModules,
 		currentPatch,
 		handleSlotClick,

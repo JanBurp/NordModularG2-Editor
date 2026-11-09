@@ -166,10 +166,12 @@ function broadcastDevicesChanged(menu = true): void {
 
 // Shows (maximizing first, matching a freshly-created window's usual state) and focuses a
 // window that may still be hidden. A no-op beyond focus() if the window is already visible,
-// so it never re-maximizes a window the user resized.
+// so it never re-maximizes a window the user resized. A no-op when HEADLESS (E2E tests):
+// show() and, on macOS, focus() would put the hidden window on screen.
 function revealWindow(window: BrowserWindow): void {
+	if (process.env.HEADLESS === '1') return;
 	if (!window.isVisible()) {
-		if (process.env.HEADLESS !== '1') window.maximize();
+		window.maximize();
 		window.show();
 	}
 	window.focus();
@@ -184,6 +186,9 @@ function createHost(cascadeIndex = 0): Host {
 	const window = new BrowserWindow({
 		width: state?.width ?? 800,
 		height: state?.height ?? 600,
+		// the official 7" Raspberry Pi touchscreen
+		minWidth: 800,
+		minHeight: 480,
 		x: state?.x !== undefined ? state.x + cascade : undefined,
 		y: state?.y !== undefined ? state.y + cascade : undefined,
 		show: !headless,
@@ -951,7 +956,18 @@ function assertInStorage(wcId: number, filepath: string): string {
 }
 
 ipcMain.handle('patches:storage-remove', (event, filepath: string) => {
-	fs.rmSync(assertInStorage(event.sender.id, filepath), { force: true });
+	fs.rmSync(assertInStorage(event.sender.id, filepath), { recursive: true, force: true });
+});
+
+// A send-bank source holding old-format files is sent from a copy in a hidden storage folder, where the
+// renderer writes their converted versions: the folder's patch files, and the .pchList when given.
+ipcMain.handle('patches:storage-bank-copy', (event, folder: string, pchList?: string) => {
+	const dir = storageDirByWc.get(event.sender.id);
+	if (!dir) throw new Error('No storage folder');
+	const tmp = fs.mkdtempSync(path.join(dir, '.tmp-bank-'));
+	for (const name of fs.readdirSync(folder)) if (/\.(pch2|prf2)$/i.test(name)) fs.copyFileSync(path.join(folder, name), path.join(tmp, name));
+	if (pchList) fs.copyFileSync(pchList, path.join(tmp, path.basename(pchList)));
+	return tmp;
 });
 
 ipcMain.handle('patches:storage-copy', (event, from: string, to: string) => {
@@ -1071,7 +1087,7 @@ ipcMain.handle('bank:select-pchlist', async (event) => {
 ipcMain.handle('help:load', (_, shortName: string) => {
 	const helpDir = app.isPackaged ? path.join(process.resourcesPath, 'doc', 'help') : path.join(process.env.APP_ROOT!, '..', 'doc', 'help');
 	if (typeof shortName !== 'string' || !/^[\w.&-]+$/.test(shortName)) return null;
-	const filePath = path.join(helpDir, `${shortName}.md`);
+	const filePath = path.join(helpDir, `${shortName}.html`);
 	try {
 		return fs.readFileSync(filePath, 'utf-8');
 	} catch {
@@ -1194,6 +1210,7 @@ const defaultMenuState: MenuState = {
 	hasCurrentPatch: false,
 	hasPerformanceContext: false,
 	isPerformanceMode: false,
+	showStatusBar: true,
 };
 
 // Selects the next (or previous) device in toolbar order, wrapping around.
@@ -1389,6 +1406,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			label: 'View',
 			submenu: [
 				{ label: 'Voice Area', click: () => sendToFocused('menu:action', 'area-voice'), accelerator: 'V' },
+				{ label: 'Split Area', click: () => sendToFocused('menu:action', 'area-split') },
 				{ label: 'FX Area', click: () => sendToFocused('menu:action', 'area-fx'), accelerator: 'F' },
 				{ type: 'separator' as const },
 				{ label: 'Slot A', click: () => sendToFocused('menu:action', 'slot-A'), accelerator: 'A' },
@@ -1408,6 +1426,13 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Zoom In', click: () => sendToFocused('menu:action', 'zoom-in'), accelerator: 'CommandOrControl+=' },
 				{ label: 'Zoom Out', click: () => sendToFocused('menu:action', 'zoom-out'), accelerator: 'CommandOrControl+-' },
 				{ label: 'Actual Size', click: () => sendToFocused('menu:action', 'zoom-reset'), accelerator: 'CommandOrControl+0' },
+				{ type: 'separator' as const },
+				{
+					label: 'Show Status Bar',
+					type: 'checkbox' as const,
+					checked: menuState.showStatusBar,
+					click: () => sendToFocused('menu:action', 'toggle-status-bar'),
+				},
 			],
 		},
 		{
@@ -1498,6 +1523,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			submenu: [
 				{ label: 'Parameter Pages', click: () => sendToFocused('menu:action', 'toggle-parameter-pages'), accelerator: 'CommandOrControl+F' },
 				{ label: 'Keyboard', click: () => sendToFocused('menu:action', 'toggle-keyboard'), accelerator: 'CommandOrControl+K' },
+				{ label: 'Meter Graph', click: () => sendToFocused('menu:action', 'toggle-meter-graph') },
 				{ label: 'Browser', click: () => sendToFocused('menu:action', 'toggle-browser'), accelerator: 'CommandOrControl+B' },
 				{ type: 'separator' as const },
 				{ label: 'Modules', click: () => sendToFocused('menu:action', 'toggle-modules'), accelerator: 'CommandOrControl+L' },
@@ -1578,6 +1604,7 @@ function currentMenuState(): MenuState {
 // every window's menu (via setApplicationMenu) on focus change broke all accelerators on Windows
 // after switching windows, while clicking the menu items still worked.
 function applyWindowMenu(window: BrowserWindow): void {
+	if (window.isDestroyed()) return;
 	const active = hostOf(window)?.active;
 	const menuState = (active && sessionByWebContentsId.get(active.view.webContents.id)?.menuState) ?? lastMenuState;
 	window.setMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, menuState)));
@@ -1585,7 +1612,7 @@ function applyWindowMenu(window: BrowserWindow): void {
 
 function refreshMenu(): void {
 	if (isMac) Menu.setApplicationMenu(Menu.buildFromTemplate(buildMenu(lastRecentFiles, currentMenuState())));
-	else for (const host of hosts) if (!host.window.isDestroyed()) applyWindowMenu(host.window);
+	else for (const host of hosts) applyWindowMenu(host.window);
 }
 
 ipcMain.on('recent-files:update', (_, files: RecentFileEntry[]) => {
