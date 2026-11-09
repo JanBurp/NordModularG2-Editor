@@ -18,6 +18,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
 
 ### Changed
+- SplitBar a bit bigger and now with small buttons to change area
 - Added split view to View menu
 
 ## [0.8.1] - 2026-11-06
