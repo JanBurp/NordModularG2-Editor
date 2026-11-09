@@ -64,7 +64,7 @@
 								class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
 								@click="handleHelpClick($event, module.id)"
 							>
-								<button v-if="canGoBack(module.id)" class="help-back" @click="back(module.id)">‹ Back</button>
+								<button v-if="canGoBack(module.id)" class="help-back" @click="goBack($event, module.id)">‹ Back</button>
 								<div v-html="helpFor(module.id, module.short)" />
 							</div>
 						</template>
@@ -154,6 +154,14 @@
 		const anchor = link.dataset.anchor;
 		const target = (anchor && block.querySelector(`[id="${anchor}"]`)) || block;
 		target.scrollIntoView({ behavior: 'instant', block: 'start' });
+	}
+
+	// Back returns to the top of the previous page (the link may have scrolled down to an anchor)
+	async function goBack(e: MouseEvent, moduleId: number) {
+		const block = (e.currentTarget as HTMLElement).parentElement!;
+		back(moduleId);
+		await nextTick();
+		block.scrollIntoView({ behavior: 'instant', block: 'start' });
 	}
 
 	const flatNavModules = computed(() => {

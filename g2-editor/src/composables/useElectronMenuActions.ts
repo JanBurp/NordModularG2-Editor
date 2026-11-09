@@ -257,8 +257,7 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 				break;
 			case 'area-split':
 				if (isInputFocused()) break;
-				if (uiStore.area === 2) uiStore.toggleSplit();
-				else uiStore.setAreaMode(2);
+				if (uiStore.area !== 2) uiStore.setAreaMode(2);
 				break;
 			case 'area-fx':
 				if (isInputFocused()) break;
