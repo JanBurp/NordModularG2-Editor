@@ -1228,8 +1228,10 @@ ipcMain.on('shell:openExternal', (_, url: string) => {
 	}
 });
 
-/* "Install USB helper" from the driver-error dialog (Linux).
- * Install the udev rule that gives the logged-in user access to the G2 (pkexec password
+/* "Install USB helper" / "Install G2 driver" from the driver-error dialog.
+ * Windows: run g2-winusb.exe elevated (UAC prompt), which switches every connected G2 to WinUSB.
+ * An elevated process's output can't be captured, so it writes its error to a log file instead.
+ * Linux: install the udev rule that gives the logged-in user access to the G2 (pkexec password
  * prompt), then re-apply rules to a G2 already plugged in. The rule's text is read here and passed
  * as an argument: root often can't read an AppImage's FUSE mount, so it can't copy the file itself. */
 const UDEV_RULES = '70-nord-g2.rules';
@@ -1239,13 +1241,25 @@ function runHelper(cmd: string, args: string[]): Promise<{ ok: boolean; error?: 
 		let stderr = '';
 		proc.stderr.on('data', (d) => (stderr += d));
 		proc.on('error', (e) => resolve({ ok: false, error: e.message }));
-		// pkexec: 126 = password dialog dismissed, 127 = not authorized
+		// pkexec: 126 = password dialog dismissed, 127 = not authorized; powershell: 1 = UAC prompt declined
 		proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
 	});
 }
 ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string }> => {
 	const resource = (devDir: string, name: string) =>
 		app.isPackaged ? path.join(process.resourcesPath, name) : path.join(process.env.APP_ROOT!, 'resources', devDir, name);
+	if (process.platform === 'win32') {
+		const log = path.join(LOG_DIR, 'g2-winusb.log');
+		const quote = (arg: string) => `'"${arg.replace(/'/g, "''")}"'`;
+		const res = await runHelper('powershell.exe', [
+			'-NoProfile',
+			'-Command',
+			`$p = Start-Process -FilePath ${quote(resource('', 'g2-winusb.exe'))} -ArgumentList ${quote(log)} -Verb RunAs -Wait -PassThru; exit $p.ExitCode`,
+		]);
+		const detail = res.ok ? '' : fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim() : '';
+		console.log(`[usb-helper] g2-winusb: ${res.ok ? 'ok' : `${res.error} ${detail}`}`);
+		return res.ok ? res : { ok: false, error: detail || res.error };
+	}
 	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
 	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;
 	try {
@@ -1379,22 +1393,22 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 	return [
 		...(isMac
 			? [
-				{
-					label: 'G2 Editor',
-					submenu: [
-						{ label: 'About G2 Editor...', click: () => sendToFocused('menu:action', 'show-about') },
-						{ label: 'Preferences...', click: () => sendToFocused('menu:action', 'toggle-settings'), accelerator: 'CommandOrControl+,' },
-						{ type: 'separator' as const },
-						{ role: 'services' as const },
-						{ type: 'separator' as const },
-						{ role: 'hide' as const },
-						{ role: 'hideOthers' as const },
-						{ role: 'unhide' as const },
-						{ type: 'separator' as const },
-						{ role: 'quit' as const },
-					],
-				},
-			]
+					{
+						label: 'G2 Editor',
+						submenu: [
+							{ label: 'About G2 Editor...', click: () => sendToFocused('menu:action', 'show-about') },
+							{ label: 'Preferences...', click: () => sendToFocused('menu:action', 'toggle-settings'), accelerator: 'CommandOrControl+,' },
+							{ type: 'separator' as const },
+							{ role: 'services' as const },
+							{ type: 'separator' as const },
+							{ role: 'hide' as const },
+							{ role: 'hideOthers' as const },
+							{ role: 'unhide' as const },
+							{ type: 'separator' as const },
+							{ role: 'quit' as const },
+						],
+					},
+				]
 			: []),
 		{
 			label: 'File',

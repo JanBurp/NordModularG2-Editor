@@ -4,12 +4,11 @@
 			<div class="bg-surface-1 border border-line-default rounded shadow-xl max-w-md w-full mx-4 p-5 flex flex-col gap-4">
 				<div class="text-sm font-semibold text-red-400">USB Driver Problem</div>
 				<p v-if="isWindows" class="text-sm text-content-secondary leading-relaxed">
-					The G2 was found on USB but its interface could not be claimed.<br /><br />
-					Install <strong class="text-content-primary">WinUSB</strong> using
-					<a href="#" class="underline text-blue-400 hover:text-blue-300" @click.prevent="openZadig">Zadig</a>: select the Nord G2, choose
-					<strong class="text-content-primary">WinUSB</strong>, and click <strong class="text-content-primary">Replace Driver</strong>. Then click
-					Retry. NOTE: This will replace Clavia's USB Driver. See also
+					The G2 was found on USB but uses a driver the editor can't use, usually Clavia's.<br /><br />
+					Click <strong class="text-content-primary">Install G2 driver</strong> to switch it to the WinUSB driver (asks for administrator permission
+					once). All connected G2s are switched; the original Clavia editor no longer sees them. Then the editor retries automatically. See also
 					<a href="#" class="underline text-blue-400 hover:text-blue-300" @click.prevent="openDriverDocs">Windows USB driver</a>.
+					<span v-if="helperError" class="block mt-2 text-red-400">Install failed: {{ helperError }}</span>
 				</p>
 				<p v-else-if="needsUsbHelper" class="text-sm text-content-secondary leading-relaxed">
 					The G2 was found on USB but this user has no permission to open it.<br /><br />
@@ -32,7 +31,7 @@
 						:disabled="installing"
 						@click="installUsbHelper"
 					>
-						{{ installing ? 'Installing…' : 'Install USB helper' }}
+						{{ installing ? 'Installing…' : isWindows ? 'Install G2 driver' : 'Install USB helper' }}
 					</button>
 					<button
 						class="px-3 py-1 text-xs border border-line-default rounded bg-surface-2 text-content-primary hover:bg-surface-3 cursor-pointer"
@@ -58,8 +57,9 @@
 	import { isLinux, isMac, isWindows } from '@/utils/platform';
 
 	const device = useDeviceStore();
+	// Windows: the G2 is bound to a driver libusb can't use (Clavia's, or none): switch it to WinUSB.
 	// Linux needs no driver, only permission: libusb_open fails with ACCESS until the udev rule is in place.
-	const needsUsbHelper = computed(() => isLinux && device.driverErrorCode === 'LIBUSB_ERROR_ACCESS');
+	const needsUsbHelper = computed(() => isWindows || (isLinux && device.driverErrorCode === 'LIBUSB_ERROR_ACCESS'));
 	const installing = ref(false);
 	const helperError = ref('');
 	// Closed by the user: stays closed until the next driver error.
@@ -74,10 +74,6 @@
 	);
 
 	const emit = defineEmits<{ retry: [] }>();
-
-	function openZadig() {
-		window.electronAPI.openExternal('https://zadig.akeo.ie/');
-	}
 
 	function openDriverDocs() {
 		window.electronAPI.openExternal('https://janburp.github.io/NordModularG2-Editor/getting-started/windows-driver');
