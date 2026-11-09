@@ -3,19 +3,20 @@ G2 Editor - Nord Modular G2 editor
 
 Click "I Agree" to continue. (This is not a license.)
 
-USB HELPER (UsbDk)
-The installer also installs UsbDk, a small Microsoft-signed USB helper
-the editor needs to talk to the G2. Windows asks once for administrator
-permission: allow it. Clavia's own G2 driver stays installed, so the
-original Clavia editor keeps working.
+USB DRIVER (WinUSB)
+The editor needs the WinUSB driver for the G2. If the app reports a
+USB driver problem, install it with Zadig (https://zadig.akeo.ie/):
 
-If the editor later shows "USB Driver Problem": click "Install USB
-helper" and allow the administrator prompt. If it says UsbDk is
-installed but not active yet, restart Windows.
+1. Right-click Zadig -> "Run as administrator".
+2. Select the Nord G2 device.
+3. Choose "WinUSB" as the driver.
+4. Click "Replace Driver" (or "Install Driver").
 
-WINDOWS ON ARM
-UsbDk can't run on Windows on ARM (e.g. Snapdragon laptops), so the
-installer skips it. Use the WinUSB driver via Zadig instead, see:
+This replaces Clavia's original driver; the original Clavia editor
+won't work until you reinstall that driver.
+
+Windows 11 may block the unsigned WinUSB driver, and Windows may
+restore the Clavia driver later. For both, see:
 https://janburp.github.io/NordModularG2-Editor/getting-started/windows-driver
 
 MORE HELP

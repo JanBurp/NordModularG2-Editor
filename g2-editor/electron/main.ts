@@ -1228,55 +1228,24 @@ ipcMain.on('shell:openExternal', (_, url: string) => {
 	}
 });
 
-/* "Install USB helper" from the driver-error dialog.
- * Windows: install UsbDk (normally done by the NSIS installer), a filter driver that lets libusb
- * open the G2 next to Clavia's driver. msiexec asks for UAC itself.
- * Linux: install the udev rule that gives the logged-in user access to the G2 (pkexec password
+/* "Install USB helper" from the driver-error dialog (Linux).
+ * Install the udev rule that gives the logged-in user access to the G2 (pkexec password
  * prompt), then re-apply rules to a G2 already plugged in. The rule's text is read here and passed
  * as an argument: root often can't read an AppImage's FUSE mount, so it can't copy the file itself. */
 const UDEV_RULES = '70-nord-g2.rules';
-const USBDK_MSI = 'UsbDk_x64.msi';
 function runHelper(cmd: string, args: string[]): Promise<{ ok: boolean; error?: string }> {
 	return new Promise((resolve) => {
 		const proc = spawn(cmd, args);
 		let stderr = '';
 		proc.stderr.on('data', (d) => (stderr += d));
 		proc.on('error', (e) => resolve({ ok: false, error: e.message }));
-		// pkexec: 126 = password dialog dismissed, 127 = not authorized; msiexec: 1602 = cancelled
+		// pkexec: 126 = password dialog dismissed, 127 = not authorized
 		proc.on('close', (code) => resolve(code === 0 ? { ok: true } : { ok: false, error: stderr.trim() || `exit code ${code}` }));
 	});
 }
-/* UsbDk service state from `sc query UsbDk`: missing (not installed), running, or stopped
- * (installed but not loaded, usually until Windows restarts). null off Windows. */
-type UsbHelperState = 'missing' | 'running' | 'stopped' | null;
-function usbDkState(): Promise<UsbHelperState> {
-	if (process.platform !== 'win32') return Promise.resolve(null);
-	return new Promise((resolve) => {
-		const proc = spawn('sc.exe', ['query', 'UsbDk']);
-		let out = '';
-		proc.stdout.on('data', (d) => (out += d));
-		proc.on('error', () => resolve(null));
-		// 1060 = ERROR_SERVICE_DOES_NOT_EXIST
-		proc.on('close', (code) => resolve(code === 1060 ? 'missing' : /STATE\s*:\s*4\b/.test(out) ? 'running' : code === 0 ? 'stopped' : null));
-	});
-}
-ipcMain.handle('usb:helper-state', () => usbDkState());
-
-ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string; restart?: boolean }> => {
+ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: string }> => {
 	const resource = (devDir: string, name: string) =>
 		app.isPackaged ? path.join(process.resourcesPath, name) : path.join(process.env.APP_ROOT!, 'resources', devDir, name);
-	if (process.platform === 'win32') {
-		// Our x64 build runs emulated on Windows on ARM, but UsbDk's x64 driver can't load there.
-		if (app.runningUnderARM64Translation) return { ok: false, error: 'UsbDk does not support Windows on ARM, use WinUSB (Zadig) instead' };
-		const msiLog = path.join(LOG_DIR, 'usbdk-install.log');
-		const res = await runHelper('msiexec.exe', ['/i', resource('', USBDK_MSI), '/passive', '/norestart', '/l*v', msiLog]);
-		const state = await usbDkState();
-		console.log(`[usb-helper] msiexec: ${res.ok ? 'ok' : res.error}, UsbDk service: ${state}`);
-		// msiexec 3010 = installed, restart required; an installed but stopped service needs a restart as well
-		if (res.error === 'exit code 3010' || (res.ok && state === 'stopped')) return { ok: false, restart: true };
-		if (res.ok && state === 'running') return { ok: true };
-		return { ok: false, error: `${res.ok ? 'UsbDk is still not installed' : res.error}. Details: ${msiLog}` };
-	}
 	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
 	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;
 	try {

@@ -173,9 +173,6 @@ int g2_drain_pending(void);
 /* libusb error code from the last failed libusb_open()/libusb_claim_interface(). */
 int g2_get_last_usb_error(void);
 
-/* Active libusb backend: "usbdk" or "winusb" on Windows, "native" elsewhere. */
-const char *g2_backend_name(void);
-
 /* Re-arm G2 notification stream (send START_COMM).
  * When listener is active, the ACK is read by the listener — no recv call here. */
 void g2_rearm(void);

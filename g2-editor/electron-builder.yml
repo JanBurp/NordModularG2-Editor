@@ -8,7 +8,6 @@ files:
   - dist/**/*
   - dist-electron/**/*
   - resources/**/*
-  - "!resources/UsbDk_x64.msi"
 
 afterPack: ./scripts/after-pack.js
 
@@ -68,13 +67,9 @@ win:
   extraResources:
     - from: resources/g2-cli.exe
       to: g2-cli.exe
-    # Downloaded by scripts/fetch-usbdk.js
-    - from: resources/UsbDk_x64.msi
-      to: UsbDk_x64.msi
 
 nsis:
-  include: resources/windows/installer.nsh
-  # Assisted installer: the user picks the folder, default Program Files. Admin rights are needed for UsbDk anyway.
+  # Assisted installer: the user picks the folder, default Program Files.
   oneClick: false
   perMachine: true
   allowToChangeInstallationDirectory: true

@@ -160,24 +160,12 @@ static void debug_recv(const uint8_t *hdr) {
     debug_hex("recv", "listener", hdr, 16);
 }
 
-static const char *g2_backend = "native";
-const char *g2_backend_name(void) { return g2_backend; }
-
 int g2_init(void) {
     int ret = libusb_init(&g2.ctx);
     if (ret < 0) {
         fprintf(stderr, "Failed to initialize libusb: %s\n", libusb_error_name(ret));
         return G2_ERR_NO_MEMORY;
     }
-#ifdef _WIN32
-    /* Prefer the UsbDk filter driver: it can take over the G2 whatever function
-     * driver is bound (Clavia's or WinUSB), so no per-device driver swap is needed.
-     * Not installed -> stay on the default WinUSB backend (Zadig setups).
-     * Must be set after init: passed to libusb_init_context() (libusb 1.0.27-1.0.29)
-     * the option is applied before the Windows backend has probed UsbDk, so it always
-     * fails with NOT_FOUND, and that backend init would reset the context to WinUSB anyway. */
-    g2_backend = libusb_set_option(g2.ctx, LIBUSB_OPTION_USE_USBDK) == LIBUSB_SUCCESS ? "usbdk" : "winusb";
-#endif
     return G2_OK;
 }
 

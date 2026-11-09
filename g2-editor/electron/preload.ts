@@ -85,7 +85,6 @@ contextBridge.exposeInMainWorld('electronAPI', {
 	claimStartupSplash: () => ipcRenderer.invoke('app:claim-startup-splash'),
 	openExternal: (url: string) => ipcRenderer.send('shell:openExternal', url),
 	installUsbHelper: () => ipcRenderer.invoke('usb:install-helper'),
-	usbHelperState: () => ipcRenderer.invoke('usb:helper-state'),
 	setTheme: (mode: 'system' | 'light' | 'dark') => ipcRenderer.invoke('theme:set', mode),
 
 	devices: {

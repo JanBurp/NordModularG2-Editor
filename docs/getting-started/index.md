@@ -46,7 +46,9 @@ has_children: true
 
 ## Install: Windows
 
-Run the `.exe` installer and follow the steps. The first time, Windows asks for administrator permission to install the USB helper (UsbDk) the editor needs; Clavia's own driver stays installed. See [Windows USB Driver](windows-driver).
+Run the `.exe` installer and follow the steps.
+
+Windows requires a USB driver for the G2. If the app reports a USB driver problem, see [Windows USB Driver](windows-driver).
 
 ## Install: Linux & Raspberry Pi
 

@@ -10,10 +10,3 @@ This project incorporates work from:
 - pch2/prf2 web viewer by ian-s
   https://electro-music.com/forum/post-455577.html#455577
   No license specified; used with attribution
-
-The Windows installer bundles:
-
-- UsbDk, Copyright (c) Red Hat, Inc., developed by Daynix Computing LTD
-  https://github.com/daynix/UsbDk
-  Licensed under the Apache License, Version 2.0
-  https://www.apache.org/licenses/LICENSE-2.0
