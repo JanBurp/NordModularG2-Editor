@@ -13,10 +13,10 @@ export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
 
-export type PaneWidthKind = 'narrow' | 'wide';
-export const DEFAULT_PANE_WIDTH: Record<PaneWidthKind, number> = { narrow: 272, wide: 600 };
-// narrow: Modules/Library previews are real module width (w-64); wide: the Mutator's 3-column reflow needs 300
-export const MIN_PANE_WIDTH: Record<PaneWidthKind, number> = { narrow: 272, wide: 300 };
+// Wide side-panel panes (Overview, Mutator, Settings) are user-resizable; the others have a fixed width
+export const WIDE_PANE_TABS: PaneTab[] = ['overview', 'mutator', 'settings'];
+export const DEFAULT_WIDE_PANE_WIDTH = 600;
+export const MIN_WIDE_PANE_WIDTH = 300; // the Mutator's narrow layout
 
 export const useSettingsStore = defineStore('settings', {
 	state: () => ({
@@ -34,7 +34,7 @@ export const useSettingsStore = defineStore('settings', {
 		dimUnusedModules: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
-		rightPaneWidth: { ...DEFAULT_PANE_WIDTH } as Record<PaneWidthKind, number>, // px, user-dragged; Overview/Mutator use 'wide'
+		widePaneWidth: DEFAULT_WIDE_PANE_WIDTH as number, // px, user-dragged (WIDE_PANE_TABS)
 		settingsSection: null as SettingsSection | null,
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
@@ -181,8 +181,8 @@ export const useSettingsStore = defineStore('settings', {
 		zoomOut() {
 			this.setCanvasZoom(this.canvasZoom - 0.1);
 		},
-		setRightPaneWidth(kind: PaneWidthKind, px: number) {
-			this.rightPaneWidth[kind] = Math.max(MIN_PANE_WIDTH[kind], Math.round(px));
+		setWidePaneWidth(px: number) {
+			this.widePaneWidth = Math.max(MIN_WIDE_PANE_WIDTH, Math.round(px));
 		},
 		resetCanvasZoom() {
 			this.canvasZoom = 1;

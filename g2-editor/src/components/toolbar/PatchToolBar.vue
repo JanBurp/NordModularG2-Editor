@@ -1,21 +1,20 @@
 <template>
-	<ToolBar data-hint-bounds>
-		<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
-		<ToolBarText class="w-36 cursor-pointer hover:text-input" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
+	<!-- Groups are spaced by gap (no dividers), so wrapped rows start flush left -->
+	<ToolBar class="gap-x-4!" data-hint-bounds>
+		<div class="flex items-center gap-2">
+			<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
+			<ToolBarText class="w-36 cursor-pointer hover:text-input" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
+		</div>
 
 		<div class="flex items-center gap-1.5">
 			<ToolBarLabel>Cat:</ToolBarLabel>
 			<Select v-model="selectedCategory" :options="soundCategories" title="Sound Category" />
 		</div>
 
-		<ToolBarDivider />
-
 		<div class="flex items-center gap-1.5">
 			<ToolBarLabel>Voice Mode:</ToolBarLabel>
 			<Select v-model="voiceSelection" :options="voiceOptions" title="Voice mode / count" class="w-18" />
 		</div>
-
-		<ToolBarDivider />
 
 		<div class="flex items-center gap-2">
 			<BtnGroup
@@ -31,14 +30,12 @@
 			/>
 		</div>
 
-		<ToolBarDivider />
 		<ColorPicker />
-		<ToolBarDivider />
 		<CableVisibilitySelector />
-		<ToolBarDivider />
 		<PatchLevel />
-		<div v-if="settingsStore.toolbarMode === 'hidden'" class="hidden @7xl:flex items-center gap-2">
-			<ToolBarDivider />
+		<!-- mini load meter: always with the extended toolbar hidden (wide windows), else once the extended toolbar's
+		     own meter has made room (< 1356px, see ExtendedToolBar.vue; both toolbars are window-wide) -->
+		<div class="hidden items-center gap-2" :class="settingsStore.toolbarMode === 'hidden' ? '@7xl:flex' : '@max-[1356px]/toolbar:flex'">
 			<CPU mini />
 		</div>
 	</ToolBar>
@@ -50,7 +47,6 @@
 	import ToolBar from './ToolBar.vue';
 	import ToolBarLabel from './ToolBarLabel.vue';
 	import ToolBarText from './ToolBarText.vue';
-	import ToolBarDivider from './ToolBarDivider.vue';
 	import BtnGroup from './BtnGroup.vue';
 	import Select from '../common/Select.vue';
 	import CableVisibilitySelector from './CableVisibilitySelector.vue';

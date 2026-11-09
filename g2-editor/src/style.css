@@ -118,6 +118,11 @@ body {
 	@apply h-5 px-1 text-xs;
 }
 
+/* Blocks that shrink with the side panel (font in cqw units): their buttons take the block's font size */
+.fit-text .btn {
+	font-size: inherit !important;
+}
+
 /* Parameter Page display box (toolbar + Parameter Overview). Unassigned = black with only a border,
    so the empty displays stay visible as drop targets. */
 .param-display {
@@ -223,8 +228,9 @@ body {
 	@apply flex gap-2 items-center py-0.5;
 }
 
+/* wider label column once the (resizable) side panel has room: @container in SidePanel.vue */
 .settings-row > span:first-child {
-	@apply w-18 text-content-secondary text-xs shrink-0;
+	@apply w-18 @sm:w-28 @md:w-40 text-content-secondary text-xs shrink-0;
 }
 
 .settings-subheader {

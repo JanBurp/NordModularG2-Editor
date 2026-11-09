@@ -1,7 +1,7 @@
 <template>
 	<ToolBarLabel v-if="!compact">Param<br />Pages:</ToolBarLabel>
 	<!-- narrower toolbar (@container in ToolBar): tighter cells, no page names -->
-	<div class="flex items-center gap-2 @5xl:gap-4" :class="{ 'ml-2 gap-2!': compact }">
+	<div class="flex items-center gap-2 @5xl:gap-4" :class="{ 'gap-2!': compact }">
 		<div
 			v-for="cell in cells"
 			:key="cell.slotIndex"
