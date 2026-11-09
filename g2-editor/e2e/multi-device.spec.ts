@@ -59,6 +59,8 @@ async function launchWithOneDevice(userDataDir: string): Promise<{ app: Electron
 	const app = await launchApp(userDataDir);
 	const page = await editorPage(app);
 	await page.waitForLoadState('domcontentloaded');
+	// desktop size, as in fixtures/electron.ts: at the hidden window's 800×600 the New button is hidden
+	await evaluateWithRetry(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1600, 900));
 	await stubDeviceDiscovery(app, [{ bus: 2, device: 1 }]);
 	await page.reload();
 	await page.waitForLoadState('domcontentloaded');

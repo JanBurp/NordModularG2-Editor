@@ -1087,7 +1087,7 @@ ipcMain.handle('bank:select-pchlist', async (event) => {
 ipcMain.handle('help:load', (_, shortName: string) => {
 	const helpDir = app.isPackaged ? path.join(process.resourcesPath, 'doc', 'help') : path.join(process.env.APP_ROOT!, '..', 'doc', 'help');
 	if (typeof shortName !== 'string' || !/^[\w.&-]+$/.test(shortName)) return null;
-	const filePath = path.join(helpDir, `${shortName}.md`);
+	const filePath = path.join(helpDir, `${shortName}.html`);
 	try {
 		return fs.readFileSync(filePath, 'utf-8');
 	} catch {
@@ -1210,6 +1210,7 @@ const defaultMenuState: MenuState = {
 	hasCurrentPatch: false,
 	hasPerformanceContext: false,
 	isPerformanceMode: false,
+	showStatusBar: true,
 };
 
 // Selects the next (or previous) device in toolbar order, wrapping around.
@@ -1405,6 +1406,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 			label: 'View',
 			submenu: [
 				{ label: 'Voice Area', click: () => sendToFocused('menu:action', 'area-voice'), accelerator: 'V' },
+				{ label: 'Split Area', click: () => sendToFocused('menu:action', 'area-split') },
 				{ label: 'FX Area', click: () => sendToFocused('menu:action', 'area-fx'), accelerator: 'F' },
 				{ type: 'separator' as const },
 				{ label: 'Slot A', click: () => sendToFocused('menu:action', 'slot-A'), accelerator: 'A' },
@@ -1424,6 +1426,13 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 				{ label: 'Zoom In', click: () => sendToFocused('menu:action', 'zoom-in'), accelerator: 'CommandOrControl+=' },
 				{ label: 'Zoom Out', click: () => sendToFocused('menu:action', 'zoom-out'), accelerator: 'CommandOrControl+-' },
 				{ label: 'Actual Size', click: () => sendToFocused('menu:action', 'zoom-reset'), accelerator: 'CommandOrControl+0' },
+				{ type: 'separator' as const },
+				{
+					label: 'Show Status Bar',
+					type: 'checkbox' as const,
+					checked: menuState.showStatusBar,
+					click: () => sendToFocused('menu:action', 'toggle-status-bar'),
+				},
 			],
 		},
 		{

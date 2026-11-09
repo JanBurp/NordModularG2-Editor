@@ -22,6 +22,9 @@
 	--color-content-muted: #9b9b9b;
 	--color-input: #8dd0e4;
 	--color-input-dimmed: #91b6b4;
+	--color-link: #175e72; /* clickable text, e.g. links in module help */
+	--color-accent: #6b3fa0; /* highlighted text (Clavia "indigo" in module help) */
+	--color-danger: #b42318; /* warning text (Clavia "red" in module help) */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +41,9 @@
 		--color-content-muted: var(--color-neutral-500);
 		--color-input: #37c0c2;
 		--color-input-dimmed: #0f7675;
+		--color-link: #37c0c2;
+		--color-accent: #b794f4;
+		--color-danger: #f87171;
 	}
 }
 
@@ -110,6 +116,11 @@ body {
 
 .btn-small {
 	@apply h-5 px-1 text-xs;
+}
+
+/* Blocks that shrink with the side panel (font in cqw units): their buttons take the block's font size */
+.fit-text .btn {
+	font-size: inherit !important;
 }
 
 /* Parameter Page display box (toolbar + Parameter Overview). Unassigned = black with only a border,
@@ -209,18 +220,6 @@ body {
 	border: 3px solid rgba(30, 30, 30, 0.8);
 }
 
-.divider-handle {
-	flex-shrink: 0;
-	height: 5px;
-	background: var(--color-surface-1);
-	cursor: row-resize;
-	user-select: none;
-}
-
-.divider-handle:hover {
-	background: var(--color-line-default);
-}
-
 .settings-input {
 	@apply w-full px-1 text-xs bg-surface-2! border border-line-subtle text-content-primary rounded-xs h-6 overflow-hidden text-ellipsis text-nowrap focus:outline-none focus:bg-surface-3 disabled:bg-surface-1 disabled:text-content-muted disabled:border-line-subtle disabled:cursor-not-allowed;
 }
@@ -229,8 +228,9 @@ body {
 	@apply flex gap-2 items-center py-0.5;
 }
 
+/* wider label column once the (resizable) side panel has room: @container in SidePanel.vue */
 .settings-row > span:first-child {
-	@apply w-18 text-content-secondary text-xs shrink-0;
+	@apply w-18 @sm:w-28 @md:w-40 text-content-secondary text-xs shrink-0;
 }
 
 .settings-subheader {

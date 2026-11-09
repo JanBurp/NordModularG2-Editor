@@ -1,8 +1,28 @@
 <template>
+	<!-- Wide panes: width is user-dragged (left-edge splitbar) and capped so the canvas keeps at least CANVAS_MIN_WIDTH.
+	     @container: panes reflow on the panel's own width -->
 	<div
-		:class="['overview', 'mutator'].includes(settingsStore.rightPaneTab) ? 'w-150' : 'w-68'"
-		class="bg-surface-1 border-l border-line-subtle flex flex-col"
+		ref="panelRef"
+		data-testid="side-panel"
+		class="@container relative shrink-0 bg-surface-1 border-l border-line-subtle flex flex-col"
+		:class="{ 'w-68': !isWide }"
+		:style="
+			isWide && {
+				width: settingsStore.widePaneWidth + 'px',
+				minWidth: MIN_WIDE_PANE_WIDTH + 'px',
+				maxWidth: `calc(100vw - ${CANVAS_MIN_WIDTH}px)`,
+			}
+		"
 	>
+		<div
+			v-if="isWide"
+			class="absolute inset-y-0 -left-1 w-2 z-10 cursor-col-resize hover:bg-accent/40"
+			:class="{ 'bg-accent/40': isDragging }"
+			title="Drag to resize, double-click to reset"
+			data-testid="side-panel-splitbar"
+			@mousedown.prevent="startResize"
+			@dblclick="settingsStore.setWidePaneWidth(DEFAULT_WIDE_PANE_WIDTH)"
+		/>
 		<div class="flex-1 overflow-hidden overflow-y-auto">
 			<PatchBrowser
 				ref="browserRef"
@@ -22,7 +42,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, onMounted, onUnmounted } from 'vue';
+	import { ref, computed, onMounted, onUnmounted } from 'vue';
 	import SettingsPane from './SettingsPane.vue';
 	import ModulesPane from './ModulesPane.vue';
 	import LibraryPane from './LibraryPane.vue';
@@ -31,11 +51,27 @@
 	import ParamOverviewPane from './ParamOverviewPane.vue';
 	import PatchMutatorPane from './PatchMutatorPane.vue';
 	import TextPane from './TextPane.vue';
-	import { useSettingsStore } from '@/store/settings';
+	import { useSettingsStore, WIDE_PANE_TABS, DEFAULT_WIDE_PANE_WIDTH, MIN_WIDE_PANE_WIDTH } from '@/store/settings';
 	import { usePatchFile } from '@/composables/usePatchFile';
+	import { useDragInteraction } from '@/composables/useDragInteraction';
 
 	const settingsStore = useSettingsStore();
 	const patchFile = usePatchFile();
+
+	const CANVAS_MIN_WIDTH = 240;
+
+	const isWide = computed(() => WIDE_PANE_TABS.includes(settingsStore.rightPaneTab));
+
+	// Drag from the rendered width (it may be capped by max-w), panel grows to the left
+	const panelRef = ref<HTMLElement | null>(null);
+	let startWidth = 0;
+	const { isDragging, onMouseDown } = useDragInteraction((dx) =>
+		settingsStore.setWidePaneWidth(Math.min(startWidth - dx, window.innerWidth - CANVAS_MIN_WIDTH)),
+	);
+	function startResize(e: MouseEvent) {
+		startWidth = panelRef.value?.offsetWidth ?? settingsStore.widePaneWidth;
+		onMouseDown(e);
+	}
 
 	const modulesPaneRef = ref<InstanceType<typeof ModulesPane> | null>(null);
 	const browserRef = ref<InstanceType<typeof PatchBrowser> | null>(null);

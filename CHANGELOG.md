@@ -8,10 +8,22 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Statusbar can be hidden (option in View menu)
+- Wide SidePanel has adjustable width
+
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup
 - Update node versions on build scripts
+- Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
+
+### Changed
+- SplitBar a bit bigger and now with small buttons to change area
+- Added split view to View menu
+- Module help now uses the original help pages (including "Common … parameters")
+- Changed Settings to the wider SidePanel
+- Responsiveness, now even works on 7” Pi screens
 
 ## [0.8.1] - 2026-11-06
 

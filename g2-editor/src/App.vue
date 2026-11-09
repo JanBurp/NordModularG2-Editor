@@ -102,7 +102,7 @@
 						/>
 					</div>
 
-					<div v-if="isSplit" class="divider-handle" @mousedown="startDividerDrag" />
+					<AreaSplitBar @drag-start="startDividerDrag" />
 
 					<div v-show="showFx" class="relative overflow-hidden min-h-0 flex-1">
 						<PatchCanvas
@@ -140,7 +140,7 @@
 			<SidePanel v-if="settingsStore.showRightPane && !uiStore.showBankOrganizer" />
 		</div>
 
-		<StatusBar />
+		<StatusBar v-if="settingsStore.showStatusBar" />
 
 		<SvgViewer v-if="uiStore.showSvgViewer" />
 	</div>
@@ -557,6 +557,7 @@
 	import ToolbarValueHint from './components/common/ToolbarValueHint.vue';
 	import KnobDragCursor from './components/common/KnobDragCursor.vue';
 	import StatusBar from './components/toolbar/StatusBar.vue';
+	import AreaSplitBar from './components/canvas/AreaSplitBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
 	import MeterGraph from './components/canvas/MeterGraph.vue';
 	import Dialog from './components/common/Dialog.vue';

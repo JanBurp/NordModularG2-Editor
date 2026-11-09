@@ -42,6 +42,7 @@ export type MenuAction =
 	| 'area-voice'
 	| 'area-fx'
 	| 'area-split'
+	| 'toggle-status-bar'
 	| 'slot-A'
 	| 'slot-B'
 	| 'slot-C'
@@ -101,6 +102,7 @@ export interface MenuState {
 	hasCurrentPatch: boolean;
 	hasPerformanceContext: boolean;
 	isPerformanceMode: boolean;
+	showStatusBar: boolean;
 }
 
 export interface SlotInfo {
