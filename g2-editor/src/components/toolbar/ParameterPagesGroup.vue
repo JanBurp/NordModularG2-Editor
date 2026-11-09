@@ -1,6 +1,7 @@
 <template>
 	<ToolBarLabel v-if="!compact">Param<br />Pages:</ToolBarLabel>
-	<div class="flex items-center gap-4" :class="{ 'ml-2 gap-2!': compact }">
+	<!-- narrower toolbar (@container in ToolBar): tighter cells, no page names -->
+	<div class="flex items-center gap-2 @5xl:gap-4" :class="{ 'ml-2 gap-2!': compact }">
 		<div
 			v-for="cell in cells"
 			:key="cell.slotIndex"
@@ -101,7 +102,7 @@
 			@update:model-value="(v) => onPageSelect(v as number)"
 			class="w-8"
 		/>
-		<div v-if="!compact" class="flex flex-col text-content-muted">
+		<div v-if="!compact" class="hidden @5xl:flex flex-col text-content-muted">
 			<div v-for="name in PAGE_NAMES" :key="name">{{ name }}</div>
 		</div>
 	</div>

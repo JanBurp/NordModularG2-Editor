@@ -1,6 +1,12 @@
 <template>
-	<div class="flex select-none pt-2" data-testid="patch-adjuster">
-		<div v-for="{ knob, label } in ADJUSTER_KNOBS" :key="knob" class="flex flex-col items-center w-16 gap-2" :class="{ 'ml-6': knob === 'modRate' }">
+	<!-- narrow side panel (@container in SidePanel): the envelope and tone groups wrap onto two lines -->
+	<div class="flex flex-wrap gap-y-3 select-none pt-2" data-testid="patch-adjuster">
+		<div
+			v-for="{ knob, label } in ADJUSTER_KNOBS"
+			:key="knob"
+			class="flex flex-col items-center w-16 gap-2"
+			:class="{ '@[560px]:ml-6': knob === 'modRate' }"
+		>
 			<Knob type="KnobReset" :value="adjuster.knobs[knob]" @change="(v) => adjuster.setKnob(knob, v)" />
 			<span class="text-xs leading-none whitespace-nowrap">{{ label }}</span>
 		</div>

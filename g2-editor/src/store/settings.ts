@@ -13,6 +13,11 @@ export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
 
+export type PaneWidthKind = 'narrow' | 'wide';
+export const DEFAULT_PANE_WIDTH: Record<PaneWidthKind, number> = { narrow: 272, wide: 600 };
+// narrow: Modules/Library previews are real module width (w-64); wide: the Mutator's 3-column reflow needs 300
+export const MIN_PANE_WIDTH: Record<PaneWidthKind, number> = { narrow: 272, wide: 300 };
+
 export const useSettingsStore = defineStore('settings', {
 	state: () => ({
 		path: '' as string,
@@ -29,6 +34,7 @@ export const useSettingsStore = defineStore('settings', {
 		dimUnusedModules: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
+		rightPaneWidth: { ...DEFAULT_PANE_WIDTH } as Record<PaneWidthKind, number>, // px, user-dragged; Overview/Mutator use 'wide'
 		settingsSection: null as SettingsSection | null,
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
@@ -174,6 +180,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		zoomOut() {
 			this.setCanvasZoom(this.canvasZoom - 0.1);
+		},
+		setRightPaneWidth(kind: PaneWidthKind, px: number) {
+			this.rightPaneWidth[kind] = Math.max(MIN_PANE_WIDTH[kind], Math.round(px));
 		},
 		resetCanvasZoom() {
 			this.canvasZoom = 1;

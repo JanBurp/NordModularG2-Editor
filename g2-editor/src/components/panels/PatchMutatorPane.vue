@@ -20,8 +20,10 @@
 				@focusout="onFocusout"
 			>
 				<!-- Settings and breeding operations. Grid without column gaps (cells carry the spacing) so the
-				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross. -->
-				<div class="grid grid-cols-[repeat(6,auto)] justify-start items-center gap-y-1 [&>*]:px-2">
+				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross.
+				     Panel narrower than 560px: 3 columns, the breeding block (order-1…5) moves below Probability/Range
+				     and the bracket lines are dropped. -->
+				<div class="grid grid-cols-[repeat(3,auto)] @[560px]:grid-cols-[repeat(6,auto)] justify-start items-center gap-y-1 [&>*]:px-2">
 					<div class="flex items-center gap-1 ml-4 px-0!">
 						<span class="flex-1" />
 						<span>Probability</span>
@@ -31,11 +33,13 @@
 					<div class="flex items-center gap-1 px-0!">
 						<span class="flex-1 border-t border-content-secondary" />
 						<span>Range</span>
-						<span class="flex-1 border-t border-content-secondary" />
+						<span class="flex-1 border-t border-content-secondary @max-[560px]:invisible" />
 					</div>
-					<div class="self-start flex px-0!"><span class="w-1/4 h-2 mt-2 border-t border-r border-content-secondary" /></div>
-					<div class="self-start flex justify-end px-0!"><span class="w-1/5 h-2 mt-2 border-t border-l border-content-secondary" /></div>
-					<div class="flex items-center gap-1 px-0!">
+					<div class="self-start flex px-0! @max-[560px]:hidden"><span class="w-1/4 h-2 mt-2 border-t border-r border-content-secondary" /></div>
+					<div class="self-start flex justify-end px-0! @max-[560px]:hidden">
+						<span class="w-1/5 h-2 mt-2 border-t border-l border-content-secondary" />
+					</div>
+					<div class="flex items-center gap-1 px-0! @max-[560px]:order-2 @max-[560px]:col-start-3 @max-[560px]:mt-2">
 						<span class="flex-1 border-t border-content-secondary" />
 						<span>Probability</span>
 						<span class="flex-1" />
@@ -44,15 +48,17 @@
 					<span class="param-display w-14 text-center justify-self-center ml-4">{{ Math.round(s.prob * 100) }}%</span>
 					<span />
 					<span class="param-display w-14 text-center justify-self-center">+/-{{ Math.round(s.range * 100) }}%</span>
-					<div class="flex gap-1 pl-6!">
+					<div class="flex flex-wrap gap-1 @[560px]:pl-6! @max-[560px]:order-1 @max-[560px]:mt-2">
 						<Button variant="default" size="small" :disabled="!s.mother || mutator.noSelection" @click="mutator.mutate()">Mutate</Button>
 						<Button variant="default" size="small" :disabled="mutator.noSelection" @click="mutator.randomize()">Randomize</Button>
 					</div>
-					<div class="flex gap-1 pl-6!">
+					<div class="flex flex-wrap gap-1 @[560px]:pl-6! @max-[560px]:order-1 @max-[560px]:mt-2">
 						<Button variant="default" size="small" :disabled="!s.mother || !s.father" @click="mutator.breed('interpolate')">Interpolate</Button>
 						<Button variant="default" size="small" :disabled="!s.mother || !s.father" @click="mutator.breed('cross')">Cross</Button>
 					</div>
-					<span class="param-display w-14 text-center justify-self-center ml-4">{{ Math.round(s.cross * 100) }}%</span>
+					<span class="param-display w-14 text-center justify-self-center ml-4 @max-[560px]:order-4 @max-[560px]:col-start-3"
+						>{{ Math.round(s.cross * 100) }}%</span
+					>
 
 					<div class="justify-self-center ml-4">
 						<Knob type="KnobSmall" :value="Math.round(s.prob * 127)" @change="(v) => mutator.setProb(v / 127)" />
@@ -61,9 +67,9 @@
 					<div class="justify-self-center">
 						<Knob type="KnobSmall" :value="Math.round((s.range / 0.5) * 127)" @change="(v) => mutator.setRange((v / 127) * 0.5)" />
 					</div>
-					<span class="self-start text-center text-content-muted pl-6!">(one parent)</span>
-					<span class="self-start text-center text-content-muted pl-6!">(both parents)</span>
-					<div class="justify-self-center ml-4">
+					<span class="self-start text-center text-content-muted @[560px]:pl-6! @max-[560px]:order-3">(one parent)</span>
+					<span class="self-start text-center text-content-muted @[560px]:pl-6! @max-[560px]:order-3">(both parents)</span>
+					<div class="justify-self-center ml-4 @max-[560px]:order-5 @max-[560px]:col-start-3">
 						<Knob type="KnobSmall" :value="Math.round(s.cross * 127)" @change="(v) => mutator.setCross(v / 127)" />
 					</div>
 				</div>
@@ -90,7 +96,7 @@
 						</div>
 					</div>
 					<div class="flex flex-col gap-1.5 w-(--box)">
-						<span class="font-bold text-right">Father</span>
+						<span class="font-bold self-end">Father</span>
 						<MutaBox :genome="mutator.genomeAt(familyRow[7])" family :focused="isFocused(familyRow[7])" v-bind="boxEvents(familyRow[7])" />
 					</div>
 				</div>
@@ -139,9 +145,13 @@
 				<!-- Quick Locks: a lit button = that category is locked -->
 				<div class="self-center flex flex-col gap-4">
 					<!-- label stretches to the button row; bracket from the centre of the first lock to the centre of Selected (2 columns wide):
-					     column = (row - 8 gaps) / 9, left pad = half a column, right pad = a column + half a gap -->
-					<BracketLabel title="Quick Locks during One Parent operations" class="pl-[calc((100%-96px)/18)] pr-[calc((100%-96px)/9+6px)]" />
-					<div class="grid grid-cols-9 gap-3">
+					     column = (row - 8 gaps) / 9, left pad = half a column, right pad = a column + half a gap.
+					     Panel narrower than 560px: 4 columns, the bracket spans the whole block. -->
+					<BracketLabel
+						title="Quick Locks during One Parent operations"
+						class="@[560px]:pl-[calc((100%-96px)/18)] @[560px]:pr-[calc((100%-96px)/9+6px)]"
+					/>
+					<div class="grid grid-cols-4 @[560px]:grid-cols-9 gap-3">
 						<div v-for="q in QUICK_LOCKS" :key="q.label" class="flex flex-col items-center gap-1">
 							<Button
 								variant="toggle"

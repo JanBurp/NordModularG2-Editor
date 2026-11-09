@@ -37,7 +37,7 @@
 		<CableVisibilitySelector />
 		<ToolBarDivider />
 		<PatchLevel />
-		<div v-if="settingsStore.toolbarMode === 'hidden'" class="hidden xl:flex items-center gap-2">
+		<div v-if="settingsStore.toolbarMode === 'hidden'" class="hidden @7xl:flex items-center gap-2">
 			<ToolBarDivider />
 			<CPU mini />
 		</div>

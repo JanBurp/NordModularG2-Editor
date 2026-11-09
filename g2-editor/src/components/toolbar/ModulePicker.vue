@@ -1,6 +1,6 @@
 <template>
 	<ToolBarGroup
-		class="flex flex-col gap-1 focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-0 focus-visible:outline-none"
+		class="flex flex-col gap-1 min-w-0 max-w-full focus-visible:ring-2 focus-visible:ring-blue-500/60 focus-visible:ring-offset-1 focus-visible:ring-offset-surface-0 focus-visible:outline-none"
 		:style="{ width: toolbarWidthPx + 'px' }"
 		tabindex="0"
 		@keydown="onKeydown"
@@ -15,7 +15,7 @@
 					:class="cat === selectedCategory ? 'bg-input text-black' : 'bg-surface-3 text-content-primary hover:bg-surface-2'"
 					:style="{
 						borderBottomColor: getCategoryColor(cat),
-						width: categoryCellWidthPx + 'px',
+						width: categoryCellWidth,
 					}"
 					@click="selectedCategory = cat"
 					@mouseenter="showHint('modulePickerCategory')"
@@ -25,7 +25,8 @@
 				</button>
 			</div>
 		</div>
-		<div class="flex items-center gap-1 h-8 overflow-hidden">
+		<!-- narrower than the widest category (small windows): scrolls sideways with the wheel -->
+		<div ref="iconRowRef" class="flex items-center gap-1 h-8 overflow-x-auto [scrollbar-width:none]" @wheel="onIconRowWheel">
 			<template v-for="(m, i) in modules" :key="m.id">
 				<img
 					v-if="graphics[m.id]"
@@ -136,9 +137,20 @@
 	const pickerWidthPx = computed(() => Math.max(ICON_SIZE, ...categories.value.map(rowWidthPx)));
 
 	// Category cells are sized to fill 8 columns of pickerWidthPx; a 9th in row 2 (Hidden) extends the toolbar instead of shrinking cells.
+	// Cells are a fraction of the picker so they shrink with it when the window is too narrow (the picker has max-w-full).
 	const CATEGORY_GAP = 1; // gap-px
-	const categoryCellWidthPx = computed(() => (pickerWidthPx.value - 7 * CATEGORY_GAP) / 8);
-	const toolbarWidthPx = computed(() =>
-		categoryRows.value[1].length > 8 ? pickerWidthPx.value + categoryCellWidthPx.value + CATEGORY_GAP : pickerWidthPx.value,
-	);
+	const categoryColumns = computed(() => (categoryRows.value[1].length > 8 ? 9 : 8));
+	const categoryCellWidth = computed(() => `calc((100% - ${(categoryColumns.value - 1) * CATEGORY_GAP}px) / ${categoryColumns.value})`);
+	const toolbarWidthPx = computed(() => ((pickerWidthPx.value - 7 * CATEGORY_GAP) / 8 + CATEGORY_GAP) * categoryColumns.value - CATEGORY_GAP);
+
+	// Vertical wheel scrolls the icon row sideways; keyboard navigation keeps the focused icon in view.
+	const iconRowRef = ref<HTMLElement | null>(null);
+	function onIconRowWheel(e: WheelEvent) {
+		const row = iconRowRef.value;
+		if (!row || row.scrollWidth <= row.clientWidth || e.deltaX !== 0) return;
+		e.preventDefault();
+		row.scrollLeft += e.deltaY;
+	}
+	watch(focusedIndex, (i) => iconRowRef.value?.children[i]?.scrollIntoView({ block: 'nearest', inline: 'nearest' }));
+	watch(selectedCategory, () => iconRowRef.value?.scrollTo({ left: 0 }));
 </script>
