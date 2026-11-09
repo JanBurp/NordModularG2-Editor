@@ -22,6 +22,9 @@
 	--color-content-muted: #9b9b9b;
 	--color-input: #8dd0e4;
 	--color-input-dimmed: #91b6b4;
+	--color-link: #175e72; /* clickable text, e.g. links in module help */
+	--color-accent: #6b3fa0; /* highlighted text (Clavia "indigo" in module help) */
+	--color-danger: #b42318; /* warning text (Clavia "red" in module help) */
 }
 
 @media (prefers-color-scheme: dark) {
@@ -38,6 +41,9 @@
 		--color-content-muted: var(--color-neutral-500);
 		--color-input: #37c0c2;
 		--color-input-dimmed: #0f7675;
+		--color-link: #37c0c2;
+		--color-accent: #b794f4;
+		--color-danger: #f87171;
 	}
 }
 

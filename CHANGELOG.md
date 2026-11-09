@@ -20,6 +20,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 - SplitBar a bit bigger and now with small buttons to change area
 - Added split view to View menu
+- Module help now uses the original help pages (including "Common … parameters")
 
 ## [0.8.1] - 2026-11-06
 

@@ -1087,7 +1087,7 @@ ipcMain.handle('bank:select-pchlist', async (event) => {
 ipcMain.handle('help:load', (_, shortName: string) => {
 	const helpDir = app.isPackaged ? path.join(process.resourcesPath, 'doc', 'help') : path.join(process.env.APP_ROOT!, '..', 'doc', 'help');
 	if (typeof shortName !== 'string' || !/^[\w.&-]+$/.test(shortName)) return null;
-	const filePath = path.join(helpDir, `${shortName}.md`);
+	const filePath = path.join(helpDir, `${shortName}.html`);
 	try {
 		return fs.readFileSync(filePath, 'utf-8');
 	} catch {
