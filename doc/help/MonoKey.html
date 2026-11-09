@@ -1,0 +1,14 @@
+<h3 class="pHeading2"><span id="NMG2_REF_3258_1056998"></span><span id="NMG2_REF_3258_30951"></span><span id="MonoKey"></span><span id="NMG2_REF_3258_1068339"></span>MonoKey</h3>
+<p class="pBody">This module provides three different control signals to emulate the keyboard behaviour of a classic monophonic synth. The signals are generated from the last/lowest/highest note (depending on the alternative below) played and affect all allocated voices, in contrast to the Keyboard module described above.</p>
+<p class="pFet_ord">Last/Lo/Hi</p>
+<p class="pBody">Select which notes should be output. ‘Last’ will output the data from the latest key played. ‘Lo’ will output data from the lowest key played and ‘Hi’ from the highest key played.</p>
+<p class="pBody">Tips! The Lo and Hi alternatives are perfect for creating a polyphonic Patch with a separate sound for the bass (Lo) or lead (Hi) lines. Patch the Pitch and Gate outputs (see below) to the bass/lead sound oscillator(s) Pitch input and the Envelope Gate input. Disable the Oscillator KBT and Envelope KB functions.</p>
+<p class="pFet_ord">Pitch</p>
+<p class="pBody">This blue output provides you with a complete pitch (note number + any pitch bend and/or glide) signal from the last/lowest/highest note (depending on the alternative above) played on the keyboard, or received at the <span class="cbutton">MIDI In</span> port.</p>
+<p class="pBody">&#160;</p>
+<p class="pBody">E4 (MIDI note 64), which is the middle E on the Nord Modular G2 keyboard when the <span class="cbutton">Oct shift</span> selector is in the center position, represents a signal level of 0 units. MIDI note 0 (C-1) represents -64 units and MIDI note 127 (G9) represents +63 units.</p>
+<p class="pBody">Signal: Bipolar.</p>
+<p class="pFet_ord">Gate</p>
+<p class="pBody">This yellow output sends a <span class="cmidi">high</span> logic level (+64 units) every time a key is pressed on the keyboard or a <span class="cmidi">midi</span> note-on is received at the <span class="cbutton">Midi In</span> port. The logic signal switches back to a <span class="cmidi">low</span> logic level (0 units) when the last key is released. You can use this signal to start envelopes in the single-trigger fashion. If a sustain pedal is activated, the logic signal will be <span class="cmidi">high</span> for as long as the pedal is pressed. Signal: Logic.</p>
+<p class="pFet_ord">Vel</p>
+<p class="pBody">This blue output provides you with a control signal from the last/lowest/highest (depending on the alternative above) note-on velocity. The velocity response of the Nord Modular G2 keyboard is linear from this output. Signal: Unipolar Positive.</p>

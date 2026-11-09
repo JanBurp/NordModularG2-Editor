@@ -42,7 +42,7 @@
 					<div v-if="isExpanded(category)" class="flex flex-col gap-2 py-2">
 						<template v-for="module in getModulesByCategory(category)" :key="module.id">
 							<div
-								:class="['w-64 bg-surface-3 overflow-visible shadow', module.id === selectedNavModuleId ? 'ring-2 ring-amber-300' : '']"
+								:class="['w-64 bg-surface-3 overflow-visible shadow', module.id === selectedNavModuleId ? 'ring-2 ring-link' : '']"
 								:style="{
 									height: getModuleHeight(module) + 'px',
 									cursor: 'grab',
@@ -60,10 +60,13 @@
 								</svg>
 							</div>
 							<div
-								v-if="(ui.helpAllModules && helpCache.get(module.id)) || (helpModule?.id === module.id && helpHtml)"
+								v-if="(ui.helpAllModules || helpModule?.id === module.id) && helpFor(module.id, module.short)"
 								class="module-help w-64 bg-surface-1 rounded p-3 text-xs text-content-secondary"
-								v-html="ui.helpAllModules ? helpCache.get(module.id) || '' : helpHtml"
-							/>
+								@click="handleHelpClick($event, module.id)"
+							>
+								<button v-if="canGoBack(module.id)" class="help-back" @click="goBack($event, module.id)">‹ Back</button>
+								<div v-html="helpFor(module.id, module.short)" />
+							</div>
 						</template>
 					</div>
 				</div>
@@ -73,7 +76,7 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, watch } from 'vue';
+	import { ref, reactive, computed, watch, nextTick } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
 	import Icon from '../common/Icon.vue';
@@ -91,7 +94,7 @@
 
 	const ui = useUiStore();
 	const settings = useSettingsStore();
-	const { helpHtml, loadHelp } = useModuleHelp();
+	const { loadPage, helpFor, openLink, canGoBack, back, resetLinks } = useModuleHelp();
 	const { addModuleAtMousePos } = useAddModule();
 	const { handleDragStart: handleModuleDragStart, handleDragEnd: handleModuleDragEnd } = useModuleDragSource();
 	const { categories } = useVisibleCategories();
@@ -135,9 +138,31 @@
 	});
 
 	watch(helpModule, (mod) => {
-		if (mod) loadHelp(mod.short);
-		else helpHtml.value = '';
+		if (mod) loadPage(mod.short);
 	});
+
+	// Showing help for another module (or toggling show-all) starts again at the module pages
+	watch([helpModule, () => ui.helpAllModules], resetLinks);
+
+	async function handleHelpClick(e: MouseEvent, moduleId: number) {
+		const link = (e.target as HTMLElement).closest<HTMLElement>('a[data-help]');
+		if (!link) return;
+		e.preventDefault();
+		const block = e.currentTarget as HTMLElement;
+		await openLink(moduleId, link.dataset.help!);
+		await nextTick();
+		const anchor = link.dataset.anchor;
+		const target = (anchor && block.querySelector(`[id="${anchor}"]`)) || block;
+		target.scrollIntoView({ behavior: 'instant', block: 'start' });
+	}
+
+	// Back returns to the top of the previous page (the link may have scrolled down to an anchor)
+	async function goBack(e: MouseEvent, moduleId: number) {
+		const block = (e.currentTarget as HTMLElement).parentElement!;
+		back(moduleId);
+		await nextTick();
+		block.scrollIntoView({ behavior: 'instant', block: 'start' });
+	}
 
 	const flatNavModules = computed(() => {
 		if (!searchQuery.value) {
@@ -195,22 +220,13 @@
 				}
 			});
 		},
-		{ flush: 'post' },
+		// immediate: Show Help can open the pane, mounting it with the id already set
+		{ flush: 'post', immediate: true },
 	);
 
-	const helpCache = ref(new Map<number, string>());
-
 	async function loadAllHelp() {
-		const { marked } = await import('marked');
 		const allMods = getAllCategories().flatMap((cat) => getModulesByCategoryRaw(cat));
-		await Promise.all(
-			allMods.map(async (mod) => {
-				if (helpCache.value.has(mod.id)) return;
-				const raw = await window.electronAPI.loadHelp(mod.short);
-				if (!raw) return;
-				helpCache.value.set(mod.id, (await marked(raw)) as string);
-			}),
-		);
+		await Promise.all(allMods.map((mod) => loadPage(mod.short)));
 	}
 
 	// Pre-load cache whenever the modules pane becomes visible so F1 "show all" is instant
@@ -308,34 +324,65 @@
 </script>
 
 <style scoped>
-	.module-help :deep(h1) {
+	/* Classes from the official help (doc/help, see scripts/import-clavia-help.mjs) */
+	.module-help {
+		display: flow-root;
+		line-height: 1.5;
+	}
+	.module-help :deep(.pHeading2) {
 		font-size: 0.85rem;
 		font-weight: 600;
 		color: var(--color-content-primary);
 		margin-bottom: 0.5rem;
 	}
-	.module-help :deep(h2) {
-		font-size: 0.75rem;
-		font-weight: 600;
-		color: var(--color-content-secondary);
-		margin-top: 0.75rem;
-		margin-bottom: 0.25rem;
-	}
-	.module-help :deep(p) {
-		margin-bottom: 0.5rem;
-		line-height: 1.5;
-	}
-	.module-help :deep(strong) {
+	.module-help :deep(.pFet_ord) {
+		font-weight: 700;
 		color: var(--color-content-primary);
-		font-weight: 600;
+		margin-top: 0.75rem;
 	}
-	.module-help :deep(ul) {
-		list-style: disc;
-		padding-left: 1rem;
-		margin-bottom: 0.5rem;
+	.module-help :deep(.pBulleted),
+	.module-help :deep(.pNummer),
+	.module-help :deep(.pNummer1) {
+		margin: 0.5rem 0 0.5rem 0.75rem;
+		text-indent: -0.5rem;
 	}
-	.module-help :deep(li) {
-		margin-bottom: 0.2rem;
-		line-height: 1.5;
+	.module-help :deep(.pBody_indraget) {
+		margin-left: 0.75rem;
+	}
+	.module-help :deep(.container_Image) {
+		margin: 0.25rem 0;
+	}
+	/* .module-help :deep(.container_Image[style*='float']) {
+		margin-left: 0.5rem;
+	} */
+	.module-help :deep(img) {
+		display: inline-block;
+		max-width: 100%;
+		height: auto;
+	}
+	.module-help :deep(.cmidi) {
+		font-variant: small-caps;
+	}
+	.module-help :deep(.cbutton),
+	.module-help :deep(.cfet_bokst_ver) {
+		font-weight: 700;
+		font-variant: small-caps;
+	}
+	.module-help :deep(.cindigo) {
+		color: var(--color-accent);
+	}
+	.module-help :deep(.cred) {
+		font-weight: 700;
+		color: var(--color-danger);
+	}
+	.module-help :deep(a[data-help]) {
+		color: var(--color-link);
+		text-decoration: underline;
+		cursor: pointer;
+	}
+	.help-back {
+		color: var(--color-link);
+		cursor: pointer;
+		margin-bottom: 0.25rem;
 	}
 </style>

@@ -1,5 +1,12 @@
 <template>
-	<svg viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round">
+	<svg
+		viewBox="0 0 16 16"
+		:fill="FILLED.has(name) ? 'currentColor' : 'none'"
+		stroke="currentColor"
+		stroke-width="1.5"
+		stroke-linecap="round"
+		stroke-linejoin="round"
+	>
 		<path v-for="d in icons[name]" :key="d" :d="d" />
 	</svg>
 </template>
@@ -19,7 +26,11 @@
 		pencil: ['M10.5 2.5l3 3L6 13l-3.5.5L3 10z', 'M9 4l3 3'],
 		star: ['M8 1.5l1.9 4.1 4.4.5-3.3 3 .9 4.4L8 11.3l-3.9 2.2.9-4.4-3.3-3 4.4-.5z'],
 		trash: ['M2.5 4h11', 'M6 4V2.5h4V4', 'M4 4l.7 9.5h6.6L12 4', 'M6.5 6.5v4.5', 'M9.5 6.5v4.5'],
+		triangleUp: ['M3 12h10L8 4z'],
+		triangleDown: ['M3 4h10L8 12z'],
+		splitRestore: ['M3 1.5h10', 'M3 14.5h10', 'M4 3.5h8L8 7.5z', 'M4 12.5h8L8 8.5z'],
 	} as const;
+	const FILLED = new Set<string>(['triangleUp', 'triangleDown', 'splitRestore']);
 
 	defineProps<{ name: keyof typeof icons }>();
 </script>

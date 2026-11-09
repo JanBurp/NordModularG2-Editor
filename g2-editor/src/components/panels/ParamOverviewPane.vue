@@ -20,8 +20,9 @@
 				<div class="border border-line-default rounded-xs px-1.5 py-1 flex flex-col gap-1">
 					<div v-for="bank in BANK_COUNT" :key="bank" class="flex items-end gap-1.5">
 						<span class="w-2 text-content-muted pb-0.5">{{ bank }}</span>
-						<div class="flex-1 grid grid-cols-4 gap-2">
-							<div v-for="pair in 4" :key="pair" class="grid grid-cols-2 gap-1">
+						<!-- always 8 per line; a narrow panel (@container in SidePanel) shrinks gaps and text (cqw) instead -->
+						<div class="flex-1 grid grid-cols-4 gap-1 @[480px]:gap-2 text-[clamp(8px,2cqw,12px)]">
+							<div v-for="pair in 4" :key="pair" class="grid grid-cols-2 gap-0.5 @[480px]:gap-1">
 								<div
 									v-for="cell in pages[page][bank - 1].slice((pair - 1) * 2, pair * 2)"
 									:key="cell.slotIndex"
@@ -38,7 +39,7 @@
 								>
 									<div class="truncate font-bold text-center">{{ cell.moduleHeader }}</div>
 									<VuMeterBar v-if="cell.assignment?.isLed && !viewMidi && !viewButtons" :value="cell.value" :label="cell.paramLabel" />
-									<div v-else class="param-display px-0! text-[11px]" :class="{ 'param-display-empty': !cell.assignment }">
+									<div v-else class="param-display px-0! text-[0.92em]" :class="{ 'param-display-empty': !cell.assignment }">
 										{{ displayText(cell) }}
 									</div>
 								</div>

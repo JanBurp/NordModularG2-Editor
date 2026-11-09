@@ -235,13 +235,15 @@ export const useUiStore = defineStore('ui', {
 
 		showModuleHelp(typeId: number) {
 			this.helpAllModules = false;
-			if (this.helpModuleTypeId === typeId) {
+			const settings = useSettingsStore();
+			// Toggles off only while visible: a closed pane keeps the old id, which would swallow the request.
+			const visible = settings.showRightPane && settings.rightPaneTab === 'modules';
+			if (visible && this.helpModuleTypeId === typeId) {
 				this.helpModuleTypeId = null;
 				return;
 			}
 			this.helpModuleTypeId = typeId;
-			const settings = useSettingsStore();
-			if (!settings.showRightPane || settings.rightPaneTab !== 'modules') {
+			if (!visible) {
 				settings.rightPaneTab = 'modules';
 				settings.showRightPane = true;
 			}

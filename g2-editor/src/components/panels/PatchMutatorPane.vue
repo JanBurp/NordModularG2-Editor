@@ -20,9 +20,15 @@
 				@focusout="onFocusout"
 			>
 				<!-- Settings and breeding operations. Grid without column gaps (cells carry the spacing) so the
-				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross. -->
-				<div class="grid grid-cols-[repeat(6,auto)] justify-start items-center gap-y-1 [&>*]:px-2">
-					<div class="flex items-center gap-1 ml-4 px-0!">
+				     label lines run through: Probability ─ Range ──╮ over the one-parent buttons, ╭─ Probability over Cross.
+				     Always one row: a panel narrower than 560px (@container in SidePanel) shrinks text (cqw), spacing and
+				     displays, and stacks each button pair; the one-parent column then takes the spare width, so the
+				     both-parents group sits at the right edge. -->
+				<div
+					data-testid="mutator-settings"
+					class="fit-text grid grid-cols-[auto_auto_auto_1fr_auto_auto] @[560px]:grid-cols-[repeat(6,auto)] px-2 @[560px]:px-0 justify-start items-center gap-y-1 [&>*]:px-1 @[560px]:[&>*]:px-2 text-[clamp(8px,2.1cqw,12px)]"
+				>
+					<div class="flex items-center gap-1 @[560px]:ml-4 px-0!">
 						<span class="flex-1" />
 						<span>Probability</span>
 						<span class="flex-1 border-t border-content-secondary" />
@@ -41,29 +47,35 @@
 						<span class="flex-1" />
 					</div>
 
-					<span class="param-display w-14 text-center justify-self-center ml-4">{{ Math.round(s.prob * 100) }}%</span>
+					<span class="param-display min-w-9 px-0.5! @[560px]:w-14 text-center justify-self-center @[560px]:ml-4"
+						>{{ Math.round(s.prob * 100) }}%</span
+					>
 					<span />
-					<span class="param-display w-14 text-center justify-self-center">+/-{{ Math.round(s.range * 100) }}%</span>
-					<div class="flex gap-1 pl-6!">
+					<span class="param-display min-w-9 px-0.5! @[560px]:w-14 text-center justify-self-center">+/-{{ Math.round(s.range * 100) }}%</span>
+					<div class="flex flex-col items-start @[560px]:flex-row gap-1 @[560px]:pl-6!">
 						<Button variant="default" size="small" :disabled="!s.mother || mutator.noSelection" @click="mutator.mutate()">Mutate</Button>
 						<Button variant="default" size="small" :disabled="mutator.noSelection" @click="mutator.randomize()">Randomize</Button>
 					</div>
-					<div class="flex gap-1 pl-6!">
+					<div class="flex flex-col @[560px]:flex-row gap-1 @[560px]:pl-6!">
 						<Button variant="default" size="small" :disabled="!s.mother || !s.father" @click="mutator.breed('interpolate')">Interpolate</Button>
 						<Button variant="default" size="small" :disabled="!s.mother || !s.father" @click="mutator.breed('cross')">Cross</Button>
 					</div>
-					<span class="param-display w-14 text-center justify-self-center ml-4">{{ Math.round(s.cross * 100) }}%</span>
+					<span class="param-display min-w-9 px-0.5! @[560px]:w-14 text-center justify-self-center @[560px]:ml-4"
+						>{{ Math.round(s.cross * 100) }}%</span
+					>
 
-					<div class="justify-self-center ml-4">
+					<div class="justify-self-center @[560px]:ml-4">
 						<Knob type="KnobSmall" :value="Math.round(s.prob * 127)" @change="(v) => mutator.setProb(v / 127)" />
 					</div>
 					<Button variant="toggle" size="small" :active="s.link" @click="mutator.toggleLink()">Link</Button>
 					<div class="justify-self-center">
 						<Knob type="KnobSmall" :value="Math.round((s.range / 0.5) * 127)" @change="(v) => mutator.setRange((v / 127) * 0.5)" />
 					</div>
-					<span class="self-start text-center text-content-muted pl-6!">(one parent)</span>
-					<span class="self-start text-center text-content-muted pl-6!">(both parents)</span>
-					<div class="justify-self-center ml-4">
+					<span class="self-start justify-self-start @[560px]:justify-self-auto text-center whitespace-nowrap text-content-muted @[560px]:pl-6!"
+						>(one parent)</span
+					>
+					<span class="self-start text-center whitespace-nowrap text-content-muted @[560px]:pl-6!">(both parents)</span>
+					<div class="justify-self-center @[560px]:ml-4">
 						<Knob type="KnobSmall" :value="Math.round(s.cross * 127)" @change="(v) => mutator.setCross(v / 127)" />
 					</div>
 				</div>
@@ -90,7 +102,7 @@
 						</div>
 					</div>
 					<div class="flex flex-col gap-1.5 w-(--box)">
-						<span class="font-bold text-right">Father</span>
+						<span class="font-bold self-end">Father</span>
 						<MutaBox :genome="mutator.genomeAt(familyRow[7])" family :focused="isFocused(familyRow[7])" v-bind="boxEvents(familyRow[7])" />
 					</div>
 				</div>
@@ -110,11 +122,12 @@
 								@contextmenu.prevent="onStorageContextMenu(ref, $event)"
 							/>
 						</div>
-						<div class="flex flex-col justify-center items-center gap-1 w-6.5">
-							<Button variant="default" size="xs" class="w-6.5 h-6.5! px-0!" title="Clear Row" @click="mutator.clearStorage(rowIndices(row - 1))">
+						<!-- each button at most half a box tall ((panel - 74px) / 16, see --box), so narrow rows stay box-high -->
+						<div class="flex flex-col justify-center items-center gap-0.5 @[560px]:gap-1 w-6.5 [&>*]:h-[min(1.625rem,calc((100cqw-74px)/16-3px))]!">
+							<Button variant="default" size="xs" class="w-6.5 px-0!" title="Clear Row" @click="mutator.clearStorage(rowIndices(row - 1))">
 								<Icon name="close" class="w-2.5 h-2.5" />
 							</Button>
-							<Button variant="default" size="xs" class="w-6.5 h-6.5! px-0!" title="Copy to Variations" @click="mutator.rowToVariations(row - 1)">
+							<Button variant="default" size="xs" class="w-6.5 px-0!" title="Copy to Variations" @click="mutator.rowToVariations(row - 1)">
 								<Icon name="chevronDown" class="w-2.5 h-2.5" />
 							</Button>
 						</div>
@@ -137,15 +150,21 @@
 				</div>
 
 				<!-- Quick Locks: a lit button = that category is locked -->
-				<div class="self-center flex flex-col gap-4">
+				<div class="self-stretch @[560px]:self-center flex flex-col gap-4">
 					<!-- label stretches to the button row; bracket from the centre of the first lock to the centre of Selected (2 columns wide):
-					     column = (row - 8 gaps) / 9, left pad = half a column, right pad = a column + half a gap -->
-					<BracketLabel title="Quick Locks during One Parent operations" class="pl-[calc((100%-96px)/18)] pr-[calc((100%-96px)/9+6px)]" />
-					<div class="grid grid-cols-9 gap-3">
-						<div v-for="q in QUICK_LOCKS" :key="q.label" class="flex flex-col items-center gap-1">
+					     column = (row - 8 gaps) / 9, left pad = half a column, right pad = a column + half a gap.
+					     Panel narrower than 560px: the 7 locks stay on one row (smaller text, cqw), Selected Modules moves below;
+					     the bracket spans the whole block. -->
+					<BracketLabel
+						title="Quick Locks during One Parent operations"
+						class="@[560px]:pl-[calc((100%-96px)/18)] @[560px]:pr-[calc((100%-96px)/9+6px)]"
+					/>
+					<div class="fit-text grid grid-cols-7 @[560px]:grid-cols-9 gap-x-1 gap-y-3 @[560px]:gap-3 text-[clamp(7px,1.9cqw,12px)]">
+						<div v-for="q in QUICK_LOCKS" :key="q.label" class="flex flex-col items-center gap-1 min-w-0">
 							<Button
 								variant="toggle"
 								size="small"
+								class="max-w-full"
 								:active="(s.lockMask & q.bit) === 0"
 								:disabled="s.soloMask !== 0"
 								@click="mutator.toggleLock(q.bit)"
@@ -154,11 +173,12 @@
 							</Button>
 							<Button variant="toggle" size="xs" :active="(s.soloMask & q.bit) !== 0" @click="mutator.toggleSolo(q.bit)">Solo</Button>
 						</div>
-						<div class="col-span-2 flex flex-col items-center gap-1">
+						<!-- own row when narrow: the help text beside the button instead of below it -->
+						<div class="col-span-7 @[560px]:col-span-2 flex @[560px]:flex-col justify-center items-center gap-2 @[560px]:gap-1">
 							<Button
 								variant="toggle"
 								size="small"
-								class="w-full"
+								class="@[560px]:w-full"
 								:active="s.selectedOnly"
 								title="Mutate/Randomize only the selected modules"
 								data-testid="mutator-selected-only"

@@ -1,8 +1,12 @@
 <template>
-	<div class="flex select-none pt-2" data-testid="patch-adjuster">
-		<div v-for="{ knob, label } in ADJUSTER_KNOBS" :key="knob" class="flex flex-col items-center w-16 gap-2" :class="{ 'ml-6': knob === 'modRate' }">
-			<Knob type="KnobReset" :value="adjuster.knobs[knob]" @change="(v) => adjuster.setKnob(knob, v)" />
-			<span class="text-xs leading-none whitespace-nowrap">{{ label }}</span>
+	<!-- Envelope and tone: two groups of four. A narrower side panel (@container in SidePanel) first shrinks the
+	     knob spacing and labels (cqw); only below ~420px does the tone group wrap onto a second row. -->
+	<div class="flex flex-wrap gap-x-[clamp(0.5rem,4cqw,1.5rem)] gap-y-3 select-none pt-2 text-[clamp(9px,2cqw,12px)]" data-testid="patch-adjuster">
+		<div v-for="(group, g) in GROUPS" :key="g" class="flex">
+			<div v-for="{ knob, label } in group" :key="knob" class="flex flex-col items-center w-[clamp(2.75rem,10.5cqw,4rem)] gap-2">
+				<Knob type="KnobReset" :value="adjuster.knobs[knob]" @change="(v) => adjuster.setKnob(knob, v)" />
+				<span class="leading-none whitespace-nowrap">{{ label }}</span>
+			</div>
 		</div>
 	</div>
 </template>
@@ -15,6 +19,7 @@
 	import { useSlotsStore } from '../../store/slots';
 	import { useUiStore } from '../../store/ui';
 
+	const GROUPS = [ADJUSTER_KNOBS.slice(0, 4), ADJUSTER_KNOBS.slice(4)]; // Attack…Release, Mod. Rate…Effects
 	const adjuster = usePatchAdjusterStore();
 	const slotsStore = useSlotsStore();
 	const ui = useUiStore();

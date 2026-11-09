@@ -64,6 +64,7 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 		hasCurrentPatch: !!currentPatch.value,
 		hasPerformanceContext: !!slotsStore.performanceRawHex,
 		isPerformanceMode: slotsStore.isPerformanceMode || deviceStore.isHardwarePerformanceMode,
+		showStatusBar: useSettingsStore().showStatusBar,
 	}));
 	watch(menuState, (state) => window.electronAPI?.updateMenuState(state), { immediate: true });
 	watch(hasClipboard, (has) => console.log(`[clipboard] menu state: hasClipboard=${has}`), { immediate: true });
@@ -254,6 +255,10 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 				if (isInputFocused()) break;
 				uiStore.setAreaMode(uiStore.area === 1 ? 2 : 1);
 				break;
+			case 'area-split':
+				if (isInputFocused()) break;
+				if (uiStore.area !== 2) uiStore.setAreaMode(2);
+				break;
 			case 'area-fx':
 				if (isInputFocused()) break;
 				uiStore.setAreaMode(uiStore.area === 0 ? 2 : 0);
@@ -309,6 +314,11 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 			case 'toggle-extended-toolbar':
 				useSettingsStore().cycleToolbarMode();
 				break;
+			case 'toggle-status-bar': {
+				const settings = useSettingsStore();
+				settings.setShowStatusBar(!settings.showStatusBar);
+				break;
+			}
 			case 'toggle-keyboard':
 				useSettingsStore().toggleVirtualKeyboard();
 				break;

@@ -13,6 +13,11 @@ export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 
 const MAX_RECENT_FILES = 20;
 
+// Wide side-panel panes (Overview, Mutator, Settings) are user-resizable; the others have a fixed width
+export const WIDE_PANE_TABS: PaneTab[] = ['overview', 'mutator', 'settings'];
+export const DEFAULT_WIDE_PANE_WIDTH = 600;
+export const MIN_WIDE_PANE_WIDTH = 300; // the Mutator's narrow layout
+
 export const useSettingsStore = defineStore('settings', {
 	state: () => ({
 		path: '' as string,
@@ -29,10 +34,12 @@ export const useSettingsStore = defineStore('settings', {
 		dimUnusedModules: false as boolean,
 		rightPaneTab: '' as PaneTab,
 		showRightPane: false as boolean,
+		widePaneWidth: DEFAULT_WIDE_PANE_WIDTH as number, // px, user-dragged (WIDE_PANE_TABS)
 		settingsSection: null as SettingsSection | null,
 		toolbarMode: 'classic' as ToolbarMode,
 		showVirtualKeyboard: false as boolean,
 		showParamPages: false as boolean,
+		showStatusBar: true as boolean,
 		patchAdjusterOpen: true as boolean, // collapsible sections of the Patch Mutator pane
 		patchMutatorOpen: true as boolean,
 		patchMutatorKeysOpen: true as boolean,
@@ -75,6 +82,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		toggleParamPages() {
 			this.showParamPages = !this.showParamPages;
+		},
+		setShowStatusBar(value: boolean) {
+			this.showStatusBar = value;
 		},
 		toggleSidebar(tab: PaneTab) {
 			this.settingsSection = null;
@@ -174,6 +184,9 @@ export const useSettingsStore = defineStore('settings', {
 		},
 		zoomOut() {
 			this.setCanvasZoom(this.canvasZoom - 0.1);
+		},
+		setWidePaneWidth(px: number) {
+			this.widePaneWidth = Math.max(MIN_WIDE_PANE_WIDTH, Math.round(px));
 		},
 		resetCanvasZoom() {
 			this.canvasZoom = 1;
