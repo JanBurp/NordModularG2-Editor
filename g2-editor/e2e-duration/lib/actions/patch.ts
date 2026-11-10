@@ -4,7 +4,7 @@ import { type ActionCtx, type ActionDef, ensureExtendedToolbar, ensureShown, fil
 const RESTORE_AFTER_MS = 1500;
 
 /** The patch name in the patch toolbar (the toolbar that holds the Sound Category select). */
-const patchName = (c: ActionCtx) => c.page.locator(':has(> div > select[title="Sound Category"]) > span.text.cursor-pointer').first();
+const patchName = (c: ActionCtx) => c.page.locator(':has(> div > select[title="Sound Category"]) > div > span.text.cursor-pointer').first();
 
 /** The Collapsible section with this title in the Settings pane (never "Synth Settings"). */
 const settingsSection = (c: ActionCtx, title: 'Patch Settings' | 'Performance Settings') =>
