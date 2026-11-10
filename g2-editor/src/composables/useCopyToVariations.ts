@@ -5,9 +5,13 @@ import { useUiStore } from '@/store/ui';
 
 const USER_VARIATIONS = [0, 1, 2, 3, 4, 5, 6, 7];
 
+// Only from a saved variation (1-8), not while the Patch Mutator auditions in its live-only variation.
+export const canCopyFrom = (variation: number) => USER_VARIATIONS.includes(variation);
+
 // Copy to Variations from the current variation: to `target` ('all' = every other variation, else one variation).
-export function copyToVariations(target: number | 'all', copy: VariationCopy): Promise<void> {
-	return useSlotsStore().copyToVariations(target === 'all' ? USER_VARIATIONS : [target], copy);
+export async function copyToVariations(target: number | 'all', copy: VariationCopy): Promise<void> {
+	if (!canCopyFrom(useUiStore().variation)) return;
+	await useSlotsStore().copyToVariations(target === 'all' ? USER_VARIATIONS : [target], copy);
 }
 
 // "<label> ▸ All Variations / Variation 1…8" (the current variation, the source, disabled).
@@ -15,7 +19,7 @@ export function buildCopyToVariationsItem(label: string, copy: VariationCopy, di
 	const current = useUiStore().variation;
 	return {
 		label,
-		disabled,
+		disabled: disabled || !canCopyFrom(current),
 		children: [
 			{ label: 'All Variations', action: () => copyToVariations('all', copy) },
 			{ type: 'separator' },

@@ -378,6 +378,7 @@
 							:options="param.btnOptions"
 							v-on="patchHints[param.key].on"
 							@update:model-value="setPatchParam(param.key, Number($event))"
+							@btn-contextmenu="(_, e) => onPatchSettingsContextMenu(e, `${group.header} ${param.label}`, [param.key])"
 						/>
 						<NumberInput
 							v-else
@@ -684,14 +685,14 @@
 		patchHints[key].changed();
 	}
 
-	// Copy to Variations: the right-clicked setting or section, or all patch settings.
+	// Copy to Variations: the right-clicked setting or section, or all patch settings (Patch Level included).
 	type PatchParamGroup = (typeof PATCH_PARAM_GROUPS)[number];
 	const groupKeys = (g: PatchParamGroup) => [...(g.toggleKey ? [g.toggleKey] : []), ...g.params.map((p) => p.key)];
 	const { open: openContextMenu } = useContextMenu();
 	function onPatchSettingsContextMenu(e: MouseEvent, name: string, keys: (keyof PatchParamVariation)[]) {
 		openContextMenu(e, [
 			buildCopyToVariationsItem(`Copy ${name} to Variations`, copyPatchParams(keys)),
-			buildCopyToVariationsItem('Copy All Patch Settings to Variations', copyPatchParams(PATCH_PARAM_GROUPS.flatMap(groupKeys))),
+			buildCopyToVariationsItem('Copy All Patch Settings to Variations', copyPatchParams(PATCH_PARAM_KEYS)),
 		]);
 	}
 </script>

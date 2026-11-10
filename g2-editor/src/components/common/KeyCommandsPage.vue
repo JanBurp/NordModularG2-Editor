@@ -39,6 +39,7 @@
 	const CTRL = isMac ? '⌃' : 'Ctrl';
 	const SHIFT_MOD = isMac ? key(SHIFT, MOD) : key(MOD, SHIFT); // ⇧ ⌘ on Mac, Ctrl+Shift elsewhere
 	const ALT_MOD = isMac ? key(ALT, MOD) : key(MOD, ALT); // ⌥ ⌘ on Mac, Ctrl+Alt elsewhere
+	const ALT_SHIFT_MOD = isMac ? key(ALT, SHIFT, MOD) : key(MOD, ALT, SHIFT); // ⌥ ⇧ ⌘ on Mac, Ctrl+Alt+Shift elsewhere
 
 	const groups = computed(() => [
 		{
@@ -78,7 +79,7 @@
 				{ keys: [key(MOD, 'A')], action: 'Select all modules' },
 				{ keys: [key(MOD, 'E')], action: 'Paste Params' },
 				{ keys: [key(SHIFT_MOD, 'E')], action: 'Copy params of selected modules to all variations' },
-				{ keys: [key(isMac ? key(ALT, SHIFT, MOD) : key(MOD, ALT, SHIFT), 'E')], action: 'Copy params with morphs to all variations' },
+				{ keys: [key(ALT_SHIFT_MOD, 'E')], action: 'Copy params with morphs to all variations' },
 				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: [key(MOD, 'Z')], action: 'Undo' },
 				{ keys: [key(SHIFT_MOD, 'Z')], action: 'Redo' },

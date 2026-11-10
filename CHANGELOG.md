@@ -11,7 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
-- Copy param(s) to all/other Varations (in ContextMenu's and Edit menu)
+- Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)
 
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering

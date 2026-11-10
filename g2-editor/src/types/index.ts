@@ -97,6 +97,7 @@ export interface MenuState {
 	canUndo: boolean;
 	canRedo: boolean;
 	hasSelection: boolean;
+	canCopyToVariations: boolean; // a selection, and not auditioning in the Patch Mutator
 	hasClipboard: boolean;
 	canPasteParams: boolean;
 	hasCurrentPatch: boolean;

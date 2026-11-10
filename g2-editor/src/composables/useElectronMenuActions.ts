@@ -14,7 +14,7 @@ import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { areaConfig, canPasteParams, copyModuleParams, resolveSelectionArea } from '@/store/slotHelpers';
-import { copyToVariations } from '@/composables/useCopyToVariations';
+import { canCopyFrom, copyToVariations } from '@/composables/useCopyToVariations';
 import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
 import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
@@ -56,6 +56,7 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 		canUndo: undoTarget.canUndo.value,
 		canRedo: undoTarget.canRedo.value,
 		hasSelection: uiStore.selectedModules.length > 0,
+		canCopyToVariations: uiStore.selectedModules.length > 0 && canCopyFrom(uiStore.variation),
 		hasClipboard: hasClipboard.value,
 		canPasteParams: canPasteParams(
 			uiStore.clipboardTypes,
@@ -84,7 +85,7 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 			return;
 		}
 		// Edit > Copy Params (with Morphs) to Variations > All Variations | Variation n, for the selected modules
-		const copyMatch = /^copy-params(-morphs)?-to-variations:(all|\d)$/.exec(action);
+		const copyMatch = /^copy-params(-morphs)?-to-variations:(all|[0-7])$/.exec(action);
 		if (copyMatch) {
 			if (isInputFocused() || uiStore.selectedModules.length === 0) return;
 			const target = copyMatch[2] === 'all' ? 'all' : Number(copyMatch[2]);

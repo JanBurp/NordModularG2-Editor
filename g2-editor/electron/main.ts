@@ -1205,6 +1205,7 @@ const defaultMenuState: MenuState = {
 	canUndo: false,
 	canRedo: false,
 	hasSelection: false,
+	canCopyToVariations: false,
 	hasClipboard: false,
 	canPasteParams: false,
 	hasCurrentPatch: false,
@@ -1317,7 +1318,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 	// Selected modules' params from the current variation (the renderer leaves that one out) to all or one variation.
 	const copyParamsToVariationsMenu = (label: string, action: string, accelerator: string): Electron.MenuItemConstructorOptions => ({
 		label,
-		enabled: menuState.hasSelection,
+		enabled: menuState.canCopyToVariations,
 		submenu: [
 			{ label: 'All Variations', accelerator, click: () => sendToFocused('menu:action', `${action}:all`) },
 			{ type: 'separator' as const },
