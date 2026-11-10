@@ -355,7 +355,7 @@
 				</SettingsRow>
 
 				<template v-for="group in PATCH_PARAM_GROUPS" :key="group.header">
-					<div class="settings-subheader flex items-center">
+					<div class="settings-subheader flex items-center" @contextmenu="onPatchSettingsContextMenu($event, group.header, groupKeys(group))">
 						<span class="w-20">{{ group.header }}</span>
 						<CheckBox
 							class="ml-px"
@@ -365,7 +365,12 @@
 							@update:model-value="setPatchParam(group.toggleKey!, $event ? 1 : 0)"
 						/>
 					</div>
-					<SettingsRow v-for="param in group.params" :key="param.key" :label="param.label">
+					<SettingsRow
+						v-for="param in group.params"
+						:key="param.key"
+						:label="param.label"
+						@contextmenu="onPatchSettingsContextMenu($event, `${group.header} ${param.label}`, [param.key])"
+					>
 						<BtnGroup
 							v-if="param.btnOptions"
 							:model-value="patchParam(param.key)"
@@ -412,6 +417,9 @@
 	import type { SlotLabel } from '@/types';
 	import { PATCH_PARAM_KEYS, type PatchParamVariation } from '@/types/patch';
 	import { TOOLBAR_HINT, useToolbarValueHint } from '@/composables/useValueHint';
+	import { useContextMenu } from '@/composables/useContextMenu';
+	import { buildCopyToVariationsItem } from '@/composables/useCopyToVariations';
+	import { copyPatchParams } from '@/store/slotHelpers';
 
 	const L = SETTINGS_LABELS;
 
@@ -674,5 +682,16 @@
 	function setPatchParam(key: keyof PatchParamVariation, value: number) {
 		slotsStore.setPatchParam(uiStore.variation, key, value);
 		patchHints[key].changed();
+	}
+
+	// Copy to Variations: the right-clicked setting or section, or all patch settings.
+	type PatchParamGroup = (typeof PATCH_PARAM_GROUPS)[number];
+	const groupKeys = (g: PatchParamGroup) => [...(g.toggleKey ? [g.toggleKey] : []), ...g.params.map((p) => p.key)];
+	const { open: openContextMenu } = useContextMenu();
+	function onPatchSettingsContextMenu(e: MouseEvent, name: string, keys: (keyof PatchParamVariation)[]) {
+		openContextMenu(e, [
+			buildCopyToVariationsItem(`Copy ${name} to Variations`, copyPatchParams(keys)),
+			buildCopyToVariationsItem('Copy All Patch Settings to Variations', copyPatchParams(PATCH_PARAM_GROUPS.flatMap(groupKeys))),
+		]);
 	}
 </script>

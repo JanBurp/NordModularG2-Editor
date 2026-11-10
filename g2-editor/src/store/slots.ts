@@ -42,6 +42,9 @@ import {
 	areaConfig,
 	morphGroupName,
 	morphKey,
+	mergeMorphs,
+	MAX_MORPHED_PARAMS,
+	type VariationCopy,
 	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
@@ -248,8 +251,6 @@ const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<ty
 // so a burst of sends (e.g. a fast morph-range drag) can delay a legitimate echo past a short
 // timeout. 500ms gives real confirmations more room while still catching a truly dropped command.
 const PARAM_ECHO_TIMEOUT_MS = 500;
-// Morphed-param records per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
-const MAX_MORPHED_PARAMS = 25;
 
 function armParamEcho(key: string, value: number): void {
 	const existing = _paramAwaitingEcho.get(key);
@@ -900,7 +901,7 @@ export const useSlotsStore = defineStore('slots', {
 			if (!slotEntry.variations) return;
 			// The G2's copy-variation only knows 0-8; the Patch Mutator's variation goes as a param dump.
 			if (fromVar === MUTATOR_VARIATION || toVar === MUTATOR_VARIATION) {
-				await this.applyVariationState(slot, toVar, slotEntry.variations[fromVar]);
+				await this.applyVariationStates(slot, [{ v: toVar, state: slotEntry.variations[fromVar] }], 'copyVariation');
 				return;
 			}
 
@@ -937,20 +938,41 @@ export const useSlotsStore = defineStore('slots', {
 			await runCliSafe(['send-sections', slot, Array.from(serializeVariationDump(entry.patch, state, variation))], label);
 		},
 
-		// Overwrites a variation with `state` as one undoable step (Patch Mutator "v" / drop on a variation).
-		async applyVariationState(slot: SlotLabel, variation: number, state: VariationState): Promise<void> {
+		// Overwrites variations with new states as one undoable step (Patch Mutator "v" / drop on a variation,
+		// Copy to Variations).
+		async applyVariationStates(slot: SlotLabel, list: { v: number; state: VariationState }[], label: string): Promise<void> {
 			const entry = this.slots[slot];
 			if (!entry.variations) return;
-			const prevState = deepCloneVariationState(entry.variations[variation]);
-			const newState = deepCloneVariationState(state);
+			const prev = list.map(({ v }) => ({ v, state: deepCloneVariationState(entry.variations![v]) }));
+			const next = list.map(({ v, state }) => ({ v, state: deepCloneVariationState(state) }));
+			const write = async (states: typeof list, suffix: string) => {
+				for (const { v, state } of states) await this._writeVariationState(slot, v, state, label + suffix);
+			};
 			const hist = useHistoryStore();
 			if (!hist.isLocked(slot)) {
 				hist.record(slot, {
-					undo: () => this._writeVariationState(slot, variation, prevState, 'applyVariationState undo'),
-					redo: () => this._writeVariationState(slot, variation, newState, 'applyVariationState redo'),
+					undo: () => write(prev, ' undo'),
+					redo: () => write(next, ' redo'),
 				});
 			}
-			await this._writeVariationState(slot, variation, newState, 'applyVariationState');
+			await write(next, '');
+		},
+
+		// Copy to Variations: `copy` from the current variation into each of `toVars` (the current one
+		// itself left out), as one undoable step.
+		async copyToVariations(toVars: number[], copy: VariationCopy): Promise<void> {
+			const ctx = this._getActivePatch();
+			const variations = ctx && this.slots[ctx.slot].variations;
+			const current = useUiStore().variation;
+			const targets = toVars.filter((v) => v !== current);
+			if (!ctx || !variations || targets.length === 0) return;
+			const from = variations[current];
+			const list = targets.map((v) => {
+				const state = deepCloneVariationState(variations[v]);
+				copy(from, state);
+				return { v, state };
+			});
+			await this.applyVariationStates(ctx.slot, list, 'copyToVariations');
 		},
 
 		handleCopyVariationEvent(slot: SlotLabel, fromVar: number, toVar: number) {
@@ -2052,19 +2074,18 @@ export const useSlotsStore = defineStore('slots', {
 					});
 				}
 			}
-			// Morphs (official GetCopyParamsMolecules): the targets' assignments are replaced by the pasted ones;
-			// a param not morphed in that group before is only added while the variation stays within MAX_MORPHED_PARAMS.
+			// Morphs: the targets' assignments are replaced by the pasted ones (mergeMorphs).
 			const morphPairs = pairs.filter((p) => p.morphs);
 			let prevMorphs: MorphAssignment[] = [];
 			let nextMorphs: MorphAssignment[] = [];
 			if (vPatch && morphPairs.length > 0) {
 				prevMorphs = vPatch.morphAssignments;
-				const prevKeys = new Set(prevMorphs.map(morphKey));
 				const replaced = new Set(morphPairs.map((p) => p.targetId));
-				nextMorphs = prevMorphs.filter((a) => !isTargetMorph(a, replaced));
-				for (const a of morphPairs.flatMap((p) => p.morphs!)) {
-					if (prevKeys.has(morphKey(a)) || nextMorphs.length < MAX_MORPHED_PARAMS) nextMorphs.push({ ...a });
-				}
+				nextMorphs = mergeMorphs(
+					prevMorphs,
+					(a) => isTargetMorph(a, replaced),
+					morphPairs.flatMap((p) => p.morphs!),
+				);
 				vPatch.morphAssignments = nextMorphs;
 			}
 			this._markSlotDirty(slot);

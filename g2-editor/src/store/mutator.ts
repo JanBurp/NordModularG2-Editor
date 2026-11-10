@@ -301,7 +301,7 @@ export const useMutatorStore = defineStore('mutator', {
 			const g = this.genomeAt(from);
 			if (!g) return;
 			if (to.kind === 'variation') {
-				await useSlotsStore().applyVariationState(this._slot(), to.index, M.variationFromGenome(g));
+				await useSlotsStore().applyVariationStates(this._slot(), [{ v: to.index, state: M.variationFromGenome(g) }], 'applyVariationState');
 				return;
 			}
 			await this._commit((s) => {

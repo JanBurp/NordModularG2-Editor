@@ -13,7 +13,8 @@ import { useUndoTarget } from './useUndoTarget';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
-import { areaConfig, canPasteParams, resolveSelectionArea } from '@/store/slotHelpers';
+import { areaConfig, canPasteParams, copyModuleParams, resolveSelectionArea } from '@/store/slotHelpers';
+import { copyToVariations } from '@/composables/useCopyToVariations';
 import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
 import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
@@ -80,6 +81,14 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 		if (action.startsWith('open-recent:')) {
 			const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
 			if (entry) await patchFile.handlePatchSelect({ type: 'disk', filepath: entry.path, kind: entry.kind });
+			return;
+		}
+		// Edit > Copy Params (with Morphs) to Variations > All Variations | Variation n, for the selected modules
+		const copyMatch = /^copy-params(-morphs)?-to-variations:(all|\d)$/.exec(action);
+		if (copyMatch) {
+			if (isInputFocused() || uiStore.selectedModules.length === 0) return;
+			const target = copyMatch[2] === 'all' ? 'all' : Number(copyMatch[2]);
+			await copyToVariations(target, copyModuleParams(resolveSelectionArea(uiStore), uiStore.selectedModules, undefined, !!copyMatch[1]));
 			return;
 		}
 		switch (action) {

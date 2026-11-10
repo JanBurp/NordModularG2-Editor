@@ -317,6 +317,7 @@
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { vuMetersByLedNo } from '../../utils/vuLevel';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { buildCopyParamsToVariationsItems } from '../../composables/useCopyToVariations';
 	import {
 		buildParamPageMenuItems,
 		buildGlobalParamPageMenuItems,
@@ -388,6 +389,10 @@
 				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
+			...buildCopyParamsToVariationsItems(
+				props.areaLabel === 'va' ? 'voice' : 'fx',
+				moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx'),
+			),
 			{ label: 'Save Selection to Library…', action: saveToLibrary },
 			{ type: 'separator' },
 			{
@@ -811,6 +816,8 @@
 			});
 		}
 
+		items.push({ type: 'separator' });
+		items.push(...buildCopyParamsToVariationsItems(props.areaLabel === 'va' ? 'voice' : 'fx', [moduleIdx.value], paramIndex));
 		items.push({ type: 'separator' });
 
 		// Morph Group assign/deassign (toggles assignment to the currently selected toolbar group)

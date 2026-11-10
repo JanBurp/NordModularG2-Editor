@@ -77,6 +77,8 @@
 				{ keys: [key(MOD, 'V')], action: 'Paste modules' },
 				{ keys: [key(MOD, 'A')], action: 'Select all modules' },
 				{ keys: [key(MOD, 'E')], action: 'Paste Params' },
+				{ keys: [key(SHIFT_MOD, 'E')], action: 'Copy params of selected modules to all variations' },
+				{ keys: [key(isMac ? key(ALT, SHIFT, MOD) : key(MOD, ALT, SHIFT), 'E')], action: 'Copy params with morphs to all variations' },
 				{ keys: ['Backspace'], action: 'Delete selection (or hovered jack’s cable/nest)' },
 				{ keys: [key(MOD, 'Z')], action: 'Undo' },
 				{ keys: [key(SHIFT_MOD, 'Z')], action: 'Redo' },

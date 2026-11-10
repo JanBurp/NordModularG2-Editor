@@ -474,6 +474,50 @@ describe('setMorphGroupLabel', () => {
 	});
 });
 
+describe('copyToVariations', () => {
+	function variations(): any[] {
+		return Array.from({ length: 10 }, (_, v) => ({
+			fx: {},
+			voice: { 2: [v, v] },
+			patch: { patchVol: v, morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: [] },
+		}));
+	}
+
+	it('copies from the current variation to every other one as one undo step', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = variations();
+		const { copyModuleParams } = await import('@/store/slotHelpers');
+
+		await store.copyToVariations([0, 1, 2, 3, 4, 5, 6, 7], copyModuleParams('voice', [2], 1, false));
+		const vars = store.slots['A'].variations!;
+		for (let v = 0; v < 8; v++) expect(vars[v].voice[2]).toEqual([v, 0]);
+		expect(vars[8].voice[2]).toEqual([8, 8]);
+		expect(store.isSlotEdited('A')).toBe(true);
+
+		await store.undo();
+		for (let v = 0; v < 8; v++) expect(store.slots['A'].variations![v].voice[2]).toEqual([v, v]);
+		await store.redo();
+		for (let v = 0; v < 8; v++) expect(store.slots['A'].variations![v].voice[2]).toEqual([v, 0]);
+	});
+
+	it('sends one variation dump per target when connected, none for the current variation', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = variations();
+		useDeviceStore().status = DeviceStatus.Connected;
+		const dump = vi.spyOn(nmg2PatchSerializer, 'serializeVariationDump').mockReturnValue(new Uint8Array([1]));
+		const { copyPatchParams } = await import('@/store/slotHelpers');
+
+		await store.copyToVariations([0, 3], copyPatchParams(['patchVol']));
+		expect(dump).toHaveBeenCalledTimes(1);
+		expect(dump.mock.calls[0][2]).toBe(3);
+		expect(store.slots['A'].variations![3].patch.patchVol).toBe(0);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['send-sections', 'A', [1]]);
+		dump.mockRestore();
+	});
+});
+
 describe('pasteParams', () => {
 	function moduleInstance(index: number, type: number, pcnt: number, modes: number[]): any {
 		return { type, index, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt, lv: [], modes };

@@ -2,6 +2,10 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildCloneEntries,
 	computeAssignRows,
+	copyModuleParams,
+	copyMorphGroup,
+	copyPatchParams,
+	mergeMorphs,
 	buildPasteParamsPairs,
 	canPasteParams,
 	freeModuleIds,
@@ -273,5 +277,68 @@ describe('computeAssignRows', () => {
 		);
 		expect(next).toEqual([param(41), meter(8, 2), meter(9, 5)]);
 		expect(touched).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 40]);
+	});
+});
+
+describe('Copy to Variations builders', () => {
+	const m = (groupIndex: number, moduleIndex: number, paramIndex: number, range: number, location: 0 | 1 = 1): any => ({
+		groupIndex,
+		location,
+		moduleIndex,
+		paramIndex,
+		range,
+	});
+	function state(values: number[], morphs: any[] = [], patch: any = {}): any {
+		return {
+			fx: { 2: [...values] },
+			voice: { 2: [...values], 3: [...values] },
+			patch: { patchVol: 0, glide: 0, morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: morphs, ...patch },
+		};
+	}
+
+	it('mergeMorphs replaces matching records and only adds new ones within the 25 limit', () => {
+		const others = Array.from({ length: 23 }, (_, i) => m(0, 30 + i, 0, 1));
+		const prev = [...others, m(0, 2, 0, 10)];
+		const next = mergeMorphs(prev, (a) => a.moduleIndex === 2, [m(0, 2, 0, 50), m(1, 2, 1, 60), m(2, 2, 1, 70)]);
+		expect(next).toEqual([...others, m(0, 2, 0, 50), m(1, 2, 1, 60)]);
+	});
+
+	it('copyModuleParams copies whole modules, values only, in the given area', () => {
+		const from = state([1, 2], [m(0, 2, 0, 50)]);
+		const to = state([9, 9], [m(0, 2, 0, 10)]);
+		copyModuleParams('voice', [2], undefined, false)(from, to);
+		expect(to.voice[2]).toEqual([1, 2]);
+		expect(to.voice[3]).toEqual([9, 9]);
+		expect(to.fx[2]).toEqual([9, 9]);
+		expect(to.patch.morphAssignments).toEqual([m(0, 2, 0, 10)]);
+		from.voice[2][0] = 5;
+		expect(to.voice[2][0]).toBe(1); // a copy, not the source's array
+	});
+
+	it('copyModuleParams with one param and morphs copies just that param and its morph ranges', () => {
+		const from = state([1, 2], [m(0, 2, 0, 50), m(1, 2, 1, 60), m(0, 2, 0, 70, 0)]);
+		const to = state([9, 9], [m(3, 2, 0, 10), m(0, 2, 1, 20)]);
+		copyModuleParams('voice', [2], 0, true)(from, to);
+		expect(to.voice[2]).toEqual([1, 9]);
+		// param 0's group 3 record is gone (not in the source), param 1 and the FX record untouched
+		expect(to.patch.morphAssignments).toEqual([m(0, 2, 1, 20), m(0, 2, 0, 50)]);
+	});
+
+	it('copyPatchParams copies only the given keys', () => {
+		const to = state([], [], { patchVol: 10, glide: 2 });
+		copyPatchParams(['patchVol'])(state([], [], { patchVol: 100, glide: 1 }), to);
+		expect(to.patch.patchVol).toBe(100);
+		expect(to.patch.glide).toBe(2);
+	});
+
+	it('copyMorphGroup copies the dial, the source and the group ranges', () => {
+		const from = state([], [m(2, 5, 0, 40), m(1, 5, 0, 30)]);
+		from.patch.morphDials[2] = 99;
+		from.patch.morphModes[2] = 1;
+		const to = state([], [m(2, 6, 0, 10), m(1, 6, 0, 20)]);
+		copyMorphGroup(2)(from, to);
+		expect(to.patch.morphDials[2]).toBe(99);
+		expect(to.patch.morphModes[2]).toBe(1);
+		expect(to.patch.morphAssignments).toEqual([m(1, 6, 0, 20), m(2, 5, 0, 40)]);
 	});
 });

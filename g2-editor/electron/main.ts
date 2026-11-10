@@ -1314,6 +1314,16 @@ function separateWindowMenuItem(): Electron.MenuItemConstructorOptions {
 function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electron.MenuItemConstructorOptions[] {
 	const slotSubmenu = (actionPrefix: string): Electron.MenuItemConstructorOptions[] =>
 		SLOT_LABELS.map((s) => ({ label: `Slot ${s}`, click: () => sendToFocused('menu:action', `${actionPrefix}-${s}`) }));
+	// Selected modules' params from the current variation (the renderer leaves that one out) to all or one variation.
+	const copyParamsToVariationsMenu = (label: string, action: string, accelerator: string): Electron.MenuItemConstructorOptions => ({
+		label,
+		enabled: menuState.hasSelection,
+		submenu: [
+			{ label: 'All Variations', accelerator, click: () => sendToFocused('menu:action', `${action}:all`) },
+			{ type: 'separator' as const },
+			...Array.from({ length: 8 }, (_, v) => ({ label: `Variation ${v + 1}`, click: () => sendToFocused('menu:action', `${action}:${v}`) })),
+		],
+	});
 
 	return [
 		...(isMac
@@ -1397,6 +1407,9 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: 'CommandOrControl+E',
 					enabled: menuState.canPasteParams,
 				},
+				copyParamsToVariationsMenu('Copy Params to Variations', 'copy-params-to-variations', 'Shift+CommandOrControl+E'),
+				copyParamsToVariationsMenu('Copy Params with Morphs to Variations', 'copy-params-morphs-to-variations', 'Alt+Shift+CommandOrControl+E'),
+				{ type: 'separator' as const },
 				{ label: 'Save Selection to Library…', click: () => sendToFocused('menu:action', 'save-to-library'), enabled: menuState.hasSelection },
 				{ type: 'separator' as const },
 				{ label: 'Select All', click: () => sendToFocused('menu:action', 'select-all'), accelerator: 'CommandOrControl+A' },

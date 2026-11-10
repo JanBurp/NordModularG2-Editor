@@ -1,31 +1,7 @@
-import type { Page } from '@playwright/test';
-import { clickContextMenuItem, dropModuleOnCanvas, openContextMenu } from './helpers';
+import { clickContextMenuItem, dropModuleOnCanvas, knobOf, moduleAt, openContextMenu, selectModule, setKnobRaw } from './helpers';
 import { evaluateWithRetry, expect, test } from './fixtures/electron';
 
 const MOD = { OscA: 97, FltClassic: 92 } as const;
-
-const moduleAt = (page: Page, short: string, occurrence: number) => page.locator(`[data-testid="canvas-va"] [data-module-short="${short}"]`).nth(occurrence);
-const knobOf = (page: Page, short: string, occurrence: number, paramIndex = 0) =>
-	moduleAt(page, short, occurrence).locator(`[data-param-index="${paramIndex}"] .knob-control`);
-
-// Click a module's title bar; with `add` the module joins the current selection (Shift-click).
-async function selectModule(page: Page, short: string, occurrence: number, add = false): Promise<void> {
-	const box = await moduleAt(page, short, occurrence).locator('[data-drag-handle]').boundingBox();
-	if (!box) throw new Error(`Module drag handle not found: ${short}[${occurrence}]`);
-	if (add) await page.keyboard.down('Shift');
-	await page.mouse.click(box.x + 64, box.y + 8);
-	if (add) await page.keyboard.up('Shift');
-	await page.waitForTimeout(100);
-}
-
-async function setKnobRaw(page: Page, short: string, occurrence: number, raw: number): Promise<void> {
-	await openContextMenu(page, knobOf(page, short, occurrence));
-	await clickContextMenuItem(page, 'Set Value');
-	const input = page.locator('[data-testid="param-edit-dialog"] input');
-	await input.fill(`#${raw}`);
-	await input.press('Enter');
-	await expect(knobOf(page, short, occurrence)).toHaveAttribute('data-value', String(raw));
-}
 
 test.describe('Paste Params', () => {
 	test.beforeEach(async ({ page, sendMenuAction }) => {
