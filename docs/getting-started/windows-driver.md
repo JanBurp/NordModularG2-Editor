@@ -6,7 +6,17 @@ nav_order: 1
 
 # Windows USB Driver
 
-The editor requires the **WinUSB** driver for the Nord G2. If the app reports a USB driver problem, install it using [Zadig](https://zadig.akeo.ie/).
+The editor requires the **WinUSB** driver for the Nord G2. Out of the box a G2 uses Clavia's driver (in Device Manager: *Clavia 64-bit USB Driver* under *Sound, video and game controllers*), so the first time the editor shows a **USB Driver Problem** dialog.
+
+Click **Install G2 driver** and allow the administrator prompt. The editor switches every connected G2 to WinUSB and connects. It works the same way as Zadig (below), with one click.
+
+> **Note:** This replaces Clavia's original USB driver. The original Clavia editor no longer sees the G2 until you reinstall Clavia's driver.
+
+If Windows later gives a G2 Clavia's driver back (another G2, another USB port, see below), the dialog appears again: click **Install G2 driver** once more.
+
+## Manual install with Zadig
+
+If the button doesn't work, install the driver by hand using [Zadig](https://zadig.akeo.ie/).
 
 > **Important:** Run Zadig as Administrator (right-click → *Run as administrator*), otherwise it cannot replace or install the driver.
 
@@ -14,20 +24,18 @@ The editor requires the **WinUSB** driver for the Nord G2. If the app reports a 
 2. Choose **WinUSB** as the driver.
 3. Click **Replace/Install Driver**.
 
-> **Note:** This replaces Clavia's original USB driver. You will need to reinstall the original Clavia driver if you want to use the original editor again.
-
 ## Log files
 
-If something doesn't work, please send us the log file: **Help → Open Log Folder** opens the folder with `main.log`.
+If something doesn't work, please send us the log files: **Help → Open Log Folder** opens the folder with `main.log` and, after **Install G2 driver**, `winusb-install.log`.
 
 ## Windows 11: Driver Signature Enforcement
 
-Windows 11 may block the unsigned WinUSB driver. If Zadig fails to install it, boot with signature enforcement disabled:
+Windows 11 may block the self-signed WinUSB driver package. If installing it fails to install it, boot with signature enforcement disabled:
 
 1. **Start → Power**, hold **Shift** and click **Restart**.
 2. Go to **Troubleshoot → Advanced options → Startup Settings → Restart**.
 3. Press **F7** — *Disable driver signature enforcement*.
-4. Once Windows has booted, run Zadig as Administrator and install the driver as described above.
+4. Once Windows has booted, click **Install G2 driver** in the editor again (or run Zadig as Administrator as described above).
 5. Reboot normally — the driver persists across reboots.
 
 ## Windows Keeps Restoring the Clavia Driver

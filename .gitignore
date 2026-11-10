@@ -12,6 +12,7 @@ g2-editor/release/
 # Binary
 cli/build/bin/g2-cli
 g2-editor/resources/g2-cli
+g2-editor/resources/wdi-simple.exe
 
 # Editor files
 *.swp

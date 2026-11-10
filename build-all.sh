@@ -153,6 +153,11 @@ if $BUILD_WIN; then
 
   step "Packaging Windows NSIS installer"
   cd "$EDITOR_DIR"
+  # libwdi's wdi-simple.exe (the "Install G2 driver" button) needs MSVC: only CI builds it.
+  if [ ! -f resources/wdi-simple.exe ]; then
+    echo "Missing g2-editor/resources/wdi-simple.exe: copy it from a CI build (Windows job)."
+    exit 1
+  fi
   npx electron-builder --win
 fi
 

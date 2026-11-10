@@ -167,6 +167,29 @@ jobs:
           name: g2-cli-windows-x64
           path: cli-release/g2-cli-windows-x64.exe
 
+      # "Install G2 driver" in the editor runs libwdi's wdi-simple (Zadig's engine) to switch the G2 to WinUSB.
+      # Same build as libwdi's own VS2022 CI, but WinUSB only (no libusb0/libusbK drivers embedded).
+      # The x64 build also embeds the ARM64 installer, which libwdi uses on Windows on ARM.
+      - uses: actions/checkout@v7
+        with:
+          repository: pbatard/libwdi
+          ref: v1.5.1
+          path: libwdi
+
+      - uses: microsoft/setup-msbuild@v2
+
+      - name: Build wdi-simple (libwdi)
+        shell: cmd
+        working-directory: libwdi
+        env:
+          BUILD_MACROS: '"WDK_DIR=\"../wdk/Windows Kits/8.0\""'
+        run: |
+          curl -fsSL "https://go.microsoft.com/fwlink/p/?LinkID=253170" -o wdk-redist.msi
+          msiexec /a wdk-redist.msi /qn TARGETDIR=%CD%\wdk
+          powershell -NoProfile -Command "(Get-Content msvc\config.h -Raw) -replace '(?s)#ifndef LIBUSB[0K]_DIR.*?#endif','' | Set-Content msvc\config.h"
+          msbuild libwdi.sln /m /p:Configuration=Release,Platform=x64,BuildMacros=%BUILD_MACROS%
+          copy x64\Release\examples\wdi-simple.exe ..\g2-editor\resources\wdi-simple.exe
+
       - name: Install dependencies & build Electron app
         working-directory: g2-editor
         run: |

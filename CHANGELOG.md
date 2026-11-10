@@ -9,13 +9,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### New
+- Windows: "Install G2 driver" button in the USB Driver Problem dialog switches all connected G2s to WinUSB in one click (no Zadig needed)
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
 
 ### Fixed
 - Help → Open Log Folder: the editor now writes a log file (main.log) you can send along with a bug report
 - Windows: installer asks for the install folder (default Program Files) instead of installing silently in AppData
-- Windows: back to the WinUSB driver (Zadig), UsbDk is no longer used. UsbDk hung for 2 minutes and failed when Clavia's driver was missing or blocked by Memory Integrity, and stopped G2s already on WinUSB from working. If you installed 0.8.1, uninstall "UsbDk Runtime Libraries" (Settings → Apps)
 - Windows: the "USB Driver Problem" dialog can be closed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
 - Windows: with multiple devices in seperate windows, closing one would show an error popup

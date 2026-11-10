@@ -67,6 +67,9 @@ win:
   extraResources:
     - from: resources/g2-cli.exe
       to: g2-cli.exe
+    # Built from libwdi by CI (build.yml)
+    - from: resources/wdi-simple.exe
+      to: wdi-simple.exe
 
 nsis:
   # Assisted installer: the user picks the folder, default Program Files.

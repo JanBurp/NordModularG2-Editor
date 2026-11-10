@@ -1229,8 +1229,9 @@ ipcMain.on('shell:openExternal', (_, url: string) => {
 });
 
 /* "Install USB helper" / "Install G2 driver" from the driver-error dialog.
- * Windows: run g2-winusb.exe elevated (UAC prompt), which switches every connected G2 to WinUSB.
- * An elevated process's output can't be captured, so it writes its error to a log file instead.
+ * Windows: run libwdi's wdi-simple elevated (UAC prompt), like Zadig: it installs a WinUSB driver
+ * package for the G2's VID/PID and force-switches every connected G2 to it. An elevated process's
+ * output can't be captured, so cmd redirects it to a log file.
  * Linux: install the udev rule that gives the logged-in user access to the G2 (pkexec password
  * prompt), then re-apply rules to a G2 already plugged in. The rule's text is read here and passed
  * as an argument: root often can't read an AppImage's FUSE mount, so it can't copy the file itself. */
@@ -1249,16 +1250,20 @@ ipcMain.handle('usb:install-helper', async (): Promise<{ ok: boolean; error?: st
 	const resource = (devDir: string, name: string) =>
 		app.isPackaged ? path.join(process.resourcesPath, name) : path.join(process.env.APP_ROOT!, 'resources', devDir, name);
 	if (process.platform === 'win32') {
-		const log = path.join(LOG_DIR, 'g2-winusb.log');
-		const quote = (arg: string) => `'"${arg.replace(/'/g, "''")}"'`;
+		const log = path.join(LOG_DIR, 'winusb-install.log');
+		const dest = path.join(app.getPath('temp'), 'g2-winusb-driver');
+		const args = `--vid 0x0FFC --pid 0x0002 --type 0 --name "Nord Modular G2" --manufacturer "Clavia DMI" --dest "${dest}"`;
+		const cmdLine = `/c ""${resource('', 'wdi-simple.exe')}" ${args} > "${log}" 2>&1"`;
+		fs.rmSync(log, { force: true }); // no stale output when the UAC prompt is declined
 		const res = await runHelper('powershell.exe', [
 			'-NoProfile',
 			'-Command',
-			`$p = Start-Process -FilePath ${quote(resource('', 'g2-winusb.exe'))} -ArgumentList ${quote(log)} -Verb RunAs -Wait -PassThru; exit $p.ExitCode`,
+			`$p = Start-Process -FilePath cmd.exe -ArgumentList '${cmdLine.replace(/'/g, "''")}' -Verb RunAs -WindowStyle Hidden -Wait -PassThru; exit $p.ExitCode`,
 		]);
-		const detail = res.ok ? '' : fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim() : '';
-		console.log(`[usb-helper] g2-winusb: ${res.ok ? 'ok' : `${res.error} ${detail}`}`);
-		return res.ok ? res : { ok: false, error: detail || res.error };
+		const output = fs.existsSync(log) ? fs.readFileSync(log, 'utf8').trim() : '';
+		console.log(`[usb-helper] wdi-simple: ${res.ok ? 'ok' : res.error}\n${output}`);
+		// wdi-simple prints each step's result; its last line is the failing one
+		return res.ok ? res : { ok: false, error: output.split('\n').pop()?.trim() || res.error };
 	}
 	if (process.platform !== 'linux') return { ok: false, error: 'not supported on this platform' };
 	const script = `printf '%s' "$1" > /etc/udev/rules.d/${UDEV_RULES} && chmod 644 /etc/udev/rules.d/${UDEV_RULES} && udevadm control --reload-rules && udevadm trigger --subsystem-match=usb --attr-match=idVendor=0ffc && udevadm settle`;

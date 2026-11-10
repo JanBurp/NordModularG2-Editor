@@ -10,3 +10,10 @@ This project incorporates work from:
 - pch2/prf2 web viewer by ian-s
   https://electro-music.com/forum/post-455577.html#455577
   No license specified; used with attribution
+
+The Windows build bundles:
+
+- wdi-simple from libwdi by Pete Batard, used to install the WinUSB driver
+  https://github.com/pbatard/libwdi (v1.5.1)
+  Licensed under the GNU Lesser General Public License v3.0
+  Embeds the Microsoft WDK 8.0 redistributable WinUSB/WDF co-installers
