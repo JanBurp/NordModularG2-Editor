@@ -47,10 +47,10 @@ static void print_usage(const char *prog) {
     printf("  get-patch <slot>                                                                                  Get patch from slot (A-D) as JSON\n");
     printf("  get-patch-file <slot> [file]                                                                      Save patch as .pch2 file\n");
     printf("  get-perf-file [file]                                                                              Save current performance as .prf2 file\n");
-    printf("  select-patch <slot> <bank:1-32> <location:1-127>                                                  Load bank patch into slot\n");
-    printf("  select-perf <bank:1-32> <location:1-127>                                                          Load bank performance\n");
-    printf("  store-patch <slot:0-4> <bank:1-32> <location:1-127>                                               Store a slot's patch to a bank location (slot 4 = performance)\n");
-    printf("  clear-patch <patch|performance> <bank:1-32> <location:1-127>                                      Clear a single bank location\n");
+    printf("  select-patch <slot> <bank:1-32> <location:1-128>                                                  Load bank patch into slot\n");
+    printf("  select-perf <bank:1-32> <location:1-128>                                                          Load bank performance\n");
+    printf("  store-patch <slot:0-4> <bank:1-32> <location:1-128>                                               Store a slot's patch to a bank location (slot 4 = performance)\n");
+    printf("  clear-patch <patch|performance> <bank:1-32> <location:1-128>                                      Clear a single bank location\n");
     printf("  upload-patch <slot> <filepath>                                                                    Upload .pch2 file to slot\n");
     printf("  upload-perf <filepath>                                                                            Upload .prf2 performance file\n");
     printf("  set-synth-settings <json>                                                                         Set all synth settings from JSON object\n");
@@ -887,7 +887,7 @@ static int cmd_set_patch_description(int argc, char **argv, int i) {
 
 static int cmd_select_patch(int argc, char **argv, int i) {
     if (i + 3 >= argc) {
-        fprintf(stderr, "Usage: select-patch <slot> <bank:1-32> <location:1-127>\n");
+        fprintf(stderr, "Usage: select-patch <slot> <bank:1-32> <location:1-128>\n");
         return 1;
     }
     int slot     = parse_slot(argv[i + 1]);
@@ -899,7 +899,7 @@ static int cmd_select_patch(int argc, char **argv, int i) {
 
 static int cmd_select_perf(int argc, char **argv, int i) {
     if (i + 2 >= argc) {
-        fprintf(stderr, "Usage: select-perf <bank:1-32> <location:1-127>\n");
+        fprintf(stderr, "Usage: select-perf <bank:1-32> <location:1-128>\n");
         return 1;
     }
     int bank     = atoi(argv[i + 1]);
@@ -909,7 +909,7 @@ static int cmd_select_perf(int argc, char **argv, int i) {
 
 static int cmd_store_patch(int argc, char **argv, int i) {
     if (i + 3 >= argc) {
-        fprintf(stderr, "Usage: store-patch <slot:0-4> <bank:1-32> <location:1-127>\n");
+        fprintf(stderr, "Usage: store-patch <slot:0-4> <bank:1-32> <location:1-128>\n");
         return 1;
     }
     int slot     = atoi(argv[i + 1]);
@@ -920,7 +920,7 @@ static int cmd_store_patch(int argc, char **argv, int i) {
 
 static int cmd_clear_patch(int argc, char **argv, int i) {
     if (i + 3 >= argc) {
-        fprintf(stderr, "Usage: clear-patch <kind:patch|performance> <bank:1-32> <location:1-127>\n");
+        fprintf(stderr, "Usage: clear-patch <kind:patch|performance> <bank:1-32> <location:1-128>\n");
         return 1;
     }
     int type     = (strcmp(argv[i + 1], "performance") == 0) ? 1 : 0;
