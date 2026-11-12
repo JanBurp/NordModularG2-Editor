@@ -46,17 +46,40 @@
 					/>
 				</div>
 			</template>
+			<span
+				role="button"
+				tabindex="0"
+				class="self-start rounded-xs px-1 text-xs cursor-pointer select-none hover:opacity-80"
+				:class="morphCount >= MAX_MORPHED_PARAMS ? 'bg-red-500 text-white' : 'bg-input-dimmed text-black'"
+				title="Morphed params in this variation (max 25) - click to list assignments"
+				@click="showAssignments = true"
+				@keydown.enter.prevent="showAssignments = true"
+			>
+				{{ morphCount }}/{{ MAX_MORPHED_PARAMS }}
+			</span>
 		</div>
 	</ToolBarGroup>
+
+	<Dialog v-model="showAssignments" :title="`Morph assignments - ${morphCount}/${MAX_MORPHED_PARAMS} params`" confirm-label="Close" :show-cancel="false">
+		<div v-if="assignmentRows.length === 0" class="text-sm text-content-secondary">No morph assignments in this variation.</div>
+		<div v-else class="max-h-96 overflow-y-auto text-xs text-content-primary">
+			<div v-for="(r, i) in assignmentRows" :key="i" class="flex gap-2 py-0.5">
+				<span class="w-20 shrink-0 truncate text-content-secondary">{{ r.group }}</span>
+				<span class="grow truncate">{{ r.area }} {{ r.module }} · {{ r.param }}</span>
+				<span class="w-10 shrink-0 text-right">{{ r.range }}</span>
+			</div>
+		</div>
+	</Dialog>
 </template>
 
 <script setup lang="ts">
-	import { computed } from 'vue';
+	import { computed, ref } from 'vue';
 	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
+	import Dialog from '../common/Dialog.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
-	import { useSlotsStore } from '../../store/slots';
-	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
+	import { MAX_MORPHED_PARAMS, useSlotsStore } from '../../store/slots';
+	import { assignmentNames, defaultPatchParams, morphedParamKeys, morphGroupName } from '../../store/slotHelpers';
 	import { useUiStore } from '../../store/ui';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
 	import SearchHit from '../common/SearchHit.vue';
@@ -103,6 +126,24 @@
 		const slot = uiStore.slotInFocus;
 		return new Set(slot ? slotsStore.getMorphAssignments(slot, uiStore.variation).map((a) => a.groupIndex) : []);
 	});
+
+	const morphCount = computed(() => {
+		const slot = uiStore.slotInFocus;
+		return slot ? morphedParamKeys(slotsStore.getMorphAssignments(slot, uiStore.variation)).size : 0;
+	});
+
+	const showAssignments = ref(false);
+	const assignmentRows = computed(() =>
+		(uiStore.slotInFocus ? slotsStore.getMorphAssignments(uiStore.slotInFocus, uiStore.variation) : [])
+			.map((a) => ({
+				groupIndex: a.groupIndex,
+				group: morphGroupName(activePatch.value, a.groupIndex),
+				area: a.location === 0 ? 'FX' : 'VA',
+				...assignmentNames(activePatch.value, a),
+				range: a.range,
+			}))
+			.sort((x, y) => x.groupIndex - y.groupIndex),
+	);
 
 	const morphDial = (i: number) => patchParams.value?.[uiStore.variation]?.morphDials?.[i] ?? 0;
 	const morphMode = (i: number) => patchParams.value?.[uiStore.variation]?.morphModes?.[i] ?? 0;

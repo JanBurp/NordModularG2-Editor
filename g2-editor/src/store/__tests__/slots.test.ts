@@ -178,6 +178,20 @@ describe('paste', () => {
 		expect(assigned).toHaveLength(25);
 		expect(assigned[24]).toMatchObject({ moduleIndex: 7, paramIndex: 0 });
 	});
+
+	it('refuses a morph assignment on a 26th distinct param, but allows another group on an already-morphed one', async () => {
+		const store = useSlotsStore();
+		const existing = Array.from({ length: 25 }, (_, i) => ({ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: i, range: 1 }));
+		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: existing } }] as any;
+		const list = () => store.slots['A'].variations![0].patch.morphAssignments;
+
+		await store.assignParamToMorphGroup('A', 0, 1, 1, 1, 25, 127);
+		expect(list()).toHaveLength(25);
+
+		await store.assignParamToMorphGroup('A', 0, 1, 1, 1, 3, 50);
+		expect(list()).toHaveLength(26);
+		expect(list().filter((a) => a.paramIndex === 3).map((a) => a.groupIndex)).toEqual([0, 1]);
+	});
 });
 
 describe('setMode', () => {

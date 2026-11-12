@@ -42,6 +42,7 @@ import {
 	areaConfig,
 	morphGroupName,
 	morphKey,
+	morphedParamKeys,
 	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
@@ -247,8 +248,8 @@ const _paramAwaitingEcho = new Map<string, { value: number; timer: ReturnType<ty
 // so a burst of sends (e.g. a fast morph-range drag) can delay a legitimate echo past a short
 // timeout. 500ms gives real confirmations more room while still catching a truly dropped command.
 const PARAM_ECHO_TIMEOUT_MS = 500;
-// Morphed-param records per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
-const MAX_MORPHED_PARAMS = 25;
+// Distinct morphed params per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
+export const MAX_MORPHED_PARAMS = 25;
 
 function armParamEcho(key: string, value: number): void {
 	const existing = _paramAwaitingEcho.get(key);
@@ -2983,6 +2984,9 @@ export const useSlotsStore = defineStore('slots', {
 		): Promise<void> {
 			const isSame = (a: MorphAssignment) =>
 				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
+			// The limit counts distinct params: another group on an already-morphed param is always allowed.
+			const morphed = morphedParamKeys(this.getMorphAssignments(slot, variation));
+			if (morphed.size >= MAX_MORPHED_PARAMS && !morphed.has(`${location}:${moduleIndex}:${paramIndex}`)) return;
 			this._mutateMorphAssignments(
 				slot,
 				variation,
