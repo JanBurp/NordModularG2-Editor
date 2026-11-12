@@ -666,9 +666,30 @@ ipcMain.handle('cli:run-batch', async (event, argsList: string[][]) => {
 	return [await sendSeq(session, argsList)];
 });
 
+// A G2 plugged in whose driver Windows couldn't start (none installed: status Error, not OK).
+function hasDriverlessG2(): Promise<boolean> {
+	return new Promise((resolve) => {
+		const proc = spawn('powershell.exe', [
+			'-NoProfile',
+			'-Command',
+			"if (Get-PnpDevice -PresentOnly | ? { $_.InstanceId -like 'USB\\VID_0FFC&PID_0002\\*' -and $_.Status -ne 'OK' }) { exit 0 } else { exit 1 }",
+		]);
+		proc.on('error', () => resolve(false));
+		proc.on('close', (code) => resolve(code === 0));
+	});
+}
+
 ipcMain.handle('cli:watch-start', async (event) => {
 	const session = resolveSession(event);
-	if (!session) throw new Error('No device bound to this window');
+	if (!session) {
+		// libusb doesn't list a G2 that has no driver at all (fresh Windows install: "Unknown device"),
+		// so no daemon ever reports usb_driver_error. Ask Windows instead, and offer the driver install.
+		if (process.platform === 'win32' && (await hasDriverlessG2())) {
+			event.sender.send('cli:watch-event', JSON.stringify({ type: 'usb_driver_error', code: 'NO_DRIVER' }));
+			return;
+		}
+		throw new Error('No device bound to this window');
+	}
 	if (session.earlyEvents && session.daemonProcess) {
 		// Daemon was started ahead of the renderer: the listener is registered now, hand over what it missed.
 		const held = session.earlyEvents;
