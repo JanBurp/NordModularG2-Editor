@@ -25,7 +25,7 @@
 				class="switch-bitmap"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect x="0" y="0" :width="width" :height="height" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<rect x="0" y="0" :width="width" :height="height" :fill="btnFill(activeIndex === 1)" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
@@ -39,7 +39,7 @@
 				class="switch-bitmap"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
+				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(true, '#EEE')" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
@@ -58,7 +58,7 @@
 				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
-				<rect x="0" y="0" :width="width" height="11" :fill="index === activeIndex ? '#6df2f2' : '#CCC'" stroke="#333" />
+				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(index === activeIndex)" stroke="#333" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${param.n}-${index})`" />
 			</svg>
 		</template>
@@ -71,8 +71,8 @@
 				class="switch-button"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="activeIndex === 1 ? '#6df2f2' : '#CCC'" />
-				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="btnFill(activeIndex === 1)" />
+				<text :x="width / 2" :y="9" :fill="textFill(activeIndex === 1)" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
 				</text>
 			</g>
@@ -83,8 +83,8 @@
 				class="switch-button"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" fill="#EEE" />
-				<text :x="width / 2" :y="9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="btnFill(true, '#EEE')" />
+				<text :x="width / 2" :y="9" :fill="textFill(true)" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
 				</text>
 			</g>
@@ -100,22 +100,19 @@
 				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
-				<rect
-					:x="getButtonX(index)"
-					:y="getButtonY(index)"
-					:width="width"
-					height="11"
-					:fill="index === activeIndex ? '#6df2f2' : '#CCC'"
-					stroke="#333"
-				/>
-				<text :x="getButtonX(index) + width / 2" :y="getButtonY(index) + 9" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+				<rect :x="getButtonX(index)" :y="getButtonY(index)" :width="width" height="11" :fill="btnFill(index === activeIndex)" stroke="#333" />
+				<text
+					:x="getButtonX(index) + width / 2"
+					:y="getButtonY(index) + 9"
+					:fill="textFill(index === activeIndex)"
+					font-size="8"
+					text-anchor="middle"
+					pointer-events="none"
+				>
 					<SearchHit :text="name" :hit="searchHitOf(index)" />
 				</text>
 			</g>
 		</template>
-
-		<!-- Morph Group assignment indicator: red = assigned to the selected group, blue = another group -->
-		<rect v-if="morphColor" x="0" y="-2" :width="width" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
 
 		<!-- Find & Replace: frame matching labels where their text isn't drawn (one button at a time, or bitmaps) -->
 		<rect
@@ -184,6 +181,16 @@
 		(index, value) => emit('change', index, value, true),
 		(info) => emit('paramLabelEdit', info),
 	);
+
+	// Morph Group assignment: the whole button takes the group's color (red = selected group, blue = another).
+	// The on state is the full color, off a pale tint of it, so the state stays readable. Without a morph
+	// assignment: `base` (default on #6df2f2 / off #CCC).
+	function btnFill(active: boolean, base?: string): string {
+		if (!props.morphColor) return base ?? (active ? '#6df2f2' : '#CCC');
+		const color = morphColorHex(props.morphColor);
+		return active ? color : `color-mix(in srgb, ${color} 35%, #CCC)`;
+	}
+	const textFill = (active: boolean) => (props.morphColor && active ? '#fff' : '#000');
 
 	function searchHitOf(labelIndex: number): 'match' | 'current' | null {
 		const m = props.searchMatches?.find((x) => x.labelIndex === labelIndex);
