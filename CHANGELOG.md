@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [0.8.2] - 2026-11-12
 
 ### New
+- Mini Mutator in Patch Toolbar (with keycommands)
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
 - Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)

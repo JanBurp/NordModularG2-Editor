@@ -32,6 +32,12 @@
 
 		<ColorPicker />
 		<CableVisibilitySelector />
+		<ToolBarDivider />
+		<!-- hidden (keys too, see App.vue) while the big Patch Mutator is open -->
+		<template v-if="!settingsStore.patchMutatorVisible">
+			<MiniMutator />
+			<ToolBarDivider />
+		</template>
 		<PatchLevel />
 		<!-- mini load meter: always with the extended toolbar hidden (wide windows), else once the extended toolbar's
 		     own meter has made room (< 1356px, see ExtendedToolBar.vue; both toolbars are window-wide) -->
@@ -59,6 +65,7 @@
 	import { SOUND_CATEGORIES as soundCategories, VARIATION_OPTIONS } from '../../constants';
 	import { VOICES } from '../../types/patch';
 	import ColorPicker from '../common/ColorPicker.vue';
+	import MiniMutator from './MiniMutator.vue';
 
 	withDefaults(defineProps<{ patchName: string; mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
 	const emit = defineEmits<{

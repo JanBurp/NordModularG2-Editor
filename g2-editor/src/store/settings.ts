@@ -65,6 +65,10 @@ export const useSettingsStore = defineStore('settings', {
 		libraryFavorites: [] as string[], // Library items' paths relative to the library folder
 		libraryFavoritesOnly: false as boolean,
 	}),
+	getters: {
+		// The big Patch Mutator section is on screen (the Mini Mutator hides meanwhile)
+		patchMutatorVisible: (s) => s.showRightPane && s.rightPaneTab === 'mutator' && s.patchMutatorOpen,
+	},
 	actions: {
 		addRecentFile(path: string, kind: RecentFile['kind']) {
 			this.recentFiles = [{ path, kind }, ...this.recentFiles.filter((f) => f.path !== path)].slice(0, MAX_RECENT_FILES);

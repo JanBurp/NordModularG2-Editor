@@ -109,6 +109,9 @@ export const STATUS_HINTS = {
 	keyboardDrone: 'Click: hold played note until clicked again',
 	keyboardRepeat: 'Click: repeatedly re-strike played note',
 	keyboardKeys: 'Click: play note · Drag: glide across keys',
+	miniMutate: 'Click/U: mutate the current variation (selected modules, or the whole patch)',
+	miniRandomize: 'Click/N: randomize the current variation (selected modules, or the whole patch)',
+	miniMutateProb: 'Drag/Wheel: mutation probability (Range follows via Link: few big jumps ↔ many small ones)',
 } as const;
 
 export type StatusHintKey = keyof typeof STATUS_HINTS;
