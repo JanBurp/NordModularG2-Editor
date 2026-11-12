@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-12
+
 ### New
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
@@ -17,9 +19,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
-- Windows: with multiple devices in seperate windows, closing one would show an error popup
+- Windows: with multiple devices in separate windows, closing one would show an error popup
 - Update node versions on build scripts
-- Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
+- Help of module (F1 or via context-menu) did not open immediately, needs sometimes three attempts
 
 ### Changed
 - Added split view to View menu
@@ -58,7 +60,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - CLI warns when it uploads an old-format file unconverted
 - Test patches in file formats 13–18, with the original editor's saves of all old-format test files
 
-## [0.8.0] - 2026-11-1
+## [0.8.0] - 2026-11-01
 
 ### New
 - Patch Adjuster
