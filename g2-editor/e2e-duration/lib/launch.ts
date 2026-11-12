@@ -3,7 +3,7 @@ import fs from 'fs';
 import os from 'os';
 import path from 'path';
 import type { EventLog } from './eventLog';
-import { editorPage } from '../../e2e/fixtures/electron';
+import { editorPage, setDesktopSize } from '../../e2e/fixtures/electron';
 
 const APP_ROOT = path.join(__dirname, '..', '..');
 
@@ -39,9 +39,7 @@ export async function launchReal(log: EventLog): Promise<Launched> {
 	app.on('close', () => log.log('main', { line: '[duration-test] Electron app closed' }));
 
 	const page = await editorPage(app);
-	// A hidden (HEADLESS) window stays at its 800×600 default, where the small-screen layout hides the load meter,
-	// the New/Init column and more; run at a desktop size, as e2e/fixtures/electron.ts does.
-	await app.evaluate(({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1600, 900));
+	if (!process.env.DURATION_HEADED) await setDesktopSize(app);
 	page.on('console', (m) => {
 		if (m.type() === 'warning' || m.type() === 'error') log.log('console', { line: m.text().slice(0, 600) });
 	});

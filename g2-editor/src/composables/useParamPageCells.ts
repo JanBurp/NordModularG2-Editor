@@ -8,7 +8,7 @@ import { useContextMenu } from './useContextMenu';
 import { showToast } from './useToast';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
-import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
+import { assignmentNames, defaultPatchParams } from '../store/slotHelpers';
 import { KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
 import { meterRows } from '../renderer/vuAutoAssign';
 import { serializeDragPayload, parseDragPayload } from '../utils/dragPayload';
@@ -168,26 +168,25 @@ export function useParamPageCells() {
 			const slotIndex = slotIndexFor(bank, page, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
 			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
+			const target = slotsStore.slots[assignmentSlot(assignment)];
+			// Default module/param names; a knob's param label below also honours user-renamed labels.
+			const names = assignmentNames(target.patch, assignment);
 			// location=2 = the PATCH_MORPH pseudo-module: paramIndex is a Morph Group, the knob is its dial.
 			// No button and no morph colouring (a morph dial can't itself be morph-assigned).
 			if (assignment.location === 2) {
-				const target = slotsStore.slots[assignmentSlot(assignment)];
 				const value = target.variations?.[uiStore.variation]?.patch.morphDials[assignment.paramIndex] ?? 0;
 				return {
 					slotIndex,
 					assignment,
 					...emptyCell,
-					moduleLabel: 'Morph',
-					paramLabel: morphGroupName(target.patch, assignment.paramIndex),
+					moduleLabel: names.module,
+					paramLabel: names.param,
 					value,
 					valueLabel: String(value),
 					defaultValue: defaultPatchParams().morphDials[assignment.paramIndex],
 				};
 			}
 			const moduleInfo = resolveModule(assignment);
-			const moduleLabel = moduleInfo
-				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
-				: String(assignment.moduleIndex);
 			// Level-meter target (isLed=1): paramIndex is a LED number, not a param. The hardware shows
 			// it as a circular VU around the knob; the editor shows a live VU meter (VuMeterRound/VuMeterBar).
 			if (assignment.isLed) {
@@ -195,8 +194,8 @@ export function useParamPageCells() {
 					slotIndex,
 					assignment,
 					...emptyCell,
-					moduleLabel,
-					paramLabel: `Meter ${assignment.paramIndex + 1}`,
+					moduleLabel: names.module,
+					paramLabel: names.param,
 					valueLabel: '[LED]',
 					value: meterLevel(assignment, moduleInfo),
 				};
@@ -217,7 +216,7 @@ export function useParamPageCells() {
 			return {
 				slotIndex,
 				assignment,
-				moduleLabel,
+				moduleLabel: names.module,
 				// A knob paired with a user-labeled button (e.g. Mixer level + mute) is named by that label
 				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,

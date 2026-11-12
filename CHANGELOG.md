@@ -8,23 +8,26 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.2] - 2026-11-12
+
 ### New
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
 - Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)
+- Responsiveness, now even works on 7” Pi screens
+- SplitBar a bit bigger and now with small buttons to change area
+- Show names of assigned params in MidiCC/ParamPages ContextMenu
 
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
-- Windows: with multiple devices in seperate windows, closing one would show an error popup
+- Windows: with multiple devices in separate windows, closing one would show an error popup
 - Update node versions on build scripts
-- Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
+- Help of module (F1 or via context-menu) did not open immediately, needs sometimes three attempts
 
 ### Changed
-- SplitBar a bit bigger and now with small buttons to change area
 - Added split view to View menu
 - Module help now uses the original help pages (including "Common … parameters")
 - Changed Settings to the wider SidePanel
-- Responsiveness, now even works on 7” Pi screens
 
 ## [0.8.1] - 2026-11-06
 
@@ -60,7 +63,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - CLI warns when it uploads an old-format file unconverted
 - Test patches in file formats 13–18, with the original editor's saves of all old-format test files
 
-## [0.8.0] - 2026-11-1
+## [0.8.0] - 2026-11-01
 
 ### New
 - Patch Adjuster
