@@ -8,6 +8,8 @@ import {
 	isCableSourceEnd,
 	isUnusedModule,
 	assignedModules,
+	assignmentLabel,
+	assignmentNames,
 	MAX_MODULE_INDEX,
 	moduleActionTargets,
 	resolveColumnCollisions,
@@ -273,5 +275,39 @@ describe('computeAssignRows', () => {
 		);
 		expect(next).toEqual([param(41), meter(8, 2), meter(9, 5)]);
 		expect(touched).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 40]);
+	});
+});
+
+describe('assignmentNames', () => {
+	// areas[0] = FX (location 0), areas[1] = voice (location 1); OscA = type 97, param 0 = FreqCoarse
+	const patch: any = {
+		areas: [{ modules: [{ ...mod(3, 97, 0, [], []), uname: '' }] }, { modules: [{ ...mod(5, 97, 0, [], []), uname: 'Lead' }] }],
+		morphParamLabels: [{ paramIndex: 9, labels: ['MyVel'] }],
+	};
+
+	it('uses the module short name when there is no uname', () => {
+		expect(assignmentNames(patch, { location: 0, moduleIndex: 3, paramIndex: 0 })).toEqual({ module: 'OscA', param: 'FreqCoarse' });
+	});
+
+	it('prefers the module uname and resolves the voice area', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 5, paramIndex: 1 })).toEqual({ module: 'Lead', param: 'FreqFine' });
+	});
+
+	it('names a level meter by its LED number', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 5, paramIndex: 2, isLed: 1 }).param).toBe('Meter 3');
+	});
+
+	it('names a Morph Group, honouring a renamed label', () => {
+		expect(assignmentNames(patch, { location: 2, moduleIndex: 1, paramIndex: 0 })).toEqual({ module: 'Morph', param: 'Wheel' });
+		expect(assignmentNames(patch, { location: 2, moduleIndex: 1, paramIndex: 1 }).param).toBe('MyVel');
+	});
+
+	it('falls back to raw indices for a missing module or patch', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 99, paramIndex: 4 })).toEqual({ module: '99', param: '4' });
+		expect(assignmentNames(null, { location: 0, moduleIndex: 7, paramIndex: 2 })).toEqual({ module: '7', param: '2' });
+	});
+
+	it('joins module and param in assignmentLabel', () => {
+		expect(assignmentLabel(patch, { location: 1, moduleIndex: 5, paramIndex: 0 })).toBe('Lead · FreqCoarse');
 	});
 });

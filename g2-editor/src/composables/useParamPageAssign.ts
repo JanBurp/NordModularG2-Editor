@@ -67,8 +67,9 @@ export function buildParamPageMenuItems(opts: {
 		deassignPrefix: 'Deassign',
 		deassignDisabled: !existing || !slot,
 		knobLabel: (slotIndex) => {
-			const a = slot ? slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === slotIndex) : undefined;
-			return a && slot ? assignmentLabel(slotsStore.slots[slot].patch, a) : '';
+			const target = slot ? slotsStore.slots[slot] : null;
+			const a = target?.paramPages.find((k) => k.slotIndex === slotIndex);
+			return a ? assignmentLabel(target?.patch, a) : '';
 		},
 		assign: (slotIndex) => {
 			if (slot) slotsStore.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
