@@ -27,7 +27,8 @@ See the [Changelog](https://github.com/JanBurp/NordModularG2-Editor/blob/main/CH
 | Undo/Redo, MIDI CC assignment, Browser, Variation copy, Led's in patch, etc. | ✅ Done |
 | Morph Editing, Parameter Pages Assignment | ✅ Done |
 | Patch Adjuster, Mutator, Parameter Overview, new: Bank organizer, Find & Replace, Library of building blocks  | ✅ Done |
-| Linux build, and more | 🗓 Planned |
+| Easier Windows install, Linux build, Midi-CC over USB, Midi controlling the editor, VU Graphs, and more | 🗓 Busy |
+| Sound Engine | 🗓 Being investigated |
 
 ### Video of version v0.8.0 (november 2026)
 
