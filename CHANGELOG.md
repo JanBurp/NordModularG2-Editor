@@ -8,13 +8,16 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Mini Mutator in Patch Toolbar (with keycommands)
+- Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)
+
+
 ## [0.8.2] - 2026-11-12
 
 ### New
-- Mini Mutator in Patch Toolbar (with keycommands)
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
-- Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)
 - Responsiveness, now even works on 7” Pi screens
 - SplitBar a bit bigger and now with small buttons to change area
 - Show names of assigned params in MidiCC/ParamPages ContextMenu
