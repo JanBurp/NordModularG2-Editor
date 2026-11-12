@@ -11,6 +11,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### New
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
+- Responsiveness, now even works on 7” Pi screens
 
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
@@ -23,7 +24,6 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Added split view to View menu
 - Module help now uses the original help pages (including "Common … parameters")
 - Changed Settings to the wider SidePanel
-- Responsiveness, now even works on 7” Pi screens
 
 ## [0.8.1] - 2026-11-06
 
