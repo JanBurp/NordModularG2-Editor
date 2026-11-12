@@ -2,12 +2,18 @@ import { describe, expect, it } from 'vitest';
 import {
 	buildCloneEntries,
 	computeAssignRows,
+	copyModuleParams,
+	copyMorphGroup,
+	copyPatchParams,
+	mergeMorphs,
 	buildPasteParamsPairs,
 	canPasteParams,
 	freeModuleIds,
 	isCableSourceEnd,
 	isUnusedModule,
 	assignedModules,
+	assignmentLabel,
+	assignmentNames,
 	MAX_MODULE_INDEX,
 	moduleActionTargets,
 	resolveColumnCollisions,
@@ -273,5 +279,102 @@ describe('computeAssignRows', () => {
 		);
 		expect(next).toEqual([param(41), meter(8, 2), meter(9, 5)]);
 		expect(touched).toEqual([8, 9, 10, 11, 12, 13, 14, 15, 40]);
+	});
+});
+
+describe('Copy to Variations builders', () => {
+	const m = (groupIndex: number, moduleIndex: number, paramIndex: number, range: number, location: 0 | 1 = 1): any => ({
+		groupIndex,
+		location,
+		moduleIndex,
+		paramIndex,
+		range,
+	});
+	function state(values: number[], morphs: any[] = [], patch: any = {}): any {
+		return {
+			fx: { 2: [...values] },
+			voice: { 2: [...values], 3: [...values] },
+			patch: { patchVol: 0, glide: 0, morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: morphs, ...patch },
+		};
+	}
+
+	it('mergeMorphs replaces matching records and only adds new ones within the 25 limit', () => {
+		const others = Array.from({ length: 23 }, (_, i) => m(0, 30 + i, 0, 1));
+		const prev = [...others, m(0, 2, 0, 10)];
+		const next = mergeMorphs(prev, (a) => a.moduleIndex === 2, [m(0, 2, 0, 50), m(1, 2, 1, 60), m(2, 2, 1, 70)]);
+		expect(next).toEqual([...others, m(0, 2, 0, 50), m(1, 2, 1, 60)]);
+	});
+
+	it('copyModuleParams copies whole modules, values only, in the given area', () => {
+		const from = state([1, 2], [m(0, 2, 0, 50)]);
+		const to = state([9, 9], [m(0, 2, 0, 10)]);
+		copyModuleParams('voice', [2], undefined, false)(from, to);
+		expect(to.voice[2]).toEqual([1, 2]);
+		expect(to.voice[3]).toEqual([9, 9]);
+		expect(to.fx[2]).toEqual([9, 9]);
+		expect(to.patch.morphAssignments).toEqual([m(0, 2, 0, 10)]);
+		from.voice[2][0] = 5;
+		expect(to.voice[2][0]).toBe(1); // a copy, not the source's array
+	});
+
+	it('copyModuleParams with one param and morphs copies just that param and its morph ranges', () => {
+		const from = state([1, 2], [m(0, 2, 0, 50), m(1, 2, 1, 60), m(0, 2, 0, 70, 0)]);
+		const to = state([9, 9], [m(3, 2, 0, 10), m(0, 2, 1, 20)]);
+		copyModuleParams('voice', [2], 0, true)(from, to);
+		expect(to.voice[2]).toEqual([1, 9]);
+		// param 0's group 3 record is gone (not in the source), param 1 and the FX record untouched
+		expect(to.patch.morphAssignments).toEqual([m(0, 2, 1, 20), m(0, 2, 0, 50)]);
+	});
+
+	it('copyPatchParams copies only the given keys', () => {
+		const to = state([], [], { patchVol: 10, glide: 2 });
+		copyPatchParams(['patchVol'])(state([], [], { patchVol: 100, glide: 1 }), to);
+		expect(to.patch.patchVol).toBe(100);
+		expect(to.patch.glide).toBe(2);
+	});
+
+	it('copyMorphGroup copies the dial, the source and the group ranges', () => {
+		const from = state([], [m(2, 5, 0, 40), m(1, 5, 0, 30)]);
+		from.patch.morphDials[2] = 99;
+		from.patch.morphModes[2] = 1;
+		const to = state([], [m(2, 6, 0, 10), m(1, 6, 0, 20)]);
+		copyMorphGroup(2)(from, to);
+		expect(to.patch.morphDials[2]).toBe(99);
+		expect(to.patch.morphModes[2]).toBe(1);
+		expect(to.patch.morphAssignments).toEqual([m(1, 6, 0, 20), m(2, 5, 0, 40)]);
+	});
+});
+
+describe('assignmentNames', () => {
+	// areas[0] = FX (location 0), areas[1] = voice (location 1); OscA = type 97, param 0 = FreqCoarse
+	const patch: any = {
+		areas: [{ modules: [{ ...mod(3, 97, 0, [], []), uname: '' }] }, { modules: [{ ...mod(5, 97, 0, [], []), uname: 'Lead' }] }],
+		morphParamLabels: [{ paramIndex: 9, labels: ['MyVel'] }],
+	};
+
+	it('uses the module short name when there is no uname', () => {
+		expect(assignmentNames(patch, { location: 0, moduleIndex: 3, paramIndex: 0 })).toEqual({ module: 'OscA', param: 'FreqCoarse' });
+	});
+
+	it('prefers the module uname and resolves the voice area', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 5, paramIndex: 1 })).toEqual({ module: 'Lead', param: 'FreqFine' });
+	});
+
+	it('names a level meter by its LED number', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 5, paramIndex: 2, isLed: 1 }).param).toBe('Meter 3');
+	});
+
+	it('names a Morph Group, honouring a renamed label', () => {
+		expect(assignmentNames(patch, { location: 2, moduleIndex: 1, paramIndex: 0 })).toEqual({ module: 'Morph', param: 'Wheel' });
+		expect(assignmentNames(patch, { location: 2, moduleIndex: 1, paramIndex: 1 }).param).toBe('MyVel');
+	});
+
+	it('falls back to raw indices for a missing module or patch', () => {
+		expect(assignmentNames(patch, { location: 1, moduleIndex: 99, paramIndex: 4 })).toEqual({ module: '99', param: '4' });
+		expect(assignmentNames(null, { location: 0, moduleIndex: 7, paramIndex: 2 })).toEqual({ module: '7', param: '2' });
+	});
+
+	it('joins module and param in assignmentLabel', () => {
+		expect(assignmentLabel(patch, { location: 1, moduleIndex: 5, paramIndex: 0 })).toBe('Lead · FreqCoarse');
 	});
 });

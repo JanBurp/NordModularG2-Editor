@@ -3,11 +3,12 @@
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { useLedStore } from '../store/led';
+import { useMeterGraphStore } from '../store/meterGraph';
 import { useContextMenu } from './useContextMenu';
 import { showToast } from './useToast';
 import { buildMorphMenuItems } from './useMorphAssign';
 import { resolveSwitchDisplayNames } from './useSwitch';
-import { defaultPatchParams, morphGroupName } from '../store/slotHelpers';
+import { assignmentNames, defaultPatchParams } from '../store/slotHelpers';
 import { KNOBS_PER_PAGE, TOTAL_KNOB_SLOTS, slotIndexFor, slotIndexToBankPageKnob } from '../renderer/paramPages';
 import { meterRows } from '../renderer/vuAutoAssign';
 import { serializeDragPayload, parseDragPayload } from '../utils/dragPayload';
@@ -17,7 +18,7 @@ import { getButtonParamIndex } from '../renderer/buttonParams';
 import { getParam } from '../renderer/parammap';
 import { formatParamDisplay } from '../utils/moduleControls';
 import { clamp } from '../utils/math';
-import { vuMetersByLedNo } from '../utils/vuLevel';
+import { vuStripKey } from '../utils/vuLevel';
 import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '../types';
 
 export type PageAssignment = ParamPageAssignment | GlobalParamPageAssignment;
@@ -75,6 +76,7 @@ export function useParamPageCells() {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const ledStore = useLedStore();
+	const meterGraph = useMeterGraphStore();
 	const { open: openContextMenu } = useContextMenu();
 
 	// A Global Parameter Page assignment carries its own target `slot` (it can address any of the
@@ -146,10 +148,9 @@ export function useParamPageCells() {
 	// module's vu elements by x (see Module.vue's onVuContextMenu); the led store keys them `vu-N` in
 	// element order. Read from the assignment's own patch: a Global Page meter can target any slot.
 	function meterLevel(a: PageAssignment, moduleInfo: ReturnType<typeof resolveModule>): number {
-		const target = vuMetersByLedNo(moduleInfo?.moduleDef)[a.paramIndex];
-		if (!target) return 0;
-		const vus = (moduleInfo?.moduleDef?.ve ?? []).filter((v) => v.type === 'vu');
-		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, `vu-${vus.indexOf(target)}`, assignmentSlot(a));
+		const key = vuStripKey(moduleInfo?.moduleDef, a.paramIndex);
+		if (!key) return 0;
+		const raw = ledStore.getStripValue(a.location === 1 ? 'va' : 'fx', a.moduleIndex, key, assignmentSlot(a));
 		return raw === 255 ? 0 : Math.min(raw, 127);
 	}
 
@@ -167,26 +168,25 @@ export function useParamPageCells() {
 			const slotIndex = slotIndexFor(bank, page, knob);
 			const assignment = list.find((k) => k.slotIndex === slotIndex) ?? null;
 			if (!assignment) return { slotIndex, assignment: null, ...emptyCell };
+			const target = slotsStore.slots[assignmentSlot(assignment)];
+			// Default module/param names; a knob's param label below also honours user-renamed labels.
+			const names = assignmentNames(target.patch, assignment);
 			// location=2 = the PATCH_MORPH pseudo-module: paramIndex is a Morph Group, the knob is its dial.
 			// No button and no morph colouring (a morph dial can't itself be morph-assigned).
 			if (assignment.location === 2) {
-				const target = slotsStore.slots[assignmentSlot(assignment)];
 				const value = target.variations?.[uiStore.variation]?.patch.morphDials[assignment.paramIndex] ?? 0;
 				return {
 					slotIndex,
 					assignment,
 					...emptyCell,
-					moduleLabel: 'Morph',
-					paramLabel: morphGroupName(target.patch, assignment.paramIndex),
+					moduleLabel: names.module,
+					paramLabel: names.param,
 					value,
 					valueLabel: String(value),
 					defaultValue: defaultPatchParams().morphDials[assignment.paramIndex],
 				};
 			}
 			const moduleInfo = resolveModule(assignment);
-			const moduleLabel = moduleInfo
-				? moduleInfo.mod.uname || moduleInfo.moduleDef?.short || String(assignment.moduleIndex)
-				: String(assignment.moduleIndex);
 			// Level-meter target (isLed=1): paramIndex is a LED number, not a param. The hardware shows
 			// it as a circular VU around the knob; the editor shows a live VU meter (VuMeterRound/VuMeterBar).
 			if (assignment.isLed) {
@@ -194,8 +194,8 @@ export function useParamPageCells() {
 					slotIndex,
 					assignment,
 					...emptyCell,
-					moduleLabel,
-					paramLabel: `Meter ${assignment.paramIndex + 1}`,
+					moduleLabel: names.module,
+					paramLabel: names.param,
 					valueLabel: '[LED]',
 					value: meterLevel(assignment, moduleInfo),
 				};
@@ -216,7 +216,7 @@ export function useParamPageCells() {
 			return {
 				slotIndex,
 				assignment,
-				moduleLabel,
+				moduleLabel: names.module,
 				// A knob paired with a user-labeled button (e.g. Mixer level + mute) is named by that label
 				paramLabel: buttonDisplay?.userLabel ?? knobDisplay.label,
 				value: knobDisplay.value,
@@ -282,8 +282,20 @@ export function useParamPageCells() {
 		};
 	}
 
+	// "Show all VU meters in Meter Graph": every meter assigned on the pages showing (Patch or Global)
+	function graphAllMetersItem(): ContextMenuItem {
+		const meters = currentAssignments()
+			.filter((a) => a.isLed && a.location !== 2)
+			.map((a) => ({ slot: assignmentSlot(a), location: a.location as 0 | 1, moduleIndex: a.moduleIndex, ledNo: a.paramIndex }));
+		return {
+			label: 'Show all VU meters in Meter Graph',
+			disabled: meters.every((m) => meterGraph.has(m)),
+			action: () => meterGraph.addAll(meters),
+		};
+	}
+
 	function onCellContextMenu(cell: Cell, event: MouseEvent) {
-		if (!cell.assignment) return openContextMenu(event, [assignMetersItem(cell)]);
+		if (!cell.assignment) return openContextMenu(event, [assignMetersItem(cell), graphAllMetersItem()]);
 		const a = cell.assignment;
 		let items: ContextMenuItem[];
 		if (uiStore.globalPagesActive) {
@@ -292,7 +304,9 @@ export function useParamPageCells() {
 			const slot = uiStore.slotInFocus;
 			items = [{ label: 'Deassign', disabled: !slot, action: () => slot && slotsStore.deassignParamPage(slot, cell.slotIndex) }];
 		}
-		items.push(assignMetersItem(cell));
+		items.push(assignMetersItem(cell), graphAllMetersItem());
+		if (a.isLed && a.location !== 2)
+			items.push(meterGraph.menuItem({ slot: assignmentSlot(a), location: a.location, moduleIndex: a.moduleIndex, ledNo: a.paramIndex }));
 		if (a.location === 2) return openContextMenu(event, items);
 		// Same single-group-toggle gesture as canvas (Module.vue): toggles this param's membership in
 		// whichever Morph Group is currently selected on the MorphGroups.vue toolbar. Resolved against

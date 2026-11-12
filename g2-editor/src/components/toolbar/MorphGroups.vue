@@ -56,7 +56,8 @@
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
 	import { useSlotsStore } from '../../store/slots';
-	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
+	import { copyMorphGroup, defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
+	import { buildCopyToVariationsItem } from '../../composables/useCopyToVariations';
 	import { useUiStore } from '../../store/ui';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
 	import SearchHit from '../common/SearchHit.vue';
@@ -165,6 +166,7 @@
 					action: () => slot && slotsStore.copyMorphGroup(slot, variation, groupIndex, j),
 				})),
 			},
+			buildCopyToVariationsItem('Copy to Variations', copyMorphGroup(groupIndex), !slot),
 			{ type: 'separator' },
 		];
 
@@ -174,7 +176,7 @@
 			...buildCCMenuItems({
 				lastCC,
 				existing,
-				enabled: !!slot,
+				slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, 2, 1, groupIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 			}),

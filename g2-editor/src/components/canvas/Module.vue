@@ -90,6 +90,7 @@
 			<ModuleBitmap v-else-if="entry.ve.type === 'bmp'" :ve="entry.ve"></ModuleBitmap>
 			<g
 				v-else-if="entry.ve.type === 'vu'"
+				data-testid="vu-meter"
 				@contextmenu.stop.prevent="onVuContextMenu($event, entry.ve)"
 				@dragover.prevent
 				@drop="onVuDrop($event, entry.ve)"
@@ -308,6 +309,7 @@
 	import { buildColorSwatches } from '../../utils/colorSwatches';
 	import { useLedStore } from '../../store/led';
 	import { useSlotsStore } from '../../store/slots';
+	import { useMeterGraphStore } from '../../store/meterGraph';
 	import { canPasteParams, moduleActionTargets } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
 	import { useDeviceStore } from '../../store/device';
@@ -315,6 +317,7 @@
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { vuMetersByLedNo } from '../../utils/vuLevel';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { buildCopyParamsToVariationsItems } from '../../composables/useCopyToVariations';
 	import {
 		buildParamPageMenuItems,
 		buildGlobalParamPageMenuItems,
@@ -386,6 +389,10 @@
 				),
 				action: () => emit('modulePasteParams', moduleIdx.value),
 			},
+			...buildCopyParamsToVariationsItems(
+				props.areaLabel === 'va' ? 'voice' : 'fx',
+				moduleActionTargets(uiStore, moduleIdx.value, props.areaLabel ?? 'fx'),
+			),
 			{ label: 'Save Selection to Library…', action: saveToLibrary },
 			{ type: 'separator' },
 			{
@@ -424,6 +431,8 @@
 		openContextMenu(e, [
 			...buildParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing, isLed: 1 }),
 			...buildGlobalParamPageMenuItems({ slot, location, moduleIndex: moduleIdx.value, paramIndex: ledNo, existing: existingGlobal, isLed: 1 }),
+			{ type: 'separator' },
+			meterGraph.menuItem({ slot, location, moduleIndex: moduleIdx.value, ledNo }),
 		]);
 	}
 
@@ -595,6 +604,7 @@
 	const uiStore = useUiStore();
 	const { showHint, clearHint } = useStatusHint();
 	const slotsStore = useSlotsStore();
+	const meterGraph = useMeterGraphStore();
 	const settingsStore = useSettingsStore();
 	const mutatorOpen = computed(() => settingsStore.showRightPane && settingsStore.rightPaneTab === 'mutator');
 	const deviceStore = useDeviceStore();
@@ -807,6 +817,8 @@
 		}
 
 		items.push({ type: 'separator' });
+		items.push(...buildCopyParamsToVariationsItems(props.areaLabel === 'va' ? 'voice' : 'fx', [moduleIdx.value], paramIndex));
+		items.push({ type: 'separator' });
 
 		// Morph Group assign/deassign (toggles assignment to the currently selected toolbar group)
 		items.push(
@@ -832,7 +844,7 @@
 			...buildCCMenuItems({
 				lastCC,
 				existing,
-				enabled: !!slot,
+				slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 			}),

@@ -21,6 +21,26 @@ export function morphGroupName(patch: Patch | null | undefined, i: number): stri
 	return patch?.morphParamLabels?.find((pl) => pl.paramIndex === 8 + i)?.labels?.[0] || MORPH_NAMES[i];
 }
 
+// Module + param display names of a MIDI CC / Parameter Page target. location 2 = a Morph Group;
+// isLed = a level meter (paramIndex is its LED number). Falls back to the raw indices.
+export function assignmentNames(
+	patch: Patch | null | undefined,
+	a: { location: number; moduleIndex: number; paramIndex: number; isLed?: number },
+): { module: string; param: string } {
+	if (a.location === 2) return { module: 'Morph', param: morphGroupName(patch, a.paramIndex) };
+	const mod = patch?.areas[a.location === 0 ? 0 : 1]?.modules.find((m) => m.index === a.moduleIndex);
+	const def = mod ? getModule(mod.type) : undefined;
+	return {
+		module: mod?.uname || def?.short || String(a.moduleIndex),
+		param: a.isLed ? `Meter ${a.paramIndex + 1}` : (def?.params?.[a.paramIndex]?.name ?? String(a.paramIndex)),
+	};
+}
+
+export function assignmentLabel(patch: Patch | null | undefined, a: Parameters<typeof assignmentNames>[1]): string {
+	const { module, param } = assignmentNames(patch, a);
+	return `${module} · ${param}`;
+}
+
 export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'va' | 'fx' } {
 	return area === 'voice' ? { areaIdx: 1, location: 'va' } : { areaIdx: 0, location: 'fx' };
 }
@@ -46,6 +66,56 @@ export function moduleActionTargets(
 // Identity of a morph assignment (its range aside).
 export function morphKey(a: MorphAssignment): string {
 	return `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
+}
+
+// Morphed-param records per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
+export const MAX_MORPHED_PARAMS = 25;
+
+// Official GetCopyParamsMolecules: the assignments of `prev` matching `isReplaced` give way to `incoming`;
+// a param not morphed in that group before is only added while the variation stays within MAX_MORPHED_PARAMS.
+export function mergeMorphs(prev: MorphAssignment[], isReplaced: (a: MorphAssignment) => boolean, incoming: MorphAssignment[]): MorphAssignment[] {
+	const prevKeys = new Set(prev.map(morphKey));
+	const next = prev.filter((a) => !isReplaced(a));
+	for (const a of incoming) {
+		if (prevKeys.has(morphKey(a)) || next.length < MAX_MORPHED_PARAMS) next.push({ ...a });
+	}
+	return next;
+}
+
+// Copy to Variations: copies part of variation `from` into (a clone of) another variation `to`.
+export type VariationCopy = (from: VariationState, to: VariationState) => void;
+
+// The params of `moduleIds` (only `paramIdx` when given); `withMorphs` also replaces their morph ranges.
+export function copyModuleParams(area: 'voice' | 'fx', moduleIds: number[], paramIdx: number | undefined, withMorphs: boolean): VariationCopy {
+	const { areaIdx } = areaConfig(area);
+	const ids = new Set(moduleIds);
+	const isCopied = (a: MorphAssignment) => a.location === areaIdx && ids.has(a.moduleIndex) && (paramIdx === undefined || a.paramIndex === paramIdx);
+	return (from, to) => {
+		for (const id of moduleIds) {
+			const src = from[area][id];
+			if (!src || !to[area][id]) continue;
+			if (paramIdx === undefined) to[area][id] = [...src];
+			else to[area][id][paramIdx] = src[paramIdx];
+		}
+		if (withMorphs) to.patch.morphAssignments = mergeMorphs(to.patch.morphAssignments, isCopied, from.patch.morphAssignments.filter(isCopied));
+	};
+}
+
+// Patch settings (volume, mute, glide, …) by key.
+export function copyPatchParams(keys: (keyof PatchParamVariation)[]): VariationCopy {
+	return (from, to) => {
+		for (const key of keys) (to.patch as unknown as Record<string, unknown>)[key] = from.patch[key];
+	};
+}
+
+// Morph Group `g`: its dial, its source and all its morph ranges.
+export function copyMorphGroup(g: number): VariationCopy {
+	const inGroup = (a: MorphAssignment) => a.groupIndex === g;
+	return (from, to) => {
+		to.patch.morphDials[g] = from.patch.morphDials[g];
+		to.patch.morphModes[g] = from.patch.morphModes[g];
+		to.patch.morphAssignments = mergeMorphs(to.patch.morphAssignments, inGroup, from.patch.morphAssignments.filter(inGroup));
+	};
 }
 
 export function findModuleByIndex(modules: ModuleInstance[], id: number): ModuleInstance | undefined {

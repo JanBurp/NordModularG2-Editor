@@ -13,7 +13,8 @@ import { useUndoTarget } from './useUndoTarget';
 import { useSettingsStore } from '@/store/settings';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
-import { areaConfig, canPasteParams, resolveSelectionArea } from '@/store/slotHelpers';
+import { areaConfig, canPasteParams, copyModuleParams, resolveSelectionArea } from '@/store/slotHelpers';
+import { canCopyFrom, copyToVariations } from '@/composables/useCopyToVariations';
 import { useBankDownloadDialog } from '@/composables/useBankDownloadDialog';
 import { useBankUploadDialog } from '@/composables/useBankUploadDialog';
 import { useDownloadToSlotDialog } from '@/composables/useDownloadToSlotDialog';
@@ -55,6 +56,7 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 		canUndo: undoTarget.canUndo.value,
 		canRedo: undoTarget.canRedo.value,
 		hasSelection: uiStore.selectedModules.length > 0,
+		canCopyToVariations: uiStore.selectedModules.length > 0 && canCopyFrom(uiStore.variation),
 		hasClipboard: hasClipboard.value,
 		canPasteParams: canPasteParams(
 			uiStore.clipboardTypes,
@@ -80,6 +82,14 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 		if (action.startsWith('open-recent:')) {
 			const entry = useSettingsStore().recentFiles[Number(action.slice('open-recent:'.length))];
 			if (entry) await patchFile.handlePatchSelect({ type: 'disk', filepath: entry.path, kind: entry.kind });
+			return;
+		}
+		// Edit > Copy Params (with Morphs) to Variations > All Variations | Variation n, for the selected modules
+		const copyMatch = /^copy-params(-morphs)?-to-variations:(all|[0-7])$/.exec(action);
+		if (copyMatch) {
+			if (isInputFocused() || uiStore.selectedModules.length === 0) return;
+			const target = copyMatch[2] === 'all' ? 'all' : Number(copyMatch[2]);
+			await copyToVariations(target, copyModuleParams(resolveSelectionArea(uiStore), uiStore.selectedModules, undefined, !!copyMatch[1]));
 			return;
 		}
 		switch (action) {
@@ -321,6 +331,9 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 			}
 			case 'toggle-keyboard':
 				useSettingsStore().toggleVirtualKeyboard();
+				break;
+			case 'toggle-meter-graph':
+				useSettingsStore().toggleMeterGraph();
 				break;
 			case 'toggle-search-replace': {
 				// Open but not focused: focus it instead of closing.

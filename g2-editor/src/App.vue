@@ -133,6 +133,7 @@
 					</div>
 				</div>
 
+				<MeterGraph v-if="settingsStore.showMeterGraph && !uiStore.showBankOrganizer" class="mt-auto" />
 				<VirtualKeyboard v-if="settingsStore.showVirtualKeyboard" class="mt-auto bg-surface-1 border-t border-line-subtle" />
 			</div>
 
@@ -558,6 +559,7 @@
 	import StatusBar from './components/toolbar/StatusBar.vue';
 	import AreaSplitBar from './components/canvas/AreaSplitBar.vue';
 	import VirtualKeyboard from './components/toolbar/VirtualKeyboard.vue';
+	import MeterGraph from './components/canvas/MeterGraph.vue';
 	import Dialog from './components/common/Dialog.vue';
 	import ComboInput from './components/common/ComboInput.vue';
 	import LoadingOverlay from './components/common/LoadingOverlay.vue';
@@ -605,6 +607,7 @@
 	import { useCableVisibility } from './composables/useCableVisibility';
 	import { useSlotsStore } from './store/slots';
 	import { useUiStore } from './store/ui';
+	import { useMutatorStore } from './store/mutator';
 	import type { SlotLabel } from './store/slots';
 	import { useBrowserStore } from './store/browser';
 	import { useSettingsStore } from './store/settings';
@@ -859,6 +862,12 @@
 				case 'h':
 					e.preventDefault();
 					toggleAllCables();
+					return;
+				case 'u':
+				case 'n':
+					if (settingsStore.patchMutatorVisible) return; // Mini Mutator hidden while the big one is open
+					e.preventDefault();
+					void useMutatorStore().mutateCurrent(e.key === 'u' ? 'mutate' : 'randomize');
 					return;
 				case ' ':
 					e.preventDefault();

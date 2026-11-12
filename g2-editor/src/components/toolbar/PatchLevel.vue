@@ -1,6 +1,6 @@
 <template>
 	<ToolBarLabel>Patch Level:</ToolBarLabel>
-	<div class="h-6 flex items-center gap-2">
+	<div class="h-6 flex items-center gap-2" @contextmenu="onContextMenu">
 		<Knob
 			:value="patchVol()"
 			:default-value="defaultPatchParams().patchVol"
@@ -29,6 +29,9 @@
 	import { usePatchParams } from '../../composables/usePatchParams';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import { TOOLBAR_HINT, useToolbarValueHint } from '../../composables/useValueHint';
+	import { useContextMenu } from '../../composables/useContextMenu';
+	import { buildCopyToVariationsItem } from '../../composables/useCopyToVariations';
+	import { copyPatchParams } from '../../store/slotHelpers';
 
 	const { showHint, clearHint } = useStatusHint();
 
@@ -49,5 +52,10 @@
 	function onActiveChange(val: boolean) {
 		slotsStore.setPatchParam(uiStore.variation, 'activeMuted', val ? 1 : 0);
 		activeHint.changed();
+	}
+
+	const { open: openContextMenu } = useContextMenu();
+	function onContextMenu(e: MouseEvent) {
+		openContextMenu(e, [buildCopyToVariationsItem('Copy to Variations', copyPatchParams(['patchVol', 'activeMuted']), !patchParams.value)]);
 	}
 </script>

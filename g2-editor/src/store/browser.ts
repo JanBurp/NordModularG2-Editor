@@ -209,6 +209,8 @@ export const useBrowserStore = defineStore('browser', {
 		// Returns false when the store failed (already reported with a toast).
 		async storePatch(slotIndex: 0 | 1 | 2 | 3, bank: number, location: number, kind: 'patch' | 'performance', name?: string): Promise<boolean> {
 			const slot = kind === 'performance' ? 4 : slotIndex;
+			// store-patch stores the G2's copy: notes not uploaded yet must get there first
+			if (!(await useSlotsStore().pushPendingText(kind === 'performance' ? SLOT_LABELS : [SLOT_LABELS[slotIndex]]))) return false;
 			try {
 				await window.cli.run(['store-patch', String(slot), String(bank), String(location)]);
 				const category =

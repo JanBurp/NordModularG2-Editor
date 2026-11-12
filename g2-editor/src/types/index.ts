@@ -36,6 +36,7 @@ export type MenuAction =
 	| 'toggle-settings'
 	| 'toggle-svg-viewer'
 	| 'toggle-keyboard'
+	| 'toggle-meter-graph'
 	| 'toggle-patch-mutator'
 	| 'toggle-bank-organizer'
 	| 'area-voice'
@@ -96,6 +97,7 @@ export interface MenuState {
 	canUndo: boolean;
 	canRedo: boolean;
 	hasSelection: boolean;
+	canCopyToVariations: boolean; // a selection, and not auditioning in the Patch Mutator
 	hasClipboard: boolean;
 	canPasteParams: boolean;
 	hasCurrentPatch: boolean;
@@ -223,6 +225,7 @@ export interface ContextMenuSwatch {
 export interface ContextMenuItem {
 	type?: 'item' | 'separator' | 'swatches';
 	label?: string;
+	hint?: string; // dimmed text after the label
 	icon?: string;
 	disabled?: boolean;
 	action?: () => void;

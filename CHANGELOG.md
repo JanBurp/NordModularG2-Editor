@@ -9,25 +9,33 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### New
-- Windows: "Install G2 driver" button in the USB Driver Problem dialog switches all connected G2s to WinUSB in one click (no Zadig needed)
+- Mini Mutator in Patch Toolbar (with keycommands)
+- Copy param(s) to all/other Variations (in ContextMenu's and Edit menu)
+- Windows: "Install G2 driver" button installs for all connected G2s the USB library
+- Linux build added
+
+## [0.8.2] - 2026-11-12
+
+### New
 - Statusbar can be hidden (option in View menu)
 - Wide SidePanel has adjustable width
+- Responsiveness, now even works on 7” Pi screens
+- SplitBar a bit bigger and now with small buttons to change area
+- Show names of assigned params in MidiCC/ParamPages ContextMenu
 
 ### Fixed
 - Help → Open Log Folder: the editor now writes a log file (main.log) you can send along with a bug report
 - Windows: installer asks for the install folder (default Program Files) instead of installing silently in AppData
 - Windows: the "USB Driver Problem" dialog can be closed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering
-- Windows: with multiple devices in seperate windows, closing one would show an error popup
+- Windows: with multiple devices in separate windows, closing one would show an error popup
 - Update node versions on build scripts
-- Help of module (F1 or via context-menu) did not open immediatly, needs sometimes three attempts
+- Help of module (F1 or via context-menu) did not open immediately, needs sometimes three attempts
 
 ### Changed
-- SplitBar a bit bigger and now with small buttons to change area
 - Added split view to View menu
 - Module help now uses the original help pages (including "Common … parameters")
 - Changed Settings to the wider SidePanel
-- Responsiveness, now even works on 7” Pi screens
 
 ## [0.8.1] - 2026-11-06
 
@@ -36,6 +44,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - "Install USB helper" button on Linux: sets up USB permission for the G2 in one click
 - Windows: no more Zadig/WinUSB. The installer sets up UsbDk once; Clavia's driver stays, so the original editor keeps working and multiple G2s need no extra steps
 - Old patch and performance files are converted to new version
+- Graph: You can add a graph for each VU meter in patch to analyse signal in time. Meters are stored with patch notes.
 
 ### Changed
 - Improved and more auto-suggesting cables
@@ -60,12 +69,13 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Patch notes are capped at 1024 characters, as on the G2
 - Patches saved from the G2 include its current-note data, as the original editor's do
 - Fix for copy/paste key commands in Windows & Linux
+- Edited patch notes did not save implicitly (saving patch)
 
 ### Others
 - CLI warns when it uploads an old-format file unconverted
 - Test patches in file formats 13–18, with the original editor's saves of all old-format test files
 
-## [0.8.0] - 2026-11-1
+## [0.8.0] - 2026-11-01
 
 ### New
 - Patch Adjuster

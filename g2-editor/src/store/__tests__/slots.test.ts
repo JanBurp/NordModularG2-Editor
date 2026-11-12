@@ -5,6 +5,8 @@ import { useHistoryStore } from '@/store/history';
 import { useDeviceStore, DeviceStatus } from '@/store/device';
 import { MORPH_NAMES } from '@/types/patch';
 import { runCliBatchSafe, runCliSafe } from '@/store/slotHelpers';
+import { useBrowserStore } from '@/store/browser';
+import * as nmg2PatchSerializer from '@/parser/nmg2PatchSerializer';
 
 afterEach(() => vi.useRealTimers());
 
@@ -469,6 +471,50 @@ describe('setMorphGroupLabel', () => {
 
 		await store.redo();
 		expect(patch.morphParamLabels?.find((pl: any) => pl.paramIndex === 8)?.labels[0]).toBe('Foo');
+	});
+});
+
+describe('copyToVariations', () => {
+	function variations(): any[] {
+		return Array.from({ length: 10 }, (_, v) => ({
+			fx: {},
+			voice: { 2: [v, v] },
+			patch: { patchVol: v, morphDials: Array(8).fill(0), morphModes: Array(8).fill(0), morphAssignments: [] },
+		}));
+	}
+
+	it('copies from the current variation to every other one as one undo step', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = variations();
+		const { copyModuleParams } = await import('@/store/slotHelpers');
+
+		await store.copyToVariations([0, 1, 2, 3, 4, 5, 6, 7], copyModuleParams('voice', [2], 1, false));
+		const vars = store.slots['A'].variations!;
+		for (let v = 0; v < 8; v++) expect(vars[v].voice[2]).toEqual([v, 0]);
+		expect(vars[8].voice[2]).toEqual([8, 8]);
+		expect(store.isSlotEdited('A')).toBe(true);
+
+		await store.undo();
+		for (let v = 0; v < 8; v++) expect(store.slots['A'].variations![v].voice[2]).toEqual([v, v]);
+		await store.redo();
+		for (let v = 0; v < 8; v++) expect(store.slots['A'].variations![v].voice[2]).toEqual([v, 0]);
+	});
+
+	it('sends one variation dump per target when connected, none for the current variation', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = variations();
+		useDeviceStore().status = DeviceStatus.Connected;
+		const dump = vi.spyOn(nmg2PatchSerializer, 'serializeVariationDump').mockReturnValue(new Uint8Array([1]));
+		const { copyPatchParams } = await import('@/store/slotHelpers');
+
+		await store.copyToVariations([0, 3], copyPatchParams(['patchVol']));
+		expect(dump).toHaveBeenCalledTimes(1);
+		expect(dump.mock.calls[0][2]).toBe(3);
+		expect(store.slots['A'].variations![3].patch.patchVol).toBe(0);
+		expect((globalThis as any).window.cli.run).toHaveBeenCalledWith(['send-sections', 'A', [1]]);
+		dump.mockRestore();
 	});
 });
 
@@ -1340,6 +1386,45 @@ describe('pushPatchToDevice', () => {
 
 		expect(result).toBe(false);
 		expect(store.slots['A'].textDirty).toBe(true);
+	});
+});
+
+describe('pushPendingText (notes not yet uploaded go to the G2 on every save)', () => {
+	function seedDirty() {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].templateRawHex = '00'.repeat(20);
+		store.slots['A'].textDirty = true;
+		useDeviceStore().status = DeviceStatus.Connected;
+		vi.spyOn(nmg2PatchSerializer, 'serializePatch').mockReturnValue('ab'.repeat(20) + 'cdef');
+		return store;
+	}
+	const cliCommands = () => ((globalThis as any).window.cli.run as ReturnType<typeof vi.fn>).mock.calls.map((c) => c[0][0]);
+
+	it('uploads only dirty slots, and only when connected', async () => {
+		const store = seedDirty();
+		expect(await store.pushPendingText(['A', 'B'])).toBe(true);
+		expect(cliCommands().filter((c) => c === 'upload-patch-data')).toHaveLength(1);
+		expect(store.slots['A'].textDirty).toBe(false);
+
+		store.slots['A'].textDirty = true;
+		useDeviceStore().status = DeviceStatus.Disconnected;
+		expect(await store.pushPendingText(['A'])).toBe(true);
+		expect(store.slots['A'].textDirty).toBe(true);
+	});
+
+	it('store in synth uploads the notes before store-patch, and stops if that upload fails', async () => {
+		seedDirty();
+		const browser = useBrowserStore();
+		expect(await browser.storePatch(0, 1, 1, 'patch', 'Lead')).toBe(true);
+		const order = cliCommands();
+		expect(order.indexOf('upload-patch-data')).toBeLessThan(order.indexOf('store-patch'));
+
+		useSlotsStore().slots['A'].textDirty = true;
+		useSlotsStore().uploadingFromFile = true; // upload refused
+		((globalThis as any).window.cli.run as ReturnType<typeof vi.fn>).mockClear();
+		expect(await browser.storePatch(0, 1, 1, 'patch', 'Lead')).toBe(false);
+		expect(cliCommands()).not.toContain('store-patch');
 	});
 });
 

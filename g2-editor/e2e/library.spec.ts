@@ -351,7 +351,7 @@ test.describe('Library', () => {
 		// OscA param 0 is FreqCoarse (nmg2mods.ts)
 		await openContextMenu(page, page.locator('[data-testid="canvas-va"] [data-module-short="OscA"] [data-param-index="0"]'));
 		await hoverContextMenuItem(page, 'Assign CC…');
-		await clickContextMenuItem(page, 'CC 2: Breath');
+		await clickContextMenuItem(page, 'CC 2 Breath');
 
 		await sendMenuAction('select-all');
 		await sendMenuAction('save-to-library');
