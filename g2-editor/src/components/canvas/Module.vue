@@ -289,7 +289,7 @@
 	import { getCategoryColor } from '../../constants/moduleCategoryColors';
 	import { useModuleGraphics } from '../../composables/useModuleGraphics';
 	import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '../../constants/ui';
-	import { isKnob, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
+	import { isKnob, isMorphable, isSlider, isSwitch, isSpinner, isSpinnerH } from '../../utils/moduleControls';
 	import { useModuleParams } from '../../composables/useModuleParams';
 	import ModuleVeText from './ModuleVeText.vue';
 	import ModuleVeLine from './ModuleVeLine.vue';
@@ -818,6 +818,7 @@
 				moduleIndex: moduleIdx.value,
 				paramIndex,
 				isAssigned: morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === uiStore.selectedMorphGroup),
+				blocked: !isMorphable(instance.value.type, paramIndex),
 				defaultRange: 127, // full parameter range, matching the real editor's initial morph range
 			}),
 		);

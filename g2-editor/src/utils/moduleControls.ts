@@ -344,3 +344,9 @@ export function matchParamValues(options: ParamValueOption[], query: string): Pa
 	const lower = q.toLowerCase();
 	return firstOfLabel.filter((o) => o.label.toLowerCase().includes(lower));
 }
+
+// Params the G2 does not morph: assigning one is accepted but has no effect. Key Quantizer (type 152): only
+// its Range knob (param 0) morphs, not Capture or the note buttons.
+export function isMorphable(moduleType: number, paramIndex: number): boolean {
+	return !(moduleType === 152 && paramIndex > 0);
+}
