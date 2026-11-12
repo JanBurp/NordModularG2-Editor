@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Wide SidePanel has adjustable width
 - Responsiveness, now even works on 7” Pi screens
 - SplitBar a bit bigger and now with small buttons to change area
+- Show names of assigned params in MidiCC/ParamPages ContextMenu
 
 ### Fixed
 - fix: order of categories in ModulePicker, swapped rows/columns ordering

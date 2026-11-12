@@ -832,7 +832,7 @@
 			...buildCCMenuItems({
 				lastCC,
 				existing,
-				enabled: !!slot,
+				slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, location as 0 | 1, moduleIdx.value, paramIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 			}),

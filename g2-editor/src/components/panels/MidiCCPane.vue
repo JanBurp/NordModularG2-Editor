@@ -62,8 +62,8 @@
 			>
 				<span class="px-2 py-0.5 truncate">{{ row.cc }}</span>
 				<span class="px-2 py-0.5 truncate text-content-secondary">{{ ccShortName(row.cc) }}</span>
-				<span class="px-2 py-0.5 truncate">{{ row.assignment ? getModuleName(row.assignment) : '' }}</span>
-				<span class="px-2 py-0.5 truncate">{{ row.assignment ? getParamName(row.assignment) : '' }}</span>
+				<span class="px-2 py-0.5 truncate">{{ row.assignment ? names(row.assignment).module : '' }}</span>
+				<span class="px-2 py-0.5 truncate">{{ row.assignment ? names(row.assignment).param : '' }}</span>
 			</div>
 		</div>
 
@@ -82,7 +82,7 @@
 	import { useUiStore } from '@/store/ui';
 	import { useStatusHint } from '@/composables/useStatusHint';
 	import { useDeviceStore } from '@/store/device';
-	import { getModule } from '@/renderer/nmg2mods';
+	import { assignmentNames } from '@/store/slotHelpers';
 	import { getAllowedCCs, CC_SHORT } from '@/composables/useMidiCC';
 	import { setBadgeDragImage } from '@/utils/badgeLayout';
 	import { serializeDragPayload, parseDragPayload } from '@/utils/dragPayload';
@@ -115,25 +115,7 @@
 		return CC_SHORT[cc] ?? '';
 	}
 
-	function getModuleName(c: MidiCCAssignment): string {
-		if (c.location === 2) return 'Morph';
-		const patch = slot.value ? slotsStore.slots[slot.value]?.patch : null;
-		if (!patch) return String(c.moduleIndex);
-		const areaIdx = c.location === 0 ? 0 : 1;
-		const mod = patch.areas[areaIdx]?.modules.find((m) => m.index === c.moduleIndex);
-		if (!mod) return String(c.moduleIndex);
-		return mod.uname || getModule(mod.type)?.short || String(c.moduleIndex);
-	}
-
-	function getParamName(c: MidiCCAssignment): string {
-		if (c.location === 2) return `Morph ${c.paramIndex + 1}`;
-		const patch = slot.value ? slotsStore.slots[slot.value]?.patch : null;
-		if (!patch) return String(c.paramIndex);
-		const areaIdx = c.location === 0 ? 0 : 1;
-		const mod = patch.areas[areaIdx]?.modules.find((m) => m.index === c.moduleIndex);
-		if (!mod) return String(c.paramIndex);
-		return getModule(mod.type)?.params?.[c.paramIndex]?.name ?? String(c.paramIndex);
-	}
+	const names = (c: MidiCCAssignment) => assignmentNames(slot.value ? slotsStore.slots[slot.value]?.patch : null, c);
 
 	// Selection
 	function selectRow(cc: number) {

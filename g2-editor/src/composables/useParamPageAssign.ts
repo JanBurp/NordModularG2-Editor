@@ -1,11 +1,13 @@
 import type { ContextMenuItem, GlobalParamPageAssignment, ParamPageAssignment, SlotLabel } from '@/types';
 import { useSlotsStore } from '@/store/slots';
+import { assignmentLabel } from '@/store/slotHelpers';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 import { PAGE_LETTERS, BANK_COUNT, KNOBS_PER_PAGE, slotIndexFor, slotIndexToBankPageKnob } from '@/renderer/paramPages';
 
 // Shared by buildParamPageMenuItems/buildGlobalParamPageMenuItems below — both build the same
 // "Assign to Page" (Page+Bank then Knob) submenu plus a "Deassign" item, differing only in the
-// assign/deassign store calls and the label text.
+// assign/deassign store calls and the label text. `knobLabel` names a knob slot's current
+// assignment ('' = unassigned), shown after "Knob N".
 function buildParamPageMenuItemsImpl(
 	slot: SlotLabel | null,
 	existing: { slotIndex: number } | undefined,
@@ -13,6 +15,7 @@ function buildParamPageMenuItemsImpl(
 		assignLabel: string;
 		deassignPrefix: string;
 		deassignDisabled: boolean;
+		knobLabel: (slotIndex: number) => string;
 		assign: (slotIndex: number) => void;
 		deassign: () => void;
 	},
@@ -24,7 +27,7 @@ function buildParamPageMenuItemsImpl(
 			Array.from({ length: BANK_COUNT }, (_, bank) => ({
 				label: `Page ${letter}${bank + 1}`,
 				children: Array.from({ length: KNOBS_PER_PAGE }, (_, knob) => ({
-					label: `Knob ${knob + 1}`,
+					label: [`Knob ${knob + 1}`, config.knobLabel(slotIndexFor(bank, page, knob))].filter(Boolean).join(': '),
 					action: () => config.assign(slotIndexFor(bank, page, knob)),
 				})),
 			})),
@@ -63,6 +66,10 @@ export function buildParamPageMenuItems(opts: {
 		assignLabel: 'Assign to Page',
 		deassignPrefix: 'Deassign',
 		deassignDisabled: !existing || !slot,
+		knobLabel: (slotIndex) => {
+			const a = slot ? slotsStore.slots[slot].paramPages.find((k) => k.slotIndex === slotIndex) : undefined;
+			return a && slot ? assignmentLabel(slotsStore.slots[slot].patch, a) : '';
+		},
 		assign: (slotIndex) => {
 			if (slot) slotsStore.assignParamToPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
 		},
@@ -92,6 +99,10 @@ export function buildGlobalParamPageMenuItems(opts: {
 		assignLabel: 'Assign to Global Page',
 		deassignPrefix: 'Deassign Global',
 		deassignDisabled: !existing,
+		knobLabel: (slotIndex) => {
+			const a = slotsStore.globalParamPages.find((k) => k.slotIndex === slotIndex);
+			return a ? `${a.slot}: ${assignmentLabel(slotsStore.slots[a.slot].patch, a)}` : '';
+		},
 		assign: (slotIndex) => {
 			if (slot) slotsStore.assignParamToGlobalPage(slot, slotIndex, location, moduleIndex, paramIndex, isLed);
 		},

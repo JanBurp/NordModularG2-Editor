@@ -1,4 +1,6 @@
-import type { ContextMenuItem, MidiCCAssignment } from '@/types';
+import type { ContextMenuItem, MidiCCAssignment, SlotLabel } from '@/types';
+import { useSlotsStore } from '@/store/slots';
+import { assignmentLabel } from '@/store/slotHelpers';
 import { computed, ref } from 'vue';
 import { useKeyHoldOverlay } from './useKeyHoldOverlay';
 
@@ -68,21 +70,23 @@ export const CC_SHORT: Record<number, string> = {
 	95: 'FX5D',
 };
 
-export function ccLabel(n: number): string {
-	const name = CC_NAMES[n];
-	return name ? `CC ${n}: ${name}` : `CC ${n}`;
-}
-
 // Builds the 3-item "Assign CC (last) / Assign CC… / Deassign CC" context-menu block shared by
-// module-param and morph CC assignment.
+// module-param and morph CC assignment. Each CC lists the param it is assigned to in `slot` (if any),
+// with its MIDI name dimmed.
 export function buildCCMenuItems(opts: {
+	slot: SlotLabel | null;
 	lastCC: number | null;
 	existing: MidiCCAssignment | undefined;
-	enabled: boolean;
 	onAssign: (cc: number) => void;
 	onDeassign: () => void;
 }): ContextMenuItem[] {
-	const { lastCC, existing, enabled, onAssign, onDeassign } = opts;
+	const { slot, lastCC, existing, onAssign, onDeassign } = opts;
+	const target = slot ? useSlotsStore().slots[slot] : null;
+	const ccItem = (cc: number): ContextMenuItem => {
+		const a = target?.controllers.find((c) => c.cc === cc);
+		return { label: a ? `CC ${cc}: ${assignmentLabel(target?.patch, a)}` : `CC ${cc}`, hint: CC_NAMES[cc], action: () => onAssign(cc) };
+	};
+	const enabled = !!slot;
 	return [
 		{
 			label: lastCC !== null ? `Assign CC (${lastCC})` : 'Assign CC (none)',
@@ -91,7 +95,7 @@ export function buildCCMenuItems(opts: {
 		},
 		{
 			label: 'Assign CC…',
-			children: getAllowedCCs().map((cc) => ({ label: ccLabel(cc), action: () => onAssign(cc) })),
+			children: getAllowedCCs().map(ccItem),
 		},
 		{
 			label: existing ? `Deassign CC (${existing.cc})` : 'Deassign CC',

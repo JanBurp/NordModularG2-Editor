@@ -223,6 +223,7 @@ export interface ContextMenuSwatch {
 export interface ContextMenuItem {
 	type?: 'item' | 'separator' | 'swatches';
 	label?: string;
+	hint?: string; // dimmed text after the label
 	icon?: string;
 	disabled?: boolean;
 	action?: () => void;

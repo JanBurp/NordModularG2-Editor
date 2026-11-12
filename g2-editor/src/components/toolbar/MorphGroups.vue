@@ -174,7 +174,7 @@
 			...buildCCMenuItems({
 				lastCC,
 				existing,
-				enabled: !!slot,
+				slot,
 				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, 2, 1, groupIndex, cc),
 				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
 			}),

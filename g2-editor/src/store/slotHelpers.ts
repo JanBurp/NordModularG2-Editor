@@ -21,6 +21,26 @@ export function morphGroupName(patch: Patch | null | undefined, i: number): stri
 	return patch?.morphParamLabels?.find((pl) => pl.paramIndex === 8 + i)?.labels?.[0] || MORPH_NAMES[i];
 }
 
+// Module + param display names of a MIDI CC / Parameter Page target. location 2 = a Morph Group;
+// isLed = a level meter (paramIndex is its LED number). Falls back to the raw indices.
+export function assignmentNames(
+	patch: Patch | null | undefined,
+	a: { location: number; moduleIndex: number; paramIndex: number; isLed?: number },
+): { module: string; param: string } {
+	if (a.location === 2) return { module: 'Morph', param: morphGroupName(patch, a.paramIndex) };
+	const mod = patch?.areas[a.location === 0 ? 0 : 1]?.modules.find((m) => m.index === a.moduleIndex);
+	const def = mod ? getModule(mod.type) : undefined;
+	return {
+		module: mod?.uname || def?.short || String(a.moduleIndex),
+		param: a.isLed ? `Meter ${a.paramIndex + 1}` : (def?.params?.[a.paramIndex]?.name ?? String(a.paramIndex)),
+	};
+}
+
+export function assignmentLabel(patch: Patch | null | undefined, a: Parameters<typeof assignmentNames>[1]): string {
+	const { module, param } = assignmentNames(patch, a);
+	return `${module} · ${param}`;
+}
+
 export function areaConfig(area: 'voice' | 'fx'): { areaIdx: 0 | 1; location: 'va' | 'fx' } {
 	return area === 'voice' ? { areaIdx: 1, location: 'va' } : { areaIdx: 0, location: 'fx' };
 }

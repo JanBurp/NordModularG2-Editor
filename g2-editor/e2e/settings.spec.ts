@@ -77,7 +77,7 @@ test.describe('settings pane', () => {
 
 		await openContextMenu(page, oscs.nth(1).locator('[data-param-index="0"]'));
 		await hoverContextMenuItem(page, 'Assign CC…');
-		await clickContextMenuItem(page, 'CC 2: Breath');
+		await clickContextMenuItem(page, 'CC 2 Breath');
 		await expect(unused).toHaveCount(1);
 		await expect(oscs.nth(1)).not.toHaveClass(/\bunused\b/);
 		await expect(oscs.nth(2)).toHaveClass(/\bunused\b/);
