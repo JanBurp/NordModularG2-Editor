@@ -62,6 +62,11 @@ export async function sendMenuActionTo(app: ElectronApplication, action: string)
 	);
 }
 
+// A hidden (HEADLESS) window is never maximized and would stay at its 800×600 default, where the
+// small-screen layout applies (slim toolbar, no Undo/Init column). Tests run at a desktop size.
+export const setDesktopSize = (app: ElectronApplication): Promise<void> =>
+	evaluateWithRetry(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1600, 900));
+
 export type AppFixtures = {
 	app: ElectronApplication;
 	page: Page;
@@ -99,10 +104,8 @@ export const test = base.extend<AppFixtures>({
 			ipcMain.handle('cli:watch-start', async () => {});
 		});
 
-		// A hidden (HEADLESS) window is never maximized and would stay at its 800×600 default, where the
-		// small-screen layout applies (slim toolbar, no Undo/Init column). Specs run at a desktop size;
-		// small-screen.spec.ts resizes on its own.
-		await evaluateWithRetry(app, ({ BrowserWindow }) => BrowserWindow.getAllWindows()[0]?.setContentSize(1600, 900));
+		// Desktop size; small-screen.spec.ts resizes on its own.
+		await setDesktopSize(app);
 
 		await use(app);
 		await app.close();

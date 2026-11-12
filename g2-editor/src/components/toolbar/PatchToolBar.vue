@@ -3,7 +3,7 @@
 	<ToolBar class="gap-x-4!" data-hint-bounds>
 		<div class="flex items-center gap-2">
 			<ToolBarLabel class="w-10">Patch:</ToolBarLabel>
-			<ToolBarText class="w-36 cursor-pointer hover:text-input" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
+			<ToolBarText class="w-36 cursor-pointer hover:text-input" data-testid="patch-name" hint="renamePatch" @click="emit('patchNameClick')">{{ patchName }}</ToolBarText>
 		</div>
 
 		<div class="flex items-center gap-1.5">
