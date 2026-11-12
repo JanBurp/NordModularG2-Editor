@@ -301,7 +301,7 @@
 	import ModuleValueDisplay from './ModuleValueDisplay.vue';
 	import ModuleKnobSpin from './ModuleKnobSpin.vue';
 	import ModuleKnobSpinH from './ModuleKnobSpinH.vue';
-	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem, VisualElement } from '../../types';
+	import type { ModuleInstance, ModuleDefinition, JackDragInfo, ContextMenuItem, VisualElement, ModuleParam } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 	import { useLibrary } from '../../composables/useLibrary';
@@ -315,6 +315,9 @@
 	import { parseDragPayload } from '../../utils/dragPayload';
 	import { vuMetersByLedNo } from '../../utils/vuLevel';
 	import { buildMorphMenuItems } from '../../composables/useMorphAssign';
+	import { knobValueAtOffset, morphRangeFromClick, seqNoteAtY, sliderValueAtY } from '../../utils/morphClickRange';
+	import { RADII } from '../../composables/useKnob';
+	import { getParam } from '../../renderer/parammap';
 	import {
 		buildParamPageMenuItems,
 		buildGlobalParamPageMenuItems,
@@ -639,6 +642,24 @@
 		onDragHandleMousedown(e);
 	}
 
+	// The range a Ctrl-click assigns: from the param's value to the clicked position (knobs, sliders, SeqNote steps);
+	// the full range (127) for other controls. `e` is the wrapper's mousedown: its CTM is the module's space.
+	function clickedMorphRange(param: ModuleParam | undefined, paramIndex: number, e: MouseEvent): number {
+		const ctm = (e.currentTarget as SVGGraphicsElement | null)?.getScreenCTM();
+		if (!param || !ctm) return 127;
+		const { x, y } = new DOMPoint(e.clientX, e.clientY).matrixTransform(ctm.inverse());
+		if (isKnob(param.n) && getParam(param.type)?.high === 127) {
+			// The knob's circle is centred at (radius + 2) inside its group; a click on the centre has no angle.
+			const centre = (RADII[param.n] ?? 10) + 2;
+			const dx = x - (param.x + centre);
+			const dy = y - (param.y + centre);
+			return Math.hypot(dx, dy) < 2 ? 127 : morphRangeFromClick(knobValueAtOffset(dx, dy), getParamValue(paramIndex));
+		}
+		if (isSlider(param.n)) return morphRangeFromClick(sliderValueAtY(y - param.y), getParamValue(paramIndex));
+		if (param.n === 'KnobSeqSlider') return morphRangeFromClick(seqNoteAtY(y, seqNotePianoRollView.value), getParamValue(paramIndex));
+		return 127;
+	}
+
 	// Mousedown on a param also selects it (and its module) — mirrors the module title-bar
 	// click path (useModuleSelecting.handleModuleClick) — so the clicked param becomes the
 	// active one for keyboard shortcuts (arrow-key nav, L) right away.
@@ -667,12 +688,14 @@
 		const groupIndex = uiStore.selectedMorphGroup;
 		const location = morphLocation.value;
 		const variation = uiStore.variation;
+		// Sliders and sequencer steps are absolute-position controls: the clicked position is where the morph ends.
+		const assignRange = clickedMorphRange(param, paramIndex, e);
 		startDrag(moduleIdx.value, paramIndex, props.areaLabel ?? 'fx', e, {
 			isAssigned: () => morphAssignmentsForParam(paramIndex).some((a) => a.groupIndex === groupIndex),
 			getRange: () => morphAssignmentsForParam(paramIndex).find((a) => a.groupIndex === groupIndex)?.range ?? 0,
 			// Freshly assigned params start at the full parameter range (matches the real editor);
 			// the user then Ctrl-drags to narrow it.
-			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, 127),
+			onAssign: () => slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex, assignRange),
 			onDeassign: () => slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIdx.value, paramIndex),
 			onRangeChange: isFixedRange
 				? undefined
