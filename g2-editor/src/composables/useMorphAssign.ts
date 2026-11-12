@@ -12,16 +12,18 @@ export function buildMorphMenuItems(opts: {
 	moduleIndex: number;
 	paramIndex: number;
 	isAssigned: boolean;
+	// A param the G2 does not morph (see isMorphable): the item is greyed out.
+	blocked?: boolean;
 	// Range used when this action *assigns* (ignored when it deassigns) — starts at the full
 	// parameter range, matching the real editor; the user then Ctrl-drags a knob/slider to narrow it.
 	defaultRange: number;
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
-	const { slot, variation, groupIndex, location, moduleIndex, paramIndex, isAssigned, defaultRange } = opts;
+	const { slot, variation, groupIndex, location, moduleIndex, paramIndex, isAssigned, blocked, defaultRange } = opts;
 	return [
 		{
 			label: isAssigned ? `Morph assign ✓ (Group ${groupIndex + 1})` : `Morph assign (Group ${groupIndex + 1})`,
-			disabled: !slot,
+			disabled: !slot || (blocked && !isAssigned),
 			action: () => {
 				if (!slot) return;
 				if (isAssigned) slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex);

@@ -14,6 +14,7 @@ import { PATCH_PARAM_KEYS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } f
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
 import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
+import { isMorphable } from '../utils/moduleControls';
 import { defaultMutaLock } from '../renderer/mutator';
 import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
@@ -2983,6 +2984,8 @@ export const useSlotsStore = defineStore('slots', {
 		): Promise<void> {
 			const isSame = (a: MorphAssignment) =>
 				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
+			const moduleType = this.slots[slot]?.patch?.areas[location]?.modules.find((m) => m.index === moduleIndex)?.type;
+			if (moduleType !== undefined && !isMorphable(moduleType, paramIndex)) return;
 			this._mutateMorphAssignments(
 				slot,
 				variation,

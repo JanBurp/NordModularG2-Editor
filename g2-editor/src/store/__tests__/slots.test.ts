@@ -180,6 +180,21 @@ describe('paste', () => {
 	});
 });
 
+describe('assignParamToMorphGroup on a Key Quantizer', () => {
+	it('allows the Range knob but ignores Capture and the note buttons', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = { areas: [{ modules: [] }, { modules: [{ index: 3, type: 152 }] }] } as any;
+		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: [] } }] as any;
+
+		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 1, 127);
+		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 13, 127);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+
+		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 0, 127);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toHaveLength(1);
+	});
+});
+
 describe('setMode', () => {
 	it('undo restores and resends the previous mode value', async () => {
 		const store = useSlotsStore();
