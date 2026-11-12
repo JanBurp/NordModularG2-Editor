@@ -68,6 +68,11 @@ export function morphKey(a: MorphAssignment): string {
 	return `${a.groupIndex}:${a.location}:${a.moduleIndex}:${a.paramIndex}`;
 }
 
+// Params with at least one assignment: one shared by several groups counts once (what the G2's 25 limit counts).
+export function morphedParamKeys(list: MorphAssignment[]): Set<string> {
+	return new Set(list.map((a) => `${a.location}:${a.moduleIndex}:${a.paramIndex}`));
+}
+
 export function findModuleByIndex(modules: ModuleInstance[], id: number): ModuleInstance | undefined {
 	return modules.find((m) => m.index === id);
 }
