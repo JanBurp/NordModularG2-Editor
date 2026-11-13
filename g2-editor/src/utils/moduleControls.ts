@@ -258,6 +258,8 @@ export function formatParamDisplay(moduleDef: ModuleDefinition, paramIndex: numb
 // A param's display text at `value` (the other params of a combined display from `values`).
 // Combined displays pad between values (e.g. Osc Freq's three nbsp); one space keeps hints compact.
 function hintDisplay(moduleDef: ModuleDefinition, paramIndex: number, values: number[], modes: number[] | undefined, value: number): string {
+	// SeqNote steps (params 0-15) are MIDI notes, not the bipolar semitone offset FreqCoarse shows.
+	if (moduleDef.short === 'SeqNote' && paramIndex < 16) return MidiNote(value);
 	const v = [...values];
 	v[paramIndex] = value;
 	return formatParamDisplay(moduleDef, paramIndex, v, modes).replace(/\s+/g, ' ');

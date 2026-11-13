@@ -8,6 +8,9 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Fixed:
+- #21: NoteSeq should show note names when hovering over step value
+
 ## [0.8.2] - 2026-11-12
 
 ### New
