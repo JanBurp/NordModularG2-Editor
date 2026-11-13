@@ -1,3 +1,4 @@
+import { CANVAS } from '@/constants/colors';
 import type { Ref } from 'vue';
 import { getModule } from './nmg2mods';
 import { MODULE_WIDTH, MODULE_ROW_HEIGHT } from '@/constants';
@@ -79,7 +80,7 @@ export function updateSnapHighlight(svg: SVGElement, current: SVGCircleElement |
 		return null;
 	}
 	if (!current) {
-		const el = svgCircle(snap.x, snap.y, 8, { fill: 'none', stroke: '#000', 'stroke-width': '3', class: 'nomouse', opacity: '0.8' });
+		const el = svgCircle(snap.x, snap.y, 8, { fill: 'none', stroke: CANVAS.snapRing, 'stroke-width': '3', class: 'nomouse', opacity: '0.8' });
 		svg.appendChild(el);
 		return el;
 	}

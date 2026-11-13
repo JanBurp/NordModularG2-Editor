@@ -87,10 +87,10 @@
 	}
 
 	.indicator-strip.indicator-bright {
-		background-color: #ff3232;
+		background-color: var(--color-indicator);
 	}
 
 	.indicator-strip.indicator-dimmed {
-		background-color: rgba(220, 50, 50, 0.4);
+		background-color: var(--color-indicator-dimmed);
 	}
 </style>

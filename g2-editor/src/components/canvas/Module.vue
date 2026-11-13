@@ -256,18 +256,19 @@
 			width="253"
 			:height="height - 3"
 			fill="none"
-			stroke="#e00"
+			:stroke="PANEL.mutationLock"
 			stroke-width="3"
 			pointer-events="none"
 		/>
 		<rect class="dim-overlay" width="256" :height="height" pointer-events="none" />
 	</g>
 	<g v-else :transform="`translate(${x}, ${y})`">
-		<rect width="256" height="32" fill="#666" stroke="#333" rx="2" />
-		<text x="128" y="20" fill="#fff" font-size="10" text-anchor="middle"> Unknown Module ({{ instance.type }}) </text>
+		<rect width="256" height="32" :fill="PANEL.valueBg" :stroke="PANEL.line" rx="2" />
+		<text x="128" y="20" :fill="PANEL.valueText" font-size="10" text-anchor="middle"> Unknown Module ({{ instance.type }}) </text>
 	</g>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { computed, onUnmounted } from 'vue';
 	import { useUiStore } from '../../store/ui';
 	import { useStatusHint } from '../../composables/useStatusHint';

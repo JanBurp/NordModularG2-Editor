@@ -9,10 +9,11 @@
 	>
 		<use href="#KnobSpin" width="10" height="10" />
 		<rect v-if="morphColor" x="0" y="-2" width="10" height="2" :fill="morphColorHex(morphColor)" pointer-events="none" />
-		<rect v-if="highlight" x="0" y="11" width="10" height="2" fill="white" pointer-events="none" />
+		<rect v-if="highlight" x="0" y="11" width="10" height="2" :fill="PANEL.highlight" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';

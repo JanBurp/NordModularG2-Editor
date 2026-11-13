@@ -12,7 +12,7 @@
 
 <script setup lang="ts">
 	import { computed } from 'vue';
-	import { GRAPH_COLORS } from '../canvas/graphFunctions';
+	import { GRAPH_COLORS } from '../../constants/colors';
 	import { chromosomePath, type Genome } from '../../renderer/mutator';
 
 	const props = defineProps<{

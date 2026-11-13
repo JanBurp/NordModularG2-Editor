@@ -8,8 +8,12 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### Changed
+- Buttons that have Morph assigned now are colored fully instead of only a small line.
+
 ### Fixed:
 - #21: NoteSeq should show note names when hovering over step value
+- cli: accept bank location 128 in select-patch / select-perf
 
 ## [0.8.2] - 2026-11-12
 

@@ -5,13 +5,13 @@
 			:y="stripTop"
 			:width="width"
 			:height="stripHeight"
-			fill="#ddd"
-			stroke="#999"
+			:fill="SEQNOTE.whiteRow"
+			:stroke="SEQNOTE.rowLine"
 			style="cursor: ns-resize"
 			data-testid="seqnote-step-strip"
 			@mousedown="onMouseDown"
 		/>
-		<rect v-for="y in blackRowYs" :key="y" :x="x" :y="y" :width="width" :height="rowHeight" fill="#999" pointer-events="none" />
+		<rect v-for="y in blackRowYs" :key="y" :x="x" :y="y" :width="width" :height="rowHeight" :fill="SEQNOTE.blackRow" pointer-events="none" />
 		<!-- Morph range span, only for the currently selected group's assignment — same visual language as ModuleSlider -->
 		<rect v-if="morphSpan" :x="x" :y="morphSpan.y" :width="width" :height="morphSpan.height" :fill="morphFillColor" opacity="0.35" pointer-events="none" />
 		<rect
@@ -26,10 +26,11 @@
 		/>
 		<polygon v-if="outOfRangeAbove" :points="topTrianglePoints" :fill="morphFillColor" pointer-events="none" />
 		<polygon v-if="outOfRangeBelow" :points="bottomTrianglePoints" :fill="morphFillColor" pointer-events="none" />
-		<rect v-if="highlight" :x="x" :y="stripTop + stripHeight" :width="width" height="2" fill="white" pointer-events="none" />
+		<rect v-if="highlight" :x="x" :y="stripTop + stripHeight" :width="width" height="2" :fill="PANEL.highlight" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL, SEQNOTE } from '@/constants/colors';
 	import { computed } from 'vue';
 	import { blackNoteRowYs, visibleNoteWindow } from '../../renderer/pianoRoll';
 	import { usePianoRollNoteInteraction } from '../../composables/usePianoRollNoteInteraction';
@@ -55,7 +56,7 @@
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const morphFillColor = computed(() => morphColorHex(props.morphColor, '#000'));
+	const morphFillColor = computed(() => morphColorHex(props.morphColor, CONTROL.handle));
 
 	const noteWindow = computed(() => visibleNoteWindow(props.zoom, props.octaveOffset));
 	const lowestVisibleNote = computed(() => noteWindow.value.low);

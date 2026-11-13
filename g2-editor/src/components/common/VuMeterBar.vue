@@ -1,5 +1,10 @@
 <template>
-	<div class="relative h-[18px] rounded-xs border border-input-dimmed bg-[#111] cursor-grab" @mouseenter="hovered = true" @mouseleave="hovered = false">
+	<div
+		class="relative h-[18px] rounded-xs border border-input-dimmed cursor-grab"
+		:style="{ background: VU_BG }"
+		@mouseenter="hovered = true"
+		@mouseleave="hovered = false"
+	>
 		<div class="absolute inset-0.5 overflow-hidden">
 			<div
 				v-for="z in VU_ZONES"
@@ -24,7 +29,8 @@
 	// LevelMeter's zones laid out left to right.
 	import { computed, ref } from 'vue';
 	import { useKeyHoldOverlay } from '../../composables/useKeyHoldOverlay';
-	import { VU_ZONES, vuFraction } from '../../utils/vuLevel';
+	import { vuFraction } from '../../utils/vuLevel';
+	import { VU_BG, VU_ZONES } from '../../constants/colors';
 	import MeterNamePopup from './MeterNamePopup.vue';
 
 	const props = defineProps<{ value: number; label: string }>();

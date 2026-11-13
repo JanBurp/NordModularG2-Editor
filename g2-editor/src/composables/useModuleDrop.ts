@@ -1,3 +1,4 @@
+import { CANVAS } from '@/constants/colors';
 import type { Ref } from 'vue';
 import type { ClipboardEntry } from '@/types/patch';
 import { getModule } from '../renderer/nmg2mods';
@@ -41,8 +42,8 @@ export function useModuleDrop(
 			dropGhost.setAttribute('pointer-events', 'none');
 			for (const r of rects) {
 				const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
-				rect.setAttribute('fill', 'rgba(100,200,100,0.25)');
-				rect.setAttribute('stroke', '#4ade80');
+				rect.setAttribute('fill', CANVAS.dropFill);
+				rect.setAttribute('stroke', CANVAS.dropStroke);
 				rect.setAttribute('stroke-width', '2');
 				rect.setAttribute('rx', '2');
 				rect.setAttribute('x', String(r.col * 256));
