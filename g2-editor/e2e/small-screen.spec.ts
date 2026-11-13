@@ -120,7 +120,7 @@ test.describe('Small screen (800×480)', () => {
 		});
 	}
 
-	for (const action of ['toggle-patch-mutator', 'toggle-parameter-overview', 'toggle-settings']) {
+	for (const action of ['toggle-patch-mutator', 'toggle-parameter-overview', 'toggle-morph-panel', 'toggle-settings']) {
 		test(`${action}: wide pane reflows down to its minimum width without sideways scrolling`, async ({ page, sendMenuAction }) => {
 			await sendMenuAction(action);
 			await dragPanelTo(page, 0); // clamped to MIN_WIDE_PANE_WIDTH

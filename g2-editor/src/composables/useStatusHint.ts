@@ -52,8 +52,9 @@ export function useStatusHint() {
 		if (held) pending = text;
 		else uiStore.statusHint = text;
 	}
-	function showHint(key: StatusHintKey): void {
-		setHint(STATUS_HINTS[key]);
+	// `extra`: live info appended to the fixed hint text (e.g. a count).
+	function showHint(key: StatusHintKey, extra?: string): void {
+		setHint(extra ? `${STATUS_HINTS[key]} · ${extra}` : STATUS_HINTS[key]);
 	}
 	function clearHint(): void {
 		setHint(null);

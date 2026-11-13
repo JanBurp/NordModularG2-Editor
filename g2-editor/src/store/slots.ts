@@ -43,6 +43,7 @@ import {
 	morphGroupName,
 	morphKey,
 	morphedParamKeys,
+	morphParamKey,
 	freeModuleIds,
 	findModuleByIndex,
 	matchesCableJack,
@@ -1438,7 +1439,7 @@ export const useSlotsStore = defineStore('slots', {
 				// (CPatchData::GetNewModulesMolecules) does after the module/cable/param dumps.
 				const newIdOf = new Map(entries.map((e) => [e.src.index, e.newId]));
 				const pastedMorphs = morphs.map((list, v) => {
-					const room = MAX_MORPHED_PARAMS - (slotEntry.variations?.[v]?.patch.morphAssignments.length ?? MAX_MORPHED_PARAMS);
+					const room = slotEntry.variations?.[v] ? MAX_MORPHED_PARAMS - this.morphLimit(slot, v).count : 0;
 					return list
 						.filter((a) => newIdOf.has(a.moduleIndex))
 						.map((a) => ({ ...a, location: areaIdx, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment)
@@ -2053,17 +2054,22 @@ export const useSlotsStore = defineStore('slots', {
 				}
 			}
 			// Morphs (official GetCopyParamsMolecules): the targets' assignments are replaced by the pasted ones;
-			// a param not morphed in that group before is only added while the variation stays within MAX_MORPHED_PARAMS.
+			// a param not morphed before (in any group) is only added while the variation stays within MAX_MORPHED_PARAMS distinct params.
 			const morphPairs = pairs.filter((p) => p.morphs);
 			let prevMorphs: MorphAssignment[] = [];
 			let nextMorphs: MorphAssignment[] = [];
 			if (vPatch && morphPairs.length > 0) {
 				prevMorphs = vPatch.morphAssignments;
-				const prevKeys = new Set(prevMorphs.map(morphKey));
+				const prevParams = morphedParamKeys(prevMorphs);
 				const replaced = new Set(morphPairs.map((p) => p.targetId));
 				nextMorphs = prevMorphs.filter((a) => !isTargetMorph(a, replaced));
+				const nextParams = morphedParamKeys(nextMorphs);
 				for (const a of morphPairs.flatMap((p) => p.morphs!)) {
-					if (prevKeys.has(morphKey(a)) || nextMorphs.length < MAX_MORPHED_PARAMS) nextMorphs.push({ ...a });
+					// A param morphed before (any group) may always get its groups; a new one only while within the limit.
+					const key = morphParamKey(a);
+					if (!prevParams.has(key) && !nextParams.has(key) && nextParams.size >= MAX_MORPHED_PARAMS) continue;
+					nextMorphs.push({ ...a });
+					nextParams.add(key);
 				}
 				vPatch.morphAssignments = nextMorphs;
 			}
@@ -2870,8 +2876,69 @@ export const useSlotsStore = defineStore('slots', {
 			sendCoalesced(`${slot}:patch:1:${param}:${variation}`, ['set-param', slot, 'patch', '1', String(param), String(value), String(variation)]);
 		},
 
+		// Copies morph groups (all when `groups` is null) of one variation to other variations, as one undo step:
+		// their assignments with ranges replace the target's ones in those groups, and the knob values and sources
+		// are copied too. A target keeps at most MAX_MORPHED_PARAMS morphed params; what doesn't fit is skipped.
+		// Each target goes to the G2 as one variation dump (_writeVariationState), not a burst of set-params.
+		async copyMorphToVariations(slot: SlotLabel, fromVar: number, groups: number[] | null, targets: number[]): Promise<void> {
+			const vars = this.slots[slot]?.variations;
+			const src = vars?.[fromVar]?.patch;
+			if (!vars || !src) return;
+			const copied = (g: number) => groups === null || groups.includes(g);
+			const skipped: number[] = [];
+			const changes = targets
+				.filter((v) => v !== fromVar && vars[v])
+				.map((v) => {
+					const before = deepCloneVariationState(vars[v]);
+					const after = deepCloneVariationState(vars[v]);
+					const p = after.patch;
+					const assignments = p.morphAssignments.filter((a) => !copied(a.groupIndex));
+					const params = morphedParamKeys(assignments);
+					for (const a of src.morphAssignments.filter((x) => copied(x.groupIndex))) {
+						const key = morphParamKey(a);
+						if (!params.has(key) && params.size >= MAX_MORPHED_PARAMS) {
+							if (!skipped.includes(v)) skipped.push(v);
+							continue;
+						}
+						assignments.push({ ...a });
+						params.add(key);
+					}
+					p.morphAssignments = assignments;
+					p.morphDials = p.morphDials.map((d, g) => (copied(g) ? src.morphDials[g] : d));
+					p.morphModes = p.morphModes.map((m, g) => (copied(g) ? src.morphModes[g] : m));
+					return { v, before, after };
+				});
+			if (changes.length === 0) return;
+
+			const hist = useHistoryStore();
+			if (!hist.isLocked(slot)) {
+				hist.record(slot, {
+					undo: async () => {
+						for (const c of changes) await this._writeVariationState(slot, c.v, c.before, 'copyMorphToVariations undo');
+					},
+					redo: async () => {
+						for (const c of changes) await this._writeVariationState(slot, c.v, c.after, 'copyMorphToVariations redo');
+					},
+				});
+			}
+			if (skipped.length > 0)
+				showToast(`Morph limit: not every param was copied to variation ${skipped.map((v) => v + 1).join(', ')} (${MAX_MORPHED_PARAMS} max)`);
+			for (const c of changes) await this._writeVariationState(slot, c.v, c.after, 'copyMorphToVariations');
+		},
+
 		getMorphAssignments(slot: SlotLabel, variation: number): MorphAssignment[] {
 			return this.slots[slot]?.variations?.[variation]?.patch.morphAssignments ?? [];
+		},
+
+		// The G2's morph limit (official CMorphMapData_11::GetNumberOfMorphedParams): distinct morphed params in a
+		// variation. `blocked`: the given param can't get a (new) group because 25 others are morphed already.
+		morphLimit(
+			slot: SlotLabel,
+			variation: number,
+			param?: { location: number; moduleIndex: number; paramIndex: number },
+		): { count: number; blocked: boolean } {
+			const morphed = morphedParamKeys(this.getMorphAssignments(slot, variation));
+			return { count: morphed.size, blocked: !!param && morphed.size >= MAX_MORPHED_PARAMS && !morphed.has(morphParamKey(param)) };
 		},
 
 		// Diffs two morphAssignments arrays (by groupIndex+location+moduleIndex+paramIndex) and pushes
@@ -2985,8 +3052,10 @@ export const useSlotsStore = defineStore('slots', {
 			const isSame = (a: MorphAssignment) =>
 				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
 			// The limit counts distinct params: another group on an already-morphed param is always allowed.
-			const morphed = morphedParamKeys(this.getMorphAssignments(slot, variation));
-			if (morphed.size >= MAX_MORPHED_PARAMS && !morphed.has(`${location}:${moduleIndex}:${paramIndex}`)) return;
+			if (this.morphLimit(slot, variation, { location, moduleIndex, paramIndex }).blocked) {
+				showToast(`Morph limit: ${MAX_MORPHED_PARAMS} params are morphed in this variation`);
+				return;
+			}
 			this._mutateMorphAssignments(
 				slot,
 				variation,

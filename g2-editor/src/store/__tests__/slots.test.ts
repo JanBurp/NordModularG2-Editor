@@ -179,18 +179,102 @@ describe('paste', () => {
 		expect(assigned[24]).toMatchObject({ moduleIndex: 7, paramIndex: 0 });
 	});
 
+	it('counts the room for pasted morphs in distinct params, not records', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		// 23 distinct params, one of them in two groups: 24 records
+		const existing = [
+			...Array.from({ length: 23 }, (_, i) => ({ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: i, range: 1 })),
+			{ groupIndex: 1, location: 1, moduleIndex: 1, paramIndex: 0, range: 1 },
+		];
+		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: existing } }] as any;
+		const src = { type: 1, index: 4, horiz: 0, vert: 0, colour: 0, uprate: 0, mutaLock: 0, pcnt: 0, lv: [], modes: [] };
+		const morphs = [[0, 1, 2].map((p) => ({ groupIndex: 1, location: 1, moduleIndex: 4, paramIndex: p, range: 9 }))] as any;
+
+		await store.paste([{ src, newId: 7, col: 0, row: 0 }] as any, [], 'voice', morphs);
+
+		const assigned = store.slots['A'].variations![0].patch.morphAssignments;
+		expect(assigned.filter((a) => a.moduleIndex === 7).map((a) => a.paramIndex)).toEqual([0, 1]);
+		expect(store.morphLimit('A', 0).count).toBe(25);
+	});
+
 	it('refuses a morph assignment on a 26th distinct param, but allows another group on an already-morphed one', async () => {
 		const store = useSlotsStore();
 		const existing = Array.from({ length: 25 }, (_, i) => ({ groupIndex: 0, location: 1, moduleIndex: 1, paramIndex: i, range: 1 }));
 		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: existing } }] as any;
 		const list = () => store.slots['A'].variations![0].patch.morphAssignments;
 
+		const { toasts } = (await import('@/composables/useToast')).useToast();
+		toasts.splice(0);
+		expect(store.morphLimit('A', 0, { location: 1, moduleIndex: 1, paramIndex: 25 })).toEqual({ count: 25, blocked: true });
 		await store.assignParamToMorphGroup('A', 0, 1, 1, 1, 25, 127);
 		expect(list()).toHaveLength(25);
+		expect(toasts.map((t) => t.message)).toEqual(['Morph limit: 25 params are morphed in this variation']);
+
+		expect(store.morphLimit('A', 0, { location: 1, moduleIndex: 1, paramIndex: 3 })).toEqual({ count: 25, blocked: false });
 
 		await store.assignParamToMorphGroup('A', 0, 1, 1, 1, 3, 50);
 		expect(list()).toHaveLength(26);
-		expect(list().filter((a) => a.paramIndex === 3).map((a) => a.groupIndex)).toEqual([0, 1]);
+		expect(
+			list()
+				.filter((a) => a.paramIndex === 3)
+				.map((a) => a.groupIndex),
+		).toEqual([0, 1]);
+	});
+});
+
+describe('copyMorphToVariations', () => {
+	const m = (groupIndex: number, paramIndex: number, range = 10): any => ({ groupIndex, location: 1, moduleIndex: 1, paramIndex, range });
+	const variation = (morphAssignments: any[], dial = 0, mode = 0): any => ({
+		fx: {},
+		voice: {},
+		patch: { morphAssignments, morphDials: Array(8).fill(dial), morphModes: Array(8).fill(mode) },
+	});
+
+	it('copies one group (assignments, knob, source) over the targets, as one undo step', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = [variation([m(0, 1, 50), m(1, 2, 60)], 100, 2), variation([m(0, 7), m(1, 8)]), variation([m(0, 9)])];
+		const v = () => store.slots['A'].variations!;
+
+		await store.copyMorphToVariations('A', 0, [0], [1, 2]);
+
+		expect(v()[1].patch.morphAssignments).toEqual([m(1, 8), m(0, 1, 50)]); // group 0 replaced, group 1 kept
+		expect(v()[2].patch.morphAssignments).toEqual([m(0, 1, 50)]);
+		expect(v()[1].patch.morphDials).toEqual([100, 0, 0, 0, 0, 0, 0, 0]);
+		expect(v()[1].patch.morphModes).toEqual([2, 0, 0, 0, 0, 0, 0, 0]);
+
+		await store.undo();
+		expect(v()[1].patch.morphAssignments).toEqual([m(0, 7), m(1, 8)]);
+		expect(v()[2].patch.morphAssignments).toEqual([m(0, 9)]);
+		expect(v()[1].patch.morphDials).toEqual(Array(8).fill(0));
+	});
+
+	it('copies all groups, replacing the whole morph setup of the target', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		store.slots['A'].variations = [variation([m(0, 1), m(3, 2)], 5, 1), variation([m(1, 8), m(6, 9)])];
+
+		await store.copyMorphToVariations('A', 0, null, [1]);
+
+		const p = store.slots['A'].variations![1].patch;
+		expect(p.morphAssignments).toEqual([m(0, 1), m(3, 2)]);
+		expect(p.morphDials).toEqual(Array(8).fill(5));
+		expect(p.morphModes).toEqual(Array(8).fill(1));
+	});
+
+	it('copies what fits under the 25 limit and names the variation in a toast', async () => {
+		const store = useSlotsStore();
+		store.slots['A'].patch = makePatch();
+		const full = Array.from({ length: 24 }, (_, i) => ({ groupIndex: 1, location: 1, moduleIndex: 2, paramIndex: i, range: 1 }));
+		store.slots['A'].variations = [variation([m(0, 1), m(0, 2)]), variation(full)];
+		const { toasts } = (await import('@/composables/useToast')).useToast();
+		toasts.splice(0);
+
+		await store.copyMorphToVariations('A', 0, [0], [1]);
+
+		expect(store.slots['A'].variations![1].patch.morphAssignments).toEqual([...full, m(0, 1)]);
+		expect(toasts.map((t) => t.message)).toEqual(['Morph limit: not every param was copied to variation 2 (25 max)']);
 	});
 });
 
@@ -554,16 +638,39 @@ describe('pasteParams', () => {
 		const before = [...others, m(0, 2, 0, 10), m(1, 2, 1, 20)];
 		store.slots['A'].variations![0].patch.morphAssignments = before;
 
-		// param 0 group 0 changes, param 1 group 1 is removed, two new ones: only one fits under 25
+		// param 0 group 0 changes, param 1 group 1 is removed, param 2 is new with two groups: the limit counts params
+		// (official GetCopyParamsMolecules), so param 2 is the 25th and both its groups go in
 		await store.pasteParams(
 			[{ targetId: 2, paramValues: [1, 2, 3], modeValues: [], morphs: [m(0, 2, 0, 50), m(3, 2, 2, 60), m(4, 2, 2, 70)] }],
 			0,
 			'voice',
 		);
-		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 50), m(3, 2, 2, 60)]);
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 50), m(3, 2, 2, 60), m(4, 2, 2, 70)]);
 
 		await store.undo();
 		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(0, 2, 0, 10), m(1, 2, 1, 20)]);
+	});
+
+	it('refuses morphs on a param that would be the 26th morphed param, keeps those on an already-morphed one', async () => {
+		const store = useSlotsStore();
+		const patch = makePatch();
+		patch.areas[1].modules = [moduleInstance(2, 5, 3, [])];
+		store.slots['A'].patch = patch;
+		store.slots['A'].variations = withVariations([0, 0, 0]);
+		const m = (groupIndex: number, moduleIndex: number, paramIndex: number, range: number): any => ({
+			groupIndex,
+			location: 1,
+			moduleIndex,
+			paramIndex,
+			range,
+		});
+		// 24 other params + the target's param 0: 25 distinct params morphed
+		const others = Array.from({ length: 24 }, (_, i) => m(0, 30 + i, 0, 1));
+		store.slots['A'].variations![0].patch.morphAssignments = [...others, m(0, 2, 0, 10)];
+
+		await store.pasteParams([{ targetId: 2, paramValues: [1, 2, 3], modeValues: [], morphs: [m(1, 2, 0, 50), m(2, 2, 2, 60)] }], 0, 'voice');
+
+		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([...others, m(1, 2, 0, 50)]);
 	});
 
 	it('does nothing when given an empty pairs list', async () => {

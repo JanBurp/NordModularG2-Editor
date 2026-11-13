@@ -8,6 +8,11 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+### New
+- Bar below MorphGroups show how many morphs are assigned, click on it to show the Morph SidePanel
+- Morph SidePanel show all assigned Morphs
+- Copy Morhp Groups (or All) to other Variations
+
 ### Changed
 - Buttons that have Morph assigned now are colored fully instead of only a small line.
 

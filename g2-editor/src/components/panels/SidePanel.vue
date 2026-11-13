@@ -33,6 +33,7 @@
 			<ModulesPane ref="modulesPaneRef" v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
 			<LibraryPane ref="libraryPaneRef" v-show="settingsStore.rightPaneTab === 'library'" :isActive="settingsStore.rightPaneTab === 'library'" />
 			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
+			<MorphPane v-show="settingsStore.rightPaneTab === 'morph'" />
 			<ParamOverviewPane v-show="settingsStore.rightPaneTab === 'overview'" />
 			<PatchMutatorPane v-show="settingsStore.rightPaneTab === 'mutator'" />
 			<TextPane v-show="settingsStore.rightPaneTab === 'text'" />
@@ -48,6 +49,7 @@
 	import LibraryPane from './LibraryPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
+	import MorphPane from './MorphPane.vue';
 	import ParamOverviewPane from './ParamOverviewPane.vue';
 	import PatchMutatorPane from './PatchMutatorPane.vue';
 	import TextPane from './TextPane.vue';

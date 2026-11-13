@@ -299,6 +299,9 @@ export function useElectronMenuActions(options: MenuActionOptions): { runMenuAct
 			case 'toggle-midi-cc-panel':
 				useSettingsStore().toggleSidebar('midicc');
 				break;
+			case 'toggle-morph-panel':
+				useSettingsStore().toggleSidebar('morph');
+				break;
 			case 'toggle-parameter-overview':
 				useSettingsStore().toggleSidebar('overview');
 				break;

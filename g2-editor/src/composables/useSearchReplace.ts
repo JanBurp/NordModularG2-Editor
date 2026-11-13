@@ -1,7 +1,8 @@
-import { computed, effectScope, nextTick, ref, watch } from 'vue';
+import { computed, effectScope, ref, watch } from 'vue';
 import { useSlotsStore } from '@/store/slots';
 import { useUiStore } from '@/store/ui';
 import { showToast } from './useToast';
+import { revealModule } from './useRevealModule';
 import { usePatchOperations } from './usePatchOperations';
 import { buildMatcher, collectItems, computeReplacements, findMatches, itemKey, splitMatches, type SearchItem } from '@/utils/searchReplace';
 
@@ -58,14 +59,7 @@ function createSearchReplace() {
 	// Bring a match into view: show its area, select its module and scroll to it.
 	async function reveal(item: SearchItem | null): Promise<void> {
 		if (!item || item.kind === 'morph') return;
-		const target = item.area === 'voice' ? 1 : 0;
-		if (uiStore.area !== 2 && uiStore.area !== target) uiStore.setAreaMode(target);
-		const location = item.area === 'voice' ? 'va' : 'fx';
-		uiStore.selectModules([item.moduleIndex], location);
-		await nextTick();
-		document
-			.querySelector(`[data-testid="canvas-${location}"] [data-module-idx="${item.moduleIndex}"]`)
-			?.scrollIntoView({ behavior: 'smooth', block: 'nearest', inline: 'nearest' });
+		await revealModule(item.area, item.moduleIndex);
 	}
 
 	watch(

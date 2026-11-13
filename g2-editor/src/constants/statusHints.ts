@@ -26,6 +26,9 @@ export const STATUS_HINTS = {
 	paramPageMorphKnob: `Drag/Wheel: adjust · Shift-drag: fine · ${ALT}-drag: assign/swap · Double-click: default · Right-click: deassign`,
 	morphKnob: `Click: select group · Hold: show its morph ranges · Drag/Wheel: adjust · Shift-drag: fine · Double-click: default · ${ALT}-drag: assign to Parameter Page · Drop CC here: assign · Right-click: rename, clear, copy, assign`,
 
+	morphLimit: `Morphed params in this variation (G2 maximum 25) · Click/⇧${MOD}I: list them`,
+	morphRow: 'Click: select the param on the canvas · ×: deassign',
+
 	// Patch Mutator — sound boxes
 	mutaBox: `Click: audition · Double-click: mutate from this sound · Drag: copy to another box · Shift-drop: interpolate · ${ALT}-drop: cross`,
 	mutaStorage: `Click: audition · Double-click: mutate from this sound · Drag: move/copy · Shift-drop: interpolate · ${ALT}-drop: cross · Right-click: delete`,

@@ -18,10 +18,12 @@ export function buildMorphMenuItems(opts: {
 }): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
 	const { slot, variation, groupIndex, location, moduleIndex, paramIndex, isAssigned, defaultRange } = opts;
+	// Greyed out when this param would be the 26th morphed param of the variation (G2 maximum 25).
+	const blocked = !!slot && slotsStore.morphLimit(slot, variation, { location, moduleIndex, paramIndex }).blocked;
 	return [
 		{
 			label: isAssigned ? `Morph assign ✓ (Group ${groupIndex + 1})` : `Morph assign (Group ${groupIndex + 1})`,
-			disabled: !slot,
+			disabled: !slot || (!isAssigned && blocked),
 			action: () => {
 				if (!slot) return;
 				if (isAssigned) slotsStore.deassignParamFromMorphGroup(slot, variation, groupIndex, location, moduleIndex, paramIndex);
