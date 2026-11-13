@@ -25,6 +25,8 @@
 	--color-link: #175e72; /* clickable text, e.g. links in module help */
 	--color-accent: #6b3fa0; /* highlighted text (Clavia "indigo" in module help) */
 	--color-danger: #b42318; /* warning text (Clavia "red" in module help) */
+	--color-indicator: #ff3232; /* toolbar button indicator strip */
+	--color-indicator-dimmed: rgba(220, 50, 50, 0.4);
 }
 
 @media (prefers-color-scheme: dark) {

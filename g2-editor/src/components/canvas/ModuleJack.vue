@@ -14,11 +14,11 @@
 		<circle v-if="type === 'input'" :cx="x" :cy="y" r="10" fill="none" style="pointer-events: all" />
 		<rect v-else :x="x - 10" :y="y - 10" width="20" height="20" rx="1" fill="none" style="pointer-events: all" />
 		<template v-if="type == 'input'">
-			<circle :cx="x" :cy="y" r="5.5" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
-			<circle :cx="x" :cy="y" r="2.5" :fill="connected ? jackColor : '#000'" stroke="#333" stroke-width="1" class="jack" />
+			<circle :cx="x" :cy="y" r="5.5" :fill="jackColor" :stroke="PANEL.line" stroke-width="1" class="jack" />
+			<circle :cx="x" :cy="y" r="2.5" :fill="connected ? jackColor : PANEL.ink" :stroke="PANEL.line" stroke-width="1" class="jack" />
 		</template>
 		<template v-else>
-			<rect :x="x - 5.5" :y="y - 5.5" width="11" height="11" rx="1" ry="1" :fill="jackColor" stroke="#333" stroke-width="1" class="jack" />
+			<rect :x="x - 5.5" :y="y - 5.5" width="11" height="11" rx="1" ry="1" :fill="jackColor" :stroke="PANEL.line" stroke-width="1" class="jack" />
 			<rect
 				:x="x - 2.5"
 				:y="y - 2.5"
@@ -26,8 +26,8 @@
 				height="5"
 				rx="1"
 				ry="1"
-				:fill="connected ? jackColor : '#000'"
-				stroke="#333"
+				:fill="connected ? jackColor : PANEL.ink"
+				:stroke="PANEL.line"
 				stroke-width="1"
 				class="jack"
 			/>
@@ -35,7 +35,7 @@
 		<!-- <text
 			:x="labelX"
 			:y="y + 3"
-			fill="#000"
+			:fill="PANEL.ink"
 			font-size="8"
 			:text-anchor="type === 'input' ? 'start' : 'end'"
 		>
@@ -44,6 +44,7 @@
 	</g>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { JACK_COLORS, getEffectiveJackColor } from '../../constants';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCableColorItems } from '../../utils/colorSwatches';

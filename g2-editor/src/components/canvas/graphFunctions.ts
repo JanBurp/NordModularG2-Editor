@@ -4,23 +4,7 @@
 // `con[i].l` in the original maps to `lv[i]` here; `mode[i]` maps to `modes[i]`.
 
 import type { VisualElement } from '../../types';
-
-// ---------------------------------------------------------------------------
-// Visual constants — adjust here to retheme the module graphs
-// ---------------------------------------------------------------------------
-
-export const GRAPH_COLORS = {
-	bgEnv: '#088', // background rect for graphenv (envelopes, filters, dx)
-	bg: '#088', // background rect for graph (LFO/OSC waveforms)
-	curveStroke: '#AFA', // waveform / envelope / filter curve stroke
-	areaFill: '#066', // area under a curve (envelopes, filter response, comb/noise humps — matches bgEnv → invisible)
-	dimLine: '#AFA', // dimmed reference lines (filter 0 dB line, Mux8-1X rails, etc.)
-	dimLineOpacity: 0.65, // ditto, opacity
-	label: '#FF0', // slope value label (yellow text)
-	dxLine: '#AFA', // dxrouter connection lines
-	dxNodeBg: '#FF0', // dxrouter node rect
-	dxNodeText: '#088', // dxrouter node number
-} as const;
+import { GRAPH_COLORS } from '../../constants/colors';
 
 // ---------------------------------------------------------------------------
 // FastVector (patchviewer:806) and helpers

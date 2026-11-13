@@ -15,9 +15,9 @@
 			<defs>
 				<!-- Local copy of the g120 radial gradient (avoids dependency on canvas SVG defs) -->
 				<radialGradient id="knob-gradient" gradientUnits="objectBoundingBox" cx="50%" cy="50%" r="70%">
-					<stop stop-color="#FFF" offset="0" />
-					<stop stop-color="#FFF" offset="0.5" />
-					<stop stop-color="#000" offset="1" />
+					<stop :stop-color="PANEL.white" offset="0" />
+					<stop :stop-color="PANEL.white" offset="0.5" />
+					<stop :stop-color="PANEL.ink" offset="1" />
 				</radialGradient>
 			</defs>
 			<!-- Offset group: matches ModuleKnob coordinate space, shifted by (1,4) for padding -->
@@ -29,20 +29,20 @@
 					:cx="radius + 2"
 					:cy="radius + 2"
 					fill="url(#knob-gradient)"
-					stroke="#333"
+					:stroke="PANEL.line"
 					stroke-width="0.5"
 					:class="{ dragging: isDragging }"
 				/>
 				<!-- Mirrors ModuleKnob.vue's canvas equivalent; shared markup lives in MorphKnobOverlay.vue -->
 				<MorphKnobOverlay :radius="radius" :value="value" :color="colorVariant" :morph-range="morphRange" :max="max" />
-				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
-				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
+				<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" :stroke="PANEL.line" />
+				<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" :stroke="PANEL.line" />
 				<line
 					:x1="radius + 2"
 					:y1="radius + 2"
 					:x2="radius + 2"
 					:y2="2"
-					stroke="black"
+					:stroke="PANEL.ink"
 					stroke-width="2"
 					:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
 				/>
@@ -64,6 +64,7 @@
 	</div>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { computed, onMounted, onUnmounted, ref } from 'vue';
 	import { clamp } from '@/utils/math';
 	import { blurFocusedControl } from '@/utils/focus';
@@ -191,7 +192,7 @@
 	}
 
 	.knob-svg circle.dragging {
-		stroke: #888;
+		stroke: v-bind('PANEL.dragging');
 		stroke-width: 1.5;
 	}
 </style>

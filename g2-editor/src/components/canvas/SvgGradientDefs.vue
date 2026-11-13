@@ -5,188 +5,188 @@
 			<defs>
 				<!-- Left side gradient -->
 				<linearGradient id="g116" gradientUnits="objectBoundingBox">
-					<stop class="gradient-stop-dark" offset="0" />
-					<stop class="gradient-stop-mid" offset="0.2" />
-					<stop class="gradient-stop-light" offset="1" />
+					<stop class="gradient-stop-dark" :stop-color="PANEL_SHADE.dark" offset="0" />
+					<stop class="gradient-stop-mid" :stop-color="PANEL_SHADE.mid" offset="0.2" />
+					<stop class="gradient-stop-light" :stop-color="PANEL_SHADE.light" offset="1" />
 				</linearGradient>
 
 				<!-- Right side gradient -->
 				<linearGradient id="g117" gradientUnits="objectBoundingBox">
-					<stop class="gradient-stop-transparent" offset="0" />
-					<stop class="gradient-stop-very-light" offset="0.7" />
-					<stop class="gradient-stop-white" offset="1" />
+					<stop class="gradient-stop-transparent" :stop-color="PANEL_SHADE.light" offset="0" />
+					<stop class="gradient-stop-very-light" :stop-color="PANEL_SHADE.veryLight" offset="0.7" />
+					<stop class="gradient-stop-white" :stop-color="PANEL_SHADE.white" offset="1" />
 				</linearGradient>
 
 				<!-- Top gradient -->
 				<linearGradient id="g118" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop class="gradient-stop-white" offset="0" />
-					<stop class="gradient-stop-very-light" offset="0.3" />
-					<stop class="gradient-stop-transparent" offset="1" />
+					<stop class="gradient-stop-white" :stop-color="PANEL_SHADE.white" offset="0" />
+					<stop class="gradient-stop-very-light" :stop-color="PANEL_SHADE.veryLight" offset="0.3" />
+					<stop class="gradient-stop-transparent" :stop-color="PANEL_SHADE.light" offset="1" />
 				</linearGradient>
 
 				<!-- Bottom gradient -->
 				<linearGradient id="g119" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop class="gradient-stop-transparent" offset="0" />
-					<stop class="gradient-stop-mid-gray" offset="0.8" />
-					<stop class="gradient-stop-dark" offset="1" />
+					<stop class="gradient-stop-transparent" :stop-color="PANEL_SHADE.light" offset="0" />
+					<stop class="gradient-stop-mid-gray" :stop-color="PANEL_SHADE.mid" offset="0.8" />
+					<stop class="gradient-stop-dark" :stop-color="PANEL_SHADE.dark" offset="1" />
 				</linearGradient>
 
 				<!-- Knob radial gradient -->
 				<radialGradient id="g120" gradientUnits="objectBoundingBox" cx="50%" cy="50%" r="70%">
-					<stop stop-color="#FFF" offset="0" />
-					<stop stop-color="#FFF" offset="0.5" />
-					<stop stop-color="#000" offset="1" />
+					<stop :stop-color="PANEL.white" offset="0" />
+					<stop :stop-color="PANEL.white" offset="0.5" />
+					<stop :stop-color="PANEL.ink" offset="1" />
 				</radialGradient>
 
 				<!-- Slider linear gradient -->
 				<linearGradient id="g121" gradientUnits="objectBoundingBox" x1="0%" y1="0%" x2="0%" y2="100%">
-					<stop stop-color="#333" offset="0" />
-					<stop stop-color="#CCC" offset="0.5" />
-					<stop stop-color="#222" offset="1" />
+					<stop :stop-color="PANEL.line" offset="0" />
+					<stop :stop-color="CONTROL.off" offset="0.5" />
+					<stop :stop-color="PANEL.symbol" offset="1" />
 				</linearGradient>
 
-				<path id="BitmapHVCA" stroke="#222" fill="none" :d="bitmapPaths['HVCA']" />
-				<path id="BitmapVVCA" stroke="#222" fill="none" :d="bitmapPaths['VVCA']" />
-				<path id="BitmapADD" stroke="#222" fill="none" :d="bitmapPaths['ADD']" />
-				<path id="BitmapWSAW" stroke="#222" fill="none" :d="bitmapPaths['WSAW']" />
-				<path id="BitmapWSQR1" stroke="#222" fill="none" :d="bitmapPaths['WSQR1']" />
-				<path id="BitmapWSQR2" stroke="#222" fill="none" :d="bitmapPaths['WSQR2']" />
-				<path id="BitmapINV" stroke="#222" fill="none" :d="bitmapPaths['INV']" />
-				<path id="BitmapSW12" stroke="#222" fill="none" :d="bitmapPaths['SW12']" />
-				<path id="BitmapSH" stroke="#222" fill="none" :d="bitmapPaths['SH']" />
-				<path id="BitmapSWcon" stroke="#222" fill="none" :d="bitmapPaths['SWcon']" />
-				<path id="BitmapSWMcon" stroke="#222" fill="none" :d="bitmapPaths['SWMcon']" />
-				<path id="BitmapLMOD" stroke="#222" fill="none" :d="bitmapPaths['LMOD']" />
-				<path id="BitmapRect" stroke="#222" fill="none" :d="bitmapPaths['Rect']" />
-				<path id="BitmapShpStatic" stroke="#222" fill="none" :d="bitmapPaths['ShpStatic']" />
-				<path id="BitmapLfoAWave" stroke="#222" fill="none" :d="bitmapPaths['LfoAWave']" />
-				<path id="BitmapLfoBWave" stroke="#222" fill="none" :d="bitmapPaths['LfoBWave']" />
-				<path id="BitmapLfoShpAWave" stroke="#222" fill="none" :d="bitmapPaths['LfoShpAWave']" />
-				<path id="BitmapOscAWave" stroke="#222" fill="none" :d="bitmapPaths['OscAWave']" />
-				<path id="BitmapOscShpAWave" stroke="#222" fill="none" :d="bitmapPaths['OscShpAWave']" />
-				<path id="BitmapOscBWave" stroke="#222" fill="none" :d="bitmapPaths['OscBWave']" />
-				<path id="Bitmapff1" stroke="none" fill="#222" fill-rule="evenodd" :d="bitmapPaths['ff1']" />
-				<path id="Bitmapff2" stroke="none" fill="#222" fill-rule="evenodd" :d="bitmapPaths['ff2']" />
-				<path id="Bitmappwr" stroke="#222" fill="none" :d="bitmapPaths['pwr']" />
-				<path id="Bitmapsharp" stroke="none" fill="#222" :d="bitmapPaths['sharp']" />
-				<path id="Bitmapbox" stroke="#222" fill="none" :d="bitmapPaths['box']" />
-				<path id="Bitmaptrig1" stroke="none" fill="#222" :d="bitmapPaths['trig1']" />
-				<path id="Bitmapgate2" stroke="none" fill="#222" :d="bitmapPaths['gate2']" />
-				<path id="Bitmapsend" stroke="none" fill="#646464" fill-rule="evenodd" :d="bitmapPaths['send']" />
-				<path id="Bitmaptrig2" stroke="none" fill="#222" :d="bitmapPaths['trig2']" />
-				<path id="BitmapCurve" stroke="#222" fill="#088" :d="bitmapPaths['Curve']" />
-				<path id="BitmapSeqLp" stroke="none" fill="#222" fill-rule="evenodd" :d="bitmapPaths['SeqLp']" />
-				<path id="BitmapOutputMode" stroke="none" fill="#000" :d="bitmapPaths['OutputMode']" />
+				<path id="BitmapHVCA" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['HVCA']" />
+				<path id="BitmapVVCA" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['VVCA']" />
+				<path id="BitmapADD" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['ADD']" />
+				<path id="BitmapWSAW" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['WSAW']" />
+				<path id="BitmapWSQR1" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['WSQR1']" />
+				<path id="BitmapWSQR2" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['WSQR2']" />
+				<path id="BitmapINV" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['INV']" />
+				<path id="BitmapSW12" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['SW12']" />
+				<path id="BitmapSH" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['SH']" />
+				<path id="BitmapSWcon" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['SWcon']" />
+				<path id="BitmapSWMcon" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['SWMcon']" />
+				<path id="BitmapLMOD" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['LMOD']" />
+				<path id="BitmapRect" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['Rect']" />
+				<path id="BitmapShpStatic" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['ShpStatic']" />
+				<path id="BitmapLfoAWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['LfoAWave']" />
+				<path id="BitmapLfoBWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['LfoBWave']" />
+				<path id="BitmapLfoShpAWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['LfoShpAWave']" />
+				<path id="BitmapOscAWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['OscAWave']" />
+				<path id="BitmapOscShpAWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['OscShpAWave']" />
+				<path id="BitmapOscBWave" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['OscBWave']" />
+				<path id="Bitmapff1" stroke="none" :fill="PANEL.symbol" fill-rule="evenodd" :d="bitmapPaths['ff1']" />
+				<path id="Bitmapff2" stroke="none" :fill="PANEL.symbol" fill-rule="evenodd" :d="bitmapPaths['ff2']" />
+				<path id="Bitmappwr" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['pwr']" />
+				<path id="Bitmapsharp" stroke="none" :fill="PANEL.symbol" :d="bitmapPaths['sharp']" />
+				<path id="Bitmapbox" :stroke="PANEL.symbol" fill="none" :d="bitmapPaths['box']" />
+				<path id="Bitmaptrig1" stroke="none" :fill="PANEL.symbol" :d="bitmapPaths['trig1']" />
+				<path id="Bitmapgate2" stroke="none" :fill="PANEL.symbol" :d="bitmapPaths['gate2']" />
+				<path id="Bitmapsend" stroke="none" :fill="PANEL.sendSymbol" fill-rule="evenodd" :d="bitmapPaths['send']" />
+				<path id="Bitmaptrig2" stroke="none" :fill="PANEL.symbol" :d="bitmapPaths['trig2']" />
+				<path id="BitmapCurve" :stroke="PANEL.symbol" :fill="GRAPH_COLORS.bg" :d="bitmapPaths['Curve']" />
+				<path id="BitmapSeqLp" stroke="none" :fill="PANEL.symbol" fill-rule="evenodd" :d="bitmapPaths['SeqLp']" />
+				<path id="BitmapOutputMode" stroke="none" :fill="PANEL.ink" :d="bitmapPaths['OutputMode']" />
 				<path
 					id="ModeLfoC"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M 3.402,130.7 3.402,138.8 C 3.649,140.9 7.995,140.8 8.259,138.8 L 8.259,131.9 C 8.203,130.2 10.22,130.3 10.29,131.9 L 10.29,138.8 C 10.33,140.8 14.01,140.8 14.18,138.8 L 14.18,131.9 C 14.61,130.2 18.29,130.2 18.59,131.9 L 18.59,140 M 3.429,112.7 3.429,122.7 8.269,122.7 8.269,113 10.29,113 10.29,122.7 14.17,122.7 14.17,113 18.56,113 18.56,123.2 M 4.486,100.3 C 6.04,90.79 8.358,92.57 10.55,100.1 11.48,103.4 12.88,101.5 13.39,100.1 14.37,96.75 15.44,96.53 18.25,103.5 M 4.423,83.99 4.423,82.13 7.498,82.13 7.498,76.42 10.67,76.42 10.67,82.82 13.76,82.82 13.76,79.59 16.82,79.59 16.82,85.19 18.73,85.19 M 5.331,62.83 5.331,58.03 11.26,58.03 11.26,68.07 17.4,68.07 17.4,63.13 M 6.025,50.53 6.025,39.71 17.33,50.92 M 5.352,32.92 11.16,21.76 17.23,32.99 M 4.381,8.594 C 6.331,2.712 8.443,0.4046 11.2,8.594 13.8,15.81 15.43,16.44 17.54,8.594"
 				/>
 				<path
 					id="ModeWave2"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M 11.94,93.31 C 14.01,93.39 14.05,98.22 11.85,98.12 9.76,98.25 9.65,93.44 11.94,93.31 z M 7.714,94.47 8.43,93.83 8.43,98.48 M 2.733,99.3 2.733,93.38 5.06,93.38 5.06,105.5 19,105.5 19,99.12 M 18.89,75.34 15.93,75.34 15.93,76.95 17.28,76.95 C 19.49,77.19 19.42,79.42 17.28,79.78 L 15.47,79.78 M 10.63,76.31 C 11.99,74.28 14.69,75.76 13.43,77.21 L 11.08,79.79 14.23,79.79 M 2.733,81.35 2.733,75.38 7.547,75.38 7.547,87.48 19,87.48 19,81.12 M 2.733,62.96 2.733,56.99 11.06,56.99 11.06,69.09 19,69.09 19,62.73 M 2.733,51.01 2.733,38.91 19.65,50.75 M 2.342,33.05 11.06,20.82 19.52,33.18 M 2.602,9.108 C 5.274,-0.6052 8.172,1.162 11.19,9.108 13.73,15.3 16.38,16.76 19.26,9.108"
 				/>
 				<path
 					id="ModeFF"
 					stroke="none"
-					fill="#222"
+					:fill="PANEL.symbol"
 					fill-rule="evenodd"
 					d="M 7.768,-17.8 8.701,-17.81 C 8.768,-17.39 9.052,-17.05 9.434,-16.86 10.15,-16.49 11.06,-16.48 11.78,-16.83 12.26,-17.09 12.55,-17.75 12.21,-18.22 11.77,-18.84 10.94,-18.87 10.27,-19.06 9.48,-19.24 8.547,-19.5 8.171,-20.29 7.788,-21.14 8.218,-22.27 9.119,-22.58 10.06,-23 11.21,-22.93 12.11,-22.43 12.63,-22.1 12.99,-21.81 13,-21.19 L 12.04,-21.18 C 11.81,-21.73 11.23,-22.07 10.64,-22.04 10.03,-22.1 9.267,-21.97 8.966,-21.36 8.75,-20.87 9.087,-20.28 9.598,-20.17 10.6,-19.82 11.75,-19.81 12.62,-19.13 13.55,-18.4 13.34,-16.78 12.33,-16.22 11.38,-15.61 10.13,-15.64 9.102,-16.04 8.325,-16.4 7.754,-16.93 7.768,-17.8 z M 17.9,-13.68 17.9,-12.88 21.9,-12.88 21.9,-13.68 z M 19.83,-12.23 C 18.83,-12.23 17.83,-11.39 17.83,-9.709 17.83,-7.069 19.85,-6.299 21.02,-7.409 L 21.72,-6.709 21.97,-7.169 21.32,-7.799 C 21.63,-8.259 21.83,-8.889 21.83,-9.709 21.83,-11.39 20.83,-12.23 19.83,-12.23 z M 21.29,-9.679 C 21.29,-6.789 18.38,-6.789 18.38,-9.679 18.38,-12.28 21.29,-12.28 21.29,-9.679 z M 19.66,-22.91 C 18.31,-22.91 16.97,-21.79 16.97,-19.54 16.97,-15.99 19.68,-14.96 21.25,-16.44 L 22.19,-15.5 22.53,-16.13 21.66,-16.97 C 22.06,-17.59 22.34,-18.43 22.34,-19.54 22.34,-21.79 21,-22.91 19.66,-22.91 z M 21.61,-19.48 C 21.61,-15.61 17.71,-15.61 17.71,-19.48 17.71,-22.97 21.61,-22.97 21.61,-19.48 z M 6,-23.88 24,-23.88 24,-5.879 6,-5.879 6,-7.059 9.025,-9.419 6,-11.67 z M 0,-19.88 5,-19.88 5,-24.88 25,-24.88 25,-19.88 36,-19.88 36,-18.88 25,-18.88 25,-9.879 36,-9.879 36,-8.879 25,-8.879 25,-4.879 5,-4.879 5,-8.879 0,-8.879 0,-9.879 5,-9.879 5,-18.88 0,-18.88 z M 17.92,11.32 17.92,12.12 21.92,12.12 21.92,11.32 z M 19.85,12.77 C 18.85,12.77 17.85,13.61 17.85,15.29 17.85,17.93 19.87,18.7 21.04,17.59 L 21.74,18.29 22,17.83 21.34,17.2 C 21.65,16.74 21.86,16.11 21.86,15.29 21.86,13.61 20.85,12.77 19.85,12.77 z M 21.31,15.33 C 21.31,18.21 18.4,18.21 18.4,15.33 18.4,12.72 21.31,12.72 21.31,15.33 z M 19.68,2.091 C 18.34,2.091 16.99,3.211 16.99,5.461 16.99,9.011 19.7,10.04 21.27,8.561 L 22.21,9.491 22.55,8.871 21.68,8.031 C 22.09,7.411 22.37,6.571 22.37,5.461 22.37,3.211 21.02,2.091 19.68,2.091 z M 21.63,5.521 C 21.63,9.391 17.73,9.391 17.73,5.521 17.73,2.031 21.63,2.031 21.63,5.521 z M 8.804,2.951 8.804,8.191 10.51,8.191 C 13.02,7.121 13.02,4.121 10.51,2.951 z M 8.023,2.121 8.023,9.121 10.63,9.121 C 14.02,8.121 14.02,3.121 10.63,2.121 z M 6.023,1.121 24.02,1.121 24.02,19.12 6.023,19.12 6.023,17.94 9.048,15.58 6.023,13.33 z M 0.023,5.121 5.023,5.121 5.023,0.1211 25.02,0.1211 25.02,5.121 36.02,5.121 36.02,6.121 25.02,6.121 25.02,15.12 36.02,15.12 36.02,16.12 25.02,16.12 25.02,20.12 5.023,20.12 5.023,16.12 0.023,16.12 0.023,15.12 5.023,15.12 5.023,6.121 0.023,6.121 z"
 				/>
 				<path
 					id="ModeDelay"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M0,61.52 7.47,61.52 7.47,54.41 15.79,54.41 15.79,61.43 20.2,61.43 M -0.089,51.52 3.47,51.52 3.47,44.41 11.62,44.41 11.62,51.43 20.2,51.43 M -0.089,40.62 3.559,40.62 3.559,33.51 18.06,33.51 18.06,40.53 20.2,40.53 M -0.089,30.62 3.47,30.62 3.47,23.51 11.62,23.51 11.62,30.53 20.2,30.53 M -0.089,19.25 9.47,19.25 9.47,12.14 18.06,12.14 18.06,19.16 20.2,19.16 M -0.089,9.254 3.47,9.254 3.47,2.136 18.06,2.136 18.06,9.165 20.2,9.165"
 				/>
 				<path
 					id="ModePulse"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M -0.089,9.254 5.872,9.254 5.872,2.136 20.06,2.136 M -0.089,19.25 5.826,19.25 5.826,12.14 14.42,12.14 14.42,19.16 20.2,19.16 M 0.0892,23.51 5.887,23.51 5.887,30.53 20.2,30.53 M -0.089,40.62 5.826,40.62 5.826,33.51 14.42,33.51 14.42,40.53 20.2,40.53"
 				/>
 				<path
 					id="ModeGate"
 					stroke="none"
-					fill="#222"
+					:fill="PANEL.symbol"
 					fill-rule="evenodd"
 					d="M 22.97,118.9 22.97,111.9 26.07,111.9 C 26.69,111.9 27.17,112 27.49,112.1 27.81,112.2 28.07,112.4 28.27,112.7 28.46,113.1 28.56,113.4 28.56,113.8 28.56,114.3 28.4,114.7 28.08,115.1 27.76,115.4 27.26,115.6 26.59,115.7 26.83,115.8 27.02,115.9 27.15,116 27.42,116.3 27.67,116.6 27.91,117 L 29.13,118.9 27.97,118.9 27.04,117.4 C 26.77,117 26.55,116.7 26.37,116.5 26.2,116.2 26.04,116.1 25.9,116 25.77,115.9 25.63,115.8 25.48,115.8 25.38,115.8 25.21,115.8 24.97,115.8 L 23.89,115.8 23.89,118.9 z M 23.89,115 25.88,115 C 26.31,115 26.64,114.9 26.87,114.8 27.11,114.8 27.29,114.6 27.42,114.4 27.54,114.2 27.6,114 27.6,113.8 27.6,113.5 27.48,113.2 27.24,113 27,112.8 26.63,112.7 26.11,112.7 L 23.89,112.7 z M 15.08,115.5 C 15.08,114.3 15.39,113.4 16.01,112.8 16.64,112.1 17.44,111.8 18.43,111.8 19.07,111.8 19.65,111.9 20.17,112.2 20.69,112.5 21.09,113 21.36,113.5 21.63,114.1 21.77,114.7 21.77,115.4 21.77,116.1 21.62,116.7 21.34,117.3 21.05,117.9 20.65,118.3 20.12,118.6 19.6,118.9 19.03,119 18.42,119 17.76,119 17.18,118.8 16.66,118.5 16.14,118.2 15.75,117.8 15.48,117.2 15.21,116.7 15.08,116.1 15.08,115.5 z M 16.03,115.5 C 16.03,116.3 16.26,117 16.71,117.5 17.17,118 17.73,118.2 18.42,118.2 19.11,118.2 19.69,118 20.14,117.5 20.59,117 20.81,116.3 20.81,115.4 20.81,114.8 20.72,114.3 20.52,113.9 20.33,113.5 20.05,113.1 19.68,112.9 19.31,112.7 18.89,112.6 18.43,112.6 17.78,112.6 17.21,112.8 16.74,113.2 16.27,113.7 16.03,114.4 16.03,115.5 z M 8.292,118.9 8.292,111.9 9.241,111.9 12.91,117.4 12.91,111.9 13.8,111.9 13.8,118.9 12.85,118.9 9.179,113.4 9.179,118.9 z M 1.066,118.9 3.77,115.2 1.385,111.9 2.487,111.9 3.756,113.7 C 4.02,114.1 4.207,114.3 4.319,114.5 4.474,114.3 4.659,114 4.872,113.7 L 6.279,111.9 7.285,111.9 4.829,115.2 7.476,118.9 6.331,118.9 4.571,116.4 C 4.473,116.2 4.371,116.1 4.266,115.9 4.11,116.2 3.999,116.3 3.932,116.4 L 2.177,118.9 z M 19.44,97.64 C 19.44,95.31 19.44,92.97 19.44,90.64 20.75,90.67 22.06,90.59 23.37,90.69 23.93,90.75 24.5,91.03 24.76,91.54 25.25,92.36 25.06,93.58 24.21,94.08 23.86,94.3 23.46,94.4 23.06,94.45 23.88,94.81 24.32,95.64 24.78,96.36 25.05,96.79 25.33,97.21 25.6,97.64 25.21,97.64 24.83,97.64 24.44,97.64 23.83,96.72 23.3,95.73 22.56,94.9 22.26,94.61 21.83,94.49 21.42,94.53 21.07,94.53 20.71,94.53 20.36,94.53 20.36,95.57 20.36,96.6 20.36,97.64 20.05,97.64 19.75,97.64 19.44,97.64 z M 20.36,93.73 C 21.26,93.7 22.16,93.77 23.05,93.69 23.55,93.6 24.01,93.22 24.06,92.7 24.15,92.15 23.75,91.57 23.19,91.49 22.56,91.35 21.92,91.44 21.28,91.42 20.97,91.42 20.67,91.42 20.36,91.42 20.36,92.19 20.36,92.96 20.36,93.73 z M 11.55,94.23 C 11.52,92.97 12.01,91.6 13.16,90.96 14.59,90.13 16.69,90.47 17.61,91.9 18.3,92.98 18.41,94.38 18.01,95.59 17.67,96.64 16.74,97.46 15.65,97.68 14.28,98.01 12.69,97.4 12.02,96.12 11.7,95.54 11.55,94.88 11.55,94.23 z M 12.5,94.24 C 12.45,95.3 13,96.48 14.07,96.83 15.17,97.24 16.57,96.73 17.01,95.61 17.36,94.74 17.37,93.74 17.08,92.86 16.76,91.93 15.83,91.26 14.85,91.32 13.81,91.31 12.81,92.05 12.62,93.09 12.53,93.47 12.5,93.85 12.5,94.24 z M 4.595,97.64 C 5.497,96.42 6.398,95.21 7.3,93.99 6.505,92.87 5.71,91.76 4.915,90.64 5.282,90.64 5.65,90.64 6.017,90.64 6.594,91.47 7.197,92.29 7.75,93.13 7.89,93.51 8.043,92.87 8.21,92.76 8.739,92.05 9.276,91.35 9.809,90.64 10.14,90.64 10.48,90.64 10.81,90.64 9.993,91.74 9.176,92.84 8.359,93.94 9.243,95.17 10.13,96.41 11.01,97.64 10.63,97.64 10.24,97.64 9.861,97.64 9.213,96.71 8.548,95.79 7.913,94.86 7.754,94.44 7.609,95.1 7.44,95.23 6.862,96.03 6.285,96.84 5.707,97.64 5.336,97.64 4.966,97.64 4.595,97.64 z M 22.53,35.19 C 22.53,32.86 22.53,30.53 22.53,28.2 23.78,28.24 25.05,28.1 26.28,28.32 27.44,28.62 28.16,29.77 28.26,30.91 28.44,32.16 28.22,33.6 27.28,34.51 26.51,35.22 25.42,35.19 24.44,35.19 23.81,35.19 23.17,35.18 22.53,35.19 z M 23.46,34.37 C 24.43,34.31 25.47,34.53 26.37,34.09 27.29,33.5 27.41,32.28 27.35,31.28 27.33,30.36 26.85,29.29 25.86,29.1 25.07,28.96 24.26,29.04 23.46,29.02 23.46,30.8 23.46,32.59 23.46,34.37 z M 15.47,35.19 15.47,28.2 16.41,28.2 20.09,33.69 20.09,28.2 20.97,28.2 20.97,35.19 20.03,35.19 16.35,29.7 16.35,35.19 z M 8.182,35.19 10.87,28.2 11.86,28.2 14.73,35.19 13.67,35.19 12.86,33.07 9.933,33.07 9.165,35.19 z M 10.2,32.32 12.57,32.32 11.84,30.38 C 11.62,29.8 11.45,29.31 11.34,28.93 11.26,29.38 11.13,29.83 10.97,30.27 z M 1.881,35.19 1.881,28.2 2.83,28.2 6.503,33.69 6.503,28.2 7.39,28.2 7.39,35.19 6.441,35.19 2.768,29.7 2.768,35.19 z M 19.36,77.06 C 19.36,74.73 19.36,72.4 19.36,70.07 20.52,70.07 21.68,70.06 22.85,70.08 23.46,70.1 24.15,70.22 24.54,70.75 25.11,71.47 25.1,72.61 24.43,73.26 24.05,73.64 23.5,73.81 22.98,73.88 23.7,74.2 24.14,74.89 24.54,75.54 24.87,76.04 25.19,76.55 25.52,77.06 25.13,77.06 24.74,77.06 24.35,77.06 23.8,76.21 23.3,75.32 22.67,74.52 22.4,74.17 21.97,73.94 21.52,73.95 21.1,73.95 20.69,73.95 20.28,73.95 20.28,74.99 20.28,76.02 20.28,77.06 19.97,77.06 19.67,77.06 19.36,77.06 z M 20.28,73.15 C 21.07,73.14 21.85,73.16 22.64,73.14 23.14,73.12 23.71,72.92 23.9,72.42 24.13,71.9 23.91,71.21 23.36,70.99 22.82,70.77 22.22,70.86 21.65,70.84 21.19,70.84 20.74,70.84 20.28,70.84 20.28,71.61 20.28,72.38 20.28,73.15 z M 11.47,73.65 C 11.4,72.2 12.16,70.6 13.62,70.13 15.2,69.55 17.26,70.28 17.85,71.93 18.4,73.35 18.22,75.15 17.15,76.27 15.74,77.67 13.04,77.44 12.03,75.69 11.65,75.08 11.46,74.36 11.47,73.65 z M 12.42,73.67 C 12.34,74.88 13.14,76.19 14.4,76.36 15.58,76.59 16.85,75.79 17.08,74.59 17.34,73.53 17.24,72.26 16.48,71.42 15.47,70.32 13.45,70.59 12.76,71.91 12.49,72.45 12.42,73.07 12.42,73.67 z M 4.679,77.06 4.679,70.07 5.628,70.07 9.301,75.56 9.301,70.07 10.19,70.07 10.19,77.06 9.239,77.06 5.566,71.56 5.566,77.06 z M 15.96,56.35 C 15.96,54.02 15.96,51.69 15.96,49.36 17.29,49.38 18.62,49.31 19.94,49.41 20.5,49.47 21.05,49.77 21.3,50.29 21.76,51.09 21.58,52.27 20.76,52.77 20.41,53 19.99,53.11 19.58,53.17 20.4,53.51 20.84,54.33 21.29,55.05 21.57,55.48 21.85,55.91 22.12,56.35 21.73,56.35 21.35,56.35 20.96,56.35 20.35,55.44 19.84,54.46 19.11,53.64 18.8,53.33 18.35,53.2 17.92,53.24 17.58,53.24 17.23,53.24 16.89,53.24 16.89,54.28 16.89,55.31 16.89,56.35 16.58,56.35 16.27,56.35 15.96,56.35 z M 16.89,52.44 C 17.8,52.41 18.71,52.49 19.61,52.39 20.13,52.3 20.61,51.86 20.61,51.31 20.63,50.77 20.21,50.24 19.66,50.19 19.01,50.07 18.35,50.15 17.7,50.13 17.43,50.13 17.16,50.13 16.89,50.13 16.89,50.9 16.89,51.67 16.89,52.44 z M 8.072,52.94 C 8.05,51.82 8.42,50.62 9.333,49.92 10.42,49.05 12.05,49.02 13.23,49.73 14.1,50.27 14.61,51.25 14.72,52.25 14.89,53.5 14.56,54.92 13.54,55.74 12.23,56.81 10.1,56.7 8.965,55.42 8.361,54.75 8.076,53.83 8.072,52.94 z M 9.026,52.96 C 8.994,53.9 9.399,54.92 10.26,55.38 11.28,55.97 12.76,55.67 13.37,54.63 13.88,53.79 13.9,52.74 13.68,51.81 13.46,50.94 12.73,50.18 11.82,50.06 10.8,49.88 9.638,50.41 9.269,51.41 9.075,51.9 9.029,52.44 9.026,52.96 z M 19.38,13.55 C 19.38,11.22 19.38,8.887 19.38,6.555 20.64,6.596 21.92,6.451 23.17,6.682 24.19,6.976 24.92,7.953 25.07,8.991 25.25,9.988 25.17,11.05 24.78,11.99 24.43,12.74 23.72,13.36 22.88,13.46 21.83,13.64 20.78,13.51 19.73,13.55 19.61,13.55 19.5,13.55 19.38,13.55 z M 20.31,12.72 C 21.24,12.67 22.22,12.85 23.11,12.5 23.82,12.16 24.11,11.34 24.18,10.6 24.24,9.861 24.22,9.079 23.91,8.395 23.61,7.814 22.99,7.388 22.33,7.405 21.67,7.344 21,7.396 20.34,7.38 20.27,7.843 20.32,8.312 20.31,8.779 20.31,10.09 20.31,11.41 20.31,12.72 z M 12.32,13.55 12.32,6.555 13.26,6.555 16.94,12.04 16.94,6.555 17.82,6.555 17.82,13.55 16.87,13.55 13.2,8.052 13.2,13.55 z M 5.032,13.55 7.717,6.555 8.714,6.555 11.58,13.55 10.52,13.55 9.706,11.43 6.782,11.43 6.014,13.55 z M 7.049,10.68 9.42,10.68 8.69,8.739 C 8.467,8.151 8.302,7.668 8.194,7.289 8.105,7.738 7.979,8.183 7.817,8.625 z"
 				/>
 				<path
 					id="ModeClkDiv"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M 2,3 L 2,7 L 9,7 L 9,3 L 16,3 L 16,7 L 23,7 L 23,3 L 26,3 M 2,17 L 2,13 L 9,13 L 9,17 L 26,17 M 2,24 L 2,28 L 9,28 L 9,24 L 16,24 L 16,28 L 23,28 L 23,24 L 26,24 M 2,38 L 2,34 L 16,34 L 16,38 L 26,38"
 				/>
 				<path
 					id="ModeDriver"
-					stroke="#222"
+					:stroke="PANEL.symbol"
 					fill="none"
 					d="M 16,18 L 16,8 C 16,6 19,6 18,4 C 17,2 14,3 15,4 M 5,29 Q 16,24 27,29 M 8,31 L 11,35 M 12,31 L 15,35 M 16,31 L 19,35 M 20,31 L 23,35 M 24,31 L 27,35 M 6,53 Q 16,46 26,53 M 6,53 Q 16,60 26,53 M 6,53 L 26,53 M 12.5,69 A 3.5,3.5 0 1 1 19.5,69 A 3.5,3.5 0 1 1 12.5,69 z M 16,72.5 L 16,81"
 				/>
 				<path
 					id="ModeRndStepPulse"
 					stroke="none"
-					fill="#222"
+					:fill="PANEL.symbol"
 					d="M1,15h3v1h-3z M2,35h31v1h-31z M3,11h1v4h-1z M3,25h1v10h-1z M4,11h2v1h-2z M5,12h1v6h-1z M6,17h2v1h-2z M7,3h1v14h-1z M8,3h2v1h-2z M8,25h1v10h-1z M9,4h1v3h-1z M10,6h2v1h-2z M10,25h1v10h-1z M11,2h1v4h-1z M12,2h2v1h-2z M13,3h1v8h-1z M14,10h2v1h-2z M14,25h1v10h-1z M15,11h1v3h-1z M16,13h2v1h-2z M17,14h1v2h-1z M18,15h2v1h-2z M19,6h1v9h-1z M19,25h1v10h-1z M20,6h2v1h-2z M21,7h1v3h-1z M21,25h1v10h-1z M22,9h2v1h-2z M23,10h1v7h-1z M24,16h2v1h-2z M25,11h1v5h-1z M26,11h2v1h-2z M27,12h1v6h-1z M27,25h1v10h-1z M28,17h2v1h-2z M29,15h1v2h-1z M30,15h2v1h-2z M31,13h1v2h-1z M31,25h1v10h-1z M32,13h2v1h-2z"
 				/>
 				<g id="check">
-					<path stroke="#666" d="M0,0 l10,0 0,10 -10,0 0,-10" />
+					<path :stroke="CONTROL.check" d="M0,0 l10,0 0,10 -10,0 0,-10" />
 				</g>
 				<g id="onoff">
 					<path
-						stroke="#222"
+						:stroke="PANEL.symbol"
 						d="M 7.022,2.097 C 9.036,2.656 10.23,4.813 9.696,6.913 9.16,9.013 7.093,10.26 5.079,9.702 3.066,9.142 1.869,6.986 2.405,4.886 2.757,3.511 3.793,2.44 5.115,2.087 M 0.5,0.5 l 11,0 0,11 -11,0z m 5.551,1.192 0,4.167 0,0"
 					/>
 				</g>
 				<g id="input">
-					<circle r="5" cx="6" cy="5" stroke="#333" />
-					<circle r="3" cx="6" cy="5" fill="black" />
+					<circle r="5" cx="6" cy="5" :stroke="PANEL.line" />
+					<circle r="3" cx="6" cy="5" :fill="PANEL.ink" />
 				</g>
 				<g id="output">
-					<path stroke="#333" d="m1,0 l10,0 0,10 -10,0z" />
-					<circle r="3" cx="6" cy="5" fill="black" />
+					<path :stroke="PANEL.line" d="m1,0 l10,0 0,10 -10,0z" />
+					<circle r="3" cx="6" cy="5" :fill="PANEL.ink" />
 				</g>
-				<g id="levelshift" stroke="#333">
-					<rect stroke="#222" fill="#CCC" x="0" y="-0.5" width="14" height="12" />
-					<rect stroke="none" fill="#666" x="2.5" y="0" width="9" height="11" />
+				<g id="levelshift" :stroke="PANEL.line">
+					<rect :stroke="PANEL.symbol" :fill="CONTROL.off" x="0" y="-0.5" width="14" height="12" />
+					<rect stroke="none" :fill="CONTROL.handle" x="2.5" y="0" width="9" height="11" />
 				</g>
-				<g id="KnobSlider" stroke="#333">
-					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,62 -10,0 0,-62 M0,46 l10,0 M0,54 l10,0" />
-					<path stoke="none" fill="#333" d="M2.5,51 l5,0 -2.5,-3 z M2.5,57 l5,0 -2.5,3 z" />
+				<g id="KnobSlider" :stroke="PANEL.line">
+					<path :fill="CONTROL.off" d="M0,0 l10,0 0,62 -10,0 0,-62 M0,46 l10,0 M0,54 l10,0" />
+					<path stoke="none" :fill="PANEL.line" d="M2.5,51 l5,0 -2.5,-3 z M2.5,57 l5,0 -2.5,3 z" />
 				</g>
-				<g id="KnobSpin" stroke="#333">
-					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,10 -10,0z M0,20 l10,0 0,-10 -10,0z" />
-					<path stoke="none" fill="#333" d="M2.5,6.5 l5,0 -2.5,-3 z M2.5,14 l5,0 -2.5,3 z" />
+				<g id="KnobSpin" :stroke="PANEL.line">
+					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M0,20 l10,0 0,-10 -10,0z" />
+					<path stoke="none" :fill="PANEL.line" d="M2.5,6.5 l5,0 -2.5,-3 z M2.5,14 l5,0 -2.5,3 z" />
 				</g>
-				<g id="KnobSpinH" stroke="#333">
-					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
-					<path stoke="none" fill="#333" d="M6,2.5 l0,5 -2.5,-2.5 z M14,2.5 l0,5 2.5,-2.5 z" />
+				<g id="KnobSpinH" :stroke="PANEL.line">
+					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
+					<path stoke="none" :fill="PANEL.line" d="M6,2.5 l0,5 -2.5,-2.5 z M14,2.5 l0,5 2.5,-2.5 z" />
 				</g>
-				<g id="KnobSpinV" stroke="#333">
-					<path stoke="#333" fill="#CCC" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
-					<path stoke="none" fill="#333" d="M2.5,4 l5,0 -2.5,3 z M12.5,6.5 l5,0 -2.5,-3 z" />
+				<g id="KnobSpinV" :stroke="PANEL.line">
+					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
+					<path stoke="none" :fill="PANEL.line" d="M2.5,4 l5,0 -2.5,3 z M12.5,6.5 l5,0 -2.5,-3 z" />
 				</g>
-				<g id="KnobSmall" stroke="#333">
+				<g id="KnobSmall" :stroke="PANEL.line">
 					<line x1="0.5" y1="17.5" x2="2.5" y2="15.5" />
 					<line x1="18.5" y1="17.5" x2="16.5" y2="15.5" />
 					<circle r="9" cx="9.5" cy="9.5" fill="url(#g120)" />
 				</g>
-				<g id="KnobMedium" stroke="#333">
+				<g id="KnobMedium" :stroke="PANEL.line">
 					<line x1="1" y1="19" x2="3" y2="17" />
 					<line x1="20" y1="19" x2="18" y2="17" />
 					<circle r="10" cx="10.5" cy="10.5" fill="url(#g120)" />
 				</g>
-				<g id="KnobReset" stroke="#333">
-					<path fill="green" stroke="black" d="m7,2 l6,0 -3,4 z" />
+				<g id="KnobReset" :stroke="PANEL.line">
+					<path :fill="KNOB_RESET.symbol" :stroke="PANEL.ink" d="m7,2 l6,0 -3,4 z" />
 					<line x1="1" y1="25" x2="3" y2="23" />
 					<line x1="20" y1="25" x2="18" y2="23" />
 					<circle r="10" cx="10.5" cy="16.5" fill="url(#g120)" />
 				</g>
-				<g id="KnobBig" stroke="#333">
+				<g id="KnobBig" :stroke="PANEL.line">
 					<line x1="1" y1="21" x2="3" y2="19" />
 					<line x1="22" y1="21" x2="20" y2="19" />
 					<circle r="11" cx="11.5" cy="11.5" fill="url(#g120)" />
@@ -198,42 +198,36 @@
 
 <script setup lang="ts">
 	import { bitmapPaths } from '@/renderer/bitmapPaths';
+	import { CONTROL, GRAPH_COLORS, KNOB_RESET, PANEL, PANEL_SHADE } from '@/constants/colors';
 </script>
 
 <style scoped>
 	/* Module panel gradient stops */
 	.gradient-stop-dark {
-		stop-color: rgb(16, 16, 16);
 		stop-opacity: 1;
 	}
 
 	.gradient-stop-mid {
-		stop-color: rgb(127, 127, 127);
 		stop-opacity: 0.75;
 	}
 
 	.gradient-stop-light {
-		stop-color: rgb(190, 190, 190);
 		stop-opacity: 0;
 	}
 
 	.gradient-stop-transparent {
-		stop-color: rgb(190, 190, 190);
 		stop-opacity: 0;
 	}
 
 	.gradient-stop-very-light {
-		stop-color: rgb(210, 210, 210);
 		stop-opacity: 0.15;
 	}
 
 	.gradient-stop-white {
-		stop-color: rgb(255, 255, 255);
 		stop-opacity: 1;
 	}
 
 	.gradient-stop-mid-gray {
-		stop-color: rgb(127, 127, 127);
 		stop-opacity: 0.25;
 	}
 </style>

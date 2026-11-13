@@ -5,10 +5,11 @@
  */
 
 // Cable colors
-export { CABLE_COLORS, CABLE_COLOR_INDEX_MAP, CABLE_SVG_COLORS, JACK_COLORS, getEffectiveJackColor, type CableColor, type CableColorName } from './cableColors';
+export { CABLE_COLOR_INDEX_MAP, getEffectiveJackColor, type CableColor, type CableColorName } from './cableColors';
+export { CABLE_COLORS, CABLE_SVG_COLORS, JACK_COLORS, MODULE_COLORS } from './colors';
 
 // Module colors
-export { MODULE_COLORS, type ModuleColor } from './moduleColors';
+export { type ModuleColor } from './moduleColors';
 
 // Sound categories
 export { SOUND_CATEGORIES, type SoundCategory } from './categories';

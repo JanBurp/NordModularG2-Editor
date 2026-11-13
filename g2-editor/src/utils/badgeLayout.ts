@@ -1,4 +1,4 @@
-import { HINT_FILL } from '../constants/ui';
+import { HINT } from '@/constants/colors';
 export interface BadgeBox {
 	x: number;
 	y: number;
@@ -33,8 +33,8 @@ export function setBadgeDragImage(e: DragEvent, text: string): void {
 	svg.style.cssText = 'position:fixed;top:-200px;left:-200px;pointer-events:none;';
 	// Same double frame as MidiBadge: black outer and white inner 1 px line.
 	for (const [inset, fill, stroke] of [
-		[0.5, HINT_FILL, '#000'],
-		[1.5, 'none', '#FFF'],
+		[0.5, HINT.fill, HINT.frame],
+		[1.5, 'none', HINT.innerFrame],
 	] as const) {
 		const rect = document.createElementNS('http://www.w3.org/2000/svg', 'rect');
 		rect.setAttribute('x', String(inset));
@@ -48,7 +48,7 @@ export function setBadgeDragImage(e: DragEvent, text: string): void {
 	const label = document.createElementNS('http://www.w3.org/2000/svg', 'text');
 	label.setAttribute('x', String(w / 2));
 	label.setAttribute('y', '10');
-	label.setAttribute('fill', '#000');
+	label.setAttribute('fill', HINT.text);
 	label.setAttribute('font-size', '10');
 	label.setAttribute('font-weight', 'bold');
 	label.setAttribute('font-family', 'monospace');

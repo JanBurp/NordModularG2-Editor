@@ -17,13 +17,14 @@
 	<path
 		v-if="color === 'red' && morphRange !== undefined"
 		:d="describeMorphSector(radius + 2, radius + 2, radius, sector[0], sector[1], maxValue)"
-		fill="#Ba4058"
+		:fill="MORPH_SECTOR"
 		opacity="0.7"
 		style="mix-blend-mode: multiply"
 		pointer-events="none"
 	/>
 </template>
 <script setup lang="ts">
+	import { MORPH_SECTOR } from '@/constants/colors';
 	import { computed } from 'vue';
 	import { describeMorphSector } from '../../utils/knobArc';
 	import { clamp } from '../../utils/math';

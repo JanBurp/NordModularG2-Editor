@@ -7,8 +7,8 @@
 			:y="led.y"
 			:width="ve.w"
 			height="6.5"
-			:fill="activeStep !== 255 && ((ve as any).exclusive ? i === activeStep : i <= activeStep) ? '#0F0' : '#040'"
-			stroke="#000"
+			:fill="activeStep !== 255 && ((ve as any).exclusive ? i === activeStep : i <= activeStep) ? LED.on : LED.off"
+			:stroke="PANEL.ink"
 			pointer-events="none"
 		/>
 	</template>
@@ -20,14 +20,15 @@
 			:y="ve.y"
 			:width="ve.w"
 			height="6.5"
-			:fill="activeStep === i - 1 ? '#0F0' : '#040'"
-			stroke="#000"
+			:fill="activeStep === i - 1 ? LED.on : LED.off"
+			:stroke="PANEL.ink"
 			pointer-events="none"
 		/>
 	</template>
-	<rect v-else pointer-events="none" :x="(ve.x || 0) + 1" :y="ve.y" :width="ve.w" height="6.5" :fill="ledOn ? '#0F0' : '#040'" stroke="#000" />
+	<rect v-else pointer-events="none" :x="(ve.x || 0) + 1" :y="ve.y" :width="ve.w" height="6.5" :fill="ledOn ? LED.on : LED.off" :stroke="PANEL.ink" />
 </template>
 <script setup lang="ts">
+	import { LED, PANEL } from '@/constants/colors';
 	import type { VisualElement } from '../../types';
 	defineProps<{
 		ve: VisualElement;

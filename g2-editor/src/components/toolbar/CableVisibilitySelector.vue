@@ -12,9 +12,8 @@
 			@mouseleave="clearHint"
 		>
 			<span
-				class="w-2 h-2 rounded-full opacity-0 transition-opacity duration-200"
+				class="w-2 h-2 rounded-full bg-black/50 opacity-0 transition-opacity duration-200"
 				:class="{ 'opacity-100': getVisibility(color.name) }"
-				:style="{ backgroundColor: 'rgba(0,0,0,0.5)' }"
 			></span>
 		</button>
 		<button

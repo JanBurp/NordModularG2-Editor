@@ -6,8 +6,8 @@
 	>
 		<!-- Output type (Pos/Neg/Bip, LFOs & Envs): green behind the active half (or whole), light strips on both sides -->
 		<svg v-if="param.n === 'levelshift' && hasBitmap" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
-			<rect x="0" y="0" :width="width" height="11" fill="#EEE" stroke="#333" />
-			<rect x="2.5" y="0.5" :width="width - 5" height="10" fill="#A0A0A0" />
+			<rect x="0" y="0" :width="width" height="11" :fill="CONTROL.single" :stroke="PANEL.line" />
+			<rect x="2.5" y="0.5" :width="width - 5" height="10" :fill="CONTROL.levelShiftBg" />
 			<rect v-if="levelShiftHalf !== 'bottom'" x="2.5" y="0.5" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
 			<rect v-if="levelShiftHalf !== 'top'" x="2.5" y="6" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
 			<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(LEVEL_SHIFT_FRAME[activeIndex] * maskh)})`" />
@@ -25,7 +25,7 @@
 				class="switch-bitmap"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect x="0" y="0" :width="width" :height="height" :fill="btnFill(activeIndex === 1)" stroke="#333" />
+				<rect x="0" y="0" :width="width" :height="height" :fill="btnFill(activeIndex === 1)" :stroke="PANEL.line" />
 				<use :href="`#Bitmap${bmp}`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
@@ -39,7 +39,7 @@
 				class="switch-bitmap"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(true, '#EEE')" stroke="#333" />
+				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(true, CONTROL.single)" :stroke="PANEL.line" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(0,${-(activeIndex * maskh)})`" :clip-path="`url(#clip-${param.n}-0)`" />
 			</svg>
 
@@ -58,7 +58,7 @@
 				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
-				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(index === activeIndex)" stroke="#333" />
+				<rect x="0" y="0" :width="width" height="11" :fill="btnFill(index === activeIndex)" :stroke="PANEL.line" />
 				<use :href="`#Bitmap${bmp}`" :transform="`translate(${-(index * width)}, 0)`" :clip-path="`url(#clip-${param.n}-${index})`" />
 			</svg>
 		</template>
@@ -71,7 +71,7 @@
 				class="switch-button"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="btnFill(activeIndex === 1)" />
+				<rect :x="0" :y="0" :width="width" height="11" :stroke="PANEL.line" :fill="btnFill(activeIndex === 1)" />
 				<text :x="width / 2" :y="9" :fill="textFill(activeIndex === 1)" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
 				</text>
@@ -83,7 +83,7 @@
 				class="switch-button"
 				v-bind="isTrigger ? { onMousedown: onTriggerDown, onMouseup: onTriggerUp, onMouseleave: onTriggerUp } : { onClick: onCycleValue }"
 			>
-				<rect :x="0" :y="0" :width="width" height="11" stroke="#333" :fill="btnFill(true, '#EEE')" />
+				<rect :x="0" :y="0" :width="width" height="11" :stroke="PANEL.line" :fill="btnFill(true, CONTROL.single)" />
 				<text :x="width / 2" :y="9" :fill="textFill(true)" font-size="8" text-anchor="middle" pointer-events="none">
 					{{ activeOptionName }}
 				</text>
@@ -100,7 +100,7 @@
 				@mouseleave="onButtonLeave"
 				@contextmenu.stop.prevent="emit('paramContextMenu', props.paramIndex, $event, index)"
 			>
-				<rect :x="getButtonX(index)" :y="getButtonY(index)" :width="width" height="11" :fill="btnFill(index === activeIndex)" stroke="#333" />
+				<rect :x="getButtonX(index)" :y="getButtonY(index)" :width="width" height="11" :fill="btnFill(index === activeIndex)" :stroke="PANEL.line" />
 				<text
 					:x="getButtonX(index) + width / 2"
 					:y="getButtonY(index) + 9"
@@ -128,16 +128,17 @@
 		/>
 
 		<!-- Selected param underline -->
-		<rect v-if="highlight" x="0" :y="underline.y" :width="underline.width" height="1.5" fill="white" pointer-events="none" />
+		<rect v-if="highlight" x="0" :y="underline.y" :width="underline.width" height="1.5" :fill="PANEL.highlight" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed, toRef } from 'vue';
 	import type { ModuleParam, ParamLabel } from '../../types';
 	import { useSwitch } from '../../composables/useSwitch';
 	import SearchHit from '../common/SearchHit.vue';
 	import { morphColorHex } from '../../utils/morphColors';
-	import { GRAPH_COLORS } from './graphFunctions';
+	import { GRAPH_COLORS } from '../../constants/colors';
 
 	const props = defineProps<{
 		param: ModuleParam;
@@ -184,13 +185,13 @@
 
 	// Morph Group assignment: the whole button takes the group's color (red = selected group, blue = another).
 	// The on state is the full color, off a pale tint of it, so the state stays readable. Without a morph
-	// assignment: `base` (default on #6df2f2 / off #CCC).
+	// assignment: `base` (default on CONTROL.on / off CONTROL.off).
 	function btnFill(active: boolean, base?: string): string {
-		if (!props.morphColor) return base ?? (active ? '#6df2f2' : '#CCC');
+		if (!props.morphColor) return base ?? (active ? CONTROL.on : CONTROL.off);
 		const color = morphColorHex(props.morphColor);
-		return active ? color : `color-mix(in srgb, ${color} 35%, #CCC)`;
+		return active ? color : `color-mix(in srgb, ${color} 35%, ${CONTROL.off})`;
 	}
-	const textFill = (active: boolean) => (props.morphColor && active ? '#fff' : '#000');
+	const textFill = (active: boolean) => (props.morphColor && active ? PANEL.white : PANEL.ink);
 
 	function searchHitOf(labelIndex: number): 'match' | 'current' | null {
 		const m = props.searchMatches?.find((x) => x.labelIndex === labelIndex);
@@ -236,12 +237,12 @@
 	}
 
 	.switch-button:hover rect {
-		stroke: #666;
+		stroke: v-bind('PANEL.hover');
 		stroke-width: 1;
 	}
 
 	.switch-button.active rect {
-		stroke: #333;
+		stroke: v-bind('PANEL.line');
 		stroke-width: 1;
 	}
 </style>
