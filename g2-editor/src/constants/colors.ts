@@ -1,5 +1,6 @@
 // The one place for the colours of module panels and the patch canvas: the G2 look, the same in light
-// and dark mode. App UI colours (toolbars, panes, dark mode) are the theme variables in style.css.
+// and dark mode. App UI colours (toolbars, panes, dark mode) are the theme variables in style.css; so are the
+// --canvas-* colours that renderer/svgStyles.css uses (cables, Find & Replace, armed jack).
 
 import type { CableColor } from './cableColors';
 

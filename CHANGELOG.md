@@ -9,7 +9,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ## [Unreleased]
 
 ### Changed
-- Buttons that have Morhp assigned now are colored fully instead of only a small line.
+- Buttons that have Morph assigned now are colored fully instead of only a small line.
 
 ## [0.8.2] - 2026-11-12
 

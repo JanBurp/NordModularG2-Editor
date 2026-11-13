@@ -29,6 +29,19 @@
 	--color-indicator-dimmed: rgba(220, 50, 50, 0.4);
 }
 
+/* Patch canvas colours used by renderer/svgStyles.css; the other canvas colours are in constants/colors.ts. */
+:root {
+	--canvas-search-frame: #f59e0b; /* Find & Replace frame, also the armed jack (click-connect) */
+	--canvas-search-frame-current: #ea580c;
+	--canvas-search-halo: #fcd34d;
+	--canvas-search-halo-current: #fb923c;
+	--canvas-cable-shadow: rgba(0, 0, 0, 0.4);
+	--canvas-cable-border: rgba(0, 0, 0, 0.3);
+	--canvas-cable-border-emphasized: rgba(0, 0, 0, 0.7);
+	--canvas-cable-border-selected: black;
+	--canvas-cable-ghost: #000;
+}
+
 @media (prefers-color-scheme: dark) {
 	:root {
 		--color-surface-0: var(--color-neutral-900);

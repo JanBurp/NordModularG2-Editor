@@ -6,7 +6,7 @@
 	>
 		<!-- Output type (Pos/Neg/Bip, LFOs & Envs): green behind the active half (or whole), light strips on both sides -->
 		<svg v-if="param.n === 'levelshift' && hasBitmap" :width="width" height="11" class="switch-bitmap" @click="onCycleValue">
-			<rect x="0" y="0" :width="width" height="11" :fill="CONTROL.single" :stroke="PANEL.line" />
+			<rect x="0" y="0" :width="width" height="11" :fill="btnFill(true, CONTROL.single)" :stroke="PANEL.line" />
 			<rect x="2.5" y="0.5" :width="width - 5" height="10" :fill="CONTROL.levelShiftBg" />
 			<rect v-if="levelShiftHalf !== 'bottom'" x="2.5" y="0.5" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
 			<rect v-if="levelShiftHalf !== 'top'" x="2.5" y="6" :width="width - 5" height="4.5" :fill="GRAPH_COLORS.dxLine" />
@@ -132,13 +132,12 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { CONTROL, PANEL } from '@/constants/colors';
+	import { CONTROL, GRAPH_COLORS, PANEL } from '@/constants/colors';
 	import { computed, toRef } from 'vue';
 	import type { ModuleParam, ParamLabel } from '../../types';
 	import { useSwitch } from '../../composables/useSwitch';
 	import SearchHit from '../common/SearchHit.vue';
 	import { morphColorHex } from '../../utils/morphColors';
-	import { GRAPH_COLORS } from '../../constants/colors';
 
 	const props = defineProps<{
 		param: ModuleParam;

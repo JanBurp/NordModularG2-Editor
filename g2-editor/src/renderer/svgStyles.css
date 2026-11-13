@@ -11,20 +11,6 @@ body {
 	height: 100%;
 }
 
-#options {
-	border: 1px solid black;
-}
-
-@media (max-width: 75em) {
-	#options {
-		font-size: 75%;
-	}
-
-	#options input {
-		font-size: 100%;
-	}
-}
-
 svg {
 	overflow: visible;
 	-webkit-user-select: none;
@@ -32,54 +18,13 @@ svg {
 	user-select: none;
 }
 
-svg.clipper {
-	overflow: hidden;
-}
-
 body {
 	background-color: gainsboro;
 	margin: 0;
 }
 
-circle.knob {
-	cursor: pointer;
-}
-
-div#wrap {
-	position: relative;
-	/* background: url(brushedmetaltile.jpg) repeat; */
-	background-color: #666;
-	width: 100%;
-	/* height: 1600px; */
-	min-height: 100%;
-}
-
-div#wrap.knobs_shadow g[id^='Knob'] circle {
-	filter: url(#f3);
-}
-
-div#wrap.sockets_shadow g#input circle[stroke] {
-	filter: url(#f4);
-}
-
-div#wrap.sockets_shadow g#output path {
-	filter: url(#f4);
-}
-
-div#wrap.cables_shadow path[class^='svgcable'] {
-	filter: url(#f3);
-}
-
-div#wrap.patching {
-	cursor: crosshair;
-}
-
 text {
 	cursor: default;
-}
-
-g.module {
-	width: 256px;
 }
 
 /* Dimmed modules get a canvas-coloured veil instead of opacity, so the area name behind them doesn't show through.
@@ -98,21 +43,21 @@ g.search-dimmed:where(:not(.selected):not(:hover)) {
 }
 .search-frame {
 	fill: none;
-	stroke: #f59e0b;
+	stroke: var(--canvas-search-frame);
 	stroke-width: 2;
 }
 .search-frame.current {
-	stroke: #ea580c;
+	stroke: var(--canvas-search-frame-current);
 	stroke-width: 4;
 }
 tspan.search-hit {
-	stroke: #fcd34d;
+	stroke: var(--canvas-search-halo);
 	stroke-width: 4px;
 	stroke-linejoin: round;
 	paint-order: stroke;
 }
 tspan.search-hit.current {
-	stroke: #fb923c;
+	stroke: var(--canvas-search-halo-current);
 }
 
 /* Main cable with shadow */
@@ -121,7 +66,7 @@ path[class^='svgcable'] {
 	stroke-linecap: round;
 	fill: none;
 	opacity: 0.9;
-	filter: drop-shadow(2px 2px 3px rgba(0, 0, 0, 0.4));
+	filter: drop-shadow(2px 2px 3px var(--canvas-cable-shadow));
 }
 
 /* Cable border/outline for definition */
@@ -130,11 +75,11 @@ path[class^='svgcableborder'] {
 	stroke-linecap: round;
 	fill: none;
 	opacity: 1;
-	stroke: rgba(0, 0, 0, 0.3);
+	stroke: var(--canvas-cable-border);
 }
 
 path.svgcableborder.selected {
-	stroke: black;
+	stroke: var(--canvas-cable-border-selected);
 	stroke-width: 5;
 	opacity: 1;
 }
@@ -144,7 +89,7 @@ path.svgcableborder.selected {
    Scales off --cable-border-width (set per cable from settings.cableThickness) rather than a
    fixed size, so the emphasis stays proportional at any thickness setting. */
 path.svgcableborder.cable-emphasized {
-	stroke: rgba(0, 0, 0, 0.7);
+	stroke: var(--canvas-cable-border-emphasized);
 	stroke-width: calc(var(--cable-border-width, 5px) + 2px) !important;
 }
 
@@ -165,59 +110,8 @@ svg.cables-flat path.svgcableborder:not(.selected):not(.cable-emphasized) {
 	stroke: transparent;
 }
 
-input#shifter,
-input#scaler {
-	display: none;
-}
-
-li.current {
-	background-color: blue;
-	color: white;
-}
-
-fieldset {
-	display: inline-block;
-	padding: 0 6px;
-	text-align: center;
-}
-
 .nomouse {
 	pointer-events: none;
-}
-
-ul#slotlist,
-ul#variationselect {
-	display: inline-block;
-	list-style: none;
-	padding: 0;
-}
-
-ul#slotlist li,
-ul#variationselect li {
-	display: inline-block;
-	border-radius: 3px;
-	vertical-align: middle;
-}
-
-ul#slotlist li span,
-ul#variationselect li span {
-	display: inline-block;
-	padding: 6px 9px;
-	border-radius: 10px;
-	color: white;
-	font-size: small;
-	cursor: pointer;
-	border: 2px solid gainsboro;
-}
-
-ul#slotlist li span.currentbutton,
-ul#variationselect li span.currentbutton {
-	border-color: orange;
-	background-color: orange;
-}
-
-fieldset {
-	border: 1px solid silver;
 }
 
 .cable-hidden {
@@ -261,7 +155,7 @@ svg.cable-dragging * {
 
 /* Click-connect mode: the jack currently armed as the pending cable source. */
 .jack-group.armed .jack {
-	stroke: #f59e0b;
+	stroke: var(--canvas-search-frame);
 	stroke-width: 2.5;
 }
 
@@ -270,7 +164,7 @@ svg.cable-dragging * {
    behind it, which reads as the cable dipping "under" that module even though it's on top. */
 .cable-ghost {
 	fill: none;
-	stroke: #000;
+	stroke: var(--canvas-cable-ghost);
 	stroke-width: 3;
 	opacity: 0.45;
 	pointer-events: none;
