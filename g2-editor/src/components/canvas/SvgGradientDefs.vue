@@ -152,23 +152,23 @@
 				</g>
 				<g id="levelshift" :stroke="PANEL.line">
 					<rect :stroke="PANEL.symbol" :fill="CONTROL.off" x="0" y="-0.5" width="14" height="12" />
-					<rect stroke="none" :fill="CONTROL.handle" x="2.5" y="0" width="9" height="11" />
+					<rect stroke="none" :fill="CONTROL.levelShiftSymbol" x="2.5" y="0" width="9" height="11" />
 				</g>
 				<g id="KnobSlider" :stroke="PANEL.line">
 					<path :fill="CONTROL.off" d="M0,0 l10,0 0,62 -10,0 0,-62 M0,46 l10,0 M0,54 l10,0" />
-					<path stoke="none" :fill="PANEL.line" d="M2.5,51 l5,0 -2.5,-3 z M2.5,57 l5,0 -2.5,3 z" />
+					<path stroke="none" :fill="PANEL.line" d="M2.5,51 l5,0 -2.5,-3 z M2.5,57 l5,0 -2.5,3 z" />
 				</g>
 				<g id="KnobSpin" :stroke="PANEL.line">
 					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M0,20 l10,0 0,-10 -10,0z" />
-					<path stoke="none" :fill="PANEL.line" d="M2.5,6.5 l5,0 -2.5,-3 z M2.5,14 l5,0 -2.5,3 z" />
+					<path stroke="none" :fill="PANEL.line" d="M2.5,6.5 l5,0 -2.5,-3 z M2.5,14 l5,0 -2.5,3 z" />
 				</g>
 				<g id="KnobSpinH" :stroke="PANEL.line">
 					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
-					<path stoke="none" :fill="PANEL.line" d="M6,2.5 l0,5 -2.5,-2.5 z M14,2.5 l0,5 2.5,-2.5 z" />
+					<path stroke="none" :fill="PANEL.line" d="M6,2.5 l0,5 -2.5,-2.5 z M14,2.5 l0,5 2.5,-2.5 z" />
 				</g>
 				<g id="KnobSpinV" :stroke="PANEL.line">
 					<path :fill="CONTROL.off" d="M0,0 l10,0 0,10 -10,0z M10,10 l10,0 0,-10 -10,0z" />
-					<path stoke="none" :fill="PANEL.line" d="M2.5,4 l5,0 -2.5,3 z M12.5,6.5 l5,0 -2.5,-3 z" />
+					<path stroke="none" :fill="PANEL.line" d="M2.5,4 l5,0 -2.5,3 z M12.5,6.5 l5,0 -2.5,-3 z" />
 				</g>
 				<g id="KnobSmall" :stroke="PANEL.line">
 					<line x1="0.5" y1="17.5" x2="2.5" y2="15.5" />

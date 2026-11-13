@@ -44,8 +44,8 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { PANEL } from '@/constants/colors';
-	import { JACK_COLORS, getEffectiveJackColor } from '../../constants';
+	import { CABLE_SVG_COLORS, PANEL } from '@/constants/colors';
+	import { getEffectiveJackColor, jackColorNameToIndex } from '../../constants/cableColors';
 	import { useContextMenu } from '../../composables/useContextMenu';
 	import { buildCableColorItems } from '../../utils/colorSwatches';
 	import { isMacCtrlClick } from '../../utils/platform';
@@ -92,7 +92,8 @@
 	const { open: openContextMenu } = useContextMenu();
 
 	const effectiveColour = computed(() => getEffectiveJackColor(props.colour, props.uprated ?? false));
-	const jackColor = computed(() => JACK_COLORS[effectiveColour.value] || effectiveColour.value);
+	// A jack has the colour of the cable it takes (CABLE_SVG_COLORS).
+	const jackColor = computed(() => CABLE_SVG_COLORS[jackColorNameToIndex(effectiveColour.value)]);
 
 	function onContextMenu(e: MouseEvent) {
 		if (!props.connected) return;

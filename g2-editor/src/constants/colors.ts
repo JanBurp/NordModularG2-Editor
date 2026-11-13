@@ -39,12 +39,13 @@ export const CONTROL = {
 	off: '#CCC',
 	on: '#6df2f2',
 	single: '#EEE', // single-state button (one label, no on/off)
-	disabled: '#e5e5e5',
+	disabled: '#EEE',
 	selectedRow: '#AAA', // selected row of a mode dropdown
 	levelShiftBg: '#A0A0A0', // Output type (Pos/Neg/Bip) switch behind the green half
 	arrow: '#555',
 	arrowDisabled: '#aaa',
-	handle: '#666', // slider handle (not morph-assigned)
+	handle: '#000', // value marker when not morph-assigned: slider handle, SeqNote step value
+	levelShiftSymbol: '#666', // inner bar of the #levelshift symbol (SvgGradientDefs)
 	check: '#666', // outline of the check symbol
 } as const;
 
@@ -93,7 +94,7 @@ export const HINT = { fill: '#FFFFDE', frame: '#000', innerFrame: '#FFF', text: 
 /** Patch canvas overlays. */
 export const CANVAS = {
 	areaLabel: '#666', // big "Voice" / "FX" label
-	dropFill: 'rgba(100,200,100,0.25)', // module drop target
+	dropFill: 'rgba(74, 222, 128, 0.25)', // module drop target (dropStroke at 25 %)
 	dropStroke: '#4ade80',
 	dragGhost: 'rgba(255,165,0,0.25)', // modules being dragged
 	dragGhostStroke: 'orange',
@@ -151,17 +152,6 @@ export const MODULE_CATEGORY_COLORS: Record<string, string> = {
 	Hidden: '#9e9e9e', // not an original category
 };
 
-/** Cable colours with display names, for the colour picker and the cable visibility toggles. */
-export const CABLE_COLORS: CableColor[] = [
-	{ name: 'red', label: 'Red', hex: '#e74c3c' },
-	{ name: 'blue', label: 'Blue', hex: '#3498db' },
-	{ name: 'yellow', label: 'Yellow', hex: '#f1c40f' },
-	{ name: 'orange', label: 'Orange', hex: '#e67e22' },
-	{ name: 'green', label: 'Green', hex: '#2ecc71' },
-	{ name: 'purple', label: 'Purple', hex: '#9b59b6' },
-	{ name: 'white', label: 'White', hex: '#ecf0f1' },
-];
-
 /** Cable stroke colours on the canvas, by cable colour index. */
 export const CABLE_SVG_COLORS: Record<number, string> = {
 	0: '#f26d6d', // Red
@@ -173,13 +163,13 @@ export const CABLE_SVG_COLORS: Record<number, string> = {
 	6: '#ffffff', // White
 };
 
-/** Jack colours for input/output connectors. */
-export const JACK_COLORS: Record<string, string> = {
-	blue: '#6d6df2',
-	red: '#f26d6d',
-	yellow: '#f2f26d',
-	orange: '#f2f26d', // orange: "#f2a26d",
-	green: '#6df26d',
-	purple: '#6d6df2', // purple: "#d26df2",
-	white: '#e0e0e0',
-};
+/** Cable colours with display names, for the colour picker and the cable visibility toggles: the drawn colours. */
+export const CABLE_COLORS: CableColor[] = [
+	{ name: 'red', label: 'Red', hex: CABLE_SVG_COLORS[0] },
+	{ name: 'blue', label: 'Blue', hex: CABLE_SVG_COLORS[1] },
+	{ name: 'yellow', label: 'Yellow', hex: CABLE_SVG_COLORS[2] },
+	{ name: 'orange', label: 'Orange', hex: CABLE_SVG_COLORS[3] },
+	{ name: 'green', label: 'Green', hex: CABLE_SVG_COLORS[4] },
+	{ name: 'purple', label: 'Purple', hex: CABLE_SVG_COLORS[5] },
+	{ name: 'white', label: 'White', hex: CABLE_SVG_COLORS[6] },
+];

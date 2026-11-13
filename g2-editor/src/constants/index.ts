@@ -6,7 +6,7 @@
 
 // Cable colors
 export { CABLE_COLOR_INDEX_MAP, getEffectiveJackColor, type CableColor, type CableColorName } from './cableColors';
-export { CABLE_COLORS, CABLE_SVG_COLORS, JACK_COLORS, MODULE_COLORS } from './colors';
+export { CABLE_COLORS, CABLE_SVG_COLORS, MODULE_COLORS } from './colors';
 
 // Module colors
 export { type ModuleColor } from './moduleColors';

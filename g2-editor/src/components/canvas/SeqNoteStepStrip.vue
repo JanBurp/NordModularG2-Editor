@@ -30,7 +30,7 @@
 	</g>
 </template>
 <script setup lang="ts">
-	import { PANEL, SEQNOTE } from '@/constants/colors';
+	import { CONTROL, PANEL, SEQNOTE } from '@/constants/colors';
 	import { computed } from 'vue';
 	import { blackNoteRowYs, visibleNoteWindow } from '../../renderer/pianoRoll';
 	import { usePianoRollNoteInteraction } from '../../composables/usePianoRollNoteInteraction';
@@ -56,7 +56,7 @@
 		paramContextMenu: [paramIndex: number, event: MouseEvent];
 	}>();
 
-	const morphFillColor = computed(() => morphColorHex(props.morphColor, PANEL.ink));
+	const morphFillColor = computed(() => morphColorHex(props.morphColor, CONTROL.handle));
 
 	const noteWindow = computed(() => visibleNoteWindow(props.zoom, props.octaveOffset));
 	const lowestVisibleNote = computed(() => noteWindow.value.low);
