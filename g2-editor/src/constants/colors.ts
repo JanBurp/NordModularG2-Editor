@@ -49,13 +49,13 @@ export const CONTROL = {
 	check: '#666', // outline of the check symbol
 } as const;
 
-/** Module LEDs (gate/step LEDs). */
-export const LED = { on: '#0F0', off: '#040' } as const;
+/** LEDs: module gate/step LEDs and the green zone of the level meters. */
+export const LED = { on: '#00cc00', off: '#005500' } as const;
 
 /** Level meters: background and colour zones, bottom/left to top/right, unlit (dim) and lit. */
 export const VU_BG = '#111';
 export const VU_ZONES = [
-	{ from: 0, to: 8 / 16, dim: '#005500', lit: '#00cc00' },
+	{ from: 0, to: 8 / 16, dim: LED.off, lit: LED.on },
 	{ from: 8 / 16, to: 12 / 16, dim: '#555500', lit: '#cccc00' },
 	{ from: 12 / 16, to: 1, dim: '#550000', lit: '#cc0000' },
 ];
@@ -85,8 +85,8 @@ export const MORPH_COLOR_HEX = {
 	red: '#e0303c',
 	blue: '#4a63c8',
 } as const;
-/** Morph range sector on a knob assigned to the selected group (multiplied over the knob). */
-export const MORPH_SECTOR = '#Ba4058';
+/** Morph range sector on a knob assigned to the selected group: morph red, darker (multiplied over the knob). */
+export const MORPH_SECTOR = `color-mix(in srgb, ${MORPH_COLOR_HEX.red} 75%, black)`;
 
 /** Value/assignment hint badges (F5–F8, hover/drag hints), CC# / Parameter Pages drag images: pale yellow. */
 export const HINT = { fill: '#FFFFDE', frame: '#000', innerFrame: '#FFF', text: '#000' } as const;
