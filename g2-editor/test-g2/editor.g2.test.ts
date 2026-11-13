@@ -12,12 +12,15 @@ import {
 	backupPerf,
 	closeOrganizer,
 	type Editor,
+	g2Focus,
 	g2Mode,
+	g2SlotNames,
 	lastAction,
 	type Mode,
 	openOrganizer,
 	perfFlags,
 	restorePerf,
+	selectSlot,
 	setMode,
 	type SlotFlags,
 	startEditor,
@@ -57,27 +60,51 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 	let g: Editor | undefined;
 	let origMode: Mode;
 	let origFlags: SlotFlags;
-	// Name of the backed-up performance; undefined once restored.
-	let origPerf: string | undefined;
+	let origSlotNames: string[];
+	// Names of the backups per mode (the actions change both); empty once restored.
+	let origPerf: Partial<Record<Mode, string>> = {};
+	// The Patch-mode focused slot (the G2 keeps one per mode); undefined once restored.
+	let origPatchSlot: string | undefined;
 	// Actions runRemaining has run.
 	const done = new Set<string>();
 
 	beforeAll(async () => {
 		origMode = await g2Mode();
 		origFlags = await perfFlags();
-		// The actions below load patches and edit all slots; nothing is stored to a bank.
-		origPerf = await backupPerf();
-		await setMode('Patch');
+		origSlotNames = await g2SlotNames();
+		// The actions below load patches and edit all slots in both modes; nothing is stored to a bank.
+		const other: Mode = origMode === 'Patch' ? 'Performance' : 'Patch';
+		origPerf[origMode] = await backupPerf(origMode);
+		await setMode(other);
+		origPerf[other] = await backupPerf(other);
+		if (other !== 'Patch') await setMode('Patch');
 		expect((await snapshotG2()).mode).toBe('Patch');
+		origPatchSlot = await g2Focus();
 		g = await startEditor();
 		expect(g.ctx.mode).toBe('Patch');
 	});
 
 	afterAll(async () => {
 		await g?.close();
-		if (origPerf !== undefined) await restorePerf(origPerf);
-		if (origMode && (await g2Mode()) !== origMode) await setMode(origMode);
+		if (origMode) await restoreG2();
 	});
+
+	// Each mode's backup goes back in that mode, the original mode last. The tests also leave another slot
+	// focused; the Patch-mode one is only selectable in Patch mode.
+	async function restoreG2() {
+		for (const mode of [origMode === 'Patch' ? 'Performance' : 'Patch', origMode] as Mode[]) {
+			const name = origPerf[mode];
+			if (name === undefined && (mode !== 'Patch' || !origPatchSlot)) continue;
+			if ((await g2Mode()) !== mode) await setMode(mode);
+			if (name !== undefined) await restorePerf(name, mode);
+			delete origPerf[mode];
+			if (mode === 'Patch' && origPatchSlot) {
+				await selectSlot(origPatchSlot);
+				origPatchSlot = undefined;
+			}
+		}
+		if ((await g2Mode()) !== origMode) await setMode(origMode);
+	}
 
 	it('connects and answers a probe', async () => {
 		expect(await g!.runner.probe()).toBe(true);
@@ -389,10 +416,9 @@ describe.skipIf(!inject('g2'))('editor on a connected G2', () => {
 
 	it('leaves the G2 as it found it', async () => {
 		await g!.close();
-		await restorePerf(origPerf!);
-		origPerf = undefined;
-		await setMode(origMode);
+		await restoreG2();
 		expect(await g2Mode()).toBe(origMode);
 		expect(await perfFlags()).toEqual(origFlags);
+		expect(await g2SlotNames()).toEqual(origSlotNames);
 	});
 });

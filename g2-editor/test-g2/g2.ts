@@ -27,14 +27,25 @@ export const g2Mode = async (): Promise<Mode> => (await runCli(['startup'], ONE_
 
 export const setMode = (mode: Mode) => runCli(['set-perf-mode', mode.toLowerCase()], ONE_SHOT_TIMEOUT_MS);
 
-const BACKUP_PATH = path.join(os.tmpdir(), 'g2-vitest-backup.prf2');
+const startup = async () => (await runCli(['startup'], ONE_SHOT_TIMEOUT_MS)).device;
 
-/** Saves the G2's edit buffer (all four slots) as a performance, one-shot; returns its name. */
-export const backupPerf = async (): Promise<string> => (await runCli(['get-perf-file', BACKUP_PATH], ONE_SHOT_TIMEOUT_MS)).name;
+/** The focused slot. The G2 keeps a separate one per mode; upload-perf doesn't change the Patch-mode one. */
+export const g2Focus = async (): Promise<string> => (await startup())?.performance?.focus;
 
-/** Uploads what backupPerf saved. upload-perf names the performance after the file, so the name is set again. */
-export async function restorePerf(name: string): Promise<void> {
-	await runCli(['upload-perf', BACKUP_PATH], ONE_SHOT_TIMEOUT_MS);
+/** The slots' patch names in the current mode. */
+export const g2SlotNames = async (): Promise<string[]> => ((await startup())?.slots ?? []).map((s: any) => s.name);
+
+export const selectSlot = (slot: string) => runCli(['slot', slot], ONE_SHOT_TIMEOUT_MS);
+
+// One backup per mode: Patch mode plays its own patch, separate from the performance's slot (hardware, 2026-11-13).
+const backupPath = (mode: Mode) => path.join(os.tmpdir(), `g2-vitest-backup-${mode.toLowerCase()}.prf2`);
+
+/** Saves the G2's edit buffer (all four slots) as a performance, one-shot; `mode` is the current mode. Returns its name. */
+export const backupPerf = async (mode: Mode): Promise<string> => (await runCli(['get-perf-file', backupPath(mode)], ONE_SHOT_TIMEOUT_MS)).name;
+
+/** Uploads what backupPerf saved, in the same mode. upload-perf names the performance after the file, so the name is set again. */
+export async function restorePerf(name: string, mode: Mode): Promise<void> {
+	await runCli(['upload-perf', backupPath(mode)], ONE_SHOT_TIMEOUT_MS);
 	await runCli(['set-perf-name', name], ONE_SHOT_TIMEOUT_MS);
 }
 
