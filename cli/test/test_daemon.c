@@ -1167,11 +1167,11 @@ static int set_mem_protect(int on) {
     return r;
 }
 
-/* 1 when bank 32 location 120 is empty, 0 when used, -1 on error. */
-static int scratch_location_empty(void) {
+/* 1 when patch bank 32 (scratch) location `location` is empty, 0 when used, -1 on error. */
+static int scratch_location_empty(int location) {
     int id = g_cmd_id++;
     char cmd[160];
-    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-location\",\"args\":[\"patch\",\"32\",\"120\",\"/tmp/g2-cli-store-check.pch2\"]}", id);
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"get-location\",\"args\":[\"patch\",\"32\",\"%d\",\"/tmp/g2-cli-store-check.pch2\"]}", id, location);
     cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
     cJSON *e = cJSON_GetObjectItem(cJSON_GetObjectItem(resp, "data"), "empty");
     int empty = cJSON_IsBool(e) ? cJSON_IsTrue(e) : -1;
@@ -1201,13 +1201,13 @@ static int refused_for_memory_protect(const char *name, const char *args) {
 void test_daemon_store_patch_memory_protect(void) {
     if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
     if (!g_device_info) TEST_IGNORE_MESSAGE("no device_info from daemon startup");
-    if (scratch_location_empty() != 1) TEST_IGNORE_MESSAGE("bank 32 location 120 is not empty: not overwriting it");
+    if (scratch_location_empty(120) != 1) TEST_IGNORE_MESSAGE("bank 32 location 120 is not empty: not overwriting it");
 
-    int stored = daemon_cmd("store-patch", "\"0\",\"32\",\"120\"") == 0 && scratch_location_empty() == 0;
+    int stored = daemon_cmd("store-patch", "\"0\",\"32\",\"120\"") == 0 && scratch_location_empty(120) == 0;
     int cleared = daemon_cmd("clear-patch", "\"patch\",\"32\",\"120\"") == 0;
     int protect_on = set_mem_protect(1) == 0;
     int refused = refused_for_memory_protect("store-patch", "\"0\",\"32\",\"120\"");
-    int stays_empty = scratch_location_empty() == 1;
+    int stays_empty = scratch_location_empty(120) == 1;
     int bank_refused = refused_for_memory_protect("clear-bank", "\"patch\",\"32\"");
 
     int protect_off = set_mem_protect(0) == 0;
@@ -1218,4 +1218,34 @@ void test_daemon_store_patch_memory_protect(void) {
     TEST_ASSERT_TRUE_MESSAGE(refused, "store-patch with Memory Protect on: not refused with \"Memory protect on\"");
     TEST_ASSERT_TRUE_MESSAGE(stays_empty, "store-patch with Memory Protect on wrote the location");
     TEST_ASSERT_TRUE_MESSAGE(bank_refused, "clear-bank with Memory Protect on: not refused with \"Memory protect on\"");
+}
+
+/* Bank locations run 1..128 and select-patch used to reject 128 (PR #24). Stores slot A at the scratch
+ * location 32-128, renames slot A, then selects 32-128 back into slot A: the stored name must return, so
+ * the G2 really loaded location 128. Slot A ends as it started; 32-128 is left empty. */
+void test_daemon_select_patch_location_128(void) {
+    if (g_daemon_ok != 0) TEST_IGNORE_MESSAGE("G2 device not connected");
+    if (scratch_location_empty(128) != 1) TEST_IGNORE_MESSAGE("bank 32 location 128 is not empty: not overwriting it");
+
+    char *name = slot_a_field("name");
+    int stored = daemon_cmd("store-patch", "\"0\",\"32\",\"128\"") == 0 && scratch_location_empty(128) == 0;
+    int renamed = daemon_cmd("set-patch-name", "\"A\",\"Loc128Tst\"") == 0;
+    int selected = daemon_cmd("select-patch", "\"A\",\"32\",\"128\"") == 0;
+    char *back = slot_a_field("name");
+    int rejected = daemon_cmd("select-patch", "\"A\",\"32\",\"129\"") != 0;
+    int cleared = daemon_cmd("clear-patch", "\"patch\",\"32\",\"128\"") == 0 && scratch_location_empty(128) == 1;
+
+    int same = name && back && strcmp(name, back) == 0;
+    if (!same && name) {
+        char args[64];
+        snprintf(args, sizeof(args), "\"A\",\"%s\"", name);
+        daemon_cmd("set-patch-name", args);
+    }
+    free(name);
+    free(back);
+    TEST_ASSERT_TRUE_MESSAGE(stored, "store-patch to location 128 failed");
+    TEST_ASSERT_TRUE_MESSAGE(renamed && selected, "set-patch-name / select-patch location 128 failed");
+    TEST_ASSERT_TRUE_MESSAGE(same, "select-patch location 128 did not load the stored patch (slot A name differs)");
+    TEST_ASSERT_TRUE_MESSAGE(rejected, "select-patch location 129 was not rejected");
+    TEST_ASSERT_TRUE_MESSAGE(cleared, "clear-patch location 128 failed - bank 32 location 128 may still be used");
 }
