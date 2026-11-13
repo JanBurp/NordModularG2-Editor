@@ -47,7 +47,8 @@
 		</div>
 		<div class="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2" data-library-scroll>
 			<!-- Filtered with v-show: typing in the search mustn't unmount and remount the previews -->
-			<div v-for="group in allGroups" v-show="filteredByGroup.has(group)" :key="group" class="mb-2">
+			<StateMessage v-if="!ready" variant="loading" message="Loading library…" />
+			<div v-for="group in ready ? allGroups : []" v-show="filteredByGroup.has(group)" :key="group" class="mb-2">
 				<div
 					class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
 					@click="toggleGroup(group)"
@@ -160,7 +161,7 @@
 				</div>
 			</div>
 			<StateMessage
-				v-if="filtered.length === 0"
+				v-if="ready && filtered.length === 0"
 				variant="empty"
 				:message="
 					settings.libraryFavoritesOnly && !searchQuery
@@ -274,10 +275,20 @@
 		resetNavIndex();
 	});
 
-	// Listed when the tab opens; re-read each time, as files may have changed on disk in between.
+	// Listed when the tab opens; re-read each time, as files may have changed on disk in between. The previews take
+	// a while to lay out: the pane paints with a spinner first, the list a frame later (on a first visit after the scan).
+	// Once built, the list stays mounted across tab switches (keeps scroll position, no re-layout).
+	const ready = ref(false);
 	watch(
 		() => props.isActive,
-		(active) => active && init(),
+		async (active) => {
+			if (!active) return;
+			const scan = init().catch(console.error);
+			if (ready.value) return;
+			if (items.value.length === 0) await scan;
+			await new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(r)));
+			ready.value = true;
+		},
 		{ immediate: true },
 	);
 

@@ -252,6 +252,21 @@ const PARAM_ECHO_TIMEOUT_MS = 500;
 // Distinct morphed params per variation the official editor allows when adding modules (GetNewModulesMolecules: 0x19).
 export const MAX_MORPHED_PARAMS = 25;
 
+// The `added` morphs that fit under the G2's limit on top of `kept`, counted in distinct params (official
+// GetNumberOfMorphedParams): a param already morphed in `kept` or listed in `allowed` always fits, a new one
+// only while fewer than MAX_MORPHED_PARAMS params are morphed. The `allowed` ones are counted first, so a new
+// param can't take their place and push the total past the limit, whatever the order of `added`.
+function fitMorphLimit(kept: MorphAssignment[], added: MorphAssignment[], allowed?: Set<string>): MorphAssignment[] {
+	const params = morphedParamKeys(kept);
+	for (const a of added) if (allowed?.has(morphParamKey(a))) params.add(morphParamKey(a));
+	return added.filter((a) => {
+		const key = morphParamKey(a);
+		if (!params.has(key) && params.size >= MAX_MORPHED_PARAMS) return false;
+		params.add(key);
+		return true;
+	});
+}
+
 function armParamEcho(key: string, value: number): void {
 	const existing = _paramAwaitingEcho.get(key);
 	if (existing) clearTimeout(existing.timer);
@@ -1439,11 +1454,11 @@ export const useSlotsStore = defineStore('slots', {
 				// (CPatchData::GetNewModulesMolecules) does after the module/cable/param dumps.
 				const newIdOf = new Map(entries.map((e) => [e.src.index, e.newId]));
 				const pastedMorphs = morphs.map((list, v) => {
-					const room = slotEntry.variations?.[v] ? MAX_MORPHED_PARAMS - this.morphLimit(slot, v).count : 0;
-					return list
+					if (!slotEntry.variations?.[v]) return [];
+					const pasted = list
 						.filter((a) => newIdOf.has(a.moduleIndex))
-						.map((a) => ({ ...a, location: areaIdx, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment)
-						.slice(0, Math.max(0, room));
+						.map((a) => ({ ...a, location: areaIdx, moduleIndex: newIdOf.get(a.moduleIndex)! }) as MorphAssignment);
+					return fitMorphLimit(this.getMorphAssignments(slot, v), pasted);
 				});
 				await this._restoreModuleMorph(slot, pastedMorphs);
 
@@ -2060,17 +2075,15 @@ export const useSlotsStore = defineStore('slots', {
 			let nextMorphs: MorphAssignment[] = [];
 			if (vPatch && morphPairs.length > 0) {
 				prevMorphs = vPatch.morphAssignments;
-				const prevParams = morphedParamKeys(prevMorphs);
 				const replaced = new Set(morphPairs.map((p) => p.targetId));
 				nextMorphs = prevMorphs.filter((a) => !isTargetMorph(a, replaced));
-				const nextParams = morphedParamKeys(nextMorphs);
-				for (const a of morphPairs.flatMap((p) => p.morphs!)) {
-					// A param morphed before (any group) may always get its groups; a new one only while within the limit.
-					const key = morphParamKey(a);
-					if (!prevParams.has(key) && !nextParams.has(key) && nextParams.size >= MAX_MORPHED_PARAMS) continue;
-					nextMorphs.push({ ...a });
-					nextParams.add(key);
-				}
+				// A param morphed before (any group) may always get its groups back.
+				const added = fitMorphLimit(
+					nextMorphs,
+					morphPairs.flatMap((p) => p.morphs!),
+					morphedParamKeys(prevMorphs),
+				);
+				nextMorphs.push(...added.map((a) => ({ ...a })));
 				vPatch.morphAssignments = nextMorphs;
 			}
 			this._markSlotDirty(slot);
@@ -2892,18 +2905,11 @@ export const useSlotsStore = defineStore('slots', {
 					const before = deepCloneVariationState(vars[v]);
 					const after = deepCloneVariationState(vars[v]);
 					const p = after.patch;
-					const assignments = p.morphAssignments.filter((a) => !copied(a.groupIndex));
-					const params = morphedParamKeys(assignments);
-					for (const a of src.morphAssignments.filter((x) => copied(x.groupIndex))) {
-						const key = morphParamKey(a);
-						if (!params.has(key) && params.size >= MAX_MORPHED_PARAMS) {
-							if (!skipped.includes(v)) skipped.push(v);
-							continue;
-						}
-						assignments.push({ ...a });
-						params.add(key);
-					}
-					p.morphAssignments = assignments;
+					const kept = p.morphAssignments.filter((a) => !copied(a.groupIndex));
+					const wanted = src.morphAssignments.filter((a) => copied(a.groupIndex));
+					const fitting = fitMorphLimit(kept, wanted);
+					if (fitting.length < wanted.length) skipped.push(v);
+					p.morphAssignments = [...kept, ...fitting.map((a) => ({ ...a }))];
 					p.morphDials = p.morphDials.map((d, g) => (copied(g) ? src.morphDials[g] : d));
 					p.morphModes = p.morphModes.map((m, g) => (copied(g) ? src.morphModes[g] : m));
 					return { v, before, after };
