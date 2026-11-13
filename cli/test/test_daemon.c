@@ -17,6 +17,7 @@
 #include <time.h>
 #include "cJSON.h"
 #include "../include/utils.h"
+#include "../include/g2_device.h"
 #include "daemon_harness.h"
 
 /* Shared daemon state — initialised by test_daemon_starts, torn down by
@@ -1232,7 +1233,13 @@ void test_daemon_select_patch_location_128(void) {
     int renamed = daemon_cmd("set-patch-name", "\"A\",\"Loc128Tst\"") == 0;
     int selected = daemon_cmd("select-patch", "\"A\",\"32\",\"128\"") == 0;
     char *back = slot_a_field("name");
-    int rejected = daemon_cmd("select-patch", "\"A\",\"32\",\"129\"") != 0;
+    int id = g_cmd_id++;
+    char cmd[128];
+    snprintf(cmd, sizeof(cmd), "{\"id\":%d,\"cmd\":\"select-patch\",\"args\":[\"A\",\"32\",\"129\"]}", id);
+    cJSON *resp = send_and_capture_response(&g_daemon, cmd, id);
+    cJSON *code = cJSON_GetObjectItem(resp, "code");
+    int rejected = cJSON_IsFalse(cJSON_GetObjectItem(resp, "ok")) && cJSON_IsNumber(code) && code->valueint == G2_ERR_INVALID_PARAM;
+    cJSON_Delete(resp);
     int cleared = daemon_cmd("clear-patch", "\"patch\",\"32\",\"128\"") == 0 && scratch_location_empty(128) == 1;
 
     int same = name && back && strcmp(name, back) == 0;
