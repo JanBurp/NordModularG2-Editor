@@ -41,7 +41,7 @@
 	import { useSliderDragInteraction } from '../../composables/useSliderDragInteraction';
 	import { useWheelInteraction } from '../../composables/useWheelInteraction';
 	import { getParamDefault } from '../../renderer/nmg2mods';
-	import { clamp } from '../../utils/math';
+	import { sliderYForValue } from '../../utils/morphClickRange';
 	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
@@ -77,14 +77,8 @@
 		(value) => emit('change', props.paramIndex, value),
 	);
 
-	const levelShiftY = computed(() => {
-		return ((127 - props.value) / 127) * 42;
-	});
-
-	const rangeTargetShiftY = computed(() => {
-		const target = clamp(props.value + (props.morphRange ?? 0), 0, 127);
-		return ((127 - target) / 127) * 42;
-	});
+	const levelShiftY = computed(() => sliderYForValue(props.value));
+	const rangeTargetShiftY = computed(() => sliderYForValue(props.value + (props.morphRange ?? 0)));
 </script>
 <style scoped>
 	.slider-control {

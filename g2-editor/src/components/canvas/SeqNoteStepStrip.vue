@@ -36,6 +36,7 @@
 	import { usePianoRollNoteInteraction } from '../../composables/usePianoRollNoteInteraction';
 	import { clamp } from '../../utils/math';
 	import { morphColorHex } from '../../utils/morphColors';
+	import { seqNoteAtY } from '../../utils/morphClickRange';
 
 	const props = defineProps<{
 		paramIndex: number;
@@ -101,7 +102,6 @@
 	});
 
 	const { onMouseDown } = usePianoRollNoteInteraction((localY) => {
-		const rowIndexFromTop = clamp(Math.floor((localY - props.stripTop) / rowHeight.value), 0, visibleSemitoneCount.value - 1);
-		emit('change', props.paramIndex, highestVisibleNote.value - rowIndexFromTop);
+		emit('change', props.paramIndex, seqNoteAtY(localY, props, props.stripTop, props.stripHeight));
 	});
 </script>

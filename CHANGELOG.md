@@ -13,6 +13,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - Morph SidePanel shows all assigned Morphs
 - Copy Morph Groups (or All) to other Variations
 - Block non morphable assignments
+- Ctrl/Cmd-click on a knob, slider or NoteSeq step assigns a Morph from the current value to the clicked position, instead of always the full range
 
 ### Changed
 - Buttons that have Morph assigned now are colored fully instead of only a small line.

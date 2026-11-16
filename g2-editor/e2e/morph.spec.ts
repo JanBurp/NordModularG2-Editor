@@ -2,7 +2,7 @@ import { clickContextMenuItem, dropModuleOnCanvas, hoverContextMenuItem, openCon
 import { expect, test } from './fixtures/electron';
 import type { MorphColor } from '../src/utils/morphColors';
 
-const MOD = { OscA: 97 } as const;
+const MOD = { OscA: 97, MixFader: 161 } as const;
 
 test.describe('morph assign', () => {
 	test('assigning a param to the selected Morph Group tints its knob and the menu then offers deassign', async ({ page, sendMenuAction }) => {
@@ -81,6 +81,38 @@ test.describe('morph assign', () => {
 		await expect(pane).toBeHidden();
 		await sendMenuAction('toggle-morph-panel');
 		await expect(pane).toBeVisible();
+	});
+
+	test('Ctrl/Cmd-click assigns a range up to the clicked position', async ({ page, sendMenuAction }) => {
+		await sendMenuAction('new-patch');
+		await dropModuleOnCanvas(page, MOD.OscA, 0, 0);
+		await dropModuleOnCanvas(page, MOD.MixFader, 1, 0);
+		const osc = page.locator('[data-testid="canvas-va"] [data-module-short="OscA"]');
+		const fader = page.locator('[data-testid="canvas-va"] [data-module-short="MixFader"]');
+
+		// FreqCoarse knob (value 64): 3 o'clock is value 107 → about +43
+		const coarse = osc.locator('[data-param-index="0"] .hit-area');
+		const box = await coarse.boundingBox();
+		if (!box) throw new Error('FreqCoarse knob not found');
+		await coarse.click({ modifiers: ['ControlOrMeta'], position: { x: box.width * 0.9, y: box.height / 2 } });
+		// PitchMod knob: its centre has no angle → the full range (force: the knob's own pointer line covers it)
+		await osc.locator('[data-param-index="3"] .hit-area').click({ modifiers: ['ControlOrMeta'], force: true });
+		// Lev1 slider (value 100): the top of the track (2 px below the param's box) is value 127 → +27
+		const lev1 = fader.locator('[data-param-index="0"]');
+		const lev1Box = await lev1.boundingBox();
+		if (!lev1Box) throw new Error('Lev1 slider not found');
+		await lev1.click({ modifiers: ['ControlOrMeta'], position: { x: lev1Box.width / 2, y: 3 } });
+
+		const bar = page.getByTestId('morph-limit');
+		await expect(bar).toContainText('3/25');
+		await bar.click();
+		const rows = page.getByTestId('morph-pane').getByTestId('morph-row');
+		await expect(rows).toHaveCount(3);
+		// Pixel rounding moves the click a few degrees off 3 o'clock; the exact math is unit-tested (morphClickRange.test.ts)
+		const coarseRange = Number((await rows.filter({ hasText: 'FreqCoarse' }).locator('span.tabular-nums').textContent())?.trim());
+		expect(Math.abs(coarseRange - 43)).toBeLessThanOrEqual(3);
+		await expect(rows.filter({ hasText: 'PitchMod' })).toContainText('+127');
+		await expect(rows.filter({ hasText: 'Lev1' })).toContainText('+27');
 	});
 
 	test('the morph group menu opens the Morph pane and copies a group to another variation', async ({ page, sendMenuAction }) => {
