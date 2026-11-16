@@ -1,20 +1,20 @@
 <template>
-	<g class="select-none" font-size="7" fill="#333" data-testid="seqnote-view-controls">
+	<g class="select-none" font-size="7" :fill="PANEL.line" data-testid="seqnote-view-controls">
 		<!-- Magnifier button: cycles zoom 0->1->2->0 (real panel coords: x:217 y:24 w:11 h:15) -->
 		<rect
 			:x="MAGNIFIER_BUTTON_BOX.x"
 			:y="MAGNIFIER_BUTTON_BOX.y"
 			:width="MAGNIFIER_BUTTON_BOX.w"
 			:height="MAGNIFIER_BUTTON_BOX.h"
-			fill="#FFF"
-			stroke="#333"
+			:fill="PANEL.white"
+			:stroke="PANEL.line"
 			style="cursor: pointer"
 			data-testid="seqnote-magnifier-button"
 			:data-zoom="view.zoom"
 			@click="cycleZoom"
 		/>
-		<circle :cx="LENS_CX" :cy="LENS_CY" :r="LENS_R" fill="none" stroke="#333" pointer-events="none" />
-		<line :x1="HANDLE_X1" :y1="HANDLE_Y1" :x2="HANDLE_X2" :y2="HANDLE_Y2" stroke="#333" pointer-events="none" />
+		<circle :cx="LENS_CX" :cy="LENS_CY" :r="LENS_R" fill="none" :stroke="PANEL.line" pointer-events="none" />
+		<line :x1="HANDLE_X1" :y1="HANDLE_Y1" :x2="HANDLE_X2" :y2="HANDLE_Y2" :stroke="PANEL.line" pointer-events="none" />
 
 		<!-- Keyboard graphic: key rows follow the current zoom/octave, aligned with SeqNoteStepStrip's rows -->
 		<rect
@@ -22,8 +22,8 @@
 			:y="KEYBOARD_BOX.y"
 			:width="KEYBOARD_BOX.w"
 			:height="KEYBOARD_BOX.h"
-			fill="#fff"
-			stroke="#333"
+			:fill="PANEL.white"
+			:stroke="PANEL.line"
 			pointer-events="none"
 			data-testid="seqnote-keyboard"
 		/>
@@ -34,7 +34,7 @@
 			:y="y"
 			:width="KEYBOARD_BOX.w * 0.6"
 			:height="keyRowHeight"
-			fill="#000"
+			:fill="PANEL.ink"
 			pointer-events="none"
 		/>
 
@@ -48,29 +48,30 @@
 			:y="BUTTONS_Y"
 			:width="OCTAVE_BOX.w / 2"
 			:height="BUTTONS_HEIGHT"
-			:fill="canOctaveDown ? '#ccc' : '#e5e5e5'"
-			stroke="#333"
+			:fill="canOctaveDown ? CONTROL.off : CONTROL.disabled"
+			:stroke="PANEL.line"
 			style="cursor: pointer"
 			data-testid="seqnote-octave-down"
 			@click="octaveDown"
 		/>
-		<polygon :points="LEFT_TRIANGLE_POINTS" :fill="canOctaveDown ? '#555' : '#aaa'" pointer-events="none" />
+		<polygon :points="LEFT_TRIANGLE_POINTS" :fill="canOctaveDown ? CONTROL.arrow : CONTROL.arrowDisabled" pointer-events="none" />
 
 		<rect
 			:x="OCTAVE_BOX.x + OCTAVE_BOX.w / 2"
 			:y="BUTTONS_Y"
 			:width="OCTAVE_BOX.w / 2"
 			:height="BUTTONS_HEIGHT"
-			:fill="canOctaveUp ? '#ccc' : '#e5e5e5'"
-			stroke="#333"
+			:fill="canOctaveUp ? CONTROL.off : CONTROL.disabled"
+			:stroke="PANEL.line"
 			style="cursor: pointer"
 			data-testid="seqnote-octave-up"
 			@click="octaveUp"
 		/>
-		<polygon :points="RIGHT_TRIANGLE_POINTS" :fill="canOctaveUp ? '#555' : '#aaa'" pointer-events="none" />
+		<polygon :points="RIGHT_TRIANGLE_POINTS" :fill="canOctaveUp ? CONTROL.arrow : CONTROL.arrowDisabled" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import {
 		SEQNOTE_MAGNIFIER_BUTTON_BOX as MAGNIFIER_BUTTON_BOX,

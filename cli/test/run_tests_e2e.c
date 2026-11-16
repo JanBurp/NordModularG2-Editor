@@ -27,6 +27,7 @@ extern void test_daemon_patch_edits_read_back(void);
 extern void test_daemon_perf_edits_read_back(void);
 extern void test_daemon_select_param_page_read_back(void);
 extern void test_daemon_store_patch_memory_protect(void);
+extern void test_daemon_select_patch_location_128(void);
 extern void test_patch_workflow_full_cycle(void);
 extern void test_patch_workflow_replace_module(void);
 extern void test_daemon_slot_flags_after_patch_to_perf(void);
@@ -66,6 +67,7 @@ int main(void) {
     run_test_silently("test_daemon_perf_edits_read_back",    test_daemon_perf_edits_read_back);
     run_test_silently("test_daemon_select_param_page_read_back", test_daemon_select_param_page_read_back);
     run_test_silently("test_daemon_store_patch_memory_protect", test_daemon_store_patch_memory_protect);
+    run_test_silently("test_daemon_select_patch_location_128", test_daemon_select_patch_location_128);
     run_test_silently("test_patch_workflow_full_cycle",      test_patch_workflow_full_cycle);
     run_test_silently("test_patch_workflow_replace_module",  test_patch_workflow_replace_module);
     run_test_silently("test_daemon_slot_flags_after_patch_to_perf", test_daemon_slot_flags_after_patch_to_perf);

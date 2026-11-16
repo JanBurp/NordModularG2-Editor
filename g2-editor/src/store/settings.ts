@@ -3,7 +3,7 @@ import { defineStore } from 'pinia';
 import type { PatchSortMode } from '@/utils/sortPatches';
 
 export type ThemeMode = 'system' | 'light' | 'dark';
-export type PaneTab = 'browser' | 'modules' | 'library' | 'midicc' | 'overview' | 'mutator' | 'text' | 'settings' | '';
+export type PaneTab = 'browser' | 'modules' | 'library' | 'midicc' | 'morph' | 'overview' | 'mutator' | 'text' | 'settings' | '';
 export type KnobMode = 'vertical' | 'horizontal' | 'circular';
 export type ToolbarMode = 'hidden' | 'classic' | 'compact';
 export type SettingsSection = 'Patch Settings' | 'Performance Settings' | 'Synth Settings' | 'Editor Settings';
@@ -14,7 +14,7 @@ export type RecentFile = { path: string; kind: 'patch' | 'performance' };
 const MAX_RECENT_FILES = 20;
 
 // Wide side-panel panes (Overview, Mutator, Settings) are user-resizable; the others have a fixed width
-export const WIDE_PANE_TABS: PaneTab[] = ['overview', 'mutator', 'settings'];
+export const WIDE_PANE_TABS: PaneTab[] = ['overview', 'morph', 'mutator', 'settings'];
 export const DEFAULT_WIDE_PANE_WIDTH = 600;
 export const MIN_WIDE_PANE_WIDTH = 300; // the Mutator's narrow layout
 

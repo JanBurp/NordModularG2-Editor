@@ -24,6 +24,7 @@ vi.mock('@/renderer/nmg2mods', () => ({
 	}),
 	getParamNavOrder: () => [0, 1],
 	getParamDefault: (p: { def?: number }) => p.def ?? 0,
+	isParamMorphable: () => true,
 }));
 
 import { createPinia, setActivePinia } from 'pinia';

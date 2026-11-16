@@ -1405,7 +1405,7 @@ int g2_set_module_mode(int slot, int location, int module_id, int param, int val
 int g2_select_patch(int slot, int bank, int location) {
     if (slot < 0 || slot > 3)           return G2_ERR_INVALID_PARAM;
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
-    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 128) return G2_ERR_INVALID_PARAM;
     if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
     g2_drain_pending();
     uint8_t cmd[4] = { 0x0a, (uint8_t)slot, (uint8_t)(bank - 1), (uint8_t)(location - 1) };
@@ -1419,7 +1419,7 @@ int g2_select_patch(int slot, int bank, int location) {
 
 int g2_select_perf(int bank, int location) {
     if (bank < 1 || bank > 32)          return G2_ERR_INVALID_PARAM;
-    if (location < 1 || location > 127) return G2_ERR_INVALID_PARAM;
+    if (location < 1 || location > 128) return G2_ERR_INVALID_PARAM;
     if (ensure_connected(1) < 0)        return G2_ERR_CONNECT;
     g2_drain_pending();
     uint8_t cmd[4] = { 0x0a, 4, (uint8_t)(bank - 1), (uint8_t)(location - 1) };

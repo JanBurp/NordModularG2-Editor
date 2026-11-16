@@ -26,7 +26,8 @@
 			<div data-testid="module-count" class="text-content-muted py-0.5 px-1 text-xs">{{ totalModuleCount }} modules</div>
 		</div>
 		<div class="flex-1 overflow-y-auto overflow-x-hidden px-2 pb-2">
-			<div v-for="category in categories" :key="category" class="mb-2">
+			<StateMessage v-if="!ready" variant="loading" message="Loading modules…" />
+			<div v-for="category in ready ? categories : []" :key="category" class="mb-2">
 				<div v-if="categoryMatchesSearch(category)">
 					<div
 						class="flex items-center gap-2 py-2 px-1 cursor-pointer text-xs font-semibold text-content-secondary border-b border-line-subtle hover:text-content-primary"
@@ -76,9 +77,10 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, reactive, computed, watch, nextTick } from 'vue';
+	import { ref, reactive, computed, watch, nextTick, onMounted } from 'vue';
 	import Module from '../canvas/Module.vue';
 	import SearchInput from '../common/SearchInput.vue';
+	import StateMessage from '../browser/StateMessage.vue';
 	import Icon from '../common/Icon.vue';
 	import { getModule, getDefaultParamValues, getAllCategories, getModulesByCategory as getModulesByCategoryRaw } from '../../renderer/nmg2mods';
 	import { filterCategoryModules } from '../../renderer/moduleSearch';
@@ -107,6 +109,10 @@
 	const preSearchExpandedCategories = ref<string[] | null>(null);
 	const searchQuery = ref('');
 	const selectedModuleId = ref<number | null>(null);
+
+	// The module previews take ~0.5 s to render: paint the pane with a spinner first, then the list (after one frame).
+	const ready = ref(false);
+	onMounted(() => requestAnimationFrame(() => requestAnimationFrame(() => (ready.value = true))));
 
 	defineProps<{
 		isActive: boolean;
@@ -198,8 +204,9 @@
 	});
 
 	watch(
-		() => ui.helpModuleTypeId,
-		(typeId) => {
+		// `ready`: scroll again once the list is rendered
+		[() => ui.helpModuleTypeId, ready],
+		([typeId]) => {
 			if (typeId === null) {
 				selectedModuleId.value = null;
 				return;

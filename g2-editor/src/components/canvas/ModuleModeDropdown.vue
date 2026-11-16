@@ -20,7 +20,14 @@
 				:aria-selected="i - 1 === value"
 				@click="onSelect(i - 1)"
 			>
-				<rect x="0" y="0" :width="rowWidth" :height="rowHeight" :fill="i - 1 === value && !isGraph ? '#AAA' : '#CCC'" stroke="#333" />
+				<rect
+					x="0"
+					y="0"
+					:width="rowWidth"
+					:height="rowHeight"
+					:fill="i - 1 === value && !isGraph ? CONTROL.selectedRow : CONTROL.off"
+					:stroke="PANEL.line"
+				/>
 				<ModuleGraph v-if="isGraph" :ve="graphVe" :lv="lv" :modes="[i - 1]" :module-id="moduleId" />
 				<use v-else :href="`#${paramDef.img}`" :transform="`translate(${imgShift[0]}, ${(i - 1) * itemHeight + imgShift[1]})`" />
 				<!-- The graph paints its own background, so darken the selected graph with an overlay instead -->
@@ -30,7 +37,7 @@
 					y="0"
 					:width="rowWidth"
 					:height="rowHeight"
-					fill="#000"
+					:fill="PANEL.ink"
 					fill-opacity="0.25"
 					pointer-events="none"
 				/>
@@ -39,6 +46,7 @@
 	</Teleport>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import { useSettingsStore } from '../../store/settings';
 	import { useViewportClampedPopup } from '../../composables/useViewportClampedPopup';

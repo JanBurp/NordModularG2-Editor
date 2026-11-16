@@ -13,8 +13,8 @@
 		>
 			{{ displayName }}
 		</text>
-		<polygon :points="leftChevron" fill="#AFA" pointer-events="none" />
-		<polygon :points="rightChevron" fill="#AFA" pointer-events="none" />
+		<polygon :points="leftChevron" :fill="GRAPH_COLORS.curveStroke" pointer-events="none" />
+		<polygon :points="rightChevron" :fill="GRAPH_COLORS.curveStroke" pointer-events="none" />
 		<rect
 			:x="ve.x"
 			:y="ve.y"
@@ -51,7 +51,7 @@
 	import { computed, ref, watch } from 'vue';
 	import type { VisualElement } from '../../types';
 	import { DRUM_SYNTH_PRESETS, findDrumSynthPresetIndex } from '../../renderer/drumSynthPresets';
-	import { GRAPH_COLORS } from './graphFunctions';
+	import { GRAPH_COLORS } from '../../constants/colors';
 	import { useDrumSynthPresetDropdown } from '../../composables/useDrumSynthPresetDropdown';
 
 	const props = defineProps<{

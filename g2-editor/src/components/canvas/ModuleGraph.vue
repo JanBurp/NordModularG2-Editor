@@ -42,7 +42,8 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
-	import { getGraph, GRAPH_COLORS } from './graphFunctions';
+	import { getGraph } from './graphFunctions';
+	import { GRAPH_COLORS } from '../../constants/colors';
 
 	const props = defineProps<{
 		ve: VisualElement;

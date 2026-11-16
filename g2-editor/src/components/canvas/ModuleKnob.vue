@@ -19,7 +19,7 @@
 			:cx="radius + 2"
 			:cy="radius + 2"
 			fill="url(#g120)"
-			stroke="#333"
+			:stroke="PANEL.line"
 			stroke-width="0.5"
 			:class="{ dragging: isDragging }"
 		/>
@@ -27,10 +27,10 @@
 		<MorphKnobOverlay :radius="radius" :value="value" :color="morphColor" :morph-range="morphRange" :max="max" />
 
 		<!-- Bottom-left tick mark -->
-		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" stroke="#333" />
+		<line x1="0.5" :y1="radius + 9.5" x2="2.5" :y2="radius + 7.5" :stroke="PANEL.line" />
 
 		<!-- Bottom-right tick mark -->
-		<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" stroke="#333" />
+		<line :x1="radius * 2 + 3.5" :y1="radius + 9.5" :x2="radius * 2 + 1.5" :y2="radius + 7.5" :stroke="PANEL.line" />
 
 		<!-- Rotating indicator line -->
 		<line
@@ -38,7 +38,7 @@
 			:y1="radius + 2"
 			:x2="radius + 2"
 			:y2="2"
-			stroke="black"
+			:stroke="PANEL.ink"
 			stroke-width="2"
 			:transform="`rotate(${angle} ${radius + 2} ${radius + 2})`"
 		/>
@@ -48,6 +48,7 @@
 	</g>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { computed, ref, toRef } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useKnob } from '../../composables/useKnob';
@@ -86,12 +87,12 @@
 	}
 
 	.knob-control:hover .hit-area + circle {
-		stroke: #666;
+		stroke: v-bind('PANEL.hover');
 		stroke-width: 1;
 	}
 
 	.knob-control circle.dragging {
-		stroke: #888;
+		stroke: v-bind('PANEL.dragging');
 		stroke-width: 1.5;
 	}
 </style>

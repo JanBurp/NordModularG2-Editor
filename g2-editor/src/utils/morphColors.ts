@@ -1,8 +1,4 @@
-// Morph Group assignment colors: red = the currently selected group, blue = a different group.
-export const MORPH_COLOR_HEX = {
-	red: '#e0303c',
-	blue: '#4a63c8',
-} as const;
+import { MORPH_COLOR_HEX } from '../constants/colors';
 
 export type MorphColor = keyof typeof MORPH_COLOR_HEX;
 

@@ -29,7 +29,8 @@ const knobAssign = (assign: string, deassign: string): ActionDef['run'] => async
 		const knob = `Knob ${1 + int(c, 8)}`;
 		await hoverItem(c.page, assign);
 		await hoverItem(c.page, page);
-		await clickItem(c.page, knob);
+		// An occupied knob reads "Knob 3: <param>" (useParamPageAssign knobLabel).
+		await clickItem(c.page, new RegExp(`^${knob}(:|$)`));
 		return `${assign} ${page} ${knob} on ${pm.what}`;
 	});
 

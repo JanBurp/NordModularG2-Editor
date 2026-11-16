@@ -29,7 +29,7 @@
 				handleCanvasClick();
 			"
 		>
-			<text :font-size="160" :x="labelCenter.x / zoom" :y="labelCenter.y / zoom" width="100%" height="100%" text-anchor="middle" fill="#666">
+			<text :font-size="160" :x="labelCenter.x / zoom" :y="labelCenter.y / zoom" width="100%" height="100%" text-anchor="middle" :fill="CANVAS.areaLabel">
 				{{ getAreaByShort(area) }}
 			</text>
 
@@ -96,6 +96,7 @@
 	</div>
 </template>
 <script setup lang="ts">
+	import { CANVAS } from '@/constants/colors';
 	import { ref, onMounted, onUnmounted, computed, provide, watch } from 'vue';
 	import type { Cable } from '../../renderer/cableRenderer';
 	import { sameJack, matchesCableJack, isUnusedModule, assignedModules } from '../../store/slotHelpers';

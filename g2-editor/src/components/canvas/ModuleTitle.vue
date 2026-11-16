@@ -1,9 +1,9 @@
 <template>
-	<rect v-if="selected" :x="nameX" :width="nameWidth" :height="nameHeight" fill="#FFF" pointer-events="none" />
-	<text v-if="isName" x="128" y="12" fill="#000" font-size="11" font-weight="800" font-family="'Inter'" text-anchor="middle">
+	<rect v-if="selected" :x="nameX" :width="nameWidth" :height="nameHeight" :fill="PANEL.white" pointer-events="none" />
+	<text v-if="isName" x="128" y="12" :fill="PANEL.ink" font-size="11" font-weight="800" font-family="'Inter'" text-anchor="middle">
 		<SearchHit :text="displayName" :hit="searchMatch" />
 	</text>
-	<text v-else :x="nameX + 2" y="10" fill="#000" font-size="10" font-weight="700" font-family="'Inter'">
+	<text v-else :x="nameX + 2" y="10" :fill="PANEL.ink" font-size="10" font-weight="700" font-family="'Inter'">
 		<SearchHit :text="shownName" :hit="searchMatch" />
 	</text>
 </template>
@@ -17,6 +17,7 @@
 	}
 </script>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { computed, ref } from 'vue';
 	import SearchHit from '../common/SearchHit.vue';
 

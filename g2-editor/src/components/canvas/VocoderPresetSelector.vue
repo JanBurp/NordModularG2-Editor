@@ -1,14 +1,15 @@
 <template>
 	<g class="vocoder-preset" data-testid="vocoder-preset">
 		<g v-for="(btn, index) in BUTTONS" :key="btn" class="vocoder-preset-button" data-testid="vocoder-preset-button" @click="onClick(btn)">
-			<rect :x="x0 + index * buttonW" :y="y0" :width="buttonW" :height="h" fill="#CCC" stroke="#333" />
-			<text :x="x0 + index * buttonW + buttonW / 2" :y="y0 + h - 3" fill="#000" font-size="8" text-anchor="middle" pointer-events="none">
+			<rect :x="x0 + index * buttonW" :y="y0" :width="buttonW" :height="h" :fill="CONTROL.off" :stroke="PANEL.line" />
+			<text :x="x0 + index * buttonW + buttonW / 2" :y="y0 + h - 3" :fill="PANEL.ink" font-size="8" text-anchor="middle" pointer-events="none">
 				{{ btn }}
 			</text>
 		</g>
 	</g>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
 	import { vocoderPreset0 } from '../../renderer/nmg2mods';
@@ -68,6 +69,6 @@
 		cursor: pointer;
 	}
 	.vocoder-preset-button:hover rect {
-		stroke: #666;
+		stroke: v-bind('PANEL.hover');
 	}
 </style>
