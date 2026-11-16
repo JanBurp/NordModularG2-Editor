@@ -4,7 +4,7 @@
 		     so a meter doesn't change the cell height. Without extraHeight it overhangs downwards, into
 		     the free space where a knob has its button (meters have none). -->
 		<svg :width="SIZE" :height="SIZE" class="block" :style="{ margin: `${marginTop}px ${-OVERHANG / 2}px ${marginBottom}px` }">
-			<circle :r="SIZE / 2" :cx="SIZE / 2" :cy="SIZE / 2" fill="#111" />
+			<circle :r="SIZE / 2" :cx="SIZE / 2" :cy="SIZE / 2" :fill="VU_BG" />
 			<path v-for="z in VU_ZONES" :key="`dim-${z.from}`" :d="arc(z.from, z.to)" :stroke="z.dim" stroke-width="5" fill="none" />
 			<template v-for="z in VU_ZONES" :key="`lit-${z.from}`">
 				<path v-if="fraction > z.from" :d="arc(z.from, Math.min(fraction, z.to))" :stroke="z.lit" stroke-width="5" fill="none" />
@@ -21,7 +21,8 @@
 	import { RADII } from '../../composables/useKnob';
 	import { useKeyHoldOverlay } from '../../composables/useKeyHoldOverlay';
 	import { describeArc } from '../../utils/knobArc';
-	import { VU_ZONES, vuFraction } from '../../utils/vuLevel';
+	import { vuFraction } from '../../utils/vuLevel';
+	import { VU_BG, VU_ZONES } from '../../constants/colors';
 	import MeterNamePopup from './MeterNamePopup.vue';
 
 	// extraHeight: px of layout space the cell freed up for the meter (centred in it, when it fits)

@@ -1,5 +1,6 @@
-import { MODULE_COLORS, MODULE_COLORS_ORDER } from '../constants/moduleColors';
-import { CABLE_COLORS, CABLE_COLOR_INDEX_MAP } from '../constants/cableColors';
+import { MODULE_COLORS_ORDER } from '../constants/moduleColors';
+import { CABLE_COLOR_INDEX_MAP } from '../constants/cableColors';
+import { CABLE_COLORS, MODULE_COLORS } from '../constants/colors';
 
 import type { ContextMenuSwatch, ContextMenuItem } from '../types';
 

@@ -1,6 +1,6 @@
 <template>
 	<svg :x="x" :y="y" :width="totalWidth" :height="height" :viewBox="`0 0 ${totalWidth} ${height}`" class="overflow-hidden! cursor-pointer" @click="onClick">
-		<rect x="0" y="0" :width="iconWidth" :height="height" fill="#CCC" stroke="#333" />
+		<rect x="0" y="0" :width="iconWidth" :height="height" :fill="CONTROL.off" :stroke="PANEL.line" />
 		<ModuleGraph v-if="isGraph" :ve="graphVe" :lv="lv" :modes="[value]" :module-id="moduleId" />
 		<use v-else-if="bitmapId" :href="`#${bitmapId}`" :transform="`translate(${imgShift[0]}, ${offset + imgShift[1]})`" />
 		<text
@@ -9,7 +9,7 @@
 			y="50%"
 			:width="iconWidth"
 			:height="height"
-			fill="#000"
+			:fill="PANEL.ink"
 			font-size="9"
 			dominant-baseline="middle"
 			text-anchor="middle"
@@ -18,12 +18,13 @@
 			{{ valueName }}
 		</text>
 		<template v-if="hasPopup">
-			<rect :x="iconWidth" y="0" :width="chevronColWidth" :height="height" fill="#CCC" stroke="#333" />
-			<polygon :points="chevronPoints" fill="#555" />
+			<rect :x="iconWidth" y="0" :width="chevronColWidth" :height="height" :fill="CONTROL.off" :stroke="PANEL.line" />
+			<polygon :points="chevronPoints" :fill="CONTROL.arrow" />
 		</template>
 	</svg>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import { getParam } from '../../renderer/parammap';
 	import { useModeDropdown } from '../../composables/useModeDropdown';

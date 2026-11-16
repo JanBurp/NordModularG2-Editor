@@ -30,9 +30,15 @@
 				:isActive="settingsStore.rightPaneTab === 'browser'"
 				@select="patchFile.handlePatchSelect"
 			/>
-			<ModulesPane ref="modulesPaneRef" v-show="settingsStore.rightPaneTab === 'modules'" :isActive="settingsStore.rightPaneTab === 'modules'" />
+			<ModulesPane
+				v-if="modulesMounted"
+				ref="modulesPaneRef"
+				v-show="settingsStore.rightPaneTab === 'modules'"
+				:isActive="settingsStore.rightPaneTab === 'modules'"
+			/>
 			<LibraryPane ref="libraryPaneRef" v-show="settingsStore.rightPaneTab === 'library'" :isActive="settingsStore.rightPaneTab === 'library'" />
 			<MidiCCPane v-show="settingsStore.rightPaneTab === 'midicc'" :isActive="settingsStore.rightPaneTab === 'midicc'" />
+			<MorphPane v-show="settingsStore.rightPaneTab === 'morph'" />
 			<ParamOverviewPane v-show="settingsStore.rightPaneTab === 'overview'" />
 			<PatchMutatorPane v-show="settingsStore.rightPaneTab === 'mutator'" />
 			<TextPane v-show="settingsStore.rightPaneTab === 'text'" />
@@ -42,12 +48,13 @@
 </template>
 
 <script setup lang="ts">
-	import { ref, computed, onMounted, onUnmounted } from 'vue';
+	import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue';
 	import SettingsPane from './SettingsPane.vue';
 	import ModulesPane from './ModulesPane.vue';
 	import LibraryPane from './LibraryPane.vue';
 	import PatchBrowser from './PatchBrowser.vue';
 	import MidiCCPane from './MidiCCPane.vue';
+	import MorphPane from './MorphPane.vue';
 	import ParamOverviewPane from './ParamOverviewPane.vue';
 	import PatchMutatorPane from './PatchMutatorPane.vue';
 	import TextPane from './TextPane.vue';
@@ -76,6 +83,21 @@
 	const modulesPaneRef = ref<InstanceType<typeof ModulesPane> | null>(null);
 	const browserRef = ref<InstanceType<typeof PatchBrowser> | null>(null);
 	const libraryPaneRef = ref<InstanceType<typeof LibraryPane> | null>(null);
+
+	// ModulesPane (a preview per module) takes ~0.5 s to mount: mount it only once its tab is shown, not on every
+	// panel open. Switching to it from another tab focuses its search, as SearchInput does for an already-mounted pane.
+	const modulesMounted = ref(false);
+	watch(
+		() => settingsStore.rightPaneTab,
+		async (tab, prev) => {
+			if (tab !== 'modules' || modulesMounted.value) return;
+			modulesMounted.value = true;
+			if (prev === undefined) return; // the panel opened on this tab
+			await nextTick();
+			modulesPaneRef.value?.focusSearch();
+		},
+		{ immediate: true },
+	);
 
 	function handleKeydown(e: KeyboardEvent) {
 		if (e.key !== '/') return;

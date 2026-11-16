@@ -1533,6 +1533,7 @@ function buildMenu(recentFiles: RecentFileEntry[], menuState: MenuState): Electr
 					accelerator: 'Shift+CommandOrControl+F',
 				},
 				{ label: 'Midi CC Panel', click: () => sendToFocused('menu:action', 'toggle-midi-cc-panel'), accelerator: 'CommandOrControl+I' },
+				{ label: 'Morph Panel', click: () => sendToFocused('menu:action', 'toggle-morph-panel'), accelerator: 'Shift+CommandOrControl+I' },
 				{ type: 'separator' as const },
 				{ label: 'Patch Adjuster & Mutator', click: () => sendToFocused('menu:action', 'toggle-patch-mutator'), accelerator: 'CommandOrControl+2' },
 				{ label: 'Bank Organizer', click: () => sendToFocused('menu:action', 'toggle-bank-organizer'), accelerator: 'CommandOrControl+3' },

@@ -4,13 +4,13 @@
 		<div class="flex items-center gap-2">
 			<template v-for="(_, i) in MORPH_NAMES" :key="i">
 				<div
-					class="relative flex flex-col items-center min-w-14 gap-1"
+					class="relative flex flex-col items-center min-w-14 gap-0.5"
 					:data-morph-group="i"
 					@contextmenu.prevent.stop="onGroupContextMenu(i, $event)"
 					@mousedown.capture="onMorphMouseDown(i, $event)"
 					@dragover.prevent
 					@drop="onMorphDrop(i, $event)"
-					@mouseenter="showHint('morphKnob')"
+					@mouseenter="showHint('morphKnob', countHint)"
 					@mouseleave="clearHint"
 				>
 					<svg
@@ -22,7 +22,7 @@
 					>
 						<MidiBadge :text="`CC# ${getMorphCC(i)}`" :x="0" :y="0" anchor="top-center" />
 					</svg>
-					<div class="w-full rounded-xs px-1 text-center bg-input-dimmed">
+					<div class="w-full rounded-xs px-1 text-center text-xs leading-4 bg-input-dimmed">
 						<span class="text-xs text-black truncate"><SearchHit :text="displayName(i)" :hit="searchMatch(i)" tag="span" /></span>
 					</div>
 					<Knob
@@ -41,11 +41,27 @@
 						:morph-idx="i"
 						v-on="modeHints[i].on"
 						@mouseenter="showHint('morphSource')"
-						@mouseleave="showHint('morphKnob')"
+						@mouseleave="showHint('morphKnob', countHint)"
 						@update:model-value="(val) => onModeChange(i, val)"
 					/>
 				</div>
 			</template>
+		</div>
+		<!-- Morph limit: distinct morphed params in this variation (G2 maximum 25); click opens the Morph pane -->
+		<div
+			role="button"
+			tabindex="0"
+			class="w-full h-2 mt-2 flex items-baseline gap-1.5 px-1 cursor-pointer select-none"
+			data-testid="morph-limit"
+			@click="settingsStore.toggleSidebar('morph')"
+			@keydown.enter.prevent="settingsStore.toggleSidebar('morph')"
+			@mouseenter="showHint('morphLimit')"
+			@mouseleave="clearHint"
+		>
+			<div class="flex-1 h-0.75 rounded-full overflow-hidden" :style="{ background: MORPH_LIMIT.track }">
+				<div class="h-full" :style="{ width: `${(morphCount / MAX_MORPHED_PARAMS) * 100}%`, background: limitColor }" />
+			</div>
+			<span class="text-[8px] leading-none text-content-secondary tabular-nums">{{ morphCount }}/{{ MAX_MORPHED_PARAMS }}</span>
 		</div>
 	</ToolBarGroup>
 </template>
@@ -55,8 +71,11 @@
 	import MidiBadge from '../canvas/MidiBadge.vue';
 	import Knob from '../common/Knob.vue';
 	import MorphSourceSelect from './MorphSourceSelect.vue';
-	import { useSlotsStore } from '../../store/slots';
+	import { MAX_MORPHED_PARAMS, useSlotsStore } from '../../store/slots';
 	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
+	import { useSettingsStore } from '../../store/settings';
+	import { NUM_VISIBLE_VARIATIONS } from '../../store/mutator';
+	import { MORPH_LIMIT } from '@/constants/colors';
 	import { useUiStore } from '../../store/ui';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
 	import SearchHit from '../common/SearchHit.vue';
@@ -104,6 +123,14 @@
 		return new Set(slot ? slotsStore.getMorphAssignments(slot, uiStore.variation).map((a) => a.groupIndex) : []);
 	});
 
+	const settingsStore = useSettingsStore();
+	const morphPanelOpen = computed(() => settingsStore.showRightPane && settingsStore.rightPaneTab === 'morph');
+	const morphCount = computed(() => (uiStore.slotInFocus ? slotsStore.morphLimit(uiStore.slotInFocus, uiStore.variation).count : 0));
+	const limitColor = computed(() =>
+		morphCount.value >= MAX_MORPHED_PARAMS ? MORPH_LIMIT.full : morphCount.value >= MAX_MORPHED_PARAMS - 5 ? MORPH_LIMIT.warn : MORPH_LIMIT.fill,
+	);
+	const countHint = computed(() => `${morphCount.value}/${MAX_MORPHED_PARAMS} params morphed`);
+
 	const morphDial = (i: number) => patchParams.value?.[uiStore.variation]?.morphDials?.[i] ?? 0;
 	const morphMode = (i: number) => patchParams.value?.[uiStore.variation]?.morphModes?.[i] ?? 0;
 
@@ -139,7 +166,22 @@
 	function onGroupContextMenu(groupIndex: number, event: MouseEvent) {
 		const slot = uiStore.slotInFocus;
 		const variation = uiStore.variation;
+		// Variations 1-8 as copy targets: All, then each one (the current one disabled).
+		const toVariations = (groups: number[] | null): ContextMenuItem[] => {
+			const others = Array.from({ length: NUM_VISIBLE_VARIATIONS }, (_, v) => v).filter((v) => v !== variation);
+			return [
+				{ label: 'All', action: () => slotsStore.copyMorphToVariations(slot, variation, groups, others) },
+				{ type: 'separator' },
+				...Array.from({ length: NUM_VISIBLE_VARIATIONS }, (_, v) => ({
+					label: String(v + 1),
+					disabled: v === variation,
+					action: () => slotsStore.copyMorphToVariations(slot, variation, groups, [v]),
+				})),
+			];
+		};
 		const items: ContextMenuItem[] = [
+			{ label: morphPanelOpen.value ? 'Close Morph Panel' : 'Open Morph Panel', action: () => settingsStore.toggleSidebar('morph') },
+			{ type: 'separator' },
 			{ label: 'Rename…', disabled: !slot, action: () => emit('morphGroupLabelEdit', { groupIndex, currentLabel: displayName(groupIndex) }) },
 			{ label: 'Clear', disabled: !slot, action: () => slot && slotsStore.clearMorphGroup(slot, variation, groupIndex) },
 			// the source buttons are hidden on short windows: choose the source here instead (current one disabled)
@@ -165,6 +207,8 @@
 					action: () => slot && slotsStore.copyMorphGroup(slot, variation, groupIndex, j),
 				})),
 			},
+			{ label: 'Copy to Variations', disabled: !slot, children: toVariations([groupIndex]) },
+			{ label: 'Copy all to Variations', disabled: !slot, children: toVariations(null) },
 			{ type: 'separator' },
 		];
 

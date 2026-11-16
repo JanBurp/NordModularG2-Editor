@@ -23,17 +23,18 @@
 		<rect
 			width="10"
 			height="6"
-			:fill="morphColorHex(morphColor, '#666')"
+			:fill="morphColorHex(morphColor, CONTROL.handle)"
 			:transform="`translate(0, ${levelShiftY})`"
 			@mousedown="onDragMouseDown"
 			@touchstart.passive="onDragMouseDown"
 		/>
 
 		<!-- Selected param underline -->
-		<rect v-if="highlight" x="0" y="63" width="10" height="2" fill="white" pointer-events="none" />
+		<rect v-if="highlight" x="0" y="63" width="10" height="2" :fill="PANEL.highlight" pointer-events="none" />
 	</g>
 </template>
 <script setup lang="ts">
+	import { CONTROL, PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import type { ModuleParam } from '../../types';
 	import { useSpinnerHoldInteraction } from '../../composables/useSpinnerHoldInteraction';
@@ -96,7 +97,7 @@
 	}
 
 	.slider-control :deep(#levelshift):hover rect:last-child {
-		stroke: #666;
+		stroke: v-bind('PANEL.hover');
 		stroke-width: 1;
 	}
 </style>

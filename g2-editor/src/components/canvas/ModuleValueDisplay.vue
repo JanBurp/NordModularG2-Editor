@@ -1,11 +1,11 @@
 <template>
-	<rect pointer-events="none" :x="ve.x" :y="ve.y" :width="ve.w" height="14" fill="#666" />
+	<rect pointer-events="none" :x="ve.x" :y="ve.y" :width="ve.w" height="14" :fill="PANEL.valueBg" />
 	<text
 		v-if="ve.ref !== undefined"
 		pointer-events="none"
 		:x="(ve.x || 0) + (ve.w || 0) / 2"
 		:y="(ve.y || 0) + 10"
-		fill="#fff"
+		:fill="PANEL.valueText"
 		font-size="8"
 		text-anchor="middle"
 	>
@@ -19,6 +19,7 @@
 	</text>
 </template>
 <script setup lang="ts">
+	import { PANEL } from '@/constants/colors';
 	import { computed } from 'vue';
 	import type { VisualElement, ModuleMode } from '../../types';
 	import { formatValue, formatCombinedValue } from '@/utils/moduleControls';

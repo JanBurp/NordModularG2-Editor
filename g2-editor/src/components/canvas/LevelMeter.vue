@@ -1,6 +1,6 @@
 <template>
 	<g>
-		<rect :x="ve.x" :y="ve.y" :width="ve.w" :height="ve.h" fill="#111" />
+		<rect :x="ve.x" :y="ve.y" :width="ve.w" :height="ve.h" :fill="VU_BG" />
 		<rect v-for="z in zones" :key="`dim-${z.from}`" :x="ve.x" :y="z.dimY" :width="ve.w" :height="z.dimH" :fill="z.dim" />
 		<template v-for="z in zones" :key="`lit-${z.from}`">
 			<rect v-if="z.litH > 0" :x="ve.x" :y="z.litY" :width="ve.w" :height="z.litH" :fill="z.lit" />
@@ -10,7 +10,8 @@
 <script setup lang="ts">
 	import { computed } from 'vue';
 	import type { VisualElement } from '../../types';
-	import { VU_ZONES, vuFraction } from '../../utils/vuLevel';
+	import { vuFraction } from '../../utils/vuLevel';
+	import { VU_BG, VU_ZONES } from '../../constants/colors';
 
 	const props = defineProps<{
 		ve: VisualElement;

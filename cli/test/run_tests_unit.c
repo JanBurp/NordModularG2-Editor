@@ -161,6 +161,7 @@ extern void test_select_param_invalid_module_id_low(void);
 extern void test_select_param_invalid_module_id_high(void);
 extern void test_select_param_invalid_param_idx_low(void);
 extern void test_select_param_invalid_param_idx_high(void);
+extern void test_select_patch_perf_invalid_location(void);
 
 extern void test_upload_patch_buf_invalid_slot_low(void);
 extern void test_upload_patch_buf_invalid_slot_high(void);
@@ -401,6 +402,7 @@ int main(void) {
     RUN_TEST(test_select_param_invalid_module_id_high);
     RUN_TEST(test_select_param_invalid_param_idx_low);
     RUN_TEST(test_select_param_invalid_param_idx_high);
+    RUN_TEST(test_select_patch_perf_invalid_location);
 
     RUN_TEST(test_upload_patch_buf_invalid_slot_low);
     RUN_TEST(test_upload_patch_buf_invalid_slot_high);
