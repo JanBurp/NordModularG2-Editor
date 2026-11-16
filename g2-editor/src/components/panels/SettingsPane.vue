@@ -412,6 +412,7 @@
 	import type { SlotLabel } from '@/types';
 	import { PATCH_PARAM_KEYS, type PatchParamVariation } from '@/types/patch';
 	import { TOOLBAR_HINT, useToolbarValueHint } from '@/composables/useValueHint';
+	import { baseName } from '@/utils/path';
 
 	const L = SETTINGS_LABELS;
 
@@ -426,9 +427,7 @@
 	const browser = useBrowserStore();
 
 	// Bank Organizer's Temporary Storage folder: the default (app data) or a chosen one.
-	const storageFolderName = computed(() =>
-		settings.storageFolder ? (settings.storageFolder.split(/[/\\]/).pop() ?? settings.storageFolder) : 'Default (app data)',
-	);
+	const storageFolderName = computed(() => (settings.storageFolder ? baseName(settings.storageFolder) : 'Default (app data)'));
 	async function setStorageFolder(folder: string) {
 		settings.setStorageFolder(folder);
 		await browser.loadStorage(); // re-points the folder watcher and reloads the list
@@ -441,9 +440,7 @@
 
 	// Library pane's folder: the default (app data) or a chosen one.
 	const library = useLibrary();
-	const libraryFolderName = computed(() =>
-		settings.libraryFolder ? (settings.libraryFolder.split(/[/\\]/).pop() ?? settings.libraryFolder) : 'Default (app data)',
-	);
+	const libraryFolderName = computed(() => (settings.libraryFolder ? baseName(settings.libraryFolder) : 'Default (app data)'));
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 

@@ -202,6 +202,7 @@
 	import { createDoubleClickDetector } from '../../utils/doubleClick';
 	import { useStatusHint } from '../../composables/useStatusHint';
 	import { sortPatches } from '../../utils/sortPatches';
+	import { baseName, parentDir } from '../../utils/path';
 
 	const props = defineProps<{
 		isActive: boolean;
@@ -265,13 +266,16 @@
 		e.stopImmediatePropagation();
 		if (key === 'ArrowUp') return navigate(-1);
 		if (key === 'ArrowDown') return navigate(1);
+		// Disk: ← goes up whether or not a row is selected; only at the root does it cycle the view
+		if (key === 'ArrowLeft' && browser.view === 'disk' && diskParentName.value) {
+			browser.navigateUp();
+			return resetNavIndex();
+		}
 		const item = flatNavItems.value[selectedNavIndex.value];
 		if (!item && (key === 'ArrowLeft' || key === 'ArrowRight')) return cycleView(key === 'ArrowLeft' ? -1 : 1);
 		if (key === 'ArrowLeft') {
-			if (browser.view === 'disk') {
-				if (diskParentName.value) browser.navigateUp();
-				resetNavIndex();
-			} else if (isBankItem(item)) setBankOpen(item.bank, false);
+			if (browser.view === 'disk') resetNavIndex();
+			else if (isBankItem(item)) setBankOpen(item.bank, false);
 			else if (item) selectedNavIndex.value = bankNavIndex.value.get((item as SynthPatch).bank) ?? selectedNavIndex.value;
 			return;
 		}
@@ -475,10 +479,10 @@
 		return q ? files.filter((e) => e.name.toLowerCase().includes(q)) : files;
 	});
 
-	const diskFolderName = computed(() => browser.diskFolder.split('/').pop() || browser.diskFolder);
+	const diskFolderName = computed(() => baseName(browser.diskFolder) || browser.diskFolder);
 	const diskParentName = computed(() => {
-		const parts = browser.diskFolder.split('/');
-		return parts.length > 1 ? parts[parts.length - 2] || '/' : '';
+		const parent = parentDir(browser.diskFolder);
+		return parent ? baseName(parent) || parent : '';
 	});
 
 	function scrollToSelected() {

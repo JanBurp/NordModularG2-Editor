@@ -6,6 +6,7 @@ import { useSlotsStore } from './slots';
 import { cliErrorText, showErrorToast, showToast } from '@/composables/useToast';
 import { ActionRecorder, HISTORY_SESSION, useOrganizerHistoryStore, type LocContent, type OrganizerAction } from './organizerHistory';
 import { convertedNote, currentFormatFile } from '@/parser/currentFormatFile';
+import { baseName, parentDir } from '@/utils/path';
 
 export interface SynthPatch {
 	bank: number;
@@ -45,8 +46,6 @@ export interface DiskEntry {
 }
 
 const extOf = (kind: BankKind) => (kind === 'performance' ? 'prf2' : 'pch2');
-// The renderer joins storage paths with '/', patches:list with the platform separator (backslash on Windows).
-const baseName = (file: string) => file.split(/[/\\]/).pop() ?? file;
 
 async function storageItemFromFile(entry: DiskEntry): Promise<StorageItem> {
 	const base = entry.name.replace(/\.(pch2|prf2)$/i, '');
@@ -202,8 +201,8 @@ export const useBrowserStore = defineStore('browser', {
 
 		async navigateUp(): Promise<void> {
 			if (!this.diskFolder) return;
-			const parent = this.diskFolder.split('/').slice(0, -1).join('/') || '/';
-			await this.loadDiskList(parent);
+			const parent = parentDir(this.diskFolder);
+			if (parent) await this.loadDiskList(parent);
 		},
 
 		// Returns false when the store failed (already reported with a toast).

@@ -22,6 +22,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - fix #21: NoteSeq should show note names when hovering over step value
 - cli fix: accept bank location 128 in select-patch / select-perf
 - fix: SidePanels opened slow, not instant
+- fix #30: Disk browser could not go up a folder on Windows (and showed the full path)
 
 ## [0.8.2] - 2026-11-12
 

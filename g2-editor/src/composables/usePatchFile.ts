@@ -6,6 +6,7 @@ import { runCliBatchSafe } from '../store/slotHelpers';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { showToast, dismissToastByKey } from './useToast';
+import { baseName } from '../utils/path';
 const { PatchParser, stripFileHeader } = await import('../parser/nmg2PatchParser');
 const { fileCrcOk } = await import('../parser/nmg2PatchSerializer');
 
@@ -134,7 +135,7 @@ export function usePatchFile() {
 		const result = await window.electronAPI.openPatchDialog(kind);
 		if (!result.success || !result.data) return;
 		const buffer = new Uint8Array(result.data).buffer;
-		const name = (result.filepath!.split(/[/\\]/).pop() ?? result.filepath!).replace(/\.(pch2|prf2)$/i, '');
+		const name = baseName(result.filepath!).replace(/\.(pch2|prf2)$/i, '');
 		warnOnBadCrc(new Uint8Array(buffer), name);
 		const rawHex = stripFileHeader(result.data as number[]);
 		let targetSlot: SlotLabel | undefined;
@@ -206,7 +207,7 @@ export function usePatchFile() {
 				const result = await window.electronAPI.patches.load(item.filepath);
 				if (!result.success || !result.data) return;
 				const buffer = new Uint8Array(result.data).buffer;
-				const name = (item.filepath.split(/[/\\]/).pop() ?? item.filepath).replace(/\.(pch2|prf2)$/i, '');
+				const name = baseName(item.filepath).replace(/\.(pch2|prf2)$/i, '');
 				warnOnBadCrc(new Uint8Array(buffer), name);
 				const rawHex = stripFileHeader(result.data as number[]);
 				const parser = new PatchParser(buffer);
