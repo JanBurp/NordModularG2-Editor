@@ -298,7 +298,9 @@ describe('copyMorphToVariations', () => {
 });
 
 describe('assignParamToMorphGroup on a Key Quantizer', () => {
-	it('allows the Range knob but ignores Capture and the note buttons', async () => {
+	it('allows the Range knob but refuses Capture and the note buttons with a toast', async () => {
+		const { toasts } = (await import('@/composables/useToast')).useToast();
+		toasts.splice(0);
 		const store = useSlotsStore();
 		store.slots['A'].patch = { areas: [{ modules: [] }, { modules: [{ index: 3, type: 152 }] }] } as any;
 		store.slots['A'].variations = [{ fx: {}, voice: {}, patch: { morphAssignments: [] } }] as any;
@@ -306,6 +308,8 @@ describe('assignParamToMorphGroup on a Key Quantizer', () => {
 		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 1, 127);
 		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 13, 127);
 		expect(store.slots['A'].variations![0].patch.morphAssignments).toEqual([]);
+		expect(toasts.map((t) => t.message)).toEqual(["Capture can't be morphed on the G2", "This parameter can't be morphed on the G2"]);
+		expect(store.paramMorphable('A', 1, 3, 1)).toBe(false);
 
 		await store.assignParamToMorphGroup('A', 0, 0, 1, 3, 0, 127);
 		expect(store.slots['A'].variations![0].patch.morphAssignments).toHaveLength(1);

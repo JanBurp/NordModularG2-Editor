@@ -12,9 +12,8 @@ import type {
 } from '@/types';
 import { PATCH_PARAM_KEYS, MORPH_NAMES, MUTATOR_VARIATION, type RenameChange } from '@/types/patch';
 import { findConnectedInputCables, findGroupOutputColor, computeUprateSet, autoRecolorCables, inferUserColours } from '../parser/cableGraph';
-import { getDefaultParamValues, getModule, isValidInArea } from '../renderer/nmg2mods';
+import { getDefaultParamValues, getModule, isParamMorphable, isValidInArea } from '../renderer/nmg2mods';
 import { getParam } from '../renderer/parammap';
-import { isMorphable } from '../utils/moduleControls';
 import { defaultMutaLock } from '../renderer/mutator';
 import { DEFAULT_PIANO_ROLL_VIEW, SEQNOTE_MODULE_TYPE, visibleNoteWindow, type PianoRollView } from '../renderer/pianoRoll';
 import type { ModuleDefinition } from '@/types/module';
@@ -2937,6 +2936,12 @@ export const useSlotsStore = defineStore('slots', {
 			return this.slots[slot]?.variations?.[variation]?.patch.morphAssignments ?? [];
 		},
 
+		// False for a param the G2 does not morph (see isParamMorphable in nmg2mods).
+		paramMorphable(slot: SlotLabel, location: number, moduleIndex: number, paramIndex: number): boolean {
+			const mod = findModuleByIndex(this.slots[slot]?.patch?.areas[location]?.modules ?? [], moduleIndex);
+			return !mod || isParamMorphable(mod.type, paramIndex);
+		},
+
 		// The G2's morph limit (official CMorphMapData_11::GetNumberOfMorphedParams): distinct morphed params in a
 		// variation. `blocked`: the given param can't get a (new) group because 25 others are morphed already.
 		morphLimit(
@@ -3058,8 +3063,11 @@ export const useSlotsStore = defineStore('slots', {
 		): Promise<void> {
 			const isSame = (a: MorphAssignment) =>
 				a.groupIndex === groupIndex && a.location === location && a.moduleIndex === moduleIndex && a.paramIndex === paramIndex;
-			const moduleType = this.slots[slot]?.patch?.areas[location]?.modules.find((m) => m.index === moduleIndex)?.type;
-			if (moduleType !== undefined && !isMorphable(moduleType, paramIndex)) return;
+			const mod = findModuleByIndex(this.slots[slot]?.patch?.areas[location]?.modules ?? [], moduleIndex);
+			if (mod && !isParamMorphable(mod.type, paramIndex)) {
+				showToast(`${getModule(mod.type)?.params?.[paramIndex]?.name || 'This parameter'} can't be morphed on the G2`);
+				return;
+			}
 			// The limit counts distinct params: another group on an already-morphed param is always allowed.
 			if (this.morphLimit(slot, variation, { location, moduleIndex, paramIndex }).blocked) {
 				showToast(`Morph limit: ${MAX_MORPHED_PARAMS} params are morphed in this variation`);

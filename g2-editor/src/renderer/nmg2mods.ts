@@ -210,6 +210,43 @@ export function isValidInArea(typeId: number, area: 'voice' | 'fx'): boolean {
 	return area === 'fx' || typeId !== FX_IN_TYPE_ID;
 }
 
+// Params the G2 does not morph (CBuildModule::IsParamMorphable): module type → param indices. Read from the
+// Mac v1.62 binary, the flag byte at +0x0d of each ParamData record (stride 0x1c). Location-2 params
+// (patch settings) are left out because they are never morph-assigned.
+const NON_MORPHABLE_PARAMS: Record<number, readonly number[]> = {
+	24: [1], // LfoC PolyMono
+	25: [9], // LfoShpA PolyMono
+	26: [1], // LfoA PolyMono
+	43: [1], // Constant BipUni
+	50: [2], // ConstSwT BipUni
+	57: [0, 2, 3], // Automate Ctrl, Ch, Echo
+	62: [3], // Overdrive Type
+	84: [4], // EnvADR TG
+	108: [0, 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17], // Vocoder bands, Emphasis, Monitor
+	141: [0, 2], // CtrlSend Ctrl, Ch
+	142: [1], // PCSend Ch
+	143: [2], // NoteSend Ch
+	146: [34], // SeqLev BipUni
+	147: [0, 1], // CtrlRcv Ctrl, Ch
+	148: [0, 1], // NoteRcv Note, Ch
+	149: [0, 1, 2, 3, 4, 5], // NoteZone (all)
+	150: [0, 1, 4], // Compressor Threshold, Ratio, RefLevel
+	152: [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13], // KeyQuant Capture + note buttons
+	156: [0], // NoteDet Note
+	157: [1], // LevConv InputType
+	165: [0, 1], // DXRouter Algorithm, Feedback
+	180: [3, 4, 8, 9, 10, 11, 12, 13, 14, 15, 17, 22], // Operator Coarse, Fine, R1..L4, BrPoint, OutLevel
+	188: [2], // ConstSwM BipUni
+	190: [5], // LfoB PolyMono
+	199: [0], // MonoKey Mode
+	200: [1], // RandomA PolyMono
+	202: [1], // RandomB PolyMono
+};
+
+export function isParamMorphable(typeId: number, paramIndex: number): boolean {
+	return !NON_MORPHABLE_PARAMS[typeId]?.includes(paramIndex);
+}
+
 const VOCODER_TYPE_ID = 108;
 
 // Vocoder preset "0": analysis band i feeds synthesis band i+1 (0 = Off), which is what makes the graph show.

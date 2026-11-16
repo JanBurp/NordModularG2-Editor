@@ -8,6 +8,7 @@ import {
 	getModulesByCategory,
 	getReplaceCandidates,
 	hasToolbarGapBefore,
+	isParamMorphable,
 	isValidInArea,
 } from '../nmg2mods';
 
@@ -80,6 +81,16 @@ describe('isValidInArea', () => {
 		expect(isValidInArea(127, 'voice')).toBe(false);
 		expect(isValidInArea(15, 'fx')).toBe(true); // Sw8-1
 		expect(isValidInArea(15, 'voice')).toBe(true);
+	});
+});
+
+describe('isParamMorphable', () => {
+	it('follows the official per-param morph flag', () => {
+		expect(isParamMorphable(152, 0)).toBe(true); // KeyQuant Range
+		expect(isParamMorphable(152, 1)).toBe(false); // KeyQuant Capture
+		expect(isParamMorphable(180, 3)).toBe(false); // Operator FreqCoarse
+		expect(isParamMorphable(180, 5)).toBe(true); // Operator FreqDetune
+		expect(isParamMorphable(15, 0)).toBe(true); // module without blocked params
 	});
 });
 
