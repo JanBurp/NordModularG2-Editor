@@ -54,6 +54,60 @@ describe('loadInitPatch — Init 1/Init 2 toolbar buttons', () => {
 	});
 });
 
+// New/Init load a template file: renaming and saving must ask for a file named after the patch
+// instead of silently overwriting the template (bonedo.de review: "the assigned name is not kept").
+describe('New/Init → rename → Save', () => {
+	function mockSave() {
+		const api = (window as any).electronAPI;
+		api.patches.load.mockResolvedValue({ success: true, data: loadFixtureBytes('EmptyPatch.pch2') });
+		api.showSaveDialog = vi.fn().mockResolvedValue({ success: true, filepath: '/p/MyBass.pch2' });
+		api.savePatch = vi.fn().mockResolvedValue(undefined);
+		return api;
+	}
+
+	async function renameAndSave(): Promise<void> {
+		const store = useSlotsStore();
+		await store.setPatchName('MyBass');
+		await store.saveSlot('A');
+	}
+
+	it('New: Save asks for a file named after the patch, never writes the bundled EmptyPatch.pch2', async () => {
+		const api = mockSave();
+		api.patches.builtinPath = vi.fn().mockResolvedValue('/app/resources/patches/EmptyPatch.pch2');
+
+		await usePatchFile().newPatch('A');
+		await renameAndSave();
+
+		expect(api.showSaveDialog).toHaveBeenCalledWith('MyBass');
+		expect(api.savePatch).toHaveBeenCalledTimes(1);
+		expect(api.savePatch.mock.calls[0][0]).toBe('/p/MyBass.pch2');
+		expect(useSlotsStore().slotFilePaths.A).toBe('/p/MyBass.pch2');
+	});
+
+	it('Init: Save asks for a file named after the patch, never overwrites the Init snapshot', async () => {
+		const api = mockSave();
+		api.patches.initLoadPath.mockResolvedValue('/fake/userData/patches/init-1.pch2');
+		useUiStore().setSlotInFocus('A');
+
+		await usePatchFile().loadInitPatch(1);
+		await renameAndSave();
+
+		expect(api.showSaveDialog).toHaveBeenCalledWith('MyBass');
+		expect(api.savePatch.mock.calls[0][0]).toBe('/p/MyBass.pch2');
+	});
+
+	it('a failed template load keeps the file the slot came from', async () => {
+		const api = mockSave();
+		await usePatchFile().handlePatchSelect({ type: 'disk', filepath: '/p/Mine.pch2' });
+		api.patches.load.mockResolvedValue({ success: false });
+		api.patches.builtinPath = vi.fn().mockResolvedValue('/app/resources/patches/EmptyPatch.pch2');
+
+		await usePatchFile().newPatch('A');
+
+		expect(useSlotsStore().slotFilePaths.A).toBe('/p/Mine.pch2');
+	});
+});
+
 // The degraded-uprate toast's Save stores back to the slot's origin; selecting a synth patch must
 // record that origin itself instead of waiting for the device's per-slot bank/patch report.
 describe('handlePatchSelect — synth patch', () => {

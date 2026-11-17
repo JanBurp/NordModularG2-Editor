@@ -23,6 +23,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 - cli fix: accept bank location 128 in select-patch / select-perf
 - fix: SidePanels opened slow, not instant
 - fix #30: Disk browser could not go up a folder on Windows (and showed the full path)
+- fix: Saving name from New/Init patch had wrong name (Bug described in [bonedo.de](https://www.bonedo.de/artikel/nord-modular-g2-open-source-projekt-bringt-den-editor-zurueck/) article)
 
 ## [0.8.2] - 2026-11-12
 

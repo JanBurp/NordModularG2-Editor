@@ -247,17 +247,23 @@ export function usePatchFile() {
 		}
 	}
 
+	// New/Init start from a template file: a Save must ask for a file (named after the patch)
+	// instead of overwriting the template.
+	async function loadTemplate(filepath: string): Promise<void> {
+		const slot = uiStore.slotInFocus;
+		await handlePatchSelect({ type: 'disk', filepath });
+		if (slotsStore.slotFilePaths[slot] === filepath) slotsStore.forgetSlotFile(slot);
+	}
+
 	async function newPatch(slot?: SlotLabel): Promise<void> {
 		if (slot) uiStore.setSlotInFocus(slot);
 		if (!window.electronAPI) return;
-		const filepath = await window.electronAPI.patches.builtinPath('EmptyPatch.pch2');
-		await handlePatchSelect({ type: 'disk', filepath });
+		await loadTemplate(await window.electronAPI.patches.builtinPath('EmptyPatch.pch2'));
 	}
 
 	async function loadInitPatch(slot: 1 | 2): Promise<void> {
 		if (!window.electronAPI) return;
-		const filepath = await window.electronAPI.patches.initLoadPath(slot);
-		await handlePatchSelect({ type: 'disk', filepath });
+		await loadTemplate(await window.electronAPI.patches.initLoadPath(slot));
 	}
 
 	return {
