@@ -33,7 +33,7 @@ The more detail you provide, the better. If I cannot replicate the issue, I cann
 The editor logs USB traffic, connection status, and commands to the DevTools console. Including this output in a bug report is very helpful.
 
 **To open the console:**
-- Menu: **View → Toggle DevTools** (or `Cmd+Shift+I` on Mac, `Ctrl+Shift+I` on Windows/Linux)
+- Menu: **Help → Toggle DevTools** (or `Cmd+Shift+I` on Mac, `Ctrl+Shift+I` on Windows/Linux)
 - Click the **Console** tab
 
 **To save the log:**
