@@ -289,6 +289,7 @@ test.describe('Library', () => {
 
 	test('dropping a library item on the canvas puts its top-left module at the drop cell', async ({ page, sendMenuAction }) => {
 		await saveToLibrary(page, sendMenuAction, 'Dropped');
+		await expect(itemRow(page, 'Dropped')).toBeVisible();
 		const canvas = (await page.locator('[data-testid="canvas-va"]').boundingBox())!;
 		await page.evaluate(
 			({ x, y }) => {
