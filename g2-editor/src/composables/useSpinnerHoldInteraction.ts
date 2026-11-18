@@ -2,7 +2,11 @@ import { onUnmounted } from 'vue';
 
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSpinV' | 'KnobSlider';
 
-export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void,
+export function useSpinnerHoldInteraction(
+	type: SpinnerType,
+	paramIndex: number,
+	getValue: () => number,
+	onChange: (index: number, value: number) => void,
 	min = 0,
 	max = 127,
 ) {
