@@ -20,7 +20,7 @@
 	import { morphColorHex } from '../../utils/morphColors';
 
 	const props = defineProps<{
-		param: ModuleParam;
+		param: Pick<ModuleParam, 'x' | 'y'>;
 		value: number;
 		paramIndex: number;
 		highlight?: boolean;

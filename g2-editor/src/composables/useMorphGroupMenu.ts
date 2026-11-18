@@ -11,8 +11,8 @@ import { buildGlobalParamPageMenuItems, buildParamPageMenuItems } from './usePar
 import { useMorphLabelDialog } from './useMorphLabelDialog';
 
 // Right-click menu of a Morph Group (toolbar MorphGroups.vue and the Morph pane): rename, clear,
-// source (when the toolbar hides its source buttons), copy, MIDI CC and Parameter Pages.
-export function buildMorphGroupMenuItems(groupIndex: number, opts: { source?: boolean } = {}): ContextMenuItem[] {
+// source (when the toolbar hides its source buttons: onSource sets it), copy, MIDI CC and Parameter Pages.
+export function buildMorphGroupMenuItems(groupIndex: number, opts: { onSource?: (mode: number) => void } = {}): ContextMenuItem[] {
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
 	const slot = uiStore.slotInFocus;
@@ -36,7 +36,7 @@ export function buildMorphGroupMenuItems(groupIndex: number, opts: { source?: bo
 	const items: ContextMenuItem[] = [
 		{ label: 'Rename…', disabled: !slot, action: () => useMorphLabelDialog().openMorphLabelDialog(groupIndex, name) },
 		{ label: 'Clear', disabled: !slot, action: () => slot && slotsStore.clearMorphGroup(slot, variation, groupIndex) },
-		...(opts.source
+		...(opts.onSource
 			? [
 					{
 						label: `Source: ${MORPH_MODE_OPTIONS[groupIndex][mode]}`,
@@ -44,7 +44,7 @@ export function buildMorphGroupMenuItems(groupIndex: number, opts: { source?: bo
 						children: MORPH_MODE_OPTIONS[groupIndex].map((n, m) => ({
 							label: n,
 							disabled: m === mode,
-							action: () => slotsStore.setMorphParam(variation, groupIndex, 'mode', m),
+							action: () => opts.onSource?.(m),
 						})),
 					},
 				]

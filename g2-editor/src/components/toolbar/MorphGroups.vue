@@ -162,7 +162,7 @@
 			{ label: morphPanelOpen.value ? 'Close Morph Panel' : 'Open Morph Panel', action: () => settingsStore.toggleSidebar('morph') },
 			{ type: 'separator' },
 			// the source buttons are hidden on short windows: choose the source in the menu instead
-			...buildMorphGroupMenuItems(groupIndex, { source: short.value }),
+			...buildMorphGroupMenuItems(groupIndex, { onSource: short.value ? (m) => onModeChange(groupIndex, m) : undefined }),
 		]);
 	}
 

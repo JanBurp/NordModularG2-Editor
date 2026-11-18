@@ -97,7 +97,7 @@
 	import { useSettingsStore } from '@/store/settings';
 	import { assignmentNames, findModuleByIndex, morphGroupName, morphKey } from '@/store/slotHelpers';
 	import { MORPH_NAMES } from '@/types/patch';
-	import type { ModuleParam, MorphAssignment } from '@/types';
+	import type { MorphAssignment } from '@/types';
 	import { MORPH_CHIP } from '@/constants/colors';
 	import { revealModule } from '@/composables/useRevealModule';
 	import { useStatusHint } from '@/composables/useStatusHint';
@@ -115,7 +115,7 @@
 
 	const { open: openContextMenu } = useContextMenu();
 	const { openRangeEdit } = useParamEditDialog();
-	const SPIN = { x: 0, y: 0 } as ModuleParam; // the range spinner at the top of its own svg
+	const SPIN = { x: 0, y: 0 }; // the range spinner at the top of its own svg
 
 	// Groups shown in the list (all by default)
 	const filter = ref(new Set(MORPH_NAMES.map((_, i) => i)));
