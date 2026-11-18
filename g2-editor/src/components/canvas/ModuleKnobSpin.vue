@@ -25,6 +25,8 @@
 		paramIndex: number;
 		highlight?: boolean;
 		morphColor?: 'red' | 'blue' | null;
+		min?: number; // default 0..127 (the Morph pane's range spinner uses -127..127)
+		max?: number;
 	}>();
 
 	const emit = defineEmits<{
@@ -37,11 +39,15 @@
 		props.paramIndex,
 		() => props.value,
 		(index, value) => emit('change', index, value),
+		props.min,
+		props.max,
 	);
 
 	const { onWheel } = useWheelInteraction(
 		() => props.value,
 		(value) => emit('change', props.paramIndex, value),
+		() => props.max ?? 127,
+		props.min,
 	);
 </script>
 <style scoped>

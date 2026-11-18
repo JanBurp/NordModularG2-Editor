@@ -3,13 +3,13 @@
 		<div v-if="showDialog" class="fixed inset-0 z-50" @mousedown.self="closeParamEdit">
 			<div
 				role="dialog"
-				aria-label="Set Value"
+				:aria-label="title"
 				class="absolute w-80 bg-surface-1 border border-line-default rounded shadow-xl"
 				:style="panelStyle"
 				data-testid="param-edit-dialog"
 			>
 				<div class="flex items-center justify-between px-4 py-3 border-b border-line-default">
-					<span class="text-sm font-semibold text-content-primary">Set Value</span>
+					<span class="text-sm font-semibold text-content-primary">{{ title }}</span>
 					<button class="hover:text-content-primary cursor-pointer" aria-label="Close" data-testid="param-edit-close" @click="closeParamEdit">
 						<Icon name="close" class="w-3 h-3" />
 					</button>
@@ -64,7 +64,7 @@
 	import { matchParamValues } from '@/utils/moduleControls';
 	import { useParamEditDialog } from '../../composables/useParamEditDialog';
 
-	const { showDialog, position, options, currentValue, currentLabel, isEnumParam, closeParamEdit, confirmParamEdit } = useParamEditDialog();
+	const { showDialog, position, options, currentValue, currentLabel, isEnumParam, title, closeParamEdit, confirmParamEdit } = useParamEditDialog();
 
 	const PANEL_W = 320; // w-80
 	const PANEL_H = 370; // title + input + list estimate

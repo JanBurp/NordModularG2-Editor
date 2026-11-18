@@ -27,7 +27,7 @@
 			<CPU :compact="mode === 'compact'" :mini="short" />
 		</div>
 
-		<MorphGroups @morph-group-label-edit="(info) => emit('morphGroupLabelEdit', info)" />
+		<MorphGroups />
 	</ToolBar>
 </template>
 
@@ -43,7 +43,6 @@
 	import { useShortWindow } from '../../composables/useShortWindow';
 
 	withDefaults(defineProps<{ mode?: 'classic' | 'compact' }>(), { mode: 'classic' });
-	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
 
 	const patchFile = usePatchFile();
 	const short = useShortWindow();

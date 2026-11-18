@@ -1,7 +1,7 @@
 import { ref, computed } from 'vue';
 import { getParam } from '../renderer/parammap';
 import { getModule } from '../renderer/nmg2mods';
-import type { ModuleDefinition, ParamDefinition } from '../types/index';
+import type { ModuleDefinition, MorphAssignment, ParamDefinition, SlotLabel } from '../types/index';
 import { useSlotsStore } from '../store/slots';
 import { useUiStore } from '../store/ui';
 import { clamp } from '@/utils/math';
@@ -21,6 +21,9 @@ interface Editing {
 const showDialog = ref(false);
 const editing = ref<Editing | null>(null);
 const position = ref({ x: 0, y: 0 });
+// Set Range (Morph pane): edits a morph assignment's range instead of a param value
+const editingRange = ref<{ slot: SlotLabel; variation: number; a: MorphAssignment } | null>(null);
+const RANGE_OPTIONS: ParamValueOption[] = Array.from({ length: 255 }, (_, i) => ({ raw: i - 127, label: i > 127 ? `+${i - 127}` : String(i - 127) }));
 
 export function useParamEditDialog() {
 	const slotsStore = useSlotsStore();
@@ -31,6 +34,7 @@ export function useParamEditDialog() {
 	// Every raw value low..high with the label the module would show for it, so mode-dependent
 	// displays (Osc FreqMode, Delay range, …) list values in the current mode's units.
 	const options = computed<ParamValueOption[]>(() => {
+		if (editingRange.value) return RANGE_OPTIONS;
 		const e = editing.value;
 		if (!e) return [];
 		const values = [...e.values];
@@ -43,10 +47,12 @@ export function useParamEditDialog() {
 		return result;
 	});
 
-	const currentValue = computed(() => editing.value?.values[editing.value.paramIndex] ?? 0);
+	const currentValue = computed(() => editingRange.value?.a.range ?? editing.value?.values[editing.value.paramIndex] ?? 0);
+	const title = computed(() => (editingRange.value ? 'Set Range' : 'Set Value'));
 	const currentLabel = computed(() => options.value.find((o) => o.raw === currentValue.value)?.label ?? String(currentValue.value));
 
 	function openParamEdit(info: { area: 'fx' | 'va'; moduleIndex: number; paramIndex: number; x: number; y: number }) {
+		editingRange.value = null;
 		const areaIdx = info.area === 'va' ? 1 : 0;
 		const area = info.area === 'va' ? 'voice' : 'fx';
 		const slot = uiStore.slotInFocus;
@@ -61,12 +67,26 @@ export function useParamEditDialog() {
 		showDialog.value = true;
 	}
 
+	function openRangeEdit(info: { slot: SlotLabel; variation: number; a: MorphAssignment; x: number; y: number }) {
+		editing.value = null;
+		editingRange.value = { slot: info.slot, variation: info.variation, a: info.a };
+		position.value = { x: info.x, y: info.y };
+		showDialog.value = true;
+	}
+
 	function closeParamEdit() {
 		showDialog.value = false;
 		editing.value = null;
+		editingRange.value = null;
 	}
 
 	async function confirmParamEdit(raw: number) {
+		const r = editingRange.value;
+		if (r) {
+			closeParamEdit();
+			const { groupIndex, location, moduleIndex, paramIndex } = r.a;
+			return slotsStore.setMorphAssignmentRange(r.slot, r.variation, groupIndex, location, moduleIndex, paramIndex, clamp(raw, -127, 127));
+		}
 		const e = editing.value;
 		if (!e) return;
 		closeParamEdit();
@@ -80,7 +100,9 @@ export function useParamEditDialog() {
 		currentValue,
 		currentLabel,
 		isEnumParam,
+		title,
 		openParamEdit,
+		openRangeEdit,
 		closeParamEdit,
 		confirmParamEdit,
 	};

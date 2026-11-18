@@ -50,7 +50,6 @@
 		<ExtendedToolBar
 			v-if="settingsStore.toolbarMode !== 'hidden' && !uiStore.showBankOrganizer"
 			:mode="settingsStore.toolbarMode === 'compact' ? 'compact' : 'classic'"
-			@morph-group-label-edit="(info) => openMorphLabelDialog(info.groupIndex, info.currentLabel)"
 		/>
 		<PatchToolBar
 			v-if="currentPatch && !uiStore.showBankOrganizer"
@@ -740,7 +739,7 @@
 		cancel: cancelPerfNameDialog,
 	} = usePerfNameDialog();
 
-	const { showMorphLabelDialog, editingMorphLabel, openMorphLabelDialog, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
+	const { showMorphLabelDialog, editingMorphLabel, confirmMorphLabel, cancelMorphLabel } = useMorphLabelDialog();
 	const { saveDialog: saveToLibraryDialog, groups: libraryGroups, editing: libraryEditing, insertDialog: libraryInsertDialog } = useLibrary();
 
 	const { showDialog: showBpmDialog, editingBpm, open: openBpmDialog, confirm: confirmBpm, cancel: cancelBpmDialog } = useBpmDialog();

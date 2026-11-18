@@ -256,14 +256,13 @@ export function useModuleKeyboard() {
 		return true;
 	}
 
-	// Resolves the currently selected param's module/slot/morph-group context, plus its existing
-	// morph assignment (if any) for the currently selected group — shared by nudgeMorphRange and
-	// toggleMorphAssign below.
+	// Resolves the key-target param's (hovered or selected, like the arrow keys) module/slot/morph-group
+	// context, plus its existing morph assignment (if any) for the currently selected group — shared by
+	// nudgeMorphRange and toggleMorphAssign below.
 	function findSelectedMorphAssignment() {
-		const sel = uiStore.selectedParam;
-		if (!sel) return undefined;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return undefined;
+		const target = findKeyTarget();
+		if (!target) return undefined;
+		const { sel, found } = target;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return undefined;
 		const groupIndex = uiStore.selectedMorphGroup;
@@ -294,16 +293,15 @@ export function useModuleKeyboard() {
 		else slotsStore.assignParamToMorphGroup(slot, variation, groupIndex, found.area, sel.moduleId, sel.paramIndex, 127);
 	}
 
-	// L assigns the last-received MIDI CC to the selected parameter — matches the original
+	// L assigns the last-received MIDI CC to the key-target (hovered or selected) parameter — matches the original
 	// G2 editor's "MIDI Learn" shortcut. Reuses assignMidiCC's existing dedupe-by-cc behavior,
 	// so stealing a CC already assigned to another knob just works.
 	function assignLastCC() {
-		const sel = uiStore.selectedParam;
-		if (!sel) return;
+		const target = findKeyTarget();
+		if (!target) return;
+		const { sel, found } = target;
 		const cc = deviceStore.lastMidiCC;
 		if (cc === null) return;
-		const found = findModuleAnywhere(sel.moduleId);
-		if (!found) return;
 		const slot = uiStore.slotInFocus;
 		if (!slot) return;
 		slotsStore.assignMidiCC(slot, found.area, sel.moduleId, sel.paramIndex, cc);

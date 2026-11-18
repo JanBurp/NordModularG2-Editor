@@ -86,6 +86,11 @@ export const MORPH_COLOR_HEX = {
 	red: '#e0303c',
 	blue: '#4a63c8',
 } as const;
+/** Morph Group chips (Morph pane): the morph colour as it tints the grey knob (MorphKnobOverlay: 55% multiply). */
+export const MORPH_CHIP = {
+	red: `color-mix(in srgb, ${MORPH_COLOR_HEX.red} 55%, #777)`,
+	blue: `color-mix(in srgb, ${MORPH_COLOR_HEX.blue} 55%, #777)`,
+} as const;
 /** Morph limit bar under the toolbar's morph knobs: share of the 25 morphable params used, amber from 20, red at 25. */
 export const MORPH_LIMIT = { track: 'rgba(128, 128, 128, 0.3)', fill: 'rgba(128, 128, 128, 0.8)', warn: '#e0a030', full: MORPH_COLOR_HEX.red } as const;
 /** Morph range sector on a knob assigned to the selected group: morph red, darker (multiplied over the knob). */

@@ -74,18 +74,15 @@
 	import { MAX_MORPHED_PARAMS, useSlotsStore } from '../../store/slots';
 	import { defaultPatchParams, morphGroupName } from '../../store/slotHelpers';
 	import { useSettingsStore } from '../../store/settings';
-	import { NUM_VISIBLE_VARIATIONS } from '../../store/mutator';
 	import { MORPH_LIMIT } from '@/constants/colors';
 	import { useUiStore } from '../../store/ui';
 	import { useSearchReplace } from '../../composables/useSearchReplace';
 	import SearchHit from '../common/SearchHit.vue';
-	import { useDeviceStore } from '../../store/device';
 	import { MORPH_MODE_OPTIONS, MORPH_NAMES } from '../../types/patch';
-	import type { ContextMenuItem } from '../../types';
 	import { useContextMenu } from '../../composables/useContextMenu';
-	import { buildCCMenuItems, useMidiCCOverlay } from '../../composables/useMidiCC';
+	import { useMidiCCOverlay } from '../../composables/useMidiCC';
 	import { parseDragPayload } from '../../utils/dragPayload';
-	import { buildGlobalParamPageMenuItems, buildParamPageMenuItems } from '../../composables/useParamPageAssign';
+	import { buildMorphGroupMenuItems } from '../../composables/useMorphGroupMenu';
 	import { startParamPageDrag } from '../../composables/useParamPageDrag';
 	import { PATCH_MORPH_MODULE_ID } from '../../parser/constants';
 	import { usePatchParams } from '../../composables/usePatchParams';
@@ -93,8 +90,6 @@
 	import { TOOLBAR_HINT, useToolbarValueHint } from '../../composables/useValueHint';
 	import { useShortWindow } from '../../composables/useShortWindow';
 	import ToolBarGroup from './ToolBarGroup.vue';
-
-	const emit = defineEmits<{ morphGroupLabelEdit: [info: { groupIndex: number; currentLabel: string }] }>();
 
 	const slotsStore = useSlotsStore();
 	const uiStore = useUiStore();
@@ -104,7 +99,6 @@
 		const key = `morph:${i}`;
 		return search.currentKey.value === key ? 'current' : search.matchKeys.value.has(key) ? 'match' : null;
 	}
-	const deviceStore = useDeviceStore();
 	const { open: openContextMenu } = useContextMenu();
 	const { showCCOverlay } = useMidiCCOverlay();
 	const { showHint, clearHint } = useStatusHint();
@@ -164,80 +158,12 @@
 	}
 
 	function onGroupContextMenu(groupIndex: number, event: MouseEvent) {
-		const slot = uiStore.slotInFocus;
-		const variation = uiStore.variation;
-		// Variations 1-8 as copy targets: All, then each one (the current one disabled).
-		const toVariations = (groups: number[] | null): ContextMenuItem[] => {
-			const others = Array.from({ length: NUM_VISIBLE_VARIATIONS }, (_, v) => v).filter((v) => v !== variation);
-			return [
-				{ label: 'All', action: () => slotsStore.copyMorphToVariations(slot, variation, groups, others) },
-				{ type: 'separator' },
-				...Array.from({ length: NUM_VISIBLE_VARIATIONS }, (_, v) => ({
-					label: String(v + 1),
-					disabled: v === variation,
-					action: () => slotsStore.copyMorphToVariations(slot, variation, groups, [v]),
-				})),
-			];
-		};
-		const items: ContextMenuItem[] = [
+		openContextMenu(event, [
 			{ label: morphPanelOpen.value ? 'Close Morph Panel' : 'Open Morph Panel', action: () => settingsStore.toggleSidebar('morph') },
 			{ type: 'separator' },
-			{ label: 'Rename…', disabled: !slot, action: () => emit('morphGroupLabelEdit', { groupIndex, currentLabel: displayName(groupIndex) }) },
-			{ label: 'Clear', disabled: !slot, action: () => slot && slotsStore.clearMorphGroup(slot, variation, groupIndex) },
-			// the source buttons are hidden on short windows: choose the source here instead (current one disabled)
-			...(short.value
-				? [
-						{
-							label: `Source: ${MORPH_MODE_OPTIONS[groupIndex][morphMode(groupIndex)]}`,
-							disabled: !slot,
-							children: MORPH_MODE_OPTIONS[groupIndex].map((name, mode) => ({
-								label: name,
-								disabled: mode === morphMode(groupIndex),
-								action: () => onModeChange(groupIndex, mode),
-							})),
-						},
-					]
-				: []),
-			{
-				label: 'Copy To',
-				disabled: !slot,
-				children: MORPH_NAMES.map((n, j) => ({
-					label: `Group ${j + 1} (${n})`,
-					disabled: j === groupIndex,
-					action: () => slot && slotsStore.copyMorphGroup(slot, variation, groupIndex, j),
-				})),
-			},
-			{ label: 'Copy to Variations', disabled: !slot, children: toVariations([groupIndex]) },
-			{ label: 'Copy all to Variations', disabled: !slot, children: toVariations(null) },
-			{ type: 'separator' },
-		];
-
-		const lastCC = deviceStore.lastMidiCC;
-		const existing = slot ? slotsStore.slots[slot].controllers.find((c) => c.location === 2 && c.paramIndex === groupIndex) : undefined;
-		items.push(
-			...buildCCMenuItems({
-				lastCC,
-				existing,
-				slot,
-				onAssign: (cc) => slot && slotsStore.assignMidiCC(slot, 2, 1, groupIndex, cc),
-				onDeassign: () => slot && existing && slotsStore.deassignMidiCC(slot, existing.cc),
-			}),
-		);
-
-		// Parameter Pages / Global Parameter Pages knob assign/deassign, same menus as a canvas param
-		// (Module.vue). A Morph Group is param `groupIndex` of the PATCH_MORPH pseudo-module (location 2).
-		const isThisGroup = (k: { location: number; moduleIndex: number; paramIndex: number }) =>
-			k.location === 2 && k.moduleIndex === PATCH_MORPH_MODULE_ID && k.paramIndex === groupIndex;
-		const target = { slot, location: 2 as const, moduleIndex: PATCH_MORPH_MODULE_ID, paramIndex: groupIndex };
-		items.push({ type: 'separator' });
-		items.push(...buildParamPageMenuItems({ ...target, existing: slot ? slotsStore.slots[slot].paramPages.find(isThisGroup) : undefined }));
-		items.push(
-			...buildGlobalParamPageMenuItems({
-				...target,
-				existing: slot ? slotsStore.globalParamPages.find((k) => k.slot === slot && isThisGroup(k)) : undefined,
-			}),
-		);
-		openContextMenu(event, items);
+			// the source buttons are hidden on short windows: choose the source in the menu instead
+			...buildMorphGroupMenuItems(groupIndex, { source: short.value }),
+		]);
 	}
 
 	// Alt+drag a Morph knob onto a Parameter Pages toolbar knob to assign it — the same gesture (and

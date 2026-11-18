@@ -2,7 +2,10 @@ import { onUnmounted } from 'vue';
 
 export type SpinnerType = 'KnobSpin' | 'KnobSpinH' | 'KnobSpinV' | 'KnobSlider';
 
-export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void) {
+export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number, getValue: () => number, onChange: (index: number, value: number) => void,
+	min = 0,
+	max = 127,
+) {
 	const STEP = 1;
 	const INITIAL_DELAY = 300;
 	const REPEAT_INTERVAL = 50;
@@ -24,7 +27,7 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 	function startRepeat(direction: 1 | -1) {
 		intervalId = setInterval(() => {
 			const value = getValue();
-			const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
+			const newValue = direction === 1 ? Math.min(max, value + STEP) : Math.max(min, value - STEP);
 			onChange(paramIndex, newValue);
 		}, REPEAT_INTERVAL);
 	}
@@ -49,7 +52,7 @@ export function useSpinnerHoldInteraction(type: SpinnerType, paramIndex: number,
 		}
 
 		const value = getValue();
-		const newValue = direction === 1 ? Math.min(127, value + STEP) : Math.max(0, value - STEP);
+		const newValue = direction === 1 ? Math.min(max, value + STEP) : Math.max(min, value - STEP);
 		onChange(paramIndex, newValue);
 
 		timeoutId = setTimeout(() => {

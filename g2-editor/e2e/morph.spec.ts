@@ -59,10 +59,12 @@ test.describe('morph assign', () => {
 		await expect(rows).toHaveCount(1);
 		await expect(rows.first()).toContainText('VA');
 
-		// Filter on another group hides it, All shows it again
+		// Turning its group off hides it, turning it on shows it again; other groups don't matter
 		await pane.getByTestId('morph-filter-1').click();
+		await expect(rows).toHaveCount(1);
+		await pane.getByTestId('morph-filter-0').click();
 		await expect(rows).toHaveCount(0);
-		await pane.getByTestId('morph-filter-all').click();
+		await pane.getByTestId('morph-filter-0').click();
 		await expect(rows).toHaveCount(1);
 
 		// A row click selects its module on the canvas
