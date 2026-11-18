@@ -10,11 +10,10 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ### New
 - Bar below MorphGroups shows how many morphs are assigned, click on it to show the Morph SidePanel
-- Morph SidePanel shows all assigned Morphs
+- Morph SidePanel: shows all morph assigments, and edit them in place
 - Copy Morph Groups (or All) to other Variations
 - Block non morphable assignments
 - Ctrl/Cmd-click on a knob, slider or NoteSeq step assigns a Morph from the current value to the clicked position, instead of always the full range
-- Morph SidePanel: shows all morph assigments, and edit them in place
 
 ### Changed
 - Buttons that have Morph assigned now are colored fully instead of only a small line.
@@ -22,7 +21,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Fixed:
 - fix #21: NoteSeq should show note names when hovering over step value
 - cli fix: accept bank location 128 in select-patch / select-perf
-- fix: SidePanels opened slow, not instant
+- fix: SidePanels opened slow, now instant
 - fix #30: Disk browser could not go up a folder on Windows (and showed the full path)
 - fix: Saving name from New/Init patch had wrong name (Bug described in [bonedo.de](https://www.bonedo.de/artikel/nord-modular-g2-open-source-projekt-bringt-den-editor-zurueck/) article)
 - fix: with hover focus, Cmd/Ctrl+Enter (assign Morph), Cmd/Ctrl+Up/Down (Morph range) and L (MIDI Learn) used the last selected param instead of the hovered one
