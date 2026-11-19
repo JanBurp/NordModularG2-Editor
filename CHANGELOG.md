@@ -8,6 +8,8 @@ Versions follow [Semantic Versioning](https://semver.org/).
 
 ## [Unreleased]
 
+## [0.8.3] - 2026-11-19
+
 ### New
 - Bar below MorphGroups shows how many morphs are assigned, click on it to show the Morph SidePanel
 - Morph SidePanel: shows all morph assigments, and edit them in place
@@ -18,7 +20,7 @@ Versions follow [Semantic Versioning](https://semver.org/).
 ### Changed
 - Buttons that have Morph assigned now are colored fully instead of only a small line.
 
-### Fixed:
+### Fixed
 - fix #21: NoteSeq should show note names when hovering over step value
 - cli fix: accept bank location 128 in select-patch / select-perf
 - fix: SidePanels opened slow, now instant
